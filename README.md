@@ -126,18 +126,18 @@ multi-service-marketplace/
 
 ## 🏗 Development Stages & Timeline
 
-| Phase                    | Description                        | Duration    | Cost (₦)      |
-| ------------------------ | ---------------------------------- | ----------- | ------------- |
-| 1. Planning & Wireframes | Requirements, flow mapping         | 1 week      | 150,000       |
-| 2. UI/UX Design          | Mockups and design system          | 1 week      | 200,000       |
-| 3. Frontend Development  | Expo and Next.js apps              | 3 weeks     | 600,000       |
-| 4. Backend Development   | NestJS, DB, APIs, payments         | 2 weeks     | 400,000       |
-| 5. Integrations          | Maps, Paystack, Firebase, AWS      | -           | 150,000       |
-| 6. Testing & QA          | Functional and performance tests   | 1 week      | 150,000       |
-| 7. Deployment            | Play Store, App Store, AWS, Vercel | 1 week      | 100,000       |
-| 8. Documentation         | Reports, docs, management          | -           | 100,000       |
-| 9. Designer Fee          | External designer                  | -           | 150,000       |
-| **Total**                |                                    | **8 weeks** | **2,000,000** |
+| Phase                    | Description                        | Duration    |
+| ------------------------ | ---------------------------------- | ----------- |
+| 1. Planning & Wireframes | Requirements, flow mapping         | 1 week      |
+| 2. UI/UX Design          | Mockups and design system          | 1 week      |
+| 3. Frontend Development  | Expo and Next.js apps              | 3 weeks     |
+| 4. Backend Development   | NestJS, DB, APIs, payments         | 2 weeks     |
+| 5. Integrations          | Maps, Paystack, Firebase, AWS      | -           |
+| 6. Testing & QA          | Functional and performance tests   | 1 week      |
+| 7. Deployment            | Play Store, App Store, AWS, Vercel | 1 week      |
+| 8. Documentation         | Reports, docs, management          | -           |
+| 9. Designer Fee          | External designer                  | -           |
+| **Total**                |                                    | **8 weeks** |
 
 ---
 
