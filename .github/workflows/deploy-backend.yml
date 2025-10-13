@@ -1,0 +1,44 @@
+name: Deploy Backend
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'backend/**'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Build backend
+        run: cd backend && yarn build
+
+      - name: Deploy to AWS
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+        run: |
+          cd backend
+          zip -r deploy.zip .
+          aws s3 cp deploy.zip s3://your-deploy-bucket/
+          aws elasticbeanstalk create-application-version \
+            --application-name your-backend-app \
+            --version-label v${{ github.run_number }} \
+            --source-bundle S3Bucket=your-deploy-bucket,S3Key=deploy.zip
+          aws elasticbeanstalk update-environment \
+            --environment-name your-env-name \
+            --version-label v${{ github.run_number }}

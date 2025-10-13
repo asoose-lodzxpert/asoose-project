@@ -1,135 +1,280 @@
-# Turborepo starter
+# Multi-Service Marketplace: Delivery & Ride Booking System
 
-This Turborepo starter is maintained by the Turborepo core team.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![NestJS](https://img.shields.io/badge/NestJS-%23E0234E.svg?&style=for-the-badge&logo=nestjs&logoColor=white)](https://nestjs.com/)
+[![React Native](https://img.shields.io/badge/React_Native-20232A?style=for-the-badge&logo=react-native&logoColor=61DAFB)](https://reactnative.dev/)
+[![Next.js](https://img.shields.io/badge/next.js-000000?style=for-the-badge&logo=nextdotjs&logoColor=white)](https://nextjs.org/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-316192?style=for-the-badge&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 
-## Using this example
+A full multi-service marketplace connecting customers, vendors, and riders.
+It supports food, groceries, and general goods delivery, plus ride bookings.
+Includes three mobile apps, two web apps, and one backend API.
 
-Run the following command:
+Built for scalability, speed, and maintainability.
 
-```sh
-npx create-turbo@latest
-```
+---
 
-## What's inside?
+## 🚀 Features
 
-This Turborepo includes the following packages/apps:
+### Mobile Applications (Expo)
 
-### Apps and Packages
+#### Customer App
 
-- `docs`: a [Next.js](https://nextjs.org/) app
-- `web`: another [Next.js](https://nextjs.org/) app
-- `@repo/ui`: a stub React component library shared by both `web` and `docs` applications
-- `@repo/eslint-config`: `eslint` configurations (includes `eslint-config-next` and `eslint-config-prettier`)
-- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
+- Authentication via email, phone, or social login
+- Location-based vendor discovery
+- Menu browsing and filtering
+- Cart, checkout, and multiple payment options (Paystack)
+- Real-time order tracking and ride booking
+- Push notifications and order history
+- Ratings, reviews, and profile management
 
-Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
+#### Vendor App
 
-### Utilities
+- Authentication and verification
+- Store setup and management
+- Product and order management
+- Sales analytics dashboard
+- Withdrawals and notifications
 
-This Turborepo has some additional tools already setup for you:
+#### Rider App
 
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-- [ESLint](https://eslint.org/) for code linting
-- [Prettier](https://prettier.io) for code formatting
+- Authentication and onboarding
+- Live order and ride assignments
+- Navigation with optimized routing
+- Trip summaries and earnings
+- Online/offline status and notifications
 
-### Build
+### Web Applications (Next.js)
 
-To build all apps and packages, run the following command:
+#### Customer Web App
 
-```
-cd my-turborepo
+- All key features of the customer mobile app
+- Fully responsive
 
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo build
+#### Customer Care Web App
 
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo build
-yarn dlx turbo build
-pnpm exec turbo build
-```
+- Manage customers, vendors, and riders
+- Handle orders, disputes, and withdrawals
+- Approve new vendors and riders
+- View analytics and reports
+- Manage categories and products
 
-You can build a specific package by using a [filter](https://turborepo.com/docs/crafting-your-repository/running-tasks#using-filters):
+### Integrations
 
-```
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo build --filter=docs
+- Google Maps for geolocation and routing
+- Firebase Cloud Messaging for push notifications
+- Paystack for secure payments and withdrawals
+- Termii SMS for delivery and ride updates
+- WebSockets (Socket.io) for real-time data sync
 
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo build --filter=docs
-yarn exec turbo build --filter=docs
-pnpm exec turbo build --filter=docs
-```
+---
 
-### Develop
+## 🛠 Technology Stack
 
-To develop all apps and packages, run the following command:
+- **Mobile**: React Native (Expo)
+- **Web**: Next.js
+- **Backend**: NestJS
+- **Database**: PostgreSQL (AWS RDS)
+- **Storage**: AWS S3
+- **Hosting**:
+  - Backend on AWS EC2
+  - Web apps on Vercel
 
-```
-cd my-turborepo
+- **Payments**: Paystack
+- **Real-time**: Socket.io
+- **Queueing**: Bull (Redis)
+- **Security**: JWT, RBAC, bcrypt, AES-256 encryption
 
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo dev
+---
 
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo dev
-yarn exec turbo dev
-pnpm exec turbo dev
-```
-
-You can develop a specific package by using a [filter](https://turborepo.com/docs/crafting-your-repository/running-tasks#using-filters):
-
-```
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo dev --filter=web
-
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo dev --filter=web
-yarn exec turbo dev --filter=web
-pnpm exec turbo dev --filter=web
-```
-
-### Remote Caching
-
-> [!TIP]
-> Vercel Remote Cache is free for all plans. Get started today at [vercel.com](https://vercel.com/signup?/signup?utm_source=remote-cache-sdk&utm_campaign=free_remote_cache).
-
-Turborepo can use a technique known as [Remote Caching](https://turborepo.com/docs/core-concepts/remote-caching) to share cache artifacts across machines, enabling you to share build caches with your team and CI/CD pipelines.
-
-By default, Turborepo will cache locally. To enable Remote Caching you will need an account with Vercel. If you don't have an account you can [create one](https://vercel.com/signup?utm_source=turborepo-examples), then enter the following commands:
+## 📁 Folder Structure
 
 ```
-cd my-turborepo
-
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo login
-
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo login
-yarn exec turbo login
-pnpm exec turbo login
+multi-service-marketplace/
+│
+├── apps/
+│   ├── vendor-app/           # Vendor mobile app (Expo)
+│   ├── customer-app/         # Customer mobile app (Expo)
+│   └── rider-app/            # Rider mobile app (Expo)
+│
+├── web/
+│   ├── customer-web-app/     # Customer web app (Next.js)
+│   └── customer-care-app/    # Customer support/admin web app (Next.js)
+│
+├── backend/                  # NestJS backend
+│   ├── src/
+│   │   ├── auth/
+│   │   ├── users/
+│   │   ├── orders/
+│   │   ├── vendors/
+│   │   ├── riders/
+│   │   ├── payments/
+│   │   ├── admin/
+│   │   └── notifications/
+│   ├── migrations/
+│   └── package.json
+│
+├── .github/
+│   └── workflows/            # CI/CD for web and backend
+│
+├── turbo.json
+├── package.json
+└── yarn.lock
 ```
 
-This will authenticate the Turborepo CLI with your [Vercel account](https://vercel.com/docs/concepts/personal-accounts/overview).
+---
 
-Next, you can link your Turborepo to your Remote Cache by running the following command from the root of your Turborepo:
+## 🏗 Development Stages & Timeline
 
-```
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo link
+| Phase                    | Description                        | Duration    | Cost (₦)      |
+| ------------------------ | ---------------------------------- | ----------- | ------------- |
+| 1. Planning & Wireframes | Requirements, flow mapping         | 1 week      | 150,000       |
+| 2. UI/UX Design          | Mockups and design system          | 1 week      | 200,000       |
+| 3. Frontend Development  | Expo and Next.js apps              | 3 weeks     | 600,000       |
+| 4. Backend Development   | NestJS, DB, APIs, payments         | 2 weeks     | 400,000       |
+| 5. Integrations          | Maps, Paystack, Firebase, AWS      | -           | 150,000       |
+| 6. Testing & QA          | Functional and performance tests   | 1 week      | 150,000       |
+| 7. Deployment            | Play Store, App Store, AWS, Vercel | 1 week      | 100,000       |
+| 8. Documentation         | Reports, docs, management          | -           | 100,000       |
+| 9. Designer Fee          | External designer                  | -           | 150,000       |
+| **Total**                |                                    | **8 weeks** | **2,000,000** |
 
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo link
-yarn exec turbo link
-pnpm exec turbo link
-```
+---
 
-## Useful Links
+## 👥 Team
 
-Learn more about the power of Turborepo:
+**Enoch (Full-stack Developer)**
 
-- [Tasks](https://turborepo.com/docs/crafting-your-repository/running-tasks)
-- [Caching](https://turborepo.com/docs/crafting-your-repository/caching)
-- [Remote Caching](https://turborepo.com/docs/core-concepts/remote-caching)
-- [Filtering](https://turborepo.com/docs/crafting-your-repository/running-tasks#using-filters)
-- [Configuration Options](https://turborepo.com/docs/reference/configuration)
-- [CLI Usage](https://turborepo.com/docs/reference/command-line-reference)
+- Backend (NestJS)
+- Database and API design
+- Integrations and deployment
+- Admin web app
+
+**Paul (Frontend Developer)**
+
+- React Native (Expo) apps
+- Next.js web apps
+- API integration and performance
+
+**UI/UX Designer**
+
+- Wireframes and mockups
+- Design system
+
+---
+
+## 🔒 Security
+
+### Backend
+
+- JWT and RBAC for access control
+- Bcrypt password hashing
+- Input validation and sanitization
+- HTTPS-only and CORS restrictions
+- AES-256 encryption for sensitive data
+- Logs and alerts for suspicious activity
+- Paystack integration with PCI compliance
+- AWS RDS restricted access and encrypted backups
+
+### Frontend
+
+- Secure token storage
+- HttpOnly cookies and SSL pinning
+- Session timeouts and forced logouts
+- Input sanitization and XSS protection
+
+### Infrastructure
+
+- AWS VPC and IAM least-privilege
+- HTTPS enforced everywhere
+- DDoS and WAF protection
+- MFA for admin dashboard
+- Version-controlled deployments
+
+### Maintenance
+
+- Monthly OWASP scans
+- Dependency audits
+- Access log reviews
+- Scheduled code reviews
+
+---
+
+## 📦 Deliverables
+
+- Three Expo apps (Customer, Vendor, Rider)
+- Two Next.js web apps (Customer, Customer Care)
+- One NestJS backend
+- PostgreSQL database
+- Full technical documentation
+- Production deployment
+
+---
+
+## 🛠 Quick Start (Development)
+
+1. **Clone**
+
+   ```
+   git clone https://github.com/yourusername/multi-service-marketplace.git
+   cd multi-service-marketplace
+   ```
+
+2. **Install dependencies**
+
+   ```
+   yarn install
+   ```
+
+3. **Backend**
+
+   ```
+   cd backend
+   cp .env.example .env
+   yarn migration:run
+   yarn start:dev
+   ```
+
+4. **Mobile (Example: Customer App)**
+
+   ```
+   cd ../apps/customer-app
+   yarn
+   yarn start
+   ```
+
+5. **Web (Example: Customer Web App)**
+
+   ```
+   cd ../../web/customer-web-app
+   yarn
+   yarn dev
+   ```
+
+---
+
+## 🤝 Contributing
+
+1. Fork the repo
+2. Create a branch (`git checkout -b feature/feature-name`)
+3. Commit (`git commit -m "Add new feature"`)
+4. Push (`git push origin feature/feature-name`)
+5. Create a Pull Request
+
+---
+
+## 📄 License
+
+Licensed under MIT. See [LICENSE](LICENSE).
+
+---
+
+## 📞 Support
+
+- Two months post-deployment support
+- Optional maintenance available
+- Contact: [paul@example.com](mailto:paul@example.com) | [mail@enochphilip.site](mailto:mail@enochphilip.site)
+
+---
+
+_Project completed October 13, 2025. Maintained by Paul & Enoch._

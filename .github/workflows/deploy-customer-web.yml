@@ -1,0 +1,37 @@
+name: Deploy Customer Web App
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'web/customer-web-app/**'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Build
+        run: cd web/customer-web-app && yarn build
+
+      - name: Deploy to Vercel
+        run: |
+          cd web/customer-web-app
+          npx vercel --token=$VERCEL_TOKEN --scope=$VERCEL_ORG_ID --prod --yes \
+            --confirm --project=$VERCEL_PROJECT_ID_CUSTOMER_WEB
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID_CUSTOMER_WEB: ${{ secrets.VERCEL_PROJECT_ID_CUSTOMER_WEB }}
