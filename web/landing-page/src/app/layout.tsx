@@ -16,7 +16,7 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://asoose.com"),
 
   title: {
-    default: "Asoose — Movement, Delivery & Access",
+    default: "Asoose - Movement, Delivery & Access",
     template: "%s | Asoose",
   },
 
