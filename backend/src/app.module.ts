@@ -22,7 +22,6 @@ import { RedisModule } from './libs/redis/redis.module';
     useClass: StrictThrottlerGuard,
   },],
 })
-export class AppModule {}
 
 export class AppModule {
   configure(consumer: MiddlewareConsumer) {
