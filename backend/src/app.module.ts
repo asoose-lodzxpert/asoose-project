@@ -4,15 +4,17 @@ import { AppService } from './app.service';
 import { CorrelationMiddleware } from './libs/logger/correlation.middleware';
 import { APP_GUARD } from '@nestjs/core';
 import { StrictThrottlerGuard } from './libs/rate-limit/strict-throttle.guard';
+import { PrismaModule } from './prisma/prisma.module';
 
 @Module({
-  imports: [],
+  imports: [PrismaModule],
   controllers: [AppController],
   providers: [AppService, {
     provide: APP_GUARD,
     useClass: StrictThrottlerGuard,
   },],
 })
+
 export class AppModule {
   configure(consumer: MiddlewareConsumer) {
     consumer.apply(CorrelationMiddleware).forRoutes('*');
