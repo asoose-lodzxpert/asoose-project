@@ -4,9 +4,10 @@ import { AppService } from './app.service';
 import { CorrelationMiddleware } from './libs/logger/correlation.middleware';
 import { APP_GUARD } from '@nestjs/core';
 import { StrictThrottlerGuard } from './libs/rate-limit/strict-throttle.guard';
+import { RedisModule } from './libs/redis/redis.module';
 
 @Module({
-  imports: [],
+  imports: [RedisModule],
   controllers: [AppController],
   providers: [AppService, {
     provide: APP_GUARD,
