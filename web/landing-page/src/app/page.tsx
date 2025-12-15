@@ -5,6 +5,8 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 
+// Trick comment
+
 function App() {
   const [isDark, setIsDark] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
