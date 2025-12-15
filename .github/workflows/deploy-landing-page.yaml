@@ -25,19 +25,19 @@ jobs:
       # Step 3: Install dependencies
       - name: Install dependencies
         run: |
-          cd landing-page
+          cd web/landing-page
           yarn install --frozen-lockfile
 
       # Step 4: Build the project
       - name: Build
         run: |
-          cd landing-page
+          cd web/landing-page
           yarn build
 
       # Step 5: Deploy to Vercel
       - name: Deploy to Vercel
         run: |
-          cd landing-page
+          cd web/landing-page
           npx vercel --token=$VERCEL_TOKEN --scope=$VERCEL_ORG_ID --prod --yes --confirm --project=$VERCEL_PROJECT_ID
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
