@@ -38,7 +38,8 @@ jobs:
       - name: Deploy to Vercel
         run: |
           cd web/landing-page
-          npx vercel --token=$VERCEL_TOKEN --scope=$VERCEL_ORG_ID --prod --yes --confirm --project=$VERCEL_PROJECT_ID
+          npx vercel --token=$VERCEL_TOKEN --scope=$VERCEL_ORG_ID --prod --yes
+
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}

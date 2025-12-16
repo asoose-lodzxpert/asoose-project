@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "name": "asoose-project-garh",
+  "builds": [
+    { "src": "package.json", "use": "@vercel/next" }
+  ],
+  "routes": [
+    { "src": "/(.*)", "dest": "/" }
+  ]
+}
