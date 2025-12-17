@@ -160,7 +160,10 @@ export default function LoginScreen() {
                   <ThemedText style={styles.inputError}>{error}</ThemedText>
                 ) : null}
 
-                <Pressable style={styles.forgot}>
+                <Pressable
+                  style={styles.forgot}
+                  onPress={() => router.push("/(auth)/resetpassword")}
+                >
                   <ThemedText type="link">Forgot password?</ThemedText>
                 </Pressable>
 

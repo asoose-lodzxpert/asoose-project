@@ -1,116 +1,237 @@
-import { Image } from 'expo-image';
-import { Platform, Pressable, StyleSheet } from 'react-native';
+import React, { useState } from "react";
+import {
+  View,
+  StyleSheet,
+  Pressable,
+  Image,
+  ScrollView,
+  Text,
+} from "react-native";
+import * as ImagePicker from "expo-image-picker";
+import { useRouter } from "expo-router";
+import { ThemedText } from "@/components/themed-text";
+import { IconSymbol } from "@/components/ui/icon-symbol";
+import { useThemeColor } from "@/hooks/use-theme-color";
+import { ThemedView } from "@/components/themed-view";
 
-import { Collapsible } from '@/components/ui/collapsible';
-import { ExternalLink } from '@/components/external-link';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Fonts } from '@/constants/theme';
-import { useAuth } from '@/context/AuthContext';
+type AllowedRoute =
+  | "/(main)/(profile)/edit"
+  | "/(auth)/resetpassword"
+  | "/(main)/(profile)/notifications"
+  | "/(main)/(profile)/support"
+  | "/(main)/(profile)/terms"
+  | "/(main)/(profile)/privacy";
 
-export default function TabTwoScreen() {
-  const {signOut} = useAuth()
+interface SettingItem {
+  label: string;
+  route: AllowedRoute;
+}
+
+const SETTINGS: SettingItem[] = [
+  { label: "Edit business profile", route: "/(main)/(profile)/edit" },
+  { label: "Change password", route: "/(auth)/resetpassword" },
+  {
+    label: "Notification preferences",
+    route: "/(main)/(profile)/notifications",
+  },
+  { label: "Support and help", route: "/(main)/(profile)/support" },
+  { label: "Terms of service", route: "/(main)/(profile)/terms" },
+  { label: "Privacy policy", route: "/(main)/(profile)/privacy" },
+];
+
+type VendorStatus = "pending" | "approved" | "suspended";
+
+interface ProfileData {
+  profilePicture?: string;
+  businessName: string;
+  shopName: string;
+  status: VendorStatus;
+}
+
+const DUMMY_PROFILE: ProfileData = {
+  profilePicture: "",
+  businessName: "Asoose",
+  shopName: "Asoose Shop",
+  status: "approved",
+};
+
+export default function ProfileScreen() {
+  const router = useRouter();
+  const primary = useThemeColor({}, "brandPrimary");
+  const textOnPrimary = useThemeColor({}, "textOnPrimary");
+
+  const [profile, setProfile] = useState<ProfileData>(DUMMY_PROFILE);
+
+  const pickImage = async () => {
+    const permissionResult =
+      await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permissionResult.granted)
+      return alert("Permission required to access photos");
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 1,
+    });
+
+    if (!result.canceled && result.assets.length > 0) {
+      setProfile((prev) => ({ ...prev, profilePicture: result.assets[0].uri }));
+    }
+  };
+
+  const getStatusColor = (status: VendorStatus) => {
+    switch (status) {
+      case "pending":
+        return useThemeColor({}, "statusPending");
+      case "approved":
+        return useThemeColor({}, "statusSuccess");
+      case "suspended":
+        return useThemeColor({}, "statusError");
+    }
+  };
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#D0D0D0', dark: '#353636' }}
-      headerImage={
-        <IconSymbol
-          size={310}
-          color="#808080"
-          name="chevron.left.forwardslash.chevron.right"
-          style={styles.headerImage}
-        />
-      }>
+    <ThemedView style={{ flex: 1 }}>
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ padding: 24, gap: 24 }}
+      >
+        {/* Profile Card */}
+        <View
+          style={[
+            styles.card,
+            { backgroundColor: useThemeColor({}, "surfaceCard") },
+          ]}
+        >
+          <View style={{ position: "relative", alignSelf: "center" }}>
+            <Image
+              source={
+                profile.profilePicture
+                  ? { uri: profile.profilePicture }
+                  : require("@/assets/default-avatar.png")
+              }
+              style={styles.avatar}
+            />
+            <Pressable style={styles.editOverlay} onPress={pickImage}>
+              <IconSymbol name="camera.fill" size={20} color="#fff" />
+            </Pressable>
+          </View>
 
-        <Pressable onPress={() => signOut()}> <ThemedText>Sign Out</ThemedText> </Pressable>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText
-          type="title"
-          style={{
-            fontFamily: Fonts.rounded,
-          }}>
-          Explore
-        </ThemedText>
-      </ThemedView>
-      <ThemedText>This app includes example code to help you get started.</ThemedText>
-      <Collapsible title="File-based routing">
-        <ThemedText>
-          This app has two screens:{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/explore.tsx</ThemedText>
-        </ThemedText>
-        <ThemedText>
-          The layout file in <ThemedText type="defaultSemiBold">app/(tabs)/_layout.tsx</ThemedText>{' '}
-          sets up the tab navigator.
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/router/introduction">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Android, iOS, and web support">
-        <ThemedText>
-          You can open this project on Android, iOS, and the web. To open the web version, press{' '}
-          <ThemedText type="defaultSemiBold">w</ThemedText> in the terminal running this project.
-        </ThemedText>
-      </Collapsible>
-      <Collapsible title="Images">
-        <ThemedText>
-          For static images, you can use the <ThemedText type="defaultSemiBold">@2x</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">@3x</ThemedText> suffixes to provide files for
-          different screen densities
-        </ThemedText>
-        <Image
-          source={require('@/assets/images/icon.png')}
-          style={{ width: 100, height: 100, alignSelf: 'center' }}
-        />
-        <ExternalLink href="https://reactnative.dev/docs/images">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Light and dark mode components">
-        <ThemedText>
-          This template has light and dark mode support. The{' '}
-          <ThemedText type="defaultSemiBold">useColorScheme()</ThemedText> hook lets you inspect
-          what the user&apos;s current color scheme is, and so you can adjust UI colors accordingly.
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/develop/user-interface/color-themes/">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Animations">
-        <ThemedText>
-          This template includes an example of an animated component. The{' '}
-          <ThemedText type="defaultSemiBold">components/HelloWave.tsx</ThemedText> component uses
-          the powerful{' '}
-          <ThemedText type="defaultSemiBold" style={{ fontFamily: Fonts.mono }}>
-            react-native-reanimated
-          </ThemedText>{' '}
-          library to create a waving hand animation.
-        </ThemedText>
-        {Platform.select({
-          ios: (
-            <ThemedText>
-              The <ThemedText type="defaultSemiBold">components/ParallaxScrollView.tsx</ThemedText>{' '}
-              component provides a parallax effect for the header image.
+          <ThemedText type="defaultSemiBold" style={styles.centerText}>
+            {profile.businessName}
+          </ThemedText>
+          <ThemedText style={styles.centerText}>{profile.shopName}</ThemedText>
+
+          <View
+            style={[
+              styles.statusBadge,
+              { backgroundColor: getStatusColor(profile.status) },
+            ]}
+          >
+            <ThemedText type="defaultSemiBold" style={{ color: textOnPrimary }}>
+              {profile.status === "approved"
+                ? "Approved Vendor"
+                : profile.status.charAt(0).toUpperCase() +
+                  profile.status.slice(1)}
             </ThemedText>
-          ),
-        })}
-      </Collapsible>
-    </ParallaxScrollView>
+          </View>
+        </View>
+
+        {/* Account Settings Title */}
+        <ThemedText type="subtitle">Account Settings</ThemedText>
+
+        {/* Account Settings Card */}
+        <View
+          style={[
+            styles.card,
+            { backgroundColor: useThemeColor({}, "surfaceCard") },
+          ]}
+        >
+          {SETTINGS.map((s, idx) => (
+            <Pressable
+              key={s.label}
+              style={[
+                styles.settingRow,
+                idx === SETTINGS.length - 1 && { borderBottomWidth: 0 },
+              ]}
+              onPress={() => router.push(s.route)}
+            >
+              <ThemedText>{s.label}</ThemedText>
+              <IconSymbol name="chevron.right" size={18} color={primary} />
+            </Pressable>
+          ))}
+        </View>
+
+        {/* Logout Button */}
+        <Pressable
+          style={[
+            styles.logoutButton,
+            { borderColor: useThemeColor({}, "statusError") },
+          ]}
+        >
+          <ThemedText style={{ color: useThemeColor({}, "statusError") }}>
+            Logout
+          </ThemedText>
+        </Pressable>
+
+        <Text style={styles.copyright}>
+          {profile.businessName} © Asoose Lodzexprt Nig Ltd
+        </Text>
+      </ScrollView>
+    </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
-  headerImage: {
-    color: '#808080',
-    bottom: -90,
-    left: -35,
-    position: 'absolute',
+  card: {
+    borderRadius: 8,
+    padding: 16,
+    gap: 12,
+    shadowColor: "#000",
+    shadowOpacity: 0.03,
+    shadowRadius: 2,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 1,
   },
-  titleContainer: {
-    flexDirection: 'row',
-    gap: 8,
+  avatar: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+  },
+  editOverlay: {
+    position: "absolute",
+    bottom: 0,
+    right: 0,
+    backgroundColor: "#000",
+    padding: 6,
+    borderRadius: 16,
+  },
+  centerText: {
+    textAlign: "center",
+  },
+  statusBadge: {
+    alignSelf: "center",
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    marginTop: 8,
+  },
+  settingRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  logoutButton: {
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: "center",
+  },
+  copyright: {
+    textAlign: "center",
+    marginTop: 16,
+    color: "#9CA3AF",
   },
 });

@@ -12,6 +12,7 @@ export type IconSymbolName =
   | "paperplane.fill"
   | "chevron.left.forwardslash.chevron.right"
   | "chevron.right"
+  | "chevron.left"
   | "info.circle"
   | "cloud.upload"
   | "camera.fill"
@@ -21,7 +22,8 @@ export type IconSymbolName =
   | "location.fill"
   | "arrow.up.left.and.arrow.down.right"
   | "xmark"
-  | "map.fill";
+  | "map.fill"
+  | "lock.fill";
 
 export const MAPPING: Record<
   IconSymbolName,
@@ -37,6 +39,7 @@ export const MAPPING: Record<
   "paperplane.fill": "send",
   "chevron.left.forwardslash.chevron.right": "code",
   "chevron.right": "chevron-right",
+  "chevron.left": "chevron-left",
   "info.circle": "info",
   "cloud.upload": "cloud-upload",
   "camera.fill": "photo-camera",
@@ -47,6 +50,7 @@ export const MAPPING: Record<
   "arrow.up.left.and.arrow.down.right": "fullscreen",
   xmark: "close",
   "map.fill": "map",
+  "lock.fill": "lock",
 };
 
 interface IconSymbolProps {
