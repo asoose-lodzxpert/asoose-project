@@ -1,0 +1,46 @@
+name: Deploy Landing Page
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'web/landing-page/**'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Checkout the repo
+      - uses: actions/checkout@v4
+
+      # Step 2: Setup Node.js
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+
+      # Step 3: Install dependencies
+      - name: Install dependencies
+        run: |
+          cd web/landing-page
+          yarn install --frozen-lockfile
+
+      # Step 4: Build the project
+      - name: Build
+        run: |
+          cd web/landing-page
+          yarn build
+
+      # Step 5: Deploy to Vercel
+      - name: Deploy to Vercel
+        run: |
+          cd web/landing-page
+          npx vercel --token=$VERCEL_TOKEN --scope=$VERCEL_ORG_ID --prod --yes
+
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_LANDING_PROJECT_ID }}

@@ -1,0 +1,4 @@
+# Authorized Digital Sellers for Asoose
+google.com, pub-0000000000000000, DIRECT, f08c47fec0942fa0
+appnexus.com, 1234, RESELLER, 5ab12345
+# Add more ad networks as needed

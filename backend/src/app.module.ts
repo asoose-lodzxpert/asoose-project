@@ -6,6 +6,8 @@ import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { ConfigModule } from '@nestjs/config';
 import { UsersModule } from './users/users.module';
+import { APP_GUARD } from '@nestjs/core';
+import { StrictThrottlerGuard } from './libs/rate-limit/strict-throttle.guard';
 
 // Assuming StrictThrottlerGuard is your custom guard or the ThrottlerGuard
 import { StrictThrottlerGuard } from './auth/guards/strict-throttler.guard'; 
