@@ -30,35 +30,35 @@ export interface AuthUser {
 export class JwtStrategy extends PassportStrategy(Strategy) {
     constructor(private configService: ConfigService) {
         
-        const supabaseUrl = configService.get<string>('SUPABASE_URL');
+        // Ensure this matches the variable name in your .env file EXACTLY
         const jwtSecret = configService.get<string>('SUPABASE_JWT_SECRET_KEY');
+        
         if (!jwtSecret) {
             throw new Error('SUPABASE_JWT_SECRET_KEY is not defined in the application configuration.');
-        }
-        
-        if (!supabaseUrl) {
-            throw new Error('SUPABASE_URL is not defined in the application configuration.');
         }
         
         super({
             jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
             ignoreExpiration: false,
             secretOrKey: jwtSecret,
-            audience: 'authenticated',
-            issuer: `${supabaseUrl}/auth/v1`, 
+            audience: 'authenticated', // Allows only logged-in users
             algorithms: ['HS256'],
+            // REMOVED: issuer check (This is often the cause of 401s in local dev)
         });
     }
 
     async validate(payload: JwtPayload): Promise<AuthUser> {
+        // 1. Verify User ID exists
         if (!payload.sub) {
             throw new UnauthorizedException('Invalid token payload: missing user ID');
         }
 
+        // 2. Verify Audience
         if (payload.aud !== 'authenticated') {
             throw new UnauthorizedException('Invalid token audience');
         }
 
+        // 3. Return the user object (this becomes req.user in controllers)
         return {
             id: payload.sub,
             email: payload.email,

@@ -2,7 +2,7 @@
 
 import { Check, Clock, CreditCard, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
-import { OrderTimeline } from '@/app/components/order/OrderTimeline';
+import { OrderTimeline } from '@/components/order/OrderTimeline';
 export default function OrderConfirmedPage() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-[#0a0a0a] flex flex-col items-center justify-center p-4 transition-colors duration-300">

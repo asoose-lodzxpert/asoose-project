@@ -68,9 +68,7 @@ const SignIn = () => {
         
         {/* Header Section */}
         <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-12 h-12 mb-6 rounded-xl bg-yellow-400 text-black font-bold text-xl shadow-lg">
-                A
-            </div>
+           
           <h1 className="text-3xl font-black tracking-tight text-gray-900 dark:text-white mb-2">Sign in</h1>
           <p className="text-sm text-gray-600 dark:text-gray-400">Welcome back to Asoosee</p>
         </div>

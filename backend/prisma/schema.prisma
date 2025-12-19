@@ -1,0 +1,144 @@
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  BANNED
+  INACTIVE
+}
+
+enum UserRole {
+  CUSTOMER
+  VENDOR
+  RIDER
+  ADMIN
+}
+
+model User {
+  id          String      @id @default(uuid())
+  email       String      @unique
+  password    String?     // Nullable for OAuth users
+  name        String?
+  phone       String?
+  avatarUrl   String?
+  orders      Order[]
+  // 2. Account Control Fields
+  status      UserStatus  @default(ACTIVE)
+  role        UserRole    @default(CUSTOMER)
+
+  // 3. Relationships
+  addresses   Address[]
+
+  // 4. Soft Delete & Recovery
+  isDeleted   Boolean     @default(false)
+  deletedAt   DateTime?
+  
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@map("users")
+}
+
+// 5. New Address Model
+model Address {
+  id          String   @id @default(uuid())
+  street      String
+  city        String
+  state       String?
+  zipCode     String
+  country     String
+  isDefault   Boolean  @default(false)
+  
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("addresses")
+}
+
+
+enum OrderStatus {
+  PENDING
+  PROCESSING
+  DELIVERED
+  CANCELLED
+}
+
+model Order {
+  id        String      @id @default(cuid())
+  userId    String
+  user      User        @relation(fields: [userId], references: [id])
+  
+  total     Float
+  status    OrderStatus @default(PENDING)
+  
+  items     OrderItem[]
+  
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+}
+
+model OrderItem {
+  id        String   @id @default(cuid())
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id])
+  
+  name      String   
+  quantity  Int
+  price     Float
+}
+
+// 1. Global Categories (e.g. Rice, Soup, Drinks)
+model Category {
+  id        String    @id @default(cuid())
+  name      String    @unique
+  image     String?   // URL to an icon/image
+  products  Product[]
+  
+  createdAt DateTime  @default(now())
+}
+
+// 2. The Vendor/Restaurant
+model Restaurant {
+  id          String    @id @default(cuid())
+  name        String
+  image       String?   // Banner image
+  address     String
+  rating      Float     @default(0) // e.g. 4.5
+  deliveryTime String   // e.g. "30-45 min"
+  
+  products    Product[]
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+// 3. The Actual Item
+model Product {
+  id          String     @id @default(cuid())
+  name        String
+  description String?
+  price       Float
+  image       String?
+  isAvailable Boolean    @default(true)
+  
+  // Relations
+  categoryId  String
+  category    Category   @relation(fields: [categoryId], references: [id])
+  
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
+  
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}
