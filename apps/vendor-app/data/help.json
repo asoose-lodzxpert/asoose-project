@@ -1,0 +1,130 @@
+{
+  "suggestions": [
+    "payment issue",
+    "add menu item",
+    "order not showing",
+    "update price"
+  ],
+  "sections": [
+    {
+      "id": "getting-started",
+      "label": "Getting Started",
+      "articles": [
+        {
+          "id": "store-setup",
+          "title": "How to set up your store",
+          "description": "A step-by-step guide to getting your store online and ready to accept orders.",
+          "content": "Setting up your store is the first step to reaching customers and receiving orders through our platform. Begin by completing your profile with accurate business information, including your store name, address, and contact details. Next, add your menu items with clear descriptions, images, and prices to make your offerings appealing and easy for customers to browse. Ensure that your operational hours are correct and adjust them for holidays or special events. Once everything is configured, go online by toggling the 'Store Open' switch in your dashboard. This will make your store visible to customers, allowing you to start receiving orders immediately. Remember to test your setup by placing a sample order to ensure everything functions smoothly. Continuous monitoring and updating of your store information is key to providing a seamless customer experience."
+        },
+        {
+          "id": "profile-completion",
+          "title": "Completing your profile",
+          "description": "Ensure your store profile is fully filled out to build trust and attract customers.",
+          "content": "A complete store profile establishes credibility and helps customers make informed decisions. Start with your store name, address, and accurate contact details. Upload a high-quality logo and cover image that represent your brand. Add a short description about your business, highlighting specialties, unique offerings, or promotions. Verify your operational hours, including opening and closing times for weekdays, weekends, and special holidays. If your platform supports social media or website links, include them to provide customers additional ways to connect with your store. Regularly review and update your profile to reflect changes in menu items, hours, or contact information. A fully completed profile increases the likelihood of customers choosing your store over competitors and helps improve visibility within the app."
+        },
+        {
+          "id": "app-navigation",
+          "title": "Navigating the app",
+          "description": "Learn how to use the dashboard and navigate all key features of the app.",
+          "content": "Understanding the layout and navigation of the app is essential for efficient store management. The main dashboard displays important information, such as new orders, pending payouts, and sales analytics. Tabs or sections typically include Menu, Orders, Payments, and Account. Learn to switch between these sections smoothly to manage different aspects of your business. Familiarize yourself with search and filter functions for orders and menu items, and locate settings for notifications, themes, and store preferences. Practice accessing help or support from within the app to resolve issues quickly. Mastering navigation ensures you can respond promptly to orders, manage your menu effectively, and maintain smooth operations throughout the day."
+        }
+      ]
+    },
+    {
+      "id": "orders",
+      "label": "Orders & Customers",
+      "articles": [
+        {
+          "id": "manage-orders",
+          "title": "Managing orders",
+          "description": "Learn how to efficiently accept, prepare, and deliver orders from customers.",
+          "content": "Managing orders effectively ensures customer satisfaction and smooth operational flow. Access the Orders screen to see all incoming orders in real-time. Carefully review each order for special requests, delivery instructions, and payment confirmations. Once verified, update the order status to 'Accepted' to notify the customer that you are processing their order. Prepare the items according to the specifications and use the system to mark the order as 'Ready for Pickup' or 'Out for Delivery.' For delivery orders, ensure the correct packaging to prevent damage and include all condiments or extras as requested. Communicate proactively with customers if there are any delays or issues. Using the built-in filters and search functionality can help you prioritize urgent orders and manage high-volume periods efficiently. Finally, analyze order history to identify trends, popular items, and potential improvements in your preparation process to enhance customer experience."
+        },
+        {
+          "id": "order-tracking",
+          "title": "Tracking orders",
+          "description": "Monitor order progress from acceptance to delivery to ensure timely fulfillment.",
+          "content": "Order tracking allows store owners to monitor every step of the fulfillment process. Use the Orders screen to check real-time statuses: pending, accepted, preparing, ready for pickup, or delivered. For delivery orders, integrate with any supported delivery tracking system if available. Update the status promptly after each stage to keep customers informed and maintain transparency. Track patterns of delayed orders to identify bottlenecks in preparation or delivery. Notifications can alert you to customer changes or cancellations, which should be handled quickly to prevent confusion. Accurate tracking reduces errors, improves customer satisfaction, and helps your store maintain a reliable reputation."
+        },
+        {
+          "id": "customer-communication",
+          "title": "Communicating with customers",
+          "description": "Tips for effectively communicating with customers about their orders or inquiries.",
+          "content": "Effective communication with customers improves their experience and reduces misunderstandings. Respond promptly to inquiries about order status, menu items, or delivery details. Use templated messages for common queries to save time, but always personalize when necessary. Inform customers immediately if there are delays, unavailable items, or substitutions. Keep your tone professional and friendly to build trust. Feedback collection can help you improve operations and menu offerings. Consider implementing a review system to monitor customer satisfaction and address complaints constructively. Consistent, clear communication enhances loyalty and encourages repeat business."
+        }
+      ]
+    },
+    {
+      "id": "payments",
+      "label": "Payments & Payouts",
+      "articles": [
+        {
+          "id": "payouts",
+          "title": "Understanding payouts",
+          "description": "Detailed overview of how payouts work, their timing, and best practices for receiving payments.",
+          "content": "Payouts are the process through which your earnings from completed orders are transferred to your bank account. All payouts are processed in USD and are subject to the platform's standard payout schedule, typically every few business days depending on your bank. To ensure successful payouts, verify that your bank account information is accurate, including the account number, routing number, and account holder name. Monitor pending payouts in your dashboard, which shows the status of each transaction, including whether it has been processed, sent, or failed. Common reasons for payout failures include mismatched account details, bank restrictions, or compliance issues. Keep detailed records of all transactions and reconcile them with your internal accounting to ensure accuracy. If you encounter issues, contact support promptly with the transaction ID and any error messages for faster resolution. Understanding this process helps maintain cash flow and ensures your business remains financially stable."
+        },
+        {
+          "id": "resolving-payment-issues",
+          "title": "Resolving payment issues",
+          "description": "Step-by-step guidance for troubleshooting failed or delayed payments.",
+          "content": "Payment issues can occur due to incorrect account details, banking delays, or compliance verification requirements. Begin by reviewing your payout history and check the status of pending or failed transactions. Verify that your bank account number, routing number, and account holder name match exactly with your records. If a payout fails, contact your bank to confirm there are no restrictions or holds on incoming transfers. Ensure that your account meets any platform verification requirements such as identity confirmation or tax information submission. Keep a record of any error codes or messages when contacting support to expedite resolution. To prevent future issues, review payouts regularly, keep account details up to date, and follow platform guidelines for transaction limits and processing times."
+        },
+        {
+          "id": "receiving-payments",
+          "title": "Receiving payments from customers",
+          "description": "Best practices for managing and confirming incoming payments from customer orders.",
+          "content": "Managing incoming customer payments efficiently ensures smooth cash flow and reduces errors. Ensure that your payment gateway or system is properly configured to receive payments for both online and in-person orders. Check the Orders screen for payment confirmation status and ensure that all orders are marked as paid before preparation begins. Address any failed or pending payments immediately by contacting the customer or your payment provider. Implement clear refund and cancellation policies to manage disputes effectively. Keep detailed records of all transactions for accounting and tax purposes. Regularly review transaction logs to identify discrepancies or suspicious activity. By actively managing customer payments, your business can avoid financial losses and maintain trust with your customers."
+        }
+      ]
+    },
+    {
+      "id": "menu",
+      "label": "Menu Management",
+      "articles": [
+        {
+          "id": "edit-menu",
+          "title": "Editing menu items",
+          "description": "Comprehensive guide on adding, updating, and removing items from your menu.",
+          "content": "Menu management is crucial to attract and retain customers. To add a new menu item, navigate to the Menu screen and select 'Add Item.' Provide a clear, descriptive title, a detailed description highlighting ingredients and features, and high-quality images to showcase the item visually. Set a competitive price and consider offering combo options or modifiers. To edit an existing item, select it from the list and update any relevant information, such as price changes, description updates, or availability. Removing items that are no longer offered helps prevent customer confusion and ensures the menu reflects your current offerings. Regularly reviewing the menu allows you to optimize for seasonal changes, promotions, and popular trends. Additionally, maintaining accurate inventory counts can prevent overselling items and improve operational efficiency. Consider using analytics to determine which items are performing best and adjust the menu strategically to maximize revenue and customer satisfaction."
+        },
+        {
+          "id": "update-prices",
+          "title": "Updating menu prices",
+          "description": "Guide to updating the pricing of menu items effectively without confusing customers.",
+          "content": "Keeping menu prices up to date is essential for profitability and clarity. Navigate to the Menu screen and select the item you wish to update. Adjust the price field according to your new pricing strategy, ensuring you consider ingredient costs, competitor pricing, and desired profit margins. When updating multiple items, make changes in batches to maintain consistency. Notify customers of significant price changes through app notifications or banners. Avoid frequent small adjustments that can confuse returning customers. Monitor sales after price updates to evaluate customer response and revenue impact. Maintaining transparent and accurate pricing fosters trust and ensures a smooth ordering experience."
+        },
+        {
+          "id": "add-menu-item",
+          "title": "Adding new menu items",
+          "description": "Step-by-step instructions for adding new items to your menu to attract more customers.",
+          "content": "Adding new items to your menu can drive sales and keep your offerings fresh. Access the Menu screen and tap 'Add Item.' Enter a descriptive name and detailed description highlighting the features, ingredients, and any dietary considerations. Upload high-quality images to make the item visually appealing. Set an appropriate price and, if applicable, add modifiers such as size options, toppings, or add-ons. Review all information before publishing to avoid errors. Consider testing new items internally before making them live to ensure quality. Use analytics to track the performance of new menu items and adjust offerings based on popularity and profitability. Regularly adding new items keeps your menu dynamic and encourages repeat orders."
+        }
+      ]
+    },
+    {
+      "id": "account",
+      "label": "Account & Security",
+      "articles": [
+        {
+          "id": "security",
+          "title": "Account security",
+          "description": "Best practices for keeping your account secure and preventing unauthorized access.",
+          "content": "Maintaining strong account security is essential to protect your business and sensitive customer data. Start by creating a strong, unique password that combines uppercase and lowercase letters, numbers, and symbols. Avoid using the same password across multiple platforms. Enable two-factor authentication (2FA) if supported, which adds an additional layer of protection by requiring a verification code sent to your phone or email. Regularly review account activity to identify any suspicious logins or changes. Keep your account recovery information, such as email and phone number, up to date to prevent being locked out. Limit access to your account to authorized personnel only, and ensure that any devices used to access the account are secure and updated. Be cautious of phishing attempts, and never share login credentials through unverified channels. By following these best practices, you minimize the risk of unauthorized access and ensure that your business operations remain secure."
+        },
+        {
+          "id": "profile-settings",
+          "title": "Managing account settings",
+          "description": "Learn how to update your account information, notifications, and preferences for optimal use.",
+          "content": "Managing your account settings allows you to customize your experience and maintain accurate information. Navigate to the Account section to update your personal details, including email, phone number, and password. Set your notification preferences to receive alerts for new orders, messages, or system updates. Adjust display settings, time zone, and language to match your operational needs. Review connected devices and revoke access for any devices that are no longer in use. Keep all settings current to ensure smooth communication and uninterrupted service. Regularly auditing your account settings helps maintain security and ensures that you are informed of all relevant activities affecting your business."
+        },
+        {
+          "id": "privacy",
+          "title": "Privacy and data protection",
+          "description": "Guidance on protecting your data and respecting customer privacy.",
+          "content": "Protecting your data and customer information is critical for legal compliance and trust. Limit access to sensitive data within your team and ensure only authorized personnel can view payment or order information. Use strong passwords and enable two-factor authentication to prevent unauthorized access. Follow privacy regulations applicable in your region, including GDPR or CCPA, if relevant. Regularly back up your data and ensure that storage systems are secure. Educate staff on proper handling of personal customer information. Monitor for suspicious activities, and report any potential breaches to the platform immediately. Maintaining strong privacy practices fosters customer confidence and reduces the risk of legal or financial penalties."
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "sections": [
+    {
+      "id": "general",
+      "label": "General Terms",
+      "icon": "file-text",
+      "content": "These terms govern your use of our app and services and form a legally binding agreement between you and our company. By accessing or using the app, you agree to comply with these terms, which include requirements for lawful use, account creation, and acceptance of updates or modifications to the platform. The general terms cover the rights of both the user and the service provider, including intellectual property ownership, permissible usage, and restrictions on copying or redistributing content. Users must follow applicable laws, avoid fraudulent or abusive behavior, and respect the intellectual property of others. Violation of these terms may result in account suspension, termination, or legal action. It is your responsibility to review these terms regularly, as continued use of the app indicates acceptance of any updates or changes. Understanding and adhering to these general terms ensures a fair, secure, and efficient experience for all users."
+    },
+    {
+      "id": "user-responsibilities",
+      "label": "User Responsibilities",
+      "icon": "shield",
+      "content": "As a user of our app, you have specific responsibilities to ensure smooth operation and protect your account, the service, and other users. You are expected to provide accurate and truthful information when creating and maintaining your account. Maintain the confidentiality of your login credentials and immediately report any unauthorized access. Use the app only for its intended purposes and avoid any actions that could disrupt the service or negatively impact other users. Follow guidelines for content submission, including images, descriptions, or communications, ensuring they are appropriate and non-infringing. Comply with all applicable laws and platform regulations, including payment obligations and data handling requirements. Actively monitor your account activity and promptly address any disputes or issues arising from orders or transactions. By following these responsibilities, you contribute to a safer, fairer, and more reliable platform for everyone."
+    },
+    {
+      "id": "payments",
+      "label": "Payments",
+      "icon": "credit-card",
+      "content": "All transactions are processed securely through our payment system, ensuring that funds are handled accurately and safely. Payments for orders, subscriptions, or services are captured using industry-standard encryption and compliance measures, such as PCI DSS. Users are responsible for providing valid and accurate payment information, including bank account or card details, to receive payouts or complete purchases. Any failed transactions must be addressed immediately, and users should monitor their account for pending, processed, or failed payments. Refunds, disputes, or chargebacks are handled according to platform policies, and users are encouraged to review these policies before raising claims. Timely payments are critical for maintaining uninterrupted access to services, and failure to comply may result in temporary suspension or restriction of certain features. Keeping payment information up to date and regularly reviewing transaction history ensures financial accuracy and smooth operation of your account."
+    },
+    {
+      "id": "liability",
+      "label": "Liability",
+      "icon": "alert-circle",
+      "content": "We are not liable for indirect, incidental, or consequential damages resulting from the use of the app, including but not limited to lost revenue, missed orders, or system downtime. While we strive to ensure reliability and accuracy, we cannot guarantee uninterrupted access, error-free performance, or complete security against unauthorized access or data breaches. Users are responsible for backing up important data and verifying transaction details. Liability for direct damages is limited to the maximum extent permitted by law, and in some jurisdictions, certain disclaimers may not apply. Users are encouraged to use the app responsibly, follow best practices for account security, and maintain records of interactions and transactions. By acknowledging these limitations of liability, you accept that the platform provides tools and services on an as-is basis and that risk management ultimately rests with the user."
+    }
+  ]
+}
