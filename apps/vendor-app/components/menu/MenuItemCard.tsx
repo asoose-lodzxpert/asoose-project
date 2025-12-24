@@ -5,7 +5,6 @@ import {
   Image,
   Switch,
   Pressable,
-  ImageSourcePropType,
   ActivityIndicator,
 } from "react-native";
 import { ThemedText } from "@/components/themed-text";
@@ -45,13 +44,12 @@ export const MenuItemCard: React.FC<Props> = ({
               style={styles.loader}
             />
           )}
-
           <Image
-            source={
-              imageError
+            source={{
+              uri: imageError
                 ? require("@/assets/images/image-placeholder.png")
-                : (item.images[0] as ImageSourcePropType)
-            }
+                : item.images[0],
+            }}
             style={styles.image}
             resizeMode="cover"
             onLoadStart={() => setImageLoading(true)}

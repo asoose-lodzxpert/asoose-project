@@ -9,6 +9,7 @@ import { useRouter } from "expo-router";
 import { ConfirmationModal } from "@/components/ui/ConfirmationModal";
 
 import { StoreMetrics, StoreOrder } from "@/types/store";
+import { useThemeColor } from "@/hooks/use-theme-color";
 
 // Mock data
 const metrics: StoreMetrics = {
@@ -47,6 +48,8 @@ export default function StoreDashboard() {
   const [confirmVisible, setConfirmVisible] = useState(false);
   const router = useRouter();
 
+  const linkColor = useThemeColor({}, "brandPrimary");
+
   /** Open confirmation modal */
   const openConfirmation = () => setConfirmVisible(true);
 
@@ -63,13 +66,12 @@ export default function StoreDashboard() {
   const actions = [
     {
       label: isOnline ? "Go Offline" : "Go Online",
-      color: "#E5E5E5",
-      icon: <IconSymbol name="power" size={16} color="#000" />,
+      icon: <IconSymbol name="power" size={16} color={linkColor} />,
       onPress: openConfirmation,
     },
     {
       label: "View Menu",
-      icon: <IconSymbol name="menu" size={16} color="#000" />,
+      icon: <IconSymbol name="menu" size={16} color={linkColor} />,
       onPress: () => router.push("/(main)/(menu)"),
     },
   ];

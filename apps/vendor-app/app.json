@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "ASOOSE VENDOR APP",
-    "slug": "vendor-app",
+    "slug": "asoose-vendor-app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -41,6 +41,11 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "f144011b-bf0a-4ba1-9cdf-b89dd47a1a2b"
+      }
     }
   }
 }
