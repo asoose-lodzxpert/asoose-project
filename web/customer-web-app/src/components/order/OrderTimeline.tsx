@@ -1,80 +1,56 @@
-import { Check, ChefHat, Bike, MapPin } from 'lucide-react';
+import { Check, ChefHat, Bike } from 'lucide-react';
 
-interface TimelineStepProps {
-  title: string;
-  subtitle: string;
-  status: 'completed' | 'current' | 'upcoming';
-  icon: any;
-  isLast?: boolean;
+interface TimelineProps {
+  status: 'PENDING' | 'PROCESSING' | 'DELIVERED' | 'CANCELLED';
 }
 
-const TimelineStep = ({ title, subtitle, status, icon: Icon, isLast }: TimelineStepProps) => {
-  let circleColor = "bg-gray-100 dark:bg-white/10 text-gray-400";
-  let lineColor = "bg-gray-100 dark:bg-white/10";
-  let iconColor = "text-gray-400";
+export const OrderTimeline = ({ status }: TimelineProps) => {
+  
+  const steps = [
+    { id: 'PENDING', label: 'Order Placed', icon: Check },
+    { id: 'PROCESSING', label: 'Preparing', icon: ChefHat },
+    { id: 'DELIVERED', label: 'Delivered', icon: Bike },
+  ];
 
-  if (status === 'completed') {
-    circleColor = "bg-green-500 text-white shadow-lg shadow-green-500/30";
-    lineColor = "bg-green-500";
-    iconColor = "text-white";
-  } else if (status === 'current') {
-    circleColor = "bg-yellow-500 text-black shadow-lg shadow-yellow-500/30 animate-pulse";
-    lineColor = "bg-gray-100 dark:bg-white/10";
-    iconColor = "text-black";
-  }
+  // Helper to determine state of each step
+  const getStepState = (stepId: string) => {
+    if (status === 'CANCELLED') return 'cancelled';
+    
+    const statusOrder = ['PENDING', 'PROCESSING', 'DELIVERED'];
+    const currentIndex = statusOrder.indexOf(status);
+    const stepIndex = statusOrder.indexOf(stepId);
+
+    if (stepIndex < currentIndex) return 'completed';
+    if (stepIndex === currentIndex) return 'active';
+    return 'inactive';
+  };
 
   return (
-    <div className="flex gap-4">
-      <div className="flex flex-col items-center">
-        {/* Circle Icon */}
-        <div className={`w-10 h-10 rounded-full flex items-center justify-center z-10 transition-colors duration-300 ${circleColor}`}>
-          <Icon className="w-5 h-5" />
-        </div>
-        {/* Connecting Line */}
-        {!isLast && (
-          <div className={`w-0.5 h-12 my-1 rounded-full transition-colors duration-300 ${lineColor}`} />
-        )}
-      </div>
-      <div className="pb-8 pt-1">
-        <h4 className={`font-bold text-sm ${status === 'upcoming' ? 'text-gray-400' : 'text-gray-900 dark:text-white'}`}>
-          {title}
-        </h4>
-        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{subtitle}</p>
-      </div>
-    </div>
-  );
-};
+    <div className="w-full py-6">
+      <div className="flex items-center justify-between relative">
+        {/* Connecting Line (Background) */}
+        <div className="absolute left-0 right-0 top-1/2 h-1 bg-gray-100 dark:bg-white/5 -z-10" />
+        
+        {steps.map((step, index) => {
+          const state = getStepState(step.id);
+          const Icon = step.icon;
+          
+          let circleClass = "bg-gray-100 text-gray-400 dark:bg-white/10 dark:text-gray-500";
+          if (state === 'completed') circleClass = "bg-green-500 text-white";
+          if (state === 'active') circleClass = "bg-yellow-500 text-black ring-4 ring-yellow-500/20";
+          if (status === 'CANCELLED') circleClass = "bg-red-100 text-red-500";
 
-export const OrderTimeline = () => {
-  return (
-    <div className="bg-white dark:bg-[#151515] p-6 rounded-3xl border border-gray-100 dark:border-white/5 shadow-sm">
-      <h3 className="font-bold text-lg mb-6 text-gray-900 dark:text-white">Order Status</h3>
-      <div className="flex flex-col">
-        <TimelineStep 
-          title="Order Placed" 
-          subtitle="Just now" 
-          status="completed" 
-          icon={Check} 
-        />
-        <TimelineStep 
-          title="Preparing" 
-          subtitle="In progress" 
-          status="current" 
-          icon={ChefHat} 
-        />
-        <TimelineStep 
-          title="On the way" 
-          subtitle="Estimated 12:45 PM" 
-          status="upcoming" 
-          icon={Bike} 
-        />
-        <TimelineStep 
-          title="Delivered" 
-          subtitle="Pending" 
-          status="upcoming" 
-          icon={MapPin} 
-          isLast
-        />
+          return (
+            <div key={step.id} className="flex flex-col items-center gap-2 bg-gray-50 dark:bg-[#0a0a0a] px-2 z-10">
+               <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${circleClass}`}>
+                  <Icon className="w-5 h-5" />
+               </div>
+               <span className={`text-xs font-bold ${state === 'active' ? 'text-yellow-600 dark:text-yellow-500' : 'text-gray-400'}`}>
+                 {step.label}
+               </span>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

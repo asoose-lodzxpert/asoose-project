@@ -4,7 +4,7 @@ import {
 import { UsersService } from './users.service';
 
 import { UpdateProfileDto } from './dto/update-profile.dto';
-
+import { CreateOrderDto } from './dto/create-order.dto';
 import { CreateAddressDto } from './dto/create-address.dto';
 import { AdminUpdateUserDto } from './dto/admin-update-user.dto';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
@@ -13,9 +13,10 @@ import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
-  @Get('profile')
+ @Get('profile')
   getProfile(@Request() req) {
-    return this.usersService.getProfile(req.user.id);
+    // Pass both ID and Email from the token
+    return this.usersService.getProfile(req.user.id, req.user.email);
   }
 
   @Get('orders')
@@ -38,6 +39,11 @@ export class UsersController {
     return this.usersService.addAddress(req.user.id, dto);
   }
 
+  @Post('orders')
+  async createOrder(@Request() req, @Body() createOrderDto: CreateOrderDto) {
+    return this.usersService.createOrder(req.user.id, createOrderDto);
+  
+}
   @Delete('address/:id')
   deleteAddress(@Request() req, @Param('id') addressId: string) {
     return this.usersService.deleteAddress(req.user.id, addressId);

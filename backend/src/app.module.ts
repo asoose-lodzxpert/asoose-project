@@ -9,6 +9,7 @@ import { UsersModule } from './users/users.module';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler'; 
 import { PrismaModule } from './prisma/prisma.module';
 import { MarketplaceModule } from './marketplace/marketplace.module';
+import { VendorModule } from './vendor/vendor.module';
 // --------------------------------------------------------------------------------
 
 @Module({
@@ -25,7 +26,8 @@ import { MarketplaceModule } from './marketplace/marketplace.module';
     UsersModule,
     AuthModule,
     PrismaModule,
-    MarketplaceModule
+    MarketplaceModule,
+    VendorModule
   ],
   controllers: [AppController],
   providers: [

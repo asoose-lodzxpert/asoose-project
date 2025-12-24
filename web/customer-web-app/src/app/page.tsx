@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useTheme } from 'next-themes'; // <--- NEW IMPORT
+import { useTheme } from 'next-themes';
 import Image from 'next/image';
+import Link from 'next/link';
 import { 
   ArrowRight, Moon, Sun, Truck, Store, 
   Menu, X, ShieldCheck, MapPin, Users, Package, 
@@ -69,7 +70,7 @@ const HERO_ACTIONS = {
 };
 
 export default function LandingPage() {
-  // --- NEW THEME LOGIC ---
+  // --- THEME LOGIC ---
   const { resolvedTheme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   
@@ -85,7 +86,6 @@ export default function LandingPage() {
 
   if (!mounted) return null;
 
-  // Helper variable so we don't have to rewrite all the JSX
   const darkMode = resolvedTheme === 'dark';
 
   const toggleTheme = () => {
@@ -127,10 +127,21 @@ export default function LandingPage() {
             <span className="text-xl font-bold tracking-tight">Asoosee</span>
           </div>
 
-          <div className="hidden md:flex gap-8 text-sm font-medium">
+          <div className="hidden md:flex gap-8 text-sm font-medium items-center">
             <a href="#features" className="hover:text-yellow-500 transition-colors">Features</a>
             <a href="#ecosystem" className="hover:text-yellow-500 transition-colors">Ecosystem</a>
             <a href="#" className="hover:text-yellow-500 transition-colors">Safety</a>
+            
+            {/* Added Links */}
+            <Link href="/vendor/register" className="hover:text-yellow-500 transition-colors">
+              Vendor Register
+            </Link>
+            <Link href="/rider/register" className="hover:text-yellow-500 transition-colors">
+              Rider Register
+            </Link>
+            <Link href="/sign-up" className="hover:text-yellow-500 transition-colors">
+              Sign Up
+            </Link>
           </div>
 
           <div className="flex items-center gap-3">
@@ -145,6 +156,40 @@ export default function LandingPage() {
             </button>
           </div>
         </div>
+
+        {/* Mobile Menu with Added Links */}
+        {isMobileMenuOpen && (
+          <div className={`md:hidden absolute top-16 left-0 right-0 border-t backdrop-blur-md ${
+            darkMode ? 'bg-[#0a0a0a]/95 border-white/10' : 'bg-white/95 border-black/5'
+          }`}>
+            <div className="flex flex-col py-4 px-6 space-y-4">
+              <a href="#features" className="py-2 hover:text-yellow-500 transition-colors" onClick={() => setIsMobileMenuOpen(false)}>
+                Features
+              </a>
+              <a href="#ecosystem" className="py-2 hover:text-yellow-500 transition-colors" onClick={() => setIsMobileMenuOpen(false)}>
+                Ecosystem
+              </a>
+              <a href="#" className="py-2 hover:text-yellow-500 transition-colors" onClick={() => setIsMobileMenuOpen(false)}>
+                Safety
+              </a>
+              
+              {/* Added Links in Mobile Menu */}
+              <Link href="/vendor/register" className="py-2 hover:text-yellow-500 transition-colors" onClick={() => setIsMobileMenuOpen(false)}>
+                Vendor Register
+              </Link>
+              <Link href="/rider/register" className="py-2 hover:text-yellow-500 transition-colors" onClick={() => setIsMobileMenuOpen(false)}>
+                Rider Register
+              </Link>
+              <Link href="/sign-up" className="py-2 hover:text-yellow-500 transition-colors" onClick={() => setIsMobileMenuOpen(false)}>
+                Sign Up
+              </Link>
+              
+              <button className="mt-4 bg-black text-white dark:bg-white dark:text-black px-4 py-2 rounded-lg text-sm font-bold hover:translate-y-[-1px] transition-transform shadow-lg">
+                Get App
+              </button>
+            </div>
+          </div>
+        )}
       </nav>
 
       {/* --- HERO SECTION (PHONE SIMULATOR) --- */}
@@ -350,14 +395,21 @@ export default function LandingPage() {
                                  <p className="opacity-70 text-sm leading-relaxed mb-6 max-w-sm">
                                    {content.desc}
                                  </p>
-                                 <button className={`flex items-center gap-2 px-5 py-2.5 rounded-lg font-bold text-sm transition-transform hover:translate-x-1 ${
-                                   darkMode 
-                                     ? 'bg-white text-black hover:bg-gray-200' 
-                                     : 'bg-black text-white hover:bg-gray-800'
-                                 }`}>
+                                 <Link 
+                                   href={
+                                     tab.id === 'vendor' ? '/vendor/register' :
+                                     tab.id === 'rider' ? '/rider/register' :
+                                     '/sign-up'
+                                   }
+                                   className={`flex items-center gap-2 px-5 py-2.5 rounded-lg font-bold text-sm transition-transform hover:translate-x-1 ${
+                                     darkMode 
+                                       ? 'bg-white text-black hover:bg-gray-200' 
+                                       : 'bg-black text-white hover:bg-gray-800'
+                                   }`}
+                                 >
                                    {content.cta} 
                                    <ArrowRight className="w-4 h-4" />
-                                 </button>
+                                 </Link>
                                </div>
                              </div>
                            </div>
@@ -435,16 +487,16 @@ export default function LandingPage() {
                 <li><a href="#" className="hover:text-yellow-500 transition-colors hover:opacity-100">Ride Hailing</a></li>
                 <li><a href="#" className="hover:text-yellow-500 transition-colors hover:opacity-100">Food Delivery</a></li>
                 <li><a href="#" className="hover:text-yellow-500 transition-colors hover:opacity-100">Logistics</a></li>
-                <li><a href="#" className="hover:text-yellow-500 transition-colors hover:opacity-100">Vendor Dashboard</a></li>
+                <li><Link href="/vendor/register" className="hover:text-yellow-500 transition-colors hover:opacity-100">Vendor Dashboard</Link></li>
               </ul>
             </div>
 
             <div>
-              <h4 className="font-bold mb-6">Company</h4>
+              <h4 className="font-bold mb-6">Join Us</h4>
               <ul className="space-y-4 text-sm opacity-70">
-                <li><a href="#" className="hover:text-yellow-500 transition-colors hover:opacity-100">About Us</a></li>
-                <li><a href="#" className="hover:text-yellow-500 transition-colors hover:opacity-100">Careers</a> <span className="text-[10px] bg-yellow-500 text-black px-1.5 py-0.5 rounded font-bold ml-1">Hiring</span></li>
-                <li><a href="#" className="hover:text-yellow-500 transition-colors hover:opacity-100">Newsroom</a></li>
+                <li><Link href="/vendor/register" className="hover:text-yellow-500 transition-colors hover:opacity-100">Become a Vendor</Link></li>
+                <li><Link href="/rider/register" className="hover:text-yellow-500 transition-colors hover:opacity-100">Become a Rider</Link></li>
+                <li><Link href="/sign-up" className="hover:text-yellow-500 transition-colors hover:opacity-100">Sign Up</Link></li>
                 <li><a href="#" className="hover:text-yellow-500 transition-colors hover:opacity-100">Contact</a></li>
               </ul>
             </div>
@@ -454,7 +506,7 @@ export default function LandingPage() {
               <ul className="space-y-4 text-sm opacity-70">
                 <li><a href="#" className="hover:text-yellow-500 transition-colors hover:opacity-100">Privacy Policy</a></li>
                 <li><a href="#" className="hover:text-yellow-500 transition-colors hover:opacity-100">Terms of Service</a></li>
-                <li><a href="#" className="hover:text-yellow-500 transition-colors hover:opacity-100">Driver Agreement</a></li>
+                <li><Link href="/rider/register" className="hover:text-yellow-500 transition-colors hover:opacity-100">Driver Agreement</Link></li>
                 <li><a href="#" className="hover:text-yellow-500 transition-colors hover:opacity-100">Security</a></li>
               </ul>
             </div>

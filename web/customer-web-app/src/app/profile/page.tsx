@@ -11,6 +11,7 @@ import { EditProfileModal } from '@/components/profile/EditProfileModal';
 import { OrderCard } from '@/components/profile/OrderCard';
 import { toast } from 'react-toastify'
 import Swal from 'sweetalert2';
+import Link from 'next/link';
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 
@@ -288,19 +289,19 @@ const isDarkMode = document.documentElement.classList.contains('dark');
           <div className="space-y-3">
             {orders.length > 0 ? (
               orders.map((order: any) => (
-                <OrderCard 
+                <Link href={`/orders/${order.id}`} key={order.id}>
+                  <OrderCard 
                   key={order.id} 
-                  id={order.id.slice(0, 8).toUpperCase()} // Short ID
+                  id={order.id.slice(0, 8).toUpperCase()} 
                   status={order.status}
-                  // Format Date
                   date={new Date(order.createdAt).toLocaleDateString('en-GB', { 
                     day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' 
                   })}
-                  // Format Money
                   total={`₦${order.total.toLocaleString()}`}
-                  // List Items
                   items={order.items.map((i: any) => `${i.quantity}x ${i.name}`)} 
                 />
+
+                </Link>
               ))
             ) : (
                // Empty State

@@ -1,12 +1,12 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 
-// 1. Define what an Item looks like in the cart
 export interface CartItem {
   id: string;
   name: string;
   price: number;
   quantity: number;
+  restaurantId: string;
 }
 
 interface CartState {
@@ -14,6 +14,7 @@ interface CartState {
   restaurantId: string | null;
   
   addItem: (item: CartItem) => void;
+  decreaseItem: (itemId: string) => void; // 👈 NEW ACTION
   removeItem: (itemId: string) => void;
   clearCart: () => void;
   
@@ -34,7 +35,6 @@ export const useCartStore = create<CartState>()(
         if (currentRestaurant && currentRestaurant !== newItem.restaurantId) {
             const confirmSwitch = window.confirm("Start a new basket? You have items from another restaurant.");
             if (!confirmSwitch) return;
-            
             set({ items: [newItem], restaurantId: newItem.restaurantId });
             return;
         }
@@ -58,6 +58,24 @@ export const useCartStore = create<CartState>()(
         }
       },
 
+      // 👇 NEW FUNCTION: Decrease quantity or remove if 1
+      decreaseItem: (itemId) => {
+        const currentItems = get().items;
+        const existingItem = currentItems.find(i => i.id === itemId);
+
+        if (existingItem && existingItem.quantity > 1) {
+            // Decrease by 1
+            set({
+                items: currentItems.map(i => 
+                    i.id === itemId ? { ...i, quantity: i.quantity - 1 } : i
+                )
+            });
+        } else {
+            // Remove entirely if quantity is 1
+            get().removeItem(itemId);
+        }
+      },
+
       removeItem: (itemId) => {
         const newItems = get().items.filter(i => i.id !== itemId);
         set({ 
@@ -68,18 +86,13 @@ export const useCartStore = create<CartState>()(
 
       clearCart: () => set({ items: [], restaurantId: null }),
 
-      getTotalPrice: () => {
-        return get().items.reduce((total, item) => total + (item.price * item.quantity), 0);
-      },
-
-      getTotalItems: () => {
-        return get().items.reduce((total, item) => total + item.quantity, 0);
-      }
+      getTotalPrice: () => get().items.reduce((total, item) => total + (item.price * item.quantity), 0),
+      getTotalItems: () => get().items.reduce((total, item) => total + item.quantity, 0)
     }),
     {
       name: 'asoosee-cart-storage',
-      storage: createJSONStorage(() => localStorage), 
-      skipHydration: true, 
+      storage: createJSONStorage(() => localStorage),
+      skipHydration: true,
     }
   )
 );
