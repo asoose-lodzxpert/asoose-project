@@ -7,7 +7,6 @@ import {
   Image,
   ScrollView,
   Switch,
-  Text,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import DraggableFlatList, {
