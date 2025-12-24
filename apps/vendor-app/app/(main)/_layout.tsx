@@ -1,17 +1,17 @@
-import { Tabs } from 'expo-router';
-import React from 'react';
+import { Tabs } from "expo-router";
+import React from "react";
 
-import { HapticTab } from '@/components/haptic-tab';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { Redirect } from 'expo-router';
-import { useAuth } from '@/context/AuthContext';
+import { HapticTab } from "@/components/haptic-tab";
+import { IconSymbol } from "@/components/ui/icon-symbol";
+import { Colors } from "@/constants/theme";
+import { useColorScheme } from "@/hooks/use-color-scheme";
+import { Redirect } from "expo-router";
+import { useAuth } from "@/context/AuthContext";
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme() ?? 'light';
+  const colorScheme = useColorScheme() ?? "light";
 
-   const { user } = useAuth();
+  const { user } = useAuth();
 
   if (!user) {
     return <Redirect href="/login" />;
@@ -22,7 +22,7 @@ export default function TabLayout() {
       screenOptions={{
         headerShown: false,
         tabBarButton: HapticTab,
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
+        tabBarActiveTintColor: Colors[colorScheme ?? "light"].tint,
         tabBarInactiveTintColor: Colors[colorScheme].tabIconDefault,
         tabBarStyle: {
           backgroundColor: Colors[colorScheme].surfaceBackground,
@@ -32,7 +32,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Dashboard',
+          title: "Dashboard",
           tabBarIcon: ({ color }) => (
             <IconSymbol size={28} name="house.fill" color={color} />
           ),
@@ -40,9 +40,9 @@ export default function TabLayout() {
       />
 
       <Tabs.Screen
-        name="orders"
+        name="(orders)"
         options={{
-          title: 'Orders',
+          title: "Orders",
           tabBarIcon: ({ color }) => (
             <IconSymbol size={28} name="ticket.fill" color={color} />
           ),
@@ -50,9 +50,9 @@ export default function TabLayout() {
       />
 
       <Tabs.Screen
-        name="menu"
+        name="(menu)"
         options={{
-          title: 'Menu',
+          title: "Menu",
           tabBarIcon: ({ color }) => (
             <IconSymbol size={28} name="fork.knife" color={color} />
           ),
@@ -60,21 +60,25 @@ export default function TabLayout() {
       />
 
       <Tabs.Screen
-        name="analytics"
+        name="notifications"
         options={{
-          title: 'Analytics',
+          title: "Notifications",
           tabBarIcon: ({ color }) => (
-            <IconSymbol size={28} name="chart.line.uptrend.xyaxis" color={color} />
+            <IconSymbol size={28} name="bell" color={color} />
           ),
         }}
       />
 
       <Tabs.Screen
-        name="profile"
+        name="(profile)"
         options={{
-          title: 'Profile',
+          title: "Profile",
           tabBarIcon: ({ color }) => (
-            <IconSymbol size={28} name="person.crop.circle.fill" color={color} />
+            <IconSymbol
+              size={28}
+              name="person.crop.circle.fill"
+              color={color}
+            />
           ),
         }}
       />
