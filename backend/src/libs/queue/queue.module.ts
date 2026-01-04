@@ -1,12 +1,17 @@
 import { Module } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 
 @Module({
   imports: [
-    BullModule.forRoot({
-      connection: {
-        url: process.env.REDIS_URL,
-      },
+    BullModule.forRootAsync({
+      imports: [ConfigModule],
+      useFactory: async (configService: ConfigService) => ({
+        connection: {
+          url: configService.get<string>('REDIS_URL'),
+        },
+      }),
+      inject: [ConfigService],
     }),
   ],
 })

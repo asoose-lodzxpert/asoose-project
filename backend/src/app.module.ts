@@ -4,14 +4,10 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { ConfigModule } from '@nestjs/config';
-import { UsersModule } from './users/users.module';
-
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler'; 
 import { PrismaModule } from './prisma/prisma.module';
-import { MarketplaceModule } from './marketplace/marketplace.module';
-import { VendorModule } from './vendor/vendor.module';
-// --------------------------------------------------------------------------------
-
+import { SuperAdminModule } from './super-admin/super-admin.module';
+import { QueueModule } from './libs/queue/queue.module';
 @Module({
   imports: [
     ThrottlerModule.forRoot([
@@ -23,11 +19,10 @@ import { VendorModule } from './vendor/vendor.module';
     ConfigModule.forRoot({ 
       isGlobal: true,
     }), 
-    UsersModule,
     AuthModule,
+    SuperAdminModule,
     PrismaModule,
-    MarketplaceModule,
-    VendorModule
+    QueueModule,
   ],
   controllers: [AppController],
   providers: [
