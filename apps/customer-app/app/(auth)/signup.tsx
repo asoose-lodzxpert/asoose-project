@@ -8,6 +8,8 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { router } from "expo-router";
+import { Alert } from "react-native";
+import { signup as signupApi } from "@/services/auth.service";
 
 import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
@@ -54,14 +56,25 @@ export default function SignupScreen() {
   /* ---------------------------------- */
   /* Simulate Signup */
   /* ---------------------------------- */
-  const handleSignup = () => {
+  const handleSignup = async () => {
     if (!accepted || !fullName || !email || !phoneNumber || !password) return;
 
     setLoading(true);
-    setTimeout(() => {
+    try {
+      const phone = `${phoneCode}${phoneNumber}`;
+      const res = await signupApi({ name: fullName, email, phone, password });
+      // assume success when no error thrown
       setLoading(false);
       router.replace("/login");
-    }, 1800);
+    } catch (err: any) {
+      setLoading(false);
+      console.error("signup error", err);
+      const msg =
+        err?.message ||
+        err?.error ||
+        "Could not create account. Please try again.";
+      Alert.alert("Signup failed", String(msg));
+    }
   };
 
   return (

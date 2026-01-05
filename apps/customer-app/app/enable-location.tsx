@@ -37,7 +37,7 @@ export default function EnableLocationScreen() {
       return;
     }
 
-    router.replace("/"); // continue to app
+  router.replace({ pathname: "/" } as any); // continue to app
   };
 
   return (

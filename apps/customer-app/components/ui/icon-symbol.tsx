@@ -15,6 +15,9 @@ export type IconSymbolName =
   | "chevron.left"
   | "chevron.down"
   | "chevron.up"
+  | "chevron.left"
+  | "chevron.down"
+  | "chevron.up"
   | "info.circle"
   | "cloud.upload"
   | "camera.fill"
@@ -65,6 +68,11 @@ export type IconSymbolName =
   | "share"
   | "file-text"
   | "credit-card"
+  | "location"
+  | "shopping-bag"
+  | "truck"
+  | "moon"
+  | "log-out"
   | "alert-circle"
   | "calender"
   | "clock.fill"
@@ -96,6 +104,11 @@ export type IconSymbolName =
   | "person.text.rectangle"
   | "doc.text"
   | "creditcard"
+  | "location"
+  | "shopping-bag"
+  | "truck"
+  | "moon"
+  | "log-out"
   | "car"
   | "box.truck"
   | "calendar"
@@ -114,44 +127,40 @@ export const MAPPING: Record<
   IconSymbolName,
   keyof typeof MaterialIcons.glyphMap
 > = {
+  location: "location-on",
+  "shopping-bag": "shopping-bag",
+  truck: "local-shipping",
+  moon: "dark-mode",
+  "log-out": "logout",
   "house.fill": "home",
   "ticket.fill": "confirmation-number",
   "fork.knife": "restaurant",
   "chart.line.uptrend.xyaxis": "show-chart",
   "person.crop.circle.fill": "account-circle",
-
   "eye.fill": "remove-red-eye",
   "eye.slash.fill": "visibility-off",
-
   "paperplane.fill": "send",
   send: "send",
-
   "chevron.left.forwardslash.chevron.right": "code",
   "chevron.right": "chevron-right",
   "chevron.left": "chevron-left",
   "chevron.down": "keyboard-arrow-down",
   "chevron.up": "keyboard-arrow-up",
-
   "info.circle": "info",
   "cloud.upload": "cloud-upload",
   "camera.fill": "photo-camera",
-
   check: "check",
-  "circle.fill": "circle",
-
+  "circle.fill": "radio-button-checked",
   "map.marker": "place",
   "location.fill": "location-on",
   "map.fill": "map",
-
   "arrow.up.left.and.arrow.down.right": "fullscreen",
   fullscreen: "fullscreen",
-
   xmark: "close",
   "lock.fill": "lock",
   pencil: "edit",
   trash: "delete",
   plus: "add",
-
   home: "home",
   restaurant: "restaurant",
   notifications: "notifications",
@@ -165,8 +174,8 @@ export const MAPPING: Record<
   "arrow.left": "arrow-back",
   "arrow.up": "arrow-upward",
   "arrow-up": "arrow-upward",
-  "arrow-u-turn-left": "arrow-left",
-  "arrow-u-turn-right": "arrow-right",
+  "arrow-u-turn-left": "undo",
+  "arrow-u-turn-right": "redo",
   "arrow-left": "arrow-left",
   "arrow-right": "arrow-right",
   settings: "settings",
@@ -229,7 +238,7 @@ export const MAPPING: Record<
   "google.logo": "g-translate",
   search: "search",
   "gearshape.fill": "settings",
-  "box.fill": "wallet-giftcard",
+  "box.fill": "inventory",
 };
 
 interface IconSymbolProps {

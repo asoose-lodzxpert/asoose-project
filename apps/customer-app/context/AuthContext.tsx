@@ -1,16 +1,19 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { loginWithDemo } from "../services/auth.service";
 
 type User = {
   id: string;
   name: string;
   email: string;
+  avatarUrl?: string | null;
+  phone?: string | null;
 };
 
 type AuthContextType = {
   user: User | null;
   loading: boolean;
-  signIn: (user: User) => Promise<void>;
+  signIn: (credentials: { email: string; password: string }) => Promise<void>;
   signOut: () => Promise<void>;
 };
 
@@ -35,12 +38,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     loadUser();
   }, []);
 
-  async function signIn(user: User) {
+  async function signIn({
+    email,
+    password,
+  }: {
+    email: string;
+    password: string;
+  }) {
+    // Call service for login
+    const user = await loginWithDemo(email, password);
     setUser(user);
     await AsyncStorage.setItem(USER_KEY, JSON.stringify(user));
   }
 
   async function signOut() {
+    // Mock sign-out using service
+    // await authService.logout(); // If implemented
     setUser(null);
     await AsyncStorage.removeItem(USER_KEY);
   }

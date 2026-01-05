@@ -41,7 +41,7 @@ export function PromotionsCarousel({ data }: { data: Promotion[] }) {
   const flatListRef = useRef<Animated.FlatList<Promotion>>(null);
 
   const [activeIndex, setActiveIndex] = useState(0);
-  const autoScrollTimer = useRef<NodeJS.Timeout | null>(null);
+  const autoScrollTimer = useRef<number | null>(null);
   const isInteracting = useRef(false);
 
   /** -------------------- */
@@ -179,7 +179,7 @@ export function PromotionsCarousel({ data }: { data: Promotion[] }) {
             style={[
               styles.dot,
               {
-                backgroundColor: i === activeIndex ? "#FFF" : textDefault,
+                backgroundColor: i === activeIndex ? primary : textDefault,
               },
             ]}
           />

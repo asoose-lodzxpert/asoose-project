@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import * as Location from "expo-location";
+import { resolveAddress } from "@/lib/reverse-address";
 
 type LocationData = {
   coords: Location.LocationObjectCoords | null;
@@ -24,21 +25,7 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [pickerVisible, setPickerVisible] = useState(false);
 
-  async function resolveAddress(coords: Location.LocationObjectCoords) {
-    try {
-      const res = await Location.reverseGeocodeAsync(coords);
-      if (!res.length) return null;
-
-      const p = res[0];
-      return {
-        label: "Current location",
-        address: `${p.formattedAddress}`,
-      };
-    } catch {
-      return null;
-    }
-  }
-
+ 
   async function useCurrentLocation() {
     const { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== "granted") return;

@@ -6,20 +6,22 @@ import {
   Animated,
 } from "react-native";
 import { useState, useCallback, useRef, useMemo } from "react";
-import { RelativePathString, router } from "expo-router";
 
 import { ThemedView } from "@/components/themed-view";
-import { ThemedText } from "@/components/themed-text";
 import { PromotionsCarousel } from "@/components/home/PromotionsCarousel";
 import { VendorCard } from "@/components/home/VendorCard";
 import { FloatingCart } from "@/components/home/FloatingCart";
 import { HomeHeader } from "@/components/home/HomeHeader";
 import { LocationPickerModal } from "@/components/home/LocationPickerModal";
 import { CategoryPillFilter } from "@/components/home/CategoryPillFilter";
+import { SectionHeader } from "@/components/home/SectionHeader";
+import { SkeletonCard } from "@/components/home/SkeletonCard";
+import { HorizontalSpacer } from "@/components/home/HorizontalSpacer";
 
 import { PROMOTIONS, POPULAR, TOP } from "@/data/home";
 import { ItemCard } from "@/components/common/ItemCard";
-import { ITEMS } from "@/types/item";
+import { getPagedRestaurants } from "@/services/home.service";
+import { getCategories } from "@/services/categories.service";
 import { useThemeColor } from "@/hooks/use-theme-color";
 
 export default function HomeScreen() {
@@ -30,20 +32,10 @@ export default function HomeScreen() {
 
   const pullAnim = useRef(new Animated.Value(0)).current;
 
-  const CATEGORIES = [
-    { key: "all", label: "All" },
-    { key: "restaurants", label: "Restaurants", icon: "restaurant" },
-    { key: "groceries", label: "Groceries", icon: "bag" },
-    { key: "pharmacy", label: "Pharmacy", icon: "plus" },
-  ];
+  const CATEGORIES = getCategories();
 
   /** CATEGORY FILTERING */
-  const filteredRestaurants = useMemo(() => {
-    if (category === "all") return ITEMS;
-    return ITEMS.filter((r) => r.category === category);
-  }, [category]);
-
-  const data = filteredRestaurants.slice(0, page * 6);
+  const data = getPagedRestaurants(category, page);
 
   function loadMore() {
     setPage((p) => p + 1);
@@ -65,37 +57,7 @@ export default function HomeScreen() {
     }, 800);
   }, []);
 
-  const HorizontalSpacer = () => <View style={{ width: 12 }} />;
-
-  /** REUSABLE SECTION HEADER */
-  const SectionHeader = ({ title, href }: { title: string; href: string }) => (
-    <View
-      style={{
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "center",
-        marginVertical: 12,
-      }}
-    >
-      <ThemedText type="subtitle">{title}</ThemedText>
-      <Pressable onPress={() => router.push(href as RelativePathString)}>
-        <ThemedText type="link">View all</ThemedText>
-      </Pressable>
-    </View>
-  );
-
-  /** SKELETON CARD */
-  const SkeletonCard = () => (
-    <View
-      style={{
-        width: 160,
-        height: 180,
-        borderRadius: 16,
-        backgroundColor: card,
-        marginRight: 12,
-      }}
-    />
-  );
+  // ...existing code...
 
   return (
     <ThemedView style={{ flex: 1 }}>

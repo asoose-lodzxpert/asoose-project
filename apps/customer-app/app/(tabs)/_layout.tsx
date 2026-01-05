@@ -20,10 +20,11 @@ export default function TabLayout() {
         tabBarStyle: { backgroundColor: themeColors.surfaceBackground },
       }}
     >
+      i
       <Tabs.Screen
-        name="order"
+        name="home"
         options={{
-          title: "Order",
+          title: "Home",
           tabBarIcon: ({ color }) => (
             <IconSymbol size={28} name="restaurant" color={color} />
           ),
@@ -39,9 +40,9 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="deliver"
+        name="delivery"
         options={{
-          title: "Deliver",
+          title: "Delivery",
           tabBarIcon: ({ color }) => (
             <IconSymbol size={28} name="box.fill" color={color} />
           ),

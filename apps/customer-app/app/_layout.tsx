@@ -6,9 +6,11 @@ import { useEffect, useState } from "react";
 import * as Location from "expo-location";
 
 import { AuthProvider, useAuth } from "@/context/AuthContext";
+import ConfirmProvider from "@/components/ui/ConfirmDialogProvider";
 import Toast from "react-native-toast-message";
 import { LocationProvider } from "@/context/LocationContext";
 import { CartProvider } from "@/context/CartContext";
+import { SendPackageProvider } from "@/context/SendPackageContext";
 
 /* ---------------------------------- */
 /* Root Navigator */
@@ -81,6 +83,15 @@ function RootNavigator() {
         {hasLaunched && user && locationGranted && (
           <Stack.Screen name="(tabs)" />
         )}
+
+        {/* Global modal routes (appear above tabs) */}
+        <Stack.Screen
+          name="location-picker"
+          options={{
+            presentation: "modal",
+            animation: "slide_from_bottom",
+          }}
+        />
       </Stack>
     </GestureHandlerRootView>
   );
@@ -93,10 +104,14 @@ export default function RootLayout() {
   return (
     <AuthProvider>
       <LocationProvider>
+        <ConfirmProvider>
         <CartProvider>
-          <RootNavigator />
-          <Toast />
+          <SendPackageProvider>
+            <RootNavigator />
+            <Toast />
+          </SendPackageProvider>
         </CartProvider>
+        </ConfirmProvider>
       </LocationProvider>
     </AuthProvider>
   );

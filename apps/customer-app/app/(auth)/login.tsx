@@ -40,32 +40,20 @@ export default function LoginScreen() {
   /* ---------------------------------- */
   /* Simulated Login */
   /* ---------------------------------- */
-  const handleLogin = () => {
+  const handleLogin = async () => {
     if (!identifier || !password) {
       setError("Please enter your email or phone and password");
       return;
     }
-
     setLoading(true);
     setError(null);
-
-    setTimeout(async () => {
-      if (password !== "password123") {
-        setLoading(false);
-        setError("Incorrect email or password");
-        return;
-      }
-
-      await signIn({
-        id: "usr_001",
-        name: "John Smith",
-        email: identifier.includes("@") ? identifier : "john.smith@example.com",
-      });
-
-      router.replace("/(tabs)");
-
-      setLoading(false);
-    }, 1800);
+    try {
+      await signIn({ email: identifier, password });
+      router.replace({ pathname: "/(tabs)" } as any);
+    } catch (err: any) {
+      setError(err.message || "Login failed");
+    }
+    setLoading(false);
   };
 
   return (

@@ -1,0 +1,36 @@
+[
+  {
+    "id": "1",
+    "from": "12 Admiralty Way, Lekki",
+    "to": "Victoria Island, Lagos",
+    "price": 3500,
+    "status": "active",
+    "paymentMethod": "Card",
+    "details": {
+      "sender": "John Doe",
+      "senderPhone": "08012345678",
+      "receiver": "Jane Smith",
+      "receiverPhone": "08087654321",
+      "instructions": "Handle with care",
+      "packageSize": "medium",
+      "options": "Fragile, Perishable"
+    }
+  },
+  {
+    "id": "2",
+    "from": "Ikeja City Mall",
+    "to": "Yaba, Lagos",
+    "price": 4200,
+    "status": "completed",
+    "paymentMethod": "Wallet",
+    "details": {
+      "sender": "Alice Brown",
+      "senderPhone": "08011223344",
+      "receiver": "Bob Green",
+      "receiverPhone": "08044332211",
+      "instructions": "No liquids",
+      "packageSize": "large",
+      "options": "None"
+    }
+  }
+]
