@@ -11,6 +11,7 @@ import Toast from "react-native-toast-message";
 import { LocationProvider } from "@/context/LocationContext";
 import { CartProvider } from "@/context/CartContext";
 import { SendPackageProvider } from "@/context/SendPackageContext";
+import { ToastProvider } from "@/components/ui/toast";
 
 /* ---------------------------------- */
 /* Root Navigator */
@@ -102,17 +103,19 @@ function RootNavigator() {
 /* ---------------------------------- */
 export default function RootLayout() {
   return (
-    <AuthProvider>
-      <LocationProvider>
-        <ConfirmProvider>
-        <CartProvider>
-          <SendPackageProvider>
-            <RootNavigator />
-            <Toast />
-          </SendPackageProvider>
-        </CartProvider>
-        </ConfirmProvider>
-      </LocationProvider>
-    </AuthProvider>
+    <ToastProvider>
+      <AuthProvider>
+        <LocationProvider>
+          <ConfirmProvider>
+            <CartProvider>
+              <SendPackageProvider>
+                <RootNavigator />
+                <Toast />
+              </SendPackageProvider>
+            </CartProvider>
+          </ConfirmProvider>
+        </LocationProvider>
+      </AuthProvider>
+    </ToastProvider>
   );
 }

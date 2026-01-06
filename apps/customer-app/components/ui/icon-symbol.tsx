@@ -2,6 +2,14 @@ import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { OpaqueColorValue, type StyleProp, type TextStyle } from "react-native";
 
 export type IconSymbolName =
+  | "radio"
+  | "map-pin"
+  | "flag"
+  | "user"
+  | "user-check"
+  | "file-text"
+  | "box"
+  | "wallet"
   | "house.fill"
   | "ticket.fill"
   | "fork.knife"
@@ -121,7 +129,12 @@ export type IconSymbolName =
   | "google.logo"
   | "search"
   | "gearshape.fill"
-  | "box.fill";
+  | "box.fill"
+  | "alert-triangle"
+  | "message-square"
+  | "mail"
+  | "x"
+  | "cart";
 
 export const MAPPING: Record<
   IconSymbolName,
@@ -239,6 +252,18 @@ export const MAPPING: Record<
   search: "search",
   "gearshape.fill": "settings",
   "box.fill": "inventory",
+  radio: "radio-button-checked",
+  "map-pin": "place",
+  flag: "flag",
+  user: "person",
+  "user-check": "verified-user",
+  box: "inventory",
+  wallet: "account-balance-wallet",
+  "message-square": "sms",
+  mail: "email",
+  "alert-triangle": "warning",
+  x: "close",
+  cart: "shopping-cart",
 };
 
 interface IconSymbolProps {

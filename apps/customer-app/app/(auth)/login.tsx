@@ -8,7 +8,7 @@ import {
   Platform,
   ActivityIndicator,
 } from "react-native";
-import { RelativePathString, router, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
 
 import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
@@ -26,7 +26,7 @@ export default function LoginScreen() {
   const textMuted = useThemeColor({}, "textMuted");
   const border = useThemeColor({}, "borderDefault");
 
-  const { signIn } = useAuth();
+  const { login } = useAuth();
   const router = useRouter();
 
   const [identifier, setIdentifier] = useState("");
@@ -48,8 +48,8 @@ export default function LoginScreen() {
     setLoading(true);
     setError(null);
     try {
-      await signIn({ email: identifier, password });
-      router.replace({ pathname: "/(tabs)" } as any);
+      await login({ email: identifier, password });
+      router.replace({ pathname: "/(tabs)/home" });
     } catch (err: any) {
       setError(err.message || "Login failed");
     }

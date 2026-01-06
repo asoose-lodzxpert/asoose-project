@@ -19,13 +19,13 @@ export default function SettingsScreen() {
   const primary = useThemeColor({}, "brandPrimary");
   const muted = useThemeColor({}, "textMuted");
   const card = useThemeColor({}, "surfaceCard");
-  const border = useThemeColor({}, "borderDefault");
-  const accentRed = useThemeColor({}, "statusError");
-  const accentBlue = useThemeColor({}, "brandPrimary");
-  const accentGreen = useThemeColor({}, "statusSuccess");
-  const textOnPrimary = useThemeColor({}, "textOnPrimary");
+    const border = useThemeColor({}, "borderDefault");
+    const accentRed = useThemeColor({}, "statusError");
+    const accentBlue = useThemeColor({}, "brandPrimary");
+    const accentGreen = useThemeColor({}, "statusSuccess");
+    const textOnPrimary = useThemeColor({}, "textOnPrimary");
 
-  const { user, signOut } = useAuth();
+    const { user, logout } = useAuth();
   const router = useRouter();
   const showConfirm = useConfirm();
 
@@ -34,20 +34,19 @@ export default function SettingsScreen() {
     profileCompletion * 100
   )}%`;
 
-  const handleSignOut = async () => {
-    const ok = await showConfirm({
-      title: "Sign out",
-      message: "Are you sure you want to sign out?",
-      icon: "alert-circle",
-      variant: "danger",
-      confirmLabel: "Sign out",
-      cancelLabel: "Cancel",
-    });
+    const handleLogout = async () => {
+      const ok = await showConfirm({
+        title: "Sign out",
+        message: "Are you sure you want to sign out?",
+        icon: "alert-circle",
+        variant: "danger",
+        confirmLabel: "Sign out",
+      });
 
     if (!ok) return;
 
-    await signOut();
-    router.replace("/(auth)/login");
+      await logout();
+      router.replace("/(auth)/login");
   };
 
   return (
@@ -56,6 +55,7 @@ export default function SettingsScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
+        {/* Profile */}
         <Pressable
           style={[styles.heroCard, { backgroundColor: primary }]}
           onPress={() => router.push("/profile" as any)}
@@ -122,6 +122,7 @@ export default function SettingsScreen() {
           </View>
         </Pressable>
 
+        {/* Your Account */}
         <ThemedView
           style={[
             styles.sectionGroup,
@@ -150,7 +151,7 @@ export default function SettingsScreen() {
 
           <Pressable
             style={styles.rowLast}
-            onPress={() => router.push("/addresses" as any)}
+            onPress={() => router.push("/(settings)/addresses")}
           >
             <View
               style={[styles.iconBox, { backgroundColor: accentBlue + "22" }]}
@@ -224,10 +225,76 @@ export default function SettingsScreen() {
           </Pressable>
         </ThemedView>
 
-        <Pressable
-          style={[styles.logoutButton, { borderColor: border }]}
-          onPress={handleSignOut}
+        {/* Account Settings */}
+        <ThemedView
+          style={[
+            styles.sectionGroup,
+            { backgroundColor: card, borderColor: border },
+          ]}
         >
+          <ThemedText type="subtitle" style={styles.sectionTitle}>
+            Account Settings
+          </ThemedText>
+
+          <Pressable
+            style={[styles.row, { borderBottomColor: border }]}
+            onPress={() => router.push("/(settings)/notifications")}
+          >
+            <View
+              style={[styles.iconBox, { backgroundColor: accentBlue + "22" }]}
+            >
+              <IconSymbol name="bell" size={18} color={primary} />
+            </View>
+            <View style={styles.rowTextWrap}>
+              <ThemedText style={styles.rowLabel}>
+                Notification Preferences
+              </ThemedText>
+              <ThemedText type="caption">Push, email and SMS</ThemedText>
+            </View>
+            <IconSymbol name="chevron.right" size={18} color={muted} />
+          </Pressable>
+
+          <Pressable
+            style={[styles.row, { borderBottomColor: border }]}
+            onPress={() => router.push("/(settings)/emergency-contact")}
+          >
+            <View
+              style={[styles.iconBox, { backgroundColor: accentGreen + "22" }]}
+            >
+              <IconSymbol name="phone" size={18} color={primary} />
+            </View>
+            <View style={styles.rowTextWrap}>
+              <ThemedText style={styles.rowLabel}>Emergency Contact</ThemedText>
+              <ThemedText type="caption">Trusted person details</ThemedText>
+            </View>
+            <IconSymbol name="chevron.right" size={18} color={muted} />
+          </Pressable>
+
+          <Pressable
+            style={styles.rowLast}
+            onPress={() => router.push("/(settings)/delete-account")}
+          >
+            <View
+              style={[styles.iconBox, { backgroundColor: accentRed + "22" }]}
+            >
+              <IconSymbol name="delete" size={18} color={accentRed} />
+            </View>
+            <View style={styles.rowTextWrap}>
+              <ThemedText style={[styles.rowLabel, { color: accentRed }]}>
+                Delete Account
+              </ThemedText>
+              <ThemedText type="caption">
+                Permanently remove your account
+              </ThemedText>
+            </View>
+          </Pressable>
+        </ThemedView>
+
+        {/* Logout */}
+         <Pressable
+           style={[styles.logoutButton, { borderColor: border }]}
+           onPress={handleLogout}
+         >
           <IconSymbol
             name="log-out"
             size={18}
@@ -243,13 +310,12 @@ export default function SettingsScreen() {
   );
 }
 
+/* ---------------- Styles ---------------- */
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingBottom: 32,
-  },
+  container: { flex: 1 },
+  scrollContent: { paddingBottom: 32 },
+
   heroCard: {
     marginTop: Platform.OS === "ios" ? 24 : 16,
     marginHorizontal: 16,
@@ -278,6 +344,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     marginTop: 8,
   },
+
   profileProgressRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -298,6 +365,7 @@ const styles = StyleSheet.create({
     height: 6,
     borderRadius: 3,
   },
+
   sectionGroup: {
     marginTop: 24,
     marginHorizontal: 16,
@@ -310,6 +378,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
   },
+
   row: {
     flexDirection: "row",
     alignItems: "center",
@@ -338,6 +407,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+
   logoutButton: {
     marginTop: 32,
     marginHorizontal: 16,

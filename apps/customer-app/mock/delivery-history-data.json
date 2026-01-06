@@ -1,11 +1,18 @@
 [
   {
     "id": "1",
-    "from": "12 Admiralty Way, Lekki",
-    "to": "Victoria Island, Lagos",
+    "from": {
+      "address": "Maiduguri Monday Market, Maiduguri",
+      "coordinates": { "lat": 11.8333, "lng": 13.15 }
+    },
+    "to": {
+      "address": "University of Maiduguri, Maiduguri",
+      "coordinates": { "lat": 11.808, "lng": 13.1825 }
+    },
     "price": 3500,
     "status": "active",
     "paymentMethod": "Card",
+    "time_initiated": "2026-01-05T09:15:00Z",
     "details": {
       "sender": "John Doe",
       "senderPhone": "08012345678",
@@ -18,17 +25,96 @@
   },
   {
     "id": "2",
-    "from": "Ikeja City Mall",
-    "to": "Yaba, Lagos",
+    "from": {
+      "address": "Bama Road, Maiduguri",
+      "coordinates": { "lat": 11.8337, "lng": 13.1512 }
+    },
+    "to": {
+      "address": "El-Kanemi Warriors Stadium, Maiduguri",
+      "coordinates": { "lat": 11.8467, "lng": 13.1572 }
+    },
     "price": 4200,
     "status": "completed",
     "paymentMethod": "Wallet",
+    "time_initiated": "2025-12-30T14:45:00Z",
     "details": {
       "sender": "Alice Brown",
       "senderPhone": "08011223344",
       "receiver": "Bob Green",
       "receiverPhone": "08044332211",
       "instructions": "No liquids",
+      "packageSize": "large",
+      "options": "None"
+    }
+  },
+  {
+    "id": "3",
+    "from": {
+      "address": "Gwoza Main Market, Gwoza",
+      "coordinates": { "lat": 11.0833, "lng": 13.6833 }
+    },
+    "to": {
+      "address": "Biu General Hospital, Biu",
+      "coordinates": { "lat": 10.6122, "lng": 12.1944 }
+    },
+    "price": 5100,
+    "status": "completed",
+    "paymentMethod": "Card",
+    "time_initiated": "2025-12-28T11:20:00Z",
+    "details": {
+      "sender": "Chinedu Okafor",
+      "senderPhone": "08099887766",
+      "receiver": "Ngozi Uche",
+      "receiverPhone": "08066778899",
+      "instructions": "Deliver before noon",
+      "packageSize": "small",
+      "options": "Express"
+    }
+  },
+  {
+    "id": "4",
+    "from": {
+      "address": "Custom Area, Maiduguri",
+      "coordinates": { "lat": 11.845, "lng": 13.16 }
+    },
+    "to": {
+      "address": "Federal Polytechnic, Mubi",
+      "coordinates": { "lat": 10.2672, "lng": 13.2675 }
+    },
+    "price": 2800,
+    "status": "completed",
+    "paymentMethod": "Cash",
+    "time_initiated": "2025-12-25T16:05:00Z",
+    "details": {
+      "sender": "Fatima Bello",
+      "senderPhone": "08033445566",
+      "receiver": "Tunde Bakare",
+      "receiverPhone": "08022334455",
+      "instructions": "Call on arrival",
+      "packageSize": "medium",
+      "options": "Gift Wrap"
+    }
+  },
+  {
+    "id": "5",
+    "from": {
+      "address": "Baga Fish Market, Baga",
+      "coordinates": { "lat": 13.1181, "lng": 13.8572 }
+    },
+    "to": {
+      "address": "Dikwa Central Mosque, Dikwa",
+      "coordinates": { "lat": 12.0, "lng": 13.9167 }
+    },
+    "price": 3900,
+    "status": "completed",
+    "paymentMethod": "Wallet",
+    "time_initiated": "2025-12-20T13:30:00Z",
+    "details": {
+      "sender": "Emeka Obi",
+      "senderPhone": "08055667788",
+      "receiver": "Aisha Musa",
+      "receiverPhone": "08077889900",
+      "instructions": "Leave at reception",
       "packageSize": "large",
       "options": "None"
     }

@@ -31,6 +31,7 @@
     "@nestjs/platform-express": "^11.0.1",
     "@nestjs/throttler": "^6.5.0",
     "@supabase/supabase-js": "^2.87.1",
+    "bullmq": "^5.66.4",
     "ioredis": "^5.8.2",
     "nest-winston": "^1.10.2",
     "passport": "^0.7.0",

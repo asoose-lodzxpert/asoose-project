@@ -1,12 +1,5 @@
-import {
-  FlatList,
-  View,
-  RefreshControl,
-  Pressable,
-  Animated,
-} from "react-native";
-import { useState, useCallback, useRef, useMemo } from "react";
-
+import { FlatList, View, RefreshControl, Animated } from "react-native";
+import { useState, useCallback, useRef } from "react";
 import { ThemedView } from "@/components/themed-view";
 import { PromotionsCarousel } from "@/components/home/PromotionsCarousel";
 import { VendorCard } from "@/components/home/VendorCard";
@@ -17,7 +10,6 @@ import { CategoryPillFilter } from "@/components/home/CategoryPillFilter";
 import { SectionHeader } from "@/components/home/SectionHeader";
 import { SkeletonCard } from "@/components/home/SkeletonCard";
 import { HorizontalSpacer } from "@/components/home/HorizontalSpacer";
-
 import { PROMOTIONS, POPULAR, TOP } from "@/data/home";
 import { ItemCard } from "@/components/common/ItemCard";
 import { getPagedRestaurants } from "@/services/home.service";
@@ -29,19 +21,14 @@ export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [category, setCategory] = useState("all");
   const card = useThemeColor({}, "surfaceCard");
-
   const pullAnim = useRef(new Animated.Value(0)).current;
-
   const CATEGORIES = getCategories();
-
-  /** CATEGORY FILTERING */
   const data = getPagedRestaurants(category, page);
 
   function loadMore() {
     setPage((p) => p + 1);
   }
 
-  /** ANIMATED REFRESH */
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     Animated.timing(pullAnim, {
@@ -49,7 +36,6 @@ export default function HomeScreen() {
       duration: 300,
       useNativeDriver: true,
     }).start();
-
     setTimeout(() => {
       setPage(1);
       setRefreshing(false);
@@ -57,10 +43,8 @@ export default function HomeScreen() {
     }, 800);
   }, []);
 
-  // ...existing code...
-
   return (
-    <ThemedView style={{ flex: 1 }}>
+    <ThemedView style={{ flex: 1 }} pointerEvents="box-none">
       <View style={{ paddingBottom: 0 }}>
         <HomeHeader />
         <CategoryPillFilter
@@ -78,9 +62,7 @@ export default function HomeScreen() {
         ListHeaderComponent={
           <>
             <PromotionsCarousel data={PROMOTIONS} />
-
             <SectionHeader title="Popular Near You" href="/popular" />
-
             {refreshing ? (
               <FlatList
                 horizontal
@@ -97,9 +79,7 @@ export default function HomeScreen() {
                 showsHorizontalScrollIndicator={false}
               />
             )}
-
             <SectionHeader title="Hot Restaurants" href="/hot" />
-
             {refreshing ? (
               <FlatList
                 horizontal
@@ -130,7 +110,6 @@ export default function HomeScreen() {
         onEndReached={loadMore}
         onEndReachedThreshold={0.4}
       />
-
       <FloatingCart />
       <LocationPickerModal />
     </ThemedView>

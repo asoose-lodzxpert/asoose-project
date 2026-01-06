@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from "react";
+import { z } from "zod";
 import {
   View,
   StyleSheet,
@@ -8,8 +9,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { router } from "expo-router";
-import { Alert } from "react-native";
-import { signup as signupApi } from "@/services/auth.service";
+import { useToast } from "@/components/ui/toast";
 
 import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
@@ -17,6 +17,7 @@ import { ThemedInput } from "@/components/ThemedInput";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { CustomDropdown } from "@/components/CustomDropdown";
+import { signup } from "@/services/auth.service";
 
 /* ---------------------------------- */
 /* Static Data */
@@ -26,7 +27,18 @@ const COUNTRY_CODES = [{ label: "+234", value: "+234" }];
 /* ---------------------------------- */
 /* Screen */
 /* ---------------------------------- */
-export default function SignupScreen() {
+export default function Signup() {
+  // Validation schema
+  const schema = z.object({
+    fullName: z.string().min(2, "Full name is required"),
+    email: z.string().email("Enter a valid email address"),
+    phoneNumber: z.string().min(7, "Phone number is required"),
+    password: z.string().min(8, "Password must be at least 8 characters"),
+    accepted: z.literal(true, { message: "You must accept the terms" }),
+  });
+
+  const [errors, setErrors] = useState<{ [key: string]: string }>({});
+  const showToast = useToast();
   const primary = useThemeColor({}, "brandPrimary");
   const surface = useThemeColor({}, "surfaceBackground");
   const textMuted = useThemeColor({}, "textMuted");
@@ -57,13 +69,27 @@ export default function SignupScreen() {
   /* Simulate Signup */
   /* ---------------------------------- */
   const handleSignup = async () => {
-    if (!accepted || !fullName || !email || !phoneNumber || !password) return;
-
+    setErrors({});
+    const result = schema.safeParse({
+      fullName,
+      email,
+      phoneNumber,
+      password,
+      accepted,
+    });
+    if (!result.success) {
+      const fieldErrors: { [key: string]: string } = {};
+      for (const issue of result.error.issues) {
+        if (issue.path[0]) fieldErrors[String(issue.path[0])] = issue.message;
+      }
+      setErrors(fieldErrors);
+      showToast({ variant: "error", message: Object.values(fieldErrors)[0] });
+      return;
+    }
     setLoading(true);
     try {
       const phone = `${phoneCode}${phoneNumber}`;
-      const res = await signupApi({ name: fullName, email, phone, password });
-      // assume success when no error thrown
+      await signup({ name: fullName, email, phone, password });
       setLoading(false);
       router.replace("/login");
     } catch (err: any) {
@@ -73,7 +99,7 @@ export default function SignupScreen() {
         err?.message ||
         err?.error ||
         "Could not create account. Please try again.";
-      Alert.alert("Signup failed", String(msg));
+      showToast({ variant: "error", message: String(msg) });
     }
   };
 
@@ -100,6 +126,11 @@ export default function SignupScreen() {
             value={fullName}
             onChangeText={setFullName}
           />
+          {errors.fullName && (
+            <ThemedText style={{ color: "#F87171", fontSize: 13 }}>
+              {errors.fullName}
+            </ThemedText>
+          )}
 
           <ThemedInput
             placeholder="Email address"
@@ -108,6 +139,11 @@ export default function SignupScreen() {
             autoCapitalize="none"
             keyboardType="email-address"
           />
+          {errors.email && (
+            <ThemedText style={{ color: "#F87171", fontSize: 13 }}>
+              {errors.email}
+            </ThemedText>
+          )}
 
           {/* Phone */}
           <View style={styles.row}>
@@ -126,6 +162,11 @@ export default function SignupScreen() {
               keyboardType="phone-pad"
               containerStyle={{ flex: 4 }}
             />
+            {errors.phoneNumber && (
+              <ThemedText style={{ color: "#F87171", fontSize: 13 }}>
+                {errors.phoneNumber}
+              </ThemedText>
+            )}
           </View>
 
           {/* Password */}
@@ -144,6 +185,11 @@ export default function SignupScreen() {
               </Pressable>
             }
           />
+          {errors.password && (
+            <ThemedText style={{ color: "#F87171", fontSize: 13 }}>
+              {errors.password}
+            </ThemedText>
+          )}
 
           {/* Strength Indicator */}
           <View style={styles.strengthRow}>
@@ -161,13 +207,6 @@ export default function SignupScreen() {
             ))}
           </View>
 
-          {/* Referral */}
-          <Pressable>
-            <ThemedText style={{ color: primary, fontWeight: "600" }}>
-              Have a referral code?
-            </ThemedText>
-          </Pressable>
-
           {/* Terms */}
           <Pressable
             style={styles.termsRow}
@@ -184,7 +223,6 @@ export default function SignupScreen() {
             >
               {accepted && <IconSymbol name="check" size={14} color="#000" />}
             </View>
-
             <ThemedText style={styles.termsText}>
               I agree to the{" "}
               <ThemedText style={{ color: primary }}>
@@ -194,6 +232,11 @@ export default function SignupScreen() {
               <ThemedText style={{ color: primary }}>Privacy Policy</ThemedText>
             </ThemedText>
           </Pressable>
+          {errors.accepted && (
+            <ThemedText style={{ color: "#F87171", fontSize: 13 }}>
+              {errors.accepted}
+            </ThemedText>
+          )}
 
           {/* Security Banner */}
           <View style={styles.securityBanner}>

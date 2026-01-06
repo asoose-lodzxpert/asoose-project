@@ -13,10 +13,17 @@ import { useRouter } from "expo-router";
 
 export type DeliveryHistoryItem = {
   id: string;
-  from: string;
-  to: string;
+  from: {
+    address: string;
+    coordinates: { lat: number; lng: number };
+  };
+  to: {
+    address: string;
+    coordinates: { lat: number; lng: number };
+  };
   price: number;
   status: string;
+  time_initiated: string; // ISO string or timestamp
 };
 
 interface Props {
@@ -39,33 +46,54 @@ export const DeliveryHistoryList: React.FC<Props> = ({
   const surfaceCard = useThemeColor({}, "surfaceCard");
   const border = useThemeColor({}, "borderDefault");
 
-  const renderItem = ({ item }: { item: DeliveryHistoryItem }) => (
-    <Pressable
-      style={[
-        styles.card,
-        { backgroundColor: surfaceCard, borderColor: border },
-      ]}
-      onPress={() => router.push(`/(delivery)/details?id=${item.id}`)}
-    >
-      <View style={styles.cardRow}>
-        <IconSymbol
-          name="truck"
-          size={20}
-          color={brandPrimary}
-          style={styles.icon}
-        />
+  const renderItem = ({ item }: { item: DeliveryHistoryItem }) => {
+    // Format time_initiated as e.g. 'Jan 5, 2026, 2:30 PM'
+    let timeString = "";
+    if (item.time_initiated) {
+      const date = new Date(item.time_initiated);
+      timeString = date.toLocaleString(undefined, {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    }
+    return (
+      <Pressable
+        style={[
+          styles.card,
+          { backgroundColor: surfaceCard, borderColor: border },
+        ]}
+        onPress={() => router.push(`/(delivery)/details?id=${item.id}`)}
+      >
+        <View style={styles.cardRow}>
+          <IconSymbol
+            name="truck"
+            size={20}
+            color={brandPrimary}
+            style={styles.icon}
+          />
 
-        <View style={styles.cardContent}>
-          <ThemedText style={styles.cardFromTo}>
-            {item.from} → {item.to}
-          </ThemedText>
-          <ThemedText type="caption">₦{item.price.toLocaleString()}</ThemedText>
+          <View style={styles.cardContent}>
+            <ThemedText style={styles.cardFromTo}>
+              {item.from.address} → {item.to.address}
+            </ThemedText>
+            <ThemedText type="caption">
+              ₦{item.price.toLocaleString()}
+            </ThemedText>
+            {timeString && (
+              <ThemedText type="caption" style={styles.timeInitiated}>
+                {timeString}
+              </ThemedText>
+            )}
+          </View>
+
+          <IconSymbol name="chevron.right" size={18} color={brandPrimary} />
         </View>
-
-        <IconSymbol name="chevron.right" size={18} color={brandPrimary} />
-      </View>
-    </Pressable>
-  );
+      </Pressable>
+    );
+  };
 
   if (loading && data.length === 0) {
     return (
@@ -124,5 +152,11 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "500",
     marginBottom: 2,
+  },
+
+  timeInitiated: {
+    fontSize: 12,
+    color: "#888",
+    marginTop: 2,
   },
 });

@@ -1,22 +1,17 @@
-import { MiddlewareConsumer, Module } from '@nestjs/common';
-// 1. IMPORT APP_GUARD from @nestjs/core
-import { APP_GUARD } from '@nestjs/core'; 
+import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { ConfigModule } from '@nestjs/config';
 import { UsersModule } from './users/users.module';
-import { APP_GUARD } from '@nestjs/core';
 import { StrictThrottlerGuard } from './libs/rate-limit/strict-throttle.guard';
-
-// Assuming StrictThrottlerGuard is your custom guard or the ThrottlerGuard
-import { StrictThrottlerGuard } from './auth/guards/strict-throttler.guard'; 
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ 
+    ConfigModule.forRoot({
       isGlobal: true,
-    }), 
+    }),
     UsersModule,
     AuthModule,
     // You must also import the ThrottlerModule if using the official package:
@@ -27,13 +22,11 @@ import { StrictThrottlerGuard } from './auth/guards/strict-throttler.guard';
   ],
   controllers: [AppController],
   providers: [
-    AppService, 
+    AppService,
     {
-      // APP_GUARD is now imported
-      provide: APP_GUARD, 
-      // StrictThrottlerGuard is now imported
-      useClass: StrictThrottlerGuard, 
-    }
+      provide: APP_GUARD,
+      useClass: StrictThrottlerGuard,
+    },
   ],
 })
 export class AppModule {}

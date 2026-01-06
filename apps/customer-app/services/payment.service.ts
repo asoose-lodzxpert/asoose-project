@@ -1,5 +1,3 @@
-import type { PackageSize } from "@/types/delivery";
-
 export type PaymentMethod = "transfer" | "paystack" | "monnify" | "flutterwave";
 
 export async function initiatePayment(method: PaymentMethod, payload: any) {

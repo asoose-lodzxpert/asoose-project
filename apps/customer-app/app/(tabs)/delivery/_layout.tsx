@@ -17,7 +17,7 @@ export default function AuthLayout() {
         name="success"
         options={{
           presentation: "modal",
-          animation: "slide_from_bottom",
+          animation: "slide_from_left",
         }}
       />
     </Stack>

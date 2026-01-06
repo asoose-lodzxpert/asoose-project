@@ -29,20 +29,24 @@ export default function DeliveryHistoryScreen() {
   const router = useRouter();
 
   const loadData = useCallback(
-    async (refresh = false) => {
+    async (refresh = false, customTab?: DeliveryTab, customPage?: number) => {
       if (loading) return;
-
       setLoading(true);
-
-      const nextPage = refresh ? 1 : page + 1;
-      const result = await fetchDeliveryHistory(tab, nextPage, PAGE_SIZE);
-
-      setData((prev) => (refresh ? result : [...prev, ...result]));
-      setPage(nextPage);
-      setHasMore(result.length === PAGE_SIZE);
-
-      setLoading(false);
-      setRefreshing(false);
+      try {
+        const currentTab = customTab ?? tab;
+        const currentPage = customPage ?? (refresh ? 1 : page + 1);
+        const result = await fetchDeliveryHistory(
+          currentTab,
+          currentPage,
+          PAGE_SIZE
+        );
+        setData((prev) => (refresh ? result : [...prev, ...result]));
+        setPage(currentPage);
+        setHasMore(result.length === PAGE_SIZE);
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
     },
     [tab, page, loading]
   );
@@ -51,25 +55,27 @@ export default function DeliveryHistoryScreen() {
     setData([]);
     setPage(1);
     setHasMore(true);
-    loadData(true);
-  }, [tab, loadData]);
+    // Wait for state to update, then load data for new tab
+    loadData(true, tab, 1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    loadData(true);
-  }, [loadData]);
+    loadData(true, tab, 1);
+  }, [loadData, tab]);
 
   const onEndReached = useCallback(() => {
     if (!loading && hasMore) {
-      loadData();
+      loadData(false, tab, page + 1);
     }
-  }, [loading, hasMore, loadData]);
+  }, [loading, hasMore, loadData, tab, page]);
 
   return (
     <ThemedView style={styles.container}>
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} style={styles.backBtn}>
-          <IconSymbol name="arrow-left" size={22} color={brandPrimary} />
+          <IconSymbol name="chevron.left" size={22} color={brandPrimary} />
         </Pressable>
         <ThemedText type="title" style={styles.headerTitle}>
           Deliveries
@@ -96,7 +102,7 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
-    paddingTop: 32,
+    paddingTop: 8,
     paddingBottom: 12,
     paddingHorizontal: 16,
   },

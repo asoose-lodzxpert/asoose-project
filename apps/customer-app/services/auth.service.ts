@@ -1,33 +1,3 @@
-import { z } from "zod";
-
-const demoUser = {
-  id: "usr_001",
-  name: "John Smith",
-  email: "john.smith@example.com",
-  password: "password123",
-  avatarUrl: null,
-  phone: "08012345678",
-};
-
-const loginSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(6),
-});
-
-export async function loginWithDemo(email: string, password: string) {
-  // Validate input
-  loginSchema.parse({ email, password });
-  // Simulate network delay
-  await new Promise((r) => setTimeout(r, 1200));
-  const isEmailMatch = email === demoUser.email || email === demoUser.phone;
-  const isPasswordMatch = password === demoUser.password;
-  if (!isEmailMatch || !isPasswordMatch) {
-    throw new Error("Incorrect email or password");
-  }
-  // Return user object (without password)
-  const { password: _, ...user } = demoUser;
-  return user;
-}
 const DEFAULT_BACKEND = "https://asoose.com/api/v1/";
 
 const BACKEND_URL =
@@ -72,6 +42,17 @@ export async function login(email: string, password: string) {
     method: "POST",
     body: JSON.stringify({ email, password }),
   });
+}
+
+export async function refreshToken(refresh: string) {
+  return requestJson("refresh", {
+    method: "POST",
+    body: JSON.stringify({ refresh }),
+  });
+}
+
+export async function logout() {
+  return requestJson("logout", { method: "POST" });
 }
 
 export const authConfig = {

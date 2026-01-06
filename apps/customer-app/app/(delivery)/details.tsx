@@ -1,109 +1,218 @@
-import React from "react";
-import { View, StyleSheet, Pressable } from "react-native";
+import React, { useEffect, useState } from "react";
+import { View, StyleSheet, Pressable, ScrollView } from "react-native";
 import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { useRouter, useLocalSearchParams } from "expo-router";
+import deliveries from "@/mock/delivery-history-data.json";
 
-// Dummy data for demonstration
-const deliveries = [
-  {
-    id: "1",
-    from: "12 Admiralty Way, Lekki",
-    to: "Victoria Island, Lagos",
-    price: 3500,
-    status: "active",
-    paymentMethod: "Card",
-    details: {
-      sender: "John Doe",
-      senderPhone: "08012345678",
-      receiver: "Jane Smith",
-      receiverPhone: "08087654321",
-      instructions: "Handle with care",
-      packageSize: "medium",
-      options: "Fragile, Perishable",
-    },
-  },
-  {
-    id: "2",
-    from: "Ikeja City Mall",
-    to: "Yaba, Lagos",
-    price: 4200,
-    status: "completed",
-    paymentMethod: "Wallet",
-    details: {
-      sender: "Alice Brown",
-      senderPhone: "08011223344",
-      receiver: "Bob Green",
-      receiverPhone: "08044332211",
-      instructions: "No liquids",
-      packageSize: "large",
-      options: "None",
-    },
-  },
-];
+type Delivery = (typeof deliveries)[number];
 
 export default function DeliveryDetailsScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams();
-  const brandPrimary = useThemeColor({}, "brandPrimary");
-  const surfaceCard = useThemeColor({}, "surfaceCard");
-  const textPrimary = useThemeColor({}, "textPrimary");
-  const delivery = deliveries.find((d) => d.id === params.id);
+  const { id } = useLocalSearchParams();
 
-  if (!delivery) {
-    return (
-      <ThemedView style={styles.container}>
-        <View style={styles.header}>
-          <Pressable onPress={() => router.back()} style={styles.backBtn}>
-            <IconSymbol name="arrow-left" size={22} color={brandPrimary} />
-          </Pressable>
-          <ThemedText type="title" style={styles.headerTitle}>
-            Delivery Details
-          </ThemedText>
-        </View>
-        <ThemedText style={{ textAlign: "center", marginTop: 32 }}>
-          Delivery not found.
-        </ThemedText>
-      </ThemedView>
-    );
-  }
+  const primary = useThemeColor({}, "brandPrimary");
+  const surface = useThemeColor({}, "surfaceCard");
+  const border = useThemeColor({}, "borderDefault");
+  const muted = useThemeColor({}, "textMuted");
+
+  const [loading, setLoading] = useState(true);
+  const [delivery, setDelivery] = useState<Delivery | null>(null);
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const deliveryId = Array.isArray(id) ? id[0] : id;
+      // @ts-ignore
+      setDelivery(deliveries.find((d) => d.id === deliveryId) ?? null);
+      setLoading(false);
+    }, 600);
+    return () => clearTimeout(t);
+  }, [id]);
 
   return (
     <ThemedView style={styles.container}>
+      {/* Header */}
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} style={styles.backBtn}>
-          <IconSymbol name="arrow-left" size={22} color={brandPrimary} />
+          <IconSymbol name="arrow-left" size={22} color={primary} />
         </Pressable>
         <ThemedText type="title" style={styles.headerTitle}>
           Delivery Details
         </ThemedText>
       </View>
-      <View style={[styles.card, { backgroundColor: surfaceCard }]}> 
-        <ThemedText style={styles.cardTitle}>From</ThemedText>
-        <ThemedText style={styles.cardValue}>{delivery.from}</ThemedText>
-        <ThemedText style={styles.cardTitle}>To</ThemedText>
-        <ThemedText style={styles.cardValue}>{delivery.to}</ThemedText>
-        <ThemedText style={styles.cardTitle}>Price</ThemedText>
-        <ThemedText style={styles.cardValue}>₦{delivery.price.toLocaleString()}</ThemedText>
-        <ThemedText style={styles.cardTitle}>Payment Method</ThemedText>
-        <ThemedText style={styles.cardValue}>{delivery.paymentMethod}</ThemedText>
-        <View style={styles.divider} />
-        <ThemedText style={styles.cardTitle}>Sender</ThemedText>
-        <ThemedText style={styles.cardValue}>{delivery.details.sender} ({delivery.details.senderPhone})</ThemedText>
-        <ThemedText style={styles.cardTitle}>Receiver</ThemedText>
-        <ThemedText style={styles.cardValue}>{delivery.details.receiver} ({delivery.details.receiverPhone})</ThemedText>
-        <ThemedText style={styles.cardTitle}>Instructions</ThemedText>
-        <ThemedText style={styles.cardValue}>{delivery.details.instructions}</ThemedText>
-        <ThemedText style={styles.cardTitle}>Package Size</ThemedText>
-        <ThemedText style={styles.cardValue}>{delivery.details.packageSize}</ThemedText>
-        <ThemedText style={styles.cardTitle}>Options</ThemedText>
-        <ThemedText style={styles.cardValue}>{delivery.details.options}</ThemedText>
-      </View>
+
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {loading && <SkeletonCard />}
+
+        {!loading && !delivery && (
+          <ThemedText style={styles.centerText}>Delivery not found</ThemedText>
+        )}
+
+        {!loading && delivery && (
+          <>
+            {/* ROUTE */}
+            <View
+              style={[
+                styles.card,
+                { backgroundColor: surface, borderColor: border },
+              ]}
+            >
+              <View style={styles.routeRow}>
+                <IconSymbol name="radio" size={18} color={primary} />
+                <ThemedText style={[styles.liveText, { color: primary }]}>
+                  Live Route
+                </ThemedText>
+              </View>
+
+              <RouteItem
+                icon="map-pin"
+                label="Pickup"
+                value={delivery.from.address}
+                color={primary}
+              />
+
+              <View style={styles.routeDivider} />
+
+              <RouteItem
+                icon="flag"
+                label="Drop-off"
+                value={delivery.to.address}
+                color={primary}
+              />
+            </View>
+
+            {/* SUMMARY */}
+            <View
+              style={[
+                styles.card,
+                { backgroundColor: surface, borderColor: border },
+              ]}
+            >
+              <SummaryItem
+                icon="wallet"
+                label="Price"
+                value={`₦${delivery.price.toLocaleString()}`}
+                highlight
+              />
+              <SummaryItem
+                icon="credit-card"
+                label="Payment"
+                value={delivery.paymentMethod}
+              />
+              <SummaryItem
+                icon="box"
+                label="Package"
+                value={delivery.details.packageSize}
+              />
+            </View>
+
+            {/* PEOPLE & NOTES */}
+            <View
+              style={[
+                styles.card,
+                { backgroundColor: surface, borderColor: border },
+              ]}
+            >
+              <SummaryItem
+                icon="user"
+                label="Sender"
+                value={`${delivery.details.sender} (${delivery.details.senderPhone})`}
+              />
+              <SummaryItem
+                icon="user-check"
+                label="Receiver"
+                value={`${delivery.details.receiver} (${delivery.details.receiverPhone})`}
+              />
+              <SummaryItem
+                icon="file-text"
+                label="Instructions"
+                value={delivery.details.instructions || "None"}
+              />
+            </View>
+          </>
+        )}
+      </ScrollView>
     </ThemedView>
   );
 }
+
+/* ---------------- Components ---------------- */
+
+function RouteItem({
+  icon,
+  label,
+  value,
+  color,
+}: {
+  icon: string;
+  label: string;
+  value: string;
+  color: string;
+}) {
+  return (
+    <View style={styles.routeItem}>
+      <IconSymbol name={icon as any} size={18} color={color} />
+      <View style={{ flex: 1 }}>
+        <ThemedText style={styles.routeLabel}>{label}</ThemedText>
+        <ThemedText style={styles.routeValue}>{value}</ThemedText>
+      </View>
+    </View>
+  );
+}
+
+function SummaryItem({
+  icon,
+  label,
+  value,
+  highlight,
+}: {
+  icon: string;
+  label: string;
+  value: string;
+  highlight?: boolean;
+}) {
+  const primary = useThemeColor({}, "brandPrimary");
+  const muted = useThemeColor({}, "textMuted");
+
+  return (
+    <View style={styles.summaryRow}>
+      <IconSymbol
+        name={icon as any}
+        size={18}
+        color={highlight ? primary : muted}
+      />
+      <View style={{ flex: 1 }}>
+        <ThemedText style={styles.summaryLabel}>{label}</ThemedText>
+        <ThemedText
+          style={[
+            styles.summaryValue,
+            highlight && { color: primary, fontWeight: "600" },
+          ]}
+        >
+          {value}
+        </ThemedText>
+      </View>
+    </View>
+  );
+}
+
+function SkeletonCard() {
+  const border = useThemeColor({}, "borderDefault");
+  return (
+    <View style={[styles.card, { borderColor: border }]}>
+      <View style={styles.skeleton} />
+      <View style={styles.skeleton} />
+      <View style={styles.skeleton} />
+    </View>
+  );
+}
+
+/* ---------------- Styles ---------------- */
 
 const styles = StyleSheet.create({
   container: {
@@ -115,7 +224,6 @@ const styles = StyleSheet.create({
     paddingTop: 32,
     paddingBottom: 12,
     paddingHorizontal: 16,
-    backgroundColor: "transparent",
   },
   backBtn: {
     marginRight: 12,
@@ -123,32 +231,70 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 20,
-    fontWeight: "bold",
-    color: "#222",
+    fontWeight: "600",
+  },
+  scrollContent: {
+    paddingBottom: 24,
   },
   card: {
-    borderRadius: 12,
-    margin: 16,
+    marginHorizontal: 16,
+    marginBottom: 12,
     padding: 16,
-    shadowColor: "#000",
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 2,
+    borderRadius: 14,
+    borderWidth: 1,
   },
-  cardTitle: {
+  routeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  liveText: {
+    marginLeft: 6,
     fontSize: 13,
     fontWeight: "600",
-    marginTop: 12,
-    color: "#888",
   },
-  cardValue: {
+  routeItem: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+  },
+  routeDivider: {
+    height: 1,
+    marginVertical: 12,
+    backgroundColor: "#E5E7EB",
+  },
+  routeLabel: {
+    fontSize: 12,
+    color: "#777",
+  },
+  routeValue: {
+    fontSize: 16,
+    fontWeight: "600",
+    lineHeight: 22,
+  },
+  summaryRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 14,
+  },
+  summaryLabel: {
+    fontSize: 12,
+    color: "#777",
+  },
+  summaryValue: {
     fontSize: 15,
     fontWeight: "500",
-    marginTop: 2,
   },
-  divider: {
-    height: 1,
-    backgroundColor: "#eee",
-    marginVertical: 12,
+  centerText: {
+    textAlign: "center",
+    marginTop: 32,
+  },
+  skeleton: {
+    height: 16,
+    borderRadius: 6,
+    backgroundColor: "#E5E7EB",
+    marginBottom: 12,
+    opacity: 0.5,
   },
 });
