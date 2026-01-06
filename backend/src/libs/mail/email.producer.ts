@@ -14,10 +14,19 @@ export class EmailProducer {
       { email },
       {
         attempts: 3,
-        backoff: {
-          type: 'exponential',
-          delay: 3000,
-        },
+        backoff: { type: 'exponential', delay: 3000 },
+        removeOnComplete: true,
+      },
+    );
+  }
+
+  // ✅ ADD THIS METHOD
+  async sendVendorMessage(email: string, subject: string, message: string) {
+    await this.emailQueue.add(
+      'send-vendor-message', // Job Name
+      { email, subject, message }, // Payload
+      {
+        attempts: 3,
         removeOnComplete: true,
       },
     );
