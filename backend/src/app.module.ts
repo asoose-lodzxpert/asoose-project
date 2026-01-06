@@ -26,7 +26,7 @@ import { QueueModule } from './libs/queue/queue.module';
   ],
   controllers: [AppController],
   providers: [
-    AppService, 
+    AppService,
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard, 
