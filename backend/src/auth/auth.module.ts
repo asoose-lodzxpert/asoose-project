@@ -11,25 +11,14 @@ import { PrismaModule } from 'src/prisma/prisma.module';
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
-        secret: configService.get<string>('SUPABASE_JWT_SECRET_KEY'), 
+        secret: configService.get<string>('SUPABASE_JWT_SECRET_KEY'),
       }),
       inject: [ConfigService],
     }),
-    ConfigModule, 
+    ConfigModule,
   ],
-  
-  providers: [
-   
-    JwtStrategy, 
-    JwtAuthGuard, 
-    PrismaModule
-  ],
-  exports: [
-   
-    JwtStrategy, 
-    JwtAuthGuard, 
-    PassportModule, 
-    JwtModule,
-  ],
+
+  providers: [JwtStrategy, JwtAuthGuard, PrismaModule],
+  exports: [JwtStrategy, JwtAuthGuard, PassportModule, JwtModule],
 })
 export class AuthModule {}
