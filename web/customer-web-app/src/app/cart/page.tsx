@@ -3,8 +3,8 @@
 import React, { useState } from 'react';
 import { ArrowLeft, Clock, Plus } from 'lucide-react';
 import Link from 'next/link';
-import { DeliveryCard } from '../components/cart/DeliveryCard';
-import { CartItem } from '../components/cart/CartItem';
+import { DeliveryCard } from '../../components/cart/DeliveryCard';
+import { CartItem } from '../../components/cart/CartItem';
 
 // --- MOCK DATA ---
 const INITIAL_CART = [
