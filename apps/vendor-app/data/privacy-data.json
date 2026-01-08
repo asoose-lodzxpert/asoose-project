@@ -1,0 +1,52 @@
+{
+  "sections": [
+    {
+      "id": "introduction",
+      "label": "Introduction",
+      "icon": "info",
+      "content": "Welcome to our Privacy Policy. Your privacy is important to us, and we are committed to protecting your personal information. This document explains how we collect, use, store, and share your data when you use our app or services. We are committed to transparency and want you to understand the types of information we gather, why we gather it, and the steps we take to ensure it is handled securely. By using our services, you consent to the practices described in this policy. We encourage you to read each section carefully and contact us if you have any questions or concerns. Maintaining your trust is our top priority, and we continuously review and update our privacy practices to reflect evolving legal requirements and best industry practices."
+    },
+    {
+      "id": "data-collection",
+      "label": "Data Collection",
+      "icon": "database",
+      "content": "We collect personal and non-personal data to provide a high-quality service and improve your experience. Personal data includes information you voluntarily provide such as your name, email address, phone number, payment information, and any communication you send to our support team. Non-personal data includes usage patterns, device information, IP addresses, browser type, and app activity. We may also collect location data with your consent to enhance features like delivery tracking or service availability. All data is collected lawfully and only for purposes necessary to operate, maintain, and improve our services. Understanding what data we collect allows you to make informed decisions about how you interact with our app and what permissions you grant."
+    },
+    {
+      "id": "data-usage",
+      "label": "Data Usage",
+      "icon": "settings",
+      "content": "The data we collect is used to deliver our services efficiently and improve your experience. This includes processing orders, sending updates, responding to inquiries, providing customer support, and personalizing app features. Usage data helps us analyze patterns and trends to optimize performance, detect errors, and develop new features. With your consent, we may also use data for marketing purposes, such as sending promotions or product recommendations. Additionally, data is used for legal compliance, fraud detection, and dispute resolution. We ensure that all usage of your data is aligned with applicable privacy laws and our internal security standards. By understanding how your data is used, you can make informed choices about app features, notifications, and privacy settings."
+    },
+    {
+      "id": "data-sharing",
+      "label": "Data Sharing",
+      "icon": "share",
+      "content": "We respect your privacy and do not sell your personal information to third parties. Your data may be shared only with trusted partners who perform services on our behalf, such as payment processors, analytics providers, or delivery services. All partners are bound by strict confidentiality agreements and are prohibited from using your data for unrelated purposes. In certain cases, we may disclose data to comply with legal obligations, enforce our terms of service, or protect the rights, property, or safety of our company or users. We also take steps to ensure that any international transfers of data meet legal standards for privacy protection. By sharing data responsibly, we aim to enhance your experience while maintaining your trust and privacy."
+    },
+    {
+      "id": "security",
+      "label": "Security",
+      "icon": "shield",
+      "content": "We implement a range of technical and organizational measures to protect your information from unauthorized access, alteration, disclosure, or destruction. These measures include secure encryption for data in transit, secure storage protocols for data at rest, access control mechanisms, regular security audits, and staff training on privacy practices. While no system is completely immune to threats, we continuously monitor and update our security protocols to mitigate risks. Users are encouraged to protect their account credentials, enable two-factor authentication if available, and report suspicious activity immediately. Maintaining robust security practices helps prevent data breaches, fraud, and unauthorized access, safeguarding both your information and the integrity of our services."
+    },
+    {
+      "id": "user-rights",
+      "label": "User Rights",
+      "icon": "user",
+      "content": "You have rights concerning the personal data we collect about you. You may request access to the data we hold, request corrections to inaccurate information, or request deletion of your personal data where legally permissible. You can also withdraw consent for certain processing activities, limit the processing of your information, or object to specific uses, such as direct marketing. To exercise these rights, contact our support team, providing sufficient information to verify your identity. We will respond to your requests in accordance with applicable privacy laws and regulations. Understanding and exercising your rights empowers you to have greater control over your data and ensures transparency in how your information is handled."
+    },
+    {
+      "id": "cookies",
+      "label": "Cookies",
+      "icon": "cookie",
+      "content": "Our app and website may use cookies and similar technologies to enhance your experience and analyze usage patterns. Cookies are small files stored on your device that allow us to remember your preferences, maintain sessions, and provide personalized features. Analytics cookies help us track app performance, user interactions, and feature engagement, enabling us to improve functionality and user experience. Some cookies are essential for core operations, while others require consent before activation. You can manage your cookie preferences through app settings or browser options. Proper use of cookies allows us to provide a seamless, tailored experience while respecting your privacy choices."
+    },
+    {
+      "id": "contact-us",
+      "label": "Contact Us",
+      "icon": "headset",
+      "content": "If you have any questions, concerns, or requests regarding your personal data or this Privacy Policy, please contact our support team. We are committed to responding promptly and transparently to all inquiries. You may reach out for clarifications on data collection practices, to exercise your rights, or to report suspected breaches. Our support team is trained to handle privacy requests securely and will guide you through the necessary steps. Providing clear and detailed information when contacting support helps us respond efficiently. Maintaining open communication ensures your privacy is respected and that your questions are resolved satisfactorily."
+    }
+  ]
+}
