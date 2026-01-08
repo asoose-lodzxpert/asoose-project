@@ -150,6 +150,17 @@ enum TransactionStatus {
 //// USER & AUTH
 //// =====================
 
+
+
+model SystemSetting {
+  key         String   @id
+  value       String  
+  description String?
+  category    String   
+  updatedAt   DateTime @updatedAt
+}
+
+
 model User {
   id        String     @id @default(uuid())
   email     String     @unique
@@ -157,11 +168,15 @@ model User {
   name      String
   phone     String?
   image     String?
+  notifications Notification[]
+  fcmToken  String?  @map("fcm_token")
   role      UserRole   @default(CUSTOMER)
   status    UserStatus @default(ACTIVE)
   verificationStatus String? @default("UNVERIFIED")
+  deletedAt DateTime?
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
+
 
   // Profiles & Relations
   riderProfile RiderProfile?
@@ -208,12 +223,29 @@ model UserDocument {
 }
 
 
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  title     String
+  message   String
+  type      String   // e.g., ORDER_CREATED, ORDER_UPDATE
+  isRead    Boolean  @default(false)
+  metadata  Json?    // Store orderId, storeId, etc.
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@index([createdAt(sort: Desc)])
+}
+
 model Address {
   id        String  @id @default(uuid())
   userId    String
   label     String
   street    String
   city      String
+  state     String
   lat       Float
   lng       Float
   isDefault Boolean @default(false)
@@ -343,6 +375,7 @@ model Store {
   lng          Float?
   image        String?
   rating       Float              @default(0)
+  ratingCount  Int   @default(0)
   status       StoreStatus        @default(PENDING)
   verification VerificationStatus @default(PENDING)
   ownerId      String
@@ -480,6 +513,7 @@ model Product {
   image      String?
   status     ProductStatus @default(ACTIVE)
   storeId    String
+  stock       Int      @default(0)
   categoryId String
   salesCount Int           @default(0)
   createdAt  DateTime      @default(now())

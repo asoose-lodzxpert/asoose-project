@@ -1,3 +1,4 @@
+import { Currency } from "@/components/Currency";
 import { TrendingUp,TrendingDown } from "lucide-react";
 const RevenueCard = ({ title, amount, change, icon: Icon, color, onClick }: any) => (
   <div className="bg-[#1E293B] border border-gray-800 rounded-2xl p-6 hover:border-gray-700 transition-all cursor-pointer" onClick={onClick}>
@@ -7,7 +8,7 @@ const RevenueCard = ({ title, amount, change, icon: Icon, color, onClick }: any)
         <div className={`p-2 bg-${color}-500/10 rounded-lg text-${color}-500`}>
           <Icon className="w-5 h-5" />
         </div>
-        <span className="text-2xl font-black text-white">{amount}</span>
+        <span className="text-2xl font-black text-white"><Currency amount={amount}/></span>
       </div>
       {change !== undefined && (
         <div className={`flex items-center gap-1 text-sm font-bold ${change >= 0 ? 'text-green-500' : 'text-red-500'}`}>

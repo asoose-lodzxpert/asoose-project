@@ -18,6 +18,12 @@ async function bootstrap() {
     whitelist: true 
   }));
 
+  app.useGlobalPipes(new ValidationPipe({
+    whitelist: true,
+    forbidNonWhitelisted: true, 
+  }));
+
+
   // 2. Ensure CORS matches your frontend URL
   app.enableCors({
     origin: 'http://localhost:3000', 

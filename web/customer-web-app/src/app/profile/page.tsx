@@ -1,7 +1,11 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { MapPin, Plus, Loader2, Edit2, LogOut, Trash2 } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { 
+  MapPin, Edit2, LogOut, Trash2, 
+  ShoppingBag, Car, Package, Settings, User, 
+  ChevronRight, Calendar, ShieldCheck, Phone 
+} from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '../../../utils/supabase/client';
 import { BottomNav } from '@/components/layout/BottomNav';
@@ -9,332 +13,465 @@ import { AddressCard } from '@/components/profile/AddressCard';
 import { AddAddressModal } from '@/components/profile/AddAddressModal';
 import { EditProfileModal } from '@/components/profile/EditProfileModal';
 import { OrderCard } from '@/components/profile/OrderCard';
-import { toast } from 'react-toastify'
+import { RideCard } from '@/components/profile/ridecard';
+import { DeliveryCard } from '@/components/profile/deliverycard';
+
+import { toast } from 'react-toastify';
 import Swal from 'sweetalert2';
 import Link from 'next/link';
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
+type Tab = 'orders' | 'rides' | 'deliveries' | 'addresses' | 'settings';
 
 export default function ProfilePage() {
   const router = useRouter();
   const supabase = createClient();
   
-  const [loading, setLoading] = useState(true);
+  // -- State --
+  const [isPageLoading, setIsPageLoading] = useState(true);
+  const [isTabLoading, setIsTabLoading] = useState(false);
   const [token, setToken] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<Tab>('orders');
   
+  // Modals
   const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
 
+  // Data
+  const [profile, setProfile] = useState<any>({});
   const [orders, setOrders] = useState<any[]>([]);
+  const [rides, setRides] = useState<any[]>([]);
+  const [deliveries, setDeliveries] = useState<any[]>([]);
+  const [addresses, setAddresses] = useState<any[]>([]);
 
-  const [profile, setProfile] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    avatarUrl: '',
-    addresses: [] as any[]
-  });
-
-  const fetchProfile = async () => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { router.push('/sign-in'); return; }
-      setToken(session.access_token);
-
-      // 1. Fetch Profile Info
-      const profileRes = await fetch(`${API_URL}/users/profile`, {
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      });
-      if (profileRes.ok) {
-        setProfile(await profileRes.json());
-      }
-
-      // 2. Fetch Orders (NEW)
-      const ordersRes = await fetch(`${API_URL}/users/orders`, {
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      });
-      if (ordersRes.ok) {
-        setOrders(await ordersRes.json());
-      }
-
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
+  // -- Helpers --
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good Morning';
+    if (hour < 18) return 'Good Afternoon';
+    return 'Good Evening';
   };
 
-  useEffect(() => { fetchProfile(); }, []);
+  const getDefaultAddress = () => {
+    if (!addresses || addresses.length === 0) return null;
+    return addresses.find((a: any) => a.isDefault) || addresses[0];
+  };
 
-const handleUpdateProfile = async (data: { name: string; phone: string }) => {
+  // -- Fetchers --
+  const fetchProfile = useCallback(async (accessToken: string) => {
+    try {
+      const res = await fetch(`${API_URL}/users/profile`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (res.ok) setProfile(await res.json());
+    } catch (e) { console.error('Profile fetch error', e); }
+  }, []);
+
+  const fetchAddresses = useCallback(async (accessToken: string) => {
+    try {
+      const res = await fetch(`${API_URL}/users/addresses`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (res.ok) setAddresses(await res.json());
+    } catch (e) { console.error('Addresses fetch error', e); }
+  }, []);
+
+  const fetchTabData = useCallback(async (tab: Tab, accessToken: string) => {
+    const headers = { Authorization: `Bearer ${accessToken}` };
+    setIsTabLoading(true);
+    try {
+      if (tab === 'orders' && orders.length === 0) {
+        const res = await fetch(`${API_URL}/users/orders`, { headers });
+        if (res.ok) setOrders(await res.json());
+      } else if (tab === 'rides' && rides.length === 0) {
+        const res = await fetch(`${API_URL}/users/rides`, { headers });
+        if (res.ok) setRides(await res.json());
+      } else if (tab === 'deliveries' && deliveries.length === 0) {
+        const res = await fetch(`${API_URL}/users/deliveries`, { headers });
+        if (res.ok) setDeliveries(await res.json());
+      }
+    } catch (error) {
+      console.error(`Failed to fetch ${tab}`, error);
+    } finally {
+      setIsTabLoading(false);
+    }
+  }, [orders.length, rides.length, deliveries.length]);
+
+  // -- Initialization --
+  useEffect(() => {
+    const init = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { router.push('/sign-in'); return; }
+      
+      setToken(session.access_token);
+      
+      // Parallel Fetch for critical data
+      await Promise.all([
+        fetchProfile(session.access_token),
+        fetchAddresses(session.access_token),
+        fetchTabData('orders', session.access_token)
+      ]);
+      
+      setIsPageLoading(false);
+    };
+    init();
+  }, []);
+
+  // Switch Tab Data
+  useEffect(() => {
+    if (token) fetchTabData(activeTab, token);
+  }, [activeTab, token]);
+
+
+  // -- Action Handlers (Update, Delete, etc.) --
+  const handleUpdateProfile = async (data: { name: string; phone: string }) => {
     if (!token) return;
-    
-    const toastId = toast.loading("Updating profile...");
-
     try {
       const res = await fetch(`${API_URL}/users/profile`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify(data),
       });
-
-      if (!res.ok) throw new Error('Failed to update');
-
-      setProfile(prev => ({ ...prev, ...data }));
-
-      toast.update(toastId, { 
-        render: "Profile updated successfully!", 
-        type: "success", 
-        isLoading: false, 
-        autoClose: 3000 
-      });
-
-    } catch (error) {
-      console.error(error);
-      toast.update(toastId, { 
-        render: "Failed to update profile.", 
-        type: "error", 
-        isLoading: false, 
-        autoClose: 3000 
-      });
+      if (!res.ok) throw new Error();
+      setProfile((prev: any) => ({ ...prev, ...data }));
+      toast.success("Profile updated successfully");
+    } catch {
+      toast.error("Failed to update profile");
     }
   };
 
- const handleAddAddress = async (addressData: any) => {
+  const handleAddAddress = async (addressData: any) => {
     if (!token) return;
-    
-    const toastId = toast.loading("Saving address...");
-
     try {
-      const res = await fetch(`${API_URL}/users/address`, {
+      const res = await fetch(`${API_URL}/users/addresses`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify(addressData),
       });
-
-      if (!res.ok) throw new Error('Failed to save');
-
-      await fetchProfile();
-      
-      toast.update(toastId, { render: "Address added successfully!", type: "success", isLoading: false, autoClose: 3000 });
-      
-    } catch (error) {
-      toast.update(toastId, { render: "Could not save address.", type: "error", isLoading: false, autoClose: 3000 });
+      if (!res.ok) throw new Error();
+      await fetchAddresses(token);
+      toast.success("Address added");
+    } catch {
+      toast.error("Failed to add address");
     }
   };
 
-const handleDeleteAddress = async (id: string) => {
+  const handleDeleteAddress = async (id: string) => {
     if (!token) return;
-const isDarkMode = document.documentElement.classList.contains('dark');
+    const isDark = document.documentElement.classList.contains('dark');
     const result = await Swal.fire({
-        background: isDarkMode ? '#1a1a1a' : '#ffffff',
-  color: isDarkMode ? '#ffffff' : '#000000',
       title: 'Delete Address?',
-      text: "You won't be able to undo this action.",
+      text: "This action cannot be undone.",
       icon: 'warning',
       showCancelButton: true,
-      confirmButtonColor: '#000000', 
-      cancelButtonColor: '#d33',
-      confirmButtonText: 'Yes, delete it!',
-      customClass: {
-        popup: 'rounded-2xl' 
-      }
+      confirmButtonColor: '#d33',
+      cancelButtonColor: isDark ? '#333' : '#ddd',
+      confirmButtonText: 'Delete',
+      background: isDark ? '#1a1a1a' : '#fff',
+      color: isDark ? '#fff' : '#000',
     });
 
     if (result.isConfirmed) {
-      const toastId = toast.loading("Deleting address...");
-
+      setAddresses(prev => prev.filter(a => a.id !== id)); // Optimistic
       try {
-        const res = await fetch(`${API_URL}/users/address/${id}`, {
-          method: 'DELETE',
-          headers: { Authorization: `Bearer ${token}` },
+        await fetch(`${API_URL}/users/addresses/${id}`, { 
+          method: 'DELETE', headers: { Authorization: `Bearer ${token}` }
         });
-
-        if (!res.ok) throw new Error('Failed');
-
-        setProfile(prev => ({ 
-          ...prev, 
-          addresses: prev.addresses.filter(a => a.id !== id) 
-        }));
-        
-        toast.update(toastId, { 
-          render: "Address deleted successfully.", 
-          type: "success", 
-          isLoading: false, 
-          autoClose: 3000 
-        });
-
-      } catch (error) {
-        toast.update(toastId, { 
-          render: "Failed to delete address.", 
-          type: "error", 
-          isLoading: false, 
-          autoClose: 3000 
-        });
+      } catch {
+        toast.error('Could not delete from server');
+        fetchAddresses(token); // Revert
       }
     }
   };
 
-  const handleDeleteAccount = async () => {
-    const result = await Swal.fire({
-      title: 'Delete your account?',
-      text: "This will deactivate your account immediately. You won't be able to log in.",
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: '#d33', 
-      cancelButtonColor: '#000000',
-      confirmButtonText: 'Yes, delete it',
-      background: document.documentElement.classList.contains('dark') ? '#1a1a1a' : '#fff',
-      color: document.documentElement.classList.contains('dark') ? '#fff' : '#000',
-    });
-
-    if (result.isConfirmed) {
-      const toastId = toast.loading("Deactivating account...");
-
-      try {
-        const res = await fetch(`${API_URL}/users/profile`, {
-          method: 'DELETE',
-          headers: { Authorization: `Bearer ${token}` },
-        });
-
-        if (!res.ok) throw new Error('Failed');
-
-        toast.update(toastId, { render: "Account deactivated.", type: "success", isLoading: false });
-        
-        await supabase.auth.signOut();
-        router.push('/sign-in');
-        
-      } catch (error) {
-        toast.update(toastId, { render: "Could not delete account.", type: "error", isLoading: false });
-      }
-    }
-  };
-
-  const handleSignOut = async () => {
+  const handleLogout = async () => {
     await supabase.auth.signOut();
     router.push('/sign-in');
   };
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-[#0a0a0a]"><Loader2 className="w-8 h-8 animate-spin text-yellow-500" /></div>;
+  if (isPageLoading) return <ProfileSkeleton />;
+
+  const defaultAddr = getDefaultAddress();
 
   return (
-    <div className="min-h-screen bg-white dark:bg-[#0a0a0a] text-gray-900 dark:text-gray-100 pb-24">
+    <div className="min-h-screen bg-gray-50 dark:bg-[#0a0a0a] text-gray-900 dark:text-gray-100 pb-24 font-sans">
       
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 pt-8 sm:pt-12">
-        {/* header */}
-        <div className="flex flex-col sm:flex-row items-start justify-between mb-8 sm:mb-10 gap-4">
-          <div className="flex gap-3 sm:gap-5 w-full sm:w-auto">
-            <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gray-100 dark:bg-white/10 rounded-full flex items-center justify-center text-xl sm:text-2xl font-bold border-2 border-white dark:border-[#0a0a0a] shadow-sm overflow-hidden flex-shrink-0">
-               {profile.avatarUrl ? <img src={profile.avatarUrl} alt="Profile" className="w-full h-full object-cover" /> : profile.name?.charAt(0)}
-            </div>
-            <div className="pt-1 sm:pt-2 flex-1 min-w-0">
-              <h1 className="text-xl sm:text-2xl font-black truncate">{profile.name}</h1>
-              <p className="text-xs sm:text-sm text-gray-500 font-medium mb-1 truncate">{profile.email}</p>
-              <p className="text-xs sm:text-sm text-gray-400 truncate">{profile.phone || 'No phone added'}</p>
-            </div>
-          </div>
-          
-          <div className="flex gap-2 w-full sm:w-auto justify-end">
-            <button 
-              onClick={() => setIsEditProfileOpen(true)}
-              className="p-2.5 sm:p-3 rounded-full bg-gray-50 dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
-            >
-              <Edit2 className="w-4 h-4 sm:w-5 sm:h-5" />
-            </button>
-            <button 
-              onClick={handleSignOut}
-              className="p-2.5 sm:p-3 rounded-full bg-red-50 dark:bg-red-900/10 text-red-500 hover:bg-red-100 transition-colors"
-            >
-              <LogOut className="w-4 h-4 sm:w-5 sm:h-5" />
-            </button>
-          </div>
-        </div>
-
-        {/* 2. address */}
-        <div className="mb-8 sm:mb-10">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-base sm:text-lg font-bold">My Addresses</h2>
-            <button onClick={() => setIsAddressModalOpen(true)} className="text-xs sm:text-sm font-bold text-yellow-600 dark:text-yellow-500 hover:underline">
-              + Add New
-            </button>
-          </div>
-          
-          <div className="flex gap-3 sm:gap-4 overflow-x-auto pb-4 scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0">
-            {profile.addresses && profile.addresses.length > 0 ? (
-              profile.addresses.map((addr: any) => (
-                <div key={addr.id} className="min-w-[260px] sm:min-w-[280px]">
-                  <AddressCard 
-                    {...addr} 
-                    tag={addr.city} 
-                    onDelete={handleDeleteAddress} 
-                  />
-                </div>
-              ))
-            ) : (
-              <div 
-                onClick={() => setIsAddressModalOpen(true)}
-                className="w-full py-6 sm:py-8 border-2 border-dashed border-gray-100 dark:border-white/10 rounded-2xl flex flex-col items-center justify-center text-gray-400 cursor-pointer hover:border-yellow-500/50 hover:bg-yellow-50 dark:hover:bg-yellow-500/5 transition-all"
-              >
-                <MapPin className="w-5 h-5 sm:w-6 sm:h-6 mb-2 opacity-50" />
-                <span className="text-xs sm:text-sm font-bold">Add your first address</span>
+      {/* 1. Enhanced Header */}
+      <div className="bg-white dark:bg-[#151515] border-b border-gray-100 dark:border-white/5 pt-10 pb-8 px-4 sm:px-8">
+        <div className="max-w-4xl mx-auto">
+          <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 text-center sm:text-left">
+            
+            {/* Avatar with Status Ring */}
+            <div className="relative">
+              <div className="w-24 h-24 bg-gray-100 dark:bg-white/10 rounded-full flex items-center justify-center text-3xl font-bold border-4 border-white dark:border-[#151515] shadow-xl overflow-hidden">
+                {profile.avatarUrl ? <img src={profile.avatarUrl} alt="Profile" className="w-full h-full object-cover" /> : profile.name?.charAt(0)}
               </div>
-            )}
-          </div>
-        </div>
-
-        
-        {/* 3. ORDER HISTORY */}
-        <div className="mb-8 sm:mb-10">
-          <h2 className="text-base sm:text-lg font-bold mb-4">Recent Orders</h2>
-          <div className="space-y-3">
-            {orders.length > 0 ? (
-              orders.map((order: any) => (
-                <Link href={`/orders/${order.id}`} key={order.id}>
-                  <OrderCard 
-                  key={order.id} 
-                  id={order.id.slice(0, 8).toUpperCase()} 
-                  status={order.status}
-                  date={new Date(order.createdAt).toLocaleDateString('en-GB', { 
-                    day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' 
-                  })}
-                  total={`₦${order.total.toLocaleString()}`}
-                  items={order.items.map((i: any) => `${i.quantity}x ${i.name}`)} 
-                />
-
-                </Link>
-              ))
-            ) : (
-               // Empty State
-               <div className="text-center py-8 sm:py-10 bg-gray-50 dark:bg-white/5 rounded-2xl border border-dashed border-gray-200 dark:border-white/10">
-                 <p className="text-sm sm:text-base text-gray-400 font-medium">No orders yet</p>
-               </div>
-            )}
-          </div>
-        </div>
-
-        {/* 4. DANGER ZONE - DELETE ACCOUNT */}
-        <div className="mt-12 sm:mt-16 pt-6 sm:pt-8 border-t border-gray-200 dark:border-white/10">
-          <h2 className="text-base sm:text-lg font-bold text-red-600 dark:text-red-500 mb-3">Danger Zone</h2>
-          <div className="bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-900/30 rounded-xl sm:rounded-2xl p-4 sm:p-6">
-            <div className="flex flex-col sm:flex-row items-start justify-between gap-4">
-              <div className="flex-1">
-                <h3 className="font-bold text-gray-900 dark:text-gray-100 mb-1 text-sm sm:text-base">Delete Account</h3>
-                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-                  Permanently deactivate your account. This action cannot be undone.
-                </p>
-              </div>
-              <button
-                onClick={handleDeleteAccount}
-                className="w-full sm:w-auto sm:ml-4 flex items-center justify-center gap-2 px-4 sm:px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl transition-colors text-sm"
+              <button 
+                onClick={() => setIsEditProfileOpen(true)}
+                className="absolute bottom-0 right-0 p-2 bg-yellow-500 text-black rounded-full shadow-lg hover:scale-105 transition-transform"
               >
-                <Trash2 className="w-4 h-4" />
-                Delete Account
+                <Edit2 className="w-4 h-4" />
               </button>
             </div>
+
+            <div className="flex-1">
+              <span className="text-sm font-bold text-yellow-600 dark:text-yellow-500 uppercase tracking-wider">
+                {getGreeting()}
+              </span>
+              <h1 className="text-3xl font-black mt-1 mb-2">{profile.name}</h1>
+              
+              {/* User Details Block */}
+              <div className="flex flex-col sm:flex-row items-center sm:items-start gap-y-1 gap-x-4 text-gray-500 dark:text-gray-400 font-medium text-sm">
+                <span className="flex items-center gap-1">
+                    {profile.email}
+                </span>
+                
+                {profile.phone && (
+                   <span className="hidden sm:inline text-gray-300">•</span>
+                )}
+                
+                {profile.phone && (
+                   <span className="flex items-center gap-1">
+                     <Phone className="w-3 h-3" /> {profile.phone}
+                   </span>
+                )}
+              </div>
+
+              {/* Address Display (New) */}
+              <div className="flex items-center justify-center sm:justify-start gap-2 mt-2 text-sm text-gray-500 dark:text-gray-400">
+                <MapPin className="w-4 h-4 text-yellow-500 shrink-0" />
+                {defaultAddr ? (
+                   <span className="truncate max-w-xs sm:max-w-md">
+                     {defaultAddr.street}, {defaultAddr.city} {defaultAddr.state}
+                   </span>
+                ) : (
+                   <span className="italic opacity-60">No address set</span>
+                )}
+              </div>
+
+              {/* Quick Stats */}
+              <div className="flex items-center justify-center sm:justify-start gap-6 mt-6 pt-4 border-t border-gray-100 dark:border-white/5 sm:border-0 sm:pt-0">
+                <div className="text-center sm:text-left">
+                  <span className="block text-xl font-black text-gray-900 dark:text-white">
+                    {orders.length || 0}
+                  </span>
+                  <span className="text-xs font-bold text-gray-400 uppercase tracking-wide">Orders</span>
+                </div>
+                <div className="w-px h-8 bg-gray-200 dark:bg-white/10" />
+                <div className="text-center sm:text-left">
+                  <span className="block text-xl font-black text-gray-900 dark:text-white">
+                    {new Date(profile.createdAt || Date.now()).getFullYear()}
+                  </span>
+                  <span className="text-xs font-bold text-gray-400 uppercase tracking-wide">Member Since</span>
+                </div>
+              </div>
+            </div>
+            
+            <button 
+              onClick={handleLogout}
+              className="hidden sm:flex items-center gap-2 px-5 py-2.5 bg-gray-100 dark:bg-white/5 hover:bg-red-50 dark:hover:bg-red-900/10 text-gray-600 dark:text-gray-400 hover:text-red-500 transition-colors rounded-xl font-bold text-sm"
+            >
+              <LogOut className="w-4 h-4" /> Sign Out
+            </button>
           </div>
         </div>
-
       </div>
+
+      {/* 2. Sticky Pill Navigation */}
+      <div className="sticky top-0 z-30 bg-gray-50/95 dark:bg-[#0a0a0a]/95 backdrop-blur-sm px-4 pt-4 pb-2 border-b border-gray-200 dark:border-white/5">
+        <div className="max-w-4xl mx-auto flex gap-2 overflow-x-auto scrollbar-hide py-2">
+          {[
+            { id: 'orders', label: 'Orders', icon: ShoppingBag },
+            { id: 'rides', label: 'Rides', icon: Car },
+            { id: 'deliveries', label: 'Deliveries', icon: Package },
+            { id: 'addresses', label: 'Addresses', icon: MapPin },
+            { id: 'settings', label: 'Settings', icon: Settings },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as Tab)}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-full whitespace-nowrap transition-all text-sm font-bold ${
+                activeTab === tab.id 
+                  ? 'bg-black dark:bg-white text-white dark:text-black shadow-lg shadow-black/10' 
+                  : 'bg-white dark:bg-[#151515] text-gray-500 hover:bg-gray-100 dark:hover:bg-white/10'
+              }`}
+            >
+              <tab.icon className="w-4 h-4" />
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* 3. Main Content Area */}
+      <main className="max-w-4xl mx-auto px-4 sm:px-6 py-8 min-h-[400px]">
+        
+        {isTabLoading ? (
+          <ContentSkeleton />
+        ) : (
+          <>
+            {/* ORDERS TAB */}
+            {activeTab === 'orders' && (
+              <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                {orders.length === 0 ? (
+                  <EmptyState 
+                    icon={ShoppingBag}
+                    title="No orders yet" 
+                    desc="Looks like you haven't ordered anything yet."
+                    actionLabel="Start Shopping"
+                    actionLink="/"
+                  />
+                ) : (
+                  orders.map((order) => (
+                    <Link href={`/orders/${order.id}`} key={order.id} className="block hover:scale-[1.01] transition-transform">
+                      <OrderCard 
+                        id={order.id.slice(0, 8).toUpperCase()} 
+                        status={order.status}
+                        date={new Date(order.createdAt).toLocaleDateString()}
+                        total={`₦${order.total.toLocaleString()}`}
+                        items={order.items.map((i: any) => `${i.quantity}x ${i.name}`)} 
+                      />
+                    </Link>
+                  ))
+                )}
+              </div>
+            )}
+
+            {/* RIDES TAB */}
+            {activeTab === 'rides' && (
+              <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                {rides.length === 0 ? (
+                  <EmptyState 
+                    icon={Car}
+                    title="No rides yet" 
+                    desc="Need a ride? Book one now."
+                    actionLabel="Book a Ride"
+                    actionLink="/rides"
+                  />
+                ) : (
+                  rides.map((ride) => (
+                    <RideCard
+                      key={ride.id}
+                      id={ride.id}
+                      status={ride.status}
+                      date={new Date(ride.createdAt).toLocaleDateString()}
+                      total={ride.total}
+                      description={ride.description}
+                    />
+                  ))
+                )}
+              </div>
+            )}
+
+            {/* DELIVERIES TAB */}
+            {activeTab === 'deliveries' && (
+              <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                {deliveries.length === 0 ? (
+                  <EmptyState 
+                     icon={Package}
+                     title="No deliveries yet" 
+                     desc="Send packages securely across the city."
+                     actionLabel="Send Package"
+                     actionLink="/courier"
+                  />
+                ) : (
+                  deliveries.map((delivery) => (
+                    <DeliveryCard
+                      key={delivery.id}
+                      id={delivery.id}
+                      status={delivery.status}
+                      date={new Date(delivery.createdAt).toLocaleDateString()}
+                      total={delivery.total}
+                      description={delivery.description}
+                      recipient={delivery.recipient}
+                    />
+                  ))
+                )}
+              </div>
+            )}
+
+            {/* ADDRESSES TAB */}
+            {activeTab === 'addresses' && (
+              <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <button 
+                  onClick={() => setIsAddressModalOpen(true)}
+                  className="w-full py-6 border-2 border-dashed border-gray-200 dark:border-white/10 rounded-3xl flex flex-col items-center justify-center gap-2 text-gray-400 font-bold hover:border-yellow-500 hover:text-yellow-500 hover:bg-yellow-50 dark:hover:bg-yellow-500/5 transition-all group"
+                >
+                  <div className="p-3 bg-gray-100 dark:bg-white/5 rounded-full group-hover:bg-yellow-100 dark:group-hover:bg-yellow-500/20 transition-colors">
+                    <MapPin className="w-6 h-6" />
+                  </div>
+                  <span>Add New Address</span>
+                </button>
+                
+                <div className="grid sm:grid-cols-2 gap-4">
+                  {addresses.map((addr) => (
+                    <AddressCard 
+                      key={addr.id}
+                      {...addr}
+                      tag={addr.label || addr.city} 
+                      onDelete={handleDeleteAddress} 
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* SETTINGS TAB */}
+            {activeTab === 'settings' && (
+              <div className="max-w-xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                
+                <div className="bg-white dark:bg-[#151515] rounded-3xl border border-gray-100 dark:border-white/5 overflow-hidden">
+                  <div className="p-4 border-b border-gray-100 dark:border-white/5 bg-gray-50/50 dark:bg-white/5">
+                    <h3 className="font-bold flex items-center gap-2"><User className="w-4 h-4"/> Personal Info</h3>
+                  </div>
+                  <div className="p-2">
+                     <button onClick={() => setIsEditProfileOpen(true)} className="w-full flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-white/5 rounded-2xl transition-colors text-left">
+                       <span className="font-medium text-sm">Edit Profile Details</span>
+                       <ChevronRight className="w-4 h-4 text-gray-400" />
+                     </button>
+                     <button className="w-full flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-white/5 rounded-2xl transition-colors text-left">
+                       <span className="font-medium text-sm">Change Password</span>
+                       <ChevronRight className="w-4 h-4 text-gray-400" />
+                     </button>
+                  </div>
+                </div>
+
+                <div className="bg-white dark:bg-[#151515] rounded-3xl border border-gray-100 dark:border-white/5 overflow-hidden">
+                   <div className="p-4 border-b border-gray-100 dark:border-white/5 bg-gray-50/50 dark:bg-white/5">
+                    <h3 className="font-bold flex items-center gap-2"><ShieldCheck className="w-4 h-4"/> Security</h3>
+                  </div>
+                   <div className="p-6">
+                      <div className="flex items-start gap-4">
+                        <div className="p-3 bg-red-100 dark:bg-red-900/20 text-red-600 rounded-full">
+                          <Trash2 className="w-6 h-6" />
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-red-600">Delete Account</h4>
+                          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 mb-4">
+                            Permanently remove your account and all associated data. This action is irreversible.
+                          </p>
+                          <button className="px-4 py-2 bg-red-50 text-red-600 font-bold text-sm rounded-lg hover:bg-red-100 transition-colors">
+                            Request Deletion
+                          </button>
+                        </div>
+                      </div>
+                   </div>
+                </div>
+
+                 <div className="sm:hidden pt-4">
+                     <button 
+                      onClick={handleLogout}
+                      className="w-full py-4 text-red-500 font-bold bg-white dark:bg-[#151515] rounded-2xl border border-gray-100 dark:border-white/5 shadow-sm"
+                    >
+                      Sign Out
+                    </button>
+                 </div>
+              </div>
+            )}
+          </>
+        )}
+      </main>
 
       <BottomNav />
       
@@ -344,7 +481,6 @@ const isDarkMode = document.documentElement.classList.contains('dark');
         onClose={() => setIsAddressModalOpen(false)} 
         onSave={handleAddAddress} 
       />
-      
       <EditProfileModal
         isOpen={isEditProfileOpen}
         initialData={{ name: profile.name, phone: profile.phone }}
@@ -354,3 +490,49 @@ const isDarkMode = document.documentElement.classList.contains('dark');
     </div>
   );
 }
+
+// -- Helper Components --
+
+const EmptyState = ({ icon: Icon, title, desc, actionLabel, actionLink }: any) => (
+  <div className="flex flex-col items-center justify-center py-20 bg-white dark:bg-[#151515] rounded-3xl border border-dashed border-gray-200 dark:border-white/10 text-center px-4">
+    <div className="w-20 h-20 bg-gray-50 dark:bg-white/5 rounded-full flex items-center justify-center mb-6 text-gray-300">
+      <Icon className="w-10 h-10 opacity-50" />
+    </div>
+    <h3 className="text-lg font-bold mb-2">{title}</h3>
+    <p className="text-gray-500 dark:text-gray-400 max-w-xs mb-8">{desc}</p>
+    {actionLabel && (
+      <Link href={actionLink} className="px-8 py-3 bg-black dark:bg-white text-white dark:text-black font-bold rounded-xl hover:scale-105 transition-transform">
+        {actionLabel}
+      </Link>
+    )}
+  </div>
+);
+
+const ProfileSkeleton = () => (
+  <div className="min-h-screen bg-gray-50 dark:bg-[#0a0a0a] pb-24 animate-pulse">
+    <div className="h-48 bg-gray-200 dark:bg-white/5 w-full mb-8" />
+    <div className="max-w-4xl mx-auto px-4 space-y-8">
+       <div className="flex gap-4">
+          <div className="w-24 h-24 rounded-full bg-gray-300 dark:bg-white/10" />
+          <div className="space-y-2 flex-1 pt-4">
+             <div className="h-6 w-48 bg-gray-300 dark:bg-white/10 rounded" />
+             <div className="h-4 w-32 bg-gray-200 dark:bg-white/5 rounded" />
+          </div>
+       </div>
+       <div className="flex gap-4 overflow-hidden">
+          {[1,2,3,4].map(i => <div key={i} className="h-10 w-24 bg-gray-200 dark:bg-white/5 rounded-full" />)}
+       </div>
+       <div className="space-y-4">
+          {[1,2,3].map(i => <div key={i} className="h-32 w-full bg-gray-200 dark:bg-white/5 rounded-2xl" />)}
+       </div>
+    </div>
+  </div>
+);
+
+const ContentSkeleton = () => (
+  <div className="space-y-4 animate-pulse">
+    {[1, 2, 3].map((i) => (
+      <div key={i} className="h-24 bg-white dark:bg-[#151515] rounded-2xl border border-gray-100 dark:border-white/5" />
+    ))}
+  </div>
+);

@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { OrderStatus, StoreStatus, RideStatus, DeliveryStatus } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 
@@ -61,62 +61,46 @@ export interface AnalyticsReport {
 
 @Injectable()
 export class AnalyticsService {
-  private readonly logger = new Logger(AnalyticsService.name);
-
   constructor(private prisma: PrismaService) {}
 
-  /**
-   * Get comprehensive analytics report
-   */
   async getAnalyticsReport(days: number = 30): Promise<AnalyticsReport> {
-    this.logger.log(`Generating analytics report for last ${days} days`);
-
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
 
-    try {
-      const [
-        overview,
-        orderVolume,
-        growth,
-        revenueBreakdown,
-        ratings,
-        topVendors,
-      ] = await Promise.all([
-        this.getOverviewMetrics(startDate),
-        this.getOrderVolumeData(startDate),
-        this.getGrowthData(),
-        this.getRevenueBreakdown(startDate),
-        this.getRatingsDistribution(),
-        this.getTopVendors(startDate),
-      ]);
+    const [
+      overview,
+      orderVolume,
+      growth,
+      revenueBreakdown,
+      ratings,
+      topVendors,
+    ] = await Promise.all([
+      this.getOverviewMetrics(startDate),
+      this.getOrderVolumeData(startDate),
+      this.getGrowthData(),
+      this.getRevenueBreakdown(startDate),
+      this.getRatingsDistribution(),
+      this.getTopVendors(startDate),
+    ]);
 
-      const avgRating = await this.getAverageRating();
+    const avgRating = await this.getAverageRating();
 
-      return {
-        overview,
-        orderVolume,
-        growth,
-        revenueBreakdown,
-        ratings,
-        avgRating,
-        topVendors,
-      };
-    } catch (error) {
-      this.logger.error('Failed to generate analytics report', error);
-      throw error;
-    }
+    return {
+      overview,
+      orderVolume,
+      growth,
+      revenueBreakdown,
+      ratings,
+      avgRating,
+      topVendors,
+    };
   }
 
-  /**
-   * Calculate overview metrics with period-over-period comparison
-   */
   private async getOverviewMetrics(startDate: Date): Promise<AnalyticsOverview> {
     const endDate = new Date();
     const periodLength = endDate.getTime() - startDate.getTime();
     const previousStartDate = new Date(startDate.getTime() - periodLength);
 
-    // Current period metrics
     const [currentOrders, previousOrders, activeStores, previousActiveStores] = 
       await Promise.all([
         this.prisma.order.aggregate({
@@ -173,82 +157,92 @@ export class AnalyticsService {
     };
   }
 
-  /**
-   * Get daily order volume and revenue data
-   */
   private async getOrderVolumeData(startDate: Date): Promise<OrderVolumeDataPoint[]> {
-    const orders = await this.prisma.order.findMany({
-      where: {
-        createdAt: { gte: startDate },
-        status: OrderStatus.DELIVERED,
-      },
-      select: {
-        createdAt: true,
-        total: true,
-      },
-      orderBy: { createdAt: 'asc' },
-    });
+const results = await this.prisma.$queryRaw<Array<{
+  date: Date;
+  orders: bigint;
+  revenue: number;
+}>>`
+  SELECT 
+    "createdAt"::date as date, 
+    COUNT(*)::bigint as orders, 
+    SUM("total")::numeric as revenue
+  FROM "Order"
+  WHERE "createdAt" >= ${startDate}
+    AND status = ${OrderStatus.DELIVERED}
+  GROUP BY "createdAt"::date
+  ORDER BY date ASC
+`;
 
-    // Group by date
-    const dataMap = new Map<string, { orders: number; revenue: number }>();
-
-    orders.forEach((order) => {
-      const date = order.createdAt.toISOString().split('T')[0];
-      const existing = dataMap.get(date) || { orders: 0, revenue: 0 };
-      dataMap.set(date, {
-        orders: existing.orders + 1,
-        revenue: existing.revenue + order.total,
-      });
-    });
-
-    return Array.from(dataMap.entries())
-      .map(([date, data]) => ({
-        date,
-        orders: data.orders,
-        revenue: Math.round(data.revenue * 100) / 100,
-      }))
-      .sort((a, b) => a.date.localeCompare(b.date));
+    return results.map(row => ({
+      date: row.date.toISOString().split('T')[0],
+      orders: Number(row.orders),
+      revenue: Math.round(Number(row.revenue) * 100) / 100,
+    }));
   }
 
-  /**
-   * Get growth trends by month (last 6 months)
-   */
   private async getGrowthData(): Promise<GrowthDataPoint[]> {
     const sixMonthsAgo = new Date();
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 
-    const [stores, orders, riders] = await Promise.all([
-      this.prisma.store.findMany({
-        where: { createdAt: { gte: sixMonthsAgo } },
-        select: { createdAt: true },
-      }),
-      this.prisma.order.findMany({
-        where: { createdAt: { gte: sixMonthsAgo } },
-        select: { createdAt: true },
-      }),
-      this.prisma.riderProfile.findMany({
-        where: { createdAt: { gte: sixMonthsAgo } },
-        select: { createdAt: true },
-      }),
+    const [storeGrowth, orderGrowth, riderGrowth] = await Promise.all([
+      this.prisma.$queryRaw<Array<{
+        month: string;
+        count: bigint;
+      }>>`
+        SELECT 
+          TO_CHAR("createdAt", 'Mon YYYY') as month,
+          COUNT(*)::bigint as count
+        FROM "Store"
+        WHERE "createdAt" >= ${sixMonthsAgo}
+        GROUP BY TO_CHAR("createdAt", 'Mon YYYY'), DATE_TRUNC('month', "createdAt")
+        ORDER BY DATE_TRUNC('month', "createdAt") ASC
+      `,
+      this.prisma.$queryRaw<Array<{
+        month: string;
+        count: bigint;
+      }>>`
+        SELECT 
+          TO_CHAR("createdAt", 'Mon YYYY') as month,
+          COUNT(*)::bigint as count
+        FROM "Order"
+        WHERE "createdAt" >= ${sixMonthsAgo}
+        GROUP BY TO_CHAR("createdAt", 'Mon YYYY'), DATE_TRUNC('month', "createdAt")
+        ORDER BY DATE_TRUNC('month', "createdAt") ASC
+      `,
+      this.prisma.$queryRaw<Array<{
+        month: string;
+        count: bigint;
+      }>>`
+        SELECT 
+          TO_CHAR("createdAt", 'Mon YYYY') as month,
+          COUNT(*)::bigint as count
+        FROM "RiderProfile"
+        WHERE "createdAt" >= ${sixMonthsAgo}
+        GROUP BY TO_CHAR("createdAt", 'Mon YYYY'), DATE_TRUNC('month', "createdAt")
+        ORDER BY DATE_TRUNC('month', "createdAt") ASC
+      `,
     ]);
 
     const monthMap = new Map<string, { stores: number; orders: number; riders: number }>();
 
-    const processData = (items: { createdAt: Date }[], key: 'stores' | 'orders' | 'riders') => {
-      items.forEach((item) => {
-        const month = item.createdAt.toLocaleDateString('en-US', { 
-          year: 'numeric', 
-          month: 'short' 
-        });
-        const existing = monthMap.get(month) || { stores: 0, orders: 0, riders: 0 };
-        existing[key]++;
-        monthMap.set(month, existing);
-      });
-    };
+    storeGrowth.forEach(row => {
+      const existing = monthMap.get(row.month) || { stores: 0, orders: 0, riders: 0 };
+      existing.stores = Number(row.count);
+      monthMap.set(row.month, existing);
+    });
 
-    processData(stores, 'stores');
-    processData(orders, 'orders');
-    processData(riders, 'riders');
+    orderGrowth.forEach(row => {
+      const existing = monthMap.get(row.month) || { stores: 0, orders: 0, riders: 0 };
+      existing.orders = Number(row.count);
+      monthMap.set(row.month, existing);
+    });
+
+    riderGrowth.forEach(row => {
+      const existing = monthMap.get(row.month) || { stores: 0, orders: 0, riders: 0 };
+      existing.riders = Number(row.count);
+      monthMap.set(row.month, existing);
+    });
 
     return Array.from(monthMap.entries()).map(([month, data]) => ({
       month,
@@ -256,205 +250,164 @@ export class AnalyticsService {
     }));
   }
 
-  /**
-   * Get revenue breakdown by store type with historical comparison
-   */
   private async getRevenueBreakdown(startDate: Date): Promise<RevenueBreakdownItem[]> {
     const endDate = new Date();
     const periodLength = endDate.getTime() - startDate.getTime();
     const previousStartDate = new Date(startDate.getTime() - periodLength);
 
-    // 1. Fetch current and previous period breakdowns
     const [currentBreakdown, previousBreakdown] = await Promise.all([
-      this.prisma.order.groupBy({
-        by: ['storeId'],
-        where: {
-          createdAt: { gte: startDate, lte: endDate },
-          status: OrderStatus.DELIVERED,
-        },
-        _sum: { total: true },
-      }),
-      this.prisma.order.groupBy({
-        by: ['storeId'],
-        where: {
-          createdAt: { gte: previousStartDate, lt: startDate },
-          status: OrderStatus.DELIVERED,
-        },
-        _sum: { total: true },
-      }),
+      this.prisma.$queryRaw<Array<{
+        category: string;
+        amount: number;
+      }>>`
+        SELECT 
+          s.type as category,
+          SUM(o.total)::numeric as amount
+        FROM "Order" o
+        INNER JOIN "Store" s ON o."storeId" = s.id
+        WHERE o."createdAt" >= ${startDate}
+          AND o."createdAt" <= ${endDate}
+          AND o.status = ${OrderStatus.DELIVERED}
+        GROUP BY s.type
+        ORDER BY amount DESC
+      `,
+      this.prisma.$queryRaw<Array<{
+        category: string;
+        amount: number;
+      }>>`
+        SELECT 
+          s.type as category,
+          SUM(o.total)::numeric as amount
+        FROM "Order" o
+        INNER JOIN "Store" s ON o."storeId" = s.id
+        WHERE o."createdAt" >= ${previousStartDate}
+          AND o."createdAt" < ${startDate}
+          AND o.status = ${OrderStatus.DELIVERED}
+        GROUP BY s.type
+      `,
     ]);
 
-    // 2. Identify all relevant store IDs to fetch their types
-    const storeIds = new Set([
-      ...currentBreakdown.map((b) => b.storeId),
-      ...previousBreakdown.map((b) => b.storeId),
-    ]);
+    const previousMap = new Map(previousBreakdown.map(p => [p.category, Number(p.amount)]));
+    const totalRevenue = currentBreakdown.reduce((sum, item) => sum + Number(item.amount), 0);
 
-    if (storeIds.size === 0) {
-      return [];
-    }
+    return currentBreakdown.map(item => {
+      const amount = Number(item.amount);
+      const previousAmount = previousMap.get(item.category) || 0;
 
-    const stores = await this.prisma.store.findMany({
-      where: { id: { in: Array.from(storeIds) } },
-      select: { id: true, type: true },
-    });
-
-    const storeTypeMap = new Map(stores.map((s) => [s.id, s.type]));
-
-    // 3. Helper to aggregate revenue by store type
-    const aggregateByType = (data: typeof currentBreakdown) => {
-      const typeRevenue = new Map<string, number>();
-      data.forEach((item) => {
-        const type = storeTypeMap.get(item.storeId) || 'OTHER';
-        const current = typeRevenue.get(type) || 0;
-        typeRevenue.set(type, current + (item._sum.total || 0));
-      });
-      return typeRevenue;
-    };
-
-    const currentTypeRevenue = aggregateByType(currentBreakdown);
-    const previousTypeRevenue = aggregateByType(previousBreakdown);
-
-    // 4. Calculate total revenue for percentage calculation
-    const totalRevenue = Array.from(currentTypeRevenue.values()).reduce((a, b) => a + b, 0);
-
-    // 5. Build response with change metrics
-    return Array.from(currentTypeRevenue.entries()).map(([category, amount]) => {
-      const previousAmount = previousTypeRevenue.get(category) || 0;
       return {
-        category,
+        category: item.category,
         amount: Math.round(amount * 100) / 100,
         percentage: totalRevenue > 0 ? (amount / totalRevenue) * 100 : 0,
         change: this.calculatePercentageChange(amount, previousAmount),
       };
-    }).sort((a, b) => b.amount - a.amount);
+    });
   }
 
-  /**
-   * Get ratings distribution across all stores
-   */
   private async getRatingsDistribution(): Promise<RatingsDistribution[]> {
-    const reviews = await this.prisma.review.groupBy({
-      by: ['rating'],
-      _count: { rating: true },
-    });
+    const results = await this.prisma.$queryRaw<Array<{
+      rating: number;
+      count: bigint;
+    }>>`
+      SELECT 
+        rating,
+        COUNT(*)::bigint as count
+      FROM "Review"
+      GROUP BY rating
+      ORDER BY rating DESC
+    `;
 
-    const totalReviews = reviews.reduce((sum, r) => sum + r._count.rating, 0);
+    const totalReviews = results.reduce((sum, r) => sum + Number(r.count), 0);
 
-    return [5, 4, 3, 2, 1].map((star) => {
-      const found = reviews.find((r) => r.rating === star);
-      const count = found?._count.rating || 0;
-      return {
-        star,
-        count,
-        percentage: totalReviews > 0 ? (count / totalReviews) * 100 : 0,
-      };
-    });
+    const ratingsMap = new Map(results.map(r => [r.rating, Number(r.count)]));
+
+    return [5, 4, 3, 2, 1].map(star => ({
+      star,
+      count: ratingsMap.get(star) || 0,
+      percentage: totalReviews > 0 ? ((ratingsMap.get(star) || 0) / totalReviews) * 100 : 0,
+    }));
   }
 
-  /**
-   * Calculate average rating
-   */
   private async getAverageRating(): Promise<number> {
-    const result = await this.prisma.review.aggregate({
-      _avg: { rating: true },
-    });
-    return Math.round((result._avg.rating || 0) * 10) / 10;
+    const result = await this.prisma.$queryRaw<Array<{ avg: number }>>`
+      SELECT AVG(rating)::numeric as avg
+      FROM "Review"
+    `;
+
+    return Math.round((result[0]?.avg || 0) * 10) / 10;
   }
 
-  /**
-   * Get top performing vendors for the specified period with historical comparison
-   */
   private async getTopVendors(startDate: Date, limit: number = 5): Promise<TopVendor[]> {
     const endDate = new Date();
     const periodLength = endDate.getTime() - startDate.getTime();
     const previousStartDate = new Date(startDate.getTime() - periodLength);
 
-    // 1. Calculate revenue per store for the CURRENT period
-    const currentPeriodStats = await this.prisma.order.groupBy({
-      by: ['storeId'],
-      where: {
-        createdAt: { gte: startDate, lte: endDate },
-        status: OrderStatus.DELIVERED,
-      },
-      _sum: { total: true },
-      _count: { _all: true },
-    });
+    const currentTopVendors = await this.prisma.$queryRaw<Array<{
+      id: string;
+      name: string;
+      revenue: number;
+      orders: bigint;
+      rating: number;
+    }>>`
+      SELECT 
+        s.id,
+        s.name,
+        SUM(o.total)::numeric as revenue,
+        COUNT(o.id)::bigint as orders,
+        s.rating
+      FROM "Store" s
+      INNER JOIN "Order" o ON o."storeId" = s.id
+      WHERE o."createdAt" >= ${startDate}
+        AND o."createdAt" <= ${endDate}
+        AND o.status = ${OrderStatus.DELIVERED}
+      GROUP BY s.id, s.name, s.rating
+      ORDER BY revenue DESC
+      LIMIT ${limit}
+    `;
 
-    if (currentPeriodStats.length === 0) {
+    if (currentTopVendors.length === 0) {
       return [];
     }
 
-    // 2. Sort stores by revenue in descending order and slice
-    const topStoreStats = currentPeriodStats
-      .map((item) => ({
-        storeId: item.storeId,
-        revenue: item._sum.total || 0,
-        orders: item._count._all || 0,
-      }))
-      .sort((a, b) => b.revenue - a.revenue)
-      .slice(0, limit);
+    const storeIds = currentTopVendors.map(v => v.id);
 
-    const topStoreIds = topStoreStats.map((s) => s.storeId);
+    const previousRevenue = await this.prisma.$queryRaw<Array<{
+      storeId: string;
+      revenue: number;
+    }>>`
+      SELECT 
+        "storeId",
+        SUM(total)::numeric as revenue
+      FROM "Order"
+      WHERE "createdAt" >= ${previousStartDate}
+        AND "createdAt" < ${startDate}
+        AND status = ${OrderStatus.DELIVERED}
+        AND "storeId" = ANY(${storeIds})
+      GROUP BY "storeId"
+    `;
 
-    // 3. Fetch Store Details and Previous Period Revenue in parallel
-    const [storesDetails, previousPeriodStats] = await Promise.all([
-      this.prisma.store.findMany({
-        where: { id: { in: topStoreIds } },
-        select: { id: true, name: true, rating: true },
-      }),
-      this.prisma.order.groupBy({
-        by: ['storeId'],
-        where: {
-          createdAt: { gte: previousStartDate, lt: startDate },
-          status: OrderStatus.DELIVERED,
-          storeId: { in: topStoreIds },
-        },
-        _sum: { total: true },
-      }),
-    ]);
+    const previousMap = new Map(previousRevenue.map(p => [p.storeId, Number(p.revenue)]));
 
-    // 4. Map for easy lookup
-    const previousRevenueMap = new Map(
-      previousPeriodStats.map((p) => [p.storeId, p._sum.total || 0])
-    );
-    const storeDetailsMap = new Map(storesDetails.map((s) => [s.id, s]));
-
-    // 5. Build final result preserving the sorted order
-    return topStoreStats
-      .map((stat) => {
-        const store = storeDetailsMap.get(stat.storeId);
-        if (!store) return null;
-
-        const previousRevenue = previousRevenueMap.get(stat.storeId) || 0;
-
-        return {
-          id: store.id,
-          name: store.name,
-          revenue: Math.round(stat.revenue * 100) / 100,
-          orders: stat.orders,
-          rating: store.rating,
-          change: this.calculatePercentageChange(stat.revenue, previousRevenue),
-        };
-      })
-      .filter((item): item is TopVendor => item !== null);
+    return currentTopVendors.map(vendor => ({
+      id: vendor.id,
+      name: vendor.name,
+      revenue: Math.round(Number(vendor.revenue) * 100) / 100,
+      orders: Number(vendor.orders),
+      rating: vendor.rating,
+      change: this.calculatePercentageChange(
+        Number(vendor.revenue),
+        previousMap.get(vendor.id) || 0
+      ),
+    }));
   }
 
-  /**
-   * Helper: Calculate percentage change
-   */
   private calculatePercentageChange(current: number, previous: number): number {
     if (previous === 0) return current > 0 ? 100 : 0;
     return Math.round(((current - previous) / previous) * 100 * 10) / 10;
   }
 
-  /**
-   * Export analytics data to CSV
-   */
   async exportAnalyticsToCSV(days: number = 30): Promise<string> {
     const data = await this.getAnalyticsReport(days);
     
-    // Simple CSV generation for orders
     let csv = 'Date,Orders,Revenue\n';
     data.orderVolume.forEach((row) => {
       csv += `${row.date},${row.orders},${row.revenue}\n`;
