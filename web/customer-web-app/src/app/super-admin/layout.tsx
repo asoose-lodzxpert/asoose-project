@@ -9,6 +9,7 @@ import {
   Menu, Bell, ChevronDown, ChevronRight 
 } from 'lucide-react';
 import { createClient } from '../../../utils/supabase/client';
+
 export default function SuperAdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -16,15 +17,28 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
   
   // State for Mobile Menu & Sidebar Dropdowns
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isUsersOpen, setIsUsersOpen] = useState(true); // Default to open so you see options immediately
+  const [isUsersOpen, setIsUsersOpen] = useState(true);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
-    router.push('/sign-in');
+    try {
+      setIsLoggingOut(true);
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        console.error('Logout error:', error.message);
+        return;
+      }
+      router.push('/sign-in');
+      router.refresh();
+    } catch (error) {
+      console.error('Unexpected logout error:', error);
+    } finally {
+      setIsLoggingOut(false);
+    }
   };
 
-  // Helper to check active state for styling
-  const isActive = (path: string) => pathname === path;
+  const isActive = (path: string) => pathname === path || pathname.startsWith(`${path}/`);
+  
   const isChildActive = (basePath: string) => pathname.startsWith(basePath);
 
   return (
@@ -65,24 +79,24 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
                  isChildActive('/super-admin/users') ? 'text-white bg-white/5' : 'text-gray-400 hover:bg-white/5 hover:text-white'
               }`}
             >
-               <div className="flex items-center gap-3">
-                 <Users className="w-5 h-5" />
-                 <span className={isChildActive('/super-admin/users') ? 'font-bold' : ''}>Users</span>
-               </div>
-               {isUsersOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                <div className="flex items-center gap-3">
+                  <Users className="w-5 h-5" />
+                  <span className={isChildActive('/super-admin/users') ? 'font-bold' : ''}>Users</span>
+                </div>
+                {isUsersOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
             </button>
             
             {/* Nested Links */}
             {isUsersOpen && (
               <div className="ml-4 mt-1 space-y-1 border-l border-gray-700 pl-3">
                  <Link href="/super-admin/users/vendors" className={`block px-4 py-2 text-sm rounded-lg transition-colors ${isActive('/super-admin/users/vendors') ? 'text-yellow-500 font-bold bg-yellow-500/10' : 'text-gray-400 hover:text-white'}`}>
-                    Vendors
+                   Vendors
                  </Link>
                  <Link href="/super-admin/users/riders" className={`block px-4 py-2 text-sm rounded-lg transition-colors ${isActive('/super-admin/users/riders') ? 'text-yellow-500 font-bold bg-yellow-500/10' : 'text-gray-400 hover:text-white'}`}>
-                    Riders
+                   Riders
                  </Link>
                  <Link href="/super-admin/users/customers" className={`block px-4 py-2 text-sm rounded-lg transition-colors ${isActive('/super-admin/users/customers') ? 'text-yellow-500 font-bold bg-yellow-500/10' : 'text-gray-400 hover:text-white'}`}>
-                    Customers
+                   Customers
                  </Link>
               </div>
             )}
@@ -118,9 +132,15 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
         <div className="absolute bottom-0 w-full p-4 border-t border-gray-800 bg-[#1E293B]">
            <button 
              onClick={handleLogout}
-             className="flex items-center gap-3 px-4 py-3 w-full text-left text-red-400 hover:bg-red-500/10 rounded-xl transition-colors font-medium"
+             disabled={isLoggingOut}
+             className={`flex items-center gap-3 px-4 py-3 w-full text-left rounded-xl transition-colors font-medium ${
+               isLoggingOut 
+                 ? 'text-red-300 bg-red-500/5 cursor-not-allowed' 
+                 : 'text-red-400 hover:bg-red-500/10'
+             }`}
            >
-             <LogOut className="w-5 h-5" /> Logout
+             <LogOut className={`w-5 h-5 ${isLoggingOut ? 'animate-spin' : ''}`} />
+             {isLoggingOut ? 'Logging out...' : 'Logout'}
            </button>
         </div>
       </aside>
@@ -131,22 +151,24 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
         {/* Top Header */}
         <header className="h-16 border-b border-gray-800 flex items-center justify-between px-6 bg-[#0F172A]/80 backdrop-blur-md sticky top-0 z-40">
            <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="md:hidden text-gray-400">
-              <Menu />
+             <Menu />
            </button>
 
            <div className="flex-1 max-w-xl mx-4 hidden md:block">
-              <input 
-                type="text" 
-                placeholder="Search across users, orders, rides..." 
-                className="w-full bg-[#1E293B] border border-gray-700 rounded-lg px-4 py-2 text-sm text-gray-300 focus:outline-none focus:border-yellow-500 transition-colors"
-              />
+             <input 
+               type="text" 
+               placeholder="Search across users, orders, rides..." 
+               className="w-full bg-[#1E293B] border border-gray-700 rounded-lg px-4 py-2 text-sm text-gray-300 focus:outline-none focus:border-yellow-500 transition-colors"
+             />
            </div>
 
            <div className="flex items-center gap-4">
-              <button className="relative p-2 text-gray-400 hover:text-white transition-colors">
+              <Link 
+              href={"/super-admin/notifications"}
+              className="relative p-2 text-gray-400 hover:text-white transition-colors">
                  <Bell className="w-5 h-5" />
                  <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-              </button>
+              </Link>
               <div className="flex items-center gap-3 pl-4 border-l border-gray-700">
                  <div className="w-8 h-8 rounded-full bg-yellow-500 flex items-center justify-center text-black font-bold text-xs shadow-lg shadow-yellow-500/20">SA</div>
                  <span className="text-sm font-bold hidden md:block text-white">Super Admin</span>

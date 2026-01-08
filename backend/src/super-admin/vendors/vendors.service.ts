@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
@@ -13,10 +13,9 @@ import {
 } from '@prisma/client';
 import { CreateVendorDto, VendorQueryDto } from './dto/vendor.dto';
 import { EmailProducer } from 'src/libs/mail/email.producer';
+
 @Injectable()
 export class StoresService {
-  private readonly logger = new Logger(StoresService.name);
-
   constructor(
     private prisma: PrismaService,
     private emailProducer: EmailProducer
@@ -39,8 +38,6 @@ export class StoresService {
     if (status) where.status = status as StoreStatus;
     if (category) where.type = category as StoreType;
     if (verification) where.verification = verification as VerificationStatus;
-
-    this.logger.log(`Fetching vendors with filters: ${JSON.stringify(where)}`);
 
     const [stores, total] = await Promise.all([
       this.prisma.store.findMany({
@@ -79,41 +76,33 @@ export class StoresService {
   }
 
   async findOne(idOrSlug: string) {
-    this.logger.log(`Fetching store details for identifier: ${idOrSlug}`);
-    
     const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idOrSlug);
     const where: Prisma.StoreWhereUniqueInput = isUUID 
       ? { id: idOrSlug } 
       : { slug: idOrSlug };
 
-    try {
-      const store = await this.prisma.store.findUnique({
-        where,
-        include: {
-          owner: { select: { email: true, phone: true, name: true, status: true } },
-          orders: {
-            include: {
-              user: { select: { name: true } },
-              items: true,
-            },
-            orderBy: { createdAt: 'desc' },
-            take: 20, 
+    const store = await this.prisma.store.findUnique({
+      where,
+      include: {
+        owner: { select: { email: true, phone: true, name: true, status: true } },
+        orders: {
+          include: {
+            user: { select: { name: true } },
+            items: true,
           },
-          reviews: { orderBy: { createdAt: 'desc' }, take: 10 },
-          vendorPayouts: { orderBy: { createdAt: 'desc' }, take: 10 },
+          orderBy: { createdAt: 'desc' },
+          take: 20, 
         },
-      });
+        reviews: { orderBy: { createdAt: 'desc' }, take: 10 },
+        vendorPayouts: { orderBy: { createdAt: 'desc' }, take: 10 },
+      },
+    });
 
-      if (!store) {
-        throw new NotFoundException(`Store not found (Identifier: ${idOrSlug})`);
-      }
-
-      return this.transformStoreDetail(store);
-
-    } catch (error) {
-      this.logger.error(`Error in findOne: ${error.message}`, error.stack);
-      throw error;
+    if (!store) {
+      throw new NotFoundException(`Store not found (Identifier: ${idOrSlug})`);
     }
+
+    return this.transformStoreDetail(store);
   }
 
   async create(dto: CreateVendorDto) {
@@ -152,12 +141,6 @@ export class StoresService {
 
       return { user, store };
     });
-
-    this.logger.log('====================================');
-    this.logger.log(`[DEV] Vendor Created Successfully`);
-    this.logger.log(`Email: ${result.user.email}`);
-    this.logger.log(`Password: ${rawPassword}`);
-    this.logger.log('====================================');
 
     return {
       id: result.store.id,
@@ -320,25 +303,22 @@ export class StoresService {
     };
   }
 
-async getVendorProducts(storeId: string) {
-    // 1. Verify store exists
+  async getVendorProducts(storeId: string) {
     const store = await this.prisma.store.findUnique({ where: { id: storeId } });
     if (!store) throw new NotFoundException('Vendor not found');
 
-    // 2. Fetch products
-const products = await this.prisma.product.findMany({
+    const products = await this.prisma.product.findMany({
       where: { storeId },
       include: {
         category: { select: { name: true } }
       },
       orderBy: [
         { status: 'asc' },
-        { salesCount: 'desc' } as any // 👈 Add 'as any' here
+        { salesCount: 'desc' } as any
       ]
     });
 
-    // 3. Transform for Frontend (Optional: flattens the category object)
-return products.map((p: any) => ({
+    return products.map((p: any) => ({
       id: p.id,
       name: p.name,
       price: p.price,
@@ -349,9 +329,7 @@ return products.map((p: any) => ({
     }));
   }
 
-async updateProductStatus(productId: string, status: string) {
-    // 1. Validate Status
-    // Map frontend "BANNED" to schema "DISABLED" if necessary
+  async updateProductStatus(productId: string, status: string) {
     let validStatus: ProductStatus;
     
     if (status === 'BANNED' || status === 'DISABLED') validStatus = ProductStatus.DISABLED;
@@ -359,7 +337,6 @@ async updateProductStatus(productId: string, status: string) {
     else if (status === 'OUT_OF_STOCK') validStatus = ProductStatus.OUT_OF_STOCK;
     else throw new Error(`Invalid status: ${status}`);
 
-    // 2. Update Database
     const product = await this.prisma.product.update({
       where: { id: productId },
       data: { status: validStatus }
@@ -367,7 +344,6 @@ async updateProductStatus(productId: string, status: string) {
 
     return product;
   }
-
 
   async sendMessageToVendor(storeId: string, message: string) {
     const store = await this.prisma.store.findUnique({
@@ -379,7 +355,6 @@ async updateProductStatus(productId: string, status: string) {
       throw new NotFoundException('Vendor or Vendor Email not found');
     }
 
-    // Call the producer
     await this.emailProducer.sendVendorMessage(
       store.owner.email,
       `Message from Super Admin - ${store.name}`,
@@ -388,5 +363,4 @@ async updateProductStatus(productId: string, status: string) {
 
     return { success: true, message: 'Email queued successfully' };
   }
-
 }

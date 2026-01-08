@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException,BadRequestException } from '@nestjs/common';
+import { 
+  Injectable, 
+  NotFoundException, 
+  BadRequestException 
+} from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { UserStatus, UserRole, Prisma, OrderStatus } from '@prisma/client';
 
@@ -19,6 +23,7 @@ export class CustomersService {
 
     const where: Prisma.UserWhereInput = {
       role: UserRole.CUSTOMER,
+      deletedAt: null, 
       status: status && status !== 'ALL' ? status : undefined,
       OR: search
         ? [
@@ -43,11 +48,17 @@ export class CustomersService {
         }
       }),
       this.prisma.user.count({ where }),
-      this.prisma.user.count({ where: { role: UserRole.CUSTOMER, status: 'ACTIVE' } }),
-      this.prisma.user.count({ where: { role: UserRole.CUSTOMER, status: 'BANNED' } }),
+      
+      this.prisma.user.count({ 
+        where: { role: UserRole.CUSTOMER, status: 'ACTIVE', deletedAt: null } 
+      }),
+      this.prisma.user.count({ 
+        where: { role: UserRole.CUSTOMER, status: 'BANNED', deletedAt: null } 
+      }),
       this.prisma.user.count({ 
         where: { 
           role: UserRole.CUSTOMER, 
+          deletedAt: null,
           createdAt: { gte: new Date(new Date().setHours(0,0,0,0)) } 
         } 
       }),
@@ -76,16 +87,6 @@ export class CustomersService {
     };
   }
 
-  async bulkUpdateStatus(ids: string[], status: UserStatus) {
-    return this.prisma.user.updateMany({
-      where: { 
-        id: { in: ids },
-        role: UserRole.CUSTOMER
-      },
-      data: { status }
-    });
-  }
-
   async findOne(id: string) {
     const customer = await this.prisma.user.findUnique({
       where: { id },
@@ -105,34 +106,62 @@ export class CustomersService {
     };
   }
 
-  // FIXED: Corrected field names to match schema.prisma (userId, total, DELIVERED)
-  private async getAggregatedStats(userId: string) {
-    const [orders, rides] = await Promise.all([
-      this.prisma.order.aggregate({
-        where: { 
-            userId: userId,        // Fixed: customerId -> userId
-            status: OrderStatus.DELIVERED // Fixed: 'COMPLETED' -> 'DELIVERED'
-        },
-        _sum: { total: true },     // Fixed: totalAmount -> total
-        _count: { id: true }
-      }),
-      this.prisma.ride.aggregate({
-        where: { customerId: userId, status: 'COMPLETED' },
-        _count: { id: true }
-      })
-    ]);
-
-    return {
-      totalOrders: orders._count?.id ?? 0, // Fixed: Added optional chaining and fallback
-      totalSpent: orders._sum?.total ?? 0, // Fixed: totalAmount -> total
-      totalRides: rides._count?.id ?? 0,   // Fixed: Added optional chaining
-    };
+  async update(id: string, data: { name?: string; phone?: string; email?: string }) {
+    if (data.email) {
+      const existing = await this.prisma.user.findUnique({ 
+        where: { email: data.email } 
+      });
+      if (existing && existing.id !== id) {
+        throw new BadRequestException('Email already in use by another user');
+      }
+    }
+    
+    return this.prisma.user.update({
+      where: { id },
+      data: {
+        name: data.name,
+        phone: data.phone,
+        email: data.email,
+      }
+    });
   }
 
-  // FIXED: Corrected where clause to use userId
-  async getCustomerOrders(customerId: string) {
+//soft delete
+  async remove(id: string) {
+    const customer = await this.prisma.user.findUnique({ where: { id } });
+    if (!customer) throw new NotFoundException('Customer not found');
+
+    return this.prisma.user.update({
+      where: { id },
+      data: {
+        deletedAt: new Date(),
+        status: 'BANNED',
+        email: `deleted_${Date.now()}_${customer.email}`, 
+        phone: customer.phone ? `deleted_${Date.now()}_${customer.phone}` : null,
+      },
+    });
+  }
+
+  async bulkUpdateStatus(ids: string[], status: UserStatus) {
+    return this.prisma.user.updateMany({
+      where: { 
+        id: { in: ids },
+        role: UserRole.CUSTOMER
+      },
+      data: { status }
+    });
+  }
+
+  async updateStatus(id: string, status: UserStatus) {
+    return this.prisma.user.update({
+      where: { id },
+      data: { status }
+    });
+  }
+
+  async getCustomerOrders(userId: string) {
     return this.prisma.order.findMany({
-      where: { userId: customerId }, // Fixed: customerId -> userId
+      where: { userId }, 
       include: {
         store: { select: { name: true, image: true } },
         items: true
@@ -150,41 +179,27 @@ export class CustomersService {
     });
   }
 
-  async updateStatus(id: string, status: UserStatus) {
-    return this.prisma.user.update({
-      where: { id },
-      data: { status }
-    });
+  // Helper to calculate total spent and ride counts
+  private async getAggregatedStats(userId: string) {
+    const [orders, rides] = await Promise.all([
+      this.prisma.order.aggregate({
+        where: { 
+            userId: userId,        
+            status: OrderStatus.DELIVERED 
+        },
+        _sum: { total: true },     
+        _count: { id: true }
+      }),
+      this.prisma.ride.aggregate({
+        where: { customerId: userId, status: 'COMPLETED' },
+        _count: { id: true }
+      })
+    ]);
+
+    return {
+      totalOrders: orders._count?.id ?? 0,
+      totalSpent: orders._sum?.total ?? 0,
+      totalRides: rides._count?.id ?? 0, 
+    };
   }
-
-  async remove(id: string) {
-    const customer = await this.prisma.user.findUnique({ where: { id } });
-    if (!customer) throw new NotFoundException('Customer not found');
-
-    return this.prisma.user.delete({
-      where: { id },
-    });
-  }
-
-async update(id: string, data: { name?: string; phone?: string; email?: string }) {
-    if (data.email) {
-      const existing = await this.prisma.user.findUnique({ 
-        where: { email: data.email } 
-      });
-      if (existing && existing.id !== id) {
-        throw new BadRequestException('Email already in use by another user');
-      }
-    }
-return this.prisma.user.update({
-      where: { id },
-      data: {
-        name: data.name,
-        phone: data.phone,
-        email: data.email,
-      }
-    });
-  }
-
- 
-
 }

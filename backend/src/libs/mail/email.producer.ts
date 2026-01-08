@@ -20,7 +20,6 @@ export class EmailProducer {
     );
   }
 
-  // ✅ ADD THIS METHOD
   async sendVendorMessage(email: string, subject: string, message: string) {
     await this.emailQueue.add(
       'send-vendor-message', // Job Name
@@ -31,4 +30,21 @@ export class EmailProducer {
       },
     );
   }
+
+async sendOrderCreatedCustomer(email: string, orderId: string, total: number) {
+    await this.emailQueue.add(
+      'order-created-customer',
+      { email, orderId, total },
+      { attempts: 3, removeOnComplete: true }
+    );
+  }
+
+  async sendOrderCreatedVendor(email: string, storeName: string, orderId: string, items: any[]) {
+    await this.emailQueue.add(
+      'order-created-vendor',
+      { email, storeName, orderId, items },
+      { attempts: 3, removeOnComplete: true }
+    );
+  }
+
 }

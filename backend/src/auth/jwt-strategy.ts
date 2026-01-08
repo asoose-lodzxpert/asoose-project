@@ -38,13 +38,11 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       ignoreExpiration: false,
       secretOrKey: jwtSecret,
       audience: 'authenticated',
-      // Remove issuer validation - Supabase doesn't always include /auth/v1
       algorithms: ['HS256'],
     });
   }
 
   async validate(payload: JwtPayload): Promise<AuthUser> {
-    console.log('JWT Payload received:', payload); // Debug log
     
     if (!payload.sub) {
       throw new UnauthorizedException('Invalid token');
@@ -52,17 +50,27 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
-      select: { id: true, email: true, role: true, status: true } 
+      select: { 
+        id: true, 
+        email: true, 
+        role: true, 
+        status: true,
+        deletedAt: true
+      } 
     });
-
-    console.log('User found:', user); // Debug log
 
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
+    // 1. Block Banned/Suspended Users
     if (user.status === 'BANNED' || user.status === 'SUSPENDED') {
       throw new UnauthorizedException('Invalid credentials');
+    }
+
+    // 2. Block Soft Deleted Users
+    if (user.deletedAt) {
+       throw new UnauthorizedException('Account deleted');
     }
 
     return {

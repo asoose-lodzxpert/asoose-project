@@ -1,326 +1,329 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import Link from 'next/link';
+import { ArrowLeft, Loader2, MessageSquare } from 'lucide-react'; // ✅ Imported MessageSquare
 import Swal from 'sweetalert2';
-import { Loader2 } from 'lucide-react'; // Import a loading icon
-import RiderHeader from './components/ridersHeader';
-import RiderProfile from './components/riderprofile';
-import StatsOverview from './components/statsoverview';
-import RiderTabs from './components/ridertabs';
-import { mockRider,mockRides,mockPayouts } from './components/data';
-import { Rider,Ride,Payout } from './components/types';
+import useSWR from 'swr'; 
+import { AppAlert } from '../../customers/[id]/alerts'; 
+import { fetcher } from '@/app/super-admin/hooks/useSuperAdminFetch';
+import { createClient } from '../../../../../../utils/supabase/client'; // ✅ Import Supabase
+
+// Components
+import RiderTabs from './components/ridertabs'; 
+import { RiderSidebar } from './components/riderssidebar';
+import { RiderOverviewTab } from './components/Rideroverviewtab';
+import { RiderLogsTab } from './components/riderslogtabs';
+import { RiderPayoutsTab } from './components/RiderpayoutsTab';
+import DocumentsTab from '@/app/super-admin/component/documentstab';
 import RiderDetailPageSkeleton from './components/skeleton';
-export default function RiderDetailPage({ params }: { params: { id: string } }) {
-  const riderId = params.id || 'RDR-005';
 
-  // --- STATE MANAGEMENT ---
-  const [isLoading, setIsLoading] = useState(true);
-  const [rider, setRider] = useState<Rider>(mockRider);
-  const [rides, setRides] = useState<Ride[]>(mockRides);
-  const [payouts, setPayouts] = useState<Payout[]>(mockPayouts);
+// Helper to fix API URL
+const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001') + (process.env.NEXT_PUBLIC_API_URL?.endsWith('/api') ? '' : '/api');
 
-  // --- FETCH DATA ON MOUNT ---
-  useEffect(() => {
-    const fetchData = async () => {
-      setIsLoading(true);
-      try {
-        // 1. Attempt to fetch Rider Profile
-        const riderRes = await fetch(`/api/riders/${riderId}`);
-        if (riderRes.ok) {
-          const riderData = await riderRes.json();
-          setRider(riderData);
-        } else {
-          console.log("Database empty or API error, using Mock Rider data");
-          setRider(mockRider);
-        }
+// --- Simple Tab Loader ---
+const TabLoader = () => (
+  <div className="flex flex-col items-center justify-center h-64 animate-in fade-in">
+    <Loader2 className="w-8 h-8 text-yellow-500 animate-spin mb-2" />
+    <p className="text-gray-500 text-xs">Loading tab data...</p>
+  </div>
+);
 
-        // 2. Attempt to fetch Rides
-        const ridesRes = await fetch(`/api/riders/${riderId}/rides`);
-        if (ridesRes.ok) {
-          const ridesData = await ridesRes.json();
-          setRides(ridesData);
-        } else {
-          console.log("Database empty or API error, using Mock Rides data");
-          setRides(mockRides);
-        }
+export default function RiderDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id: riderId } = React.use(params);
+  const [activeTab, setActiveTab] = useState('Overview');
 
-        // 3. Attempt to fetch Payouts
-        const payoutsRes = await fetch(`/api/riders/${riderId}/payouts`);
-        if (payoutsRes.ok) {
-          const payoutsData = await payoutsRes.json();
-          setPayouts(payoutsData);
-        } else {
-          console.log("Database empty or API error, using Mock Payouts data");
-          setPayouts(mockPayouts);
-        }
-
-      } catch (error) {
-        console.error("Network error, falling back to all mock data", error);
-        // Fallback is already set in initial state, but explicit setting ensures consistency
-        setRider(mockRider);
-        setRides(mockRides);
-        setPayouts(mockPayouts);
-      } finally {
-        setIsLoading(false);
-      }
+  // ✅ Helper: Get Auth Header
+  const getAuthHeader = async () => {
+    const supabase = createClient();
+    const { data: { session } } = await supabase.auth.getSession();
+    return {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session?.access_token || ''}`
     };
-
-    fetchData();
-  }, [riderId]);
-
-  // --- HANDLER: Toggle Rider Status (Suspend/Activate) ---
-  const handleToggleRiderStatus = async () => {
-    const action = rider.status === 'Suspended' ? 'activate' : 'suspend';
-    const newStatus = rider.status === 'Suspended' ? 'Online' : 'Suspended';
-    
-    const result = await Swal.fire({
-      title: `${rider.status === 'Suspended' ? 'Activate' : 'Suspend'} Rider?`,
-      text: `Are you sure you want to ${action} ${rider.name}?`,
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: rider.status === 'Suspended' ? '#10b981' : '#ef4444',
-      cancelButtonColor: '#6b7280',
-      confirmButtonText: rider.status === 'Suspended' ? 'Yes, activate!' : 'Yes, suspend!',
-      background: '#1E293B',
-      color: '#fff'
-    });
-
-    if (result.isConfirmed) {
-      try {
-        // API Call
-        const response = await fetch(`/api/riders/${riderId}/status`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: newStatus }),
-        });
-
-        if (!response.ok) throw new Error('Failed to update status');
-
-        // Update UI
-        setRider(prev => ({ ...prev, status: newStatus }));
-        
-        Swal.fire({
-          title: 'Updated!',
-          text: `Rider status has been changed.`,
-          icon: 'success',
-          background: '#1E293B',
-          color: '#fff',
-          timer: 1500,
-          showConfirmButton: false,
-        });
-      } catch (error) {
-        Swal.fire({
-          title: 'Error',
-          text: 'Failed to update rider status.',
-          icon: 'error',
-          background: '#1E293B',
-          color: '#fff'
-        });
-      }
-    }
   };
 
-  // --- HANDLER: Delete Ride ---
-  const handleDeleteRide = async (id: string) => {
-    const result = await Swal.fire({
-      title: 'Delete Ride?',
-      text: "You won't be able to revert this!",
-      icon: 'warning',
+  // ===========================================================================
+  //  ✅ SWR DATA FETCHING
+  // ===========================================================================
+
+  // 1. Fetch Main Rider Profile
+  const { 
+    data: rider, 
+    error, 
+    isLoading, 
+    mutate: mutateRider 
+  } = useSWR<any>(
+    riderId ? `/super-admin/riders/${riderId}` : null,
+    fetcher
+  );
+
+  // 2. Fetch Payouts (Conditionally)
+  const { 
+    data: payouts, 
+    isLoading: isPayoutsLoading, // ✅ Extract loading state
+    mutate: mutatePayouts 
+  } = useSWR(
+    riderId && activeTab === 'Payouts' ? `/super-admin/riders/${riderId}/payouts` : null,
+    fetcher
+  );
+
+  // --- Handlers ---
+
+  // ✉️ Message Rider
+  const handleMessageRider = async () => {
+    const { value: text } = await Swal.fire({
+      title: 'Message Rider',
+      input: 'textarea',
+      inputLabel: `Send email to ${rider?.name}`,
+      inputPlaceholder: 'Type your message here...',
       showCancelButton: true,
-      confirmButtonColor: '#ef4444',
-      cancelButtonColor: '#6b7280',
-      confirmButtonText: 'Yes, delete it!',
-      background: '#1E293B',
-      color: '#fff'
+      confirmButtonText: 'Send Email',
+      confirmButtonColor: '#3b82f6',
+      background: '#1E293B', color: '#fff',
+      showLoaderOnConfirm: true,
+      preConfirm: async (message) => {
+        if (!message) return Swal.showValidationMessage('Message required');
+        try {
+          const headers = await getAuthHeader();
+          const res = await fetch(`${API_URL}/super-admin/riders/${riderId}/message`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ message })
+          });
+          if (!res.ok) throw new Error('Failed to send');
+        } catch (error) {
+          Swal.showValidationMessage(`Request failed: ${error}`);
+        }
+      }
     });
 
-    if (result.isConfirmed) {
-      try {
-        // API Call
-        const response = await fetch(`/api/rides/${id}`, {
-          method: 'DELETE',
-        });
-
-        if (!response.ok) throw new Error('Failed to delete ride');
-
-        // Update UI
-        setRides(prev => prev.filter(r => r.id !== id));
-        
-        Swal.fire({
-          title: 'Deleted!',
-          text: 'The ride record has been deleted.',
-          icon: 'success',
-          background: '#1E293B',
-          color: '#fff',
-          timer: 1500,
-          showConfirmButton: false,
-        });
-      } catch (error) {
-        Swal.fire({
-          title: 'Error',
-          text: 'Failed to delete ride record.',
-          icon: 'error',
-          background: '#1E293B',
-          color: '#fff'
-        });
-      }
-    }
+    if (text) AppAlert.success('Email Sent to Rider');
   };
 
-  // --- HANDLER: Process Payout ---
-  const handleProcessPayout = async (id: string) => {
-    Swal.fire({
-      title: 'Processing...',
-      text: 'Communicating with the bank...',
-      allowOutsideClick: false,
-      background: '#1E293B',
-      color: '#fff',
-      didOpen: () => Swal.showLoading()
-    });
-
+  // ✏️ Update Profile
+  const handleUpdateProfile = async (data: any) => {
     try {
-      // API Call
-      const response = await fetch(`/api/payouts/${id}/process`, {
-        method: 'POST',
+      const headers = await getAuthHeader();
+      const res = await fetch(`${API_URL}/super-admin/riders/${riderId}`, {
+          method: 'PATCH',
+          headers, // ✅ Added Auth
+          body: JSON.stringify(data)
       });
-
-      if (!response.ok) throw new Error('Payment processing failed');
-
-      // Update UI
-      setPayouts(prev => prev.map(p => 
-        p.id === id ? { ...p, status: 'Paid', processedBy: 'Admin User' } : p
-      ));
+      if (!res.ok) throw new Error('Update failed');
       
-      Swal.fire({
-        icon: 'success',
-        title: 'Payment Sent!',
-        background: '#1E293B',
-        color: '#fff',
-        timer: 1500,
-        showConfirmButton: false,
-      });
+      mutateRider(); 
+      AppAlert.success('Profile Updated');
     } catch (error) {
-      Swal.fire({
-        title: 'Transaction Failed',
-        text: 'Could not process the payout. Please try again.',
-        icon: 'error',
-        background: '#1E293B',
-        color: '#fff'
+      AppAlert.error('Error', 'Failed to update profile');
+    }
+  };
+
+  // 🚦 Suspend / Reactivate
+  const handleToggleStatus = async () => {
+    const isSuspending = rider.status !== 'SUSPENDED';
+    
+    if (isSuspending) {
+      const { value: reason } = await Swal.fire({
+        title: 'Suspend Rider?',
+        input: 'select',
+        inputOptions: { 'Low Rating': 'Low Rating', 'Fraud': 'Fraud', 'Other': 'Other' },
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        confirmButtonText: 'Suspend',
+        background: '#1E293B', color: '#fff'
       });
-    }
-  };
 
-  // --- HANDLER: Retry Payout ---
-  const handleRetryPayout = async (id: string) => {
-     const result = await Swal.fire({
-      title: 'Retry Payment?',
-      text: "Attempt to process this failed payment again?",
-      icon: 'question',
-      showCancelButton: true,
-      confirmButtonColor: '#eab308',
-      confirmButtonText: 'Yes, Retry',
-      background: '#1E293B',
-      color: '#fff'
-    });
-
-    if (result.isConfirmed) {
+      if (reason) {
+         try {
+           const headers = await getAuthHeader();
+           await fetch(`${API_URL}/super-admin/riders/${riderId}/status`, {
+              method: 'PATCH', 
+              headers, // ✅ Added Auth
+              body: JSON.stringify({ status: 'SUSPENDED' })
+           });
+           mutateRider();
+           AppAlert.success('Rider Suspended');
+         } catch (e) {
+           AppAlert.error('Error', 'Failed to suspend rider');
+         }
+      }
+    } else {
       try {
-        // Optimistic Update: Set to Pending immediately
-        setPayouts(prev => prev.map(p => 
-          p.id === id ? { ...p, status: 'Pending', description: 'Retry Attempt' } : p
-        ));
-
-        // Call Process Logic
-        await handleProcessPayout(id);
-
-      } catch (error) {
-        // Revert on error if needed (omitted for brevity)
-        console.error("Retry failed", error);
+        const headers = await getAuthHeader();
+        await fetch(`${API_URL}/super-admin/riders/${riderId}/status`, {
+          method: 'PATCH', 
+          headers, // ✅ Added Auth
+          body: JSON.stringify({ status: 'ACTIVE' }) // ✅ Changed OFFLINE to ACTIVE
+        });
+        mutateRider();
+        AppAlert.success('Rider Reactivated');
+      } catch (e) {
+        AppAlert.error('Error', 'Failed to reactivate rider');
       }
     }
   };
 
-  // --- HANDLER: Delete Payout ---
-  const handleDeletePayout = async (id: string) => {
-    const result = await Swal.fire({
-      title: 'Remove Payout Record?',
-      text: "This effectively cancels any pending transaction logs.",
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: '#ef4444',
-      confirmButtonText: 'Delete',
-      background: '#1E293B',
-      color: '#fff'
-    });
+  // 📄 Verify Documents
+  const handleVerifyDocument = async (docId: string, status: 'VERIFIED' | 'REJECTED', rejectionReason?: string) => {
+    try {
+      const headers = await getAuthHeader();
+      const res = await fetch(`${API_URL}/super-admin/verification/documents/${docId}`, {
+        method: 'PATCH',
+        headers, // ✅ Added Auth
+        body: JSON.stringify({ status, rejectionReason })
+      });
 
-    if (result.isConfirmed) {
-      try {
-        // API Call
-        const response = await fetch(`/api/payouts/${id}`, {
-          method: 'DELETE',
-        });
+      if (!res.ok) throw new Error('Action failed');
 
-        if (!response.ok) throw new Error('Failed to delete payout');
+      Swal.fire({
+        title: status === 'VERIFIED' ? 'Verified' : 'Rejected',
+        icon: status === 'VERIFIED' ? 'success' : 'warning',
+        toast: true, position: 'top-end', timer: 2000,
+        showConfirmButton: false, background: '#1E293B', color: '#fff'
+      });
 
-        // Update UI
-        setPayouts(prev => prev.filter(p => p.id !== id));
-        
-        Swal.fire({
-          title: 'Deleted!',
-          icon: 'success',
-          background: '#1E293B',
-          color: '#fff',
-          timer: 1500,
-          showConfirmButton: false,
-        });
-      } catch (error) {
-        Swal.fire({
-          title: 'Error',
-          text: 'Failed to delete payout record.',
-          icon: 'error',
-          background: '#1E293B',
-          color: '#fff'
-        });
-      }
+      mutateRider(); 
+    } catch (error) {
+      Swal.fire({ title: 'Error', text: 'Could not update document', icon: 'error' });
     }
   };
 
-  // --- LOADING VIEW ---
-  if (isLoading) {
+  // 💰 Process Payouts
+  const handleProcessPayout = async (payoutId: string, status: string) => {
+    try {
+      const headers = await getAuthHeader();
+      const res = await fetch(`${API_URL}/super-admin/riders/${riderId}/payouts/${payoutId}`, {
+        method: 'PATCH',
+        headers, // ✅ Added Auth
+        body: JSON.stringify({ status })
+      });
+      if (!res.ok) throw new Error('Action failed');
+      
+      mutatePayouts(); 
+      mutateRider(); 
+      AppAlert.success('Payout Updated');
+    } catch (error) {
+      AppAlert.error('Error', 'Failed to process payout');
+    }
+  };
+
+  // --- Render ---
+
+  if (isLoading) return <RiderDetailPageSkeleton/>;
+
+  if (error || !rider) {
     return (
-     <RiderDetailPageSkeleton/>
+      <div className="min-h-screen bg-[#0F172A] p-10 text-white text-center flex flex-col items-center">
+        <p className="text-xl font-bold mb-4">Rider Not Found</p>
+        <Link href="/super-admin/users/riders" className="text-yellow-500 hover:underline">Return to List</Link>
+      </div>
     );
   }
 
-  // --- MAIN VIEW ---
   return (
-    <div className="min-h-screen bg-[#0F172A] p-4 md:p-6">
+    <div className="min-h-screen bg-[#0F172A] p-4 md:p-6 pb-20">
       <div className="max-w-7xl mx-auto space-y-6">
         
-        {/* Header Section */}
-        <RiderHeader rider={rider} onToggleStatus={handleToggleRiderStatus} />
+        {/* Header */}
+        <div className="flex justify-between items-end">
+          <div>
+            <Link href="/super-admin/users/riders" className="text-gray-400 hover:text-white flex items-center gap-1 text-sm mb-4">
+              <ArrowLeft className="w-4 h-4" /> Back to Riders
+            </Link>
+            <div className="flex items-center gap-3">
+                <h1 className="text-2xl font-bold text-white">Rider Details</h1>
+                <span className={`px-2 py-1 text-[10px] font-bold uppercase rounded border ${
+                  rider.status === 'ONLINE' ? 'bg-green-500/10 text-green-500 border-green-500/20' : 
+                  rider.status === 'SUSPENDED' ? 'bg-red-500/10 text-red-500 border-red-500/20' : 
+                  'bg-gray-500/10 text-gray-500 border-gray-500/20'
+                }`}>
+                  {rider.status}
+                </span>
+            </div>
+          </div>
+          
+          {/* ✅ Message Button */}
+          <button 
+            onClick={handleMessageRider}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold rounded-lg transition-colors shadow-lg shadow-blue-500/20"
+          >
+            <MessageSquare className="w-4 h-4" /> Message Rider
+          </button>
+        </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          
-          {/* Left Column: Profile, Vehicle, Docs */}
-          <div className="lg:col-span-1">
-             <RiderProfile rider={rider} />
-          </div>
+           {/* LEFT: Sidebar */}
+           <div className="lg:col-span-1">
+              <RiderSidebar 
+                rider={rider} 
+                onToggleStatus={handleToggleStatus} 
+                onUpdate={handleUpdateProfile} 
+              />
+           </div>
 
-          {/* Right Column: Stats & Tabs */}
-          <div className="lg:col-span-2 space-y-6">
-             <StatsOverview rider={rider} rides={rides} payouts={payouts} />
-             
-             <RiderTabs 
-               rides={rides} 
-               payouts={payouts}
-               onDeleteRide={handleDeleteRide}
-               onProcessPayout={handleProcessPayout}
-               onRetryPayout={handleRetryPayout}
-               onDeletePayout={handleDeletePayout}
-             />
-          </div>
+           {/* RIGHT: Content Tabs */}
+           <div className="lg:col-span-2">
+              <div className="bg-[#1E293B] border border-gray-800 rounded-xl overflow-hidden min-h-[600px] flex flex-col">
+                  
+                  {/* Tab Navigation */}
+                  <div className="flex border-b border-gray-800 overflow-x-auto hide-scrollbar">
+                     {['Overview', 'Ride History', 'Documents', 'Logs', 'Payouts'].map(tab => (
+                        <button 
+                          key={tab} 
+                          onClick={() => setActiveTab(tab)} 
+                          className={`px-6 py-4 text-sm font-bold border-b-2 transition-colors whitespace-nowrap ${
+                            activeTab === tab 
+                              ? 'text-yellow-500 border-yellow-500 bg-[#0F172A]' 
+                              : 'text-gray-400 border-transparent hover:text-white hover:bg-white/5'
+                          }`}
+                        >
+                          {tab}
+                        </button>
+                     ))}
+                  </div>
 
+                  {/* Tab Content with Loading States */}
+                  <div className="flex-1">
+                     {activeTab === 'Overview' && (
+                       <RiderOverviewTab rider={rider} onRefresh={mutateRider} />
+                     )}
+                     
+                     {activeTab === 'Documents' && (
+                       <DocumentsTab 
+                          documents={rider?.documents || []} 
+                          onVerify={(id) => handleVerifyDocument(id, 'VERIFIED')}
+                          onReject={(id, reason) => handleVerifyDocument(id, 'REJECTED', reason)}
+                       />
+                     )}
+                     
+                     {activeTab === 'Ride History' && (
+                       <RiderTabs 
+                         rides={rider.rides || []} 
+                         payouts={[]} 
+                         onDeleteRide={() => {}} 
+                         onProcessPayout={() => {}} 
+                         onRetryPayout={() => {}} 
+                         onDeletePayout={() => {}} 
+                       />
+                     )}
+                     
+                     {activeTab === 'Logs' && (
+                       <RiderLogsTab logs={rider.activityLogs || []} />
+                     )}
+                     
+                     {activeTab === 'Payouts' && (
+                       // ✅ Added Loading State for Payouts
+                       isPayoutsLoading ? <TabLoader /> : (
+                         <RiderPayoutsTab 
+                           payouts={payouts || []} 
+                           onProcess={handleProcessPayout} 
+                         />
+                       )
+                     )}
+                  </div>
+              </div>
+           </div>
         </div>
       </div>
     </div>

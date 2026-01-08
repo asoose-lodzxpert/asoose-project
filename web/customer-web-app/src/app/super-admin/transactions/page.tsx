@@ -2,406 +2,373 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
-import { ArrowUpRight, ArrowDownLeft, DollarSign, Download, Filter, Eye, Trash2 } from 'lucide-react';
+import { ArrowUpRight, ArrowDownLeft, DollarSign, Download, Filter, Eye, Search, Loader2, Wallet, TrendingUp, TrendingDown, AlertCircle, RefreshCw, X, Calendar } from 'lucide-react';
 import { DataTable } from '@/app/super-admin/component/datatable';
-import { createColumnHelper, ColumnDef } from '@tanstack/react-table';
-import Swal from 'sweetalert2';
+import { ColumnDef } from '@tanstack/react-table';
 import { TransactionsListSkeleton } from './component/skeleton';
-
-// --- Types ---
+import { toast } from 'react-toastify';
+import useSWR from 'swr'; 
+import { fetcher } from '../hooks/useSuperAdminFetch';
+// Types matching Backend Response
 interface Transaction {
   id: string;
-  type: string;
+  type: 'Credit' | 'Debit';
   amount: string;
   desc: string;
+  refId?: string;
+  refType?: string;
   user: string;
   date: string;
   status: string;
 }
 
-// --- Mock Data (Fallback) ---
-const MOCK_TRANSACTIONS: Transaction[] = [
-  { id: 'TXN-901', type: 'Credit', amount: '+$45.00', desc: 'Order Payment #ORD-001', user: 'John Doe', date: '2024-05-10 14:30', status: 'Success' },
-  { id: 'TXN-902', type: 'Debit', amount: '-$38.50', desc: 'Vendor Payout - Joe\'s Pizza', user: 'Joe\'s Pizza', date: '2024-05-10 09:00', status: 'Success' },
-  { id: 'TXN-903', type: 'Credit', amount: '+$12.50', desc: 'Ride Payment #RID-502', user: 'Bob W.', date: '2024-05-09 18:45', status: 'Success' },
-  { id: 'TXN-904', type: 'Debit', amount: '-$150.00', desc: 'Weekly Rider Payout', user: 'Michael Chen', date: '2024-05-08 23:00', status: 'Processing' },
-  { id: 'TXN-905', type: 'Credit', amount: '+$22.00', desc: 'Order Payment #ORD-005', user: 'David G.', date: '2024-05-08 12:00', status: 'Failed' },
-  { id: 'TXN-906', type: 'Credit', amount: '+$67.80', desc: 'Order Payment #ORD-006', user: 'Sarah M.', date: '2024-05-07 16:20', status: 'Success' },
-  { id: 'TXN-907', type: 'Debit', amount: '-$95.00', desc: 'Vendor Payout - Sushi Express', user: 'Sushi Express', date: '2024-05-07 10:15', status: 'Success' },
-  { id: 'TXN-908', type: 'Credit', amount: '+$31.25', desc: 'Order Payment #ORD-007', user: 'Emily R.', date: '2024-05-06 19:45', status: 'Success' },
-];
+interface TransactionStats {
+  revenue: number;
+  payouts: number;
+  net: number;
+}
 
-const columnHelper = createColumnHelper<Transaction>();
+interface TransactionsApiResponse {
+    data: Transaction[];
+    stats: TransactionStats;
+    meta: {
+        total: number;
+        page: number;
+        limit: number;
+    }
+}
+
+// --- Summary Card Component (Unchanged) ---
+const StatsCard = ({ title, value, type }: { title: string, value: string, type: 'net' | 'in' | 'out' }) => {
+  const colors = {
+    net: 'bg-blue-500/10 text-blue-500 border-blue-500/20',
+    in: 'bg-green-500/10 text-green-500 border-green-500/20',
+    out: 'bg-orange-500/10 text-orange-500 border-orange-500/20',
+  };
+  const Icon = type === 'in' ? TrendingUp : type === 'out' ? TrendingDown : Wallet;
+  return (
+    <div className="bg-[#1E293B] border border-gray-700 rounded-xl p-4 hover:border-gray-600 transition-colors">
+      <div className="flex items-center justify-between">
+        <p className="text-gray-400 text-sm">{title}</p>
+        <Icon className={`w-5 h-5 ${colors[type].split(' ')[1]}`} />
+      </div>
+      <p className="text-2xl font-bold text-white mt-2">{value}</p>
+    </div>
+  );
+};
 
 export default function TransactionsPage() {
-  // --- State ---
+  // --- UI State ---
   const [filterOpen, setFilterOpen] = useState(false);
+  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
+
+  // Filters
   const [statusFilter, setStatusFilter] = useState('All');
   const [typeFilter, setTypeFilter] = useState('All');
-  const [rowSelection, setRowSelection] = useState({});
-  const [transactions, setTransactions] = useState<Transaction[]>(MOCK_TRANSACTIONS);
-  const [isLoading, setIsLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
 
-  // --- Data Fetching ---
+  // Debounce search input
   useEffect(() => {
-    const fetchTransactions = async () => {
-      setIsLoading(true);
-      try {
-        const response = await fetch('/api/transactions');
-        if (response.ok) {
-          const data = await response.json();
-          setTransactions(data);
-        } else {
-          console.warn("API unavailable, using mock data");
-          setTransactions(MOCK_TRANSACTIONS);
-        }
-      } catch (error) {
-        console.error("Failed to fetch transactions:", error);
-        setTransactions(MOCK_TRANSACTIONS);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+      setPagination(prev => ({ ...prev, pageIndex: 0 })); // Reset page on search
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
-    fetchTransactions();
-  }, []);
+  // ===========================================================================
+  //  ✅ SWR DATA FETCHING
+  // ===========================================================================
 
-  // --- Handlers ---
-  const handleDeleteTransaction = async (transaction: Transaction) => {
-    const result = await Swal.fire({
-      title: 'Delete Transaction?',
-      html: `
-        <div class="text-left text-gray-300">
-          <p class="mb-2">Are you sure you want to delete this transaction?</p>
-          <div class="bg-[#1E293B] p-3 rounded-lg border border-gray-700 mt-3">
-            <p class="text-sm font-bold text-yellow-500">${transaction.id}</p>
-            <p class="text-xs text-gray-400">Amount: <span class="${transaction.type === 'Credit' ? 'text-green-400' : 'text-white'}">${transaction.amount}</span></p>
-          </div>
-          <p class="text-red-400 text-sm font-bold mt-3">This action cannot be undone!</p>
-        </div>
-      `,
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: '#ef4444',
-      cancelButtonColor: '#6b7280',
-      confirmButtonText: 'Yes, delete it!',
-      background: '#1E293B',
-      color: '#fff'
+  const queryString = useMemo(() => {
+    const params = new URLSearchParams({
+        page: (pagination.pageIndex + 1).toString(),
+        limit: pagination.pageSize.toString(),
     });
 
-    if (result.isConfirmed) {
-      try {
-        // API Call
-        const res = await fetch(`/api/transactions/${transaction.id}`, { method: 'DELETE' });
-        if (!res.ok) throw new Error('Failed to delete');
+    if (debouncedSearch) params.append('search', debouncedSearch);
+    if (statusFilter !== 'All') params.append('status', statusFilter.toUpperCase());
+    if (typeFilter !== 'All') params.append('type', typeFilter);
 
-        // Update State
-        setTransactions(prev => prev.filter(t => t.id !== transaction.id));
+    return params.toString();
+  }, [pagination, debouncedSearch, statusFilter, typeFilter]);
 
-        Swal.fire({
-          title: 'Deleted!',
-          text: `Transaction ${transaction.id} has been deleted.`,
-          icon: 'success',
-          background: '#1E293B',
-          color: '#fff',
-          confirmButtonColor: '#eab308',
-          timer: 1500,
-          showConfirmButton: false,
-        });
-      } catch (error) {
-        Swal.fire({ title: 'Error', text: 'Failed to delete transaction.', icon: 'error', background: '#1E293B', color: '#fff' });
-      }
-    }
-  };
+  const { 
+    data: apiResponse, 
+    error, 
+    isLoading, 
+    mutate 
+  } = useSWR<TransactionsApiResponse>(
+    `/super-admin/transactions?${queryString}`,
+    fetcher,
+    { keepPreviousData: true }
+  );
 
-  const handleExport = () => {
-    const csv = [
-      ['Transaction ID', 'Description', 'User', 'Date', 'Amount', 'Type', 'Status'].join(','),
-      ...filteredTransactions.map(t => 
-        [t.id, t.desc, t.user, t.date, t.amount, t.type, t.status].join(',')
-      )
-    ].join('\n');
-    
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'transactions.csv';
-    a.click();
-  };
+  const transactions = apiResponse?.data || [];
+  const stats = apiResponse?.stats || { revenue: 0, payouts: 0, net: 0 };
+  const total = apiResponse?.meta?.total || 0;
+  const isError = !!error;
 
   // --- Helpers ---
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'Success': return 'bg-green-500/20 text-green-500 border-green-500/20';
-      case 'Processing': return 'bg-yellow-500/20 text-yellow-500 border-yellow-500/20';
-      case 'Failed': return 'bg-red-500/20 text-red-500 border-red-500/20';
-      default: return 'bg-gray-500/20 text-gray-400 border-gray-500/20';
-    }
-  };
+  const formatCurrency = (val: number) =>
+    new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(val);
 
-  const getAmountColor = (type: string) => {
-    return type === 'Credit' ? 'text-green-400' : 'text-white';
-  };
+  const hasActiveFilters = statusFilter !== 'All' || typeFilter !== 'All' || searchTerm !== '';
 
-  // --- Filters ---
-  const filteredTransactions = useMemo(() => {
-    let result = transactions;
-    
-    if (statusFilter !== 'All') {
-      result = result.filter(t => t.status === statusFilter);
-    }
-    
-    if (typeFilter !== 'All') {
-      result = result.filter(t => t.type === typeFilter);
-    }
-    
-    return result;
-  }, [statusFilter, typeFilter, transactions]);
+  const clearAllFilters = () => {
+    setSearchTerm('');
+    setDebouncedSearch('');
+    setStatusFilter('All');
+    setTypeFilter('All');
+    setPagination({ pageIndex: 0, pageSize: 10 });
+  };
 
   // --- Columns ---
-  const columns = useMemo<ColumnDef<Transaction, any>[]>(() => [
-    columnHelper.accessor("id", {
-      header: "Transaction ID",
+  const columns = useMemo<ColumnDef<Transaction>[]>(() => [
+    {
+      accessorKey: 'id',
+      header: 'Transaction ID',
       cell: info => (
+        <span className="text-gray-400 font-mono text-xs">
+          {info.getValue<string>().substring(0, 8)}...
+        </span>
+      ),
+    },
+    {
+      accessorKey: 'desc',
+      header: 'Description',
+      cell: info => {
+        const row = info.row.original;
+        if (row.refId && row.refType) {
+          return (
+            <Link
+              href={`/super-admin/${row.refType.toLowerCase()}s/${row.refId}`}
+              className="text-yellow-500 hover:underline flex items-center gap-1"
+            >
+              {info.getValue<string>()}
+              <ArrowUpRight className="w-3 h-3" />
+            </Link>
+          );
+        }
+        return <span className="text-gray-300">{info.getValue<string>()}</span>;
+      },
+    },
+    {
+      accessorKey: 'user',
+      header: 'User',
+      cell: info => <span className="text-gray-300">{info.getValue<string>()}</span>,
+    },
+    {
+      accessorKey: 'type',
+      header: 'Type',
+      cell: ({ row }) => (
+        <div className="flex items-center gap-1.5">
+          {row.original.type === 'Credit' ? (
+            <>
+              <div className="w-1.5 h-1.5 rounded-full bg-green-500"></div>
+              <span className="text-gray-300 text-sm">Credit</span>
+            </>
+          ) : (
+            <>
+              <div className="w-1.5 h-1.5 rounded-full bg-orange-500"></div>
+              <span className="text-gray-300 text-sm">Debit</span>
+            </>
+          )}
+        </div>
+      ),
+    },
+    {
+      accessorKey: 'amount',
+      header: 'Amount',
+      cell: ({ row }) => (
+        <div className="flex items-center gap-1">
+          {row.original.type === 'Credit' ? (
+            <ArrowUpRight className="w-4 h-4 text-green-500" />
+          ) : (
+            <ArrowDownLeft className="w-4 h-4 text-orange-500" />
+          )}
+          <span className={`font-semibold ${row.original.type === 'Credit' ? 'text-green-500' : 'text-orange-500'}`}>
+            {row.original.amount}
+          </span>
+        </div>
+      ),
+    },
+    {
+      accessorKey: 'status',
+      header: 'Status',
+      cell: ({ getValue }) => {
+        const status = getValue<string>();
+        const color =
+          status === 'Success'
+            ? 'bg-green-500/20 text-green-500 border-green-500/30'
+            : status === 'Processing'
+            ? 'bg-yellow-500/20 text-yellow-500 border-yellow-500/30'
+            : 'bg-red-500/20 text-red-500 border-red-500/30';
+        return <span className={`px-2.5 py-1 rounded-md text-xs font-medium border ${color}`}>{status}</span>;
+      },
+    },
+    {
+      accessorKey: 'date',
+      header: 'Date',
+      cell: info => (
+        <span className="text-gray-400 text-sm">
+          {new Date(info.getValue<string>()).toLocaleDateString('en-US', { 
+            month: 'short', 
+            day: 'numeric', 
+            year: 'numeric' 
+          })}
+        </span>
+      ),
+    },
+    {
+      id: 'actions',
+      header: '',
+      cell: ({ row }) => (
         <Link
-          href={`/super-admin/transactions/${info.getValue()}`}
-          className="font-mono text-yellow-500 hover:text-yellow-400 hover:underline transition-colors text-xs"
+          href={`/super-admin/transactions/${row.original.id}`}
+          className="text-yellow-500 hover:text-yellow-400 hover:bg-yellow-500/10 p-2 rounded-lg transition-colors inline-flex"
+          aria-label="View transaction details"
         >
-          {info.getValue()}
+          <Eye className="w-4 h-4" />
         </Link>
       ),
-    }),
-    
-    columnHelper.accessor("desc", {
-      header: "Description",
-      cell: info => (
-        <span className="font-medium text-white truncate">
-          {info.getValue()}
-        </span>
-      ),
-    }),
-
-    columnHelper.accessor("user", {
-      header: "User",
-      cell: info => (
-        <span className="text-gray-400 truncate">
-          {info.getValue()}
-        </span>
-      ),
-    }),
-
-    columnHelper.accessor("date", {
-      header: "Date",
-      cell: info => (
-        <span className="text-xs font-mono text-gray-500">
-          {info.getValue()}
-        </span>
-      ),
-    }),
-
-    columnHelper.accessor("amount", {
-      header: "Amount",
-      cell: info => {
-        const transaction = info.row.original;
-        return (
-          <span className={`font-bold ${getAmountColor(transaction.type)}`}>
-            {info.getValue()}
-          </span>
-        );
-      },
-    }),
-
-    columnHelper.accessor("status", {
-      header: "Status",
-      cell: info => {
-        const status = info.getValue();
-        return (
-          <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${getStatusColor(status)}`}>
-            {status}
-          </span>
-        );
-      },
-    }),
-
-    {
-      id: "actions",
-      header: "Actions",
-      cell: ({ row }) => {
-        const transaction = row.original;
-        return (
-          <div className="flex items-center gap-2">
-            <Link href={`/super-admin/transactions/${transaction.id}`}>
-              <button 
-                className="p-2 hover:bg-blue-500/10 rounded-lg text-gray-400 hover:text-blue-500 transition-colors"
-                title="View Transaction"
-              >
-                <Eye className="w-4 h-4" />
-              </button>
-            </Link>
-            
-            <button 
-              onClick={() => handleDeleteTransaction(transaction)}
-              className="p-2 hover:bg-red-500/10 rounded-lg text-gray-400 hover:text-red-500 transition-colors"
-              title="Delete Transaction"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
-          </div>
-        );
-      },
     },
   ], []);
 
   // --- Mobile Card ---
   const TransactionCard = ({ transaction }: { transaction: Transaction }) => (
-    <div className="bg-[#1E293B] border border-gray-800 rounded-lg p-4 hover:border-gray-700 transition-colors mb-3">
-      <div className="flex justify-between items-start mb-3">
-        <Link
-          href={`/super-admin/transactions/${transaction.id}`}
-          className="text-yellow-500 hover:text-yellow-400 font-mono font-bold text-sm transition-colors"
-        >
-          {transaction.id}
-        </Link>
-        <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${getStatusColor(transaction.status)}`}>
+    <div className="bg-[#1E293B] border border-gray-700 rounded-lg p-4 space-y-3 hover:border-gray-600 transition-colors">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex-1 min-w-0">
+          <span className="text-xs text-gray-500 font-mono block truncate">{transaction.id}</span>
+        </div>
+        <span className={`px-2.5 py-1 rounded-md text-xs font-medium border whitespace-nowrap ${
+            transaction.status === 'Success' ? 'bg-green-500/20 text-green-500 border-green-500/30' :
+            transaction.status === 'Processing' ? 'bg-yellow-500/20 text-yellow-500 border-yellow-500/30' :
+            'bg-red-500/20 text-red-500 border-red-500/30'
+        }`}>
           {transaction.status}
         </span>
       </div>
-
-      <div className="mb-4">
-        <p className="font-medium text-white mb-2">{transaction.desc}</p>
-        <div className="flex items-center justify-between text-sm">
-          <div className="text-gray-400">
-            <div className="mb-1">User: {transaction.user}</div>
-            <div className="font-mono text-gray-500 text-xs">{transaction.date}</div>
-          </div>
-          <span className={`font-bold text-lg ${getAmountColor(transaction.type)}`}>
-            {transaction.amount}
-          </span>
-        </div>
+      <div>
+        {transaction.refId && transaction.refType ? (
+          <Link href={`/super-admin/${transaction.refType.toLowerCase()}s/${transaction.refId}`} className="text-yellow-500 hover:underline font-medium text-base flex items-center gap-1">
+            {transaction.desc} <ArrowUpRight className="w-3.5 h-3.5" />
+          </Link>
+        ) : (
+          <p className="text-white font-medium text-base">{transaction.desc}</p>
+        )}
       </div>
-
-      <div className="flex items-center gap-2 mb-4">
-        <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${
-          transaction.type === 'Credit' 
-            ? 'bg-green-500/20 text-green-400 border border-green-500/20' 
-            : 'bg-blue-500/20 text-blue-400 border border-blue-500/20'
-        }`}>
-          {transaction.type}
+      <div className="flex items-center justify-between pt-2 border-t border-gray-700">
+        <div className="flex items-center gap-2">
+          {transaction.type === 'Credit' ? (
+            <>
+              <div className="w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center"><ArrowUpRight className="w-4 h-4 text-green-500" /></div>
+              <span className="text-sm text-gray-300">Credit</span>
+            </>
+          ) : (
+            <>
+              <div className="w-8 h-8 rounded-full bg-orange-500/20 flex items-center justify-center"><ArrowDownLeft className="w-4 h-4 text-orange-500" /></div>
+              <span className="text-sm text-gray-300">Debit</span>
+            </>
+          )}
+        </div>
+        <span className={`font-bold text-xl ${transaction.type === 'Credit' ? 'text-green-500' : 'text-orange-500'}`}>
+          {transaction.amount}
         </span>
       </div>
-
-      <div className="flex gap-2 pt-3 border-t border-gray-800">
-        <Link
-          href={`/super-admin/transactions/${transaction.id}`}
-          className="flex-1 flex items-center justify-center gap-2 py-2 bg-gray-700/50 rounded-lg hover:bg-white/10 text-gray-300 hover:text-white transition-colors"
-        >
-          <Eye className="w-4 h-4" />
-          <span className="text-sm">View</span>
-        </Link>
-        <button 
-          onClick={() => handleDeleteTransaction(transaction)}
-          className="flex-1 flex items-center justify-center gap-2 py-2 bg-red-500/10 rounded-lg hover:bg-red-500 hover:text-white text-red-500 transition-colors"
-        >
-          <Trash2 className="w-4 h-4" />
-          <span className="text-sm">Delete</span>
-        </button>
-      </div>
+      <Link href={`/super-admin/transactions/${transaction.id}`} className="flex items-center justify-center gap-2 w-full py-2.5 bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-500 rounded-lg transition-colors mt-3">
+        <Eye className="w-4 h-4" /> <span className="text-sm font-semibold">View Details</span>
+      </Link>
     </div>
   );
 
-  const renderMobileCard = (transaction: Transaction) => <TransactionCard transaction={transaction} />;
-
-  if (isLoading) {
-    return <TransactionsListSkeleton />;
-  }
-
   return (
-    <div className="min-h-screen bg-[#0F172A] p-4 md:p-6">
-      <div className="max-w-7xl mx-auto space-y-6">
-        
-        {/* Header */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div>
-            <h1 className="text-xl md:text-2xl font-bold text-white">Transactions</h1>
-            <p className="text-gray-400 text-sm mt-1">Monitor all financial transactions and payouts</p>
-          </div>
-          
-          <div className="flex gap-2 w-full md:w-auto">
-             <button 
-                onClick={() => setFilterOpen(!filterOpen)}
-                className="md:hidden flex items-center justify-center p-2 border border-gray-700 rounded-lg transition-colors text-gray-300 hover:bg-gray-800"
-              >
-                <Filter className="w-4 h-4" />
-              </button>
-
-            <button 
-              onClick={handleExport}
-              className="flex-1 md:flex-none flex items-center justify-center gap-2 px-3 md:px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-black font-bold rounded-lg transition-colors text-sm"
-            >
-              <Download className="w-4 h-4" />
-              <span className="hidden md:inline">Export</span>
-              <span className="inline md:hidden">Export CSV</span>
-            </button>
-          </div>
+    <div className="min-h-screen bg-[#0F172A] text-white p-4 md:p-8">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 gap-4">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold">Transactions</h1>
+          <p className="text-gray-400 text-sm mt-1">Monitor all financial activities and payouts</p>
         </div>
+        <div className="flex items-center gap-3">
+          <button onClick={() => setFilterOpen(!filterOpen)} className="md:hidden flex items-center justify-center gap-2 px-4 py-2 border border-gray-700 rounded-lg text-gray-300 hover:text-white hover:bg-gray-800 transition-colors relative">
+            <Filter className="w-5 h-5" /> <span className="text-sm font-medium">Filters</span>
+            {hasActiveFilters && <span className="absolute -top-1 -right-1 w-3 h-3 bg-yellow-500 rounded-full"></span>}
+          </button>
+          <button onClick={() => mutate()} className="p-2 border border-gray-700 rounded-lg text-gray-300 hover:text-white hover:bg-gray-800 transition-colors" title="Refresh">
+             <RefreshCw className={`w-5 h-5 ${isLoading ? 'animate-spin' : ''}`} />
+          </button>
+          <button onClick={() => toast.info('Export feature coming soon')} className="flex items-center gap-2 px-4 py-2 bg-yellow-500 text-black rounded-lg hover:bg-yellow-400 transition-colors font-semibold">
+            <Download className="w-4 h-4" /> <span className="hidden sm:inline">Export</span>
+          </button>
+        </div>
+      </div>
 
-        {/* Filters Section (Collapsible on Mobile) */}
-        <div className={`bg-[#1E293B] p-3 md:p-4 rounded-xl border border-gray-800 ${filterOpen ? 'block' : 'hidden'} md:block`}>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="text-xs text-gray-400 font-bold uppercase mb-2 block">Status</label>
-              <select 
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="w-full bg-[#0F172A] text-white text-sm px-3 py-2 rounded-lg border border-gray-700 focus:border-yellow-500 outline-none"
-              >
-                <option>All</option>
-                <option>Success</option>
-                <option>Processing</option>
-                <option>Failed</option>
-              </select>
+      {/* Summary Stats */}
+      {apiResponse && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+          <StatsCard title="Net Revenue" value={formatCurrency(stats.net)} type="net" />
+          <StatsCard title="Total In" value={formatCurrency(stats.revenue)} type="in" />
+          <StatsCard title="Total Out" value={formatCurrency(stats.payouts)} type="out" />
+        </div>
+      )}
+
+      {/* Desktop Filters */}
+      <div className="hidden md:flex flex-row gap-3 mb-6 bg-[#1E293B] p-4 rounded-lg border border-gray-700">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+          <input type="text" placeholder="Search by ID, user, description..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full bg-[#0F172A] border border-gray-700 rounded-lg pl-9 pr-10 py-2 text-sm text-gray-300 outline-none focus:border-yellow-500 transition-colors" />
+          {searchTerm && <button onClick={() => setSearchTerm('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300"><X className="w-4 h-4" /></button>}
+        </div>
+        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="bg-[#0F172A] text-gray-300 text-sm border border-gray-700 rounded-lg px-3 py-2 outline-none focus:border-yellow-500 transition-colors cursor-pointer">
+          <option>All</option><option>Success</option><option>Processing</option><option>Failed</option>
+        </select>
+        <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} className="bg-[#0F172A] text-gray-300 text-sm border border-gray-700 rounded-lg px-3 py-2 outline-none focus:border-yellow-500 transition-colors cursor-pointer">
+          <option>All</option><option>Credit</option><option>Debit</option>
+        </select>
+        {hasActiveFilters && <button onClick={clearAllFilters} className="px-4 py-2 text-sm text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors flex items-center gap-2"><X className="w-4 h-4" /> Clear</button>}
+      </div>
+
+      {/* Table Area */}
+      <div className="bg-[#1E293B] rounded-xl border border-gray-700 overflow-hidden">
+        {isLoading && transactions.length === 0 ? (
+          <TransactionsListSkeleton />
+        ) : isError ? (
+          <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
+            <AlertCircle className="w-8 h-8 text-red-500 mb-2" />
+            <h3 className="text-lg font-semibold text-white mb-2">Connection Error</h3>
+            <button onClick={() => mutate()} className="flex items-center gap-2 px-6 py-3 bg-yellow-500 text-black rounded-lg hover:bg-yellow-400 font-semibold transition-colors"><RefreshCw className="w-4 h-4" /> Retry</button>
+          </div>
+        ) : transactions.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
+            <DollarSign className="w-8 h-8 text-gray-600 mb-4" />
+            <h3 className="text-lg font-semibold text-white mb-2">No Transactions Found</h3>
+            <p className="text-gray-400 mb-6 max-w-md">No transactions match your current filters.</p>
+            {hasActiveFilters && <button onClick={clearAllFilters} className="flex items-center gap-2 px-6 py-3 bg-yellow-500 text-black rounded-lg hover:bg-yellow-400 font-semibold transition-colors">Clear All Filters</button>}
+          </div>
+        ) : (
+          <>
+            <div className="hidden md:block">
+              <DataTable columns={columns} data={transactions} pagination={pagination} setPagination={setPagination} total={total} />
             </div>
-            
-            <div>
-              <label className="text-xs text-gray-400 font-bold uppercase mb-2 block">Type</label>
-              <select 
-                value={typeFilter}
-                onChange={(e) => setTypeFilter(e.target.value)}
-                className="w-full bg-[#0F172A] text-white text-sm px-3 py-2 rounded-lg border border-gray-700 focus:border-yellow-500 outline-none"
-              >
-                <option>All</option>
-                <option>Credit</option>
-                <option>Debit</option>
-              </select>
+            <div className="md:hidden">
+              {filterOpen && (
+                <div className="p-4 border-b border-gray-700 space-y-3 bg-[#0F172A]/50">
+                   <input type="text" placeholder="Search..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full bg-[#0F172A] border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-300 outline-none" />
+                   <div className="grid grid-cols-2 gap-3">
+                      <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="bg-[#0F172A] text-gray-300 text-sm border border-gray-700 rounded-lg px-3 py-2 outline-none"><option>All</option><option>Success</option><option>Processing</option><option>Failed</option></select>
+                      <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} className="bg-[#0F172A] text-gray-300 text-sm border border-gray-700 rounded-lg px-3 py-2 outline-none"><option>All</option><option>Credit</option><option>Debit</option></select>
+                   </div>
+                </div>
+              )}
+              <div className="space-y-3 p-4">
+                {transactions.map(transaction => <TransactionCard key={transaction.id} transaction={transaction} />)}
+              </div>
             </div>
-          </div>
-          
-          <div className="flex gap-2 mt-4">
-            <button 
-              onClick={() => {
-                setStatusFilter('All');
-                setTypeFilter('All');
-              }}
-              className="px-4 py-2 text-gray-400 hover:text-white text-sm transition-colors border border-gray-700 rounded-lg"
-            >
-              Clear Filters
-            </button>
-          </div>
-        </div>
-
-        {/* Data Table */}
-        <div className="bg-[#1E293B] border border-gray-800 rounded-xl overflow-hidden flex-1 min-h-0">
-          <DataTable
-            data={filteredTransactions}
-            columns={columns}
-            rowSelection={rowSelection}
-            onRowSelectionChange={setRowSelection}
-            pageSize={10}
-            renderMobileCard={renderMobileCard}
-          />
-        </div>
-
+          </>
+        )}
       </div>
     </div>
   );

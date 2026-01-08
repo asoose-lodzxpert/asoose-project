@@ -6,7 +6,8 @@ export interface CartItem {
   name: string;
   price: number;
   quantity: number;
-  restaurantId: string;
+  restaurantId: string; // Ensure this is here
+  image?: string | null; // <--- FIX: Add this line
 }
 
 interface CartState {
@@ -14,7 +15,7 @@ interface CartState {
   restaurantId: string | null;
   
   addItem: (item: CartItem) => void;
-  decreaseItem: (itemId: string) => void; // 👈 NEW ACTION
+  decreaseItem: (itemId: string) => void;
   removeItem: (itemId: string) => void;
   clearCart: () => void;
   
@@ -32,8 +33,9 @@ export const useCartStore = create<CartState>()(
         const currentItems = get().items;
         const currentRestaurant = get().restaurantId;
 
+        // Validation: Prevent mixing orders from different vendors
         if (currentRestaurant && currentRestaurant !== newItem.restaurantId) {
-            const confirmSwitch = window.confirm("Start a new basket? You have items from another restaurant.");
+            const confirmSwitch = window.confirm("Start a new basket? You have items from another vendor.");
             if (!confirmSwitch) return;
             set({ items: [newItem], restaurantId: newItem.restaurantId });
             return;
@@ -58,20 +60,17 @@ export const useCartStore = create<CartState>()(
         }
       },
 
-      // 👇 NEW FUNCTION: Decrease quantity or remove if 1
       decreaseItem: (itemId) => {
         const currentItems = get().items;
         const existingItem = currentItems.find(i => i.id === itemId);
 
         if (existingItem && existingItem.quantity > 1) {
-            // Decrease by 1
             set({
                 items: currentItems.map(i => 
                     i.id === itemId ? { ...i, quantity: i.quantity - 1 } : i
                 )
             });
         } else {
-            // Remove entirely if quantity is 1
             get().removeItem(itemId);
         }
       },

@@ -1,23 +1,24 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, 
   Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
-import { ChartDataPoint } from './data';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Info } from 'lucide-react';
 
-// Custom Tooltip
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
     return (
-      <div className="bg-black/90 border border-gray-700 rounded-lg p-3 shadow-xl">
-        <p className="text-gray-300 text-xs font-bold mb-2">{label}</p>
+      <div className="bg-[#0F172A] border border-gray-700 rounded-lg p-3 shadow-xl z-50">
+        <p className="text-gray-300 text-xs font-bold mb-2 border-b border-gray-800 pb-1">{label}</p>
         {payload.map((entry: any, index: number) => (
-          <p key={index} className="text-xs" style={{ color: entry.color }}>
-            {entry.name}: <span className="font-bold">{entry.value}</span>
-          </p>
+          <div key={index} className="flex items-center justify-between gap-4 text-xs mb-1">
+            <span style={{ color: entry.color }}>{entry.name}</span>
+            <span className="font-mono font-bold text-white">
+              {entry.name === 'Revenue' ? '$' : ''}{entry.value.toLocaleString()}
+            </span>
+          </div>
         ))}
       </div>
     );
@@ -26,77 +27,60 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 interface ChartsProps {
-  orderVolumeData: ChartDataPoint[];
-  growthData: ChartDataPoint[];
+  volumeData: any[];
+  growthData: any[];
+  granularity: string;
 }
 
-export default function ChartsSection({ orderVolumeData, growthData }: ChartsProps) {
-  // 1. Add state to track if component is mounted in browser
-  const [isMounted, setIsMounted] = useState(false);
-
-  // 2. Set mounted to true only after initial client-side render
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
-
-  // 3. Helper to render a skeleton if not mounted yet
-  const ChartSkeleton = () => (
-    <div className="h-[300px] w-full flex items-center justify-center bg-gray-800/20 rounded-lg animate-pulse border border-gray-800 border-dashed">
-      <div className="flex flex-col items-center gap-2 text-gray-500">
-        <Loader2 className="w-6 h-6 animate-spin" />
-        <span className="text-xs">Loading Chart...</span>
-      </div>
-    </div>
-  );
-
+export default function ChartsSection({ volumeData, growthData, granularity }: ChartsProps) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       
       {/* Chart 1: Order Volume */}
       <div className="bg-[#1E293B] p-6 rounded-xl border border-gray-800">
-        <h3 className="font-bold text-lg text-white mb-6">Order Volume by Service Type</h3>
-        
-        {/* 4. Conditionally render: If not mounted, show Skeleton. If mounted, show Chart. */}
-        {!isMounted ? (
-          <ChartSkeleton />
-        ) : (
-          <div className="h-[300px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={orderVolumeData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.3} />
-                <XAxis dataKey="name" stroke="#9CA3AF" tick={{ fill: '#9CA3AF', fontSize: 12 }} />
-                <YAxis stroke="#9CA3AF" tick={{ fill: '#9CA3AF', fontSize: 12 }} />
-                <Tooltip content={<CustomTooltip />} />
-                <Legend wrapperStyle={{ color: '#9CA3AF', fontSize: '12px', paddingTop: '10px' }} iconType="circle" />
-                <Bar dataKey="food" fill="#3B82F6" radius={[4, 4, 0, 0]} name="Food" />
-                <Bar dataKey="grocery" fill="#6B7280" radius={[4, 4, 0, 0]} name="Grocery" />
-              </BarChart>
-            </ResponsiveContainer>
+        <div className="flex justify-between items-start mb-6">
+          <div>
+            <h3 className="font-bold text-lg text-white">Order Volume & Revenue</h3>
+            <p className="text-xs text-gray-400 flex items-center gap-1 mt-1">
+              <Info className="w-3 h-3" /> Grouped by <span className="text-yellow-500 font-bold">{granularity}</span>
+            </p>
           </div>
-        )}
+        </div>
+        
+        <div className="h-[300px] w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={volumeData} onClick={(data) => console.log("Drill down to date:", data?.activeLabel)}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.2} vertical={false} />
+              <XAxis dataKey="name" stroke="#9CA3AF" tick={{ fill: '#6B7280', fontSize: 10 }} tickLine={false} axisLine={false} dy={10} />
+              <YAxis yAxisId="left" stroke="#9CA3AF" tick={{ fill: '#6B7280', fontSize: 10 }} tickLine={false} axisLine={false} />
+              <YAxis yAxisId="right" orientation="right" stroke="#9CA3AF" tick={{ fill: '#6B7280', fontSize: 10 }} tickLine={false} axisLine={false} />
+              <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
+              <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '20px' }} />
+              
+              <Bar yAxisId="left" dataKey="orders" fill="#3B82F6" radius={[4, 4, 0, 0]} name="Orders" barSize={granularity === 'Day' ? 20 : 40} />
+              <Bar yAxisId="right" dataKey="revenue" fill="#10B981" radius={[4, 4, 0, 0]} name="Revenue" barSize={granularity === 'Day' ? 20 : 40} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
       </div>
 
       {/* Chart 2: Growth */}
       <div className="bg-[#1E293B] p-6 rounded-xl border border-gray-800">
-        <h3 className="font-bold text-lg text-white mb-6">Ride vs. Delivery Growth</h3>
-        
-        {!isMounted ? (
-          <ChartSkeleton />
-        ) : (
-          <div className="h-[300px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={growthData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.3} />
-                <XAxis dataKey="name" stroke="#9CA3AF" tick={{ fill: '#9CA3AF', fontSize: 12 }} />
-                <YAxis stroke="#9CA3AF" tick={{ fill: '#9CA3AF', fontSize: 12 }} />
-                <Tooltip content={<CustomTooltip />} />
-                <Legend wrapperStyle={{ color: '#9CA3AF', fontSize: '12px', paddingTop: '10px' }} iconType="circle" />
-                <Line type="monotone" dataKey="rides" stroke="#EAB308" strokeWidth={3} dot={{ fill: '#EAB308', r: 4 }} activeDot={{ r: 6 }} name="Rides" />
-                <Line type="monotone" dataKey="delivery" stroke="#A855F7" strokeWidth={3} dot={{ fill: '#A855F7', r: 4 }} activeDot={{ r: 6 }} name="Delivery" />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        )}
+        <h3 className="font-bold text-lg text-white mb-6">Platform Growth</h3>
+        <div className="h-[300px] w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={growthData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.2} vertical={false} />
+              <XAxis dataKey="name" stroke="#9CA3AF" tick={{ fill: '#6B7280', fontSize: 10 }} tickLine={false} axisLine={false} dy={10} />
+              <YAxis stroke="#9CA3AF" tick={{ fill: '#6B7280', fontSize: 10 }} tickLine={false} axisLine={false} />
+              <Tooltip content={<CustomTooltip />} />
+              <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '20px' }} />
+              
+              <Line type="monotone" dataKey="rides" stroke="#EAB308" strokeWidth={3} dot={{ fill: '#EAB308', r: 4, strokeWidth: 0 }} activeDot={{ r: 6 }} name="New Riders" />
+              <Line type="monotone" dataKey="delivery" stroke="#A855F7" strokeWidth={3} dot={{ fill: '#A855F7', r: 4, strokeWidth: 0 }} activeDot={{ r: 6 }} name="New Orders" />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
       </div>
     </div>
   );

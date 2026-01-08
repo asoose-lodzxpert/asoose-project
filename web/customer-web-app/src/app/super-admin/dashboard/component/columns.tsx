@@ -1,12 +1,12 @@
 import React from 'react';
 import Link from 'next/link';
 import { createColumnHelper } from '@tanstack/react-table';
-import { Activity, Alert } from './data';
+import { Activity,Alert } from './data';
 import { 
   Clock, ShoppingCart, Car, Package, Truck, Users, ExternalLink, 
   MoreHorizontal, AlertCircle, Eye 
 } from 'lucide-react';
-
+import { formatDistanceToNow, parseISO } from 'date-fns';
 const columnHelperActivity = createColumnHelper<Activity>();
 const columnHelperAlert = createColumnHelper<Alert>();
 
@@ -54,15 +54,18 @@ export const getActivityLink = (activity: Activity) => {
 
 // --- Activity Columns ---
 export const createActivityColumns = () => [
-  columnHelperActivity.accessor("time", {
-    header: "Timestamp",
-    cell: info => (
-      <div className="flex items-center gap-2">
-        <Clock className="w-3 h-3 text-gray-500" />
-        <span className="font-mono text-gray-400 text-xs">{info.getValue()}</span>
-      </div>
-    ),
-  }),
+columnHelperActivity.accessor("time", {
+  header: "Timestamp",
+  cell: info => (
+    <div className="flex items-center gap-2">
+      <Clock className="w-3 h-3 text-gray-500" />
+      {/* Parse the ISO string from backend */}
+      <span className="font-mono text-gray-400 text-xs">
+        {formatDistanceToNow(parseISO(info.getValue()), { addSuffix: true })}
+      </span>
+    </div>
+  ),
+}),
   columnHelperActivity.accessor("event", {
     header: "Event",
     cell: info => (
