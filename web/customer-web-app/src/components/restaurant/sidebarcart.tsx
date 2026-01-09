@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useCartStore } from '@/store/useCartStore';
+import Link from 'next/link';
 
 interface SidebarCartProps {
   restaurantName: string;
@@ -54,12 +55,13 @@ export const SidebarCart = ({ restaurantName }: SidebarCartProps) => {
         </div>
       )}
 
-      <button 
-        disabled={items.length === 0}
-        className="w-full bg-yellow-500 text-black py-4 rounded-xl font-bold shadow-lg shadow-yellow-500/20 hover:bg-yellow-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+      <Link
+        href={"/checkout"}
+        // Added 'block' and 'text-center' to ensure full width
+        className="block text-center w-full bg-yellow-500 text-black py-4 rounded-xl font-bold shadow-lg shadow-yellow-500/20 hover:bg-yellow-400 transition-colors"
       >
         Checkout
-      </button>
+      </Link>
     </div>
   );
 };

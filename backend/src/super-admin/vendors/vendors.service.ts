@@ -7,9 +7,9 @@ import {
 import { PrismaService } from 'src/prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
-import { ProductStatus } from '@prisma/client';
 import {
   Prisma,
+  ProductStatus,
   StoreStatus,
   VerificationStatus,
   UserRole,
@@ -18,6 +18,7 @@ import {
 } from '@prisma/client';
 import { CreateVendorDto, VendorQueryDto } from './dto/vendor.dto';
 import { EmailProducer } from 'src/mail/email.producer';
+
 @Injectable()
 export class StoresService {
   private readonly logger = new Logger(StoresService.name);
@@ -51,8 +52,6 @@ export class StoresService {
     if (status) where.status = status as StoreStatus;
     if (category) where.type = category as StoreType;
     if (verification) where.verification = verification as VerificationStatus;
-
-    this.logger.log(`Fetching vendors with filters: ${JSON.stringify(where)}`);
 
     const [stores, total] = await Promise.all([
       this.prisma.store.findMany({
@@ -175,12 +174,6 @@ export class StoresService {
 
       return { user, store };
     });
-
-    this.logger.log('====================================');
-    this.logger.log(`[DEV] Vendor Created Successfully`);
-    this.logger.log(`Email: ${result.user.email}`);
-    this.logger.log(`Password: ${rawPassword}`);
-    this.logger.log('====================================');
 
     return {
       id: result.store.id,
@@ -347,13 +340,12 @@ export class StoresService {
   }
 
   async getVendorProducts(storeId: string) {
-    // 1. Verify store exists
+    // Verify store exists
     const store = await this.prisma.store.findUnique({
       where: { id: storeId },
     });
     if (!store) throw new NotFoundException('Vendor not found');
 
-    // 2. Fetch products
     const products = await this.prisma.product.findMany({
       where: { storeId },
       include: {
@@ -361,11 +353,10 @@ export class StoresService {
       },
       orderBy: [
         { status: 'asc' },
-        { salesCount: 'desc' } as any, // 👈 Add 'as any' here
+        { salesCount: 'desc' } as any, // TypeScript workaround for Prisma sorting
       ],
     });
 
-    // 3. Transform for Frontend (Optional: flattens the category object)
     return products.map((p: any) => ({
       id: p.id,
       name: p.name,
@@ -378,8 +369,6 @@ export class StoresService {
   }
 
   async updateProductStatus(productId: string, status: string) {
-    // 1. Validate Status
-    // Map frontend "BANNED" to schema "DISABLED" if necessary
     let validStatus: ProductStatus;
 
     if (status === 'BANNED' || status === 'DISABLED')
@@ -389,7 +378,6 @@ export class StoresService {
       validStatus = ProductStatus.OUT_OF_STOCK;
     else throw new Error(`Invalid status: ${status}`);
 
-    // 2. Update Database
     const product = await this.prisma.product.update({
       where: { id: productId },
       data: { status: validStatus },
@@ -408,7 +396,6 @@ export class StoresService {
       throw new NotFoundException('Vendor or Vendor Email not found');
     }
 
-    // Call the producer
     await this.emailProducer.sendVendorMessage(
       store.owner.email,
       `Message from Super Admin - ${store.name}`,

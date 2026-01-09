@@ -1,162 +1,128 @@
+'use client';
+
 import React from 'react';
 
-// Reusable Shimmer Effect Component
-const Shimmer = () => (
-  <div className="absolute inset-0 -translate-x-full animate-[shimmer_2s_infinite] bg-gradient-to-r from-transparent via-white/10 to-transparent" />
-);
-
-// Skeleton Box Component
-const SkeletonBox = ({ className = "", children = null }) => (
-  <div className={`relative overflow-hidden bg-gray-800/50 rounded ${className}`}>
-    <Shimmer />
-    {children}
-  </div>
-);
-
-const SkeletonText = ({ width = "w-full", height = "h-4" }) => (
-  <div className={`relative overflow-hidden ${width} ${height} bg-gray-800/50 rounded`}>
-    <Shimmer />
-  </div>
-);
-
-export const TransactionsListSkeleton = () => {
+export function TransactionsListSkeleton() {
   return (
-    <div className="min-h-screen bg-[#0F172A] p-4 md:p-6">
-      <div className="max-w-7xl mx-auto space-y-6">
-        
-        {/* Header Skeleton */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div className="space-y-2">
-            <SkeletonText width="w-48" height="h-8" />
-            <SkeletonText width="w-64" height="h-4" />
-          </div>
-          
-          <div className="flex gap-2 sm:gap-3 w-full sm:w-auto">
-            <SkeletonBox className="flex-1 sm:flex-none w-32 h-10 rounded-lg" />
-            <SkeletonBox className="flex-1 sm:flex-none w-32 h-10 rounded-lg" />
-          </div>
+    <div className="min-h-screen bg-[#0F172A] text-white p-4 md:p-8">
+      {/* Header Skeleton */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
+        <div className="space-y-2">
+          <div className="h-8 w-48 bg-[#1E293B] rounded animate-pulse"></div>
+          <div className="h-4 w-64 bg-[#1E293B] rounded animate-pulse"></div>
         </div>
+        <div className="flex gap-3 mt-4 md:mt-0">
+          <div className="md:hidden h-10 w-10 bg-[#1E293B] rounded-lg animate-pulse"></div>
+          <div className="hidden md:block h-10 w-32 bg-[#1E293B] rounded-lg animate-pulse"></div>
+        </div>
+      </div>
 
-        {/* Stats Cards Skeleton */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="bg-[#1E293B] p-4 md:p-6 rounded-xl border border-gray-800">
-              <div className="flex items-center justify-between mb-2">
-                <SkeletonText width="w-32" height="h-3" />
-                <SkeletonBox className="w-10 h-10 rounded-lg" />
-              </div>
-              <SkeletonText width="w-24" height="h-8" />
-              <SkeletonText width="w-40" height="h-3" />
+      {/* Stats Cards Skeleton */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        {[1, 2, 3].map((item) => (
+          <div key={item} className="bg-[#1E293B] border border-gray-700 rounded-xl p-4 animate-pulse">
+            <div className="flex items-center justify-between">
+              <div className="h-4 w-20 bg-[#0F172A] rounded"></div>
+              <div className="h-5 w-5 bg-[#0F172A] rounded"></div>
             </div>
-          ))}
-        </div>
-
-        {/* Filters Section Skeleton */}
-        <div className="bg-[#1E293B] p-3 md:p-4 rounded-xl border border-gray-800">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
-            <SkeletonText width="w-32" height="h-6" />
-            
-            <div className="flex items-center gap-2 w-full md:w-auto">
-              <SkeletonBox className="flex-1 md:w-64 h-10 rounded-lg" />
-              <SkeletonBox className="w-24 h-10 rounded-lg" />
-            </div>
+            <div className="h-8 w-32 bg-[#0F172A] rounded mt-2"></div>
           </div>
-        </div>
+        ))}
+      </div>
 
+      {/* Filters Skeleton */}
+      <div className="hidden md:flex flex-col md:flex-row gap-3 mb-6 bg-[#1E293B] p-4 rounded-lg border border-gray-700">
+        <div className="relative flex-1">
+          <div className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 bg-[#0F172A] rounded"></div>
+          <div className="w-full h-10 bg-[#0F172A] rounded-lg"></div>
+        </div>
+        <div className="h-10 w-32 bg-[#0F172A] rounded-lg"></div>
+        <div className="h-10 w-40 bg-[#0F172A] rounded-lg"></div>
+      </div>
+
+      {/* Table Area Skeleton */}
+      <div className="bg-[#1E293B] rounded-xl border border-gray-700 p-4">
         {/* Desktop Table Skeleton */}
-        <div className="hidden md:block bg-[#1E293B] border border-gray-800 rounded-xl overflow-hidden">
-          {/* Table Header */}
-          <div className="bg-[#0F172A] border-b border-gray-800 p-4">
-            <div className="grid grid-cols-7 gap-4">
-              {['Transaction ID', 'Description', 'User', 'Date', 'Amount', 'Status', 'Actions'].map((_, i) => (
-                <SkeletonText key={i} width="w-20" height="h-4" />
-              ))}
-            </div>
+        <div className="hidden md:block">
+          {/* Table Header Skeleton */}
+          <div className="grid grid-cols-7 gap-4 mb-4 px-4">
+            {[1, 2, 3, 4, 5, 6, 7].map((item) => (
+              <div key={item} className="h-6 bg-[#0F172A] rounded animate-pulse"></div>
+            ))}
           </div>
 
-          {/* Table Rows */}
-          <div className="divide-y divide-gray-800">
+          {/* Table Rows Skeleton */}
+          <div className="space-y-3">
             {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((row) => (
-              <div key={row} className="p-4">
-                <div className="grid grid-cols-7 gap-4 items-center">
-                  {/* Transaction ID */}
-                  <SkeletonText width="w-20" height="h-4" />
-                  
-                  {/* Description */}
-                  <SkeletonText width="w-full" height="h-4" />
-                  
-                  {/* User */}
-                  <SkeletonText width="w-24" height="h-4" />
-                  
-                  {/* Date */}
-                  <SkeletonText width="w-32" height="h-4" />
-                  
-                  {/* Amount */}
-                  <SkeletonText width="w-16" height="h-4" />
-                  
-                  {/* Status */}
-                  <SkeletonBox className="w-20 h-6 rounded" />
-                  
-                  {/* Actions */}
-                  <div className="flex items-center gap-1">
-                    <SkeletonBox className="w-8 h-8 rounded-lg" />
-                  </div>
+              <div key={row} className="grid grid-cols-7 gap-4 p-4 border-t border-gray-700">
+                {/* ID */}
+                <div className="space-y-2">
+                  <div className="h-4 w-24 bg-[#0F172A] rounded animate-pulse"></div>
+                </div>
+                
+                {/* Description */}
+                <div className="space-y-2">
+                  <div className="h-4 w-48 bg-[#0F172A] rounded animate-pulse"></div>
+                </div>
+                
+                {/* User */}
+                <div className="space-y-2">
+                  <div className="h-4 w-32 bg-[#0F172A] rounded animate-pulse"></div>
+                </div>
+                
+                {/* Amount */}
+                <div className="space-y-2">
+                  <div className="h-4 w-24 bg-[#0F172A] rounded animate-pulse"></div>
+                </div>
+                
+                {/* Status */}
+                <div className="space-y-2">
+                  <div className="h-6 w-16 bg-[#0F172A] rounded-full animate-pulse"></div>
+                </div>
+                
+                {/* Date */}
+                <div className="space-y-2">
+                  <div className="h-4 w-24 bg-[#0F172A] rounded animate-pulse"></div>
+                </div>
+                
+                {/* Actions */}
+                <div className="space-y-2">
+                  <div className="h-4 w-4 bg-[#0F172A] rounded animate-pulse ml-auto"></div>
                 </div>
               </div>
             ))}
           </div>
 
           {/* Pagination Skeleton */}
-          <div className="border-t border-gray-800 px-4 py-3">
-            <div className="flex justify-between items-center">
-              <SkeletonText width="w-32" height="h-4" />
-              <div className="flex gap-2">
-                <SkeletonBox className="w-20 h-8 rounded" />
-                <SkeletonBox className="w-20 h-8 rounded" />
-              </div>
+          <div className="flex items-center justify-between p-4 border-t border-gray-700">
+            <div className="h-4 w-32 bg-[#0F172A] rounded animate-pulse"></div>
+            <div className="flex gap-2">
+              <div className="h-8 w-8 bg-[#0F172A] rounded animate-pulse"></div>
+              <div className="h-8 w-8 bg-[#0F172A] rounded animate-pulse"></div>
+              <div className="h-8 w-24 bg-[#0F172A] rounded animate-pulse"></div>
+              <div className="h-8 w-8 bg-[#0F172A] rounded animate-pulse"></div>
+              <div className="h-8 w-8 bg-[#0F172A] rounded animate-pulse"></div>
             </div>
           </div>
         </div>
 
         {/* Mobile Cards Skeleton */}
         <div className="md:hidden space-y-3">
-          {[1, 2, 3, 4, 5].map((card) => (
-            <div key={card} className="bg-[#1E293B] border border-gray-800 rounded-lg p-4">
-              {/* Header */}
-              <div className="flex justify-between items-start mb-3">
-                <SkeletonText width="w-24" height="h-5" />
-                <SkeletonBox className="w-20 h-6 rounded" />
+          {[1, 2, 3, 4, 5].map((item) => (
+            <div key={item} className="bg-[#0F172A] border border-gray-700 rounded-lg p-4 space-y-3">
+              <div className="flex items-start justify-between">
+                <div className="h-4 w-32 bg-[#1E293B] rounded animate-pulse"></div>
+                <div className="h-6 w-16 bg-[#1E293B] rounded-full animate-pulse"></div>
               </div>
-
-              {/* Details */}
-              <div className="space-y-3 mb-4">
-                <div className="flex justify-between">
-                  <SkeletonText width="w-20" height="h-4" />
-                  <SkeletonText width="w-32" height="h-4" />
-                </div>
-                <div className="flex justify-between">
-                  <SkeletonText width="w-20" height="h-4" />
-                  <SkeletonText width="w-28" height="h-4" />
-                </div>
-                <div className="flex justify-between">
-                  <SkeletonText width="w-20" height="h-4" />
-                  <SkeletonText width="w-24" height="h-4" />
-                </div>
-                <div className="flex justify-between">
-                  <SkeletonText width="w-20" height="h-4" />
-                  <SkeletonText width="w-16" height="h-4" />
-                </div>
-              </div>
-
-              {/* Actions */}
-              <div className="flex gap-2 pt-3 border-t border-gray-800">
-                <SkeletonBox className="flex-1 h-10 rounded-lg" />
+              <div className="h-5 w-48 bg-[#1E293B] rounded animate-pulse"></div>
+              <div className="flex items-center justify-between">
+                <div className="h-4 w-24 bg-[#1E293B] rounded animate-pulse"></div>
+                <div className="h-5 w-20 bg-[#1E293B] rounded animate-pulse"></div>
               </div>
             </div>
           ))}
         </div>
-
       </div>
     </div>
   );
-};
+}

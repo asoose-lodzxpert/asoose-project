@@ -5,6 +5,8 @@ import './globals.css';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
+import { NotificationListener } from '@/components/NotificationListener';
+
 import { ThemeProvider } from './provider/provider';
 const inter = Inter({ subsets: ['latin'] });
 
@@ -24,10 +26,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           enableSystem
           disableTransitionOnChange
         >
+          <NotificationListener/>
           {children}
           
           <ToastContainer 
-            position="bottom-center"
+            position="top-right"
             autoClose={3000}
             hideProgressBar={true}
             newestOnTop={false}

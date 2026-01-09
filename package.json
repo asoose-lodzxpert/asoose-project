@@ -9,6 +9,7 @@
     "check-types": "turbo run check-types"
   },
   "devDependencies": {
+    "@babel/core": "^7.28.5",
     "prettier": "^3.6.2",
     "turbo": "^2.5.8",
     "typescript": "5.9.2"
@@ -16,11 +17,11 @@
   "engines": {
     "node": ">=18"
   },
-  "packageManager": "yarn@1.22.22",
-"workspaces": [
-  "apps/*",
-  "packages/*",
-  "backend",
-  "web/*"  
-]
+  "packageManager": "yarn@4.12.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "backend",
+    "web/*"
+  ]
 }

@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { Check, Clock, CreditCard, ArrowRight, MapPin, Receipt, Loader2, ChevronLeft } from 'lucide-react';
 import Link from 'next/link';
 import { OrderTimeline } from '@/components/order/OrderTimeline';
-import { createClient } from '../../../../../utils/supabase/client';
+import { createClient } from '../../../../utils/supabase/client';
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 export default function OrderDetailsPage() {

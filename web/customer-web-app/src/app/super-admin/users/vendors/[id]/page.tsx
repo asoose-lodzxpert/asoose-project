@@ -1,426 +1,474 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { 
-  ArrowLeft, Edit, CheckCircle, XCircle, Mail, Phone, MapPin, 
-  Star, Clock, Save, Loader2, Trash2, DollarSign, TrendingUp, 
-  Settings, Percent, ToggleLeft, ToggleRight, Download, Upload,
-  Search, FileCheck, Activity, TrendingDown,
-  CheckSquare, Square, Eye, AlertCircle, BarChart3, RefreshCw,
-  MessageSquare, UserCheck, ShieldAlert
-} from 'lucide-react';
+import React, { useState } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import { Loader2, DollarSign, TrendingUp } from 'lucide-react';
 import Swal from 'sweetalert2';
+import useSWR from 'swr'; 
+import { fetcher } from '@/app/super-admin/hooks/useSuperAdminFetch';
+import { createClient } from '../../../../../../utils/supabase/client';
+
+// --- Components ---
 import SkeletonLoader from './components/skeletonLoader';
 import RevenueCard from './components/revenuecard';
 import BusinessInfoCard from './components/businesscard';
 import PerformanceChart from './components/performancechart';
 import OrderHistoryTab from './components/orderhistorytab';
-import DocumentsTab from './components/documentstab';
 import ReviewsTab from './components/reviewstab';
-import AdminNotesSection from './components/adminnotessection';
 import ActivityLogTab from './components/activitylogtab';
-interface Vendor {
+import VendorHeader from './components/vendorheader';
+import HealthScoreCard from './components/healthcard';
+import ProductsTabContent from './components/productstabcontent';
+import PayoutsTabContent from './components/payoutstabcontent';
+import DocumentsTab from '@/app/super-admin/component/documentstab';
+
+// --- Types ---
+interface VendorDetails {
   id: string;
-  name: string;
-  image: string;
+  name: string;      
+  ownerName: string; 
   email: string;
   phone: string;
-  address: string;
-  category: string;
   status: string;
-  onlineStatus: string;
-  totalRevenue: string;
-  unpaidBalance: string;
-  rating: number;
-  reviews: number;
+  verification: string;
+  totalRevenue: number;
+  unpaidBalance: number;
   totalOrders: number;
-  revenueChange: number;
+  orders: any[];
+  reviews: any[];
+  address?: string;
+  vendorDocuments: {
+    id: string;
+    name: string;        
+    url: string;
+    status: 'PENDING' | 'VERIFIED' | 'REJECTED';
+    rejectionReason?: string;
+    uploadedDate: string; 
+  }[];
 }
 
+// --- Validation Helper ---
+const validateEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
+// --- Simple Tab Loader Component ---
+const TabLoader = () => (
+  <div className="flex flex-col items-center justify-center h-64 space-y-4 animate-in fade-in">
+    <Loader2 className="w-8 h-8 text-yellow-500 animate-spin" />
+    <p className="text-gray-500 text-sm font-medium">Loading tab data...</p>
+  </div>
+);
+
 export default function VendorDetailPage() {
-  const [vendor, setVendor] = useState<Vendor | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const params = useParams();
+  const router = useRouter();
+  const slugOrId = params?.id as string; 
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
+  // --- UI State ---
+  const [activeTab, setActiveTab] = useState('Order History');
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState('Order History');
-  const [formData, setFormData] = useState({
-    name: '',
-    phone: '',
-    address: '',
-    email: ''
+  
+  // Local form state
+  const [formData, setFormData] = useState({ 
+    storeName: '', ownerName: '', phone: '', email: '' , address: ''
   });
 
-  // Mock Data
-  const orders = [
-    { id: '#ORD-999', date: '2024-05-20', customer: 'John Doe', status: 'Delivered', total: '$45.00' },
-    { id: '#ORD-998', date: '2024-05-19', customer: 'Jane Smith', status: 'Pending', total: '$22.50' },
-    { id: '#ORD-997', date: '2024-05-18', customer: 'Bob Wilson', status: 'Delivered', total: '$67.80' },
-    { id: '#ORD-996', date: '2024-05-17', customer: 'Alice Brown', status: 'Cancelled', total: '$31.20' },
-  ];
-
-  const payouts = [
-    { id: 'PAY-881', date: '2024-05-01', amount: '$450.00', status: 'Paid', method: 'Bank Transfer' },
-    { id: 'PAY-882', date: '2024-04-15', amount: '$1,200.00', status: 'Paid', method: 'Stripe' },
-  ];
-
-  const documents = [
-    { name: "Business Registration", file: "joes_pizza_reg.pdf", status: "Verified", uploadedDate: "2024-01-15" },
-    { name: "Tax ID", file: "joes_pizza_tax.pdf", status: "Pending", uploadedDate: "2024-05-10" },
-    { name: "Health Certificate", file: "health_cert.pdf", status: "Verified", uploadedDate: "2024-03-20" },
-  ];
-
-  const activityLogs = [
-    { id: '1', action: 'Status Changed', user: 'Admin John', timestamp: '2 hours ago', details: 'Changed vendor status from Pending to Active' },
-    { id: '2', action: 'Profile Updated', user: 'Admin Sarah', timestamp: '1 day ago', details: 'Updated phone number and address' },
-    { id: '3', action: 'Document Verified', user: 'Admin Mike', timestamp: '3 days ago', details: 'Verified Business Registration document' },
-    { id: '4', action: 'Payout Processed', user: 'System', timestamp: '5 days ago', details: 'Processed payout of $450.00' },
-  ];
-
-  // New Data
-  const reviews = [
-    { id: '1', user: 'Alice M.', rating: 5, comment: 'Amazing packaging and fast delivery!', date: '2 days ago', orderId: '#ORD-999' },
-    { id: '2', user: 'Bob D.', rating: 2, comment: 'Food was cold when it arrived.', date: '1 week ago', orderId: '#ORD-997' },
-  ];
-
-  const adminNotes = [
-    { id: '1', admin: 'Super Admin', note: 'Vendor called regarding commission rates. Agreed to review next month.', date: '3 days ago' },
-  ];
-
-  // Fetch Data
-  useEffect(() => {
-    const fetchVendor = async () => {
-      setTimeout(() => {
-        const mockData: Vendor = {
-          id: 'VDR-001',
-          name: "Joe's Pizza",
-          image: "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=400&h=400&fit=crop",
-          email: "joe@pizza.com",
-          phone: "+1 (555) 123-4567",
-          address: "123 Main St, Brooklyn, NY",
-          category: "Restaurant",
-          status: "Active",
-          onlineStatus: "Online",
-          totalRevenue: "$45,230.00",
-          unpaidBalance: "$1,250.00",
-          rating: 4.8,
-          reviews: 1234,
-          totalOrders: 1234,
-          revenueChange: 12.5
-        };
-
-        setVendor(mockData);
-        setFormData({
-          name: mockData.name,
-          phone: mockData.phone,
-          address: mockData.address,
-          email: mockData.email
-        });
-        setIsLoading(false);
-      }, 1500);
+  // Helper to get auth token
+  const getAuthHeader = async () => {
+    const supabase = createClient();
+    const { data: { session } } = await supabase.auth.getSession();
+    return {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session?.access_token || ''}`
     };
+  };
 
-    fetchVendor();
-  }, []);
+  // DATA FETCHING (Main & Tabs)
 
+  // 1. Main Vendor Profile
+  const { 
+    data: vendor, 
+    error, 
+    isLoading: isVendorLoading, 
+    mutate: mutateVendor 
+  } = useSWR<VendorDetails>(
+    slugOrId ? `/super-admin/vendors/${slugOrId}` : null,
+    fetcher,
+    {
+      onSuccess: (data) => {
+        if (!isEditing) {
+            setFormData({
+                storeName: data.name,     
+                ownerName: data.ownerName || '',
+                phone: data.phone || '',
+                address: data.address || '', 
+                email: data.email
+            });
+        }
+      }
+    }
+  );
+
+  // 2. Performance Charts (Always fetched if vendor exists)
+  const { data: performanceData } = useSWR(
+    vendor?.id ? `/super-admin/vendors/${vendor.id}/performance?days=30` : null,
+    fetcher
+  );
+
+  // 3. Tab Specific Data (Fetch on demand)
+  
+  // -- Products --
+  const { 
+    data: products, 
+    mutate: mutateProducts,
+    isLoading: isProductsLoading 
+  } = useSWR(
+    vendor?.id && activeTab === 'Products' ? `/super-admin/vendors/${vendor.id}/products` : null,
+    fetcher
+  );
+
+  // -- Documents --
+  const { 
+    data: documentsData, 
+    mutate: mutateDocuments,
+    isLoading: isDocumentsLoading
+  } = useSWR(
+    vendor?.id && activeTab === 'Documents' ? `/super-admin/vendors/${vendor.id}/documents` : null,
+    fetcher
+  );
+
+  // -- Payouts --
+  const { 
+    data: payoutsData, 
+    mutate: mutatePayouts,
+    isLoading: isPayoutsLoading
+  } = useSWR(
+    vendor?.id && activeTab === 'Payouts' ? `/super-admin/vendors/${vendor.id}/payouts` : null,
+    fetcher
+  );
+  // Normalize payouts structure
+  const payoutsHistory = payoutsData?.history || (Array.isArray(payoutsData) ? payoutsData : []) || [];
+
+  // -- Activity Log --
+  const { 
+    data: activityLogs,
+    isLoading: isActivityLoading
+  } = useSWR(
+    vendor?.id && activeTab === 'Activity Log' ? `/super-admin/vendors/${vendor.id}/activity` : null,
+    fetcher
+  );
+
+  // ===========================================================================
+  //  HANDLERS
+  // ===========================================================================
+
+  // 📝 Save Profile
   const handleSave = async () => {
+    if (!validateEmail(formData.email)) {
+      Swal.fire({ icon: 'warning', title: 'Invalid Email', background: '#1E293B', color: '#fff' });
+      return;
+    }
+
     setIsSaving(true);
-    setTimeout(() => {
-      setVendor({ ...vendor!, ...formData });
+    try {
+      const headers = await getAuthHeader();
+      const res = await fetch(`${API_URL}/api/super-admin/vendors/${vendor?.id}`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify(formData),
+      });
+
+      if (!res.ok) throw new Error('Failed');
+      
+      mutateVendor();
       setIsEditing(false);
+      Swal.fire({ icon: 'success', title: 'Updated!', timer: 1500, showConfirmButton: false, background: '#1E293B', color: '#fff' });
+    } catch {
+      Swal.fire({ icon: 'error', title: 'Error', text: 'Could not save changes.', background: '#1E293B', color: '#fff' });
+    } finally {
       setIsSaving(false);
+    }
+  };
+
+  // 🛍️ Toggle Product Status
+  const toggleProductBan = async (productId: string, currentStatus: string) => {
+    const newStatus = (currentStatus === 'BANNED' || currentStatus === 'DISABLED') ? 'ACTIVE' : 'DISABLED';
+    
+    // Optimistic Update
+    if (products) {
+        mutateProducts(products.map((p: any) => p.id === productId ? { ...p, status: newStatus } : p), false);
+    }
+
+    try {
+      const headers = await getAuthHeader();
+      await fetch(`${API_URL}/api/super-admin/vendors/products/${productId}/status`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({ status: newStatus })
+      });
+      Swal.fire({ icon: 'success', title: `Product ${newStatus === 'ACTIVE' ? 'Activated' : 'Banned'}`, toast: true, position: 'bottom-end', timer: 1500, showConfirmButton: false, background: '#1E293B', color: '#fff' });
+      mutateProducts();
+    } catch {
+      mutateProducts();
+      Swal.fire({ icon: 'error', title: 'Action Failed', toast: true, position: 'top-end', background: '#1E293B', color: '#fff' });
+    }
+  };
+
+  // 📂 Verify Document
+  const handleVerifyDocument = async (docId: string, status: 'VERIFIED' | 'REJECTED', rejectionReason?: string) => {
+    try {
+      const headers = await getAuthHeader();
+      const res = await fetch(`${API_URL}/api/super-admin/verification/documents/${docId}`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({ status, rejectionReason })
+      });
+
+      if (!res.ok) throw new Error('Action failed');
+
       Swal.fire({
-        title: 'Success!',
-        text: 'Vendor profile updated successfully',
+        title: status === 'VERIFIED' ? 'Verified' : 'Rejected',
+        icon: status === 'VERIFIED' ? 'success' : 'warning',
+        toast: true,
+        position: 'top-end',
+        timer: 2000,
+        showConfirmButton: false,
+        background: '#1E293B', color: '#fff'
+      });
+      mutateDocuments();
+      mutateVendor(); // Update main profile status if needed
+    } catch (error) {
+      Swal.fire({ title: 'Error', text: 'Could not update document', icon: 'error' });
+    }
+  };
+
+  // 💰 Process Payout
+  const handleProcessPayout = async () => {
+    if (!vendor?.unpaidBalance || vendor.unpaidBalance <= 0) return;
+
+    const result = await Swal.fire({
+      title: 'Confirm Payout',
+      text: `Send $${vendor.unpaidBalance.toLocaleString()} to vendor?`,
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'Yes, Pay',
+      confirmButtonColor: '#10b981',
+      background: '#1E293B', color: '#fff'
+    });
+
+    if (result.isConfirmed) {
+      try {
+        const headers = await getAuthHeader();
+        const res = await fetch(`${API_URL}/api/super-admin/vendors/${vendor.id}/payouts`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ amount: vendor.unpaidBalance })
+        });
+        
+        if (!res.ok) throw new Error('Payout failed');
+        
+        mutatePayouts();
+        mutateVendor();
+        Swal.fire({ title: 'Paid!', icon: 'success', background: '#1E293B', color: '#fff' });
+      } catch {
+        Swal.fire({ title: 'Error', text: 'Payout failed', icon: 'error', background: '#1E293B', color: '#fff' });
+      }
+    }
+  };
+
+
+const handleMessageVendor = async () => {
+    const { value: text } = await Swal.fire({
+      title: 'Message Vendor',
+      input: 'textarea',
+      inputLabel: `Send an email to ${vendor?.name}`,
+      inputPlaceholder: 'Type your message here...',
+      inputAttributes: {
+        'aria-label': 'Type your message here'
+      },
+      showCancelButton: true,
+      confirmButtonText: 'Send Email',
+      confirmButtonColor: '#3b82f6', 
+      cancelButtonColor: '#ef4444',
+      background: '#1E293B',
+      color: '#fff',
+      showLoaderOnConfirm: true,
+      preConfirm: async (message) => {
+        if (!message) return Swal.showValidationMessage('Message cannot be empty');
+        
+        try {
+          // Get auth session
+          const session = await import('../../../../../../utils/supabase/client').then(m => m.createClient().auth.getSession());
+          
+          const response = await fetch(`${API_URL}/super-admin/vendors/${vendor?.id}/message`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session.data.session?.access_token}`
+            },
+            body: JSON.stringify({ message })
+          });
+
+          if (!response.ok) throw new Error(response.statusText);
+          return await response.json();
+        } catch (error) {
+          Swal.showValidationMessage(`Request failed: ${error}`);
+        }
+      },
+      allowOutsideClick: () => !Swal.isLoading()
+    });
+
+    if (text) {
+      Swal.fire({
+        title: 'Sent!',
+        text: 'The vendor has been emailed.',
         icon: 'success',
         background: '#1E293B',
         color: '#fff',
-        confirmButtonColor: '#eab308'
+        timer: 2000,
+        showConfirmButton: false
       });
-    }, 1000);
-  };
-
-  const handleStatusChange = async (newStatus: string) => {
-    const result = await Swal.fire({
-      title: 'Are you sure?',
-      text: `Change status to ${newStatus}?`,
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: newStatus === 'Active' ? '#10b981' : '#ef4444',
-      cancelButtonColor: '#6b7280',
-      confirmButtonText: 'Yes, change it!',
-      background: '#1E293B',
-      color: '#fff'
-    });
-
-    if (result.isConfirmed) {
-      setVendor({ ...vendor!, status: newStatus });
-      Swal.fire({ title: 'Updated!', text: `Vendor status changed to ${newStatus}`, icon: 'success', background: '#1E293B', color: '#fff', confirmButtonColor: '#eab308' });
     }
   };
 
-  const handleDelete = async () => {
-    const result = await Swal.fire({
-      title: 'Delete Vendor?',
-      text: "This action cannot be undone!",
-      icon: 'error',
-      showCancelButton: true,
-      confirmButtonColor: '#ef4444',
-      cancelButtonColor: '#6b7280',
-      confirmButtonText: 'Yes, delete it!',
-      background: '#1E293B',
-      color: '#fff'
-    });
 
-    if (result.isConfirmed) {
-      Swal.fire({ title: 'Deleted!', text: 'Vendor has been deleted', icon: 'success', background: '#1E293B', color: '#fff', confirmButtonColor: '#eab308' });
-    }
-  };
+  // ===========================================================================
+  //  RENDER
+  // ===========================================================================
 
-  const handleImpersonate = () => {
-    Swal.fire({
-      title: 'Impersonating Vendor',
-      text: 'Redirecting you to the Vendor Dashboard as "Joe\'s Pizza"...',
-      icon: 'info',
-      timer: 2000,
-      timerProgressBar: true,
-      background: '#1E293B',
-      color: '#fff'
-    });
-  }
-
-  // Document Handlers (kept same as before)
-  const handleDocumentVerify = (name: string) => Swal.fire({ title: 'Verified!', icon: 'success', background: '#1E293B', color: '#fff' });
-  const handleDocumentReject = (name: string) => Swal.fire({ title: 'Rejected!', icon: 'error', background: '#1E293B', color: '#fff' });
-
-  if (isLoading) return <SkeletonLoader />;
-  if (!vendor) return <div className="text-white p-10">Vendor not found</div>;
+  if (isVendorLoading) return <SkeletonLoader />;
+  if (error || !vendor) return <div className="min-h-screen bg-[#0F172A] flex items-center justify-center text-gray-400">Vendor not found</div>;
 
   return (
-    <>
-      <div className="max-w-7xl mx-auto px-6 space-y-6">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div>
-            <button className="text-gray-400 hover:text-white flex items-center gap-1 text-sm mb-2 transition-colors">
-              <ArrowLeft className="w-4 h-4" /> Back to List
-            </button>
-            <h1 className="text-3xl font-bold text-white">Vendor Profile: {vendor.name}</h1>
+    <div className="max-w-7xl mx-auto px-4 md:px-6 space-y-6 pb-20">
+      
+      {/* 1. Header Component */}
+      <VendorHeader 
+        name={vendor.name} 
+        status={vendor.status} 
+        isEditing={isEditing} 
+        isSaving={isSaving}
+        onEdit={() => setIsEditing(true)}
+        onSave={handleSave}
+        onBack={() => router.back()}
+        onMessage={handleMessageVendor}
+      />
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pt-2">
+        {/* 2. Info Columns */}
+        <div className="space-y-6">
+            <HealthScoreCard totalOrders={vendor.totalOrders} />
+            <BusinessInfoCard 
+              vendor={vendor}
+              formData={formData}
+              isEditing={isEditing}
+              onFormChange={(data) => setFormData(prev => ({...prev, ...data}))}
+            />
+        </div>
+
+        {/* 3. Financials Column */}
+        <div className="lg:col-span-2 space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <RevenueCard 
+              title="Total Revenue" 
+              amount={`$${vendor.totalRevenue?.toLocaleString() || '0.00'}`} 
+              change={0} 
+              icon={DollarSign} 
+              color="green" 
+              onClick={() => setActiveTab('Order History')} 
+            />
+            <RevenueCard 
+              title="Unpaid Balance" 
+              amount={`$${vendor.unpaidBalance?.toLocaleString() || '0.00'}`} 
+              icon={TrendingUp} 
+              color="yellow" 
+              onClick={() => setActiveTab('Payouts')} 
+            />
           </div>
-          
-          <div className="flex gap-3">
+          <PerformanceChart data={performanceData || []} />
+        </div>
+      </div>
+
+      {/* 4. Tabs Section */}
+      <div className="mt-8 w-full bg-[#1E293B] border-t border-gray-800 rounded-t-xl overflow-hidden min-h-[500px]">
+        <div className="flex border-b border-gray-800 overflow-x-auto px-6 hide-scrollbar">
+          {['Order History', 'Products', 'Payouts', 'Documents', 'Reviews', 'Activity Log'].map((tab) => (
             <button 
-              onClick={handleImpersonate}
-              className="flex items-center gap-2 px-4 py-2 border border-blue-500/50 text-blue-400 hover:bg-blue-500/10 rounded-lg transition-all"
-              title="Log in as this vendor"
+              key={tab} 
+              onClick={() => setActiveTab(tab)} 
+              className={`px-6 py-4 text-sm font-bold whitespace-nowrap border-b-2 transition-all ${
+                activeTab === tab 
+                  ? 'text-yellow-500 border-yellow-500 bg-[#0F172A]/50' 
+                  : 'text-gray-400 border-transparent hover:text-white'
+              }`}
             >
-              <UserCheck className="w-4 h-4" /> Impersonate
+              {tab}
             </button>
-
-            {isEditing ? (
-              <>
-                <button onClick={() => setIsEditing(false)} className="px-4 py-2 border border-gray-700 rounded-lg text-gray-300 hover:bg-gray-800 transition-all">Cancel</button>
-                <button onClick={handleSave} disabled={isSaving} className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white font-bold rounded-lg hover:bg-green-500 disabled:opacity-50 transition-all">
-                  {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Save
-                </button>
-              </>
-            ) : (
-              <button onClick={() => setIsEditing(true)} className="flex items-center gap-2 px-4 py-2 border border-gray-700 rounded-lg text-gray-300 hover:text-yellow-500 hover:border-yellow-500 transition-all">
-                <Edit className="w-4 h-4" /> Edit Profile
-              </button>
-            )}
-            <button onClick={handleDelete} className="flex items-center gap-2 px-4 py-2 bg-red-500/10 text-red-500 border border-red-500/20 rounded-lg hover:bg-red-500 hover:text-white transition-all">
-              <Trash2 className="w-4 h-4" /> Delete
-            </button>
-          </div>
+          ))}
         </div>
 
-        {/* Status Banner */}
-        <div className={`border rounded-xl p-4 flex flex-col md:flex-row justify-between items-center gap-4 transition-all ${
-          vendor.status === 'Pending' ? 'bg-yellow-500/10 border-yellow-500/20' : 
-          vendor.status === 'Active' ? 'bg-green-500/10 border-green-500/20' : 
-          'bg-red-500/10 border-red-500/20'
-        }`}>
-          <div className="flex items-center gap-3">
-            <div className={`p-2 rounded-full ${vendor.status === 'Pending' ? 'bg-yellow-500/20 text-yellow-500' : vendor.status === 'Active' ? 'bg-green-500/20 text-green-500' : 'bg-red-500/20 text-red-500'}`}>
-              <Clock className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className={`font-bold text-sm uppercase tracking-wider ${vendor.status === 'Pending' ? 'text-yellow-500' : vendor.status === 'Active' ? 'text-green-500' : 'text-red-500'}`}>
-                Current Status: {vendor.status}
-              </h3>
-            </div>
-          </div>
-          <div className="flex gap-3 w-full md:w-auto">
-            {vendor.status !== 'Active' && (
-              <button onClick={() => handleStatusChange('Active')} className="px-6 py-2 bg-green-500 hover:bg-green-600 text-white font-bold rounded-lg flex items-center gap-2 transition-all">
-                <CheckCircle className="w-4 h-4" /> Approve
-              </button>
+        <div className="p-6">
+            {/* --- ORDERS --- */}
+            {activeTab === 'Order History' && (
+                <OrderHistoryTab orders={vendor.orders || []} />
             )}
-            {vendor.status !== 'Rejected' && (
-              <button onClick={() => handleStatusChange('Rejected')} className="px-6 py-2 bg-red-500/10 hover:bg-red-500 hover:text-white text-red-500 border border-red-500/20 font-bold rounded-lg flex items-center gap-2 transition-all">
-                <XCircle className="w-4 h-4" /> Reject
-              </button>
-            )}
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          
-          {/* Left Column: Business Info */}
-          <BusinessInfoCard 
-            vendor={vendor}
-            formData={formData}
-            isEditing={isEditing}
-            onFormChange={setFormData}
-          />
-
-          {/* Right Column: Financial & Operational Stats */}
-          <div className="lg:col-span-2 space-y-6">
             
-            {/* Financial Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <RevenueCard
-                title="Total Lifetime Revenue"
-                amount={vendor.totalRevenue}
-                change={vendor.revenueChange}
-                icon={DollarSign}
-                color="green"
-                onClick={() => setActiveTab('Order History')}
+            {/* --- PRODUCTS --- */}
+            {activeTab === 'Products' && (
+              <ProductsTabContent 
+                products={products || []} 
+                onToggleBan={toggleProductBan} 
+                isLoading={isProductsLoading} // ✅ Passed explicit loading
               />
-              <RevenueCard
-                title="Unpaid Balance"
-                amount={vendor.unpaidBalance}
-                icon={TrendingUp}
-                color="yellow"
-                onClick={() => setActiveTab('Payouts')}
-              />
-            </div>
+            )}
 
-            {/* Performance Chart */}
-            <PerformanceChart />
-          </div>
+            {/* --- PAYOUTS --- */}
+            {activeTab === 'Payouts' && (
+              isPayoutsLoading ? <TabLoader /> : (
+                <PayoutsTabContent 
+                  unpaidBalance={vendor.unpaidBalance} 
+                  payouts={payoutsHistory} 
+                  onProcessPayout={handleProcessPayout} 
+                />
+              )
+            )}
+
+            {/* --- DOCUMENTS --- */}
+            {activeTab === 'Documents' && (
+              isDocumentsLoading ? <TabLoader /> : (
+                <DocumentsTab 
+                  // ✅ FIX: Prioritize SWR data, fallback to vendor object, default to empty array
+                  // Also maps 'name' to 'type' and 'uploadedDate' to 'createdAt' to match the Document interface
+                  documents={(documentsData || vendor?.vendorDocuments || []).map((doc: any) => ({
+                    id: doc.id,
+                    url: doc.url,
+                    status: doc.status,
+                    rejectionReason: doc.rejectionReason,
+                    type: doc.type || doc.name || 'Document', 
+                    createdAt: doc.createdAt || doc.uploadedDate || new Date().toISOString()
+                  }))} 
+                  
+                  onVerify={(id) => handleVerifyDocument(id, 'VERIFIED')}
+                  onReject={(id, reason) => handleVerifyDocument(id, 'REJECTED', reason)}
+                  showUploadButton={true}
+                />
+              )
+            )}
+
+            {/* --- REVIEWS --- */}
+            {activeTab === 'Reviews' && (
+                <ReviewsTab reviews={vendor.reviews || []} />
+            )}
+
+            {/* --- ACTIVITY --- */}
+            {activeTab === 'Activity Log' && (
+                isActivityLoading ? <TabLoader /> : (
+                   <ActivityLogTab logs={activityLogs || []} />
+                )
+            )}
         </div>
       </div>
-
-      {/* Tabs Container */}
-     <div className="mt-8 w-full bg-[#1E293B] border-t border-gray-800 min-h-[600px]">
-        
-        {/* Inner Content Constrained to max-w-7xl to match top section alignment */}
-        <div className="max-w-7xl mx-auto">
-          
-          {/* Tabs Navigation */}
-          <div className="flex border-b border-gray-800 overflow-x-auto px-6">
-            {['Order History', 'Payouts', 'Documents', 'Reviews', 'Activity Log', 'Settings'].map((tab) => (
-              <button 
-                key={tab} 
-                onClick={() => setActiveTab(tab)} 
-                className={`px-6 py-4 text-sm font-bold whitespace-nowrap transition-all border-b-2 ${
-                  activeTab === tab 
-                    ? 'text-yellow-500 border-yellow-500 bg-[#0F172A]/50' 
-                    : 'text-gray-400 border-transparent hover:text-white hover:bg-white/5'
-                }`}
-              >
-                {tab}
-              </button>
-            ))}
-          </div>
-
-          {/* Tab Content Area */}
-          <div className="p-6">
-            
-            {/* 1. ORDER HISTORY */}
-            {activeTab === 'Order History' && <OrderHistoryTab orders={orders} />}
-
-
-            {/* 2. PAYOUTS */}
-           {activeTab === 'Payouts' && (
-              <div className="space-y-6">
-                <div className="flex items-center justify-between p-6 bg-[#0F172A] border border-gray-700 rounded-xl">
-                  <div>
-                    <p className="text-gray-400 text-sm font-bold uppercase">Available for Payout</p>
-                    <h3 className="text-3xl font-black text-white mt-1">{vendor.unpaidBalance}</h3>
-                  </div>
-                  <button className="px-6 py-3 bg-green-600 hover:bg-green-500 text-white font-bold rounded-lg flex items-center gap-2 transition-all">
-                    <DollarSign className="w-4 h-4" /> Pay Now
-                  </button>
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold text-white mb-4">Payout History</h3>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm text-left">
-                      <thead className="text-xs text-gray-500 uppercase font-bold border-b border-gray-700">
-                        <tr>
-                          <th className="pb-3">Date</th>
-                          <th className="pb-3">Method</th>
-                          <th className="pb-3">Amount</th>
-                          <th className="pb-3">Status</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-800">
-                        {payouts.map((pay) => (
-                          <tr key={pay.id} className="hover:bg-[#0F172A] transition-colors">
-                            <td className="py-4 text-white">{pay.date}</td>
-                            <td className="py-4 text-gray-400">{pay.method}</td>
-                            <td className="py-4 font-bold text-white">{pay.amount}</td>
-                            <td className="py-4">
-                              <span className="text-green-500 font-bold">{pay.status}</span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* 3. REVIEWS */}
-           {activeTab === 'Reviews' && <ReviewsTab reviews={reviews} />}
-            {activeTab === 'Activity Log' && <ActivityLogTab logs={activityLogs} />}
-
-            {/* 4. DOCUMENTS */}
-             {activeTab === 'Documents' && (
-              <DocumentsTab 
-                documents={documents} 
-                onVerify={handleDocumentVerify}
-                onReject={handleDocumentReject}
-              />
-            )}
-
-            {/* 5. SETTINGS (With Admin Notes) */}
-            {activeTab === 'Settings' && (
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  {/* Configuration Controls */}
-                  <div className="space-y-6">
-                     <h3 className="font-bold text-white flex items-center gap-2"><Settings className="w-4 h-4" /> Configuration</h3>
-                     <div className="p-4 bg-[#0F172A] border border-gray-800 rounded-xl space-y-4">
-                        <div className="flex items-center justify-between">
-                           <span className="text-white font-bold">Featured Vendor</span>
-                           <ToggleLeft className="w-8 h-8 text-gray-600 cursor-pointer" />
-                        </div>
-                        <div className="flex items-center justify-between">
-                           <span className="text-white font-bold">Active Status</span>
-                           <ToggleRight className="w-8 h-8 text-green-500 cursor-pointer" />
-                        </div>
-                     </div>
-                  </div>
-
-                  {/* Admin Notes Section */}
-                  <div className="space-y-6">
-                     <h3 className="font-bold text-white flex items-center gap-2"><ShieldAlert className="w-4 h-4" /> Admin Notes</h3>
-                     <div className="p-4 bg-[#0F172A] border border-gray-800 rounded-xl">
-
-                  <AdminNotesSection notes={adminNotes} />
-
-                        <div className="bg-gray-800/50 p-3 rounded text-gray-300 text-sm">Vendor requested lower commission.</div>
-                     </div>
-                  </div>
-               </div>
-            )}
-
-          </div>
-        </div>
-      </div>
-    </>
+    </div>
   );
 }

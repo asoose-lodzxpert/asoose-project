@@ -1,73 +1,119 @@
-import { MapPin, Star,Mail,Phone } from "lucide-react";
-const BusinessInfoCard = ({ vendor, formData, isEditing, onFormChange }: any) => (
-  <div className="lg:col-span-1 bg-[#1E293B] border border-gray-800 rounded-2xl p-6 h-fit">
-    <h2 className="text-lg font-bold text-gray-200 mb-6 pb-4 border-b border-gray-800">
-      Business Information
-    </h2>
-    <div className="flex flex-col items-center mb-6">
-      <div className="w-24 h-24 rounded-full border-4 border-gray-700 overflow-hidden mb-4 relative">
-        <img src={vendor.image} alt={vendor.name} className="w-full h-full object-cover" />
-        {vendor.onlineStatus === 'Online' && (
-          <div className="absolute bottom-2 right-2 w-4 h-4 bg-green-500 rounded-full border-2 border-[#1E293B]">
-            <div className="w-full h-full bg-green-500 rounded-full animate-ping opacity-75"></div>
-          </div>
-        )}
-      </div>
-      {isEditing ? (
-        <input 
-          type="text" 
-          value={formData.name} 
-          onChange={(e) => onFormChange({...formData, name: e.target.value})} 
-          className="bg-[#0F172A] border border-gray-700 text-white text-center font-bold rounded p-2 w-full transition-all focus:border-yellow-500 focus:outline-none"
-        />
-      ) : (
-        <h3 className="text-xl font-bold text-white">{vendor.name}</h3>
-      )}
-      <p className="text-sm text-gray-400 font-mono mt-1">{vendor.id}</p>
-      
-      {/* Star Rating */}
-      <div className="mt-4 flex items-center gap-2">
-        <div className="flex text-yellow-500">
-          {[...Array(5)].map((_, i) => (
-            <Star key={i} className={`w-4 h-4 ${i < Math.floor(vendor.rating) ? 'fill-yellow-500' : 'text-gray-600'}`} />
-          ))}
-        </div>
-        <span className="text-white font-bold text-lg">{vendor.rating}</span>
-        <span className="text-gray-400 text-sm">({vendor.reviews} reviews)</span>
-      </div>
-    </div>
-    
-    <div className="space-y-4">
-      <div className="flex items-center gap-3 text-gray-300">
-        <Mail className="w-4 h-4 text-gray-500 shrink-0" />
-        <span className="text-sm">{vendor.email}</span>
-      </div>
-      <div className="flex items-center gap-3 text-gray-300">
-        <Phone className="w-4 h-4 text-gray-500 shrink-0" />
-        {isEditing ? (
-          <input 
-            value={formData.phone} 
-            onChange={(e) => onFormChange({...formData, phone: e.target.value})} 
-            className="bg-[#0F172A] border border-gray-700 text-white text-sm rounded p-2 w-full transition-all focus:border-yellow-500 focus:outline-none"
-          />
-        ) : (
-          <span className="text-sm">{vendor.phone}</span>
-        )}
-      </div>
-      <div className="flex items-center gap-3 text-gray-300">
-        <MapPin className="w-4 h-4 text-gray-500 shrink-0" />
-        {isEditing ? (
-          <input 
-            value={formData.address} 
-            onChange={(e) => onFormChange({...formData, address: e.target.value})} 
-            className="bg-[#0F172A] border border-gray-700 text-white text-sm rounded p-2 w-full transition-all focus:border-yellow-500 focus:outline-none"
-          />
-        ) : (
-          <span className="text-sm">{vendor.address}</span>
-        )}
-      </div>
-    </div>
-  </div>
-);
+import React from 'react';
+import { MapPin, Star, Mail, Phone, Store, Calendar, Clock } from "lucide-react";
 
-export default BusinessInfoCard
+interface BusinessInfoCardProps {
+  vendor: any;
+  formData: any;
+  isEditing: boolean;
+  onFormChange: (data: any) => void;
+}
+
+const BusinessInfoCard = ({ vendor, formData, isEditing, onFormChange }: BusinessInfoCardProps) => {
+  
+  const formatDate = (date: string) => 
+    date ? new Date(date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : 'N/A';
+
+  return (
+    <div className="bg-[#1E293B] border border-gray-800 rounded-xl p-6 relative overflow-hidden h-fit">
+      <div className="flex flex-col items-center text-center">
+        
+        {/* Profile Image Section */}
+        <div className="w-24 h-24 rounded-full border-4 border-gray-700 bg-gray-800 flex items-center justify-center mb-4 overflow-hidden relative">
+          <img 
+            src={vendor.image || "https://via.placeholder.com/150"} 
+            alt={vendor.name} 
+            className="w-full h-full object-cover" 
+          />
+          {vendor.status === 'ACTIVE' && (
+            <div className="absolute bottom-2 right-2 w-3 h-3 bg-green-500 rounded-full border border-[#1E293B]">
+              <div className="w-full h-full bg-green-500 rounded-full animate-ping opacity-75"></div>
+            </div>
+          )}
+        </div>
+
+        {/* Store Name */}
+        <div className="w-full mb-1">
+          {isEditing ? (
+            <input 
+              type="text" 
+              value={formData.storeName || ''} 
+              onChange={(e) => onFormChange({ ...formData, storeName: e.target.value })} 
+              className="bg-transparent border-b border-gray-700 text-white text-center text-xl font-bold w-full focus:border-yellow-500 focus:outline-none pb-1 placeholder-gray-600"
+              placeholder="Store Name"
+            />
+          ) : (
+            <h2 className="text-xl font-bold text-white">{vendor.name}</h2>
+          )}
+        </div>
+
+        {/* ID */}
+        <p className="text-gray-500 text-xs font-mono mb-2">
+          {vendor.id}
+        </p>
+
+        {/* Rating Badge (Integrated subtly) */}
+        <div className="flex items-center gap-1.5 mb-6 px-3 py-1 bg-[#0F172A] rounded-full border border-gray-800">
+            <Star className="w-3.5 h-3.5 fill-yellow-500 text-yellow-500" />
+            <span className="text-white text-xs font-bold">{vendor.rating || 0}</span>
+            <span className="text-gray-500 text-[10px]">({vendor.reviewsCount || 0} reviews)</span>
+        </div>
+
+        {/* Info List Container */}
+        <div className="w-full space-y-3 text-left bg-[#0F172A] p-4 rounded-lg border border-gray-800">
+          
+          {/* Email (Read Only) */}
+          <div className="flex items-center gap-3 text-sm text-gray-300">
+            <Mail className="w-4 h-4 text-gray-500 shrink-0" /> 
+            <span className="truncate">{vendor.email}</span>
+          </div>
+
+          {/* Phone */}
+          <div className="flex items-center gap-3 text-sm text-gray-300">
+            <Phone className="w-4 h-4 text-gray-500 shrink-0" /> 
+            {isEditing ? (
+                <input 
+                  value={formData.phone || ''} 
+                  onChange={(e) => onFormChange({ ...formData, phone: e.target.value })} 
+                  className="bg-[#1E293B] border border-gray-700 text-white text-xs rounded px-2 py-1 w-full focus:border-yellow-500 focus:outline-none"
+                  placeholder="Phone Number"
+                />
+            ) : (
+                <span>{vendor.phone || 'No phone provided'}</span>
+            )}
+          </div>
+
+          {/* Address */}
+          <div className="flex items-start gap-3 text-sm text-gray-300">
+            <MapPin className="w-4 h-4 text-gray-500 shrink-0 mt-0.5" /> 
+            {isEditing ? (
+                <textarea 
+                  value={formData.address || ''} 
+                  onChange={(e) => onFormChange({ ...formData, address: e.target.value })} 
+                  className="bg-[#1E293B] border border-gray-700 text-white text-xs rounded px-2 py-1 w-full focus:border-yellow-500 focus:outline-none resize-none"
+                  placeholder="Address"
+                  rows={2}
+                />
+            ) : (
+                <span className="leading-tight">{vendor.address || 'No address set'}</span>
+            )}
+          </div>
+
+          {/* Joined Date */}
+          <div className="flex items-center gap-3 text-sm text-gray-300">
+            <Calendar className="w-4 h-4 text-gray-500 shrink-0" /> 
+            <span>Joined {formatDate(vendor.createdAt)}</span>
+          </div>
+
+          {/* Updated Date */}
+          <div className="flex items-center gap-3 text-sm text-gray-300">
+            <Clock className="w-4 h-4 text-gray-500 shrink-0" /> 
+            <span>Updated {formatDate(vendor.updatedAt)}</span>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default BusinessInfoCard;
