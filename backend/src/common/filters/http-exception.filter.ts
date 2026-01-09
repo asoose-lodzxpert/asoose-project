@@ -4,7 +4,7 @@ import {
   ArgumentsHost,
   HttpException,
   HttpStatus,
-  Logger, // Import Logger
+  Logger,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 
@@ -23,10 +23,10 @@ export class HttpExceptionFilter implements ExceptionFilter {
     if (exception instanceof HttpException) {
       status = exception.getStatus();
       const res = exception.getResponse();
-      message = typeof res === 'string' ? res : (res as any).message ?? message;
+      message =
+        typeof res === 'string' ? res : ((res as any).message ?? message);
     } else {
-      // LOG THE REAL ERROR HERE
-      this.logger.error(`Global Exception Filter: ${exception}`); 
+      this.logger.error(`Global Exception Filter: ${exception}`);
       if (exception instanceof Error) {
         this.logger.error(exception.stack);
       }
