@@ -2,6 +2,7 @@ import { Stack } from "expo-router";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { View, ActivityIndicator } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { NotificationPreferencesProvider } from "@/context/NotificationPreferencesContext";
 
 function RootNavigator() {
   const { user, loading } = useAuth();
@@ -26,7 +27,9 @@ function RootNavigator() {
 export default function RootLayout() {
   return (
     <AuthProvider>
-      <RootNavigator />
+      <NotificationPreferencesProvider>
+        <RootNavigator />
+      </NotificationPreferencesProvider>
     </AuthProvider>
   );
 }

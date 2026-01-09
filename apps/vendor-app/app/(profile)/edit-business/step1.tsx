@@ -1,4 +1,4 @@
-import React, { useRef } from "react";
+import React, { useRef, useEffect, useState } from "react";
 import {
   View,
   StyleSheet,
@@ -8,6 +8,9 @@ import {
   Pressable,
 } from "react-native";
 import { useRouter } from "expo-router";
+import Toast from "react-native-toast-message";
+import { getBusinessDetails } from "@/services/business-details.service";
+import { updateBusinessInfo } from "@/services/business.service";
 
 import { ThemedInput } from "@/components/ThemedInput";
 import { ThemedText } from "@/components/themed-text";
@@ -38,30 +41,74 @@ export default function EditBusinessInfoScreen() {
 
   const scrollRef = useRef<ScrollView>(null);
 
-  /** Mock data — replace with store / API data */
-  const [data, setData] = React.useState<SignupStep1Data>({
-    businessName: "Fresh Bites Ltd",
-    businessEmail: "contact@freshbites.com",
-    countryCode: "+234",
-    phoneNumber: "8012345678",
-    businessType: "Restaurant",
-    employees: "1-5",
-    password: "", // unused but required by type
-  });
+  const [data, setData] = useState<SignupStep1Data | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const details = await getBusinessDetails();
+        if (mounted && details?.step1) {
+          setData({
+            businessName: details.step1.businessName || "",
+            businessEmail: details.step1.businessEmail || "",
+            countryCode: details.step1.countryCode || "+234",
+            phoneNumber: details.step1.phoneNumber || "",
+            businessType: details.step1.businessType || "",
+            employees: details.step1.employees || "",
+            password: "", // unused
+          });
+        }
+      } catch (err) {
+        Toast.show({ type: "error", text1: "Failed to load business info" });
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   /** Generic change handler */
   const onChange = <K extends keyof SignupStep1Data>(
     key: K,
     value: SignupStep1Data[K]
   ) => {
-    setData((prev) => ({ ...prev, [key]: value }));
+    setData((prev) => (prev ? { ...prev, [key]: value } : prev));
   };
 
   /** Save handler */
-  const handleSave = () => {
-    // TODO: submit updated business info to backend
-    router.back();
+  const handleSave = async () => {
+    if (!data) return;
+    setSaving(true);
+    try {
+      await updateBusinessInfo({
+        businessName: data.businessName,
+        businessEmail: data.businessEmail,
+        countryCode: data.countryCode,
+        phoneNumber: data.phoneNumber,
+        businessType: data.businessType,
+        employees: data.employees,
+      });
+      Toast.show({ type: "success", text1: "Business info updated" });
+      router.back();
+    } catch (err) {
+      Toast.show({ type: "error", text1: "Failed to update business info" });
+    } finally {
+      setSaving(false);
+    }
   };
+
+  if (loading) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        <ThemedText type="subtitle">Loading business info...</ThemedText>
+      </View>
+    );
+  }
 
   return (
     <ThemedView style={{ flex: 1 }}>
@@ -96,7 +143,7 @@ export default function EditBusinessInfoScreen() {
             <ThemedText type="defaultSemiBold">Business name</ThemedText>
             <ThemedInput
               placeholder="Registered business name"
-              value={data.businessName}
+              value={data?.businessName}
               onChangeText={(v) => onChange("businessName", v)}
             />
           </View>
@@ -106,7 +153,7 @@ export default function EditBusinessInfoScreen() {
             <ThemedText type="defaultSemiBold">Business email</ThemedText>
             <ThemedInput
               placeholder="Business contact email"
-              value={data.businessEmail}
+              value={data?.businessEmail}
               onChangeText={(v) => onChange("businessEmail", v)}
               keyboardType="email-address"
             />
@@ -120,13 +167,13 @@ export default function EditBusinessInfoScreen() {
             <View style={styles.row}>
               <SelectInput<CountryCode>
                 options={COUNTRY_CODES}
-                selected={data.countryCode || undefined}
+                selected={data?.countryCode || undefined}
                 onSelect={(v) => onChange("countryCode", v)}
                 style={{ flex: 1 }}
               />
               <ThemedInput
                 placeholder="Phone number"
-                value={data.phoneNumber}
+                value={data?.phoneNumber}
                 onChangeText={(v) => onChange("phoneNumber", v)}
                 keyboardType="phone-pad"
                 style={{ flex: 2 }}
@@ -139,7 +186,7 @@ export default function EditBusinessInfoScreen() {
             <ThemedText type="defaultSemiBold">Type of business</ThemedText>
             <SelectInput<BusinessType>
               options={BUSINESS_TYPES}
-              selected={data.businessType || undefined}
+              selected={data?.businessType || undefined}
               onSelect={(v) => onChange("businessType", v)}
               placeholder="Select business category"
             />
@@ -150,7 +197,7 @@ export default function EditBusinessInfoScreen() {
             <ThemedText type="defaultSemiBold">Number of employees</ThemedText>
             <SelectInput<EmployeeRange>
               options={EMPLOYEE_RANGES}
-              selected={data.employees || undefined}
+              selected={data?.employees || undefined}
               onSelect={(v) => onChange("employees", v)}
               placeholder="Employee range"
             />
@@ -158,11 +205,15 @@ export default function EditBusinessInfoScreen() {
 
           {/* Save Button */}
           <Pressable
-            style={[styles.saveButton, { backgroundColor: brandPrimary }]}
+            style={[
+              styles.saveButton,
+              { backgroundColor: brandPrimary, opacity: saving ? 0.7 : 1 },
+            ]}
             onPress={handleSave}
+            disabled={saving}
           >
             <ThemedText type="defaultSemiBold" style={{ color: "#fff" }}>
-              Save changes
+              {saving ? "Saving..." : "Save changes"}
             </ThemedText>
           </Pressable>
         </ScrollView>

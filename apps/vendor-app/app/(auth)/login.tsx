@@ -12,7 +12,6 @@ import {
   TouchableWithoutFeedback,
   Animated,
 } from "react-native";
-import { login } from "@/services/auth";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { ThemedView } from "@/components/themed-view";
 import { ThemedInput } from "@/components/ThemedInput";
@@ -78,8 +77,7 @@ export default function LoginScreen() {
     setLoading(true);
 
     try {
-      const result = await login(identifier, password);
-      await signIn(result.user);
+      const result = await signIn(identifier, password);
       router.replace("/(main)");
     } catch (e: any) {
       setError(e.message);

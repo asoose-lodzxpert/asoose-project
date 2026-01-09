@@ -4,7 +4,6 @@ import { StoreOrder } from "@/types/store";
 import { OrderCard } from "@/components/order/OrderCard";
 import { ThemedText } from "@/components/themed-text";
 import { useThemeColor } from "@/hooks/use-theme-color";
-import { IconSymbol } from "@/components/ui/icon-symbol"; // example icon component
 
 interface Props {
   orders: StoreOrder[];
@@ -12,6 +11,7 @@ interface Props {
   onActionPress?: () => void;
   actionLabel?: string;
   actionIcon?: React.ReactNode;
+  loading?: boolean;
 }
 
 export const RecentOrdersFeed: React.FC<Props> = ({
@@ -20,6 +20,7 @@ export const RecentOrdersFeed: React.FC<Props> = ({
   onActionPress,
   actionLabel,
   actionIcon,
+  loading,
 }) => {
   const mutedText = useThemeColor({}, "textDisabled");
   const primary = useThemeColor({}, "brandPrimary");
@@ -56,15 +57,31 @@ export const RecentOrdersFeed: React.FC<Props> = ({
         </View>
       )}
 
-      <FlatList
-        data={orders}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <OrderCard order={item as any} tab={getTab(item.status)} />
-        )}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24 }}
-        showsVerticalScrollIndicator={false}
-      />
+      {loading ? (
+        <View style={{ paddingHorizontal: 16 }}>
+          {[...Array(3)].map((_, i) => (
+            <View
+              key={i}
+              style={{
+                height: 60,
+                backgroundColor: "#eee",
+                borderRadius: 10,
+                marginBottom: 12,
+              }}
+            />
+          ))}
+        </View>
+      ) : (
+        <FlatList
+          data={orders}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => (
+            <OrderCard order={item as any} tab={getTab(item.status)} />
+          )}
+          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24 }}
+          showsVerticalScrollIndicator={false}
+        />
+      )}
     </View>
   );
 };

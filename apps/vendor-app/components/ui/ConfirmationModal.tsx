@@ -8,6 +8,7 @@ interface Props {
   message: string;
   onConfirm: () => void;
   onCancel: () => void;
+  loading?: boolean;
 }
 
 export const ConfirmationModal: React.FC<Props> = ({
@@ -15,6 +16,7 @@ export const ConfirmationModal: React.FC<Props> = ({
   message,
   onConfirm,
   onCancel,
+  loading,
 }) => {
   const background = useThemeColor({}, "surfaceBackground");
   const primary = useThemeColor({}, "brandPrimary");
@@ -32,15 +34,22 @@ export const ConfirmationModal: React.FC<Props> = ({
             <Pressable
               style={[styles.button, { backgroundColor: red }]}
               onPress={onCancel}
+              disabled={loading}
             >
               <ThemedText style={{ color: "#fff" }}>Cancel</ThemedText>
             </Pressable>
 
             <Pressable
-              style={[styles.button, { backgroundColor: primary }]}
+              style={[
+                styles.button,
+                { backgroundColor: primary, opacity: loading ? 0.7 : 1 },
+              ]}
               onPress={onConfirm}
+              disabled={loading}
             >
-              <ThemedText style={{ color: "#fff" }}>Confirm</ThemedText>
+              <ThemedText style={{ color: "#fff" }}>
+                {loading ? "Please wait..." : "Confirm"}
+              </ThemedText>
             </Pressable>
           </View>
         </View>

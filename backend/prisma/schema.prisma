@@ -1,10 +1,11 @@
+
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  url = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
 
@@ -17,6 +18,7 @@ enum UserRole {
   VENDOR
   RIDER
   ADMIN
+  DRIVER
   SUPER_ADMIN
   ADMIN_MANAGER // Operations (Riders/Vendors) but no Financials
   ADMIN_SUPPORT // View Only + Disputes
@@ -166,7 +168,6 @@ model User {
   // Profiles & Relations
   riderProfile RiderProfile?
 
-  stores       Store[]
   orders       Order[]
   addresses    Address[]
   reviews      Review[]
@@ -252,6 +253,7 @@ model RiderPayout {
 }
 
 model RiderProfile {
+  balance Float @default(0)
   id     String @id @default(uuid())
   userId String @unique
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -333,19 +335,43 @@ model VehicleDocument {
 //// STORE / VENDOR
 //// =====================
 
+model Vendor {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  countryCode    String
+  phone     String
+  businessType   String
+  employees      String
+  password       String
+  businessRegCert String?
+  taxIdDoc        String?
+  proofOfAddress  String?
+  image           String?
+  status          UserStatus @default(PENDING)
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+    store     Store?
+  notificationsPreferences Json? // Stores notification preferences for the vendor
+}
+
 model Store {
   id           String             @id @default(uuid())
   name         String
+  description  String
   slug         String             @unique
   type         StoreType
   address      String?
   lat          Float?
   lng          Float?
-  image        String?
+  logo         String?
+  banner       String?
+  openHours    Json?
   rating       Float              @default(0)
   status       StoreStatus        @default(PENDING)
   verification VerificationStatus @default(PENDING)
-  ownerId      String
+    vendorId     String   @unique
   createdAt    DateTime           @default(now())
   updatedAt    DateTime           @updatedAt
 
@@ -360,17 +386,19 @@ model Store {
   walletBalance Float @default(0)
 
   // Relations
-  owner           User             @relation(fields: [ownerId], references: [id], onDelete: Restrict)
-  products        Product[]
-  orders          Order[]
-  reviews         Review[]
-  vendorPayouts   VendorPayout[]
-  vendorDocuments VendorDocument[]
-  openingHours    OpeningHour[]
-  bankAccount     BankAccount?
-  storeLogs       StoreLog[]
+    vendor           Vendor?           @relation(fields: [vendorId], references: [id], onDelete: Restrict)
+  products         Product[]
+  orders           Order[]
+  reviews          Review[]
+  vendorPayouts    VendorPayout[]
+  vendorDocuments  VendorDocument[]
+  openingHours     OpeningHour[]
+  bankAccount      BankAccount?
+  storeLogs        StoreLog[]
 
-  @@index([ownerId])
+  balance          Float @default(0)
+
+  @@index([vendorId])
   @@index([status, verification])
   @@index([type, status])
   @@index([lat, lng])
@@ -481,6 +509,7 @@ model Product {
   status     ProductStatus @default(ACTIVE)
   storeId    String
   categoryId String
+  inventory  Int?
   salesCount Int           @default(0)
   createdAt  DateTime      @default(now())
   updatedAt  DateTime      @updatedAt

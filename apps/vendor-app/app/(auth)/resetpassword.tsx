@@ -1,8 +1,14 @@
 import React, { useState, useEffect, useRef } from "react";
 import { ScrollView, KeyboardAvoidingView, Platform } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+
 import Toast from "react-native-toast-message";
 import { useRouter } from "expo-router";
+import {
+  sendVendorOtp,
+  verifyVendorOtp,
+  resetVendorPassword,
+} from "@/services/reset-password.service";
 
 import { ResetPasswordEmail } from "@/components/reset-password/ResetPasswordEmail";
 import { ResetPasswordOtp } from "@/components/reset-password/ResetPasswordOtp";
@@ -32,17 +38,13 @@ export default function ResetPasswordScreen() {
     if (!email) return;
     setLoading(true);
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
+      await sendVendorOtp(email);
       const newResendCount = resendCount + 1;
       setResendCount(newResendCount);
-
       const now = Date.now();
       await AsyncStorage.setItem(LAST_SENT_KEY, now.toString());
       await AsyncStorage.setItem(RESEND_COUNT_KEY, newResendCount.toString());
-
       setCooldown(30 + (newResendCount - 1) * 30);
-
       Toast.show({
         type: "success",
         text1: "OTP sent!",
@@ -87,17 +89,29 @@ export default function ResetPasswordScreen() {
   const handleNextEmail = async () => {
     if (!email) return Toast.show({ type: "error", text1: "Enter email" });
     setLoading(true);
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    setLoading(false);
-    setStep(2);
+    try {
+      // Optionally check if email exists on backend
+      // Send OTP request
+      await sendOtp();
+      setStep(2);
+    } catch (err) {
+      Toast.show({ type: "error", text1: "Failed to send OTP" });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleNextOtp = async () => {
     if (!otp) return Toast.show({ type: "error", text1: "Enter OTP" });
     setLoading(true);
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    setLoading(false);
-    setStep(3);
+    try {
+      await verifyVendorOtp(email, otp);
+      setStep(3);
+    } catch (err) {
+      Toast.show({ type: "error", text1: "Invalid OTP" });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleChangePassword = async () => {
@@ -108,10 +122,15 @@ export default function ResetPasswordScreen() {
       return Toast.show({ type: "error", text1: "Passwords do not match" });
 
     setLoading(true);
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    setLoading(false);
-    Toast.show({ type: "success", text1: "Password changed successfully!" });
-    setStep(4);
+    try {
+      await resetVendorPassword(email, otp, newPassword);
+      Toast.show({ type: "success", text1: "Password changed successfully!" });
+      setStep(4);
+    } catch (err) {
+      Toast.show({ type: "error", text1: "Failed to reset password" });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleDone = () => router.push("/(auth)/login");

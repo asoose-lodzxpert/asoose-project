@@ -1,7 +1,14 @@
-import React from "react";
-import { View, StyleSheet, Pressable, ScrollView } from "react-native";
+import React, { useState, useEffect } from "react";
+import {
+  View,
+  StyleSheet,
+  Pressable,
+  ScrollView,
+  ActivityIndicator,
+} from "react-native";
+import { getBusinessDetails } from "@/services/business-details.service";
+import Toast from "react-native-toast-message";
 import { useRouter } from "expo-router";
-
 import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
 import { IconSymbol } from "@/components/ui/icon-symbol";
@@ -9,9 +16,6 @@ import { useThemeColor } from "@/hooks/use-theme-color";
 
 /**
  * Edit Business Details Screen
- *
- * Shows business information in card sections.
- * Each section can be edited individually.
  */
 export default function EditBusinessDetailsScreen() {
   const router = useRouter();
@@ -19,26 +23,35 @@ export default function EditBusinessDetailsScreen() {
   const background = useThemeColor({}, "surfaceBackground");
   const brandPrimary = useThemeColor({}, "brandPrimary");
 
-  /** Mocked business data (replace with real store/state) */
-  const businessData = {
-    step1: {
-      businessName: "Fresh Bites Ltd",
-      businessEmail: "contact@freshbites.com",
-      phoneNumber: "+234 801 234 5678",
-      businessType: "Restaurant",
-      employees: "10 - 50",
-    },
-    step2: {
-      businessRegCert: "Uploaded",
-      taxIdDoc: "Uploaded",
-      proofOfAddress: "Not uploaded",
-    },
-    step3: {
-      storeName: "Fresh Bites Bistro",
-      storeDescription: "Healthy meals, fast delivery",
-      openHours: "Mon - Sun, 8am - 10pm",
-    },
-  };
+  const [businessData, setBusinessData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const data = await getBusinessDetails();
+        if (mounted) setBusinessData(data);
+      } catch (err) {
+        Toast.show({ type: "error", text1: "Failed to load business details" });
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  // ---------------- UI ----------------
+
+  if (loading) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        <ActivityIndicator size="large" color={brandPrimary} />
+      </View>
+    );
+  }
 
   return (
     <ThemedView style={{ flex: 1 }}>
@@ -56,7 +69,6 @@ export default function EditBusinessDetailsScreen() {
 
         <ThemedText type="title">Business Details</ThemedText>
 
-        {/* Spacer for centering title */}
         <View style={{ width: 40 }} />
       </View>
 
@@ -73,12 +85,12 @@ export default function EditBusinessDetailsScreen() {
         >
           <InfoRow
             label="Business Name"
-            value={businessData.step1.businessName}
+            value={businessData?.step1?.businessName}
           />
-          <InfoRow label="Email" value={businessData.step1.businessEmail} />
-          <InfoRow label="Phone" value={businessData.step1.phoneNumber} />
-          <InfoRow label="Type" value={businessData.step1.businessType} />
-          <InfoRow label="Employees" value={businessData.step1.employees} />
+          <InfoRow label="Email" value={businessData?.step1?.businessEmail} />
+          <InfoRow label="Phone" value={businessData?.step1?.phoneNumber} />
+          <InfoRow label="Type" value={businessData?.step1?.businessType} />
+          <InfoRow label="Employees" value={businessData?.step1?.employees} />
         </InfoCard>
 
         {/* ===== Documents ===== */}
@@ -87,16 +99,13 @@ export default function EditBusinessDetailsScreen() {
           onEdit={() => router.push("/(profile)/edit-business/step2")}
         >
           <InfoRow
-            label="Registration Certificate"
-            value={businessData.step2.businessRegCert}
+            label="Business Reg. Certificate"
+            value={businessData?.step2?.businessRegCert}
           />
-          <InfoRow
-            label="Tax ID Document"
-            value={businessData.step2.taxIdDoc}
-          />
+          <InfoRow label="Tax ID" value={businessData?.step2?.taxIdDoc} />
           <InfoRow
             label="Proof of Address"
-            value={businessData.step2.proofOfAddress}
+            value={businessData?.step2?.proofOfAddress}
           />
         </InfoCard>
 
@@ -105,12 +114,12 @@ export default function EditBusinessDetailsScreen() {
           title="Store Details"
           onEdit={() => router.push("/(profile)/edit-business/step3")}
         >
-          <InfoRow label="Store Name" value={businessData.step3.storeName} />
+          <InfoRow label="Store Name" value={businessData?.step3?.storeName} />
           <InfoRow
             label="Description"
-            value={businessData.step3.storeDescription}
+            value={businessData?.step3?.storeDescription}
           />
-          <InfoRow label="Opening Hours" value={businessData.step3.openHours} />
+          <InfoRow label="Open Hours" value={businessData?.step3?.openHours} />
         </InfoCard>
       </ScrollView>
     </ThemedView>
@@ -133,7 +142,6 @@ function InfoCard({ title, children, onEdit }: InfoCardProps) {
 
   return (
     <View style={[styles.card, { backgroundColor: cardBg }]}>
-      {/* Card Header */}
       <View style={styles.cardHeader}>
         <ThemedText type="defaultSemiBold">{title}</ThemedText>
 
@@ -145,7 +153,6 @@ function InfoCard({ title, children, onEdit }: InfoCardProps) {
         </Pressable>
       </View>
 
-      {/* Card Content */}
       <View style={{ gap: 12 }}>{children}</View>
     </View>
   );
@@ -185,8 +192,6 @@ const styles = StyleSheet.create({
   card: {
     padding: 16,
     borderRadius: 16,
-
-    // Subtle shadow (iOS + Android)
     shadowColor: "#000",
     shadowOpacity: 0.06,
     shadowRadius: 10,

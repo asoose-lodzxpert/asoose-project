@@ -1,5 +1,15 @@
-import React, { useState } from "react";
-import { View, StyleSheet, Pressable, ScrollView, Alert } from "react-native";
+import Toast from "react-native-toast-message";
+import { getBusinessDetails } from "@/services/business-details.service";
+import { updateBusinessDocuments } from "@/services/business.service";
+import React, { useEffect, useState } from "react";
+import {
+  View,
+  StyleSheet,
+  Pressable,
+  ScrollView,
+  Alert,
+  ActivityIndicator,
+} from "react-native";
 import { useRouter } from "expo-router";
 import * as DocumentPicker from "expo-document-picker";
 
@@ -20,12 +30,32 @@ export default function EditBusinessDocumentsScreen() {
   const surface = useThemeColor({}, "surfaceCard");
   const border = useThemeColor({}, "borderDefault");
 
-  /** Mock data — replace with API/store data */
-  const [data, setData] = useState<SignupStep2Data>({
-    businessRegCert: "",
-    taxIdDoc: "",
-    proofOfAddress: "",
-  });
+  const [data, setData] = useState<SignupStep2Data | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const details = await getBusinessDetails();
+        if (mounted && details?.step2) {
+          setData({
+            businessRegCert: details.step2.businessRegCert || "",
+            taxIdDoc: details.step2.taxIdDoc || "",
+            proofOfAddress: details.step2.proofOfAddress || "",
+          });
+        }
+      } catch (err) {
+        Toast.show({ type: "error", text1: "Failed to load documents" });
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   /** Handle file pick */
   const pickFile = async (key: keyof SignupStep2Data) => {
@@ -44,12 +74,29 @@ export default function EditBusinessDocumentsScreen() {
       return;
     }
 
-    setData((prev) => ({ ...prev, [key]: file.uri }));
+    setData((prev) => (prev ? { ...prev, [key]: file.uri } : prev));
   };
 
   /** Remove uploaded file */
   const removeFile = (key: keyof SignupStep2Data) => {
-    setData((prev) => ({ ...prev, [key]: "" }));
+    setData((prev) => (prev ? { ...prev, [key]: "" } : prev));
+  };
+  const handleSave = async () => {
+    if (!data) return;
+    setSaving(true);
+    try {
+      await updateBusinessDocuments({
+        businessRegCert: data.businessRegCert,
+        taxIdDoc: data.taxIdDoc,
+        proofOfAddress: data.proofOfAddress,
+      });
+      Toast.show({ type: "success", text1: "Documents updated" });
+      router.back();
+    } catch (err) {
+      Toast.show({ type: "error", text1: "Failed to update documents" });
+    } finally {
+      setSaving(false);
+    }
   };
 
   /** Render single document card */
@@ -58,7 +105,7 @@ export default function EditBusinessDocumentsScreen() {
     label: string,
     optional?: boolean
   ) => {
-    const value = data[key];
+    const value = data?.[key];
     const uploaded = Boolean(value);
 
     return (
@@ -105,6 +152,15 @@ export default function EditBusinessDocumentsScreen() {
     );
   };
 
+  if (loading) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        <ActivityIndicator size="large" color={primary} />
+        <ThemedText type="subtitle">Loading documents...</ThemedText>
+      </View>
+    );
+  }
+
   return (
     <ThemedView style={{ flex: 1 }}>
       {/* ================= Header ================= */}
@@ -134,6 +190,26 @@ export default function EditBusinessDocumentsScreen() {
         {renderDocCard("taxIdDoc", "Tax Identification Document")}
 
         {renderDocCard("proofOfAddress", "Proof of Address", true)}
+
+        <Pressable
+          style={[
+            styles.card,
+            {
+              backgroundColor: primary,
+              marginTop: 24,
+              opacity: saving ? 0.7 : 1,
+            },
+          ]}
+          onPress={handleSave}
+          disabled={saving}
+        >
+          <ThemedText
+            type="defaultSemiBold"
+            style={{ color: "#fff", textAlign: "center" }}
+          >
+            {saving ? "Saving..." : "Save changes"}
+          </ThemedText>
+        </Pressable>
       </ScrollView>
     </ThemedView>
   );

@@ -18,7 +18,6 @@ interface Props {
 export const QuickActions: React.FC<Props> = ({ heading, actions }) => {
   const background = useThemeColor({}, "surfaceCard");
   const mutedText = useThemeColor({}, "textDisabled");
-  const linkColor = useThemeColor({}, "brandPrimary");
 
   return (
     <View style={styles.wrapper}>

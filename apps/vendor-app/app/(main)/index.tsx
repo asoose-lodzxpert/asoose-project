@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { ThemedView } from "@/components/themed-view";
 import { StoreHeader } from "@/components/store/StoreHeader";
 import { MetricsCards } from "@/components/store/MetricsCards";
@@ -10,53 +10,119 @@ import { ConfirmationModal } from "@/components/ui/ConfirmationModal";
 
 import { StoreMetrics, StoreOrder } from "@/types/store";
 import { useThemeColor } from "@/hooks/use-theme-color";
+import {
+  fetchStoreMetrics,
+  fetchStoreOrders,
+  fetchStoreOnlineStatus,
+  toggleStoreOnline,
+} from "@/services/home.services";
+import { fetchStorePublicDetails } from "@/services/store.services";
+import Toast from "react-native-toast-message";
 
-// Mock data
-const metrics: StoreMetrics = {
-  todaysOrders: 12,
-  todaysSales: 1250050,
-  pendingApprovals: 3,
-  avgRating: 95,
-};
-
-const orders: StoreOrder[] = [
-  {
-    id: "1",
-    customerName: "Sarah J.",
-    customerProfile: "https://picsum.photos/50",
-    items: [
-      { id: "1", name: "Burger", quantity: 2 },
-      { id: "2", name: "Fries", quantity: 1 },
-    ],
-    total: 1250,
-    status: "pending",
-    timestamp: "5 min ago",
-  },
-  {
-    id: "2",
-    customerName: "John D.",
-    customerProfile: "https://picsum.photos/51",
-    items: [{ id: "3", name: "Pizza", quantity: 1 }],
-    total: 500,
-    status: "accepted",
-    timestamp: "10 min ago",
-  },
-];
-
-export default function StoreDashboard() {
-  const [isOnline, setIsOnline] = useState(true);
+export default function StoreDashboardPage() {
+  const [isOnline, setIsOnline] = useState<boolean | null>(null);
+  const [metrics, setMetrics] = useState<StoreMetrics | null>(null);
+  const [orders, setOrders] = useState<StoreOrder[] | null>(null);
+  const [storeName, setStoreName] = useState<string>("");
+  const [loadingOnline, setLoadingOnline] = useState(true);
+  const [loadingMetrics, setLoadingMetrics] = useState(true);
+  const [loadingOrders, setLoadingOrders] = useState(true);
+  const [loadingStore, setLoadingStore] = useState(true);
+  const [toggleLoading, setToggleLoading] = useState(false);
   const [confirmVisible, setConfirmVisible] = useState(false);
   const router = useRouter();
-
   const linkColor = useThemeColor({}, "brandPrimary");
+
+  // Fetch store public details
+  const fetchStore = useCallback(async () => {
+    setLoadingStore(true);
+    try {
+      const res = await fetchStorePublicDetails();
+      setStoreName(res?.name || "Unknown");
+    } catch (e: any) {
+      setStoreName("Unknown");
+    } finally {
+      setLoadingStore(false);
+    }
+  }, []);
+
+  // Fetch online status
+  const fetchOnline = useCallback(async () => {
+    setLoadingOnline(true);
+    try {
+      const res = await fetchStoreOnlineStatus();
+      setIsOnline(!!res.isOnline);
+    } catch (e: any) {
+      Toast.show({
+        type: "error",
+        text1: e.message || "Failed to fetch online status",
+      });
+    } finally {
+      setLoadingOnline(false);
+    }
+  }, []);
+
+  // Fetch metrics
+  const fetchMetrics = useCallback(async () => {
+    setLoadingMetrics(true);
+    try {
+      const res = await fetchStoreMetrics();
+      setMetrics(res);
+    } catch (e: any) {
+      Toast.show({
+        type: "error",
+        text1: e.message || "Failed to fetch metrics",
+      });
+    } finally {
+      setLoadingMetrics(false);
+    }
+  }, []);
+
+  // Fetch orders
+  const fetchOrders = useCallback(async () => {
+    setLoadingOrders(true);
+    try {
+      const res = await fetchStoreOrders();
+      setOrders(res);
+    } catch (e: any) {
+      Toast.show({
+        type: "error",
+        text1: e.message || "Failed to fetch orders",
+      });
+    } finally {
+      setLoadingOrders(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchOnline();
+    fetchMetrics();
+    fetchOrders();
+    fetchStore();
+  }, [fetchOnline, fetchMetrics, fetchOrders, fetchStore]);
 
   /** Open confirmation modal */
   const openConfirmation = () => setConfirmVisible(true);
 
   /** Confirm toggle */
-  const handleConfirmToggle = () => {
-    setIsOnline((prev) => !prev);
-    setConfirmVisible(false);
+  const handleConfirmToggle = async () => {
+    setToggleLoading(true);
+    try {
+      const res = await toggleStoreOnline();
+      setIsOnline(!!res.isOnline);
+      Toast.show({
+        type: "success",
+        text1: `Store is now ${res.isOnline ? "online" : "offline"}`,
+      });
+    } catch (e: any) {
+      Toast.show({
+        type: "error",
+        text1: e.message || "Failed to toggle online status",
+      });
+    } finally {
+      setToggleLoading(false);
+      setConfirmVisible(false);
+    }
   };
 
   /** Cancel modal */
@@ -68,6 +134,7 @@ export default function StoreDashboard() {
       label: isOnline ? "Go Offline" : "Go Online",
       icon: <IconSymbol name="power" size={16} color={linkColor} />,
       onPress: openConfirmation,
+      loading: toggleLoading,
     },
     {
       label: "View Menu",
@@ -79,22 +146,34 @@ export default function StoreDashboard() {
   return (
     <ThemedView style={{ flex: 1 }}>
       <StoreHeader
-        storeName="Fresh Bites Bistro"
+        storeName={storeName}
         approved
-        isOnline={isOnline}
+        isOnline={!!isOnline}
         onToggleOnline={openConfirmation}
+        loading={loadingOnline || loadingStore}
       />
 
-      <MetricsCards metrics={metrics} />
+      <MetricsCards
+        metrics={
+          metrics || {
+            todaysOrders: 0,
+            todaysSales: 0,
+            pendingApprovals: 0,
+            avgRating: 0,
+          }
+        }
+        loading={loadingMetrics}
+      />
 
       <QuickActions heading="Quick Actions" actions={actions} />
 
       <RecentOrdersFeed
-        orders={orders}
+        orders={orders || []}
         heading="Recent Orders"
         actionLabel="View All"
         actionIcon={<IconSymbol name="arrow.right" size={16} color="#E5A503" />}
         onActionPress={() => router.push("/(main)/(orders)")}
+        loading={loadingOrders}
       />
 
       <ConfirmationModal
@@ -102,6 +181,7 @@ export default function StoreDashboard() {
         message={`Are you sure you want to ${isOnline ? "go offline" : "go online"}?`}
         onConfirm={handleConfirmToggle}
         onCancel={handleCancel}
+        loading={toggleLoading}
       />
     </ThemedView>
   );

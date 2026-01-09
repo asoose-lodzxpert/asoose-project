@@ -1,29 +1,41 @@
-import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import { ProductStatus } from '@prisma/client';
-import { 
-  Prisma, 
-  StoreStatus, 
-  VerificationStatus, 
-  UserRole, 
-  UserStatus, 
-  StoreType 
+import {
+  Prisma,
+  StoreStatus,
+  VerificationStatus,
+  UserRole,
+  UserStatus,
+  StoreType,
 } from '@prisma/client';
 import { CreateVendorDto, VendorQueryDto } from './dto/vendor.dto';
-import { EmailProducer } from 'src/libs/mail/email.producer';
+import { EmailProducer } from 'src/mail/email.producer';
 @Injectable()
 export class StoresService {
   private readonly logger = new Logger(StoresService.name);
 
   constructor(
     private prisma: PrismaService,
-    private emailProducer: EmailProducer
+    private emailProducer: EmailProducer,
   ) {}
 
   async findAll(query: VendorQueryDto) {
-    const { search, status, category, verification, page = 1, limit = 10 } = query;
+    const {
+      search,
+      status,
+      category,
+      verification,
+      page = 1,
+      limit = 10,
+    } = query;
     const skip = (page - 1) * limit;
 
     const where: Prisma.StoreWhereInput = {};
@@ -57,7 +69,7 @@ export class StoresService {
     ]);
 
     return {
-      data: stores.map(store => ({
+      data: stores.map((store) => ({
         id: store.id,
         name: store.name,
         email: store.owner?.email ?? 'No Owner',
@@ -80,24 +92,29 @@ export class StoresService {
 
   async findOne(idOrSlug: string) {
     this.logger.log(`Fetching store details for identifier: ${idOrSlug}`);
-    
-    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idOrSlug);
-    const where: Prisma.StoreWhereUniqueInput = isUUID 
-      ? { id: idOrSlug } 
+
+    const isUUID =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        idOrSlug,
+      );
+    const where: Prisma.StoreWhereUniqueInput = isUUID
+      ? { id: idOrSlug }
       : { slug: idOrSlug };
 
     try {
       const store = await this.prisma.store.findUnique({
         where,
         include: {
-          owner: { select: { email: true, phone: true, name: true, status: true } },
+          owner: {
+            select: { email: true, phone: true, name: true, status: true },
+          },
           orders: {
             include: {
               user: { select: { name: true } },
               items: true,
             },
             orderBy: { createdAt: 'desc' },
-            take: 20, 
+            take: 20,
           },
           reviews: { orderBy: { createdAt: 'desc' }, take: 10 },
           vendorPayouts: { orderBy: { createdAt: 'desc' }, take: 10 },
@@ -105,11 +122,12 @@ export class StoresService {
       });
 
       if (!store) {
-        throw new NotFoundException(`Store not found (Identifier: ${idOrSlug})`);
+        throw new NotFoundException(
+          `Store not found (Identifier: ${idOrSlug})`,
+        );
       }
 
       return this.transformStoreDetail(store);
-
     } catch (error) {
       this.logger.error(`Error in findOne: ${error.message}`, error.stack);
       throw error;
@@ -117,16 +135,21 @@ export class StoresService {
   }
 
   async create(dto: CreateVendorDto) {
-    const existingEmail = await this.prisma.user.findUnique({ where: { email: dto.email } });
+    const existingEmail = await this.prisma.user.findUnique({
+      where: { email: dto.email },
+    });
     if (existingEmail) throw new ConflictException('Email already in use');
 
-    const existingSlug = await this.prisma.store.findUnique({ where: { slug: dto.slug } });
+    const existingSlug = await this.prisma.store.findUnique({
+      where: { slug: dto.slug },
+    });
     if (existingSlug) throw new ConflictException('Store slug already exists');
 
-    const rawPassword = dto.password || crypto.randomBytes(8).toString('hex') + '!Aa1'; 
+    const rawPassword =
+      dto.password || crypto.randomBytes(8).toString('hex') + '!Aa1';
     const hashedPassword = await bcrypt.hash(rawPassword, 10);
 
-    const result = await this.prisma.$transaction(async tx => {
+    const result = await this.prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
         data: {
           email: dto.email,
@@ -173,14 +196,14 @@ export class StoresService {
     let newSlug: string | undefined = undefined;
     if (dto.storeName && dto.storeName !== store.name) {
       newSlug = this.generateSlug(dto.storeName);
-      
+
       const existingSlug = await this.prisma.store.findFirst({
-        where: { 
+        where: {
           slug: newSlug,
-          id: { not: id }
-        }
+          id: { not: id },
+        },
       });
-      
+
       if (existingSlug) {
         newSlug = `${newSlug}-${Date.now()}`;
       }
@@ -193,15 +216,18 @@ export class StoresService {
         slug: newSlug,
         address: dto.address || undefined,
         status: dto.status || undefined,
-        owner: (dto.ownerName || dto.phone || dto.email) ? {
-          update: {
-            name: dto.ownerName || undefined,
-            phone: dto.phone || undefined,
-            email: dto.email || undefined,
-          }
-        } : undefined,
+        owner:
+          dto.ownerName || dto.phone || dto.email
+            ? {
+                update: {
+                  name: dto.ownerName || undefined,
+                  phone: dto.phone || undefined,
+                  email: dto.email || undefined,
+                },
+              }
+            : undefined,
       },
-      include: { owner: true }
+      include: { owner: true },
     });
 
     return {
@@ -212,7 +238,7 @@ export class StoresService {
       ownerName: updatedStore.owner.name,
       phone: updatedStore.owner.phone,
       email: updatedStore.owner.email,
-      status: updatedStore.status
+      status: updatedStore.status,
     };
   }
 
@@ -223,7 +249,7 @@ export class StoresService {
     return this.prisma.store.update({
       where: { id },
       data: {
-        status: StoreStatus.SUSPENDED, 
+        status: StoreStatus.SUSPENDED,
         slug: `${store.slug}-deleted-${Date.now()}`,
       },
     });
@@ -236,7 +262,7 @@ export class StoresService {
     const orders = await this.prisma.order.findMany({
       where: {
         storeId,
-        status: 'DELIVERED', 
+        status: 'DELIVERED',
         createdAt: { gte: startDate },
       },
       select: { createdAt: true, total: true },
@@ -249,11 +275,11 @@ export class StoresService {
       groupedData[dateKey] = (groupedData[dateKey] || 0) + Number(order.total);
     });
 
-    const finalData: { date: string; revenue: number }[] = []; 
-    
+    const finalData: { date: string; revenue: number }[] = [];
+
     for (let i = 0; i < days; i++) {
       const d = new Date();
-      d.setDate(d.getDate() - (days - 1 - i)); 
+      d.setDate(d.getDate() - (days - 1 - i));
       const dateString = d.toISOString().split('T')[0];
 
       finalData.push({
@@ -294,7 +320,7 @@ export class StoresService {
       status: store.status,
       verification: store.verification,
       rating: store.rating,
-      
+
       totalRevenue,
       unpaidBalance: Math.max(0, totalRevenue - paidOut),
       totalOrders: store.orders.length,
@@ -320,59 +346,62 @@ export class StoresService {
     };
   }
 
-async getVendorProducts(storeId: string) {
+  async getVendorProducts(storeId: string) {
     // 1. Verify store exists
-    const store = await this.prisma.store.findUnique({ where: { id: storeId } });
+    const store = await this.prisma.store.findUnique({
+      where: { id: storeId },
+    });
     if (!store) throw new NotFoundException('Vendor not found');
 
     // 2. Fetch products
-const products = await this.prisma.product.findMany({
+    const products = await this.prisma.product.findMany({
       where: { storeId },
       include: {
-        category: { select: { name: true } }
+        category: { select: { name: true } },
       },
       orderBy: [
         { status: 'asc' },
-        { salesCount: 'desc' } as any // 👈 Add 'as any' here
-      ]
+        { salesCount: 'desc' } as any, // 👈 Add 'as any' here
+      ],
     });
 
     // 3. Transform for Frontend (Optional: flattens the category object)
-return products.map((p: any) => ({
+    return products.map((p: any) => ({
       id: p.id,
       name: p.name,
       price: p.price,
       image: p.image,
       category: p.category?.name || 'Uncategorized',
       status: p.status,
-      sales: p.salesCount
+      sales: p.salesCount,
     }));
   }
 
-async updateProductStatus(productId: string, status: string) {
+  async updateProductStatus(productId: string, status: string) {
     // 1. Validate Status
     // Map frontend "BANNED" to schema "DISABLED" if necessary
     let validStatus: ProductStatus;
-    
-    if (status === 'BANNED' || status === 'DISABLED') validStatus = ProductStatus.DISABLED;
+
+    if (status === 'BANNED' || status === 'DISABLED')
+      validStatus = ProductStatus.DISABLED;
     else if (status === 'ACTIVE') validStatus = ProductStatus.ACTIVE;
-    else if (status === 'OUT_OF_STOCK') validStatus = ProductStatus.OUT_OF_STOCK;
+    else if (status === 'OUT_OF_STOCK')
+      validStatus = ProductStatus.OUT_OF_STOCK;
     else throw new Error(`Invalid status: ${status}`);
 
     // 2. Update Database
     const product = await this.prisma.product.update({
       where: { id: productId },
-      data: { status: validStatus }
+      data: { status: validStatus },
     });
 
     return product;
   }
 
-
   async sendMessageToVendor(storeId: string, message: string) {
     const store = await this.prisma.store.findUnique({
       where: { id: storeId },
-      include: { owner: true }
+      include: { owner: true },
     });
 
     if (!store || !store.owner?.email) {
@@ -383,10 +412,9 @@ async updateProductStatus(productId: string, status: string) {
     await this.emailProducer.sendVendorMessage(
       store.owner.email,
       `Message from Super Admin - ${store.name}`,
-      message
+      message,
     );
 
     return { success: true, message: 'Email queued successfully' };
   }
-
 }

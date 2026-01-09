@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { View, StyleSheet, Pressable, Platform, Alert } from "react-native";
 import Toast from "react-native-toast-message";
+import { signupVendor } from "@/services/signup.service";
 import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
 import { ProgressBar } from "@/components/signup/ProgressBar";
@@ -15,9 +16,9 @@ import {
   SignupStep3Data,
 } from "@/types/signup";
 
-export default function SignupScreen() {
+export default function Signup() {
   const [step, setStep] = useState<number>(1);
-
+  const [submitting, setSubmitting] = useState<boolean>(false);
   const [data, setData] = useState<SignupData>({
     step1: {
       businessName: "",
@@ -135,13 +136,22 @@ export default function SignupScreen() {
   };
 
   const handleSubmit = async () => {
-    console.log("Submitting data:", data);
-    if (Platform.OS === "android") {
-      Toast.show({ type: "success", text1: "Signup submitted successfully!" });
-    } else {
-      Alert.alert("Success", "Signup submitted successfully!");
+    setSubmitting(true);
+    try {
+      await signupVendor(data);
+      if (Platform.OS === "android") {
+        Toast.show({
+          type: "success",
+          text1: "Signup submitted successfully!",
+        });
+      } else {
+        Alert.alert("Success", "Signup submitted successfully!");
+      }
+    } catch (err) {
+      // Error handled in service
+    } finally {
+      setSubmitting(false);
     }
-    return new Promise<void>((resolve) => setTimeout(resolve, 2000));
   };
 
   const renderStep = () => {
@@ -174,7 +184,7 @@ export default function SignupScreen() {
         <Pressable
           style={[styles.button, step === 1 && { opacity: 0.5 }]}
           onPress={() => step > 1 && setStep(step - 1)}
-          disabled={step === 1}
+          disabled={step === 1 || submitting}
         >
           <ThemedText type="defaultSemiBold">Back</ThemedText>
         </Pressable>
@@ -184,11 +194,13 @@ export default function SignupScreen() {
             styles.button,
             styles.nextButton,
             { backgroundColor: "#E5A503" },
+            submitting && { opacity: 0.5 },
           ]}
           onPress={handleNext}
+          disabled={submitting}
         >
           <ThemedText type="defaultSemiBold">
-            {step < 4 ? "Next" : "Submit"}
+            {submitting ? "Creating account..." : step < 4 ? "Next" : "Submit"}
           </ThemedText>
         </Pressable>
       </View>

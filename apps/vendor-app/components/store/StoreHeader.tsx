@@ -8,6 +8,7 @@ interface Props {
   approved: boolean;
   isOnline: boolean;
   onToggleOnline: () => void;
+  loading?: boolean;
 }
 
 export const StoreHeader: React.FC<Props> = ({
@@ -15,9 +16,41 @@ export const StoreHeader: React.FC<Props> = ({
   approved,
   isOnline,
   onToggleOnline,
+  loading,
 }) => {
   const yellow = useThemeColor({}, "brandPrimary");
   const green = useThemeColor({}, "statusSuccess");
+
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.left}>
+          <View
+            style={{
+              width: 120,
+              height: 20,
+              backgroundColor: "#eee",
+              borderRadius: 4,
+            }}
+          />
+          <View
+            style={[
+              styles.badge,
+              { backgroundColor: "#eee", width: 60, height: 20 },
+            ]}
+          />
+        </View>
+        <View
+          style={{
+            width: 40,
+            height: 24,
+            backgroundColor: "#eee",
+            borderRadius: 12,
+          }}
+        />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>

@@ -1,4 +1,9 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
+import {
+  fetchVendorProfile,
+  fetchStorePublicDetails,
+  fetchStoreBalance,
+} from "@/services/profile.service";
 import {
   View,
   StyleSheet,
@@ -39,12 +44,12 @@ const SETTINGS: SettingItem[] = [
   { label: "Privacy policy", route: "/(profile)/privacy" },
 ];
 
-const DUMMY_PROFILE: ProfileData & { balance: number } = {
+const INITIAL_PROFILE: ProfileData & { balance: number } = {
   profilePicture: "",
-  businessName: "Asoose",
-  shopName: "Asoose Shop",
-  status: "approved",
-  balance: 2574256,
+  businessName: "",
+  shopName: "",
+  status: "pending",
+  balance: 0,
 };
 
 export default function ProfileScreen() {
@@ -55,7 +60,52 @@ export default function ProfileScreen() {
   const mutedText = useThemeColor({}, "textDisabled");
   const { signOut } = useAuth();
 
-  const [profile, setProfile] = useState(DUMMY_PROFILE);
+  const [profile, setProfile] = useState(INITIAL_PROFILE);
+  const [loading, setLoading] = useState(true);
+  const balanceInterval = useRef<number | null>(null);
+
+  // Fetch profile and store info
+  useEffect(() => {
+    let mounted = true;
+    async function loadProfile() {
+      setLoading(true);
+      try {
+        const [vendor, store, balance] = await Promise.all([
+          fetchVendorProfile(),
+          fetchStorePublicDetails(),
+          fetchStoreBalance(),
+        ]);
+        if (!mounted) return;
+        setProfile({
+          profilePicture: vendor.image || "",
+          businessName: vendor.name || "",
+          shopName: store?.name || "",
+          status: vendor.status || "pending",
+          balance: balance?.amount ?? 0,
+        });
+      } catch (e) {
+        // Optionally show error toast
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    }
+    loadProfile();
+
+    // Set up periodic balance refresh
+    balanceInterval.current = setInterval(async () => {
+      try {
+        const balance = await fetchStoreBalance();
+        setProfile((prev) => ({ ...prev, balance: balance?.amount ?? 0 }));
+      } catch {}
+    }, 180000); // 3 minutes
+
+    return () => {
+      mounted = false;
+      if (balanceInterval.current) {
+        clearInterval(balanceInterval.current);
+      }
+    };
+  }, []);
 
   /** Pick profile image */
   const pickImage = async () => {
@@ -85,6 +135,16 @@ export default function ProfileScreen() {
         return useThemeColor({}, "statusError");
     }
   };
+
+  if (loading) {
+    return (
+      <ThemedView
+        style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
+      >
+        <ThemedText type="title">Loading profile...</ThemedText>
+      </ThemedView>
+    );
+  }
 
   return (
     <ThemedView style={{ flex: 1 }}>

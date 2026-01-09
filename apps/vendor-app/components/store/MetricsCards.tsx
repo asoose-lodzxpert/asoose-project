@@ -7,15 +7,34 @@ import formatMoney from "@/lib/format-money";
 
 interface Props {
   metrics: StoreMetrics;
+  loading?: boolean;
 }
 
 type Card = { label: string; value: number | string };
 
-// Helper to format numbers
-
-export const MetricsCards: React.FC<Props> = ({ metrics }) => {
+export const MetricsCards: React.FC<Props> = ({ metrics, loading }) => {
   const background = useThemeColor({}, "surfaceCard");
   const mutedText = useThemeColor({}, "textDisabled");
+
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        {[0, 1].map((rowIdx) => (
+          <View key={rowIdx} style={styles.row}>
+            {[0, 1].map((colIdx) => (
+              <View
+                key={colIdx}
+                style={[
+                  styles.card,
+                  { backgroundColor: "#eee", minHeight: 60 },
+                ]}
+              />
+            ))}
+          </View>
+        ))}
+      </View>
+    );
+  }
 
   const cardData: Card[] = [
     { label: "Today's Orders", value: metrics.todaysOrders },
@@ -44,7 +63,7 @@ export const MetricsCards: React.FC<Props> = ({ metrics }) => {
                 style={{ textAlign: "left", width: "100%" }}
               >
                 {c.label === "Today's Sales"
-                  ? `₦${formatMoney(Number(c.value))}`
+                  ? `\u20a6${formatMoney(Number(c.value))}`
                   : formatMoney(c.value)}
               </ThemedText>
               <ThemedText

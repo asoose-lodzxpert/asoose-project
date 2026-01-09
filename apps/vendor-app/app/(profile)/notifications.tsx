@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 import {
   View,
   StyleSheet,
@@ -12,7 +12,10 @@ import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
-import { DEFAULT_NOTIFICATION_SETTINGS } from "@/config/notification-settings";
+import {
+  NotificationPreferencesProvider,
+  useNotificationPreferences,
+} from "../../context/NotificationPreferencesContext";
 
 interface NotificationItem {
   key: string;
@@ -81,27 +84,27 @@ const SECTIONS: NotificationSection[] = [
 ];
 
 export default function NotificationSettingsScreen() {
-  const router = useRouter();
+  return (
+    <NotificationPreferencesProvider>
+      <NotificationSettingsContent />
+    </NotificationPreferencesProvider>
+  );
+}
 
+function NotificationSettingsContent() {
+  const router = useRouter();
   const primary = useThemeColor({}, "brandPrimary");
   const textSecondary = useThemeColor({}, "textSecondary");
   const borderColor = useThemeColor({}, "borderDefault");
+  const { preferences, loading, updatePreferences } =
+    useNotificationPreferences();
+  const [updating, setUpdating] = React.useState<string | null>(null);
 
-  const [loading, setLoading] = useState(true);
-  const [values, setValues] = useState<Record<string, boolean>>({});
-
-  useEffect(() => {
-    const loadSettings = async () => {
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-      setValues(DEFAULT_NOTIFICATION_SETTINGS);
-      setLoading(false);
-    };
-
-    loadSettings();
-  }, []);
-
-  const toggle = (key: string) => {
-    setValues((prev) => ({ ...prev, [key]: !prev[key] }));
+  const toggle = async (key: string) => {
+    setUpdating(key);
+    const newPrefs = { ...preferences, [key]: !preferences[key] };
+    await updatePreferences(newPrefs);
+    setUpdating(null);
   };
 
   if (loading) {
@@ -149,10 +152,11 @@ export default function NotificationSettingsScreen() {
                 </View>
 
                 <Switch
-                  value={values[item.key]}
+                  value={preferences[item.key]}
                   onValueChange={() => toggle(item.key)}
                   trackColor={{ false: "#D1D5DB", true: `${primary}66` }}
-                  thumbColor={values[item.key] ? primary : "#F3F4F6"}
+                  thumbColor={preferences[item.key] ? primary : "#F3F4F6"}
+                  disabled={updating === item.key}
                 />
               </View>
             ))}
@@ -162,7 +166,6 @@ export default function NotificationSettingsScreen() {
     </ThemedView>
   );
 }
-
 const styles = StyleSheet.create({
   loaderContainer: {
     flex: 1,

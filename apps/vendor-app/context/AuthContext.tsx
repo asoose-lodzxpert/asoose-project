@@ -1,5 +1,11 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import React, { createContext, useContext, useEffect, useState } from "react";
+import {
+  login,
+  getAccessToken,
+  refreshAccessToken,
+  clearTokens,
+} from "@/services/auth";
+import { fetchCurrentUser } from "@/services/auth-fetch";
 
 type User = {
   id: string;
@@ -10,39 +16,47 @@ type User = {
 type AuthContextType = {
   user: User | null;
   loading: boolean;
-  signIn: (user: User) => Promise<void>;
+  signIn: (identifier: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType | null>(null);
-
-const USER_KEY = '@auth/user';
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function loadUser() {
+    async function checkToken() {
       try {
-        const stored = await AsyncStorage.getItem(USER_KEY);
-        if (stored) setUser(JSON.parse(stored));
+        const accessToken = await getAccessToken();
+        if (accessToken) {
+          try {
+            await refreshAccessToken();
+            const userData = await fetchCurrentUser();
+            setUser(userData);
+          } catch {
+            await clearTokens();
+            setUser(null);
+          }
+        } else {
+          setUser(null);
+        }
       } finally {
         setLoading(false);
       }
     }
-
-    loadUser();
+    checkToken();
   }, []);
 
-  async function signIn(user: User) {
+  async function signIn(identifier: string, password: string) {
+    const { user } = await login(identifier, password);
     setUser(user);
-    await AsyncStorage.setItem(USER_KEY, JSON.stringify(user));
   }
 
   async function signOut() {
     setUser(null);
-    await AsyncStorage.removeItem(USER_KEY);
+    await clearTokens();
   }
 
   return (
@@ -54,6 +68,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 export function useAuth() {
   const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error('useAuth must be used within AuthProvider');
+  if (!ctx) throw new Error("useAuth must be used within AuthProvider");
   return ctx;
 }
