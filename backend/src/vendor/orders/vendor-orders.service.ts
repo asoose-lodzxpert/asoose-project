@@ -23,7 +23,7 @@ export class VendorOrdersService {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
       include: { 
-        store: { select: { ownerId: true, name: true } }
+store: { select: { vendorId: true, name: true } }
       }
     });
 
@@ -33,8 +33,8 @@ export class VendorOrdersService {
     }
     
     // Strict Ownership Check
-    if (order.store.ownerId !== userId) {
-      this.logger.warn(`Security Alert: User ${userId} tried to access order ${orderId}`);
+if (order.store?.vendorId !== userId) {
+    this.logger.warn(`Security Alert: User ${userId} tried to access order ${orderId}`);
       throw new ForbiddenException('You do not have access to this order');
     }
     
@@ -46,8 +46,8 @@ export class VendorOrdersService {
   // 1. LIST ORDERS
   async findAll(userId: string, storeId: string, page = 1, limit = 20) {
     const store = await this.prisma.store.findUnique({ where: { id: storeId } });
-    if (!store || store.ownerId !== userId) {
-      throw new ForbiddenException('Invalid store access');
+if (!store || store.vendorId !== userId) {
+    throw new ForbiddenException('Invalid store access');
     }
 
     const skip = (page - 1) * limit;
@@ -116,8 +116,8 @@ export class VendorOrdersService {
            action: 'ORDER_REJECTED',
            target: orderId,
            details: reason,
-           metadata: { storeName: order.store.name }
-         }
+          metadata: { storeName: order.store?.name }
+          }
        });
 
        // =================================================================

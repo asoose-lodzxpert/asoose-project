@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { UsersController } from './users.controller';
 import { UsersService } from './users.service';
 import { PrismaModule } from '../prisma/prisma.module';
-import { MailModule } from 'src/libs/mail/mail.module';
+import { MailModule } from 'src/mail/mail.module';
 import { ConfigModule } from '@nestjs/config';
 import { BullModule } from '@nestjs/bullmq';
 // Services
@@ -13,7 +13,7 @@ import { InventoryService } from './inventory.service';
 import { NotificationFacade } from './notification.facade';
 
 // Modules
-import { RedisModule } from 'src/libs/redis/redis.module';
+import { RedisModule } from 'src/redis/redis.module';
 import { NotificationsModule } from 'src/notifications/notifications.module';
 import { FcmModule } from 'src/libs/fcm/fcm.module';
 
@@ -25,7 +25,7 @@ import { FcmModule } from 'src/libs/fcm/fcm.module';
     RedisModule,
     NotificationsModule, 
     FcmModule,
-    // [!code ++] Register the Email Queue to fix 'BullQueue_email' error
+    RedisModule,
     BullModule.registerQueue({
       name: 'email',
     }),

@@ -68,7 +68,7 @@ export class CartService {
         restaurant: {
             id: store.id,
             name: store.name,
-            image: store.image,
+            image: store.logo,
             // Format time range based on prepTime (e.g., "20-35 min")
             time: `${store.prepTime || 20}-${(store.prepTime || 20) + 15} min`, 
             currency: '₦' // Or dynamic based on region

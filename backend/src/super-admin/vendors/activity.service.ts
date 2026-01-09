@@ -8,13 +8,13 @@ export class ActivityService {
   async getVendorActivityLogs(storeId: string, page = 1, limit = 10) {
     const store = await this.prisma.store.findUnique({
       where: { id: storeId },
-      select: { ownerId: true },
+      select: { vendorId: true },
     });
 
     if (!store) throw new NotFoundException('Store not found');
 
     const logs = await this.prisma.activityLog.findMany({
-      where: { userId: store.ownerId },
+where: { userId: store.vendorId },
       orderBy: { createdAt: 'desc' },
       take: limit,
       skip: (page - 1) * limit,
@@ -24,7 +24,7 @@ export class ActivityService {
     });
 
     const total = await this.prisma.activityLog.count({
-      where: { userId: store.ownerId },
+where: { userId: store.vendorId },
     });
 
     return {

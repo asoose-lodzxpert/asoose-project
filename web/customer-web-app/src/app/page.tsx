@@ -6,9 +6,8 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { 
   ArrowRight, Moon, Sun, Truck, Store, 
-  Menu, X, ShieldCheck, MapPin, Users, Package, 
-  TrendingUp, ChevronRight, ShoppingCart, Smartphone,
-  Zap, CreditCard, Navigation
+  Menu, X, Users, Package, ChevronRight, 
+  ShoppingCart, Zap, Navigation
 } from 'lucide-react';
 
 // --- DATA ---
@@ -49,7 +48,8 @@ const HERO_ACTIONS = {
     buttonText: "Order Now",
     color: "bg-yellow-500",
     textColor: "text-black",
-    icon: ShoppingCart
+    icon: ShoppingCart,
+    link: "/store" 
   },
   ride: {
     title: "Ride Hailing",
@@ -57,7 +57,8 @@ const HERO_ACTIONS = {
     buttonText: "Book Ride",
     color: "bg-black",
     textColor: "text-white",
-    icon: Navigation
+    icon: Navigation,
+    link: "/ride" 
   },
   delivery: {
     title: "Logistics",
@@ -65,7 +66,8 @@ const HERO_ACTIONS = {
     buttonText: "Send Package",
     color: "bg-green-600",
     textColor: "text-white",
-    icon: Package
+    icon: Package,
+    link: "/logistics" 
   }
 };
 
@@ -132,7 +134,6 @@ export default function LandingPage() {
             <a href="#ecosystem" className="hover:text-yellow-500 transition-colors">Ecosystem</a>
             <a href="#" className="hover:text-yellow-500 transition-colors">Safety</a>
             
-            {/* Added Links */}
             <Link href="/vendor/register" className="hover:text-yellow-500 transition-colors">
               Vendor Register
             </Link>
@@ -157,7 +158,7 @@ export default function LandingPage() {
           </div>
         </div>
 
-        {/* Mobile Menu with Added Links */}
+        {/* Mobile Menu */}
         {isMobileMenuOpen && (
           <div className={`md:hidden absolute top-16 left-0 right-0 border-t backdrop-blur-md ${
             darkMode ? 'bg-[#0a0a0a]/95 border-white/10' : 'bg-white/95 border-black/5'
@@ -173,7 +174,6 @@ export default function LandingPage() {
                 Safety
               </a>
               
-              {/* Added Links in Mobile Menu */}
               <Link href="/vendor/register" className="py-2 hover:text-yellow-500 transition-colors" onClick={() => setIsMobileMenuOpen(false)}>
                 Vendor Register
               </Link>
@@ -281,9 +281,10 @@ export default function LandingPage() {
                      <p className="opacity-80 text-sm font-medium leading-relaxed">{currentHeroAction.subtitle}</p>
                    </div>
                    
-                   <button className="w-full py-4 bg-white text-black rounded-xl font-bold flex justify-center items-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-transform">
+                   {/* ACTION BUTTON WITH LINK */}
+                   <Link href={currentHeroAction.link} className="w-full py-4 bg-white text-black rounded-xl font-bold flex justify-center items-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-transform">
                      {currentHeroAction.buttonText} <ChevronRight className="w-4 h-4"/>
-                   </button>
+                   </Link>
                 </div>
                 
                 <div className={`p-4 rounded-2xl mb-4 flex items-center gap-4 ${darkMode ? 'bg-white/5' : 'bg-white border'}`}>
@@ -308,21 +309,22 @@ export default function LandingPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-3 grid-rows-3 md:grid-rows-2 gap-4 h-auto md:h-[600px]">
           
-          {/* Large Card: Food */}
+          {/* Large Card: Food - Added Link */}
           <div className={`md:col-span-2 row-span-2 rounded-3xl p-8 relative overflow-hidden group transition-all duration-300 hover:shadow-2xl ${
             darkMode ? 'bg-[#111] border border-white/10' : 'bg-white border border-gray-200'
           }`}>
              <div className="relative z-10 flex flex-col justify-between h-full">
-                <div>
-                  <div className="w-12 h-12 bg-yellow-500 rounded-full flex items-center justify-center mb-6 text-black">
-                    <ShoppingCart className="w-6 h-6" />
-                  </div>
-                  <h3 className="text-3xl font-bold mb-2">Food & Groceries</h3>
-                  <p className="opacity-60 max-w-sm">From local Bukas to 5-star restaurants, and weekly grocery runs. Delivered hot and fresh.</p>
-                </div>
-                <button className="w-fit mt-8 px-6 py-3 rounded-full border border-current font-bold hover:bg-yellow-500 hover:border-yellow-500 hover:text-black transition-colors">
-                  Start Shopping
-                </button>
+               <div>
+                 <div className="w-12 h-12 bg-yellow-500 rounded-full flex items-center justify-center mb-6 text-black">
+                   <ShoppingCart className="w-6 h-6" />
+                 </div>
+                 <h3 className="text-3xl font-bold mb-2">Food & Groceries</h3>
+                 <p className="opacity-60 max-w-sm">From local Bukas to 5-star restaurants, and weekly grocery runs. Delivered hot and fresh.</p>
+               </div>
+               {/* Linked Button */}
+               <Link href="/food" className="w-fit mt-8 px-6 py-3 rounded-full border border-current font-bold hover:bg-yellow-500 hover:border-yellow-500 hover:text-black transition-colors">
+                 Start Shopping
+               </Link>
              </div>
              <div className="absolute right-0 bottom-0 w-1/2 h-full opacity-10 group-hover:opacity-20 transition-opacity">
                 <div className="w-full h-full bg-yellow-500" style={{ clipPath: 'polygon(20% 0%, 100% 0, 100% 100%, 0% 100%)' }}></div>
@@ -330,8 +332,8 @@ export default function LandingPage() {
              <div className="absolute -right-10 -bottom-10 w-64 h-64 bg-gradient-to-br from-orange-400 to-red-500 rounded-full blur-3xl opacity-20"></div>
           </div>
 
-          {/* Medium Card: Rides */}
-          <div className={`rounded-3xl p-8 flex flex-col justify-between group hover:-translate-y-1 transition-transform duration-300 ${
+          {/* Medium Card: Rides - Added Link Wrapper */}
+          <Link href="/ride" className={`rounded-3xl p-8 flex flex-col justify-between group hover:-translate-y-1 transition-transform duration-300 ${
              darkMode ? 'bg-[#151515] border border-white/10' : 'bg-blue-50 border border-blue-100'
           }`}>
              <div className="flex justify-between items-start">
@@ -342,10 +344,10 @@ export default function LandingPage() {
                <h3 className="text-2xl font-bold mb-1">Ride Hailing</h3>
                <p className="opacity-60 text-sm">Safe travel, 24/7.</p>
              </div>
-          </div>
+          </Link>
 
-          {/* Medium Card: Logistics */}
-          <div className={`rounded-3xl p-8 flex flex-col justify-between group hover:-translate-y-1 transition-transform duration-300 ${
+          {/* Medium Card: Logistics - Added Link Wrapper */}
+          <Link href="/logistics" className={`rounded-3xl p-8 flex flex-col justify-between group hover:-translate-y-1 transition-transform duration-300 ${
              darkMode ? 'bg-[#151515] border border-white/10' : 'bg-green-50 border border-green-100'
           }`}>
              <div className="flex justify-between items-start">
@@ -356,7 +358,7 @@ export default function LandingPage() {
                <h3 className="text-2xl font-bold mb-1">Logistics</h3>
                <p className="opacity-60 text-sm">Send packages instantly.</p>
              </div>
-          </div>
+          </Link>
 
         </div>
       </section>
@@ -380,8 +382,8 @@ export default function LandingPage() {
                           onClick={() => setActiveTab(tab.id)}
                           className={`group rounded-2xl transition-all duration-300 border-l-4 cursor-pointer overflow-hidden ${
                             isActive 
-                              ? 'bg-yellow-500/5 border-yellow-500 pb-6' 
-                              : 'hover:bg-gray-100 dark:hover:bg-white/5 border-transparent py-4'
+                            ? 'bg-yellow-500/5 border-yellow-500 pb-6' 
+                            : 'hover:bg-gray-100 dark:hover:bg-white/5 border-transparent py-4'
                           }`}
                         >
                            <div className={`flex items-center gap-4 px-6 ${isActive ? 'pt-6' : ''}`}>
@@ -403,8 +405,8 @@ export default function LandingPage() {
                                    }
                                    className={`flex items-center gap-2 px-5 py-2.5 rounded-lg font-bold text-sm transition-transform hover:translate-x-1 ${
                                      darkMode 
-                                       ? 'bg-white text-black hover:bg-gray-200' 
-                                       : 'bg-black text-white hover:bg-gray-800'
+                                     ? 'bg-white text-black hover:bg-gray-200' 
+                                     : 'bg-black text-white hover:bg-gray-800'
                                    }`}
                                  >
                                    {content.cta} 

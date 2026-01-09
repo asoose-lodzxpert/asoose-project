@@ -3,7 +3,6 @@ import { PrismaService } from '../prisma/prisma.service';
 import { StoreType } from '@prisma/client';
 import { CreateReviewDto } from './dto/create-review.dto';
 
-// Robust UUID Regex
 const isUUID = (str: string) => 
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
 
@@ -12,17 +11,7 @@ export interface HomeVertical {
   type: StoreType;
   title: string;
   categories: { id: string; name: string; image: string }[];
-  vendors: {
-    id: string;
-    slug: string;
-    name: string;
-    image: string | null;
-    rating: number;
-    ratingCount: number;
-    deliveryTime: string;
-    address: string | null;
-    deliveryFee: number;
-  }[];
+  vendors: any[];
 }
 
 @Injectable()
@@ -59,96 +48,190 @@ export class MarketplaceService {
           name: c.name,
           image: this.getCategoryImage(c.name),
         })),
-        vendors: stores.map((store) => ({
-          id: store.id,
-          slug: store.slug, 
-          name: store.name,
-          image: store.image,
-          rating: store.rating || 0,
-          ratingCount: store.ratingCount || 0,
-          deliveryTime: `${store.prepTime || 20} - ${(store.prepTime || 20) + 15} mins`,
-          address: store.address,
-          deliveryFee: 500,
-        })),
+        vendors: this.mapStoresToVendors(stores),
       });
     }
     return { verticals };
   }
 
-  // ... inside MarketplaceService class
+  // NEW: Optimized single category fetch
+  // src/marketplace/marketplace.service.ts
 
-async getVendorDetails(identifier: string) {
-  const isId = isUUID(identifier);
-  const query = isId ? { id: identifier } : { slug: identifier };
+  async getCategoryData(verticalId: string, filter?: string) {
+    // 1. Determine Sorting Logic based on the filter
+    let orderBy: any = { createdAt: 'desc' }; // Default: Newest first
 
-  const store = await this.prisma.store.findUnique({
-    where: query,
-    include: {
-      products: {
-        where: { status: 'ACTIVE' },
-        include: { 
-          category: { select: { name: true } },
-          // 1. Include Modifiers Here
-          modifierGroups: {
-            include: { modifiers: true },
-            orderBy: { name: 'asc' }
-          }
-        },
+    if (filter === 'Top Rated') {
+      orderBy = { rating: 'desc' };
+    } else if (filter === 'Fastest Delivery') {
+      // NOTE: Only works if you added 'deliveryTime' to your Store schema. 
+      // If not, this will default to sorting by name or ignore it.
+      // orderBy = { deliveryTime: 'asc' }; 
+    } 
+    // Add logic for 'Low Delivery Fee' if you have that column
+
+    // 2. Fetch the data with the dynamic sort
+    const stores = await this.prisma.store.findMany({
+      where: {
+        // Match the store type (vertical) derived from ID
+        // Assuming 'food' maps to 'RESTAURANT', etc. 
+        // You might need a helper map here like the frontend has
+        type: this.mapSlugToType(verticalId), 
+        status: 'ACTIVE',
       },
-      reviews: {
-        take: 20,
-        orderBy: { createdAt: 'desc' },
-        include: {
-          user: { select: { name: true, image: true } }
-        }
+      orderBy: orderBy,
+      take: 20,
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        logo: true, // mapped to 'image' in frontend
+        rating: true,
+        type: true,
+        // deliveryTime: true, // Uncomment if schema has it
+        // deliveryFee: true,  // Uncomment if schema has it
       }
-    },
-  });
+    });
 
-  if (!store) return null;
+    // 3. Return formatted structure
+    return {
+      id: verticalId,
+      title: this.formatTitle(verticalId),
+      vendors: stores.map(store => ({
+        id: store.id,
+        name: store.name,
+        slug: store.slug,
+        image: store.logo,
+        rating: store.rating || 0,
+        type: store.type,
+        // Fallbacks if columns don't exist yet
+        deliveryTime: '30-45 min', 
+        deliveryFee: 500,
+        prepTime: 20
+      })),
+    };
+  }
 
-  return {
-    id: store.id,
-    slug: store.slug,
-    name: store.name,
-    type: store.type,
-    image: store.image,
-    address: store.address || 'Address not available',
-    rating: store.rating || 0,
-    deliveryTime: `${store.prepTime || 20} - ${(store.prepTime || 20) + 15} mins`,
-    products: store.products.map((p) => ({
-      id: p.id,
-      name: p.name,
-      price: p.price,
-      image: p.image,
-      description: p.slug, // Using slug as description per your schema/logic
-      category: { name: p.category.name },
-      // 2. Map Modifiers Here
-      modifierGroups: p.modifierGroups.map(g => ({
-        id: g.id,
-        name: g.name,
-        minSelect: g.minSelect,
-        maxSelect: g.maxSelect,
-        modifiers: g.modifiers.map(m => ({
-          id: m.id,
-          name: m.name,
-          price: m.price
+  // Helper to map URL slug (food) to DB Enum (RESTAURANT)
+  private mapSlugToType(slug: string): any {
+    const map: Record<string, string> = {
+      'food': 'RESTAURANT',
+      'grocery': 'GROCERY',
+      'pharmacy': 'PHARMACY',
+      'market': 'MARKET'
+    };
+    // Return mapped type or fallback (or handle error)
+    return map[slug.toLowerCase()] || 'RESTAURANT';
+  }
+
+  private formatTitle(slug: string): string {
+    const titles: Record<string, string> = {
+      'food': 'Food Delivery',
+      'grocery': 'Groceries',
+      'pharmacy': 'Pharmacy',
+      'market': 'Local Market'
+    };
+    return titles[slug.toLowerCase()] || slug;
+  }
+
+  async search(query: string) {
+    const stores = await this.prisma.store.findMany({
+      where: {
+        status: 'ACTIVE',
+        verification: 'VERIFIED',
+        name: { contains: query, mode: 'insensitive' },
+      },
+      take: 10,
+    });
+
+    const products = await this.prisma.product.findMany({
+      where: {
+        status: 'ACTIVE',
+        store: { status: 'ACTIVE' },
+        OR: [
+          { name: { contains: query, mode: 'insensitive' } },
+          { category: { name: { contains: query, mode: 'insensitive' } } },
+        ],
+      },
+      include: {
+        store: { select: { name: true, slug: true, id: true } },
+        category: { select: { name: true } },
+      },
+      take: 20,
+    });
+
+    return { stores, products };
+  }
+
+  async getVendorDetails(identifier: string) {
+    const isId = isUUID(identifier);
+    const query = isId ? { id: identifier } : { slug: identifier };
+
+    const store = await this.prisma.store.findUnique({
+      where: query,
+      include: {
+        products: {
+          where: { status: 'ACTIVE' },
+          include: { 
+            category: { select: { name: true } },
+            modifierGroups: {
+              include: { modifiers: true },
+              orderBy: { name: 'asc' }
+            }
+          },
+        },
+        reviews: {
+          take: 20,
+          orderBy: { createdAt: 'desc' },
+          include: {
+            user: { select: { name: true, image: true } }
+          }
+        }
+      },
+    });
+
+    if (!store) return null;
+
+    return {
+      id: store.id,
+      slug: store.slug,
+      name: store.name,
+      type: store.type,
+      image: store.logo,
+      address: store.address || 'Address not available',
+      rating: store.rating || 0,
+      deliveryTime: `${store.prepTime || 20} - ${(store.prepTime || 20) + 15} mins`,
+      products: store.products.map((p) => ({
+        id: p.id,
+        name: p.name,
+        price: p.price,
+        image: p.image,
+        description: p.slug, 
+        category: { name: p.category.name },
+        modifierGroups: p.modifierGroups.map(g => ({
+          id: g.id,
+          name: g.name,
+          minSelect: g.minSelect,
+          maxSelect: g.maxSelect,
+          modifiers: g.modifiers.map(m => ({
+            id: m.id,
+            name: m.name,
+            price: m.price
+          }))
         }))
-      }))
-    })),
-    reviews: store.reviews.map((r) => ({
-      id: r.id,
-      userId: r.userId,
-      userName: r.user.name || 'Anonymous',
-      userImage: r.user.image,
-      rating: r.rating,
-      comment: r.comment,
-      date: r.createdAt,
-    })),
-  };
-}
+      })),
+      reviews: store.reviews.map((r) => ({
+        id: r.id,
+        userId: r.userId,
+        userName: r.user.name || 'Anonymous',
+        userImage: r.user.image,
+        rating: r.rating,
+        comment: r.comment,
+        date: r.createdAt,
+      })),
+    };
+  }
 
-  // --- HELPERS ---
   private formatSectionTitle(type: string): string {
     const title = type.charAt(0) + type.slice(1).toLowerCase();
     return (type === 'GROCERY' || type === 'PHARMACY') ? title.replace('y', 'ies') : title + 's';
@@ -163,25 +246,19 @@ async getVendorDetails(identifier: string) {
     return '/icons/default.png';
   }
 
-  private async updateStoreRating(storeId: string) {
-    const aggregations = await this.prisma.review.aggregate({
-      where: { storeId },
-      _avg: { rating: true },
-      _count: { rating: true },
-    });
-
-    const newRating = aggregations._avg.rating || 0;
-    const totalReviews = aggregations._count.rating || 0;
-
-    await this.prisma.store.update({
-      where: { id: storeId },
-      data: { 
-        rating: Number(newRating.toFixed(1)),
-        ratingCount: totalReviews // Now actively saving the count
-      },
-    });
-    
-    this.logger.log(`Updated Store ${storeId} rating to ${newRating} (${totalReviews} reviews)`);
+  private mapStoresToVendors(stores: any[]) {
+    return stores.map((store) => ({
+      id: store.id,
+      slug: store.slug, 
+      name: store.name,
+      image: store.image,
+      rating: store.rating || 0,
+      ratingCount: store.ratingCount || 0,
+      deliveryTime: `${store.prepTime || 20} - ${(store.prepTime || 20) + 15} mins`,
+      address: store.address,
+      deliveryFee: 500,
+      type: store.type
+    }));
   }
 
   async upsertReview(userId: string, dto: CreateReviewDto) {
@@ -189,50 +266,16 @@ async getVendorDetails(identifier: string) {
     if (!store) throw new Error('Store not found');
 
     const review = await this.prisma.review.upsert({
-      where: {
-        userId_storeId: {
-          userId: userId,
-          storeId: dto.storeId,
-        },
-      },
-      update: {
-        rating: dto.rating,
-        comment: dto.comment,
-      },
-      create: {
-        userId: userId,
-        storeId: dto.storeId,
-        rating: dto.rating,
-        comment: dto.comment,
-      },
+      where: { userId_storeId: { userId: userId, storeId: dto.storeId } },
+      update: { rating: dto.rating, comment: dto.comment },
+      create: { userId: userId, storeId: dto.storeId, rating: dto.rating, comment: dto.comment },
     });
-
-    await this.updateStoreRating(dto.storeId);
-
     return review;
   }
-  
 
-
-async deleteReview(userId: string, storeId: string) {
-  try {
-    const deleted = await this.prisma.review.delete({
-      where: {
-        userId_storeId: {
-          userId: userId,
-          storeId: storeId,
-        },
-      },
+  async deleteReview(userId: string, storeId: string) {
+     return this.prisma.review.delete({
+      where: { userId_storeId: { userId: userId, storeId: storeId } },
     });
-
-    // Recalculate rating after deletion
-    await this.updateStoreRating(storeId);
-
-    return deleted;
-  } catch (error) {
-    throw new Error('Review not found or already deleted');
   }
-  }
-
-
 }

@@ -14,10 +14,8 @@ import * as crypto from 'crypto';
 import { PricingService } from './pricing.service';
 import { AddressesService } from './addresses.service';
 import { NotificationFacade } from './notification.facade';
-import Redis from 'ioredis';
-import { InjectRedis } from '@nestjs-modules/ioredis';
+import type { RedisClientType } from 'redis'
 import { InventoryService } from './inventory.service';
-
 
 const ORDER_STATUS = { PENDING: 'PENDING' } as const;
 const DELIVERY_STATUS = { REQUESTED: 'REQUESTED' } as const;
@@ -37,10 +35,13 @@ export class OrdersService {
     private addressesService: AddressesService,
     private notificationFacade: NotificationFacade,
     private inventoryService: InventoryService,
-    @Inject('REDIS') private readonly redis: Redis,
+    // CHANGED: Inject REDIS_CLIENT with correct type
+    @Inject('REDIS_CLIENT') private readonly redis: RedisClientType,
   ) {}
 
-  // 1. QUOTE CALCULATION 
+  // ==================================================================
+  // 1. QUOTE CALCULATION
+  // ==================================================================
 
   async calculateQuote(userId: string, data: CreateOrderDto) {
     const { addressId, restaurantId, items } = data;
@@ -48,7 +49,7 @@ export class OrdersService {
     // A. Fetch Store & Address
     const store = await this.prisma.store.findUnique({
       where: { id: restaurantId },
-      select: { lat: true, lng: true, name: true }
+      select: { lat: true, lng: true, name: true },
     });
     if (!store) throw new NotFoundException('Store not found');
 
@@ -64,7 +65,7 @@ export class OrdersService {
     const products = await this.prisma.product.findMany({
       where: { id: { in: productIds } },
     });
-    
+
     let subtotal = 0;
     items.forEach((item) => {
       const product = products.find((p) => p.id === item.id);
@@ -74,7 +75,6 @@ export class OrdersService {
     });
 
     // C. Calculate Fees
-    // Default to 0,0 if store lat/lng is missing (should be validated elsewhere)
     const storeLat = store.lat || 0;
     const storeLng = store.lng || 0;
 
@@ -82,12 +82,12 @@ export class OrdersService {
       storeLat,
       storeLng,
       address.lat,
-      address.lng
+      address.lng,
     );
 
     const deliveryFee = this.pricingService.calculateDeliveryFee(distance);
     // Assumes PricingService has calculateServiceFee(amount)
-    const serviceFee = this.pricingService.calculateServiceFee(subtotal); 
+    const serviceFee = this.pricingService.calculateServiceFee(subtotal);
     const total = subtotal + deliveryFee + serviceFee;
 
     return {
@@ -96,7 +96,7 @@ export class OrdersService {
       serviceFee,
       total,
       distanceKm: parseFloat(distance.toFixed(2)),
-      estimatedTime: '30-45 mins', // Placeholder for dynamic time logic
+      estimatedTime: '30-45 mins',
     };
   }
 
@@ -106,24 +106,28 @@ export class OrdersService {
 
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   async createOrder(
-    userId: string, 
-    data: CreateOrderDto, 
-    idempotencyHeader?: string
+    userId: string,
+    data: CreateOrderDto,
+    idempotencyHeader?: string,
   ) {
-    const startTime = Date.now();
-    
     // 1. Generate Key
-    const rawKey = this.generateIdempotencyKey(userId, data, idempotencyHeader);
+    const rawKey = this.generateIdempotencyKey(
+      userId,
+      data,
+      idempotencyHeader,
+    );
     const redisKey = `${IDEMPOTENCY_PREFIX}${rawKey}`;
 
     // 2. Acquire Lock (Redis Atomic Operation)
     const existingOrderId = await this.acquireIdempotencyLock(redisKey);
 
     if (existingOrderId) {
-      this.logger.log(`Idempotency hit: Returning existing order ${existingOrderId}`);
-      return this.prisma.order.findUnique({ 
-         where: { id: existingOrderId },
-         include: { user: { select: { email: true, name: true } } }
+      this.logger.log(
+        `Idempotency hit: Returning existing order ${existingOrderId}`,
+      );
+      return this.prisma.order.findUnique({
+        where: { id: existingOrderId },
+        include: { user: { select: { email: true, name: true } } },
       });
     }
 
@@ -146,7 +150,7 @@ export class OrdersService {
 
           const store = await tx.store.findUnique({
             where: { id: restaurantId },
-            include: { owner: { select: { email: true, id: true } } },
+            include: { vendor: { select: { email: true, id: true } } },
           });
           if (!store) throw new NotFoundException('Store not found');
 
@@ -157,13 +161,14 @@ export class OrdersService {
           this.inventoryService.validateStock(items, productMap);
 
           // D. Handle Addresses
-          const pickupAddress = await this.addressesService.getOrCreateStoreAddress(
-            store.ownerId,
-            store.address || 'Unknown Store Address',
-            store.lat || 0.0,
-            store.lng || 0.0,
-            tx,
-          );
+          const pickupAddress =
+            await this.addressesService.getOrCreateStoreAddress(
+              store.vendorId,
+              store.address || 'Unknown Store Address',
+              store.lat || 0.0,
+              store.lng || 0.0,
+              tx,
+            );
 
           const dropoffAddress = await tx.address.findUnique({
             where: { id: addressId },
@@ -179,7 +184,8 @@ export class OrdersService {
             dropoffAddress.lat,
             dropoffAddress.lng,
           );
-          const deliveryFee = this.pricingService.calculateDeliveryFee(distance);
+          const deliveryFee =
+            this.pricingService.calculateDeliveryFee(distance);
 
           // F. Prepare Items Data & Calculate Subtotal
           let itemsTotal = 0;
@@ -204,15 +210,16 @@ export class OrdersService {
             emailItems.push(`${item.quantity}x ${product.name}`);
           }
 
-          // [FIX] Calculate Service Fee and Final Total
-          const serviceFee = this.pricingService.calculateServiceFee(itemsTotal);
+          // Calculate Service Fee and Final Total
+          const serviceFee =
+            this.pricingService.calculateServiceFee(itemsTotal);
           const finalTotal = itemsTotal + deliveryFee + serviceFee;
 
           // Set context for notifications
           notificationContext = {
-            storeOwnerId: store.ownerId,
+            storeOwnerId: store.vendorId,
             storeName: store.name,
-            storeOwnerEmail: store.owner.email,
+            storeOwnerEmail: store.vendor?.email, // Fixed: Added optional chaining
             customerEmail: user.email,
           };
 
@@ -221,7 +228,7 @@ export class OrdersService {
             data: {
               userId,
               storeId: restaurantId,
-              total: finalTotal, // Includes Service Fee now
+              total: finalTotal,
               status: ORDER_STATUS.PENDING,
               items: { create: orderItemsData },
               delivery: {
@@ -247,7 +254,7 @@ export class OrdersService {
           await this.inventoryService.decrementStock(tx, items);
 
           this.logger.log(
-            `Order ${newOrder.id} created. Total: ₦${finalTotal} (Items: ${itemsTotal}, Del: ${deliveryFee}, Svc: ${serviceFee})`
+            `Order ${newOrder.id} created. Total: ₦${finalTotal} (Items: ${itemsTotal}, Del: ${deliveryFee}, Svc: ${serviceFee})`,
           );
 
           return newOrder;
@@ -267,11 +274,10 @@ export class OrdersService {
         order.total,
         notificationContext.customerEmail,
         notificationContext.storeOwnerEmail,
-        emailItems
+        emailItems,
       );
 
       return order;
-
     } catch (error) {
       // 5. Release Lock on Failure
       await this.releaseIdempotencyLock(redisKey);
@@ -280,7 +286,7 @@ export class OrdersService {
   }
 
   // ==================================================================
-  // READ OPERATIONS
+  // 3. READ OPERATIONS
   // ==================================================================
 
   async getUserOrders(userId: string) {
@@ -290,7 +296,7 @@ export class OrdersService {
         orderBy: { createdAt: 'desc' },
         include: {
           items: { select: { quantity: true, nameSnap: true } },
-          store: { select: { name: true, image: true } },
+          store: { select: { name: true, logo: true } }, // Fixed: logo not image
         },
         take: 50,
       });
@@ -300,14 +306,18 @@ export class OrdersService {
         status: order.status,
         total: order.total,
         createdAt: order.createdAt,
-        storeName: order.store.name,
-        items: order.items.map((i) => ({
+        storeName: order.store?.name,
+        storeLogo: order.store?.logo,
+        items: order.items?.map((i) => ({
           name: i.nameSnap,
           quantity: i.quantity,
         })),
       }));
-    } catch (error) {
-      this.logger.error(`Failed to fetch orders for user ${userId}`, error.stack);
+    } catch (error: any) {
+      this.logger.error(
+        `Failed to fetch orders for user ${userId}`,
+        error.stack,
+      );
       throw new BadRequestException('Failed to retrieve orders');
     }
   }
@@ -322,7 +332,7 @@ export class OrdersService {
           store: {
             select: {
               name: true,
-              owner: { select: { phone: true } },
+              vendor: { select: { phone: true } },
             },
           },
         },
@@ -348,8 +358,8 @@ export class OrdersService {
             }
           : null,
         store: {
-          name: order.store.name,
-          phone: order.store.owner.phone,
+          name: order.store?.name,
+          phone: order.store?.vendor?.phone,
         },
       };
     } catch (error) {
@@ -359,12 +369,12 @@ export class OrdersService {
   }
 
   // ==================================================================
-  // HELPER METHODS
+  // 4. HELPER METHODS
   // ==================================================================
 
   private async validateAndFetchProducts(
-    tx: Prisma.TransactionClient, 
-    items: OrderItemDto[]
+    tx: Prisma.TransactionClient,
+    items: OrderItemDto[],
   ): Promise<Map<string, Product>> {
     const productIds = items.map((item) => item.id);
     const products = await tx.product.findMany({
@@ -375,7 +385,7 @@ export class OrdersService {
       const foundIds = new Set(products.map((p) => p.id));
       const missingIds = productIds.filter((id) => !foundIds.has(id));
       throw new BadRequestException(
-        `Products not found: ${missingIds.join(', ')}`
+        `Products not found: ${missingIds.join(', ')}`,
       );
     }
     return new Map(products.map((p) => [p.id, p]));
@@ -393,7 +403,10 @@ export class OrdersService {
   }
 
   private handleOrderError(userId: string, error: any) {
-    this.logger.error(`Order creation failed for ${userId}: ${error.message}`, error.stack);
+    this.logger.error(
+      `Order creation failed for ${userId}: ${error.message}`,
+      error.stack,
+    );
     if (
       error instanceof NotFoundException ||
       error instanceof BadRequestException ||
@@ -408,11 +421,20 @@ export class OrdersService {
   }
 
   // ==================================================================
-  // REDIS IDEMPOTENCY UTILS
+  // 5. REDIS IDEMPOTENCY UTILS (UPDATED SYNTAX)
   // ==================================================================
 
   private async acquireIdempotencyLock(key: string): Promise<string | null> {
-    const result = await this.redis.set(key, 'PROCESSING', 'PX', LOCK_TTL_MS, 'NX');
+    // CHANGED: Use object syntax for options (Node-Redis v4+)
+    const result = await this.redis.set(
+      key,
+      'PROCESSING',
+      {
+        PX: LOCK_TTL_MS,
+        NX: true,
+      }
+    );
+    
     if (result === 'OK') {
       return null;
     }
@@ -420,14 +442,20 @@ export class OrdersService {
     const value = await this.redis.get(key);
 
     if (value === 'PROCESSING') {
-      throw new ConflictException('This order is currently being processed. Please wait.');
+      throw new ConflictException(
+        'This order is currently being processed. Please wait.',
+      );
     }
 
     return value;
   }
 
-  private async completeIdempotency(key: string, orderId: string): Promise<void> {
-    await this.redis.set(key, orderId, 'PX', COMPLETED_TTL_MS);
+  private async completeIdempotency(
+    key: string,
+    orderId: string,
+  ): Promise<void> {
+    // CHANGED: Use object syntax for options
+    await this.redis.set(key, orderId, { PX: COMPLETED_TTL_MS });
   }
 
   private async releaseIdempotencyLock(key: string): Promise<void> {

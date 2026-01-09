@@ -72,7 +72,7 @@ export class TransactionsService {
               store: { 
                 select: { 
                   name: true,
-                  owner: { select: { name: true, email: true } }
+                  vendor: { select: { name: true, email: true } }
                 } 
               }
             }
@@ -153,7 +153,7 @@ export class TransactionsService {
           include: {
             store: {
               include: {
-                owner: true,
+                vendor: true,
                 bankAccount: true,
                 orders: {
                   where: {

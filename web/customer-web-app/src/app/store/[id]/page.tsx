@@ -6,7 +6,7 @@ import { Search, PenLine } from 'lucide-react';
 import { MenuTabs } from '@/components/restaurant/MenuTabs'; 
 import { SidebarCart } from '@/components/restaurant/sidebarcart';
 import { FloatingCart } from '@/components/home/FloatingCart';
-import { BottomNav } from '@/components/layout/BottomNav';
+import  BottomNav  from '@/components/layout/BottomNav';
 import { StoreHero } from '@/store/StoreHero';
 import { ProductCard } from '@/store/ProductCard';
 import { StoreReviews } from '@/store/StoreReviews';

@@ -391,7 +391,7 @@ model Vendor {
 model Store {
   id           String             @id @default(uuid())
   name         String
-  description  String
+description String @default("No description provided")
   slug         String             @unique
   type         StoreType
   address      String?

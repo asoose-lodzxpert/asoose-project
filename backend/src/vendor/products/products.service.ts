@@ -1,24 +1,27 @@
-import { 
-  Injectable, 
-  NotFoundException, 
-  ForbiddenException, 
-  Logger
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+  Logger,
 } from '@nestjs/common';
 import { ProductStatus } from '@prisma/client';
-import { PrismaService } from 'src/prisma/prisma.service';
-import { CreateProductDto,UpdateProductDto } from '../dto/product.dto';
-
+import { PrismaService } from '../../prisma/prisma.service'; // Fixed relative import
+import { CreateProductDto, UpdateProductDto } from '../dto/product.dto';
+import { StorageService } from '../../libs/storage/storage.service'; // Fixed relative import
 
 @Injectable()
 export class VendorProductsService {
   private readonly logger = new Logger(VendorProductsService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private storageService: StorageService,
+  ) {}
 
   async getAllCategories() {
     return this.prisma.category.findMany({
       orderBy: { name: 'asc' },
-      select: { id: true, name: true } 
+      select: { id: true, name: true },
     });
   }
 
@@ -28,7 +31,7 @@ export class VendorProductsService {
   private async validateStoreOwnership(userId: string, storeId: string) {
     const store = await this.prisma.store.findUnique({
       where: { id: storeId },
-      select: { ownerId: true, name: true, status: true }
+      select: { vendorId: true, name: true, status: true }, // Fixed: ownerId -> vendorId
     });
 
     if (!store) {
@@ -36,14 +39,22 @@ export class VendorProductsService {
       throw new NotFoundException('Store not found');
     }
 
-    if (store.ownerId !== userId) {
-      this.logger.warn(`Security Alert: User ${userId} attempted to access store ${storeId} owned by ${store.ownerId}`);
+    if (store.vendorId !== userId) {
+      // Fixed: ownerId -> vendorId
+      this.logger.warn(
+        `Security Alert: User ${userId} attempted to access store ${storeId} owned by ${store.vendorId}`,
+      );
       throw new ForbiddenException('You do not own this store');
     }
-    
+
     // Optional: Block actions if store is suspended
-    if (store.status === 'SUSPENDED' || store.status === 'CLOSED_PERMANENTLY') {
-       throw new ForbiddenException(`Store is ${store.status}. Actions restricted.`);
+    if (
+      store.status === 'SUSPENDED' ||
+      store.status === 'CLOSED_PERMANENTLY'
+    ) {
+      throw new ForbiddenException(
+        `Store is ${store.status}. Actions restricted.`,
+      );
     }
 
     return store;
@@ -55,21 +66,23 @@ export class VendorProductsService {
   private async validateProductOwnership(userId: string, productId: string) {
     const product = await this.prisma.product.findUnique({
       where: { id: productId },
-      include: { store: { select: { ownerId: true, id: true } } }
+      include: { store: { select: { vendorId: true, id: true } } }, // Fixed: ownerId -> vendorId
     });
 
     if (!product) {
       throw new NotFoundException('Product not found');
     }
 
-    if (product.store.ownerId !== userId) {
-      this.logger.warn(`Security Alert: User ${userId} tried to access product ${productId} belonging to another vendor.`);
+    // Fixed: Check vendorId
+    if (product.store.vendorId !== userId) {
+      this.logger.warn(
+        `Security Alert: User ${userId} tried to access product ${productId} belonging to another vendor.`,
+      );
       throw new ForbiddenException('You do not have access to this product');
     }
 
     return product;
   }
-
 
   async findAll(userId: string, storeId: string) {
     await this.validateStoreOwnership(userId, storeId);
@@ -78,8 +91,8 @@ export class VendorProductsService {
       where: { storeId },
       orderBy: { createdAt: 'desc' },
       include: {
-        category: { select: { name: true } }
-      }
+        category: { select: { name: true } },
+      },
     });
   }
 
@@ -94,7 +107,9 @@ export class VendorProductsService {
 
     // 2. Generate Slug
     let slug = this.generateSlug(dto.name);
-    const existingSlug = await this.prisma.product.findUnique({ where: { slug } });
+    const existingSlug = await this.prisma.product.findUnique({
+      where: { slug },
+    });
     if (existingSlug) {
       slug = `${slug}-${Date.now()}`;
     }
@@ -110,10 +125,12 @@ export class VendorProductsService {
         status: ProductStatus.ACTIVE,
         storeId: dto.storeId,
         categoryId: dto.categoryId,
-      }
+      },
     });
 
-    this.logger.log(`Product created: "${product.name}" (ID: ${product.id}) for Store: ${store.name}`);
+    this.logger.log(
+      `Product created: "${product.name}" (ID: ${product.id}) for Store: ${store.name}`,
+    );
     return product;
   }
 
@@ -123,11 +140,17 @@ export class VendorProductsService {
 
     // 2. Handle Slug Update if name changes
     let newSlug: string | undefined = undefined;
-    
+
     if (dto.name && dto.name !== product.name) {
       newSlug = this.generateSlug(dto.name);
-      const existing = await this.prisma.product.findUnique({ where: { slug: newSlug } });
+      const existing = await this.prisma.product.findUnique({
+        where: { slug: newSlug },
+      });
       if (existing) newSlug = `${newSlug}-${Date.now()}`;
+    }
+
+    if (dto.image && product.image && dto.image !== product.image) {
+      this.storageService.deleteFile(product.image);
     }
 
     // 3. Update
@@ -141,7 +164,7 @@ export class VendorProductsService {
         stock: dto.stock,
         categoryId: dto.categoryId,
         status: dto.status,
-      }
+      },
     });
 
     this.logger.log(`Product updated: ${productId} by User ${userId}`);
@@ -157,8 +180,8 @@ export class VendorProductsService {
       where: { id: productId },
       data: {
         status: ProductStatus.DISABLED,
-        slug: `${product.slug}-deleted-${Date.now()}`
-      }
+        slug: `${product.slug}-deleted-${Date.now()}`,
+      },
     });
 
     this.logger.log(`Product soft-deleted: ${productId} by User ${userId}`);

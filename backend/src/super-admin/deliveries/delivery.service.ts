@@ -86,7 +86,8 @@ export class DeliveriesService {
         order: { 
           include: { 
             store: { 
-              select: { name: true, address: true, owner: { select: { phone: true } } } 
+              // Line 89
+select: { name: true, address: true, vendor: { select: { phone: true } } }
             } 
           } 
         },

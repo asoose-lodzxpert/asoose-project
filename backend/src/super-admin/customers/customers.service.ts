@@ -3,7 +3,7 @@ import {
   NotFoundException, 
   BadRequestException 
 } from '@nestjs/common';
-import { PrismaService } from 'src/prisma/prisma.service';
+import { PrismaService } from '../../prisma/prisma.service'; // Changed to relative path for safety
 import { UserStatus, UserRole, Prisma, OrderStatus } from '@prisma/client';
 
 @Injectable()
@@ -163,7 +163,7 @@ export class CustomersService {
     return this.prisma.order.findMany({
       where: { userId }, 
       include: {
-        store: { select: { name: true, image: true } },
+        store: { select: { name: true, logo: true } }, // <--- Fixed: Added comma here
         items: true
       },
       orderBy: { createdAt: 'desc' },

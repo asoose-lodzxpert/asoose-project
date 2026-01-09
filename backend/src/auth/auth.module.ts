@@ -5,6 +5,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { JwtStrategy } from './jwt-strategy';
 import { PrismaModule } from 'src/prisma/prisma.module';
+import { OtpModule } from './otp.module';
 import {
   AuthController,
   DriverAuthController,
@@ -14,6 +15,8 @@ import {
 import { VendorAuthController } from './vendor-auth.controller';
 import { VendorAuthService } from './vendor-auth.service';
 import { AuthService } from './auth.service';
+import { MailModule } from 'src/mail/mail.module';
+import { RedisModule } from 'src/redis/redis.module';
 @Module({
   imports: [
     PassportModule.register({ defaultStrategy: 'jwt' }),
@@ -25,6 +28,8 @@ import { AuthService } from './auth.service';
       inject: [ConfigService],
     }),
     ConfigModule,
+    OtpModule,
+    MailModule
   ],
 
   controllers: [

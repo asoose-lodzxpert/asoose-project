@@ -28,10 +28,10 @@ import { FcmModule } from './libs/fcm/fcm.module';
       isGlobal: true,
     }),
 
-    ThrottlerModule.forRoot({
-      ttl: 60_000,
-      limit: 10,
-    }),
+ ThrottlerModule.forRoot([{
+  ttl: 60000,
+  limit: 10,
+}]),
 
     BullModule.forRoot({
       connection: {

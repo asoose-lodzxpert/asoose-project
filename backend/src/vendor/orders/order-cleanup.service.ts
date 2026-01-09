@@ -29,7 +29,7 @@ export class OrderCleanupService {
     for (const order of staleOrders) {
       try {
         await this.vendorOrdersService.declineOrder(
-          order.store.ownerId, // Acting as the owner
+order.store.vendorId,
           order.id,
           'Auto-declined: Vendor did not respond in time.'
         );

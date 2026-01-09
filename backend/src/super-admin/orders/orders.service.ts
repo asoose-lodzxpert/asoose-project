@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { OrderFilterDto } from './dto/order-filter.dto';
-import { Prisma, StoreType } from '@prisma/client';
+import { Prisma, StoreType, OrderStatus } from '@prisma/client'; // Added OrderStatus
 import { TransactionLedgerService } from '../transactions/transaction-ledger.service';
 
 // Helper to map friendly frontend names to DB Enums
@@ -95,7 +95,8 @@ export class OrdersService {
         user: true,
         store: { 
           include: { 
-            owner: { select: { name: true, phone: true, email: true } } 
+            // Line 98
+vendor: { select: { name: true, phone: true, email: true } }
           } 
         },
         items: { include: { product: true } },
@@ -265,9 +266,7 @@ export class OrdersService {
       throw new BadRequestException('Can only refund completed payments');
     }
 
-    // ✅ FIX: Capture payment object here to ensure TS knows it's not null inside transaction
     const payment = order.payment;
-
     const amountToRefund = refundAmount || payment.amount;
 
     if (amountToRefund > payment.amount) {
@@ -277,7 +276,7 @@ export class OrdersService {
     return this.prisma.$transaction(async (tx) => {
       // Update payment status
       await tx.payment.update({
-        where: { id: payment.id }, // ✅ Use captured 'payment'
+        where: { id: payment.id },
         data: { 
           status: amountToRefund === payment.amount ? 'REFUNDED' : 'PARTIALLY_REFUNDED'
         }
@@ -285,7 +284,7 @@ export class OrdersService {
 
       // Record refund in ledger
       await this.ledgerService.recordRefund({
-        id: payment.id, // ✅ Use captured 'payment'
+        id: payment.id,
         amount: amountToRefund,
         userId: order.user.id,
         orderId: order.id
@@ -300,11 +299,51 @@ export class OrdersService {
           metadata: { 
             amount: amountToRefund,
             reason: reason || 'Refund processed',
-            isPartial: amountToRefund < payment.amount // ✅ Use captured 'payment'
+            isPartial: amountToRefund < payment.amount
           }
         }
       });
     });
+  }
+
+  // ⚠️ 6. Force Status Override ("God Mode")
+  // Allows moving an order to ANY status without standard validation.
+  async forceStatusChange(orderId: string, newStatus: OrderStatus, reason: string, adminId: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId }
+    });
+
+    if (!order) throw new NotFoundException('Order not found');
+
+    // Perform the Override
+    const updatedOrder = await this.prisma.order.update({
+      where: { id: orderId },
+      data: { 
+        status: newStatus,
+        // Manage timestamps based on status
+        cancelledAt: newStatus === 'CANCELLED' ? new Date() : undefined,
+        deliveredAt: newStatus === 'DELIVERED' ? new Date() : undefined,
+        // If resetting to PENDING/PREPARING, we might want to clear deliveredAt
+        ...( ['PENDING', 'PREPARING', 'CONFIRMED'].includes(newStatus) && { deliveredAt: null, cancelledAt: null })
+      }
+    });
+
+    // Log the System Override
+    await this.prisma.activityLog.create({
+      data: {
+        userId: adminId,
+        action: 'ORDER_FORCE_UPDATE',
+        details: `Force status change from ${order.status} to ${newStatus}. Reason: ${reason}`,
+        target: orderId,
+        metadata: {
+            oldStatus: order.status,
+            newStatus: newStatus,
+            reason: reason
+        }
+      },
+    });
+
+    return updatedOrder;
   }
 
   // --- Transformers ---
@@ -361,7 +400,9 @@ export class OrdersService {
       logs: logs.map((log: any) => ({
         date: log.createdAt,
         user: log.user?.name || 'System',
-        action: log.action
+        action: log.action,
+        // Include detail/metadata in response so Admin sees reason for override
+        details: log.details || (log.metadata ? JSON.stringify(log.metadata) : '') 
       }))
     };
   }

@@ -4,8 +4,8 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { PrismaService } from 'src/prisma/prisma.service';
-import * as bcrypt from 'bcrypt';
+import { PrismaService } from '../../prisma/prisma.service'; // Fixed Import
+import * as bcrypt from 'bcryptjs'; // Changed to bcryptjs based on previous install
 import * as crypto from 'crypto';
 import {
   Prisma,
@@ -17,7 +17,7 @@ import {
   StoreType,
 } from '@prisma/client';
 import { CreateVendorDto, VendorQueryDto } from './dto/vendor.dto';
-import { EmailProducer } from 'src/mail/email.producer';
+import { EmailProducer } from '../../mail/email.producer'; // Fixed Import
 
 @Injectable()
 export class StoresService {
@@ -44,8 +44,8 @@ export class StoresService {
     if (search) {
       where.OR = [
         { name: { contains: search, mode: 'insensitive' } },
-        { owner: { email: { contains: search, mode: 'insensitive' } } },
-        { owner: { name: { contains: search, mode: 'insensitive' } } },
+        { vendor: { email: { contains: search, mode: 'insensitive' } } },
+        { vendor: { name: { contains: search, mode: 'insensitive' } } },
       ];
     }
 
@@ -57,7 +57,7 @@ export class StoresService {
       this.prisma.store.findMany({
         where,
         include: {
-          owner: { select: { email: true } },
+          vendor: { select: { email: true } },
           _count: { select: { orders: true, reviews: true } },
         },
         orderBy: { createdAt: 'desc' },
@@ -71,7 +71,7 @@ export class StoresService {
       data: stores.map((store) => ({
         id: store.id,
         name: store.name,
-        email: store.owner?.email ?? 'No Owner',
+        email: store.vendor?.email ?? 'No Owner',
         category: store.type,
         status: store.status,
         verification: store.verification,
@@ -104,8 +104,13 @@ export class StoresService {
       const store = await this.prisma.store.findUnique({
         where,
         include: {
-          owner: {
-            select: { email: true, phone: true, name: true, status: true },
+          vendor: {
+            select: {
+              email: true,
+              phone: true,
+              name: true,
+              status: true,
+            },
           },
           orders: {
             include: {
@@ -127,7 +132,7 @@ export class StoresService {
       }
 
       return this.transformStoreDetail(store);
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Error in findOne: ${error.message}`, error.stack);
       throw error;
     }
@@ -142,7 +147,8 @@ export class StoresService {
     const existingSlug = await this.prisma.store.findUnique({
       where: { slug: dto.slug },
     });
-    if (existingSlug) throw new ConflictException('Store slug already exists');
+    if (existingSlug)
+      throw new ConflictException('Store slug already exists');
 
     const rawPassword =
       dto.password || crypto.randomBytes(8).toString('hex') + '!Aa1';
@@ -164,12 +170,13 @@ export class StoresService {
         data: {
           name: dto.storeName,
           slug: dto.slug,
-          ownerId: user.id,
+          vendorId: user.id, // Fixed: ownerId -> vendorId
+          description: `Store for ${dto.storeName}`, // Fixed: Added required description
           status: StoreStatus.PENDING,
           verification: VerificationStatus.PENDING,
           type: dto.type,
         },
-        include: { owner: { select: { email: true } } },
+        include: { vendor: { select: { email: true } } },
       });
 
       return { user, store };
@@ -209,7 +216,7 @@ export class StoresService {
         slug: newSlug,
         address: dto.address || undefined,
         status: dto.status || undefined,
-        owner:
+        vendor:
           dto.ownerName || dto.phone || dto.email
             ? {
                 update: {
@@ -220,7 +227,7 @@ export class StoresService {
               }
             : undefined,
       },
-      include: { owner: true },
+      include: { vendor: true },
     });
 
     return {
@@ -228,9 +235,9 @@ export class StoresService {
       name: updatedStore.name,
       slug: updatedStore.slug,
       address: updatedStore.address,
-      ownerName: updatedStore.owner.name,
-      phone: updatedStore.owner.phone,
-      email: updatedStore.owner.email,
+      ownerName: updatedStore.vendor?.name, // Fixed: Added optional chaining
+      phone: updatedStore.vendor?.phone,
+      email: updatedStore.vendor?.email,
       status: updatedStore.status,
     };
   }
@@ -265,7 +272,8 @@ export class StoresService {
     const groupedData: Record<string, number> = {};
     orders.forEach((order) => {
       const dateKey = order.createdAt.toISOString().split('T')[0];
-      groupedData[dateKey] = (groupedData[dateKey] || 0) + Number(order.total);
+      groupedData[dateKey] =
+        (groupedData[dateKey] || 0) + Number(order.total);
     });
 
     const finalData: { date: string; revenue: number }[] = [];
@@ -305,10 +313,10 @@ export class StoresService {
     return {
       id: store.id,
       name: store.name,
-      email: store.owner.email,
-      phone: store.owner.phone,
+      email: store.vendor?.email, // Fixed: owner -> vendor
+      phone: store.vendor?.phone,
       slug: store.slug,
-      ownerName: store.owner.name,
+      ownerName: store.vendor?.name,
       address: store.address,
       status: store.status,
       verification: store.verification,
@@ -389,15 +397,15 @@ export class StoresService {
   async sendMessageToVendor(storeId: string, message: string) {
     const store = await this.prisma.store.findUnique({
       where: { id: storeId },
-      include: { owner: true },
+      include: { vendor: true },
     });
 
-    if (!store || !store.owner?.email) {
+    if (!store || !store.vendor?.email) {
       throw new NotFoundException('Vendor or Vendor Email not found');
     }
 
     await this.emailProducer.sendVendorMessage(
-      store.owner.email,
+      store.vendor.email,
       `Message from Super Admin - ${store.name}`,
       message,
     );
