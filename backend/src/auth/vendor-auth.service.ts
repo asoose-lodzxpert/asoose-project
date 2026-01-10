@@ -46,6 +46,7 @@ export class VendorAuthService {
   async loginVendor(body: { email: string; password: string }) {
     const vendor = await this.prisma.vendor.findUnique({
       where: { email: body.email },
+      include: { store: true },
     });
 
     if (!vendor || !(await bcrypt.compare(body.password, vendor.password))) {
@@ -60,7 +61,17 @@ export class VendorAuthService {
     return {
       accessToken,
       refreshToken,
-      vendor,
+      vendor: {
+        id: vendor.id,
+        name: vendor.name,
+        email: vendor.email,
+        countryCode: vendor.countryCode,
+        phone: vendor.phone,
+        businessType: vendor.businessType,
+        employees: vendor.employees,
+        image: vendor.image,
+        storeId: vendor.store?.id || null,
+      },
     };
   }
 
@@ -142,6 +153,55 @@ export class VendorAuthService {
     });
   }
 
+  // ---------------- AUTHENTICATED CHANGE PASSWORD ----------------
+
+  async changePassword(
+    email: string,
+    otp: string,
+    newPassword: string,
+  ): Promise<{ message: string }> {
+    const valid = await this.otpService.verifyOtp(email, otp);
+    if (!valid) throw new UnauthorizedException('Invalid or expired OTP');
+
+    const vendor = await this.prisma.vendor.findUnique({ where: { email } });
+    if (!vendor) throw new NotFoundException('Vendor not found');
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    await this.otpService.clearOtp(email);
+
+    await this.prisma.vendor.update({
+      where: { email },
+      data: { password: hashedPassword },
+    });
+
+    return { message: 'Password changed successfully' };
+  }
+
+  // ---------------- PUSH TOKENS ----------------
+  async savePushToken(vendorId: string, token: string, platform: string) {
+    const field =
+      platform === 'ios' || platform === 'android'
+        ? 'expoPushToken'
+        : 'fcmToken';
+
+    await this.prisma.vendor.update({
+      where: { id: vendorId },
+      data: { [field]: token },
+    });
+
+    return { message: 'Push token saved successfully' };
+  }
+
+  async removePushToken(vendorId: string) {
+    await this.prisma.vendor.update({
+      where: { id: vendorId },
+      data: { expoPushToken: null, fcmToken: null },
+    });
+
+    return { message: 'Push token removed successfully' };
+  }
+
   // ---------------- PROFILE ----------------
 
   async updateVendorProfile(vendorId: string, dto: UpdateProfileDto) {
@@ -187,11 +247,13 @@ export class VendorAuthService {
   async getPublicVendorDetails(idOrEmail: string) {
     let vendor = await this.prisma.vendor.findUnique({
       where: { id: idOrEmail },
+      include: { store: true },
     });
 
     if (!vendor) {
       vendor = await this.prisma.vendor.findUnique({
         where: { email: idOrEmail },
+        include: { store: true },
       });
     }
 
@@ -206,6 +268,7 @@ export class VendorAuthService {
       businessType,
       employees,
       image,
+      store,
     } = vendor;
 
     return {
@@ -217,6 +280,7 @@ export class VendorAuthService {
       businessType,
       employees,
       image,
+      storeId: store?.id || null,
     };
   }
 

@@ -1,4 +1,4 @@
-export type OrderTab = "pending" | "active" | "completed";
+export type OrderTab = "pending" | "active" | "history";
 
 export interface OrderItem {
   id: string;

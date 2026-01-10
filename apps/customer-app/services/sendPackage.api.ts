@@ -19,6 +19,8 @@ export function calculatePrice(
   // base by distance
   const base = distanceKm * ratePerKm;
 
+  // 0-3, 3.1, 
+
   // size multiplier
   let sizeMultiplier = 1;
   if (packageSize === "medium") sizeMultiplier = 1.2;
@@ -59,6 +61,7 @@ export function calculatePrice(
       perishableSurcharge +
       insuranceFee
   );
+
   // Helper to normalize numbers to 2 decimal places (except coords)
   const toTwo = (v: number) => Number(v.toFixed(2));
 

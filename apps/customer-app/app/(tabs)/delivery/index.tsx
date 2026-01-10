@@ -34,7 +34,7 @@ function Screen() {
   }, []);
   return (
     <ThemedView style={{ flex: 1 }}>
-      <SendPackageHeader />
+      {/* <SendPackageHeader /> */}
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}

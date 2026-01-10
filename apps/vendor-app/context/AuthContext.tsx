@@ -3,7 +3,7 @@ import {
   login,
   getAccessToken,
   refreshAccessToken,
-  clearTokens,
+  logout,
 } from "@/services/auth";
 import { fetchCurrentUser } from "@/services/auth-fetch";
 
@@ -11,6 +11,7 @@ type User = {
   id: string;
   name: string;
   email: string;
+  storeId: string | null;
 };
 
 type AuthContextType = {
@@ -36,7 +37,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const userData = await fetchCurrentUser();
             setUser(userData);
           } catch {
-            await clearTokens();
+            await logout();
             setUser(null);
           }
         } else {
@@ -56,7 +57,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   async function signOut() {
     setUser(null);
-    await clearTokens();
+    await logout();
   }
 
   return (

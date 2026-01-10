@@ -8,9 +8,16 @@ import { ChangePasswordChange } from "@/components/change-password/ChangePasswor
 import { ChangePasswordSuccess } from "@/components/change-password/ChangePasswordSuccess";
 import { ChangePasswordHeader } from "@/components/change-password/ChangePasswordHeader";
 import { ThemedView } from "@/components/themed-view";
+import { useAuth } from "@/context/AuthContext";
+import {
+  sendChangePasswordOtp,
+  verifyChangePasswordOtp,
+  changePassword,
+} from "@/services/reset-password.service";
 
 export default function ResetPasswordScreen() {
   const router = useRouter();
+  const { user } = useAuth();
 
   const [step, setStep] = useState<2 | 3 | 4>(2);
   const [loading, setLoading] = useState(false);
@@ -19,17 +26,61 @@ export default function ResetPasswordScreen() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
+  /** Send OTP on mount */
+  React.useEffect(() => {
+    const sendOtp = async () => {
+      try {
+        await sendChangePasswordOtp();
+        Toast.show({
+          type: "success",
+          text1: "OTP sent to your email",
+        });
+      } catch (error: any) {
+        Toast.show({
+          type: "error",
+          text1: error.message || "Failed to send OTP",
+        });
+      }
+    };
+
+    sendOtp();
+  }, []);
+
   /** OTP verified */
   const handleOtpVerified = async () => {
     if (!otp) {
       return Toast.show({ type: "error", text1: "Enter OTP" });
     }
 
-    setLoading(true);
-    await new Promise((r) => setTimeout(r, 800));
-    setLoading(false);
+    if (otp.length !== 6) {
+      return Toast.show({ type: "error", text1: "OTP must be 6 digits" });
+    }
 
-    setStep(3);
+    setLoading(true);
+
+    try {
+      const result = await verifyChangePasswordOtp(otp);
+
+      if (result.valid) {
+        Toast.show({
+          type: "success",
+          text1: "OTP verified successfully",
+        });
+        setStep(3);
+      } else {
+        Toast.show({
+          type: "error",
+          text1: "Invalid OTP. Please try again.",
+        });
+      }
+    } catch (error: any) {
+      Toast.show({
+        type: "error",
+        text1: error.message || "Invalid OTP",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   /** Change password */
@@ -45,16 +96,32 @@ export default function ResetPasswordScreen() {
       });
     }
 
+    if (newPassword.length < 6) {
+      return Toast.show({
+        type: "error",
+        text1: "Password must be at least 6 characters",
+      });
+    }
+
     setLoading(true);
-    await new Promise((r) => setTimeout(r, 1000));
-    setLoading(false);
 
-    Toast.show({
-      type: "success",
-      text1: "Password changed successfully!",
-    });
+    try {
+      await changePassword(otp, newPassword);
 
-    setStep(4);
+      Toast.show({
+        type: "success",
+        text1: "Password changed successfully!",
+      });
+
+      setStep(4);
+    } catch (error: any) {
+      Toast.show({
+        type: "error",
+        text1: error.message || "Failed to change password",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -71,7 +138,7 @@ export default function ResetPasswordScreen() {
         >
           {step === 2 && (
             <ChangePasswordOtp
-              email="demo@demo.com"
+              email={user?.email || ""}
               otp={otp}
               onChangeOtp={setOtp}
               onVerified={handleOtpVerified}
@@ -90,9 +157,7 @@ export default function ResetPasswordScreen() {
             />
           )}
 
-          {step === 4 && (
-            <ChangePasswordSuccess onDone={() => router.back()} />
-          )}
+          {step === 4 && <ChangePasswordSuccess onDone={() => router.back()} />}
         </ScrollView>
       </KeyboardAvoidingView>
 

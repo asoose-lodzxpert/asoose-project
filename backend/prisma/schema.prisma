@@ -87,6 +87,9 @@ enum DeliveryStatus {
 
 enum PayoutStatus {
   PENDING
+  APPROVED
+  COMPLETED
+  REJECTED
   PAID
   FAILED
 }
@@ -381,6 +384,8 @@ model Vendor {
   proofOfAddress  String?
   image           String?
   status          UserStatus @default(PENDING)
+  expoPushToken   String? // Expo push notification token
+  fcmToken        String? // Firebase Cloud Messaging token
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
 
@@ -419,7 +424,7 @@ description String @default("No description provided")
   walletBalance Float @default(0)
 
   // Relations
-    vendor           Vendor?           @relation(fields: [vendorId], references: [id], onDelete: Restrict)
+  vendor           Vendor?           @relation(fields: [vendorId], references: [id], onDelete: Restrict)
   products         Product[]
   orders           Order[]
   reviews          Review[]
@@ -490,13 +495,17 @@ model VendorDocument {
 }
 
 model VendorPayout {
-  id        String       @id @default(uuid())
-  storeId   String
-  amount    Float
-  method    String
-  status    PayoutStatus
-  reference String?
-  createdAt DateTime     @default(now())
+  id               String       @id @default(uuid())
+  storeId          String
+  bankAccountId    String?
+  amount           Float
+  method           String       @default("BANK_TRANSFER")
+  status           PayoutStatus @default(PENDING)
+  reference        String?
+  rejectionReason  String?
+  processedAt      DateTime?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
 
   store        Store         @relation(fields: [storeId], references: [id], onDelete: Restrict)
   transactions Transaction[] // NEW: Link to transaction ledger

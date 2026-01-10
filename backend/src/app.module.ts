@@ -21,28 +21,37 @@ import { NotificationsModule } from './notifications/notifications.module';
 
 import { QueueModule } from './queue/queue.module';
 import { FcmModule } from './libs/fcm/fcm.module';
+import { MapsModule } from './maps/maps.module';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({
-      isGlobal: true,
-    }),
+    // ---------- Global Config ----------
+    ConfigModule.forRoot({ isGlobal: true }),
 
- ThrottlerModule.forRoot([{
-  ttl: 60000,
-  limit: 10,
-}]),
+    // ---------- Rate Limiting ----------
+    ThrottlerModule.forRoot(),
 
+    // ---------- BullMQ / Redis ----------
     BullModule.forRoot({
       connection: {
         host: process.env.REDIS_HOST || 'localhost',
         port: Number(process.env.REDIS_PORT) || 6379,
+        username: process.env.REDIS_USERNAME || undefined,
+        password: process.env.REDIS_PASSWORD || undefined,
+        ...(process.env.REDIS_TLS === 'true' && {
+          tls: { servername: process.env.REDIS_HOST },
+        }),
+        maxRetriesPerRequest: null,
+        enableReadyCheck: true,
+        connectTimeout: 10000,
       },
     }),
 
+    // ---------- Scheduling & Events ----------
     ScheduleModule.forRoot(),
     EventEmitterModule.forRoot({ global: true }),
 
+    // ---------- App Modules ----------
     AuthModule,
     PrismaModule,
     RedisModule,
@@ -52,13 +61,11 @@ import { FcmModule } from './libs/fcm/fcm.module';
     CartModule,
     UsersModule,
     NotificationsModule,
-
     QueueModule,
     FcmModule,
+    MapsModule,
   ],
-
   controllers: [AppController],
-
   providers: [
     AppService,
     {

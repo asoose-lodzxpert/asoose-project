@@ -33,6 +33,9 @@ export const MenuItemCard: React.FC<Props> = ({
   const primary = useThemeColor({}, "brandPrimary");
   const background = useThemeColor({}, "surfaceBackground");
 
+  const isInStock = item.status === "ACTIVE";
+  const isOutOfStock = item.status === "OUT_OF_STOCK";
+
   return (
     <View style={[styles.card, { backgroundColor: background }]}>
       <View style={styles.top}>
@@ -45,11 +48,11 @@ export const MenuItemCard: React.FC<Props> = ({
             />
           )}
           <Image
-            source={{
-              uri: imageError
-                ? require("@/assets/images/image-placeholder.png")
-                : item.images[0],
-            }}
+            source={
+              item.image && !imageError
+                ? { uri: item.image }
+                : require("@/assets/images/image-placeholder.png")
+            }
             style={styles.image}
             resizeMode="cover"
             onLoadStart={() => setImageLoading(true)}
@@ -64,7 +67,13 @@ export const MenuItemCard: React.FC<Props> = ({
         <View style={{ flex: 1 }}>
           <ThemedText type="defaultSemiBold">{item.name}</ThemedText>
 
-          {!item.inStock && (
+          {item.category?.name && (
+            <ThemedText style={styles.category}>
+              {item.category.name}
+            </ThemedText>
+          )}
+
+          {isOutOfStock && (
             <View style={styles.outOfStock}>
               <ThemedText style={styles.outText}>Out of stock</ThemedText>
             </View>
@@ -73,16 +82,20 @@ export const MenuItemCard: React.FC<Props> = ({
           <ThemedText style={styles.price}>
             ₦{item.price.toLocaleString()}
           </ThemedText>
+
+          {item.stock !== undefined && (
+            <ThemedText style={styles.stock}>Stock: {item.stock}</ThemedText>
+          )}
         </View>
 
         <Switch
-          value={item.inStock}
+          value={isInStock}
           onValueChange={onToggleStock}
           trackColor={{
             false: "#E5E7EB",
             true: primary,
           }}
-          thumbColor={item.inStock ? primary : "#F3F4F6"}
+          thumbColor={isInStock ? primary : "#F3F4F6"}
           ios_backgroundColor="#E5E7EB"
         />
       </View>
@@ -148,6 +161,12 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
 
+  category: {
+    fontSize: 12,
+    opacity: 0.6,
+    marginTop: 2,
+  },
+
   outOfStock: {
     alignSelf: "flex-start",
     marginTop: 4,
@@ -155,7 +174,6 @@ const styles = StyleSheet.create({
     minWidth: 90,
     paddingHorizontal: 6,
     paddingVertical: 4,
-    // borderRadius: 999,
     backgroundColor: "#FEE2E2",
   },
 
@@ -169,6 +187,12 @@ const styles = StyleSheet.create({
     marginTop: 2,
     fontSize: 14,
     opacity: 0.8,
+  },
+
+  stock: {
+    fontSize: 12,
+    opacity: 0.5,
+    marginTop: 2,
   },
 
   divider: {

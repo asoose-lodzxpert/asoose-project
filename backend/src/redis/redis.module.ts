@@ -19,6 +19,9 @@ let redisClient: RedisClientType | null = null;
             socket: {
               host: process.env.REDIS_HOST,
               port: Number(process.env.REDIS_PORT) || 6389,
+              ...(process.env.REDIS_TLS === 'true' && {
+                tls: true,
+              }),
             },
           });
           redisClient.on('error', (err) =>

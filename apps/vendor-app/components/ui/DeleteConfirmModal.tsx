@@ -8,6 +8,7 @@ interface Props {
   label: string;
   onCancel: () => void;
   onConfirm: () => void;
+  loading?: boolean;
 }
 
 export const DeleteConfirmModal: React.FC<Props> = ({
@@ -15,6 +16,7 @@ export const DeleteConfirmModal: React.FC<Props> = ({
   label,
   onCancel,
   onConfirm,
+  loading,
 }) => {
   const error = useThemeColor({}, "statusError");
 
@@ -29,11 +31,15 @@ export const DeleteConfirmModal: React.FC<Props> = ({
           </ThemedText>
 
           <View style={styles.actions}>
-            <Pressable onPress={onCancel}>
-              <ThemedText>Cancel</ThemedText>
+            <Pressable onPress={onCancel} disabled={loading}>
+              <ThemedText style={{ opacity: loading ? 0.5 : 1 }}>
+                Cancel
+              </ThemedText>
             </Pressable>
-            <Pressable onPress={onConfirm}>
-              <ThemedText style={{ color: error }}>Delete</ThemedText>
+            <Pressable onPress={onConfirm} disabled={loading}>
+              <ThemedText style={{ color: error, opacity: loading ? 0.5 : 1 }}>
+                {loading ? "Deleting..." : "Delete"}
+              </ThemedText>
             </Pressable>
           </View>
         </View>

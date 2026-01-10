@@ -1,0 +1,19 @@
+# ConfigMap for non-sensitive configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: asoose-backend-config
+  namespace: asoose
+data:
+  NODE_ENV: "production"
+  REDIS_HOST: "asoose-redis-service"
+  REDIS_PORT: "6379"
+  JWT_EXPIRES_IN: "15m"
+  JWT_REFRESH_EXPIRES_IN: "7d"
+  EMAIL_PORT: "587"
+  SUPABASE_BUCKET: "asoose-uploads"
+  # Database Configuration (using RDS endpoint)
+  # Update with your RDS endpoint after creation
+  DB_HOST: "asoose-postgres.xxxxx.us-east-1.rds.amazonaws.com"
+  DB_PORT: "5432"
+  DB_NAME: "asoose_db"

@@ -5,10 +5,15 @@ import { ScrollView, Pressable, StyleSheet, View } from "react-native";
 import { ThemedText } from "@/components/themed-text";
 import { useThemeColor } from "@/hooks/use-theme-color";
 
+interface CategoryOption {
+  id: string;
+  name: string;
+}
+
 interface Props {
-  categories: string[];
+  categories: CategoryOption[];
   active: string | null;
-  onSelect: (category: string | null) => void;
+  onSelect: (categoryId: string | null) => void;
   counts?: Record<string, number>;
 }
 
@@ -39,11 +44,11 @@ export const MenuFilters = memo(
 
           {categories.map((category) => (
             <FilterPill
-              key={category}
-              label={category}
-              active={active === category}
-              count={counts[category]}
-              onPress={() => onSelect(category)}
+              key={category.id}
+              label={category.name}
+              active={active === category.id}
+              count={counts[category.id]}
+              onPress={() => onSelect(category.id)}
               primary={primary}
               border={border}
               textOnPrimary={textOnPrimary}

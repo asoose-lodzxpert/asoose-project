@@ -2,13 +2,15 @@ import * as SecureStore from "expo-secure-store";
 
 // ---------- KEY HELPERS (scoped by vendor identifier) ----------
 
-const accessTokenKey = () => `@asoose_vendor_access_token`;
+const accessTokenKey = () => `asoose_vendor_access_token`;
 
-const refreshTokenKey = () => `@asoose_vendor_refresh_token`;
+const refreshTokenKey = () => `asoose_vendor_refresh_token`;
 
 // ---------------- LOGIN ----------------
 
 export async function login(identifier: string, password: string) {
+  console.log("Auth check 1");
+  
   const res = await fetch(
     `${process.env.EXPO_PUBLIC_API_URL}/auth/vendor/login`,
     {
@@ -20,6 +22,8 @@ export async function login(identifier: string, password: string) {
 
   if (!res.ok) {
     const error = await res.json().catch(() => ({}));
+    console.log("Error:" + error);
+    
     throw new Error(error.message || "Invalid credentials");
   }
 

@@ -16,7 +16,7 @@ export const OrderTabs: React.FC<Props> = ({ active, onChange }) => {
   const tabs: { key: OrderTab; label: string }[] = [
     { key: "pending", label: "Pending" },
     { key: "active", label: "Active" },
-    { key: "completed", label: "History" },
+    { key: "history", label: "History" },
   ];
 
   return (

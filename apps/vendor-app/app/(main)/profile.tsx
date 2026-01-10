@@ -218,7 +218,9 @@ export default function ProfileScreen() {
               </View>
               <Pressable
                 style={styles.withdrawButton}
-                onPress={() => console.log("Withdraw pressed")}
+                onPress={() =>
+                  router.push("/(profile)/withdrawal" as RelativePathString)
+                }
               >
                 <ThemedText style={{ color: "#fff", fontWeight: "600" }}>
                   Withdraw

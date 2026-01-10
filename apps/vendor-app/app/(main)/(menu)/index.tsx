@@ -1,8 +1,17 @@
-import React, { useMemo, useState, useCallback } from "react";
-import { StyleSheet, FlatList, RefreshControl, Alert } from "react-native";
+import React, { useMemo, useState, useCallback, useEffect } from "react";
+import {
+  StyleSheet,
+  FlatList,
+  RefreshControl,
+  ActivityIndicator,
+  View,
+} from "react-native";
+import Toast from "react-native-toast-message";
 
 import { ThemedView } from "@/components/themed-view";
+import { ThemedText } from "@/components/themed-text";
 import { useThemeColor } from "@/hooks/use-theme-color";
+import { useAuth } from "@/context/AuthContext";
 
 import { MenuHeader } from "@/components/menu/MenuHeader";
 import { MenuTabs } from "@/components/menu/MenuTabs";
@@ -15,99 +24,206 @@ import { MenuItemCard } from "@/components/menu/MenuItemCard";
 
 import { DeleteConfirmModal } from "@/components/ui/DeleteConfirmModal";
 import { FloatingActionButton } from "@/components/ui/FloatingActionButton";
-import { INITIAL_CATEGORIES, INITIAL_ITEMS } from "@/config/demo-menu";
 
 import { AddMenuItemModal } from "@/components/menu/AddMenuItemModal";
 import { AddCategoryModal } from "@/components/menu/AddCategoryModal";
 
+import {
+  fetchProducts,
+  fetchCategories,
+  createProduct,
+  updateProduct,
+  deleteProduct,
+  toggleProductStock,
+  Product,
+} from "@/services/products.service";
+import { useFocusEffect } from "expo-router";
+
 export default function MenuScreen() {
   const primary = useThemeColor({}, "brandPrimary");
+  const { user } = useAuth();
 
   const [activeTab, setActiveTab] = useState<"items" | "categories">("items");
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
 
-  const [items, setItems] = useState<MenuItem[]>(INITIAL_ITEMS);
-  const [categories, setCategories] = useState<Category[]>(INITIAL_CATEGORIES);
+  const [items, setItems] = useState<MenuItem[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
 
   const [deleteTarget, setDeleteTarget] = useState<MenuItem | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const [refreshingItems, setRefreshingItems] = useState(false);
-  const [refreshingCategories, setRefreshingCategories] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   /* -------------------- Modals -------------------- */
   const [menuItemModalVisible, setMenuItemModalVisible] = useState(false);
   const [itemToEdit, setItemToEdit] = useState<MenuItem | undefined>(undefined);
 
   const [addCategoryModalVisible, setAddCategoryModalVisible] = useState(false);
-  const [newCategoryName, setNewCategoryName] = useState("");
+
+  /* -------------------- Load Data -------------------- */
+  const loadData = async (isRefresh = false) => {
+    if (!user?.storeId) {
+      setLoading(false);
+      Toast.show({
+        type: "error",
+        text1: "No store found",
+        text2: "Please complete your store setup",
+      });
+      return;
+    }
+
+    try {
+      if (!isRefresh) setLoading(true);
+
+      const [productsData, categoriesData] = await Promise.all([
+        fetchProducts(user.storeId),
+        fetchCategories(),
+      ]);
+
+      setItems(productsData);
+      setCategories(categoriesData);
+    } catch (error: any) {
+      Toast.show({
+        type: "error",
+        text1: error.message || "Failed to load menu data",
+      });
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, [user?.storeId])
+  );
 
   /* -------------------- Computed -------------------- */
   const filteredItems = useMemo(() => {
     if (!activeCategory) return items;
-    return items.filter((i) => i.category === activeCategory);
+    return items.filter((i) => i.categoryId === activeCategory);
   }, [items, activeCategory]);
 
-  const categoryNames = useMemo(
-    () => categories.map((c) => c.name),
+  const categoryOptions = useMemo(
+    () => categories.map((c) => ({ id: c.id, name: c.name })),
     [categories]
   );
 
   const categoryCounts = useMemo<Record<string, number>>(() => {
     const counts: Record<string, number> = {};
-    categories.forEach((c) => (counts[c.name] = 0));
+    categories.forEach((c) => (counts[c.id] = 0));
     items.forEach((i) => {
-      if (counts[i.category] !== undefined) counts[i.category] += 1;
+      if (counts[i.categoryId] !== undefined) counts[i.categoryId] += 1;
     });
     return counts;
   }, [items, categories]);
 
   /* -------------------- Handlers -------------------- */
-  const handleToggleStock = (id: string) => {
-    setItems((prev) =>
-      prev.map((i) => (i.id === id ? { ...i, inStock: !i.inStock } : i))
-    );
+  const handleToggleStock = async (id: string) => {
+    const item = items.find((i) => i.id === id);
+    if (!item) return;
+
+    try {
+      const updated = await toggleProductStock(id, item.status);
+      setItems((prev) =>
+        prev.map((i) => (i.id === id ? { ...i, status: updated.status } : i))
+      );
+      Toast.show({
+        type: "success",
+        text1: updated.status === "ACTIVE" ? "In stock" : "Out of stock",
+      });
+    } catch (error: any) {
+      Toast.show({
+        type: "error",
+        text1: error.message || "Failed to update stock",
+      });
+    }
   };
 
-  const handleDeleteItem = () => {
+  const handleDeleteItem = async () => {
     if (!deleteTarget) return;
-    setItems((prev) => prev.filter((i) => i.id !== deleteTarget.id));
-    setDeleteTarget(null);
-  };
 
-  const handleRefreshItems = useCallback(() => {
-    setRefreshingItems(true);
-    setTimeout(() => setRefreshingItems(false), 800);
-  }, []);
-
-  const handleRefreshCategories = useCallback(() => {
-    setRefreshingCategories(true);
-    setTimeout(() => setRefreshingCategories(false), 800);
-  }, []);
-
-  const handleSaveMenuItem = (item: MenuItem) => {
-    const existingIndex = items.findIndex((i) => i.id === item.id);
-    if (existingIndex >= 0) {
-      // update
-      const updated = [...items];
-      updated[existingIndex] = item;
-      setItems(updated);
-    } else {
-      setItems((prev) => [...prev, item]);
+    setDeletingId(deleteTarget.id);
+    try {
+      await deleteProduct(deleteTarget.id);
+      setItems((prev) => prev.filter((i) => i.id !== deleteTarget.id));
+      Toast.show({
+        type: "success",
+        text1: "Product deleted",
+      });
+      setDeleteTarget(null);
+    } catch (error: any) {
+      Toast.show({
+        type: "error",
+        text1: error.message || "Failed to delete product",
+      });
+    } finally {
+      setDeletingId(null);
     }
   };
 
-  const handleSaveCategory = () => {
-    if (!newCategoryName.trim()) {
-      Alert.alert("Validation Error", "Category name is required");
-      return;
+  const handleRefresh = useCallback(() => {
+    setRefreshing(true);
+    loadData(true);
+  }, [user?.storeId]);
+
+  const handleSaveMenuItem = async (
+    item: Partial<MenuItem> & {
+      name: string;
+      price: number;
+      categoryId: string;
     }
-    const newCat: Category = {
-      id: `mock-${Math.random().toString(36).substr(2, 9)}`,
-      name: newCategoryName.trim(),
-    };
-    setCategories((prev) => [...prev, newCat]);
-    setNewCategoryName("");
-    setAddCategoryModalVisible(false);
+  ) => {
+    if (!user?.storeId) return;
+
+    try {
+      if (itemToEdit) {
+        // Update existing
+        const updated = await updateProduct(itemToEdit.id, {
+          name: item.name,
+          price: item.price,
+          categoryId: item.categoryId,
+          stock: item.stock,
+          image: item.image || undefined,
+        });
+
+        setItems((prev) =>
+          prev.map((i) => (i.id === updated.id ? updated : i))
+        );
+
+        Toast.show({
+          type: "success",
+          text1: "Product updated",
+        });
+      } else {
+        // Create new
+        const created = await createProduct({
+          storeId: user.storeId,
+          name: item.name,
+          price: item.price,
+          categoryId: item.categoryId,
+          stock: item.stock || 0,
+          image: item.image || undefined,
+        });
+
+        setItems((prev) => [created, ...prev]);
+
+        Toast.show({
+          type: "success",
+          text1: "Product created",
+        });
+      }
+
+      setMenuItemModalVisible(false);
+      setItemToEdit(undefined);
+    } catch (error: any) {
+      Toast.show({
+        type: "error",
+        text1: error.message || "Failed to save product",
+      });
+    }
   };
 
   /* -------------------- Renderers -------------------- */
@@ -127,21 +243,36 @@ export default function MenuScreen() {
     <CategoryRow
       name={item.name}
       onEdit={() => {}}
-      onDelete={() =>
-        setCategories((prev) => prev.filter((c) => c.id !== item.id))
-      }
+      onDelete={() => {
+        // TODO: Add category deletion endpoint to backend
+        Toast.show({
+          type: "info",
+          text1: "Category deletion",
+          text2: "Feature coming soon",
+        });
+      }}
     />
   );
 
+  if (loading) {
+    return (
+      <ThemedView
+        style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
+      >
+        <ActivityIndicator size="large" color={primary} />
+        <ThemedText style={{ marginTop: 16 }}>Loading menu...</ThemedText>
+      </ThemedView>
+    );
+  }
+
   return (
     <ThemedView style={{ flex: 1 }}>
-      <MenuHeader />
       <MenuTabs active={activeTab} onChange={setActiveTab} />
 
       {activeTab === "items" && (
         <>
           <MenuFilters
-            categories={categoryNames}
+            categories={categoryOptions}
             active={activeCategory}
             onSelect={setActiveCategory}
             counts={categoryCounts}
@@ -154,8 +285,8 @@ export default function MenuScreen() {
             contentContainerStyle={styles.content}
             refreshControl={
               <RefreshControl
-                refreshing={refreshingItems}
-                onRefresh={handleRefreshItems}
+                refreshing={refreshing}
+                onRefresh={handleRefresh}
                 tintColor={primary}
               />
             }
@@ -172,8 +303,8 @@ export default function MenuScreen() {
           contentContainerStyle={styles.content}
           refreshControl={
             <RefreshControl
-              refreshing={refreshingCategories}
-              onRefresh={handleRefreshCategories}
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
               tintColor={primary}
             />
           }
@@ -200,22 +331,35 @@ export default function MenuScreen() {
         label="Do you want to delete this item?"
         onCancel={() => setDeleteTarget(null)}
         onConfirm={handleDeleteItem}
+        loading={deletingId !== null}
       />
 
       {/* Add/Edit Menu Item Modal */}
       <AddMenuItemModal
         visible={menuItemModalVisible}
-        onClose={() => setMenuItemModalVisible(false)}
+        onClose={() => {
+          setMenuItemModalVisible(false);
+          setItemToEdit(undefined);
+        }}
         onSave={handleSaveMenuItem}
-        categories={categoryNames}
+        categories={categoryOptions}
         itemToEdit={itemToEdit}
       />
 
       <AddCategoryModal
         visible={addCategoryModalVisible}
         onClose={() => setAddCategoryModalVisible(false)}
-        onSave={handleSaveCategory}
+        onSave={() => {
+          setAddCategoryModalVisible(false);
+          Toast.show({
+            type: "info",
+            text1: "Category creation",
+            text2: "Feature coming soon",
+          });
+        }}
       />
+
+      <Toast />
     </ThemedView>
   );
 }
@@ -224,33 +368,6 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: 16,
     paddingBottom: 24,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.3)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  modal: {
-    width: "90%",
-    borderRadius: 16,
-    padding: 16,
-  },
-  sectionTitle: { fontSize: 16, fontWeight: "600", marginBottom: 12 },
-  input: {
-    borderWidth: 1,
-    borderRadius: 10,
-    padding: 10,
-    marginBottom: 16,
-  },
-  modalActions: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    gap: 12,
-  },
-  button: {
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 10,
+    flexGrow: 1,
   },
 });

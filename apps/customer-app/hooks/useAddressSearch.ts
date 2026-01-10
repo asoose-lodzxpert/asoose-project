@@ -1,7 +1,10 @@
+import axios from "axios";
 import { useEffect, useRef, useState } from "react";
 
-const API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_KEY!;
-const cache = new Map<string, any[]>();
+// IMPORTANT: Ensure the protocol (http/https) matches your backend server.
+// For local development, use http://localhost:3000
+// If deploying to production with SSL, set EXPO_PUBLIC_API_URL to https://yourdomain.com
+const API_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000";
 
 export function useAddressSearch(
   query: string,
@@ -16,52 +19,28 @@ export function useAddressSearch(
       setResults([]);
       return;
     }
-
-    if (cache.has(query)) {
-      setResults(cache.get(query)!);
-      return;
-    }
-
     if (debounceRef.current) clearTimeout(debounceRef.current);
-
-    debounceRef.current = setTimeout(async () => {
+    debounceRef.current = window.setTimeout(async () => {
       setLoading(true);
-
       try {
-        const bias = location
-          ? `&location=${location.latitude},${location.longitude}&radius=30000`
-          : "";
-
-        const res = await fetch(
-          `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(
-            query
-          )}${bias}&components=country:ng&key=${API_KEY}`
-        );
-
-        const json = await res.json();
-
-        const data =
-          json.predictions?.map((p: any) => ({
-            id: p.place_id,
-            title: p.structured_formatting.main_text,
-            subtitle: p.structured_formatting.secondary_text,
-          })) ?? [];
-
-        cache.set(query, data);
-        setResults(data);
+        const params: any = { query };
+        if (location) {
+          params.latitude = location.latitude;
+          params.longitude = location.longitude;
+        }
+        const res = await axios.get(`${API_URL}/maps/address-search`, {
+          params,
+        });
+        setResults(res.data);
       } catch {
         setResults([]);
       } finally {
         setLoading(false);
       }
     }, 300);
-
     return () => {
-      if (debounceRef.current) {
-        clearTimeout(debounceRef.current);
-      }
+      if (debounceRef.current) clearTimeout(debounceRef.current);
     };
   }, [query, location]);
-
   return { results, loading };
 }

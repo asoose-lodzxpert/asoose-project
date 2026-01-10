@@ -119,4 +119,97 @@ export class VendorService {
       timestamp: order.createdAt.toISOString(),
     }));
   }
+
+  // Get bank accounts for vendor
+  async getBankAccounts(vendorId: string) {
+    const store = await this.prisma.store.findUnique({ where: { vendorId } });
+    if (!store) return [];
+
+    const bankAccount = await this.prisma.bankAccount.findUnique({
+      where: { storeId: store.id },
+      select: {
+        id: true,
+        bankName: true,
+        accountNumber: true,
+        accountName: true,
+      },
+    });
+
+    return bankAccount ? [bankAccount] : [];
+  }
+
+  // Get withdrawal history
+  async getWithdrawals(vendorId: string) {
+    const store = await this.prisma.store.findUnique({ where: { vendorId } });
+    if (!store) return [];
+
+    const withdrawals = await this.prisma.vendorPayout.findMany({
+      where: { storeId: store.id },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    });
+
+    // Get bank account details for each withdrawal
+    const bankAccount = await this.prisma.bankAccount.findUnique({
+      where: { storeId: store.id },
+    });
+
+    return withdrawals.map((w) => ({
+      id: w.id,
+      amount: w.amount,
+      status: w.status,
+      bankName: bankAccount?.bankName || 'N/A',
+      accountNumber: bankAccount?.accountNumber || 'N/A',
+      createdAt: w.createdAt.toISOString(),
+      processedAt: w.processedAt?.toISOString(),
+      rejectionReason: w.rejectionReason,
+      referenceNumber: w.reference,
+    }));
+  }
+
+  // Create withdrawal request
+  async createWithdrawal(
+    vendorId: string,
+    data: { amount: number; bankAccountId: string },
+  ) {
+    const store = await this.prisma.store.findUnique({ where: { vendorId } });
+    if (!store) throw new Error('Store not found');
+
+    // Check if vendor has sufficient balance
+    if (store.balance < data.amount) {
+      throw new Error('Insufficient balance');
+    }
+
+    // Verify bank account belongs to this store
+    const bankAccount = await this.prisma.bankAccount.findUnique({
+      where: { id: data.bankAccountId },
+    });
+
+    if (!bankAccount || bankAccount.storeId !== store.id) {
+      throw new Error('Invalid bank account');
+    }
+
+    // Create withdrawal request
+    const withdrawal = await this.prisma.vendorPayout.create({
+      data: {
+        storeId: store.id,
+        bankAccountId: data.bankAccountId,
+        amount: data.amount,
+        method: 'BANK_TRANSFER',
+        status: 'PENDING',
+      },
+    });
+
+    // Deduct from store balance immediately (pending approval)
+    await this.prisma.store.update({
+      where: { id: store.id },
+      data: { balance: { decrement: data.amount } },
+    });
+
+    return {
+      id: withdrawal.id,
+      message: 'Withdrawal request submitted successfully',
+      status: 'PENDING',
+    };
+  }
 }

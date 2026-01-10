@@ -60,11 +60,11 @@ export default function LoginScreen() {
 
   function validateForm() {
     if (!identifier) {
-      setError("Email or phone number is required.");
+      setError("Email is required.");
       return false;
     }
-    if (!password || password.length < 6) {
-      setError("Password must be at least 6 characters.");
+    if (!password || password.length < 8) {
+      setError("Password must be at least 8 characters.");
       return false;
     }
     return true;
@@ -77,7 +77,7 @@ export default function LoginScreen() {
     setLoading(true);
 
     try {
-      const result = await signIn(identifier, password);
+      await signIn(identifier, password);
       router.replace("/(main)");
     } catch (e: any) {
       setError(e.message);
@@ -123,8 +123,9 @@ export default function LoginScreen() {
 
                 <View style={styles.field}>
                   <ThemedInput
-                    placeholder="Email or phone number"
+                    placeholder="Email address"
                     autoCapitalize="none"
+                    keyboardType="email-address"
                     value={identifier}
                     onChangeText={(text) => {
                       setIdentifier(text);

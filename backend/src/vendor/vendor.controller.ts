@@ -64,4 +64,25 @@ export class VendorController {
   getOrders(@Req() req) {
     return this.vendorService.getStoreOrders(req.user.id);
   }
+
+  @Get('bank-accounts')
+  @Roles('VENDOR')
+  getBankAccounts(@Req() req) {
+    return this.vendorService.getBankAccounts(req.user.id);
+  }
+
+  @Get('withdrawals')
+  @Roles('VENDOR')
+  getWithdrawals(@Req() req) {
+    return this.vendorService.getWithdrawals(req.user.id);
+  }
+
+  @Post('withdrawals')
+  @Roles('VENDOR')
+  createWithdrawal(
+    @Req() req,
+    @Body() body: { amount: number; bankAccountId: string },
+  ) {
+    return this.vendorService.createWithdrawal(req.user.id, body);
+  }
 }

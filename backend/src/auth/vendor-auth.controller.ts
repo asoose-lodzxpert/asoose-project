@@ -7,6 +7,7 @@ import {
   UseGuards,
   Get,
   Put,
+  Delete,
 } from '@nestjs/common';
 import { VendorAuthService } from './vendor-auth.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -106,5 +107,51 @@ export class VendorAuthController {
   async getBusinessDetails(@Req() req) {
     const { id } = req.user || {};
     return this.vendorAuthService.getBusinessDetails(id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('send-change-password-otp')
+  async sendChangePasswordOtp(@Req() req) {
+    const { email } = req.user || {};
+    return this.vendorAuthService.sendOtpForPasswordReset(email);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('verify-change-password-otp')
+  async verifyChangePasswordOtp(@Req() req, @Body() body: { otp: string }) {
+    const { email } = req.user || {};
+    const isValid = await this.vendorAuthService.verifyOtp(email, body.otp);
+    return { valid: isValid };
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('change-password')
+  async changePassword(
+    @Req() req,
+    @Body() body: { otp: string; newPassword: string },
+  ) {
+    const { email } = req.user || {};
+    return this.vendorAuthService.changePassword(
+      email,
+      body.otp,
+      body.newPassword,
+    );
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('push-token')
+  async savePushToken(
+    @Req() req,
+    @Body() body: { token: string; platform: string },
+  ) {
+    const { id } = req.user || {};
+    return this.vendorAuthService.savePushToken(id, body.token, body.platform);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Delete('push-token')
+  async removePushToken(@Req() req) {
+    const { id } = req.user || {};
+    return this.vendorAuthService.removePushToken(id);
   }
 }
