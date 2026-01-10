@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, StyleSheet, Pressable, Platform, Alert } from "react-native";
+import { View, StyleSheet, Pressable, Platform } from "react-native";
 import { useRouter } from "expo-router";
 import Toast from "react-native-toast-message";
 import { signupVendor } from "@/services/signup.service";
@@ -119,11 +119,7 @@ export default function Signup() {
   };
 
   const showToast = (message: string) => {
-    if (Platform.OS === "android") {
-      Toast.show({ type: "error", text1: message });
-    } else {
-      Alert.alert("Error", message);
-    }
+    Toast.show({ type: "error", text1: message });
   };
 
   const handleNext = async () => {
@@ -141,20 +137,12 @@ export default function Signup() {
     setSubmitting(true);
     try {
       await signupVendor(data);
-      if (Platform.OS === "android") {
-        Toast.show({
-          type: "success",
-          text1: "Account created successfully!",
-          text2: "Please login to continue",
-        });
-      } else {
-        Alert.alert(
-          "Success",
-          "Account created successfully! Please login to continue.",
-          [{ text: "OK", onPress: () => router.replace("/(auth)/login") }]
-        );
-      }
-      // Navigate to login after short delay for Android toast
+      Toast.show({
+        type: "success",
+        text1: "Account created successfully!",
+        text2: "Please login to continue",
+      });
+      // Navigate to login after short delay
       setTimeout(() => {
         router.replace("/(auth)/login");
       }, 1500);

@@ -1,6 +1,7 @@
 import React from "react";
-import { View, Pressable, Image, StyleSheet, Alert } from "react-native";
+import { View, Pressable, Image, StyleSheet } from "react-native";
 import * as ImagePicker from "expo-image-picker";
+import Toast from "react-native-toast-message";
 import { ThemedText } from "@/components/themed-text";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 
@@ -21,7 +22,11 @@ export const ImageUpload: React.FC<Props> = ({
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
     if (status !== "granted") {
-      Alert.alert("Permission required", "Please allow access to photos.");
+      Toast.show({
+        type: "error",
+        text1: "Permission required",
+        text2: "Please allow access to photos.",
+      });
       return;
     }
 

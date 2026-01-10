@@ -22,6 +22,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { QueueModule } from './queue/queue.module';
 import { FcmModule } from './libs/fcm/fcm.module';
 import { MapsModule } from './maps/maps.module';
+import { StorageModule } from './storage/storage.module';
 
 @Module({
   imports: [
@@ -64,6 +65,7 @@ import { MapsModule } from './maps/maps.module';
     QueueModule,
     FcmModule,
     MapsModule,
+    StorageModule,
   ],
   controllers: [AppController],
   providers: [

@@ -7,7 +7,6 @@ import {
   StyleSheet,
   Pressable,
   ScrollView,
-  Alert,
   ActivityIndicator,
 } from "react-native";
 import { useRouter } from "expo-router";
@@ -70,7 +69,11 @@ export default function EditBusinessDocumentsScreen() {
     const file = result.assets[0];
 
     if (file.size && file.size > MAX_SIZE) {
-      Alert.alert("File too large", "Maximum file size is 5MB");
+      Toast.show({
+        type: "error",
+        text1: "File too large",
+        text2: "Maximum file size is 5MB",
+      });
       return;
     }
 
