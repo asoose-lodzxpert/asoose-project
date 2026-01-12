@@ -3,7 +3,7 @@
 import React from 'react';
 import { Download, CheckCircle, XCircle, Clock, AlertCircle } from 'lucide-react';
 import { AppAlert } from '../../../customers/[id]/alerts';
-import { Currency } from '@/components/Currency';
+import { Currency } from '@/app/main/components/Currency';
 interface Payout {
   id: string;
   amount: number;

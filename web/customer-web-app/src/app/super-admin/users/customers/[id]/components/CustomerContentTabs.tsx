@@ -2,7 +2,7 @@ import React from 'react';
 import { Car, AlertCircle } from 'lucide-react';
 import OrderHistoryTab from '../../../vendors/[id]/components/orderhistorytab';
 import { Order, Ride } from '../types';
-import { Currency } from '@/components/Currency'; 
+import { Currency } from '@/app/main/components/Currency'; 
 
 interface CustomerContentTabsProps {
   activeTab: 'Orders' | 'Rides' | 'Logs';

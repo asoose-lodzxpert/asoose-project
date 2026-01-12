@@ -8,7 +8,7 @@ import {
 import Swal from 'sweetalert2';
 import { AppAlert } from '../../../customers/[id]/alerts';
 import { createClient } from '../../../../../../../utils/supabase/client'; // ✅ Import Supabase Client
-import { Currency } from '@/components/Currency';
+import { Currency } from '@/app/main/components/Currency';
 interface RiderSidebarProps {
   rider: any;
   onToggleStatus: () => void;

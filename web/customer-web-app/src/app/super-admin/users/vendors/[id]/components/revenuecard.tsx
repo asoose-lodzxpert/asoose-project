@@ -1,4 +1,4 @@
-import { Currency } from "@/components/Currency";
+import { Currency } from "@/app/main/components/Currency";
 import { TrendingUp,TrendingDown } from "lucide-react";
 const RevenueCard = ({ title, amount, change, icon: Icon, color, onClick }: any) => (
   <div className="bg-[#1E293B] border border-gray-800 rounded-2xl p-6 hover:border-gray-700 transition-all cursor-pointer" onClick={onClick}>

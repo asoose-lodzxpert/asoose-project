@@ -42,4 +42,31 @@ export class AppController {
       redis: redisStatus,
     };
   }
+
+@Get('public/settings/maintenance')
+async checkMaintenance() {
+  const cacheKey = 'system:maintenance_mode';
+  
+  // 1. Try to get from Redis first
+  const cachedValue = await this.redisClient.get(cacheKey);
+  if (cachedValue !== null) {
+    return { active: cachedValue === 'true' };
+  }
+
+  // 2. Fallback to Database
+  const setting = await this.prisma.systemSetting.findUnique({
+    where: { key: 'maintenance_mode' }
+  });
+
+  const isActive = setting?.value === 'true';
+
+  // 3. Store in Redis for future requests (e.g., expire in 1 minute)
+  await this.redisClient.set(cacheKey, String(isActive), {
+    EX: 60 
+  });
+
+  return { active: isActive };
+}
+
+
 }

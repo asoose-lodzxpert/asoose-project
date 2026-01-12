@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { ShoppingBag, Ban, Search, X, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
-import { Currency } from '@/components/Currency';
+import { Currency } from '@/app/main/components/Currency';
 
 interface Product {
   id: string;

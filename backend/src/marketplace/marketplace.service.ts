@@ -54,30 +54,39 @@ export class MarketplaceService {
     return { verticals };
   }
 
-  // NEW: Optimized single category fetch
-  // src/marketplace/marketplace.service.ts
+  // --- REWRITTEN METHOD ---
+  async getCategoryData(verticalId: string, sortParam?: string) {
+    // 1. Determine Sorting Logic
+    // We map the frontend codes (RATING_DESC, etc) to Prisma orderBy objects
+    let orderBy: any = { rating: 'desc' }; // Default to popular
 
-  async getCategoryData(verticalId: string, filter?: string) {
-    // 1. Determine Sorting Logic based on the filter
-    let orderBy: any = { createdAt: 'desc' }; // Default: Newest first
+    switch (sortParam) {
+      case 'RATING_DESC':
+      case 'top-rated': 
+        orderBy = { rating: 'desc' };
+        break;
+      case 'TIME_ASC':
+      case 'fastest':
+        // Sort by prepTime as a proxy for delivery speed
+        orderBy = { prepTime: 'asc' }; 
+        break;
+      case 'FEE_ASC':
+      case 'cheapest':
+        // Delivery Fee is currently calculated dynamically (500), so we can't sort by it in DB.
+        // Fallback to sorting by prepTime or Rating, or price if you had a avgPrice column.
+        orderBy = { prepTime: 'asc' }; 
+        break;
+      case 'all':
+      default:
+        orderBy = { rating: 'desc' };
+    }
 
-    if (filter === 'Top Rated') {
-      orderBy = { rating: 'desc' };
-    } else if (filter === 'Fastest Delivery') {
-      // NOTE: Only works if you added 'deliveryTime' to your Store schema. 
-      // If not, this will default to sorting by name or ignore it.
-      // orderBy = { deliveryTime: 'asc' }; 
-    } 
-    // Add logic for 'Low Delivery Fee' if you have that column
-
-    // 2. Fetch the data with the dynamic sort
+    // 2. Fetch the data
     const stores = await this.prisma.store.findMany({
       where: {
-        // Match the store type (vertical) derived from ID
-        // Assuming 'food' maps to 'RESTAURANT', etc. 
-        // You might need a helper map here like the frontend has
         type: this.mapSlugToType(verticalId), 
         status: 'ACTIVE',
+        verification: 'VERIFIED', // Ensure we only show verified stores
       },
       orderBy: orderBy,
       take: 20,
@@ -88,12 +97,12 @@ export class MarketplaceService {
         logo: true, // mapped to 'image' in frontend
         rating: true,
         type: true,
-        // deliveryTime: true, // Uncomment if schema has it
-        // deliveryFee: true,  // Uncomment if schema has it
+        prepTime: true,
+        address: true,
       }
     });
 
-    // 3. Return formatted structure
+    // 3. Return formatted structure matching frontend expectations
     return {
       id: verticalId,
       title: this.formatTitle(verticalId),
@@ -104,15 +113,15 @@ export class MarketplaceService {
         image: store.logo,
         rating: store.rating || 0,
         type: store.type,
-        // Fallbacks if columns don't exist yet
-        deliveryTime: '30-45 min', 
-        deliveryFee: 500,
-        prepTime: 20
+        // Calculate display strings
+        deliveryTime: `${store.prepTime || 20} - ${(store.prepTime || 20) + 15} min`,
+        deliveryFee: 500, // Hardcoded for now per requirements
+        prepTime: store.prepTime || 20,
+        address: store.address
       })),
     };
   }
 
-  // Helper to map URL slug (food) to DB Enum (RESTAURANT)
   private mapSlugToType(slug: string): any {
     const map: Record<string, string> = {
       'food': 'RESTAURANT',
@@ -120,7 +129,6 @@ export class MarketplaceService {
       'pharmacy': 'PHARMACY',
       'market': 'MARKET'
     };
-    // Return mapped type or fallback (or handle error)
     return map[slug.toLowerCase()] || 'RESTAURANT';
   }
 

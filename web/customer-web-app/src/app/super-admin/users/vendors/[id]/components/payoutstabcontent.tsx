@@ -1,6 +1,6 @@
 import React from 'react';
 import { DollarSign, CheckCircle } from 'lucide-react';
-import { Currency } from '@/components/Currency';
+import { Currency } from '@/app/main/components/Currency';
 
 interface Payout {
   id: string;

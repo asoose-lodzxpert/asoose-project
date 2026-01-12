@@ -2,15 +2,15 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation'; 
-import { HomeHeader } from '@/components/home/HomeHeader';
+import { HomeHeader } from '@/app/main/components/home/HomeHeader';
 import { Search, Heart, Share2, MapPin, Clock, Star, ShoppingBag, PartyPopper, Loader2 } from 'lucide-react';
-import { MenuTabs } from '@/components/restaurant/MenuTabs';
-import { MenuItem } from '@/components/restaurant/MenuItem';
-import { BottomNav } from '@/components/layout/BottomNav';
-import { RestaurantHero } from '@/components/restaurant/RestaurantHero';
-import { AppFooter } from '@/components/layout/AppFooter';
-import { FloatingCart } from '@/components/home/FloatingCart';
-import { SidebarCart } from '@/components/restaurant/sidebarcart';
+import { MenuTabs } from '@/app/main/components/restaurant/MenuTabs';
+import { MenuItem } from '@/app/main/components/restaurant/MenuItem';
+import { BottomNav } from '@/app/main/components/layout/BottomNav';
+import { RestaurantHero } from '@/app/main/components/restaurant/RestaurantHero';
+import { AppFooter } from '@/app/main/components/layout/AppFooter';
+import { FloatingCart } from '@/app/main/components/home/FloatingCart';
+import { SidebarCart } from '@/app/main/components/restaurant/sidebarcart';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
