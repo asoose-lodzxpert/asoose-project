@@ -16,20 +16,23 @@ import { VendorAuthController } from './vendor-auth.controller';
 import { VendorAuthService } from './vendor-auth.service';
 import { AuthService } from './auth.service';
 import { MailModule } from 'src/mail/mail.module';
-import { RedisModule } from 'src/redis/redis.module';
+
 @Module({
   imports: [
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
-        secret: configService.get<string>('SUPABASE_JWT_SECRET_KEY'),
+        secret:
+          configService.get<string>('JWT_SECRET') ||
+          'your-secret-key-change-in-production',
+        signOptions: { expiresIn: '7d' },
       }),
       inject: [ConfigService],
     }),
     ConfigModule,
     OtpModule,
-    MailModule
+    MailModule,
   ],
 
   controllers: [

@@ -32,20 +32,21 @@ export class NotificationsGateway
       if (!token) return client.disconnect();
 
       const payload = this.jwtService.verify(token, {
-          secret: process.env.SUPABASE_JWT_SECRET_KEY 
+        secret:
+          process.env.JWT_SECRET || 'your-secret-key-change-in-production',
       });
       const userId = payload.sub || payload.userId;
 
       client.data.userId = userId;
-      
+
       if (!this.activeUsers.has(userId)) {
         this.activeUsers.set(userId, new Set());
       }
-      
+
       this.activeUsers.get(userId)?.add(client.id);
 
       client.join(`user_${userId}`);
-      
+
       this.logger.log(`Client connected: ${userId}`);
     } catch (err) {
       this.logger.error(`Connection unauthorized: ${err.message}`);
@@ -71,8 +72,11 @@ export class NotificationsGateway
   }
 
   private extractToken(client: Socket): string | null {
-    const auth = client.handshake.headers.authorization || client.handshake.auth.token;
+    const auth =
+      client.handshake.headers.authorization || client.handshake.auth.token;
     if (!auth) return null;
-    return Array.isArray(auth) ? auth[0].replace('Bearer ', '') : auth.replace('Bearer ', '');
+    return Array.isArray(auth)
+      ? auth[0].replace('Bearer ', '')
+      : auth.replace('Bearer ', '');
   }
 }

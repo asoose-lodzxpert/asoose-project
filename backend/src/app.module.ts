@@ -23,6 +23,7 @@ import { QueueModule } from './queue/queue.module';
 import { FcmModule } from './libs/fcm/fcm.module';
 import { MapsModule } from './maps/maps.module';
 import { StorageModule } from './storage/storage.module';
+import { PaymentModule } from './payment/payment.module';
 
 @Module({
   imports: [
@@ -66,6 +67,7 @@ import { StorageModule } from './storage/storage.module';
     FcmModule,
     MapsModule,
     StorageModule,
+    PaymentModule,
   ],
   controllers: [AppController],
   providers: [

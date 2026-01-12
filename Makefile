@@ -63,7 +63,7 @@ k8s-shell: ## Access backend pod shell
 	$(KUBECTL) exec -it $$($(KUBECTL) get pods -n $(NAMESPACE) -l app=asoose-backend -o jsonpath='{.items[0].metadata.name}') -n $(NAMESPACE) -- sh
 
 k8s-migrate: ## Run migrations in Kubernetes
-	$(KUBECTL) exec -it $$($(KUBECTL) get pods -n $(NAMESPACE) -l app=asoose-backend -o jsonpath='{.items[0].metadata.name}') -n $(NAMESPACE) -- npx prisma migrate deploy
+	$(KUBECTL) exec -it $$($(KUBECTL) get pods -n $(NAMESPACE) -l app=asoose-backend -o jsonpath='{.items[0].metadata.name}') -n $(NAMESPACE) -- yarn prisma migrate deploy
 
 k8s-scale: ## Scale backend (usage: make k8s-scale REPLICAS=5)
 	$(KUBECTL) scale deployment/asoose-backend --replicas=$(REPLICAS) -n $(NAMESPACE)

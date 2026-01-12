@@ -21,6 +21,12 @@ COPY backend ./backend
 # Generate Prisma Client
 RUN cd backend && yarn prisma generate
 
+# Verify Prisma client was generated
+RUN find /app -name ".prisma" -type d || echo "Prisma client not found - checking alternative locations" && \
+    ls -la /app/node_modules/.prisma 2>/dev/null || \
+    ls -la /app/backend/node_modules/.prisma 2>/dev/null || \
+    echo "WARNING: Prisma client location unknown"
+
 # Build the backend - explicitly run nest build in backend directory
 RUN cd backend && yarn build
 
@@ -41,17 +47,15 @@ RUN addgroup -g 1001 -S nodejs && adduser -S nodejs -u 1001
 # Copy built backend code
 COPY --from=builder /app/backend/dist ./dist
 COPY --from=builder /app/backend/prisma ./prisma
-COPY --from=builder /app/backend/node_modules/.prisma ./node_modules/.prisma
 
 # Copy package.json files
 COPY --from=builder /app/backend/package.json ./package.json
 
-# Copy production node_modules
+# Copy production node_modules from root (Yarn workspaces installs everything here)
 COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/backend/node_modules ./backend_node_modules
 
-# Merge backend node_modules into main node_modules
-RUN cp -r ./backend_node_modules/* ./node_modules/ 2>/dev/null || true && rm -rf ./backend_node_modules
+# Create uploads directory for local file storage
+RUN mkdir -p /app/uploads
 
 # Change ownership to nodejs user
 RUN chown -R nodejs:nodejs /app
@@ -69,4 +73,5 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
 
 # Start backend with dumb-init
 ENTRYPOINT ["dumb-init", "--"]
-CMD ["node", "dist/main.js"]
+CMD ["node", "dist/src/main.js"]
+

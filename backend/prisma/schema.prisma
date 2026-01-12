@@ -155,8 +155,6 @@ enum TransactionStatus {
 //// USER & AUTH
 //// =====================
 
-
-
 model SystemSetting {
   key         String   @id
   value       String  
@@ -474,6 +472,10 @@ model BankAccount {
   accountName    String
   currency       String        @default("NGN")
 
+  // Payment Gateway Recipient Codes (for disbursements)
+  paystackRecipientCode    String?
+  flutterwaveRecipientCode String?
+
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
@@ -603,6 +605,7 @@ model Order {
   storeId   String
   total     Float
   status    OrderStatus @default(PENDING)
+  paymentStatus String?  @default("PENDING") // PENDING, PAID, FAILED
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
   disputes Dispute[]
@@ -653,17 +656,36 @@ model Payment {
   failureReason String?
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
-  disputes Dispute[]
-  order        Order?        @relation("OrderPayment", fields: [orderId], references: [id], onDelete: Cascade)
-  ride         Ride?         @relation("RidePayment", fields: [rideId], references: [id], onDelete: Cascade)
-  user         User          @relation(fields: [userId], references: [id], onDelete: Restrict)
-  transactions Transaction[] // NEW: Link to transaction ledger
+  
+  // Payment Gateway Fields
+  reference           String  @unique
+  gateway             String  // PAYSTACK, FLUTTERWAVE, MONNIFY
+  authorizationUrl    String?
+  accessCode          String?
+  accountNumber       String?
+  bankName            String?
+  accountName         String?
+  expiresAt           DateTime?
+  paidAt              DateTime?
+  verifiedAt          DateTime?
+  customerEmail       String?
+  customerName        String?
+  metadata            Json?
+  paymentStatus       String? // PAID, FAILED, PENDING (for order relation)
+  
+  disputes      Dispute[]
+  order         Order?        @relation("OrderPayment", fields: [orderId], references: [id], onDelete: Cascade)
+  ride          Ride?         @relation("RidePayment", fields: [rideId], references: [id], onDelete: Cascade)
+  user          User          @relation(fields: [userId], references: [id], onDelete: Restrict)
+  transactions  Transaction[] // Link to transaction ledger
 
   @@index([userId, status])
   @@index([status, createdAt])
   @@index([transactionId])
   @@index([orderId])
   @@index([rideId])
+  @@index([reference])
+  @@index([gateway, status])
   @@index([status, createdAt(sort: Desc), amount])
 }
 
