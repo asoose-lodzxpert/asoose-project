@@ -14,7 +14,7 @@ import { UsersService } from './users.service';
 import { CreateAddressDto, CreateOrderDto } from './dto/users.dto'; // <--- Import DTOs
 
 @Controller('users')
-@UseGuards(JwtAuthGuard)
+// @UseGuards(JwtAuthGuard)
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
@@ -58,10 +58,10 @@ export class UsersController {
   // ADDRESS ENDPOINTS
   // ==================================================================
 
-  @Get('addresses')
-  async getMyAddresses(@Request() req) {
-    return this.usersService.getUserAddresses(req.user.id);
-  }
+  // @Get('addresses')
+  // async getMyAddresses(@Request() req) {
+  //   return this.usersService.getUserAddresses(req.user.id);
+  // }
 
   @Post('addresses')
   async addAddress(@Request() req, @Body() body: CreateAddressDto) { // Use DTO

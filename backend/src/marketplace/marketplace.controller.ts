@@ -21,9 +21,12 @@ export class MarketplaceController {
   @Get('categories/:id')
   async getCategory(
     @Param('id') id: string,
-    @Query('filter') filter?: string
+    @Query('sort') sort?: string 
   ) {
-    const categoryData = await this.marketplaceService.getCategoryData(id, filter);
+    // FIX: Changed @Query('filter') to @Query('sort') to match frontend
+    // Default to 'all' if undefined
+    const categoryData = await this.marketplaceService.getCategoryData(id, sort || 'all');
+    
     if (!categoryData) {
       throw new NotFoundException(`Category vertical not found: ${id}`);
     }

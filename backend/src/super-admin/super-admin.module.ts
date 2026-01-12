@@ -13,6 +13,9 @@ import { DashboardModule } from './dashboard/dashboard.module';
 import { ZonesModule } from './zones/zones.modle';
 import { VerificationModule } from './verification/verification.module';
 import { AdminsModule } from './admins/admins.module';
+import { BannerModule } from './banners/banner.module';
+import { SettingsController } from './settings/settings.controller';
+import { SettingsService } from './settings/settings.service';
 @Module({
   imports: [
     DashboardModule,
@@ -28,8 +31,9 @@ import { AdminsModule } from './admins/admins.module';
     ZonesModule,
     VerificationModule,
     AdminsModule,
+    BannerModule,
   ],
-  controllers: [],
-  providers: [ PrismaService,],
+  controllers: [SettingsController],
+  providers: [ PrismaService,SettingsService],
 })
 export class SuperAdminModule {}

@@ -333,8 +333,10 @@ export class OrdersService {
             select: {
               name: true,
               vendor: { select: { phone: true } },
+              
             },
           },
+          disputes: { select: { id: true, status: true } }
         },
       });
 
@@ -345,6 +347,8 @@ export class OrdersService {
         status: order.status,
         total: order.total,
         createdAt: order.createdAt,
+        deliveredAt: order.deliveredAt, 
+      dispute: order.disputes[0] || null,
         items: order.items.map((item) => ({
           id: item.id,
           name: item.nameSnap,

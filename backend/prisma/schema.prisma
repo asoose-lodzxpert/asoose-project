@@ -943,3 +943,16 @@ model ServiceZone {
 
   @@map("service_zones")
 }
+
+model Banner {
+  id          String   @id @default(uuid())
+  title       String
+  subtitle    String
+  buttonText  String   @default("Order Now")
+  link        String   @default("/store")
+  image       String?  // Optional background image
+  type        String   @default("PROMO") // e.g., PROMO, AD, INFO
+  isActive    Boolean  @default(true)
+  priority    Int      @default(0)
+  createdAt   DateTime @default(now())
+}
