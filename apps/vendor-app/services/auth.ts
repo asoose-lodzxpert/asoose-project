@@ -10,37 +10,43 @@ const refreshTokenKey = () => `asoose_vendor_refresh_token`;
 
 export async function login(identifier: string, password: string) {
   console.log("Auth check 1");
-  
-  const res = await fetch(
-    `${process.env.EXPO_PUBLIC_API_URL}/auth/vendor/login`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: identifier, password }),
+  console.log("API URL:", process.env.EXPO_PUBLIC_API_URL);
+
+  try {
+    const res = await fetch(
+      `${process.env.EXPO_PUBLIC_API_URL}/auth/vendor/login`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: identifier, password }),
+      }
+    );
+
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({}));
+      console.log("Error:", error);
+
+      throw new Error(error.message || "Invalid credentials");
     }
-  );
 
-  if (!res.ok) {
-    const error = await res.json().catch(() => ({}));
-    console.log("Error:" + error);
-    
-    throw new Error(error.message || "Invalid credentials");
+    const { accessToken, refreshToken, vendor } = await res.json();
+
+    // assuming vendor.id or vendor.identifier exists
+    const vendorKey = vendor.id || vendor.identifier || identifier;
+
+    await SecureStore.setItemAsync(accessTokenKey(), accessToken, {
+      keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY,
+    });
+
+    await SecureStore.setItemAsync(refreshTokenKey(), refreshToken, {
+      keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY,
+    });
+
+    return { user: vendor, vendorKey };
+  } catch (error) {
+    console.error("Login error details:", error);
+    throw error;
   }
-
-  const { accessToken, refreshToken, vendor } = await res.json();
-
-  // assuming vendor.id or vendor.identifier exists
-  const vendorKey = vendor.id || vendor.identifier || identifier;
-
-  await SecureStore.setItemAsync(accessTokenKey(), accessToken, {
-    keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY,
-  });
-
-  await SecureStore.setItemAsync(refreshTokenKey(), refreshToken, {
-    keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY,
-  });
-
-  return { user: vendor, vendorKey };
 }
 
 // ---------------- TOKEN HELPERS ----------------

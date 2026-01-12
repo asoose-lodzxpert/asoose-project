@@ -10,7 +10,7 @@ import 'dotenv/config';
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
-  app.setGlobalPrefix('v1/api');
+  app.setGlobalPrefix(process.env.API_PREFIX || 'api/v1');
 
   // Serve static files from uploads directory
   app.useStaticAssets(join(__dirname, '..', 'uploads'), {
@@ -41,6 +41,8 @@ async function bootstrap() {
   });
 
   await app.listen(process.env.PORT ?? 3000, '0.0.0.0');
-  console.log(`Backend is running on: ${await app.getUrl()}/v1/api`);
+  console.log(
+    `Backend is running on: ${await app.getUrl()}/${process.env.API_PREFIX || 'api/v1'}`,
+  );
 }
 bootstrap();

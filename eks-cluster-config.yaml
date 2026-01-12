@@ -1,0 +1,43 @@
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+
+metadata:
+  name: asoose-eks-cluster
+  region: us-east-1
+  version: "1.34"
+
+managedNodeGroups:
+  - name: asoose-workers
+    instanceType: t3.medium
+    minSize: 2
+    maxSize: 6
+    desiredCapacity: 3
+    volumeSize: 30
+    ssh:
+      allow: false
+    labels:
+      role: worker
+      environment: production
+    tags:
+      Environment: production
+      Project: asoose
+    iam:
+      withAddonPolicies:
+        autoScaler: true
+        ebs: true
+        efs: true
+        albIngress: true
+        cloudWatch: true
+
+iam:
+  withOIDC: true
+
+addons:
+  - name: vpc-cni
+  - name: coredns
+  - name: kube-proxy
+  - name: aws-ebs-csi-driver
+
+cloudWatch:
+  clusterLogging:
+    enableTypes: ["all"]
