@@ -23,9 +23,8 @@ import { FcmModule } from 'src/libs/fcm/fcm.module';
     MailModule,
     ConfigModule,
     RedisModule,
-    NotificationsModule, 
+    NotificationsModule,
     FcmModule,
-    RedisModule,
     BullModule.registerQueue({
       name: 'email',
     }),

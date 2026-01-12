@@ -5,9 +5,9 @@ import {
   Logger,
 } from '@nestjs/common';
 import { ProductStatus } from '@prisma/client';
-import { PrismaService } from '../../prisma/prisma.service'; // Fixed relative import
+import { PrismaService } from '../../prisma/prisma.service';
 import { CreateProductDto, UpdateProductDto } from '../dto/product.dto';
-import { StorageService } from '../../libs/storage/storage.service'; // Fixed relative import
+import { StorageService } from '../../storage/storage.service';
 
 @Injectable()
 export class VendorProductsService {
@@ -48,10 +48,7 @@ export class VendorProductsService {
     }
 
     // Optional: Block actions if store is suspended
-    if (
-      store.status === 'SUSPENDED' ||
-      store.status === 'CLOSED_PERMANENTLY'
-    ) {
+    if (store.status === 'SUSPENDED' || store.status === 'CLOSED_PERMANENTLY') {
       throw new ForbiddenException(
         `Store is ${store.status}. Actions restricted.`,
       );

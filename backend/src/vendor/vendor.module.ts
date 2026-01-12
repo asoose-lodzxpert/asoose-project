@@ -11,7 +11,7 @@ import { VendorProductsController } from './products/products.controller';
 // Orders
 import { VendorOrdersService } from './orders/vendor-orders.service';
 import { VendorOrdersController } from './orders/vendor-orders.controller';
-import { StorageModule } from 'src/libs/storage/storage.module';
+import { StorageModule } from '../storage/storage.module';
 
 @Module({
   imports: [PrismaModule, StorageModule],
