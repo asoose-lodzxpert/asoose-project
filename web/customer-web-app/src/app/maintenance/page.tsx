@@ -9,14 +9,12 @@ export default function MaintenancePage() {
   const router = useRouter();
   const [isChecking, setIsChecking] = useState(false);
 
-  // 1. Auto-check status every 10 seconds 
   useEffect(() => {
     const checkStatus = async () => {
       try {
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/public/settings/maintenance`);
         const data = await res.json();
 
-        // If maintenance is no longer active, send them home!
         if (data.active === false) {
           router.push('/main/store');
         }
