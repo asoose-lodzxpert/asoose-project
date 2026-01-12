@@ -34,13 +34,13 @@ docker-clean: ## Remove Docker containers and volumes
 
 # Database Commands
 db-migrate: ## Run database migrations
-	docker exec -it asoose-backend npx prisma migrate deploy
+	docker exec -it asoose-backend yarn prisma migrate deploy
 
 db-seed: ## Seed database
-	docker exec -it asoose-backend npm run seed
+	docker exec -it asoose-backend yarn seed
 
 db-studio: ## Open Prisma Studio
-	docker exec -it asoose-backend npx prisma studio
+	docker exec -it asoose-backend yarn prisma studio
 
 db-backup: ## Backup database
 	docker exec asoose-postgres pg_dump -U asoose asoose_db > backup-$$(date +%Y%m%d-%H%M%S).sql

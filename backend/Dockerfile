@@ -6,23 +6,26 @@ WORKDIR /app
 # Copy root package.json & lockfile for Yarn workspaces
 COPY package.json yarn.lock ./
 
+# Copy workspace packages
+COPY packages ./packages
+
 # Copy backend package.json
 COPY backend/package.json backend/
 
-# Install all dependencies
+# Install all dependencies (including devDependencies for build)
 RUN yarn install --frozen-lockfile
 
 # Copy backend source files
 COPY backend ./backend
 
-# Copy prisma files
-COPY backend/prisma ./backend/prisma
-
 # Generate Prisma Client
-RUN cd backend && npx prisma generate
+RUN cd backend && yarn prisma generate
 
-# Build the backend
-RUN yarn workspace backend build
+# Build the backend - explicitly run nest build in backend directory
+RUN cd backend && yarn build
+
+# Verify dist folder was created
+RUN ls -la /app/backend/dist || (echo "Build failed - dist folder not found" && exit 1)
 
 # ---- Runtime Stage ----
 FROM node:20-alpine
@@ -38,12 +41,17 @@ RUN addgroup -g 1001 -S nodejs && adduser -S nodejs -u 1001
 # Copy built backend code
 COPY --from=builder /app/backend/dist ./dist
 COPY --from=builder /app/backend/prisma ./prisma
+COPY --from=builder /app/backend/node_modules/.prisma ./node_modules/.prisma
 
-# Copy backend package.json
-COPY --from=builder /app/backend/package.json ./
+# Copy package.json files
+COPY --from=builder /app/backend/package.json ./package.json
 
-# Copy node_modules from builder
+# Copy production node_modules
 COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/backend/node_modules ./backend_node_modules
+
+# Merge backend node_modules into main node_modules
+RUN cp -r ./backend_node_modules/* ./node_modules/ 2>/dev/null || true && rm -rf ./backend_node_modules
 
 # Change ownership to nodejs user
 RUN chown -R nodejs:nodejs /app
