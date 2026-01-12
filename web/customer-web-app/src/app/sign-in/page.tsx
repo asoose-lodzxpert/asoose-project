@@ -16,34 +16,47 @@ const SignIn = () => {
     password: ''
   });
 
-  const handleLogin = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    
-    if (!loginData.email || !loginData.password) {
-      setError('Please fill in all fields');
-      return;
-    }
+// as/customer-web-app/src/app/sign-in/page.tsx
 
-    setIsLoading(true);
-    setError('');
-    try {
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: loginData.email,
-        password: loginData.password
-      });
-      
-      if (signInError) {
-        throw signInError;
-      }
-      
-      router.push('/dashboard');
-      
-    } catch (err: any) {
-      setError(err.message || 'Login failed');
-    } finally {
-      setIsLoading(false);
+const handleLogin = async (e?: React.FormEvent) => {
+  if (e) e.preventDefault();
+  
+  if (!loginData.email || !loginData.password) {
+    setError('Please fill in all fields');
+    return;
+  }
+
+  setIsLoading(true);
+  setError('');
+  try {
+    const { data: { user }, error: signInError } = await supabase.auth.signInWithPassword({
+      email: loginData.email,
+      password: loginData.password
+    });
+    
+    if (signInError) throw signInError;
+
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user?.id)
+      .single();
+
+    if (profileError) throw profileError;
+
+    // Role-based redirection logic
+    if (profile?.role === 'super_admin') {
+      router.push('/super-admin/dashboard');
+    } else {
+      router.push('/store');
     }
-  };
+    
+  } catch (err: any) {
+    setError(err.message || 'Login failed');
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   const handleGoogleSignIn = async () => {
     try {

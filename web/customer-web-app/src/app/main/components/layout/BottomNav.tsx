@@ -1,0 +1,59 @@
+'use client';
+
+import { useState } from 'react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { ShoppingBag, Car, Package, Settings } from 'lucide-react';
+
+const NavItem = ({ 
+  icon: Icon, 
+  label, 
+  active = false,
+  href
+}: { 
+  icon: any, 
+  label: string, 
+  active?: boolean,
+  href: string
+}) => (
+  <Link 
+    href={href}
+    className={`flex flex-col items-center gap-1 w-16 transition-colors active:scale-90 duration-200 ${
+      active 
+        ? 'text-yellow-600 dark:text-yellow-500' 
+        : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-200'
+    }`}
+  >
+    <div className={`p-1.5 rounded-xl transition-all ${active ? 'bg-yellow-500/10' : ''}`}>
+      <Icon className={`w-6 h-6 ${active ? 'fill-yellow-500/20 stroke-[2.5px]' : 'stroke-2'}`} />
+    </div>
+    <span className="text-[10px] font-bold">{label}</span>
+  </Link>
+);
+
+export default function BottomNav() {
+  const pathname = usePathname();
+
+  const navItems = [
+    { icon: ShoppingBag, label: 'Order', href: '/main/store' },
+    { icon: Car, label: 'Ride', href: '/main/ride' },
+    { icon: Package, label: 'Deliver', href: '/main/delivery' },
+    { icon: Settings, label: 'Settings', href: '/main/settings' }
+  ];
+
+  return (
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-[#0a0a0a] border-t border-gray-100 dark:border-white/5 py-2 px-6 z-50">
+      <div className="flex justify-between items-end max-w-md mx-auto">
+        {navItems.map((item) => (
+          <NavItem
+            key={item.label}
+            icon={item.icon}
+            label={item.label}
+            href={item.href}
+            active={pathname === item.href}
+          />
+        ))}
+      </div>
+    </nav>
+  );
+}

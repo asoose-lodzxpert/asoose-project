@@ -1,6 +1,6 @@
 import React from 'react';
 import { CustomerStats as IStats } from '../types';
-import { Currency } from '@/components/Currency';
+import { Currency } from '@/app/main/components/Currency';
 export const CustomerStats: React.FC<{ stats: IStats }> = ({ stats }) => {
   const formatCurrency = (amount: number) => 
     new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(amount);

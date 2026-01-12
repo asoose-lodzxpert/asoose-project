@@ -126,7 +126,7 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex justify-between items-center">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 bg-yellow-400 rounded-lg flex items-center justify-center font-bold text-black border border-yellow-500 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] dark:shadow-none">A</div>
-            <span className="text-xl font-bold tracking-tight">Asoosee</span>
+            <span className="text-xl font-bold tracking-tight">Asoose</span>
           </div>
 
           <div className="hidden md:flex gap-8 text-sm font-medium items-center">
@@ -451,7 +451,7 @@ export default function LandingPage() {
       <footer className={`relative py-20 overflow-hidden ${darkMode ? 'bg-black border-t border-white/10' : 'bg-white border-t border-black/5'}`}>
         
         <div className="absolute -bottom-10 -left-10 pointer-events-none select-none opacity-[0.03]">
-          <span className="text-[20rem] font-black leading-none tracking-tighter truncate">Asoosee</span>
+          <span className="text-[20rem] font-black leading-none tracking-tighter truncate">Asoose</span>
         </div>
 
         <div className="relative z-10 max-w-7xl mx-auto px-6">
@@ -460,7 +460,7 @@ export default function LandingPage() {
             <div className="lg:col-span-2 space-y-6">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 bg-yellow-400 rounded-lg flex items-center justify-center font-bold text-black border border-yellow-500">A</div>
-                <span className="text-2xl font-bold tracking-tight">Asoosee</span>
+                <span className="text-2xl font-bold tracking-tight">Asoose</span>
               </div>
               <p className="text-sm opacity-60 leading-relaxed max-w-xs">
                 The operating system for your daily life. Moving people, goods, and payments across Nigeria with speed and trust.
@@ -517,7 +517,7 @@ export default function LandingPage() {
 
           <div className={`pt-8 border-t flex flex-col md:flex-row justify-between items-center gap-4 ${darkMode ? 'border-white/10' : 'border-black/5'}`}>
             <div className="text-sm opacity-40 font-medium">
-              © 2025 Asoosee Technologies Inc. Lagos, Nigeria.
+              © 2025 Asoose Technologies Inc. Lagos, Nigeria.
             </div>
             
             <div className="flex gap-4">

@@ -5,10 +5,14 @@ import './globals.css';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
-import { NotificationListener } from '@/components/NotificationListener';
+import { NotificationListener } from '@/app/main/components/NotificationListener';
+
+import { GoogleMapsProvider } from '@/providers/GoogleMapsProvider';
 
 import { ThemeProvider } from './provider/provider';
 const inter = Inter({ subsets: ['latin'] });
+
+
 
 export const metadata: Metadata = {
   title: 'Asoosee',
@@ -27,8 +31,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           disableTransitionOnChange
         >
           <NotificationListener/>
-          {children}
-          
+          <GoogleMapsProvider>
+              {children}
+          </GoogleMapsProvider>
           <ToastContainer 
             position="top-right"
             autoClose={3000}

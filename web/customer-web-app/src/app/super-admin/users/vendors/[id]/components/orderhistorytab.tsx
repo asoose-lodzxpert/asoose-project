@@ -6,7 +6,7 @@ import { DataTable } from "@/app/super-admin/component/datatable";
 import { Eye, CheckSquare, Square, Search, Filter, X } from "lucide-react";
 import OrderCard from "@/app/super-admin/component/ordercard";
 import Link from "next/link";
-import { Currency } from "@/components/Currency"; // ✅ Using your reusable Currency component
+import { Currency } from "@/app/main/components/Currency"; // ✅ Using your reusable Currency component
 
 // --- Types ---
 interface Order {

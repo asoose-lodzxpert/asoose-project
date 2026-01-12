@@ -13,7 +13,7 @@ import { ColumnDef } from '@tanstack/react-table';
 import Swal from 'sweetalert2';
 import { toast } from 'react-toastify';
 import { fetcher } from '../hooks/useSuperAdminFetch';
-import { Currency } from '@/components/Currency';
+import { Currency } from '@/app/main/components/Currency';
 import OrdersPageSkeleton from './components/skeleton';
 // --- Types ---
 interface Order {

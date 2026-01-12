@@ -12,7 +12,7 @@ import { toast } from 'react-toastify';
 import useSWR from 'swr'; 
 import { fetcher } from '../../hooks/useSuperAdminFetch';
 import OrderActionsPanel from './component/OrderActionsPanel';
-import { Currency } from '@/components/Currency';
+import { Currency } from '@/app/main/components/Currency';
 // --- Types ---
 interface OrderDetail {
   id: string;
