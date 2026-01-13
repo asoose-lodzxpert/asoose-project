@@ -12,26 +12,35 @@ export class AppController {
   ) {}
 
   @Get()
-  getHello(): string {
+  getHello() {
     return this.appService.getHello();
   }
 
   @Get('health')
-  async testServices(): Promise<any> {
-    // Test Prisma DB
+  async health(): Promise<{
+    backend: string;
+    database: string;
+    redis: string;
+  }> {
     let dbStatus = 'ok';
+    let redisStatus = 'ok';
+
     try {
-      await this.prisma.$queryRaw`SELECT 1`;
+      await Promise.race([
+        this.prisma.$queryRaw`SELECT 1`,
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('DB timeout')), 2000),
+        ),
+      ]);
     } catch (e) {
       dbStatus = 'error';
     }
 
-    // Test Redis
-    let redisStatus = 'ok';
+    const redisTestKey = 'health:test';
     try {
-      await this.redisClient.set('test-key', 'test-value');
-      const value = await this.redisClient.get('test-key');
-      if (value !== 'test-value') redisStatus = 'error';
+      await this.redisClient.set(redisTestKey, '1', { EX: 5 });
+      const value = await this.redisClient.get(redisTestKey);
+      if (value !== '1') redisStatus = 'error';
     } catch (e) {
       redisStatus = 'error';
     }
@@ -43,30 +52,28 @@ export class AppController {
     };
   }
 
-@Get('public/settings/maintenance')
-async checkMaintenance() {
-  const cacheKey = 'system:maintenance_mode';
-  
-  // 1. Try to get from Redis first
-  const cachedValue = await this.redisClient.get(cacheKey);
-  if (cachedValue !== null) {
-    return { active: cachedValue === 'true' };
+  @Get('public/settings/maintenance')
+  async checkMaintenance() {
+    const cacheKey = 'system:maintenance_mode';
+
+    // 1. Try to get from Redis first
+    const cachedValue = await this.redisClient.get(cacheKey);
+    if (cachedValue !== null) {
+      return { active: cachedValue === 'true' };
+    }
+
+    // 2. Fallback to Database
+    const setting = await this.prisma.systemSetting.findUnique({
+      where: { key: 'maintenance_mode' },
+    });
+
+    const isActive = setting?.value === 'true';
+
+    // 3. Store in Redis for future requests (e.g., expire in 1 minute)
+    await this.redisClient.set(cacheKey, String(isActive), {
+      EX: 60,
+    });
+
+    return { active: isActive };
   }
-
-  // 2. Fallback to Database
-  const setting = await this.prisma.systemSetting.findUnique({
-    where: { key: 'maintenance_mode' }
-  });
-
-  const isActive = setting?.value === 'true';
-
-  // 3. Store in Redis for future requests (e.g., expire in 1 minute)
-  await this.redisClient.set(cacheKey, String(isActive), {
-    EX: 60 
-  });
-
-  return { active: isActive };
-}
-
-
 }
