@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { OrderFilterDto } from './dto/order-filter.dto';
 import { Prisma, StoreType, OrderStatus } from '@prisma/client'; // Added OrderStatus
@@ -6,17 +10,17 @@ import { TransactionLedgerService } from '../transactions/transaction-ledger.ser
 
 // Helper to map friendly frontend names to DB Enums
 const SERVICE_TYPE_MAP: Record<string, StoreType> = {
-  'Food': 'RESTAURANT',
-  'Grocery': 'GROCERY',
-  'Pharmacy': 'PHARMACY',
-  'Logistics': 'MARKET'
+  Food: 'RESTAURANT',
+  Grocery: 'GROCERY',
+  Pharmacy: 'PHARMACY',
+  Logistics: 'MARKET',
 };
 
 @Injectable()
 export class OrdersService {
   constructor(
     private prisma: PrismaService,
-    private ledgerService: TransactionLedgerService
+    private ledgerService: TransactionLedgerService,
   ) {}
 
   // 📋 1. List All Orders
@@ -24,7 +28,8 @@ export class OrdersService {
     const { search, status, type, from, to, page = 1, limit = 10 } = query;
     const skip = (Number(page) - 1) * Number(limit);
 
-    const storeType = type && type !== 'All' ? SERVICE_TYPE_MAP[type] : undefined;
+    const storeType =
+      type && type !== 'All' ? SERVICE_TYPE_MAP[type] : undefined;
 
     const where: Prisma.OrderWhereInput = {
       ...(search && {
@@ -32,20 +37,21 @@ export class OrdersService {
           { id: { contains: search, mode: 'insensitive' } },
           { user: { name: { contains: search, mode: 'insensitive' } } },
           { store: { name: { contains: search, mode: 'insensitive' } } },
-        ]
+        ],
       }),
-      ...(status && status !== 'All' && {
-        status: status as Prisma.EnumOrderStatusFilter
-      }),
+      ...(status &&
+        status !== 'All' && {
+          status: status as Prisma.EnumOrderStatusFilter,
+        }),
       ...(storeType && {
-        store: { type: storeType }
+        store: { type: storeType },
       }),
       ...((from || to) && {
         createdAt: {
           ...(from && { gte: new Date(new Date(from).setHours(0, 0, 0, 0)) }),
-          ...(to && { lte: new Date(new Date(to).setHours(23, 59, 59, 999)) })
-        }
-      })
+          ...(to && { lte: new Date(new Date(to).setHours(23, 59, 59, 999)) }),
+        },
+      }),
     };
 
     const [orders, total] = await Promise.all([
@@ -58,21 +64,21 @@ export class OrdersService {
           user: { select: { name: true } },
           store: { select: { name: true, type: true } },
           payment: { select: { status: true, amount: true } },
-          delivery: { 
-            include: { rider: { include: { user: { select: { name: true } } } } } 
-          }
-        }
+          delivery: {
+            include: { rider: { select: { name: true } } },
+          },
+        },
       }),
-      this.prisma.order.count({ where })
+      this.prisma.order.count({ where }),
     ]);
 
     return {
-      data: orders.map(order => ({
+      data: orders.map((order) => ({
         id: order.id,
         status: order.status,
         customer: order.user.name,
         vendor: order.store.name,
-        rider: order.delivery?.rider?.user.name ?? 'Unassigned',
+        rider: order.delivery?.rider?.name ?? 'Unassigned',
         amount: order.payment?.amount ?? order.total,
         paymentStatus: order.payment?.status ?? 'UNPAID',
         type: this.mapStoreTypeToService(order.store.type),
@@ -82,8 +88,8 @@ export class OrdersService {
         total,
         page: Number(page),
         limit: Number(limit),
-        pages: Math.ceil(total / Number(limit))
-      }
+        pages: Math.ceil(total / Number(limit)),
+      },
     };
   }
 
@@ -93,22 +99,22 @@ export class OrdersService {
       where: { id },
       include: {
         user: true,
-        store: { 
-          include: { 
+        store: {
+          include: {
             // Line 98
-vendor: { select: { name: true, phone: true, email: true } }
-          } 
+            vendor: { select: { name: true, phone: true, email: true } },
+          },
         },
         items: { include: { product: true } },
         payment: true,
         delivery: {
           include: {
-            rider: { include: { user: true, vehicle: true } },
+            rider: { include: { vehicle: true } },
             pickupAddress: true,
-            dropoffAddress: true
-          }
+            dropoffAddress: true,
+          },
         },
-      }
+      },
     });
 
     if (!order) throw new NotFoundException(`Order #${id} not found`);
@@ -117,12 +123,12 @@ vendor: { select: { name: true, phone: true, email: true } }
       where: { target: { contains: id } },
       orderBy: { createdAt: 'desc' },
       take: 20,
-      include: { user: { select: { name: true } } }
+      include: { user: { select: { name: true } } },
     });
 
     const dispute = await this.prisma.dispute.findFirst({
       where: { orderId: id, status: 'OPEN' },
-      select: { id: true, reason: true }
+      select: { id: true, reason: true },
     });
 
     return this.transformForDetail(order, logs, dispute);
@@ -135,8 +141,8 @@ vendor: { select: { name: true, phone: true, email: true } }
       include: {
         payment: true,
         store: { select: { id: true, commissionRate: true } },
-        user: { select: { id: true } }
-      }
+        user: { select: { id: true } },
+      },
     });
 
     if (!order) throw new NotFoundException('Order not found');
@@ -149,10 +155,10 @@ vendor: { select: { name: true, phone: true, email: true } }
       // 1. Update order status
       const updatedOrder = await tx.order.update({
         where: { id },
-        data: { 
+        data: {
           status: 'DELIVERED',
-          deliveredAt: new Date()
-        }
+          deliveredAt: new Date(),
+        },
       });
 
       // 2. Record payment in ledger (if payment exists and is completed)
@@ -163,7 +169,7 @@ vendor: { select: { name: true, phone: true, email: true } }
           userId: order.user.id,
           orderId: order.id,
           method: order.payment.method,
-          status: order.payment.status
+          status: order.payment.status,
         });
 
         // 3. Record commission and vendor earnings
@@ -171,7 +177,7 @@ vendor: { select: { name: true, phone: true, email: true } }
           id: order.id,
           storeId: order.store.id,
           total: order.total,
-          commissionRate: order.store.commissionRate || 20 // Default 20%
+          commissionRate: order.store.commissionRate || 20, // Default 20%
         });
       }
 
@@ -181,11 +187,11 @@ vendor: { select: { name: true, phone: true, email: true } }
           userId: 'SYSTEM',
           action: 'ORDER_COMPLETED',
           target: id,
-          metadata: { 
+          metadata: {
             completedAt: new Date().toISOString(),
-            totalAmount: order.total
-          }
-        }
+            totalAmount: order.total,
+          },
+        },
       });
 
       return updatedOrder;
@@ -194,28 +200,30 @@ vendor: { select: { name: true, phone: true, email: true } }
 
   // ❌ 4. Cancel Order (With Refund Handling)
   async remove(id: string, adminUserId?: string) {
-    const order = await this.prisma.order.findUnique({ 
+    const order = await this.prisma.order.findUnique({
       where: { id },
       include: {
         payment: true,
-        user: { select: { id: true } }
-      }
+        user: { select: { id: true } },
+      },
     });
 
     if (!order) throw new NotFoundException('Order not found');
-    
+
     if (['DELIVERED', 'CANCELLED', 'REJECTED'].includes(order.status)) {
-      throw new BadRequestException(`Cannot cancel order that is ${order.status}`);
+      throw new BadRequestException(
+        `Cannot cancel order that is ${order.status}`,
+      );
     }
 
     return this.prisma.$transaction(async (tx) => {
       // 1. Cancel the order
       await tx.order.update({
         where: { id },
-        data: { 
+        data: {
           status: 'CANCELLED',
-          cancelledAt: new Date()
-        }
+          cancelledAt: new Date(),
+        },
       });
 
       // 2. Process refund if payment was completed
@@ -223,7 +231,7 @@ vendor: { select: { name: true, phone: true, email: true } }
         // Update payment status to refunded
         await tx.payment.update({
           where: { id: order.payment.id },
-          data: { status: 'REFUNDED' }
+          data: { status: 'REFUNDED' },
         });
 
         // Record refund in ledger
@@ -231,7 +239,7 @@ vendor: { select: { name: true, phone: true, email: true } }
           id: order.payment.id,
           amount: order.payment.amount,
           userId: order.user.id,
-          orderId: order.id
+          orderId: order.id,
         });
       }
 
@@ -241,11 +249,11 @@ vendor: { select: { name: true, phone: true, email: true } }
           userId: adminUserId || 'SUPER_ADMIN',
           action: 'ORDER_CANCELLED',
           target: id,
-          metadata: { 
+          metadata: {
             reason: 'Admin Force Cancel',
-            refunded: order.payment?.status === 'COMPLETED'
-          }
-        }
+            refunded: order.payment?.status === 'COMPLETED',
+          },
+        },
       });
     });
   }
@@ -256,12 +264,13 @@ vendor: { select: { name: true, phone: true, email: true } }
       where: { id },
       include: {
         payment: true,
-        user: { select: { id: true } }
-      }
+        user: { select: { id: true } },
+      },
     });
 
     if (!order) throw new NotFoundException('Order not found');
-    if (!order.payment) throw new BadRequestException('No payment found for this order');
+    if (!order.payment)
+      throw new BadRequestException('No payment found for this order');
     if (order.payment.status !== 'COMPLETED') {
       throw new BadRequestException('Can only refund completed payments');
     }
@@ -277,9 +286,12 @@ vendor: { select: { name: true, phone: true, email: true } }
       // Update payment status
       await tx.payment.update({
         where: { id: payment.id },
-        data: { 
-          status: amountToRefund === payment.amount ? 'REFUNDED' : 'PARTIALLY_REFUNDED'
-        }
+        data: {
+          status:
+            amountToRefund === payment.amount
+              ? 'REFUNDED'
+              : 'PARTIALLY_REFUNDED',
+        },
       });
 
       // Record refund in ledger
@@ -287,7 +299,7 @@ vendor: { select: { name: true, phone: true, email: true } }
         id: payment.id,
         amount: amountToRefund,
         userId: order.user.id,
-        orderId: order.id
+        orderId: order.id,
       });
 
       // Log activity
@@ -296,21 +308,26 @@ vendor: { select: { name: true, phone: true, email: true } }
           userId: 'ADMIN',
           action: 'REFUND_ISSUED',
           target: id,
-          metadata: { 
+          metadata: {
             amount: amountToRefund,
             reason: reason || 'Refund processed',
-            isPartial: amountToRefund < payment.amount
-          }
-        }
+            isPartial: amountToRefund < payment.amount,
+          },
+        },
       });
     });
   }
 
   // ⚠️ 6. Force Status Override ("God Mode")
   // Allows moving an order to ANY status without standard validation.
-  async forceStatusChange(orderId: string, newStatus: OrderStatus, reason: string, adminId: string) {
+  async forceStatusChange(
+    orderId: string,
+    newStatus: OrderStatus,
+    reason: string,
+    adminId: string,
+  ) {
     const order = await this.prisma.order.findUnique({
-      where: { id: orderId }
+      where: { id: orderId },
     });
 
     if (!order) throw new NotFoundException('Order not found');
@@ -318,14 +335,17 @@ vendor: { select: { name: true, phone: true, email: true } }
     // Perform the Override
     const updatedOrder = await this.prisma.order.update({
       where: { id: orderId },
-      data: { 
+      data: {
         status: newStatus,
         // Manage timestamps based on status
         cancelledAt: newStatus === 'CANCELLED' ? new Date() : undefined,
         deliveredAt: newStatus === 'DELIVERED' ? new Date() : undefined,
         // If resetting to PENDING/PREPARING, we might want to clear deliveredAt
-        ...( ['PENDING', 'PREPARING', 'CONFIRMED'].includes(newStatus) && { deliveredAt: null, cancelledAt: null })
-      }
+        ...(['PENDING', 'PREPARING', 'CONFIRMED'].includes(newStatus) && {
+          deliveredAt: null,
+          cancelledAt: null,
+        }),
+      },
     });
 
     // Log the System Override
@@ -336,10 +356,10 @@ vendor: { select: { name: true, phone: true, email: true } }
         details: `Force status change from ${order.status} to ${newStatus}. Reason: ${reason}`,
         target: orderId,
         metadata: {
-            oldStatus: order.status,
-            newStatus: newStatus,
-            reason: reason
-        }
+          oldStatus: order.status,
+          newStatus: newStatus,
+          reason: reason,
+        },
       },
     });
 
@@ -361,49 +381,55 @@ vendor: { select: { name: true, phone: true, email: true } }
       dispute: dispute,
       amount: order.total,
       updatedAt: order.updatedAt,
-      isLate: ['PREPARING', 'PENDING'].includes(order.status) && 
-              (new Date().getTime() - new Date(order.createdAt).getTime()) > 45 * 60000, 
-      
+      isLate:
+        ['PREPARING', 'PENDING'].includes(order.status) &&
+        new Date().getTime() - new Date(order.createdAt).getTime() > 45 * 60000,
+
       customer: {
         name: order.user.name,
         phone: order.user.phone,
         email: order.user.email,
-        address: order.delivery?.dropoffAddress?.street || 'N/A'
+        address: order.delivery?.dropoffAddress?.street || 'N/A',
       },
 
       vendor: {
         name: order.store.name,
         address: order.store.address,
-        ownerName: order.store.owner.name,
-        ownerPhone: order.store.owner.phone
+        ownerName: order.store.vendor?.name || 'N/A',
+        ownerPhone: order.store.vendor?.phone || 'N/A',
       },
 
-      rider: order.delivery?.rider ? {
-        name: order.delivery.rider.user.name,
-        phone: order.delivery.rider.user.phone,
-        vehicle: order.delivery.rider.vehicle?.plateNumber
-      } : null,
+      rider: order.delivery?.rider
+        ? {
+            name: order.delivery.rider.name,
+            phone: order.delivery.rider.phone,
+            vehicle: order.delivery.rider.vehicle?.plateNumber,
+          }
+        : null,
 
       items: order.items.map((item: any) => ({
         name: item.nameSnap,
         quantity: item.quantity,
         price: item.price,
-        options: item.selectedOptions
+        options: item.selectedOptions,
       })),
 
-      payment: order.payment ? {
-        status: order.payment.status,
-        method: order.payment.method,
-        total: order.payment.amount
-      } : null,
+      payment: order.payment
+        ? {
+            status: order.payment.status,
+            method: order.payment.method,
+            total: order.payment.amount,
+          }
+        : null,
 
       logs: logs.map((log: any) => ({
         date: log.createdAt,
         user: log.user?.name || 'System',
         action: log.action,
         // Include detail/metadata in response so Admin sees reason for override
-        details: log.details || (log.metadata ? JSON.stringify(log.metadata) : '') 
-      }))
+        details:
+          log.details || (log.metadata ? JSON.stringify(log.metadata) : ''),
+      })),
     };
   }
 }

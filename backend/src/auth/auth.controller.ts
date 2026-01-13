@@ -4,8 +4,6 @@ import { JwtAuthGuard } from './jwt-auth.guard';
 import { RolesGuard } from './roles.guards';
 import { Roles } from './roles.decorator';
 import { CreateUserDto } from './dto/create-user.dto';
-import { CreateVendorDto } from './dto/create-vendor.dto';
-import { CreateRiderDto } from './dto/create-rider.dto';
 import { CreateDriverDto } from './dto/create-driver.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
@@ -54,34 +52,6 @@ export class UserAuthController {
   @Roles('CUSTOMER')
   updateProfile(@Body() dto: UpdateProfileDto, @Req() req) {
     return this.authService.updateUserProfile(req.user.id, dto);
-  }
-}
-
-// Rider Auth
-@Controller('auth/rider')
-export class RiderAuthController {
-  constructor(private readonly authService: AuthService) {}
-
-  @Post('login')
-  login(@Body() body) {
-    return this.authService.loginRider(body);
-  }
-
-  @Post('register')
-  register(@Body() dto: CreateRiderDto) {
-    return this.authService.registerRider(dto);
-  }
-
-  @Post('reset-password')
-  resetPassword(@Body() dto: ResetPasswordDto) {
-    return this.authService.resetRiderPassword(dto);
-  }
-
-  @Patch('profile')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('RIDER')
-  updateProfile(@Body() dto: UpdateProfileDto, @Req() req) {
-    return this.authService.updateRiderProfile(req.user.id, dto);
   }
 }
 

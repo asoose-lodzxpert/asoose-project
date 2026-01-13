@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { DeliveryFilterDto } from './dto/delivery-filter.dto';
 import { Prisma, DeliveryStatus } from '@prisma/client';
@@ -8,7 +12,7 @@ import { TransactionLedgerService } from '../transactions/transaction-ledger.ser
 export class DeliveriesService {
   constructor(
     private prisma: PrismaService,
-    private ledgerService: TransactionLedgerService
+    private ledgerService: TransactionLedgerService,
   ) {}
 
   // 📦 1. List All Deliveries
@@ -22,15 +26,19 @@ export class DeliveriesService {
           { id: { contains: search, mode: 'insensitive' } },
           { recipientName: { contains: search, mode: 'insensitive' } },
           { customer: { name: { contains: search, mode: 'insensitive' } } },
-          { order: { store: { name: { contains: search, mode: 'insensitive' } } } }
-        ]
+          {
+            order: {
+              store: { name: { contains: search, mode: 'insensitive' } },
+            },
+          },
+        ],
       }),
       ...((from || to) && {
         createdAt: {
           ...(from && { gte: new Date(new Date(from).setHours(0, 0, 0, 0)) }),
-          ...(to && { lte: new Date(new Date(to).setHours(23, 59, 59, 999)) })
-        }
-      })
+          ...(to && { lte: new Date(new Date(to).setHours(23, 59, 59, 999)) }),
+        },
+      }),
     };
 
     // Apply Status Filter
@@ -38,9 +46,9 @@ export class DeliveriesService {
       const statusMap: Record<string, DeliveryStatus[]> = {
         'Pending Pickup': ['REQUESTED', 'ASSIGNED'],
         'In Transit': ['PICKED_UP'],
-        'Delivered': ['DELIVERED'],
-        'Failed': ['CANCELLED'],
-        'Cancelled': ['CANCELLED']
+        Delivered: ['DELIVERED'],
+        Failed: ['CANCELLED'],
+        Cancelled: ['CANCELLED'],
       };
       if (statusMap[status]) {
         where.status = { in: statusMap[status] };
@@ -58,12 +66,12 @@ export class DeliveriesService {
         include: {
           customer: { select: { name: true } },
           order: { include: { store: { select: { name: true } } } },
-          rider: { include: { user: { select: { name: true } } } },
+          rider: { select: { name: true } },
           pickupAddress: true,
           dropoffAddress: true,
-        }
+        },
       }),
-      this.prisma.delivery.count({ where })
+      this.prisma.delivery.count({ where }),
     ]);
 
     return {
@@ -72,8 +80,8 @@ export class DeliveriesService {
         total,
         page: Number(page),
         limit: Number(limit),
-        pages: Math.ceil(total / Number(limit))
-      }
+        pages: Math.ceil(total / Number(limit)),
+      },
     };
   }
 
@@ -83,23 +91,26 @@ export class DeliveriesService {
       where: { id },
       include: {
         customer: { select: { name: true, phone: true, email: true } },
-        order: { 
-          include: { 
-            store: { 
+        order: {
+          include: {
+            store: {
               // Line 89
-select: { name: true, address: true, vendor: { select: { phone: true } } }
-            } 
-          } 
+              select: {
+                name: true,
+                address: true,
+                vendor: { select: { phone: true } },
+              },
+            },
+          },
         },
-        rider: { 
-          include: { 
-            user: { select: { name: true, phone: true } },
-            vehicle: true 
-          } 
+        rider: {
+          include: {
+            vehicle: true,
+          },
         },
         pickupAddress: true,
         dropoffAddress: true,
-      }
+      },
     });
 
     if (!delivery) throw new NotFoundException(`Delivery #${id} not found`);
@@ -113,13 +124,13 @@ select: { name: true, address: true, vendor: { select: { phone: true } } }
       where: { id },
       include: {
         rider: { select: { id: true } },
-        order: { 
-          include: { 
+        order: {
+          include: {
             payment: true,
-            user: { select: { id: true } }
-          } 
-        }
-      }
+            user: { select: { id: true } },
+          },
+        },
+      },
     });
 
     if (!delivery) throw new NotFoundException('Delivery not found');
@@ -134,10 +145,10 @@ select: { name: true, address: true, vendor: { select: { phone: true } } }
       // 1. Update delivery status
       const updatedDelivery = await tx.delivery.update({
         where: { id },
-        data: { 
+        data: {
           status: 'DELIVERED',
-          deliveredAt: new Date()
-        }
+          deliveredAt: new Date(),
+        },
       });
 
       // 2. Record delivery earnings in ledger
@@ -147,8 +158,8 @@ select: { name: true, address: true, vendor: { select: { phone: true } } }
       if (deliveryFee > 0 && delivery.rider) {
         await this.ledgerService.recordDeliveryEarnings({
           id: delivery.id,
-          riderProfileId: delivery.rider.id,
-          deliveryFee
+          riderId: delivery.rider.id,
+          deliveryFee,
         });
       }
 
@@ -156,27 +167,30 @@ select: { name: true, address: true, vendor: { select: { phone: true } } }
       if (delivery.orderId && delivery.order) {
         await tx.order.update({
           where: { id: delivery.orderId },
-          data: { 
+          data: {
             status: 'DELIVERED',
-            deliveredAt: new Date()
-          }
+            deliveredAt: new Date(),
+          },
         });
 
         // Record order payment and commission if payment exists
-        if (delivery.order.payment && delivery.order.payment.status === 'COMPLETED') {
+        if (
+          delivery.order.payment &&
+          delivery.order.payment.status === 'COMPLETED'
+        ) {
           await this.ledgerService.recordPayment({
             id: delivery.order.payment.id,
             amount: delivery.order.payment.amount,
             userId: delivery.order.user.id,
             orderId: delivery.orderId,
             method: delivery.order.payment.method,
-            status: delivery.order.payment.status
+            status: delivery.order.payment.status,
           });
 
           // Record order commission (if order has store)
           const order = await tx.order.findUnique({
             where: { id: delivery.orderId },
-            include: { store: { select: { id: true, commissionRate: true } } }
+            include: { store: { select: { id: true, commissionRate: true } } },
           });
 
           if (order?.store) {
@@ -184,7 +198,7 @@ select: { name: true, address: true, vendor: { select: { phone: true } } }
               id: order.id,
               storeId: order.store.id,
               total: delivery.order.total,
-              commissionRate: order.store.commissionRate || 20
+              commissionRate: order.store.commissionRate || 20,
             });
           }
         }
@@ -196,12 +210,12 @@ select: { name: true, address: true, vendor: { select: { phone: true } } }
           userId: 'SYSTEM',
           action: 'DELIVERY_COMPLETED',
           target: id,
-          metadata: { 
+          metadata: {
             completedAt: new Date().toISOString(),
             deliveryFee,
-            orderId: delivery.orderId
-          }
-        }
+            orderId: delivery.orderId,
+          },
+        },
       });
 
       return updatedDelivery;
@@ -210,16 +224,16 @@ select: { name: true, address: true, vendor: { select: { phone: true } } }
 
   // 🚫 4. Cancel/Delete Delivery
   async remove(id: string, adminUserId?: string, reason?: string) {
-    const delivery = await this.prisma.delivery.findUnique({ 
+    const delivery = await this.prisma.delivery.findUnique({
       where: { id },
       include: {
         order: {
           include: {
             payment: true,
-            user: { select: { id: true } }
-          }
-        }
-      }
+            user: { select: { id: true } },
+          },
+        },
+      },
     });
 
     if (!delivery) throw new NotFoundException('Delivery not found');
@@ -232,31 +246,34 @@ select: { name: true, address: true, vendor: { select: { phone: true } } }
       // 1. Cancel the delivery
       await tx.delivery.update({
         where: { id },
-        data: { status: 'CANCELLED' }
+        data: { status: 'CANCELLED' },
       });
 
       // 2. If this delivery has an associated order, cancel it too
       if (delivery.orderId && delivery.order) {
         await tx.order.update({
           where: { id: delivery.orderId },
-          data: { 
+          data: {
             status: 'CANCELLED',
-            cancelledAt: new Date()
-          }
+            cancelledAt: new Date(),
+          },
         });
 
         // Process refund if payment was completed
-        if (delivery.order.payment && delivery.order.payment.status === 'COMPLETED') {
+        if (
+          delivery.order.payment &&
+          delivery.order.payment.status === 'COMPLETED'
+        ) {
           await tx.payment.update({
             where: { id: delivery.order.payment.id },
-            data: { status: 'REFUNDED' }
+            data: { status: 'REFUNDED' },
           });
 
           await this.ledgerService.recordRefund({
             id: delivery.order.payment.id,
             amount: delivery.order.payment.amount,
             userId: delivery.order.user.id,
-            ...(delivery.orderId && { orderId: delivery.orderId })
+            ...(delivery.orderId && { orderId: delivery.orderId }),
           });
         }
       }
@@ -267,12 +284,12 @@ select: { name: true, address: true, vendor: { select: { phone: true } } }
           userId: adminUserId || 'SUPER_ADMIN',
           action: 'DELIVERY_CANCELLED',
           target: id,
-          metadata: { 
+          metadata: {
             reason: reason || 'Cancelled by admin',
             orderId: delivery.orderId,
-            refunded: delivery.order?.payment?.status === 'COMPLETED'
-          }
-        }
+            refunded: delivery.order?.payment?.status === 'COMPLETED',
+          },
+        },
       });
     });
   }
@@ -285,17 +302,19 @@ select: { name: true, address: true, vendor: { select: { phone: true } } }
         order: {
           include: {
             payment: true,
-            user: { select: { id: true } }
-          }
-        }
-      }
+            user: { select: { id: true } },
+          },
+        },
+      },
     });
 
     if (!delivery) throw new NotFoundException('Delivery not found');
-    
+
     // Check if order exists
     if (!delivery.order) {
-      throw new BadRequestException('No associated order found for this delivery');
+      throw new BadRequestException(
+        'No associated order found for this delivery',
+      );
     }
 
     // Check if payment exists
@@ -316,13 +335,16 @@ select: { name: true, address: true, vendor: { select: { phone: true } } }
     return this.prisma.$transaction(async (tx) => {
       // Safe to use non-null assertion here because we checked above
       const payment = delivery.order!.payment!;
-      
+
       // Update payment status
       await tx.payment.update({
         where: { id: payment.id },
-        data: { 
-          status: amountToRefund === payment.amount ? 'REFUNDED' : 'PARTIALLY_REFUNDED'
-        }
+        data: {
+          status:
+            amountToRefund === payment.amount
+              ? 'REFUNDED'
+              : 'PARTIALLY_REFUNDED',
+        },
       });
 
       // Record refund in ledger
@@ -330,7 +352,7 @@ select: { name: true, address: true, vendor: { select: { phone: true } } }
         id: payment.id,
         amount: amountToRefund,
         userId: delivery.order!.user.id,
-        ...(delivery.orderId && { orderId: delivery.orderId })
+        ...(delivery.orderId && { orderId: delivery.orderId }),
       });
 
       // Log activity
@@ -339,12 +361,12 @@ select: { name: true, address: true, vendor: { select: { phone: true } } }
           userId: 'ADMIN',
           action: 'REFUND_ISSUED',
           target: id,
-          metadata: { 
+          metadata: {
             amount: amountToRefund,
             reason: reason || 'Refund processed',
-            isPartial: amountToRefund < payment.amount
-          }
-        }
+            isPartial: amountToRefund < payment.amount,
+          },
+        },
       });
     });
   }
@@ -362,66 +384,99 @@ select: { name: true, address: true, vendor: { select: { phone: true } } }
     return {
       id: d.id,
       type: this.inferType(d.weightKg || 0, d.isFragile),
-      sender: d.order?.store?.name || d.customer.name, 
+      sender: d.order?.store?.name || d.customer.name,
       recipient: d.recipientName,
-      driver: d.rider?.user?.name || '-',
-      status: d.status === 'PICKED_UP' ? 'In Transit' : 
-              d.status === 'ASSIGNED' ? 'Pending Pickup' : 
-              d.status === 'REQUESTED' ? 'Pending Pickup' :
-              d.status.charAt(0) + d.status.slice(1).toLowerCase(),
+      driver: d.rider?.name || '-',
+      status:
+        d.status === 'PICKED_UP'
+          ? 'In Transit'
+          : d.status === 'ASSIGNED'
+            ? 'Pending Pickup'
+            : d.status === 'REQUESTED'
+              ? 'Pending Pickup'
+              : d.status.charAt(0) + d.status.slice(1).toLowerCase(),
       pickup: d.pickupAddress.city || d.pickupAddress.street,
       dropoff: d.dropoffAddress.city || d.dropoffAddress.street,
-      eta: d.deliveredAt ? 'Delivered' : 'Est. 2 hrs' 
+      eta: d.deliveredAt ? 'Delivered' : 'Est. 2 hrs',
     };
-  }
+  };
 
   private transformForDetail = (d: any) => {
     return {
       id: d.id,
-      status: d.status === 'PICKED_UP' ? 'In Transit' : 
-              d.status === 'ASSIGNED' ? 'Pending Pickup' : 
-              d.status.charAt(0) + d.status.slice(1).toLowerCase(),
+      status:
+        d.status === 'PICKED_UP'
+          ? 'In Transit'
+          : d.status === 'ASSIGNED'
+            ? 'Pending Pickup'
+            : d.status.charAt(0) + d.status.slice(1).toLowerCase(),
       created: d.createdAt.toISOString(),
       eta: d.deliveredAt ? 'Arrived' : 'Calculated based on traffic',
       type: this.inferType(d.weightKg || 0, d.isFragile),
-      
+
       package: {
         weight: `${d.weightKg || 0} kg`,
         dims: 'N/A',
         contents: d.packageDetails || 'No details',
-        fragile: d.isFragile
+        fragile: d.isFragile,
       },
 
-      sender: d.order ? {
-        name: d.order.store.name,
-        address: d.order.store.address || 'N/A',
-        phone: d.order.store.owner?.phone || 'N/A'
-      } : {
-        name: d.customer.name,
-        address: d.pickupAddress.street,
-        phone: d.customer.phone
-      },
+      sender: d.order
+        ? {
+            name: d.order.store.name,
+            address: d.order.store.address || 'N/A',
+            phone: d.order.store.vendor?.phone || 'N/A',
+          }
+        : {
+            name: d.customer.name,
+            address: d.pickupAddress.street,
+            phone: d.customer.phone,
+          },
 
       recipient: {
         name: d.recipientName,
         address: `${d.dropoffAddress.street}, ${d.dropoffAddress.city}`,
         phone: d.recipientPhone,
-        instructions: 'N/A'
+        instructions: 'N/A',
       },
 
-      courier: d.rider ? {
-        name: d.rider.user.name,
-        id: d.rider.id,
-        vehicle: d.rider.vehicle ? `${d.rider.vehicle.color} ${d.rider.vehicle.model}` : 'Unknown',
-        phone: d.rider.user.phone
-      } : null,
+      courier: d.rider
+        ? {
+            name: d.rider.name,
+            id: d.rider.id,
+            vehicle: d.rider.vehicle
+              ? `${d.rider.vehicle.color} ${d.rider.vehicle.model}`
+              : 'Unknown',
+            phone: d.rider.phone,
+          }
+        : null,
 
       history: [
-        { status: 'Request Created', loc: 'System', time: d.createdAt, done: true },
-        { status: 'Driver Assigned', loc: 'System', time: d.assignedAt, done: !!d.assignedAt },
-        { status: 'Picked Up', loc: d.pickupAddress.street, time: d.pickedUpAt, done: !!d.pickedUpAt },
-        { status: 'Delivered', loc: d.dropoffAddress.street, time: d.deliveredAt, done: !!d.deliveredAt },
-      ]
+        {
+          status: 'Request Created',
+          loc: 'System',
+          time: d.createdAt,
+          done: true,
+        },
+        {
+          status: 'Driver Assigned',
+          loc: 'System',
+          time: d.assignedAt,
+          done: !!d.assignedAt,
+        },
+        {
+          status: 'Picked Up',
+          loc: d.pickupAddress.street,
+          time: d.pickedUpAt,
+          done: !!d.pickedUpAt,
+        },
+        {
+          status: 'Delivered',
+          loc: d.dropoffAddress.street,
+          time: d.deliveredAt,
+          done: !!d.deliveredAt,
+        },
+      ],
     };
-  }
+  };
 }

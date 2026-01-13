@@ -4,17 +4,27 @@ import { Queue } from 'bullmq';
 
 @Injectable()
 export class EmailProducer {
-  constructor(
-    @InjectQueue('email') private readonly emailQueue: Queue,
-  ) {}
+  constructor(@InjectQueue('email') private readonly emailQueue: Queue) {}
 
-  async sendWelcomeEmail(email: string) {
+  async sendWelcomeEmail(email: string, name?: string) {
     await this.emailQueue.add(
       'send-welcome',
-      { email },
+      { email, name },
       {
         attempts: 3,
         backoff: { type: 'exponential', delay: 3000 },
+        removeOnComplete: true,
+      },
+    );
+  }
+
+  async sendPasswordResetOtp(email: string, name: string, otp: string) {
+    await this.emailQueue.add(
+      'rider-password-reset-otp',
+      { email, name, otp },
+      {
+        attempts: 3,
+        backoff: { type: 'fixed', delay: 2000 },
         removeOnComplete: true,
       },
     );
@@ -31,20 +41,28 @@ export class EmailProducer {
     );
   }
 
-async sendOrderCreatedCustomer(email: string, orderId: string, total: number) {
+  async sendOrderCreatedCustomer(
+    email: string,
+    orderId: string,
+    total: number,
+  ) {
     await this.emailQueue.add(
       'order-created-customer',
       { email, orderId, total },
-      { attempts: 3, removeOnComplete: true }
+      { attempts: 3, removeOnComplete: true },
     );
   }
 
-  async sendOrderCreatedVendor(email: string, storeName: string, orderId: string, items: any[]) {
+  async sendOrderCreatedVendor(
+    email: string,
+    storeName: string,
+    orderId: string,
+    items: any[],
+  ) {
     await this.emailQueue.add(
       'order-created-vendor',
       { email, storeName, orderId, items },
-      { attempts: 3, removeOnComplete: true }
+      { attempts: 3, removeOnComplete: true },
     );
   }
-
 }

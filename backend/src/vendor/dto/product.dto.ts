@@ -1,11 +1,12 @@
-import { 
-  IsNotEmpty, 
-  IsNumber, 
-  IsOptional, 
-  IsString, 
-  IsUUID, 
-  Min, 
-  IsEnum 
+import {
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Min,
+  IsEnum,
+  IsArray,
 } from 'class-validator';
 import { ProductStatus } from '@prisma/client';
 
@@ -26,6 +27,11 @@ export class CreateProductDto {
   @IsOptional()
   @IsString()
   image?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  images?: string[];
 
   @IsNotEmpty()
   @IsUUID()
@@ -50,6 +56,11 @@ export class UpdateProductDto {
   @IsOptional()
   @IsString()
   image?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  images?: string[];
 
   @IsOptional()
   @IsUUID()

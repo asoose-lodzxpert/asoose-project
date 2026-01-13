@@ -9,11 +9,12 @@ import { OtpModule } from './otp.module';
 import {
   AuthController,
   DriverAuthController,
-  RiderAuthController,
   UserAuthController,
 } from './auth.controller';
 import { VendorAuthController } from './vendor-auth.controller';
 import { VendorAuthService } from './vendor-auth.service';
+import { RiderAuthController } from './rider-auth.controller';
+import { RiderAuthService } from './rider-auth.service';
 import { AuthService } from './auth.service';
 import { MailModule } from 'src/mail/mail.module';
 
@@ -33,6 +34,7 @@ import { MailModule } from 'src/mail/mail.module';
     ConfigModule,
     OtpModule,
     MailModule,
+    PrismaModule,
   ],
 
   controllers: [
@@ -47,13 +49,14 @@ import { MailModule } from 'src/mail/mail.module';
     JwtStrategy,
     JwtAuthGuard,
     VendorAuthService,
-    PrismaModule,
+    RiderAuthService,
   ],
   exports: [
     AuthService,
     JwtStrategy,
     JwtAuthGuard,
     VendorAuthService,
+    RiderAuthService,
     PassportModule,
     JwtModule,
   ],

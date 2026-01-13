@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { PrismaService } from '../prisma/prisma.service';
-import { NotificationFacade } from '../users/notification.facade'; 
+import { NotificationFacade } from '../users/notification.facade';
 
 @Injectable()
 export class RiderDispatchListener {
@@ -9,7 +9,7 @@ export class RiderDispatchListener {
 
   constructor(
     private prisma: PrismaService,
-    private notificationFacade: NotificationFacade 
+    private notificationFacade: NotificationFacade,
   ) {}
 
   @OnEvent('order.ready')
@@ -18,7 +18,7 @@ export class RiderDispatchListener {
 
     const order = await this.prisma.order.findUnique({
       where: { id: payload.orderId },
-      include: { delivery: true, store: true }
+      include: { delivery: true, store: true },
     });
 
     if (!order || !order.delivery) {
@@ -26,9 +26,14 @@ export class RiderDispatchListener {
       return;
     }
 
-    const nearbyRiders = await this.prisma.riderProfile.findMany({
+    const nearbyRiders = await this.prisma.rider.findMany({
       where: { isOnline: true },
-      take: 5
+      take: 5,
+      select: {
+        id: true,
+        name: true,
+        fcmToken: true,
+      },
     });
 
     if (nearbyRiders.length === 0) {
@@ -37,24 +42,25 @@ export class RiderDispatchListener {
     }
 
     const selectedRider = nearbyRiders[0];
-    
+
     await this.prisma.delivery.update({
       where: { id: order.delivery.id },
       data: {
-        riderProfileId: selectedRider.id,
+        riderId: selectedRider.id,
         status: 'ASSIGNED',
-        assignedAt: new Date()
-      }
+        assignedAt: new Date(),
+      },
     });
 
-    // [!code ++] NOTIFY THE RIDER
-    await this.notificationFacade.sendInAppNotification(
-      selectedRider.userId,
+    await this.notificationFacade.notifyRider(
+      selectedRider.id,
       'New Delivery Assigned',
-      `Pick up order #${payload.orderId.slice(0,8)} at ${order.store.name}`,
-      { orderId: payload.orderId, type: 'DELIVERY_ASSIGNED' }
+      `Pick up order #${payload.orderId.slice(0, 8)} at ${order.store.name}`,
+      { orderId: payload.orderId, type: 'DELIVERY_ASSIGNED' },
     );
 
-    this.logger.log(`Rider ${selectedRider.id} assigned and notified for Order ${payload.orderId}`);
+    this.logger.log(
+      `Rider ${selectedRider.id} assigned and notified for Order ${payload.orderId}`,
+    );
   }
 }

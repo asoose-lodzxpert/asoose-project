@@ -16,7 +16,7 @@ export class AppController {
     return this.appService.getHello();
   }
 
-  @Get('test-services')
+  @Get('health')
   async testServices(): Promise<any> {
     // Test Prisma DB
     let dbStatus = 'ok';

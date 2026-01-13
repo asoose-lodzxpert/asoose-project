@@ -1,20 +1,24 @@
-import { 
-  BadRequestException, 
-  Injectable, 
+import {
+  BadRequestException,
+  Injectable,
   NotFoundException,
-  ForbiddenException 
+  ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { TransactionLedgerService } from '../transactions/transaction-ledger.service';
 import { CreateDisputeDto } from './dto/create-dispute.dto';
 import { AddMessageDto } from './dto/add-message.dto';
-import { ResolveDisputeDto, ResolutionAction, RefundSource } from './dto/resolve-dispute.dto';
+import {
+  ResolveDisputeDto,
+  ResolutionAction,
+  RefundSource,
+} from './dto/resolve-dispute.dto';
 
 @Injectable()
 export class DisputesService {
   constructor(
     private prisma: PrismaService,
-    private ledger: TransactionLedgerService
+    private ledger: TransactionLedgerService,
   ) {}
 
   // ==================== CREATE DISPUTE ====================
@@ -26,7 +30,9 @@ export class DisputesService {
     // 2. Check for existing open disputes
     const existingDispute = await this.checkExistingDispute(dto);
     if (existingDispute) {
-      throw new BadRequestException('An open dispute already exists for this transaction');
+      throw new BadRequestException(
+        'An open dispute already exists for this transaction',
+      );
     }
 
     // 3. Get payment info for linking
@@ -34,13 +40,13 @@ export class DisputesService {
     if (dto.orderId) {
       const order = await this.prisma.order.findUnique({
         where: { id: dto.orderId },
-        include: { payment: true }
+        include: { payment: true },
       });
       paymentId = order?.payment?.id;
     } else if (dto.rideId) {
       const ride = await this.prisma.ride.findUnique({
         where: { id: dto.rideId },
-        include: { payment: true }
+        include: { payment: true },
       });
       paymentId = ride?.payment?.id;
     }
@@ -54,14 +60,18 @@ export class DisputesService {
         evidenceImages: dto.evidenceImages || [],
         // Fixed: Uses userId param, not dto property
         openedByUser: { connect: { id: userId } },
-        ...(dto.targetUserId && { targetUser: { connect: { id: dto.targetUserId } } }),
+        ...(dto.targetUserId && {
+          targetUser: { connect: { id: dto.targetUserId } },
+        }),
         ...(paymentId && { payment: { connect: { id: paymentId } } }),
-        
+
         // Polymorphic connections
         ...(dto.orderId && { order: { connect: { id: dto.orderId } } }),
         ...(dto.rideId && { ride: { connect: { id: dto.rideId } } }),
-        ...(dto.deliveryId && { delivery: { connect: { id: dto.deliveryId } } }),
-        
+        ...(dto.deliveryId && {
+          delivery: { connect: { id: dto.deliveryId } },
+        }),
+
         // Initial message
         messages: {
           create: {
@@ -75,76 +85,95 @@ export class DisputesService {
         openedByUser: { select: { id: true, name: true, email: true } },
         order: { select: { id: true, total: true, status: true } },
         ride: { select: { id: true, totalFare: true, status: true } },
-        delivery: { select: { id: true, deliveryFee: true, status: true } }
-      }
+        delivery: { select: { id: true, deliveryFee: true, status: true } },
+      },
     });
   }
 
   // ==================== VALIDATE ELIGIBILITY ====================
-  private async validateDisputeEligibility(dto: CreateDisputeDto, userId: string) {
+  private async validateDisputeEligibility(
+    dto: CreateDisputeDto,
+    userId: string,
+  ) {
     if (dto.orderId) {
       const order = await this.prisma.order.findUnique({
         where: { id: dto.orderId },
-        include: { delivery: true }
+        include: { delivery: true },
       });
 
       if (!order) throw new NotFoundException('Order not found');
-      
+
       if (order.userId !== userId) {
         throw new ForbiddenException('You can only dispute your own orders');
       }
 
       if (!['DELIVERED', 'CANCELLED'].includes(order.status)) {
-        throw new BadRequestException('Cannot dispute an order that is still in progress');
+        throw new BadRequestException(
+          'Cannot dispute an order that is still in progress',
+        );
       }
 
-      const daysSinceDelivery = order.deliveredAt 
-        ? Math.floor((Date.now() - order.deliveredAt.getTime()) / (1000 * 60 * 60 * 24))
+      const daysSinceDelivery = order.deliveredAt
+        ? Math.floor(
+            (Date.now() - order.deliveredAt.getTime()) / (1000 * 60 * 60 * 24),
+          )
         : 0;
-      
-      if (order.deliveredAt && daysSinceDelivery > 7) {
-        throw new BadRequestException('Disputes must be filed within 7 days of delivery');
-      }
 
+      if (order.deliveredAt && daysSinceDelivery > 7) {
+        throw new BadRequestException(
+          'Disputes must be filed within 7 days of delivery',
+        );
+      }
     } else if (dto.rideId) {
       const ride = await this.prisma.ride.findUnique({
-        where: { id: dto.rideId }
+        where: { id: dto.rideId },
       });
 
       if (!ride) throw new NotFoundException('Ride not found');
-      
+
       if (ride.customerId !== userId) {
         throw new ForbiddenException('You can only dispute your own rides');
       }
 
       if (!['COMPLETED', 'CANCELLED'].includes(ride.status)) {
-        throw new BadRequestException('Cannot dispute a ride that is still in progress');
+        throw new BadRequestException(
+          'Cannot dispute a ride that is still in progress',
+        );
       }
 
       const hoursSinceRide = ride.completedAt
-        ? Math.floor((Date.now() - ride.completedAt.getTime()) / (1000 * 60 * 60))
+        ? Math.floor(
+            (Date.now() - ride.completedAt.getTime()) / (1000 * 60 * 60),
+          )
         : 0;
-      
-      if (ride.completedAt && hoursSinceRide > 24) {
-        throw new BadRequestException('Disputes must be filed within 24 hours of ride completion');
-      }
 
+      if (ride.completedAt && hoursSinceRide > 24) {
+        throw new BadRequestException(
+          'Disputes must be filed within 24 hours of ride completion',
+        );
+      }
     } else if (dto.deliveryId) {
       const delivery = await this.prisma.delivery.findUnique({
-        where: { id: dto.deliveryId }
+        where: { id: dto.deliveryId },
       });
 
       if (!delivery) throw new NotFoundException('Delivery not found');
-      
+
       if (delivery.customerId !== userId) {
-        throw new ForbiddenException('You can only dispute your own deliveries');
+        throw new ForbiddenException(
+          'You can only dispute your own deliveries',
+        );
       }
 
       if (!['DELIVERED', 'CANCELLED'].includes(delivery.status)) {
-        throw new BadRequestException('Cannot dispute a delivery that is still in progress');
+        throw new BadRequestException(
+          'Cannot dispute a delivery that is still in progress',
+        );
       }
     } else {
-      throw new BadRequestException('Must specify orderId, rideId, or deliveryId');
+      throw new BadRequestException(
+        'Must specify orderId, rideId, or deliveryId',
+      );
     }
   }
 
@@ -157,39 +186,39 @@ export class DisputesService {
           ...(dto.orderId ? [{ orderId: dto.orderId }] : []),
           ...(dto.rideId ? [{ rideId: dto.rideId }] : []),
           ...(dto.deliveryId ? [{ deliveryId: dto.deliveryId }] : []),
-        ]
-      }
+        ],
+      },
     });
   }
 
   // ==================== LIST DISPUTES ====================
   // Fixed: Interface includes userId and role
-  async findAll(params: { 
-    skip?: number; 
-    take?: number; 
-    status?: string; 
+  async findAll(params: {
+    skip?: number;
+    take?: number;
+    status?: string;
     priority?: string;
     search?: string;
-    userId?: string; 
-    role?: string;   
+    userId?: string;
+    role?: string;
   }) {
     const { skip, take, status, priority, search, userId, role } = params;
-    
+
     const whereClause: any = {};
-    
+
     if (status && status !== 'All') {
       whereClause.status = status;
     }
-    
+
     if (priority && priority !== 'All') {
       whereClause.priority = priority;
     }
-    
+
     // If not admin, only show user's own disputes
     if (role !== 'SUPER_ADMIN' && role !== 'ADMIN' && userId) {
       whereClause.openedByUserId = userId;
     }
-    
+
     if (search) {
       whereClause.OR = [
         { id: { contains: search, mode: 'insensitive' } },
@@ -204,43 +233,46 @@ export class DisputesService {
         take: take || 10,
         where: whereClause,
         include: {
-          openedByUser: { select: { id: true, name: true, email: true, role: true } },
+          openedByUser: {
+            select: { id: true, name: true, email: true, role: true },
+          },
           targetUser: { select: { id: true, name: true, role: true } },
           order: { select: { id: true, total: true, status: true } },
           ride: { select: { id: true, totalFare: true, status: true } },
           delivery: { select: { id: true, deliveryFee: true, status: true } },
           payment: { select: { id: true, amount: true, status: true } },
-          _count: { select: { messages: true } }
+          _count: { select: { messages: true } },
         },
-        orderBy: [
-          { priority: 'desc' },
-          { createdAt: 'desc' }
-        ],
+        orderBy: [{ priority: 'desc' }, { createdAt: 'desc' }],
       }),
       this.prisma.dispute.count({ where: whereClause }),
     ]);
 
-    return { 
-      data: data.map(d => ({
+    return {
+      data: data.map((d) => ({
         ...d,
         messageCount: d._count.messages,
         isUrgent: d.priority === 'URGENT',
-        hoursOpen: Math.floor((Date.now() - d.createdAt.getTime()) / (1000 * 60 * 60)),
-        breachedSLA: this.checkSLABreach(d)
+        hoursOpen: Math.floor(
+          (Date.now() - d.createdAt.getTime()) / (1000 * 60 * 60),
+        ),
+        breachedSLA: this.checkSLABreach(d),
       })),
-      total 
+      total,
     };
   }
 
   // ==================== CHECK SLA BREACH ====================
   private checkSLABreach(dispute: any): boolean {
-    const hoursOpen = Math.floor((Date.now() - dispute.createdAt.getTime()) / (1000 * 60 * 60));
-    
+    const hoursOpen = Math.floor(
+      (Date.now() - dispute.createdAt.getTime()) / (1000 * 60 * 60),
+    );
+
     const slaHours: Record<string, number> = {
       URGENT: 4,
       HIGH: 24,
       MEDIUM: 48,
-      LOW: 72
+      LOW: 72,
     };
 
     return hoursOpen > (slaHours[dispute.priority] || 72);
@@ -255,39 +287,44 @@ export class DisputesService {
         openedByUser: true,
         targetUser: true,
         messages: {
-          where: role === 'SUPER_ADMIN' || role === 'ADMIN' 
-            ? {} 
-            : { isInternal: false }, // Hide internal messages from customers
-          include: { 
-            sender: { select: { id: true, name: true, role: true, image: true } } 
+          where:
+            role === 'SUPER_ADMIN' || role === 'ADMIN'
+              ? {}
+              : { isInternal: false }, // Hide internal messages from customers
+          include: {
+            sender: {
+              select: { id: true, name: true, role: true, image: true },
+            },
           },
           orderBy: { createdAt: 'asc' },
         },
         payment: {
           include: {
             order: { include: { items: true, store: true } },
-            ride: { include: { rider: { include: { user: true } } } }
-          }
+            ride: {
+              include: { rider: { select: { name: true, phone: true } } },
+            },
+          },
         },
         order: {
-          include: { 
-            items: { include: { product: true } }, 
-            store: true, 
-            delivery: true 
+          include: {
+            items: { include: { product: true } },
+            store: true,
+            delivery: true,
           },
         },
         ride: {
-          include: { 
-            rider: { include: { user: true, vehicle: true } }, 
-            pickupAddress: true, 
-            dropoffAddress: true 
+          include: {
+            rider: { include: { vehicle: true } },
+            pickupAddress: true,
+            dropoffAddress: true,
           },
         },
         delivery: {
-          include: { 
-            rider: { include: { user: true, vehicle: true } }, 
-            pickupAddress: true, 
-            dropoffAddress: true 
+          include: {
+            rider: { include: { vehicle: true } },
+            pickupAddress: true,
+            dropoffAddress: true,
           },
         },
       },
@@ -299,7 +336,10 @@ export class DisputesService {
 
     // Authorization check
     if (role !== 'SUPER_ADMIN' && role !== 'ADMIN') {
-      if (dispute.openedByUserId !== userId && dispute.targetUserId !== userId) {
+      if (
+        dispute.openedByUserId !== userId &&
+        dispute.targetUserId !== userId
+      ) {
         throw new ForbiddenException('You do not have access to this dispute');
       }
     }
@@ -308,29 +348,36 @@ export class DisputesService {
       ...dispute,
       canResolve: role === 'SUPER_ADMIN' || role === 'ADMIN',
       canAddMessage: dispute.status === 'OPEN',
-      hoursOpen: Math.floor((Date.now() - dispute.createdAt.getTime()) / (1000 * 60 * 60)),
-      breachedSLA: this.checkSLABreach(dispute)
+      hoursOpen: Math.floor(
+        (Date.now() - dispute.createdAt.getTime()) / (1000 * 60 * 60),
+      ),
+      breachedSLA: this.checkSLABreach(dispute),
     };
   }
 
   // ==================== ADD MESSAGE ====================
   // Fixed: Accepts userId and role
-  async addMessage(id: string, dto: AddMessageDto, userId: string, role: string) {
-    const dispute = await this.prisma.dispute.findUnique({ 
+  async addMessage(
+    id: string,
+    dto: AddMessageDto,
+    userId: string,
+    role: string,
+  ) {
+    const dispute = await this.prisma.dispute.findUnique({
       where: { id },
-      include: { openedByUser: true, targetUser: true }
+      include: { openedByUser: true, targetUser: true },
     });
-    
+
     if (!dispute) {
       throw new NotFoundException('Dispute not found');
     }
-    
+
     if (dispute.status !== 'OPEN') {
       throw new BadRequestException('Cannot add messages to a closed dispute');
     }
 
     // Authorization check
-    const canMessage = 
+    const canMessage =
       userId === dispute.openedByUserId ||
       userId === dispute.targetUserId ||
       role === 'SUPER_ADMIN' ||
@@ -341,7 +388,8 @@ export class DisputesService {
     }
 
     // Only admins can send internal messages
-    const isInternal = dto.isInternal && (role === 'SUPER_ADMIN' || role === 'ADMIN');
+    const isInternal =
+      dto.isInternal && (role === 'SUPER_ADMIN' || role === 'ADMIN');
 
     return this.prisma.disputeMessage.create({
       data: {
@@ -350,7 +398,9 @@ export class DisputesService {
         message: dto.message,
         isInternal,
       },
-      include: { sender: { select: { id: true, name: true, role: true, image: true } } }
+      include: {
+        sender: { select: { id: true, name: true, role: true, image: true } },
+      },
     });
   }
 
@@ -362,25 +412,36 @@ export class DisputesService {
     return this.prisma.dispute.update({
       where: { id },
       data: {
-        adminNotes: dispute.adminNotes 
+        adminNotes: dispute.adminNotes
           ? `${dispute.adminNotes}\n\n[${new Date().toISOString()}] ${note}`
           : note,
         messages: {
           create: {
             senderId: adminId,
             message: note,
-            isInternal: true
-          }
-        }
-      }
+            isInternal: true,
+          },
+        },
+      },
     });
   }
 
   // ==================== RESOLVE DISPUTE ====================
   // Fixed: Accepts adminId as argument
   async resolve(id: string, dto: ResolveDisputeDto, adminId: string) {
-    const dispute = await this.findOne(id, adminId, 'SUPER_ADMIN');
-    
+    const dispute = await this.prisma.dispute.findUnique({
+      where: { id },
+      include: {
+        payment: true,
+        order: true,
+        ride: true,
+        delivery: true,
+      },
+    });
+    if (!dispute) {
+      throw new NotFoundException('Dispute not found');
+    }
+
     if (dispute.status !== 'OPEN') {
       throw new BadRequestException('Dispute is already closed');
     }
@@ -393,18 +454,23 @@ export class DisputesService {
       // ========== HANDLE REFUNDS ==========
       if (dto.action.includes('REFUND')) {
         // Determine refund amount
-        const maxRefund = dispute.payment?.amount || 
-                          dispute.order?.total || 
-                          dispute.ride?.totalFare || 
-                          dispute.delivery?.deliveryFee || 
-                          0;
+        const maxRefund =
+          dispute.payment?.amount ||
+          dispute.order?.total ||
+          dispute.ride?.totalFare ||
+          dispute.delivery?.deliveryFee ||
+          0;
 
         if (dto.action === ResolutionAction.REFUND_PARTIAL) {
           if (!dto.refundAmount || dto.refundAmount <= 0) {
-            throw new BadRequestException('Refund amount must be greater than 0');
+            throw new BadRequestException(
+              'Refund amount must be greater than 0',
+            );
           }
           if (dto.refundAmount > maxRefund) {
-            throw new BadRequestException(`Refund amount cannot exceed ${maxRefund}`);
+            throw new BadRequestException(
+              `Refund amount cannot exceed ${maxRefund}`,
+            );
           }
           refundAmount = dto.refundAmount;
         } else {
@@ -432,39 +498,45 @@ export class DisputesService {
               disputeId: id,
               refundSource: dto.refundSource,
               adminId: adminId,
-              customerId: customerId
+              customerId: customerId,
             },
-          }
+          },
         });
 
         // ========== UPDATE PAYMENT STATUS ==========
         if (dispute.paymentId) {
-          const newStatus = dto.action === ResolutionAction.REFUND_FULL 
-            ? 'REFUNDED' 
-            : 'PARTIALLY_REFUNDED';
+          const newStatus =
+            dto.action === ResolutionAction.REFUND_FULL
+              ? 'REFUNDED'
+              : 'PARTIALLY_REFUNDED';
 
           await tx.payment.update({
             where: { id: dispute.paymentId },
-            data: { status: newStatus }
+            data: { status: newStatus },
           });
         }
 
         // ========== DEBIT VENDOR WALLET (if applicable) ==========
-        if (dto.refundSource === RefundSource.VENDOR_WALLET && dispute.order?.storeId) {
+        if (
+          dto.refundSource === RefundSource.VENDOR_WALLET &&
+          dispute.order?.storeId
+        ) {
           const store = await tx.store.findUnique({
             where: { id: dispute.order.storeId },
-            select: { walletBalance: true }
+            select: { walletBalance: true },
           });
 
           if ((store?.walletBalance || 0) < refundAmount) {
-            throw new BadRequestException('Vendor wallet has insufficient balance for refund');
+            throw new BadRequestException(
+              'Vendor wallet has insufficient balance for refund',
+            );
           }
 
           const currentBalance = store?.walletBalance || 0;
 
           await tx.store.update({
             where: { id: dispute.order.storeId },
-            data: { walletBalance: { decrement: refundAmount } }
+            data: { walletBalance: { decrement: refundAmount } },
           });
 
           // Record wallet debit transaction
@@ -479,8 +551,8 @@ export class DisputesService {
               balanceBefore: currentBalance,
               balanceAfter: currentBalance - refundAmount,
               processedBy: adminId,
-              metadata: { disputeId: id, reason: 'dispute_refund' }
-            }
+              metadata: { disputeId: id, reason: 'dispute_refund' },
+            },
           });
         }
 
@@ -508,15 +580,15 @@ Admin Notes:
 ${dto.resolutionNotes}
 ━━━━━━━━━━━━━━━━━━━━`,
               isInternal: false,
-            }
-          }
+            },
+          },
         },
         include: {
           openedByUser: true,
           order: true,
           ride: true,
-          delivery: true
-        }
+          delivery: true,
+        },
       });
 
       return updatedDispute;
@@ -526,7 +598,7 @@ ${dto.resolutionNotes}
   // ==================== REJECT DISPUTE ====================
   async reject(id: string, reason: string, adminId: string) {
     const dispute = await this.prisma.dispute.findUnique({ where: { id } });
-    
+
     if (!dispute) throw new NotFoundException('Dispute not found');
     if (dispute.status !== 'OPEN') {
       throw new BadRequestException('Dispute is already closed');
@@ -547,33 +619,30 @@ ${dto.resolutionNotes}
 Reason:
 ${reason}
 ━━━━━━━━━━━━━━━━━━━━`,
-            isInternal: false
-          }
-        }
-      }
+            isInternal: false,
+          },
+        },
+      },
     });
   }
 
   // ==================== GET STATISTICS ====================
   async getStats() {
-    const [
-      totalOpen,
-      totalResolved,
-      totalRejected,
-      urgentOpen,
-      breachedSLA
-    ] = await Promise.all([
-      this.prisma.dispute.count({ where: { status: 'OPEN' } }),
-      this.prisma.dispute.count({ where: { status: 'RESOLVED' } }),
-      this.prisma.dispute.count({ where: { status: 'REJECTED' } }),
-      this.prisma.dispute.count({ where: { status: 'OPEN', priority: 'URGENT' } }),
-      this.prisma.dispute.findMany({
-        where: { status: 'OPEN' },
-        select: { priority: true, createdAt: true }
-      })
-    ]);
+    const [totalOpen, totalResolved, totalRejected, urgentOpen, breachedSLA] =
+      await Promise.all([
+        this.prisma.dispute.count({ where: { status: 'OPEN' } }),
+        this.prisma.dispute.count({ where: { status: 'RESOLVED' } }),
+        this.prisma.dispute.count({ where: { status: 'REJECTED' } }),
+        this.prisma.dispute.count({
+          where: { status: 'OPEN', priority: 'URGENT' },
+        }),
+        this.prisma.dispute.findMany({
+          where: { status: 'OPEN' },
+          select: { priority: true, createdAt: true },
+        }),
+      ]);
 
-    const breached = breachedSLA.filter(d => this.checkSLABreach(d)).length;
+    const breached = breachedSLA.filter((d) => this.checkSLABreach(d)).length;
 
     return {
       totalOpen,
@@ -581,7 +650,9 @@ ${reason}
       totalRejected,
       urgentOpen,
       breachedSLA: breached,
-      resolutionRate: totalResolved / ((totalResolved + totalRejected + totalOpen) || 1) * 100
+      resolutionRate:
+        (totalResolved / (totalResolved + totalRejected + totalOpen || 1)) *
+        100,
     };
   }
 }

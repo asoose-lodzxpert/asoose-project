@@ -1,12 +1,10 @@
-# ASOOSE Project Makefile
-.PHONY: help docker-build docker-up docker-down k8s-deploy k8s-delete clean
+# ASOOSE Project Makefile (Backend Only)
+.PHONY: help docker-build docker-up docker-down docker-logs docker-clean db-migrate db-seed db-studio clean clean-all
 
 # Variables
 DOCKER_COMPOSE = docker-compose
-KUBECTL = kubectl
 AWS_REGION = us-east-1
 ECR_REPO = asoose-backend
-NAMESPACE = asoose
 
 help: ## Show this help message
 	@echo 'Usage: make [target]'
@@ -18,21 +16,41 @@ help: ## Show this help message
 docker-build: ## Build Docker image
 	docker build -t $(ECR_REPO):latest -f backend/Dockerfile .
 
-docker-up: ## Start Docker Compose services
-	$(DOCKER_COMPOSE) up -d
-	@echo "Services started. Access backend at http://localhost:3000"
+docker-up: ## Start backend container
+	docker run -d --name asoose-backend -p 3000:3000 \
+		-e NODE_ENV=production \
+		-e DATABASE_URL="postgresql://asoose_user:K8sH7qW4eZp9@containers-us-west-123.railway.app:5432/railway_db" \
+		-e DIRECT_URL="postgresql://asoose_user:K8sH7qW4eZp9@containers-us-west-123.railway.app:5432/railway_db" \
+		-e REDIS_HOST="redis-hostname.railway.app" \
+		-e REDIS_PORT=12345 \
+		-e REDIS_PASSWORD="S7f4L0k9R1vN" \
+		-e JWT_SECRET="R9v8M2hG5yU1wQ0zX7tJ6nF8kL3aB2c" \
+		-e JWT_EXPIRES_IN="15m" \
+		-e JWT_REFRESH_SECRET="P4x9V8cW2sM6qR1bN5yE7uH3dZ0fL8t" \
+		-e JWT_REFRESH_EXPIRES_IN="7d" \
+		-e EMAIL_HOST="smtp.mailtrap.io" \
+		-e EMAIL_PORT=587 \
+		-e EMAIL_USER="e5f2a3b1c4d5" \
+		-e EMAIL_PASSWORD="aB9kL7mN2pQ3" \
+		-e EMAIL_FROM="no-reply@asoose.app" \
+		-e SUPABASE_URL="https://xyzcompany.supabase.co" \
+		-e SUPABASE_KEY="supabase-anon-key-1234567890abcdef" \
+		-e SUPABASE_BUCKET="asoose-uploads" \
+		$(ECR_REPO):latest
+	@echo "Backend started. Access at http://localhost:3000"
 
-docker-down: ## Stop Docker Compose services
-	$(DOCKER_COMPOSE) down
+docker-down: ## Stop backend container
+	docker stop asoose-backend && docker rm asoose-backend
 
-docker-logs: ## View Docker Compose logs
-	$(DOCKER_COMPOSE) logs -f
+docker-logs: ## View backend logs
+	docker logs -f asoose-backend
 
-docker-clean: ## Remove Docker containers and volumes
-	$(DOCKER_COMPOSE) down -v
+docker-clean: ## Remove backend image
+	docker rm -f asoose-backend || true
+	docker rmi $(ECR_REPO):latest || true
 	docker system prune -f
 
-# Database Commands
+# Prisma Commands (assumes Railway DB)
 db-migrate: ## Run database migrations
 	docker exec -it asoose-backend yarn prisma migrate deploy
 
@@ -41,32 +59,6 @@ db-seed: ## Seed database
 
 db-studio: ## Open Prisma Studio
 	docker exec -it asoose-backend yarn prisma studio
-
-db-backup: ## Backup database
-	docker exec asoose-postgres pg_dump -U asoose asoose_db > backup-$$(date +%Y%m%d-%H%M%S).sql
-	@echo "Database backed up to backup-$$(date +%Y%m%d-%H%M%S).sql"
-
-# Kubernetes Commands
-k8s-deploy: ## Deploy to Kubernetes
-	cd k8s && ./deploy.sh
-
-k8s-delete: ## Delete Kubernetes resources
-	$(KUBECTL) delete namespace $(NAMESPACE)
-
-k8s-status: ## Show Kubernetes status
-	$(KUBECTL) get all -n $(NAMESPACE)
-
-k8s-logs: ## View Kubernetes logs
-	$(KUBECTL) logs -f deployment/asoose-backend -n $(NAMESPACE)
-
-k8s-shell: ## Access backend pod shell
-	$(KUBECTL) exec -it $$($(KUBECTL) get pods -n $(NAMESPACE) -l app=asoose-backend -o jsonpath='{.items[0].metadata.name}') -n $(NAMESPACE) -- sh
-
-k8s-migrate: ## Run migrations in Kubernetes
-	$(KUBECTL) exec -it $$($(KUBECTL) get pods -n $(NAMESPACE) -l app=asoose-backend -o jsonpath='{.items[0].metadata.name}') -n $(NAMESPACE) -- yarn prisma migrate deploy
-
-k8s-scale: ## Scale backend (usage: make k8s-scale REPLICAS=5)
-	$(KUBECTL) scale deployment/asoose-backend --replicas=$(REPLICAS) -n $(NAMESPACE)
 
 # AWS Commands
 aws-login: ## Login to AWS ECR
@@ -85,7 +77,7 @@ dev-setup: ## Setup development environment
 dev-install: ## Install dependencies
 	yarn install
 
-dev-start: ## Start development server
+dev-start: ## Start development server locally
 	yarn workspace backend start:dev
 
 # Testing Commands
@@ -96,7 +88,7 @@ test-e2e: ## Run e2e tests
 	yarn workspace backend test:e2e
 
 # Cleanup Commands
-clean: ## Clean all build artifacts
+clean: ## Clean build artifacts
 	rm -rf node_modules
 	rm -rf backend/dist
 	rm -rf backend/node_modules

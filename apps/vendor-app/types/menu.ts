@@ -6,6 +6,7 @@ export interface MenuItem {
   slug: string;
   price: number;
   image: string | null;
+  images?: string[];
   status: "ACTIVE" | "OUT_OF_STOCK" | "DISABLED";
   storeId: string;
   stock: number;

@@ -137,4 +137,43 @@ export class NotificationFacade {
       },
     );
   }
+
+  async notifyRider(
+    riderId: string,
+    title: string,
+    message: string,
+    metadata?: Record<string, any>,
+  ) {
+    try {
+      const rider = await this.prisma.rider.findUnique({
+        where: { id: riderId },
+        select: {
+          fcmToken: true,
+          expoPushToken: true,
+          email: true,
+          name: true,
+        },
+      });
+
+      if (!rider) {
+        this.logger.warn(`Cannot notify rider ${riderId}: record not found`);
+        return;
+      }
+
+      if (rider.fcmToken) {
+        await this.fcmService.sendToDevice(
+          rider.fcmToken,
+          title,
+          message,
+          metadata,
+        );
+      } else {
+        this.logger.warn(
+          `Rider ${riderId} has no FCM token configured; skipping push notification`,
+        );
+      }
+    } catch (error) {
+      this.logger.error(`Failed to notify rider ${riderId}`, error.stack);
+    }
+  }
 }

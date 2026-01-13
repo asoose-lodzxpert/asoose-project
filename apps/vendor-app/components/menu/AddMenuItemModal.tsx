@@ -6,18 +6,18 @@ import {
   Pressable,
   Image,
   ScrollView,
-  TextInput,
   ActivityIndicator,
+  FlatList,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import Toast from "react-native-toast-message";
 
 import { ThemedText } from "@/components/themed-text";
-import { ThemedView } from "@/components/themed-view";
 import { ThemedInput } from "@/components/ThemedInput";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { MenuItem } from "@/types/menu";
+import { uploadFile } from "@/services/storage.service";
 
 interface CategoryOption {
   id: string;
@@ -33,6 +33,7 @@ interface Props {
     categoryId: string;
     stock?: number;
     image?: string;
+    images?: string[];
   }) => void;
   categories: CategoryOption[];
   itemToEdit?: MenuItem;
@@ -53,28 +54,47 @@ export const AddMenuItemModal: React.FC<Props> = ({
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
   const [stock, setStock] = useState("");
-  const [image, setImage] = useState<string | null>(null);
+  const [images, setImages] = useState<string[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   useEffect(() => {
     if (itemToEdit) {
       setName(itemToEdit.name || "");
       setPrice(itemToEdit.price?.toString() || "");
       setStock(itemToEdit.stock?.toString() || "0");
-      setImage(itemToEdit.image || null);
+
+      // Handle both old single image and new images array
+      const productImages: string[] = [];
+      if (itemToEdit.images && itemToEdit.images.length > 0) {
+        productImages.push(...itemToEdit.images);
+      } else if (itemToEdit.image) {
+        productImages.push(itemToEdit.image);
+      }
+      setImages(productImages);
+
       setSelectedCategory(itemToEdit.categoryId || null);
     } else {
       setName("");
       setPrice("");
       setStock("0");
-      setImage(null);
+      setImages([]);
       setSelectedCategory(null);
     }
   }, [itemToEdit, visible]);
 
   const pickImage = async () => {
     try {
+      // Check if we already have 5 images (max limit)
+      if (images.length >= 5) {
+        Toast.show({
+          type: "error",
+          text1: "Maximum 5 images allowed",
+        });
+        return;
+      }
+
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ["images"],
         quality: 0.7,
@@ -83,9 +103,47 @@ export const AddMenuItemModal: React.FC<Props> = ({
       });
 
       if (!result.canceled && result.assets.length > 0) {
-        setImage(result.assets[0].uri);
-        // TODO: Upload to storage service
-        // For now, using local URI
+        const asset = result.assets[0];
+
+        setUploading(true);
+        setUploadProgress(0);
+
+        try {
+          // Upload to backend storage
+          const fileUri = asset.uri;
+          const fileName =
+            fileUri.split("/").pop() || `product-${Date.now()}.jpg`;
+          const fileType = asset.type === "image" ? "image/jpeg" : "image/png";
+
+          const uploadedUrl = await uploadFile(
+            {
+              uri: fileUri,
+              name: fileName,
+              type: fileType,
+            },
+            (progress) => {
+              setUploadProgress(progress.percentage);
+            }
+          );
+
+          // Add uploaded URL to images array
+          setImages((prev) => [...prev, uploadedUrl]);
+
+          Toast.show({
+            type: "success",
+            text1: "Image uploaded successfully",
+          });
+        } catch (error) {
+          console.error("Upload error:", error);
+          Toast.show({
+            type: "error",
+            text1: "Failed to upload image",
+            text2: error instanceof Error ? error.message : "Please try again",
+          });
+        } finally {
+          setUploading(false);
+          setUploadProgress(0);
+        }
       }
     } catch (error) {
       console.log("Image pick error:", error);
@@ -94,6 +152,10 @@ export const AddMenuItemModal: React.FC<Props> = ({
         text1: "Failed to pick image",
       });
     }
+  };
+
+  const removeImage = (index: number) => {
+    setImages((prev) => prev.filter((_, i) => i !== index));
   };
 
   const showToast = (message: string) => {
@@ -110,13 +172,15 @@ export const AddMenuItemModal: React.FC<Props> = ({
     if (!price.trim() || isNaN(Number(price)) || Number(price) <= 0)
       return showToast("Valid price is required");
     if (!selectedCategory) return showToast("Select a category");
+    if (images.length === 0) return showToast("At least one image is required");
 
     onSave({
       name: name.trim(),
       price: Number(price),
       categoryId: selectedCategory,
       stock: stock ? Number(stock) : 0,
-      image: image || undefined,
+      image: images[0], // First image as primary
+      images: images, // All images array
     });
   };
 
@@ -132,30 +196,71 @@ export const AddMenuItemModal: React.FC<Props> = ({
               {itemToEdit ? "Edit Product" : "Add Product"}
             </ThemedText>
 
-            {/* Image Upload */}
+            {/* Image Upload Section */}
             <View style={styles.section}>
               <ThemedText type="defaultSemiBold" style={styles.label}>
-                Product Image
+                Product Images * (Max 5)
               </ThemedText>
-              <Pressable
-                onPress={pickImage}
-                style={[
-                  styles.imagePicker,
-                  { borderColor: border },
-                  image && styles.imagePickerWithImage,
-                ]}
-              >
-                {image ? (
-                  <Image source={{ uri: image }} style={styles.previewImage} />
-                ) : (
-                  <View style={styles.imagePlaceholder}>
-                    <IconSymbol name="camera.fill" size={32} color={muted} />
-                    <ThemedText style={{ color: muted, marginTop: 8 }}>
-                      Tap to upload
-                    </ThemedText>
-                  </View>
-                )}
-              </Pressable>
+
+              {/* Uploaded Images Grid */}
+              {images.length > 0 && (
+                <View style={styles.imagesGrid}>
+                  {images.map((uri, index) => (
+                    <View key={index} style={styles.imageContainer}>
+                      <Image source={{ uri }} style={styles.uploadedImage} />
+                      <Pressable
+                        style={styles.removeButton}
+                        onPress={() => removeImage(index)}
+                      >
+                        <IconSymbol
+                          name="xmark.circle.fill"
+                          size={24}
+                          color="#EF4444"
+                        />
+                      </Pressable>
+                      {index === 0 && (
+                        <View style={styles.primaryBadge}>
+                          <ThemedText style={styles.primaryText}>
+                            Primary
+                          </ThemedText>
+                        </View>
+                      )}
+                    </View>
+                  ))}
+                </View>
+              )}
+
+              {/* Add Image Button */}
+              {images.length < 5 && (
+                <Pressable
+                  onPress={pickImage}
+                  disabled={uploading}
+                  style={[
+                    styles.imagePicker,
+                    { borderColor: border },
+                    uploading && styles.imagePickerDisabled,
+                  ]}
+                >
+                  {uploading ? (
+                    <View style={styles.uploadingContainer}>
+                      <ActivityIndicator size="large" color={primary} />
+                      <ThemedText style={{ color: primary, marginTop: 8 }}>
+                        Uploading... {uploadProgress}%
+                      </ThemedText>
+                    </View>
+                  ) : (
+                    <View style={styles.imagePlaceholder}>
+                      <IconSymbol name="camera.fill" size={32} color={muted} />
+                      <ThemedText style={{ color: muted, marginTop: 8 }}>
+                        Tap to upload
+                      </ThemedText>
+                      <ThemedText style={{ color: muted, fontSize: 12 }}>
+                        {images.length}/5 images
+                      </ThemedText>
+                    </View>
+                  )}
+                </Pressable>
+              )}
             </View>
 
             {/* Product Name */}
@@ -287,6 +392,44 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     fontWeight: "600",
   },
+  imagesGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 12,
+  },
+  imageContainer: {
+    width: 100,
+    height: 100,
+    borderRadius: 12,
+    overflow: "hidden",
+    position: "relative",
+  },
+  uploadedImage: {
+    width: "100%",
+    height: "100%",
+  },
+  removeButton: {
+    position: "absolute",
+    top: 4,
+    right: 4,
+    backgroundColor: "rgba(255, 255, 255, 0.9)",
+    borderRadius: 12,
+  },
+  primaryBadge: {
+    position: "absolute",
+    bottom: 4,
+    left: 4,
+    backgroundColor: "#10B981",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  primaryText: {
+    color: "#fff",
+    fontSize: 10,
+    fontWeight: "600",
+  },
   imagePicker: {
     height: 120,
     borderRadius: 12,
@@ -295,15 +438,13 @@ const styles = StyleSheet.create({
     borderColor: "#D1D5DB",
     justifyContent: "center",
     alignItems: "center",
-    overflow: "hidden",
   },
-  imagePickerWithImage: {
-    borderStyle: "solid",
-    borderColor: "#10B981",
+  imagePickerDisabled: {
+    opacity: 0.5,
   },
-  previewImage: {
-    width: "100%",
-    height: "100%",
+  uploadingContainer: {
+    alignItems: "center",
+    gap: 8,
   },
   imagePlaceholder: {
     alignItems: "center",

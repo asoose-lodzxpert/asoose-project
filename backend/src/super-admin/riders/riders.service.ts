@@ -1,12 +1,22 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { UserRole, UserStatus, VerificationStatus, RideStatus, Prisma } from '@prisma/client';
+import {
+  UserStatus,
+  VerificationStatus,
+  RideStatus,
+  Prisma,
+} from '@prisma/client';
 import { EmailProducer } from 'src/mail/email.producer';
 
 @Injectable()
 export class RidersService {
-  constructor(private prisma: PrismaService,
-    private emailProducer: EmailProducer
+  constructor(
+    private prisma: PrismaService,
+    private emailProducer: EmailProducer,
   ) {}
 
   async findAll(params: {
@@ -16,361 +26,357 @@ export class RidersService {
     status?: string;
   }) {
     const { page, limit, search, status } = params;
-    const skip = (page - 1) * limit;
+    const take = Number(limit);
+    const skip = (Number(page) - 1) * take;
 
-    const where: Prisma.UserWhereInput = {
-      role: UserRole.RIDER,
-    };
+    const filters: Prisma.RiderWhereInput[] = [];
 
-    // 2. Search Logic (Name, Email, Phone, or Plate Number)
     if (search) {
-      where.OR = [
-        { name: { contains: search, mode: 'insensitive' } },
-        { email: { contains: search, mode: 'insensitive' } },
-        { phone: { contains: search, mode: 'insensitive' } },
-        { 
-          riderProfile: { 
-            vehicle: { plateNumber: { contains: search, mode: 'insensitive' } } 
-          } 
-        }
-      ];
+      filters.push({
+        OR: [
+          { name: { contains: search, mode: 'insensitive' } },
+          { email: { contains: search, mode: 'insensitive' } },
+          { phone: { contains: search, mode: 'insensitive' } },
+          {
+            vehicle: { plateNumber: { contains: search, mode: 'insensitive' } },
+          },
+        ],
+      });
     }
 
-    // 3. Status Filters
     if (status === 'PENDING') {
-      where.OR = [
-        { status: UserStatus.PENDING },
-        // Pending if any RiderDocument is pending
-        { riderProfile: { documents: { some: { status: VerificationStatus.PENDING } } } }
-      ];
+      filters.push({
+        OR: [
+          { status: UserStatus.PENDING },
+          { documents: { some: { status: VerificationStatus.PENDING } } },
+        ],
+      });
     } else if (status === 'ONLINE') {
-      where.riderProfile = { isOnline: true };
-      where.status = UserStatus.ACTIVE;
+      filters.push({ status: UserStatus.ACTIVE, isOnline: true });
     } else if (status === 'SUSPENDED') {
-      where.status = UserStatus.SUSPENDED;
+      filters.push({ status: UserStatus.SUSPENDED });
+    } else if (
+      status &&
+      Object.values(UserStatus).includes(status as UserStatus)
+    ) {
+      filters.push({ status: status as UserStatus });
     }
 
-    // 4. Parallel Queries for Data + Stats
+    const where: Prisma.RiderWhereInput = filters.length
+      ? { AND: filters }
+      : {};
+
     const [riders, total, stats] = await Promise.all([
-      this.prisma.user.findMany({
+      this.prisma.rider.findMany({
         where,
         skip,
-        take: limit,
+        take,
         orderBy: { createdAt: 'desc' },
         include: {
-          riderProfile: {
-            include: { vehicle: true, documents: true }
-          }
-        }
+          vehicle: { include: { documents: true } },
+          documents: true,
+        },
       }),
-      this.prisma.user.count({ where }),
-      this.getStats()
+      this.prisma.rider.count({ where }),
+      this.getStats(),
     ]);
 
-    // 5. Format Response
     return {
-      data: riders.map(user => this.mapToRiderDTO(user)),
+      data: riders.map((rider) => this.mapToRiderDTO(rider)),
       meta: {
         total,
-        page,
-        limit,
-        pages: Math.ceil(total / limit),
+        page: Number(page),
+        limit: take,
+        pages: Math.ceil(total / take),
       },
-      stats
+      stats,
     };
   }
 
   async findOne(id: string) {
-    // 1. Fetch User with deep relations
-    const user = await this.prisma.user.findUnique({
+    const rider = await this.prisma.rider.findUnique({
       where: { id },
       include: {
-        riderProfile: {
-          include: {
-            vehicle: { include: { documents: true } },
-            documents: true,
-          }
-        },
-        addresses: true,
-      }
+        vehicle: { include: { documents: true } },
+        documents: true,
+        bankAccount: true,
+      },
     });
 
-    if (!user || !user.riderProfile) throw new NotFoundException('Rider not found');
+    if (!rider) throw new NotFoundException('Rider not found');
 
-    const profileId = user.riderProfile.id;
-
-    // 2. Calculate Real-time Performance Metrics from Ride History
     const rideStats = await this.prisma.ride.groupBy({
       by: ['status'],
-      where: { riderProfileId: profileId },
-      _count: { id: true }
+      where: { riderId: rider.id },
+      _count: { id: true },
     });
 
-    const ridesCount = rideStats.reduce((acc, curr) => {
-      acc[curr.status] = curr._count.id;
-      return acc;
-    }, {} as Record<RideStatus, number>);
+    const ridesCount = rideStats.reduce(
+      (acc, curr) => {
+        acc[curr.status] = curr._count?.id ?? 0;
+        return acc;
+      },
+      {} as Record<RideStatus, number>,
+    );
 
     const totalTrips = Object.values(ridesCount).reduce((a, b) => a + b, 0);
     const completed = ridesCount[RideStatus.COMPLETED] || 0;
     const cancelled = ridesCount[RideStatus.CANCELLED] || 0;
 
     const completionRate = totalTrips > 0 ? (completed / totalTrips) * 100 : 0;
-    const cancellationRate = totalTrips > 0 ? (cancelled / totalTrips) * 100 : 0;
-    
-    // 3. Combine Documents (Personal + Vehicle)
+    const cancellationRate =
+      totalTrips > 0 ? (cancelled / totalTrips) * 100 : 0;
+
     const documents = [
-      ...user.riderProfile.documents.map(d => ({ 
-        id: d.id, type: d.type, url: d.url, status: d.status, updatedAt: d.updatedAt, category: 'PERSONAL' 
+      ...rider.documents.map((d) => ({
+        id: d.id,
+        type: d.type,
+        url: d.url,
+        status: d.status,
+        updatedAt: d.updatedAt,
+        category: 'PERSONAL',
       })),
-      ...(user.riderProfile.vehicle?.documents.map(d => ({ 
-        id: d.id, 
-        type: d.type, 
-        url: d.url, 
-        // VehicleDocs don't have a status field in schema, defaulting to VERIFIED
-        status: 'VERIFIED' as VerificationStatus, 
-        updatedAt: d.updatedAt, 
-        category: 'VEHICLE' 
-      })) || [])
+      ...(rider.vehicle?.documents.map((d) => ({
+        id: d.id,
+        type: d.type,
+        url: d.url,
+        status: 'VERIFIED' as VerificationStatus,
+        updatedAt: d.updatedAt,
+        category: 'VEHICLE',
+      })) || []),
     ];
 
-    // 4. Return DTO
     return {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      phone: user.phone,
-      image: (user as any).image || null,
-      status: user.status === 'ACTIVE' && user.riderProfile.isOnline ? 'ONLINE' : user.status,
+      id: rider.id,
+      name: rider.name,
+      email: rider.email,
+      phone: rider.phone,
+      image: rider.image || null,
+      status:
+        rider.status === UserStatus.ACTIVE && rider.isOnline
+          ? 'ONLINE'
+          : rider.status,
       verification: this.determineVerificationStatus(documents),
-      rating: user.riderProfile.rating,
-      totalRides: user.riderProfile.totalRides,
-      walletBalance: user.riderProfile.walletBalance,
-      joinedAt: user.createdAt,
-      lastSeen: user.updatedAt,
-      currentLat: user.riderProfile.currentLat,
-      currentLng: user.riderProfile.currentLng,
-      vehicle: user.riderProfile.vehicle,
+      rating: rider.rating,
+      totalRides: rider.totalRides,
+      walletBalance: rider.walletBalance,
+      joinedAt: rider.createdAt,
+      lastSeen: rider.updatedAt,
+      currentLat: rider.currentLat,
+      currentLng: rider.currentLng,
+      vehicle: rider.vehicle,
       documents,
       performance: {
         completionRate: parseFloat(completionRate.toFixed(1)),
         cancellationRate: parseFloat(cancellationRate.toFixed(1)),
-        totalTrips
-      }
+        totalTrips,
+      },
     };
   }
 
   async updateStatus(id: string, status: UserStatus) {
-    return this.prisma.user.update({
+    return this.prisma.rider.update({
       where: { id },
-      data: { status }
+      data: { status },
     });
   }
 
-  async verifyDocument(riderId: string, docId: string, status: VerificationStatus) {
-    // Only works for RiderDocument as VehicleDocument has no status in schema
+  async verifyDocument(
+    _riderId: string,
+    docId: string,
+    status: VerificationStatus,
+  ) {
     return this.prisma.riderDocument.update({
       where: { id: docId },
-      data: { status }
+      data: { status },
     });
   }
 
   async remove(id: string) {
-    const rider = await this.prisma.user.findUnique({ 
-      where: { id, role: UserRole.RIDER } 
-    });
-    
+    const rider = await this.prisma.rider.findUnique({ where: { id } });
+
     if (!rider) throw new NotFoundException('Rider not found');
 
-    // Deleting User cascades to RiderProfile, Documents, etc.
-    return this.prisma.user.delete({
+    return this.prisma.rider.delete({
       where: { id },
     });
   }
 
-  async getRiderRides(userId: string) {
-    const profile = await this.prisma.riderProfile.findUnique({ where: { userId } });
-    if (!profile) return [];
-
+  async getRiderRides(riderId: string) {
     return this.prisma.ride.findMany({
-      where: { riderProfileId: profile.id },
+      where: { riderId },
       orderBy: { createdAt: 'desc' },
       take: 50,
       include: {
         pickupAddress: true,
         dropoffAddress: true,
-        payment: true
-      }
+        payment: true,
+      },
     });
   }
 
   async updateLocation(id: string, lat: number, lng: number) {
-    // 1. Find the Rider Profile ID associated with this User ID
-    const user = await this.prisma.user.findUnique({
+    const rider = await this.prisma.rider.findUnique({ where: { id } });
+
+    if (!rider) throw new NotFoundException('Rider not found');
+
+    return this.prisma.rider.update({
       where: { id },
-      include: { riderProfile: true }
-    });
-
-    if (!user || !user.riderProfile) throw new NotFoundException('Rider Profile not found');
-
-    // 2. Update the profile
-    return this.prisma.riderProfile.update({
-      where: { id: user.riderProfile.id },
       data: {
         currentLat: lat,
         currentLng: lng,
-      }
+      },
     });
   }
 
-  async update(id: string, data: { name?: string; phone?: string; email?: string }) {
-    // 1. Check for email duplication if email is being changed
+  async update(
+    id: string,
+    data: { name?: string; phone?: string; email?: string },
+  ) {
     if (data.email) {
-      const existing = await this.prisma.user.findUnique({ where: { email: data.email } });
+      const existing = await this.prisma.rider.findUnique({
+        where: { email: data.email },
+      });
       if (existing && existing.id !== id) {
         throw new BadRequestException('Email already in use by another user');
       }
     }
 
-    // 2. Update User
-    return this.prisma.user.update({
+    return this.prisma.rider.update({
       where: { id },
       data: {
         name: data.name,
         phone: data.phone,
         email: data.email,
-      }
+      },
     });
   }
 
-  async adjustWallet(userId: string, type: 'CREDIT' | 'DEBIT', amount: number, reason: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      include: { riderProfile: true }
-    });
+  async adjustWallet(
+    userId: string,
+    type: 'CREDIT' | 'DEBIT',
+    amount: number,
+    reason: string,
+  ) {
+    const rider = await this.prisma.rider.findUnique({ where: { id: userId } });
 
-    if (!user || !user.riderProfile) throw new NotFoundException('Rider not found');
+    if (!rider) throw new NotFoundException('Rider not found');
 
-    const riderProfile = user.riderProfile; // Store reference before transaction
     const adjustment = type === 'CREDIT' ? amount : -amount;
-    const newBalance = riderProfile.walletBalance + adjustment;
+    const newBalance = rider.walletBalance + adjustment;
 
-    // Use transaction to ensure Balance update and Log creation happen together
     return this.prisma.$transaction(async (tx) => {
-      // 1. Update Wallet
-      const updatedProfile = await tx.riderProfile.update({
-        where: { id: riderProfile.id },
-        data: { walletBalance: newBalance }
+      const updatedRider = await tx.rider.update({
+        where: { id: rider.id },
+        data: { walletBalance: newBalance },
       });
 
-      // 2. Create Audit Log
       await tx.activityLog.create({
         data: {
-          userId: user.id,
+          userId: 'SYSTEM',
           action: `WALLET_${type}`,
-          target: 'Rider Wallet',
-          metadata: { 
-            reason: reason, 
-            oldBalance: riderProfile.walletBalance, 
-            amount, 
-            newBalance 
-          }
-        }
+          target: rider.id,
+          metadata: {
+            riderId: rider.id,
+            riderName: rider.name,
+            reason,
+            oldBalance: rider.walletBalance,
+            amount,
+            newBalance,
+          },
+        },
       });
 
-      return updatedProfile;
+      return updatedRider;
     });
   }
 
   async getPayouts(userId: string) {
-    const profile = await this.prisma.riderProfile.findUnique({ where: { userId } });
-    if (!profile) return [];
     return this.prisma.riderPayout.findMany({
-      where: { riderProfileId: profile.id },
-      orderBy: { createdAt: 'desc' }
+      where: { riderId: userId },
+      orderBy: { createdAt: 'desc' },
     });
   }
 
   async requestPayout(userId: string, amount: number) {
-    const user = await this.prisma.user.findUnique({ 
-      where: { id: userId }, 
-      include: { riderProfile: true } 
-    });
-    
-    if (!user?.riderProfile) throw new NotFoundException('Rider not found');
-    if (user.riderProfile.walletBalance < amount) throw new BadRequestException('Insufficient funds');
+    const rider = await this.prisma.rider.findUnique({ where: { id: userId } });
 
-    const riderProfile = user.riderProfile; // Store reference before transaction
+    if (!rider) throw new NotFoundException('Rider not found');
+    if (rider.walletBalance < amount) {
+      throw new BadRequestException('Insufficient funds');
+    }
 
     return this.prisma.$transaction(async (tx) => {
-      // 1. Deduct from Wallet immediately (lock funds)
-      await tx.riderProfile.update({
-        where: { id: riderProfile.id },
-        data: { walletBalance: { decrement: amount } }
+      await tx.rider.update({
+        where: { id: rider.id },
+        data: { walletBalance: { decrement: amount } },
       });
 
-      // 2. Create Payout Record
       return tx.riderPayout.create({
         data: {
-          riderProfileId: riderProfile.id,
+          riderId: rider.id,
           amount,
-          status: 'PENDING'
-        }
+          status: 'PENDING',
+        },
       });
     });
   }
 
-  async processPayout(payoutId: string, status: 'PAID' | 'FAILED', reference?: string) {
-    const payout = await this.prisma.riderPayout.findUnique({ where: { id: payoutId } });
+  async processPayout(
+    payoutId: string,
+    status: 'PAID' | 'FAILED',
+    reference?: string,
+  ) {
+    const payout = await this.prisma.riderPayout.findUnique({
+      where: { id: payoutId },
+    });
     if (!payout) throw new NotFoundException('Payout not found');
 
     if (status === 'FAILED') {
-      // Refund the rider if payout failed
-      await this.prisma.riderProfile.update({
-        where: { id: payout.riderProfileId },
-        data: { walletBalance: { increment: payout.amount } }
+      await this.prisma.rider.update({
+        where: { id: payout.riderId },
+        data: { walletBalance: { increment: payout.amount } },
       });
     }
 
     return this.prisma.riderPayout.update({
       where: { id: payoutId },
-      data: { 
-        status, 
-        reference, 
-        processedAt: new Date() 
-      }
+      data: {
+        status,
+        reference,
+        processedAt: new Date(),
+      },
     });
   }
 
   // --- Helpers ---
 
-  private mapToRiderDTO(user: any) {
-    const profile = user.riderProfile || {};
-    const vehicle = profile.vehicle || {};
-    
-    let status = user.status;
-    if (user.status === 'ACTIVE' && profile.isOnline) status = 'ONLINE';
-    
-    // Check if any personal doc is pending
-    const hasPendingDocs = profile.documents?.some((d: any) => d.status === 'PENDING');
+  private mapToRiderDTO(rider: any) {
+    const vehicle = rider.vehicle || {};
+
+    let status = rider.status;
+    if (rider.status === UserStatus.ACTIVE && rider.isOnline) status = 'ONLINE';
+
+    const documents = rider.documents || [];
+    const hasPendingDocs = documents.some((d: any) => d.status === 'PENDING');
 
     return {
-      id: user.id,
-      name: user.name,
-      email: user.email,
+      id: rider.id,
+      name: rider.name,
+      email: rider.email,
       plateNumber: vehicle.plateNumber || 'N/A',
       status,
       verification: hasPendingDocs ? 'PENDING' : 'VERIFIED',
-      rating: profile.rating || 0,
-      walletBalance: profile.walletBalance || 0,
-      createdAt: user.createdAt
+      rating: rider.rating || 0,
+      walletBalance: rider.walletBalance || 0,
+      createdAt: rider.createdAt,
     };
   }
 
   private determineVerificationStatus(documents: any[]) {
     if (documents.length === 0) return 'PENDING';
-    const hasPending = documents.some(d => d.status === 'PENDING');
-    const hasRejected = documents.some(d => d.status === 'REJECTED');
+    const hasPending = documents.some((d) => d.status === 'PENDING');
+    const hasRejected = documents.some((d) => d.status === 'REJECTED');
     if (hasRejected) return 'REJECTED';
     if (hasPending) return 'PENDING';
     return 'VERIFIED';
@@ -378,77 +384,59 @@ export class RidersService {
 
   private async getStats() {
     const [total, online, suspended, pending] = await Promise.all([
-      this.prisma.user.count({ where: { role: UserRole.RIDER } }),
-      this.prisma.riderProfile.count({ where: { isOnline: true } }),
-      this.prisma.user.count({ where: { role: UserRole.RIDER, status: UserStatus.SUSPENDED } }),
-      this.prisma.user.count({ where: { role: UserRole.RIDER, status: UserStatus.PENDING } }),
+      this.prisma.rider.count(),
+      this.prisma.rider.count({
+        where: { isOnline: true, status: UserStatus.ACTIVE },
+      }),
+      this.prisma.rider.count({ where: { status: UserStatus.SUSPENDED } }),
+      this.prisma.rider.count({ where: { status: UserStatus.PENDING } }),
     ]);
 
     return { total, online, suspended, pending };
   }
 
-async sendMessageToRider(riderId: string, message: string) {
-    const rider = await this.prisma.riderProfile.findUnique({
+  async sendMessageToRider(riderId: string, message: string) {
+    const rider = await this.prisma.rider.findUnique({
       where: { id: riderId },
-      select: { 
-        // ✅ Correctly select from the related 'user' model
-        user: {
-          select: {
-            email: true,
-            name: true,
-          }
-        }
-      } 
+      select: { email: true, name: true },
     });
 
-    // ✅ Access fields via rider.user
-    if (!rider || !rider.user?.email) {
+    if (!rider?.email) {
       throw new NotFoundException('Rider or email not found');
     }
 
     await this.emailProducer.sendVendorMessage(
-      rider.user.email, 
-      `Message from Admin - ${rider.user.name}`,
-      message
+      rider.email,
+      `Message from Admin - ${rider.name}`,
+      message,
     );
 
     return { success: true, message: 'Email queued successfully' };
   }
 
-
-
-  // ... existing methods
-
-  // ✅ ADD THIS: Logic to update vehicle in database
   async updateVehicle(userId: string, data: any) {
-    // 1. Find the rider profile associated with the user
-    const user = await this.prisma.user.findUnique({
+    const rider = await this.prisma.rider.findUnique({
       where: { id: userId },
-      include: { 
-        riderProfile: { 
-          include: { vehicle: true } 
-        } 
-      }
+      include: { vehicle: true },
     });
 
-    if (!user || !user.riderProfile) {
-      throw new NotFoundException('Rider profile not found');
+    if (!rider) {
+      throw new NotFoundException('Rider not found');
     }
 
-    if (!user.riderProfile.vehicle) {
+    if (!rider.vehicle) {
       throw new NotFoundException('Vehicle record not found for this rider');
     }
 
     return this.prisma.vehicle.update({
-      where: { id: user.riderProfile.vehicle.id },
+      where: { id: rider.vehicle.id },
       data: {
         brand: data.brand,
         model: data.model,
-        year: Number(data.year), // Ensure year is a number
+        year: data.year ? Number(data.year) : rider.vehicle.year,
         color: data.color,
-        plateNumber: data.plateNumber
-      }
+        plateNumber: data.plateNumber,
+      },
     });
   }
-
 }

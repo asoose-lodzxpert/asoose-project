@@ -364,12 +364,11 @@ export class PaymentService {
       bankAccount = vendor.store.bankAccount;
       recipientName = vendor.name;
     } else if (dto.recipientType === RecipientType.RIDER) {
-      // For riders, get rider profile and its bank account
-      const rider = await this.prisma.riderProfile.findUnique({
+      // For riders, get rider record and its bank account
+      const rider = await this.prisma.rider.findUnique({
         where: { id: dto.recipientId },
         include: {
           bankAccount: true,
-          user: true,
         },
       });
 
@@ -378,7 +377,7 @@ export class PaymentService {
       }
 
       bankAccount = rider.bankAccount;
-      recipientName = rider.user.name || 'Rider';
+      recipientName = rider.name || 'Rider';
     } else {
       throw new BadRequestException('Invalid recipient type');
     }

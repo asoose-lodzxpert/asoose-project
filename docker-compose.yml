@@ -1,43 +1,6 @@
+version: "3.9"
+
 services:
-  # PostgreSQL Database
-  postgres:
-    image: postgres:16-alpine
-    container_name: asoose-postgres
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:-asoose}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-asoose_password}
-      POSTGRES_DB: ${POSTGRES_DB:-asoose_db}
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-asoose}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - asoose-network
-
-  # Redis Cache
-  redis:
-    image: redis:7-alpine
-    container_name: asoose-redis
-    restart: unless-stopped
-    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-redis_password}
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
-      interval: 10s
-      timeout: 3s
-      retries: 5
-    networks:
-      - asoose-network
-
   # Backend API
   backend:
     build:
@@ -49,30 +12,34 @@ services:
       - "3000:3000"
     environment:
       NODE_ENV: production
-      DATABASE_URL: postgresql://${POSTGRES_USER:-asoose}:${POSTGRES_PASSWORD:-asoose_password}@postgres:5432/${POSTGRES_DB:-asoose_db}
-      DIRECT_URL: postgresql://${POSTGRES_USER:-asoose}:${POSTGRES_PASSWORD:-asoose_password}@postgres:5432/${POSTGRES_DB:-asoose_db}
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_password}
-      JWT_SECRET: ${JWT_SECRET:-your-super-secret-jwt-key-change-in-production}
-      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-15m}
-      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-your-super-secret-refresh-key-change-in-production}
-      JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
-      # Email Configuration
-      EMAIL_HOST: ${EMAIL_HOST}
-      EMAIL_PORT: ${EMAIL_PORT:-587}
-      EMAIL_USER: ${EMAIL_USER}
-      EMAIL_PASSWORD: ${EMAIL_PASSWORD}
-      EMAIL_FROM: ${EMAIL_FROM}
-      # Supabase Configuration
-      SUPABASE_URL: ${SUPABASE_URL}
-      SUPABASE_KEY: ${SUPABASE_KEY}
-      SUPABASE_BUCKET: ${SUPABASE_BUCKET:-asoose-uploads}
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+
+      # Database (Railway Postgres)
+      DATABASE_URL: postgresql://asoose_user:K8sH7qW4eZp9@containers-us-west-123.railway.app:5432/railway_db
+      DIRECT_URL: postgresql://asoose_user:K8sH7qW4eZp9@containers-us-west-123.railway.app:5432/railway_db
+
+      # Redis (Railway Redis)
+      REDIS_HOST: redis-hostname.railway.app
+      REDIS_PORT: 12345
+      REDIS_PASSWORD: S7f4L0k9R1vN
+
+      # JWT secrets
+      JWT_SECRET: R9v8M2hG5yU1wQ0zX7tJ6nF8kL3aB2c
+      JWT_EXPIRES_IN: 15m
+      JWT_REFRESH_SECRET: P4x9V8cW2sM6qR1bN5yE7uH3dZ0fL8t
+      JWT_REFRESH_EXPIRES_IN: 7d
+
+      # Email configuration
+      EMAIL_HOST: smtp.mailtrap.io
+      EMAIL_PORT: 587
+      EMAIL_USER: e5f2a3b1c4d5
+      EMAIL_PASSWORD: aB9kL7mN2pQ3
+      EMAIL_FROM: "no-reply@asoose.app"
+
+      # Supabase (if used)
+      SUPABASE_URL: https://xyzcompany.supabase.co
+      SUPABASE_KEY: supabase-anon-key-1234567890abcdef
+      SUPABASE_BUCKET: asoose-uploads
+
     healthcheck:
       test:
         [
@@ -85,15 +52,3 @@ services:
       timeout: 3s
       retries: 3
       start_period: 40s
-    networks:
-      - asoose-network
-
-volumes:
-  postgres_data:
-    driver: local
-  redis_data:
-    driver: local
-
-networks:
-  asoose-network:
-    driver: bridge

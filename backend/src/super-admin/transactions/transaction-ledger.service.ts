@@ -22,9 +22,9 @@ export class TransactionLedgerService {
     method: string;
     status: string;
   }) {
-    const description = payment.orderId 
+    const description = payment.orderId
       ? 'Payment for order'
-      : payment.rideId 
+      : payment.rideId
         ? 'Payment for ride'
         : 'Wallet top-up';
 
@@ -41,9 +41,9 @@ export class TransactionLedgerService {
         balanceAfter: 0,
         metadata: {
           method: payment.method,
-          userId: payment.userId
-        }
-      }
+          userId: payment.userId,
+        },
+      },
     });
   }
 
@@ -62,7 +62,7 @@ export class TransactionLedgerService {
     // Get current vendor balance
     const store = await this.prisma.store.findUnique({
       where: { id: order.storeId },
-      select: { walletBalance: true }
+      select: { walletBalance: true },
     });
 
     const currentBalance = store?.walletBalance || 0;
@@ -80,9 +80,9 @@ export class TransactionLedgerService {
         balanceAfter: 0,
         metadata: {
           storeId: order.storeId,
-          commissionRate: order.commissionRate
-        }
-      }
+          commissionRate: order.commissionRate,
+        },
+      },
     });
 
     // Record vendor earning
@@ -99,9 +99,9 @@ export class TransactionLedgerService {
         balanceAfter: currentBalance + vendorEarning,
         metadata: {
           orderTotal: order.total,
-          commission: commission
-        }
-      }
+          commission: commission,
+        },
+      },
     });
 
     // Update store wallet balance
@@ -109,8 +109,8 @@ export class TransactionLedgerService {
       where: { id: order.storeId },
       data: {
         walletBalance: { increment: vendorEarning },
-        totalRevenue: { increment: order.total }
-      }
+        totalRevenue: { increment: order.total },
+      },
     });
 
     return { commission, vendorEarning };
@@ -121,15 +121,14 @@ export class TransactionLedgerService {
    */
   async recordRideEarnings(ride: {
     id: string;
-    riderProfileId: string;
+    riderId: string;
     totalFare: number;
     platformFee: number;
     driverFee: number;
   }) {
-    // Get current rider balance
-    const rider = await this.prisma.riderProfile.findUnique({
-      where: { id: ride.riderProfileId },
-      select: { walletBalance: true }
+    const rider = await this.prisma.rider.findUnique({
+      where: { id: ride.riderId },
+      select: { walletBalance: true },
     });
 
     const currentBalance = rider?.walletBalance || 0;
@@ -146,10 +145,10 @@ export class TransactionLedgerService {
         balanceBefore: 0,
         balanceAfter: 0,
         metadata: {
-          riderProfileId: ride.riderProfileId,
-          totalFare: ride.totalFare
-        }
-      }
+          riderId: ride.riderId,
+          totalFare: ride.totalFare,
+        },
+      },
     });
 
     // Record rider earning
@@ -158,7 +157,7 @@ export class TransactionLedgerService {
         type: 'RIDER_EARNING',
         amount: ride.driverFee,
         entityType: 'RIDER',
-        entityId: ride.riderProfileId,
+        entityId: ride.riderId,
         rideId: ride.id,
         description: 'Ride earnings credited to wallet',
         status: 'COMPLETED',
@@ -166,17 +165,17 @@ export class TransactionLedgerService {
         balanceAfter: currentBalance + ride.driverFee,
         metadata: {
           totalFare: ride.totalFare,
-          platformFee: ride.platformFee
-        }
-      }
+          platformFee: ride.platformFee,
+        },
+      },
     });
 
     // Update rider wallet balance
-    await this.prisma.riderProfile.update({
-      where: { id: ride.riderProfileId },
+    await this.prisma.rider.update({
+      where: { id: ride.riderId },
       data: {
-        walletBalance: { increment: ride.driverFee }
-      }
+        walletBalance: { increment: ride.driverFee },
+      },
     });
 
     return { platformFee: ride.platformFee, driverFee: ride.driverFee };
@@ -187,15 +186,15 @@ export class TransactionLedgerService {
    */
   async recordDeliveryEarnings(delivery: {
     id: string;
-    riderProfileId: string;
+    riderId: string;
     deliveryFee: number;
   }) {
     const platformFee = delivery.deliveryFee * 0.15; // 15% platform fee
     const riderEarning = delivery.deliveryFee - platformFee;
 
-    const rider = await this.prisma.riderProfile.findUnique({
-      where: { id: delivery.riderProfileId },
-      select: { walletBalance: true }
+    const rider = await this.prisma.rider.findUnique({
+      where: { id: delivery.riderId },
+      select: { walletBalance: true },
     });
 
     const currentBalance = rider?.walletBalance || 0;
@@ -210,8 +209,8 @@ export class TransactionLedgerService {
         description: 'Platform fee from delivery',
         status: 'COMPLETED',
         balanceBefore: 0,
-        balanceAfter: 0
-      }
+        balanceAfter: 0,
+      },
     });
 
     // Record rider earning
@@ -220,21 +219,21 @@ export class TransactionLedgerService {
         type: 'RIDER_EARNING',
         amount: riderEarning,
         entityType: 'RIDER',
-        entityId: delivery.riderProfileId,
+        entityId: delivery.riderId,
         deliveryId: delivery.id,
         description: 'Delivery earnings credited to wallet',
         status: 'COMPLETED',
         balanceBefore: currentBalance,
-        balanceAfter: currentBalance + riderEarning
-      }
+        balanceAfter: currentBalance + riderEarning,
+      },
     });
 
     // Update rider wallet balance
-    await this.prisma.riderProfile.update({
-      where: { id: delivery.riderProfileId },
+    await this.prisma.rider.update({
+      where: { id: delivery.riderId },
       data: {
-        walletBalance: { increment: riderEarning }
-      }
+        walletBalance: { increment: riderEarning },
+      },
     });
 
     return { platformFee, riderEarning };
@@ -252,7 +251,7 @@ export class TransactionLedgerService {
   }) {
     const store = await this.prisma.store.findUnique({
       where: { id: payout.storeId },
-      select: { walletBalance: true }
+      select: { walletBalance: true },
     });
 
     const currentBalance = store?.walletBalance || 0;
@@ -271,9 +270,9 @@ export class TransactionLedgerService {
           balanceBefore: currentBalance,
           balanceAfter: currentBalance, // Balance not deducted until PAID
           metadata: {
-            reference: payout.reference
-          }
-        }
+            reference: payout.reference,
+          },
+        },
       });
     }
 
@@ -283,9 +282,9 @@ export class TransactionLedgerService {
       await this.prisma.transaction.updateMany({
         where: {
           vendorPayoutId: payout.id,
-          type: 'PAYOUT_REQUESTED'
+          type: 'PAYOUT_REQUESTED',
         },
-        data: { status: 'COMPLETED' }
+        data: { status: 'COMPLETED' },
       });
 
       // Create payout completed transaction
@@ -301,17 +300,17 @@ export class TransactionLedgerService {
           balanceBefore: currentBalance,
           balanceAfter: currentBalance - payout.amount,
           metadata: {
-            reference: payout.reference
-          }
-        }
+            reference: payout.reference,
+          },
+        },
       });
 
       // Deduct from store wallet
       await this.prisma.store.update({
         where: { id: payout.storeId },
         data: {
-          walletBalance: { decrement: payout.amount }
-        }
+          walletBalance: { decrement: payout.amount },
+        },
       });
     }
 
@@ -320,12 +319,12 @@ export class TransactionLedgerService {
       await this.prisma.transaction.updateMany({
         where: {
           vendorPayoutId: payout.id,
-          type: 'PAYOUT_REQUESTED'
+          type: 'PAYOUT_REQUESTED',
         },
-        data: { 
+        data: {
           status: 'FAILED',
-          description: 'Payout failed - amount returned to wallet'
-        }
+          description: 'Payout failed - amount returned to wallet',
+        },
       });
     }
   }
@@ -335,14 +334,14 @@ export class TransactionLedgerService {
    */
   async recordRiderPayout(payout: {
     id: string;
-    riderProfileId: string;
+    riderId: string;
     amount: number;
     status: 'PENDING' | 'PAID' | 'FAILED';
     reference?: string;
   }) {
-    const rider = await this.prisma.riderProfile.findUnique({
-      where: { id: payout.riderProfileId },
-      select: { walletBalance: true }
+    const rider = await this.prisma.rider.findUnique({
+      where: { id: payout.riderId },
+      select: { walletBalance: true },
     });
 
     const currentBalance = rider?.walletBalance || 0;
@@ -353,16 +352,16 @@ export class TransactionLedgerService {
           type: 'PAYOUT_REQUESTED',
           amount: payout.amount,
           entityType: 'RIDER',
-          entityId: payout.riderProfileId,
+          entityId: payout.riderId,
           riderPayoutId: payout.id,
           description: 'Payout requested',
           status: 'PENDING',
           balanceBefore: currentBalance,
           balanceAfter: currentBalance,
           metadata: {
-            reference: payout.reference
-          }
-        }
+            reference: payout.reference,
+          },
+        },
       });
     }
 
@@ -370,9 +369,9 @@ export class TransactionLedgerService {
       await this.prisma.transaction.updateMany({
         where: {
           riderPayoutId: payout.id,
-          type: 'PAYOUT_REQUESTED'
+          type: 'PAYOUT_REQUESTED',
         },
-        data: { status: 'COMPLETED' }
+        data: { status: 'COMPLETED' },
       });
 
       await this.prisma.transaction.create({
@@ -380,23 +379,23 @@ export class TransactionLedgerService {
           type: 'PAYOUT_COMPLETED',
           amount: payout.amount,
           entityType: 'RIDER',
-          entityId: payout.riderProfileId,
+          entityId: payout.riderId,
           riderPayoutId: payout.id,
           description: 'Payout transferred to bank',
           status: 'COMPLETED',
           balanceBefore: currentBalance,
           balanceAfter: currentBalance - payout.amount,
           metadata: {
-            reference: payout.reference
-          }
-        }
+            reference: payout.reference,
+          },
+        },
       });
 
-      await this.prisma.riderProfile.update({
-        where: { id: payout.riderProfileId },
+      await this.prisma.rider.update({
+        where: { id: payout.riderId },
         data: {
-          walletBalance: { decrement: payout.amount }
-        }
+          walletBalance: { decrement: payout.amount },
+        },
       });
     }
 
@@ -404,12 +403,12 @@ export class TransactionLedgerService {
       await this.prisma.transaction.updateMany({
         where: {
           riderPayoutId: payout.id,
-          type: 'PAYOUT_REQUESTED'
+          type: 'PAYOUT_REQUESTED',
         },
-        data: { 
+        data: {
           status: 'FAILED',
-          description: 'Payout failed - amount returned to wallet'
-        }
+          description: 'Payout failed - amount returned to wallet',
+        },
       });
     }
   }
@@ -436,9 +435,9 @@ export class TransactionLedgerService {
         balanceBefore: 0,
         balanceAfter: 0,
         metadata: {
-          userId: payment.userId
-        }
-      }
+          userId: payment.userId,
+        },
+      },
     });
   }
 
@@ -454,34 +453,33 @@ export class TransactionLedgerService {
   }) {
     // Get current balance
     let currentBalance = 0;
-    
+
     if (data.entityType === 'STORE') {
       const store = await this.prisma.store.findUnique({
         where: { id: data.entityId },
-        select: { walletBalance: true }
+        select: { walletBalance: true },
       });
       currentBalance = store?.walletBalance || 0;
-      
+
       // Update store balance
       await this.prisma.store.update({
         where: { id: data.entityId },
         data: {
-          walletBalance: { increment: data.amount }
-        }
+          walletBalance: { increment: data.amount },
+        },
       });
     } else {
-      const rider = await this.prisma.riderProfile.findUnique({
+      const rider = await this.prisma.rider.findUnique({
         where: { id: data.entityId },
-        select: { walletBalance: true }
+        select: { walletBalance: true },
       });
       currentBalance = rider?.walletBalance || 0;
-      
-      // Update rider balance
-      await this.prisma.riderProfile.update({
+
+      await this.prisma.rider.update({
         where: { id: data.entityId },
         data: {
-          walletBalance: { increment: data.amount }
-        }
+          walletBalance: { increment: data.amount },
+        },
       });
     }
 
@@ -497,33 +495,33 @@ export class TransactionLedgerService {
         balanceAfter: currentBalance + data.amount,
         processedBy: data.adminUserId,
         metadata: {
-          reason: data.reason
-        }
-      }
+          reason: data.reason,
+        },
+      },
     });
   }
 }
 
 /**
  * USAGE EXAMPLES:
- * 
+ *
  * 1. When order is completed and paid:
  *    await ledgerService.recordPayment(payment);
  *    await ledgerService.recordOrderCommission(order);
- * 
+ *
  * 2. When ride is completed:
  *    await ledgerService.recordPayment(payment);
  *    await ledgerService.recordRideEarnings(ride);
- * 
+ *
  * 3. When delivery is completed:
  *    await ledgerService.recordDeliveryEarnings(delivery);
- * 
+ *
  * 4. When vendor requests payout:
  *    await ledgerService.recordVendorPayout({ ...payout, status: 'PENDING' });
- * 
+ *
  * 5. When payout is processed by bank:
  *    await ledgerService.recordVendorPayout({ ...payout, status: 'PAID' });
- * 
+ *
  * 6. When admin makes adjustment:
  *    await ledgerService.recordAdjustment({
  *      entityType: 'STORE',

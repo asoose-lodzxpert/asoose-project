@@ -180,10 +180,6 @@ model User {
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
 
-
-  // Profiles & Relations
-  riderProfile RiderProfile?
-
   orders       Order[]
   addresses    Address[]
   reviews      Review[]
@@ -267,32 +263,20 @@ model Address {
 //// RIDER & LOGISTICS
 //// =====================
 
-model RiderPayout {
-  id             String        @id @default(uuid())
-  riderProfileId String
-  amount         Float
-  status         PayoutStatus  @default(PENDING)
-  method         PaymentMethod @default(BANK_TRANSFER)
-  reference      String?       // Transaction ID from bank/payment gateway
-  processedAt    DateTime?
-  createdAt      DateTime      @default(now())
+model Rider {
+  id              String     @id @default(uuid())
+  name            String
+  email           String     @unique
+  countryCode     String
+  phone           String
+  password        String
+  image           String?
+  status          UserStatus @default(PENDING)
+  expoPushToken   String?    // Expo push notification token
+  fcmToken        String?    // Firebase Cloud Messaging token
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
 
-  riderProfile RiderProfile  @relation(fields: [riderProfileId], references: [id], onDelete: Cascade)
-  transactions Transaction[] // NEW: Link to transaction ledger
-
-  @@index([riderProfileId, status])
-  @@index([createdAt])
-  @@index([status, createdAt(sort: Desc)])
-}
-
-model RiderProfile {
-  balance Float @default(0)
-  id     String @id @default(uuid())
-  userId String @unique
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  payouts RiderPayout[]
-  bankAccount BankAccount?
   // Live Status (Critical for Matching)
   isOnline   Boolean @default(false)
   currentLat Float?
@@ -300,30 +284,50 @@ model RiderProfile {
 
   // Financials & Stats
   walletBalance Float @default(0)
+  balance       Float @default(0)
   rating        Float @default(5.0)
   totalRides    Int   @default(0)
 
-  // Asset Management
-  vehicle   Vehicle?
-  documents RiderDocument[]
+  // Relations
+  payouts                  RiderPayout[]
+  bankAccount              BankAccount?
+  vehicle                  Vehicle?
+  documents                RiderDocument[]
+  rides                    Ride[]     @relation("RideRider")
+  deliveries               Delivery[] @relation("DeliveryRider")
+  notificationsPreferences Json?      // Stores notification preferences
 
-  // Trip History
-  rides      Ride[]     @relation("RideRider")
-  deliveries Delivery[] @relation("DeliveryRider")
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
+  @@index([email])
+  @@index([status])
   @@index([isOnline, currentLat, currentLng])
   @@index([rating])
   @@index([walletBalance])
   @@index([totalRides, rating])
+  @@index([status, createdAt(sort: Desc)])
+}
+
+model RiderPayout {
+  id        String        @id @default(uuid())
+  riderId   String
+  amount    Float
+  status    PayoutStatus  @default(PENDING)
+  method    PaymentMethod @default(BANK_TRANSFER)
+  reference String?       // Transaction ID from bank/payment gateway
+  processedAt DateTime?
+  createdAt   DateTime    @default(now())
+
+  rider        Rider         @relation(fields: [riderId], references: [id], onDelete: Cascade)
+  transactions Transaction[] // Link to transaction ledger
+
+  @@index([riderId, status])
+  @@index([createdAt])
+  @@index([status, createdAt(sort: Desc)])
 }
 
 model Vehicle {
-  id             String       @id @default(uuid())
-  riderProfileId String       @unique
-  riderProfile   RiderProfile @relation(fields: [riderProfileId], references: [id], onDelete: Cascade)
+  id          String @id @default(uuid())
+  riderId     String @unique
+  rider       Rider  @relation(fields: [riderId], references: [id], onDelete: Cascade)
 
   type        String
   brand       String
@@ -338,16 +342,16 @@ model Vehicle {
 }
 
 model RiderDocument {
-  id             String             @id @default(uuid())
-  riderProfileId String
-  riderProfile   RiderProfile       @relation(fields: [riderProfileId], references: [id], onDelete: Cascade)
-  type           String
-  url            String
-  status         VerificationStatus @default(PENDING)
-  createdAt      DateTime           @default(now())
-  updatedAt      DateTime           @updatedAt
+  id        String             @id @default(uuid())
+  riderId   String
+  rider     Rider              @relation(fields: [riderId], references: [id], onDelete: Cascade)
+  type      String
+  url       String
+  status    VerificationStatus @default(PENDING)
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
 
-  @@index([riderProfileId, status])
+  @@index([riderId, status])
 }
 
 model VehicleDocument {
@@ -463,9 +467,9 @@ model BankAccount {
   storeId        String?       @unique 
   store          Store?        @relation(fields: [storeId], references: [id], onDelete: Cascade)
 
-  // Add riderProfileId relation
-  riderProfileId String?       @unique
-  riderProfile   RiderProfile? @relation(fields: [riderProfileId], references: [id], onDelete: Cascade)
+  // Add riderId relation
+  riderId        String?       @unique
+  rider          Rider?        @relation(fields: [riderId], references: [id], onDelete: Cascade)
 
   bankName       String
   accountNumber  String
@@ -550,6 +554,7 @@ model Product {
   slug       String        @unique
   price      Float
   image      String?
+  images     String[]      @default([])
   status     ProductStatus @default(ACTIVE)
   storeId    String
   stock       Int      @default(0)
@@ -696,7 +701,7 @@ model Payment {
 model Ride {
   id               String     @id @default(uuid())
   customerId       String
-  riderProfileId   String?
+  riderId          String?
   pickupAddressId  String
   dropoffAddressId String
   status           RideStatus @default(REQUESTED)
@@ -727,14 +732,14 @@ model Ride {
   startedAt   DateTime?
   completedAt DateTime?
 
-  customer       User          @relation("RideCustomer", fields: [customerId], references: [id], onDelete: Cascade)
-  rider          RiderProfile? @relation("RideRider", fields: [riderProfileId], references: [id], onDelete: SetNull)
-  pickupAddress  Address       @relation("RidePickup", fields: [pickupAddressId], references: [id], onDelete: Restrict)
-  dropoffAddress Address       @relation("RideDropoff", fields: [dropoffAddressId], references: [id], onDelete: Restrict)
-  payment        Payment?      @relation("RidePayment")
+  customer       User     @relation("RideCustomer", fields: [customerId], references: [id], onDelete: Cascade)
+  rider          Rider?   @relation("RideRider", fields: [riderId], references: [id], onDelete: SetNull)
+  pickupAddress  Address  @relation("RidePickup", fields: [pickupAddressId], references: [id], onDelete: Restrict)
+  dropoffAddress Address  @relation("RideDropoff", fields: [dropoffAddressId], references: [id], onDelete: Restrict)
+  payment        Payment? @relation("RidePayment")
 
   @@index([customerId, status])
-  @@index([riderProfileId, status])
+  @@index([riderId, status])
   @@index([status, createdAt])
   @@index([createdAt(sort: Desc)])
 }
@@ -743,7 +748,7 @@ model Delivery {
   id               String         @id @default(uuid())
   orderId          String?        @unique
   customerId       String
-  riderProfileId   String?
+  riderId          String?
   pickupAddressId  String
   dropoffAddressId String
   status           DeliveryStatus @default(REQUESTED)
@@ -771,15 +776,15 @@ model Delivery {
   pickedUpAt  DateTime?
   deliveredAt DateTime?
 
-  order          Order?        @relation("OrderDelivery", fields: [orderId], references: [id], onDelete: Cascade)
-  customer       User          @relation("DeliveryCustomer", fields: [customerId], references: [id], onDelete: Cascade)
-  rider          RiderProfile? @relation("DeliveryRider", fields: [riderProfileId], references: [id], onDelete: SetNull)
-  pickupAddress  Address       @relation("DeliveryPickup", fields: [pickupAddressId], references: [id], onDelete: Restrict)
-  dropoffAddress Address       @relation("DeliveryDropoff", fields: [dropoffAddressId], references: [id], onDelete: Restrict)
+  order          Order?   @relation("OrderDelivery", fields: [orderId], references: [id], onDelete: Cascade)
+  customer       User     @relation("DeliveryCustomer", fields: [customerId], references: [id], onDelete: Cascade)
+  rider          Rider?   @relation("DeliveryRider", fields: [riderId], references: [id], onDelete: SetNull)
+  pickupAddress  Address  @relation("DeliveryPickup", fields: [pickupAddressId], references: [id], onDelete: Restrict)
+  dropoffAddress Address  @relation("DeliveryDropoff", fields: [dropoffAddressId], references: [id], onDelete: Restrict)
 
   @@index([orderId])
   @@index([customerId, status])
-  @@index([riderProfileId, status])
+  @@index([riderId, status])
   @@index([status, createdAt])
   @@index([createdAt(sort: Desc)])
 }

@@ -4,7 +4,9 @@ export const envSchema = z.object({
   // ----------------
   // Application
   // ----------------
-  NODE_ENV: z.enum(['development', 'staging', 'production', 'test']).default('development'),
+  NODE_ENV: z
+    .enum(['development', 'staging', 'production', 'test'])
+    .default('development'),
   PORT: z.coerce.number().default(3000),
   API_PREFIX: z.string().default('api/v1'),
 
@@ -51,14 +53,14 @@ export const envSchema = z.object({
   // ----------------
   STORAGE_TYPE: z.enum(['local', 's3', 'cloudinary']).default('local'),
   STORAGE_PATH: z.string().default('./uploads'),
-  
+
   // AWS S3
   AWS_S3_BUCKET: z.string().optional(),
   AWS_S3_REGION: z.string().optional(),
   AWS_ACCESS_KEY_ID: z.string().optional(),
   AWS_SECRET_ACCESS_KEY: z.string().optional(),
   AWS_REGION: z.string().optional(),
-  
+
   // Cloudinary
   CLOUDINARY_CLOUD_NAME: z.string().optional(),
   CLOUDINARY_API_KEY: z.string().optional(),
@@ -73,7 +75,9 @@ export const envSchema = z.object({
   // ----------------
   // CORS
   // ----------------
-  CORS_ORIGIN: z.string().default('http://localhost:3001,http://localhost:19006'),
+  CORS_ORIGIN: z
+    .string()
+    .default('http://localhost:3001,http://localhost:19006'),
   CORS_CREDENTIALS: z.string().default('true'),
 
   // ----------------
@@ -95,11 +99,11 @@ export const envSchema = z.object({
   // Paystack
   PAYSTACK_SECRET_KEY: z.string().optional(),
   PAYSTACK_PUBLIC_KEY: z.string().optional(),
-  
+
   // Flutterwave
   FLUTTERWAVE_SECRET_KEY: z.string().optional(),
   FLUTTERWAVE_PUBLIC_KEY: z.string().optional(),
-  
+
   // Monnify
   MONNIFY_BASE_URL: z.string().default('https://sandbox.monnify.com'),
   MONNIFY_API_KEY: z.string().optional(),
@@ -118,7 +122,7 @@ export const envSchema = z.object({
   FCM_PROJECT_ID: z.string().optional(),
   FCM_CLIENT_EMAIL: z.string().optional(),
   FCM_PRIVATE_KEY: z.string().optional(),
-  
+
   // Expo Push Notifications
   EXPO_ACCESS_TOKEN: z.string().optional(),
 

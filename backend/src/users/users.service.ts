@@ -1,14 +1,11 @@
-import { 
-  Injectable, 
-  Logger, 
+import {
+  Injectable,
+  Logger,
   BadRequestException,
-  NotFoundException 
+  NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { 
-  CreateAddressDto, 
-  CreateOrderDto 
-} from './dto/users.dto';
+import { CreateAddressDto, CreateOrderDto } from './dto/users.dto';
 import { OrdersService } from './orders.service';
 import { AddressesService } from './addresses.service';
 
@@ -25,12 +22,11 @@ export class UsersService {
   // ==================================================================
   // DELEGATED METHODS (Orders & Addresses)
   // ==================================================================
-  
 
-async createOrder(
-    userId: string, 
-    data: CreateOrderDto, 
-    idempotencyKey?: string // <--- Add this
+  async createOrder(
+    userId: string,
+    data: CreateOrderDto,
+    idempotencyKey?: string, // <--- Add this
   ) {
     // Pass it to ordersService
     return this.ordersService.createOrder(userId, data, idempotencyKey);
@@ -55,8 +51,8 @@ async createOrder(
   // ==================================================================
   // REMAINING LOGIC (Rides & Deliveries)
   // ==================================================================
-  
-  // Since we didn't create specific services for Rides/Deliveries, 
+
+  // Since we didn't create specific services for Rides/Deliveries,
   // their logic remains here to "tie everything up".
 
   /**
@@ -82,7 +78,7 @@ async createOrder(
     } catch (error) {
       this.logger.error(
         `Failed to fetch deliveries for user ${userId}`,
-        error.stack
+        error.stack,
       );
       throw new BadRequestException('Failed to retrieve deliveries');
     }
@@ -101,7 +97,7 @@ async createOrder(
         include: {
           pickupAddress: true,
           dropoffAddress: true,
-          rider: { include: { user: { select: { name: true, phone: true } } } },
+          rider: { select: { name: true, phone: true } },
         },
       });
 
@@ -111,15 +107,15 @@ async createOrder(
 
       return {
         ...delivery,
-        riderName: delivery.rider?.user.name,
-        riderPhone: delivery.rider?.user.phone,
+        riderName: delivery.rider?.name,
+        riderPhone: delivery.rider?.phone,
       };
     } catch (error) {
       if (error instanceof NotFoundException) throw error;
-      
+
       this.logger.error(
         `Failed to fetch delivery ${deliveryId} for user ${userId}`,
-        error.stack
+        error.stack,
       );
       throw new BadRequestException('Failed to retrieve delivery details');
     }
@@ -147,7 +143,7 @@ async createOrder(
     } catch (error) {
       this.logger.error(
         `Failed to fetch rides for user ${userId}`,
-        error.stack
+        error.stack,
       );
       throw new BadRequestException('Failed to retrieve rides');
     }
@@ -168,7 +164,6 @@ async createOrder(
           dropoffAddress: true,
           rider: {
             include: {
-              user: { select: { name: true, phone: true } },
               vehicle: true,
             },
           },
@@ -181,26 +176,24 @@ async createOrder(
 
       return {
         ...ride,
-        driverName: ride.rider?.user.name,
-        driverPhone: ride.rider?.user.phone,
+        driverName: ride.rider?.name,
+        driverPhone: ride.rider?.phone,
         vehicle: ride.rider?.vehicle
           ? `${ride.rider.vehicle.color} ${ride.rider.vehicle.model} (${ride.rider.vehicle.plateNumber})`
           : null,
       };
     } catch (error) {
       if (error instanceof NotFoundException) throw error;
-      
+
       this.logger.error(
         `Failed to fetch ride ${rideId} for user ${userId}`,
-        error.stack
+        error.stack,
       );
       throw new BadRequestException('Failed to retrieve ride details');
     }
   }
 
-async getOrderQuote(userId: string, data: CreateOrderDto) {
+  async getOrderQuote(userId: string, data: CreateOrderDto) {
     return this.ordersService.calculateQuote(userId, data);
   }
-
-
 }
