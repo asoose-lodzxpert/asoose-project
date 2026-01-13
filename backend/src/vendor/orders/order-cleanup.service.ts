@@ -8,30 +8,30 @@ export class OrderCleanupService {
 
   constructor(
     private prisma: PrismaService,
-    private vendorOrdersService: VendorOrdersService
+    private vendorOrdersService: VendorOrdersService,
   ) {}
 
   // Runs every 5 minutes
   @Cron(CronExpression.EVERY_5_MINUTES)
   async autoDeclineStaleOrders() {
     this.logger.log('Running stale order cleanup...');
-    
+
     const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
 
     const staleOrders = await this.prisma.order.findMany({
       where: {
         status: 'PENDING',
-        createdAt: { lt: fifteenMinutesAgo }
+        createdAt: { lt: fifteenMinutesAgo },
       },
-      include: { store: true } // Need ownerId for the service call
+      include: { store: true }, // Need ownerId for the service call
     });
 
     for (const order of staleOrders) {
       try {
         await this.vendorOrdersService.declineOrder(
-order.store.vendorId,
+          order.store.vendorId,
           order.id,
-          'Auto-declined: Vendor did not respond in time.'
+          'Auto-declined: Vendor did not respond in time.',
         );
         this.logger.log(`Auto-declined order ${order.id}`);
       } catch (e) {

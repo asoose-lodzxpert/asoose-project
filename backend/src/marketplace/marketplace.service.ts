@@ -3,7 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { StoreType } from '@prisma/client';
 import { CreateReviewDto } from './dto/create-review.dto';
 
-const isUUID = (str: string) => 
+const isUUID = (str: string) =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
 
 export interface HomeVertical {
@@ -21,7 +21,12 @@ export class MarketplaceService {
   constructor(private prisma: PrismaService) {}
 
   async getHomeData() {
-    const verticalTypes: StoreType[] = ['RESTAURANT', 'GROCERY', 'PHARMACY', 'MARKET'];
+    const verticalTypes: StoreType[] = [
+      'RESTAURANT',
+      'GROCERY',
+      'PHARMACY',
+      'MARKET',
+    ];
     const verticals: HomeVertical[] = [];
 
     for (const type of verticalTypes) {
@@ -62,19 +67,19 @@ export class MarketplaceService {
 
     switch (sortParam) {
       case 'RATING_DESC':
-      case 'top-rated': 
+      case 'top-rated':
         orderBy = { rating: 'desc' };
         break;
       case 'TIME_ASC':
       case 'fastest':
         // Sort by prepTime as a proxy for delivery speed
-        orderBy = { prepTime: 'asc' }; 
+        orderBy = { prepTime: 'asc' };
         break;
       case 'FEE_ASC':
       case 'cheapest':
         // Delivery Fee is currently calculated dynamically (500), so we can't sort by it in DB.
         // Fallback to sorting by prepTime or Rating, or price if you had a avgPrice column.
-        orderBy = { prepTime: 'asc' }; 
+        orderBy = { prepTime: 'asc' };
         break;
       case 'all':
       default:
@@ -84,7 +89,7 @@ export class MarketplaceService {
     // 2. Fetch the data
     const stores = await this.prisma.store.findMany({
       where: {
-        type: this.mapSlugToType(verticalId), 
+        type: this.mapSlugToType(verticalId),
         status: 'ACTIVE',
         verification: 'VERIFIED', // Ensure we only show verified stores
       },
@@ -99,14 +104,14 @@ export class MarketplaceService {
         type: true,
         prepTime: true,
         address: true,
-      }
+      },
     });
 
     // 3. Return formatted structure matching frontend expectations
     return {
       id: verticalId,
       title: this.formatTitle(verticalId),
-      vendors: stores.map(store => ({
+      vendors: stores.map((store) => ({
         id: store.id,
         name: store.name,
         slug: store.slug,
@@ -117,27 +122,27 @@ export class MarketplaceService {
         deliveryTime: `${store.prepTime || 20} - ${(store.prepTime || 20) + 15} min`,
         deliveryFee: 500, // Hardcoded for now per requirements
         prepTime: store.prepTime || 20,
-        address: store.address
+        address: store.address,
       })),
     };
   }
 
   private mapSlugToType(slug: string): any {
     const map: Record<string, string> = {
-      'food': 'RESTAURANT',
-      'grocery': 'GROCERY',
-      'pharmacy': 'PHARMACY',
-      'market': 'MARKET'
+      food: 'RESTAURANT',
+      grocery: 'GROCERY',
+      pharmacy: 'PHARMACY',
+      market: 'MARKET',
     };
     return map[slug.toLowerCase()] || 'RESTAURANT';
   }
 
   private formatTitle(slug: string): string {
     const titles: Record<string, string> = {
-      'food': 'Food Delivery',
-      'grocery': 'Groceries',
-      'pharmacy': 'Pharmacy',
-      'market': 'Local Market'
+      food: 'Food Delivery',
+      grocery: 'Groceries',
+      pharmacy: 'Pharmacy',
+      market: 'Local Market',
     };
     return titles[slug.toLowerCase()] || slug;
   }
@@ -180,21 +185,21 @@ export class MarketplaceService {
       include: {
         products: {
           where: { status: 'ACTIVE' },
-          include: { 
+          include: {
             category: { select: { name: true } },
             modifierGroups: {
               include: { modifiers: true },
-              orderBy: { name: 'asc' }
-            }
+              orderBy: { name: 'asc' },
+            },
           },
         },
         reviews: {
           take: 20,
           orderBy: { createdAt: 'desc' },
           include: {
-            user: { select: { name: true, image: true } }
-          }
-        }
+            user: { select: { name: true, image: true } },
+          },
+        },
       },
     });
 
@@ -214,19 +219,19 @@ export class MarketplaceService {
         name: p.name,
         price: p.price,
         image: p.image,
-        description: p.slug, 
+        description: p.slug,
         category: { name: p.category.name },
-        modifierGroups: p.modifierGroups.map(g => ({
+        modifierGroups: p.modifierGroups.map((g) => ({
           id: g.id,
           name: g.name,
           minSelect: g.minSelect,
           maxSelect: g.maxSelect,
-          modifiers: g.modifiers.map(m => ({
+          modifiers: g.modifiers.map((m) => ({
             id: m.id,
             name: m.name,
-            price: m.price
-          }))
-        }))
+            price: m.price,
+          })),
+        })),
       })),
       reviews: store.reviews.map((r) => ({
         id: r.id,
@@ -242,7 +247,9 @@ export class MarketplaceService {
 
   private formatSectionTitle(type: string): string {
     const title = type.charAt(0) + type.slice(1).toLowerCase();
-    return (type === 'GROCERY' || type === 'PHARMACY') ? title.replace('y', 'ies') : title + 's';
+    return type === 'GROCERY' || type === 'PHARMACY'
+      ? title.replace('y', 'ies')
+      : title + 's';
   }
 
   private getCategoryImage(name: string): string {
@@ -257,7 +264,7 @@ export class MarketplaceService {
   private mapStoresToVendors(stores: any[]) {
     return stores.map((store) => ({
       id: store.id,
-      slug: store.slug, 
+      slug: store.slug,
       name: store.name,
       image: store.image,
       rating: store.rating || 0,
@@ -265,24 +272,31 @@ export class MarketplaceService {
       deliveryTime: `${store.prepTime || 20} - ${(store.prepTime || 20) + 15} mins`,
       address: store.address,
       deliveryFee: 500,
-      type: store.type
+      type: store.type,
     }));
   }
 
   async upsertReview(userId: string, dto: CreateReviewDto) {
-    const store = await this.prisma.store.findUnique({ where: { id: dto.storeId } });
+    const store = await this.prisma.store.findUnique({
+      where: { id: dto.storeId },
+    });
     if (!store) throw new Error('Store not found');
 
     const review = await this.prisma.review.upsert({
       where: { userId_storeId: { userId: userId, storeId: dto.storeId } },
       update: { rating: dto.rating, comment: dto.comment },
-      create: { userId: userId, storeId: dto.storeId, rating: dto.rating, comment: dto.comment },
+      create: {
+        userId: userId,
+        storeId: dto.storeId,
+        rating: dto.rating,
+        comment: dto.comment,
+      },
     });
     return review;
   }
 
   async deleteReview(userId: string, storeId: string) {
-     return this.prisma.review.delete({
+    return this.prisma.review.delete({
       where: { userId_storeId: { userId: userId, storeId: storeId } },
     });
   }

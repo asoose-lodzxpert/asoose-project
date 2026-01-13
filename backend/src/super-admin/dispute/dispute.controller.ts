@@ -1,5 +1,15 @@
 import {
-  Controller, Get, Post, Body, Patch, Param, Query, UseGuards, Request, HttpCode, HttpStatus
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Query,
+  UseGuards,
+  Request,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import { DisputesService } from './dispute.service';
 import { CreateDisputeDto } from './dto/create-dispute.dto';
@@ -11,7 +21,13 @@ import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { RolesGuard } from '../../auth/roles.guards';
 import { Roles } from '../../auth/roles.decorator';
 import { UserRole } from '@prisma/client';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiQuery,
+} from '@nestjs/swagger';
 
 @ApiTags('Disputes')
 @ApiBearerAuth()
@@ -22,7 +38,13 @@ export class DisputesController {
 
   // Open to regular users to file complaints
   @Post()
-  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN_MANAGER, UserRole.CUSTOMER, UserRole.VENDOR, UserRole.RIDER)
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN_MANAGER,
+    UserRole.CUSTOMER,
+    UserRole.VENDOR,
+    UserRole.RIDER,
+  )
   @ApiOperation({ summary: 'Create a new dispute' })
   create(@Body() dto: CreateDisputeDto, @Request() req) {
     return this.disputesService.create(dto, req.user.id);
@@ -48,7 +70,14 @@ export class DisputesController {
   }
 
   @Get(':id')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN_MANAGER, UserRole.ADMIN_SUPPORT, UserRole.CUSTOMER, UserRole.VENDOR, UserRole.RIDER)
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN_MANAGER,
+    UserRole.ADMIN_SUPPORT,
+    UserRole.CUSTOMER,
+    UserRole.VENDOR,
+    UserRole.RIDER,
+  )
   @ApiOperation({ summary: 'Get dispute details' })
   findOne(@Param('id') id: string, @Request() req) {
     return this.disputesService.findOne(id, req.user.id, req.user.role);
@@ -60,7 +89,7 @@ export class DisputesController {
   addMessage(
     @Param('id') id: string,
     @Body() dto: AddMessageDto,
-    @Request() req
+    @Request() req,
   ) {
     return this.disputesService.addMessage(id, dto, req.user.id, req.user.role);
   }
@@ -73,7 +102,7 @@ export class DisputesController {
   addAdminNote(
     @Param('id') id: string,
     @Body('note') note: string,
-    @Request() req
+    @Request() req,
   ) {
     return this.disputesService.addAdminNote(id, note, req.user.id);
   }
@@ -84,11 +113,11 @@ export class DisputesController {
   @ApiOperation({ summary: 'Update dispute priority' })
   async updatePriority(
     @Param('id') id: string,
-    @Body() dto: UpdatePriorityDto
+    @Body() dto: UpdatePriorityDto,
   ) {
     return this.disputesService['prisma'].dispute.update({
       where: { id },
-      data: { priority: dto.priority }
+      data: { priority: dto.priority },
     });
   }
 
@@ -99,7 +128,7 @@ export class DisputesController {
   resolve(
     @Param('id') id: string,
     @Body() dto: ResolveDisputeDto,
-    @Request() req
+    @Request() req,
   ) {
     dto.adminId = req.user.id;
     return this.disputesService.resolve(id, dto, req.user.id);
@@ -112,7 +141,7 @@ export class DisputesController {
   reject(
     @Param('id') id: string,
     @Body('reason') reason: string,
-    @Request() req
+    @Request() req,
   ) {
     return this.disputesService.reject(id, reason, req.user.id);
   }

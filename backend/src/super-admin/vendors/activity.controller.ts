@@ -1,4 +1,12 @@
-import { Controller, Get, Param, Query, UseGuards, DefaultValuePipe, ParseIntPipe } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Param,
+  Query,
+  UseGuards,
+  DefaultValuePipe,
+  ParseIntPipe,
+} from '@nestjs/common';
 import { ActivityService } from './activity.service';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { RolesGuard } from '../../auth/roles.guards';

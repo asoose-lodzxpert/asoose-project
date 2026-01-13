@@ -1,20 +1,20 @@
-import { 
-  Controller, 
-  Get, 
-  Post, 
-  Patch, 
-  Delete, 
-  Body, 
-  Param, 
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Delete,
+  Body,
+  Param,
   UseGuards,
   HttpCode,
-  HttpStatus 
+  HttpStatus,
 } from '@nestjs/common';
 import { BannersService } from './banners.service';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { RolesGuard } from 'src/auth/roles.guards';
 import { Roles } from 'src/auth/roles.decorator';
-import { CreateBannerDto,UpdateBannerDto } from './dto/create-banner.dto';
+import { CreateBannerDto, UpdateBannerDto } from './dto/create-banner.dto';
 
 @Controller('super-admin/banners')
 @UseGuards(JwtAuthGuard, RolesGuard)

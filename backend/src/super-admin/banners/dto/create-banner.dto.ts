@@ -1,14 +1,14 @@
-import { 
-  IsString, 
-  IsNotEmpty, 
-  IsUrl, 
-  IsEnum, 
-  IsInt, 
-  Min, 
-  Max, 
-  IsOptional, 
+import {
+  IsString,
+  IsNotEmpty,
+  IsUrl,
+  IsEnum,
+  IsInt,
+  Min,
+  Max,
+  IsOptional,
   IsBoolean,
-  Matches 
+  Matches,
 } from 'class-validator';
 import { PartialType } from '@nestjs/mapped-types';
 
@@ -30,10 +30,15 @@ export class CreateBannerDto {
   @IsNotEmpty({ message: 'Button text is required' })
   buttonText: string;
 
-  @IsUrl({ protocols: ['http', 'https'], require_protocol: true }, { 
-    message: 'Link must be a valid HTTP/HTTPS URL' 
+  @IsUrl(
+    { protocols: ['http', 'https'], require_protocol: true },
+    {
+      message: 'Link must be a valid HTTP/HTTPS URL',
+    },
+  )
+  @Matches(/^https?:\/\//, {
+    message: 'Link must start with http:// or https://',
   })
-  @Matches(/^https?:\/\//, { message: 'Link must start with http:// or https://' })
   link: string;
 
   @IsString()

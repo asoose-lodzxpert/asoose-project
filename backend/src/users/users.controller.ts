@@ -1,13 +1,13 @@
-import { 
-  Controller, 
-  Get, 
-  Param, 
-  UseGuards, 
-  Request, 
-  NotFoundException, 
-  Post, 
-  Body, 
-  Headers // <--- Import Headers
+import {
+  Controller,
+  Get,
+  Param,
+  UseGuards,
+  Request,
+  NotFoundException,
+  Post,
+  Body,
+  Headers, // <--- Import Headers
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { UsersService } from './users.service';
@@ -25,14 +25,14 @@ export class UsersController {
   // NEW: This was missing!
   @Post('orders')
   async createOrder(
-    @Request() req, 
+    @Request() req,
     @Body() createOrderDto: CreateOrderDto,
-    @Headers('idempotency-key') idempotencyKey?: string // <--- Capture Header
+    @Headers('idempotency-key') idempotencyKey?: string, // <--- Capture Header
   ) {
     return this.usersService.createOrder(
-      req.user.id, 
+      req.user.id,
       createOrderDto,
-      idempotencyKey // Pass to service
+      idempotencyKey, // Pass to service
     );
   }
 
@@ -46,11 +46,11 @@ export class UsersController {
   async getOrderDetails(@Request() req, @Param('id') orderId: string) {
     const userId = req.user.id;
     const order = await this.usersService.getOrderDetails(userId, orderId);
-    
+
     if (!order) {
       throw new NotFoundException('Order not found');
     }
-    
+
     return order;
   }
 
@@ -64,7 +64,8 @@ export class UsersController {
   // }
 
   @Post('addresses')
-  async addAddress(@Request() req, @Body() body: CreateAddressDto) { // Use DTO
+  async addAddress(@Request() req, @Body() body: CreateAddressDto) {
+    // Use DTO
     return this.usersService.addUserAddress(req.user.id, body);
   }
 
@@ -79,7 +80,10 @@ export class UsersController {
 
   @Get('deliveries/:id')
   async getDeliveryDetails(@Request() req, @Param('id') id: string) {
-    const delivery = await this.usersService.getDeliveryDetails(req.user.id, id);
+    const delivery = await this.usersService.getDeliveryDetails(
+      req.user.id,
+      id,
+    );
     if (!delivery) throw new NotFoundException('Delivery not found');
     return delivery;
   }

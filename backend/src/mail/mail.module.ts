@@ -14,7 +14,7 @@ import { join } from 'path';
     }),
 
     MailerModule.forRootAsync({
-      imports: [ConfigModule], 
+      imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
         transport: {
@@ -30,7 +30,7 @@ import { join } from 'path';
           from: `"Asoose Admin" <${config.get<string>('MAIL_FROM')}>`,
         },
         template: {
-          dir: join(__dirname, 'templates'), 
+          dir: join(__dirname, 'templates'),
           adapter: new HandlebarsAdapter(),
           options: {
             strict: true,

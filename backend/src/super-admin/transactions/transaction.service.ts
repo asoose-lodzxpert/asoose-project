@@ -225,7 +225,7 @@ export class TransactionsService {
     }
 
     // 2. Transform the base data
-    let detail = this.transformTransactionDetail(t);
+    const detail = this.transformTransactionDetail(t);
 
     // =========================================================
     // 🚀 MANUAL FETCH: Fill in missing context (Order/Ride)

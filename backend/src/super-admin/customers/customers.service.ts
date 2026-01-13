@@ -1,7 +1,7 @@
-import { 
-  Injectable, 
-  NotFoundException, 
-  BadRequestException 
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service'; // Changed to relative path for safety
 import { UserStatus, UserRole, Prisma, OrderStatus } from '@prisma/client';
@@ -23,7 +23,7 @@ export class CustomersService {
 
     const where: Prisma.UserWhereInput = {
       role: UserRole.CUSTOMER,
-      deletedAt: null, 
+      deletedAt: null,
       status: status && status !== 'ALL' ? status : undefined,
       OR: search
         ? [
@@ -37,32 +37,33 @@ export class CustomersService {
       ? { [sortBy]: sortOrder || 'asc' }
       : { createdAt: 'desc' };
 
-    const [customers, total, activeCount, bannedCount, newTodayCount] = await Promise.all([
-      this.prisma.user.findMany({
-        where,
-        skip,
-        take: limit,
-        orderBy,
-        include: {
-          _count: { select: { orders: true } }
-        }
-      }),
-      this.prisma.user.count({ where }),
-      
-      this.prisma.user.count({ 
-        where: { role: UserRole.CUSTOMER, status: 'ACTIVE', deletedAt: null } 
-      }),
-      this.prisma.user.count({ 
-        where: { role: UserRole.CUSTOMER, status: 'BANNED', deletedAt: null } 
-      }),
-      this.prisma.user.count({ 
-        where: { 
-          role: UserRole.CUSTOMER, 
-          deletedAt: null,
-          createdAt: { gte: new Date(new Date().setHours(0,0,0,0)) } 
-        } 
-      }),
-    ]);
+    const [customers, total, activeCount, bannedCount, newTodayCount] =
+      await Promise.all([
+        this.prisma.user.findMany({
+          where,
+          skip,
+          take: limit,
+          orderBy,
+          include: {
+            _count: { select: { orders: true } },
+          },
+        }),
+        this.prisma.user.count({ where }),
+
+        this.prisma.user.count({
+          where: { role: UserRole.CUSTOMER, status: 'ACTIVE', deletedAt: null },
+        }),
+        this.prisma.user.count({
+          where: { role: UserRole.CUSTOMER, status: 'BANNED', deletedAt: null },
+        }),
+        this.prisma.user.count({
+          where: {
+            role: UserRole.CUSTOMER,
+            deletedAt: null,
+            createdAt: { gte: new Date(new Date().setHours(0, 0, 0, 0)) },
+          },
+        }),
+      ]);
 
     return {
       data: customers.map((c) => ({
@@ -82,8 +83,8 @@ export class CustomersService {
       stats: {
         active: activeCount,
         banned: bannedCount,
-        newToday: newTodayCount
-      }
+        newToday: newTodayCount,
+      },
     };
   }
 
@@ -92,8 +93,8 @@ export class CustomersService {
       where: { id },
       include: {
         _count: { select: { orders: true } },
-        addresses: true
-      }
+        addresses: true,
+      },
     });
 
     if (!customer) throw new NotFoundException('Customer not found');
@@ -101,32 +102,35 @@ export class CustomersService {
     const stats = await this.getAggregatedStats(id);
 
     return {
-        ...customer,
-        stats
+      ...customer,
+      stats,
     };
   }
 
-  async update(id: string, data: { name?: string; phone?: string; email?: string }) {
+  async update(
+    id: string,
+    data: { name?: string; phone?: string; email?: string },
+  ) {
     if (data.email) {
-      const existing = await this.prisma.user.findUnique({ 
-        where: { email: data.email } 
+      const existing = await this.prisma.user.findUnique({
+        where: { email: data.email },
       });
       if (existing && existing.id !== id) {
         throw new BadRequestException('Email already in use by another user');
       }
     }
-    
+
     return this.prisma.user.update({
       where: { id },
       data: {
         name: data.name,
         phone: data.phone,
         email: data.email,
-      }
+      },
     });
   }
 
-//soft delete
+  //soft delete
   async remove(id: string) {
     const customer = await this.prisma.user.findUnique({ where: { id } });
     if (!customer) throw new NotFoundException('Customer not found');
@@ -136,38 +140,40 @@ export class CustomersService {
       data: {
         deletedAt: new Date(),
         status: 'BANNED',
-        email: `deleted_${Date.now()}_${customer.email}`, 
-        phone: customer.phone ? `deleted_${Date.now()}_${customer.phone}` : null,
+        email: `deleted_${Date.now()}_${customer.email}`,
+        phone: customer.phone
+          ? `deleted_${Date.now()}_${customer.phone}`
+          : null,
       },
     });
   }
 
   async bulkUpdateStatus(ids: string[], status: UserStatus) {
     return this.prisma.user.updateMany({
-      where: { 
+      where: {
         id: { in: ids },
-        role: UserRole.CUSTOMER
+        role: UserRole.CUSTOMER,
       },
-      data: { status }
+      data: { status },
     });
   }
 
   async updateStatus(id: string, status: UserStatus) {
     return this.prisma.user.update({
       where: { id },
-      data: { status }
+      data: { status },
     });
   }
 
   async getCustomerOrders(userId: string) {
     return this.prisma.order.findMany({
-      where: { userId }, 
+      where: { userId },
       include: {
         store: { select: { name: true, logo: true } }, // <--- Fixed: Added comma here
-        items: true
+        items: true,
       },
       orderBy: { createdAt: 'desc' },
-      take: 50
+      take: 50,
     });
   }
 
@@ -175,7 +181,7 @@ export class CustomersService {
     return this.prisma.ride.findMany({
       where: { customerId },
       orderBy: { createdAt: 'desc' },
-      take: 50
+      take: 50,
     });
   }
 
@@ -183,23 +189,23 @@ export class CustomersService {
   private async getAggregatedStats(userId: string) {
     const [orders, rides] = await Promise.all([
       this.prisma.order.aggregate({
-        where: { 
-            userId: userId,        
-            status: OrderStatus.DELIVERED 
+        where: {
+          userId: userId,
+          status: OrderStatus.DELIVERED,
         },
-        _sum: { total: true },     
-        _count: { id: true }
+        _sum: { total: true },
+        _count: { id: true },
       }),
       this.prisma.ride.aggregate({
         where: { customerId: userId, status: 'COMPLETED' },
-        _count: { id: true }
-      })
+        _count: { id: true },
+      }),
     ]);
 
     return {
       totalOrders: orders._count?.id ?? 0,
       totalSpent: orders._sum?.total ?? 0,
-      totalRides: rides._count?.id ?? 0, 
+      totalRides: rides._count?.id ?? 0,
     };
   }
 }

@@ -7,9 +7,7 @@ import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis'
   imports: [
     ThrottlerModule.forRootAsync({
       useFactory: () => ({
-        throttlers: [
-          { limit: 20, ttl: 60 * 1000 },
-        ],
+        throttlers: [{ limit: 20, ttl: 60 * 1000 }],
         storage: new ThrottlerStorageRedisService(
           new Redis(process.env.REDIS_URL!),
         ),

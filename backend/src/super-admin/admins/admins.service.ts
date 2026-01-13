@@ -1,4 +1,9 @@
-import { Injectable, ConflictException, BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  ConflictException,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateAdminDto } from './dto/create-admins.dto';
 import * as bcrypt from 'bcrypt';
@@ -50,7 +55,14 @@ export class AdminsService {
   async findAll() {
     return this.prisma.user.findMany({
       where: {
-        role: { in: ['SUPER_ADMIN', 'ADMIN_MANAGER', 'ADMIN_SUPPORT', 'ADMIN_FINANCE'] }
+        role: {
+          in: [
+            'SUPER_ADMIN',
+            'ADMIN_MANAGER',
+            'ADMIN_SUPPORT',
+            'ADMIN_FINANCE',
+          ],
+        },
       },
       select: {
         id: true,
@@ -60,21 +72,21 @@ export class AdminsService {
         status: true,
         createdAt: true,
       },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
     });
   }
-  
+
   // Revoke Access (Ban/Delete)
   async remove(id: string, creatorId: string) {
     // Prevent self-deletion
     if (id === creatorId) {
-      throw new BadRequestException("You cannot delete your own account");
+      throw new BadRequestException('You cannot delete your own account');
     }
 
     // Check if user exists and is an admin
-    const user = await this.prisma.user.findUnique({ 
+    const user = await this.prisma.user.findUnique({
       where: { id },
-      select: { id: true, email: true, role: true }
+      select: { id: true, email: true, role: true },
     });
 
     if (!user) {
@@ -82,24 +94,31 @@ export class AdminsService {
     }
 
     // Verify the user is an admin role
-    const adminRoles = ['SUPER_ADMIN', 'ADMIN_MANAGER', 'ADMIN_SUPPORT', 'ADMIN_FINANCE'];
+    const adminRoles = [
+      'SUPER_ADMIN',
+      'ADMIN_MANAGER',
+      'ADMIN_SUPPORT',
+      'ADMIN_FINANCE',
+    ];
     if (!adminRoles.includes(user.role)) {
-      throw new BadRequestException('Can only delete admin users through this endpoint');
+      throw new BadRequestException(
+        'Can only delete admin users through this endpoint',
+      );
     }
 
     // Delete the user
     await this.prisma.user.delete({ where: { id } });
-    
+
     // Log the action
     await this.prisma.activityLog.create({
       data: {
         userId: creatorId,
         action: 'ADMIN_DELETED',
         target: `User: ${id}`,
-        details: `Deleted admin ${user.email}`
-      }
+        details: `Deleted admin ${user.email}`,
+      },
     });
-    
+
     return { message: 'Admin removed successfully' };
   }
 }

@@ -1,5 +1,10 @@
 import { Injectable } from '@nestjs/common';
-import { OrderStatus, StoreStatus, RideStatus, DeliveryStatus } from '@prisma/client';
+import {
+  OrderStatus,
+  StoreStatus,
+  RideStatus,
+  DeliveryStatus,
+} from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 
 // DTOs
@@ -96,12 +101,14 @@ export class AnalyticsService {
     };
   }
 
-  private async getOverviewMetrics(startDate: Date): Promise<AnalyticsOverview> {
+  private async getOverviewMetrics(
+    startDate: Date,
+  ): Promise<AnalyticsOverview> {
     const endDate = new Date();
     const periodLength = endDate.getTime() - startDate.getTime();
     const previousStartDate = new Date(startDate.getTime() - periodLength);
 
-    const [currentOrders, previousOrders, activeStores, previousActiveStores] = 
+    const [currentOrders, previousOrders, activeStores, previousActiveStores] =
       await Promise.all([
         this.prisma.order.aggregate({
           where: {
@@ -139,30 +146,43 @@ export class AnalyticsService {
     const previousOrderCount = previousOrders._count;
 
     const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
-    const previousAvgOrderValue = 
+    const previousAvgOrderValue =
       previousOrderCount > 0 ? previousRevenue / previousOrderCount : 0;
 
     return {
       totalRevenue,
-      revenueChange: this.calculatePercentageChange(totalRevenue, previousRevenue),
+      revenueChange: this.calculatePercentageChange(
+        totalRevenue,
+        previousRevenue,
+      ),
       totalOrders,
-      ordersChange: this.calculatePercentageChange(totalOrders, previousOrderCount),
+      ordersChange: this.calculatePercentageChange(
+        totalOrders,
+        previousOrderCount,
+      ),
       activeStores,
-      storesChange: this.calculatePercentageChange(activeStores, previousActiveStores),
+      storesChange: this.calculatePercentageChange(
+        activeStores,
+        previousActiveStores,
+      ),
       avgOrderValue,
       avgOrderValueChange: this.calculatePercentageChange(
         avgOrderValue,
-        previousAvgOrderValue
+        previousAvgOrderValue,
       ),
     };
   }
 
-  private async getOrderVolumeData(startDate: Date): Promise<OrderVolumeDataPoint[]> {
-const results = await this.prisma.$queryRaw<Array<{
-  date: Date;
-  orders: bigint;
-  revenue: number;
-}>>`
+  private async getOrderVolumeData(
+    startDate: Date,
+  ): Promise<OrderVolumeDataPoint[]> {
+    const results = await this.prisma.$queryRaw<
+      Array<{
+        date: Date;
+        orders: bigint;
+        revenue: number;
+      }>
+    >`
   SELECT 
     "createdAt"::date as date, 
     COUNT(*)::bigint as orders, 
@@ -174,7 +194,7 @@ const results = await this.prisma.$queryRaw<Array<{
   ORDER BY date ASC
 `;
 
-    return results.map(row => ({
+    return results.map((row) => ({
       date: row.date.toISOString().split('T')[0],
       orders: Number(row.orders),
       revenue: Math.round(Number(row.revenue) * 100) / 100,
@@ -186,10 +206,12 @@ const results = await this.prisma.$queryRaw<Array<{
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 
     const [storeGrowth, orderGrowth, riderGrowth] = await Promise.all([
-      this.prisma.$queryRaw<Array<{
-        month: string;
-        count: bigint;
-      }>>`
+      this.prisma.$queryRaw<
+        Array<{
+          month: string;
+          count: bigint;
+        }>
+      >`
         SELECT 
           TO_CHAR("createdAt", 'Mon YYYY') as month,
           COUNT(*)::bigint as count
@@ -198,10 +220,12 @@ const results = await this.prisma.$queryRaw<Array<{
         GROUP BY TO_CHAR("createdAt", 'Mon YYYY'), DATE_TRUNC('month', "createdAt")
         ORDER BY DATE_TRUNC('month', "createdAt") ASC
       `,
-      this.prisma.$queryRaw<Array<{
-        month: string;
-        count: bigint;
-      }>>`
+      this.prisma.$queryRaw<
+        Array<{
+          month: string;
+          count: bigint;
+        }>
+      >`
         SELECT 
           TO_CHAR("createdAt", 'Mon YYYY') as month,
           COUNT(*)::bigint as count
@@ -210,10 +234,12 @@ const results = await this.prisma.$queryRaw<Array<{
         GROUP BY TO_CHAR("createdAt", 'Mon YYYY'), DATE_TRUNC('month', "createdAt")
         ORDER BY DATE_TRUNC('month', "createdAt") ASC
       `,
-      this.prisma.$queryRaw<Array<{
-        month: string;
-        count: bigint;
-      }>>`
+      this.prisma.$queryRaw<
+        Array<{
+          month: string;
+          count: bigint;
+        }>
+      >`
         SELECT 
           TO_CHAR("createdAt", 'Mon YYYY') as month,
           COUNT(*)::bigint as count
@@ -224,22 +250,37 @@ const results = await this.prisma.$queryRaw<Array<{
       `,
     ]);
 
-    const monthMap = new Map<string, { stores: number; orders: number; riders: number }>();
+    const monthMap = new Map<
+      string,
+      { stores: number; orders: number; riders: number }
+    >();
 
-    storeGrowth.forEach(row => {
-      const existing = monthMap.get(row.month) || { stores: 0, orders: 0, riders: 0 };
+    storeGrowth.forEach((row) => {
+      const existing = monthMap.get(row.month) || {
+        stores: 0,
+        orders: 0,
+        riders: 0,
+      };
       existing.stores = Number(row.count);
       monthMap.set(row.month, existing);
     });
 
-    orderGrowth.forEach(row => {
-      const existing = monthMap.get(row.month) || { stores: 0, orders: 0, riders: 0 };
+    orderGrowth.forEach((row) => {
+      const existing = monthMap.get(row.month) || {
+        stores: 0,
+        orders: 0,
+        riders: 0,
+      };
       existing.orders = Number(row.count);
       monthMap.set(row.month, existing);
     });
 
-    riderGrowth.forEach(row => {
-      const existing = monthMap.get(row.month) || { stores: 0, orders: 0, riders: 0 };
+    riderGrowth.forEach((row) => {
+      const existing = monthMap.get(row.month) || {
+        stores: 0,
+        orders: 0,
+        riders: 0,
+      };
       existing.riders = Number(row.count);
       monthMap.set(row.month, existing);
     });
@@ -250,16 +291,20 @@ const results = await this.prisma.$queryRaw<Array<{
     }));
   }
 
-  private async getRevenueBreakdown(startDate: Date): Promise<RevenueBreakdownItem[]> {
+  private async getRevenueBreakdown(
+    startDate: Date,
+  ): Promise<RevenueBreakdownItem[]> {
     const endDate = new Date();
     const periodLength = endDate.getTime() - startDate.getTime();
     const previousStartDate = new Date(startDate.getTime() - periodLength);
 
     const [currentBreakdown, previousBreakdown] = await Promise.all([
-      this.prisma.$queryRaw<Array<{
-        category: string;
-        amount: number;
-      }>>`
+      this.prisma.$queryRaw<
+        Array<{
+          category: string;
+          amount: number;
+        }>
+      >`
         SELECT 
           s.type as category,
           SUM(o.total)::numeric as amount
@@ -271,10 +316,12 @@ const results = await this.prisma.$queryRaw<Array<{
         GROUP BY s.type
         ORDER BY amount DESC
       `,
-      this.prisma.$queryRaw<Array<{
-        category: string;
-        amount: number;
-      }>>`
+      this.prisma.$queryRaw<
+        Array<{
+          category: string;
+          amount: number;
+        }>
+      >`
         SELECT 
           s.type as category,
           SUM(o.total)::numeric as amount
@@ -287,10 +334,15 @@ const results = await this.prisma.$queryRaw<Array<{
       `,
     ]);
 
-    const previousMap = new Map(previousBreakdown.map(p => [p.category, Number(p.amount)]));
-    const totalRevenue = currentBreakdown.reduce((sum, item) => sum + Number(item.amount), 0);
+    const previousMap = new Map(
+      previousBreakdown.map((p) => [p.category, Number(p.amount)]),
+    );
+    const totalRevenue = currentBreakdown.reduce(
+      (sum, item) => sum + Number(item.amount),
+      0,
+    );
 
-    return currentBreakdown.map(item => {
+    return currentBreakdown.map((item) => {
       const amount = Number(item.amount);
       const previousAmount = previousMap.get(item.category) || 0;
 
@@ -304,10 +356,12 @@ const results = await this.prisma.$queryRaw<Array<{
   }
 
   private async getRatingsDistribution(): Promise<RatingsDistribution[]> {
-    const results = await this.prisma.$queryRaw<Array<{
-      rating: number;
-      count: bigint;
-    }>>`
+    const results = await this.prisma.$queryRaw<
+      Array<{
+        rating: number;
+        count: bigint;
+      }>
+    >`
       SELECT 
         rating,
         COUNT(*)::bigint as count
@@ -318,12 +372,15 @@ const results = await this.prisma.$queryRaw<Array<{
 
     const totalReviews = results.reduce((sum, r) => sum + Number(r.count), 0);
 
-    const ratingsMap = new Map(results.map(r => [r.rating, Number(r.count)]));
+    const ratingsMap = new Map(results.map((r) => [r.rating, Number(r.count)]));
 
-    return [5, 4, 3, 2, 1].map(star => ({
+    return [5, 4, 3, 2, 1].map((star) => ({
       star,
       count: ratingsMap.get(star) || 0,
-      percentage: totalReviews > 0 ? ((ratingsMap.get(star) || 0) / totalReviews) * 100 : 0,
+      percentage:
+        totalReviews > 0
+          ? ((ratingsMap.get(star) || 0) / totalReviews) * 100
+          : 0,
     }));
   }
 
@@ -336,18 +393,23 @@ const results = await this.prisma.$queryRaw<Array<{
     return Math.round((result[0]?.avg || 0) * 10) / 10;
   }
 
-  private async getTopVendors(startDate: Date, limit: number = 5): Promise<TopVendor[]> {
+  private async getTopVendors(
+    startDate: Date,
+    limit: number = 5,
+  ): Promise<TopVendor[]> {
     const endDate = new Date();
     const periodLength = endDate.getTime() - startDate.getTime();
     const previousStartDate = new Date(startDate.getTime() - periodLength);
 
-    const currentTopVendors = await this.prisma.$queryRaw<Array<{
-      id: string;
-      name: string;
-      revenue: number;
-      orders: bigint;
-      rating: number;
-    }>>`
+    const currentTopVendors = await this.prisma.$queryRaw<
+      Array<{
+        id: string;
+        name: string;
+        revenue: number;
+        orders: bigint;
+        rating: number;
+      }>
+    >`
       SELECT 
         s.id,
         s.name,
@@ -368,12 +430,14 @@ const results = await this.prisma.$queryRaw<Array<{
       return [];
     }
 
-    const storeIds = currentTopVendors.map(v => v.id);
+    const storeIds = currentTopVendors.map((v) => v.id);
 
-    const previousRevenue = await this.prisma.$queryRaw<Array<{
-      storeId: string;
-      revenue: number;
-    }>>`
+    const previousRevenue = await this.prisma.$queryRaw<
+      Array<{
+        storeId: string;
+        revenue: number;
+      }>
+    >`
       SELECT 
         "storeId",
         SUM(total)::numeric as revenue
@@ -385,9 +449,11 @@ const results = await this.prisma.$queryRaw<Array<{
       GROUP BY "storeId"
     `;
 
-    const previousMap = new Map(previousRevenue.map(p => [p.storeId, Number(p.revenue)]));
+    const previousMap = new Map(
+      previousRevenue.map((p) => [p.storeId, Number(p.revenue)]),
+    );
 
-    return currentTopVendors.map(vendor => ({
+    return currentTopVendors.map((vendor) => ({
       id: vendor.id,
       name: vendor.name,
       revenue: Math.round(Number(vendor.revenue) * 100) / 100,
@@ -395,7 +461,7 @@ const results = await this.prisma.$queryRaw<Array<{
       rating: vendor.rating,
       change: this.calculatePercentageChange(
         Number(vendor.revenue),
-        previousMap.get(vendor.id) || 0
+        previousMap.get(vendor.id) || 0,
       ),
     }));
   }
@@ -407,12 +473,12 @@ const results = await this.prisma.$queryRaw<Array<{
 
   async exportAnalyticsToCSV(days: number = 30): Promise<string> {
     const data = await this.getAnalyticsReport(days);
-    
+
     let csv = 'Date,Orders,Revenue\n';
     data.orderVolume.forEach((row) => {
       csv += `${row.date},${row.orders},${row.revenue}\n`;
     });
-    
+
     return csv;
   }
 }

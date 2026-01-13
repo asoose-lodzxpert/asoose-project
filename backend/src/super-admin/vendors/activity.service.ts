@@ -14,22 +14,22 @@ export class ActivityService {
     if (!store) throw new NotFoundException('Store not found');
 
     const logs = await this.prisma.activityLog.findMany({
-where: { userId: store.vendorId },
+      where: { userId: store.vendorId },
       orderBy: { createdAt: 'desc' },
       take: limit,
       skip: (page - 1) * limit,
       include: {
-        user: { select: { name: true, role: true } } // Include helpful context
-      }
+        user: { select: { name: true, role: true } }, // Include helpful context
+      },
     });
 
     const total = await this.prisma.activityLog.count({
-where: { userId: store.vendorId },
+      where: { userId: store.vendorId },
     });
 
     return {
       data: logs,
-      meta: { total, page, limit, totalPages: Math.ceil(total / limit) }
+      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
     };
   }
 }

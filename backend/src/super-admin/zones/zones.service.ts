@@ -61,11 +61,14 @@ export class ZonesService {
   checkLocation(lat: number, lng: number, zoneCoords: any[]) {
     let inside = false;
     for (let i = 0, j = zoneCoords.length - 1; i < zoneCoords.length; j = i++) {
-      const xi = zoneCoords[i].lat, yi = zoneCoords[i].lng;
-      const xj = zoneCoords[j].lat, yj = zoneCoords[j].lng;
+      const xi = zoneCoords[i].lat,
+        yi = zoneCoords[i].lng;
+      const xj = zoneCoords[j].lat,
+        yj = zoneCoords[j].lng;
 
-      const intersect = ((yi > lng) !== (yj > lng))
-          && (lat < (xj - xi) * (lng - yi) / (yj - yi) + xi);
+      const intersect =
+        yi > lng !== yj > lng &&
+        lat < ((xj - xi) * (lng - yi)) / (yj - yi) + xi;
       if (intersect) inside = !inside;
     }
     return inside;

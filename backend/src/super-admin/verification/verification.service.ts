@@ -1,6 +1,13 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { VerifyDocumentDto, VerificationDecision } from './dto/verify-document.dto';
+import {
+  VerifyDocumentDto,
+  VerificationDecision,
+} from './dto/verify-document.dto';
 
 @Injectable()
 export class VerificationService {
@@ -12,7 +19,10 @@ export class VerificationService {
       where: { id: docId },
       data: {
         status: dto.status,
-        rejectionReason: dto.status === VerificationDecision.REJECTED ? dto.rejectionReason : null,
+        rejectionReason:
+          dto.status === VerificationDecision.REJECTED
+            ? dto.rejectionReason
+            : null,
       },
       include: { user: true },
     });
@@ -29,7 +39,7 @@ export class VerificationService {
     // 3. Trigger Auto-Approval Check
     if (dto.status === VerificationDecision.VERIFIED) {
       await this.checkAndActivateUser(doc.userId);
-    } 
+    }
     // 4. Handle Rejection (Downgrade user if they were active)
     else if (dto.status === VerificationDecision.REJECTED) {
       await this.prisma.user.update({
@@ -49,7 +59,11 @@ export class VerificationService {
 
     let requiredTypes: string[] = [];
     if (user.role === 'RIDER') {
-      requiredTypes = ['DRIVER_LICENSE', 'VEHICLE_INSURANCE', 'ROAD_WORTHINESS'];
+      requiredTypes = [
+        'DRIVER_LICENSE',
+        'VEHICLE_INSURANCE',
+        'ROAD_WORTHINESS',
+      ];
     } else if (user.role === 'VENDOR') {
       requiredTypes = ['CAC_CERT', 'FOOD_SAFETY_CERT'];
     } else {
@@ -62,16 +76,16 @@ export class VerificationService {
     });
 
     // Check if ALL required types are present AND verified
-    const allVerified = requiredTypes.every((type) => 
-      userDocs.some((doc) => doc.type === type && doc.status === 'VERIFIED')
+    const allVerified = requiredTypes.every((type) =>
+      userDocs.some((doc) => doc.type === type && doc.status === 'VERIFIED'),
     );
 
     if (allVerified) {
       await this.prisma.user.update({
         where: { id: userId },
-        data: { 
+        data: {
           status: 'ACTIVE', // Or 'OFFLINE' for riders so they can toggle online
-          verificationStatus: 'VERIFIED' 
+          verificationStatus: 'VERIFIED',
         },
       });
     }

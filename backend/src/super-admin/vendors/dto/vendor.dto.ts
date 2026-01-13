@@ -1,5 +1,12 @@
-import { IsEmail, IsEnum, IsNotEmpty, IsOptional, IsPhoneNumber, IsString, MinLength } from 'class-validator';
-import { StoreType, StoreStatus, VerificationStatus } from '@prisma/client';
+import {
+  IsEmail,
+  IsEnum,
+  IsNotEmpty,
+  IsOptional,
+  IsPhoneNumber,
+  IsString,
+  MinLength,
+} from 'class-validator';
 import { Transform } from 'class-transformer';
 
 // --- ENUMS for Validation ---
@@ -8,6 +15,13 @@ export enum VendorCategory {
   GROCERY = 'GROCERY',
   PHARMACY = 'PHARMACY',
   MARKET = 'MARKET',
+}
+
+export enum StoreStatus {
+  ACTIVE = 'ACTIVE',
+  PENDING = 'PENDING',
+  SUSPENDED = 'SUSPENDED',
+  CLOSED_PERMANENTLY = 'CLOSED_PERMANENTLY',
 }
 
 // --- CREATE VENDOR DTO ---
@@ -47,8 +61,8 @@ export class VendorQueryDto {
   search?: string;
 
   @IsOptional()
-  @IsEnum(StoreStatus) 
-  status?: string;     
+  @IsEnum(StoreStatus)
+  status?: string;
 
   @IsOptional()
   @IsString()

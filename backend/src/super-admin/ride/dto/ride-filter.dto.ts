@@ -1,4 +1,10 @@
-import { IsOptional, IsString, IsEnum, IsDateString, IsNumber } from 'class-validator';
+import {
+  IsOptional,
+  IsString,
+  IsEnum,
+  IsDateString,
+  IsNumber,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class RideFilterDto {
@@ -16,7 +22,7 @@ export class RideFilterDto {
 
   @IsOptional()
   @IsDateString()
-  to?: string;   // YYYY-MM-DD
+  to?: string; // YYYY-MM-DD
 
   @IsOptional()
   @Type(() => Number)

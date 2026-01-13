@@ -10,10 +10,10 @@ export const ADDRESS_LABELS = {
 // 1. Define City Boundaries (Example: Maiduguri, Nigeria)
 // Go to Google Maps, right click top-right and bottom-left of the city to get these.
 const CITY_BOUNDS = {
-  MIN_LAT: 11.7500, // South-most edge
-  MAX_LAT: 11.9500, // North-most edge
-  MIN_LNG: 13.0500, // West-most edge
-  MAX_LNG: 13.2500, // East-most edge
+  MIN_LAT: 11.75, // South-most edge
+  MAX_LAT: 11.95, // North-most edge
+  MIN_LNG: 13.05, // West-most edge
+  MAX_LNG: 13.25, // East-most edge
 } as const;
 
 @Injectable()
@@ -29,7 +29,10 @@ export class AddressesService {
         orderBy: { isDefault: 'desc' },
       });
     } catch (error) {
-      this.logger.error(`Failed to fetch addresses for user ${userId}`, error.stack);
+      this.logger.error(
+        `Failed to fetch addresses for user ${userId}`,
+        error.stack,
+      );
       throw new BadRequestException('Failed to retrieve addresses');
     }
   }
@@ -64,7 +67,7 @@ export class AddressesService {
             label: sanitizedData.label || 'Home',
             isDefault: sanitizedData.isDefault || false,
             // 3. Use Real Coordinates
-            lat: data.lat, 
+            lat: data.lat,
             lng: data.lng,
           },
         });
@@ -72,8 +75,11 @@ export class AddressesService {
     } catch (error) {
       // Pass through our specific validation errors
       if (error instanceof BadRequestException) throw error;
-      
-      this.logger.error(`Failed to add address for user ${userId}`, error.stack);
+
+      this.logger.error(
+        `Failed to add address for user ${userId}`,
+        error.stack,
+      );
       throw new BadRequestException('Failed to add address');
     }
   }
@@ -83,13 +89,15 @@ export class AddressesService {
     storeAddress: string,
     lat: number,
     lng: number,
-    tx: Prisma.TransactionClient = this.prisma
+    tx: Prisma.TransactionClient = this.prisma,
   ) {
     // Validate Store coordinates too (prevents admins from setting fake store locations)
     if (!this.isWithinCity(lat, lng)) {
-        this.logger.warn(`Store ${ownerId} has invalid coordinates: ${lat}, ${lng}`);
-        // We might throw here, or fallback to a default if legacy data is bad
-        throw new BadRequestException('Store location is outside service area');
+      this.logger.warn(
+        `Store ${ownerId} has invalid coordinates: ${lat}, ${lng}`,
+      );
+      // We might throw here, or fallback to a default if legacy data is bad
+      throw new BadRequestException('Store location is outside service area');
     }
 
     let pickupAddress = await tx.address.findFirst({
@@ -136,7 +144,7 @@ export class AddressesService {
 
     if (!this.isWithinCity(lat, lng)) {
       throw new BadRequestException(
-        'Sorry, this location is outside our Maiduguri service area.'
+        'Sorry, this location is outside our Maiduguri service area.',
       );
     }
   }

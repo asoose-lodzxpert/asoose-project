@@ -13,7 +13,10 @@ export class PricingService {
     this.BASE_FEE = this.validateConfig('DELIVERY_BASE_FEE', 500);
     this.RATE_PER_KM = this.validateConfig('DELIVERY_RATE_PER_KM', 200);
     this.MIN_FEE = this.validateConfig('DELIVERY_MIN_FEE', 1000);
-    this.SERVICE_FEE_PERCENTAGE = this.validateConfig('SERVICE_FEE_PERCENTAGE', 0.05); // Default 5%
+    this.SERVICE_FEE_PERCENTAGE = this.validateConfig(
+      'SERVICE_FEE_PERCENTAGE',
+      0.05,
+    ); // Default 5%
   }
 
   /**

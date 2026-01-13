@@ -14,7 +14,7 @@ import * as crypto from 'crypto';
 import { PricingService } from './pricing.service';
 import { AddressesService } from './addresses.service';
 import { NotificationFacade } from './notification.facade';
-import type { RedisClientType } from 'redis'
+import type { RedisClientType } from 'redis';
 import { InventoryService } from './inventory.service';
 
 const ORDER_STATUS = { PENDING: 'PENDING' } as const;
@@ -111,11 +111,7 @@ export class OrdersService {
     idempotencyHeader?: string,
   ) {
     // 1. Generate Key
-    const rawKey = this.generateIdempotencyKey(
-      userId,
-      data,
-      idempotencyHeader,
-    );
+    const rawKey = this.generateIdempotencyKey(userId, data, idempotencyHeader);
     const redisKey = `${IDEMPOTENCY_PREFIX}${rawKey}`;
 
     // 2. Acquire Lock (Redis Atomic Operation)
@@ -132,7 +128,7 @@ export class OrdersService {
     }
 
     // Context for notifications
-    let emailItems: string[] = [];
+    const emailItems: string[] = [];
     let notificationContext: any = {};
 
     try {
@@ -333,10 +329,9 @@ export class OrdersService {
             select: {
               name: true,
               vendor: { select: { phone: true } },
-              
             },
           },
-          disputes: { select: { id: true, status: true } }
+          disputes: { select: { id: true, status: true } },
         },
       });
 
@@ -347,8 +342,8 @@ export class OrdersService {
         status: order.status,
         total: order.total,
         createdAt: order.createdAt,
-        deliveredAt: order.deliveredAt, 
-      dispute: order.disputes[0] || null,
+        deliveredAt: order.deliveredAt,
+        dispute: order.disputes[0] || null,
         items: order.items.map((item) => ({
           id: item.id,
           name: item.nameSnap,
@@ -430,15 +425,11 @@ export class OrdersService {
 
   private async acquireIdempotencyLock(key: string): Promise<string | null> {
     // CHANGED: Use object syntax for options (Node-Redis v4+)
-    const result = await this.redis.set(
-      key,
-      'PROCESSING',
-      {
-        PX: LOCK_TTL_MS,
-        NX: true,
-      }
-    );
-    
+    const result = await this.redis.set(key, 'PROCESSING', {
+      PX: LOCK_TTL_MS,
+      NX: true,
+    });
+
     if (result === 'OK') {
       return null;
     }

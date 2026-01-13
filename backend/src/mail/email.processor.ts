@@ -3,7 +3,7 @@ import { Job } from 'bullmq';
 import { MailerService } from '@nestjs-modules/mailer';
 
 @Processor('email')
-export class EmailProcessor extends WorkerHost { 
+export class EmailProcessor extends WorkerHost {
   constructor(private readonly mailer: MailerService) {
     super();
   }
@@ -29,11 +29,13 @@ export class EmailProcessor extends WorkerHost {
   }
 
   // ✅ ADD THIS HANDLER
-  private async sendVendorMessage(job: Job<{ email: string; subject: string; message: string }>) {
+  private async sendVendorMessage(
+    job: Job<{ email: string; subject: string; message: string }>,
+  ) {
     await this.mailer.sendMail({
       to: job.data.email,
       subject: job.data.subject,
-      text: job.data.message, 
+      text: job.data.message,
       // html: `<p>${job.data.message}</p>` // You can use HTML too
     });
   }

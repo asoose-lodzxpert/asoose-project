@@ -1,5 +1,10 @@
-import { CallHandler, ExecutionContext, Injectable, NestInterceptor } from "@nestjs/common";
-import { tap } from "rxjs";
+import {
+  CallHandler,
+  ExecutionContext,
+  Injectable,
+  NestInterceptor,
+} from '@nestjs/common';
+import { tap } from 'rxjs';
 
 @Injectable()
 export class HttpLoggingInterceptor implements NestInterceptor {
@@ -22,7 +27,6 @@ export class HttpLoggingInterceptor implements NestInterceptor {
     );
   }
 }
-
 
 // Logging in Queues & Workers
 

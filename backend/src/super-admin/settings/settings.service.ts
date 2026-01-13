@@ -1,4 +1,9 @@
-import { Injectable, Inject, Logger, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  Inject,
+  Logger,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { RedisClientType } from 'redis';
 
@@ -27,13 +32,13 @@ export class SettingsService {
    */
   async updateBulk(settings: { key: string; value: any }[]) {
     try {
-      // 1. Create a list of upsert operations 
+      // 1. Create a list of upsert operations
       const operations = settings.map((s) =>
         this.prisma.systemSetting.upsert({
           where: { key: s.key },
           update: { value: String(s.value) },
-          create: { 
-            key: s.key, 
+          create: {
+            key: s.key,
             value: String(s.value),
             category: this.inferCategory(s.key),
           },
@@ -43,10 +48,10 @@ export class SettingsService {
       // 2. Execute all updates atomically
       const results = await this.prisma.$transaction(operations);
 
-      // 3. CACHE INVALIDATION: 
-      // If maintenance_mode was changed, we MUST clear Redis so the 
+      // 3. CACHE INVALIDATION:
+      // If maintenance_mode was changed, we MUST clear Redis so the
       // AppController and Middleware see the update immediately.
-      if (settings.some(s => s.key === 'maintenance_mode')) {
+      if (settings.some((s) => s.key === 'maintenance_mode')) {
         await this.redisClient.del(this.MAINTENANCE_CACHE_KEY);
         this.logger.log('Maintenance mode changed: Redis cache invalidated.');
       }
@@ -62,8 +67,10 @@ export class SettingsService {
    * Helper to assign categories to new settings if they don't exist yet.
    */
   private inferCategory(key: string): string {
-    if (key.includes('fare') || key.includes('cost') || key.includes('radius')) return 'Logistics';
-    if (key.includes('commission') || key.includes('withdrawal')) return 'Financials';
+    if (key.includes('fare') || key.includes('cost') || key.includes('radius'))
+      return 'Logistics';
+    if (key.includes('commission') || key.includes('withdrawal'))
+      return 'Financials';
     return 'General';
   }
 

@@ -557,7 +557,7 @@ export class PaymentService {
               processedBy: adminId,
               processedAt: new Date(),
             },
-          } as any,
+          },
         },
       });
 

@@ -7,5 +7,4 @@ export class AddMessageDto {
   @IsOptional()
   @IsBoolean()
   isInternal?: boolean;
-  
 }

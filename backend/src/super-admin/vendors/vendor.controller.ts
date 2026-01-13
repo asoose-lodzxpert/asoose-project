@@ -1,5 +1,15 @@
-import { 
-  Body, Controller, Delete, Get, Param, Post, Query, UseGuards, UsePipes, ValidationPipe, Patch
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Query,
+  UseGuards,
+  UsePipes,
+  ValidationPipe,
+  Patch,
 } from '@nestjs/common';
 import { StoresService } from './vendors.service';
 import { CreateVendorDto, VendorQueryDto } from './dto/vendor.dto';
@@ -15,7 +25,7 @@ export class VendorsController {
   constructor(private readonly storesService: StoresService) {}
 
   @Get()
-  @UsePipes(new ValidationPipe({ transform: true })) 
+  @UsePipes(new ValidationPipe({ transform: true }))
   async getAllStores(@Query() query: VendorQueryDto) {
     return this.storesService.findAll(query);
   }
@@ -26,7 +36,7 @@ export class VendorsController {
   }
 
   @Post()
-  @UsePipes(new ValidationPipe({ whitelist: true })) 
+  @UsePipes(new ValidationPipe({ whitelist: true }))
   async createVendor(@Body() dto: CreateVendorDto) {
     return this.storesService.create(dto);
   }
@@ -37,10 +47,7 @@ export class VendorsController {
   }
 
   @Get(':id/performance')
-  async getPerformance(
-    @Param('id') id: string,
-    @Query('days') days?: string,
-  ) {
+  async getPerformance(@Param('id') id: string, @Query('days') days?: string) {
     return this.storesService.getPerformanceData(id, Number(days) || 30);
   }
 
@@ -57,17 +64,16 @@ export class VendorsController {
   @Patch('products/:productId/status')
   async updateProductStatus(
     @Param('productId') productId: string,
-    @Body('status') status: 'ACTIVE' | 'DISABLED'
+    @Body('status') status: 'ACTIVE' | 'DISABLED',
   ) {
     return this.storesService.updateProductStatus(productId, status);
   }
 
-@Post(':id/message')
+  @Post(':id/message')
   async messageVendor(
     @Param('id') id: string,
-    @Body('message') message: string
+    @Body('message') message: string,
   ) {
     return this.storesService.sendMessageToVendor(id, message);
   }
-
 }

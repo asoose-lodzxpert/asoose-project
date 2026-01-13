@@ -7,7 +7,7 @@ COPY package.json yarn.lock ./
 COPY packages ./packages
 COPY backend/package.json backend/
 
-RUN yarn install --frozen-lockfile
+RUN yarn install --frozen-lockfile --production
 
 COPY backend ./backend
 
@@ -44,4 +44,4 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
   CMD node -e "require('http').get('http://localhost:3000/health', r => process.exit(r.statusCode === 200 ? 0 : 1))"
 
-CMD ["dumb-init", "sh", "-c", "npx prisma migrate deploy && node dist/src/main.js"]
+CMD ["dumb-init", "--", "sh", "-c", "npx prisma migrate deploy && node dist/src/main.js"]

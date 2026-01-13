@@ -9,10 +9,13 @@ export class MapsController {
   async addressSearch(
     @Query('query') query: string,
     @Query('latitude') latitude?: string,
-    @Query('longitude') longitude?: string
+    @Query('longitude') longitude?: string,
   ) {
     if (!query || query.length < 3) return [];
-    const bias = latitude && longitude ? `&location=${latitude},${longitude}&radius=30000` : '';
+    const bias =
+      latitude && longitude
+        ? `&location=${latitude},${longitude}&radius=30000`
+        : '';
     const url = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(query)}${bias}&components=country:ng&key=${API_KEY}`;
     const res = await axios.get(url);
     return (
@@ -27,7 +30,7 @@ export class MapsController {
   @Get('places-autocomplete')
   async placesAutocomplete(
     @Query('query') query: string,
-    @Query('location') location?: string
+    @Query('location') location?: string,
   ) {
     if (!query || query.length < 3) return [];
     const url = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(query)}&key=${API_KEY}&location=${location ?? ''}&radius=30000`;

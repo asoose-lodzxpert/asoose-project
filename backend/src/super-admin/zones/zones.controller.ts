@@ -1,4 +1,14 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+  Query,
+} from '@nestjs/common';
 import { ZonesService } from './zones.service';
 import { CreateZoneDto, UpdateZoneDto } from './dto/create-zone.dto';
 // Adjust these import paths to match your project structure
@@ -32,14 +42,22 @@ export class ZonesController {
     const longitude = parseFloat(lng);
 
     // Find all zones that contain this point
-    const matchedZones = zones.filter(zone => 
-      zone.isActive && 
-      this.zonesService.checkLocation(latitude, longitude, zone.coordinates as any[])
+    const matchedZones = zones.filter(
+      (zone) =>
+        zone.isActive &&
+        this.zonesService.checkLocation(
+          latitude,
+          longitude,
+          zone.coordinates as any[],
+        ),
     );
 
     return {
       isCovered: matchedZones.length > 0,
-      activeZones: matchedZones.map(z => ({ name: z.name, multiplier: z.basePriceMultiplier }))
+      activeZones: matchedZones.map((z) => ({
+        name: z.name,
+        multiplier: z.basePriceMultiplier,
+      })),
     };
   }
 

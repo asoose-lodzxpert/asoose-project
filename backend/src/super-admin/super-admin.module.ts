@@ -34,6 +34,6 @@ import { SettingsService } from './settings/settings.service';
     BannerModule,
   ],
   controllers: [SettingsController],
-  providers: [ PrismaService,SettingsService],
+  providers: [PrismaService, SettingsService],
 })
 export class SuperAdminModule {}

@@ -1,4 +1,11 @@
-import { Controller, Get, Param, Patch, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { RideFilterDto } from './dto/ride-filter.dto';
 import { RidesService } from './ride.service';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';

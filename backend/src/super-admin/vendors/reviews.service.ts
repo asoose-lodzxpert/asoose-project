@@ -12,10 +12,10 @@ export class ReviewsService {
       take: limit,
       skip: (page - 1) * limit,
       include: {
-        user: { 
-          select: { name: true } 
-        }
-      }
+        user: {
+          select: { name: true },
+        },
+      },
     });
 
     const total = await this.prisma.review.count({
@@ -24,7 +24,7 @@ export class ReviewsService {
 
     return {
       data: reviews,
-      meta: { total, page, limit, totalPages: Math.ceil(total / limit) }
+      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
     };
   }
 }

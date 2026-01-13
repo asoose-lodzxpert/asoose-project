@@ -24,7 +24,7 @@ export class OrdersService {
 
     return {
       data: orders,
-      meta: { total, page, limit, totalPages: Math.ceil(total / limit) }
+      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
     };
   }
 }

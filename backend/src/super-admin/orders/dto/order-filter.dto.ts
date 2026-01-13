@@ -19,7 +19,7 @@ export class OrderFilterDto {
 
   @IsOptional()
   @IsDateString()
-  to?: string;   // YYYY-MM-DD
+  to?: string; // YYYY-MM-DD
 
   @IsOptional()
   page?: number;

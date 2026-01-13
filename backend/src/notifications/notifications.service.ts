@@ -1,12 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { NotificationsGateway } from './notifications.gateway'; 
+import { NotificationsGateway } from './notifications.gateway';
 
 @Injectable()
 export class NotificationsService {
   constructor(
     private prisma: PrismaService,
-    private notificationsGateway: NotificationsGateway 
+    private notificationsGateway: NotificationsGateway,
   ) {}
 
   async create(data: {
@@ -65,7 +65,7 @@ export class NotificationsService {
       data: { isRead: true },
     });
   }
-  
+
   async markAllAsRead(userId: string) {
     return this.prisma.notification.updateMany({
       where: { userId, isRead: false },

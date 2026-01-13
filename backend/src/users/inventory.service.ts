@@ -16,12 +16,12 @@ export class InventoryService {
 
     for (const item of items) {
       const product = productMap.get(item.id);
-      
+
       // Assuming your Product model has a 'stock' or 'quantity' field
       // Adjust 'stock' to match your actual database column name
       if (product && product.stock < item.quantity) {
         errors.push(
-          `Insufficient stock for ${product.name}. Requested: ${item.quantity}, Available: ${product.stock}`
+          `Insufficient stock for ${product.name}. Requested: ${item.quantity}, Available: ${product.stock}`,
         );
       }
     }
@@ -38,8 +38,8 @@ export class InventoryService {
     for (const item of items) {
       await tx.product.update({
         where: { id: item.id },
-        data: { 
-          stock: { decrement: item.quantity } 
+        data: {
+          stock: { decrement: item.quantity },
         },
       });
     }

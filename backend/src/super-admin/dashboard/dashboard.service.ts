@@ -1,6 +1,6 @@
-import { 
-  Injectable, 
-  InternalServerErrorException, 
+import {
+  Injectable,
+  InternalServerErrorException,
   UnauthorizedException,
   Logger,
   Inject,
@@ -8,13 +8,13 @@ import {
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import type { Cache } from 'cache-manager';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { 
-  OrderStatus, 
-  DisputeStatus, 
-  StoreStatus, 
+import {
+  OrderStatus,
+  DisputeStatus,
+  StoreStatus,
   VerificationStatus,
   UserRole,
-  User 
+  User,
 } from '@prisma/client';
 
 // ==================== INTERFACES ====================
@@ -78,14 +78,19 @@ export class DashboardService {
 
   constructor(
     private prisma: PrismaService,
-    @Inject(CACHE_MANAGER) private cacheManager: Cache
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {}
 
   // ==================== AUTHORIZATION ====================
 
   private validateSuperAdmin(user: User): void {
-    if (!user || (user.role !== UserRole.SUPER_ADMIN && user.role !== UserRole.ADMIN)) {
-      this.logger.warn(`Unauthorized dashboard access attempt by user: ${user?.id}`);
+    if (
+      !user ||
+      (user.role !== UserRole.SUPER_ADMIN && user.role !== UserRole.ADMIN)
+    ) {
+      this.logger.warn(
+        `Unauthorized dashboard access attempt by user: ${user?.id}`,
+      );
       throw new UnauthorizedException('Super admin access required');
     }
   }
@@ -97,7 +102,9 @@ export class DashboardService {
 
     try {
       // Try cache first
-      const cached = await this.cacheManager.get<DashboardResponse>(this.STATS_CACHE_KEY);
+      const cached = await this.cacheManager.get<DashboardResponse>(
+        this.STATS_CACHE_KEY,
+      );
       if (cached) {
         this.logger.debug('Returning cached dashboard stats');
         return cached;
@@ -112,12 +119,14 @@ export class DashboardService {
       return stats;
     } catch (error) {
       this.logger.error('Failed to fetch dashboard stats', error.stack);
-      
+
       // Attempt to return minimal fallback data
       try {
         return await this.getMinimalStats();
       } catch (fallbackError) {
-        throw new InternalServerErrorException('Unable to load dashboard statistics');
+        throw new InternalServerErrorException(
+          'Unable to load dashboard statistics',
+        );
       }
     }
   }
@@ -137,35 +146,45 @@ export class DashboardService {
       revenueMetrics,
       userMetrics,
       storeMetrics,
-      disputeCount
+      disputeCount,
     ] = await Promise.all([
-      this.getOrderMetrics(sevenDaysAgo, fourteenDaysAgo, thirtyDaysAgo, sixtyDaysAgo),
-      this.getRevenueMetrics(sevenDaysAgo, fourteenDaysAgo, thirtyDaysAgo, sixtyDaysAgo),
+      this.getOrderMetrics(
+        sevenDaysAgo,
+        fourteenDaysAgo,
+        thirtyDaysAgo,
+        sixtyDaysAgo,
+      ),
+      this.getRevenueMetrics(
+        sevenDaysAgo,
+        fourteenDaysAgo,
+        thirtyDaysAgo,
+        sixtyDaysAgo,
+      ),
       this.getUserMetrics(thirtyDaysAgo),
       this.getStoreMetrics(),
-      this.prisma.dispute.count({ where: { status: DisputeStatus.OPEN } })
+      this.prisma.dispute.count({ where: { status: DisputeStatus.OPEN } }),
     ]);
 
     // Calculate growth percentages
     const orderGrowth = this.calculatePercentageChange(
       orderMetrics.currentMonth,
-      orderMetrics.previousMonth
+      orderMetrics.previousMonth,
     );
     const userGrowth = this.calculatePercentageChange(
       userMetrics.active,
-      userMetrics.priorToMonth
+      userMetrics.priorToMonth,
     );
     const revenueGrowth = this.calculatePercentageChange(
       revenueMetrics.currentMonth,
-      revenueMetrics.previousMonth
+      revenueMetrics.previousMonth,
     );
     const weeklyOrderGrowth = this.calculatePercentageChange(
       orderMetrics.lastWeek,
-      orderMetrics.previousWeek
+      orderMetrics.previousWeek,
     );
     const weeklyRevenueGrowth = this.calculatePercentageChange(
       revenueMetrics.lastWeek,
-      revenueMetrics.previousWeek
+      revenueMetrics.previousWeek,
     );
 
     // Build stat cards
@@ -212,17 +231,17 @@ export class DashboardService {
     const quickAccess: QuickAccessStats = {
       approvals: {
         total: storeMetrics.pendingApprovals,
-        details: 'Stores awaiting verification'
+        details: 'Stores awaiting verification',
       },
       disputes: {
         total: disputeCount,
-        details: 'Unresolved customer issues'
+        details: 'Unresolved customer issues',
       },
       revenue: {
         growth: `${revenueGrowth > 0 ? '+' : ''}${revenueGrowth}%`,
         details: 'Growth vs last 30 days',
-        isPositive: revenueGrowth >= 0
-      }
+        isPositive: revenueGrowth >= 0,
+      },
     };
 
     // Trending metrics (velocity indicators)
@@ -230,7 +249,7 @@ export class DashboardService {
       ordersWeekly: weeklyOrderGrowth,
       revenueWeekly: weeklyRevenueGrowth,
       isAccelerating: weeklyOrderGrowth > orderGrowth,
-      criticalAlerts: disputeCount + storeMetrics.pendingApprovals
+      criticalAlerts: disputeCount + storeMetrics.pendingApprovals,
     };
 
     return { stats, quickAccess, trending };
@@ -242,13 +261,15 @@ export class DashboardService {
     sevenDaysAgo: Date,
     fourteenDaysAgo: Date,
     thirtyDaysAgo: Date,
-    sixtyDaysAgo: Date
+    sixtyDaysAgo: Date,
   ) {
     // Single aggregation with time-based grouping
-    const results = await this.prisma.$queryRaw<Array<{
-      period: string;
-      count: bigint;
-    }>>`
+    const results = await this.prisma.$queryRaw<
+      Array<{
+        period: string;
+        count: bigint;
+      }>
+    >`
       SELECT 
         CASE 
           WHEN "createdAt" >= ${sevenDaysAgo} THEN 'lastWeek'
@@ -266,10 +287,10 @@ export class DashboardService {
       lastWeek: 0,
       previousWeek: 0,
       currentMonth: 0,
-      previousMonth: 0
+      previousMonth: 0,
     };
 
-    results.forEach(row => {
+    results.forEach((row) => {
       if (row.period) {
         metrics[row.period as keyof typeof metrics] = Number(row.count);
       }
@@ -282,12 +303,14 @@ export class DashboardService {
     sevenDaysAgo: Date,
     fourteenDaysAgo: Date,
     thirtyDaysAgo: Date,
-    sixtyDaysAgo: Date
+    sixtyDaysAgo: Date,
   ) {
-    const results = await this.prisma.$queryRaw<Array<{
-      period: string | null;
-      total: number;
-    }>>`
+    const results = await this.prisma.$queryRaw<
+      Array<{
+        period: string | null;
+        total: number;
+      }>
+    >`
       SELECT 
         CASE 
           WHEN "deliveredAt" >= ${sevenDaysAgo} THEN 'lastWeek'
@@ -304,7 +327,7 @@ export class DashboardService {
 
     const lifetime = await this.prisma.order.aggregate({
       where: { status: OrderStatus.DELIVERED },
-      _sum: { total: true }
+      _sum: { total: true },
     });
 
     const metrics = {
@@ -312,10 +335,10 @@ export class DashboardService {
       lastWeek: 0,
       previousWeek: 0,
       currentMonth: 0,
-      previousMonth: 0
+      previousMonth: 0,
     };
 
-    results.forEach(row => {
+    results.forEach((row) => {
       if (row.period) {
         metrics[row.period as keyof typeof metrics] = row.total;
       }
@@ -328,8 +351,8 @@ export class DashboardService {
     const [active, priorToMonth] = await Promise.all([
       this.prisma.user.count({ where: { status: 'ACTIVE' } }),
       this.prisma.user.count({
-        where: { status: 'ACTIVE', createdAt: { lt: thirtyDaysAgo } }
-      })
+        where: { status: 'ACTIVE', createdAt: { lt: thirtyDaysAgo } },
+      }),
     ]);
 
     return { active, priorToMonth };
@@ -338,13 +361,13 @@ export class DashboardService {
   private async getStoreMetrics() {
     const results = await this.prisma.store.groupBy({
       by: ['status', 'verification'],
-      _count: true
+      _count: true,
     });
 
     let activeStores = 0;
     let pendingApprovals = 0;
 
-    results.forEach(group => {
+    results.forEach((group) => {
       if (group.status === StoreStatus.ACTIVE) {
         activeStores += group._count;
       }
@@ -364,7 +387,7 @@ export class DashboardService {
     try {
       // Check cache
       const cached = await this.cacheManager.get<DashboardActivity[]>(
-        this.ACTIVITY_CACHE_KEY
+        this.ACTIVITY_CACHE_KEY,
       );
       if (cached) return cached;
 
@@ -374,7 +397,7 @@ export class DashboardService {
         include: { user: { select: { name: true, role: true } } },
       });
 
-      const activities = logs.map(log => this.mapActivityLog(log));
+      const activities = logs.map((log) => this.mapActivityLog(log));
 
       // Cache for 1 minute (more frequent updates)
       await this.cacheManager.set(this.ACTIVITY_CACHE_KEY, activities, 60);
@@ -388,23 +411,24 @@ export class DashboardService {
 
   private mapActivityLog(log: any): DashboardActivity {
     const action = log.action?.toLowerCase() || '';
-    
+
     // Intelligent type detection based on action context
     let type: DashboardActivity['type'] = 'admin';
-    
+
     if (action.includes('order')) type = 'order';
     else if (action.includes('ride')) type = 'ride';
     else if (action.includes('delivery')) type = 'delivery';
-    else if (action.includes('store') || action.includes('vendor')) type = 'vendor';
+    else if (action.includes('store') || action.includes('vendor'))
+      type = 'vendor';
     else if (action.includes('customer')) type = 'customer';
     else {
       // Fallback to role-based mapping
       const roleMap: Record<string, DashboardActivity['type']> = {
-        'CUSTOMER': 'customer',
-        'VENDOR': 'vendor',
-        'RIDER': 'ride',
-        'ADMIN': 'admin',
-        'SUPER_ADMIN': 'admin'
+        CUSTOMER: 'customer',
+        VENDOR: 'vendor',
+        RIDER: 'ride',
+        ADMIN: 'admin',
+        SUPER_ADMIN: 'admin',
       };
       type = roleMap[log.user.role] || 'admin';
     }
@@ -427,7 +451,7 @@ export class DashboardService {
     try {
       // Check cache
       const cached = await this.cacheManager.get<DashboardAlert[]>(
-        this.ALERTS_CACHE_KEY
+        this.ALERTS_CACHE_KEY,
       );
       if (cached) return cached;
 
@@ -436,44 +460,47 @@ export class DashboardService {
           where: { status: DisputeStatus.OPEN },
           take: 5,
           orderBy: { createdAt: 'desc' },
-          include: { openedByUser: { select: { name: true } } }
+          include: { openedByUser: { select: { name: true } } },
         }),
         this.prisma.store.findMany({
           where: { verification: VerificationStatus.PENDING },
           take: 5,
-          orderBy: { createdAt: 'desc' }
-        })
+          orderBy: { createdAt: 'desc' },
+        }),
       ]);
 
       const alerts: DashboardAlert[] = [];
 
       // High priority disputes
-      disputes.forEach(d => {
+      disputes.forEach((d) => {
         alerts.push({
           id: d.id,
           category: 'Dispute',
           message: `Dispute from ${d.openedByUser.name}: ${d.reason}`,
-          severity: d.priority === 'HIGH' || d.priority === 'URGENT' ? 'HIGH' : 'MEDIUM',
+          severity:
+            d.priority === 'HIGH' || d.priority === 'URGENT'
+              ? 'HIGH'
+              : 'MEDIUM',
           status: 'New',
-          time: d.createdAt.toISOString()
+          time: d.createdAt.toISOString(),
         });
       });
 
       // Pending verifications
-      pendingStores.forEach(s => {
+      pendingStores.forEach((s) => {
         alerts.push({
           id: s.id,
           category: 'Verification',
           message: `New store registration: ${s.name}`,
           severity: 'MEDIUM',
           status: 'New',
-          time: s.createdAt.toISOString()
+          time: s.createdAt.toISOString(),
         });
       });
 
       // Sort by time (newest first)
       const sortedAlerts = alerts.sort(
-        (a, b) => new Date(b.time).getTime() - new Date(a.time).getTime()
+        (a, b) => new Date(b.time).getTime() - new Date(a.time).getTime(),
       );
 
       // Cache for 2 minutes
@@ -503,7 +530,7 @@ export class DashboardService {
 
     const [orderCount, userCount] = await Promise.all([
       this.prisma.order.count(),
-      this.prisma.user.count({ where: { status: 'ACTIVE' } })
+      this.prisma.user.count({ where: { status: 'ACTIVE' } }),
     ]);
 
     return {
@@ -525,13 +552,17 @@ export class DashboardService {
           iconName: 'UserCheck',
           color: 'text-purple-500',
           bgColor: 'bg-purple-500/10',
-        }
+        },
       ],
       quickAccess: {
         approvals: { total: 0, details: 'Data unavailable' },
         disputes: { total: 0, details: 'Data unavailable' },
-        revenue: { growth: 'N/A', details: 'Data unavailable', isPositive: true }
-      }
+        revenue: {
+          growth: 'N/A',
+          details: 'Data unavailable',
+          isPositive: true,
+        },
+      },
     };
   }
 
@@ -541,7 +572,7 @@ export class DashboardService {
     await Promise.all([
       this.cacheManager.del(this.STATS_CACHE_KEY),
       this.cacheManager.del(this.ACTIVITY_CACHE_KEY),
-      this.cacheManager.del(this.ALERTS_CACHE_KEY)
+      this.cacheManager.del(this.ALERTS_CACHE_KEY),
     ]);
     this.logger.log('Dashboard cache invalidated');
   }

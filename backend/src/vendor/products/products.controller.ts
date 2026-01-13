@@ -1,23 +1,22 @@
-import { 
-  Controller, 
-  Get, 
-  Post, 
-  Body, 
-  Patch, 
-  Param, 
-  Delete, 
-  UseGuards, 
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
   Request,
   Query,
-  Logger 
+  Logger,
 } from '@nestjs/common';
 import { VendorProductsService } from './products.service';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { RolesGuard } from '../../auth/roles.guards';
 import { Roles } from '../../auth/roles.decorator';
 import { UserRole } from '@prisma/client';
-import { CreateProductDto,UpdateProductDto } from '../dto/product.dto';
-
+import { CreateProductDto, UpdateProductDto } from '../dto/product.dto';
 
 @Controller('vendor/products')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -37,9 +36,9 @@ export class VendorProductsController {
   @Get()
   async findAll(@Request() req, @Query('storeId') storeId: string) {
     const userId = req.user.userId || req.user.sub;
-    
+
     if (!storeId) {
-      throw new Error("storeId query parameter is required");
+      throw new Error('storeId query parameter is required');
     }
 
     return this.productsService.findAll(userId, storeId);
@@ -62,9 +61,9 @@ export class VendorProductsController {
   // 5. UPDATE
   @Patch(':id')
   async update(
-    @Request() req, 
-    @Param('id') id: string, 
-    @Body() updateProductDto: UpdateProductDto
+    @Request() req,
+    @Param('id') id: string,
+    @Body() updateProductDto: UpdateProductDto,
   ) {
     const userId = req.user.userId || req.user.sub;
     return this.productsService.update(userId, id, updateProductDto);

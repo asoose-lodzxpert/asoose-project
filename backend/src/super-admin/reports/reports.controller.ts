@@ -1,5 +1,15 @@
 import {
-  Controller, Get, Query, ParseIntPipe, DefaultValuePipe, UseGuards, HttpCode, HttpStatus, Header, StreamableFile, BadRequestException
+  Controller,
+  Get,
+  Query,
+  ParseIntPipe,
+  DefaultValuePipe,
+  UseGuards,
+  HttpCode,
+  HttpStatus,
+  Header,
+  StreamableFile,
+  BadRequestException,
 } from '@nestjs/common';
 import { AnalyticsService, AnalyticsReport } from './reports.service';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
@@ -19,7 +29,8 @@ export class AnalyticsController {
   async getAnalytics(
     @Query('days', new DefaultValuePipe(30), ParseIntPipe) days: number,
   ): Promise<AnalyticsReport> {
-    if (days < 1 || days > 365) throw new BadRequestException('Days must be between 1 and 365');
+    if (days < 1 || days > 365)
+      throw new BadRequestException('Days must be between 1 and 365');
     return this.analyticsService.getAnalyticsReport(days);
   }
 
@@ -29,7 +40,8 @@ export class AnalyticsController {
   async getOverview(
     @Query('days', new DefaultValuePipe(30), ParseIntPipe) days: number,
   ) {
-    if (days < 1 || days > 365) throw new BadRequestException('Days must be between 1 and 365');
+    if (days < 1 || days > 365)
+      throw new BadRequestException('Days must be between 1 and 365');
     const report = await this.analyticsService.getAnalyticsReport(days);
     return { overview: report.overview, avgRating: report.avgRating };
   }
@@ -40,7 +52,8 @@ export class AnalyticsController {
   async getRevenue(
     @Query('days', new DefaultValuePipe(30), ParseIntPipe) days: number,
   ) {
-    if (days < 1 || days > 365) throw new BadRequestException('Days must be between 1 and 365');
+    if (days < 1 || days > 365)
+      throw new BadRequestException('Days must be between 1 and 365');
     const report = await this.analyticsService.getAnalyticsReport(days);
     return {
       breakdown: report.revenueBreakdown,
@@ -64,7 +77,8 @@ export class AnalyticsController {
     @Query('days', new DefaultValuePipe(30), ParseIntPipe) days: number,
     @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number,
   ) {
-    if (days < 1 || days > 365) throw new BadRequestException('Days must be between 1 and 365');
+    if (days < 1 || days > 365)
+      throw new BadRequestException('Days must be between 1 and 365');
     const report = await this.analyticsService.getAnalyticsReport(days);
     return { vendors: report.topVendors.slice(0, limit) };
   }
@@ -85,7 +99,8 @@ export class AnalyticsController {
   async exportAnalytics(
     @Query('days', new DefaultValuePipe(30), ParseIntPipe) days: number,
   ): Promise<StreamableFile> {
-    if (days < 1 || days > 365) throw new BadRequestException('Days must be between 1 and 365');
+    if (days < 1 || days > 365)
+      throw new BadRequestException('Days must be between 1 and 365');
     const csv = await this.analyticsService.exportAnalyticsToCSV(days);
     const buffer = Buffer.from(csv, 'utf-8');
     return new StreamableFile(buffer);

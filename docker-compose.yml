@@ -1,7 +1,6 @@
 version: "3.9"
 
 services:
-  # Backend API
   backend:
     build:
       context: .
@@ -10,36 +9,10 @@ services:
     restart: unless-stopped
     ports:
       - "3000:3000"
+    env_file:
+      - .env
     environment:
       NODE_ENV: production
-
-      # Database (Railway Postgres)
-      DATABASE_URL: postgresql://asoose_user:K8sH7qW4eZp9@containers-us-west-123.railway.app:5432/railway_db
-      DIRECT_URL: postgresql://asoose_user:K8sH7qW4eZp9@containers-us-west-123.railway.app:5432/railway_db
-
-      # Redis (Railway Redis)
-      REDIS_HOST: redis-hostname.railway.app
-      REDIS_PORT: 12345
-      REDIS_PASSWORD: S7f4L0k9R1vN
-
-      # JWT secrets
-      JWT_SECRET: R9v8M2hG5yU1wQ0zX7tJ6nF8kL3aB2c
-      JWT_EXPIRES_IN: 15m
-      JWT_REFRESH_SECRET: P4x9V8cW2sM6qR1bN5yE7uH3dZ0fL8t
-      JWT_REFRESH_EXPIRES_IN: 7d
-
-      # Email configuration
-      EMAIL_HOST: smtp.mailtrap.io
-      EMAIL_PORT: 587
-      EMAIL_USER: e5f2a3b1c4d5
-      EMAIL_PASSWORD: aB9kL7mN2pQ3
-      EMAIL_FROM: "no-reply@asoose.app"
-
-      # Supabase (if used)
-      SUPABASE_URL: https://xyzcompany.supabase.co
-      SUPABASE_KEY: supabase-anon-key-1234567890abcdef
-      SUPABASE_BUCKET: asoose-uploads
-
     healthcheck:
       test:
         [

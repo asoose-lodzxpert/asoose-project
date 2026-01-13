@@ -5,7 +5,7 @@ import { TransactionsService } from './transaction.service';
 import { TransactionLedgerService } from './transaction-ledger.service';
 @Module({
   controllers: [TransactionsController],
-  providers: [TransactionsService,TransactionLedgerService, PrismaService],
-  exports: [TransactionLedgerService]
+  providers: [TransactionsService, TransactionLedgerService, PrismaService],
+  exports: [TransactionLedgerService],
 })
 export class TransactionsModule {}

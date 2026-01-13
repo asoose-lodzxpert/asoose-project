@@ -1,12 +1,12 @@
-import { 
-  Controller, 
-  Get, 
-  Post, 
-  Param, 
-  UseGuards, 
+import {
+  Controller,
+  Get,
+  Post,
+  Param,
+  UseGuards,
   Request,
   HttpCode,
-  HttpStatus
+  HttpStatus,
 } from '@nestjs/common';
 import { DashboardService } from './dashboard.service';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
@@ -15,7 +15,7 @@ import { Roles } from '../../auth/roles.decorator';
 import { UserRole } from '@prisma/client';
 
 @Controller('super-admin/dashboard')
-@UseGuards(JwtAuthGuard, RolesGuard) 
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class DashboardController {
   constructor(private readonly dashboardService: DashboardService) {}
 

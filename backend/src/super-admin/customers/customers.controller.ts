@@ -1,5 +1,13 @@
-import { 
-  Controller, Get, Param, Query, Patch, Body, UseGuards, ParseIntPipe, Delete 
+import {
+  Controller,
+  Get,
+  Param,
+  Query,
+  Patch,
+  Body,
+  UseGuards,
+  ParseIntPipe,
+  Delete,
 } from '@nestjs/common';
 import { CustomersService } from './customers.service';
 import { UserStatus, UserRole } from '@prisma/client';
@@ -46,7 +54,7 @@ export class CustomersController {
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN_MANAGER)
   async update(
     @Param('id') id: string,
-    @Body() body: { name?: string; phone?: string; email?: string }
+    @Body() body: { name?: string; phone?: string; email?: string },
   ) {
     return this.customersService.update(id, body);
   }
@@ -54,8 +62,8 @@ export class CustomersController {
   @Patch(':id/status')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN_MANAGER)
   async updateStatus(
-    @Param('id') id: string, 
-    @Body('status') status: UserStatus
+    @Param('id') id: string,
+    @Body('status') status: UserStatus,
   ) {
     return this.customersService.updateStatus(id, status);
   }

@@ -147,8 +147,7 @@ export class StoresService {
     const existingSlug = await this.prisma.store.findUnique({
       where: { slug: dto.slug },
     });
-    if (existingSlug)
-      throw new ConflictException('Store slug already exists');
+    if (existingSlug) throw new ConflictException('Store slug already exists');
 
     const rawPassword =
       dto.password || crypto.randomBytes(8).toString('hex') + '!Aa1';
@@ -272,8 +271,7 @@ export class StoresService {
     const groupedData: Record<string, number> = {};
     orders.forEach((order) => {
       const dateKey = order.createdAt.toISOString().split('T')[0];
-      groupedData[dateKey] =
-        (groupedData[dateKey] || 0) + Number(order.total);
+      groupedData[dateKey] = (groupedData[dateKey] || 0) + Number(order.total);
     });
 
     const finalData: { date: string; revenue: number }[] = [];

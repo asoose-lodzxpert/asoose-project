@@ -1,4 +1,11 @@
-import { IsString, IsOptional, IsUUID, IsEnum, IsArray, IsUrl } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsUUID,
+  IsEnum,
+  IsArray,
+  IsUrl,
+} from 'class-validator';
 import { DisputePriority } from '@prisma/client';
 
 export class CreateDisputeDto {
@@ -33,5 +40,4 @@ export class CreateDisputeDto {
   @IsArray()
   @IsUrl({}, { each: true })
   evidenceImages?: string[];
-  
 }

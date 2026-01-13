@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { CreateBannerDto,UpdateBannerDto } from './dto/create-banner.dto';
+import { CreateBannerDto, UpdateBannerDto } from './dto/create-banner.dto';
 @Injectable()
 export class BannersService {
   constructor(private prisma: PrismaService) {}
@@ -62,11 +62,11 @@ export class BannersService {
 
   async findOne(id: string) {
     const banner = await this.prisma.banner.findUnique({ where: { id } });
-    
+
     if (!banner) {
       throw new NotFoundException(`Banner with ID ${id} not found`);
     }
-    
+
     return banner;
   }
 }

@@ -1,13 +1,13 @@
-import { 
-  Controller, 
-  Get, 
-  Patch, 
-  Param, 
-  Body, 
-  UseGuards, 
-  Request, 
+import {
+  Controller,
+  Get,
+  Patch,
+  Param,
+  Body,
+  UseGuards,
+  Request,
   Query,
-  Logger
+  Logger,
 } from '@nestjs/common';
 import { VendorOrdersService } from './vendor-orders.service';
 import { UserRole } from '@prisma/client';
@@ -26,11 +26,11 @@ export class VendorOrdersController {
   // GET /vendor/orders?storeId=...&page=1
   @Get()
   async findAll(
-    @Request() req, 
+    @Request() req,
     @Query('storeId') storeId: string,
-    @Query('page') page: number
+    @Query('page') page: number,
   ) {
-    if(!storeId) throw new Error("storeId is required");
+    if (!storeId) throw new Error('storeId is required');
     const userId = req.user.userId || req.user.sub;
     return this.ordersService.findAll(userId, storeId, Number(page) || 1);
   }
@@ -46,9 +46,9 @@ export class VendorOrdersController {
   // PATCH /vendor/orders/:id/decline
   @Patch(':id/decline')
   async decline(
-    @Request() req, 
-    @Param('id') id: string, 
-    @Body('reason') reason: string
+    @Request() req,
+    @Param('id') id: string,
+    @Body('reason') reason: string,
   ) {
     const userId = req.user.userId || req.user.sub;
     this.logger.log(`Vendor ${userId} declining order ${id}`);
