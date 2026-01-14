@@ -14,7 +14,7 @@ import { updateBusinessInfo } from "@/services/business.service";
 
 import { ThemedInput } from "@/components/ThemedInput";
 import { ThemedText } from "@/components/themed-text";
-import { SelectInput } from "@/components/ui/SelectInput";
+import { CustomDropdown } from "@/components/CustomDropdown";
 import { ThemedView } from "@/components/themed-view";
 import { useThemeColor } from "@/hooks/use-theme-color";
 
@@ -165,11 +165,15 @@ export default function EditBusinessInfoScreen() {
               Business phone number
             </ThemedText>
             <View style={styles.row}>
-              <SelectInput<CountryCode>
-                options={COUNTRY_CODES}
-                selected={data?.countryCode || undefined}
-                onSelect={(v) => onChange("countryCode", v)}
-                style={{ flex: 1 }}
+              <CustomDropdown
+                data={COUNTRY_CODES.map((code) => ({
+                  label: code,
+                  value: code,
+                }))}
+                value={data?.countryCode || null}
+                onChange={(v) => onChange("countryCode", v as CountryCode)}
+                placeholder="Code"
+                containerStyle={{ flex: 1 }}
               />
               <ThemedInput
                 placeholder="Phone number"
@@ -184,10 +188,13 @@ export default function EditBusinessInfoScreen() {
           {/* Business Type */}
           <View style={styles.field}>
             <ThemedText type="defaultSemiBold">Type of business</ThemedText>
-            <SelectInput<BusinessType>
-              options={BUSINESS_TYPES}
-              selected={data?.businessType || undefined}
-              onSelect={(v) => onChange("businessType", v)}
+            <CustomDropdown
+              data={BUSINESS_TYPES.map((type) => ({
+                label: type,
+                value: type,
+              }))}
+              value={data?.businessType || null}
+              onChange={(v) => onChange("businessType", v as BusinessType)}
               placeholder="Select business category"
             />
           </View>
@@ -195,10 +202,13 @@ export default function EditBusinessInfoScreen() {
           {/* Employees */}
           <View style={styles.field}>
             <ThemedText type="defaultSemiBold">Number of employees</ThemedText>
-            <SelectInput<EmployeeRange>
-              options={EMPLOYEE_RANGES}
-              selected={data?.employees || undefined}
-              onSelect={(v) => onChange("employees", v)}
+            <CustomDropdown
+              data={EMPLOYEE_RANGES.map((range) => ({
+                label: range,
+                value: range,
+              }))}
+              value={data?.employees || null}
+              onChange={(v) => onChange("employees", v as EmployeeRange)}
               placeholder="Employee range"
             />
           </View>

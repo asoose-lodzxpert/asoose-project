@@ -16,6 +16,7 @@ import {
   SignupStep2Data,
   SignupStep3Data,
 } from "@/types/signup";
+import { useThemeColor } from "@/hooks/use-theme-color";
 
 export default function Signup() {
   const router = useRouter();
@@ -34,6 +35,9 @@ export default function Signup() {
     step2: {},
     step3: { storeName: "", storeDescription: "", openHours: {} },
   });
+
+  const surfaceCard = useThemeColor({}, "surfaceCard");
+  const border = useThemeColor({}, "borderDefault");
 
   // Change handlers
   const handleChangeStep1 = <K extends keyof SignupStep1Data>(
@@ -179,7 +183,16 @@ export default function Signup() {
       <ProgressBar step={step} />
       <View style={{ flex: 1, paddingHorizontal: 24 }}>{renderStep()}</View>
 
-      <View style={styles.navBar}>
+      <View
+        style={[
+          styles.navBar,
+          {
+            backgroundColor: surfaceCard,
+            borderTopColor: border,
+            borderTopWidth: Platform.OS === "ios" ? 0 : 1,
+          },
+        ]}
+      >
         <Pressable
           style={[styles.button, step === 1 && { opacity: 0.5 }]}
           onPress={() => step > 1 && setStep(step - 1)}
@@ -215,7 +228,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 12,
     padding: 16,
-    backgroundColor: "#FFF",
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     shadowColor: "#000",

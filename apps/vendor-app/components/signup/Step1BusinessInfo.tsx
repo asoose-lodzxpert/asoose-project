@@ -6,11 +6,10 @@ import {
   Platform,
   ScrollView,
   Pressable,
-  TextInput,
 } from "react-native";
 import { ThemedInput } from "@/components/ThemedInput";
 import { ThemedText } from "@/components/themed-text";
-import { SelectInput } from "@/components/ui/SelectInput";
+import { CustomDropdown } from "@/components/CustomDropdown";
 import {
   BUSINESS_TYPES,
   EMPLOYEE_RANGES,
@@ -83,7 +82,7 @@ export const Step1BusinessInfo: React.FC<Step1Props> = ({ data, onChange }) => {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <ThemedText type="title">Let’s get started</ThemedText>
+        <ThemedText type="title">Let's get started</ThemedText>
         <ThemedText type="subtitle" style={styles.subtitle}>
           Tell us about your business
         </ThemedText>
@@ -113,18 +112,19 @@ export const Step1BusinessInfo: React.FC<Step1Props> = ({ data, onChange }) => {
         <View style={styles.field}>
           <ThemedText type="defaultSemiBold">Business phone number</ThemedText>
           <View style={styles.row}>
-            <SelectInput<CountryCode>
-              options={COUNTRY_CODES}
-              selected={data.countryCode || undefined}
-              onSelect={(v) => onChange("countryCode", v)}
-              style={{ flex: 1 }}
+            <CustomDropdown
+              data={COUNTRY_CODES.map((code) => ({ label: code, value: code }))}
+              value={data.countryCode || null}
+              onChange={(v) => onChange("countryCode", v as CountryCode)}
+              placeholder="Code"
+              containerStyle={{ flex: 2 }}
             />
             <ThemedInput
               placeholder="Enter phone number"
               value={data.phoneNumber}
               onChangeText={(v) => onChange("phoneNumber", v)}
               keyboardType="phone-pad"
-              style={{ flex: 2 }}
+              containerStyle={{ flex: 4 }}
             />
           </View>
         </View>
@@ -132,10 +132,10 @@ export const Step1BusinessInfo: React.FC<Step1Props> = ({ data, onChange }) => {
         {/* Business Type */}
         <View style={styles.field}>
           <ThemedText type="defaultSemiBold">Type of business</ThemedText>
-          <SelectInput<BusinessType>
-            options={BUSINESS_TYPES}
-            selected={data.businessType || undefined}
-            onSelect={(v) => onChange("businessType", v)}
+          <CustomDropdown
+            data={BUSINESS_TYPES.map((type) => ({ label: type, value: type }))}
+            value={data.businessType || null}
+            onChange={(v) => onChange("businessType", v as BusinessType)}
             placeholder="Select your business category"
           />
         </View>
@@ -143,10 +143,13 @@ export const Step1BusinessInfo: React.FC<Step1Props> = ({ data, onChange }) => {
         {/* Employees */}
         <View style={styles.field}>
           <ThemedText type="defaultSemiBold">Number of employees</ThemedText>
-          <SelectInput<EmployeeRange>
-            options={EMPLOYEE_RANGES}
-            selected={data.employees || undefined}
-            onSelect={(v) => onChange("employees", v)}
+          <CustomDropdown
+            data={EMPLOYEE_RANGES.map((range) => ({
+              label: range,
+              value: range,
+            }))}
+            value={data.employees || null}
+            onChange={(v) => onChange("employees", v as EmployeeRange)}
             placeholder="Choose an employee range"
           />
         </View>
@@ -209,7 +212,7 @@ const styles = StyleSheet.create({
   },
   row: {
     flexDirection: "row",
-    gap: 8,
+    gap: 12,
   },
   validationContainer: {
     marginTop: 8,

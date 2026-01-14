@@ -45,6 +45,9 @@ COPY --from=builder /app/backend/prisma ./prisma
 COPY --from=builder /app/backend/package.json ./package.json
 COPY --from=builder /app/node_modules ./node_modules
 
+# Regenerate Prisma Client in the runtime container to ensure proper bindings
+RUN npx prisma generate --schema=./prisma/schema.prisma
+
 # Create uploads directory
 RUN mkdir -p /app/uploads && chown -R nodejs:nodejs /app
 
@@ -59,4 +62,4 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
 
 # Run migrations and start server
 ENTRYPOINT ["dumb-init", "--"]
-CMD ["sh", "-c", "npx node dist/main.js"]
+CMD ["sh", "-c", "npx prisma generate && node dist/src/main.js"]

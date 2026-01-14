@@ -19,8 +19,11 @@ export async function uploadFile(
     type: file.type,
   });
 
-  // Get auth token
+  // Get auth token (optional for signup)
   const token = await AsyncStorage.getItem("token");
+
+  // Use public endpoint if no token (during signup), authenticated endpoint otherwise
+  const endpoint = token ? "/storage/upload" : "/storage/upload-public";
 
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
@@ -66,9 +69,9 @@ export async function uploadFile(
     });
 
     // Configure and send request
-    xhr.open("POST", `${process.env.EXPO_PUBLIC_API_URL}/storage/upload`);
+    xhr.open("POST", `${process.env.EXPO_PUBLIC_API_URL}${endpoint}`);
 
-    // Set authorization header
+    // Set authorization header only if token exists
     if (token) {
       xhr.setRequestHeader("Authorization", `Bearer ${token}`);
     }

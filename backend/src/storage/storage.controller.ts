@@ -47,6 +47,36 @@ export class StorageController {
     return { url };
   }
 
+  @Post('upload-public')
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadFilePublic(@UploadedFile() file: Express.Multer.File) {
+    if (!file) {
+      throw new BadRequestException('No file provided');
+    }
+
+    // Validate file size (5MB max)
+    const MAX_SIZE = 5 * 1024 * 1024;
+    if (file.size > MAX_SIZE) {
+      throw new BadRequestException('File size exceeds 5MB limit');
+    }
+
+    // Validate file type - only documents for signup
+    const allowedTypes = [
+      'application/pdf',
+      'image/jpeg',
+      'image/png',
+      'image/jpg',
+    ];
+    if (!allowedTypes.includes(file.mimetype)) {
+      throw new BadRequestException(
+        'Invalid file type. Only PDF, JPG, and PNG are allowed',
+      );
+    }
+
+    const url = await this.storageService.uploadFile(file);
+    return { url };
+  }
+
   @Delete('delete')
   @UseGuards(JwtAuthGuard)
   async deleteFile(@Body() body: { url: string }) {
