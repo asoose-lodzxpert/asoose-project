@@ -11,7 +11,8 @@ import {
   Delete,
 } from '@nestjs/common';
 import { RidersService } from './riders.service';
-import { UserStatus, VerificationStatus, UserRole } from '@prisma/client';
+import { UserStatus, VerificationStatus } from '@prisma/client';
+import { UserRole } from '../../common/enums/user-role.enum';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { RolesGuard } from '../../auth/roles.guards';
 import { Roles } from '../../auth/roles.decorator';

@@ -1,30 +1,22 @@
-export enum PaymentGateway {
-  PAYSTACK = 'PAYSTACK',
-  FLUTTERWAVE = 'FLUTTERWAVE',
-  MONNIFY = 'MONNIFY',
-}
+// Import enums from shared location
+import type {
+  PaymentGateway,
+  PaymentStatus,
+  PaymentMethod,
+  TransactionType,
+  PaymentType,
+  RecipientType,
+} from '../enums/payment.enums';
 
-export enum PaymentStatus {
-  PENDING = 'PENDING',
-  SUCCESS = 'SUCCESS',
-  FAILED = 'FAILED',
-  CANCELLED = 'CANCELLED',
-  REFUNDED = 'REFUNDED',
-  PARTIAL_REFUND = 'PARTIAL_REFUND',
-}
-
-export enum PaymentMethod {
-  CARD = 'CARD',
-  BANK_TRANSFER = 'BANK_TRANSFER',
-  USSD = 'USSD',
-  MOBILE_MONEY = 'MOBILE_MONEY',
-}
-
-export enum TransactionType {
-  PAYMENT = 'PAYMENT',
-  DISBURSEMENT = 'DISBURSEMENT',
-  REFUND = 'REFUND',
-}
+// Re-export enums for backward compatibility
+export {
+  PaymentGateway,
+  PaymentStatus,
+  PaymentMethod,
+  TransactionType,
+  PaymentType,
+  RecipientType,
+} from '../enums/payment.enums';
 
 export interface PaymentInitResponse {
   reference: string;

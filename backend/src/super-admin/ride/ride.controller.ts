@@ -11,7 +11,7 @@ import { RidesService } from './ride.service';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { RolesGuard } from '../../auth/roles.guards';
 import { Roles } from '../../auth/roles.decorator';
-import { UserRole } from '@prisma/client';
+import { UserRole } from '../../common/enums/user-role.enum';
 
 @Controller('super-admin/rides')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -34,3 +34,4 @@ export class RidesController {
     return this.ridesService.cancel(id);
   }
 }
+

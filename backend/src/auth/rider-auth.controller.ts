@@ -12,6 +12,7 @@ import { RiderAuthService } from './rider-auth.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guards';
 import { Roles } from '../auth/roles.decorator';
+import { UserRole } from '../common/enums/user-role.enum';
 import { CreateRiderDto } from '../auth/dto/create-rider.dto';
 import { ResetPasswordDto } from '../auth/dto/reset-password.dto';
 import { UpdateProfileDto } from '../auth/dto/update-profile.dto';
@@ -56,7 +57,7 @@ export class RiderAuthController {
 
   @Patch('profile')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('RIDER')
+  @Roles(UserRole.RIDER)
   updateProfile(@Body() dto: UpdateProfileDto, @Req() req) {
     return this.riderAuthService.updateRiderProfile(req.user.id, dto);
   }

@@ -10,7 +10,8 @@ import {
   Delete,
 } from '@nestjs/common';
 import { CustomersService } from './customers.service';
-import { UserStatus, UserRole } from '@prisma/client';
+import { UserStatus } from '@prisma/client';
+import { UserRole } from '../../common/enums/user-role.enum';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { RolesGuard } from '../../auth/roles.guards';
 import { Roles } from '../../auth/roles.decorator';

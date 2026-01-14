@@ -8,17 +8,15 @@ import {
   Min,
   ValidateIf,
 } from 'class-validator';
-import { PaymentGateway, PaymentMethod } from '../interfaces/payment.interface';
 
-export enum PaymentType {
-  ORDER = 'ORDER',
-  RIDE = 'RIDE',
-}
+import {
+  PaymentGateway,
+  PaymentMethod,
+  PaymentType,
+  RecipientType,
+} from '../enums/payment.enums';
 
-export enum RecipientType {
-  VENDOR = 'VENDOR',
-  RIDER = 'RIDER',
-}
+export { PaymentType, RecipientType };
 
 export class InitiatePaymentDto {
   @IsNumber()
@@ -72,10 +70,10 @@ export class VerifyPaymentDto {
 
 export class DisbursePaymentDto {
   @IsString()
-  recipientId: string; // Vendor or Rider ID
+  recipientId: string;
 
   @IsEnum(RecipientType)
-  recipientType: RecipientType; // VENDOR or RIDER
+  recipientType: RecipientType;
 
   @IsNumber()
   @Min(100)

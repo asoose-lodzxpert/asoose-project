@@ -15,10 +15,11 @@ import { CreateZoneDto, UpdateZoneDto } from './dto/create-zone.dto';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard'; // Adjust path
 import { Roles } from 'src/auth/roles.decorator';
 import { RolesGuard } from 'src/auth/roles.guards';
+import { UserRole } from 'src/common/enums/user-role.enum';
 
 @Controller('super-admin/zones')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('SUPER_ADMIN', 'ADMIN_MANAGER')
+@Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN_MANAGER)
 export class ZonesController {
   constructor(private readonly zonesService: ZonesService) {}
 
@@ -28,7 +29,7 @@ export class ZonesController {
   }
 
   @Get()
-  @Roles('SUPER_ADMIN', 'ADMIN_MANAGER', 'ADMIN_SUPPORT')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN_MANAGER, UserRole.ADMIN_SUPPORT)
   findAll() {
     return this.zonesService.findAll();
   }

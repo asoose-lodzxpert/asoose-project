@@ -9,7 +9,7 @@ import { Prisma, RideStatus } from '@prisma/client';
 import { TransactionLedgerService } from '../transactions/transaction-ledger.service';
 
 // ✅ Type-safe query fragments for performance
-const rideListInclude = Prisma.validator<Prisma.RideDefaultArgs>()({
+const rideListInclude = {
   include: {
     customer: { select: { id: true, name: true, image: true } },
     rider: {
@@ -25,9 +25,9 @@ const rideListInclude = Prisma.validator<Prisma.RideDefaultArgs>()({
     pickupAddress: { select: { street: true, city: true } },
     dropoffAddress: { select: { street: true, city: true } },
   },
-});
+} as const;
 
-const rideDetailInclude = Prisma.validator<Prisma.RideDefaultArgs>()({
+const rideDetailInclude = {
   include: {
     customer: true,
     rider: {
@@ -39,7 +39,7 @@ const rideDetailInclude = Prisma.validator<Prisma.RideDefaultArgs>()({
     dropoffAddress: true,
     payment: true,
   },
-});
+} as const;
 
 type RideWithListRelations = Prisma.RideGetPayload<typeof rideListInclude>;
 type RideWithDetailRelations = Prisma.RideGetPayload<typeof rideDetailInclude>;

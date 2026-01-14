@@ -13,6 +13,7 @@ import { VendorAuthService } from './vendor-auth.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guards';
 import { Roles } from '../auth/roles.decorator';
+import { UserRole } from '../common/enums/user-role.enum';
 import { CreateVendorDto } from '../auth/dto/create-vendor.dto';
 import { ResetPasswordDto } from '../auth/dto/reset-password.dto';
 import { UpdateProfileDto } from '../auth/dto/update-profile.dto';
@@ -57,7 +58,7 @@ export class VendorAuthController {
 
   @Patch('profile')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('VENDOR')
+  @Roles(UserRole.VENDOR)
   updateProfile(@Body() dto: UpdateProfileDto, @Req() req) {
     return this.vendorAuthService.updateVendorProfile(req.user.id, dto);
   }

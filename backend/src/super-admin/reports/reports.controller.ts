@@ -15,11 +15,11 @@ import { AnalyticsService, AnalyticsReport } from './reports.service';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { RolesGuard } from '../../auth/roles.guards';
 import { Roles } from '../../auth/roles.decorator';
-import { UserRole } from '@prisma/client';
+import { UserRole } from '../../common/enums/user-role.enum';
 
 @Controller('/super-admin/reports')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('SUPER_ADMIN', 'ADMIN_MANAGER')
+@Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN_MANAGER)
 export class AnalyticsController {
   constructor(private readonly analyticsService: AnalyticsService) {}
 

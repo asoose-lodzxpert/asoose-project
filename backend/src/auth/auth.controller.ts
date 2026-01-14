@@ -7,6 +7,7 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { CreateDriverDto } from './dto/create-driver.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
+import { UserRole } from '../common/enums/user-role.enum';
 
 @Controller('auth')
 export class AuthController {
@@ -49,7 +50,7 @@ export class UserAuthController {
 
   @Patch('profile')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('CUSTOMER')
+  @Roles(UserRole.CUSTOMER)
   updateProfile(@Body() dto: UpdateProfileDto, @Req() req) {
     return this.authService.updateUserProfile(req.user.id, dto);
   }
@@ -77,7 +78,7 @@ export class DriverAuthController {
 
   @Patch('profile')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('DRIVER')
+  @Roles(UserRole.DRIVER)
   updateProfile(@Body() dto: UpdateProfileDto, @Req() req) {
     return this.authService.updateDriverProfile(req.user.id, dto);
   }

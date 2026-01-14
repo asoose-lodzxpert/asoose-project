@@ -4,7 +4,7 @@ import { TransactionFilterDto } from './dto/transaction-filter.dto';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { RolesGuard } from '../../auth/roles.guards';
 import { Roles } from '../../auth/roles.decorator';
-import { UserRole } from '@prisma/client';
+import { UserRole } from '../../common/enums/user-role.enum';
 
 @Controller('super-admin/transactions')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -23,3 +23,4 @@ export class TransactionsController {
     return this.transactionsService.findOne(id);
   }
 }
+

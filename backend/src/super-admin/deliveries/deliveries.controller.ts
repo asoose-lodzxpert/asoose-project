@@ -11,7 +11,7 @@ import { DeliveryFilterDto } from './dto/delivery-filter.dto';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { RolesGuard } from '../../auth/roles.guards';
 import { Roles } from '../../auth/roles.decorator';
-import { UserRole } from '@prisma/client';
+import { UserRole } from '../../common/enums/user-role.enum';
 
 @Controller('super-admin/deliveries')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -37,3 +37,4 @@ export class DeliveriesController {
     return this.deliveriesService.remove(id);
   }
 }
+

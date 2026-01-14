@@ -4,9 +4,10 @@ import { VerifyDocumentDto } from './dto/verify-document.dto';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { RolesGuard } from 'src/auth/roles.guards';
 import { Roles } from 'src/auth/roles.decorator';
+import { UserRole } from 'src/common/enums/user-role.enum';
 @Controller('super-admin/verification')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('SUPER_ADMIN', 'ADMIN_MANAGER', 'ADMIN_SUPPORT')
+@Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN_MANAGER, UserRole.ADMIN_SUPPORT)
 export class VerificationController {
   constructor(private readonly verificationService: VerificationService) {}
 

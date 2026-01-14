@@ -15,10 +15,11 @@ import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { RolesGuard } from 'src/auth/roles.guards';
 import { Roles } from 'src/auth/roles.decorator';
 import { CreateBannerDto, UpdateBannerDto } from './dto/create-banner.dto';
+import { UserRole } from 'src/common/enums/user-role.enum';
 
 @Controller('super-admin/banners')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('SUPER_ADMIN')
+@Roles(UserRole.SUPER_ADMIN)
 export class BannersController {
   constructor(private readonly bannersService: BannersService) {}
 

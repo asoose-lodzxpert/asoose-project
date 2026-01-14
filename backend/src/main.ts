@@ -24,12 +24,6 @@ async function bootstrap() {
     new ValidationPipe({
       transform: true,
       whitelist: true,
-    }),
-  );
-
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
       forbidNonWhitelisted: true,
     }),
   );
@@ -41,7 +35,7 @@ async function bootstrap() {
   });
 
   await app.listen(process.env.PORT ?? 3000, '0.0.0.0');
-  console.log(
+  appLogger.log(
     `Backend is running on: ${await app.getUrl()}/${process.env.API_PREFIX || 'api/v1'}`,
   );
 }

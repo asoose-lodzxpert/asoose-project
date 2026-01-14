@@ -10,7 +10,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { VendorOrdersService } from './vendor-orders.service';
-import { UserRole } from '@prisma/client';
+import { UserRole } from '../../common/enums/user-role.enum';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { RolesGuard } from 'src/auth/roles.guards';
 import { Roles } from 'src/auth/roles.decorator';
