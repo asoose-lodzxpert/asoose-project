@@ -5,10 +5,11 @@ import {
   Body,
   UseInterceptors,
   UploadedFile,
+  UploadedFiles,
   BadRequestException,
   UseGuards,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { StorageService } from './storage.service';
 
@@ -45,6 +46,53 @@ export class StorageController {
 
     const url = await this.storageService.uploadFile(file);
     return { url };
+  }
+
+  @Post('upload-bulk')
+  @UseGuards(JwtAuthGuard)
+  @UseInterceptors(FilesInterceptor('files', 10)) // Max 10 files
+  async uploadBulk(@UploadedFiles() files: Express.Multer.File[]) {
+    if (!files || files.length === 0) {
+      throw new BadRequestException('No files provided');
+    }
+
+    // Validate file size and type for each file
+    const MAX_SIZE = 5 * 1024 * 1024;
+    const allowedTypes = [
+      'application/pdf',
+      'image/jpeg',
+      'image/png',
+      'image/jpg',
+    ];
+
+    const validFiles: Express.Multer.File[] = [];
+    const errors: { index: number; message: string }[] = [];
+
+    files.forEach((file, index) => {
+      if (file.size > MAX_SIZE) {
+        errors.push({
+          index,
+          message: `File ${file.originalname} exceeds 5MB limit`,
+        });
+      } else if (!allowedTypes.includes(file.mimetype)) {
+        errors.push({
+          index,
+          message: `File ${file.originalname} has invalid type`,
+        });
+      } else {
+        validFiles.push(file);
+      }
+    });
+
+    // Upload all valid files
+    const urls = await this.storageService.uploadBulk(validFiles);
+
+    return {
+      urls,
+      totalFiles: files.length,
+      uploadedFiles: validFiles.length,
+      errors: errors.length > 0 ? errors : undefined,
+    };
   }
 
   @Post('upload-public')

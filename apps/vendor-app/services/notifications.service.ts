@@ -4,10 +4,11 @@ const API = process.env.EXPO_PUBLIC_API_URL;
 
 export interface Notification {
   id: string;
-  userId: string;
+  vendorId: string;
   title: string;
   message: string;
-  type: string; // ORDER_CREATED, ORDER_UPDATE, PAYOUT_APPROVED, PAYOUT_REJECTED, SYSTEM
+  type: "ORDER" | "PAYOUT" | "SYSTEM"; // Notification types
+  category?: string;
   isRead: boolean;
   metadata?: {
     orderId?: string;
@@ -23,39 +24,67 @@ export interface NotificationsResponse {
   meta: {
     total: number;
     page: number;
+    limit: number;
     pages: number;
   };
 }
 
 export async function fetchNotifications(
-  page: number = 1
+  page: number = 1,
+  type?: "ORDER" | "PAYOUT" | "SYSTEM",
+  isRead?: boolean
 ): Promise<NotificationsResponse> {
-  return fetchWithAuth(`${API}/notifications?page=${page}`);
+  const params = new URLSearchParams({
+    page: page.toString(),
+    limit: "20",
+  });
+
+  if (type) {
+    params.append("type", type);
+  }
+
+  if (isRead !== undefined) {
+    params.append("isRead", isRead.toString());
+  }
+
+  return fetchWithAuth(`${API}/vendor/notifications?${params.toString()}`);
 }
 
 export async function getUnreadCount(): Promise<{ count: number }> {
-  return fetchWithAuth(`${API}/notifications/unread-count`);
+  return fetchWithAuth(`${API}/vendor/notifications/unread-count`);
 }
 
 export async function markAsRead(notificationId: string): Promise<void> {
-  return fetchWithAuth(`${API}/notifications/${notificationId}/read`, {
+  return fetchWithAuth(`${API}/vendor/notifications/${notificationId}/read`, {
     method: "PATCH",
   });
 }
 
 export async function markAllAsRead(): Promise<void> {
-  return fetchWithAuth(`${API}/notifications/read-all`, {
+  return fetchWithAuth(`${API}/vendor/notifications/read-all`, {
     method: "PATCH",
   });
 }
 
 // Helper to determine notification category for filtering
 export function getNotificationType(
-  type: string
+  type: "ORDER" | "PAYOUT" | "SYSTEM"
 ): "orders" | "payouts" | "system" {
-  if (type.includes("ORDER")) return "orders";
-  if (type.includes("PAYOUT")) return "payouts";
+  if (type === "ORDER") return "orders";
+  if (type === "PAYOUT") return "payouts";
   return "system";
+}
+
+// Map tab to API type filter
+export function getApiTypeFromTab(
+  tab: "orders" | "payouts" | "system"
+): "ORDER" | "PAYOUT" | "SYSTEM" | undefined {
+  const mapping = {
+    orders: "ORDER" as const,
+    payouts: "PAYOUT" as const,
+    system: "SYSTEM" as const,
+  };
+  return mapping[tab];
 }
 
 export async function getNotificationPreferences() {

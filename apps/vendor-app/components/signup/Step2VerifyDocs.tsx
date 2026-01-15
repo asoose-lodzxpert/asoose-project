@@ -6,7 +6,8 @@ import {
   ScrollView,
   ActivityIndicator,
 } from "react-native";
-import * as DocumentPicker from "expo-document-picker";
+import * as ImagePicker from "expo-image-picker";
+import * as FileSystem from "expo-file-system";
 import Toast from "react-native-toast-message";
 import { ThemedText } from "@/components/themed-text";
 import { IconSymbol } from "@/components/ui/icon-symbol";
@@ -34,23 +35,51 @@ export const Step2VerifyDocs: React.FC<Step2Props> = ({ data, onChange }) => {
 
   const pickFile = async (key: keyof SignupStep2Data) => {
     try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: ["application/pdf", "image/jpeg", "image/png"],
-        multiple: false,
-        copyToCacheDirectory: true,
+      // Request permission
+      const permissionResult =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+      if (!permissionResult.granted) {
+        Toast.show({
+          type: "error",
+          text1: "Permission required",
+          text2: "Please allow access to your photo library",
+        });
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        allowsEditing: false,
+        quality: 0.8,
       });
 
       if (result.canceled) return;
 
-      const file = result.assets[0];
+      const image = result.assets[0];
 
-      if (file.size && file.size > MAX_SIZE) {
-        Toast.show({
-          type: "error",
-          text1: "File too large",
-          text2: "Maximum file size is 5MB",
-        });
-        return;
+      // Check file size using expo-file-system
+      try {
+        const file = new FileSystem.File(image.uri);
+        const fileInfo = await file.info();
+
+        if (fileInfo.exists && fileInfo.size) {
+          if (fileInfo.size > MAX_SIZE) {
+            Toast.show({
+              type: "error",
+              text1: "File too large",
+              text2: `Maximum file size is 5MB. Your file is ${(
+                fileInfo.size /
+                1024 /
+                1024
+              ).toFixed(2)}MB`,
+            });
+            return;
+          }
+        }
+      } catch (sizeError) {
+        console.warn("Could not check file size:", sizeError);
+        // Continue anyway if we can't check size
       }
 
       // Set uploading state
@@ -59,12 +88,12 @@ export const Step2VerifyDocs: React.FC<Step2Props> = ({ data, onChange }) => {
         [key]: { uploading: true, progress: 0 },
       }));
 
-      // Upload file to backend
+      // Upload image to backend
       const url = await uploadFile(
         {
-          uri: file.uri,
-          name: file.name,
-          type: file.mimeType || "application/octet-stream",
+          uri: image.uri,
+          name: `document-${Date.now()}.jpg`,
+          type: "image/jpeg",
         },
         (progress: UploadProgress) => {
           setUploadState((prev) => ({
@@ -89,7 +118,8 @@ export const Step2VerifyDocs: React.FC<Step2Props> = ({ data, onChange }) => {
       Toast.show({
         type: "error",
         text1: "Upload Failed",
-        text2: error instanceof Error ? error.message : "Failed to upload file",
+        text2:
+          error instanceof Error ? error.message : "Failed to upload image",
       });
     }
   };

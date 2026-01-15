@@ -48,7 +48,7 @@ export default function PrivacyScreen() {
           <ThemedText style={{ color: linkColor }}>Back</ThemedText>
         </Pressable>
 
-        <ThemedText type="title">Privacy Policy</ThemedText>
+        <ThemedText type="subtitle">Privacy Policy</ThemedText>
 
         <Pressable
           onPress={handleShare}

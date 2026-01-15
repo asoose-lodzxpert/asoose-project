@@ -1,9 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { NubanService } from '../libs/nuban/nuban.service';
 
 @Injectable()
 export class VendorService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly nubanService: NubanService,
+  ) {}
 
   async getStorePublicDetails(vendorId: string) {
     const store = await this.prisma.store.findUnique({
@@ -25,6 +29,22 @@ export class VendorService {
       },
     });
     return store;
+  }
+
+  async updateVendorImage(vendorId: string, imageUrl: string) {
+    const vendor = await this.prisma.vendor.update({
+      where: { id: vendorId },
+      data: { image: imageUrl },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        image: true,
+        status: true,
+      },
+    });
+    return vendor;
   }
 
   async getStoreBalance(vendorId: string) {
@@ -136,6 +156,149 @@ export class VendorService {
     });
 
     return bankAccount ? [bankAccount] : [];
+  }
+
+  // Get single bank account for vendor
+  async getBankAccount(vendorId: string) {
+    const store = await this.prisma.store.findUnique({ where: { vendorId } });
+    if (!store) return null;
+
+    const bankAccount = await this.prisma.bankAccount.findUnique({
+      where: { storeId: store.id },
+      select: {
+        bankName: true,
+        bankCode: true,
+        accountNumber: true,
+        accountName: true,
+      },
+    });
+
+    return bankAccount;
+  }
+
+  // Get all Nigerian banks
+  async getBanks() {
+    const banks = await this.prisma.bank.findMany({
+      where: { isActive: true },
+      select: {
+        id: true,
+        name: true,
+        code: true,
+      },
+      orderBy: { name: 'asc' },
+    });
+    return banks;
+  }
+
+  // Verify account number using NUBAN API
+  async verifyAccountNumber(bankCode: string, accountNumber: string) {
+    return await this.nubanService.verifyAccountNumber(bankCode, accountNumber);
+  }
+
+  // Save (create or update) bank account
+  async saveBankAccount(
+    vendorId: string,
+    data: {
+      bankName: string;
+      bankCode: string;
+      accountNumber: string;
+      accountName: string;
+    },
+  ) {
+    const store = await this.prisma.store.findUnique({ where: { vendorId } });
+    if (!store) throw new Error('Store not found');
+
+    // Check if bank account already exists
+    const existing = await this.prisma.bankAccount.findUnique({
+      where: { storeId: store.id },
+    });
+
+    if (existing) {
+      // Update existing
+      return await this.prisma.bankAccount.update({
+        where: { storeId: store.id },
+        data: {
+          bankName: data.bankName,
+          bankCode: data.bankCode,
+          accountNumber: data.accountNumber,
+          accountName: data.accountName,
+        },
+        select: {
+          bankName: true,
+          bankCode: true,
+          accountNumber: true,
+          accountName: true,
+        },
+      });
+    } else {
+      // Create new
+      return await this.prisma.bankAccount.create({
+        data: {
+          storeId: store.id,
+          bankName: data.bankName,
+          bankCode: data.bankCode,
+          accountNumber: data.accountNumber,
+          accountName: data.accountName,
+        },
+        select: {
+          bankName: true,
+          bankCode: true,
+          accountNumber: true,
+          accountName: true,
+        },
+      });
+    }
+  }
+
+  // Update bank account
+  async updateBankAccount(
+    vendorId: string,
+    data: {
+      bankName?: string;
+      accountNumber?: string;
+      accountName?: string;
+    },
+  ) {
+    const store = await this.prisma.store.findUnique({ where: { vendorId } });
+    if (!store) throw new Error('Store not found');
+
+    const bankAccount = await this.prisma.bankAccount.findUnique({
+      where: { storeId: store.id },
+    });
+
+    if (!bankAccount) {
+      throw new Error('Bank account not found');
+    }
+
+    return await this.prisma.bankAccount.update({
+      where: { storeId: store.id },
+      data,
+      select: {
+        bankName: true,
+        accountNumber: true,
+        accountName: true,
+      },
+    });
+  }
+
+  // Delete bank account
+  async deleteBankAccount(vendorId: string) {
+    const store = await this.prisma.store.findUnique({ where: { vendorId } });
+    if (!store) throw new Error('Store not found');
+
+    const bankAccount = await this.prisma.bankAccount.findUnique({
+      where: { storeId: store.id },
+    });
+
+    if (!bankAccount) {
+      throw new Error('Bank account not found');
+    }
+
+    await this.prisma.bankAccount.delete({
+      where: { storeId: store.id },
+    });
+
+    return { message: 'Bank account deleted successfully' };
   }
 
   // Get withdrawal history

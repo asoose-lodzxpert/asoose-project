@@ -18,7 +18,7 @@ export const NotificationsTabs: React.FC<Props> = ({
 }) => {
   const primary = useThemeColor({}, "brandPrimary");
   const inactive = useThemeColor({}, "textSecondary");
-  const mutedText = useThemeColor({}, "textDisabled");
+  const borderDefault = useThemeColor({}, "borderDefault");
 
   const tabs: { key: NotificationTab; label: string; icon: string }[] = [
     { key: "orders", label: "New Orders", icon: "bell" },
@@ -33,7 +33,9 @@ export const NotificationsTabs: React.FC<Props> = ({
           {heading}
         </ThemedText>
       )}
-      <View style={styles.tabsContainer}>
+      <View
+        style={[styles.tabsContainer, { borderBottomColor: borderDefault }]}
+      >
         {tabs.map((tab) => (
           <Pressable
             key={tab.key}
@@ -65,12 +67,11 @@ const styles = StyleSheet.create({
   tabsContainer: {
     flexDirection: "row",
     borderBottomWidth: 1,
-    borderColor: "#E5E7EB",
   },
   tab: {
     flex: 1,
     alignItems: "center",
-    paddingVertical: 12,
+    paddingVertical: 20,
     borderBottomWidth: 2,
     borderBottomColor: "transparent",
   },

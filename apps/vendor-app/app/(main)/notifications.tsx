@@ -18,7 +18,7 @@ import { Ionicons } from "@expo/vector-icons";
 import {
   fetchNotifications,
   markAllAsRead,
-  getNotificationType,
+  getApiTypeFromTab,
   Notification,
 } from "@/services/notifications.service";
 import { useNotifications } from "@/context/NotificationContext";
@@ -37,7 +37,7 @@ export default function NotificationsScreen() {
   const [hasMore, setHasMore] = useState(true);
   const [markingAllRead, setMarkingAllRead] = useState(false);
 
-  const { setUnreadCount } = useNotifications();
+  const { setUnreadCount, refreshUnreadCount } = useNotifications();
 
   const loadNotifications = async (pageNum: number, isRefresh = false) => {
     try {
@@ -47,7 +47,10 @@ export default function NotificationsScreen() {
         setLoadingMore(true);
       }
 
-      const response = await fetchNotifications(pageNum);
+      // Get type filter based on active tab
+      const typeFilter = getApiTypeFromTab(activeTab);
+
+      const response = await fetchNotifications(pageNum, typeFilter);
 
       if (isRefresh || pageNum === 1) {
         setNotifications(response.data);
@@ -58,9 +61,8 @@ export default function NotificationsScreen() {
       setHasMore(pageNum < response.meta.pages);
       setPage(pageNum);
 
-      // Update unread count
-      const unreadCount = response.data.filter((n) => !n.isRead).length;
-      setUnreadCount(unreadCount);
+      // Refresh global unread count
+      await refreshUnreadCount();
     } catch (error: any) {
       Toast.show({
         type: "error",
@@ -73,13 +75,13 @@ export default function NotificationsScreen() {
     }
   };
 
-  // Load notifications when screen focuses
+  // Load notifications when screen focuses or tab changes
   useFocusEffect(
     useCallback(() => {
       setPage(1);
       setHasMore(true);
       loadNotifications(1);
-    }, [])
+    }, [activeTab])
   );
 
   // Auto-refresh every 60 seconds
@@ -109,7 +111,7 @@ export default function NotificationsScreen() {
     try {
       await markAllAsRead();
       setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
-      setUnreadCount(0);
+      await refreshUnreadCount();
       Toast.show({
         type: "success",
         text1: "All notifications marked as read",
@@ -124,23 +126,15 @@ export default function NotificationsScreen() {
     }
   };
 
-  const handleNotificationRead = (notificationId: string) => {
+  const handleNotificationRead = async (notificationId: string) => {
     // Optimistically update UI
     setNotifications((prev) =>
       prev.map((n) => (n.id === notificationId ? { ...n, isRead: true } : n))
     );
 
-    // Update unread count
-    const unreadCount = notifications.filter(
-      (n) => !n.isRead && n.id !== notificationId
-    ).length;
-    setUnreadCount(unreadCount);
+    // Refresh global unread count
+    await refreshUnreadCount();
   };
-
-  // Filter by tab
-  const filteredNotifications = notifications.filter(
-    (n) => getNotificationType(n.type) === activeTab
-  );
 
   const renderFooter = () => {
     if (!loadingMore) return null;
@@ -174,16 +168,15 @@ export default function NotificationsScreen() {
     );
   };
 
-  const unreadCount = filteredNotifications.filter((n) => !n.isRead).length;
+  const unreadCount = notifications.filter((n) => !n.isRead).length;
+
+  const borderColor = useThemeColor({}, "borderDefault");
+  const background = useThemeColor({}, "surfaceCard");
 
   return (
     <ThemedView style={{ flex: 1 }}>
       <View style={styles.headerContainer}>
-        <NotificationsTabs
-          active={activeTab}
-          onChange={setActiveTab}
-          heading="Notifications"
-        />
+        <NotificationsTabs active={activeTab} onChange={setActiveTab} />
         {unreadCount > 0 && (
           <TouchableOpacity
             onPress={handleMarkAllRead}
@@ -202,15 +195,77 @@ export default function NotificationsScreen() {
       </View>
 
       {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={primary} />
-          <ThemedText style={{ marginTop: 16 }}>
-            Loading notifications...
-          </ThemedText>
+        <View style={{ paddingHorizontal: 16, paddingTop: 16 }}>
+          {[...Array(5)].map((_, i) => (
+            <View
+              key={i}
+              style={{
+                backgroundColor: background,
+                borderRadius: 10,
+                marginBottom: 12,
+                padding: 12,
+              }}
+            >
+              {/* Top row skeleton */}
+              <View style={{ flexDirection: "row", marginBottom: 8 }}>
+                <View
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 20,
+                    backgroundColor: borderColor,
+                    opacity: 0.3,
+                  }}
+                />
+                <View style={{ flex: 1, marginLeft: 8 }}>
+                  <View
+                    style={{
+                      width: "70%",
+                      height: 16,
+                      backgroundColor: borderColor,
+                      borderRadius: 4,
+                      opacity: 0.3,
+                      marginBottom: 6,
+                    }}
+                  />
+                  <View
+                    style={{
+                      width: "40%",
+                      height: 12,
+                      backgroundColor: borderColor,
+                      borderRadius: 4,
+                      opacity: 0.3,
+                    }}
+                  />
+                </View>
+              </View>
+
+              {/* Message skeleton */}
+              <View
+                style={{
+                  width: "90%",
+                  height: 14,
+                  backgroundColor: borderColor,
+                  borderRadius: 4,
+                  opacity: 0.3,
+                  marginBottom: 4,
+                }}
+              />
+              <View
+                style={{
+                  width: "70%",
+                  height: 14,
+                  backgroundColor: borderColor,
+                  borderRadius: 4,
+                  opacity: 0.3,
+                }}
+              />
+            </View>
+          ))}
         </View>
       ) : (
         <FlatList
-          data={filteredNotifications}
+          data={notifications}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
             <NotificationCard

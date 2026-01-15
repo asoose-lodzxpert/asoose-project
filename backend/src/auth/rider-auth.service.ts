@@ -127,7 +127,7 @@ export class RiderAuthService {
       );
     }
 
-    const payload = { id: rider.id, email: rider.email, role: 'RIDER' };
+    const payload = { sub: rider.id, email: rider.email, role: 'RIDER' };
     const accessToken = this.jwtService.sign(payload);
     const refreshToken = this.jwtService.sign(payload, { expiresIn: '30d' });
 
@@ -257,14 +257,14 @@ export class RiderAuthService {
     try {
       const payload = this.jwtService.verify(refreshToken);
       const rider = await this.prisma.rider.findUnique({
-        where: { id: payload.id },
+        where: { id: payload.sub || payload.id }, // Support both for backward compatibility
       });
 
       if (!rider) {
         throw new UnauthorizedException('Rider not found');
       }
 
-      const newPayload = { id: rider.id, email: rider.email, role: 'RIDER' };
+      const newPayload = { sub: rider.id, email: rider.email, role: 'RIDER' };
       const accessToken = this.jwtService.sign(newPayload);
 
       return { accessToken };

@@ -90,7 +90,6 @@ export default function LoginScreen() {
     <ThemedView style={styles.container}>
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <View style={{ flex: 1 }}>
-          {/* Animated Logo + App Name */}
           <Animated.View
             style={[
               styles.logoContainer,
@@ -115,7 +114,7 @@ export default function LoginScreen() {
             <ScrollView
               contentContainerStyle={{ flexGrow: 1 }}
               keyboardShouldPersistTaps="handled"
-              showsVerticalScrollIndicator={false} // hide scroll bar
+              showsVerticalScrollIndicator={false}
             >
               {/* Form */}
               <View style={styles.form}>

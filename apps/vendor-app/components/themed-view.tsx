@@ -1,4 +1,4 @@
-import { type ViewProps } from "react-native";
+import { type ViewProps, StatusBar, useColorScheme } from "react-native";
 
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -19,5 +19,16 @@ export function ThemedView({
     "surfaceBackground"
   );
 
-  return <SafeAreaView style={[{ backgroundColor }, style]} {...otherProps} />;
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === "dark";
+
+  return (
+    <>
+      <StatusBar
+        barStyle={isDark ? "light-content" : "dark-content"}
+        backgroundColor={backgroundColor}
+      />
+      <SafeAreaView style={[{ backgroundColor }, style]} {...otherProps} />
+    </>
+  );
 }

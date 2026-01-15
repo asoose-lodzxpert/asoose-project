@@ -18,11 +18,7 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { MenuItem } from "@/types/menu";
 import { uploadFile } from "@/services/storage.service";
-
-interface CategoryOption {
-  id: string;
-  name: string;
-}
+import { fetchCategories, Category } from "@/services/products.service";
 
 interface Props {
   visible: boolean;
@@ -35,7 +31,6 @@ interface Props {
     image?: string;
     images?: string[];
   }) => void;
-  categories: CategoryOption[];
   itemToEdit?: MenuItem;
 }
 
@@ -43,7 +38,6 @@ export const AddMenuItemModal: React.FC<Props> = ({
   visible,
   onClose,
   onSave,
-  categories,
   itemToEdit,
 }) => {
   const background = useThemeColor({}, "surfaceBackground");
@@ -58,6 +52,31 @@ export const AddMenuItemModal: React.FC<Props> = ({
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loadingCategories, setLoadingCategories] = useState(false);
+
+  // Load categories when modal opens
+  useEffect(() => {
+    if (visible) {
+      loadCategories();
+    }
+  }, [visible]);
+
+  const loadCategories = async () => {
+    setLoadingCategories(true);
+    try {
+      const data = await fetchCategories();
+      setCategories(data);
+    } catch (error) {
+      Toast.show({
+        type: "error",
+        text1: "Failed to load categories",
+      });
+    } finally {
+      setLoadingCategories(false);
+    }
+  };
 
   useEffect(() => {
     if (itemToEdit) {
@@ -128,17 +147,11 @@ export const AddMenuItemModal: React.FC<Props> = ({
 
           // Add uploaded URL to images array
           setImages((prev) => [...prev, uploadedUrl]);
-
-          Toast.show({
-            type: "success",
-            text1: "Image uploaded successfully",
-          });
         } catch (error) {
           console.error("Upload error:", error);
           Toast.show({
             type: "error",
             text1: "Failed to upload image",
-            text2: error instanceof Error ? error.message : "Please try again",
           });
         } finally {
           setUploading(false);
@@ -147,10 +160,6 @@ export const AddMenuItemModal: React.FC<Props> = ({
       }
     } catch (error) {
       console.log("Image pick error:", error);
-      Toast.show({
-        type: "error",
-        text1: "Failed to pick image",
-      });
     }
   };
 
@@ -162,8 +171,6 @@ export const AddMenuItemModal: React.FC<Props> = ({
     Toast.show({
       type: "error",
       text1: message,
-      position: "top",
-      visibilityTime: 2000,
     });
   };
 
@@ -212,11 +219,7 @@ export const AddMenuItemModal: React.FC<Props> = ({
                         style={styles.removeButton}
                         onPress={() => removeImage(index)}
                       >
-                        <IconSymbol
-                          name="xmark.circle.fill"
-                          size={24}
-                          color="#EF4444"
-                        />
+                        <IconSymbol name="xmark" size={20} color="#EF4444" />
                       </Pressable>
                       {index === 0 && (
                         <View style={styles.primaryBadge}>
@@ -280,35 +283,44 @@ export const AddMenuItemModal: React.FC<Props> = ({
               <ThemedText type="defaultSemiBold" style={styles.label}>
                 Category *
               </ThemedText>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.categoriesContainer}
-              >
-                {categories.map((cat) => (
-                  <Pressable
-                    key={cat.id}
-                    onPress={() => setSelectedCategory(cat.id)}
-                    style={[
-                      styles.categoryChip,
-                      { borderColor: border },
-                      selectedCategory === cat.id && {
-                        backgroundColor: primary,
-                        borderColor: primary,
-                      },
-                    ]}
-                  >
-                    <ThemedText
+              {loadingCategories ? (
+                <View style={styles.uploadingContainer}>
+                  <ActivityIndicator size="small" color={primary} />
+                  <ThemedText style={{ marginLeft: 8, color: muted }}>
+                    Loading categories...
+                  </ThemedText>
+                </View>
+              ) : (
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.categoriesContainer}
+                >
+                  {categories.map((cat) => (
+                    <Pressable
+                      key={cat.id}
+                      onPress={() => setSelectedCategory(cat.id)}
                       style={[
-                        styles.categoryText,
-                        selectedCategory === cat.id && { color: "#fff" },
+                        styles.categoryChip,
+                        { borderColor: border },
+                        selectedCategory === cat.id && {
+                          backgroundColor: primary,
+                          borderColor: primary,
+                        },
                       ]}
                     >
-                      {cat.name}
-                    </ThemedText>
-                  </Pressable>
-                ))}
-              </ScrollView>
+                      <ThemedText
+                        style={[
+                          styles.categoryText,
+                          selectedCategory === cat.id && { color: "#fff" },
+                        ]}
+                      >
+                        {cat.name}
+                      </ThemedText>
+                    </Pressable>
+                  ))}
+                </ScrollView>
+              )}
             </View>
 
             {/* Price */}

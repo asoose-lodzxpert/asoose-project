@@ -51,7 +51,7 @@ const styles = StyleSheet.create({
   tab: {
     flex: 1,
     alignItems: "center",
-    paddingVertical: 12,
+    paddingVertical: 24,
     borderBottomWidth: 2,
     borderBottomColor: "transparent",
   },

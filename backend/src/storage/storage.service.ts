@@ -1,153 +1,201 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import * as fs from 'fs/promises';
-import * as path from 'path';
-import { existsSync, mkdirSync } from 'fs';
+import * as dotenv from 'dotenv';
+import {
+  S3Client,
+  PutObjectCommand,
+  DeleteObjectCommand,
+  GetObjectCommand,
+} from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+
+dotenv.config();
 
 @Injectable()
 export class StorageService {
-  private storageType: 'local' | 's3' | 'cloudinary';
-  private storagePath: string;
-  private baseUrl: string;
+  private s3Client: S3Client;
+  private readonly bucket: string;
 
-  constructor(private configService: ConfigService) {
-    this.storageType =
-      this.configService.get<'local' | 's3' | 'cloudinary'>('STORAGE_TYPE') ||
-      'local';
-    this.storagePath =
-      this.configService.get<string>('STORAGE_PATH') || './uploads';
-    this.baseUrl =
-      this.configService.get<string>('BACKEND_URL') || 'http://localhost:3000';
+  constructor() {
+    const endpoint = process.env.RAILWAY_S3_ENDPOINT;
+    const bucket = process.env.RAILWAY_S3_BUCKET;
+    const region = process.env.RAILWAY_S3_REGION || 'us-east-1';
+    const accessKeyId = process.env.RAILWAY_S3_ACCESS_KEY_ID;
+    const secretAccessKey = process.env.RAILWAY_S3_SECRET_ACCESS_KEY;
 
-    // Create uploads directory if it doesn't exist (for local storage)
-    if (this.storageType === 'local' && !existsSync(this.storagePath)) {
-      mkdirSync(this.storagePath, { recursive: true });
-    }
-  }
-
-  async uploadFile(file: Express.Multer.File): Promise<string> {
-    try {
-      const timestamp = Date.now();
-      const randomStr = Math.random().toString(36).substring(2, 15);
-      const extension = file.originalname.split('.').pop();
-      const filename = `${timestamp}-${randomStr}.${extension}`;
-
-      if (this.storageType === 'local') {
-        return await this.uploadToLocal(file, filename);
-      } else if (this.storageType === 's3') {
-        return await this.uploadToS3(file, filename);
-      } else if (this.storageType === 'cloudinary') {
-        return await this.uploadToCloudinary(file, filename);
-      }
-
-      throw new Error('Invalid storage type');
-    } catch (error) {
+    if (!endpoint || !bucket || !accessKeyId || !secretAccessKey) {
       throw new InternalServerErrorException(
-        `Failed to upload file: ${error.message}`,
+        'Missing Railway S3 env vars. Set RAILWAY_S3_ENDPOINT, RAILWAY_S3_BUCKET, RAILWAY_S3_ACCESS_KEY_ID, RAILWAY_S3_SECRET_ACCESS_KEY',
       );
     }
-  }
 
-  private async uploadToLocal(
-    file: Express.Multer.File,
-    filename: string,
-  ): Promise<string> {
-    const filepath = path.join(this.storagePath, filename);
-    await fs.writeFile(filepath, file.buffer);
-    return `${this.baseUrl}/uploads/${filename}`;
-  }
+    this.bucket = bucket;
 
-  private async uploadToS3(
-    file: Express.Multer.File,
-    filename: string,
-  ): Promise<string> {
-    // If you want to use S3, uncomment this code and install aws-sdk:
-    // npm install @aws-sdk/client-s3
-
-    /*
-    import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
-    
-    const s3Client = new S3Client({
-      region: this.configService.get<string>('AWS_S3_REGION'),
+    this.s3Client = new S3Client({
+      endpoint,
+      region,
       credentials: {
-        accessKeyId: this.configService.get<string>('AWS_ACCESS_KEY_ID'),
-        secretAccessKey: this.configService.get<string>('AWS_SECRET_ACCESS_KEY'),
+        accessKeyId,
+        secretAccessKey,
       },
+      forcePathStyle: true,
     });
-
-    const bucket = this.configService.get<string>('AWS_S3_BUCKET');
-    const key = `uploads/${filename}`;
-
-    await s3Client.send(new PutObjectCommand({
-      Bucket: bucket,
-      Key: key,
-      Body: file.buffer,
-      ContentType: file.mimetype,
-    }));
-
-    return `https://${bucket}.s3.${this.configService.get<string>('AWS_S3_REGION')}.amazonaws.com/${key}`;
-    */
-
-    throw new Error(
-      'S3 storage is not configured. Please install @aws-sdk/client-s3 and uncomment the code.',
-    );
   }
 
-  private async uploadToCloudinary(
+  // =========================
+  // Upload single + signed URL
+  // =========================
+  async uploadFile(
     file: Express.Multer.File,
-    filename: string,
-  ): Promise<string> {
-    // If you want to use Cloudinary, uncomment this code and install cloudinary:
-    // npm install cloudinary
-
-    /*
-    import { v2 as cloudinary } from 'cloudinary';
-
-    cloudinary.config({
-      cloud_name: this.configService.get<string>('CLOUDINARY_CLOUD_NAME'),
-      api_key: this.configService.get<string>('CLOUDINARY_API_KEY'),
-      api_secret: this.configService.get<string>('CLOUDINARY_API_SECRET'),
-    });
-
-    return new Promise((resolve, reject) => {
-      cloudinary.uploader.upload_stream(
-        { folder: 'asoose-uploads', public_id: filename },
-        (error, result) => {
-          if (error) reject(error);
-          else resolve(result.secure_url);
-        }
-      ).end(file.buffer);
-    });
-    */
-
-    throw new Error(
-      'Cloudinary storage is not configured. Please install cloudinary and uncomment the code.',
-    );
-  }
-
-  async deleteFile(url: string): Promise<void> {
+  ): Promise<{ key: string; signedUrl: string }> {
     try {
-      if (this.storageType === 'local') {
-        const filename = url.split('/').pop();
-        if (!filename) {
-          throw new Error('Invalid file URL');
-        }
-        const filepath = path.join(this.storagePath, filename);
+      const key = this.generateKey(file.originalname);
 
-        if (existsSync(filepath)) {
-          await fs.unlink(filepath);
-        }
-      } else if (this.storageType === 's3') {
-        // Implement S3 deletion if needed
-        throw new Error('S3 deletion not implemented');
-      } else if (this.storageType === 'cloudinary') {
-        // Implement Cloudinary deletion if needed
-        throw new Error('Cloudinary deletion not implemented');
-      }
-    } catch (error) {
-      throw new InternalServerErrorException(
-        `Failed to delete file: ${error.message}`,
+      await this.s3Client.send(
+        new PutObjectCommand({
+          Bucket: this.bucket,
+          Key: key,
+          Body: file.buffer,
+          ContentType: file.mimetype,
+        }),
       );
+
+      const signedUrl = await this.getSignedGetUrl(key);
+
+      return { key, signedUrl };
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      throw new InternalServerErrorException(`Failed to upload file: ${msg}`);
     }
   }
+
+  // =========================
+  // Upload bulk + signed URLs
+  // =========================
+  async uploadBulk(
+    files: Express.Multer.File[],
+  ): Promise<{ key: string; signedUrl: string }[]> {
+    try {
+      const results = await Promise.all(
+        files.map(async (file) => {
+          const key = this.generateKey(file.originalname);
+
+          await this.s3Client.send(
+            new PutObjectCommand({
+              Bucket: this.bucket,
+              Key: key,
+              Body: file.buffer,
+              ContentType: file.mimetype,
+            }),
+          );
+
+          const signedUrl = await this.getSignedGetUrl(key);
+
+          return { key, signedUrl };
+        }),
+      );
+
+      return results;
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      throw new InternalServerErrorException(`Failed to upload files: ${msg}`);
+    }
+  }
+
+  // =========================
+  // Delete by FULL URL
+  // =========================
+  async deleteFile(fileUrl: string): Promise<void> {
+    try {
+      const key = this.extractKeyFromUrl(fileUrl);
+
+      await this.s3Client.send(
+        new DeleteObjectCommand({
+          Bucket: this.bucket,
+          Key: key,
+        }),
+      );
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      throw new InternalServerErrorException(`Failed to delete file: ${msg}`);
+    }
+  }
+
+
+  // =========================
+  // Delete by KEY (recommended)
+  // =========================
+  async deleteFileByKey(key: string): Promise<void> {
+    try {
+      await this.s3Client.send(
+        new DeleteObjectCommand({
+          Bucket: this.bucket,
+          Key: key,
+        }),
+      );
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      throw new InternalServerErrorException(`Failed to delete file: ${msg}`);
+    }
+  }
+
+  // =========================
+  // Generate signed URL later
+  // =========================
+  async getSignedUrlForKey(
+    key: string,
+    expiresInSeconds = 60 * 60,
+  ): Promise<string> {
+    try {
+      return await this.getSignedGetUrl(key, expiresInSeconds);
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      throw new InternalServerErrorException(`Failed to sign url: ${msg}`);
+    }
+  }
+
+  // =========================
+  // Helpers
+  // =========================
+
+  private generateKey(originalName: string): string {
+    const timestamp = Date.now();
+    const randomStr = Math.random().toString(36).slice(2);
+    const ext = originalName.split('.').pop() || 'bin';
+    return `uploads/${timestamp}-${randomStr}.${ext}`;
+  }
+
+  private async getSignedGetUrl(
+    key: string,
+    expiresIn = 60 * 60,
+  ): Promise<string> {
+    return getSignedUrl(
+      this.s3Client,
+      new GetObjectCommand({
+        Bucket: this.bucket,
+        Key: key,
+      }),
+      { expiresIn },
+    );
+  }
+
+    private extractKeyFromUrl(url: string): string {
+    try {
+      const parsed = new URL(url);
+
+      // pathname = /bucket-name/uploads/xxx.png
+      const parts = parsed.pathname.split('/').filter(Boolean);
+
+      const bucketIndex = parts.indexOf(this.bucket);
+
+      if (bucketIndex === -1 || bucketIndex + 1 >= parts.length) {
+        throw new Error('Invalid Railway storage URL');
+      }
+
+      // everything after bucket name is the key
+      return parts.slice(bucketIndex + 1).join('/');
+    } catch {
+      throw new Error('Invalid file URL format');
+    }
+  }
+
 }

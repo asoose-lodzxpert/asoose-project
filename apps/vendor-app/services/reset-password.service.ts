@@ -7,7 +7,10 @@ export async function sendVendorOtp(email: string) {
     `${process.env.EXPO_PUBLIC_API_URL}/auth/vendor/send-otp`,
     {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "ngrok-skip-browser-warning": "true",
+      },
       body: JSON.stringify({ email }),
     }
   );
@@ -20,7 +23,10 @@ export async function verifyVendorOtp(email: string, otp: string) {
     `${process.env.EXPO_PUBLIC_API_URL}/auth/vendor/verify-otp`,
     {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "ngrok-skip-browser-warning": "true",
+      },
       body: JSON.stringify({ email, otp }),
     }
   );
@@ -37,7 +43,10 @@ export async function resetVendorPassword(
     `${process.env.EXPO_PUBLIC_API_URL}/auth/vendor/reset-password`,
     {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "ngrok-skip-browser-warning": "true",
+      },
       body: JSON.stringify({ email, otp, newPassword }),
     }
   );

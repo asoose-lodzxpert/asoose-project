@@ -11,6 +11,7 @@ export interface Product {
   id: string;
   name: string;
   slug: string;
+  description?: string | null;
   price: number;
   image: string | null;
   images?: string[];
@@ -30,6 +31,7 @@ export interface Product {
 export interface CreateProductInput {
   storeId: string;
   name: string;
+  description?: string;
   price: number;
   image?: string;
   images?: string[];
@@ -39,6 +41,7 @@ export interface CreateProductInput {
 
 export interface UpdateProductInput {
   name?: string;
+  description?: string;
   price?: number;
   image?: string;
   images?: string[];

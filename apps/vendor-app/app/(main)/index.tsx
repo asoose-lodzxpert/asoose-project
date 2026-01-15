@@ -7,6 +7,7 @@ import { RecentOrdersFeed } from "@/components/store/RecentOrdersFeed";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useRouter } from "expo-router";
 import { ConfirmationModal } from "@/components/ui/ConfirmationModal";
+import { ScrollView, RefreshControl } from "react-native";
 
 import { StoreMetrics, StoreOrder } from "@/types/store";
 import { useThemeColor } from "@/hooks/use-theme-color";
@@ -30,6 +31,7 @@ export default function StoreDashboardPage() {
   const [loadingStore, setLoadingStore] = useState(true);
   const [toggleLoading, setToggleLoading] = useState(false);
   const [confirmVisible, setConfirmVisible] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const router = useRouter();
   const linkColor = useThemeColor({}, "brandPrimary");
 
@@ -101,6 +103,21 @@ export default function StoreDashboardPage() {
     fetchStore();
   }, [fetchOnline, fetchMetrics, fetchOrders, fetchStore]);
 
+  /** Handle pull to refresh */
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([
+        fetchOnline(),
+        fetchMetrics(),
+        fetchOrders(),
+        fetchStore(),
+      ]);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [fetchOnline, fetchMetrics, fetchOrders, fetchStore]);
+
   /** Open confirmation modal */
   const openConfirmation = () => setConfirmVisible(true);
 
@@ -145,36 +162,50 @@ export default function StoreDashboardPage() {
 
   return (
     <ThemedView style={{ flex: 1 }}>
-      <StoreHeader
-        storeName={storeName}
-        approved
-        isOnline={!!isOnline}
-        onToggleOnline={openConfirmation}
-        loading={loadingOnline || loadingStore}
-      />
-
-      <MetricsCards
-        metrics={
-          metrics || {
-            todaysOrders: 0,
-            todaysSales: 0,
-            pendingApprovals: 0,
-            avgRating: 0,
-          }
+      <ScrollView
+        contentContainerStyle={{ flexGrow: 1 }}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor={linkColor}
+          />
         }
-        loading={loadingMetrics}
-      />
+      >
+        <StoreHeader
+          storeName={storeName}
+          approved
+          isOnline={!!isOnline}
+          onToggleOnline={openConfirmation}
+          loading={loadingOnline || loadingStore}
+        />
 
-      <QuickActions heading="Quick Actions" actions={actions} />
+        <MetricsCards
+          metrics={
+            metrics || {
+              todaysOrders: 0,
+              todaysSales: 0,
+              pendingApprovals: 0,
+              avgRating: 0,
+            }
+          }
+          loading={loadingMetrics}
+        />
 
-      <RecentOrdersFeed
-        orders={orders || []}
-        heading="Recent Orders"
-        actionLabel="View All"
-        actionIcon={<IconSymbol name="arrow.right" size={16} color="#E5A503" />}
-        onActionPress={() => router.push("/(main)/(orders)")}
-        loading={loadingOrders}
-      />
+        <QuickActions heading="Quick Actions" actions={actions} />
+
+        <RecentOrdersFeed
+          orders={orders || []}
+          heading="Recent Orders"
+          actionLabel="View All"
+          actionIcon={
+            <IconSymbol name="arrow.right" size={16} color="#E5A503" />
+          }
+          onActionPress={() => router.push("/(main)/(orders)")}
+          loading={loadingOrders}
+        />
+      </ScrollView>
 
       <ConfirmationModal
         visible={confirmVisible}

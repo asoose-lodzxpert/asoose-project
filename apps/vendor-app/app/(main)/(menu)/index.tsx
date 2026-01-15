@@ -1,11 +1,5 @@
-import React, { useMemo, useState, useCallback, useEffect } from "react";
-import {
-  StyleSheet,
-  FlatList,
-  RefreshControl,
-  ActivityIndicator,
-  View,
-} from "react-native";
+import React, { useMemo, useState, useCallback } from "react";
+import { StyleSheet, FlatList, RefreshControl, View } from "react-native";
 import Toast from "react-native-toast-message";
 
 import { ThemedView } from "@/components/themed-view";
@@ -13,37 +7,28 @@ import { ThemedText } from "@/components/themed-text";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { useAuth } from "@/context/AuthContext";
 
-import { MenuHeader } from "@/components/menu/MenuHeader";
-import { MenuTabs } from "@/components/menu/MenuTabs";
 import { MenuEmptyState } from "@/components/menu/MenuEmptyState";
 import { MenuFilters } from "@/components/menu/MenuFilters";
 
 import { Category, MenuItem } from "@/types/menu";
-import { CategoryRow } from "@/components/menu/CategoryRow";
 import { MenuItemCard } from "@/components/menu/MenuItemCard";
 
 import { DeleteConfirmModal } from "@/components/ui/DeleteConfirmModal";
 import { FloatingActionButton } from "@/components/ui/FloatingActionButton";
 
-import { AddMenuItemModal } from "@/components/menu/AddMenuItemModal";
-import { AddCategoryModal } from "@/components/menu/AddCategoryModal";
-
 import {
   fetchProducts,
   fetchCategories,
-  createProduct,
-  updateProduct,
   deleteProduct,
   toggleProductStock,
-  Product,
 } from "@/services/products.service";
-import { useFocusEffect } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 
 export default function MenuScreen() {
+  const router = useRouter();
   const primary = useThemeColor({}, "brandPrimary");
   const { user } = useAuth();
 
-  const [activeTab, setActiveTab] = useState<"items" | "categories">("items");
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
 
   const [items, setItems] = useState<MenuItem[]>([]);
@@ -54,12 +39,6 @@ export default function MenuScreen() {
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-
-  /* -------------------- Modals -------------------- */
-  const [menuItemModalVisible, setMenuItemModalVisible] = useState(false);
-  const [itemToEdit, setItemToEdit] = useState<MenuItem | undefined>(undefined);
-
-  const [addCategoryModalVisible, setAddCategoryModalVisible] = useState(false);
 
   /* -------------------- Load Data -------------------- */
   const loadData = async (isRefresh = false) => {
@@ -106,10 +85,12 @@ export default function MenuScreen() {
     return items.filter((i) => i.categoryId === activeCategory);
   }, [items, activeCategory]);
 
-  const categoryOptions = useMemo(
-    () => categories.map((c) => ({ id: c.id, name: c.name })),
-    [categories]
-  );
+  const categoryOptions = useMemo(() => {
+    const categoriesWithItems = categories.filter((c) =>
+      items.some((item) => item.categoryId === c.id)
+    );
+    return categoriesWithItems.map((c) => ({ id: c.id, name: c.name }));
+  }, [categories, items]);
 
   const categoryCounts = useMemo<Record<string, number>>(() => {
     const counts: Record<string, number> = {};
@@ -169,160 +150,196 @@ export default function MenuScreen() {
     loadData(true);
   }, [user?.storeId]);
 
-  const handleSaveMenuItem = async (
-    item: Partial<MenuItem> & {
-      name: string;
-      price: number;
-      categoryId: string;
-    }
-  ) => {
-    if (!user?.storeId) return;
-
-    try {
-      if (itemToEdit) {
-        // Update existing
-        const updated = await updateProduct(itemToEdit.id, {
-          name: item.name,
-          price: item.price,
-          categoryId: item.categoryId,
-          stock: item.stock,
-          image: item.image || undefined,
-        });
-
-        setItems((prev) =>
-          prev.map((i) => (i.id === updated.id ? updated : i))
-        );
-
-        Toast.show({
-          type: "success",
-          text1: "Product updated",
-        });
-      } else {
-        // Create new
-        const created = await createProduct({
-          storeId: user.storeId,
-          name: item.name,
-          price: item.price,
-          categoryId: item.categoryId,
-          stock: item.stock || 0,
-          image: item.image || undefined,
-        });
-
-        setItems((prev) => [created, ...prev]);
-
-        Toast.show({
-          type: "success",
-          text1: "Product created",
-        });
-      }
-
-      setMenuItemModalVisible(false);
-      setItemToEdit(undefined);
-    } catch (error: any) {
-      Toast.show({
-        type: "error",
-        text1: error.message || "Failed to save product",
-      });
-    }
-  };
-
   /* -------------------- Renderers -------------------- */
   const renderMenuItem = ({ item }: { item: MenuItem }) => (
     <MenuItemCard
       item={item}
       onToggleStock={() => handleToggleStock(item.id)}
-      onEdit={() => {
-        setItemToEdit(item);
-        setMenuItemModalVisible(true);
-      }}
+      onEdit={() => router.push(`/(main)/(menu)/add-item?id=${item.id}`)}
       onDelete={() => setDeleteTarget(item)}
     />
   );
 
-  const renderCategory = ({ item }: { item: Category }) => (
-    <CategoryRow
-      name={item.name}
-      onEdit={() => {}}
-      onDelete={() => {
-        // TODO: Add category deletion endpoint to backend
-        Toast.show({
-          type: "info",
-          text1: "Category deletion",
-          text2: "Feature coming soon",
-        });
-      }}
-    />
-  );
+  const borderColor = useThemeColor({}, "borderDefault");
+  const background = useThemeColor({}, "surfaceCard");
 
   if (loading) {
     return (
-      <ThemedView
-        style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
-      >
-        <ActivityIndicator size="large" color={primary} />
-        <ThemedText style={{ marginTop: 16 }}>Loading menu...</ThemedText>
+      <ThemedView style={{ flex: 1 }}>
+        {/* Header skeleton */}
+        <View style={styles.header}>
+          <View
+            style={{
+              width: 80,
+              height: 28,
+              backgroundColor: borderColor,
+              borderRadius: 6,
+              opacity: 0.3,
+              marginBottom: 8,
+            }}
+          />
+          <View
+            style={{
+              width: 200,
+              height: 16,
+              backgroundColor: borderColor,
+              borderRadius: 4,
+              opacity: 0.3,
+            }}
+          />
+        </View>
+
+        {/* Filters skeleton */}
+        <View style={{ paddingHorizontal: 16, marginBottom: 16 }}>
+          <View style={{ flexDirection: "row", gap: 8 }}>
+            {[...Array(4)].map((_, i) => (
+              <View
+                key={i}
+                style={{
+                  width: 90,
+                  height: 36,
+                  backgroundColor: borderColor,
+                  borderRadius: 18,
+                  opacity: 0.3,
+                }}
+              />
+            ))}
+          </View>
+        </View>
+
+        {/* Menu items skeleton */}
+        <View style={{ paddingHorizontal: 16 }}>
+          {[...Array(4)].map((_, i) => (
+            <View
+              key={i}
+              style={{
+                backgroundColor: background,
+                borderRadius: 12,
+                marginBottom: 12,
+                padding: 12,
+              }}
+            >
+              <View style={{ flexDirection: "row", marginBottom: 12 }}>
+                {/* Image skeleton */}
+                <View
+                  style={{
+                    width: 80,
+                    height: 80,
+                    backgroundColor: borderColor,
+                    borderRadius: 8,
+                    opacity: 0.3,
+                  }}
+                />
+
+                {/* Content skeleton */}
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <View
+                    style={{
+                      width: "70%",
+                      height: 18,
+                      backgroundColor: borderColor,
+                      borderRadius: 4,
+                      opacity: 0.3,
+                      marginBottom: 8,
+                    }}
+                  />
+                  <View
+                    style={{
+                      width: "40%",
+                      height: 14,
+                      backgroundColor: borderColor,
+                      borderRadius: 4,
+                      opacity: 0.3,
+                      marginBottom: 8,
+                    }}
+                  />
+                  <View
+                    style={{
+                      width: "50%",
+                      height: 16,
+                      backgroundColor: borderColor,
+                      borderRadius: 4,
+                      opacity: 0.3,
+                    }}
+                  />
+                </View>
+
+                {/* Switch skeleton */}
+                <View
+                  style={{
+                    width: 50,
+                    height: 30,
+                    backgroundColor: borderColor,
+                    borderRadius: 15,
+                    opacity: 0.3,
+                  }}
+                />
+              </View>
+
+              {/* Actions skeleton */}
+              <View style={{ flexDirection: "row", gap: 8 }}>
+                <View
+                  style={{
+                    flex: 1,
+                    height: 36,
+                    backgroundColor: borderColor,
+                    borderRadius: 8,
+                    opacity: 0.3,
+                  }}
+                />
+                <View
+                  style={{
+                    flex: 1,
+                    height: 36,
+                    backgroundColor: borderColor,
+                    borderRadius: 8,
+                    opacity: 0.3,
+                  }}
+                />
+              </View>
+            </View>
+          ))}
+        </View>
       </ThemedView>
     );
   }
 
   return (
     <ThemedView style={{ flex: 1 }}>
-      <MenuTabs active={activeTab} onChange={setActiveTab} />
+      {/* Header */}
+      <View style={styles.header}>
+        <ThemedText type="title">Menu</ThemedText>
+        <ThemedText type="caption" style={styles.caption}>
+          Manage your products and inventory
+        </ThemedText>
+      </View>
 
-      {activeTab === "items" && (
-        <>
-          <MenuFilters
-            categories={categoryOptions}
-            active={activeCategory}
-            onSelect={setActiveCategory}
-            counts={categoryCounts}
+      <MenuFilters
+        categories={categoryOptions}
+        active={activeCategory}
+        onSelect={setActiveCategory}
+        counts={categoryCounts}
+      />
+      <FlatList
+        style={{ marginTop: 16 }}
+        data={filteredItems}
+        keyExtractor={(item) => item.id}
+        renderItem={renderMenuItem}
+        contentContainerStyle={styles.content}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor={primary}
           />
-          <FlatList
-            style={{ marginTop: 16 }}
-            data={filteredItems}
-            keyExtractor={(item) => item.id}
-            renderItem={renderMenuItem}
-            contentContainerStyle={styles.content}
-            refreshControl={
-              <RefreshControl
-                refreshing={refreshing}
-                onRefresh={handleRefresh}
-                tintColor={primary}
-              />
-            }
-            ListEmptyComponent={<MenuEmptyState />}
-          />
-        </>
-      )}
-
-      {activeTab === "categories" && (
-        <FlatList
-          data={categories}
-          keyExtractor={(item) => item.id}
-          renderItem={renderCategory}
-          contentContainerStyle={styles.content}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={handleRefresh}
-              tintColor={primary}
-            />
-          }
-          ListEmptyComponent={<MenuEmptyState />}
-        />
-      )}
+        }
+        ListEmptyComponent={<MenuEmptyState />}
+      />
 
       {/* Floating Action Button */}
       <FloatingActionButton
         icon="plus"
-        onPress={() => {
-          if (activeTab === "items") {
-            setItemToEdit(undefined);
-            setMenuItemModalVisible(true);
-          } else {
-            setAddCategoryModalVisible(true);
-          }
-        }}
+        onPress={() => router.push("/(main)/(menu)/add-item")}
       />
 
       {/* Delete Confirmation */}
@@ -334,37 +351,21 @@ export default function MenuScreen() {
         loading={deletingId !== null}
       />
 
-      {/* Add/Edit Menu Item Modal */}
-      <AddMenuItemModal
-        visible={menuItemModalVisible}
-        onClose={() => {
-          setMenuItemModalVisible(false);
-          setItemToEdit(undefined);
-        }}
-        onSave={handleSaveMenuItem}
-        categories={categoryOptions}
-        itemToEdit={itemToEdit}
-      />
-
-      <AddCategoryModal
-        visible={addCategoryModalVisible}
-        onClose={() => setAddCategoryModalVisible(false)}
-        onSave={() => {
-          setAddCategoryModalVisible(false);
-          Toast.show({
-            type: "info",
-            text1: "Category creation",
-            text2: "Feature coming soon",
-          });
-        }}
-      />
-
       <Toast />
     </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
+  header: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 12,
+  },
+  caption: {
+    marginTop: 4,
+    opacity: 0.6,
+  },
   content: {
     paddingHorizontal: 16,
     paddingBottom: 24,

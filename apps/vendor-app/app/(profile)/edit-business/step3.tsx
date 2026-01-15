@@ -1,11 +1,5 @@
 import React, { useRef, useState, useEffect } from "react";
-import {
-  ScrollView,
-  StyleSheet,
-  View,
-  Pressable,
-  ActivityIndicator,
-} from "react-native";
+import { ScrollView, StyleSheet, View, Pressable } from "react-native";
 import Toast from "react-native-toast-message";
 import { getBusinessDetails } from "@/services/business-details.service";
 import { updateStoreDetails } from "@/services/business.service";
@@ -27,6 +21,8 @@ export default function EditStoreDetailsScreen() {
   const router = useRouter();
   const mapRef = useRef<MapView | null>(null);
   const primary = useThemeColor({}, "brandPrimary");
+  const borderColor = useThemeColor({}, "borderDefault");
+  const surfaceCard = useThemeColor({}, "surfaceCard");
 
   // Store data state
   const [storeData, setStoreData] = useState<SignupStep3Data | null>(null);
@@ -115,10 +111,165 @@ export default function EditStoreDetailsScreen() {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-        <ActivityIndicator size="large" color={primary} />
-        <ThemedText type="subtitle">Loading store details...</ThemedText>
-      </View>
+      <ThemedView style={{ flex: 1 }}>
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{
+            gap: 20,
+            paddingBottom: 32,
+            paddingHorizontal: 16,
+          }}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Header Skeleton */}
+          <View style={styles.header}>
+            <View
+              style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
+            >
+              <View
+                style={{
+                  width: 24,
+                  height: 24,
+                  borderRadius: 12,
+                  backgroundColor: borderColor,
+                  opacity: 0.3,
+                }}
+              />
+              <View
+                style={{
+                  width: 60,
+                  height: 20,
+                  borderRadius: 4,
+                  backgroundColor: borderColor,
+                  opacity: 0.3,
+                }}
+              />
+            </View>
+          </View>
+
+          {/* Title Skeleton */}
+          <View
+            style={{
+              width: 150,
+              height: 24,
+              borderRadius: 4,
+              backgroundColor: borderColor,
+              opacity: 0.3,
+            }}
+          />
+
+          {/* Store Info Fields Skeleton */}
+          {[1, 2].map((i) => (
+            <View key={i}>
+              <View
+                style={{
+                  width: 100,
+                  height: 18,
+                  borderRadius: 4,
+                  backgroundColor: borderColor,
+                  opacity: 0.3,
+                  marginBottom: 8,
+                }}
+              />
+              <View
+                style={{
+                  height: 50,
+                  borderRadius: 12,
+                  backgroundColor: borderColor,
+                  opacity: 0.3,
+                }}
+              />
+            </View>
+          ))}
+
+          {/* Images Section Skeleton */}
+          <View
+            style={{
+              width: 100,
+              height: 24,
+              borderRadius: 4,
+              backgroundColor: borderColor,
+              opacity: 0.3,
+            }}
+          />
+
+          {/* Logo Upload Skeleton */}
+          <View
+            style={{
+              height: 140,
+              borderRadius: 12,
+              backgroundColor: borderColor,
+              opacity: 0.3,
+            }}
+          />
+
+          {/* Banner Upload Skeleton */}
+          <View
+            style={{
+              height: 140,
+              borderRadius: 12,
+              backgroundColor: borderColor,
+              opacity: 0.3,
+            }}
+          />
+
+          {/* Location Section Skeleton */}
+          <View
+            style={{
+              width: 100,
+              height: 24,
+              borderRadius: 4,
+              backgroundColor: borderColor,
+              opacity: 0.3,
+            }}
+          />
+
+          {/* Map Skeleton */}
+          <View
+            style={{
+              height: 200,
+              borderRadius: 12,
+              backgroundColor: borderColor,
+              opacity: 0.3,
+            }}
+          />
+
+          {/* Open Hours Section Skeleton */}
+          <View
+            style={{
+              width: 130,
+              height: 24,
+              borderRadius: 4,
+              backgroundColor: borderColor,
+              opacity: 0.3,
+            }}
+          />
+
+          {/* Open Hours Cards Skeleton */}
+          {[1, 2, 3].map((i) => (
+            <View
+              key={i}
+              style={{
+                height: 60,
+                borderRadius: 12,
+                backgroundColor: borderColor,
+                opacity: 0.3,
+              }}
+            />
+          ))}
+
+          {/* Save Button Skeleton */}
+          <View
+            style={{
+              marginTop: 24,
+              height: 50,
+              borderRadius: 14,
+              backgroundColor: borderColor,
+              opacity: 0.3,
+            }}
+          />
+        </ScrollView>
+      </ThemedView>
     );
   }
 

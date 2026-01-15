@@ -6,9 +6,9 @@ import { VerificationStatus } from '@prisma/client';
 export class DocumentsService {
   constructor(private prisma: PrismaService) {}
 
-  async getVendorDocuments(storeId: string) {
+  async getVendorDocuments(vendorId: string) {
     return this.prisma.vendorDocument.findMany({
-      where: { storeId },
+      where: { vendorId },
       orderBy: { uploadedDate: 'desc' },
     });
   }

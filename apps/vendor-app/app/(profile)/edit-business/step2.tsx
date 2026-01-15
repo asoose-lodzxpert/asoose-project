@@ -10,7 +10,9 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { useRouter } from "expo-router";
-import * as DocumentPicker from "expo-document-picker";
+import * as ImagePicker from "expo-image-picker";
+import * as FileSystem from "expo-file-system";
+import { uploadFile, UploadProgress } from "@/services/storage.service";
 
 import { ThemedText } from "@/components/themed-text";
 import { IconSymbol } from "@/components/ui/icon-symbol";
@@ -18,10 +20,14 @@ import { ThemedView } from "@/components/themed-view";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { SignupStep2Data } from "@/types/signup";
 
-/**
- * Max file size: 5MB
- */
-const MAX_SIZE = 5 * 1024 * 1024;
+const MAX_SIZE = 5 * 1024 * 1024; // 5MB
+
+type UploadState = {
+  [K in keyof SignupStep2Data]?: {
+    uploading: boolean;
+    progress: number;
+  };
+};
 
 export default function EditBusinessDocumentsScreen() {
   const router = useRouter();
@@ -32,6 +38,7 @@ export default function EditBusinessDocumentsScreen() {
   const [data, setData] = useState<SignupStep2Data | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploadState, setUploadState] = useState<UploadState>({});
 
   useEffect(() => {
     let mounted = true;
@@ -58,26 +65,94 @@ export default function EditBusinessDocumentsScreen() {
 
   /** Handle file pick */
   const pickFile = async (key: keyof SignupStep2Data) => {
-    const result = await DocumentPicker.getDocumentAsync({
-      type: ["application/pdf", "image/jpeg", "image/png"],
-      multiple: false,
-      copyToCacheDirectory: true,
-    });
+    try {
+      // Request permission
+      const permissionResult =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
 
-    if (result.canceled) return;
+      if (!permissionResult.granted) {
+        Toast.show({
+          type: "error",
+          text1: "Permission required",
+          text2: "Please allow access to your photo library",
+        });
+        return;
+      }
 
-    const file = result.assets[0];
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        allowsEditing: false,
+        quality: 0.8,
+      });
 
-    if (file.size && file.size > MAX_SIZE) {
+      if (result.canceled) return;
+
+      const image = result.assets[0];
+
+      // Check file size using expo-file-system
+      try {
+        const file = new FileSystem.File(image.uri);
+        const fileInfo = await file.info();
+
+        if (fileInfo.exists && fileInfo.size) {
+          if (fileInfo.size > MAX_SIZE) {
+            Toast.show({
+              type: "error",
+              text1: "File too large",
+              text2: `Maximum file size is 5MB. Your file is ${(
+                fileInfo.size /
+                1024 /
+                1024
+              ).toFixed(2)}MB`,
+            });
+            return;
+          }
+        }
+      } catch (sizeError) {
+        console.warn("Could not check file size:", sizeError);
+        // Continue anyway if we can't check size
+      }
+
+      // Set uploading state
+      setUploadState((prev) => ({
+        ...prev,
+        [key]: { uploading: true, progress: 0 },
+      }));
+
+      // Upload image to backend
+      const url = await uploadFile(
+        {
+          uri: image.uri,
+          name: `document-${Date.now()}.jpg`,
+          type: "image/jpeg",
+        },
+        (progress: UploadProgress) => {
+          setUploadState((prev) => ({
+            ...prev,
+            [key]: { uploading: true, progress: progress.percentage },
+          }));
+        }
+      );
+
+      setData((prev) => (prev ? { ...prev, [key]: url } : prev));
+
+      setUploadState((prev) => ({
+        ...prev,
+        [key]: { uploading: false, progress: 100 },
+      }));
+    } catch (error) {
+      setUploadState((prev) => ({
+        ...prev,
+        [key]: { uploading: false, progress: 0 },
+      }));
+
       Toast.show({
         type: "error",
-        text1: "File too large",
-        text2: "Maximum file size is 5MB",
+        text1: "Upload Failed",
+        text2:
+          error instanceof Error ? error.message : "Failed to upload image",
       });
-      return;
     }
-
-    setData((prev) => (prev ? { ...prev, [key]: file.uri } : prev));
   };
 
   /** Remove uploaded file */
@@ -110,6 +185,8 @@ export default function EditBusinessDocumentsScreen() {
   ) => {
     const value = data?.[key];
     const uploaded = Boolean(value);
+    const state = uploadState[key];
+    const isUploading = state?.uploading || false;
 
     return (
       <View style={[styles.card, { backgroundColor: surface }]}>
@@ -119,7 +196,7 @@ export default function EditBusinessDocumentsScreen() {
             {label} {optional && "(Optional)"}
           </ThemedText>
 
-          {uploaded && (
+          {uploaded && !isUploading && (
             <Pressable onPress={() => removeFile(key)}>
               <ThemedText type="link">Remove</ThemedText>
             </Pressable>
@@ -128,7 +205,7 @@ export default function EditBusinessDocumentsScreen() {
 
         {/* Upload area */}
         <Pressable
-          onPress={() => pickFile(key)}
+          onPress={() => !isUploading && pickFile(key)}
           style={[
             styles.uploadBox,
             {
@@ -136,20 +213,32 @@ export default function EditBusinessDocumentsScreen() {
               borderStyle: uploaded ? "solid" : "dashed",
             },
           ]}
+          disabled={isUploading}
         >
-          <IconSymbol
-            size={32}
-            name={uploaded ? "check" : "cloud.upload"}
-            color={uploaded ? "#22C55E" : "#9CA3AF"}
-          />
+          {isUploading ? (
+            <>
+              <ActivityIndicator size="large" color={primary} />
+              <ThemedText style={styles.uploadText}>
+                Uploading... {state?.progress || 0}%
+              </ThemedText>
+            </>
+          ) : (
+            <>
+              <IconSymbol
+                size={32}
+                name={uploaded ? "check" : "cloud.upload"}
+                color={uploaded ? "#22C55E" : "#9CA3AF"}
+              />
 
-          <ThemedText style={styles.uploadText}>
-            {uploaded ? "Document uploaded" : "Tap to upload document"}
-          </ThemedText>
+              <ThemedText style={styles.uploadText}>
+                {uploaded ? "Image uploaded" : "Tap to upload image"}
+              </ThemedText>
 
-          <ThemedText style={styles.hintText}>
-            {uploaded ? value?.split("/").pop() : "PDF, JPG or PNG (max 5MB)"}
-          </ThemedText>
+              <ThemedText style={styles.hintText}>
+                {uploaded ? "Tap to change image" : "JPG or PNG (recommended)"}
+              </ThemedText>
+            </>
+          )}
         </Pressable>
       </View>
     );
@@ -157,10 +246,94 @@ export default function EditBusinessDocumentsScreen() {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-        <ActivityIndicator size="large" color={primary} />
-        <ThemedText type="subtitle">Loading documents...</ThemedText>
-      </View>
+      <ThemedView style={{ flex: 1 }}>
+        {/* Header Skeleton */}
+        <View style={styles.header}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            <View
+              style={{
+                width: 24,
+                height: 24,
+                borderRadius: 12,
+                backgroundColor: border,
+                opacity: 0.3,
+              }}
+            />
+            <View
+              style={{
+                width: 60,
+                height: 20,
+                borderRadius: 4,
+                backgroundColor: border,
+                opacity: 0.3,
+              }}
+            />
+          </View>
+        </View>
+
+        <ScrollView
+          contentContainerStyle={styles.container}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Title Skeleton */}
+          <View
+            style={{
+              width: 250,
+              height: 24,
+              borderRadius: 4,
+              backgroundColor: border,
+              opacity: 0.3,
+            }}
+          />
+
+          {/* Document Cards Skeleton */}
+          {[1, 2, 3].map((i) => (
+            <View
+              key={i}
+              style={[
+                styles.card,
+                {
+                  backgroundColor: surface,
+                  borderWidth: 1,
+                  borderColor: border,
+                },
+              ]}
+            >
+              {/* Card Header */}
+              <View
+                style={{
+                  width: 200,
+                  height: 18,
+                  borderRadius: 4,
+                  backgroundColor: border,
+                  opacity: 0.3,
+                }}
+              />
+
+              {/* Upload Box */}
+              <View
+                style={{
+                  height: 140,
+                  borderRadius: 12,
+                  backgroundColor: border,
+                  opacity: 0.3,
+                }}
+              />
+            </View>
+          ))}
+
+          {/* Save Button Skeleton */}
+          <View
+            style={{
+              marginTop: 24,
+              height: 50,
+              borderRadius: 14,
+              backgroundColor: border,
+              opacity: 0.3,
+            }}
+          />
+        </ScrollView>
+      </ThemedView>
     );
   }
 

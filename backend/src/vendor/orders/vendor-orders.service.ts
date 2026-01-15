@@ -18,7 +18,6 @@ export class VendorOrdersService {
     private readonly eventEmitter: EventEmitter2,
   ) {}
 
-  // HELPER: Security & Validation
   private async validateOrderAccess(userId: string, orderId: string) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
@@ -32,33 +31,42 @@ export class VendorOrdersService {
       throw new NotFoundException('Order not found');
     }
 
-    // Strict Ownership Check
     if (order.store?.vendorId !== userId) {
-      this.logger.warn(
-        `Security Alert: User ${userId} tried to access order ${orderId}`,
-      );
       throw new ForbiddenException('You do not have access to this order');
     }
 
     return order;
   }
 
-  // BUSINESS LOGIC
-
-  // 1. LIST ORDERS
-  async findAll(userId: string, storeId: string, page = 1, limit = 20) {
-    const store = await this.prisma.store.findUnique({
-      where: { id: storeId },
+  async findAll(vendorId: string, status?: string, page = 1, limit = 20) {
+    const store = await this.prisma.store.findFirst({
+      where: { vendorId },
     });
-    if (!store || store.vendorId !== userId) {
-      throw new ForbiddenException('Invalid store access');
+
+    if (!store) {
+      this.logger.warn(`No store found for vendor ${vendorId}`);
+      return {
+        data: [],
+        meta: { total: 0, page, limit, pages: 0 },
+      };
     }
 
     const skip = (page - 1) * limit;
 
+    const whereClause: any = { storeId: store.id };
+
+    if (status) {
+      const statuses = status.split(',').map((s) => s.trim());
+      if (statuses.length === 1) {
+        whereClause.status = statuses[0];
+      } else {
+        whereClause.status = { in: statuses };
+      }
+    }
+
     const [data, total] = await Promise.all([
       this.prisma.order.findMany({
-        where: { storeId },
+        where: whereClause,
         orderBy: { createdAt: 'desc' },
         take: limit,
         skip,
@@ -68,7 +76,7 @@ export class VendorOrdersService {
           delivery: { select: { status: true, riderId: true } },
         },
       }),
-      this.prisma.order.count({ where: { storeId } }),
+      this.prisma.order.count({ where: whereClause }),
     ]);
 
     return {
@@ -77,7 +85,6 @@ export class VendorOrdersService {
     };
   }
 
-  // 2. ACCEPT ORDER
   async acceptOrder(userId: string, orderId: string) {
     const order = await this.validateOrderAccess(userId, orderId);
 
@@ -92,11 +99,9 @@ export class VendorOrdersService {
       data: { status: OrderStatus.CONFIRMED },
     });
 
-    this.logger.log(`Order ${orderId} ACCEPTED by vendor ${userId}`);
     return updated;
   }
 
-  // 3. DECLINE ORDER
   async declineOrder(userId: string, orderId: string, reason: string) {
     const order = await this.validateOrderAccess(userId, orderId);
 
@@ -104,9 +109,7 @@ export class VendorOrdersService {
       throw new BadRequestException('Can only decline PENDING orders');
     }
 
-    // Atomic Transaction: Cancel Order + Log Activity
     return this.prisma.$transaction(async (tx) => {
-      // A. Update Status
       const updated = await tx.order.update({
         where: { id: orderId },
         data: {
@@ -115,7 +118,6 @@ export class VendorOrdersService {
         },
       });
 
-      // B. Log Activity
       await tx.activityLog.create({
         data: {
           userId,
@@ -137,7 +139,6 @@ export class VendorOrdersService {
     });
   }
 
-  // 4. MARK READY (Triggers Rider Dispatch)
   async markReady(userId: string, orderId: string) {
     const order = await this.validateOrderAccess(userId, orderId);
 
@@ -152,13 +153,11 @@ export class VendorOrdersService {
       data: { status: OrderStatus.READY },
     });
 
-    // Notify Rider Module (Operational, not Financial)
     this.eventEmitter.emit('order.ready', {
       orderId: updated.id,
       storeId: updated.storeId,
     });
 
-    this.logger.log(`Order ${orderId} READY. Rider dispatch event emitted.`);
     return updated;
   }
 

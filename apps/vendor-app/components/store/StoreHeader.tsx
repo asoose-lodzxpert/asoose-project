@@ -20,6 +20,7 @@ export const StoreHeader: React.FC<Props> = ({
 }) => {
   const yellow = useThemeColor({}, "brandPrimary");
   const green = useThemeColor({}, "statusSuccess");
+  const borderColor = useThemeColor({}, "borderDefault");
 
   if (loading) {
     return (
@@ -29,14 +30,20 @@ export const StoreHeader: React.FC<Props> = ({
             style={{
               width: 120,
               height: 20,
-              backgroundColor: "#eee",
+              backgroundColor: borderColor,
               borderRadius: 4,
+              opacity: 0.3,
             }}
           />
           <View
             style={[
               styles.badge,
-              { backgroundColor: "#eee", width: 60, height: 20 },
+              {
+                backgroundColor: borderColor,
+                width: 60,
+                height: 20,
+                opacity: 0.3,
+              },
             ]}
           />
         </View>
@@ -44,8 +51,9 @@ export const StoreHeader: React.FC<Props> = ({
           style={{
             width: 40,
             height: 24,
-            backgroundColor: "#eee",
+            backgroundColor: borderColor,
             borderRadius: 12,
+            opacity: 0.3,
           }}
         />
       </View>

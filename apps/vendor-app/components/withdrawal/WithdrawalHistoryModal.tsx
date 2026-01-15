@@ -1,12 +1,5 @@
 import React, { useState, useEffect } from "react";
-import {
-  View,
-  StyleSheet,
-  Modal,
-  ScrollView,
-  Pressable,
-  ActivityIndicator,
-} from "react-native";
+import { View, StyleSheet, Modal, ScrollView, Pressable } from "react-native";
 import Toast from "react-native-toast-message";
 
 import { ThemedView } from "@/components/themed-view";
@@ -113,19 +106,116 @@ export function WithdrawalHistoryModal({ visible, onClose }: Props) {
       <ThemedView style={{ flex: 1 }}>
         {/* Header */}
         <View style={[styles.header, { borderBottomColor: borderColor }]}>
-          <ThemedText type="title">Withdrawal History</ThemedText>
+          <ThemedText type="subtitle">Withdrawal History</ThemedText>
           <Pressable onPress={onClose} style={styles.closeButton}>
             <IconSymbol name="xmark" size={24} color={primary} />
           </Pressable>
         </View>
 
         {loading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={primary} />
-            <ThemedText style={{ marginTop: 16 }}>
-              Loading history...
-            </ThemedText>
-          </View>
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={styles.content}
+          >
+            {[1, 2, 3, 4].map((item) => (
+              <View
+                key={item}
+                style={[
+                  styles.withdrawalCard,
+                  {
+                    backgroundColor: surfaceCard,
+                    borderColor: borderColor,
+                  },
+                ]}
+              >
+                {/* Header skeleton */}
+                <View style={styles.cardHeader}>
+                  <View
+                    style={{
+                      width: 100,
+                      height: 20,
+                      backgroundColor: borderColor,
+                      borderRadius: 4,
+                      opacity: 0.3,
+                    }}
+                  />
+                  <View
+                    style={{
+                      width: 80,
+                      height: 24,
+                      backgroundColor: borderColor,
+                      borderRadius: 12,
+                      opacity: 0.3,
+                    }}
+                  />
+                </View>
+
+                {/* Bank details skeleton */}
+                <View style={{ gap: 8, marginTop: 12 }}>
+                  <View style={styles.detailRow}>
+                    <View
+                      style={{
+                        width: 80,
+                        height: 14,
+                        backgroundColor: borderColor,
+                        borderRadius: 4,
+                        opacity: 0.3,
+                      }}
+                    />
+                    <View
+                      style={{
+                        width: 120,
+                        height: 14,
+                        backgroundColor: borderColor,
+                        borderRadius: 4,
+                        opacity: 0.3,
+                      }}
+                    />
+                  </View>
+                  <View style={styles.detailRow}>
+                    <View
+                      style={{
+                        width: 100,
+                        height: 14,
+                        backgroundColor: borderColor,
+                        borderRadius: 4,
+                        opacity: 0.3,
+                      }}
+                    />
+                    <View
+                      style={{
+                        width: 100,
+                        height: 14,
+                        backgroundColor: borderColor,
+                        borderRadius: 4,
+                        opacity: 0.3,
+                      }}
+                    />
+                  </View>
+                  <View style={styles.detailRow}>
+                    <View
+                      style={{
+                        width: 90,
+                        height: 14,
+                        backgroundColor: borderColor,
+                        borderRadius: 4,
+                        opacity: 0.3,
+                      }}
+                    />
+                    <View
+                      style={{
+                        width: 130,
+                        height: 14,
+                        backgroundColor: borderColor,
+                        borderRadius: 4,
+                        opacity: 0.3,
+                      }}
+                    />
+                  </View>
+                </View>
+              </View>
+            ))}
+          </ScrollView>
         ) : withdrawals.length === 0 ? (
           <View style={styles.emptyContainer}>
             <IconSymbol name="file-text" size={60} color={mutedText} />
@@ -292,6 +382,11 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 12,
     borderWidth: 1,
+  },
+  cardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   withdrawalHeader: {
     flexDirection: "row",

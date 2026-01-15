@@ -1,15 +1,22 @@
-import React from "react";
-import { View, Pressable, Image, StyleSheet } from "react-native";
+import React, { useState } from "react";
+import {
+  View,
+  Pressable,
+  Image,
+  StyleSheet,
+  ActivityIndicator,
+} from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import Toast from "react-native-toast-message";
 import { ThemedText } from "@/components/themed-text";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { uploadFile } from "@/services/storage.service";
 
 interface Props {
   label: string;
   value?: string;
   circular?: boolean;
-  onPick: (uri: string) => void;
+  onPick: (url: string) => void;
 }
 
 export const ImageUpload: React.FC<Props> = ({
@@ -18,6 +25,8 @@ export const ImageUpload: React.FC<Props> = ({
   circular,
   onPick,
 }) => {
+  const [uploading, setUploading] = useState(false);
+
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
@@ -38,7 +47,48 @@ export const ImageUpload: React.FC<Props> = ({
     });
 
     if (!result.canceled && result.assets.length > 0) {
-      onPick(result.assets[0].uri);
+      const asset = result.assets[0];
+
+      // Extract filename and determine mime type
+      const uriParts = asset.uri.split("/");
+      const filename = uriParts[uriParts.length - 1];
+      const fileType =
+        asset.type === "image"
+          ? `image/${filename.split(".").pop()}`
+          : "image/jpeg";
+
+      setUploading(true);
+
+      try {
+        const uploadedUrl = await uploadFile(
+          {
+            uri: asset.uri,
+            name: filename,
+            type: fileType,
+          },
+          (progress) => {
+            // console.log(`Upload progress: ${progress.percentage}%`);
+          }
+        );
+
+        onPick(uploadedUrl);
+
+        Toast.show({
+          type: "success",
+          text1: "Upload successful",
+          text2: "Image uploaded successfully.",
+        });
+      } catch (error) {
+        console.error("Upload error:", error);
+        Toast.show({
+          type: "error",
+          text1: "Upload failed",
+          text2:
+            error instanceof Error ? error.message : "Failed to upload image",
+        });
+      } finally {
+        setUploading(false);
+      }
     }
   };
 
@@ -49,6 +99,7 @@ export const ImageUpload: React.FC<Props> = ({
       <Pressable
         style={circular ? styles.circle : styles.banner}
         onPress={pickImage}
+        disabled={uploading}
       >
         {value && (
           <Image
@@ -57,9 +108,16 @@ export const ImageUpload: React.FC<Props> = ({
           />
         )}
 
-        <View style={styles.overlay}>
-          <IconSymbol name="camera.fill" size={24} color="#fff" />
-        </View>
+        {uploading ? (
+          <View style={styles.uploadingOverlay}>
+            <ActivityIndicator size="large" color="#fff" />
+            <ThemedText style={styles.uploadingText}>Uploading...</ThemedText>
+          </View>
+        ) : (
+          <View style={styles.overlay}>
+            <IconSymbol name="camera.fill" size={24} color="#fff" />
+          </View>
+        )}
       </Pressable>
     </View>
   );
@@ -100,5 +158,19 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.45)",
     justifyContent: "center",
     alignItems: "center",
+  },
+
+  uploadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.7)",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 12,
+  },
+
+  uploadingText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "600",
   },
 });

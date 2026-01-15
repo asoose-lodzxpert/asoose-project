@@ -30,6 +30,7 @@ export type IconSymbolName =
   | "trash"
   | "plus"
   | "fullscreen"
+  | "exclamationmark.triangle"
   | "send"
   | "home"
   | "restaurant"
@@ -111,6 +112,7 @@ export const MAPPING: Record<
   pencil: "edit",
   trash: "delete",
   plus: "add",
+  "exclamationmark.triangle": "warning",
 
   home: "home",
   restaurant: "restaurant",

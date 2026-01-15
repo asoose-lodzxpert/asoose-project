@@ -14,6 +14,7 @@ import {
   setupNotificationCategories,
 } from "@/services/push-notifications.service";
 import { acceptOrder, declineOrder } from "@/services/orders.service";
+import { getUnreadCount } from "@/services/notifications.service";
 import { useAuth } from "./AuthContext";
 
 type NotificationContextType = {
@@ -21,6 +22,7 @@ type NotificationContextType = {
   notification: Notifications.Notification | undefined;
   unreadCount: number;
   setUnreadCount: (count: number) => void;
+  refreshUnreadCount: () => Promise<void>;
 };
 
 const NotificationContext = createContext<NotificationContextType | null>(null);
@@ -40,6 +42,16 @@ export function NotificationProvider({
   const notificationListener = useRef<Notifications.Subscription | null>(null);
   const responseListener = useRef<Notifications.Subscription | null>(null);
 
+  // Function to refresh unread count from backend
+  const refreshUnreadCount = async () => {
+    try {
+      const { count } = await getUnreadCount();
+      setUnreadCount(count);
+    } catch (error) {
+      console.error("Failed to refresh unread count:", error);
+    }
+  };
+
   useEffect(() => {
     if (!user) return;
 
@@ -53,6 +65,9 @@ export function NotificationProvider({
         savePushToken(token);
       }
     });
+
+    // Load initial unread count
+    refreshUnreadCount();
 
     // Listen for notifications received while app is foregrounded
     notificationListener.current =
@@ -113,6 +128,7 @@ export function NotificationProvider({
         notification,
         unreadCount,
         setUnreadCount,
+        refreshUnreadCount,
       }}
     >
       {children}

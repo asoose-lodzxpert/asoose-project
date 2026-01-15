@@ -17,6 +17,7 @@ import { UserRole } from '../common/enums/user-role.enum';
 import { CreateVendorDto } from '../auth/dto/create-vendor.dto';
 import { ResetPasswordDto } from '../auth/dto/reset-password.dto';
 import { UpdateProfileDto } from '../auth/dto/update-profile.dto';
+import { LoginVendorDto } from '../auth/dto/login-vendor.dto';
 
 @Controller('auth/vendor')
 export class VendorAuthController {
@@ -24,15 +25,15 @@ export class VendorAuthController {
 
   @Post('me')
   @UseGuards(JwtAuthGuard)
+  @Roles(UserRole.VENDOR)
   async getMe(@Req() req) {
-    // Get vendor id or email from JWT token
     const { id, email } = req.user || {};
     return await this.vendorAuthService.getPublicVendorDetails(id || email);
   }
 
   @Post('login')
-  login(@Body() body) {
-    return this.vendorAuthService.loginVendor(body);
+  login(@Body() dto: LoginVendorDto) {
+    return this.vendorAuthService.loginVendor(dto);
   }
 
   @Post('register')
@@ -69,6 +70,7 @@ export class VendorAuthController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Roles(UserRole.VENDOR)
   @Get('notifications-preferences')
   async getNotificationsPreferences(@Req() req) {
     const { id } = req.user || {};
@@ -76,6 +78,7 @@ export class VendorAuthController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Roles(UserRole.VENDOR)
   @Put('notifications-preferences')
   async updateNotificationsPreferences(@Req() req, @Body() body) {
     const { id } = req.user || {};
@@ -83,6 +86,7 @@ export class VendorAuthController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Roles(UserRole.VENDOR)
   @Put('business-info')
   async updateBusinessInfo(@Req() req, @Body() body) {
     const { id } = req.user || {};
@@ -90,6 +94,7 @@ export class VendorAuthController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Roles(UserRole.VENDOR)
   @Put('business-documents')
   async updateBusinessDocuments(@Req() req, @Body() body) {
     const { id } = req.user || {};
@@ -97,6 +102,7 @@ export class VendorAuthController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Roles(UserRole.VENDOR)
   @Put('store-details')
   async updateStoreDetails(@Req() req, @Body() body) {
     const { id } = req.user || {};
@@ -104,6 +110,7 @@ export class VendorAuthController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Roles(UserRole.VENDOR)
   @Get('business-details')
   async getBusinessDetails(@Req() req) {
     const { id } = req.user || {};

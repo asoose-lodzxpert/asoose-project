@@ -15,6 +15,7 @@ type Card = { label: string; value: number | string };
 export const MetricsCards: React.FC<Props> = ({ metrics, loading }) => {
   const background = useThemeColor({}, "surfaceCard");
   const mutedText = useThemeColor({}, "textDisabled");
+  const borderColor = useThemeColor({}, "borderDefault");
 
   if (loading) {
     return (
@@ -24,11 +25,28 @@ export const MetricsCards: React.FC<Props> = ({ metrics, loading }) => {
             {[0, 1].map((colIdx) => (
               <View
                 key={colIdx}
-                style={[
-                  styles.card,
-                  { backgroundColor: "#eee", minHeight: 60 },
-                ]}
-              />
+                style={[styles.card, { backgroundColor: background }]}
+              >
+                <View
+                  style={{
+                    width: "60%",
+                    height: 24,
+                    backgroundColor: borderColor,
+                    borderRadius: 4,
+                    opacity: 0.3,
+                    marginBottom: 8,
+                  }}
+                />
+                <View
+                  style={{
+                    width: "80%",
+                    height: 16,
+                    backgroundColor: borderColor,
+                    borderRadius: 4,
+                    opacity: 0.3,
+                  }}
+                />
+              </View>
             ))}
           </View>
         ))}

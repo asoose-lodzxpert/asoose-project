@@ -24,15 +24,17 @@ export const RecentOrdersFeed: React.FC<Props> = ({
 }) => {
   const mutedText = useThemeColor({}, "textDisabled");
   const primary = useThemeColor({}, "brandPrimary");
+  const background = useThemeColor({}, "surfaceCard");
+  const borderColor = useThemeColor({}, "borderDefault");
 
-  const getTab = (status: string): "pending" | "active" | "completed" => {
+  const getTab = (status: string): "pending" | "active" | "history" => {
     switch (status) {
       case "pending":
         return "pending";
       case "accepted":
         return "active";
       default:
-        return "completed";
+        return "history";
     }
   };
 
@@ -63,12 +65,121 @@ export const RecentOrdersFeed: React.FC<Props> = ({
             <View
               key={i}
               style={{
-                height: 60,
-                backgroundColor: "#eee",
+                backgroundColor: background,
                 borderRadius: 10,
                 marginBottom: 12,
+                padding: 12,
               }}
-            />
+            >
+              {/* Profile row skeleton */}
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  marginBottom: 12,
+                }}
+              >
+                <View
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 20,
+                    backgroundColor: borderColor,
+                    opacity: 0.3,
+                  }}
+                />
+                <View style={{ marginLeft: 8, flex: 1 }}>
+                  <View
+                    style={{
+                      width: "40%",
+                      height: 16,
+                      backgroundColor: borderColor,
+                      borderRadius: 4,
+                      opacity: 0.3,
+                      marginBottom: 4,
+                    }}
+                  />
+                  <View
+                    style={{
+                      width: "30%",
+                      height: 12,
+                      backgroundColor: borderColor,
+                      borderRadius: 4,
+                      opacity: 0.3,
+                    }}
+                  />
+                </View>
+                <View
+                  style={{
+                    width: 70,
+                    height: 24,
+                    backgroundColor: borderColor,
+                    borderRadius: 12,
+                    opacity: 0.3,
+                  }}
+                />
+              </View>
+
+              {/* Items skeleton */}
+              <View style={{ marginBottom: 12 }}>
+                {[0, 1].map((idx) => (
+                  <View
+                    key={idx}
+                    style={{
+                      flexDirection: "row",
+                      justifyContent: "space-between",
+                      marginBottom: 6,
+                    }}
+                  >
+                    <View
+                      style={{
+                        width: "50%",
+                        height: 14,
+                        backgroundColor: borderColor,
+                        borderRadius: 4,
+                        opacity: 0.3,
+                      }}
+                    />
+                    <View
+                      style={{
+                        width: "20%",
+                        height: 14,
+                        backgroundColor: borderColor,
+                        borderRadius: 4,
+                        opacity: 0.3,
+                      }}
+                    />
+                  </View>
+                ))}
+              </View>
+
+              {/* Total skeleton */}
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                }}
+              >
+                <View
+                  style={{
+                    width: "20%",
+                    height: 18,
+                    backgroundColor: borderColor,
+                    borderRadius: 4,
+                    opacity: 0.3,
+                  }}
+                />
+                <View
+                  style={{
+                    width: "30%",
+                    height: 18,
+                    backgroundColor: borderColor,
+                    borderRadius: 4,
+                    opacity: 0.3,
+                  }}
+                />
+              </View>
+            </View>
           ))}
         </View>
       ) : (

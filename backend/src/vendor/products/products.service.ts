@@ -116,6 +116,7 @@ export class VendorProductsService {
       data: {
         name: dto.name,
         slug,
+        description: dto.description,
         price: dto.price,
         image: dto.image,
         stock: dto.stock ?? 0,
@@ -156,6 +157,7 @@ export class VendorProductsService {
       data: {
         name: dto.name,
         slug: newSlug,
+        description: dto.description,
         price: dto.price,
         image: dto.image,
         stock: dto.stock,

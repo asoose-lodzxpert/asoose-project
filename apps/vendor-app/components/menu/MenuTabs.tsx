@@ -42,7 +42,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 12,
+    paddingVertical: 24,
     borderBottomWidth: 2,
     borderBottomColor: "transparent",
   },

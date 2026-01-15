@@ -22,6 +22,8 @@ type CustomDropdownProps = {
   inputProps?: Partial<React.ComponentProps<typeof ThemedInput>>;
   containerStyle?: object;
   dropdownStyle?: object;
+
+  modal?: boolean;
 };
 
 export function CustomDropdown({
@@ -34,6 +36,7 @@ export function CustomDropdown({
   disabled = false,
   containerStyle,
   dropdownStyle,
+  modal = true,
 }: CustomDropdownProps) {
   const primary = useThemeColor({}, "brandPrimary");
   const muted = useThemeColor({}, "textMuted");
@@ -89,6 +92,7 @@ export function CustomDropdown({
         }}
         activeColor={border}
         disable={disabled}
+        mode={modal ? "modal" : "auto"}
       />
 
       {prompt && <ThemedText style={styles.prompt}>{prompt}</ThemedText>}

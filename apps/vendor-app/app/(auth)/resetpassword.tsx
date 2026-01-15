@@ -58,10 +58,10 @@ export default function ResetPasswordScreen() {
   };
 
   useEffect(() => {
-    if (step === 2) restoreCooldownAndSend();
+    if (step === 2) restoreCooldown();
   }, [step]);
 
-  const restoreCooldownAndSend = async () => {
+  const restoreCooldown = async () => {
     const lastSent = await AsyncStorage.getItem(LAST_SENT_KEY);
     const storedResendCount = await AsyncStorage.getItem(RESEND_COUNT_KEY);
 
@@ -73,8 +73,6 @@ export default function ResetPasswordScreen() {
       const calculatedCooldown = 30 + (count - 1) * 30 - elapsed;
       setCooldown(calculatedCooldown > 0 ? calculatedCooldown : 0);
     }
-
-    if (!lastSent) sendOtp();
   };
 
   useEffect(() => {
@@ -88,17 +86,7 @@ export default function ResetPasswordScreen() {
 
   const handleNextEmail = async () => {
     if (!email) return Toast.show({ type: "error", text1: "Enter email" });
-    setLoading(true);
-    try {
-      // Optionally check if email exists on backend
-      // Send OTP request
-      await sendOtp();
-      setStep(2);
-    } catch (err) {
-      Toast.show({ type: "error", text1: "Failed to send OTP" });
-    } finally {
-      setLoading(false);
-    }
+    setStep(2);
   };
 
   const handleNextOtp = async () => {

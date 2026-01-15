@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { nigerianBanks } from './banks-seed';
 
 const prisma = new PrismaClient();
 
@@ -16,12 +17,47 @@ async function main() {
   ];
 
   console.log('📦 Seeding system settings...');
-  
+
   for (const setting of settings) {
     await prisma.systemSetting.upsert({
       where: { key: setting.key },
-      update: {}, // Don't overwrite existing values if they already exist
+      update: {},
       create: setting,
+    });
+  }
+
+  console.log('🏦 Seeding Nigerian banks...');
+
+  for (const bank of nigerianBanks) {
+    await prisma.bank.upsert({
+      where: { code: bank.code },
+      update: { name: bank.name, isActive: true },
+      create: { name: bank.name, code: bank.code, isActive: true },
+    });
+  }
+
+  console.log('🍕 Seeding product categories...');
+
+  const categories = [
+    { name: 'Meals', slug: 'meals' },
+    { name: 'Drinks', slug: 'drinks' },
+    { name: 'Snacks', slug: 'snacks' },
+    { name: 'Desserts', slug: 'desserts' },
+    { name: 'Breakfast', slug: 'breakfast' },
+    { name: 'Lunch', slug: 'lunch' },
+    { name: 'Dinner', slug: 'dinner' },
+    { name: 'Groceries', slug: 'groceries' },
+    { name: 'Fruits', slug: 'fruits' },
+    { name: 'Vegetables', slug: 'vegetables' },
+    { name: 'Bakery', slug: 'bakery' },
+    { name: 'Dairy', slug: 'dairy' },
+  ];
+
+  for (const category of categories) {
+    await prisma.category.upsert({
+      where: { slug: category.slug },
+      update: { name: category.name },
+      create: category,
     });
   }
 

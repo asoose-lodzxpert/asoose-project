@@ -45,7 +45,7 @@ export default function TermsScreen() {
           <ThemedText style={{ color: linkColor }}>Back</ThemedText>
         </Pressable>
 
-        <ThemedText type="title">Terms of Service</ThemedText>
+        <ThemedText type="subtitle">Terms of Service</ThemedText>
 
         <Pressable
           onPress={handleShare}

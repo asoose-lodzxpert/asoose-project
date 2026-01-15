@@ -21,10 +21,8 @@ import { useThemeColor } from "@/hooks/use-theme-color";
 import {
   BUSINESS_TYPES,
   EMPLOYEE_RANGES,
-  COUNTRY_CODES,
   BusinessType,
   EmployeeRange,
-  CountryCode,
 } from "@/config/signup";
 import { SignupStep1Data } from "@/types/signup";
 import { IconSymbol } from "@/components/ui/icon-symbol.ios";
@@ -38,6 +36,8 @@ import { IconSymbol } from "@/components/ui/icon-symbol.ios";
 export default function EditBusinessInfoScreen() {
   const router = useRouter();
   const brandPrimary = useThemeColor({}, "brandPrimary");
+  const borderColor = useThemeColor({}, "borderDefault");
+  const surfaceCard = useThemeColor({}, "surfaceCard");
 
   const scrollRef = useRef<ScrollView>(null);
 
@@ -85,11 +85,8 @@ export default function EditBusinessInfoScreen() {
     if (!data) return;
     setSaving(true);
     try {
+      // Only send editable fields (business type and employees)
       await updateBusinessInfo({
-        businessName: data.businessName,
-        businessEmail: data.businessEmail,
-        countryCode: data.countryCode,
-        phoneNumber: data.phoneNumber,
         businessType: data.businessType,
         employees: data.employees,
       });
@@ -104,9 +101,82 @@ export default function EditBusinessInfoScreen() {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-        <ThemedText type="subtitle">Loading business info...</ThemedText>
-      </View>
+      <ThemedView style={{ flex: 1 }}>
+        {/* Header Skeleton */}
+        <View style={styles.header}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            <View
+              style={{
+                width: 24,
+                height: 24,
+                borderRadius: 12,
+                backgroundColor: borderColor,
+                opacity: 0.3,
+              }}
+            />
+            <View
+              style={{
+                width: 60,
+                height: 20,
+                borderRadius: 4,
+                backgroundColor: borderColor,
+                opacity: 0.3,
+              }}
+            />
+          </View>
+        </View>
+
+        <ScrollView
+          contentContainerStyle={styles.container}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Title Skeleton */}
+          <View
+            style={{
+              width: 200,
+              height: 24,
+              borderRadius: 4,
+              backgroundColor: borderColor,
+              opacity: 0.3,
+            }}
+          />
+
+          {/* Form Fields Skeleton */}
+          {[1, 2, 3, 4, 5].map((i) => (
+            <View key={i} style={styles.field}>
+              <View
+                style={{
+                  width: 120,
+                  height: 18,
+                  borderRadius: 4,
+                  backgroundColor: borderColor,
+                  opacity: 0.3,
+                  marginBottom: 6,
+                }}
+              />
+              <View
+                style={{
+                  height: 50,
+                  borderRadius: 12,
+                  backgroundColor: borderColor,
+                  opacity: 0.3,
+                }}
+              />
+            </View>
+          ))}
+
+          {/* Save Button Skeleton */}
+          <View
+            style={{
+              marginTop: 24,
+              height: 50,
+              borderRadius: 14,
+              backgroundColor: borderColor,
+              opacity: 0.3,
+            }}
+          />
+        </ScrollView>
+      </ThemedView>
     );
   }
 
@@ -138,51 +208,57 @@ export default function EditBusinessInfoScreen() {
         >
           <ThemedText type="subtitle">Update your business details</ThemedText>
 
-          {/* Business Name */}
+          {/* Business Name - NON-EDITABLE */}
           <View style={styles.field}>
             <ThemedText type="defaultSemiBold">Business name</ThemedText>
             <ThemedInput
               placeholder="Registered business name"
               value={data?.businessName}
-              onChangeText={(v) => onChange("businessName", v)}
+              editable={false}
+              style={{ opacity: 0.6 }}
             />
+            <ThemedText style={{ fontSize: 11, opacity: 0.6 }}>
+              Contact support to change your business name
+            </ThemedText>
           </View>
 
-          {/* Business Email */}
+          {/* Business Email - NON-EDITABLE */}
           <View style={styles.field}>
             <ThemedText type="defaultSemiBold">Business email</ThemedText>
             <ThemedInput
               placeholder="Business contact email"
               value={data?.businessEmail}
-              onChangeText={(v) => onChange("businessEmail", v)}
               keyboardType="email-address"
+              editable={false}
+              style={{ opacity: 0.6 }}
             />
+            <ThemedText style={{ fontSize: 11, opacity: 0.6 }}>
+              Contact support to change your business email
+            </ThemedText>
           </View>
 
-          {/* Phone Number */}
+          {/* Phone Number - NON-EDITABLE */}
           <View style={styles.field}>
             <ThemedText type="defaultSemiBold">
               Business phone number
             </ThemedText>
             <View style={styles.row}>
-              <CustomDropdown
-                data={COUNTRY_CODES.map((code) => ({
-                  label: code,
-                  value: code,
-                }))}
-                value={data?.countryCode || null}
-                onChange={(v) => onChange("countryCode", v as CountryCode)}
-                placeholder="Code"
-                containerStyle={{ flex: 1 }}
+              <ThemedInput
+                value={data?.countryCode}
+                editable={false}
+                containerStyle={{ flex: 2, opacity: 0.6 }}
               />
               <ThemedInput
                 placeholder="Phone number"
                 value={data?.phoneNumber}
-                onChangeText={(v) => onChange("phoneNumber", v)}
                 keyboardType="phone-pad"
-                style={{ flex: 2 }}
+                editable={false}
+                containerStyle={{ flex: 4, opacity: 0.6 }}
               />
             </View>
+            <ThemedText style={{ fontSize: 11, opacity: 0.6 }}>
+              Contact support to change your phone number
+            </ThemedText>
           </View>
 
           {/* Business Type */}

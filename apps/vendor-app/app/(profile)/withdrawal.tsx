@@ -125,9 +125,181 @@ export default function WithdrawalScreen() {
 
   if (initialLoading) {
     return (
-      <ThemedView style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={primary} />
-        <ThemedText style={{ marginTop: 16 }}>Loading...</ThemedText>
+      <ThemedView style={{ flex: 1 }}>
+        {/* Header Skeleton */}
+        <View style={[styles.header, { borderBottomColor: borderColor }]}>
+          <View style={styles.backButton}>
+            <View
+              style={{
+                width: 24,
+                height: 24,
+                backgroundColor: borderColor,
+                borderRadius: 12,
+                opacity: 0.3,
+              }}
+            />
+            <View
+              style={{
+                width: 50,
+                height: 20,
+                backgroundColor: borderColor,
+                borderRadius: 4,
+                opacity: 0.3,
+              }}
+            />
+          </View>
+          <View
+            style={{
+              width: 120,
+              height: 24,
+              backgroundColor: borderColor,
+              borderRadius: 4,
+              opacity: 0.3,
+            }}
+          />
+          <View
+            style={{
+              width: 24,
+              height: 24,
+              backgroundColor: borderColor,
+              borderRadius: 12,
+              opacity: 0.3,
+            }}
+          />
+        </View>
+
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.content}>
+          {/* Balance Card Skeleton */}
+          <View style={[styles.balanceCard, { backgroundColor: surfaceCard }]}>
+            <View
+              style={{
+                width: 120,
+                height: 16,
+                backgroundColor: borderColor,
+                borderRadius: 4,
+                opacity: 0.3,
+                marginBottom: 12,
+              }}
+            />
+            <View
+              style={{
+                width: 150,
+                height: 36,
+                backgroundColor: borderColor,
+                borderRadius: 6,
+                opacity: 0.3,
+              }}
+            />
+          </View>
+
+          {/* Amount Input Skeleton */}
+          <View style={styles.section}>
+            <View
+              style={{
+                width: 150,
+                height: 20,
+                backgroundColor: borderColor,
+                borderRadius: 4,
+                opacity: 0.3,
+                marginBottom: 12,
+              }}
+            />
+            <View
+              style={[
+                styles.inputContainer,
+                {
+                  backgroundColor: surfaceCard,
+                  borderColor: borderColor,
+                },
+              ]}
+            >
+              <View
+                style={{
+                  flex: 1,
+                  height: 24,
+                  backgroundColor: borderColor,
+                  borderRadius: 4,
+                  opacity: 0.3,
+                }}
+              />
+            </View>
+          </View>
+
+          {/* Bank Account Skeleton */}
+          <View style={styles.section}>
+            <View
+              style={{
+                width: 100,
+                height: 20,
+                backgroundColor: borderColor,
+                borderRadius: 4,
+                opacity: 0.3,
+                marginBottom: 12,
+              }}
+            />
+            {[1, 2].map((item) => (
+              <View
+                key={item}
+                style={[
+                  styles.bankCard,
+                  {
+                    backgroundColor: surfaceCard,
+                    borderColor: borderColor,
+                    marginBottom: 12,
+                  },
+                ]}
+              >
+                <View style={styles.bankCardLeft}>
+                  <View
+                    style={[
+                      styles.bankIcon,
+                      { backgroundColor: borderColor, opacity: 0.3 },
+                    ]}
+                  />
+                  <View style={{ flex: 1, gap: 6 }}>
+                    <View
+                      style={{
+                        width: "60%",
+                        height: 16,
+                        backgroundColor: borderColor,
+                        borderRadius: 4,
+                        opacity: 0.3,
+                      }}
+                    />
+                    <View
+                      style={{
+                        width: "40%",
+                        height: 14,
+                        backgroundColor: borderColor,
+                        borderRadius: 4,
+                        opacity: 0.3,
+                      }}
+                    />
+                    <View
+                      style={{
+                        width: "50%",
+                        height: 14,
+                        backgroundColor: borderColor,
+                        borderRadius: 4,
+                        opacity: 0.3,
+                      }}
+                    />
+                  </View>
+                </View>
+              </View>
+            ))}
+          </View>
+        </ScrollView>
+
+        {/* Footer Skeleton */}
+        <View style={[styles.footer, { borderTopColor: borderColor }]}>
+          <View
+            style={[
+              styles.withdrawButton,
+              { backgroundColor: borderColor, opacity: 0.3 },
+            ]}
+          />
+        </View>
       </ThemedView>
     );
   }
@@ -140,7 +312,7 @@ export default function WithdrawalScreen() {
           <IconSymbol name="chevron.left" size={24} color={primary} />
           <ThemedText type="defaultSemiBold">Back</ThemedText>
         </Pressable>
-        <ThemedText type="title">Withdraw Funds</ThemedText>
+        <ThemedText type="subtitle">Withdraw Funds</ThemedText>
         <Pressable
           onPress={() => setShowHistory(true)}
           style={styles.historyButton}

@@ -5,6 +5,7 @@ import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { BullModule } from '@nestjs/bullmq';
+import { CacheModule } from '@nestjs/cache-manager';
 
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -14,6 +15,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { RedisModule } from './redis/redis.module';
 import { SuperAdminModule } from './super-admin/super-admin.module';
 import { VendorModule } from './vendor/vendor.module';
+import { RidersModule } from './riders/riders.module';
 import { MarketplaceModule } from './marketplace/marketplace.module';
 import { CartModule } from './cart/cart.module';
 import { UsersModule } from './users/users.module';
@@ -29,6 +31,13 @@ import { PaymentModule } from './payment/payment.module';
   imports: [
     // ---------- Global Config ----------
     ConfigModule.forRoot({ isGlobal: true }),
+
+    // ---------- Caching ----------
+    CacheModule.register({
+      isGlobal: true,
+      ttl: 60, // Default TTL in seconds (1 minute)
+      max: 100, // Maximum number of items in cache
+    }),
 
     // ---------- Rate Limiting ----------
     ThrottlerModule.forRoot(),
@@ -59,6 +68,7 @@ import { PaymentModule } from './payment/payment.module';
     RedisModule,
     SuperAdminModule,
     VendorModule,
+    RidersModule,
     MarketplaceModule,
     CartModule,
     UsersModule,

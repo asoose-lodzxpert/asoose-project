@@ -40,7 +40,6 @@ export interface OrdersResponse {
 }
 
 export async function fetchOrders(
-  storeId: string,
   status: "pending" | "active" | "history",
   page: number = 1
 ): Promise<OrdersResponse> {
@@ -51,7 +50,7 @@ export async function fetchOrders(
   };
 
   return await fetchWithAuth(
-    `${process.env.EXPO_PUBLIC_API_URL}/vendor/orders?storeId=${storeId}&status=${statusMap[status]}&page=${page}&limit=20`
+    `${process.env.EXPO_PUBLIC_API_URL}/vendor/orders?status=${statusMap[status]}&page=${page}&limit=20`
   );
 }
 

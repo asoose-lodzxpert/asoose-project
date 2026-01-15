@@ -17,7 +17,11 @@ export async function login(identifier: string, password: string) {
       `${process.env.EXPO_PUBLIC_API_URL}/auth/vendor/login`,
       {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          // Add ngrok bypass header for development
+          "ngrok-skip-browser-warning": "true",
+        },
         body: JSON.stringify({ email: identifier, password }),
       }
     );
@@ -69,7 +73,11 @@ export async function refreshAccessToken() {
     `${process.env.EXPO_PUBLIC_API_URL}/auth/vendor/refresh`,
     {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        // Add ngrok bypass header for development
+        "ngrok-skip-browser-warning": "true",
+      },
       body: JSON.stringify({ refreshToken }),
     }
   );

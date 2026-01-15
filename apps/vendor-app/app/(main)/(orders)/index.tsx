@@ -47,25 +47,40 @@ export default function OrderScreen() {
   const [showDeclineModal, setShowDeclineModal] = useState(false);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
 
+  // Track if component is mounted to prevent state updates after unmount
+  const isMountedRef = React.useRef(true);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
   const loadOrders = async (pageNum: number, isRefresh = false) => {
     if (!user?.storeId) {
-      setLoading(false);
-      Toast.show({
-        type: "error",
-        text1: "No store found",
-        text2: "Please complete your store setup",
-      });
+      if (isMountedRef.current) {
+        setLoading(false);
+        Toast.show({
+          type: "error",
+          text1: "No store found",
+          text2: "Please complete your store setup",
+        });
+      }
       return;
     }
 
     try {
       if (pageNum === 1 && !isRefresh) {
-        setLoading(true);
+        if (isMountedRef.current) setLoading(true);
       } else if (pageNum > 1) {
-        setLoadingMore(true);
+        if (isMountedRef.current) setLoadingMore(true);
       }
 
-      const response = await fetchOrders(user.storeId, tab, pageNum);
+      const response = await fetchOrders(tab, pageNum);
+
+      if (!isMountedRef.current) return;
 
       if (isRefresh || pageNum === 1) {
         setOrders(response.data);
@@ -76,36 +91,61 @@ export default function OrderScreen() {
       setHasMore(pageNum < response.meta.pages);
       setPage(pageNum);
     } catch (error: any) {
-      Toast.show({
-        type: "error",
-        text1: error.message || "Failed to load orders",
-      });
+      if (isMountedRef.current) {
+        Toast.show({
+          type: "error",
+          text1: error.message || "Failed to load orders",
+        });
+      }
     } finally {
-      setLoading(false);
-      setLoadingMore(false);
-      setRefreshing(false);
+      if (isMountedRef.current) {
+        setLoading(false);
+        setLoadingMore(false);
+        setRefreshing(false);
+      }
     }
   };
 
   // Load orders when tab changes or screen focuses
   useFocusEffect(
     useCallback(() => {
-      setPage(1);
-      setHasMore(true);
-      loadOrders(1);
-    }, [tab])
+      let mounted = true;
+
+      const load = async () => {
+        if (mounted) {
+          setPage(1);
+          setHasMore(true);
+          await loadOrders(1);
+        }
+      };
+
+      load();
+
+      // Cleanup function to prevent state updates after unmount
+      return () => {
+        mounted = false;
+      };
+    }, [tab, user?.storeId])
   );
 
   // Auto-refresh every 30 seconds for pending and active tabs
   useEffect(() => {
     if (tab === "history") return;
 
+    let mounted = true;
+
     const interval = setInterval(() => {
-      loadOrders(1, true);
+      if (mounted) {
+        loadOrders(1, true);
+      }
     }, 30000); // 30 seconds
 
-    return () => clearInterval(interval);
-  }, [tab]);
+    // Cleanup: clear interval when component unmounts or tab changes
+    return () => {
+      mounted = false;
+      clearInterval(interval);
+    };
+  }, [tab, user?.storeId]);
 
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
@@ -121,9 +161,11 @@ export default function OrderScreen() {
   };
 
   const handleAccept = async (orderId: string) => {
-    setAcceptingId(orderId);
+    if (isMountedRef.current) setAcceptingId(orderId);
     try {
       await acceptOrder(orderId);
+
+      if (!isMountedRef.current) return;
 
       Toast.show({
         type: "success",
@@ -134,12 +176,14 @@ export default function OrderScreen() {
       // Remove from pending list or refresh
       setOrders((prev) => prev.filter((o) => o.id !== orderId));
     } catch (error: any) {
-      Toast.show({
-        type: "error",
-        text1: error.message || "Failed to accept order",
-      });
+      if (isMountedRef.current) {
+        Toast.show({
+          type: "error",
+          text1: error.message || "Failed to accept order",
+        });
+      }
     } finally {
-      setAcceptingId(null);
+      if (isMountedRef.current) setAcceptingId(null);
     }
   };
 
@@ -151,9 +195,11 @@ export default function OrderScreen() {
   const handleDeclineConfirm = async (reason: string) => {
     if (!selectedOrderId) return;
 
-    setDecliningId(selectedOrderId);
+    if (isMountedRef.current) setDecliningId(selectedOrderId);
     try {
       await declineOrder(selectedOrderId, reason);
+
+      if (!isMountedRef.current) return;
 
       Toast.show({
         type: "success",
@@ -164,20 +210,26 @@ export default function OrderScreen() {
       setShowDeclineModal(false);
       setOrders((prev) => prev.filter((o) => o.id !== selectedOrderId));
     } catch (error: any) {
-      Toast.show({
-        type: "error",
-        text1: error.message || "Failed to decline order",
-      });
+      if (isMountedRef.current) {
+        Toast.show({
+          type: "error",
+          text1: error.message || "Failed to decline order",
+        });
+      }
     } finally {
-      setDecliningId(null);
-      setSelectedOrderId(null);
+      if (isMountedRef.current) {
+        setDecliningId(null);
+        setSelectedOrderId(null);
+      }
     }
   };
 
   const handlePrepare = async (orderId: string) => {
-    setPreparingId(orderId);
+    if (isMountedRef.current) setPreparingId(orderId);
     try {
       await markAsPreparing(orderId);
+
+      if (!isMountedRef.current) return;
 
       Toast.show({
         type: "success",
@@ -192,12 +244,14 @@ export default function OrderScreen() {
         )
       );
     } catch (error: any) {
-      Toast.show({
-        type: "error",
-        text1: error.message || "Failed to update order",
-      });
+      if (isMountedRef.current) {
+        Toast.show({
+          type: "error",
+          text1: error.message || "Failed to update order",
+        });
+      }
     } finally {
-      setPreparingId(null);
+      if (isMountedRef.current) setPreparingId(null);
     }
   };
 
@@ -228,6 +282,9 @@ export default function OrderScreen() {
     );
   };
 
+  const borderColor = useThemeColor({}, "borderDefault");
+  const background = useThemeColor({}, "surfaceCard");
+
   return (
     <ThemedView style={{ flex: 1 }}>
       <OrderTabs active={tab} onChange={setTab} />
@@ -237,9 +294,152 @@ export default function OrderScreen() {
       </View>
 
       {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={primary} />
-          <ThemedText style={{ marginTop: 16 }}>Loading orders...</ThemedText>
+        <View style={{ paddingHorizontal: 16 }}>
+          {[...Array(4)].map((_, i) => (
+            <View
+              key={i}
+              style={{
+                backgroundColor: background,
+                borderRadius: 10,
+                marginBottom: 12,
+                padding: 12,
+              }}
+            >
+              {/* Profile row skeleton */}
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  marginBottom: 12,
+                }}
+              >
+                <View
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 20,
+                    backgroundColor: borderColor,
+                    opacity: 0.3,
+                  }}
+                />
+                <View style={{ marginLeft: 8, flex: 1 }}>
+                  <View
+                    style={{
+                      width: "40%",
+                      height: 16,
+                      backgroundColor: borderColor,
+                      borderRadius: 4,
+                      opacity: 0.3,
+                      marginBottom: 4,
+                    }}
+                  />
+                  <View
+                    style={{
+                      width: "30%",
+                      height: 12,
+                      backgroundColor: borderColor,
+                      borderRadius: 4,
+                      opacity: 0.3,
+                    }}
+                  />
+                </View>
+                <View
+                  style={{
+                    width: 70,
+                    height: 24,
+                    backgroundColor: borderColor,
+                    borderRadius: 12,
+                    opacity: 0.3,
+                  }}
+                />
+              </View>
+
+              {/* Items skeleton */}
+              <View style={{ marginBottom: 12 }}>
+                {[0, 1].map((idx) => (
+                  <View
+                    key={idx}
+                    style={{
+                      flexDirection: "row",
+                      justifyContent: "space-between",
+                      marginBottom: 6,
+                    }}
+                  >
+                    <View
+                      style={{
+                        width: "50%",
+                        height: 14,
+                        backgroundColor: borderColor,
+                        borderRadius: 4,
+                        opacity: 0.3,
+                      }}
+                    />
+                    <View
+                      style={{
+                        width: "20%",
+                        height: 14,
+                        backgroundColor: borderColor,
+                        borderRadius: 4,
+                        opacity: 0.3,
+                      }}
+                    />
+                  </View>
+                ))}
+              </View>
+
+              {/* Total skeleton */}
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  marginBottom: 12,
+                }}
+              >
+                <View
+                  style={{
+                    width: "20%",
+                    height: 18,
+                    backgroundColor: borderColor,
+                    borderRadius: 4,
+                    opacity: 0.3,
+                  }}
+                />
+                <View
+                  style={{
+                    width: "30%",
+                    height: 18,
+                    backgroundColor: borderColor,
+                    borderRadius: 4,
+                    opacity: 0.3,
+                  }}
+                />
+              </View>
+
+              {/* Action buttons skeleton (for pending tab) */}
+              {tab === "pending" && (
+                <View style={{ flexDirection: "row", gap: 8 }}>
+                  <View
+                    style={{
+                      flex: 1,
+                      height: 40,
+                      backgroundColor: borderColor,
+                      borderRadius: 8,
+                      opacity: 0.3,
+                    }}
+                  />
+                  <View
+                    style={{
+                      flex: 1,
+                      height: 40,
+                      backgroundColor: borderColor,
+                      borderRadius: 8,
+                      opacity: 0.3,
+                    }}
+                  />
+                </View>
+              )}
+            </View>
+          ))}
         </View>
       ) : (
         <FlatList

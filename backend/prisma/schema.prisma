@@ -223,18 +223,26 @@ model UserDocument {
 
 model Notification {
   id        String   @id @default(uuid())
-  userId    String
+  userId    String?
+  vendorId  String?
+  riderId   String?
   title     String
   message   String
-  type      String   // e.g., ORDER_CREATED, ORDER_UPDATE
+  type      String   // e.g., ORDER, PAYOUT, SYSTEM
+  category  String?  // e.g., ORDER_CREATED, ORDER_UPDATE, PAYOUT_PROCESSED
   isRead    Boolean  @default(false)
   metadata  Json?    // Store orderId, storeId, etc.
   createdAt DateTime @default(now())
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vendor Vendor? @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  rider  Rider?  @relation(fields: [riderId], references: [id], onDelete: Cascade)
 
   @@index([userId, isRead])
+  @@index([vendorId, isRead])
+  @@index([riderId, isRead])
   @@index([createdAt(sort: Desc)])
+  @@index([type])
 }
 
 model Address {
@@ -293,9 +301,10 @@ model Rider {
   bankAccount              BankAccount?
   vehicle                  Vehicle?
   documents                RiderDocument[]
-  rides                    Ride[]     @relation("RideRider")
-  deliveries               Delivery[] @relation("DeliveryRider")
-  notificationsPreferences Json?      // Stores notification preferences
+  rides                    Ride[]         @relation("RideRider")
+  deliveries               Delivery[]     @relation("DeliveryRider")
+  notifications            Notification[]
+  notificationsPreferences Json? // Stores notification preferences
 
   @@index([email])
   @@index([status])
@@ -373,25 +382,24 @@ model VehicleDocument {
 //// =====================
 
 model Vendor {
-  id        String   @id @default(uuid())
-  name      String
-  email     String   @unique
+  id             String     @id @default(uuid())
+  name           String
+  email          String     @unique
   countryCode    String
-  phone     String
+  phone          String
   businessType   String
   employees      String
   password       String
-  businessRegCert String?
-  taxIdDoc        String?
-  proofOfAddress  String?
-  image           String?
-  status          UserStatus @default(PENDING)
-  expoPushToken   String? // Expo push notification token
-  fcmToken        String? // Firebase Cloud Messaging token
-  createdAt       DateTime   @default(now())
-  updatedAt       DateTime   @updatedAt
+  image          String?
+  status         UserStatus @default(PENDING)
+  expoPushToken  String?    // Expo push notification token
+  fcmToken       String?    // Firebase Cloud Messaging token
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
 
-    store     Store?
+  store                    Store?
+  documents                VendorDocument[]
+  notifications            Notification[]
   notificationsPreferences Json? // Stores notification preferences for the vendor
 }
 
@@ -431,7 +439,6 @@ description String @default("No description provided")
   orders           Order[]
   reviews          Review[]
   vendorPayouts    VendorPayout[]
-  vendorDocuments  VendorDocument[]
   openingHours     OpeningHour[]
   bankAccount      BankAccount?
   storeLogs        StoreLog[]
@@ -472,6 +479,7 @@ model BankAccount {
   rider          Rider?        @relation(fields: [riderId], references: [id], onDelete: Cascade)
 
   bankName       String
+  bankCode       String        // Bank code for NUBAN verification
   accountNumber  String
   accountName    String
   currency       String        @default("NGN")
@@ -484,20 +492,22 @@ model BankAccount {
   updatedAt      DateTime      @updatedAt
 
   @@index([accountNumber])
+  @@index([bankCode])
 }
 
 model VendorDocument {
   id           String             @id @default(uuid())
-  storeId      String
-  name         String
+  vendorId     String
+  name         String             // e.g., "businessRegCert", "taxIdDoc", "proofOfAddress"
   fileName     String
   url          String
   status       VerificationStatus @default(PENDING)
   uploadedDate DateTime           @default(now())
 
-  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
 
-  @@index([storeId, status])
+  @@index([vendorId, status])
+  @@index([vendorId, name])
 }
 
 model VendorPayout {
@@ -539,6 +549,7 @@ model StoreLog {
 
 model Category {
   id        String   @id @default(uuid())
+  slug      String   @unique
   name      String   @unique
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -549,20 +560,21 @@ model Category {
 }
 
 model Product {
-  id         String        @id @default(uuid())
-  name       String
-  slug       String        @unique
-  price      Float
-  image      String?
-  images     String[]      @default([])
-  status     ProductStatus @default(ACTIVE)
-  storeId    String
-  stock       Int      @default(0)
-  categoryId String
-  inventory  Int?
-  salesCount Int           @default(0)
-  createdAt  DateTime      @default(now())
-  updatedAt  DateTime      @updatedAt
+  id          String        @id @default(uuid())
+  name        String
+  slug        String        @unique
+  description String?
+  price       Float
+  image       String?
+  images      String[]      @default([])
+  status      ProductStatus @default(ACTIVE)
+  storeId     String
+  stock       Int           @default(0)
+  categoryId  String
+  inventory   Int?
+  salesCount  Int           @default(0)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
 
   store          Store           @relation(fields: [storeId], references: [id], onDelete: Cascade)
   category       Category        @relation(fields: [categoryId], references: [id], onDelete: Restrict)
@@ -960,4 +972,15 @@ model Banner {
   isActive    Boolean  @default(true)
   priority    Int      @default(0)
   createdAt   DateTime @default(now())
+}
+
+model Bank {
+  id        String   @id @default(uuid())
+  name      String   @unique // e.g., "Access Bank"
+  code      String   @unique // e.g., "044"
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  
+  @@index([code])
+  @@index([name])
 }
