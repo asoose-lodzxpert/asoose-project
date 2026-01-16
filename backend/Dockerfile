@@ -14,11 +14,11 @@ RUN yarn install --frozen-lockfile
 # Copy backend source code
 COPY backend ./backend
 
-# Generate Prisma client
-RUN cd backend && npx prisma generate
+# Generate Prisma client (use yarn workspace to ensure correct path)
+RUN yarn workspace backend prisma generate
 
 # Build the NestJS backend
-RUN cd backend && yarn build
+RUN yarn workspace backend build
 
 # ---- Runtime Stage ----
 FROM node:20-slim
