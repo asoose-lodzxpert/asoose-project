@@ -375,4 +375,73 @@ export class VendorService {
       status: 'PENDING',
     };
   }
+
+  async requestAccountDeletion(
+    vendorId: string,
+    data: { reasons: string[]; additionalInfo?: string },
+  ) {
+    // Check if vendor exists
+    const vendor = await this.prisma.vendor.findUnique({
+      where: { id: vendorId },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        deletionStatus: true,
+      },
+    });
+
+    if (!vendor) {
+      throw new Error('Vendor not found');
+    }
+
+    if (vendor.deletionStatus === 'PENDING') {
+      throw new Error('Account deletion request already pending');
+    }
+
+    if (vendor.deletionStatus === 'APPROVED') {
+      throw new Error('Account is already scheduled for deletion');
+    }
+
+    // Update vendor with deletion request
+    await this.prisma.vendor.update({
+      where: { id: vendorId },
+      data: {
+        deletionStatus: 'PENDING',
+        deletionRequestedAt: new Date(),
+        deletionReasons: data.reasons,
+        deletionAdditionalInfo: data.additionalInfo,
+      },
+    });
+
+    // TODO: Send notification to admin team about deletion request
+    // TODO: Send email to vendor confirming deletion request
+
+    return {
+      message:
+        'Account deletion request submitted. You will be notified once admin reviews your request.',
+      status: 'PENDING',
+    };
+  }
+
+  async getAccountDeletionStatus(vendorId: string) {
+    const vendor = await this.prisma.vendor.findUnique({
+      where: { id: vendorId },
+      select: {
+        deletionStatus: true,
+        deletionRequestedAt: true,
+        deletionReasons: true,
+      },
+    });
+
+    if (!vendor) {
+      throw new Error('Vendor not found');
+    }
+
+    return {
+      isPendingDeletion: vendor.deletionStatus === 'PENDING',
+      deletionRequestedAt: vendor.deletionRequestedAt,
+      reasons: vendor.deletionReasons,
+    };
+  }
 }

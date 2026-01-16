@@ -186,4 +186,19 @@ export class VendorController {
   ) {
     return this.vendorService.createWithdrawal(req.user.id, body);
   }
+
+  @Post('account/deletion-request')
+  @Roles(UserRole.VENDOR)
+  requestAccountDeletion(
+    @Req() req,
+    @Body() body: { reasons: string[]; additionalInfo?: string },
+  ) {
+    return this.vendorService.requestAccountDeletion(req.user.id, body);
+  }
+
+  @Get('account/deletion-status')
+  @Roles(UserRole.VENDOR)
+  getAccountDeletionStatus(@Req() req) {
+    return this.vendorService.getAccountDeletionStatus(req.user.id);
+  }
 }
