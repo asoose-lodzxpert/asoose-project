@@ -15,10 +15,7 @@
         "ITSAppUsesNonExemptEncryption": false
       }
     },
-    "platforms": [
-      "ios",
-      "android"
-    ],
+    "platforms": ["ios", "android"],
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
@@ -27,11 +24,7 @@
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.asoose.vendor.app",
-      "permissions": [
-        "INTERNET",
-        "ACCESS_FINE_LOCATION",
-        "POST_NOTIFICATIONS"
-      ],
+      "permissions": ["INTERNET", "ACCESS_FINE_LOCATION", "POST_NOTIFICATIONS"],
       "blockedPermissions": [
         "CAMERA",
         "RECORD_AUDIO",
@@ -58,7 +51,7 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "ASOOSE Vendor App needs access to your photo library to upload product images, store logos, and business verification documents."
+          "photosPermission": "ASOOSE Vendor App needs access to your photo library to upload product images, store logos, and business verification documents for your multi-marketplace store."
         }
       ],
       [

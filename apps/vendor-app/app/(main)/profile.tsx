@@ -33,7 +33,8 @@ type AllowedRoute =
   | "/(profile)/notifications"
   | "/(profile)/support"
   | "/(profile)/terms"
-  | "/(profile)/privacy";
+  | "/(profile)/privacy"
+  | "/(profile)/delete-account";
 
 interface SettingItem {
   label: string;
@@ -47,6 +48,7 @@ const SETTINGS: SettingItem[] = [
   { label: "Support and help", route: "/(profile)/support" },
   { label: "Terms of service", route: "/(profile)/terms" },
   { label: "Privacy policy", route: "/(profile)/privacy" },
+  { label: "Delete account", route: "/(profile)/delete-account" },
 ];
 
 const INITIAL_PROFILE: ProfileData & { balance: number } = {

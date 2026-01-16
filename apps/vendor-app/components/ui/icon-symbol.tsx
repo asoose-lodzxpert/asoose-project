@@ -19,11 +19,13 @@ export type IconSymbolName =
   | "cloud.upload"
   | "camera.fill"
   | "check"
+  | "checkmark"
   | "circle.fill"
   | "map.marker"
   | "location.fill"
   | "arrow.up.left.and.arrow.down.right"
   | "xmark"
+  | "xmark.circle"
   | "map.fill"
   | "lock.fill"
   | "pencil"
@@ -31,6 +33,10 @@ export type IconSymbolName =
   | "plus"
   | "fullscreen"
   | "exclamationmark.triangle"
+  | "exclamationmark.triangle.fill"
+  | "clock"
+  | "shield.checkmark"
+  | "checkmark.circle.fill"
   | "send"
   | "home"
   | "restaurant"
@@ -96,6 +102,7 @@ export const MAPPING: Record<
   "camera.fill": "photo-camera",
 
   check: "check",
+  checkmark: "check",
   "circle.fill": "circle",
 
   "map.marker": "place",
@@ -106,6 +113,7 @@ export const MAPPING: Record<
   fullscreen: "fullscreen",
 
   xmark: "close",
+  "xmark.circle": "cancel",
 
   "lock.fill": "lock",
 
@@ -113,6 +121,10 @@ export const MAPPING: Record<
   trash: "delete",
   plus: "add",
   "exclamationmark.triangle": "warning",
+  "exclamationmark.triangle.fill": "warning",
+  clock: "schedule",
+  "shield.checkmark": "verified-user",
+  "checkmark.circle.fill": "check-circle",
 
   home: "home",
   restaurant: "restaurant",

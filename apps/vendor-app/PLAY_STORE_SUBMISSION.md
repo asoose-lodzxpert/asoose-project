@@ -1,9 +1,11 @@
 # Google Play Store Submission Guide
+
 ## ASOOSE Vendor App - Complete Deployment Checklist
 
 **Date:** January 16, 2026  
 **App Version:** 1.0.0  
-**Package Name:** com.asoose.vendor.app
+**Package Name:** com.asoose.vendor.app  
+**App Type:** Multi-Marketplace Vendor Platform
 
 ---
 
@@ -25,26 +27,29 @@
 Based on app functionality analysis, the following permissions are **REQUIRED**:
 
 #### 1. **INTERNET** (Automatic)
+
 - **Purpose:** Communication with backend API
 - **User Visible:** No
 - **Required for:** Login, orders, products, notifications, payments
 - **Justification:** Essential for all app functionality
 
 #### 2. **READ_MEDIA_IMAGES** (Android 13+) / **READ_EXTERNAL_STORAGE** (Android 12 and below)
+
 - **Purpose:** Selecting product images, store logo, banner, and verification documents
 - **User Visible:** Yes (runtime permission)
-- **Required for:** 
-  - Uploading product images during menu item creation
+- **Required for:**
+  - Uploading product images during product listing creation
   - Uploading store logo and banner during setup
   - Uploading business verification documents (registration cert, tax ID, proof of address)
 - **Runtime Request:** Only when user taps "Upload Image" or "Add Product Image"
 - **SDK Used:** `expo-image-picker` (^17.0.10)
-- **Justification:** Vendors need to upload product photos and business documents
+- **Justification:** Vendors need to upload product photos and business documents for their multi-marketplace store
 
 #### 3. **ACCESS_FINE_LOCATION** (Optional)
+
 - **Purpose:** Auto-fill store location during setup
 - **User Visible:** Yes (runtime permission)
-- **Required for:** 
+- **Required for:**
   - "Use Current Location" feature during store setup
   - Optional convenience feature for vendors
 - **Runtime Request:** Only when user taps "Use Current Location" button
@@ -53,6 +58,7 @@ Based on app functionality analysis, the following permissions are **REQUIRED**:
 - **Note:** NOT required for core app functionality - purely optional
 
 #### 4. **POST_NOTIFICATIONS** (Android 13+)
+
 - **Purpose:** Send order notifications, payment updates, and business alerts
 - **User Visible:** Yes (runtime permission on Android 13+)
 - **Required for:**
@@ -65,12 +71,14 @@ Based on app functionality analysis, the following permissions are **REQUIRED**:
 - **Justification:** Critical for vendors to receive timely order notifications
 
 #### 5. **VIBRATE** (Automatic with notifications)
+
 - **Purpose:** Vibrate device for important notifications
 - **User Visible:** No
 - **Required for:** Notification alerts
 - **Justification:** Helps vendors notice new orders
 
 #### 6. **WAKE_LOCK** (Automatic)
+
 - **Purpose:** Keep device awake during critical operations
 - **User Visible:** No
 - **Required for:** Push notification delivery
@@ -93,11 +101,7 @@ Based on app functionality analysis, the following permissions are **REQUIRED**:
 {
   "expo": {
     "android": {
-      "permissions": [
-        "INTERNET",
-        "ACCESS_FINE_LOCATION",
-        "POST_NOTIFICATIONS"
-      ],
+      "permissions": ["INTERNET", "ACCESS_FINE_LOCATION", "POST_NOTIFICATIONS"],
       "blockedPermissions": [
         "CAMERA",
         "RECORD_AUDIO",
@@ -110,7 +114,7 @@ Based on app functionality analysis, the following permissions are **REQUIRED**:
       [
         "expo-image-picker",
         {
-          "photosPermission": "This app needs access to your photo library to upload product images, store logos, and business verification documents."
+          "photosPermission": "This app needs access to your photo library to upload product images, store logos, and business verification documents for your multi-marketplace store."
         }
       ],
       [
@@ -141,13 +145,16 @@ Use these exact answers when filling out the Google Play Console Data Safety sec
 ### Section 1: Data Collection and Security
 
 **Does your app collect or share any of the required user data types?**
+
 - ✅ **Yes**
 
 **Is all of the user data collected by your app encrypted in transit?**
+
 - ✅ **Yes**
 - All data is transmitted over HTTPS/TLS
 
 **Do you provide a way for users to request that their data is deleted?**
+
 - ✅ **Yes**
 - Users can delete their account via App Settings → Delete Account
 - Users can email support@asoose.com to request deletion
@@ -159,16 +166,18 @@ Use these exact answers when filling out the Google Play Console Data Safety sec
 #### **Personal Information**
 
 ##### Location
+
 - **Collected:** ✅ Yes
 - **Shared:** ❌ No
 - **Optional:** ✅ Yes (only if user taps "Use Current Location")
-- **Purpose:** 
+- **Purpose:**
   - ✅ App functionality
   - Used to set store address for customer delivery
 - **Data handling:**
   - **Ephemeral:** ❌ No (stored as store address)
 
 ##### Name
+
 - **Collected:** ✅ Yes
 - **Shared:** ❌ No (only business name shown to customers)
 - **Optional:** ❌ No
@@ -179,6 +188,7 @@ Use these exact answers when filling out the Google Play Console Data Safety sec
   - **Ephemeral:** ❌ No
 
 ##### Email address
+
 - **Collected:** ✅ Yes
 - **Shared:** ❌ No
 - **Optional:** ❌ No
@@ -190,6 +200,7 @@ Use these exact answers when filling out the Google Play Console Data Safety sec
   - **Ephemeral:** ❌ No
 
 ##### Phone number
+
 - **Collected:** ✅ Yes
 - **Shared:** ❌ No
 - **Optional:** ❌ No
@@ -203,6 +214,7 @@ Use these exact answers when filling out the Google Play Console Data Safety sec
 #### **Financial Information**
 
 ##### User payment info (Bank account details)
+
 - **Collected:** ✅ Yes
 - **Shared:** ✅ Yes (only with payment processor for payouts)
 - **Optional:** ❌ No
@@ -217,6 +229,7 @@ Use these exact answers when filling out the Google Play Console Data Safety sec
 #### **Photos and Videos**
 
 ##### Photos
+
 - **Collected:** ✅ Yes
 - **Shared:** ✅ Yes (displayed to customers on marketplace)
 - **Optional:** ❌ No (required for product listings)
@@ -228,6 +241,7 @@ Use these exact answers when filling out the Google Play Console Data Safety sec
 #### **Files and Docs**
 
 ##### Files and docs (Business verification documents)
+
 - **Collected:** ✅ Yes
 - **Shared:** ❌ No (internal verification only)
 - **Optional:** ❌ No (required for account verification)
@@ -240,6 +254,7 @@ Use these exact answers when filling out the Google Play Console Data Safety sec
 #### **App Activity**
 
 ##### App interactions
+
 - **Collected:** ✅ Yes
 - **Shared:** ❌ No
 - **Optional:** ❌ No
@@ -250,12 +265,15 @@ Use these exact answers when filling out the Google Play Console Data Safety sec
   - **Ephemeral:** ❌ No
 
 ##### In-app search history
+
 - **Collected:** ❌ No
 
 ##### Installed apps
+
 - **Collected:** ❌ No
 
 ##### Other user-generated content (Product descriptions, store info)
+
 - **Collected:** ✅ Yes
 - **Shared:** ✅ Yes (displayed to customers)
 - **Optional:** ❌ No
@@ -265,6 +283,7 @@ Use these exact answers when filling out the Google Play Console Data Safety sec
   - **Ephemeral:** ❌ No
 
 ##### Other actions (Order management)
+
 - **Collected:** ✅ Yes
 - **Shared:** ❌ No
 - **Optional:** ❌ No
@@ -276,11 +295,13 @@ Use these exact answers when filling out the Google Play Console Data Safety sec
 #### **Web Browsing**
 
 ##### Web browsing history
+
 - **Collected:** ❌ No
 
 #### **App Info and Performance**
 
 ##### Crash logs
+
 - **Collected:** ✅ Yes
 - **Shared:** ❌ No
 - **Optional:** ❌ No (automatic)
@@ -291,6 +312,7 @@ Use these exact answers when filling out the Google Play Console Data Safety sec
   - **Ephemeral:** ✅ Yes (deleted after 90 days)
 
 ##### Diagnostics
+
 - **Collected:** ✅ Yes
 - **Shared:** ❌ No
 - **Optional:** ❌ No (automatic)
@@ -301,11 +323,13 @@ Use these exact answers when filling out the Google Play Console Data Safety sec
   - **Ephemeral:** ✅ Yes (deleted after 90 days)
 
 ##### Other app performance data
+
 - **Collected:** ❌ No
 
 #### **Device or Other IDs**
 
 ##### Device or other IDs
+
 - **Collected:** ✅ Yes (for push notifications only)
 - **Shared:** ✅ Yes (with Expo push notification service)
 - **Optional:** ✅ Yes (user can deny notification permission)
@@ -319,6 +343,7 @@ Use these exact answers when filling out the Google Play Console Data Safety sec
 ### Section 3: Data Sharing
 
 **Do you share data with third parties?**
+
 - ✅ **Yes**
 
 **Third-party data sharing:**
@@ -339,6 +364,7 @@ Use these exact answers when filling out the Google Play Console Data Safety sec
    - Is data transferred off device: ✅ Yes
 
 **Data NOT shared with:**
+
 - ❌ Advertising companies
 - ❌ Analytics providers (no Google Analytics, Firebase, etc.)
 - ❌ Data brokers
@@ -349,20 +375,25 @@ Use these exact answers when filling out the Google Play Console Data Safety sec
 ### Section 4: Security Practices
 
 **Is all user data encrypted in transit?**
+
 - ✅ **Yes** - HTTPS/TLS encryption
 
 **Can users request data deletion?**
+
 - ✅ **Yes**
 - In-app: Settings → Delete Account
 - Email: support@asoose.com
 
 **Is your app committed to following Google Play's Families Policy?**
+
 - ❌ **No** (App is for business use, 18+ only)
 
 **Has your app undergone a security review?**
+
 - ✅ **Yes** (if you have) / ❌ **No** (if pending)
 
 **Do you have a privacy policy?**
+
 - ✅ **Yes**
 - URL: `https://[your-domain]/privacy-policy.html` ← **Deploy the privacy-policy.html file first**
 
@@ -388,6 +419,7 @@ Use these exact answers when filling out the Google Play Console Data Safety sec
 2. **Get the public URL** (e.g., `https://asoose-vendor-privacy.vercel.app/`)
 
 3. **Add URL to app.json:**
+
    ```json
    {
      "expo": {
@@ -406,6 +438,7 @@ Use these exact answers when filling out the Google Play Console Data Safety sec
 ### Critical User Flows - Test Before Submission
 
 #### ✅ Authentication
+
 - [ ] Login with valid credentials succeeds
 - [ ] Login with invalid credentials shows error
 - [ ] Password reset flow works end-to-end
@@ -413,15 +446,19 @@ Use these exact answers when filling out the Google Play Console Data Safety sec
 - [ ] Document upload succeeds during signup
 - [ ] App handles network errors gracefully
 
-#### ✅ Menu Management
-- [ ] Add new product with image succeeds
+#### ✅ Product Management
+
+- [ ] Create new product succeeds
+- [ ] Upload product image works
 - [ ] Edit product updates correctly
 - [ ] Delete product removes from list
+- [ ] Product categories display correctly
+- [ ] Inventory tracking updates properly
 - [ ] Toggle stock status works
-- [ ] Product image upload completes
 - [ ] Product form validation works
 
 #### ✅ Order Management
+
 - [ ] New order notification received
 - [ ] Order list loads without crash
 - [ ] Order details display correctly
@@ -430,12 +467,14 @@ Use these exact answers when filling out the Google Play Console Data Safety sec
 - [ ] Order status transitions work
 
 #### ✅ Payments/Withdrawals
+
 - [ ] Payment history loads
 - [ ] Withdrawal request succeeds
 - [ ] Bank account can be added/edited
 - [ ] Balance displays correctly
 
 #### ✅ Location Feature
+
 - [ ] Location permission request works
 - [ ] "Use Current Location" works
 - [ ] Map displays correctly
@@ -443,6 +482,7 @@ Use these exact answers when filling out the Google Play Console Data Safety sec
 - [ ] App works if location permission denied
 
 #### ✅ Image Upload
+
 - [ ] Photo library permission request works
 - [ ] Image selection from gallery works
 - [ ] Image upload progress shows
@@ -451,6 +491,7 @@ Use these exact answers when filling out the Google Play Console Data Safety sec
 - [ ] Large images are handled
 
 #### ✅ Notifications
+
 - [ ] Notification permission request works
 - [ ] Push notifications received
 - [ ] Notification tap opens correct screen
@@ -458,6 +499,7 @@ Use these exact answers when filling out the Google Play Console Data Safety sec
 - [ ] App works if notification permission denied
 
 #### ✅ Error Handling
+
 - [ ] No internet: Shows error message
 - [ ] Server error: Shows appropriate message
 - [ ] Invalid token: Redirects to login
@@ -467,6 +509,7 @@ Use these exact answers when filling out the Google Play Console Data Safety sec
 ### Potential Rejection Risks
 
 **🟢 LOW RISK:**
+
 - ✅ Permissions properly justified
 - ✅ Privacy policy comprehensive
 - ✅ No sensitive permissions (camera, contacts, etc.)
@@ -474,11 +517,13 @@ Use these exact answers when filling out the Google Play Console Data Safety sec
 - ✅ No advertising or tracking
 
 **🟡 MEDIUM RISK:**
+
 - ⚠️ Financial data collection - **Mitigation:** Clear privacy policy, encryption, necessary for payouts
 - ⚠️ Location collection - **Mitigation:** Optional feature, clear justification, not background
 - ⚠️ Document uploads - **Mitigation:** Required for business verification, stated in privacy policy
 
 **🔴 HIGH RISK (NONE DETECTED):**
+
 - ✅ No children's content issues (18+ app)
 - ✅ No deceptive behavior
 - ✅ No malware or security risks
@@ -491,11 +536,13 @@ Use these exact answers when filling out the Google Play Console Data Safety sec
 ### Prerequisites
 
 1. **EAS CLI installed:**
+
    ```bash
    npm install -g eas-cli
    ```
 
 2. **Logged into Expo:**
+
    ```bash
    eas login
    ```
@@ -516,11 +563,7 @@ Use these exact answers when filling out the Google Play Console Data Safety sec
     "android": {
       "versionCode": 1,
       "package": "com.asoose.vendor.app",
-      "permissions": [
-        "INTERNET",
-        "ACCESS_FINE_LOCATION",
-        "POST_NOTIFICATIONS"
-      ],
+      "permissions": ["INTERNET", "ACCESS_FINE_LOCATION", "POST_NOTIFICATIONS"],
       "blockedPermissions": [
         "CAMERA",
         "RECORD_AUDIO",
@@ -555,6 +598,7 @@ eas build --profile production --platform android
 ```
 
 **What happens:**
+
 - EAS builds a production Android App Bundle (.aab)
 - Version code auto-increments
 - Build is optimized and signed
@@ -580,6 +624,7 @@ adb install build-*.apk
 ```
 
 **Test critical flows:**
+
 - [ ] Login works
 - [ ] Orders display
 - [ ] Product upload works
@@ -593,6 +638,7 @@ adb install build-*.apk
 ### Before Upload to Play Store
 
 #### App Preparation
+
 - [ ] Privacy policy deployed to public URL
 - [ ] Privacy policy URL added to app.json
 - [ ] Production API URL set in eas.json
@@ -604,14 +650,16 @@ adb install build-*.apk
 - [ ] Test build installed and tested
 
 #### Play Console Setup
+
 - [ ] Google Play Console account created
 - [ ] Developer account verified ($25 fee paid)
 - [ ] App created in Play Console
 - [ ] Package name matches: `com.asoose.vendor.app`
 
 #### Store Listing
+
 - [ ] App name: "ASOOSE Vendor App"
-- [ ] Short description (max 80 chars): "Manage your food business on ASOOSE"
+- [ ] Short description (max 80 chars): "Manage your multi-marketplace business on ASOOSE"
 - [ ] Full description written (see template below)
 - [ ] App category: Business
 - [ ] Target age: 18+
@@ -626,6 +674,7 @@ adb install build-*.apk
 - [ ] Contact website (optional)
 
 #### Data Safety
+
 - [ ] Data Safety form completed (use answers from this document)
 - [ ] All data types marked correctly
 - [ ] Third-party sharing disclosed
@@ -633,17 +682,19 @@ adb install build-*.apk
 - [ ] Deletion method specified
 
 #### Content Rating
+
 - [ ] IARC questionnaire completed
 - [ ] Violence: None
 - [ ] Sexual content: None
 - [ ] Language: None
-- [ ] Controlled substances: None (food only)
+- [ ] Controlled substances: None
 - [ ] Gambling: None
 - [ ] User interaction: Yes (business-to-customer)
 - [ ] Share location: Yes (optional)
 - [ ] Share personal info: Yes (with customers)
 
 #### App Content
+
 - [ ] Target audience: Adults 18+
 - [ ] Ads: None
 - [ ] In-app purchases: None
@@ -652,6 +703,7 @@ adb install build-*.apk
 - [ ] No intellectual property violations
 
 #### Countries and Regions
+
 - [ ] Countries selected (or "All countries")
 - [ ] Pricing: Free
 
@@ -661,18 +713,21 @@ adb install build-*.apk
 2. **Upload AAB file** (from EAS build)
 3. **Release name:** "Version 1.0.0 - Initial Release"
 4. **Release notes:**
+
    ```
    Welcome to ASOOSE Vendor App!
-   
-   Manage your food business with ease:
+
+   Manage your multi-marketplace business with ease:
    • Accept and manage customer orders in real-time
-   • Add and update your menu items
+   • Add and update your product listings
    • Track payments and request withdrawals
    • Receive instant notifications for new orders
    • Manage your store hours and information
-   
+   • Sell across multiple marketplaces from one platform
+
    This is our first release. We're excited to help you grow your business!
    ```
+
 5. **Review → Rollout to Production**
 
 ### Post-Submission
@@ -688,15 +743,17 @@ adb install build-*.apk
 ## 📱 Store Listing Description Template
 
 **Short Description (80 chars max):**
+
 ```
-Manage your food business on ASOOSE - Orders, menu, and payments
+Manage your multi-marketplace business on ASOOSE - Orders & products
 ```
 
 **Full Description:**
-```
-ASOOSE Vendor App - Your Business Management Hub
 
-Grow your food business with the ASOOSE Vendor App. Manage orders, update your menu, and track payments all in one place.
+```
+ASOOSE Vendor App - Your Multi-Marketplace Business Hub
+
+Grow your business with the ASOOSE Vendor App. Manage orders, update your products, and track payments across multiple marketplaces all in one place.
 
 🎯 KEY FEATURES
 
@@ -707,12 +764,13 @@ Grow your food business with the ASOOSE Vendor App. Manage orders, update your m
 • View order history and details
 • Communicate with customers
 
-🍽️ Menu Management
+🛍️ Product Management
 • Add new products with photos
 • Update prices and descriptions
 • Set items as in-stock or out-of-stock
 • Organize by categories
-• Drag to reorder menu items
+• Manage inventory across multiple marketplaces
+• Drag to reorder product listings
 
 💰 Payments & Withdrawals
 • Track your earnings
@@ -795,6 +853,7 @@ Join thousands of food vendors growing their business with ASOOSE!
 8. **Store Settings** - Show business profile
 
 **Tips:**
+
 - Use clean, high-quality screenshots
 - Show actual app functionality (not mockups)
 - Include status bar and navigation
@@ -831,12 +890,14 @@ Join thousands of food vendors growing their business with ASOOSE!
 ## 📈 Post-Launch Monitoring
 
 **Week 1:**
+
 - [ ] Monitor crash reports daily
 - [ ] Respond to user reviews
 - [ ] Track download numbers
 - [ ] Check for permission-related issues
 
 **Ongoing:**
+
 - [ ] Plan updates based on feedback
 - [ ] Monitor Data Safety compliance
 - [ ] Keep privacy policy updated

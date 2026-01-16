@@ -65,7 +65,7 @@ export default function MenuScreen() {
     } catch (error: any) {
       Toast.show({
         type: "error",
-        text1: error.message || "Failed to load menu data",
+        text1: error.message || "Failed to load listings data",
       });
     } finally {
       setLoading(false);
@@ -207,7 +207,7 @@ export default function MenuScreen() {
           </View>
         </View>
 
-        {/* Menu items skeleton */}
+        {/* Listings skeleton */}
         <View style={{ paddingHorizontal: 16 }}>
           {[...Array(4)].map((_, i) => (
             <View
@@ -308,7 +308,7 @@ export default function MenuScreen() {
     <ThemedView style={{ flex: 1 }}>
       {/* Header */}
       <View style={styles.header}>
-        <ThemedText type="title">Menu</ThemedText>
+        <ThemedText type="title">Listings</ThemedText>
         <ThemedText type="caption" style={styles.caption}>
           Manage your products and inventory
         </ThemedText>
