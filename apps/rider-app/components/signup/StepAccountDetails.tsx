@@ -62,14 +62,14 @@ export function StepAccountDetails({ data, onChange }: Props) {
   };
 
   return (
-    <>
+    <View>
       {/* Bank */}
       <CustomDropdown
         data={BANKS}
         value={data.bank}
         onChange={(v) => onChange("bank", v as string)}
         placeholder="Select bank"
-        containerStyle={{ flex: 2, marginTop: 20 }}
+        containerStyle={{ marginTop: 20 }}
         label="Bank name"
       />
 
@@ -130,7 +130,7 @@ export function StepAccountDetails({ data, onChange }: Props) {
           </ThemedText>
         </View>
       )}
-    </>
+    </View>
   );
 }
 

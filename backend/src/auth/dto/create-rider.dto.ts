@@ -66,6 +66,23 @@ export class CreateRiderDto {
   @IsString()
   vehicleRegistration?: string;
 
+  // Bank Account Information
+  @IsOptional()
+  @IsString()
+  bankName?: string;
+
+  @IsOptional()
+  @IsString()
+  bankCode?: string;
+
+  @IsOptional()
+  @IsString()
+  accountNumber?: string;
+
+  @IsOptional()
+  @IsString()
+  accountName?: string;
+
   @IsOptional()
   @IsObject()
   location?: { lat: number; lng: number };

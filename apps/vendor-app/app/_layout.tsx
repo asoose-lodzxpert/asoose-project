@@ -6,6 +6,7 @@ import { NotificationPreferencesProvider } from "@/context/NotificationPreferenc
 import { NotificationProvider } from "@/context/NotificationContext";
 import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useEffect, useRef } from "react";
 
 function LoadingScreen() {
@@ -84,13 +85,15 @@ function RootNavigator() {
 
 export default function RootLayout() {
   return (
-    <AuthProvider>
-      <NotificationProvider>
-        <NotificationPreferencesProvider>
-          <RootNavigator />
-        </NotificationPreferencesProvider>
-      </NotificationProvider>
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <NotificationProvider>
+          <NotificationPreferencesProvider>
+            <RootNavigator />
+          </NotificationPreferencesProvider>
+        </NotificationProvider>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }
 

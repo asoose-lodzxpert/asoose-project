@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useState, useEffect } from "react";
 import {
   View,
   StyleSheet,
@@ -6,70 +6,19 @@ import {
   ScrollView,
   RefreshControl,
 } from "react-native";
+import Toast from "react-native-toast-message";
 
 import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
 import { CustomDropdown } from "@/components/CustomDropdown";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { useRouter } from "expo-router";
-
-/* ---------------------------------- */
-/* Mock Data */
-/* ---------------------------------- */
-
-const EARNINGS_DATA = {
-  today: {
-    total: 12500,
-    deliveries: 8,
-    avgPerDelivery: 1560,
-    hoursOnline: 6,
-    rating: 4.9,
-    breakdown: {
-      deliveryFees: 14000,
-      bonuses: 1000,
-      serviceFees: -2500,
-    },
-  },
-
-  week: {
-    total: 78200,
-    deliveries: 48,
-    avgPerDelivery: 1630,
-    hoursOnline: 36,
-    rating: 4.91,
-    breakdown: {
-      deliveryFees: 88000,
-      bonuses: 6000,
-      serviceFees: -15800,
-    },
-  },
-
-  month: {
-    total: 312500,
-    deliveries: 198,
-    avgPerDelivery: 1580,
-    hoursOnline: 150,
-    rating: 4.92,
-    breakdown: {
-      deliveryFees: 345000,
-      bonuses: 22000,
-      serviceFees: -54500,
-    },
-  },
-
-  year: {
-    total: 3650000,
-    deliveries: 2350,
-    avgPerDelivery: 1550,
-    hoursOnline: 1800,
-    rating: 4.91,
-    breakdown: {
-      deliveryFees: 4020000,
-      bonuses: 310000,
-      serviceFees: -680000,
-    },
-  },
-};
+import {
+  getEarnings,
+  getWalletBalance,
+  type EarningsData,
+  type Timeframe,
+} from "@/services/earnings.service";
 
 /* ---------------------------------- */
 /* Timeframes */
@@ -86,8 +35,6 @@ const TIMEFRAMES: Option[] = [
   { label: "This Month", value: "month" },
   { label: "This Year", value: "year" },
 ];
-
-type Timeframe = "today" | "week" | "month" | "year";
 
 /* ---------------------------------- */
 /* Currency Formatter */
@@ -117,27 +64,45 @@ export default function EarningsScreen() {
   const router = useRouter();
 
   const [timeframe, setTimeframe] = useState<Timeframe>("week");
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [data, setData] = useState<EarningsData | null>(null);
+  const [walletBalance, setWalletBalance] = useState<number>(0);
 
-  const data = EARNINGS_DATA[timeframe];
-
-  const simulateFetch = useCallback(() => {
-    setLoading(true);
-    setTimeout(() => {
+  // Fetch earnings data
+  const fetchEarningsData = useCallback(async () => {
+    try {
+      setLoading(true);
+      const [earningsData, walletData] = await Promise.all([
+        getEarnings(timeframe),
+        getWalletBalance(),
+      ]);
+      setData(earningsData);
+      setWalletBalance(walletData.balance);
+    } catch (error: any) {
+      Toast.show({
+        type: "error",
+        text1: "Failed to load earnings",
+        text2: error.message || "Please try again",
+      });
+    } finally {
       setLoading(false);
       setRefreshing(false);
-    }, 1500);
-  }, []);
+    }
+  }, [timeframe]);
+
+  // Initial load
+  useEffect(() => {
+    fetchEarningsData();
+  }, [fetchEarningsData]);
 
   const onRefresh = () => {
     setRefreshing(true);
-    simulateFetch();
+    fetchEarningsData();
   };
 
   const handleTimeframeChange = (v: string | number) => {
     setTimeframe(v as Timeframe);
-    simulateFetch();
   };
 
   return (
@@ -165,94 +130,108 @@ export default function EarningsScreen() {
       >
         {/* Virtual Bank Card Balance Section */}
         <View style={styles.cardContainer}>
-          <View style={[styles.virtualCard, { backgroundColor: primary }]}>
-            <View style={styles.cardOverlay} />
+          {loading && !data ? (
+            <VirtualCardSkeleton />
+          ) : (
+            <View style={[styles.virtualCard, { backgroundColor: primary }]}>
+              <View style={styles.cardOverlay} />
 
-            <ThemedText style={styles.cardLabel}>Available Balance</ThemedText>
-
-            <ThemedText type="title" style={styles.cardBalance}>
-              {loading ? "—" : formatCurrency(data.total)}
-            </ThemedText>
-
-            <ThemedText style={styles.cardNumber}>
-              •••• •••• •••• 2479
-            </ThemedText>
-
-            <View style={styles.cardBottomRow}>
-              <ThemedText style={styles.cardSubtitle}>
-                Ready to withdraw
+              <ThemedText style={styles.cardLabel}>
+                Available Balance
               </ThemedText>
-              <Pressable
-                style={styles.cardWithdrawBtn}
-                disabled={loading}
-                onPress={() => router.push("/(earnings)/withdraw")}
-              >
-                <ThemedText
-                  style={[styles.cardWithdrawText, { color: primary }]}
-                >
-                  Withdraw
+
+              <ThemedText type="title" style={styles.cardBalance}>
+                {formatCurrency(walletBalance)}
+              </ThemedText>
+
+              <ThemedText style={styles.cardNumber}>
+                •••• •••• •••• 2479
+              </ThemedText>
+
+              <View style={styles.cardBottomRow}>
+                <ThemedText style={styles.cardSubtitle}>
+                  Ready to withdraw
                 </ThemedText>
-              </Pressable>
+                <Pressable
+                  style={styles.cardWithdrawBtn}
+                  disabled={loading}
+                  onPress={() => router.push("/(earnings)/withdraw")}
+                >
+                  <ThemedText
+                    style={[styles.cardWithdrawText, { color: primary }]}
+                  >
+                    Withdraw
+                  </ThemedText>
+                </Pressable>
+              </View>
             </View>
-          </View>
+          )}
         </View>
 
         <SectionTitle title="Performance" />
 
-        <View style={styles.metricsGrid}>
-          <MetricCard
-            label="Deliveries"
-            value={loading ? "—" : `${data.deliveries}`}
-          />
-          <MetricCard
-            label="Avg / Delivery"
-            value={loading ? "—" : formatCurrency(data.avgPerDelivery)}
-          />
-          <MetricCard
-            label="Hours Online"
-            value={loading ? "—" : `${data.hoursOnline.toFixed(1)}h`}
-          />
-          <MetricCard
-            label="Rating"
-            value={loading ? "—" : `${data.rating} ★`}
-          />
-        </View>
+        {loading && !data ? (
+          <View style={styles.metricsGrid}>
+            {[1, 2, 3, 4].map((i) => (
+              <MetricCardSkeleton key={i} />
+            ))}
+          </View>
+        ) : (
+          <View style={styles.metricsGrid}>
+            <MetricCard
+              label="Deliveries"
+              value={data ? `${data.deliveries}` : "—"}
+            />
+            <MetricCard
+              label="Avg / Delivery"
+              value={data ? formatCurrency(data.avgPerDelivery) : "—"}
+            />
+            <MetricCard
+              label="Hours Online"
+              value={data ? `${data.hoursOnline.toFixed(1)}h` : "—"}
+            />
+            <MetricCard
+              label="Rating"
+              value={data ? `${data.rating} ★` : "—"}
+            />
+          </View>
+        )}
 
         <SectionTitle title="Earnings Breakdown" />
 
-        <View style={[styles.breakdownCard, { backgroundColor: cardBg }]}>
-          <BreakdownRow
-            label="Delivery fees"
-            subtitle="Base pay for completed deliveries"
-            value={data.breakdown.deliveryFees}
-            valueColor={text}
-            loading={loading}
-          />
-          <BreakdownRow
-            label="Bonuses"
-            subtitle="Incentives for peak hours & promotions"
-            value={data.breakdown.bonuses}
-            valueColor={text}
-            loading={loading}
-          />
-          <BreakdownRow
-            label="Service fees"
-            subtitle="Platform deduction for operations"
-            value={data.breakdown.serviceFees}
-            valueColor={danger}
-            loading={loading}
-          />
+        {loading && !data ? (
+          <BreakdownSkeleton />
+        ) : (
+          <View style={[styles.breakdownCard, { backgroundColor: cardBg }]}>
+            <BreakdownRow
+              label="Delivery fees"
+              subtitle="Base pay for completed deliveries"
+              value={data?.breakdown.deliveryFees || 0}
+              valueColor={text}
+            />
+            <BreakdownRow
+              label="Bonuses"
+              subtitle="Incentives for peak hours & promotions"
+              value={data?.breakdown.bonuses || 0}
+              valueColor={text}
+            />
+            <BreakdownRow
+              label="Service fees"
+              subtitle="Platform deduction for operations"
+              value={data?.breakdown.serviceFees || 0}
+              valueColor={danger}
+            />
 
-          <View style={styles.divider} />
+            <View style={styles.divider} />
 
-          <BreakdownRow
-            label="Total Earnings"
-            value={data.total}
-            bold
-            loading={loading}
-            valueColor={text}
-          />
-        </View>
+            <BreakdownRow
+              label="Total Earnings"
+              value={data?.total || 0}
+              bold
+              valueColor={text}
+            />
+          </View>
+        )}
 
         <View style={[styles.explainerCard, { backgroundColor: cardBg }]}>
           <ThemedText type="defaultSemiBold" style={{ marginBottom: 12 }}>
@@ -269,11 +248,89 @@ export default function EarningsScreen() {
 
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      <Toast />
     </ThemedView>
   );
 }
 
 /* Components */
+
+/* Skeleton Loaders */
+function SkeletonBox({
+  width,
+  height,
+  borderRadius = 8,
+}: {
+  width: number | `${number}%`;
+  height: number;
+  borderRadius?: number;
+}) {
+  return (
+    <View
+      style={{
+        width: width as any,
+        height,
+        borderRadius,
+        backgroundColor: "rgba(0,0,0,0.06)",
+      }}
+    />
+  );
+}
+
+function VirtualCardSkeleton() {
+  const primary = useThemeColor({}, "brandPrimary");
+
+  return (
+    <View style={[styles.virtualCard, { backgroundColor: primary }]}>
+      <View style={styles.cardOverlay} />
+      <SkeletonBox width={120} height={16} borderRadius={4} />
+      <SkeletonBox width="80%" height={42} borderRadius={8} />
+      <SkeletonBox width={180} height={18} borderRadius={4} />
+      <View style={styles.cardBottomRow}>
+        <SkeletonBox width={120} height={16} borderRadius={4} />
+        <SkeletonBox width={100} height={44} borderRadius={22} />
+      </View>
+    </View>
+  );
+}
+
+function MetricCardSkeleton() {
+  const cardBg = useThemeColor({}, "surfaceSubtle");
+
+  return (
+    <View style={[styles.metricCard, { backgroundColor: cardBg }]}>
+      <SkeletonBox width={80} height={16} borderRadius={4} />
+      <SkeletonBox width={60} height={20} borderRadius={4} />
+    </View>
+  );
+}
+
+function BreakdownSkeleton() {
+  const cardBg = useThemeColor({}, "surfaceSubtle");
+
+  return (
+    <View style={[styles.breakdownCard, { backgroundColor: cardBg }]}>
+      {[1, 2, 3].map((i) => (
+        <View key={i} style={styles.breakdownRow}>
+          <View style={{ flex: 1, gap: 6 }}>
+            <SkeletonBox width="60%" height={16} borderRadius={4} />
+            <SkeletonBox width="90%" height={13} borderRadius={4} />
+          </View>
+          <SkeletonBox width={80} height={16} borderRadius={4} />
+        </View>
+      ))}
+
+      <View style={styles.divider} />
+
+      <View style={styles.breakdownRow}>
+        <SkeletonBox width={100} height={18} borderRadius={4} />
+        <SkeletonBox width={100} height={18} borderRadius={4} />
+      </View>
+    </View>
+  );
+}
+
 function MetricCard({ label, value }: { label: string; value: string }) {
   const cardBg = useThemeColor({}, "surfaceSubtle");
   const muted = useThemeColor({}, "textMuted");
@@ -292,14 +349,12 @@ function BreakdownRow({
   value,
   bold,
   valueColor,
-  loading,
 }: {
   label: string;
   subtitle?: string;
   value: number;
   bold?: boolean;
   valueColor?: string;
-  loading?: boolean;
 }) {
   const muted = useThemeColor({}, "textMuted");
 
@@ -319,9 +374,7 @@ function BreakdownRow({
         type={bold ? "defaultSemiBold" : "default"}
         style={{ color: valueColor }}
       >
-        {loading
-          ? "—"
-          : `${value < 0 ? "-" : ""}${formatCurrency(Math.abs(value))}`}
+        {`${value < 0 ? "-" : ""}${formatCurrency(Math.abs(value))}`}
       </ThemedText>
     </View>
   );

@@ -6,6 +6,7 @@ import {
   Pressable,
   Alert,
   RefreshControl,
+  Animated,
 } from "react-native";
 import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
@@ -13,103 +14,151 @@ import { ThemedInput } from "@/components/ThemedInput";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { useRouter } from "expo-router";
+import Toast from "react-native-toast-message";
+import {
+  getBankAccount,
+  updateBankAccount,
+} from "@/services/bank-account.service";
+import type { BankAccount } from "@/types/bank-account";
 
-type PaymentMethod = {
-  bank: string | null;
-  accountNumber: string;
-  accountName: string;
-  isDefault?: boolean;
+// Skeleton loader component
+const SkeletonBox = ({
+  width,
+  height,
+  radius = 8,
+}: {
+  width: number | string;
+  height: number;
+  radius?: number;
+}) => {
+  const opacity = React.useRef(new Animated.Value(0.3)).current;
+
+  React.useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, {
+          toValue: 0.7,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacity, {
+          toValue: 0.3,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [opacity]);
+
+  return (
+    <Animated.View
+      style={[
+        {
+          height,
+          backgroundColor: "#E5E7EB",
+          borderRadius: radius,
+          opacity,
+        },
+        typeof width === "number" ? { width } : { width: width as any },
+      ]}
+    />
+  );
+};
+
+const BankCardSkeleton = ({ border }: { border: string }) => {
+  return (
+    <View style={[styles.card, { borderColor: border }]}>
+      <View style={styles.field}>
+        <SkeletonBox width={80} height={16} />
+        <SkeletonBox width="100%" height={48} radius={12} />
+      </View>
+      <View style={styles.field}>
+        <SkeletonBox width={75} height={16} />
+        <SkeletonBox width="100%" height={48} radius={12} />
+      </View>
+      <View style={styles.field}>
+        <SkeletonBox width={110} height={16} />
+        <SkeletonBox width="100%" height={48} radius={12} />
+      </View>
+      <View style={styles.field}>
+        <SkeletonBox width={95} height={16} />
+        <SkeletonBox width="100%" height={48} radius={12} />
+      </View>
+    </View>
+  );
 };
 
 export default function PaymentMethodsScreen() {
   const router = useRouter();
   const primary = useThemeColor({}, "brandPrimary");
   const surface = useThemeColor({}, "surfaceBackground");
+  const border = useThemeColor({}, "borderDefault");
 
-  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
+  const [bankAccount, setBankAccount] = useState<BankAccount | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [editing, setEditing] = useState(false);
 
-  /* Simulate fetch */
-  useEffect(() => {
-    const timeout = setTimeout(() => {
-      setPaymentMethods([
-        {
-          bank: "Access Bank",
-          accountNumber: "1234567890",
-          accountName: "John Smith",
-          isDefault: true,
-        },
-        {
-          bank: "GT Bank",
-          accountNumber: "0987654321",
-          accountName: "John Smith",
-        },
-      ]);
+  const fetchBankAccount = useCallback(async () => {
+    try {
+      setLoading(true);
+      const account = await getBankAccount();
+      setBankAccount(account);
+    } catch (error: any) {
+      Toast.show({
+        type: "error",
+        text1: "Failed to load bank account",
+        text2: error.message || "Please try again",
+      });
+    } finally {
       setLoading(false);
-    }, 1200);
-
-    return () => clearTimeout(timeout);
+      setRefreshing(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchBankAccount();
+  }, [fetchBankAccount]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    setTimeout(() => {
-      setPaymentMethods((prev) => [...prev]); // simulate reload
-      setRefreshing(false);
-    }, 1000);
-  }, []);
+    fetchBankAccount();
+  }, [fetchBankAccount]);
 
-  const addAccount = () => {
-    setPaymentMethods((prev) => [
-      ...prev,
-      { bank: null, accountNumber: "", accountName: "" },
-    ]);
-    setEditing(true);
+  const updateAccount = (key: keyof BankAccount, value: string) => {
+    if (bankAccount) {
+      setBankAccount({ ...bankAccount, [key]: value });
+    }
   };
 
-  const deleteAccount = (index: number) => {
-    Alert.alert(
-      "Delete Account",
-      "Are you sure you want to delete this account?",
-      [
-        { text: "Cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: () =>
-            setPaymentMethods((prev) => prev.filter((_, i) => i !== index)),
-        },
-      ]
-    );
-  };
+  const saveChanges = async () => {
+    if (!bankAccount) return;
 
-  const setDefault = (index: number) => {
-    setPaymentMethods((prev) =>
-      prev.map((pm, i) => ({ ...pm, isDefault: i === index }))
-    );
-  };
+    try {
+      const updatedAccount = await updateBankAccount({
+        bankName: bankAccount.bankName,
+        bankCode: bankAccount.bankCode,
+        accountNumber: bankAccount.accountNumber,
+        accountName: bankAccount.accountName,
+      });
 
-  const updateAccount = (
-    index: number,
-    key: keyof PaymentMethod,
-    value: string
-  ) => {
-    setPaymentMethods((prev) =>
-      prev.map((pm, i) => (i === index ? { ...pm, [key]: value } : pm))
-    );
+      setBankAccount(updatedAccount);
+      Toast.show({
+        type: "success",
+        text1: "Saved",
+        text2: "Bank account updated successfully",
+      });
+      setEditing(false);
+    } catch (error: any) {
+      Toast.show({
+        type: "error",
+        text1: "Update failed",
+        text2: error.message || "Failed to update bank account",
+      });
+    }
   };
-
-  if (loading) {
-    return (
-      <ThemedView style={[styles.container, { backgroundColor: surface }]}>
-        <ThemedText style={{ textAlign: "center", marginTop: 200 }}>
-          Loading payment methods...
-        </ThemedText>
-      </ThemedView>
-    );
-  }
 
   return (
     <ThemedView style={[styles.container, { backgroundColor: surface }]}>
@@ -118,47 +167,63 @@ export default function PaymentMethodsScreen() {
         <Pressable onPress={() => router.back()}>
           <IconSymbol name="chevron.left" size={24} color={primary} />
         </Pressable>
-        <ThemedText type="title" style={{ flex: 1, textAlign: "center" }}>
-          Payment Methods
+        <ThemedText type="subtitle" style={{ flex: 1, textAlign: "center" }}>
+          Bank Account
         </ThemedText>
-        <Pressable
-          onPress={() => {
-            if (editing) {
-              Alert.alert("Saved", "Payment methods saved successfully");
-            }
-            setEditing(!editing);
-          }}
-        >
-          <ThemedText style={{ color: primary, fontWeight: "600" }}>
-            {editing ? "Done" : "Edit"}
-          </ThemedText>
-        </Pressable>
+        {!loading && bankAccount && (
+          <Pressable
+            onPress={() => {
+              if (editing) {
+                saveChanges();
+              } else {
+                setEditing(true);
+              }
+            }}
+          >
+            <ThemedText style={{ color: primary, fontWeight: "600" }}>
+              {editing ? "Save" : "Edit"}
+            </ThemedText>
+          </Pressable>
+        )}
+        {!bankAccount && !loading && <View style={{ width: 40 }} />}
       </View>
 
       <ScrollView
         contentContainerStyle={{ padding: 20, gap: 20 }}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[primary]}
+          />
         }
       >
-        {paymentMethods.map((pm, index) => (
-          <View
-            key={index}
-            style={[styles.card, pm.isDefault && { borderColor: primary }]}
-          >
-            <Field label="Bank">
+        {loading && !bankAccount ? (
+          <BankCardSkeleton border={border} />
+        ) : bankAccount ? (
+          <View style={[styles.card, { borderColor: primary }]}>
+            <Field label="Bank Name">
               <ThemedInput
                 placeholder="Bank Name"
-                value={pm.bank || ""}
-                onChangeText={(v) => updateAccount(index, "bank", v)}
+                value={bankAccount.bankName}
+                onChangeText={(v) => updateAccount("bankName", v)}
                 editable={editing}
+              />
+            </Field>
+            <Field label="Bank Code">
+              <ThemedInput
+                placeholder="e.g., 044 (Optional)"
+                value={bankAccount.bankCode || ""}
+                onChangeText={(v) => updateAccount("bankCode", v)}
+                editable={editing}
+                keyboardType="numeric"
               />
             </Field>
             <Field label="Account Number">
               <ThemedInput
                 placeholder="1234567890"
-                value={pm.accountNumber}
-                onChangeText={(v) => updateAccount(index, "accountNumber", v)}
+                value={bankAccount.accountNumber}
+                onChangeText={(v) => updateAccount("accountNumber", v)}
                 editable={editing}
                 keyboardType="numeric"
               />
@@ -166,42 +231,32 @@ export default function PaymentMethodsScreen() {
             <Field label="Account Name">
               <ThemedInput
                 placeholder="John Smith"
-                value={pm.accountName}
-                onChangeText={(v) => updateAccount(index, "accountName", v)}
+                value={bankAccount.accountName}
+                onChangeText={(v) => updateAccount("accountName", v)}
                 editable={editing}
               />
             </Field>
 
-            {editing && (
-              <View style={styles.actions}>
-                <Pressable onPress={() => deleteAccount(index)}>
-                  <ThemedText type="link" style={{ color: "#EF4444" }}>
-                    Delete
-                  </ThemedText>
-                </Pressable>
-                {!pm.isDefault && (
-                  <Pressable onPress={() => setDefault(index)}>
-                    <ThemedText type="link" style={{ color: primary }}>
-                      Set as default
-                    </ThemedText>
-                  </Pressable>
-                )}
-                {pm.isDefault && (
-                  <ThemedText style={{ color: "#22C55E", fontWeight: "600" }}>
-                    Default
-                  </ThemedText>
-                )}
-              </View>
-            )}
+            <View style={styles.infoBox}>
+              <IconSymbol name="info.circle" size={20} color={primary} />
+              <ThemedText style={styles.infoText}>
+                This is your default withdrawal account. All earnings will be
+                transferred here.
+              </ThemedText>
+            </View>
           </View>
-        ))}
-
-        <Pressable style={styles.addButton} onPress={addAccount}>
-          <IconSymbol name="plus" size={20} color="#fff" />
-          <ThemedText style={{ color: "#fff", fontWeight: "600" }}>
-            Add Account
-          </ThemedText>
-        </Pressable>
+        ) : (
+          <View style={styles.emptyState}>
+            <IconSymbol name="creditcard" size={48} color="#9CA3AF" />
+            <ThemedText type="subtitle" style={{ color: "#6B7280" }}>
+              No Bank Account
+            </ThemedText>
+            <ThemedText style={{ color: "#9CA3AF", textAlign: "center" }}>
+              You haven't added a bank account yet. Contact support to add your
+              withdrawal account.
+            </ThemedText>
+          </View>
+        )}
       </ScrollView>
     </ThemedView>
   );
@@ -235,25 +290,30 @@ const styles = StyleSheet.create({
   card: {
     padding: 16,
     borderRadius: 14,
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: "#D1D5DB",
     backgroundColor: "transparent",
     gap: 12,
   },
   field: { marginTop: 12, gap: 6 },
-  actions: {
+  infoBox: {
     flexDirection: "row",
-    justifyContent: "space-between",
+    gap: 12,
+    backgroundColor: "#EFF6FF",
+    padding: 12,
+    borderRadius: 10,
     marginTop: 12,
   },
-  addButton: {
-    marginTop: 20,
-    backgroundColor: "#2563EB",
-    padding: 14,
-    borderRadius: 14,
-    flexDirection: "row",
+  infoText: {
+    flex: 1,
+    fontSize: 13,
+    color: "#1E40AF",
+    lineHeight: 18,
+  },
+  emptyState: {
     alignItems: "center",
     justifyContent: "center",
-    gap: 8,
+    paddingVertical: 60,
+    gap: 12,
   },
 });

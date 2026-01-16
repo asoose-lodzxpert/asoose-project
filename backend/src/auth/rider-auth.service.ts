@@ -61,6 +61,20 @@ export class RiderAuthService {
           },
         }),
 
+        // Create bank account if provided
+        ...(dto.bankName &&
+          dto.accountNumber && {
+            bankAccount: {
+              create: {
+                bankName: dto.bankName,
+                bankCode: dto.bankCode || '000',
+                accountNumber: dto.accountNumber,
+                accountName: dto.accountName || dto.name,
+                currency: 'NGN',
+              },
+            },
+          }),
+
         // Create documents if provided
         ...(dto.driverLicense && {
           documents: {
@@ -92,13 +106,22 @@ export class RiderAuthService {
           },
         }),
       },
-      include: { vehicle: true, documents: true },
+      include: { vehicle: true, documents: true, bankAccount: true },
     });
 
     // Send welcome email
     await this.emailProducer.sendWelcomeEmail(rider.email, rider.name);
 
-    return rider;
+    return {
+      rider: {
+        id: rider.id,
+        name: rider.name,
+        email: rider.email,
+        phone: rider.phone,
+        status: rider.status,
+      },
+      message: 'Registration successful! Please wait for account verification.',
+    };
   }
 
   // ============== LOGIN ==============

@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   ScrollView,
   RefreshControl,
+  Animated,
 } from "react-native";
 import { useRouter } from "expo-router";
 
@@ -15,19 +16,59 @@ import { ThemedText } from "@/components/themed-text";
 import { ThemedInput } from "@/components/ThemedInput";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
+import {
+  getWithdrawalInfo,
+  requestWithdrawal,
+} from "@/services/withdrawal.service";
+import type { WithdrawalInfo, BankAccountInfo } from "@/types/withdrawal";
 
 /* ---------------------------------- */
-/* Config (Simulated Backend Data) */
+/* Skeleton Loader Component */
 /* ---------------------------------- */
+const SkeletonBox = ({
+  width = "100%",
+  height = 20,
+  style = {},
+}: {
+  width?: string | number;
+  height?: number;
+  style?: any;
+}) => {
+  const opacity = React.useRef(new Animated.Value(0.3)).current;
 
-const WITHDRAW_DATA = {
-  balance: 367500,
-  min: 5000,
-  accounts: [
-    { id: "1", bank: "GTBank", type: "Savings", last4: "1234" },
-    { id: "2", bank: "Access Bank", type: "Current", last4: "8890" },
-    { id: "3", bank: "UBA", type: "Savings", last4: "5566" },
-  ],
+  React.useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, {
+          toValue: 1,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacity, {
+          toValue: 0.3,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [opacity]);
+
+  return (
+    <Animated.View
+      style={[
+        {
+          width: typeof width === "number" ? width : width,
+          height,
+          backgroundColor: "#E1E9EE",
+          borderRadius: 4,
+        },
+        style,
+        { opacity },
+      ]}
+    />
+  );
 };
 
 /* ---------------------------------- */
@@ -48,14 +89,32 @@ export default function WithdrawEarningsScreen() {
   const [amountDisplay, setAmountDisplay] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  const [account, setAccount] = useState(WITHDRAW_DATA.accounts[0]);
+  const [withdrawalInfo, setWithdrawalInfo] = useState<WithdrawalInfo | null>(
+    null
+  );
+  const [account, setAccount] = useState<BankAccountInfo | null>(null);
   const [accountModal, setAccountModal] = useState(false);
   const [successModal, setSuccessModal] = useState(false);
 
-  // Simulate initial data load
+  // Load withdrawal info
   useEffect(() => {
-    setTimeout(() => setLoading(false), 1200);
+    loadWithdrawalInfo();
   }, []);
+
+  const loadWithdrawalInfo = async () => {
+    try {
+      setLoading(true);
+      const data = await getWithdrawalInfo();
+      setWithdrawalInfo(data);
+      if (data.bankAccount) {
+        setAccount(data.bankAccount);
+      }
+    } catch (err) {
+      console.error("Error loading withdrawal info:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Format number with commas
   const formatAmount = (num: number): string => {
@@ -74,16 +133,20 @@ export default function WithdrawEarningsScreen() {
   /* ---------------------------------- */
 
   useEffect(() => {
+    if (!withdrawalInfo) return;
+
     if (!amountDisplay) {
       setError(null);
-    } else if (numericAmount < WITHDRAW_DATA.min) {
-      setError(`Minimum withdrawal is ₦${WITHDRAW_DATA.min.toLocaleString()}`);
-    } else if (numericAmount > WITHDRAW_DATA.balance) {
+    } else if (numericAmount < withdrawalInfo.minWithdrawal) {
+      setError(
+        `Minimum withdrawal is ₦${withdrawalInfo.minWithdrawal.toLocaleString()}`
+      );
+    } else if (numericAmount > withdrawalInfo.balance) {
       setError("Amount exceeds available balance");
     } else {
       setError(null);
     }
-  }, [amountDisplay, numericAmount]);
+  }, [amountDisplay, numericAmount, withdrawalInfo]);
 
   const handleAmountChange = (text: string) => {
     const cleaned = text.replace(/[^0-9]/g, "");
@@ -97,35 +160,121 @@ export default function WithdrawEarningsScreen() {
 
   const openAccountModal = () => {
     setAccountModal(true);
-    setAccountModalLoading(true);
-    setTimeout(() => setAccountModalLoading(false), 1000);
   };
 
-  const withdraw = () => {
-    if (error || numericAmount === 0) return;
+  const withdraw = async () => {
+    if (error || numericAmount === 0 || !account) return;
 
-    setWithdrawing(true);
-    setTimeout(() => {
-      setWithdrawing(false);
+    try {
+      setWithdrawing(true);
+      await requestWithdrawal({
+        amount: numericAmount,
+        bankAccountId: account.id,
+      });
       setSuccessModal(true);
-    }, 1800);
+      setAmountDisplay("");
+    } catch (err: any) {
+      setError(err.message || "Failed to process withdrawal");
+    } finally {
+      setWithdrawing(false);
+    }
   };
 
   // Pull-to-refresh handler
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-
-    // Simulate fetching fresh data
-    setTimeout(() => {
-      // Here you could update balance/accounts with new mock data if desired
-      setRefreshing(false);
-    }, 1500);
+    loadWithdrawalInfo().finally(() => setRefreshing(false));
   }, []);
 
   if (loading) {
     return (
+      <ThemedView style={{ flex: 1, backgroundColor: surface }}>
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          {/* Header Skeleton */}
+          <View style={styles.backRow}>
+            <SkeletonBox width={80} height={20} />
+          </View>
+
+          <SkeletonBox width={200} height={32} style={{ marginBottom: 24 }} />
+
+          {/* Balance Card Skeleton */}
+          <View style={[styles.balanceCard, { backgroundColor: cardBg }]}>
+            <SkeletonBox
+              width={120}
+              height={16}
+              style={{ alignSelf: "center", marginBottom: 8 }}
+            />
+            <SkeletonBox
+              width={180}
+              height={32}
+              style={{ alignSelf: "center", marginBottom: 8 }}
+            />
+            <SkeletonBox
+              width={100}
+              height={16}
+              style={{ alignSelf: "center" }}
+            />
+          </View>
+
+          {/* Bank Card Skeleton */}
+          <View style={styles.section}>
+            <SkeletonBox width={100} height={18} style={{ marginBottom: 12 }} />
+            <View style={[styles.bankCard, { backgroundColor: cardBg }]}>
+              <SkeletonBox
+                width={22}
+                height={22}
+                style={{ borderRadius: 11 }}
+              />
+              <View style={{ flex: 1 }}>
+                <SkeletonBox
+                  width="60%"
+                  height={16}
+                  style={{ marginBottom: 6 }}
+                />
+                <SkeletonBox width="40%" height={14} />
+              </View>
+              <SkeletonBox width={60} height={20} />
+            </View>
+          </View>
+
+          {/* Amount Section Skeleton */}
+          <View style={styles.section}>
+            <SkeletonBox width={80} height={18} style={{ marginBottom: 12 }} />
+            <SkeletonBox
+              width="100%"
+              height={48}
+              style={{ marginBottom: 12 }}
+            />
+            <View style={styles.quickRow}>
+              {[1, 2, 3, 4].map((i) => (
+                <SkeletonBox
+                  key={i}
+                  width={70}
+                  height={36}
+                  style={{ borderRadius: 8 }}
+                />
+              ))}
+            </View>
+          </View>
+
+          {/* Button Skeleton */}
+          <SkeletonBox
+            width="100%"
+            height={56}
+            style={{ borderRadius: 12, marginTop: 32 }}
+          />
+        </ScrollView>
+      </ThemedView>
+    );
+  }
+
+  if (!withdrawalInfo || !account) {
+    return (
       <ThemedView style={[styles.center, { backgroundColor: surface }]}>
-        <ActivityIndicator size="large" color={primary} />
+        <ThemedText>No bank account configured</ThemedText>
+        <ThemedText style={{ color: muted, marginTop: 8 }}>
+          Please add a bank account to withdraw
+        </ThemedText>
       </ThemedView>
     );
   }
@@ -158,7 +307,7 @@ export default function WithdrawEarningsScreen() {
             Available balance
           </ThemedText>
           <ThemedText type="title" style={{ textAlign: "center" }}>
-            ₦{WITHDRAW_DATA.balance.toLocaleString()}
+            ₦{withdrawalInfo.balance.toLocaleString()}
           </ThemedText>
           <ThemedText style={{ color: primary, textAlign: "center" }}>
             Ready to withdraw
@@ -173,14 +322,14 @@ export default function WithdrawEarningsScreen() {
             <IconSymbol name="credit-card" size={22} color={primary} />
 
             <View style={{ flex: 1 }}>
-              <ThemedText>{account.bank}</ThemedText>
+              <ThemedText>{account.bankName}</ThemedText>
               <ThemedText style={styles.bankSub}>
-                {account.type} - ••••{account.last4}
+                {account.accountNumber} - {account.accountName}
               </ThemedText>
             </View>
 
             <Pressable onPress={openAccountModal}>
-              <ThemedText type="link">Change</ThemedText>
+              <ThemedText type="link">View</ThemedText>
             </Pressable>
           </View>
         </View>
@@ -210,7 +359,7 @@ export default function WithdrawEarningsScreen() {
             <QuickButton
               label="All"
               onPress={() =>
-                setAmountDisplay(formatAmount(WITHDRAW_DATA.balance))
+                setAmountDisplay(formatAmount(withdrawalInfo.balance))
               }
             />
           </View>
@@ -234,49 +383,31 @@ export default function WithdrawEarningsScreen() {
         </Pressable>
       </ScrollView>
 
-      {/* Account Selector Modal */}
+      {/* Account Info Modal */}
       <Modal transparent visible={accountModal} animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={[styles.modalCard, { backgroundColor: cardBg }]}>
-            <ThemedText type="defaultSemiBold">Select account</ThemedText>
+            <ThemedText type="defaultSemiBold">Bank Account Details</ThemedText>
 
-            {accountModalLoading ? (
-              <View style={styles.loadingRows}>
-                {[1, 2, 3].map((i) => (
-                  <View key={i} style={styles.skeletonRow}>
-                    <View style={styles.skeletonIcon} />
-                    <View style={{ flex: 1 }}>
-                      <View style={styles.skeletonLine} />
-                      <View
-                        style={[
-                          styles.skeletonLine,
-                          { width: "60%", marginTop: 6 },
-                        ]}
-                      />
-                    </View>
-                  </View>
-                ))}
+            <View style={styles.modalRow}>
+              <IconSymbol name="credit-card" size={18} color={primary} />
+              <View>
+                <ThemedText>{account.bankName}</ThemedText>
+                <ThemedText style={styles.bankSub}>
+                  {account.accountNumber}
+                </ThemedText>
+                <ThemedText style={styles.bankSub}>
+                  {account.accountName}
+                </ThemedText>
               </View>
-            ) : (
-              WITHDRAW_DATA.accounts.map((a) => (
-                <Pressable
-                  key={a.id}
-                  style={styles.modalRow}
-                  onPress={() => {
-                    setAccount(a);
-                    setAccountModal(false);
-                  }}
-                >
-                  <IconSymbol name="credit-card" size={18} color={primary} />
-                  <View>
-                    <ThemedText>{a.bank}</ThemedText>
-                    <ThemedText style={styles.bankSub}>
-                      {a.type} - ••••{a.last4}
-                    </ThemedText>
-                  </View>
-                </Pressable>
-              ))
-            )}
+            </View>
+
+            <Pressable
+              style={[styles.closeBtn, { backgroundColor: primary }]}
+              onPress={() => setAccountModal(false)}
+            >
+              <ThemedText style={styles.withdrawText}>Close</ThemedText>
+            </Pressable>
           </View>
         </View>
       </Modal>
@@ -464,5 +595,14 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 24,
     borderRadius: 12,
+  },
+
+  closeBtn: {
+    marginTop: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    width: "100%",
+    alignItems: "center",
   },
 });

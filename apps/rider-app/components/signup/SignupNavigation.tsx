@@ -1,4 +1,4 @@
-import { View, Pressable, StyleSheet } from "react-native";
+import { View, Pressable, StyleSheet, ActivityIndicator } from "react-native";
 import { ThemedText } from "@/components/themed-text";
 import { useThemeColor } from "@/hooks/use-theme-color";
 
@@ -6,16 +6,21 @@ type Props = {
   step: number;
   onNext: () => void;
   onBack: () => void;
+  loading?: boolean;
 };
 
-export function SignupNavigation({ step, onNext, onBack }: Props) {
+export function SignupNavigation({ step, onNext, onBack, loading }: Props) {
   const primary = useThemeColor({}, "brandPrimary");
   const textOnPrimary = useThemeColor({}, "textOnPrimary");
 
   return (
     <View style={styles.container}>
       {step > 1 && (
-        <Pressable style={styles.backButton} onPress={onBack}>
+        <Pressable
+          style={styles.backButton}
+          onPress={onBack}
+          disabled={loading}
+        >
           <ThemedText type="link">Back</ThemedText>
         </Pressable>
       )}
@@ -23,10 +28,15 @@ export function SignupNavigation({ step, onNext, onBack }: Props) {
       <Pressable
         style={[styles.nextButton, { backgroundColor: primary }]}
         onPress={onNext}
+        disabled={loading}
       >
-        <ThemedText type="defaultSemiBold" style={{ color: textOnPrimary }}>
-          {step === 3 ? "Submit" : "Continue"}
-        </ThemedText>
+        {loading ? (
+          <ActivityIndicator color={textOnPrimary} />
+        ) : (
+          <ThemedText type="defaultSemiBold" style={{ color: textOnPrimary }}>
+            {step === 3 ? "Submit" : "Continue"}
+          </ThemedText>
+        )}
       </Pressable>
     </View>
   );

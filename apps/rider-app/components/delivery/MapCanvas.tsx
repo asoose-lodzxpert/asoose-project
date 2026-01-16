@@ -14,13 +14,12 @@ import MapView, {
   LatLng,
 } from "react-native-maps";
 import * as Location from "expo-location";
-import axios from "axios";
-import polyline from "@mapbox/polyline";
 
 import { Keys } from "@/config/keys";
 import { useDelivery } from "@/context/DeliveryContext";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
+import { getDirections } from "@/services/maps";
 
 export type MapCanvasHandle = {
   animateToPickup: () => void;
@@ -117,15 +116,23 @@ const MapCanvas = forwardRef<MapCanvasHandle>((_, ref) => {
         return;
       }
 
-      const { coordinates, distance, duration } = await getRouteData(
-        location.coords,
-        destination,
-        Keys.GOOGLE_MAPS_API_KEY
-      );
+      try {
+        const { coordinates, distance, duration, error } = await getDirections(
+          location.coords,
+          destination as { latitude: number; longitude: number }
+        );
 
-      setRouteCoords(coordinates);
-      setDistanceLeft(distance.text);
-      setEta(duration.text);
+        if (error) {
+          console.error("Failed to fetch route:", error);
+          return;
+        }
+
+        setRouteCoords(coordinates);
+        setDistanceLeft(distance.text);
+        setEta(duration.text);
+      } catch (error) {
+        console.error("Error fetching route:", error);
+      }
     }
 
     fetchRoute();
@@ -213,29 +220,6 @@ const MapCanvas = forwardRef<MapCanvasHandle>((_, ref) => {
 });
 
 export default MapCanvas;
-
-/* ───────── helpers ───────── */
-
-async function getRouteData(
-  origin: { latitude: number; longitude: number },
-  destination: { latitude: number; longitude: number },
-  apiKey: string
-) {
-  const res = await axios.get(
-    `https://maps.googleapis.com/maps/api/directions/json?origin=${origin.latitude},${origin.longitude}&destination=${destination.latitude},${destination.longitude}&key=${apiKey}&mode=driving`
-  );
-
-  const route = res.data.routes[0];
-  const points: LatLng[] = polyline
-    .decode(route.overview_polyline.points)
-    .map(([lat, lng]: [number, number]) => ({ latitude: lat, longitude: lng }));
-
-  return {
-    coordinates: points,
-    distance: route.legs[0].distance,
-    duration: route.legs[0].duration,
-  };
-}
 
 /* ───────── styles ───────── */
 

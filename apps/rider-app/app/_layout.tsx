@@ -46,6 +46,7 @@ function RootNavigator() {
             <Stack.Screen name="(auth)" />
           ))}
       </Stack>
+      <Toast />
     </GestureHandlerRootView>
   );
 }
@@ -55,7 +56,6 @@ export default function RootLayout() {
     <AuthProvider>
       <DeliveryProvider>
         <RootNavigator />
-        <Toast />
       </DeliveryProvider>
     </AuthProvider>
   );

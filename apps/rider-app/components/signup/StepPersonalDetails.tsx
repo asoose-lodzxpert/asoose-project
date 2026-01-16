@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { View, StyleSheet, Platform, KeyboardAvoidingView } from "react-native";
+import { View, StyleSheet, Platform, Pressable } from "react-native";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedInput } from "@/components/ThemedInput";
 import { IconSymbol } from "@/components/ui/icon-symbol";
@@ -22,6 +22,8 @@ export function StepPersonalDetails({ data, onChange }: Props) {
   const [selectedState, setSelectedState] = useState<string | undefined>(
     undefined
   );
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const cities = useMemo(() => {
     if (!selectedState) return [];
@@ -29,16 +31,68 @@ export function StepPersonalDetails({ data, onChange }: Props) {
   }, [selectedState]);
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      keyboardVerticalOffset={Platform.OS === "ios" ? 80 : 0}
-    >
+    <View>
       {/* Full name */}
       <Field label="Full name">
         <ThemedInput
           placeholder="John Doe"
           value={data.fullName}
           onChangeText={(v) => onChange("fullName", v)}
+          autoCapitalize="words"
+        />
+      </Field>
+
+      {/* Email */}
+      <Field label="Email address">
+        <ThemedInput
+          placeholder="john@example.com"
+          value={data.email}
+          onChangeText={(v) => onChange("email", v)}
+          keyboardType="email-address"
+          autoCapitalize="none"
+          autoComplete="email"
+        />
+      </Field>
+
+      {/* Password */}
+      <Field label="Password">
+        <ThemedInput
+          placeholder="Minimum 8 characters"
+          value={data.password}
+          onChangeText={(v) => onChange("password", v)}
+          secureTextEntry={!showPassword}
+          autoCapitalize="none"
+          iconRight={
+            <Pressable onPress={() => setShowPassword(!showPassword)}>
+              <IconSymbol
+                size={24}
+                name={showPassword ? "eye.fill" : "eye.slash.fill"}
+                color={primary}
+              />
+            </Pressable>
+          }
+        />
+      </Field>
+
+      {/* Confirm Password */}
+      <Field label="Confirm password">
+        <ThemedInput
+          placeholder="Re-enter your password"
+          value={data.confirmPassword}
+          onChangeText={(v) => onChange("confirmPassword", v)}
+          secureTextEntry={!showConfirmPassword}
+          autoCapitalize="none"
+          iconRight={
+            <Pressable
+              onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+            >
+              <IconSymbol
+                size={24}
+                name={showConfirmPassword ? "eye.fill" : "eye.slash.fill"}
+                color={primary}
+              />
+            </Pressable>
+          }
         />
       </Field>
 
@@ -122,7 +176,7 @@ export function StepPersonalDetails({ data, onChange }: Props) {
         <IconSymbol name="shield" size={16} color={primary} />
         <ThemedText style={{ color: muted }}>Your data is secured</ThemedText>
       </View>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 

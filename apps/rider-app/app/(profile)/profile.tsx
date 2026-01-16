@@ -1,30 +1,23 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import {
   View,
   StyleSheet,
   ScrollView,
   Pressable,
   RefreshControl,
-  ActivityIndicator,
 } from "react-native";
 import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { RelativePathString, useRouter } from "expo-router";
-
-const initialProfileData = {
-  name: "John Smith",
-  riderId: "#RDR-12345",
-  verified: true,
-  rating: 4.92,
-  totalDeliveries: 156,
-  hrsOnline: 12,
-  thisWeek: 18,
-  appPreferences: {
-    notifications: true,
-  },
-};
+import Toast from "react-native-toast-message";
+import {
+  getRiderProfile,
+  getProfileStats,
+  type RiderProfile,
+  type ProfileStats,
+} from "@/services/profile.service";
 
 const accountManagementItems = [
   {
@@ -45,6 +38,73 @@ const accountManagementItems = [
   },
 ];
 
+/* Skeleton Loaders */
+function SkeletonBox({
+  width,
+  height,
+  borderRadius = 8,
+}: {
+  width: number | `${number}%`;
+  height: number;
+  borderRadius?: number;
+}) {
+  return (
+    <View
+      style={{
+        width: width as any,
+        height,
+        borderRadius,
+        backgroundColor: "rgba(0,0,0,0.06)",
+      }}
+    />
+  );
+}
+
+function ProfileCardSkeleton({ border }: { border: string }) {
+  return (
+    <View style={[styles.profileCard, { borderColor: border }]}>
+      <SkeletonBox width={64} height={64} borderRadius={32} />
+      <View style={{ flex: 1, gap: 8 }}>
+        <SkeletonBox width="60%" height={24} borderRadius={4} />
+        <SkeletonBox width="40%" height={16} borderRadius={4} />
+        <SkeletonBox width="50%" height={20} borderRadius={4} />
+        <SkeletonBox width="70%" height={18} borderRadius={4} />
+      </View>
+    </View>
+  );
+}
+
+function StatsRowSkeleton({ border }: { border: string }) {
+  return (
+    <View style={styles.statsRow}>
+      {[1, 2, 3].map((i) => (
+        <View key={i} style={[styles.statCard, { borderColor: border }]}>
+          <SkeletonBox width={22} height={22} borderRadius={11} />
+          <SkeletonBox width={40} height={20} borderRadius={4} />
+          <SkeletonBox width={60} height={16} borderRadius={4} />
+        </View>
+      ))}
+    </View>
+  );
+}
+
+function SectionSkeleton({ border }: { border: string }) {
+  return (
+    <View style={[styles.section, { borderColor: border }]}>
+      <SkeletonBox width={150} height={20} borderRadius={4} />
+      {[1, 2, 3, 4].map((i) => (
+        <View key={i} style={[styles.menuItem, { borderColor: border }]}>
+          <View style={styles.menuLeft}>
+            <SkeletonBox width={22} height={22} borderRadius={11} />
+            <SkeletonBox width={150} height={18} borderRadius={4} />
+          </View>
+          <SkeletonBox width={18} height={18} borderRadius={9} />
+        </View>
+      ))}
+    </View>
+  );
+}
+
 export default function ProfileScreen() {
   const primary = useThemeColor({}, "brandPrimary");
   const surface = useThemeColor({}, "surfaceBackground");
@@ -54,39 +114,41 @@ export default function ProfileScreen() {
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [profile, setProfile] = useState<typeof initialProfileData | null>(
-    null
-  );
+  const [profile, setProfile] = useState<RiderProfile | null>(null);
+  const [stats, setStats] = useState<ProfileStats | null>(null);
 
-  // Simulate loading
-  React.useEffect(() => {
-    const timeout = setTimeout(() => {
-      setProfile(initialProfileData);
+  const fetchProfileData = useCallback(async () => {
+    try {
+      setLoading(true);
+      const [profileData, statsData] = await Promise.all([
+        getRiderProfile(),
+        getProfileStats(),
+      ]);
+      setProfile(profileData);
+      setStats(statsData);
+    } catch (error: any) {
+      Toast.show({
+        type: "error",
+        text1: "Failed to load profile",
+        text2: error.message || "Please try again",
+      });
+    } finally {
       setLoading(false);
-    }, 1200);
-    return () => clearTimeout(timeout);
+      setRefreshing(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchProfileData();
+  }, [fetchProfileData]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    setTimeout(() => {
-      setProfile(initialProfileData);
-      setRefreshing(false);
-    }, 1000);
-  }, []);
+    fetchProfileData();
+  }, [fetchProfileData]);
 
-  if (loading || !profile) {
-    return (
-      <ThemedView
-        style={[
-          styles.container,
-          { justifyContent: "center", alignItems: "center" },
-        ]}
-      >
-        <ActivityIndicator size={24} color={primary} />
-      </ThemedView>
-    );
-  }
+  const isVerified =
+    profile?.status === "ACTIVE" || profile?.status === "VERIFIED";
 
   return (
     <ThemedView style={[styles.container, { backgroundColor: surface }]}>
@@ -99,86 +161,115 @@ export default function ProfileScreen() {
       <ScrollView
         contentContainerStyle={styles.content}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[primary]}
+          />
         }
       >
         {/* Profile Card */}
-        <View style={[styles.profileCard, { borderColor: border }]}>
-          <View style={[styles.avatar, { backgroundColor: primary }]}>
-            <IconSymbol name="person" size={36} color="#fff" />
-          </View>
-          <View style={{ flex: 1 }}>
-            <ThemedText type="title">{profile.name}</ThemedText>
-            <ThemedText style={styles.subText}>
-              Rider ID: {profile.riderId}
-            </ThemedText>
-            {profile.verified && (
-              <View style={styles.badge}>
-                <IconSymbol name="checkmark.seal" size={14} color="#16A34A" />
-                <ThemedText style={styles.badgeText}>Verified Rider</ThemedText>
-              </View>
-            )}
-            <View style={styles.ratingRow}>
-              <IconSymbol name="star.fill" size={18} color="#FACC15" />
-              <ThemedText style={styles.ratingText}>
-                {profile.rating}
-              </ThemedText>
+        {loading && !profile ? (
+          <ProfileCardSkeleton border={border} />
+        ) : profile ? (
+          <View style={[styles.profileCard, { borderColor: border }]}>
+            <View style={[styles.avatar, { backgroundColor: primary }]}>
+              {profile.image ? (
+                <View style={{ width: 64, height: 64, borderRadius: 32 }}>
+                  {/* TODO: Add image component */}
+                  <IconSymbol name="person" size={36} color="#fff" />
+                </View>
+              ) : (
+                <IconSymbol name="person" size={36} color="#fff" />
+              )}
+            </View>
+            <View style={{ flex: 1 }}>
+              <ThemedText type="title">{profile.name}</ThemedText>
               <ThemedText style={styles.subText}>
-                ({profile.totalDeliveries} deliveries)
+                Rider ID: #{profile.id.slice(0, 8).toUpperCase()}
               </ThemedText>
-              <Pressable>
-                <ThemedText style={[styles.link, { color: primary }]}>
-                  View Feedback
+              {isVerified && (
+                <View style={styles.badge}>
+                  <IconSymbol name="checkmark.seal" size={14} color="#16A34A" />
+                  <ThemedText style={styles.badgeText}>
+                    Verified Rider
+                  </ThemedText>
+                </View>
+              )}
+              <View style={styles.ratingRow}>
+                <IconSymbol name="star.fill" size={18} color="#FACC15" />
+                <ThemedText style={styles.ratingText}>
+                  {profile.rating.toFixed(2)}
                 </ThemedText>
-              </Pressable>
+                <ThemedText style={styles.subText}>
+                  ({profile.totalRides} deliveries)
+                </ThemedText>
+                <Pressable>
+                  <ThemedText style={[styles.link, { color: primary }]}>
+                    View Feedback
+                  </ThemedText>
+                </Pressable>
+              </View>
             </View>
           </View>
-        </View>
+        ) : null}
 
         {/* Stats */}
-        <View style={styles.statsRow}>
-          <StatCard
-            label="Deliveries"
-            value={profile.totalDeliveries.toString()}
-            icon="box.truck"
-            border={border}
-          />
-          <StatCard
-            label="Hrs Online"
-            value={profile.hrsOnline.toString()}
-            icon="clock"
-            border={border}
-          />
-          <StatCard
-            label="This Week"
-            value={profile.thisWeek.toString()}
-            icon="calendar"
-            border={border}
-          />
-        </View>
+        {loading && !stats ? (
+          <StatsRowSkeleton border={border} />
+        ) : stats ? (
+          <View style={styles.statsRow}>
+            <StatCard
+              label="Deliveries"
+              value={stats.totalDeliveries.toString()}
+              icon="box.truck"
+              border={border}
+            />
+            <StatCard
+              label="Hrs Online"
+              value={stats.hoursOnline.toFixed(1)}
+              icon="clock"
+              border={border}
+            />
+            <StatCard
+              label="This Week"
+              value={stats.thisWeekDeliveries.toString()}
+              icon="calendar"
+              border={border}
+            />
+          </View>
+        ) : null}
 
         {/* Account Management */}
-        <Section title="Account Management" border={border}>
-          {accountManagementItems.map((item) => (
-            <MenuItem
-              key={item.label}
-              icon={item.icon}
-              label={item.label}
-              border={border}
-              onPress={() => router.push(item.route as RelativePathString)}
-            />
-          ))}
-        </Section>
+        {loading && !profile ? (
+          <SectionSkeleton border={border} />
+        ) : profile ? (
+          <Section title="Account Management" border={border}>
+            {accountManagementItems.map((item) => (
+              <MenuItem
+                key={item.label}
+                icon={item.icon}
+                label={item.label}
+                border={border}
+                onPress={() => router.push(item.route as RelativePathString)}
+              />
+            ))}
+          </Section>
+        ) : null}
 
         {/* App Preferences */}
-        <Section title="App Preferences" border={border}>
-          <MenuItem
-            icon="bell"
-            label="Notifications"
-            border={border}
-            onPress={() => router.push("/(profile)/notifications")}
-          />
-        </Section>
+        {loading && !profile ? (
+          <SectionSkeleton border={border} />
+        ) : profile ? (
+          <Section title="App Preferences" border={border}>
+            <MenuItem
+              icon="bell"
+              label="Notifications"
+              border={border}
+              onPress={() => router.push("/(profile)/notifications")}
+            />
+          </Section>
+        ) : null}
       </ScrollView>
     </ThemedView>
   );

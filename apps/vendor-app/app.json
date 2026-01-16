@@ -18,7 +18,6 @@
     "platforms": ["ios", "android"],
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/adaptive-icon.png"
       },
       "edgeToEdgeEnabled": true,
@@ -41,11 +40,7 @@
         {
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 200,
-          "resizeMode": "contain",
-          "backgroundColor": "#F9FAFB",
-          "dark": {
-            "backgroundColor": "#0F172A"
-          }
+          "resizeMode": "contain"
         }
       ],
       [
@@ -66,7 +61,8 @@
           "icon": "./assets/images/icon.png",
           "color": "#0EA5E9"
         }
-      ]
+      ],
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true,

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   View,
   StyleSheet,
@@ -7,7 +7,7 @@ import {
   Image,
   Alert,
 } from "react-native";
-import * as DocumentPicker from "expo-document-picker";
+import * as ImagePicker from "expo-image-picker";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedInput } from "@/components/ThemedInput";
 import { useThemeColor } from "@/hooks/use-theme-color";
@@ -42,28 +42,53 @@ const VEHICLES: { key: VehicleType; label: string; icon: any }[] = [
 
 export function StepVehicleInfo({ data, onChange }: Props) {
   const primary = useThemeColor({}, "brandPrimary");
+  const [uploading, setUploading] = useState<string | null>(null);
 
-  const pickFile = async (key: keyof SignupForm["documents"]) => {
-    const result = await DocumentPicker.getDocumentAsync({
-      type: ["application/pdf", "image/jpeg", "image/png"],
-      multiple: false,
-      copyToCacheDirectory: true,
-    });
+  const pickImage = async (key: keyof SignupForm["documents"]) => {
+    try {
+      setUploading(key);
 
-    if (result.canceled) return;
+      const { status } =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert(
+          "Permission Required",
+          "Please grant camera roll permissions to upload documents."
+        );
+        setUploading(null);
+        return;
+      }
 
-    const asset = result.assets?.[0];
-    if (!asset) return;
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        quality: 0.8,
+        base64: false,
+      });
 
-    if (asset.size && asset.size > MAX_SIZE) {
-      Alert.alert("File too large", "Maximum file size is 5MB");
-      return;
+      if (result.canceled) {
+        setUploading(null);
+        return;
+      }
+
+      const asset = result.assets?.[0];
+      if (!asset?.uri) {
+        setUploading(null);
+        return;
+      }
+
+      // Store the URI as the document value
+      onChange("documents", {
+        ...data.documents,
+        [key]: asset.uri,
+      });
+
+      setUploading(null);
+    } catch (error) {
+      console.error("Error picking image:", error);
+      Alert.alert("Error", "Failed to pick image");
+      setUploading(null);
     }
-
-    onChange("documents", {
-      ...data.documents,
-      [key]: asset,
-    });
   };
 
   const removeFile = (key: keyof SignupForm["documents"]) => {
@@ -116,6 +141,17 @@ export function StepVehicleInfo({ data, onChange }: Props) {
         />
       </Field>
 
+      {/* Year */}
+      <Field label="Year">
+        <ThemedInput
+          placeholder="2020"
+          value={data.year}
+          onChangeText={(v) => onChange("year", v)}
+          keyboardType="number-pad"
+          maxLength={4}
+        />
+      </Field>
+
       {/* Color */}
       <Field label="Color">
         <ThemedInput
@@ -138,20 +174,22 @@ export function StepVehicleInfo({ data, onChange }: Props) {
       <Field label="Upload Documents">
         {(
           [
-            { key: "id", label: "ID Document" },
-            { key: "license", label: "Driver's License" },
-            { key: "insurance", label: "Vehicle Insurance" },
+            { key: "idCard", label: "ID Document (National ID/Passport)" },
+            { key: "driverLicense", label: "Driver's License" },
+            { key: "vehicleInsurance", label: "Vehicle Insurance" },
+            { key: "vehicleRegistration", label: "Vehicle Registration" },
           ] as const
         ).map(({ key, label }) => {
           const file = data.documents[key];
           const uploaded = Boolean(file);
+          const isUploading = uploading === key;
 
           return (
             <View key={key} style={styles.section}>
               <ThemedText type="defaultSemiBold">{label}</ThemedText>
               <Pressable
-                disabled={uploaded}
-                onPress={() => pickFile(key)}
+                disabled={uploaded || isUploading}
+                onPress={() => pickImage(key)}
                 style={[
                   styles.uploadCard,
                   uploaded && {
@@ -163,20 +201,20 @@ export function StepVehicleInfo({ data, onChange }: Props) {
               >
                 <IconSymbol
                   size={32}
-                  name={uploaded ? "check" : "cloud.upload"}
+                  name={uploaded ? "checkmark.circle.fill" : "cloud.upload"}
                   color={uploaded ? "#22C55E" : "#9CA3AF"}
                 />
                 <ThemedText style={styles.uploadText}>
-                  {uploaded
-                    ? "File uploaded successfully"
-                    : "Tap to upload or drag & drop"}
+                  {isUploading
+                    ? "Uploading..."
+                    : uploaded
+                      ? "File uploaded successfully"
+                      : "Tap to upload image"}
                 </ThemedText>
                 <ThemedText style={styles.hintText}>
                   {uploaded && file
-                    ? (file as any).name ||
-                      (file as any).uri?.split("/").pop() ||
-                      ""
-                    : "PDF, JPG, PNG (max 5MB)"}
+                    ? file.split("/").pop() || "Document"
+                    : "JPG, PNG (max 5MB)"}
                 </ThemedText>
                 {uploaded && (
                   <Pressable

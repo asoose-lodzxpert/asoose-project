@@ -11,8 +11,8 @@ import {
   Keyboard,
   TouchableWithoutFeedback,
   Animated,
+  Alert,
 } from "react-native";
-import { login } from "@/services/auth";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { ThemedView } from "@/components/themed-view";
 import { ThemedInput } from "@/components/ThemedInput";
@@ -26,16 +26,16 @@ export default function LoginScreen() {
   const [password, setPassword] = useState("");
   const [secure, setSecure] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [biometricLoading, setBiometricLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const { signIn } = useAuth();
+  const { signIn, signInWithBiometric, biometric } = useAuth();
   const router = useRouter();
 
   const primary = useThemeColor({}, "brandPrimary");
   const textOnPrimary = useThemeColor({}, "textOnPrimary");
   const muted = useThemeColor({}, "textMuted");
 
-  // Animated logo
   const logoAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -79,18 +79,51 @@ export default function LoginScreen() {
     setLoading(true);
 
     try {
-      const result = await login(identifier, password);
-      await signIn(result.user);
+      await signIn(identifier, password);
       router.replace("/(tabs)");
     } catch (e: any) {
-      setError(e.message);
+      setError(e.message || "Login failed. Please try again.");
     } finally {
       setLoading(false);
     }
   }
 
-  function handleBiometricLogin() {
-    // biometric auth logic (Face ID / Fingerprint)
+  async function handleBiometricLogin() {
+    if (!biometric.isSupported) {
+      Alert.alert(
+        "Not Supported",
+        "Your device doesn't support biometric authentication."
+      );
+      return;
+    }
+
+    if (!biometric.isEnrolled) {
+      Alert.alert(
+        "Not Enrolled",
+        "Please set up biometric authentication in your device settings."
+      );
+      return;
+    }
+
+    if (!biometric.isEnabled) {
+      Alert.alert(
+        "Biometric Login Disabled",
+        "Please login with your credentials first and enable biometric login in settings."
+      );
+      return;
+    }
+
+    setBiometricLoading(true);
+    setError("");
+
+    try {
+      await signInWithBiometric();
+      router.replace("/(tabs)");
+    } catch (e: any) {
+      setError(e.message || "Biometric authentication failed.");
+    } finally {
+      setBiometricLoading(false);
+    }
   }
 
   return (
@@ -195,10 +228,21 @@ export default function LoginScreen() {
                   </Pressable>
 
                   <Pressable
-                    style={[styles.fingerprintButton, { borderColor: primary }]}
+                    style={[
+                      styles.fingerprintButton,
+                      { borderColor: primary },
+                      (!biometric.isEnabled || biometricLoading) && {
+                        opacity: 0.5,
+                      },
+                    ]}
                     onPress={handleBiometricLogin}
+                    disabled={biometricLoading || !biometric.isEnabled}
                   >
-                    <IconSymbol name="touchid" size={26} color={primary} />
+                    {biometricLoading ? (
+                      <ActivityIndicator color={primary} />
+                    ) : (
+                      <IconSymbol name="touchid" size={26} color={primary} />
+                    )}
                   </Pressable>
                 </View>
 

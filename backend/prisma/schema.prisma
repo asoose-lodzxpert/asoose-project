@@ -292,7 +292,6 @@ model Rider {
 
   // Financials & Stats
   walletBalance Float @default(0)
-  balance       Float @default(0)
   rating        Float @default(5.0)
   totalRides    Int   @default(0)
 
@@ -301,6 +300,7 @@ model Rider {
   bankAccount              BankAccount?
   vehicle                  Vehicle?
   documents                RiderDocument[]
+  notificationSettings     RiderNotificationSettings? @relation("RiderNotificationSettings")
   rides                    Ride[]         @relation("RideRider")
   deliveries               Delivery[]     @relation("DeliveryRider")
   notifications            Notification[]
@@ -361,6 +361,33 @@ model RiderDocument {
   updatedAt DateTime           @updatedAt
 
   @@index([riderId, status])
+}
+
+model RiderNotificationSettings {
+  id        String   @id @default(uuid())
+  riderId   String   @unique
+  rider     Rider    @relation("RiderNotificationSettings", fields: [riderId], references: [id], onDelete: Cascade)
+  
+  // Master toggle
+  masterEnabled Boolean @default(true)
+  
+  // Delivery notifications
+  newOrders     Boolean @default(true)
+  orderUpdates  Boolean @default(true)
+  vibration     Boolean @default(true)
+  
+  // Earnings notifications
+  paymentUpdates Boolean @default(true)
+  dailySummary   Boolean @default(false)
+  weeklySummary  Boolean @default(true)
+  
+  // Account & Safety
+  securityAlerts Boolean @default(true)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([riderId])
 }
 
 model VehicleDocument {

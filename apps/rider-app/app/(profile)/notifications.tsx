@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import {
   View,
   StyleSheet,
@@ -6,28 +6,98 @@ import {
   Switch,
   RefreshControl,
   Pressable,
+  Animated,
 } from "react-native";
 import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { useRouter } from "expo-router";
+import Toast from "react-native-toast-message";
+import {
+  getNotificationSettings,
+  updateNotificationSettings,
+} from "@/services/notification-settings.service";
 
-type NotificationSettings = {
+// Skeleton loader component
+const SkeletonBox = ({
+  width,
+  height,
+  radius = 8,
+}: {
+  width: number | string;
+  height: number;
+  radius?: number;
+}) => {
+  const opacity = React.useRef(new Animated.Value(0.3)).current;
+  const surfaceCard = useThemeColor({}, "surfaceCard");
+
+  React.useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, {
+          toValue: 0.7,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacity, {
+          toValue: 0.3,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [opacity]);
+
+  return (
+    <Animated.View
+      style={[
+        {
+          height,
+          backgroundColor: surfaceCard,
+          borderRadius: radius,
+          opacity,
+        },
+        typeof width === "number" ? { width } : { width: width as any },
+      ]}
+    />
+  );
+};
+
+const ToggleRowSkeleton = () => {
+  return (
+    <View style={styles.row}>
+      <SkeletonBox width={180} height={18} />
+      <SkeletonBox width={51} height={31} radius={16} />
+    </View>
+  );
+};
+
+const SectionSkeleton = ({ border }: { border: string }) => {
+  return (
+    <View style={[styles.section, { borderColor: border }]}>
+      <SkeletonBox width={140} height={20} />
+      <ToggleRowSkeleton />
+      <ToggleRowSkeleton />
+      <ToggleRowSkeleton />
+    </View>
+  );
+};
+
+type NotificationSettingsState = {
   masterEnabled: boolean;
-
   delivery: {
     newOrders: boolean;
     orderUpdates: boolean;
     vibration: boolean;
   };
-
   earnings: {
     paymentUpdates: boolean;
     dailySummary: boolean;
     weeklySummary: boolean;
   };
-
   accountSafety: {
     alerts: boolean;
   };
@@ -39,9 +109,9 @@ export default function NotificationsScreen() {
   const surface = useThemeColor({}, "surfaceBackground");
   const border = useThemeColor({}, "borderDefault");
 
+  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-
-  const [settings, setSettings] = useState<NotificationSettings>({
+  const [settings, setSettings] = useState<NotificationSettingsState>({
     masterEnabled: true,
     delivery: {
       newOrders: true,
@@ -58,17 +128,75 @@ export default function NotificationsScreen() {
     },
   });
 
-  const onRefresh = useCallback(() => {
-    setRefreshing(true);
-    setTimeout(() => {
-      setSettings((prev) => ({ ...prev }));
+  const fetchSettings = useCallback(async () => {
+    try {
+      setLoading(true);
+      const data = await getNotificationSettings();
+
+      // Map API response to local state structure
+      setSettings({
+        masterEnabled: data.masterEnabled,
+        delivery: {
+          newOrders: data.newOrders,
+          orderUpdates: data.orderUpdates,
+          vibration: data.vibration,
+        },
+        earnings: {
+          paymentUpdates: data.paymentUpdates,
+          dailySummary: data.dailySummary,
+          weeklySummary: data.weeklySummary,
+        },
+        accountSafety: {
+          alerts: data.securityAlerts,
+        },
+      });
+    } catch (error: any) {
+      Toast.show({
+        type: "error",
+        text1: "Failed to load settings",
+        text2: error.message || "Please try again",
+      });
+    } finally {
+      setLoading(false);
       setRefreshing(false);
-    }, 1000);
+    }
   }, []);
 
+  useEffect(() => {
+    fetchSettings();
+  }, [fetchSettings]);
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    fetchSettings();
+  }, [fetchSettings]);
+
+  const saveSettings = async (updatedSettings: NotificationSettingsState) => {
+    try {
+      await updateNotificationSettings({
+        masterEnabled: updatedSettings.masterEnabled,
+        newOrders: updatedSettings.delivery.newOrders,
+        orderUpdates: updatedSettings.delivery.orderUpdates,
+        vibration: updatedSettings.delivery.vibration,
+        paymentUpdates: updatedSettings.earnings.paymentUpdates,
+        dailySummary: updatedSettings.earnings.dailySummary,
+        weeklySummary: updatedSettings.earnings.weeklySummary,
+        securityAlerts: updatedSettings.accountSafety.alerts,
+      });
+    } catch (error: any) {
+      Toast.show({
+        type: "error",
+        text1: "Failed to update settings",
+        text2: error.message || "Please try again",
+      });
+      // Revert to previous settings on error
+      fetchSettings();
+    }
+  };
+
   const toggleMaster = (value: boolean) => {
-    setSettings((prev) => ({
-      ...prev,
+    const updatedSettings = {
+      ...settings,
       masterEnabled: value,
       delivery: {
         newOrders: value,
@@ -83,7 +211,9 @@ export default function NotificationsScreen() {
       accountSafety: {
         alerts: value,
       },
-    }));
+    };
+    setSettings(updatedSettings);
+    saveSettings(updatedSettings);
   };
 
   return (
@@ -98,105 +228,132 @@ export default function NotificationsScreen() {
         </ThemedText>
         <View style={{ width: 40 }} />
       </View>
-
-      {/* <ThemedText style={styles.subHeader}>Manage your alerts</ThemedText> */}
-
+      
       <ScrollView
         contentContainerStyle={{ padding: 20, gap: 28 }}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[primary]}
+          />
         }
       >
-        {/* Master Toggle */}
-        <View style={[styles.section, { borderColor: border }]}>
-          <ToggleRow
-            label="Enable Notifications"
-            value={settings.masterEnabled}
-            onChange={toggleMaster}
-          />
-        </View>
+        {loading ? (
+          <>
+            <SectionSkeleton border={border} />
+            <SectionSkeleton border={border} />
+            <SectionSkeleton border={border} />
+            <SectionSkeleton border={border} />
+          </>
+        ) : (
+          <>
+            {/* Master Toggle */}
+            <View style={[styles.section, { borderColor: border }]}>
+              <ToggleRow
+                label="Enable Notifications"
+                value={settings.masterEnabled}
+                onChange={toggleMaster}
+              />
+            </View>
 
-        {/* Delivery Notifications */}
-        <Section title="Delivery Notifications">
-          <ToggleRow
-            label="Alert for new delivery requests"
-            value={settings.delivery.newOrders}
-            onChange={(v) =>
-              setSettings((p) => ({
-                ...p,
-                delivery: { ...p.delivery, newOrders: v },
-              }))
-            }
-          />
-          <ToggleRow
-            label="Status changes and messages"
-            value={settings.delivery.orderUpdates}
-            onChange={(v) =>
-              setSettings((p) => ({
-                ...p,
-                delivery: { ...p.delivery, orderUpdates: v },
-              }))
-            }
-          />
-          <ToggleRow
-            label="Vibration"
-            value={settings.delivery.vibration}
-            onChange={(v) =>
-              setSettings((p) => ({
-                ...p,
-                delivery: { ...p.delivery, vibration: v },
-              }))
-            }
-          />
-        </Section>
+            {/* Delivery Notifications */}
+            <Section title="Delivery Notifications">
+              <ToggleRow
+                label="Alert for new delivery requests"
+                value={settings.delivery.newOrders}
+                onChange={(v) => {
+                  const updated = {
+                    ...settings,
+                    delivery: { ...settings.delivery, newOrders: v },
+                  };
+                  setSettings(updated);
+                  saveSettings(updated);
+                }}
+              />
+              <ToggleRow
+                label="Status changes and messages"
+                value={settings.delivery.orderUpdates}
+                onChange={(v) => {
+                  const updated = {
+                    ...settings,
+                    delivery: { ...settings.delivery, orderUpdates: v },
+                  };
+                  setSettings(updated);
+                  saveSettings(updated);
+                }}
+              />
+              <ToggleRow
+                label="Vibration"
+                value={settings.delivery.vibration}
+                onChange={(v) => {
+                  const updated = {
+                    ...settings,
+                    delivery: { ...settings.delivery, vibration: v },
+                  };
+                  setSettings(updated);
+                  saveSettings(updated);
+                }}
+              />
+            </Section>
 
-        {/* Earnings Notifications */}
-        <Section title="Earnings Notifications">
-          <ToggleRow
-            label="Payment updates"
-            value={settings.earnings.paymentUpdates}
-            onChange={(v) =>
-              setSettings((p) => ({
-                ...p,
-                earnings: { ...p.earnings, paymentUpdates: v },
-              }))
-            }
-          />
-          <ToggleRow
-            label="Daily summary"
-            value={settings.earnings.dailySummary}
-            onChange={(v) =>
-              setSettings((p) => ({
-                ...p,
-                earnings: { ...p.earnings, dailySummary: v },
-              }))
-            }
-          />
-          <ToggleRow
-            label="Weekly summary"
-            value={settings.earnings.weeklySummary}
-            onChange={(v) =>
-              setSettings((p) => ({
-                ...p,
-                earnings: { ...p.earnings, weeklySummary: v },
-              }))
-            }
-          />
-        </Section>
+            {/* Earnings Notifications */}
+            <Section title="Earnings Notifications">
+              <ToggleRow
+                label="Payment updates"
+                value={settings.earnings.paymentUpdates}
+                onChange={(v) => {
+                  const updated = {
+                    ...settings,
+                    earnings: { ...settings.earnings, paymentUpdates: v },
+                  };
+                  setSettings(updated);
+                  saveSettings(updated);
+                }}
+              />
+              <ToggleRow
+                label="Daily summary"
+                value={settings.earnings.dailySummary}
+                onChange={(v) => {
+                  const updated = {
+                    ...settings,
+                    earnings: { ...settings.earnings, dailySummary: v },
+                  };
+                  setSettings(updated);
+                  saveSettings(updated);
+                }}
+              />
+              <ToggleRow
+                label="Weekly summary"
+                value={settings.earnings.weeklySummary}
+                onChange={(v) => {
+                  const updated = {
+                    ...settings,
+                    earnings: { ...settings.earnings, weeklySummary: v },
+                  };
+                  setSettings(updated);
+                  saveSettings(updated);
+                }}
+              />
+            </Section>
 
-        {/* Account & Safety */}
-        <Section title="Account & Safety">
-          <ToggleRow
-            label="Security alerts"
-            value={settings.accountSafety.alerts}
-            onChange={(v) =>
-              setSettings((p) => ({
-                ...p,
-                accountSafety: { alerts: v },
-              }))
-            }
-          />
-        </Section>
+            {/* Account & Safety */}
+            <Section title="Account & Safety">
+              <ToggleRow
+                label="Security alerts"
+                value={settings.accountSafety.alerts}
+                onChange={(v) => {
+                  const updated = {
+                    ...settings,
+                    accountSafety: { alerts: v },
+                  };
+                  setSettings(updated);
+                  saveSettings(updated);
+                }}
+              />
+            </Section>
+          </>
+        )}
       </ScrollView>
     </ThemedView>
   );
