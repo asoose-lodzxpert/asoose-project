@@ -1,41 +1,34 @@
 import Link from 'next/link';
-import { FileQuestion, Home, ArrowLeft } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 
 export default function NotFound() {
   return (
-    <div className="min-h-screen bg-[#0F172A] flex flex-col items-center justify-center text-center p-4">
-      {/* Icon with Glow Effect */}
-      <div className="relative mb-8">
-        <div className="absolute inset-0 bg-yellow-500 blur-2xl opacity-20 rounded-full"></div>
-        <div className="relative bg-[#1E293B] p-6 rounded-2xl border border-gray-800 shadow-xl">
-          <FileQuestion className="w-16 h-16 text-yellow-500" />
-        </div>
+    <div className="min-h-screen bg-[#0a0a0a] flex flex-col items-center justify-center p-6 select-none">
+      {/* 404 Visual */}
+      <div className="mb-4">
+        <span className="text-[12rem] font-black leading-none tracking-tighter text-white/5">
+          404
+        </span>
       </div>
 
       {/* Text Content */}
-      <h1 className="text-4xl font-black text-white mb-2 tracking-tight">
-        Page Not Found
-      </h1>
-      <p className="text-gray-400 max-w-md mb-8">
-        The page you are looking for does not exist!.
-      </p>
-
-      {/* Action Buttons */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <Link 
-          href="/home" 
-          className="flex items-center gap-2 px-6 py-3 bg-yellow-500 hover:bg-yellow-400 text-black font-bold rounded-xl transition-all shadow-lg shadow-yellow-500/20"
-        >
-          <Home className="w-4 h-4" /> Go to Home
-        </Link>
-        
-        <Link 
-          href=".." 
-          className="flex items-center gap-2 px-6 py-3 bg-[#1E293B] hover:bg-[#334155] text-white font-bold rounded-xl border border-gray-700 transition-all"
-        >
-          <ArrowLeft className="w-4 h-4" /> Go Back
-        </Link>
+      <div className="text-center space-y-2 mb-12">
+        <h1 className="text-xl font-bold text-white uppercase tracking-[0.3em]">
+          Lost in Space
+        </h1>
+        <p className="text-zinc-500 text-sm font-medium">
+          The page you requested does not exist.
+        </p>
       </div>
+
+      {/* Simplified Action */}
+      <Link 
+        href="/home" 
+        className="group flex items-center gap-3 text-yellow-500 hover:text-white transition-colors duration-300"
+      >
+        <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" />
+        <span className="text-xs font-black uppercase tracking-widest">Return to Base</span>
+      </Link>
     </div>
   );
 }

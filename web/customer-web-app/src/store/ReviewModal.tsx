@@ -6,7 +6,8 @@ import { X, Star, Loader2 } from 'lucide-react';
 interface ReviewModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (rating: number, comment: string) => Promise<void>;
+  onSubmit: (rating: number, comment: string, orderId?: string) => Promise<void>;
+  orderId?: string; // Optional for general store reviews, required for verified order reviews
   initialData?: {
     rating: number;
     comment: string;
@@ -20,6 +21,7 @@ export const ReviewModal = ({
   isOpen,
   onClose,
   onSubmit,
+  orderId, // Destructured to pass to the submission logic
   initialData,
 }: ReviewModalProps) => {
   const isEditMode = Boolean(initialData);
@@ -90,7 +92,8 @@ export const ReviewModal = ({
     setIsSubmitting(true);
 
     try {
-      await onSubmit(rating, comment.trim());
+      // Passes orderId as the third argument to link the review to a specific purchase
+      await onSubmit(rating, comment.trim(), orderId);
       onClose();
     } catch (err) {
       setErrors({
@@ -125,15 +128,16 @@ export const ReviewModal = ({
       >
         {/* Header */}
         <div className="flex justify-between items-center mb-6">
-          <h3 id="review-title" className="text-xl font-black">
+          <h3 id="review-title" className="text-xl font-black italic">
             {isEditMode ? 'Edit Review' : 'Write a Review'}
           </h3>
           <button
             onClick={onClose}
             disabled={isSubmitting}
+            className="p-2 hover:bg-gray-100 dark:hover:bg-white/5 rounded-full transition-colors"
             aria-label="Close modal"
           >
-            <X />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
@@ -149,12 +153,6 @@ export const ReviewModal = ({
               onMouseEnter={() => setHoverRating(s)}
               onMouseLeave={() => setHoverRating(0)}
               onClick={() => setRating(s)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  setRating(s);
-                }
-              }}
             >
               <Star
                 className={`w-10 h-10 transition-colors ${
@@ -168,7 +166,7 @@ export const ReviewModal = ({
         </div>
 
         {errors.rating && (
-          <p className="text-center text-sm text-red-500 mb-2">
+          <p className="text-center text-xs font-bold text-red-500 mb-2 uppercase tracking-widest">
             {errors.rating}
           </p>
         )}
@@ -181,42 +179,43 @@ export const ReviewModal = ({
             setComment(e.target.value)
           }
           disabled={isSubmitting}
-          className="w-full h-32 p-4 rounded-xl resize-none border
-            focus:outline-none focus:ring-2 focus:ring-yellow-500"
-          placeholder="Share your experience (optional)"
+          className="w-full h-32 p-4 rounded-2xl resize-none border-none bg-gray-50 dark:bg-white/5
+            focus:outline-none focus:ring-2 focus:ring-yellow-500 transition-all"
+          placeholder="Share your experience (optional)..."
         />
 
-        <div className="flex justify-between text-xs mt-2 mb-2 text-gray-500">
+        <div className="flex justify-between text-[10px] font-black uppercase tracking-widest mt-2 mb-4 text-gray-400">
           <span>
-            {comment.trim() &&
-            comment.trim().length < MIN_COMMENT_LENGTH
+            {comment.trim() && comment.trim().length < MIN_COMMENT_LENGTH
               ? `Min ${MIN_COMMENT_LENGTH} chars`
               : 'Optional'}
           </span>
-          <span>{MAX_COMMENT_LENGTH - comment.length} left</span>
+          <span>{MAX_COMMENT_LENGTH - comment.length} characters left</span>
         </div>
 
         {errors.comment && (
-          <p className="text-sm text-red-500 mb-3">
+          <p className="text-xs font-bold text-red-500 mb-3 uppercase tracking-widest">
             {errors.comment}
           </p>
         )}
 
         {errors.submit && (
-          <p className="text-sm text-red-600 mb-3">
-            {errors.submit}
-          </p>
+          <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl mb-4">
+            <p className="text-xs font-bold text-red-600 text-center">
+              {errors.submit}
+            </p>
+          </div>
         )}
 
         <button
           onClick={handleSubmit}
           disabled={isSubmitting}
-          className="w-full h-12 bg-yellow-500 rounded-xl font-bold
-            disabled:opacity-60 disabled:cursor-not-allowed"
+          className="w-full h-14 bg-yellow-500 hover:bg-yellow-600 text-black rounded-2xl font-black
+            disabled:opacity-60 disabled:cursor-not-allowed transition-all active:scale-[0.98] flex items-center justify-center gap-2 shadow-xl shadow-yellow-500/20"
         >
           {isSubmitting ? (
             <>
-              <Loader2 className="inline mr-2 animate-spin" />
+              <Loader2 className="w-5 h-5 animate-spin" />
               Submitting…
             </>
           ) : isEditMode ? (

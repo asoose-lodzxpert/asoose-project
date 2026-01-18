@@ -1,5 +1,5 @@
 import { 
-  Body, Controller, Delete, Get, Param, Post, Query, UseGuards, UsePipes, ValidationPipe, Patch
+  Body, Controller, Delete, Get, Param, Post, Query, UseGuards, UsePipes, ValidationPipe, Patch,Request
 } from '@nestjs/common';
 import { StoresService } from './vendors.service';
 import { CreateVendorDto, VendorQueryDto } from './dto/vendor.dto';
@@ -31,11 +31,6 @@ export class VendorsController {
     return this.storesService.create(dto);
   }
 
-  @Delete(':id')
-  async deleteVendor(@Param('id') id: string) {
-    return this.storesService.delete(id);
-  }
-
   @Get(':id/performance')
   async getPerformance(
     @Param('id') id: string,
@@ -44,10 +39,17 @@ export class VendorsController {
     return this.storesService.getPerformanceData(id, Number(days) || 30);
   }
 
-  @Patch(':id')
-  async updateVendor(@Param('id') id: string, @Body() body: any) {
-    return this.storesService.update(id, body);
-  }
+@Delete(':id')
+async remove(@Param('id') id: string, @Request() req) {
+  const adminId = req.user.id || req.user.userId; // Extract ID from JWT session
+  return this.storesService.delete(id, adminId);
+}
+
+@Patch(':id')
+async update(@Param('id') id: string, @Body() dto: any, @Request() req) {
+  const adminId = req.user.id || req.user.userId;
+  return this.storesService.update(id, dto, adminId);
+}
 
   @Get(':id/products')
   getProducts(@Param('id') id: string) {

@@ -10,6 +10,8 @@ import { NotificationListener } from '@/app/main/components/NotificationListener
 import { GoogleMapsProvider } from '@/providers/GoogleMapsProvider';
 
 import { ThemeProvider } from './provider/provider';
+import Navbar from './components/layout/Navbar';
+import Footer from './components/layout/Footer';
 const inter = Inter({ subsets: ['latin'] });
 
 
@@ -32,7 +34,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         >
           <NotificationListener/>
           <GoogleMapsProvider>
+            {/* <Navbar/> */}
               {children}
+              {/* <Footer/> */}
           </GoogleMapsProvider>
           <ToastContainer 
             position="top-right"

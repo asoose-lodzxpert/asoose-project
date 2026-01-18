@@ -1,18 +1,19 @@
 'use client';
 
 import React, { useState } from 'react';
-import { X, AlertCircle, Loader2 } from 'lucide-react';
+import { X, Loader2 } from 'lucide-react';
 import { toast } from 'react-toastify';
-import { createClient } from '../../../../utils/supabase/client';
+import { createClient } from '../../../../../utils/supabase/client';
 import ImageUpload from '@/app/main/components/ImageUpload'; 
 
 interface ReportDisputeModalProps {
   isOpen: boolean;
   onClose: () => void;
   orderId: string;
+  onSuccess?: () => void;
 }
 
-export default function ReportDisputeModal({ isOpen, onClose, orderId }: ReportDisputeModalProps) {
+export default function ReportDisputeModal({ isOpen, onClose, orderId, onSuccess }: ReportDisputeModalProps) {
   const [reason, setReason] = useState("");
   const [description, setDescription] = useState("");
   const [evidenceImages, setEvidenceImages] = useState<string[]>([]);
@@ -30,27 +31,44 @@ export default function ReportDisputeModal({ isOpen, onClose, orderId }: ReportD
     setIsSubmitting(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+      
+      // Production Safety: Ensure session exists before fetching
+      if (!session) {
+        toast.error("Your session has expired. Please log in again.");
+        return;
+      }
+
+      const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001').replace(/\/$/, '');
 
       const res = await fetch(`${API_URL}/super-admin/disputes`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.access_token}`
+          'Authorization': `Bearer ${session.access_token}`
         },
         body: JSON.stringify({
           reason,
-          description,
+          description: description.trim(),
           orderId,
           evidenceImages, 
-          priority: 'MEDIUM'
+          priority: 'MEDIUM' // Matches DisputePriority enum in schema
         })
       });
 
-      if (!res.ok) throw new Error("Failed to submit dispute");
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || "Failed to submit dispute");
+      }
 
+      // Success Flow
       toast.success("Dispute reported successfully.");
+      if (onSuccess) onSuccess(); // Trigger SWR refresh in parent
       onClose();
+      
+      // Reset local state for next use
+      setReason("");
+      setDescription("");
+      setEvidenceImages([]);
     } catch (err: any) {
       toast.error(err.message);
     } finally {
@@ -62,35 +80,46 @@ export default function ReportDisputeModal({ isOpen, onClose, orderId }: ReportD
 
   return (
     <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="w-full max-w-md bg-white dark:bg-[#151515] rounded-t-[2rem] sm:rounded-[2rem] overflow-hidden">
+      <div className="w-full max-w-md bg-white dark:bg-[#151515] rounded-t-[2rem] sm:rounded-[2rem] overflow-hidden shadow-2xl">
         <div className="p-6 border-b dark:border-white/5 flex justify-between items-center">
-          <h2 className="text-xl font-black">Report an Issue</h2>
-          <button onClick={onClose}><X className="w-5 h-5" /></button>
+          <h2 className="text-xl font-black italic">Report an Issue</h2>
+          <button 
+            onClick={onClose} 
+            className="p-2 hover:bg-gray-100 dark:hover:bg-white/5 rounded-full transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-5">
-          <select 
-            value={reason} 
-            onChange={(e) => setReason(e.target.value)}
-            className="w-full p-4 bg-gray-50 dark:bg-white/5 rounded-2xl outline-none"
-          >
-            <option value="">Select a reason</option>
-            <option value="Items missing">Items missing from order</option>
-            <option value="Food quality">Food quality issues</option>
-            <option value="Incorrect items">Incorrect items received</option>
-          </select>
+          <div className="space-y-1">
+            <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-1">Reason for Dispute</label>
+            <select 
+              value={reason} 
+              onChange={(e) => setReason(e.target.value)}
+              className="w-full p-4 bg-gray-50 dark:bg-white/5 rounded-2xl outline-none border border-transparent focus:border-yellow-500 transition-colors"
+            >
+              <option value="">Select a reason</option>
+              <option value="Items missing">Items missing from order</option>
+              <option value="Food quality">Food quality issues</option>
+              <option value="Incorrect items">Incorrect items received</option>
+              <option value="Delivery issue">Problem with delivery/rider</option>
+            </select>
+          </div>
 
-          <textarea 
-            value={description} 
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="Additional details..."
-            className="w-full p-4 bg-gray-50 dark:bg-white/5 rounded-2xl h-24 outline-none"
-          />
+          <div className="space-y-1">
+            <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-1">Description</label>
+            <textarea 
+              value={description} 
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Provide more details about what happened..."
+              className="w-full p-4 bg-gray-50 dark:bg-white/5 rounded-2xl h-28 outline-none border border-transparent focus:border-yellow-500 transition-colors resize-none"
+            />
+          </div>
 
-          {/* Evidence Upload Section */}
           <div className="space-y-2">
-            <p className="text-xs font-bold text-gray-400 uppercase ml-1">Evidence Photos</p>
-            <div className="grid grid-cols-2 gap-2">
+            <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-1">Evidence Photos</label>
+            <div className="grid grid-cols-2 gap-3">
               <ImageUpload bucket="marketplace_assets" onUpload={handleImageUpload} label="Photo 1" />
               <ImageUpload bucket="marketplace_assets" onUpload={handleImageUpload} label="Photo 2" />
             </div>
@@ -99,9 +128,13 @@ export default function ReportDisputeModal({ isOpen, onClose, orderId }: ReportD
           <button 
             type="submit" 
             disabled={isSubmitting}
-            className="w-full bg-yellow-500 py-4 rounded-2xl font-black flex items-center justify-center gap-2"
+            className="w-full bg-yellow-500 hover:bg-yellow-600 disabled:opacity-50 text-black py-4 rounded-2xl font-black flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
           >
-            {isSubmitting ? <Loader2 className="animate-spin" /> : "Submit Report"}
+            {isSubmitting ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+              "Submit Report"
+            )}
           </button>
         </form>
       </div>

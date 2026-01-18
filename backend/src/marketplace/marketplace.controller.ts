@@ -1,4 +1,4 @@
-import { Controller, Get, Param, NotFoundException, Body, Request, UseGuards, Post, Delete, Query } from '@nestjs/common';
+import { Controller, Get, Param, NotFoundException, Body, Request, UseGuards, Post, Delete, Query,ParseIntPipe } from '@nestjs/common';
 import { MarketplaceService } from './marketplace.service';
 import { CreateReviewDto } from './dto/create-review.dto';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
@@ -23,8 +23,6 @@ export class MarketplaceController {
     @Param('id') id: string,
     @Query('sort') sort?: string 
   ) {
-    // FIX: Changed @Query('filter') to @Query('sort') to match frontend
-    // Default to 'all' if undefined
     const categoryData = await this.marketplaceService.getCategoryData(id, sort || 'all');
     
     if (!categoryData) {
@@ -41,6 +39,17 @@ export class MarketplaceController {
     }
     return vendor;
   }
+
+
+  @Get('stores')
+  async getStores(
+    @Query('page', new ParseIntPipe({ optional: true })) page: number = 1,
+    @Query('limit', new ParseIntPipe({ optional: true })) limit: number = 10,
+    @Query('type') type?: string,
+  ) {
+    return this.marketplaceService.getPaginatedStores(page, limit, type);
+  }
+
 
   @UseGuards(JwtAuthGuard)
   @Post('reviews')
