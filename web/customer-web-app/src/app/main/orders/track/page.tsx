@@ -8,7 +8,7 @@ import {
   ChevronLeft, Phone, User, CreditCard, 
   Loader2, AlertCircle, RefreshCw, WifiOff, Package 
 } from 'lucide-react';
-import { createClient } from '../../../../utils/supabase/client';
+import { createClient } from '../../../../../utils/supabase/client';
 import { toast } from 'react-toastify';
 import SmartTimeline, { TimelineStep } from './component/smartTimeline';
 // --- Configuration ---

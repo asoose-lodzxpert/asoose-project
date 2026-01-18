@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { 
   Check, Clock, MapPin, Loader2, ChevronLeft, 
@@ -8,12 +8,12 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'react-toastify';
+import useSWR from 'swr'; //
 
 import { OrderTimeline } from '@/app/main/components/order/OrderTimeline';
-import ReportDisputeModal from '../component/page';
-import { createClient } from '../../../../utils/supabase/client';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+import ReportDisputeModal from '../page';
+import { createClient } from '../../../../../utils/supabase/client';
+const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001').replace(/\/$/, '');
 
 export default function OrderDetailsPage() {
   const params = useParams();
@@ -21,45 +21,48 @@ export default function OrderDetailsPage() {
   const orderId = params.id as string;
   const supabase = createClient();
 
-  const [loading, setLoading] = useState(true);
-  const [order, setOrder] = useState<any>(null);
   const [isDisputeModalOpen, setIsDisputeModalOpen] = useState(false);
 
-  // 1. Fetch Order Data
-  useEffect(() => {
-    const fetchOrder = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { 
-        router.push('/sign-in'); 
-        return; 
-      }
+  // 1. Production Fetcher with Auth
+  const fetcher = async (url: string) => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      router.push('/sign-in');
+      throw new Error("Not authenticated");
+    }
 
-      try {
-        const res = await fetch(`${API_URL}/users/orders/${orderId}`, {
-           headers: { Authorization: `Bearer ${session.access_token}` }
-        });
-        
-        if (!res.ok) throw new Error("Order not found");
-        const data = await res.json();
-        setOrder(data);
-      } catch (err: any) {
-        toast.error(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${session.access_token}` }
+    });
 
-    fetchOrder();
-  }, [orderId, router, supabase.auth]);
+    if (!res.ok) {
+      const error = await res.json();
+      throw new Error(error.message || "Failed to fetch order");
+    }
 
-  // 2. Production-Ready Eligibility Logic
+    return res.json();
+  };
+
+  // 2. SWR Implementation with Polling
+  // refreshInterval: Polls every 10s unless the order is DELIVERED or CANCELLED
+  const { data: order, error, isLoading, mutate } = useSWR(
+    orderId ? `${API_URL}/users/orders/${orderId}` : null,
+    fetcher,
+    {
+      refreshInterval: (data) => 
+        data && ['DELIVERED', 'CANCELLED'].includes(data.status) ? 0 : 10000,
+      revalidateOnFocus: true,
+      dedupingInterval: 5000,
+    }
+  );
+
+  // 3. Dispute Eligibility Logic
   const { canReport, isExpired, hasDispute } = useMemo(() => {
     if (!order) return { canReport: false, isExpired: false, hasDispute: false };
 
     const hasActiveDispute = !!order.dispute;
-    
-    // Check 7-day window if delivered
     let isPastWindow = false;
+
     if (order.deliveredAt) {
       const deliveredDate = new Date(order.deliveredAt);
       const sevenDaysAgo = new Date();
@@ -76,16 +79,16 @@ export default function OrderDetailsPage() {
     };
   }, [order]);
 
-  if (loading) return (
+  if (isLoading) return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-[#0a0a0a]">
       <Loader2 className="w-8 h-8 animate-spin text-yellow-500" />
     </div>
   );
   
-  if (!order) return (
+  if (error || !order) return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-[#0a0a0a] p-4 text-center">
       <AlertCircle className="w-12 h-12 text-gray-400 mb-4" />
-      <h2 className="text-xl font-bold">Order not found</h2>
+      <h2 className="text-xl font-bold">{error?.message || "Order not found"}</h2>
       <Link href="/profile" className="text-yellow-500 font-bold mt-2">Back to my orders</Link>
     </div>
   );
@@ -106,9 +109,9 @@ export default function OrderDetailsPage() {
 
       <div className="w-full max-w-md space-y-6">
         
-        {/* 1. STATUS BADGE */}
+        {/* Status Badge */}
         <div className="text-center space-y-3">
-          <div className={`w-20 h-20 rounded-full mx-auto flex items-center justify-center shadow-2xl animate-in zoom-in duration-500 ${
+          <div className={`w-20 h-20 rounded-full mx-auto flex items-center justify-center shadow-2xl transition-colors duration-500 ${
               order.status === 'DELIVERED' ? 'bg-green-500 shadow-green-500/20' : 'bg-yellow-500 shadow-yellow-500/20'
           }`}>
             <Check className="w-10 h-10 text-white stroke-[3px]" />
@@ -118,17 +121,17 @@ export default function OrderDetailsPage() {
                 {order.status.replace('_', ' ')}
             </h1>
             <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">
-              {order.status === 'DELIVERED' ? 'Package received safely' : 'We are processing your request'}
+              {order.status === 'DELIVERED' ? 'Package received safely' : 'Real-time status tracking active'}
             </p>
           </div>
         </div>
 
-        {/* 2. LIVE TIMELINE */}
+        {/* Live Timeline */}
         <OrderTimeline status={order.status} />
 
-        {/* 3. DISPUTE STATUS (Production Alert) */}
+        {/* Dispute Status */}
         {hasDispute && (
-          <div className="bg-blue-500/10 border border-blue-500/20 p-5 rounded-[2rem] flex items-start gap-4 animate-in slide-in-from-top-4 duration-300">
+          <div className="bg-blue-500/10 border border-blue-500/20 p-5 rounded-[2rem] flex items-start gap-4">
             <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center shrink-0">
               <MessageSquare className="w-5 h-5 text-white" />
             </div>
@@ -137,14 +140,11 @@ export default function OrderDetailsPage() {
               <p className="text-xs text-blue-600/70 dark:text-blue-400/60 font-medium mt-0.5">
                 Status: <span className="font-bold">{order.dispute.status}</span>
               </p>
-              <button className="mt-3 text-xs font-black flex items-center gap-1 text-blue-700 dark:text-blue-300">
-                VIEW DISPUTE LOGS <ArrowRight className="w-3 h-3" />
-              </button>
             </div>
           </div>
         )}
 
-        {/* 4. SUMMARY CARD */}
+        {/* Order Summary Card */}
         <div className="bg-white dark:bg-[#151515] rounded-[2.5rem] p-6 shadow-sm border border-gray-100 dark:border-white/5 space-y-6">
            <div className="space-y-4">
               <div className="flex justify-between items-center">
@@ -183,7 +183,7 @@ export default function OrderDetailsPage() {
            </div>
         </div>
 
-        {/* 5. PRODUCTION-READY ACTIONS */}
+        {/* Actions */}
         <div className="space-y-3">
            <Link href="/store" className="block w-full bg-yellow-500 text-black py-4 rounded-full font-black text-center shadow-xl shadow-yellow-500/20 active:scale-[0.98] transition-all">
               Order Again
@@ -212,6 +212,7 @@ export default function OrderDetailsPage() {
         isOpen={isDisputeModalOpen} 
         onClose={() => setIsDisputeModalOpen(false)} 
         orderId={orderId} 
+        onSuccess={() => mutate()} // Refresh data after reporting
       />
     </div>
   );

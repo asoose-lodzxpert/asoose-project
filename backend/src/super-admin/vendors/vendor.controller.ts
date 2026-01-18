@@ -1,15 +1,5 @@
-import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  Param,
-  Post,
-  Query,
-  UseGuards,
-  UsePipes,
-  ValidationPipe,
-  Patch,
+import { 
+  Body, Controller, Delete, Get, Param, Post, Query, UseGuards, UsePipes, ValidationPipe, Patch, Req
 } from '@nestjs/common';
 import { StoresService } from './vendors.service';
 import { CreateVendorDto, VendorQueryDto } from './dto/vendor.dto';
@@ -41,20 +31,21 @@ export class VendorsController {
     return this.storesService.create(dto);
   }
 
-  @Delete(':id')
-  async deleteVendor(@Param('id') id: string) {
-    return this.storesService.delete(id);
-  }
-
   @Get(':id/performance')
   async getPerformance(@Param('id') id: string, @Query('days') days?: string) {
     return this.storesService.getPerformanceData(id, Number(days) || 30);
   }
+@Delete(':id')
+async remove(@Param('id') id: string, @Req() req) {
+  const adminId = req.user.id || req.user.userId;
+  return this.storesService.delete(id, adminId);
+}
 
-  @Patch(':id')
-  async updateVendor(@Param('id') id: string, @Body() body: any) {
-    return this.storesService.update(id, body);
-  }
+@Patch(':id')
+async update(@Param('id') id: string, @Body() dto: any, @Req() req) {
+  const adminId = req.user.id || req.user.userId;
+  return this.storesService.update(id, dto, adminId);
+}
 
   @Get(':id/products')
   getProducts(@Param('id') id: string) {

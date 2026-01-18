@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { RedisClientType } from 'redis';
-
+import { ActivityLogService } from 'src/common/services/activity-log.services';
 @Injectable()
 export class SettingsService {
   private readonly logger = new Logger(SettingsService.name);
@@ -14,6 +14,8 @@ export class SettingsService {
 
   constructor(
     private prisma: PrismaService,
+    // ✅ Inject the ActivityLogService
+    private logService: ActivityLogService, 
     @Inject('REDIS_CLIENT') private readonly redisClient: RedisClientType,
   ) {}
 
@@ -28,9 +30,9 @@ export class SettingsService {
 
   /**
    * Updates or Creates multiple settings in a single transaction.
-   * This fixes the "Record to update not found" error by using upsert.
+   * ✅ Added adminId parameter to track who performed the update
    */
-  async updateBulk(settings: { key: string; value: any }[]) {
+  async updateBulk(settings: { key: string; value: any }[], adminId: string) {
     try {
       // 1. Create a list of upsert operations
       const operations = settings.map((s) =>
@@ -48,8 +50,8 @@ export class SettingsService {
       // 2. Execute all updates atomically
       const results = await this.prisma.$transaction(operations);
 
-      // 3. CACHE INVALIDATION:
-      // If maintenance_mode was changed, we MUST clear Redis so the
+      // 3. CACHE INVALIDATION: 
+      // If maintenance_mode was changed, we MUST clear Redis so the 
       // AppController and Middleware see the update immediately.
       if (settings.some((s) => s.key === 'maintenance_mode')) {
         await this.redisClient.del(this.MAINTENANCE_CACHE_KEY);

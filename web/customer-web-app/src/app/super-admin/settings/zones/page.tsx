@@ -63,7 +63,7 @@ export default function ServiceZonesPage() {
 
     try {
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-      const session = await import('@/utils/supabase/client').then(m => m.createClient().auth.getSession());
+      const session = await import('../../../../../utils/supabase/client').then(m => m.createClient().auth.getSession());
       
       // 2. API Call
       const res = await fetch(`${API_URL}/super-admin/zones`, {
@@ -107,7 +107,7 @@ export default function ServiceZonesPage() {
     if (result.isConfirmed) {
       try {
         const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-        const session = await import('@/utils/supabase/client').then(m => m.createClient().auth.getSession());
+        const session = await import('../../../../../utils/supabase/client').then(m => m.createClient().auth.getSession());
 
         await fetch(`${API_URL}/super-admin/zones/${id}`, {
           method: 'DELETE',

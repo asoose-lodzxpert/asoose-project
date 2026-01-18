@@ -62,34 +62,28 @@ export default function DisputeDetailPage({ params }: DisputeDetailPageProps) {
   };
 
   // ===========================================================================
-  //  HANDLERS (Using Mutate)
+  //  HANDLERS (Includes Audit Logging logic on the Backend)
   // ===========================================================================
 
   const handleSendMessage = async (message: string, isInternal: boolean) => {
     if (!disputeId) return;
     
-    // Optimistic UI Update (Optional: Makes it feel instant)
-    // We update the local cache immediately before the API call returns
+    // Optimistic UI Update
     if (dispute) {
        const optimisticMsg = {
          id: 'temp-' + Date.now(),
          message,
          isInternal,
-         sender: 'You', // Or current user name
+         sender: 'You',
          createdAt: new Date().toISOString(),
          isAdmin: true
        };
-       // Update cache without re-fetching yet
        mutate({ ...dispute, messages: [...dispute.messages, optimisticMsg as any] }, false);
     }
 
     try {
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-      const token = localStorage.getItem('token'); // Or however you get token if not in fetcher for posts
-
-      // Note: For POST requests, we still use fetch, but we rely on mutate() to refresh data
-      // Ideally, you should create a reusable 'postFetcher' or similar in your lib
-      const session = await import('../../../../utils/supabase/client').then(m => m.createClient().auth.getSession());
+      const session = await import('../../../../../utils/supabase/client').then(m => m.createClient().auth.getSession());
       const authToken = session.data.session?.access_token;
 
       const res = await fetch(`${API_URL}/super-admin/disputes/${disputeId}/messages`, {
@@ -104,20 +98,18 @@ export default function DisputeDetailPage({ params }: DisputeDetailPageProps) {
       if (!res.ok) throw new Error('Failed');
       
       toast.success(isInternal ? 'Internal note added' : 'Message sent');
-      
-      // ✅ Re-fetch true data from server to get correct IDs/Timestamps
       mutate(); 
 
     } catch (e) {
       toast.error('Failed to send message');
-      mutate(); // Revert optimistic update on error
+      mutate(); 
     }
   };
 
   const handleUpdatePriority = async (priority: string) => {
     if (!disputeId) return;
     try {
-      const session = await import('../../../../utils/supabase/client').then(m => m.createClient().auth.getSession());
+      const session = await import('../../../../../utils/supabase/client').then(m => m.createClient().auth.getSession());
       const authToken = session.data.session?.access_token;
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -131,7 +123,7 @@ export default function DisputeDetailPage({ params }: DisputeDetailPageProps) {
       });
 
       toast.success('Priority updated');
-      mutate(); // ✅ Refresh data
+      mutate(); 
     } catch (e) {
       toast.error('Failed to update priority');
     }
@@ -141,7 +133,7 @@ export default function DisputeDetailPage({ params }: DisputeDetailPageProps) {
     if (!dispute || !disputeId) return;
     setProcessing(true);
     try {
-      const session = await import('../../../../utils/supabase/client').then(m => m.createClient().auth.getSession());
+      const session = await import('../../../../../utils/supabase/client').then(m => m.createClient().auth.getSession());
       const authToken = session.data.session?.access_token;
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -179,9 +171,9 @@ export default function DisputeDetailPage({ params }: DisputeDetailPageProps) {
 
       if (!res.ok) throw new Error('Action failed');
       
-      toast.success('Dispute updated successfully');
+      toast.success('Dispute resolved. Action has been recorded in audit logs.');
       setModalType(null);
-      mutate(); // ✅ Refresh data to show new status/resolution
+      mutate(); 
 
     } catch (e) {
       toast.error('Failed to process request');
@@ -214,6 +206,7 @@ export default function DisputeDetailPage({ params }: DisputeDetailPageProps) {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
+            {/* DisputeOverview now handles the Evidence Gallery layout internally */}
             <DisputeOverview 
               dispute={dispute} 
               onImageClick={setSelectedImage} 

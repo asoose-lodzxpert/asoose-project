@@ -4,16 +4,13 @@ import Link from 'next/link';
 import { Ride, Payout } from './types';
 import { 
   CheckCircle, XCircle, Clock, AlertTriangle, Calendar, 
-  User, Eye, ExternalLink, DollarSign, Trash2 
+  User, Eye, DollarSign, Trash2 
 } from 'lucide-react';
 
 const rideColumnHelper = createColumnHelper<Ride>();
 const payoutColumnHelper = createColumnHelper<Payout>();
 
 // --- Helper functions for styling (Unchanged) ---
-
-
-
 export const getRideStatusColor = (status: string) => {
   switch (status) {
     case 'Completed': return 'bg-green-500/20 text-green-500 border-green-500/20';
@@ -107,7 +104,8 @@ export const createRideColumns = ({ onDelete }: RideColumnActions) => [
       </div>
     ),
   }),
-  {
+  // FIX: Using rideColumnHelper.display for proper type inference
+  rideColumnHelper.display({
     id: "actions",
     header: "Actions",
     cell: ({ row }) => (
@@ -124,7 +122,7 @@ export const createRideColumns = ({ onDelete }: RideColumnActions) => [
         </button>
       </div>
     ),
-  },
+  }),
 ];
 
 interface PayoutColumnActions {
@@ -159,7 +157,8 @@ export const createPayoutColumns = ({ onProcess, onRetry, onDelete }: PayoutColu
       </span>
     ),
   }),
-  {
+  // FIX: Using payoutColumnHelper.display for proper type inference
+  payoutColumnHelper.display({
     id: "actions",
     header: "Actions",
     cell: ({ row }) => {
@@ -194,5 +193,5 @@ export const createPayoutColumns = ({ onProcess, onRetry, onDelete }: PayoutColu
         </div>
       );
     },
-  },
+  }),
 ];

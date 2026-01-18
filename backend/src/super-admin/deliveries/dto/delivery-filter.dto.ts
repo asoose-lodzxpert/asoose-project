@@ -16,9 +16,14 @@ export class DeliveryFilterDto {
   @IsString()
   status?: string;
 
+  // ✅ FIX: Added riderId
   @IsOptional()
   @IsString()
-  type?: string; // 'Document', 'Parcel', 'Freight' (Inferred logic)
+  riderId?: string;
+
+  @IsOptional()
+  @IsString()
+  type?: string;
 
   @IsOptional()
   @IsDateString()

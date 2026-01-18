@@ -15,6 +15,7 @@ import { toast } from 'react-toastify';
 import { fetcher } from '../hooks/useSuperAdminFetch';
 import { Currency } from '@/app/main/components/Currency';
 import OrdersPageSkeleton from './components/skeleton';
+
 // --- Types ---
 interface Order {
   id: string;
@@ -37,6 +38,30 @@ interface OrdersApiResponse {
   };
 }
 
+// --- Constants ---
+const QUICK_TABS = [
+  { label: 'All', value: 'All' },
+  { label: 'Pending', value: 'PENDING', count: 0 }, 
+  { label: 'Preparing', value: 'PREPARING', count: 0 },
+  { label: 'Disputes', value: 'DISPUTE', alert: true },
+];
+
+// --- Helper Functions ---
+function timeAgo(dateString: string) {
+  const diff = (new Date().getTime() - new Date(dateString).getTime()) / 1000;
+  if (diff < 60) return 'Just now';
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
+  return new Date(dateString).toLocaleDateString();
+}
+
+function isLate(placedAt: string, status: string) {
+  if (['DELIVERED', 'CANCELLED', 'COMPLETED', 'REJECTED'].includes(status.toUpperCase())) return false;
+  const diff = new Date().getTime() - new Date(placedAt).getTime();
+  return diff > 45 * 60 * 1000; // 45 Minutes
+}
+
 // --- Helper Components ---
 const CopyableId = ({ id }: { id: string }) => {
   const [copied, setCopied] = useState(false);
@@ -56,28 +81,17 @@ const CopyableId = ({ id }: { id: string }) => {
   );
 };
 
-function timeAgo(dateString: string) {
-  const diff = (new Date().getTime() - new Date(dateString).getTime()) / 1000;
-  if (diff < 60) return 'Just now';
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
-  return new Date(dateString).toLocaleDateString();
-}
-
 export default function OrdersPage() {
-  // --- UI State ---
+  // --- UI State (ALL hooks at top level) ---
   const [filterOpen, setFilterOpen] = useState(false);
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
-
-  // Filters
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [typeFilter, setTypeFilter] = useState('All');
   const [dateRange, setDateRange] = useState({ from: '', to: '' });
 
   // ===========================================================================
-  //  ✅ SWR DATA FETCHING
+  //  ✅ ALL useMemo/useCallback HOOKS (before any conditional logic)
   // ===========================================================================
 
   const queryString = useMemo(() => {
@@ -106,49 +120,260 @@ export default function OrdersPage() {
     { keepPreviousData: true }
   );
 
-  if (isLoading) {
-   return <OrdersPageSkeleton />;
-}
+  // Memoized derived data
+  const orders = useMemo(() => apiResponse?.data || [], [apiResponse]);
+  const totalOrders = useMemo(() => apiResponse?.meta?.total || 0, [apiResponse]);
 
-  const orders = apiResponse?.data || [];
-  const totalOrders = apiResponse?.meta?.total || 0;
+  // Memoized columns definition
+  const columns = useMemo<ColumnDef<Order>[]>(() => {
+    const handleCancelOrder = async (id: string) => {
+      const result = await Swal.fire({
+        title: 'Cancel Order?', 
+        text: "This will effectively stop the order processing.",
+        icon: 'warning', 
+        showCancelButton: true, 
+        confirmButtonColor: '#ef4444', 
+        confirmButtonText: 'Yes, Cancel',
+        background: '#1E293B', 
+        color: '#fff'
+      });
+
+      if (result.isConfirmed) {
+         try {
+           const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+           const { createClient } = await import('../../../../utils/supabase/client');
+           const session = await createClient().auth.getSession();
+           
+           const res = await fetch(`${API_URL}/super-admin/orders/${id}`, { 
+               method: 'DELETE',
+               headers: { 'Authorization': `Bearer ${session.data.session?.access_token}` }
+           });
+           
+           if (!res.ok) throw new Error('Failed');
+           
+           Swal.fire({ title: 'Cancelled', icon: 'success', background: '#1E293B', color: '#fff', timer: 1500, showConfirmButton: false });
+           mutate(); 
+         } catch (err) {
+           toast.error('Could not cancel order');
+         }
+      }
+    };
+
+    return [
+      {
+        accessorKey: 'id',
+        header: 'Order ID',
+        cell: ({ row }) => (
+          <div>
+            <Link href={`/super-admin/orders/${row.original.id}`} className="block">
+               <CopyableId id={row.original.id} />
+            </Link>
+            {isLate(row.original.placedAt, row.original.status) && (
+               <span className="text-[10px] text-red-400 font-bold flex items-center gap-1 mt-1 animate-pulse">
+                  <AlertCircle className="w-3 h-3" /> Late
+               </span>
+            )}
+          </div>
+        )
+      },
+      {
+        accessorKey: 'type',
+        header: 'Type',
+        cell: ({ getValue }) => <span className="text-[10px] font-bold text-gray-400 bg-gray-800 px-2 py-1 rounded border border-gray-700">{getValue() as string}</span>
+      },
+      {
+        accessorKey: 'vendor',
+        header: 'Store',
+        cell: ({ getValue }) => <span className="text-white font-medium text-sm truncate max-w-[120px] block" title={getValue() as string}>{getValue() as string}</span>
+      },
+      {
+        accessorKey: 'customer',
+        header: 'Customer',
+        cell: ({ getValue }) => <span className="text-gray-400 text-sm truncate max-w-[100px] block">{getValue() as string}</span>
+      },
+      {
+          id: 'financials',
+          header: 'Payment',
+          cell: ({ row }) => (
+              <div className="flex flex-col">
+                  <span className="text-white font-bold text-sm"><Currency amount={row.original.amount} /></span>
+                  <span className={`text-[10px] uppercase font-bold ${
+                      row.original.paymentStatus === 'PAID' ? 'text-green-500' : 
+                      row.original.paymentStatus === 'FAILED' ? 'text-red-500' : 'text-yellow-500'
+                  }`}>
+                      {row.original.paymentStatus}
+                  </span>
+              </div>
+          )
+      },
+      {
+        accessorKey: 'status',
+        header: 'Status',
+        cell: ({ getValue }) => {
+          const status = (getValue() as string).toUpperCase();
+          
+          let style = 'text-gray-400 border-gray-700 bg-gray-800';
+          let icon = <Clock className="w-3 h-3" />;
+
+          if (status === 'DELIVERED' || status === 'COMPLETED') {
+              style = 'text-green-400 bg-green-500/10 border-green-500/20';
+              icon = <CheckCircle className="w-3 h-3" />;
+          } else if (status === 'PENDING') {
+              style = 'text-yellow-500 bg-yellow-500/10 border-yellow-500/20';
+              icon = <Loader2 className="w-3 h-3 animate-spin" />;
+          } else if (status === 'PREPARING') {
+              style = 'text-blue-400 bg-blue-500/10 border-blue-500/20';
+              icon = <Package className="w-3 h-3" />;
+          } else if (status === 'CANCELLED') {
+              style = 'text-red-400 bg-red-500/10 border-red-500/20';
+              icon = <XCircle className="w-3 h-3" />;
+          }
+
+          return (
+            <span className={`pl-1.5 pr-2.5 py-1 rounded text-[10px] font-bold uppercase border flex items-center gap-1.5 w-fit ${style}`}>
+              {icon} {status}
+            </span>
+          );
+        }
+      },
+      {
+        accessorKey: 'placedAt',
+        header: 'Placed',
+        cell: ({ getValue }) => (
+          <div className="flex flex-col">
+              <span className="text-gray-200 text-xs font-medium">{timeAgo(getValue() as string)}</span>
+              <span className="text-gray-600 text-[10px]">{new Date(getValue() as string).toLocaleDateString()}</span>
+          </div>
+        )
+      },
+      {
+        id: 'actions',
+        header: '',
+        cell: ({ row }) => (
+          <div className="flex justify-end gap-1">
+             <Link href={`/super-admin/orders/${row.original.id}`} className="p-2 hover:bg-blue-500/10 rounded-lg text-gray-400 hover:text-blue-500 transition-colors">
+               <Eye className="w-4 h-4" />
+             </Link>
+             {!['DELIVERED', 'COMPLETED', 'CANCELLED'].includes(row.original.status.toUpperCase()) && (
+                 <button 
+                   onClick={() => handleCancelOrder(row.original.id)} 
+                   className="p-2 hover:bg-red-500/10 rounded-lg text-gray-400 hover:text-red-500 transition-colors"
+                   title="Cancel Order"
+                 >
+                   <XCircle className="w-4 h-4" />
+                 </button>
+             )}
+          </div>
+        )
+      }
+    ];
+  }, [mutate]);
+
+  // Memoized mobile card renderer
+  const renderMobileCard = useMemo(() => {
+    const handleCancelOrder = async (id: string) => {
+      const result = await Swal.fire({
+        title: 'Cancel Order?', 
+        text: "This will effectively stop the order processing.",
+        icon: 'warning', 
+        showCancelButton: true, 
+        confirmButtonColor: '#ef4444', 
+        confirmButtonText: 'Yes, Cancel',
+        background: '#1E293B', 
+        color: '#fff'
+      });
+
+      if (result.isConfirmed) {
+         try {
+           const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+           const { createClient } = await import('../../../../utils/supabase/client');
+           const session = await createClient().auth.getSession();
+           
+           const res = await fetch(`${API_URL}/super-admin/orders/${id}`, { 
+               method: 'DELETE',
+               headers: { 'Authorization': `Bearer ${session.data.session?.access_token}` }
+           });
+           
+           if (!res.ok) throw new Error('Failed');
+           
+           Swal.fire({ title: 'Cancelled', icon: 'success', background: '#1E293B', color: '#fff', timer: 1500, showConfirmButton: false });
+           mutate(); 
+         } catch (err) {
+           toast.error('Could not cancel order');
+         }
+      }
+    };
+
+    return (order: Order) => (
+      <div className="bg-[#1E293B] border border-gray-800 p-4 rounded-xl mb-3 space-y-4 shadow-sm">
+        {/* Header: ID + Status */}
+        <div className="flex justify-between items-start">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-xs text-yellow-500 font-bold">#{order.id.substring(0, 8)}</span>
+              {isLate(order.placedAt, order.status) && (
+                <span className="text-[10px] text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded font-bold animate-pulse">Late</span>
+              )}
+            </div>
+            <span className="text-xs text-gray-500 mt-0.5 block">{timeAgo(order.placedAt)}</span>
+          </div>
+          <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase border ${
+             order.status === 'DELIVERED' ? 'text-green-400 bg-green-500/10 border-green-500/20' :
+             order.status === 'PENDING' ? 'text-yellow-500 bg-yellow-500/10 border-yellow-500/20' :
+             order.status === 'CANCELLED' ? 'text-red-400 bg-red-500/10 border-red-500/20' :
+             'text-blue-400 bg-blue-500/10 border-blue-500/20'
+          }`}>
+            {order.status}
+          </span>
+        </div>
+
+        {/* Body: Vendor & Customer */}
+        <div className="grid grid-cols-2 gap-4 border-t border-b border-gray-800 py-3">
+          <div>
+            <p className="text-[10px] text-gray-500 uppercase font-bold mb-1">Store</p>
+            <p className="text-sm font-bold text-white truncate">{order.vendor}</p>
+          </div>
+          <div>
+            <p className="text-[10px] text-gray-500 uppercase font-bold mb-1">Customer</p>
+            <p className="text-sm text-gray-300 truncate">{order.customer}</p>
+          </div>
+        </div>
+
+        {/* Footer: Amount & Actions */}
+        <div className="flex justify-between items-center">
+           <div className="flex flex-col">
+              <span className="text-sm font-bold text-white"><Currency amount={order.amount}/> </span>
+              <span className={`text-[10px] font-bold ${order.paymentStatus === 'PAID' ? 'text-green-500' : 'text-red-500'}`}>
+                 {order.paymentStatus}
+              </span>
+           </div>
+           
+           <div className="flex gap-2">
+             {!['DELIVERED', 'COMPLETED', 'CANCELLED'].includes(order.status) && (
+               <button 
+                 onClick={() => handleCancelOrder(order.id)}
+                 className="p-2 bg-red-500/10 text-red-500 rounded-lg hover:bg-red-500/20 transition-colors"
+               >
+                 <XCircle className="w-4 h-4" />
+               </button>
+             )}
+             <Link href={`/super-admin/orders/${order.id}`} className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white text-xs font-bold rounded-lg flex items-center gap-2 transition-colors">
+               <Eye className="w-3 h-3" /> View
+             </Link>
+           </div>
+        </div>
+      </div>
+    );
+  }, [mutate]);
+
+  // Check if any filters are active
+  const hasActiveFilters = useMemo(() => {
+    return statusFilter !== 'All' || typeFilter !== 'All' || dateRange.from || searchTerm;
+  }, [statusFilter, typeFilter, dateRange, searchTerm]);
 
   // ===========================================================================
-  //  HANDLERS
+  //  ✅ NOW conditional rendering (after all hooks)
   // ===========================================================================
-
-  const handleCancelOrder = async (id: string) => {
-    const result = await Swal.fire({
-      title: 'Cancel Order?', 
-      text: "This will effectively stop the order processing.",
-      icon: 'warning', 
-      showCancelButton: true, 
-      confirmButtonColor: '#ef4444', 
-      confirmButtonText: 'Yes, Cancel',
-      background: '#1E293B', 
-      color: '#fff'
-    });
-
-    if (result.isConfirmed) {
-       try {
-         const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-         const { createClient } = await import('../../../../utils/supabase/client');
-         const session = await createClient().auth.getSession();
-         
-         const res = await fetch(`${API_URL}/super-admin/orders/${id}`, { 
-             method: 'DELETE',
-             headers: { 'Authorization': `Bearer ${session.data.session?.access_token}` }
-         });
-         
-         if (!res.ok) throw new Error('Failed');
-         
-         Swal.fire({ title: 'Cancelled', icon: 'success', background: '#1E293B', color: '#fff', timer: 1500, showConfirmButton: false });
-         mutate(); 
-       } catch (err) {
-         toast.error('Could not cancel order');
-       }
-    }
-  };
 
   const clearFilters = () => {
     setSearchTerm('');
@@ -157,129 +382,9 @@ export default function OrdersPage() {
     setDateRange({ from: '', to: '' });
   };
 
-  const isLate = (placedAt: string, status: string) => {
-    if (['DELIVERED', 'CANCELLED', 'COMPLETED', 'REJECTED'].includes(status.toUpperCase())) return false;
-    const diff = new Date().getTime() - new Date(placedAt).getTime();
-    return diff > 45 * 60 * 1000; // 45 Minutes
-  };
-
-  // Quick Tabs Config
-  const QUICK_TABS = [
-    { label: 'All', value: 'All' },
-    { label: 'Pending', value: 'PENDING', count: 0 }, 
-    { label: 'Preparing', value: 'PREPARING', count: 0 },
-    { label: 'Disputes', value: 'DISPUTE', alert: true },
-  ];
-
-  // --- Columns ---
-  const columns = useMemo<ColumnDef<Order>[]>(() => [
-    {
-      accessorKey: 'id',
-      header: 'Order ID',
-      cell: ({ row }) => (
-        <div>
-          <Link href={`/super-admin/orders/${row.original.id}`} className="block">
-             <CopyableId id={row.original.id} />
-          </Link>
-          {isLate(row.original.placedAt, row.original.status) && (
-             <span className="text-[10px] text-red-400 font-bold flex items-center gap-1 mt-1 animate-pulse">
-                <AlertCircle className="w-3 h-3" /> Late
-             </span>
-          )}
-        </div>
-      )
-    },
-    {
-      accessorKey: 'type',
-      header: 'Type',
-      cell: ({ getValue }) => <span className="text-[10px] font-bold text-gray-400 bg-gray-800 px-2 py-1 rounded border border-gray-700">{getValue() as string}</span>
-    },
-    {
-      accessorKey: 'vendor',
-      header: 'Store',
-      cell: ({ getValue }) => <span className="text-white font-medium text-sm truncate max-w-[120px] block" title={getValue() as string}>{getValue() as string}</span>
-    },
-    {
-      accessorKey: 'customer',
-      header: 'Customer',
-      cell: ({ getValue }) => <span className="text-gray-400 text-sm truncate max-w-[100px] block">{getValue() as string}</span>
-    },
-    {
-        id: 'financials',
-        header: 'Payment',
-        cell: ({ row }) => (
-            <div className="flex flex-col">
-                <span className="text-white font-bold text-sm"><Currency amount={row.original.amount} /></span>
-                <span className={`text-[10px] uppercase font-bold ${
-                    row.original.paymentStatus === 'PAID' ? 'text-green-500' : 
-                    row.original.paymentStatus === 'FAILED' ? 'text-red-500' : 'text-yellow-500'
-                }`}>
-                    {row.original.paymentStatus}
-                </span>
-            </div>
-        )
-    },
-    {
-      accessorKey: 'status',
-      header: 'Status',
-      cell: ({ getValue }) => {
-        const status = (getValue() as string).toUpperCase();
-        
-        let style = 'text-gray-400 border-gray-700 bg-gray-800';
-        let icon = <Clock className="w-3 h-3" />;
-
-        if (status === 'DELIVERED' || status === 'COMPLETED') {
-            style = 'text-green-400 bg-green-500/10 border-green-500/20';
-            icon = <CheckCircle className="w-3 h-3" />;
-        } else if (status === 'PENDING') {
-            style = 'text-yellow-500 bg-yellow-500/10 border-yellow-500/20';
-            icon = <Loader2 className="w-3 h-3 animate-spin" />;
-        } else if (status === 'PREPARING') {
-            style = 'text-blue-400 bg-blue-500/10 border-blue-500/20';
-            icon = <Package className="w-3 h-3" />;
-        } else if (status === 'CANCELLED') {
-            style = 'text-red-400 bg-red-500/10 border-red-500/20';
-            icon = <XCircle className="w-3 h-3" />;
-        }
-
-        return (
-          <span className={`pl-1.5 pr-2.5 py-1 rounded text-[10px] font-bold uppercase border flex items-center gap-1.5 w-fit ${style}`}>
-            {icon} {status}
-          </span>
-        );
-      }
-    },
-    {
-      accessorKey: 'placedAt',
-      header: 'Placed',
-      cell: ({ getValue }) => (
-        <div className="flex flex-col">
-            <span className="text-gray-200 text-xs font-medium">{timeAgo(getValue() as string)}</span>
-            <span className="text-gray-600 text-[10px]">{new Date(getValue() as string).toLocaleDateString()}</span>
-        </div>
-      )
-    },
-    {
-      id: 'actions',
-      header: '',
-      cell: ({ row }) => (
-        <div className="flex justify-end gap-1">
-           <Link href={`/super-admin/orders/${row.original.id}`} className="p-2 hover:bg-blue-500/10 rounded-lg text-gray-400 hover:text-blue-500 transition-colors">
-             <Eye className="w-4 h-4" />
-           </Link>
-           {!['DELIVERED', 'COMPLETED', 'CANCELLED'].includes(row.original.status.toUpperCase()) && (
-               <button 
-                 onClick={() => handleCancelOrder(row.original.id)} 
-                 className="p-2 hover:bg-red-500/10 rounded-lg text-gray-400 hover:text-red-500 transition-colors"
-                 title="Cancel Order"
-               >
-                 <XCircle className="w-4 h-4" />
-               </button>
-           )}
-        </div>
-      )
-    }
-  ], []);
+  if (isLoading && orders.length === 0) {
+    return <OrdersPageSkeleton />;
+  }
 
   // --- Render ---
   return (
@@ -365,7 +470,7 @@ export default function OrdersPage() {
            </div>
 
            {/* Active Filter Chips */}
-           {(statusFilter !== 'All' || typeFilter !== 'All' || dateRange.from || searchTerm) && (
+           {hasActiveFilters && (
              <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-800">
                 {searchTerm && <span className="px-2 py-1 bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded text-xs flex items-center gap-1">Search: "{searchTerm}" <button onClick={() => setSearchTerm('')}><XCircle className="w-3 h-3 hover:text-white" /></button></span>}
                 {statusFilter !== 'All' && <span className="px-2 py-1 bg-yellow-500/10 text-yellow-500 border border-yellow-500/20 rounded text-xs flex items-center gap-1">Status: {statusFilter} <button onClick={() => setStatusFilter('All')}><XCircle className="w-3 h-3 hover:text-white" /></button></span>}
@@ -389,66 +494,7 @@ export default function OrdersPage() {
                pageCount={Math.ceil(totalOrders / pagination.pageSize)}
                pagination={pagination}
                onPaginationChange={setPagination}
-               renderMobileCard={(order) => (
-                 <div className="bg-[#1E293B] border border-gray-800 p-4 rounded-xl mb-3 space-y-4 shadow-sm">
-                   {/* Header: ID + Status */}
-                   <div className="flex justify-between items-start">
-                     <div>
-                       <div className="flex items-center gap-2">
-                         <span className="font-mono text-xs text-yellow-500 font-bold">#{order.id.substring(0, 8)}</span>
-                         {isLate(order.placedAt, order.status) && (
-                           <span className="text-[10px] text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded font-bold animate-pulse">Late</span>
-                         )}
-                       </div>
-                       <span className="text-xs text-gray-500 mt-0.5 block">{timeAgo(order.placedAt)}</span>
-                     </div>
-                     <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase border ${
-                        order.status === 'DELIVERED' ? 'text-green-400 bg-green-500/10 border-green-500/20' :
-                        order.status === 'PENDING' ? 'text-yellow-500 bg-yellow-500/10 border-yellow-500/20' :
-                        order.status === 'CANCELLED' ? 'text-red-400 bg-red-500/10 border-red-500/20' :
-                        'text-blue-400 bg-blue-500/10 border-blue-500/20'
-                     }`}>
-                       {order.status}
-                     </span>
-                   </div>
-
-                   {/* Body: Vendor & Customer */}
-                   <div className="grid grid-cols-2 gap-4 border-t border-b border-gray-800 py-3">
-                     <div>
-                       <p className="text-[10px] text-gray-500 uppercase font-bold mb-1">Store</p>
-                       <p className="text-sm font-bold text-white truncate">{order.vendor}</p>
-                     </div>
-                     <div>
-                       <p className="text-[10px] text-gray-500 uppercase font-bold mb-1">Customer</p>
-                       <p className="text-sm text-gray-300 truncate">{order.customer}</p>
-                     </div>
-                   </div>
-
-                   {/* Footer: Amount & Actions */}
-                   <div className="flex justify-between items-center">
-                      <div className="flex flex-col">
-                         <span className="text-sm font-bold text-white"><Currency amount={order.amount}/> </span>
-                         <span className={`text-[10px] font-bold ${order.paymentStatus === 'PAID' ? 'text-green-500' : 'text-red-500'}`}>
-                            {order.paymentStatus}
-                         </span>
-                      </div>
-                      
-                      <div className="flex gap-2">
-                        {!['DELIVERED', 'COMPLETED', 'CANCELLED'].includes(order.status) && (
-                          <button 
-                            onClick={() => handleCancelOrder(order.id)}
-                            className="p-2 bg-red-500/10 text-red-500 rounded-lg hover:bg-red-500/20 transition-colors"
-                          >
-                            <XCircle className="w-4 h-4" />
-                          </button>
-                        )}
-                        <Link href={`/super-admin/orders/${order.id}`} className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white text-xs font-bold rounded-lg flex items-center gap-2 transition-colors">
-                          <Eye className="w-3 h-3" /> View
-                        </Link>
-                      </div>
-                   </div>
-                 </div>
-               )}
+               renderMobileCard={renderMobileCard}
              />
            ) : (
              <div className="flex flex-col items-center justify-center py-24 text-center">
