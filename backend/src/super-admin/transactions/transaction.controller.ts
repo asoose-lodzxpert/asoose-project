@@ -1,14 +1,13 @@
-import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Query, UseGuards,Post,Body,Req } from '@nestjs/common';
 import { TransactionsService } from './transaction.service';
 import { TransactionFilterDto } from './dto/transaction-filter.dto';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { RolesGuard } from '../../auth/roles.guards';
 import { Roles } from '../../auth/roles.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
-
+import { AdjustWalletDto } from './dto/adjust-wallet.dto';
 @Controller('super-admin/transactions')
 @UseGuards(JwtAuthGuard, RolesGuard)
-// 💰 LOCK: Finance Only
 @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN_FINANCE)
 export class TransactionsController {
   constructor(private readonly transactionsService: TransactionsService) {}
@@ -22,5 +21,13 @@ export class TransactionsController {
   findOne(@Param('id') id: string) {
     return this.transactionsService.findOne(id);
   }
+
+@Post('adjust-wallet')
+@Roles(UserRole.SUPER_ADMIN)
+@UseGuards(JwtAuthGuard, RolesGuard)
+async adjustWallet(@Body() dto: AdjustWalletDto, @Req() req) {
+  return this.transactionsService.adjustWallet(dto, req.user.id);
+}
+
 }
 

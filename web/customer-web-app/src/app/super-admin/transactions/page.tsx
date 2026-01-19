@@ -2,13 +2,18 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
-import { ArrowUpRight, ArrowDownLeft, DollarSign, Download, Filter, Eye, Search, Loader2, Wallet, TrendingUp, TrendingDown, AlertCircle, RefreshCw, X, Calendar } from 'lucide-react';
+import { 
+  ArrowUpRight, ArrowDownLeft, DollarSign, Download, Filter, Eye, Search, 
+  Loader2, Wallet, TrendingUp, TrendingDown, AlertCircle, RefreshCw, X, Calendar 
+} from 'lucide-react';
 import { DataTable } from '@/app/super-admin/component/datatable';
 import { ColumnDef } from '@tanstack/react-table';
 import { TransactionsListSkeleton } from './component/skeleton';
+import WalletAdjustmentModal from './component/WalletAdjustmentModal'; // ✅ Import the Modal
 import { toast } from 'react-toastify';
 import useSWR from 'swr'; 
 import { fetcher } from '../hooks/useSuperAdminFetch';
+
 // Types matching Backend Response
 interface Transaction {
   id: string;
@@ -38,7 +43,7 @@ interface TransactionsApiResponse {
     }
 }
 
-// --- Summary Card Component (Unchanged) ---
+// --- Summary Card Component ---
 const StatsCard = ({ title, value, type }: { title: string, value: string, type: 'net' | 'in' | 'out' }) => {
   const colors = {
     net: 'bg-blue-500/10 text-blue-500 border-blue-500/20',
@@ -60,6 +65,7 @@ const StatsCard = ({ title, value, type }: { title: string, value: string, type:
 export default function TransactionsPage() {
   // --- UI State ---
   const [filterOpen, setFilterOpen] = useState(false);
+  const [isAdjustmentModalOpen, setIsAdjustmentModalOpen] = useState(false); // ✅ Modal State
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
 
   // Filters
@@ -293,13 +299,26 @@ export default function TransactionsPage() {
           <p className="text-gray-400 text-sm mt-1">Monitor all financial activities and payouts</p>
         </div>
         <div className="flex items-center gap-3">
+          
           <button onClick={() => setFilterOpen(!filterOpen)} className="md:hidden flex items-center justify-center gap-2 px-4 py-2 border border-gray-700 rounded-lg text-gray-300 hover:text-white hover:bg-gray-800 transition-colors relative">
             <Filter className="w-5 h-5" /> <span className="text-sm font-medium">Filters</span>
             {hasActiveFilters && <span className="absolute -top-1 -right-1 w-3 h-3 bg-yellow-500 rounded-full"></span>}
           </button>
+
+          {/* ✅ Adjust Wallet Button */}
+          <button 
+            onClick={() => setIsAdjustmentModalOpen(true)}
+            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg font-bold transition-colors shadow-lg shadow-blue-500/20"
+          >
+            <Wallet className="w-4 h-4" />
+            <span className="hidden sm:inline">Adjust Wallet</span>
+            <span className="sm:hidden">Adjust</span>
+          </button>
+
           <button onClick={() => mutate()} className="p-2 border border-gray-700 rounded-lg text-gray-300 hover:text-white hover:bg-gray-800 transition-colors" title="Refresh">
              <RefreshCw className={`w-5 h-5 ${isLoading ? 'animate-spin' : ''}`} />
           </button>
+
           <button onClick={() => toast.info('Export feature coming soon')} className="flex items-center gap-2 px-4 py-2 bg-yellow-500 text-black rounded-lg hover:bg-yellow-400 transition-colors font-semibold">
             <Download className="w-4 h-4" /> <span className="hidden sm:inline">Export</span>
           </button>
@@ -351,7 +370,13 @@ export default function TransactionsPage() {
         ) : (
           <>
             <div className="hidden md:block">
-              <DataTable columns={columns} data={transactions} pagination={pagination} setPagination={setPagination} total={total} />
+             <DataTable 
+              columns={columns} 
+              data={transactions} 
+              pagination={pagination} 
+              onPaginationChange={setPagination} 
+              pageCount={Math.ceil(total / pagination.pageSize)} 
+            />
             </div>
             <div className="md:hidden">
               {filterOpen && (
@@ -370,6 +395,13 @@ export default function TransactionsPage() {
           </>
         )}
       </div>
+
+      {/* ✅ Modal Rendered Here */}
+      <WalletAdjustmentModal 
+        isOpen={isAdjustmentModalOpen}
+        onClose={() => setIsAdjustmentModalOpen(false)}
+        onSuccess={() => mutate()} 
+      />
     </div>
   );
 }
