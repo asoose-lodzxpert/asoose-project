@@ -73,7 +73,11 @@ export type IconSymbolName =
   | "share"
   | "file-text"
   | "credit-card"
-  | "alert-circle";
+  | "alert-circle"
+  | "pause.circle.fill"
+  | "clock.fill"
+  | "list.clipboard.fill"
+  | "hand.raised.fill";
 
 export const MAPPING: Record<
   IconSymbolName,
@@ -156,6 +160,10 @@ export const MAPPING: Record<
   "file-text": "text-snippet",
   "credit-card": "credit-card",
   "alert-circle": "incomplete-circle",
+  "pause.circle.fill": "pause-circle-filled",
+  "clock.fill": "schedule",
+  "list.clipboard.fill": "assignment",
+  "hand.raised.fill": "front-hand",
 };
 
 interface IconSymbolProps {

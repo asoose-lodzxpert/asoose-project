@@ -175,7 +175,6 @@ export default function StoreDashboardPage() {
       >
         <StoreHeader
           storeName={storeName}
-          approved
           isOnline={!!isOnline}
           onToggleOnline={openConfirmation}
           loading={loadingOnline || loadingStore}
@@ -203,6 +202,7 @@ export default function StoreDashboardPage() {
             <IconSymbol name="arrow.right" size={16} color="#E5A503" />
           }
           onActionPress={() => router.push("/(main)/(orders)")}
+          onRefresh={fetchOrders}
           loading={loadingOrders}
         />
       </ScrollView>

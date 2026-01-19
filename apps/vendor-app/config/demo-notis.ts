@@ -8,7 +8,7 @@ export const MOCK_NOTIFICATIONS: Notification[] = [
     timestamp: "2 min ago",
     summary: "Customer John D. ordered 2x Burger, 1x Fries",
     actionLabel: "View Order",
-    actionCallback: () => console.log("View Order clicked"),
+    actionCallback: () => {},
   },
   {
     id: "2",
@@ -31,7 +31,7 @@ export const MOCK_NOTIFICATIONS: Notification[] = [
     timestamp: "12 min ago",
     summary: "Customer Sarah K. ordered 1x Salad, 1x Lemonade",
     actionLabel: "View Order",
-    actionCallback: () => console.log("View Order clicked"),
+    actionCallback: () => {},
   },
   {
     id: "5",
@@ -55,7 +55,7 @@ export const MOCK_NOTIFICATIONS: Notification[] = [
     timestamp: "35 min ago",
     summary: "Customer Alex P. ordered 3x Pizza",
     actionLabel: "View Order",
-    actionCallback: () => console.log("View Order clicked"),
+    actionCallback: () => {},
   },
   {
     id: "8",
@@ -64,7 +64,7 @@ export const MOCK_NOTIFICATIONS: Notification[] = [
     timestamp: "40 min ago",
     summary: "Customer Maria L. confirmed delivery",
     actionLabel: "View Order",
-    actionCallback: () => console.log("View Order clicked"),
+    actionCallback: () => {},
   },
   {
     id: "9",
@@ -87,7 +87,7 @@ export const MOCK_NOTIFICATIONS: Notification[] = [
     timestamp: "1 hr 5 min ago",
     summary: "Customer Liam T. ordered 2x Sushi Rolls",
     actionLabel: "View Order",
-    actionCallback: () => console.log("View Order clicked"),
+    actionCallback: () => {},
   },
   {
     id: "12",
@@ -110,7 +110,7 @@ export const MOCK_NOTIFICATIONS: Notification[] = [
     timestamp: "1 hr 45 min ago",
     summary: "Customer Emma W. cancelled their order",
     actionLabel: "View Order",
-    actionCallback: () => console.log("View Order clicked"),
+    actionCallback: () => {},
   },
   {
     id: "15",
@@ -119,7 +119,7 @@ export const MOCK_NOTIFICATIONS: Notification[] = [
     timestamp: "2 hr ago",
     summary: "Customer Noah G. ordered 1x Latte, 2x Muffins",
     actionLabel: "View Order",
-    actionCallback: () => console.log("View Order clicked"),
+    actionCallback: () => {},
   },
   {
     id: "16",
@@ -143,7 +143,7 @@ export const MOCK_NOTIFICATIONS: Notification[] = [
     timestamp: "2 hr 45 min ago",
     summary: "Customer Olivia H. ordered 4x Sandwiches",
     actionLabel: "View Order",
-    actionCallback: () => console.log("View Order clicked"),
+    actionCallback: () => {},
   },
   {
     id: "19",

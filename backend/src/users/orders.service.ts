@@ -16,6 +16,7 @@ import { AddressesService } from './addresses.service';
 import { NotificationFacade } from './notification.facade';
 import type { RedisClientType } from 'redis';
 import { InventoryService } from './inventory.service';
+import { VendorOrdersStreamService } from '../vendor/orders/vendor-orders-stream.service';
 
 const ORDER_STATUS = { PENDING: 'PENDING' } as const;
 const DELIVERY_STATUS = { REQUESTED: 'REQUESTED' } as const;
@@ -35,6 +36,7 @@ export class OrdersService {
     private addressesService: AddressesService,
     private notificationFacade: NotificationFacade,
     private inventoryService: InventoryService,
+    private vendorOrdersStreamService: VendorOrdersStreamService,
     // CHANGED: Inject REDIS_CLIENT with correct type
     @Inject('REDIS_CLIENT') private readonly redis: RedisClientType,
   ) {}
@@ -261,7 +263,19 @@ export class OrdersService {
       // 3. Mark Idempotency as COMPLETED
       await this.completeIdempotency(redisKey, order.id);
 
-      // 4. Notifications
+      // 4. Emit SSE event for real-time vendor notification
+      this.vendorOrdersStreamService.emitNewOrder(order.storeId, order.id, {
+        id: order.id,
+        status: order.status,
+        total: order.total,
+        customerName: order.user?.name || 'Unknown',
+        customerEmail: order.user?.email || 'Unknown',
+        storeName: order.store?.name || 'Unknown',
+        itemCount: items.length,
+        createdAt: order.createdAt,
+      });
+
+      // 5. Notifications
       this.notificationFacade.sendOrderNotifications(
         userId,
         notificationContext.storeOwnerId,
@@ -275,7 +289,7 @@ export class OrdersService {
 
       return order;
     } catch (error) {
-      // 5. Release Lock on Failure
+      // 6. Release Lock on Failure
       await this.releaseIdempotencyLock(redisKey);
       this.handleOrderError(userId, error);
     }

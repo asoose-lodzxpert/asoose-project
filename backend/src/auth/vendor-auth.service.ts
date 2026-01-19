@@ -3,6 +3,7 @@ import {
   Inject,
   UnauthorizedException,
   NotFoundException,
+  forwardRef,
 } from '@nestjs/common';
 import { EmailProducer } from '../mail/email.producer';
 import { PrismaService } from '../prisma/prisma.service';
@@ -16,6 +17,8 @@ import * as bcrypt from 'bcryptjs';
 
 @Injectable()
 export class VendorAuthService {
+  private securityNotificationsService: any;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
@@ -23,6 +26,11 @@ export class VendorAuthService {
     @Inject('REDIS_CLIENT') private readonly redisClient: RedisClientType,
     private readonly emailProducer: EmailProducer,
   ) {}
+
+  // Lazy injection to avoid circular dependency
+  setSecurityNotificationsService(service: any) {
+    this.securityNotificationsService = service;
+  }
 
   // ---------------- NOTIFICATION PREFERENCES ----------------
 
@@ -90,6 +98,23 @@ export class VendorAuthService {
       accessToken.substring(0, 50) + '...',
     );
 
+    // Send login notification
+    if (this.securityNotificationsService) {
+      try {
+        await this.securityNotificationsService.notifyLogin(
+          vendor.id,
+          vendor.email,
+          vendor.name,
+          {
+            timestamp: new Date(),
+            device: 'Web/Mobile', // Can be enhanced with actual device info
+          },
+        );
+      } catch (error) {
+        console.error('Failed to send login notification:', error);
+      }
+    }
+
     return {
       accessToken,
       refreshToken,
@@ -102,6 +127,7 @@ export class VendorAuthService {
         businessType: vendor.businessType,
         employees: vendor.employees,
         image: vendor.image,
+        status: vendor.status,
         storeId: vendor.store?.id || null,
       },
     };
@@ -181,6 +207,20 @@ export class VendorAuthService {
       }
     }
 
+    // Send account creation success notification
+    if (this.securityNotificationsService) {
+      try {
+        await this.securityNotificationsService.notifyAccountCreated(
+          vendor.id,
+          vendor.email,
+          vendor.name,
+          vendor.store?.name || 'Your Store',
+        );
+      } catch (error) {
+        console.error('Failed to send account creation notification:', error);
+      }
+    }
+
     return vendor;
   }
 
@@ -201,10 +241,11 @@ export class VendorAuthService {
 
     const otp = await this.otpService.generateOtp(normalizedEmail);
 
-    await this.emailProducer.sendVendorMessage(
+    // Send password reset email using template
+    await this.emailProducer.sendVendorPasswordReset(
       normalizedEmail,
-      'Password Reset OTP',
-      `Your OTP code for password reset is: ${otp}`,
+      vendor.name,
+      otp,
     );
   }
 
@@ -227,10 +268,26 @@ export class VendorAuthService {
 
     await this.otpService.clearOtp(normalizedEmail);
 
-    return this.prisma.vendor.update({
+    const updatedVendor = await this.prisma.vendor.update({
       where: { email: normalizedEmail },
       data: { password: hashedPassword },
     });
+
+    // Send password reset notification
+    if (this.securityNotificationsService) {
+      try {
+        await this.securityNotificationsService.notifyPasswordReset(
+          updatedVendor.id,
+          updatedVendor.email,
+          updatedVendor.name,
+          { timestamp: new Date() },
+        );
+      } catch (error) {
+        console.error('Failed to send password reset notification:', error);
+      }
+    }
+
+    return updatedVendor;
   }
 
   // ---------------- AUTHENTICATED CHANGE PASSWORD ----------------
@@ -265,6 +322,20 @@ export class VendorAuthService {
       where: { email: normalizedEmail },
       data: { password: hashedPassword },
     });
+
+    // Send password change notification
+    if (this.securityNotificationsService) {
+      try {
+        await this.securityNotificationsService.notifyPasswordChanged(
+          vendor.id,
+          vendor.email,
+          vendor.name,
+          { timestamp: new Date() },
+        );
+      } catch (error) {
+        console.error('Failed to send password change notification:', error);
+      }
+    }
 
     return { message: 'Password changed successfully' };
   }
@@ -366,6 +437,7 @@ export class VendorAuthService {
       employees,
       image,
       store,
+      status,
     } = vendor;
 
     return {
@@ -377,6 +449,7 @@ export class VendorAuthService {
       businessType,
       employees,
       image,
+      status,
       storeId: store?.id || null,
     };
   }

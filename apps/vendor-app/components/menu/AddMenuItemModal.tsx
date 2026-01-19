@@ -8,6 +8,8 @@ import {
   ScrollView,
   ActivityIndicator,
   FlatList,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import Toast from "react-native-toast-message";
@@ -84,14 +86,8 @@ export const AddMenuItemModal: React.FC<Props> = ({
       setPrice(itemToEdit.price?.toString() || "");
       setStock(itemToEdit.stock?.toString() || "0");
 
-      // Handle both old single image and new images array
-      const productImages: string[] = [];
-      if (itemToEdit.images && itemToEdit.images.length > 0) {
-        productImages.push(...itemToEdit.images);
-      } else if (itemToEdit.image) {
-        productImages.push(itemToEdit.image);
-      }
-      setImages(productImages);
+      // Load images array
+      setImages(itemToEdit.images || []);
 
       setSelectedCategory(itemToEdit.categoryId || null);
     } else {
@@ -148,7 +144,6 @@ export const AddMenuItemModal: React.FC<Props> = ({
           // Add uploaded URL to images array
           setImages((prev) => [...prev, uploadedUrl]);
         } catch (error) {
-          console.error("Upload error:", error);
           Toast.show({
             type: "error",
             text1: "Failed to upload image",
@@ -159,7 +154,7 @@ export const AddMenuItemModal: React.FC<Props> = ({
         }
       }
     } catch (error) {
-      console.log("Image pick error:", error);
+      // Silent error handling
     }
   };
 
@@ -194,186 +189,199 @@ export const AddMenuItemModal: React.FC<Props> = ({
   return (
     <Modal visible={visible} transparent animationType="slide">
       <Pressable style={styles.overlay} onPress={onClose}>
-        <Pressable
-          style={[styles.modal, { backgroundColor: background }]}
-          onPress={(e) => e.stopPropagation()}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={{ flex: 1, justifyContent: "flex-end" }}
         >
-          <ScrollView showsVerticalScrollIndicator={false}>
-            <ThemedText type="title" style={styles.title}>
-              {itemToEdit ? "Edit Product" : "Add Product"}
-            </ThemedText>
-
-            {/* Image Upload Section */}
-            <View style={styles.section}>
-              <ThemedText type="defaultSemiBold" style={styles.label}>
-                Product Images * (Max 5)
+          <Pressable
+            style={[styles.modal, { backgroundColor: background }]}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={{ paddingBottom: 100 }}
+            >
+              <ThemedText type="title" style={styles.title}>
+                {itemToEdit ? "Edit Product" : "Add Product"}
               </ThemedText>
 
-              {/* Uploaded Images Grid */}
-              {images.length > 0 && (
-                <View style={styles.imagesGrid}>
-                  {images.map((uri, index) => (
-                    <View key={index} style={styles.imageContainer}>
-                      <Image source={{ uri }} style={styles.uploadedImage} />
+              {/* Image Upload Section */}
+              <View style={styles.section}>
+                <ThemedText type="defaultSemiBold" style={styles.label}>
+                  Product Images * (Max 5)
+                </ThemedText>
+
+                {/* Uploaded Images Grid */}
+                {images.length > 0 && (
+                  <View style={styles.imagesGrid}>
+                    {images.map((uri, index) => (
+                      <View key={index} style={styles.imageContainer}>
+                        <Image source={{ uri }} style={styles.uploadedImage} />
+                        <Pressable
+                          style={styles.removeButton}
+                          onPress={() => removeImage(index)}
+                        >
+                          <IconSymbol name="xmark" size={20} color="#EF4444" />
+                        </Pressable>
+                        {index === 0 && (
+                          <View style={styles.primaryBadge}>
+                            <ThemedText style={styles.primaryText}>
+                              Primary
+                            </ThemedText>
+                          </View>
+                        )}
+                      </View>
+                    ))}
+                  </View>
+                )}
+
+                {/* Add Image Button */}
+                {images.length < 5 && (
+                  <Pressable
+                    onPress={pickImage}
+                    disabled={uploading}
+                    style={[
+                      styles.imagePicker,
+                      { borderColor: border },
+                      uploading && styles.imagePickerDisabled,
+                    ]}
+                  >
+                    {uploading ? (
+                      <View style={styles.uploadingContainer}>
+                        <ActivityIndicator size="large" color={primary} />
+                        <ThemedText style={{ color: primary, marginTop: 8 }}>
+                          Uploading... {uploadProgress}%
+                        </ThemedText>
+                      </View>
+                    ) : (
+                      <View style={styles.imagePlaceholder}>
+                        <IconSymbol
+                          name="camera.fill"
+                          size={32}
+                          color={muted}
+                        />
+                        <ThemedText style={{ color: muted, marginTop: 8 }}>
+                          Tap to upload
+                        </ThemedText>
+                        <ThemedText style={{ color: muted, fontSize: 12 }}>
+                          {images.length}/5 images
+                        </ThemedText>
+                      </View>
+                    )}
+                  </Pressable>
+                )}
+              </View>
+
+              {/* Product Name */}
+              <View style={styles.section}>
+                <ThemedText type="defaultSemiBold" style={styles.label}>
+                  Product Name *
+                </ThemedText>
+                <ThemedInput
+                  value={name}
+                  onChangeText={setName}
+                  placeholder="e.g., Jollof Rice"
+                />
+              </View>
+
+              {/* Category */}
+              <View style={styles.section}>
+                <ThemedText type="defaultSemiBold" style={styles.label}>
+                  Category *
+                </ThemedText>
+                {loadingCategories ? (
+                  <View style={styles.uploadingContainer}>
+                    <ActivityIndicator size="small" color={primary} />
+                    <ThemedText style={{ marginLeft: 8, color: muted }}>
+                      Loading categories...
+                    </ThemedText>
+                  </View>
+                ) : (
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.categoriesContainer}
+                  >
+                    {categories.map((cat) => (
                       <Pressable
-                        style={styles.removeButton}
-                        onPress={() => removeImage(index)}
-                      >
-                        <IconSymbol name="xmark" size={20} color="#EF4444" />
-                      </Pressable>
-                      {index === 0 && (
-                        <View style={styles.primaryBadge}>
-                          <ThemedText style={styles.primaryText}>
-                            Primary
-                          </ThemedText>
-                        </View>
-                      )}
-                    </View>
-                  ))}
-                </View>
-              )}
-
-              {/* Add Image Button */}
-              {images.length < 5 && (
-                <Pressable
-                  onPress={pickImage}
-                  disabled={uploading}
-                  style={[
-                    styles.imagePicker,
-                    { borderColor: border },
-                    uploading && styles.imagePickerDisabled,
-                  ]}
-                >
-                  {uploading ? (
-                    <View style={styles.uploadingContainer}>
-                      <ActivityIndicator size="large" color={primary} />
-                      <ThemedText style={{ color: primary, marginTop: 8 }}>
-                        Uploading... {uploadProgress}%
-                      </ThemedText>
-                    </View>
-                  ) : (
-                    <View style={styles.imagePlaceholder}>
-                      <IconSymbol name="camera.fill" size={32} color={muted} />
-                      <ThemedText style={{ color: muted, marginTop: 8 }}>
-                        Tap to upload
-                      </ThemedText>
-                      <ThemedText style={{ color: muted, fontSize: 12 }}>
-                        {images.length}/5 images
-                      </ThemedText>
-                    </View>
-                  )}
-                </Pressable>
-              )}
-            </View>
-
-            {/* Product Name */}
-            <View style={styles.section}>
-              <ThemedText type="defaultSemiBold" style={styles.label}>
-                Product Name *
-              </ThemedText>
-              <ThemedInput
-                value={name}
-                onChangeText={setName}
-                placeholder="e.g., Jollof Rice"
-              />
-            </View>
-
-            {/* Category */}
-            <View style={styles.section}>
-              <ThemedText type="defaultSemiBold" style={styles.label}>
-                Category *
-              </ThemedText>
-              {loadingCategories ? (
-                <View style={styles.uploadingContainer}>
-                  <ActivityIndicator size="small" color={primary} />
-                  <ThemedText style={{ marginLeft: 8, color: muted }}>
-                    Loading categories...
-                  </ThemedText>
-                </View>
-              ) : (
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.categoriesContainer}
-                >
-                  {categories.map((cat) => (
-                    <Pressable
-                      key={cat.id}
-                      onPress={() => setSelectedCategory(cat.id)}
-                      style={[
-                        styles.categoryChip,
-                        { borderColor: border },
-                        selectedCategory === cat.id && {
-                          backgroundColor: primary,
-                          borderColor: primary,
-                        },
-                      ]}
-                    >
-                      <ThemedText
+                        key={cat.id}
+                        onPress={() => setSelectedCategory(cat.id)}
                         style={[
-                          styles.categoryText,
-                          selectedCategory === cat.id && { color: "#fff" },
+                          styles.categoryChip,
+                          { borderColor: border },
+                          selectedCategory === cat.id && {
+                            backgroundColor: primary,
+                            borderColor: primary,
+                          },
                         ]}
                       >
-                        {cat.name}
-                      </ThemedText>
-                    </Pressable>
-                  ))}
-                </ScrollView>
-              )}
-            </View>
-
-            {/* Price */}
-            <View style={styles.section}>
-              <ThemedText type="defaultSemiBold" style={styles.label}>
-                Price (₦) *
-              </ThemedText>
-              <ThemedInput
-                value={price}
-                onChangeText={setPrice}
-                placeholder="0.00"
-                keyboardType="numeric"
-              />
-            </View>
-
-            {/* Stock */}
-            <View style={styles.section}>
-              <ThemedText type="defaultSemiBold" style={styles.label}>
-                Stock Quantity
-              </ThemedText>
-              <ThemedInput
-                value={stock}
-                onChangeText={setStock}
-                placeholder="0"
-                keyboardType="numeric"
-              />
-            </View>
-
-            {/* Actions */}
-            <View style={styles.actions}>
-              <Pressable
-                onPress={onClose}
-                style={[styles.button, { backgroundColor: "#E5E7EB" }]}
-              >
-                <ThemedText style={{ color: "#374151" }}>Cancel</ThemedText>
-              </Pressable>
-
-              <Pressable
-                onPress={handleSave}
-                style={[styles.button, { backgroundColor: primary, flex: 1 }]}
-                disabled={uploading}
-              >
-                {uploading ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <ThemedText style={{ color: "#fff" }}>
-                    {itemToEdit ? "Update" : "Add"} Product
-                  </ThemedText>
+                        <ThemedText
+                          style={[
+                            styles.categoryText,
+                            selectedCategory === cat.id && { color: "#fff" },
+                          ]}
+                        >
+                          {cat.name}
+                        </ThemedText>
+                      </Pressable>
+                    ))}
+                  </ScrollView>
                 )}
-              </Pressable>
-            </View>
-          </ScrollView>
-        </Pressable>
+              </View>
+
+              {/* Price */}
+              <View style={styles.section}>
+                <ThemedText type="defaultSemiBold" style={styles.label}>
+                  Price (₦) *
+                </ThemedText>
+                <ThemedInput
+                  value={price}
+                  onChangeText={setPrice}
+                  placeholder="0.00"
+                  keyboardType="numeric"
+                />
+              </View>
+
+              {/* Stock */}
+              <View style={styles.section}>
+                <ThemedText type="defaultSemiBold" style={styles.label}>
+                  Stock Quantity
+                </ThemedText>
+                <ThemedInput
+                  value={stock}
+                  onChangeText={setStock}
+                  placeholder="0"
+                  keyboardType="numeric"
+                />
+              </View>
+
+              {/* Actions */}
+              <View style={styles.actions}>
+                <Pressable
+                  onPress={onClose}
+                  style={[styles.button, { backgroundColor: "#E5E7EB" }]}
+                >
+                  <ThemedText style={{ color: "#374151" }}>Cancel</ThemedText>
+                </Pressable>
+
+                <Pressable
+                  onPress={handleSave}
+                  style={[styles.button, { backgroundColor: primary, flex: 1 }]}
+                  disabled={uploading}
+                >
+                  {uploading ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <ThemedText style={{ color: "#fff" }}>
+                      {itemToEdit ? "Update" : "Add"} Product
+                    </ThemedText>
+                  )}
+                </Pressable>
+              </View>
+            </ScrollView>
+          </Pressable>
+        </KeyboardAvoidingView>
       </Pressable>
 
       <Toast />

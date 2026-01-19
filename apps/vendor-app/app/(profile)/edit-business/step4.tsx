@@ -6,6 +6,8 @@ import {
   ScrollView,
   TextInput,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { useRouter } from "expo-router";
 import Toast from "react-native-toast-message";
@@ -89,7 +91,6 @@ export default function Step4BankAccountScreen() {
         setAccountNameVerified(true); // Already saved account is verified
       }
     } catch (error: any) {
-      console.log("Error loading data:", error);
       setBanks([]); // Ensure banks is always an array
     } finally {
       setLoading(false);
@@ -432,195 +433,202 @@ export default function Step4BankAccountScreen() {
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={{ flex: 1 }}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
       >
-        <View style={[styles.card, { backgroundColor: surfaceCard }]}>
-          <ThemedText type="defaultSemiBold" style={{ marginBottom: 16 }}>
-            {hasExisting ? "Update Bank Account" : "Add Bank Account"}
-          </ThemedText>
+        <ScrollView
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={[styles.card, { backgroundColor: surfaceCard }]}>
+            <ThemedText type="defaultSemiBold" style={{ marginBottom: 16 }}>
+              {hasExisting ? "Update Bank Account" : "Add Bank Account"}
+            </ThemedText>
 
-          {/* Bank Selection */}
-          <View style={styles.inputGroup}>
-            <CustomDropdown
-              label="Select Bank"
-              placeholder="-- Select Bank --"
-              data={banks.map((bank) => ({
-                label: bank.name,
-                value: bank.code,
-              }))}
-              value={formData.bankCode}
-              onChange={(value) => handleBankChange(value as string)}
-              modal={true}
-            />
-            {errors.bankCode && (
-              <ThemedText style={[styles.errorText, { color: errorColor }]}>
-                {errors.bankCode}
-              </ThemedText>
-            )}
-          </View>
-
-          {/* Account Number */}
-          <View style={styles.inputGroup}>
-            <ThemedText style={styles.label}>Account Number</ThemedText>
-            <View style={{ flexDirection: "row", gap: 8 }}>
-              <TextInput
-                style={[
-                  styles.input,
-                  { flex: 1 },
-                  {
-                    backgroundColor: surfaceCard,
-                    borderColor: errors.accountNumber
-                      ? errorColor
-                      : borderColor,
-                    color: textPrimary,
-                  },
-                ]}
-                placeholder="0123456789"
-                placeholderTextColor={mutedText}
-                keyboardType="numeric"
-                maxLength={10}
-                value={formData.accountNumber}
-                onChangeText={handleAccountNumberChange}
-                editable={!verifying}
+            {/* Bank Selection */}
+            <View style={styles.inputGroup}>
+              <CustomDropdown
+                label="Select Bank"
+                placeholder="-- Select Bank --"
+                data={banks.map((bank) => ({
+                  label: bank.name,
+                  value: bank.code,
+                }))}
+                value={formData.bankCode}
+                onChange={(value) => handleBankChange(value as string)}
+                modal={true}
               />
-              <Pressable
-                onPress={handleVerifyAccount}
-                disabled={
-                  verifying ||
-                  !formData.bankCode ||
-                  formData.accountNumber.length !== 10
-                }
-                style={[
-                  styles.verifyButton,
-                  {
-                    backgroundColor:
-                      verifying ||
-                      !formData.bankCode ||
-                      formData.accountNumber.length !== 10
-                        ? mutedText
-                        : primary,
-                  },
-                ]}
-              >
-                {verifying ? (
-                  <ActivityIndicator color="#fff" size="small" />
-                ) : (
-                  <ThemedText
-                    type="defaultSemiBold"
-                    style={{ color: "#fff", fontSize: 14 }}
-                  >
-                    Verify
-                  </ThemedText>
-                )}
-              </Pressable>
-            </View>
-            {errors.accountNumber && (
-              <ThemedText style={[styles.errorText, { color: errorColor }]}>
-                {errors.accountNumber}
-              </ThemedText>
-            )}
-          </View>
-
-          {/* Account Name (Auto-filled after verification) */}
-          <View style={styles.inputGroup}>
-            <ThemedText style={styles.label}>Account Name</ThemedText>
-            <View
-              style={[
-                styles.input,
-                {
-                  backgroundColor: accountNameVerified
-                    ? successColor + "10"
-                    : surfaceCard,
-                  borderColor: errors.accountName
-                    ? errorColor
-                    : accountNameVerified
-                      ? successColor
-                      : borderColor,
-                  flexDirection: "row",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                },
-              ]}
-            >
-              <ThemedText
-                style={{
-                  color: formData.accountName ? textPrimary : mutedText,
-                  flex: 1,
-                }}
-              >
-                {formData.accountName || "Verify account to see name"}
-              </ThemedText>
-              {accountNameVerified && (
-                <IconSymbol name="check" size={20} color={successColor} />
+              {errors.bankCode && (
+                <ThemedText style={[styles.errorText, { color: errorColor }]}>
+                  {errors.bankCode}
+                </ThemedText>
               )}
             </View>
-            {errors.accountName && (
-              <ThemedText style={[styles.errorText, { color: errorColor }]}>
-                {errors.accountName}
-              </ThemedText>
-            )}
-          </View>
 
-          {/* Save Button */}
-          <Pressable
-            onPress={handleSave}
-            disabled={saving || !accountNameVerified}
-            style={[
-              styles.saveButton,
-              {
-                backgroundColor:
-                  saving || !accountNameVerified ? mutedText : primary,
-              },
-            ]}
-          >
-            {saving ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <ThemedText type="defaultSemiBold" style={{ color: "#fff" }}>
-                {hasExisting ? "Update Account" : "Add Account"}
-              </ThemedText>
-            )}
-          </Pressable>
+            {/* Account Number */}
+            <View style={styles.inputGroup}>
+              <ThemedText style={styles.label}>Account Number</ThemedText>
+              <View style={{ flexDirection: "row", gap: 8 }}>
+                <TextInput
+                  style={[
+                    styles.input,
+                    { flex: 1 },
+                    {
+                      backgroundColor: surfaceCard,
+                      borderColor: errors.accountNumber
+                        ? errorColor
+                        : borderColor,
+                      color: textPrimary,
+                    },
+                  ]}
+                  placeholder="0123456789"
+                  placeholderTextColor={mutedText}
+                  keyboardType="numeric"
+                  maxLength={10}
+                  value={formData.accountNumber}
+                  onChangeText={handleAccountNumberChange}
+                  editable={!verifying}
+                />
+                <Pressable
+                  onPress={handleVerifyAccount}
+                  disabled={
+                    verifying ||
+                    !formData.bankCode ||
+                    formData.accountNumber.length !== 10
+                  }
+                  style={[
+                    styles.verifyButton,
+                    {
+                      backgroundColor:
+                        verifying ||
+                        !formData.bankCode ||
+                        formData.accountNumber.length !== 10
+                          ? mutedText
+                          : primary,
+                    },
+                  ]}
+                >
+                  {verifying ? (
+                    <ActivityIndicator color="#fff" size="small" />
+                  ) : (
+                    <ThemedText
+                      type="defaultSemiBold"
+                      style={{ color: "#fff", fontSize: 14 }}
+                    >
+                      Verify
+                    </ThemedText>
+                  )}
+                </Pressable>
+              </View>
+              {errors.accountNumber && (
+                <ThemedText style={[styles.errorText, { color: errorColor }]}>
+                  {errors.accountNumber}
+                </ThemedText>
+              )}
+            </View>
 
-          {/* Delete Button (only if existing account) */}
-          {hasExisting && (
+            {/* Account Name (Auto-filled after verification) */}
+            <View style={styles.inputGroup}>
+              <ThemedText style={styles.label}>Account Name</ThemedText>
+              <View
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: accountNameVerified
+                      ? successColor + "10"
+                      : surfaceCard,
+                    borderColor: errors.accountName
+                      ? errorColor
+                      : accountNameVerified
+                        ? successColor
+                        : borderColor,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                  },
+                ]}
+              >
+                <ThemedText
+                  style={{
+                    color: formData.accountName ? textPrimary : mutedText,
+                    flex: 1,
+                  }}
+                >
+                  {formData.accountName || "Verify account to see name"}
+                </ThemedText>
+                {accountNameVerified && (
+                  <IconSymbol name="check" size={20} color={successColor} />
+                )}
+              </View>
+              {errors.accountName && (
+                <ThemedText style={[styles.errorText, { color: errorColor }]}>
+                  {errors.accountName}
+                </ThemedText>
+              )}
+            </View>
+
+            {/* Save Button */}
             <Pressable
-              onPress={handleDelete}
-              disabled={deleting}
+              onPress={handleSave}
+              disabled={saving || !accountNameVerified}
               style={[
-                styles.deleteButton,
+                styles.saveButton,
                 {
-                  borderColor: errorColor,
+                  backgroundColor:
+                    saving || !accountNameVerified ? mutedText : primary,
                 },
               ]}
             >
-              {deleting ? (
-                <ActivityIndicator color={errorColor} />
+              {saving ? (
+                <ActivityIndicator color="#fff" />
               ) : (
-                <ThemedText
-                  type="defaultSemiBold"
-                  style={{ color: errorColor }}
-                >
-                  Remove Account
+                <ThemedText type="defaultSemiBold" style={{ color: "#fff" }}>
+                  {hasExisting ? "Update Account" : "Add Account"}
                 </ThemedText>
               )}
             </Pressable>
-          )}
-        </View>
 
-        {/* Info Card */}
-        <View style={[styles.infoCard, { backgroundColor: primary + "10" }]}>
-          <IconSymbol name="info.circle" size={20} color={primary} />
-          <View style={{ flex: 1 }}>
-            <ThemedText style={{ fontSize: 12, color: primary }}>
-              This bank account will be used for withdrawal payments. Ensure the
-              details are correct.
-            </ThemedText>
+            {/* Delete Button (only if existing account) */}
+            {hasExisting && (
+              <Pressable
+                onPress={handleDelete}
+                disabled={deleting}
+                style={[
+                  styles.deleteButton,
+                  {
+                    borderColor: errorColor,
+                  },
+                ]}
+              >
+                {deleting ? (
+                  <ActivityIndicator color={errorColor} />
+                ) : (
+                  <ThemedText
+                    type="defaultSemiBold"
+                    style={{ color: errorColor }}
+                  >
+                    Remove Account
+                  </ThemedText>
+                )}
+              </Pressable>
+            )}
           </View>
-        </View>
-      </ScrollView>
+
+          {/* Info Card */}
+          <View style={[styles.infoCard, { backgroundColor: primary + "10" }]}>
+            <IconSymbol name="info.circle" size={20} color={primary} />
+            <View style={{ flex: 1 }}>
+              <ThemedText style={{ fontSize: 12, color: primary }}>
+                This bank account will be used for withdrawal payments. Ensure
+                the details are correct.
+              </ThemedText>
+            </View>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
 
       <ConfirmModal />
       <Toast />
@@ -638,6 +646,7 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 16,
+    paddingBottom: 100,
     gap: 16,
   },
   card: {

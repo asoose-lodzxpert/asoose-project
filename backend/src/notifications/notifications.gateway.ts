@@ -71,6 +71,14 @@ export class NotificationsGateway
     this.server.to(`user_${userId}`).emit('notification', payload);
   }
 
+  sendToVendor(vendorId: string, payload: any) {
+    this.server.to(`user_${vendorId}`).emit('notification', payload);
+  }
+
+  sendToRider(riderId: string, payload: any) {
+    this.server.to(`user_${riderId}`).emit('notification', payload);
+  }
+
   private extractToken(client: Socket): string | null {
     const auth =
       client.handshake.headers.authorization || client.handshake.auth.token;

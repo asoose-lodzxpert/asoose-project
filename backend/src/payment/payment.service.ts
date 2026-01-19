@@ -3,12 +3,16 @@ import {
   BadRequestException,
   Logger,
   NotFoundException,
+  Inject,
+  forwardRef,
+  Optional,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { PaystackService } from './paystack.service';
 import { FlutterwaveService } from './flutterwave.service';
 import { MonnifyService } from './monnify.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { TripsService } from '../users/trips/trips.service';
 import {
   PaymentGateway,
   PaymentMethod,
@@ -37,6 +41,9 @@ export class PaymentService {
     private flutterwaveService: FlutterwaveService,
     private monnifyService: MonnifyService,
     private notificationsService: NotificationsService,
+    @Optional()
+    @Inject(forwardRef(() => TripsService))
+    private tripsService?: TripsService,
   ) {}
 
   async initiatePayment(
@@ -265,8 +272,10 @@ export class PaymentService {
           include: {
             user: true,
             store: true,
+            delivery: true, // Include delivery to check if it exists
           },
         },
+        ride: true, // Include ride if payment is for a ride
       },
     });
 
@@ -286,6 +295,11 @@ export class PaymentService {
 
       // Send notifications
       await this.sendPaymentNotifications(payment);
+
+      // Start delivery matching if order has a delivery
+      if (payment.order?.delivery) {
+        await this.startDeliveryMatching(payment.order.delivery.id);
+      }
     } else if (
       verification.status === PaymentStatus.FAILED &&
       payment.orderId
@@ -296,6 +310,52 @@ export class PaymentService {
           status: 'FAILED' as any,
         },
       });
+    }
+
+    // Start ride matching if payment is for a ride
+    if (verification.status === PaymentStatus.SUCCESS && payment.rideId) {
+      await this.startRideMatching(payment.rideId);
+    }
+  }
+
+  /**
+   * Start ride matching after payment is successful
+   */
+  private async startRideMatching(rideId: string): Promise<void> {
+    try {
+      if (!this.tripsService) {
+        this.logger.error(
+          `TripsService not available - cannot start ride matching for ${rideId}`,
+        );
+        return;
+      }
+
+      await this.tripsService.startRideMatching(rideId);
+      this.logger.log(`Started ride matching for ride ${rideId}`);
+    } catch (error) {
+      this.logger.error(`Failed to start ride matching for ${rideId}:`, error);
+    }
+  }
+
+  /**
+   * Start delivery matching after payment is successful
+   */
+  private async startDeliveryMatching(deliveryId: string): Promise<void> {
+    try {
+      if (!this.tripsService) {
+        this.logger.error(
+          `TripsService not available - cannot start delivery matching for ${deliveryId}`,
+        );
+        return;
+      }
+
+      await this.tripsService.startDeliveryMatching(deliveryId);
+      this.logger.log(`Started delivery matching for delivery ${deliveryId}`);
+    } catch (error) {
+      this.logger.error(
+        `Failed to start delivery matching for ${deliveryId}:`,
+        error,
+      );
     }
   }
 

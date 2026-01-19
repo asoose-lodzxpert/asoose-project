@@ -28,7 +28,7 @@ export default function TermsScreen() {
         .join("\n\n");
       await Share.share({ message: text });
     } catch (error) {
-      console.error("Error sharing terms:", error);
+      // Silent error handling
     }
   };
 

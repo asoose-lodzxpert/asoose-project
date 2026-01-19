@@ -10,6 +10,7 @@ export interface RiderProfile {
   phone: string;
   countryCode: string;
   image: string | null;
+  role: "RIDER" | "DRIVER"; // Role to distinguish between rider and driver
   status: string;
   rating: number;
   totalRides: number;

@@ -48,7 +48,7 @@ export function NotificationProvider({
       const { count } = await getUnreadCount();
       setUnreadCount(count);
     } catch (error) {
-      console.error("Failed to refresh unread count:", error);
+      // Silent error handling
     }
   };
 
@@ -72,7 +72,6 @@ export function NotificationProvider({
     // Listen for notifications received while app is foregrounded
     notificationListener.current =
       Notifications.addNotificationReceivedListener((notification) => {
-        console.log("Notification received:", notification);
         setNotification(notification);
         setUnreadCount((prev) => prev + 1);
       });
@@ -81,8 +80,6 @@ export function NotificationProvider({
     responseListener.current =
       Notifications.addNotificationResponseReceivedListener(
         async (response) => {
-          console.log("Notification response:", response);
-
           const data = response.notification.request.content.data;
           const actionId = response.actionIdentifier;
 

@@ -9,9 +9,6 @@ const refreshTokenKey = () => `asoose_vendor_refresh_token`;
 // ---------------- LOGIN ----------------
 
 export async function login(identifier: string, password: string) {
-  console.log("Auth check 1");
-  console.log("API URL:", process.env.EXPO_PUBLIC_API_URL);
-
   try {
     const res = await fetch(
       `${process.env.EXPO_PUBLIC_API_URL}/auth/vendor/login`,
@@ -28,8 +25,6 @@ export async function login(identifier: string, password: string) {
 
     if (!res.ok) {
       const error = await res.json().catch(() => ({}));
-      console.log("Error:", error);
-
       throw new Error(error.message || "Invalid credentials");
     }
 
@@ -48,7 +43,6 @@ export async function login(identifier: string, password: string) {
 
     return { user: vendor, vendorKey };
   } catch (error) {
-    console.error("Login error details:", error);
     throw error;
   }
 }

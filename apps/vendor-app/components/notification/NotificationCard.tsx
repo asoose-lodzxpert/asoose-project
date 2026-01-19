@@ -52,7 +52,7 @@ export const NotificationCard: React.FC<Props> = ({ notification, onRead }) => {
         await markAsRead(notification.id);
         onRead?.(notification.id);
       } catch (error) {
-        console.error("Failed to mark notification as read:", error);
+        // Silent error handling
       } finally {
         setIsReading(false);
       }

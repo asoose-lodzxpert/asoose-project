@@ -1,5 +1,7 @@
 import { fetchWithAuth } from "./auth-fetch";
 
+const API_URL = process.env.EXPO_PUBLIC_API_URL;
+
 interface BankAccountData {
   bankName: string;
   bankCode: string;
@@ -15,13 +17,12 @@ interface Bank {
 
 export async function getBanks(): Promise<Bank[]> {
   try {
-    const response = await fetchWithAuth("/vendor/dashboard/banks", {
+    const response = await fetchWithAuth(`${API_URL}/vendor/dashboard/banks`, {
       method: "GET",
     });
     // Ensure we always return an array
     return Array.isArray(response) ? response : [];
   } catch (error) {
-    console.error("Error fetching banks:", error);
     return []; // Return empty array on error
   }
 }
@@ -30,32 +31,41 @@ export async function verifyAccountNumber(
   bankCode: string,
   accountNumber: string
 ): Promise<{ accountName: string }> {
-  const response = await fetchWithAuth("/vendor/dashboard/verify-account", {
-    method: "POST",
-    body: JSON.stringify({ bankCode, accountNumber }),
-  });
+  const response = await fetchWithAuth(
+    `${API_URL}/vendor/dashboard/verify-account`,
+    {
+      method: "POST",
+      body: JSON.stringify({ bankCode, accountNumber }),
+    }
+  );
   return response;
 }
 
 export async function getBankAccount(): Promise<BankAccountData | null> {
-  const response = await fetchWithAuth("/vendor/dashboard/bank-account", {
-    method: "GET",
-  });
+  const response = await fetchWithAuth(
+    `${API_URL}/vendor/dashboard/bank-account`,
+    {
+      method: "GET",
+    }
+  );
   return response;
 }
 
 export async function saveBankAccount(
   data: BankAccountData
 ): Promise<BankAccountData> {
-  const response = await fetchWithAuth("/vendor/dashboard/bank-account", {
-    method: "POST",
-    body: JSON.stringify(data),
-  });
+  const response = await fetchWithAuth(
+    `${API_URL}/vendor/dashboard/bank-account`,
+    {
+      method: "POST",
+      body: JSON.stringify(data),
+    }
+  );
   return response;
 }
 
 export async function deleteBankAccount(): Promise<void> {
-  await fetchWithAuth("/vendor/dashboard/bank-account", {
+  await fetchWithAuth(`${API_URL}/vendor/dashboard/bank-account`, {
     method: "DELETE",
   });
 }

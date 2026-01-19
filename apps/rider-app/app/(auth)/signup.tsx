@@ -33,6 +33,7 @@ export default function SignupScreen() {
     email: "",
     password: "",
     confirmPassword: "",
+    role: "RIDER", // Default to RIDER, can be changed to DRIVER
     address: "",
     phoneCode: "+234",
     phoneNumber: "",

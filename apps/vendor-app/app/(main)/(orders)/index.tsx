@@ -22,6 +22,7 @@ import {
 } from "@/services/orders.service";
 import { useFocusEffect } from "expo-router";
 import { useAuth } from "@/context/AuthContext";
+import { useOrderStream, OrderStreamEvent } from "@/hooks/use-order-stream";
 
 type OrderTab = "pending" | "active" | "history";
 
@@ -49,6 +50,42 @@ export default function OrderScreen() {
 
   // Track if component is mounted to prevent state updates after unmount
   const isMountedRef = React.useRef(true);
+
+  // SSE event handlers
+  const handleNewOrder = useCallback(
+    (orderData: OrderStreamEvent) => {
+      // Only add to pending tab
+      if (tab === "pending" && isMountedRef.current) {
+        Toast.show({
+          type: "success",
+          text1: "🎉 New Order!",
+          text2: `Order from ${orderData.customerName}`,
+          visibilityTime: 4000,
+        });
+
+        // Refresh the list to include the new order
+        loadOrders(1, true);
+      }
+    },
+    [tab]
+  );
+
+  const handleOrderUpdate = useCallback(
+    (orderData: OrderStreamEvent) => {
+      // Refresh current tab
+      if (isMountedRef.current) {
+        loadOrders(1, true);
+      }
+    },
+    [tab]
+  );
+
+  // SSE Connection (disabled for history tab)
+  const { isConnected, error: sseError } = useOrderStream({
+    onNewOrder: handleNewOrder,
+    onOrderUpdate: handleOrderUpdate,
+    enabled: tab !== "history", // Disable SSE for history tab
+  });
 
   // Cleanup on unmount
   useEffect(() => {
@@ -128,9 +165,14 @@ export default function OrderScreen() {
     }, [tab, user?.storeId])
   );
 
-  // Auto-refresh every 30 seconds for pending and active tabs
+  // Auto-refresh every 30 seconds for pending and active tabs (FALLBACK when SSE fails)
   useEffect(() => {
     if (tab === "history") return;
+
+    // Only use polling if SSE is not connected
+    if (isConnected) {
+      return;
+    }
 
     let mounted = true;
 
@@ -145,7 +187,7 @@ export default function OrderScreen() {
       mounted = false;
       clearInterval(interval);
     };
-  }, [tab, user?.storeId]);
+  }, [tab, isConnected, user?.storeId]);
 
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
@@ -290,7 +332,30 @@ export default function OrderScreen() {
       <OrderTabs active={tab} onChange={setTab} />
 
       <View style={[styles.pullTextContainer, { backgroundColor: muted }]}>
-        <ThemedText type="caption">Pull down to refresh</ThemedText>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          {/* SSE Connection Status */}
+          {tab !== "history" && (
+            <View
+              style={{ flexDirection: "row", alignItems: "center", gap: 4 }}
+            >
+              <View
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: 4,
+                  backgroundColor: isConnected ? "#22c55e" : "#f59e0b",
+                }}
+              />
+              <ThemedText type="caption" style={{ fontSize: 11 }}>
+                {isConnected ? "Live" : sseError ? "Polling" : "Connecting..."}
+              </ThemedText>
+              <ThemedText type="caption" style={{ marginLeft: 4 }}>
+                •
+              </ThemedText>
+            </View>
+          )}
+          <ThemedText type="caption">Pull down to refresh</ThemedText>
+        </View>
       </View>
 
       {loading ? (

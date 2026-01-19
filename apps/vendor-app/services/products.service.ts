@@ -13,8 +13,7 @@ export interface Product {
   slug: string;
   description?: string | null;
   price: number;
-  image: string | null;
-  images?: string[];
+  images: string[];
   status: "ACTIVE" | "OUT_OF_STOCK" | "DISABLED";
   storeId: string;
   stock: number;
@@ -33,7 +32,6 @@ export interface CreateProductInput {
   name: string;
   description?: string;
   price: number;
-  image?: string;
   images?: string[];
   categoryId: string;
   stock?: number;
@@ -43,7 +41,6 @@ export interface UpdateProductInput {
   name?: string;
   description?: string;
   price?: number;
-  image?: string;
   images?: string[];
   categoryId?: string;
   stock?: number;

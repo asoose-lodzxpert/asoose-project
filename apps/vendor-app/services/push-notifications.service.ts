@@ -55,7 +55,6 @@ export async function registerForPushNotificationsAsync(): Promise<
     }
 
     if (finalStatus !== "granted") {
-      console.log("Failed to get push token for push notification!");
       return;
     }
 
@@ -66,12 +65,13 @@ export async function registerForPushNotificationsAsync(): Promise<
           projectId,
         })
       ).data;
-      console.log("Push token:", token);
-    } catch (e) {
-      console.error("Error getting push token:", e);
+    } catch (e: any) {
+      // Silently fail if Firebase is not configured
+      // This is common in development or if FCM credentials are not set up
+      return undefined;
     }
   } else {
-    console.log("Must use physical device for Push Notifications");
+    return undefined;
   }
 
   return token;
@@ -85,7 +85,7 @@ export async function savePushToken(token: string): Promise<void> {
       body: JSON.stringify({ token, platform: Platform.OS }),
     });
   } catch (error) {
-    console.error("Failed to save push token:", error);
+    // Silent error handling
   }
 }
 
@@ -96,7 +96,7 @@ export async function removePushToken(): Promise<void> {
       method: "DELETE",
     });
   } catch (error) {
-    console.error("Failed to remove push token:", error);
+    // Silent error handling
   }
 }
 

@@ -32,6 +32,67 @@ export function StepPersonalDetails({ data, onChange }: Props) {
 
   return (
     <View>
+      {/* Role Selection */}
+      <Field label="I want to be a">
+        <View style={styles.roleContainer}>
+          <Pressable
+            style={[
+              styles.roleOption,
+              data.role === "RIDER" && {
+                borderColor: primary,
+                backgroundColor: `${primary}15`,
+              },
+            ]}
+            onPress={() => onChange("role", "RIDER")}
+          >
+            <IconSymbol
+              name="package"
+              size={24}
+              color={data.role === "RIDER" ? primary : muted}
+            />
+            <ThemedText
+              style={[
+                styles.roleText,
+                data.role === "RIDER" && { color: primary, fontWeight: "600" },
+              ]}
+            >
+              Delivery Rider
+            </ThemedText>
+            <ThemedText style={[styles.roleDesc, { color: muted }]}>
+              Deliver packages & food
+            </ThemedText>
+          </Pressable>
+
+          <Pressable
+            style={[
+              styles.roleOption,
+              data.role === "DRIVER" && {
+                borderColor: primary,
+                backgroundColor: `${primary}15`,
+              },
+            ]}
+            onPress={() => onChange("role", "DRIVER")}
+          >
+            <IconSymbol
+              name="car"
+              size={24}
+              color={data.role === "DRIVER" ? primary : muted}
+            />
+            <ThemedText
+              style={[
+                styles.roleText,
+                data.role === "DRIVER" && { color: primary, fontWeight: "600" },
+              ]}
+            >
+              Ride Driver
+            </ThemedText>
+            <ThemedText style={[styles.roleDesc, { color: muted }]}>
+              Transport passengers
+            </ThemedText>
+          </Pressable>
+        </View>
+      </Field>
+
       {/* Full name */}
       <Field label="Full name">
         <ThemedInput
@@ -215,6 +276,29 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: "row",
     gap: 12,
+  },
+  roleContainer: {
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 8,
+  },
+  roleOption: {
+    flex: 1,
+    padding: 16,
+    borderRadius: 14,
+    borderWidth: 2,
+    borderColor: "#E5E7EB",
+    alignItems: "center",
+    gap: 8,
+  },
+  roleText: {
+    fontSize: 14,
+    fontWeight: "500",
+    textAlign: "center",
+  },
+  roleDesc: {
+    fontSize: 11,
+    textAlign: "center",
   },
   dropdown: {
     height: 52,

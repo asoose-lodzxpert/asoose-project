@@ -11,6 +11,7 @@ import { ThemedInput } from "@/components/ThemedInput";
 import { OpenHour } from "@/types/signup";
 import { DAYS } from "@/config/signup";
 import { Checkbox } from "react-native-paper";
+import { useThemeColor } from "@/hooks/use-theme-color";
 
 interface Props {
   value: Record<string, OpenHour>;
@@ -18,6 +19,8 @@ interface Props {
 }
 
 export const OpenHoursBlock: React.FC<Props> = ({ value, onChange }) => {
+  const borderDefault = useThemeColor({}, "borderDefault");
+
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -35,7 +38,10 @@ export const OpenHoursBlock: React.FC<Props> = ({ value, onChange }) => {
           });
 
         return (
-          <View key={day} style={styles.dayContainer}>
+          <View
+            key={day}
+            style={[styles.dayContainer, { borderColor: borderDefault }]}
+          >
             <ThemedText style={styles.dayLabel}>
               {day.charAt(0).toUpperCase() + day.slice(1)}
             </ThemedText>
@@ -99,7 +105,6 @@ export const OpenHoursBlock: React.FC<Props> = ({ value, onChange }) => {
 const styles = StyleSheet.create({
   dayContainer: {
     borderWidth: 1,
-    borderColor: "#E5E7EB",
     borderRadius: 12,
     padding: 12,
     gap: 8,

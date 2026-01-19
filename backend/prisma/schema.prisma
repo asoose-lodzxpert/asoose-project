@@ -70,19 +70,21 @@ enum OrderStatus {
 }
 
 enum RideStatus {
-  REQUESTED
-  ACCEPTED
-  IN_PROGRESS
-  COMPLETED
-  CANCELLED
+  PENDING      // Payment not yet confirmed
+  REQUESTED    // Payment confirmed, searching for driver
+  ACCEPTED     // Driver accepted
+  IN_PROGRESS  // Trip started
+  COMPLETED    // Trip completed
+  CANCELLED    // Trip cancelled
 }
 
 enum DeliveryStatus {
-  REQUESTED
-  ASSIGNED
-  PICKED_UP
-  DELIVERED
-  CANCELLED
+  PENDING      // Payment not yet confirmed
+  REQUESTED    // Payment confirmed, searching for rider
+  ASSIGNED     // Rider assigned
+  PICKED_UP    // Package picked up
+  DELIVERED    // Package delivered
+  CANCELLED    // Delivery cancelled
 }
 
 enum PayoutStatus {
@@ -279,6 +281,7 @@ model Rider {
   phone           String
   password        String
   image           String?
+  role            UserRole   @default(RIDER) // RIDER or DRIVER
   status          UserStatus @default(PENDING)
   expoPushToken   String?    // Expo push notification token
   fcmToken        String?    // Firebase Cloud Messaging token
@@ -307,6 +310,7 @@ model Rider {
   notificationsPreferences Json? // Stores notification preferences
 
   @@index([email])
+  @@index([role])
   @@index([status])
   @@index([isOnline, currentLat, currentLng])
   @@index([rating])
@@ -601,7 +605,6 @@ model Product {
   slug        String        @unique
   description String?
   price       Float
-  image       String?
   images      String[]      @default([])
   status      ProductStatus @default(ACTIVE)
   storeId     String

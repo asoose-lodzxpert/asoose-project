@@ -29,10 +29,6 @@ export class CreateProductDto {
   price: number;
 
   @IsOptional()
-  @IsString()
-  image?: string;
-
-  @IsOptional()
   @IsArray()
   @IsString({ each: true })
   images?: string[];
@@ -60,10 +56,6 @@ export class UpdateProductDto {
   @IsNumber()
   @Min(0)
   price?: number;
-
-  @IsOptional()
-  @IsString()
-  image?: string;
 
   @IsOptional()
   @IsArray()

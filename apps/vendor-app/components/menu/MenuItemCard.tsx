@@ -49,8 +49,8 @@ export const MenuItemCard: React.FC<Props> = ({
           )}
           <Image
             source={
-              item.image && !imageError
-                ? { uri: item.image }
+              item.images && item.images.length > 0 && !imageError
+                ? { uri: item.images[0] }
                 : require("@/assets/images/image-placeholder.png")
             }
             style={styles.image}

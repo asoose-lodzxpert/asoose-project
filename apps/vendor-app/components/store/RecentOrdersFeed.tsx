@@ -1,9 +1,11 @@
-import React from "react";
+import React, { useCallback, useState, useEffect } from "react";
 import { View, FlatList, StyleSheet, Pressable } from "react-native";
 import { StoreOrder } from "@/types/store";
 import { OrderCard } from "@/components/order/OrderCard";
 import { ThemedText } from "@/components/themed-text";
 import { useThemeColor } from "@/hooks/use-theme-color";
+import { useOrderStream, OrderStreamEvent } from "@/hooks/use-order-stream";
+import Toast from "react-native-toast-message";
 
 interface Props {
   orders: StoreOrder[];
@@ -12,6 +14,7 @@ interface Props {
   actionLabel?: string;
   actionIcon?: React.ReactNode;
   loading?: boolean;
+  onRefresh?: () => void;
 }
 
 export const RecentOrdersFeed: React.FC<Props> = ({
@@ -21,11 +24,51 @@ export const RecentOrdersFeed: React.FC<Props> = ({
   actionLabel,
   actionIcon,
   loading,
+  onRefresh,
 }) => {
   const mutedText = useThemeColor({}, "textDisabled");
   const primary = useThemeColor({}, "brandPrimary");
   const background = useThemeColor({}, "surfaceCard");
   const borderColor = useThemeColor({}, "borderDefault");
+  const green = useThemeColor({}, "statusSuccess");
+
+  const [showLiveIndicator, setShowLiveIndicator] = useState(false);
+
+  // SSE event handlers
+  const handleNewOrder = useCallback(
+    (orderData: OrderStreamEvent) => {
+      // Show live indicator with animation
+      setShowLiveIndicator(true);
+      setTimeout(() => setShowLiveIndicator(false), 2000);
+
+      // Show toast notification
+      Toast.show({
+        type: "success",
+        text1: "🎉 New Order!",
+        text2: `Order from ${orderData.customerName}`,
+        visibilityTime: 3000,
+      });
+
+      // Refresh the feed
+      onRefresh?.();
+    },
+    [onRefresh]
+  );
+
+  const handleOrderUpdate = useCallback(
+    (orderData: OrderStreamEvent) => {
+      // Refresh the feed
+      onRefresh?.();
+    },
+    [onRefresh]
+  );
+
+  // SSE Connection
+  const { isConnected } = useOrderStream({
+    onNewOrder: handleNewOrder,
+    onOrderUpdate: handleOrderUpdate,
+    enabled: true, // Always enabled for dashboard
+  });
 
   const getTab = (status: string): "pending" | "active" | "history" => {
     switch (status) {
@@ -42,9 +85,45 @@ export const RecentOrdersFeed: React.FC<Props> = ({
     <View style={styles.wrapper}>
       {heading && (
         <View style={styles.headingRow}>
-          <ThemedText type="defaultSemiBold" style={{ color: mutedText }}>
-            {heading}
-          </ThemedText>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <ThemedText type="defaultSemiBold" style={{ color: mutedText }}>
+              {heading}
+            </ThemedText>
+            {/* Live indicator */}
+            {isConnected && (
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 4,
+                  paddingHorizontal: 8,
+                  paddingVertical: 2,
+                  borderRadius: 8,
+                  backgroundColor: showLiveIndicator
+                    ? green + "30"
+                    : green + "15",
+                }}
+              >
+                <View
+                  style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: 3,
+                    backgroundColor: green,
+                  }}
+                />
+                <ThemedText
+                  style={{
+                    fontSize: 10,
+                    fontWeight: "600",
+                    color: green,
+                  }}
+                >
+                  LIVE
+                </ThemedText>
+              </View>
+            )}
+          </View>
 
           {onActionPress && actionLabel && (
             <Pressable style={styles.actionButton} onPress={onActionPress}>

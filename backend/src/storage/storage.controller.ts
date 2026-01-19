@@ -44,8 +44,8 @@ export class StorageController {
       );
     }
 
-    const url = await this.storageService.uploadFile(file);
-    return { url };
+    const result = await this.storageService.uploadFile(file);
+    return { url: result.signedUrl };
   }
 
   @Post('upload-bulk')
@@ -85,7 +85,10 @@ export class StorageController {
     });
 
     // Upload all valid files
-    const urls = await this.storageService.uploadBulk(validFiles);
+    const results = await this.storageService.uploadBulk(validFiles);
+
+    // Extract just the URLs (signedUrl) from results
+    const urls = results.map((result) => result.signedUrl);
 
     return {
       urls,
@@ -121,8 +124,8 @@ export class StorageController {
       );
     }
 
-    const url = await this.storageService.uploadFile(file);
-    return { url };
+    const result = await this.storageService.uploadFile(file);
+    return { url: result.signedUrl };
   }
 
   @Delete('delete')

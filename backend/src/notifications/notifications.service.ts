@@ -1,19 +1,29 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsGateway } from './notifications.gateway';
+import { ExpoPushService } from '../libs/expo/expo-push.service';
+import { FcmService } from '../libs/fcm/fcm.service';
 
 @Injectable()
 export class NotificationsService {
+  private readonly logger = new Logger(NotificationsService.name);
+
   constructor(
     private prisma: PrismaService,
     private notificationsGateway: NotificationsGateway,
+    private expoPushService: ExpoPushService,
+    private fcmService: FcmService,
   ) {}
 
+  /**
+   * Create notification for a user (customer)
+   */
   async create(data: {
     userId: string;
     title: string;
     message: string;
     type: string;
+    category?: string;
     metadata?: any;
   }) {
     const notification = await this.prisma.notification.create({
@@ -22,16 +32,159 @@ export class NotificationsService {
         title: data.title,
         message: data.message,
         type: data.type,
+        category: data.category,
         metadata: data.metadata || {},
         isRead: false,
       },
     });
 
+    // Send real-time WebSocket notification
     this.notificationsGateway.sendToUser(data.userId, notification);
+
+    // Send push notification if user has token
+    try {
+      const user = await this.prisma.user.findUnique({
+        where: { id: data.userId },
+        select: { fcmToken: true },
+      });
+
+      if (user?.fcmToken) {
+        await this.fcmService.sendToDevice(
+          user.fcmToken,
+          data.title,
+          data.message,
+          data.metadata,
+        );
+      }
+    } catch (error) {
+      this.logger.error(
+        `Failed to send push notification to user ${data.userId}:`,
+        error,
+      );
+    }
 
     return notification;
   }
 
+  /**
+   * Create notification for a vendor
+   */
+  async createForVendor(data: {
+    vendorId: string;
+    title: string;
+    message: string;
+    type: string;
+    category?: string;
+    metadata?: any;
+  }) {
+    const notification = await this.prisma.notification.create({
+      data: {
+        vendorId: data.vendorId,
+        title: data.title,
+        message: data.message,
+        type: data.type,
+        category: data.category,
+        metadata: data.metadata || {},
+        isRead: false,
+      },
+    });
+
+    // Send real-time WebSocket notification
+    this.notificationsGateway.sendToVendor(data.vendorId, notification);
+
+    // Send push notification if vendor has token
+    try {
+      const vendor = await this.prisma.vendor.findUnique({
+        where: { id: data.vendorId },
+        select: { expoPushToken: true, fcmToken: true },
+      });
+
+      if (vendor?.expoPushToken) {
+        await this.expoPushService.sendToDevice(
+          vendor.expoPushToken,
+          data.title,
+          data.message,
+          data.metadata,
+        );
+      } else if (vendor?.fcmToken) {
+        await this.fcmService.sendToDevice(
+          vendor.fcmToken,
+          data.title,
+          data.message,
+          data.metadata,
+        );
+      }
+    } catch (error) {
+      this.logger.error(
+        `Failed to send push notification to vendor ${data.vendorId}:`,
+        error,
+      );
+    }
+
+    return notification;
+  }
+
+  /**
+   * Create notification for a rider
+   */
+  async createForRider(data: {
+    riderId: string;
+    title: string;
+    message: string;
+    type: string;
+    category?: string;
+    metadata?: any;
+  }) {
+    const notification = await this.prisma.notification.create({
+      data: {
+        riderId: data.riderId,
+        title: data.title,
+        message: data.message,
+        type: data.type,
+        category: data.category,
+        metadata: data.metadata || {},
+        isRead: false,
+      },
+    });
+
+    // Send real-time WebSocket notification
+    this.notificationsGateway.sendToRider(data.riderId, notification);
+
+    // Send push notification if rider has token
+    try {
+      const rider = await this.prisma.rider.findUnique({
+        where: { id: data.riderId },
+        select: { expoPushToken: true, fcmToken: true },
+      });
+
+      if (rider?.expoPushToken) {
+        await this.expoPushService.sendToDevice(
+          rider.expoPushToken,
+          data.title,
+          data.message,
+          data.metadata,
+        );
+      } else if (rider?.fcmToken) {
+        await this.fcmService.sendToDevice(
+          rider.fcmToken,
+          data.title,
+          data.message,
+          data.metadata,
+        );
+      }
+    } catch (error) {
+      this.logger.error(
+        `Failed to send push notification to rider ${data.riderId}:`,
+        error,
+      );
+    }
+
+    return notification;
+  }
+
+  /**
+   * Get notifications for a user (customer)
+   */
   async getUserNotifications(userId: string, page = 1) {
     const take = 20;
     const skip = (page - 1) * take;
@@ -52,6 +205,55 @@ export class NotificationsService {
     };
   }
 
+  /**
+   * Get notifications for a vendor
+   */
+  async getVendorNotifications(vendorId: string, page = 1) {
+    const take = 20;
+    const skip = (page - 1) * take;
+
+    const [data, total] = await Promise.all([
+      this.prisma.notification.findMany({
+        where: { vendorId },
+        orderBy: { createdAt: 'desc' },
+        take,
+        skip,
+      }),
+      this.prisma.notification.count({ where: { vendorId } }),
+    ]);
+
+    return {
+      data,
+      meta: { total, page, pages: Math.ceil(total / take) },
+    };
+  }
+
+  /**
+   * Get notifications for a rider
+   */
+  async getRiderNotifications(riderId: string, page = 1) {
+    const take = 20;
+    const skip = (page - 1) * take;
+
+    const [data, total] = await Promise.all([
+      this.prisma.notification.findMany({
+        where: { riderId },
+        orderBy: { createdAt: 'desc' },
+        take,
+        skip,
+      }),
+      this.prisma.notification.count({ where: { riderId } }),
+    ]);
+
+    return {
+      data,
+      meta: { total, page, pages: Math.ceil(total / take) },
+    };
+  }
+
+  /**
+   * Get unread count for a user
+   */
   async getUnreadCount(userId: string) {
     const count = await this.prisma.notification.count({
       where: { userId, isRead: false },
@@ -59,6 +261,29 @@ export class NotificationsService {
     return { count };
   }
 
+  /**
+   * Get unread count for a vendor
+   */
+  async getVendorUnreadCount(vendorId: string) {
+    const count = await this.prisma.notification.count({
+      where: { vendorId, isRead: false },
+    });
+    return { count };
+  }
+
+  /**
+   * Get unread count for a rider
+   */
+  async getRiderUnreadCount(riderId: string) {
+    const count = await this.prisma.notification.count({
+      where: { riderId, isRead: false },
+    });
+    return { count };
+  }
+
+  /**
+   * Mark notification as read for a user
+   */
   async markAsRead(userId: string, notificationId: string) {
     return this.prisma.notification.updateMany({
       where: { id: notificationId, userId },
@@ -66,9 +291,52 @@ export class NotificationsService {
     });
   }
 
+  /**
+   * Mark notification as read for a vendor
+   */
+  async markVendorAsRead(vendorId: string, notificationId: string) {
+    return this.prisma.notification.updateMany({
+      where: { id: notificationId, vendorId },
+      data: { isRead: true },
+    });
+  }
+
+  /**
+   * Mark notification as read for a rider
+   */
+  async markRiderAsRead(riderId: string, notificationId: string) {
+    return this.prisma.notification.updateMany({
+      where: { id: notificationId, riderId },
+      data: { isRead: true },
+    });
+  }
+
+  /**
+   * Mark all notifications as read for a user
+   */
   async markAllAsRead(userId: string) {
     return this.prisma.notification.updateMany({
       where: { userId, isRead: false },
+      data: { isRead: true },
+    });
+  }
+
+  /**
+   * Mark all notifications as read for a vendor
+   */
+  async markAllVendorAsRead(vendorId: string) {
+    return this.prisma.notification.updateMany({
+      where: { vendorId, isRead: false },
+      data: { isRead: true },
+    });
+  }
+
+  /**
+   * Mark all notifications as read for a rider
+   */
+  async markAllRiderAsRead(riderId: string) {
+    return this.prisma.notification.updateMany({
+      where: { riderId, isRead: false },
       data: { isRead: true },
     });
   }

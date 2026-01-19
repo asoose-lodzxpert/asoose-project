@@ -109,7 +109,6 @@ export default function EditBusinessDocumentsScreen() {
           }
         }
       } catch (sizeError) {
-        console.warn("Could not check file size:", sizeError);
         // Continue anyway if we can't check size
       }
 
@@ -244,7 +243,7 @@ export default function EditBusinessDocumentsScreen() {
     );
   };
 
-  if (loading) {
+  if (loading || !data) {
     return (
       <ThemedView style={{ flex: 1 }}>
         {/* Header Skeleton */}

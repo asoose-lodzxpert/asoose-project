@@ -6,6 +6,8 @@ import {
   Image,
   ScrollView,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
@@ -97,8 +99,8 @@ export default function AddEditItemScreen() {
       setCategoryId(item.categoryId);
 
       // Load existing images as not new
-      if (item.image) {
-        setImages([{ uri: item.image, isNew: false }]);
+      if (item.images && item.images.length > 0) {
+        setImages(item.images.map((uri) => ({ uri, isNew: false })));
       }
     } catch (error: any) {
       Toast.show({
@@ -123,7 +125,7 @@ export default function AddEditItemScreen() {
         return result.assets[0].uri;
       }
     } catch (error) {
-      console.log("Image pick error:", error);
+      // Silent error handling
     }
     return null;
   };
@@ -163,14 +165,14 @@ export default function AddEditItemScreen() {
     setImages((prev) => prev.filter((_, i) => i !== idx));
   };
 
-  const uploadImages = async (): Promise<string | undefined> => {
+  const uploadImages = async (): Promise<string[]> => {
     // Separate images into existing (unchanged) and new/edited
     const existingImages = images.filter((img) => !img.isNew && !img.isEdited);
     const imagesToUpload = images.filter((img) => img.isNew || img.isEdited);
 
-    // If no new images to upload, return the first existing image
+    // If no new images to upload, return existing images
     if (imagesToUpload.length === 0) {
-      return existingImages[0]?.uri;
+      return existingImages.map((img) => img.uri);
     }
 
     setUploadingImages(true);
@@ -182,17 +184,11 @@ export default function AddEditItemScreen() {
         type: "image/jpeg",
       }));
 
-      console.log("Uploading files:", filesToUpload.length);
-
       // Upload all new/edited images at once
       const uploadedUrls = await uploadBulk(
         filesToUpload,
-        (progress: UploadProgress) => {
-          console.log("Upload progress:", progress.percentage);
-        }
+        (progress: UploadProgress) => {}
       );
-
-      console.log("Upload successful, URLs:", uploadedUrls);
 
       // Combine existing unchanged URLs with newly uploaded URLs
       // For edit mode: preserve position of existing images
@@ -210,11 +206,9 @@ export default function AddEditItemScreen() {
         }
       });
 
-      // Return the first URL (backend currently expects single image)
-      // TODO: Update backend Product model to support multiple images
-      return finalUrls[0];
+      // Return all URLs as array
+      return finalUrls;
     } catch (error: any) {
-      console.error("Upload error:", error);
       const errorMessage = error?.message || "Failed to upload images";
       throw new Error(errorMessage);
     } finally {
@@ -263,7 +257,7 @@ export default function AddEditItemScreen() {
     setSaving(true);
     try {
       // Upload images first
-      const imageUrl = await uploadImages();
+      const imageUrls = await uploadImages();
 
       if (isEdit && itemId) {
         // Update existing product
@@ -273,7 +267,7 @@ export default function AddEditItemScreen() {
           price: Number(price),
           categoryId,
           stock: Number(stock) || 0,
-          image: imageUrl,
+          images: imageUrls,
         });
 
         Toast.show({
@@ -289,7 +283,7 @@ export default function AddEditItemScreen() {
           price: Number(price),
           categoryId,
           stock: Number(stock) || 0,
-          image: imageUrl,
+          images: imageUrls,
         });
 
         Toast.show({
@@ -444,174 +438,184 @@ export default function AddEditItemScreen() {
         </Pressable>
       </View>
 
-      <ScrollView
-        contentContainerStyle={styles.container}
-        showsVerticalScrollIndicator={false}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={{ flex: 1 }}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
       >
-        <ThemedText type="title" style={{ marginBottom: 24 }}>
-          {isEdit ? "Edit Product" : "Add New Product"}
-        </ThemedText>
-
-        {/* Item Name */}
-        <View style={styles.section}>
-          <ThemedText type="defaultSemiBold" style={styles.label}>
-            Product Name *
-          </ThemedText>
-          <ThemedInput
-            placeholder="Enter product name"
-            value={name}
-            onChangeText={setName}
-          />
-        </View>
-
-        {/* Description */}
-        <View style={styles.section}>
-          <ThemedText type="defaultSemiBold" style={styles.label}>
-            Description
-          </ThemedText>
-          <ThemedInput
-            placeholder="Product description (optional)"
-            value={description}
-            onChangeText={setDescription}
-            style={{ height: 80, textAlignVertical: "top" }}
-            multiline
-            maxLength={200}
-          />
-          <ThemedText type="caption" style={{ marginTop: 4, color: mutedText }}>
-            {description.length}/200
-          </ThemedText>
-        </View>
-
-        {/* Price */}
-        <View style={styles.section}>
-          <ThemedText type="defaultSemiBold" style={styles.label}>
-            Price (₦) *
-          </ThemedText>
-          <ThemedInput
-            placeholder="0.00"
-            value={price}
-            onChangeText={(t) => setPrice(t.replace(/[^0-9.]/g, ""))}
-            keyboardType="numeric"
-          />
-        </View>
-
-        {/* Stock */}
-        <View style={styles.section}>
-          <ThemedText type="defaultSemiBold" style={styles.label}>
-            Stock Quantity
-          </ThemedText>
-          <ThemedInput
-            placeholder="0"
-            value={stock}
-            onChangeText={(t) => setStock(t.replace(/[^0-9]/g, ""))}
-            keyboardType="numeric"
-          />
-        </View>
-
-        {/* Category */}
-        <View style={styles.section}>
-          <CustomDropdown
-            label="Category *"
-            placeholder="Select category"
-            data={categories.map((cat) => ({
-              label: cat.name,
-              value: cat.id,
-            }))}
-            value={categoryId}
-            onChange={(value) => setCategoryId(value as string)}
-            modal={true}
-          />
-        </View>
-
-        {/* Images */}
-        <View style={styles.section}>
-          <ThemedText type="defaultSemiBold" style={styles.label}>
-            Product Images * (Max 8)
-          </ThemedText>
-          <ThemedText
-            type="caption"
-            style={{ marginBottom: 12, color: mutedText }}
-          >
-            Tap to replace image. Long press to reorder.
+        <ScrollView
+          contentContainerStyle={styles.container}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          <ThemedText type="title" style={{ marginBottom: 24 }}>
+            {isEdit ? "Edit Product" : "Add New Product"}
           </ThemedText>
 
-          {images.length === 0 ? (
-            // Show placeholder when no images
-            <Pressable
-              style={[styles.image, styles.placeholder, { borderColor }]}
-              onPress={handleAddImage}
+          {/* Item Name */}
+          <View style={styles.section}>
+            <ThemedText type="defaultSemiBold" style={styles.label}>
+              Product Name *
+            </ThemedText>
+            <ThemedInput
+              placeholder="Enter product name"
+              value={name}
+              onChangeText={setName}
+            />
+          </View>
+
+          {/* Description */}
+          <View style={styles.section}>
+            <ThemedText type="defaultSemiBold" style={styles.label}>
+              Description
+            </ThemedText>
+            <ThemedInput
+              placeholder="Product description (optional)"
+              value={description}
+              onChangeText={setDescription}
+              style={{ height: 80, textAlignVertical: "top" }}
+              multiline
+              maxLength={200}
+            />
+            <ThemedText
+              type="caption"
+              style={{ marginTop: 4, color: mutedText }}
             >
-              <IconSymbol name="plus" size={24} color={mutedText} />
-              <ThemedText
-                style={{ fontSize: 10, marginTop: 4, color: mutedText }}
+              {description.length}/200
+            </ThemedText>
+          </View>
+
+          {/* Price */}
+          <View style={styles.section}>
+            <ThemedText type="defaultSemiBold" style={styles.label}>
+              Price (₦) *
+            </ThemedText>
+            <ThemedInput
+              placeholder="0.00"
+              value={price}
+              onChangeText={(t) => setPrice(t.replace(/[^0-9.]/g, ""))}
+              keyboardType="numeric"
+            />
+          </View>
+
+          {/* Stock */}
+          <View style={styles.section}>
+            <ThemedText type="defaultSemiBold" style={styles.label}>
+              Stock Quantity
+            </ThemedText>
+            <ThemedInput
+              placeholder="0"
+              value={stock}
+              onChangeText={(t) => setStock(t.replace(/[^0-9]/g, ""))}
+              keyboardType="numeric"
+            />
+          </View>
+
+          {/* Category */}
+          <View style={styles.section}>
+            <CustomDropdown
+              label="Category *"
+              placeholder="Select category"
+              data={categories.map((cat) => ({
+                label: cat.name,
+                value: cat.id,
+              }))}
+              value={categoryId}
+              onChange={(value) => setCategoryId(value as string)}
+              modal={true}
+            />
+          </View>
+
+          {/* Images */}
+          <View style={styles.section}>
+            <ThemedText type="defaultSemiBold" style={styles.label}>
+              Product Images * (Max 8)
+            </ThemedText>
+            <ThemedText
+              type="caption"
+              style={{ marginBottom: 12, color: mutedText }}
+            >
+              Tap to replace image. Long press to reorder.
+            </ThemedText>
+
+            {images.length === 0 ? (
+              // Show placeholder when no images
+              <Pressable
+                style={[styles.image, styles.placeholder, { borderColor }]}
+                onPress={handleAddImage}
               >
-                Add Image
+                <IconSymbol name="plus" size={24} color={mutedText} />
+                <ThemedText
+                  style={{ fontSize: 10, marginTop: 4, color: mutedText }}
+                >
+                  Add Image
+                </ThemedText>
+              </Pressable>
+            ) : (
+              // Show images with add button on the side
+              <View style={{ flexDirection: "row", gap: 12 }}>
+                <DraggableFlatList
+                  horizontal
+                  data={images}
+                  keyExtractor={(item, i) => `${item.uri}-${i}`}
+                  renderItem={renderImage}
+                  onDragEnd={({ data }) => setImages(data)}
+                  contentContainerStyle={{ gap: 12 }}
+                  showsHorizontalScrollIndicator={false}
+                  style={{ flex: 1 }}
+                />
+
+                {images.length < 8 && (
+                  <Pressable
+                    style={[styles.image, styles.placeholder, { borderColor }]}
+                    onPress={handleAddImage}
+                  >
+                    <IconSymbol name="plus" size={24} color={mutedText} />
+                  </Pressable>
+                )}
+              </View>
+            )}
+          </View>
+
+          {/* Action Buttons */}
+          <View style={styles.actions}>
+            <Pressable
+              style={[
+                styles.button,
+                styles.cancelButton,
+                { borderColor: primary },
+              ]}
+              onPress={handleCancel}
+              disabled={saving || uploadingImages}
+            >
+              <ThemedText type="defaultSemiBold" style={{ color: primary }}>
+                Cancel
               </ThemedText>
             </Pressable>
-          ) : (
-            // Show images with add button on the side
-            <View style={{ flexDirection: "row", gap: 12 }}>
-              <DraggableFlatList
-                horizontal
-                data={images}
-                keyExtractor={(item, i) => `${item.uri}-${i}`}
-                renderItem={renderImage}
-                onDragEnd={({ data }) => setImages(data)}
-                contentContainerStyle={{ gap: 12 }}
-                showsHorizontalScrollIndicator={false}
-                style={{ flex: 1 }}
-              />
 
-              {images.length < 8 && (
-                <Pressable
-                  style={[styles.image, styles.placeholder, { borderColor }]}
-                  onPress={handleAddImage}
-                >
-                  <IconSymbol name="plus" size={24} color={mutedText} />
-                </Pressable>
+            <Pressable
+              style={[
+                styles.button,
+                styles.saveButton,
+                {
+                  backgroundColor: primary,
+                  opacity: saving || uploadingImages ? 0.7 : 1,
+                },
+              ]}
+              onPress={handleSave}
+              disabled={saving || uploadingImages}
+            >
+              {saving || uploadingImages ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <ThemedText type="defaultSemiBold" style={{ color: "#fff" }}>
+                  {isEdit ? "Update Product" : "Create Product"}
+                </ThemedText>
               )}
-            </View>
-          )}
-        </View>
-
-        {/* Action Buttons */}
-        <View style={styles.actions}>
-          <Pressable
-            style={[
-              styles.button,
-              styles.cancelButton,
-              { borderColor: primary },
-            ]}
-            onPress={handleCancel}
-            disabled={saving || uploadingImages}
-          >
-            <ThemedText type="defaultSemiBold" style={{ color: primary }}>
-              Cancel
-            </ThemedText>
-          </Pressable>
-
-          <Pressable
-            style={[
-              styles.button,
-              styles.saveButton,
-              {
-                backgroundColor: primary,
-                opacity: saving || uploadingImages ? 0.7 : 1,
-              },
-            ]}
-            onPress={handleSave}
-            disabled={saving || uploadingImages}
-          >
-            {saving || uploadingImages ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <ThemedText type="defaultSemiBold" style={{ color: "#fff" }}>
-                {isEdit ? "Update Product" : "Create Product"}
-              </ThemedText>
-            )}
-          </Pressable>
-        </View>
-      </ScrollView>
+            </Pressable>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
 
       <ConfirmModal />
       <Toast />
@@ -629,7 +633,7 @@ const styles = StyleSheet.create({
   },
   container: {
     padding: 16,
-    paddingBottom: 40,
+    paddingBottom: 100,
   },
   section: {
     marginBottom: 20,

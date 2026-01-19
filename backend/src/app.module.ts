@@ -26,6 +26,7 @@ import { FcmModule } from './libs/fcm/fcm.module';
 import { MapsModule } from './maps/maps.module';
 import { StorageModule } from './storage/storage.module';
 import { PaymentModule } from './payment/payment.module';
+import { MatchingModule } from './matching/matching.module';
 
 @Module({
   imports: [
@@ -78,6 +79,7 @@ import { PaymentModule } from './payment/payment.module';
     MapsModule,
     StorageModule,
     PaymentModule,
+    MatchingModule,
   ],
   controllers: [AppController],
   providers: [

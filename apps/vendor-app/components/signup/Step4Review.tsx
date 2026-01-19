@@ -3,6 +3,7 @@ import { View, StyleSheet, ScrollView, Image } from "react-native";
 import { ThemedText } from "@/components/themed-text";
 import { SignupData } from "@/types/signup";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { useThemeColor } from "@/hooks/use-theme-color";
 
 interface Step4Props {
   data: SignupData;
@@ -10,6 +11,10 @@ interface Step4Props {
 
 export const Step4Review: React.FC<Step4Props> = ({ data }) => {
   const { step1, step2, step3 } = data;
+  const successColor = useThemeColor({}, "statusSuccess");
+  const errorColor = useThemeColor({}, "statusError");
+  const textSecondary = useThemeColor({}, "textSecondary");
+  const surfaceCard = useThemeColor({}, "surfaceCard");
 
   const renderDocument = (doc: string | undefined, type: string) => {
     const uploaded = !!doc;
@@ -18,7 +23,7 @@ export const Step4Review: React.FC<Step4Props> = ({ data }) => {
         <IconSymbol
           name={uploaded ? "check" : "xmark"}
           size={20}
-          color={uploaded ? "#22C55E" : "#EF4444"}
+          color={uploaded ? successColor : errorColor}
         />
         <View style={{ marginLeft: 8, flex: 1 }}>
           <ThemedText>{uploaded ? doc : "Not uploaded"}</ThemedText>
@@ -37,7 +42,7 @@ export const Step4Review: React.FC<Step4Props> = ({ data }) => {
       <ThemedText type="subtitle">Make sure everything is correct.</ThemedText>
 
       {/* Business Information */}
-      <View style={styles.card}>
+      <View style={[styles.card, { backgroundColor: surfaceCard }]}>
         <ThemedText type="subtitle">Business Information</ThemedText>
 
         <View style={styles.infoRow}>
@@ -69,7 +74,7 @@ export const Step4Review: React.FC<Step4Props> = ({ data }) => {
       </View>
 
       {/* Verification Documents */}
-      <View style={styles.card}>
+      <View style={[styles.card, { backgroundColor: surfaceCard }]}>
         <ThemedText type="subtitle">Verification Documents</ThemedText>
         {renderDocument(step2.businessRegCert, "Business Registration")}
         {renderDocument(step2.taxIdDoc, "Tax ID")}
@@ -77,7 +82,7 @@ export const Step4Review: React.FC<Step4Props> = ({ data }) => {
       </View>
 
       {/* Store Setup */}
-      <View style={styles.card}>
+      <View style={[styles.card, { backgroundColor: surfaceCard }]}>
         <ThemedText type="subtitle">Store Setup</ThemedText>
 
         <View style={styles.infoRow}>
@@ -94,14 +99,14 @@ export const Step4Review: React.FC<Step4Props> = ({ data }) => {
         {step3.storeLogo ? (
           <Image source={{ uri: step3.storeLogo }} style={styles.logo} />
         ) : (
-          <IconSymbol size={40} name="camera.fill" color="#6B7280" />
+          <IconSymbol size={40} name="camera.fill" color={textSecondary} />
         )}
 
         <ThemedText style={{ marginTop: 8 }}>Store Banner</ThemedText>
         {step3.storeBanner ? (
           <Image source={{ uri: step3.storeBanner }} style={styles.banner} />
         ) : (
-          <IconSymbol size={40} name="camera.fill" color="#6B7280" />
+          <IconSymbol size={40} name="camera.fill" color={textSecondary} />
         )}
 
         <View style={{ marginTop: 8 }}>
@@ -135,7 +140,6 @@ export const Step4Review: React.FC<Step4Props> = ({ data }) => {
 const styles = StyleSheet.create({
   container: { flexGrow: 1, gap: 24 },
   card: {
-    backgroundColor: "#FFF",
     borderRadius: 12,
     padding: 16,
     shadowColor: "#000",

@@ -31,6 +31,10 @@ type UploadState = {
 
 export const Step2VerifyDocs: React.FC<Step2Props> = ({ data, onChange }) => {
   const primary = useThemeColor({}, "brandPrimary");
+  const successColor = useThemeColor({}, "statusSuccess");
+  const textMuted = useThemeColor({}, "textMuted");
+  const borderDefault = useThemeColor({}, "borderDefault");
+  const surfaceSubtle = useThemeColor({}, "surfaceSubtle");
   const [uploadState, setUploadState] = useState<UploadState>({});
 
   const pickFile = async (key: keyof SignupStep2Data) => {
@@ -78,7 +82,6 @@ export const Step2VerifyDocs: React.FC<Step2Props> = ({ data, onChange }) => {
           }
         }
       } catch (sizeError) {
-        console.warn("Could not check file size:", sizeError);
         // Continue anyway if we can't check size
       }
 
@@ -161,6 +164,7 @@ export const Step2VerifyDocs: React.FC<Step2Props> = ({ data, onChange }) => {
               onPress={() => pickFile(key as keyof SignupStep2Data)}
               style={[
                 styles.uploadCard,
+                { borderColor: borderDefault },
                 uploaded && {
                   borderColor: primary,
                   borderStyle: "solid",
@@ -179,7 +183,12 @@ export const Step2VerifyDocs: React.FC<Step2Props> = ({ data, onChange }) => {
                   <ThemedText style={styles.uploadText}>
                     Uploading... {progress}%
                   </ThemedText>
-                  <View style={styles.progressBarContainer}>
+                  <View
+                    style={[
+                      styles.progressBarContainer,
+                      { backgroundColor: surfaceSubtle },
+                    ]}
+                  >
                     <View
                       style={[
                         styles.progressBar,
@@ -193,7 +202,7 @@ export const Step2VerifyDocs: React.FC<Step2Props> = ({ data, onChange }) => {
                   <IconSymbol
                     size={32}
                     name={uploaded ? "check" : "cloud.upload"}
-                    color={uploaded ? "#22C55E" : "#9CA3AF"}
+                    color={uploaded ? successColor : textMuted}
                   />
 
                   <ThemedText style={styles.uploadText}>
@@ -202,7 +211,7 @@ export const Step2VerifyDocs: React.FC<Step2Props> = ({ data, onChange }) => {
                       : "Tap to upload or drag & drop"}
                   </ThemedText>
 
-                  <ThemedText style={styles.hintText}>
+                  <ThemedText style={[styles.hintText, { color: textMuted }]}>
                     {uploaded
                       ? value?.split("/").pop()
                       : "PDF, JPG, PNG (max 5MB)"}
@@ -242,7 +251,6 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
     borderStyle: "dashed",
-    borderColor: "#D1D5DB",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
@@ -255,7 +263,6 @@ const styles = StyleSheet.create({
   hintText: {
     fontSize: 12,
     textAlign: "center",
-    color: "#9CA3AF",
   },
   removeButton: {
     marginTop: 6,
@@ -263,7 +270,6 @@ const styles = StyleSheet.create({
   progressBarContainer: {
     width: "80%",
     height: 6,
-    backgroundColor: "#E5E7EB",
     borderRadius: 3,
     marginTop: 8,
     overflow: "hidden",

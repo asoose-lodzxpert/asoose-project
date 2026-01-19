@@ -8,8 +8,12 @@ import {
   Request,
   Query,
   Logger,
+  Sse,
+  MessageEvent,
 } from '@nestjs/common';
+import { Observable } from 'rxjs';
 import { VendorOrdersService } from './vendor-orders.service';
+import { VendorOrdersStreamService } from './vendor-orders-stream.service';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { RolesGuard } from 'src/auth/roles.guards';
@@ -21,7 +25,35 @@ import { Roles } from 'src/auth/roles.decorator';
 export class VendorOrdersController {
   private readonly logger = new Logger(VendorOrdersController.name);
 
-  constructor(private readonly ordersService: VendorOrdersService) {}
+  constructor(
+    private readonly ordersService: VendorOrdersService,
+    private readonly streamService: VendorOrdersStreamService,
+  ) {}
+
+  /**
+   * SSE endpoint for real-time order notifications
+   * Vendors connect to this endpoint and receive events when:
+   * - New orders are created for their store
+   * - Order statuses change
+   */
+  @Sse('stream')
+  streamOrders(@Request() req): Observable<MessageEvent> {
+    const vendorId = req.user.id;
+    const storeId = req.user.storeId;
+
+    if (!storeId) {
+      this.logger.warn(
+        `Vendor ${vendorId} attempted to connect without a storeId`,
+      );
+      throw new Error('No store associated with this vendor');
+    }
+
+    this.logger.log(
+      `Vendor ${vendorId} connected to order stream for store ${storeId}`,
+    );
+
+    return this.streamService.getOrderStream(storeId);
+  }
 
   @Get()
   async findAll(

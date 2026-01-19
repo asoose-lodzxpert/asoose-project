@@ -18,6 +18,7 @@ import {
   type RiderProfile,
   type ProfileStats,
 } from "@/services/profile.service";
+import { getRoleLabel } from "@/utils/role";
 
 const accountManagementItems = [
   {
@@ -186,13 +187,14 @@ export default function ProfileScreen() {
             <View style={{ flex: 1 }}>
               <ThemedText type="title">{profile.name}</ThemedText>
               <ThemedText style={styles.subText}>
-                Rider ID: #{profile.id.slice(0, 8).toUpperCase()}
+                {getRoleLabel(profile.role)} ID: #
+                {profile.id.slice(0, 8).toUpperCase()}
               </ThemedText>
               {isVerified && (
                 <View style={styles.badge}>
                   <IconSymbol name="checkmark.seal" size={14} color="#16A34A" />
                   <ThemedText style={styles.badgeText}>
-                    Verified Rider
+                    Verified {getRoleLabel(profile.role)}
                   </ThemedText>
                 </View>
               )}

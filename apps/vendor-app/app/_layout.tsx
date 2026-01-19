@@ -7,6 +7,8 @@ import { NotificationProvider } from "@/context/NotificationContext";
 import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { toastConfig } from "@/components/ThemedToast";
+import Toast from "react-native-toast-message";
 import { useEffect, useRef } from "react";
 
 function LoadingScreen() {
@@ -77,7 +79,17 @@ function RootNavigator() {
   return (
     <GestureHandlerRootView>
       <Stack screenOptions={{ headerShown: false }}>
-        {user ? <Stack.Screen name="(main)" /> : <Stack.Screen name="(auth)" />}
+        {!user ? (
+          <Stack.Screen name="(auth)" />
+        ) : user.status === "PENDING" ? (
+          <Stack.Screen name="(status)/pending" />
+        ) : user.status === "SUSPENDED" ? (
+          <Stack.Screen name="(status)/suspended" />
+        ) : user.status === "BANNED" ? (
+          <Stack.Screen name="(status)/banned" />
+        ) : (
+          <Stack.Screen name="(main)" />
+        )}
       </Stack>
     </GestureHandlerRootView>
   );
@@ -90,6 +102,7 @@ export default function RootLayout() {
         <NotificationProvider>
           <NotificationPreferencesProvider>
             <RootNavigator />
+            <Toast config={toastConfig} />
           </NotificationPreferencesProvider>
         </NotificationProvider>
       </AuthProvider>

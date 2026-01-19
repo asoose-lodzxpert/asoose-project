@@ -1,12 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { NubanService } from '../libs/nuban/nuban.service';
+import { VendorSecurityNotificationsService } from './notifications/vendor-security-notifications.service';
 
 @Injectable()
 export class VendorService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly nubanService: NubanService,
+    private readonly securityNotifications: VendorSecurityNotificationsService,
   ) {}
 
   async getStorePublicDetails(vendorId: string) {
@@ -44,6 +46,18 @@ export class VendorService {
         status: true,
       },
     });
+
+    // Send profile update notification
+    try {
+      await this.securityNotifications.notifyProfileImageUpdated(
+        vendor.id,
+        vendor.email,
+        vendor.name,
+      );
+    } catch (error) {
+      console.error('Failed to send profile update notification:', error);
+    }
+
     return vendor;
   }
 
@@ -232,7 +246,7 @@ export class VendorService {
       });
     } else {
       // Create new
-      return await this.prisma.bankAccount.create({
+      const newBankAccount = await this.prisma.bankAccount.create({
         data: {
           storeId: store.id,
           bankName: data.bankName,
@@ -247,6 +261,26 @@ export class VendorService {
           accountName: true,
         },
       });
+
+      // Send notification for new bank account
+      try {
+        const vendor = await this.prisma.vendor.findUnique({
+          where: { id: vendorId },
+        });
+        if (vendor) {
+          await this.securityNotifications.notifyBankAccountAdded(
+            vendor.id,
+            vendor.email,
+            vendor.name,
+            data.bankName,
+            data.accountNumber,
+          );
+        }
+      } catch (error) {
+        console.error('Failed to send bank account notification:', error);
+      }
+
+      return newBankAccount;
     }
   }
 
@@ -270,15 +304,36 @@ export class VendorService {
       throw new Error('Bank account not found');
     }
 
-    return await this.prisma.bankAccount.update({
+    const updated = await this.prisma.bankAccount.update({
       where: { storeId: store.id },
       data,
       select: {
         bankName: true,
+        bankCode: true,
         accountNumber: true,
         accountName: true,
       },
     });
+
+    // Send notification for bank account update
+    try {
+      const vendor = await this.prisma.vendor.findUnique({
+        where: { id: vendorId },
+      });
+      if (vendor) {
+        await this.securityNotifications.notifyBankAccountUpdated(
+          vendor.id,
+          vendor.email,
+          vendor.name,
+          updated.bankName,
+          updated.accountNumber,
+        );
+      }
+    } catch (error) {
+      console.error('Failed to send bank account update notification:', error);
+    }
+
+    return updated;
   }
 
   // Delete bank account
@@ -294,9 +349,31 @@ export class VendorService {
       throw new Error('Bank account not found');
     }
 
+    const bankName = bankAccount.bankName;
+
     await this.prisma.bankAccount.delete({
       where: { storeId: store.id },
     });
+
+    // Send notification for bank account deletion
+    try {
+      const vendor = await this.prisma.vendor.findUnique({
+        where: { id: vendorId },
+      });
+      if (vendor) {
+        await this.securityNotifications.notifyBankAccountDeleted(
+          vendor.id,
+          vendor.email,
+          vendor.name,
+          bankName,
+        );
+      }
+    } catch (error) {
+      console.error(
+        'Failed to send bank account deletion notification:',
+        error,
+      );
+    }
 
     return { message: 'Bank account deleted successfully' };
   }
@@ -369,6 +446,25 @@ export class VendorService {
       data: { balance: { decrement: data.amount } },
     });
 
+    // Send notification for withdrawal request
+    try {
+      const vendor = await this.prisma.vendor.findUnique({
+        where: { id: vendorId },
+      });
+      if (vendor) {
+        await this.securityNotifications.notifyWithdrawalCreated(
+          vendor.id,
+          vendor.email,
+          vendor.name,
+          data.amount,
+          bankAccount.bankName,
+          bankAccount.accountNumber,
+        );
+      }
+    } catch (error) {
+      console.error('Failed to send withdrawal notification:', error);
+    }
+
     return {
       id: withdrawal.id,
       message: 'Withdrawal request submitted successfully',
@@ -414,8 +510,16 @@ export class VendorService {
       },
     });
 
-    // TODO: Send notification to admin team about deletion request
-    // TODO: Send email to vendor confirming deletion request
+    // Send notification for account deletion request
+    try {
+      await this.securityNotifications.notifyAccountDeletionRequested(
+        vendor.id,
+        vendor.email,
+        vendor.name,
+      );
+    } catch (error) {
+      console.error('Failed to send deletion request notification:', error);
+    }
 
     return {
       message:

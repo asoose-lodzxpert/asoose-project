@@ -10,6 +10,7 @@ import {
 import MapView, { Marker, Region } from "react-native-maps";
 import { ThemedText } from "@/components/themed-text";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { useThemeColor } from "@/hooks/use-theme-color";
 
 interface Props {
   mapRef: React.RefObject<MapView | null>;
@@ -29,6 +30,8 @@ export const LocationBlock: React.FC<Props> = ({
   const [loading, setLoading] = useState(false);
   const [fullMapVisible, setFullMapVisible] = useState(false);
   const [tempLocation, setTempLocation] = useState(location);
+  const textOnPrimary = useThemeColor({}, "textOnPrimary");
+  const brandPrimary = useThemeColor({}, "brandPrimary");
 
   const handleUseCurrent = async () => {
     if (loading) return;
@@ -132,10 +135,12 @@ export const LocationBlock: React.FC<Props> = ({
 
           {/* Confirm button */}
           <Pressable
-            style={styles.confirmButton}
+            style={[styles.confirmButton, { backgroundColor: brandPrimary }]}
             onPress={confirmFullMapLocation}
           >
-            <ThemedText style={styles.confirmText}>Confirm Location</ThemedText>
+            <ThemedText style={[styles.confirmText, { color: textOnPrimary }]}>
+              Confirm Location
+            </ThemedText>
           </Pressable>
 
           {/* Close button */}
@@ -143,7 +148,7 @@ export const LocationBlock: React.FC<Props> = ({
             style={styles.closeButton}
             onPress={() => setFullMapVisible(false)}
           >
-            <IconSymbol name="xmark" size={24} color="#fff" />
+            <IconSymbol name="xmark" size={24} color={textOnPrimary} />
           </Pressable>
         </View>
       </Modal>
@@ -180,13 +185,11 @@ const styles = StyleSheet.create({
     position: "absolute",
     bottom: 40,
     alignSelf: "center",
-    backgroundColor: "#007AFF",
     paddingVertical: 12,
     paddingHorizontal: 24,
     borderRadius: 8,
   },
   confirmText: {
-    color: "#fff",
     fontWeight: "bold",
   },
   closeButton: {

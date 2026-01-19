@@ -5,6 +5,7 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { MailModule } from 'src/mail/mail.module';
 import { ConfigModule } from '@nestjs/config';
 import { BullModule } from '@nestjs/bullmq';
+
 // Services
 import { OrdersService } from './orders.service';
 import { AddressesService } from './addresses.service';
@@ -16,6 +17,8 @@ import { NotificationFacade } from './notification.facade';
 import { RedisModule } from 'src/redis/redis.module';
 import { NotificationsModule } from 'src/notifications/notifications.module';
 import { FcmModule } from 'src/libs/fcm/fcm.module';
+import { TripsModule } from './trips/trips.module';
+import { VendorModule } from 'src/vendor/vendor.module';
 
 @Module({
   imports: [
@@ -25,6 +28,8 @@ import { FcmModule } from 'src/libs/fcm/fcm.module';
     RedisModule,
     NotificationsModule,
     FcmModule,
+    TripsModule,
+    VendorModule,
     BullModule.registerQueue({
       name: 'email',
     }),

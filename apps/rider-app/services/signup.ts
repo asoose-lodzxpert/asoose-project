@@ -22,6 +22,7 @@ export async function registerRider(
       name: formData.fullName,
       email: formData.email,
       password: formData.password,
+      role: formData.role, // RIDER or DRIVER
       countryCode: formData.phoneCode,
       phone: formData.phoneNumber,
 

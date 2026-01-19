@@ -1,22 +1,29 @@
-import React from 'react';
-import { View, StyleSheet, Pressable } from 'react-native';
-import { ThemedText } from '@/components/themed-text';
-import { useRouter } from 'expo-router';
-import { useThemeColor } from '@/hooks/use-theme-color';
+import React from "react";
+import { View, StyleSheet, Pressable } from "react-native";
+import { ThemedText } from "@/components/themed-text";
+import { useRouter } from "expo-router";
+import { useThemeColor } from "@/hooks/use-theme-color";
 
 interface ProgressBarProps {
   step: number;
   totalSteps?: number;
 }
 
-export const ProgressBar: React.FC<ProgressBarProps> = ({ step, totalSteps = 4 }) => {
-  const primary = useThemeColor({}, 'brandPrimary');
+export const ProgressBar: React.FC<ProgressBarProps> = ({
+  step,
+  totalSteps = 4,
+}) => {
+  const primary = useThemeColor({}, "brandPrimary");
+  const borderDefault = useThemeColor({}, "borderDefault");
   const router = useRouter();
 
   return (
     <View style={styles.wrapper}>
       {/* Link back to login */}
-      <Pressable onPress={() => router.replace('/login')} style={styles.loginLink}>
+      <Pressable
+        onPress={() => router.replace("/login")}
+        style={styles.loginLink}
+      >
         <ThemedText type="link">Already have an account? Log in</ThemedText>
       </Pressable>
 
@@ -32,7 +39,7 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({ step, totalSteps = 4 }
             key={idx}
             style={[
               styles.step,
-              { backgroundColor: idx + 1 <= step ? primary : '#E5E5E5' },
+              { backgroundColor: idx + 1 <= step ? primary : borderDefault },
             ]}
           />
         ))}
@@ -47,17 +54,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
   },
   loginLink: {
-    alignSelf: 'flex-end',
+    alignSelf: "flex-end",
     marginBottom: 8,
   },
   stepText: {
     marginBottom: 8,
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   container: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
   },
   step: {
     flex: 1,

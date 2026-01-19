@@ -1,5 +1,12 @@
 import React, { useRef, useState, useEffect } from "react";
-import { ScrollView, StyleSheet, View, Pressable } from "react-native";
+import {
+  ScrollView,
+  StyleSheet,
+  View,
+  Pressable,
+  KeyboardAvoidingView,
+  Platform,
+} from "react-native";
 import Toast from "react-native-toast-message";
 import { getBusinessDetails } from "@/services/business-details.service";
 import { updateStoreDetails } from "@/services/business.service";
@@ -109,7 +116,7 @@ export default function EditStoreDetailsScreen() {
     });
   };
 
-  if (loading) {
+  if (loading || !storeData) {
     return (
       <ThemedView style={{ flex: 1 }}>
         <ScrollView
@@ -275,75 +282,82 @@ export default function EditStoreDetailsScreen() {
 
   return (
     <ThemedView style={{ flex: 1 }}>
-      <ScrollView
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={{ flex: 1 }}
-        contentContainerStyle={{
-          gap: 20,
-          paddingBottom: 32,
-          paddingHorizontal: 16,
-        }}
-        showsVerticalScrollIndicator={false}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
       >
-        {/* ================= Header ================= */}
-        <View style={styles.header}>
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{
+            gap: 20,
+            paddingBottom: 100,
+            paddingHorizontal: 16,
+          }}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          {/* ================= Header ================= */}
+          <View style={styles.header}>
+            <Pressable
+              onPress={() => router.back()}
+              style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
+            >
+              <IconSymbol name="chevron.left" size={24} color={primary} />
+              <ThemedText type="defaultSemiBold" style={{ color: primary }}>
+                Back
+              </ThemedText>
+            </Pressable>
+          </View>
+
+          <StoreInfo data={storeData!} onChange={handleChange} />
+
+          {/* ================= Images ================= */}
+          <ThemedText type="subtitle">Images</ThemedText>
+          <ImageUpload
+            label="Store Logo"
+            value={storeData?.storeLogo || ""}
+            circular
+            onPick={(v) => handleChange("storeLogo", v)}
+          />
+          <ImageUpload
+            label="Store Banner"
+            value={storeData?.storeBanner || ""}
+            onPick={(v) => handleChange("storeBanner", v)}
+          />
+
+          {/* ================= Location ================= */}
+          <ThemedText type="subtitle">Location</ThemedText>
+          <LocationBlock
+            mapRef={mapRef}
+            primary={primary}
+            location={storeData?.location || { lat: 6.5244, lng: 3.3792 }}
+            onUseCurrent={useCurrentLocation}
+            onPick={(v) => handleChange("location", v)}
+          />
+
+          {/* ================= Open Hours ================= */}
+          <ThemedText type="subtitle">Open Hours</ThemedText>
+          <OpenHoursBlock value={openHours} onChange={updateOpenHours} />
+
           <Pressable
-            onPress={() => router.back()}
-            style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
+            style={{
+              marginTop: 24,
+              backgroundColor: primary,
+              paddingVertical: 14,
+              borderRadius: 14,
+              alignItems: "center",
+              opacity: saving ? 0.7 : 1,
+            }}
+            onPress={handleSave}
+            disabled={saving}
           >
-            <IconSymbol name="chevron.left" size={24} color={primary} />
-            <ThemedText type="defaultSemiBold" style={{ color: primary }}>
-              Back
+            <ThemedText type="defaultSemiBold" style={{ color: "#fff" }}>
+              {saving ? "Saving..." : "Save changes"}
             </ThemedText>
           </Pressable>
-        </View>
-
-        <StoreInfo data={storeData!} onChange={handleChange} />
-
-        {/* ================= Images ================= */}
-        <ThemedText type="subtitle">Images</ThemedText>
-        <ImageUpload
-          label="Store Logo"
-          value={storeData?.storeLogo || ""}
-          circular
-          onPick={(v) => handleChange("storeLogo", v)}
-        />
-        <ImageUpload
-          label="Store Banner"
-          value={storeData?.storeBanner || ""}
-          onPick={(v) => handleChange("storeBanner", v)}
-        />
-
-        {/* ================= Location ================= */}
-        <ThemedText type="subtitle">Location</ThemedText>
-        <LocationBlock
-          mapRef={mapRef}
-          primary={primary}
-          location={storeData?.location || { lat: 6.5244, lng: 3.3792 }}
-          onUseCurrent={useCurrentLocation}
-          onPick={(v) => handleChange("location", v)}
-        />
-
-        {/* ================= Open Hours ================= */}
-        <ThemedText type="subtitle">Open Hours</ThemedText>
-        <OpenHoursBlock value={openHours} onChange={updateOpenHours} />
-
-        <Pressable
-          style={{
-            marginTop: 24,
-            backgroundColor: primary,
-            paddingVertical: 14,
-            borderRadius: 14,
-            alignItems: "center",
-            opacity: saving ? 0.7 : 1,
-          }}
-          onPress={handleSave}
-          disabled={saving}
-        >
-          <ThemedText type="defaultSemiBold" style={{ color: "#fff" }}>
-            {saving ? "Saving..." : "Save changes"}
-          </ThemedText>
-        </Pressable>
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </ThemedView>
   );
 }

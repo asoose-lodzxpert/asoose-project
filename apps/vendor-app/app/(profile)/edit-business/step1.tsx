@@ -37,7 +37,6 @@ export default function EditBusinessInfoScreen() {
   const router = useRouter();
   const brandPrimary = useThemeColor({}, "brandPrimary");
   const borderColor = useThemeColor({}, "borderDefault");
-  const surfaceCard = useThemeColor({}, "surfaceCard");
 
   const scrollRef = useRef<ScrollView>(null);
 
@@ -85,7 +84,6 @@ export default function EditBusinessInfoScreen() {
     if (!data) return;
     setSaving(true);
     try {
-      // Only send editable fields (business type and employees)
       await updateBusinessInfo({
         businessType: data.businessType,
         employees: data.employees,
@@ -99,7 +97,7 @@ export default function EditBusinessInfoScreen() {
     }
   };
 
-  if (loading) {
+  if (loading || !data) {
     return (
       <ThemedView style={{ flex: 1 }}>
         {/* Header Skeleton */}

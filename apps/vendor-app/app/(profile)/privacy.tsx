@@ -43,7 +43,7 @@ export default function PrivacyScreen() {
         .join("\n\n");
       await Share.share({ message: text });
     } catch (error) {
-      console.error("Error sharing privacy policy:", error);
+      // Silent error handling
     }
   };
 

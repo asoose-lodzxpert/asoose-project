@@ -11,6 +11,7 @@ type User = {
   id: string;
   name: string;
   email: string;
+  status: "ACTIVE" | "PENDING" | "SUSPENDED" | "BANNED";
   storeId: string | null;
 };
 
@@ -19,6 +20,7 @@ type AuthContextType = {
   loading: boolean;
   signIn: (identifier: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
+  getToken: () => Promise<string | null>;
 };
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -60,8 +62,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await logout();
   }
 
+  async function getToken() {
+    return await getAccessToken();
+  }
+
   return (
-    <AuthContext.Provider value={{ user, loading, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, loading, signIn, signOut, getToken }}>
       {children}
     </AuthContext.Provider>
   );

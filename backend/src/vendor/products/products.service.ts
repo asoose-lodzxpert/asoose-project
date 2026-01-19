@@ -118,7 +118,7 @@ export class VendorProductsService {
         slug,
         description: dto.description,
         price: dto.price,
-        image: dto.image,
+        images: dto.images ?? [],
         stock: dto.stock ?? 0,
         status: ProductStatus.ACTIVE,
         storeId: dto.storeId,
@@ -147,8 +147,20 @@ export class VendorProductsService {
       if (existing) newSlug = `${newSlug}-${Date.now()}`;
     }
 
-    if (dto.image && product.image && dto.image !== product.image) {
-      this.storageService.deleteFile(product.image);
+    // Handle image deletion: delete old images that are not in the new images array
+    if (dto.images && product.images && product.images.length > 0) {
+      const imagesToDelete = product.images.filter(
+        (oldImage) => !dto.images!.includes(oldImage),
+      );
+
+      // Delete removed images from storage
+      for (const imageUrl of imagesToDelete) {
+        try {
+          await this.storageService.deleteFile(imageUrl);
+        } catch (error) {
+          this.logger.warn(`Failed to delete image: ${imageUrl}`, error);
+        }
+      }
     }
 
     // 3. Update
@@ -159,7 +171,7 @@ export class VendorProductsService {
         slug: newSlug,
         description: dto.description,
         price: dto.price,
-        image: dto.image,
+        images: dto.images,
         stock: dto.stock,
         categoryId: dto.categoryId,
         status: dto.status,

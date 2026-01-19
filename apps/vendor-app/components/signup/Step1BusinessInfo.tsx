@@ -32,6 +32,8 @@ interface Step1Props {
 
 export const Step1BusinessInfo: React.FC<Step1Props> = ({ data, onChange }) => {
   const brandPrimary = useThemeColor({}, "brandPrimary");
+  const successColor = useThemeColor({}, "statusSuccess");
+  const errorColor = useThemeColor({}, "statusError");
   const [password, setPassword] = useState("");
   const [secure, setSecure] = useState(true);
   const [isPasswordFocused, setIsPasswordFocused] = useState(false);
@@ -63,9 +65,9 @@ export const Step1BusinessInfo: React.FC<Step1Props> = ({ data, onChange }) => {
       <IconSymbol
         name={valid ? "check" : "xmark"}
         size={16}
-        color={valid ? "green" : "red"}
+        color={valid ? successColor : errorColor}
       />
-      <ThemedText style={{ color: valid ? "green" : "red" }}>
+      <ThemedText style={{ color: valid ? successColor : errorColor }}>
         {label}
       </ThemedText>
     </View>

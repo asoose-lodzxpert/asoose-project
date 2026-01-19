@@ -2,12 +2,15 @@ export type SignupStep = 1 | 2 | 3 | 4;
 
 export type VehicleType = "bicycle" | "motorcycle" | "car" | "walking" | null;
 
+export type UserRole = "RIDER" | "DRIVER";
+
 export interface SignupForm {
   // Step 1 - Personal Details
   fullName: string;
   email: string;
   password: string;
   confirmPassword: string;
+  role: UserRole; // RIDER for deliveries, DRIVER for rides
   address: string;
   phoneCode: string;
   phoneNumber: string;

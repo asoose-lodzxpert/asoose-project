@@ -256,7 +256,7 @@ export default function LoginScreen() {
                 {/* Sign up */}
                 <View style={styles.signup}>
                   <ThemedText>
-                    New rider?{" "}
+                    New partner?{" "}
                     <ThemedText
                       type="link"
                       onPress={() => router.push("/(auth)/signup")}

@@ -23,11 +23,11 @@ export default function OnboardingScreen() {
         />
 
         <ThemedText type="title" style={styles.appName}>
-          Asoose Rider App
+          Asoose Partner App
         </ThemedText>
 
         <ThemedText style={[styles.tagline, { color: muted }]}>
-          Deliver. Earn. Succeed.
+          Deliver & Drive. Earn. Succeed.
         </ThemedText>
       </View>
 

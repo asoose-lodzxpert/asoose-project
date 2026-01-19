@@ -115,8 +115,6 @@ export async function uploadBulk(
 ): Promise<string[]> {
   const formData = new FormData();
 
-  console.log("uploadBulk called with files:", files.length);
-
   // Append all files
   files.forEach((file, index) => {
     // @ts-ignore - React Native FormData supports file objects
@@ -131,14 +129,8 @@ export async function uploadBulk(
   const token = await getAccessToken();
 
   if (!token) {
-    console.error("No auth token found");
     throw new Error("Authentication required for bulk upload");
   }
-
-  console.log(
-    "Uploading to:",
-    `${process.env.EXPO_PUBLIC_API_URL}/storage/upload-bulk`
-  );
 
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
@@ -157,30 +149,18 @@ export async function uploadBulk(
 
     // Handle completion
     xhr.addEventListener("load", () => {
-      console.log("Upload completed with status:", xhr.status);
-      console.log("Response:", xhr.responseText);
-
       if (xhr.status >= 200 && xhr.status < 300) {
         try {
           const response: BulkUploadResult = JSON.parse(xhr.responseText);
-
-          // Log any errors but still return successful uploads
-          if (response.errors && response.errors.length > 0) {
-            console.warn("Some files failed to upload:", response.errors);
-          }
-
           resolve(response.urls);
         } catch (error) {
-          console.error("Failed to parse response:", error);
           reject(new Error("Failed to parse upload response"));
         }
       } else {
         try {
           const error = JSON.parse(xhr.responseText);
-          console.error("Upload failed:", error);
           reject(new Error(error.message || "Bulk upload failed"));
         } catch {
-          console.error("Upload failed with status:", xhr.status);
           reject(new Error(`Bulk upload failed with status ${xhr.status}`));
         }
       }
@@ -188,12 +168,10 @@ export async function uploadBulk(
 
     // Handle errors
     xhr.addEventListener("error", (e) => {
-      console.error("Network error during upload:", e);
       reject(new Error("Network error during bulk upload"));
     });
 
     xhr.addEventListener("abort", () => {
-      console.error("Upload cancelled");
       reject(new Error("Bulk upload cancelled"));
     });
 

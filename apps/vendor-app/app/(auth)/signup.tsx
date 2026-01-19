@@ -38,6 +38,8 @@ export default function Signup() {
 
   const surfaceCard = useThemeColor({}, "surfaceCard");
   const border = useThemeColor({}, "borderDefault");
+  const brandPrimary = useThemeColor({}, "brandPrimary");
+  const textOnPrimary = useThemeColor({}, "textOnPrimary");
 
   // Change handlers
   const handleChangeStep1 = <K extends keyof SignupStep1Data>(
@@ -205,13 +207,13 @@ export default function Signup() {
           style={[
             styles.button,
             styles.nextButton,
-            { backgroundColor: "#E5A503" },
+            { backgroundColor: brandPrimary },
             submitting && { opacity: 0.5 },
           ]}
           onPress={handleNext}
           disabled={submitting}
         >
-          <ThemedText type="defaultSemiBold">
+          <ThemedText type="defaultSemiBold" style={{ color: textOnPrimary }}>
             {submitting ? "Creating account..." : step < 4 ? "Next" : "Submit"}
           </ThemedText>
         </Pressable>

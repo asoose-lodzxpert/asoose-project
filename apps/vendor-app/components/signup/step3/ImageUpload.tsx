@@ -11,6 +11,7 @@ import Toast from "react-native-toast-message";
 import { ThemedText } from "@/components/themed-text";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { uploadFile } from "@/services/storage.service";
+import { useThemeColor } from "@/hooks/use-theme-color";
 
 interface Props {
   label: string;
@@ -26,6 +27,8 @@ export const ImageUpload: React.FC<Props> = ({
   onPick,
 }) => {
   const [uploading, setUploading] = useState(false);
+  const textOnPrimary = useThemeColor({}, "textOnPrimary");
+  const borderDefault = useThemeColor({}, "borderDefault");
 
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -79,7 +82,6 @@ export const ImageUpload: React.FC<Props> = ({
           text2: "Image uploaded successfully.",
         });
       } catch (error) {
-        console.error("Upload error:", error);
         Toast.show({
           type: "error",
           text1: "Upload failed",
@@ -97,7 +99,10 @@ export const ImageUpload: React.FC<Props> = ({
       <ThemedText style={styles.label}>{label}</ThemedText>
 
       <Pressable
-        style={circular ? styles.circle : styles.banner}
+        style={[
+          circular ? styles.circle : styles.banner,
+          { borderColor: borderDefault },
+        ]}
         onPress={pickImage}
         disabled={uploading}
       >
@@ -110,12 +115,16 @@ export const ImageUpload: React.FC<Props> = ({
 
         {uploading ? (
           <View style={styles.uploadingOverlay}>
-            <ActivityIndicator size="large" color="#fff" />
-            <ThemedText style={styles.uploadingText}>Uploading...</ThemedText>
+            <ActivityIndicator size="large" color={textOnPrimary} />
+            <ThemedText
+              style={[styles.uploadingText, { color: textOnPrimary }]}
+            >
+              Uploading...
+            </ThemedText>
           </View>
         ) : (
           <View style={styles.overlay}>
-            <IconSymbol name="camera.fill" size={24} color="#fff" />
+            <IconSymbol name="camera.fill" size={24} color={textOnPrimary} />
           </View>
         )}
       </Pressable>
@@ -129,7 +138,6 @@ const styles = StyleSheet.create({
     height: 90,
     borderRadius: 45,
     borderWidth: 1,
-    borderColor: "#D1D5DB",
     overflow: "hidden",
     justifyContent: "center",
     alignItems: "center",
@@ -143,7 +151,6 @@ const styles = StyleSheet.create({
     width: "100%",
     aspectRatio: 16 / 9,
     borderWidth: 1,
-    borderColor: "#D1D5DB",
     borderRadius: 12,
     overflow: "hidden",
     justifyContent: "center",
@@ -169,7 +176,6 @@ const styles = StyleSheet.create({
   },
 
   uploadingText: {
-    color: "#fff",
     fontSize: 14,
     fontWeight: "600",
   },
