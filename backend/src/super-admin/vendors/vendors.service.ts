@@ -4,8 +4,8 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { PrismaService } from '../../prisma/prisma.service'; // Fixed Import
-import * as bcrypt from 'bcryptjs'; // Changed to bcryptjs based on previous install
+import { PrismaService } from '../../prisma/prisma.service';
+import * as bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
 import {
   Prisma,
@@ -17,8 +17,8 @@ import {
   StoreType,
 } from '@prisma/client';
 import { CreateVendorDto, VendorQueryDto } from './dto/vendor.dto';
-import { EmailProducer } from '../../mail/email.producer'; // Fixed Import
-
+import { EmailProducer } from '../../mail/email.producer';
+import { ActivityLogService } from 'src/common/services/activity-log.services';
 @Injectable()
 export class StoresService {
   private readonly logger = new Logger(StoresService.name);
@@ -26,6 +26,7 @@ export class StoresService {
   constructor(
     private prisma: PrismaService,
     private emailProducer: EmailProducer,
+    private logService: ActivityLogService,
   ) {}
 
   async findAll(query: VendorQueryDto) {
@@ -169,8 +170,8 @@ export class StoresService {
         data: {
           name: dto.storeName,
           slug: dto.slug,
-          vendorId: user.id, // Fixed: ownerId -> vendorId
-          description: `Store for ${dto.storeName}`, // Fixed: Added required description
+          vendorId: user.id,
+          description: `Store for ${dto.storeName}`,
           status: StoreStatus.PENDING,
           verification: VerificationStatus.PENDING,
           type: dto.type,
@@ -188,7 +189,10 @@ export class StoresService {
     };
   }
 
-  async update(id: string, dto: any) {
+  /**
+   * Updates vendor details and records an audit log.
+   */
+  async update(id: string, dto: any, adminId: string) {
     const store = await this.prisma.store.findUnique({ where: { id } });
     if (!store) throw new NotFoundException('Store not found');
 
@@ -229,21 +233,42 @@ export class StoresService {
       include: { vendor: true },
     });
 
+    // Audit Log for update action
+    await this.logService.record({
+      userId: adminId,
+      action: 'UPDATE_VENDOR',
+      target: updatedStore.name,
+      details: `Admin modified vendor details for ${updatedStore.name}`,
+      metadata: { changes: dto }
+    });
+
     return {
       id: updatedStore.id,
       name: updatedStore.name,
       slug: updatedStore.slug,
       address: updatedStore.address,
-      ownerName: updatedStore.vendor?.name, // Fixed: Added optional chaining
+      ownerName: updatedStore.vendor?.name,
       phone: updatedStore.vendor?.phone,
       email: updatedStore.vendor?.email,
       status: updatedStore.status,
     };
   }
 
-  async delete(id: string) {
+  /**
+   * Suspends a vendor and records an audit log.
+   */
+  async delete(id: string, adminId: string) {
     const store = await this.prisma.store.findUnique({ where: { id } });
     if (!store) throw new NotFoundException('Store not found');
+
+    // Audit Log for suspension action
+    await this.logService.record({
+      userId: adminId,
+      action: 'SUSPEND_VENDOR',
+      target: store.name,
+      status: 'SUSPENDED',
+      details: 'Admin performed soft-delete/suspension on vendor'
+    });
 
     return this.prisma.store.update({
       where: { id },
@@ -311,7 +336,7 @@ export class StoresService {
     return {
       id: store.id,
       name: store.name,
-      email: store.vendor?.email, // Fixed: owner -> vendor
+      email: store.vendor?.email,
       phone: store.vendor?.phone,
       slug: store.slug,
       ownerName: store.vendor?.name,
@@ -346,7 +371,6 @@ export class StoresService {
   }
 
   async getVendorProducts(storeId: string) {
-    // Verify store exists
     const store = await this.prisma.store.findUnique({
       where: { id: storeId },
     });
@@ -359,7 +383,7 @@ export class StoresService {
       },
       orderBy: [
         { status: 'asc' },
-        { salesCount: 'desc' } as any, // TypeScript workaround for Prisma sorting
+        { salesCount: 'desc' } as any,
       ],
     });
 

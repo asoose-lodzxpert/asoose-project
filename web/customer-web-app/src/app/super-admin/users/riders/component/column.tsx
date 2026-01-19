@@ -9,7 +9,7 @@ import {
 
 const columnHelper = createColumnHelper<Rider>();
 
-// --- Visual Helpers ---
+// --- Visual Helpers (Unchanged) ---
 export const getStatusColor = (status: string) => {
   switch (status) {
     case 'Online': return 'bg-green-500/20 text-green-500 border-green-500/20';
@@ -39,63 +39,6 @@ export const getVerificationColor = (verification: string) => {
     ? 'bg-blue-500/20 text-blue-400 border-blue-500/20' 
     : 'bg-yellow-500/20 text-yellow-500 border-yellow-500/20';
 };
-
-// --- Mobile Card Component ---
-export const RiderCard = ({ 
-  rider, onToggleStatus, onDelete 
-}: { 
-  rider: Rider; 
-  onToggleStatus: (rider: Rider) => void; 
-  onDelete: (rider: Rider) => void;
-}) => (
-  <div className="bg-[#1E293B] border border-gray-800 rounded-lg p-4 mb-3">
-    <div className="flex justify-between items-start mb-3">
-      <Link href={`/super-admin/users/riders/${rider.id}`} className="text-yellow-500 font-mono font-bold text-sm">
-        {rider.id}
-      </Link>
-      <div className="flex items-center gap-1">
-        {getStatusIcon(rider.status)}
-        <span className={`px-2 py-1 rounded text-xs font-bold uppercase border ${getStatusColor(rider.status)}`}>
-          {rider.status}
-        </span>
-      </div>
-    </div>
-    
-    <div className="mb-3 space-y-1">
-      <div className="font-bold text-white text-lg">{rider.name}</div>
-      <div className="flex items-center gap-2 text-gray-400 text-sm"><Phone className="w-3 h-3" /> {rider.phone}</div>
-    </div>
-
-    <div className="grid grid-cols-2 gap-3 mb-4 text-sm">
-      <div className="flex items-center gap-2">
-        <div className={`p-1.5 rounded-lg ${rider.type === 'Car' ? 'bg-blue-500/10 text-blue-400' : 'bg-orange-500/10 text-orange-400'}`}>
-          {getVehicleIcon(rider.type)}
-        </div>
-        <div>
-          <div className="text-white font-medium">{rider.vehicle}</div>
-          <div className="text-gray-500 text-xs font-mono">{rider.plate}</div>
-        </div>
-      </div>
-      <div className="flex items-center gap-2">
-        <Star className="w-4 h-4 text-yellow-500" />
-        <div className="text-white font-medium">{rider.rating ? rider.rating.toFixed(1) : '-'}</div>
-      </div>
-    </div>
-
-    <div className="flex gap-2 pt-3 border-t border-gray-800">
-      <Link href={`/super-admin/users/riders/${rider.id}`} className="flex-1 flex items-center justify-center gap-2 py-2 bg-gray-700/50 rounded-lg text-gray-300">
-        <Eye className="w-4 h-4" /><span className="text-sm">View</span>
-      </Link>
-      <button onClick={() => onToggleStatus(rider)} className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg ${rider.status === 'Suspended' ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
-        {rider.status === 'Suspended' ? <CheckCircle className="w-4 h-4" /> : <Ban className="w-4 h-4" />}
-        <span className="text-sm">{rider.status === 'Suspended' ? 'Activate' : 'Suspend'}</span>
-      </button>
-      <button onClick={() => onDelete(rider)} className="flex-1 flex items-center justify-center gap-2 py-2 bg-red-500/10 text-red-500 rounded-lg">
-        <Trash2 className="w-4 h-4" /><span className="text-sm">Delete</span>
-      </button>
-    </div>
-  </div>
-);
 
 // --- Column Generator ---
 interface ColumnActions {
@@ -160,7 +103,8 @@ export const createRiderColumns = ({ onToggleStatus, onDelete }: ColumnActions) 
     header: "Total Rides",
     cell: info => <span className="text-center font-mono text-white">{info.getValue()}</span>,
   }),
-  {
+  // FIX: Using columnHelper.display for proper type inference
+  columnHelper.display({
     id: "actions",
     header: "Actions",
     cell: ({ row }) => (
@@ -172,5 +116,5 @@ export const createRiderColumns = ({ onToggleStatus, onDelete }: ColumnActions) 
         <button onClick={() => onDelete(row.original)} className="p-2 hover:bg-red-500/10 rounded-lg text-gray-400 hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
       </div>
     ),
-  },
+  }),
 ];

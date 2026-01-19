@@ -1,8 +1,9 @@
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
 
 export type DeliveryStage = 
   | 'IDLE' 
-  | 'CONFIGURING' // Adding package details
+  | 'CONFIGURING' 
   | 'SELECTING_VEHICLE' 
   | 'FINDING_COURIER' 
   | 'COURIER_ASSIGNED' 
@@ -10,59 +11,90 @@ export type DeliveryStage =
   | 'COMPLETED' 
   | 'CANCELLED';
 
+type Position = { lat: number; lng: number };
+
+interface PackageInfo {
+  type: string;
+  weight: string;
+  instructions: string;
+  recipientName: string;
+  recipientPhone: string;
+  destinationAddress: string;
+}
+
 interface DeliveryState {
   stage: DeliveryStage;
   activeDeliveryId: string | null;
-  
-  // Locations
-  pickupPos: google.maps.LatLngLiteral | null;
-  dropoffPos: google.maps.LatLngLiteral | null;
-  courierPos: google.maps.LatLngLiteral | undefined;
-
-  // Package Info
-  packageInfo: {
-    type: string;
-    weight: string;
-    instructions: string;
-  };
-
-  // UI State
+  pickupPos: Position | null;
+  dropoffPos: Position | null;
+  courierPos: Position | undefined;
+  packageInfo: PackageInfo;
   priceEstimates: any | null;
   courierInfo: any | null;
   isCalculating: boolean;
 
   // Actions
   setStage: (stage: DeliveryStage) => void;
-  setLocations: (pickup?: google.maps.LatLngLiteral, dropoff?: google.maps.LatLngLiteral) => void;
-  setPackageInfo: (info: Partial<DeliveryState['packageInfo']>) => void;
+  setLocations: (pickup?: Position, dropoff?: Position) => void;
+  setPackageInfo: (info: Partial<PackageInfo>) => void;
   resetDelivery: () => void;
 }
 
-export const useDeliveryStore = create<DeliveryState>((set) => ({
-  stage: 'IDLE',
-  activeDeliveryId: null,
-  pickupPos: null,
-  dropoffPos: null,
-  courierPos: undefined,
-  packageInfo: { type: 'Document', weight: '< 5kg', instructions: '' },
-  priceEstimates: null,
-  courierInfo: null,
-  isCalculating: false,
+const initialPackageInfo: PackageInfo = {
+  type: 'Document',
+  weight: '< 5kg',
+  instructions: '',
+  recipientName: '',
+  recipientPhone: '',
+  destinationAddress: '',
+};
 
-  setStage: (stage) => set({ stage }),
-  setLocations: (pickup, dropoff) => set((state) => ({ 
-    pickupPos: pickup ?? state.pickupPos, 
-    dropoffPos: dropoff ?? state.dropoffPos 
-  })),
-  setPackageInfo: (info) => set((state) => ({ 
-    packageInfo: { ...state.packageInfo, ...info } 
-  })),
-  resetDelivery: () => set({
-    stage: 'IDLE',
-    activeDeliveryId: null,
-    dropoffPos: null,
-    courierPos: undefined,
-    priceEstimates: null,
-    courierInfo: null
-  }),
-}));
+export const useDeliveryStore = create<DeliveryState>()(
+  persist(
+    (set) => ({
+      stage: 'IDLE',
+      activeDeliveryId: null,
+      pickupPos: null,
+      dropoffPos: null,
+      courierPos: undefined,
+      packageInfo: initialPackageInfo,
+      priceEstimates: null,
+      courierInfo: null,
+      isCalculating: false,
+
+      setStage: (stage) => set({ stage }),
+      
+      setLocations: (pickup, dropoff) => set((state) => ({ 
+        pickupPos: pickup ?? state.pickupPos, 
+        dropoffPos: dropoff ?? state.dropoffPos 
+      })),
+
+      setPackageInfo: (info) => set((state) => ({ 
+        packageInfo: { ...state.packageInfo, ...info } 
+      })),
+
+      resetDelivery: () => set({
+        stage: 'IDLE',
+        activeDeliveryId: null,
+        pickupPos: null,
+        dropoffPos: null,
+        courierPos: undefined,
+        priceEstimates: null,
+        courierInfo: null,
+        packageInfo: initialPackageInfo,
+      }),
+    }),
+    {
+      name: 'asoose-delivery-storage', // Key used in localStorage
+      storage: createJSONStorage(() => localStorage),
+      // Optional: Only persist these specific fields
+      partialize: (state) => ({ 
+        stage: state.stage, 
+        packageInfo: state.packageInfo,
+        activeDeliveryId: state.activeDeliveryId,
+        pickupPos: state.pickupPos,
+        dropoffPos: state.dropoffPos
+      }),
+    }
+  )
+);

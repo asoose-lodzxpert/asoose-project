@@ -1,4 +1,3 @@
-// src/app/checkout/types.ts
 
 export interface Address {
   id: string;

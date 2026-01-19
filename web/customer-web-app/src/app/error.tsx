@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { AlertTriangle, RefreshCw, Home } from 'lucide-react';
+import { RefreshCcw, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 
 export default function Error({
@@ -11,49 +11,52 @@ export default function Error({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
-  
   useEffect(() => {
-    // Log the error to an error reporting service (e.g. Sentry)
     console.error('Runtime Error:', error);
   }, [error]);
 
   return (
-    <div className="min-h-screen bg-[#0F172A] flex flex-col items-center justify-center text-center p-4">
-      
-      {/* Icon with Red Glow */}
-      <div className="relative mb-8">
-        <div className="absolute inset-0 bg-red-500 blur-2xl opacity-20 rounded-full"></div>
-        <div className="relative bg-[#1E293B] p-6 rounded-2xl border border-red-500/30 shadow-xl">
-          <AlertTriangle className="w-16 h-16 text-red-500" />
-        </div>
+    <div className="min-h-screen bg-[#0a0a0a] flex flex-col items-center justify-center p-6 select-none">
+      {/* Visual Indicator */}
+      <div className="mb-6">
+        <div className="w-1 h-12 bg-red-500 animate-pulse" />
       </div>
 
-      <h1 className="text-3xl font-black text-white mb-2">Something went wrong!</h1>
-      
-      <p className="text-gray-400 max-w-md mb-6 text-sm">
-        We encountered an unexpected error. Our team has been notified.
-        <br />
-        <span className="font-mono text-xs bg-black/30 px-2 py-1 rounded mt-2 inline-block text-red-400">
-           Error: {error.message || 'Unknown Error'}
-        </span>
-      </p>
+      {/* Primary Message */}
+      <div className="text-center space-y-2 mb-8">
+        <h1 className="text-xl font-bold text-white uppercase tracking-[0.3em]">
+          System Failure
+        </h1>
+        <p className="text-zinc-500 text-sm font-medium max-w-xs mx-auto">
+          An unexpected exception has occurred within the application core.
+        </p>
+      </div>
 
-      <div className="flex flex-col sm:flex-row gap-4">
+      {/* Technical Metadata - Minimalist Error Display */}
+      <div className="mb-12">
+        <code className="text-[10px] font-mono uppercase tracking-widest text-red-500/60 bg-red-500/5 px-3 py-1 rounded-full border border-red-500/10">
+          {error.digest || 'ERR_INTERNAL_CORE'}
+        </code>
+      </div>
+
+      {/* Actions */}
+      <div className="flex flex-col items-center gap-6">
         <button
           onClick={() => reset()}
-          className="flex items-center gap-2 px-6 py-3 bg-white text-black font-bold rounded-xl hover:bg-gray-200 transition-all shadow-lg"
+          className="group flex items-center gap-3 text-white hover:text-red-500 transition-colors duration-300"
         >
-          <RefreshCw className="w-4 h-4" /> Try Again
+          <RefreshCcw className="w-4 h-4 transition-transform group-active:rotate-180" />
+          <span className="text-xs font-black uppercase tracking-widest">Execute Recovery</span>
         </button>
 
         <Link 
           href="/super-admin/dashboard" 
-          className="flex items-center gap-2 px-6 py-3 bg-[#1E293B] hover:bg-[#334155] text-white font-bold rounded-xl border border-gray-700 transition-all"
+          className="group flex items-center gap-3 text-zinc-500 hover:text-white transition-colors duration-300"
         >
-          <Home className="w-4 h-4" /> Return Home
+          <span className="text-xs font-black uppercase tracking-widest">Abort to Dashboard</span>
+          <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
         </Link>
       </div>
-
     </div>
   );
 }

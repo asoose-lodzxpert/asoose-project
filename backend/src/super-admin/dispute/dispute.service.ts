@@ -7,6 +7,7 @@ import {
 import { PrismaService } from 'src/prisma/prisma.service';
 import { TransactionLedgerService } from '../transactions/transaction-ledger.service';
 import { CreateDisputeDto } from './dto/create-dispute.dto';
+import { UserRole } from '@prisma/client';
 import { AddMessageDto } from './dto/add-message.dto';
 import {
   ResolveDisputeDto,
@@ -280,80 +281,57 @@ export class DisputesService {
 
   // ==================== GET SINGLE DISPUTE ====================
   // Fixed: Accepts userId and role
-  async findOne(id: string, userId: string, role: string) {
-    const dispute = await this.prisma.dispute.findUnique({
-      where: { id },
-      include: {
-        openedByUser: true,
-        targetUser: true,
-        messages: {
-          where:
-            role === 'SUPER_ADMIN' || role === 'ADMIN'
-              ? {}
-              : { isInternal: false }, // Hide internal messages from customers
-          include: {
-            sender: {
-              select: { id: true, name: true, role: true, image: true },
+async findOne(id: string, userId: string, role: string | UserRole) {
+  const dispute = await this.prisma.dispute.findUnique({
+    where: { id },
+    include: {
+      openedByUser: true,
+      targetUser: true,
+      messages: {
+        where: role === UserRole.SUPER_ADMIN || role === UserRole.ADMIN ? {} : { isInternal: false },
+        include: { sender: { select: { id: true, name: true, role: true, image: true } } },
+        orderBy: { createdAt: 'asc' },
+      },
+      payment: {
+        include: {
+          order: { include: { items: true, store: true } },
+          ride: {
+            include: {
+              // Fixed: Access rider fields directly (no 'user' relation)
+              rider: { 
+                include: { 
+                  vehicle: true 
+                } 
+              },
+              pickupAddress: true,
+              dropoffAddress: true,
             },
-          },
-          orderBy: { createdAt: 'asc' },
-        },
-        payment: {
-          include: {
-            order: { include: { items: true, store: true } },
-            ride: {
-              include: { rider: { select: { name: true, phone: true } } },
-            },
-          },
-        },
-        order: {
-          include: {
-            items: { include: { product: true } },
-            store: true,
-            delivery: true,
-          },
-        },
-        ride: {
-          include: {
-            rider: { include: { vehicle: true } },
-            pickupAddress: true,
-            dropoffAddress: true,
-          },
-        },
-        delivery: {
-          include: {
-            rider: { include: { vehicle: true } },
-            pickupAddress: true,
-            dropoffAddress: true,
           },
         },
       },
-    });
+      order: { include: { items: { include: { product: true } }, store: true, delivery: true } },
+      ride: { include: { rider: { include: { vehicle: true } }, pickupAddress: true, dropoffAddress: true } },
+      delivery: { include: { rider: { include: { vehicle: true } }, pickupAddress: true, dropoffAddress: true } },
+    },
+  });
 
-    if (!dispute) {
-      throw new NotFoundException(`Dispute ${id} not found`);
+  if (!dispute) throw new NotFoundException(`Dispute ${id} not found`);
+
+  // Type-safe check for role
+  if (role !== UserRole.SUPER_ADMIN && role !== UserRole.ADMIN) {
+    if (dispute.openedByUserId !== userId && dispute.targetUserId !== userId) {
+      throw new ForbiddenException('You do not have access to this dispute');
     }
-
-    // Authorization check
-    if (role !== 'SUPER_ADMIN' && role !== 'ADMIN') {
-      if (
-        dispute.openedByUserId !== userId &&
-        dispute.targetUserId !== userId
-      ) {
-        throw new ForbiddenException('You do not have access to this dispute');
-      }
-    }
-
-    return {
-      ...dispute,
-      canResolve: role === 'SUPER_ADMIN' || role === 'ADMIN',
-      canAddMessage: dispute.status === 'OPEN',
-      hoursOpen: Math.floor(
-        (Date.now() - dispute.createdAt.getTime()) / (1000 * 60 * 60),
-      ),
-      breachedSLA: this.checkSLABreach(dispute),
-    };
   }
+
+  return {
+    ...dispute,
+    canResolve: role === UserRole.SUPER_ADMIN || role === UserRole.ADMIN,
+    canAddMessage: dispute.status === 'OPEN',
+    hoursOpen: Math.floor((Date.now() - dispute.createdAt.getTime()) / (1000 * 60 * 60)),
+    breachedSLA: this.checkSLABreach(dispute),
+  };
+}
 
   // ==================== ADD MESSAGE ====================
   // Fixed: Accepts userId and role
@@ -428,17 +406,9 @@ export class DisputesService {
 
   // ==================== RESOLVE DISPUTE ====================
   // Fixed: Accepts adminId as argument
-  async resolve(id: string, dto: ResolveDisputeDto, adminId: string) {
-    const dispute = await this.prisma.dispute.findUnique({
-      where: { id },
-      include: {
-        payment: true,
-        order: true,
-        ride: true,
-        delivery: true,
-      },
-    });
-    if (!dispute) {
+async resolve(id: string, dto: ResolveDisputeDto, adminId: string) {
+const dispute = await this.findOne(id, adminId, UserRole.SUPER_ADMIN);
+  if (!dispute) {
       throw new NotFoundException('Dispute not found');
     }
 

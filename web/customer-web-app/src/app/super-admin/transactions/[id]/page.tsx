@@ -7,7 +7,7 @@ import useSWR from 'swr';
 import { fetcher } from '../../hooks/useSuperAdminFetch';
 
 import { TransactionDetail } from './types'; 
-import TransactionHeader from './component/TransactionHeader';
+import TransactionHeader from './component/transactionheader';
 import { TransactionSummary } from './component/TransactionSummary';
 import { Timeline } from './component/Timeline';
 import { OrderDetailsCard } from './component/OrderDetailsCard';

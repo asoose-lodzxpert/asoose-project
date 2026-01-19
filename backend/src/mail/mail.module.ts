@@ -20,7 +20,7 @@ import { join } from 'path';
         transport: {
           host: config.get<string>('MAIL_HOST'),
           port: config.get<number>('MAIL_PORT'),
-          secure: config.get('MAIL_SECURE') === 'true', // Use 'true' string check or boolean
+          secure: String(config.get('MAIL_SECURE')) === 'true',
           auth: {
             user: config.get<string>('MAIL_USER'),
             pass: config.get<string>('MAIL_PASS'),
@@ -30,7 +30,7 @@ import { join } from 'path';
           from: `"Asoose Admin" <${config.get<string>('MAIL_FROM')}>`,
         },
         template: {
-          dir: join(__dirname, 'templates'),
+          dir: join(__dirname, '..', 'libs', 'mail', 'templates'),
           adapter: new HandlebarsAdapter(),
           options: {
             strict: true,

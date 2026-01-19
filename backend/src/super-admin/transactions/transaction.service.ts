@@ -1,6 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException,BadRequestException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { TransactionFilterDto } from './dto/transaction-filter.dto';
+import { AdjustWalletDto, AdjustmentType, WalletTargetType } from './dto/adjust-wallet.dto';
+
 import {
   TransactionType,
   TransactionStatus,
@@ -881,4 +883,88 @@ export class TransactionsService {
     };
     return map[type] || type;
   }
+
+async adjustWallet(dto: AdjustWalletDto, adminId: string) {
+  const { targetId, targetType, type, amount, description } = dto;
+  
+  // 1. Determine direction (Credit = positive, Debit = negative)
+  const finalAmount = type === AdjustmentType.CREDIT ? amount : -amount;
+
+  return this.prisma.$transaction(async (tx) => {
+    let currentBalance = 0;
+    let entityType: WalletEntityType;
+    let entityName = '';
+
+    // 2. Fetch current entity and validate
+    if (targetType === WalletTargetType.VENDOR) {
+      const store = await tx.store.findUnique({ where: { id: targetId } });
+      if (!store) throw new NotFoundException('Vendor Store not found');
+      currentBalance = store.walletBalance;
+      entityType = WalletEntityType.STORE;
+      entityName = store.name;
+      
+      // Prevent debiting below zero (optional, remove if overdrafts allowed)
+      if (type === AdjustmentType.DEBIT && currentBalance < amount) {
+        throw new BadRequestException('Insufficient wallet balance for debit');
+      }
+
+      // Update Store
+      await tx.store.update({
+        where: { id: targetId },
+        data: { walletBalance: { increment: finalAmount } },
+      });
+    } else {
+      const rider = await tx.rider.findUnique({ where: { id: targetId } });
+      if (!rider) throw new NotFoundException('Rider not found');
+      currentBalance = rider.walletBalance;
+      entityType = WalletEntityType.RIDER;
+      entityName = rider.name;
+
+      if (type === AdjustmentType.DEBIT && currentBalance < amount) {
+        throw new BadRequestException('Insufficient wallet balance for debit');
+      }
+
+      // Update Rider
+      await tx.rider.update({
+        where: { id: targetId },
+        data: { walletBalance: { increment: finalAmount } },
+      });
+    }
+
+    // 3. Create Ledger Entry
+    const transaction = await tx.transaction.create({
+      data: {
+        type: TransactionType.ADJUSTMENT,
+        amount: finalAmount,
+        entityType,
+        entityId: targetId,
+        status: TransactionStatus.COMPLETED,
+        description: description,
+        balanceBefore: currentBalance,
+        balanceAfter: currentBalance + finalAmount,
+        processedBy: adminId,
+        metadata: {
+          adminAction: type,
+          reason: description,
+          adminId
+        },
+      },
+    });
+
+    // 4. Log Admin Activity
+    await tx.activityLog.create({
+      data: {
+        userId: adminId,
+        action: 'WALLET_ADJUSTMENT',
+        target: targetId,
+        details: `${type} of ${amount} applied to ${targetType} (${entityName})`,
+        metadata: { transactionId: transaction.id },
+      },
+    });
+
+    return transaction;
+  });
+}
+
+
 }

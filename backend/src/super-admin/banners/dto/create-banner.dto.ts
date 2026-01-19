@@ -1,77 +1,42 @@
-import {
-  IsString,
-  IsNotEmpty,
-  IsUrl,
-  IsEnum,
-  IsInt,
-  Min,
-  Max,
-  IsOptional,
-  IsBoolean,
-  Matches,
-} from 'class-validator';
-import { PartialType } from '@nestjs/mapped-types';
-
-export enum BannerType {
-  PROMO = 'PROMO',
-  AD = 'AD',
-}
+import { IsBoolean, IsNotEmpty, IsNumber, IsOptional, IsString, IsUrl, IsEnum, IsArray } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
 
 export class CreateBannerDto {
   @IsString()
-  @IsNotEmpty({ message: 'Title is required' })
+  @IsNotEmpty()
   title: string;
 
   @IsString()
-  @IsNotEmpty({ message: 'Subtitle is required' })
+  @IsNotEmpty()
   subtitle: string;
 
   @IsString()
-  @IsNotEmpty({ message: 'Button text is required' })
-  buttonText: string;
-
-  @IsUrl(
-    { protocols: ['http', 'https'], require_protocol: true },
-    {
-      message: 'Link must be a valid HTTP/HTTPS URL',
-    },
-  )
-  @Matches(/^https?:\/\//, {
-    message: 'Link must start with http:// or https://',
-  })
-  link: string;
+  @IsOptional()
+  buttonText?: string;
 
   @IsString()
-  @IsNotEmpty({ message: 'Banner image is required' })
-  image: string;
+  @IsOptional()
+  link?: string;
 
-  @IsEnum(BannerType, { message: 'Type must be either PROMO or AD' })
-  type: BannerType;
+  @IsString()
+  @IsOptional()
+  type?: string;
 
-  @IsInt({ message: 'Priority must be an integer' })
-  @Min(0, { message: 'Priority must be at least 0' })
-  @Max(100, { message: 'Priority must not exceed 100' })
-  priority: number;
+  @IsNumber()
+  @IsOptional()
+  @Type(() => Number) // Handle FormData string-to-number conversion
+  priority?: number;
 
   @IsBoolean()
   @IsOptional()
+  @Transform(({ value }) => value === 'true' || value === true) // Handle FormData boolean
   isActive?: boolean;
 }
 
-// UpdateBannerDto makes all fields optional
-export class UpdateBannerDto extends PartialType(CreateBannerDto) {}
+export class UpdateBannerDto extends CreateBannerDto {}
 
-// Response DTO for type safety
-export class BannerResponseDto {
-  id: string;
-  title: string;
-  subtitle: string;
-  buttonText: string;
-  link: string;
-  image: string;
-  type: BannerType;
-  priority: number;
-  isActive: boolean;
-  createdAt: Date;
-  updatedAt: Date;
+export class ReorderBannersDto {
+  @IsArray()
+  @IsString({ each: true })
+  ids: string[];
 }
