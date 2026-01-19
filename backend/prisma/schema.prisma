@@ -209,7 +209,7 @@ model UserDocument {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   
   type      String   // e.g., "DRIVER_LICENSE", "VEHICLE_INSURANCE", "CAC_CERT"
-  url       String   // S3/Supabase Storage URL
+  url       String   // Storage URL (Railway S3 or S3-compatible)
   
   status    VerificationStatus @default(PENDING)
   rejectionReason String?      // Required if status is REJECTED

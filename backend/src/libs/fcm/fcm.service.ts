@@ -13,9 +13,6 @@ export class FcmService {
 
   private initializeFirebase() {
     try {
-      const fcmServerKey = this.configService.get<string>('FCM_SERVER_KEY');
-      const fcmProjectId = this.configService.get<string>('FCM_PROJECT_ID');
-
       // Check if Firebase is already initialized
       if (admin.apps.length > 0) {
         this.firebaseApp = admin.apps[0];
@@ -23,37 +20,39 @@ export class FcmService {
         return;
       }
 
+      const fcmProjectId = this.configService.get<string>('FCM_PROJECT_ID');
+      const fcmClientEmail = this.configService.get<string>('FCM_CLIENT_EMAIL');
+      const fcmPrivateKey = this.configService.get<string>('FCM_PRIVATE_KEY');
+
       // Only initialize if credentials are provided
-      if (!fcmServerKey || !fcmProjectId) {
+      if (!fcmProjectId || !fcmClientEmail || !fcmPrivateKey) {
         this.logger.warn(
           'FCM credentials not configured. Push notifications will be disabled.',
+        );
+        this.logger.warn(
+          'Required env vars: FCM_PROJECT_ID, FCM_CLIENT_EMAIL, FCM_PRIVATE_KEY',
         );
         return;
       }
 
-      // Initialize Firebase Admin SDK
-      // Note: For production, use service account JSON file instead of server key
-      // For now, we'll just log that FCM is configured
-      this.logger.log(
-        'FCM configured with project ID: ' +
-          fcmProjectId.substring(0, 10) +
-          '...',
-      );
-
-      // TODO: Initialize with service account for production
-      // this.firebaseApp = admin.initializeApp({
-      //   credential: admin.credential.cert({
-      //     projectId: fcmProjectId,
-      //     clientEmail: process.env.FCM_CLIENT_EMAIL,
-      //     privateKey: process.env.FCM_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-      //   }),
-      // });
+      // Initialize Firebase Admin SDK with service account credentials
+      this.firebaseApp = admin.initializeApp({
+        credential: admin.credential.cert({
+          projectId: fcmProjectId,
+          clientEmail: fcmClientEmail,
+          // Replace escaped newlines with actual newlines
+          privateKey: fcmPrivateKey.replace(/\\n/g, '\n'),
+        }),
+      });
 
       this.logger.log(
-        'FCM Service initialized (mock mode - add credentials for production)',
+        `Firebase Admin SDK initialized successfully for project: ${fcmProjectId}`,
       );
     } catch (error) {
       this.logger.error('Failed to initialize Firebase Admin SDK:', error);
+      this.logger.error(
+        'Please check your FCM credentials in environment variables',
+      );
     }
   }
 

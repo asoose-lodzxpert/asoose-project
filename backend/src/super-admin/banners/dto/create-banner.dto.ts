@@ -1,4 +1,13 @@
-import { IsBoolean, IsNotEmpty, IsNumber, IsOptional, IsString, IsUrl, IsEnum, IsArray } from 'class-validator';
+import {
+  IsBoolean,
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsString,
+  IsUrl,
+  IsEnum,
+  IsArray,
+} from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 
 export class CreateBannerDto {
@@ -17,6 +26,10 @@ export class CreateBannerDto {
   @IsString()
   @IsOptional()
   link?: string;
+
+  @IsString()
+  @IsOptional()
+  image?: string;
 
   @IsString()
   @IsOptional()

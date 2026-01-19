@@ -1,12 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { StoreType, StoreStatus, 
-  VerificationStatus, 
-  Prisma 
-
- } from '@prisma/client';
+import {
+  StoreType,
+  StoreStatus,
+  VerificationStatus,
+  Prisma,
+} from '@prisma/client';
 import { CreateReviewDto } from './dto/create-review.dto';
-
 
 const isUUID = (str: string) =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
@@ -63,47 +63,43 @@ export class MarketplaceService {
     }
 
     const banners = await this.prisma.banner.findMany({
-    where: { isActive: true },
-    orderBy: { priority: 'desc' },
-    take: 5
-  });
-    return { verticals,banners };
+      where: { isActive: true },
+      orderBy: { priority: 'desc' },
+      take: 5,
+    });
+    return { verticals, banners };
   }
 
+  async getPaginatedStores(page: number, limit: number, type?: string) {
+    const skip = (page - 1) * limit;
 
+    // Explicitly type the where object
+    const where: Prisma.StoreWhereInput = {
+      status: StoreStatus.ACTIVE, // Use the Enum instead of a string
+      verification: VerificationStatus.VERIFIED, // Use the Enum instead of a string
+      ...(type ? { type: this.mapSlugToType(type) } : {}),
+    };
 
+    const [stores, total] = await Promise.all([
+      this.prisma.store.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { rating: 'desc' },
+      }),
+      this.prisma.store.count({ where }),
+    ]);
 
-async getPaginatedStores(page: number, limit: number, type?: string) {
-  const skip = (page - 1) * limit;
-
-  // Explicitly type the where object
-  const where: Prisma.StoreWhereInput = {
-    status: StoreStatus.ACTIVE, // Use the Enum instead of a string
-    verification: VerificationStatus.VERIFIED, // Use the Enum instead of a string
-    ...(type ? { type: this.mapSlugToType(type) } : {}),
-  };
-
-  const [stores, total] = await Promise.all([
-    this.prisma.store.findMany({
-      where,
-      skip,
-      take: limit,
-      orderBy: { rating: 'desc' },
-    }),
-    this.prisma.store.count({ where }),
-  ]);
-
-  return {
-    stores: this.mapStoresToVendors(stores),
-    meta: {
-      total,
-      page,
-      lastPage: Math.ceil(total / limit),
-      hasMore: page * limit < total,
-    },
-  };
-}
-
+    return {
+      stores: this.mapStoresToVendors(stores),
+      meta: {
+        total,
+        page,
+        lastPage: Math.ceil(total / limit),
+        hasMore: page * limit < total,
+      },
+    };
+  }
 
   async getCategoryData(verticalId: string, sortParam?: string) {
     // 1. Determine Sorting Logic
@@ -174,10 +170,10 @@ async getPaginatedStores(page: number, limit: number, type?: string) {
 
   private mapSlugToType(slug: string): any {
     const map: Record<string, string> = {
-      'food': 'RESTAURANT',
-      'grocery': 'GROCERY',
-      'pharmacy': 'PHARMACY',
-      'market': 'MARKET'
+      food: 'RESTAURANT',
+      grocery: 'GROCERY',
+      pharmacy: 'PHARMACY',
+      market: 'MARKET',
     };
     return map[slug.toLowerCase()] || 'RESTAURANT';
   }
@@ -263,7 +259,7 @@ async getPaginatedStores(page: number, limit: number, type?: string) {
         id: p.id,
         name: p.name,
         price: p.price,
-        image: p.image,
+        image: p.images[0] || null, // Use first image from array
         description: p.slug,
         category: { name: p.category.name },
         modifierGroups: p.modifierGroups.map((g) => ({
@@ -345,7 +341,4 @@ async getPaginatedStores(page: number, limit: number, type?: string) {
       where: { userId_storeId: { userId: userId, storeId: storeId } },
     });
   }
-
-  
-
 }

@@ -564,4 +564,188 @@ export class RidersService {
       },
     };
   }
+
+  async getOrdersHistory(
+    riderId: string,
+    status?: string,
+    page: number = 1,
+    limit: number = 20,
+  ) {
+    const skip = (page - 1) * limit;
+
+    // Parse status filter if provided
+    let statusArray: string[] | undefined;
+    if (status) {
+      statusArray = status.split(',').map((s) => s.trim());
+    }
+
+    // Build where clauses
+    const rideWhere: any = { riderId };
+    const deliveryWhere: any = { riderId };
+
+    if (statusArray && statusArray.length > 0) {
+      rideWhere.status = { in: statusArray };
+      deliveryWhere.status = { in: statusArray };
+    }
+
+    // Fetch both rides and deliveries
+    const [rides, deliveries] = await Promise.all([
+      this.prisma.ride.findMany({
+        where: rideWhere,
+        include: {
+          customer: {
+            select: {
+              id: true,
+              name: true,
+              phone: true,
+              image: true,
+            },
+          },
+          pickupAddress: {
+            select: {
+              id: true,
+              street: true,
+              city: true,
+              state: true,
+              lat: true,
+              lng: true,
+            },
+          },
+          dropoffAddress: {
+            select: {
+              id: true,
+              street: true,
+              city: true,
+              state: true,
+              lat: true,
+              lng: true,
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.delivery.findMany({
+        where: deliveryWhere,
+        include: {
+          order: {
+            include: {
+              store: {
+                select: {
+                  id: true,
+                  name: true,
+                  address: true,
+                },
+              },
+            },
+          },
+          customer: {
+            select: {
+              id: true,
+              name: true,
+              phone: true,
+              image: true,
+            },
+          },
+          pickupAddress: {
+            select: {
+              id: true,
+              street: true,
+              city: true,
+              state: true,
+              lat: true,
+              lng: true,
+            },
+          },
+          dropoffAddress: {
+            select: {
+              id: true,
+              street: true,
+              city: true,
+              state: true,
+              lat: true,
+              lng: true,
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+    ]);
+
+    // Transform rides
+    const transformedRides = rides.map((ride) => ({
+      id: ride.id,
+      type: 'ride',
+      customerId: ride.customerId,
+      customerName: ride.customer?.name || 'Unknown',
+      customerPhone: ride.customer?.phone || 'N/A',
+      customerImage: ride.customer?.image,
+      pickupLocation: ride.pickupAddress
+        ? `${ride.pickupAddress.street}, ${ride.pickupAddress.city}`
+        : 'N/A',
+      pickupLat: ride.pickupAddress?.lat,
+      pickupLng: ride.pickupAddress?.lng,
+      dropoffLocation: ride.dropoffAddress
+        ? `${ride.dropoffAddress.street}, ${ride.dropoffAddress.city}`
+        : 'N/A',
+      dropoffLat: ride.dropoffAddress?.lat,
+      dropoffLng: ride.dropoffAddress?.lng,
+      totalAmount: ride.totalFare || 0,
+      distance: ride.distanceKm,
+      duration: ride.durationMin,
+      status: ride.status,
+      createdAt: ride.createdAt,
+      acceptedAt: ride.acceptedAt,
+      startedAt: ride.startedAt,
+      completedAt: ride.completedAt,
+      cancelledAt: ride.cancelledAt,
+    }));
+
+    // Transform deliveries
+    const transformedDeliveries = deliveries.map((delivery) => ({
+      id: delivery.id,
+      type: 'delivery',
+      orderId: delivery.orderId,
+      storeName: delivery.order?.store?.name || 'Unknown Store',
+      storeAddress: delivery.order?.store?.address || 'N/A',
+      customerName: delivery.customer?.name || 'Unknown',
+      customerPhone: delivery.customer?.phone || 'N/A',
+      customerImage: delivery.customer?.image,
+      pickupLocation: delivery.pickupAddress
+        ? `${delivery.pickupAddress.street}, ${delivery.pickupAddress.city}`
+        : 'N/A',
+      pickupLat: delivery.pickupAddress?.lat,
+      pickupLng: delivery.pickupAddress?.lng,
+      dropoffLocation: delivery.dropoffAddress
+        ? `${delivery.dropoffAddress.street}, ${delivery.dropoffAddress.city}`
+        : 'N/A',
+      dropoffLat: delivery.dropoffAddress?.lat,
+      dropoffLng: delivery.dropoffAddress?.lng,
+      totalAmount: delivery.deliveryFee,
+      distance: delivery.distanceKm,
+      status: delivery.status,
+      createdAt: delivery.createdAt,
+      assignedAt: delivery.assignedAt,
+      pickedUpAt: delivery.pickedUpAt,
+      deliveredAt: delivery.deliveredAt,
+    }));
+
+    // Combine and sort by createdAt (newest first)
+    const combined = [...transformedRides, ...transformedDeliveries].sort(
+      (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
+    );
+
+    // Apply pagination
+    const total = combined.length;
+    const paginatedData = combined.slice(skip, skip + limit);
+
+    return {
+      data: paginatedData,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
 }
