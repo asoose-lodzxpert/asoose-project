@@ -3,6 +3,9 @@ import { createClient } from "../../../utils/supabase/client"
 import { useEffect, useState } from 'react'
 import { Copy, Check, User, Key } from 'lucide-react'
 
+// Force dynamic rendering to prevent prerendering errors
+export const dynamic = 'force-dynamic';
+
 const Dashboard = () => {
     const supabase = createClient()
     const [token, setToken] = useState<string>('')
