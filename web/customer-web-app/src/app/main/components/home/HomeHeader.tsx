@@ -140,7 +140,7 @@ export const HomeHeader = () => {
                 />
               </div>
               <span className="text-lg font-black tracking-tight hidden sm:block text-zinc-900 dark:text-white">
-                Asoose Lodzxpert
+                Asoose 
               </span>
             </Link>
           )}

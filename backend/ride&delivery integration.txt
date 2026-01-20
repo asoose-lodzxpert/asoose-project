@@ -1,0 +1,175 @@
+Here is the breakdown of actionable tasks for implementing the Ride and Delivery Backend Integrations. This focuses on connecting the logistics logic (TripsService, MatchingService) with the financial core (PaymentService, LedgerService) and the real-time event system.
+
+Phase 1: The Payment-Logistics Handshake
+Goal: Ensure trips only become active after payment is secured.
+
+Task 1.1: Payment Success Trigger (The Bridge)
+
+Action: Modify PaymentService.updatePaymentStatus to act as the traffic controller.
+
+Logic:
+
+If status becomes SUCCESS:
+
+Check if payment.rideId exists → Call tripsService.startRideMatching(rideId).
+
+Check if payment.orderId exists (and has delivery) → Call tripsService.startDeliveryMatching(deliveryId).
+
+If status becomes FAILED:
+
+Update Ride/Order status to PAYMENT_FAILED to notify the user immediately.
+
+Reference: as/backend/src/payment/payment.service.ts
+
+Task 1.2: Matching Initiation Validation
+
+Action: Implement startRideMatching and startDeliveryMatching in TripsService.
+
+Constraint: These methods must verify the entity is in PENDING state. If it's already REQUESTED or CANCELLED, throw an exception to prevent duplicate matching flows.
+
+Reference: as/backend/src/users/trips/trips.service.ts
+
+Phase 2: The Matching Engine (Ride & Delivery)
+Goal: Efficiently assign drivers using Redis and Geo-hashing.
+
+Task 2.1: Redis Geo-Hash Implementation
+
+Action: Ensure GeoService.latLngToHex is correctly implemented using the H3 library (resolution 7 or 8 is standard for city-level matching).
+
+Reference: as/backend/src/matching/workers/ride-matching.processor.ts
+
+Task 2.2: The "Ring Search" Algorithm
+
+Action: Implement the loop in RideMatchingProcessor and DeliveryMatchingProcessor to search concentric rings (k=0 to k=5).
+
+Optimization: Fail fast—if no drivers are found in Ring 5, do not retry immediately; increment the attempt counter and re-queue with a delay.
+
+Reference: as/backend/src/matching/workers/ride-matching.processor.ts
+
+Task 2.3: Atomic Driver Locking (Lua Script)
+
+Action: Verify the ATOMIC_LOCK_DRIVER Lua script is loaded in RedisService.
+
+Logic: This script must check if a driver is ONLINE AND IDLE (not in another trip). It must set a lock key (e.g., lock:driver:{id}) that expires in 45-90 seconds (the acceptance window).
+
+Reference: as/backend/src/matching/workers/ride-matching.processor.ts
+
+Task 2.4: Handling "No Driver Found"
+
+Action: Implement handleNoDriverFound logic.
+
+Logic: If max attempts reached (e.g., 20), update Ride/Delivery status to CANCELLED and trigger an automatic refund via PaymentService.processRefund.
+
+Reference: as/backend/src/matching/workers/ride-matching.processor.ts
+
+Phase 3: Trip Lifecycle & State Management
+Goal: Manage the trip progression (Pickup -> Dropoff -> Complete).
+
+Task 3.1: OTP Verification Endpoints
+
+Action: Create endpoints in RidersController (or TripsController) for:
+
+verifyPickupOtp(rideId, otp): Transitions status from ACCEPTED to IN_PROGRESS.
+
+verifyDeliveryOtp(deliveryId, otp): Transitions status from PICKED_UP to DELIVERED.
+
+Reference: as/backend/src/users/trips/trips.service.ts
+
+Task 3.2: Ride Cancellation Guard
+
+Action: Implement strict checks in cancelRide and cancelDelivery.
+
+Logic:
+
+If status is PENDING (Pre-matching): Cancel allowed, full refund.
+
+If status is REQUESTED (Matching): Cancel allowed, full refund.
+
+If status is ACCEPTED (Driver en route): Cancel allowed, but charge cancellation fee (optional).
+
+If status is IN_PROGRESS: Deny cancellation.
+
+Reference: as/backend/src/users/trips/trips.service.ts
+
+Phase 4: Financial Settlement (Closing the Loop)
+Goal: Distribute earnings immediately upon trip completion.
+
+Task 4.1: Ride Completion & Ledger Sync
+
+Action: Create a completeRide method (likely in TripsService or RidesService).
+
+Logic:
+
+Verify IN_PROGRESS status.
+
+Update status to COMPLETED.
+
+Call ledgerService.recordRideEarnings to split the fare (platformFee vs driverFee) and credit the driver's wallet.
+
+Reference: as/backend/src/super-admin/transactions/transaction-ledger.service.ts
+
+Task 4.2: Delivery Completion & Ledger Sync
+
+Action: Finalize DeliveriesService.completeDelivery.
+
+Logic:
+
+Verify PICKED_UP status.
+
+Update status to DELIVERED.
+
+Call ledgerService.recordDeliveryEarnings (pay rider).
+
+Critical: Call ledgerService.recordOrderCommission (pay vendor & platform) since the order is now fulfilled.
+
+Reference: as/backend/src/super-admin/deliveries/delivery.service.ts
+
+Phase 5: Real-time Communication (Socket.IO)
+Goal: Keep Customer, Driver, and Vendor in sync without refreshing.
+
+Task 5.1: Event Emitters Integration
+
+Action: Inject EventBusService into TripsService and MatchingProcessors.
+
+Events to Emit:
+
+ride.requested: Sent to Admins/Monitoring.
+
+ride.driver.assigned: Sent to Customer (contains Driver details).
+
+ride.driver.proposal: Sent to Driver (contains Trip details for acceptance).
+
+ride.status.changed: Generic update for all parties (arrived, started, completed).
+
+Reference: as/backend/src/users/trips/trips.service.ts
+
+Task 5.2: Driver Location Tracking
+
+Action: Implement updateLocation in RidersGateway (WebSocket).
+
+Logic:
+
+Receive { lat, lng, riderId }.
+
+Update Redis key driver:location:{id}.
+
+Optimization: Only push updates to the specific customer if the driver is currently in an active ACCEPTED or IN_PROGRESS trip with them.
+
+Reference: as/backend/src/matching/workers/ride-matching.processor.ts
+
+Phase 6: Admin Logistics Oversight
+Goal: Allow admins to intervene in stuck trips.
+
+Task 6.1: Force Re-Matching
+
+Action: Create an Admin endpoint POST /admin/rides/:id/rematch.
+
+Logic: Reset status to REQUESTED, increment attempt count, and re-inject into the matching queue. Useful if a driver goes offline after accepting.
+
+Task 6.2: Manual Completion
+
+Action: Expose completeDelivery and completeRide to Super Admins.
+
+Use Case: Driver phone dies, but trip was completed physically. Admin manually closes the trip to release funds.
+
+Reference: as/backend/src/super-admin/deliveries/delivery.service.ts

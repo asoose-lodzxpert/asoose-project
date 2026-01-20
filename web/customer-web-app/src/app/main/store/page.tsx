@@ -5,7 +5,9 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useSearchParams } from 'next/navigation';
 import { 
-  Store, X, ChevronRight, Utensils, Loader2 
+  Store, X, ChevronRight, Utensils, Loader2, 
+  ShoppingBasket, Pizza, Coffee, Gift, BriefcaseMedical, 
+  Carrot, Sandwich, Truck // Added new icons
 } from 'lucide-react';
 
 // Components
@@ -31,6 +33,23 @@ interface Vendor {
 interface VerticalSection {
   id: string; title: string; vendors: Vendor[];
 }
+
+// --- HELPER: GET CATEGORY ICON ---
+const getCategoryIcon = (title: string) => {
+  const t = title.toLowerCase();
+  if (t.includes('restaurant') || t.includes('food')) return <Utensils className="w-7 h-7" />;
+  if (t.includes('grocery') || t.includes('market')) return <ShoppingBasket className="w-7 h-7" />;
+  if (t.includes('pharmacy') || t.includes('health') || t.includes('med')) return <BriefcaseMedical className="w-7 h-7" />;
+  if (t.includes('fast food') || t.includes('burger')) return <Sandwich className="w-7 h-7" />;
+  if (t.includes('pizza')) return <Pizza className="w-7 h-7" />;
+  if (t.includes('coffee') || t.includes('cafe')) return <Coffee className="w-7 h-7" />;
+  if (t.includes('fresh') || t.includes('veg')) return <Carrot className="w-7 h-7" />;
+  if (t.includes('courier') || t.includes('send')) return <Truck className="w-7 h-7" />;
+  if (t.includes('gift')) return <Gift className="w-7 h-7" />;
+  
+  // Default fallback
+  return <Store className="w-7 h-7" />;
+};
 
 // --- DATA HOOK (CURATED CONTENT) ---
 function useStoreData(query: string | null) {
@@ -179,9 +198,10 @@ export default function StorePage() {
                   {verticals.map((v) => (
                     <Link key={v.id} href={`/main/store/category/${v.id}`} className="flex flex-col items-center p-5 rounded-3xl bg-white dark:bg-[#151515] border border-gray-100 dark:border-white/5 hover:border-yellow-500/30 transition-all group">
                       <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-yellow-50 dark:bg-yellow-900/10 text-yellow-600 transition-transform group-hover:scale-110">
-                        <Store className="w-7 h-7" />
+                        {/* ✅ DYNAMIC ICON HERE */}
+                        {getCategoryIcon(v.title)}
                       </div>
-                      <span className="mt-4 text-sm font-bold">{v.title}</span>
+                      <span className="mt-4 text-sm font-bold text-center capitalize">{v.title}</span>
                     </Link>
                   ))}
                </div>
@@ -192,7 +212,7 @@ export default function StorePage() {
               {verticals.map((section) => (
                 <section key={section.id} className="px-4">
                   <div className="flex justify-between items-end mb-6">
-                    <h2 className="text-2xl font-black">{section.title}</h2>
+                    <h2 className="text-2xl font-black capitalize">{section.title}</h2>
                     <Link href={`/main/store/category/${section.id}`} className="text-xs font-bold text-yellow-600 bg-yellow-50 dark:bg-yellow-900/20 px-4 py-2 rounded-full">
                       See all
                     </Link>
