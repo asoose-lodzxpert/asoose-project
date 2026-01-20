@@ -24,7 +24,7 @@ export const FloatingCart = () => {
   return (
     <div className="fixed top-28 right-6 z-[999] md:hidden"> 
       <button 
-        onClick={() => router.push('/checkout')} 
+        onClick={() => router.push('/main/checkout')} 
         aria-label="View Cart"
         className="relative w-12 h-12 bg-yellow-500 text-black rounded-full shadow-2xl shadow-yellow-500/40 flex items-center justify-center active:scale-90 transition-transform border-4 border-white dark:border-[#0a0a0a]"
       >

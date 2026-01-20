@@ -56,8 +56,7 @@ export const SidebarCart = ({ restaurantName }: SidebarCartProps) => {
       )}
 
       <Link
-        href={"/checkout"}
-        // Added 'block' and 'text-center' to ensure full width
+        href={"/main/checkout"}
         className="block text-center w-full bg-yellow-500 text-black py-4 rounded-xl font-bold shadow-lg shadow-yellow-500/20 hover:bg-yellow-400 transition-colors"
       >
         Checkout

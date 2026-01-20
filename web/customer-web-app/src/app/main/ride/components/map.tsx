@@ -2,8 +2,8 @@
 
 import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { GoogleMap, Marker, Polyline, Circle } from '@react-google-maps/api';
-import { Loader2, Navigation, AlertCircle } from 'lucide-react';
-
+import { Loader2, AlertCircle, Crosshair } from 'lucide-react';
+import { MAP_ICONS } from './mapIcons';
 const containerStyle = { width: '100%', height: '100%' };
 
 const mapOptions: google.maps.MapOptions = {
@@ -46,57 +46,34 @@ export default function GoogleMapView({
   const [mapError, setMapError] = useState<string | null>(null);
   const animationRef = useRef<number | null>(null);
 
-  // Custom SVG Markers
+  // Custom Markers from Constants
   const markers = useMemo(() => {
-    if (!isLoaded) return null;
+    if (!isLoaded || !window.google) return null;
     
     return {
       userLocation: {
-        url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-          <svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="20" cy="20" r="18" fill="#10b981" stroke="white" stroke-width="3"/>
-            <circle cx="20" cy="20" r="6" fill="white"/>
-          </svg>
-        `),
-        scaledSize: new google.maps.Size(40, 40),
-        anchor: new google.maps.Point(20, 20),
+        ...MAP_ICONS.userLocation,
+        scaledSize: new google.maps.Size(MAP_ICONS.userLocation.scaledSize.width, MAP_ICONS.userLocation.scaledSize.height),
+        anchor: new google.maps.Point(MAP_ICONS.userLocation.anchor.x, MAP_ICONS.userLocation.anchor.y),
       },
       pickupPin: {
-        url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-          <svg width="32" height="42" viewBox="0 0 32 42" xmlns="http://www.w3.org/2000/svg">
-            <path d="M16 0C7.163 0 0 7.163 0 16c0 12 16 26 16 26s16-14 16-26c0-8.837-7.163-16-16-16z" fill="#10b981"/>
-            <circle cx="16" cy="16" r="8" fill="white"/>
-            <circle cx="16" cy="16" r="4" fill="#10b981"/>
-          </svg>
-        `),
-        scaledSize: new google.maps.Size(32, 42),
-        anchor: new google.maps.Point(16, 42),
+        ...MAP_ICONS.pickupPin,
+        scaledSize: new google.maps.Size(MAP_ICONS.pickupPin.scaledSize.width, MAP_ICONS.pickupPin.scaledSize.height),
+        anchor: new google.maps.Point(MAP_ICONS.pickupPin.anchor.x, MAP_ICONS.pickupPin.anchor.y),
       },
       destinationPin: {
-        url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-          <svg width="32" height="42" viewBox="0 0 32 42" xmlns="http://www.w3.org/2000/svg">
-            <path d="M16 0C7.163 0 0 7.163 0 16c0 12 16 26 16 26s16-14 16-26c0-8.837-7.163-16-16-16z" fill="#ef4444"/>
-            <rect x="11" y="11" width="10" height="10" rx="1" fill="white"/>
-          </svg>
-        `),
-        scaledSize: new google.maps.Size(32, 42),
-        anchor: new google.maps.Point(16, 42),
+        ...MAP_ICONS.destinationPin,
+        scaledSize: new google.maps.Size(MAP_ICONS.destinationPin.scaledSize.width, MAP_ICONS.destinationPin.scaledSize.height),
+        anchor: new google.maps.Point(MAP_ICONS.destinationPin.anchor.x, MAP_ICONS.destinationPin.anchor.y),
       },
-      carIcon: (heading: number) => ({
-        url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-          <svg width="48" height="48" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
-            <g transform="translate(24, 24) rotate(${heading}) translate(-24, -24)">
-              <ellipse cx="24" cy="28" rx="16" ry="10" fill="rgba(0,0,0,0.2)"/>
-              <path d="M24 8 L32 28 L28 28 L28 32 L20 32 L20 28 L16 28 Z" fill="#000000" stroke="white" stroke-width="1.5"/>
-              <circle cx="20" cy="30" r="2" fill="white"/>
-              <circle cx="28" cy="30" r="2" fill="white"/>
-              <path d="M24 8 L26 14 L22 14 Z" fill="#fbbf24"/>
-            </g>
-          </svg>
-        `),
-        scaledSize: new google.maps.Size(48, 48),
-        anchor: new google.maps.Point(24, 24),
-      }),
+      carIcon: (heading: number) => {
+        const iconData = MAP_ICONS.carIcon(heading);
+        return {
+            ...iconData,
+            scaledSize: new google.maps.Size(iconData.scaledSize.width, iconData.scaledSize.height),
+            anchor: new google.maps.Point(iconData.anchor.x, iconData.anchor.y),
+        };
+      },
     };
   }, [isLoaded]);
 
@@ -116,13 +93,9 @@ export default function GoogleMapView({
           const path = result.routes[0].overview_path;
           setRoute(path);
           
-          // Extract distance and duration
           const leg = result.routes[0].legs[0];
           if (onRouteCalculated && leg.distance && leg.duration) {
-            onRouteCalculated(
-              leg.distance.value, // meters
-              leg.duration.value  // seconds
-            );
+            onRouteCalculated(leg.distance.value, leg.duration.value);
           }
           
           setMapError(null);
@@ -137,7 +110,7 @@ export default function GoogleMapView({
   // Calculate driver route (driver to user pickup)
   useEffect(() => {
     if (!isLoaded || !driverPos || !userPos || !window.google) return;
-    if (rideStage !== 'DRIVER_ASSIGNED' && rideStage !== 'DRIVER_ARRIVING') return;
+    if (rideStage !== 'ON_WAY' && rideStage !== 'ARRIVED') return;
 
     const directionsService = new google.maps.DirectionsService();
     directionsService.route(
@@ -151,13 +124,9 @@ export default function GoogleMapView({
           const path = result.routes[0].overview_path;
           setDriverRoute(path);
           
-          // Extract driver ETA
           const leg = result.routes[0].legs[0];
           if (onDriverRouteCalculated && leg.distance && leg.duration) {
-            onDriverRouteCalculated(
-              leg.distance.value,
-              leg.duration.value
-            );
+            onDriverRouteCalculated(leg.distance.value, leg.duration.value);
           }
         }
       }
@@ -176,7 +145,6 @@ export default function GoogleMapView({
       return;
     }
 
-    // Calculate heading
     const calcHeading = (from: typeof driverPos, to: typeof driverPos) => {
       const lat1 = (from.lat * Math.PI) / 180;
       const lat2 = (to.lat * Math.PI) / 180;
@@ -192,7 +160,6 @@ export default function GoogleMapView({
     const heading = calcHeading(animatedDriverPos, driverPos);
     setCarHeading(heading);
 
-    // Smooth animation
     let frame = 0;
     const totalFrames = 60;
     const startPos = { ...animatedDriverPos };
@@ -222,7 +189,6 @@ export default function GoogleMapView({
     };
   }, [driverPos]);
 
-  // Center map on user location
   const centerOnUser = useCallback(() => {
     if (mapRef.current && userPos) {
       mapRef.current.panTo(userPos);
@@ -237,11 +203,11 @@ export default function GoogleMapView({
     const bounds = new google.maps.LatLngBounds();
     bounds.extend(new google.maps.LatLng(userPos.lat, userPos.lng));
 
-    if (driverPos && (rideStage === 'DRIVER_ASSIGNED' || rideStage === 'DRIVER_ARRIVING')) {
+    if (driverPos && (rideStage === 'ON_WAY' || rideStage === 'ARRIVED')) {
       bounds.extend(new google.maps.LatLng(driverPos.lat, driverPos.lng));
     }
 
-    if (destPos && (rideStage === 'IN_RIDE' || rideStage === 'IDLE')) {
+    if (destPos && (rideStage === 'IN_PROGRESS' || rideStage === 'IDLE')) {
       bounds.extend(new google.maps.LatLng(destPos.lat, destPos.lng));
     }
 
@@ -256,13 +222,6 @@ export default function GoogleMapView({
   const onMapLoad = useCallback((map: google.maps.Map) => {
     mapRef.current = map;
   }, []);
-
-  // Handle geolocation errors
-  useEffect(() => {
-    if (!userPos && isLoaded) {
-      setMapError('Location access required. Please enable location services.');
-    }
-  }, [userPos, isLoaded]);
 
   if (!isLoaded) {
     return (
@@ -283,7 +242,7 @@ export default function GoogleMapView({
         options={mapOptions}
         onLoad={onMapLoad}
       >
-        {/* User Location Marker with Accuracy Circle */}
+        {/* User Location */}
         {userPos && markers && (
           <>
             <Circle
@@ -305,7 +264,7 @@ export default function GoogleMapView({
           </>
         )}
 
-        {/* Destination Marker */}
+        {/* Destination */}
         {destPos && markers && (
           <Marker 
             position={destPos} 
@@ -314,12 +273,12 @@ export default function GoogleMapView({
           />
         )}
 
-        {/* Main Route Polyline (user to destination) */}
-        {route.length > 0 && (rideStage === 'IDLE' || rideStage === 'IN_RIDE') && (
+        {/* Main Route */}
+        {route.length > 0 && (rideStage === 'IDLE' || rideStage === 'IN_PROGRESS') && (
           <Polyline
             path={route}
             options={{
-              strokeColor: rideStage === 'IN_RIDE' ? '#10b981' : '#6b7280',
+              strokeColor: rideStage === 'IN_PROGRESS' ? '#10b981' : '#6b7280',
               strokeOpacity: 0.8,
               strokeWeight: 5,
               geodesic: true,
@@ -327,8 +286,8 @@ export default function GoogleMapView({
           />
         )}
 
-        {/* Driver Route Polyline (driver to pickup) */}
-        {driverRoute.length > 0 && (rideStage === 'DRIVER_ASSIGNED' || rideStage === 'DRIVER_ARRIVING') && (
+        {/* Driver Route */}
+        {driverRoute.length > 0 && (rideStage === 'ON_WAY' || rideStage === 'ARRIVED') && (
           <Polyline
             path={driverRoute}
             options={{
@@ -337,11 +296,7 @@ export default function GoogleMapView({
               strokeWeight: 4,
               geodesic: true,
               icons: [{
-                icon: {
-                  path: 'M 0,-1 0,1',
-                  strokeOpacity: 0.7,
-                  scale: 3,
-                },
+                icon: { path: 'M 0,-1 0,1', strokeOpacity: 0.7, scale: 3 },
                 offset: '0',
                 repeat: '20px'
               }]
@@ -349,7 +304,7 @@ export default function GoogleMapView({
           />
         )}
 
-        {/* Driver Car Marker */}
+        {/* Driver Car */}
         {animatedDriverPos && markers && (
           <>
             <Marker
@@ -387,7 +342,7 @@ export default function GoogleMapView({
           className="absolute top-4 right-4 bg-white p-3 rounded-full shadow-lg hover:bg-gray-50 transition-colors z-10 active:scale-95"
           aria-label="Center on your location"
         >
-          <Navigation className="w-5 h-5 text-gray-700" />
+          <Crosshair className="w-5 h-5 text-gray-700" />
         </button>
       )}
 

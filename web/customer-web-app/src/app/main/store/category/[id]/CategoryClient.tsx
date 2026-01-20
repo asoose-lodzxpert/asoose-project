@@ -9,8 +9,8 @@ import {
 } from 'lucide-react';
 import { HomeHeader } from '@/app/main/components/home/HomeHeader';
 import { RestaurantCard } from '@/app/main/components/home/RestaurantCard';
-import { AppFooter } from '@/app/main/components/layout/AppFooter';
-import  BottomNav  from '@/app/main/components/layout/BottomNav';
+import  AppFooter  from '@/app/main/components/layout/AppFooter';
+import BottomNav from '@/app/main/components/layout/BottomNav';
 import { FloatingCart } from '@/app/main/components/home/FloatingCart';
 
 // --- TYPES ---
@@ -50,7 +50,6 @@ export default function CategoryClient({
   const [isPending, startTransition] = useTransition();
   const [scrolled, setScrolled] = useState(false);
 
-  // Detect scroll for header styling
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 50);
     window.addEventListener('scroll', handleScroll);
@@ -62,20 +61,22 @@ export default function CategoryClient({
   const handleFilterClick = (filterSlug: string) => {
     if (filterSlug === activeFilter) return;
     startTransition(() => {
-      router.push(`/store/category/${categoryId}?filter=${filterSlug}`, { scroll: false });
+      // ✅ Correct Link with /main prefix
+      router.push(`/main/store/category/${categoryId}?filter=${filterSlug}`, { scroll: false });
     });
   };
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-[#0a0a0a] text-gray-900 dark:text-gray-100 font-sans pb-24 transition-colors duration-300">
-      <HomeHeader />
+      {/* <HomeHeader /> */}
 
       <main className="max-w-7xl mx-auto min-h-[80vh]">
         {/* --- HERO / HEADER SECTION --- */}
         <div className="px-4 pt-6 pb-2">
            <div className="flex flex-col gap-4">
             <div className="flex items-center gap-2 text-sm text-gray-500">
-               <Link href="/store" className="hover:text-yellow-500 transition-colors">Marketplace</Link>
+               {/* ✅ Correct Link with /main prefix */}
+               <Link href="/main/store" className="hover:text-yellow-500 transition-colors">Marketplace</Link>
                <ChevronDown className="w-3 h-3 -rotate-90" />
                <span className="text-gray-900 dark:text-white font-medium capitalize">
                   {data.title || categoryId}
@@ -149,21 +150,21 @@ export default function CategoryClient({
                     className="animate-in fade-in slide-in-from-bottom-8 duration-700 fill-mode-backwards"
                     style={{ animationDelay: `${index * 50}ms` }}
                   >
-                    <Link href={`/store/${vendor.slug || vendor.id}`} className="block h-full">
+                    {/* ✅ Correct Link with /main prefix */}
+                    <Link href={`/main/store/${vendor.slug || vendor.id}`} className="block h-full">
                       <RestaurantCard
                         name={vendor.name}
                         image={vendor.image}
                         rating={vendor.rating}
                         time={vendor.deliveryTime || '30-45 min'}
                         deliveryFee={vendor.deliveryFee}
-                        tags={[vendor.type]} // Backend typically sends one type, but UI accepts array
+                        tags={[vendor.type]}
                       />
                     </Link>
                   </div>
                 ))}
               </div>
             ) : (
-              /* Empty State */
               <div className="flex flex-col items-center justify-center py-32 text-center">
                 <div className="w-24 h-24 bg-gray-100 dark:bg-white/5 rounded-full flex items-center justify-center mb-6 animate-pulse">
                   <SearchX className="w-10 h-10 text-gray-400" />
@@ -187,8 +188,8 @@ export default function CategoryClient({
       </main>
 
       <FloatingCart />
-      <BottomNav />
-      <AppFooter />
+      {/* <BottomNav /> */}
+      {/* <AppFooter /> */}
     </div>
   );
 }

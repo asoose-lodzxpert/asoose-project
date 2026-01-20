@@ -157,7 +157,7 @@ export class TransactionsService {
                   include: { bankAccount: true },
                 },
                 items: {
-                  include: { product: { select: { name: true, image: true } } },
+                  include: { product: { select: { name: true, images: true } } },
                 },
               },
             },
@@ -261,7 +261,7 @@ export class TransactionsService {
             qty: i.quantity,
             price: i.price,
             total: i.quantity * i.price,
-            image: i.product?.image,
+            image: i.product?.images?.[0] || null,
             options: i.selectedOptions,
           })),
           subtotal,

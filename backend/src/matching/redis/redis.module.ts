@@ -2,8 +2,8 @@ import { Module, Global } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
 import { RedisService } from './redis.service';
-
-export const REDIS_CLIENT = 'REDIS_CLIENT';
+// 👇 Fix: Import the constant instead of defining it here
+import { REDIS_CLIENT } from './redis-keys.constants'; 
 
 @Global()
 @Module({

@@ -74,10 +74,10 @@ import { PrismaModule } from '../prisma/prisma.module';
     AssignmentTimeoutProcessor,
   ],
   exports: [
-    RedisService,
+    // RedisService,
     GeoService,
     EventBusService,
-    QueueService,
+    QueueModule,
     DriverStateService,
   ],
 })

@@ -6,6 +6,7 @@ import { ActivityService } from './activity.service';
 import { OrdersService } from './orders.service';
 import { ReviewsService } from './reviews.service';
 import { DocumentsService } from './document.service';
+import { ActivityLogService } from 'src/common/services/activity-log.services';
 
 @Module({
   imports: [MailModule],
@@ -16,6 +17,7 @@ import { DocumentsService } from './document.service';
     OrdersService,
     ReviewsService,
     DocumentsService,
+    ActivityLogService, 
   ],
 })
 export class VendorModule {}

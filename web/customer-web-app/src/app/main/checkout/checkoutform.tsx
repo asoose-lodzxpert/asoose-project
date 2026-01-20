@@ -7,7 +7,8 @@ import { createClient } from '../../../../utils/supabase/client';
 import { ChevronLeft, WifiOff, AlertCircle, Loader2 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import { toast } from 'react-toastify';
-
+import { paymentService, InitiatePaymentPayload } from '@/services/payment.service';
+import { PAYMENT_METHODS } from '../ride/constants/config';
 // Components
 import { Address } from './types';
 import { AddAddressModal } from '@/app/main/components/checkout/addadressmodal';
@@ -31,7 +32,7 @@ export default function CheckoutForm() {
   const [isOnline, setIsOnline] = useState(true);
   const [showAddAddressModal, setShowAddAddressModal] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
-
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(PAYMENT_METHODS[0])
   // Store
   const { items: cartItems, getTotalPrice, addItem, decreaseItem, removeItem, clearCart } = useCartStore();
   
@@ -129,7 +130,7 @@ export default function CheckoutForm() {
     }
   };
 
-  const handlePlaceOrder = async () => {
+const handlePlaceOrder = async () => {
     if (!isOnline) return toast.error('No internet connection');
     if (!selectedAddress) return toast.error('Select an address');
     
@@ -140,60 +141,72 @@ export default function CheckoutForm() {
     setRetryCount(0);
 
     try {
-      // 1. Generate Idempotency Key (UUID)
-      // This ensures if the network retries, the backend won't double charge
       const idempotencyKey = crypto.randomUUID(); 
 
       const payload = {
         addressId: selectedAddress.id,
         restaurantId: cartItems[0].restaurantId,
         items: cartItems.map((i) => ({ id: i.id, quantity: i.quantity })),
+        // Backend should support paymentMethod in CreateOrderDto ideally, 
+        // if not, we create order first then pay.
       };
 
+      // 1. Create Order
       const res = await fetch(`${API_URL}/users/orders`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${session.access_token}`,
-          'Idempotency-Key': idempotencyKey, // <-- Sent to backend
+          'Idempotency-Key': idempotencyKey,
         },
         body: JSON.stringify(payload),
       });
 
       const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Order failed');
 
-      if (!res.ok) {
-        if (res.status === 409) throw new Error('Order already processing');
-        throw new Error(data.message || 'Order failed');
+      // 2. Handle Payment
+      if (selectedPaymentMethod.type === 'CASH') {
+        await Swal.fire({
+          icon: 'success',
+          title: 'Order Placed!',
+          text: `Order #${data.id.slice(0, 8)} confirmed. Pay cash on delivery.`,
+          confirmButtonColor: '#EAB308',
+        });
+        clearCart();
+        router.push(`/profile/orders/${data.id}`);
+      } else {
+        // Initialize Online Payment
+        localStorage.setItem('pending_checkout', 'true');
+        localStorage.setItem('last_order_id', data.id);
+        
+        const paymentPayload: InitiatePaymentPayload = {
+          amount: data.total, // Ensure backend returns total
+          email: session.user.email || 'customer@example.com',
+          gateway: selectedPaymentMethod.gateway as any,
+          method: 'CARD',
+          type: 'ORDER',
+          orderId: data.id,
+        };
+
+        const paymentRes = await paymentService.initiatePayment(paymentPayload);
+        
+        if (paymentRes.authorizationUrl) {
+           window.location.href = paymentRes.authorizationUrl;
+        } else {
+           throw new Error('Payment initialization failed');
+        }
       }
-
-      // 2. Success: Use Backend Total
-      // The backend calculated the exact distance fee. Use that total.
-      const finalTotal = data.total;
-
-      await Swal.fire({
-        icon: 'success',
-        title: 'Order Placed!',
-        html: `
-          <div class="text-left space-y-2">
-             <p>Order <strong>#${data.id.slice(0, 8)}</strong> confirmed.</p>
-             <p>Total: <strong>₦${finalTotal.toLocaleString()}</strong></p>
-          </div>
-        `,
-        confirmButtonColor: '#EAB308',
-        confirmButtonText: 'View Order',
-      });
-
-      clearCart();
-      router.push(`/profile/orders/${data.id}`);
 
     } catch (error: any) {
       console.error(error);
       toast.error(error.message || 'Something went wrong');
-    } finally {
       setIsProcessing(false);
     }
   };
+
+
+
 
   if (!mounted) {
     return (

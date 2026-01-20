@@ -263,7 +263,7 @@ async getPaginatedStores(page: number, limit: number, type?: string) {
         id: p.id,
         name: p.name,
         price: p.price,
-        image: p.image,
+        image: p.images?.[0] || null,
         description: p.slug,
         category: { name: p.category.name },
         modifierGroups: p.modifierGroups.map((g) => ({

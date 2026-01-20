@@ -27,12 +27,17 @@ import { VendorSecurityNotificationsService } from './notifications/vendor-secur
 import { StorageModule } from '../storage/storage.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 
+// 👇 1. Services IMPORTS
+import { ActivityLogService } from 'src/common/services/activity-log.services';
+// Ensure this path points to where your StoresService actually is
+// import { StoresService } from './stores/stores.service'; 
+import { StoresService } from 'src/super-admin/vendors/vendors.service';
 @Module({
   imports: [
     PrismaModule,
     StorageModule,
     JwtModule,
-    MailModule,
+    MailModule, // Provides EmailProducer
     OtpModule,
     NotificationsModule,
   ],
@@ -51,6 +56,10 @@ import { NotificationsModule } from '../notifications/notifications.module';
     VendorService,
     VendorAuthService,
     NubanService,
+    
+    // 👇 2. VITAL: Add BOTH Services here
+    ActivityLogService, // Fixes the "?" at index [2]
+    StoresService,      // The service itself
   ],
   exports: [VendorSecurityNotificationsService, VendorOrdersStreamService],
 })
@@ -66,7 +75,6 @@ export class VendorModule implements OnModuleInit {
       { strict: false },
     );
 
-    // Set up the circular dependency
     vendorAuthService.setSecurityNotificationsService(
       securityNotificationsService,
     );

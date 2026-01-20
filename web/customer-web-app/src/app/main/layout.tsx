@@ -1,5 +1,5 @@
 import { HomeHeader } from '@/app/main/components/home/HomeHeader';
-import { AppFooter } from './components/layout/AppFooter';
+import  AppFooter  from './components/layout/AppFooter';
 import BottomNav from '@/app/main/components/layout/BottomNav';
 
 // Force all pages under /main to be dynamically rendered

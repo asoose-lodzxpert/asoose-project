@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { Search, MapPin, ChevronDown, Moon, Sun, Car, Package, Utensils, User, Bell, ShoppingBag } from 'lucide-react';
 import { useTheme } from 'next-themes';
@@ -28,14 +29,22 @@ export const HomeHeader = () => {
   const pathname = usePathname();
   const supabase = createClient();
 
-  // Condition to check if search should be visible (on main store page)
+  // Logic for Search visibility (Only on main store page)
   const isStorePage = pathname === '/main/store';
 
-  /**
-   * FIX: Helper to check if a link is active.
-   * Using .startsWith() ensures the tab stays active on sub-routes 
-   * (e.g., /main/store/restaurant-id)
-   */
+  // Logic for Address visibility (Store page AND Store detail pages)
+  const isStoreSection = pathname.startsWith('/main/store');
+
+  // NEW: Logic for Branding visibility (Ride, Delivery, Cart, Order, Checkout, Notifications)
+  const showBranding = [
+    '/main/ride', 
+    '/main/delivery', 
+    '/main/cart', 
+    '/main/orders', 
+    '/main/checkout',
+    '/main/notifications' // Added this route
+  ].some(path => pathname.startsWith(path));
+
   const isActive = (path: string) => pathname.startsWith(path);
 
   useEffect(() => {
@@ -114,29 +123,52 @@ export const HomeHeader = () => {
     <header className="sticky top-0 z-30 bg-white/80 dark:bg-[#0a0a0a]/90 backdrop-blur-xl border-b border-gray-100 dark:border-white/5 transition-colors duration-300">
       <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-6">
         
-        {/* LEFT: Logo & Address */}
+        {/* LEFT: Branding OR Address */}
         <div className="flex items-center gap-6">
-          <Link href="/main/profile" 
-            className="flex items-center gap-3 group min-w-fit hover:bg-gray-50 dark:hover:bg-white/5 p-2 rounded-xl transition-colors focus:outline-none focus:ring-2 focus:ring-yellow-500"
-            aria-label="Change delivery address"
-          >
-            <div className={`p-2 rounded-full transition-colors ${isActive('/main/profile') ? 'bg-yellow-500 shadow-lg shadow-yellow-500/20' : 'bg-yellow-500/10 group-hover:bg-yellow-500/20'}`}>
-              <MapPin className={`w-5 h-5 ${isActive('/main/profile') ? 'text-white' : 'text-yellow-500'}`} aria-hidden="true" />
-            </div>
-            <div className="hidden sm:block text-left">
-              <div className="text-[10px] text-gray-500 font-black uppercase tracking-widest leading-none mb-1">
-                Deliver to
+          
+          {/* 1. Branding (Visible on Ride, Delivery, Cart, Order, Checkout, Notifications) */}
+          {showBranding && (
+            <Link href="/" className="flex items-center gap-3 group">
+              <div className="w-9 h-9 relative transition-transform group-hover:scale-105">
+                <Image 
+                  src="/logo.png" 
+                  alt="Asoose Logo"
+                  width={36}
+                  height={36}
+                  className="object-cover"
+                  priority
+                />
               </div>
-              <div className="flex items-center gap-1 font-bold text-sm leading-none whitespace-nowrap max-w-[150px] sm:max-w-[200px] truncate dark:text-white">
-                {deliveryAddress ? (
-                   <>{deliveryAddress.label} - {deliveryAddress.details}</>
-                ) : (
-                   <span>Set Location</span>
-                )}
-                <ChevronDown className="w-4 h-4 text-gray-400 shrink-0" aria-hidden="true" />
+              <span className="text-lg font-black tracking-tight hidden sm:block text-zinc-900 dark:text-white">
+                Asoose Lodzxpert
+              </span>
+            </Link>
+          )}
+
+          {/* 2. Address (Visible only in Store Section) */}
+          {isStoreSection && (
+            <Link href="/main/profile" 
+              className="flex items-center gap-3 group min-w-fit hover:bg-gray-50 dark:hover:bg-white/5 p-2 rounded-xl transition-colors focus:outline-none focus:ring-2 focus:ring-yellow-500"
+              aria-label="Change delivery address"
+            >
+              <div className={`p-2 rounded-full transition-colors ${isActive('/main/profile') ? 'bg-yellow-500 shadow-lg shadow-yellow-500/20' : 'bg-yellow-500/10 group-hover:bg-yellow-500/20'}`}>
+                <MapPin className={`w-5 h-5 ${isActive('/main/profile') ? 'text-white' : 'text-yellow-500'}`} aria-hidden="true" />
               </div>
-            </div>
-          </Link>
+              <div className="hidden sm:block text-left">
+                <div className="text-[10px] text-gray-500 font-black uppercase tracking-widest leading-none mb-1">
+                  Deliver to
+                </div>
+                <div className="flex items-center gap-1 font-bold text-sm leading-none whitespace-nowrap max-w-[150px] sm:max-w-[200px] truncate dark:text-white">
+                  {deliveryAddress ? (
+                     <>{deliveryAddress.label} - {deliveryAddress.details}</>
+                  ) : (
+                     <span>Set Location</span>
+                  )}
+                  <ChevronDown className="w-4 h-4 text-gray-400 shrink-0" aria-hidden="true" />
+                </div>
+              </div>
+            </Link>
+          )}
         </div>
 
         {/* CENTER: Search Bar (Desktop) */}
@@ -173,7 +205,6 @@ export const HomeHeader = () => {
               <Package className="w-3.5 h-3.5" /> Send
             </Link>
             
-            {/* FIXED: isActive check now correctly uses '/main/checkout' */}
             <Link href="/main/checkout" className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-yellow-500 ${isActive('/main/checkout') ? 'bg-white dark:bg-zinc-800 text-yellow-500 shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}>
               <ShoppingBag className="w-3.5 h-3.5" /> Cart
             </Link>
@@ -204,9 +235,10 @@ export const HomeHeader = () => {
               )}
             </Link>
 
+            {/* Profile Icon - Only visible on Desktop (hidden md:block) */}
             <Link 
               href="/main/profile" 
-              className={`p-2 rounded-full hover:bg-gray-100 dark:hover:bg-white/10 transition-colors focus:outline-none focus:ring-2 focus:ring-yellow-500 ${isActive('/main/profile') ? 'text-yellow-500' : 'text-gray-500 dark:text-gray-400'}`}
+              className={`hidden md:block p-2 rounded-full hover:bg-gray-100 dark:hover:bg-white/10 transition-colors focus:outline-none focus:ring-2 focus:ring-yellow-500 ${isActive('/main/profile') ? 'text-yellow-500' : 'text-gray-500 dark:text-gray-400'}`}
               aria-label="View profile"
             >
               <User className="w-5 h-5" />

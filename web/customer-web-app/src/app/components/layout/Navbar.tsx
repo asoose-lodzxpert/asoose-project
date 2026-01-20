@@ -33,24 +33,27 @@ export default function Navbar() {
       darkMode ? 'bg-[#0a0a0a]/80 border-white/10' : 'bg-white/80 border-black/5'
     }`}>
       <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-        {/* Logo - Left side */}
-        <Link href="/" className="flex items-center gap-2 font-bold text-xl tracking-tight">
-          <div className="w-12 h-12">
+        {/* Logo Section */}
+        <Link href="/" className="flex items-center gap-3 group">
+          <div className="w-10 h-10 relative transition-transform group-hover:scale-105">
             <Image 
               src="/logo.png" 
               alt="Asoose Logo"
-              width={48}
-              height={48}
+              width={40}
+              height={40}
               className="object-cover"
               priority
             />
           </div>
+          {/* App Name - Hidden on small mobile, visible on sm+ */}
+          <span className={`text-lg font-black tracking-tight hidden sm:block ${darkMode ? 'text-white' : 'text-zinc-900'}`}>
+            Asoose 
+          </span>
         </Link>
 
-        {/* Desktop Links - Moved to right */}
+        {/* Desktop Links */}
         <div className="hidden md:flex items-center gap-8">
-          {/* Navigation Links */}
-          <div className="flex gap-8 text-sm font-bold uppercase tracking-wider">
+          <div className="flex gap-6 text-xs font-bold uppercase tracking-widest">
             {navLinks.map((link) => {
               const isActive = pathname === link.href;
               return (
@@ -58,7 +61,7 @@ export default function Navbar() {
                   key={link.name} 
                   href={link.href} 
                   className={`transition-colors hover:text-yellow-500 ${
-                    isActive ? 'text-yellow-500' : darkMode ? 'text-white' : 'text-black'
+                    isActive ? 'text-yellow-500' : darkMode ? 'text-zinc-300' : 'text-zinc-600'
                   }`}
                 >
                   {link.name}
@@ -67,23 +70,20 @@ export default function Navbar() {
             })}
           </div>
 
-          {/* Divider */}
           <div className={`h-6 w-px ${darkMode ? 'bg-white/20' : 'bg-black/10'}`} />
 
-          {/* Actions - Right side */}
           <div className="flex items-center gap-4">
             <button 
               onClick={() => setTheme(darkMode ? 'light' : 'dark')} 
-              className="p-2 hover:text-yellow-500 transition-colors"
+              className={`p-2 rounded-full transition-colors ${darkMode ? 'hover:bg-white/10 text-zinc-400' : 'hover:bg-black/5 text-zinc-600'}`}
               aria-label="Toggle theme"
             >
               {darkMode ? <Sun size={18} /> : <Moon size={18} />}
             </button>
             
-            {/* Sign-up button */}
             <Link 
               href="/sign-up" 
-              className="bg-yellow-400 text-black px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-yellow-300 transition-all active:scale-95"
+              className="bg-yellow-400 text-black px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-yellow-300 transition-all active:scale-95 "
             >
               Sign up
             </Link>
@@ -92,18 +92,21 @@ export default function Navbar() {
 
         {/* Mobile menu button */}
         <button 
-          className="md:hidden" 
+          className="md:hidden p-2" 
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
           aria-label="Toggle mobile menu"
         >
-          {isMobileMenuOpen ? <X size={20}/> : <Menu size={20}/>}
+          {isMobileMenuOpen ? 
+            <X size={24} className={darkMode ? 'text-white' : 'text-black'}/> : 
+            <Menu size={24} className={darkMode ? 'text-white' : 'text-black'}/>
+          }
         </button>
       </div>
 
       {/* Mobile Menu Overlay */}
       {isMobileMenuOpen && (
-        <div className={`md:hidden fixed top-16 left-0 right-0 p-6 border-b shadow-xl ${darkMode ? 'bg-[#0a0a0a] border-white/10' : 'bg-white border-black/5'}`}>
-          <div className="flex flex-col gap-6 font-bold uppercase tracking-widest text-sm">
+        <div className={`md:hidden fixed top-16 left-0 right-0 border-b shadow-2xl animate-in slide-in-from-top-5 ${darkMode ? 'bg-[#0a0a0a] border-white/10' : 'bg-white border-black/5'}`}>
+          <div className="p-6 flex flex-col gap-6 font-bold uppercase tracking-widest text-sm">
             {navLinks.map((link) => {
               const isActive = pathname === link.href;
               return (
@@ -111,31 +114,30 @@ export default function Navbar() {
                   key={link.name} 
                   href={link.href} 
                   onClick={() => setIsMobileMenuOpen(false)}
-                  className={`transition-colors ${isActive ? 'text-yellow-500' : darkMode ? 'text-white' : 'text-black'}`}
+                  className={`transition-colors ${isActive ? 'text-yellow-500' : darkMode ? 'text-zinc-300' : 'text-zinc-600'}`}
                 >
                   {link.name}
                 </Link>
               );
             })}
             
-            {/* Mobile theme toggle */}
-            <button 
-              onClick={() => {
-                setTheme(darkMode ? 'light' : 'dark');
-                setIsMobileMenuOpen(false);
-              }} 
-              className="flex items-center gap-3 p-2 hover:text-yellow-500 transition-colors"
-              aria-label="Toggle theme"
-            >
-              {darkMode ? <Sun size={18} /> : <Moon size={18} />}
-              <span>{darkMode ? 'Light Mode' : 'Dark Mode'}</span>
-            </button>
+            <div className={`h-px w-full ${darkMode ? 'bg-white/10' : 'bg-black/5'}`} />
 
-            {/* Mobile sign-up button */}
+            <div className="flex items-center justify-between">
+               <span className={darkMode ? 'text-zinc-400' : 'text-zinc-600'}>Theme</span>
+               <button 
+                onClick={() => setTheme(darkMode ? 'light' : 'dark')} 
+                className="flex items-center gap-2 p-2 rounded-lg bg-yellow-500/10 text-yellow-500"
+              >
+                {darkMode ? <Sun size={18} /> : <Moon size={18} />}
+                <span className="text-xs">{darkMode ? 'Light' : 'Dark'}</span>
+              </button>
+            </div>
+
             <Link 
               href="/sign-up" 
               onClick={() => setIsMobileMenuOpen(false)}
-              className="bg-yellow-400 text-black px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-yellow-300 transition-all active:scale-95 text-center"
+              className="bg-yellow-400 text-black w-full py-3 rounded-xl text-sm font-bold hover:bg-yellow-300 transition-all text-center"
             >
               Sign up
             </Link>
