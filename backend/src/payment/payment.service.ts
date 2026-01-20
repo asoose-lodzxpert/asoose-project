@@ -663,6 +663,113 @@ export class PaymentService {
     }
   }
 
+  /**
+   * Handle Monnify Refund Webhook
+   * Called when a refund is completed on Monnify
+   */
+  async handleMonnifyRefundWebhook(
+    payload: any,
+    signature: string,
+  ): Promise<void> {
+    // Verify webhook signature
+    const isValid = this.monnifyService.verifyWebhookSignature(
+      payload,
+      signature,
+    );
+
+    if (!isValid) {
+      this.logger.warn('Invalid Monnify refund webhook signature');
+      throw new BadRequestException('Invalid webhook signature');
+    }
+
+    // Extract refund data from payload
+    const {
+      eventType,
+      eventData,
+    }: {
+      eventType: string;
+      eventData: {
+        transactionReference: string;
+        refundReference: string;
+        refundAmount: number;
+        refundStatus: string;
+        destinationAccountNumber: string;
+        destinationBankCode: string;
+        completedOn?: string;
+      };
+    } = payload;
+
+    this.logger.log(`Monnify refund webhook: ${eventType}`, eventData);
+
+    // Only process successful refund completions
+    if (eventType !== 'SUCCESSFUL_REFUND') {
+      this.logger.log(`Ignoring refund event type: ${eventType}`);
+      return;
+    }
+
+    try {
+      // Find the original payment by reference
+      const payment = await this.prisma.payment.findUnique({
+        where: { reference: eventData.transactionReference },
+        include: {
+          order: {
+            include: {
+              user: true,
+              store: true,
+            },
+          },
+        },
+      });
+
+      if (!payment) {
+        this.logger.warn(
+          `Payment not found for refund: ${eventData.transactionReference}`,
+        );
+        return;
+      }
+
+      // Update payment record with refund info
+      await this.prisma.payment.update({
+        where: { id: payment.id },
+        data: {
+          status: 'REFUNDED' as any,
+          metadata: {
+            ...((payment.metadata as Record<string, any>) || {}),
+            refund: {
+              refundReference: eventData.refundReference,
+              refundAmount: eventData.refundAmount,
+              refundStatus: eventData.refundStatus,
+              completedOn: eventData.completedOn,
+            },
+          },
+        },
+      });
+
+      // Send refund notification to customer
+      if (payment.order?.userId) {
+        await this.notificationsService.create({
+          userId: payment.order.userId,
+          title: 'Refund Processed',
+          message: `Your refund of ₦${eventData.refundAmount.toLocaleString()} has been processed successfully.`,
+          type: 'REFUND_SUCCESS',
+          metadata: {
+            orderId: payment.orderId,
+            reference: payment.reference,
+            refundReference: eventData.refundReference,
+            refundAmount: eventData.refundAmount,
+          },
+        });
+      }
+
+      this.logger.log(
+        `Refund processed successfully: ${eventData.refundReference}`,
+      );
+    } catch (error) {
+      this.logger.error('Error processing Monnify refund webhook:', error);
+      throw error;
+    }
+  }
+
   private generateReference(prefix = 'PAY'): string {
     return `${prefix}-${Date.now()}-${Math.random().toString(36).substring(7).toUpperCase()}`;
   }

@@ -9,6 +9,7 @@ import {
   Get,
   Query,
   Req,
+  Logger,
 } from '@nestjs/common';
 import type { RawBodyRequest } from '@nestjs/common';
 import { PaymentService } from './payment.service';
@@ -27,6 +28,8 @@ import { Request } from 'express';
 
 @Controller('payment')
 export class PaymentController {
+  private readonly logger = new Logger(PaymentController.name);
+
   constructor(private readonly paymentService: PaymentService) {}
 
   @Post('initialize')
@@ -79,10 +82,11 @@ export class PaymentController {
     return { status: 'success' };
   }
 
-  // Monnify Webhook
-  @Post('webhook/monnify')
+  // Monnify Webhooks
+  // Transaction Completion Webhook
+  @Post('webhook/monnify/transaction')
   @HttpCode(HttpStatus.OK)
-  async monnifyWebhook(
+  async monnifyTransactionWebhook(
     @Req() req: RawBodyRequest<Request>,
     @Headers('monnify-signature') signature: string,
   ) {
@@ -92,6 +96,84 @@ export class PaymentController {
       payload,
       signature,
     );
+    return { status: 'success' };
+  }
+
+  // Refund Completion Webhook
+  @Post('webhook/monnify/refund')
+  @HttpCode(HttpStatus.OK)
+  async monnifyRefundWebhook(
+    @Req() req: RawBodyRequest<Request>,
+    @Headers('monnify-signature') signature: string,
+  ) {
+    const payload = req.body;
+    this.logger.log('Monnify Refund Webhook received:', payload);
+    await this.paymentService.handleMonnifyRefundWebhook(payload, signature);
+    return { status: 'success' };
+  }
+
+  // Disbursement Webhook (for payouts to vendors/riders)
+  @Post('webhook/monnify/disbursement')
+  @HttpCode(HttpStatus.OK)
+  async monnifyDisbursementWebhook(
+    @Req() req: RawBodyRequest<Request>,
+    @Headers('monnify-signature') signature: string,
+  ) {
+    const payload = req.body;
+    this.logger.log('Monnify Disbursement Webhook received');
+    // TODO: Implement disbursement webhook handling
+    return { status: 'success' };
+  }
+
+  // Settlement Webhook
+  @Post('webhook/monnify/settlement')
+  @HttpCode(HttpStatus.OK)
+  async monnifySettlementWebhook(
+    @Req() req: RawBodyRequest<Request>,
+    @Headers('monnify-signature') signature: string,
+  ) {
+    const payload = req.body;
+    this.logger.log('Monnify Settlement Webhook received');
+    // TODO: Implement settlement webhook handling
+    return { status: 'success' };
+  }
+
+  // Mandate Webhook (for recurring payments)
+  @Post('webhook/monnify/mandate')
+  @HttpCode(HttpStatus.OK)
+  async monnifyMandateWebhook(
+    @Req() req: RawBodyRequest<Request>,
+    @Headers('monnify-signature') signature: string,
+  ) {
+    const payload = req.body;
+    this.logger.log('Monnify Mandate Webhook received');
+    // TODO: Implement mandate webhook handling
+    return { status: 'success' };
+  }
+
+  // Wallet Activity Notification Webhook
+  @Post('webhook/monnify/wallet-activity')
+  @HttpCode(HttpStatus.OK)
+  async monnifyWalletActivityWebhook(
+    @Req() req: RawBodyRequest<Request>,
+    @Headers('monnify-signature') signature: string,
+  ) {
+    const payload = req.body;
+    this.logger.log('Monnify Wallet Activity Webhook received');
+    // TODO: Implement wallet activity webhook handling
+    return { status: 'success' };
+  }
+
+  // Low Balance Notification Webhook
+  @Post('webhook/monnify/low-balance')
+  @HttpCode(HttpStatus.OK)
+  async monnifyLowBalanceWebhook(
+    @Req() req: RawBodyRequest<Request>,
+    @Headers('monnify-signature') signature: string,
+  ) {
+    const payload = req.body;
+    this.logger.log('Monnify Low Balance Webhook received');
+    // TODO: Implement low balance notification handling
     return { status: 'success' };
   }
 
