@@ -4,12 +4,15 @@ import {
   OnGatewayConnection,
   OnGatewayDisconnect,
   OnGatewayInit,
+  SubscribeMessage,
+  MessageBody,
+  ConnectedSocket,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 
-// ✅ FIX: Explicit CORS configuration for Socket.IO
+// Explicit CORS configuration for Socket.IO
 @WebSocketGateway({
   cors: {
     origin: process.env.CORS_ORIGIN 
@@ -81,21 +84,43 @@ export class NotificationsGateway
     }
   }
 
+  /**
+   * Allow clients to join a specific order room for tracking
+   */
+  @SubscribeMessage('joinOrderRoom')
+  handleJoinOrderRoom(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { orderId: string },
+  ) {
+    if (data && data.orderId) {
+      const roomName = `order_${data.orderId}`;
+      client.join(roomName);
+      this.logger.log(`User ${client.data.userId} joined room: ${roomName}`);
+      return { event: 'joinedRoom', room: roomName };
+    }
+  }
 
   sendToUser(userId: string, payload: any) {
     this.server.to(`user_${userId}`).emit('notification', payload);
   }
 
-  // Vendors and Riders likely share the same User ID system in your DB, 
-  // but if they have distinct "Vendor IDs" vs "User IDs", keep these methods.
-  // Otherwise, sendToUser works for all of them if they are in the 'user_{id}' room.
-  
   sendToVendor(vendorId: string, payload: any) {
     this.server.to(`user_${vendorId}`).emit('notification', payload);
   }
 
   sendToRider(riderId: string, payload: any) {
     this.server.to(`user_${riderId}`).emit('notification', payload);
+  }
+
+  /**
+   * Emit real-time order updates to anyone tracking this order
+   */
+  sendOrderUpdate(orderId: string, payload: any) {
+    // 1. Emit to the specific event listener expected by frontend hooks
+    this.server.emit(`order_update_${orderId}`, payload);
+    
+    // 2. Also emit to the standard room for scalability
+    this.server.to(`order_${orderId}`).emit('order_update', payload);
   }
 
   private extractToken(client: Socket): string | null {
