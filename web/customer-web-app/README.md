@@ -6,13 +6,14 @@ A Next.js-based web application for managing customer orders, rides, and marketp
 
 ### Prerequisites
 
-- Node.js 18+ 
+- Node.js 18+
 - Yarn or npm
 - Backend API running (see `backend/README.md`)
 
 ### Installation
 
 1. **Install dependencies:**
+
    ```bash
    yarn install
    # or
@@ -20,31 +21,33 @@ A Next.js-based web application for managing customer orders, rides, and marketp
    ```
 
 2. **Configure environment variables:**
+
    ```bash
    # Copy the example environment file
    cp .env.example .env
-   
+
    # Or create .env.local for local development
    cp .env.example .env.local
    ```
 
 3. **Update environment variables:**
-   
+
    Edit `.env` or `.env.local` with your configuration:
-   
+
    ```env
    # Backend API URL
    NEXT_PUBLIC_API_URL=http://localhost:3001/api
-   
+
    # Google Maps API Key (required for maps features)
    NEXT_PUBLIC_GOOGLE_MAPS_KEY=your_google_maps_api_key
-   
+
    # Supabase (legacy - optional if migrating from Supabase)
    NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
    NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_key
    ```
 
 4. **Run the development server:**
+
    ```bash
    yarn dev
    # or
@@ -52,19 +55,19 @@ A Next.js-based web application for managing customer orders, rides, and marketp
    ```
 
 5. **Open your browser:**
-   
+
    Navigate to [http://localhost:3000](http://localhost:3000)
 
 ## 📋 Environment Variables
 
-| Variable | Required | Description | Default |
-|----------|----------|-------------|---------|
-| `NEXT_PUBLIC_API_URL` | ✅ Yes | Backend API endpoint | `http://localhost:3001/api` |
-| `NEXT_PUBLIC_GOOGLE_MAPS_KEY` | ✅ Yes | Google Maps API key for maps/geocoding | - |
-| `NEXT_PUBLIC_SUPABASE_URL` | ⚠️ Optional | Supabase project URL (legacy) | - |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | ⚠️ Optional | Supabase anon key (legacy) | - |
-| `NEXT_PUBLIC_APP_URL` | ⚠️ Optional | App URL for redirects | `http://localhost:3000` |
-| `NEXT_PUBLIC_APP_NAME` | ⚠️ Optional | Application name | `Asoose Customer Portal` |
+| Variable                        | Required    | Description                            | Default                     |
+| ------------------------------- | ----------- | -------------------------------------- | --------------------------- |
+| `NEXT_PUBLIC_API_URL`           | ✅ Yes      | Backend API endpoint                   | `http://localhost:3001/api` |
+| `NEXT_PUBLIC_GOOGLE_MAPS_KEY`   | ✅ Yes      | Google Maps API key for maps/geocoding | -                           |
+| `NEXT_PUBLIC_SUPABASE_URL`      | ⚠️ Optional | Supabase project URL (legacy)          | -                           |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | ⚠️ Optional | Supabase anon key (legacy)             | -                           |
+| `NEXT_PUBLIC_APP_URL`           | ⚠️ Optional | App URL for redirects                  | `http://localhost:3000`     |
+| `NEXT_PUBLIC_APP_NAME`          | ⚠️ Optional | Application name                       | `Asoose Customer Portal`    |
 
 ### Getting API Keys
 
@@ -124,16 +127,19 @@ yarn test             # Run tests (if configured)
 ## 🐛 Troubleshooting
 
 ### Build fails with "prerender error"
+
 - Ensure `.env` file exists with required variables
 - Check that API endpoints are accessible
 - For client-only pages, add `export const dynamic = 'force-dynamic'`
 
 ### Maps not loading
+
 - Verify `NEXT_PUBLIC_GOOGLE_MAPS_KEY` is set correctly
 - Check Google Maps API is enabled in console
 - Ensure billing is enabled (required for Maps API)
 
 ### API requests failing
+
 - Confirm backend is running on the configured port
 - Check `NEXT_PUBLIC_API_URL` matches backend URL
 - Verify CORS is configured in backend for your domain
