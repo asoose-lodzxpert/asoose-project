@@ -62,3 +62,64 @@ export async function fetchWithAuth(url: string, options: RequestInit = {}) {
 export async function fetchCurrentUser() {
   return await fetchWithAuth(`${process.env.EXPO_PUBLIC_API_URL}/riders/me`);
 }
+
+export async function fetchWithAuthMultipart(url: string, formData: FormData) {
+  const accessToken = await getAccessToken();
+
+  if (!accessToken) throw new Error("No access token");
+
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${accessToken}`,
+    "ngrok-skip-browser-warning": "true",
+    // Don't set Content-Type - let browser set it with boundary for multipart/form-data
+  };
+
+  const res = await fetch(url, {
+    method: "POST",
+    body: formData,
+    headers,
+  });
+
+  if (res.status === 401) {
+    try {
+      if (!isRefreshing) {
+        isRefreshing = true;
+        refreshPromise = refreshAccessToken();
+      }
+
+      const newAccessToken = await refreshPromise;
+      isRefreshing = false;
+      refreshPromise = null;
+
+      const retryHeaders: Record<string, string> = {
+        Authorization: `Bearer ${newAccessToken}`,
+        "ngrok-skip-browser-warning": "true",
+      };
+
+      const retryRes = await fetch(url, {
+        method: "POST",
+        body: formData,
+        headers: retryHeaders,
+      });
+
+      if (!retryRes.ok) {
+        const error = await retryRes.json().catch(() => ({}));
+        throw new Error(error.message || "Request failed");
+      }
+
+      return retryRes.json();
+    } catch (refreshError) {
+      isRefreshing = false;
+      refreshPromise = null;
+
+      throw new Error("Session expired. Please login again.");
+    }
+  }
+
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({}));
+    throw new Error(error.message || "Request failed");
+  }
+
+  return res.json();
+}

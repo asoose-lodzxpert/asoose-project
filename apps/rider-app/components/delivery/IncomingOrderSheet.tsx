@@ -5,47 +5,50 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { useDelivery } from "@/context/DeliveryContext";
 
+const AUTO_DECLINE_TIMEOUT = 90;
+
 export default function IncomingOrderSheet() {
-  const { incomingOrder, acceptOrder, declineOrder, setStatus, status } =
-    useDelivery();
+  const { incomingOrder, acceptOrder, declineOrder } = useDelivery();
 
   const primary = useThemeColor({}, "brandPrimary");
   const surface = useThemeColor({}, "surfaceBackground");
   const danger = useThemeColor({}, "statusError");
 
-  const [timer, setTimer] = useState(90); // 90 seconds countdown
+  const [timer, setTimer] = useState(AUTO_DECLINE_TIMEOUT);
   const [loadingAccept, setLoadingAccept] = useState(false);
 
   useEffect(() => {
     if (!incomingOrder) return;
 
-    // Countdown interval
+    setTimer(AUTO_DECLINE_TIMEOUT);
+
     const interval = setInterval(() => {
-      setTimer((prev) => prev - 1);
+      setTimer((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          declineOrder();
+          return 0;
+        }
+        return prev - 1;
+      });
     }, 1000);
 
     return () => clearInterval(interval);
   }, [incomingOrder]);
 
-  // Auto-decline when timer hits 0
-  useEffect(() => {
-    if (timer <= 0 && incomingOrder) {
-      declineOrder();
-      // if (status === "online-waiting") setStatus("online-waiting");
-    }
-  }, [timer, incomingOrder, declineOrder, setStatus]);
-
   if (!incomingOrder) return null;
 
   const handleAccept = async () => {
     setLoadingAccept(true);
-    await acceptOrder(incomingOrder.id);
-    setLoadingAccept(false);
+    try {
+      await acceptOrder(incomingOrder.id);
+    } catch (error) {
+      setLoadingAccept(false);
+    }
   };
 
   const handleDecline = async () => {
     await declineOrder();
-    setStatus("online-waiting");
   };
 
   const minutes = Math.floor(timer / 60);

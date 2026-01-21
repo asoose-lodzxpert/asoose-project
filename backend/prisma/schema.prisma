@@ -82,7 +82,9 @@ enum DeliveryStatus {
   PENDING      // Payment not yet confirmed
   REQUESTED    // Payment confirmed, searching for rider
   ASSIGNED     // Rider assigned
+  ACCEPTED     // Rider accepted the delivery
   PICKED_UP    // Package picked up
+  IN_TRANSIT   // Package in transit to customer
   DELIVERED    // Package delivered
   CANCELLED    // Delivery cancelled
 }

@@ -7,20 +7,37 @@ import {
   Patch,
   Body,
   Post,
+  UseInterceptors,
+  UploadedFile,
+  BadRequestException,
+  Sse,
+  MessageEvent,
+  Request,
 } from '@nestjs/common';
+import { Observable } from 'rxjs';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guards';
 import { Roles } from '../auth/roles.decorator';
 import { UserRole } from '../common/enums/user-role.enum';
 import { RidersService } from './riders.service';
+import { RidersStreamService } from './riders-stream.service';
 import { UpdateBankAccountDto } from './dto/update-bank-account.dto';
 import { UpdateNotificationSettingsDto } from './dto/update-notification-settings.dto';
 import { UpdatePersonalInfoDto } from './dto/update-personal-info.dto';
 import { CreateWithdrawalDto } from './dto/create-withdrawal.dto';
+import { UpdateRiderStatusDto } from './dto/update-status.dto';
+import { AcceptDeliveryDto } from './dto/accept-delivery.dto';
+import { CompleteDeliveryDto } from './dto/complete-delivery.dto';
+import { StorageService } from '../storage/storage.service';
 
 @Controller('riders')
 export class RidersController {
-  constructor(private readonly ridersService: RidersService) {}
+  constructor(
+    private readonly ridersService: RidersService,
+    private readonly storageService: StorageService,
+    private readonly streamService: RidersStreamService,
+  ) {}
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.RIDER)
@@ -28,6 +45,54 @@ export class RidersController {
   async getCurrentRider(@Req() req) {
     const { id } = req.user || {};
     return this.ridersService.getRiderProfile(id);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.RIDER, UserRole.DRIVER)
+  @Sse('stream')
+  streamEvents(@Request() req): Observable<MessageEvent> {
+    const riderId = req.user.id;
+    return this.streamService.getRiderStream(riderId);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.RIDER, UserRole.DRIVER)
+  @Patch('status')
+  async updateStatus(@Req() req, @Body() dto: UpdateRiderStatusDto) {
+    const { id } = req.user || {};
+    return this.ridersService.updateRiderStatus(id, dto);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.RIDER, UserRole.DRIVER)
+  @Post('deliveries/accept')
+  async acceptDelivery(@Req() req, @Body() dto: AcceptDeliveryDto) {
+    const { id } = req.user || {};
+    return this.ridersService.acceptDelivery(id, dto);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.RIDER, UserRole.DRIVER)
+  @Patch('deliveries/:id/pickup')
+  async confirmPickup(@Req() req, @Query('deliveryId') deliveryId: string) {
+    const { id } = req.user || {};
+    return this.ridersService.confirmPickup(id, deliveryId);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.RIDER, UserRole.DRIVER)
+  @Post('deliveries/complete')
+  async completeDelivery(@Req() req, @Body() dto: CompleteDeliveryDto) {
+    const { id } = req.user || {};
+    return this.ridersService.completeDelivery(id, dto);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.RIDER, UserRole.DRIVER)
+  @Get('deliveries/active')
+  async getActiveDelivery(@Req() req) {
+    const { id } = req.user || {};
+    return this.ridersService.getActiveDelivery(id);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -104,6 +169,42 @@ export class RidersController {
   ) {
     const { id } = req.user || {};
     return this.ridersService.updatePersonalInfo(id, updateData);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.RIDER)
+  @Post('upload-profile-image')
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadProfileImage(
+    @Req() req,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    if (!file) {
+      throw new BadRequestException('No file provided');
+    }
+
+    // Validate file size (5MB max)
+    const MAX_SIZE = 5 * 1024 * 1024;
+    if (file.size > MAX_SIZE) {
+      throw new BadRequestException('File size exceeds 5MB limit');
+    }
+
+    // Validate file type (images only)
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg'];
+    if (!allowedTypes.includes(file.mimetype)) {
+      throw new BadRequestException(
+        'Invalid file type. Only JPG and PNG images are allowed',
+      );
+    }
+
+    // Upload file to storage
+    const result = await this.storageService.uploadFile(file);
+
+    // Update rider's image field
+    const { id } = req.user || {};
+    await this.ridersService.updateRiderImage(id, result.signedUrl);
+
+    return { imageUrl: result.signedUrl };
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)

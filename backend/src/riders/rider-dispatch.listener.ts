@@ -3,6 +3,7 @@ import { OnEvent } from '@nestjs/event-emitter';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationFacade } from '../users/notification.facade';
 import { TripsService } from '../users/trips/trips.service';
+import { RidersStreamService } from './riders-stream.service';
 
 @Injectable()
 export class RiderDispatchListener {
@@ -12,6 +13,7 @@ export class RiderDispatchListener {
     private prisma: PrismaService,
     private notificationFacade: NotificationFacade,
     private tripsService: TripsService,
+    private ridersStreamService: RidersStreamService,
   ) {}
 
   @OnEvent('order.ready')
@@ -45,10 +47,27 @@ export class RiderDispatchListener {
 
     const selectedRider = nearbyRiders[0];
 
-    // Use TripsService to assign driver (includes real-time customer notification)
     await this.tripsService.assignDriver(order.delivery.id, selectedRider.id);
 
-    // Notify the rider about the new assignment
+    const deliveryData = {
+      id: order.delivery.id,
+      orderId: payload.orderId,
+      storeName: order.store.name,
+      storeAddress: order.store.address,
+      customerName: order.delivery.recipientName,
+      customerPhone: order.delivery.recipientPhone,
+      deliveryFee: order.delivery.deliveryFee,
+      packageDetails: order.delivery.packageDetails,
+      pickupAddress: order.delivery.pickupAddressId,
+      dropoffAddress: order.delivery.dropoffAddressId,
+    };
+
+    this.ridersStreamService.emitDeliveryAssigned(
+      selectedRider.id,
+      order.delivery.id,
+      deliveryData,
+    );
+
     await this.notificationFacade.notifyRider(
       selectedRider.id,
       'New Delivery Assigned',

@@ -2,11 +2,9 @@ import { Module, Global } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
 import { RedisService } from './redis.service';
+import { MATCHING_REDIS_CLIENT } from './redis.constants';
 
-// Use a distinct token for the matching system Redis client to avoid
-// colliding with the application's global Redis provider (which uses
-// the 'REDIS_CLIENT' token).
-export const MATCHING_REDIS_CLIENT = 'MATCHING_REDIS_CLIENT';
+export { MATCHING_REDIS_CLIENT } from './redis.constants';
 
 @Global()
 @Module({
@@ -19,7 +17,7 @@ export const MATCHING_REDIS_CLIENT = 'MATCHING_REDIS_CLIENT';
           host: configService.get('REDIS_HOST', 'localhost'),
           port: configService.get('REDIS_PORT', 6379),
           password: configService.get('REDIS_PASSWORD'),
-          db: configService.get('MATCHING_REDIS_DB', 1), // Use separate DB for matching system (default: 1)
+          db: configService.get('MATCHING_REDIS_DB', 1),
           retryStrategy: (times) => {
             const delay = Math.min(times * 50, 2000);
             return delay;
@@ -53,4 +51,4 @@ export const MATCHING_REDIS_CLIENT = 'MATCHING_REDIS_CLIENT';
   ],
   exports: [MATCHING_REDIS_CLIENT, RedisService],
 })
-export class RedisModule {}
+export class MatchingRedisModule {}

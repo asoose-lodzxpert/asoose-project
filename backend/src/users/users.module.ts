@@ -43,6 +43,6 @@ import { VendorModule } from 'src/vendor/vendor.module';
     InventoryService,
     NotificationFacade,
   ],
-  exports: [UsersService, AddressesService],
+  exports: [UsersService, AddressesService, NotificationFacade],
 })
 export class UsersModule {}

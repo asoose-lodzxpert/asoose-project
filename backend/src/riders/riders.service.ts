@@ -8,10 +8,18 @@ import { UpdateBankAccountDto } from './dto/update-bank-account.dto';
 import { UpdateNotificationSettingsDto } from './dto/update-notification-settings.dto';
 import { UpdatePersonalInfoDto } from './dto/update-personal-info.dto';
 import { CreateWithdrawalDto } from './dto/create-withdrawal.dto';
+import { UpdateRiderStatusDto } from './dto/update-status.dto';
+import { AcceptDeliveryDto } from './dto/accept-delivery.dto';
+import { CompleteDeliveryDto } from './dto/complete-delivery.dto';
+import { RidersStreamService } from './riders-stream.service';
+import { DeliveryStatus } from '@prisma/client';
 
 @Injectable()
 export class RidersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly streamService: RidersStreamService,
+  ) {}
 
   async getRiderProfile(riderId: string) {
     const rider = await this.prisma.rider.findUnique({
@@ -447,6 +455,26 @@ export class RidersService {
     };
   }
 
+  async updateRiderImage(riderId: string, imageUrl: string) {
+    const rider = await this.prisma.rider.findUnique({
+      where: { id: riderId },
+    });
+
+    if (!rider) {
+      throw new NotFoundException('Rider not found');
+    }
+
+    await this.prisma.rider.update({
+      where: { id: riderId },
+      data: { image: imageUrl },
+    });
+
+    return {
+      message: 'Profile image updated successfully',
+      imageUrl,
+    };
+  }
+
   // Withdrawal methods
   async getWithdrawalInfo(riderId: string) {
     const rider = await this.prisma.rider.findUnique({
@@ -746,6 +774,281 @@ export class RidersService {
         total,
         totalPages: Math.ceil(total / limit),
       },
+    };
+  }
+
+  async updateRiderStatus(riderId: string, dto: UpdateRiderStatusDto) {
+    const rider = await this.prisma.rider.findUnique({
+      where: { id: riderId },
+    });
+
+    if (!rider) {
+      throw new NotFoundException('Rider not found');
+    }
+
+    const updated = await this.prisma.rider.update({
+      where: { id: riderId },
+      data: {
+        isOnline: dto.isOnline,
+        currentLat: dto.currentLat,
+        currentLng: dto.currentLng,
+      },
+    });
+
+    return {
+      success: true,
+      isOnline: updated.isOnline,
+      message: updated.isOnline
+        ? 'You are now online and available for deliveries'
+        : 'You are now offline',
+    };
+  }
+
+  async getActiveDelivery(riderId: string) {
+    const delivery = await this.prisma.delivery.findFirst({
+      where: {
+        riderId,
+        status: {
+          in: [
+            DeliveryStatus.ASSIGNED,
+            DeliveryStatus.ACCEPTED,
+            DeliveryStatus.PICKED_UP,
+            DeliveryStatus.IN_TRANSIT,
+          ],
+        },
+      },
+      include: {
+        pickupAddress: {
+          select: {
+            id: true,
+            street: true,
+            city: true,
+            state: true,
+            lat: true,
+            lng: true,
+          },
+        },
+        dropoffAddress: {
+          select: {
+            id: true,
+            street: true,
+            city: true,
+            state: true,
+            lat: true,
+            lng: true,
+          },
+        },
+        order: {
+          include: {
+            store: {
+              select: {
+                id: true,
+                name: true,
+                address: true,
+              },
+            },
+            items: {
+              include: {
+                product: {
+                  select: {
+                    name: true,
+                    images: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!delivery) {
+      return null;
+    }
+
+    return {
+      id: delivery.id,
+      orderId: delivery.orderId,
+      status: delivery.status,
+      pickupAddress: delivery.pickupAddress,
+      dropoffAddress: delivery.dropoffAddress,
+      vendorName: delivery.order?.store?.name || 'Unknown',
+      customerName: delivery.recipientName,
+      customerPhone: delivery.recipientPhone,
+      deliveryFee: delivery.deliveryFee,
+      packageDetails: delivery.packageDetails,
+      deliveryOtp: delivery.deliveryOtp,
+      items: delivery.order?.items?.map((item) => ({
+        name: item.product?.name || 'Unknown',
+        quantity: item.quantity,
+        image: item.product?.images?.[0] || null,
+      })),
+      assignedAt: delivery.assignedAt,
+      pickedUpAt: delivery.pickedUpAt,
+    };
+  }
+
+  async acceptDelivery(riderId: string, dto: AcceptDeliveryDto) {
+    const delivery = await this.prisma.delivery.findUnique({
+      where: { id: dto.deliveryId },
+      include: {
+        pickupAddress: true,
+        dropoffAddress: true,
+        order: {
+          include: {
+            store: true,
+          },
+        },
+      },
+    });
+
+    if (!delivery) {
+      throw new NotFoundException('Delivery not found');
+    }
+
+    if (delivery.riderId !== riderId) {
+      throw new BadRequestException('This delivery is not assigned to you');
+    }
+
+    if (delivery.status !== DeliveryStatus.ASSIGNED) {
+      throw new BadRequestException(
+        `Cannot accept delivery with status: ${delivery.status}`,
+      );
+    }
+
+    const updated = await this.prisma.delivery.update({
+      where: { id: dto.deliveryId },
+      data: {
+        status: DeliveryStatus.ACCEPTED,
+      },
+    });
+
+    if (dto.currentLat && dto.currentLng) {
+      await this.prisma.rider.update({
+        where: { id: riderId },
+        data: {
+          currentLat: dto.currentLat,
+          currentLng: dto.currentLng,
+        },
+      });
+    }
+
+    this.streamService.emitDeliveryUpdate(riderId, delivery.id, {
+      status: DeliveryStatus.ACCEPTED,
+      message: 'Delivery accepted',
+    });
+
+    return {
+      success: true,
+      delivery: await this.getActiveDelivery(riderId),
+    };
+  }
+
+  async confirmPickup(riderId: string, deliveryId: string) {
+    const delivery = await this.prisma.delivery.findUnique({
+      where: { id: deliveryId },
+    });
+
+    if (!delivery) {
+      throw new NotFoundException('Delivery not found');
+    }
+
+    if (delivery.riderId !== riderId) {
+      throw new BadRequestException('This delivery is not assigned to you');
+    }
+
+    if (
+      delivery.status !== DeliveryStatus.ACCEPTED &&
+      delivery.status !== DeliveryStatus.ASSIGNED
+    ) {
+      throw new BadRequestException(
+        `Cannot confirm pickup for delivery with status: ${delivery.status}`,
+      );
+    }
+
+    await this.prisma.delivery.update({
+      where: { id: deliveryId },
+      data: {
+        status: DeliveryStatus.IN_TRANSIT,
+        pickedUpAt: new Date(),
+      },
+    });
+
+    this.streamService.emitDeliveryUpdate(riderId, deliveryId, {
+      status: DeliveryStatus.IN_TRANSIT,
+      message: 'Package picked up successfully',
+    });
+
+    return {
+      success: true,
+      message: 'Package picked up successfully',
+      delivery: await this.getActiveDelivery(riderId),
+    };
+  }
+
+  async completeDelivery(riderId: string, dto: CompleteDeliveryDto) {
+    const delivery = await this.prisma.delivery.findUnique({
+      where: { id: dto.deliveryId },
+      include: {
+        order: true,
+      },
+    });
+
+    if (!delivery) {
+      throw new NotFoundException('Delivery not found');
+    }
+
+    if (delivery.riderId !== riderId) {
+      throw new BadRequestException('This delivery is not assigned to you');
+    }
+
+    if (
+      delivery.status !== DeliveryStatus.IN_TRANSIT &&
+      delivery.status !== DeliveryStatus.PICKED_UP
+    ) {
+      throw new BadRequestException(
+        `Cannot complete delivery with status: ${delivery.status}`,
+      );
+    }
+
+    if (delivery.deliveryOtp && dto.deliveryOtp !== delivery.deliveryOtp) {
+      throw new BadRequestException('Invalid delivery OTP');
+    }
+
+    await this.prisma.delivery.update({
+      where: { id: dto.deliveryId },
+      data: {
+        status: DeliveryStatus.DELIVERED,
+        deliveredAt: new Date(),
+        deliveryProof: dto.deliveryProof,
+      },
+    });
+
+    if (delivery.order) {
+      await this.prisma.order.update({
+        where: { id: delivery.order.id },
+        data: {
+          status: 'DELIVERED',
+        },
+      });
+    }
+
+    await this.prisma.rider.update({
+      where: { id: riderId },
+      data: {
+        totalRides: { increment: 1 },
+      },
+    });
+
+    this.streamService.emitDeliveryUpdate(riderId, dto.deliveryId, {
+      status: DeliveryStatus.DELIVERED,
+      message: 'Delivery completed successfully',
+    });
+
+    return {
+      success: true,
+      message: 'Delivery completed successfully',
+      earnings: delivery.deliveryFee,
     };
   }
 }

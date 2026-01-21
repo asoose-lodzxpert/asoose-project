@@ -1,4 +1,4 @@
-import { fetchWithAuth } from "./auth-fetch";
+import { fetchWithAuth, fetchWithAuthMultipart } from "./auth-fetch";
 import type {
   PersonalInfo,
   UpdatePersonalInfoDto,
@@ -18,7 +18,7 @@ export async function getPersonalInfo(): Promise<PersonalInfo> {
 }
 
 export async function updatePersonalInfo(
-  data: UpdatePersonalInfoDto
+  data: UpdatePersonalInfoDto,
 ): Promise<PersonalInfo> {
   try {
     const response = await fetchWithAuth(`${API_URL}/riders/personal-info`, {
@@ -46,20 +46,12 @@ export async function uploadProfileImage(imageUri: string): Promise<string> {
       type,
     } as any);
 
-    const response = await fetch(`${API_URL}/riders/upload-profile-image`, {
-      method: "POST",
-      body: formData,
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
-    });
+    const response = await fetchWithAuthMultipart(
+      `${API_URL}/riders/upload-profile-image`,
+      formData,
+    );
 
-    if (!response.ok) {
-      throw new Error("Failed to upload image");
-    }
-
-    const data = await response.json();
-    return data.imageUrl;
+    return response.imageUrl;
   } catch (error) {
     console.error("Error uploading profile image:", error);
     throw error;

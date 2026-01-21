@@ -15,7 +15,7 @@ export interface SignupResponse {
 }
 
 export async function registerRider(
-  formData: SignupForm
+  formData: SignupForm,
 ): Promise<SignupResponse> {
   try {
     const payload = {
@@ -76,24 +76,32 @@ export async function registerRider(
 
 export async function uploadDocument(
   file: string,
-  type: "idCard" | "driverLicense" | "vehicleInsurance" | "vehicleRegistration"
+  type: "idCard" | "driverLicense" | "vehicleInsurance" | "vehicleRegistration",
 ): Promise<string> {
   try {
+    // For signup, documents are uploaded to public endpoint (no auth required)
     // Create FormData for file upload
     const formData = new FormData();
 
-    // Extract file info from base64 or file URI
-    const fileBlob = await fetch(file).then((r) => r.blob());
-    formData.append("file", fileBlob, `${type}-${Date.now()}.jpg`);
-    formData.append("type", type);
+    // Convert URI to blob
+    const response = await fetch(file);
+    const blob = await response.blob();
 
-    const res = await fetch(`${API_URL}/storage/upload`, {
+    // Append file with proper metadata
+    formData.append("file", blob as any, `${type}-${Date.now()}.jpg`);
+
+    const res = await fetch(`${API_URL}/storage/upload-public`, {
       method: "POST",
       body: formData,
+      headers: {
+        "ngrok-skip-browser-warning": "true",
+        // Don't set Content-Type - let browser set it with boundary for multipart/form-data
+      },
     });
 
     if (!res.ok) {
-      throw new Error("Failed to upload document");
+      const error = await res.json().catch(() => ({}));
+      throw new Error(error.message || "Failed to upload document");
     }
 
     const { url } = await res.json();

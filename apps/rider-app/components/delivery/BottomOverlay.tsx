@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React from "react";
 import { StyleSheet, View } from "react-native";
 
 import { useDelivery } from "@/context/DeliveryContext";
@@ -10,7 +10,6 @@ import EnRouteToPickup from "./EnRouteToPickup";
 import AtPickupScreen from "./AtPickupScreen";
 import EnRouteToDropoff from "./EnRouteToDropoff";
 import ConfirmDeliveryScreen from "./ConfirmDeliveryScreen";
-import { deliveryService } from "@/services/deliveryService";
 
 type Props = {
   onAnimateToPickup?: () => void;
@@ -21,23 +20,7 @@ export default function BottomOverlay({
   onAnimateToPickup,
   onAnimateToDropoff,
 }: Props) {
-  const {
-    status,
-    setStatus,
-    activeDelivery,
-    incomingOrder,
-    arriveAtPickup,
-    confirmPickup,
-    arriveAtDropoff,
-    completeDelivery,
-    waitForOrder,
-  } = useDelivery();
-
-  useEffect(() => {
-    if (status !== "online-waiting") return;
-
-    waitForOrder();
-  }, [status, setStatus]);
+  const { status, activeDelivery, incomingOrder } = useDelivery();
 
   return (
     <View style={styles.container} pointerEvents="box-none">

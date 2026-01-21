@@ -4,16 +4,7 @@ import { ThemedText } from "@/components/themed-text";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useDelivery } from "@/context/DeliveryContext";
-
-// Mock rider stats (in real app, this would come from API)
-const fetchRiderStats = async () => {
-  await new Promise((resolve) => setTimeout(resolve, 800));
-  return {
-    deliveriesToday: 0,
-    earningsToday: 0.0,
-    rating: 4.9,
-  };
-};
+import { riderApiService } from "@/services/rider-api.service";
 
 export default function OfflineScreen() {
   const { goOnline } = useDelivery();
@@ -21,28 +12,29 @@ export default function OfflineScreen() {
   const surface = useThemeColor({}, "surfaceBackground");
 
   const [stats, setStats] = useState({
-    deliveriesToday: 0,
-    earningsToday: 0.0,
-    rating: 4.9,
+    totalDeliveries: 0,
+    totalEarnings: 0.0,
+    rating: 0,
   });
   const [loading, setLoading] = useState(true);
 
-  const loadStats = async () => {
-    setLoading(true);
-    try {
-      const data = await fetchRiderStats();
-      setStats(data);
-    } catch (error) {
-      console.error("Failed to load rider stats");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
+    const loadStats = async () => {
+      setLoading(true);
+      try {
+        const data = await riderApiService.getEarningsStats("today");
+        setStats({
+          totalDeliveries: data.totalDeliveries || 0,
+          totalEarnings: data.totalEarnings || 0.0,
+          rating: data.rating || 0,
+        });
+      } catch (error) {
+      } finally {
+        setLoading(false);
+      }
+    };
+
     loadStats();
-    const interval = setInterval(loadStats, 10000);
-    return () => clearInterval(interval);
   }, []);
 
   return (
@@ -63,7 +55,7 @@ export default function OfflineScreen() {
             {loading ? (
               <ActivityIndicator size="small" color="#666" />
             ) : (
-              <ThemedText type="title">{stats.deliveriesToday}</ThemedText>
+              <ThemedText type="title">{stats.totalDeliveries}</ThemedText>
             )}
             <ThemedText style={styles.statLabel}>Deliveries Today</ThemedText>
           </View>
@@ -73,7 +65,7 @@ export default function OfflineScreen() {
               <ActivityIndicator size="small" color="#666" />
             ) : (
               <ThemedText type="title">
-                ${stats.earningsToday.toFixed(2)}
+                ${stats.totalEarnings.toFixed(2)}
               </ThemedText>
             )}
             <ThemedText style={styles.statLabel}>Earned Today</ThemedText>
@@ -83,7 +75,7 @@ export default function OfflineScreen() {
             {loading ? (
               <ActivityIndicator size="small" color="#666" />
             ) : (
-              <ThemedText type="title">{stats.rating} ★</ThemedText>
+              <ThemedText type="title">{stats.rating.toFixed(1)} ★</ThemedText>
             )}
             <ThemedText style={styles.statLabel}>Your Rating</ThemedText>
           </View>

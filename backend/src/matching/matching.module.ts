@@ -1,9 +1,8 @@
 import { Module } from '@nestjs/common';
 import { EventEmitterModule } from '@nestjs/event-emitter';
-import { ConfigModule } from '@nestjs/config';
 
 // Redis
-import { RedisModule } from './redis/redis.module';
+import { MatchingRedisModule } from './redis/redis.module';
 import { RedisService } from './redis/redis.service';
 
 // Geo
@@ -49,15 +48,12 @@ import { PrismaModule } from '../prisma/prisma.module';
  */
 @Module({
   imports: [
-    ConfigModule.forRoot({
-      isGlobal: true,
-    }),
     EventEmitterModule.forRoot({
       wildcard: true,
       delimiter: '.',
       maxListeners: 20,
     }),
-    RedisModule,
+    MatchingRedisModule,
     QueueModule,
     PrismaModule,
   ],
@@ -79,7 +75,7 @@ import { PrismaModule } from '../prisma/prisma.module';
     EventBusService,
     QueueModule,
     // Re-export modules to make their services available
-    RedisModule,
+    MatchingRedisModule,
     QueueModule,
     // Export module-specific services
     GeoService,

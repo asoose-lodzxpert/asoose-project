@@ -7,9 +7,15 @@ import { MonnifyService } from './monnify.service';
 import { PrismaModule } from '../prisma/prisma.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { TripsModule } from '../users/trips/trips.module';
+import { TransactionsModule } from '../super-admin/transactions/transaction.module';
 
 @Module({
-  imports: [PrismaModule, NotificationsModule, forwardRef(() => TripsModule)],
+  imports: [
+    PrismaModule,
+    NotificationsModule,
+    forwardRef(() => TripsModule),
+    TransactionsModule,
+  ],
   controllers: [PaymentController],
   providers: [
     PaymentService,

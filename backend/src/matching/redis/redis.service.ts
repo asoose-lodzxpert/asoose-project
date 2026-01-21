@@ -1,6 +1,6 @@
 import { Injectable, Inject, Logger } from '@nestjs/common';
 import Redis from 'ioredis';
-import { MATCHING_REDIS_CLIENT } from './redis.module';
+import { MATCHING_REDIS_CLIENT } from './redis.constants';
 import {
   REDIS_KEYS,
   REDIS_TTL,
