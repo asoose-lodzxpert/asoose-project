@@ -124,4 +124,22 @@ export class RidersController {
     const { id } = req.user || {};
     return this.ridersService.requestWithdrawal(id, createWithdrawalDto);
   }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.RIDER, UserRole.DRIVER)
+  @Get('orders/history')
+  async getOrdersHistory(
+    @Req() req,
+    @Query('status') status?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const { id } = req.user || {};
+    return this.ridersService.getOrdersHistory(
+      id,
+      status,
+      page ? parseInt(page) : 1,
+      limit ? parseInt(limit) : 20,
+    );
+  }
 }

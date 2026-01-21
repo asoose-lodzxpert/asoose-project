@@ -52,3 +52,5 @@ const styles = StyleSheet.create({
     right: 0,
   },
 });
+
+// check this files and make sure there are connected to the data base and instead for polling to receive ride requests and updates, use SSE to receive the updates from the database, and also make sure the ride re-matching after the wait time is implemented and make sure it is production ready

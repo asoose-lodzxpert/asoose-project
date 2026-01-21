@@ -78,6 +78,12 @@ import { PrismaModule } from '../prisma/prisma.module';
     GeoService,
     EventBusService,
     QueueModule,
+    // Re-export modules to make their services available
+    RedisModule,
+    QueueModule,
+    // Export module-specific services
+    GeoService,
+    EventBusService,
     DriverStateService,
   ],
 })

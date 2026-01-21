@@ -239,7 +239,7 @@ export class StoresService {
       action: 'UPDATE_VENDOR',
       target: updatedStore.name,
       details: `Admin modified vendor details for ${updatedStore.name}`,
-      metadata: { changes: dto }
+      metadata: { changes: dto },
     });
 
     return {
@@ -267,7 +267,7 @@ export class StoresService {
       action: 'SUSPEND_VENDOR',
       target: store.name,
       status: 'SUSPENDED',
-      details: 'Admin performed soft-delete/suspension on vendor'
+      details: 'Admin performed soft-delete/suspension on vendor',
     });
 
     return this.prisma.store.update({
@@ -381,17 +381,14 @@ export class StoresService {
       include: {
         category: { select: { name: true } },
       },
-      orderBy: [
-        { status: 'asc' },
-        { salesCount: 'desc' } as any,
-      ],
+      orderBy: [{ status: 'asc' }, { salesCount: 'desc' } as any],
     });
 
     return products.map((p: any) => ({
       id: p.id,
       name: p.name,
       price: p.price,
-      image: p.image,
+      image: p.images?.[0] || null, // Use first image from array
       category: p.category?.name || 'Uncategorized',
       status: p.status,
       sales: p.salesCount,

@@ -143,11 +143,4 @@ export const envSchema = z.object({
   // Health Check
   // ----------------
   HEALTH_CHECK_PATH: z.string().default('/health'),
-
-  // ----------------
-  // Legacy/Deprecated (Supabase - for reference)
-  // ----------------
-  SUPABASE_URL: z.string().optional(),
-  SUPABASE_KEY: z.string().optional(),
-  SUPABASE_BUCKET: z.string().optional(),
 });

@@ -85,6 +85,7 @@ export function CustomDropdown({
         }}
         activeColor={border}
         disable={disabled}
+        mode="modal"
       />
 
       {prompt && <ThemedText style={styles.prompt}>{prompt}</ThemedText>}
