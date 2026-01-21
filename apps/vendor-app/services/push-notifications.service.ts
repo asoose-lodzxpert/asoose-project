@@ -1,12 +1,13 @@
-import * as Notifications from "expo-notifications";
-import * as Device from "expo-device";
-import { Platform } from "react-native";
 import Constants from "expo-constants";
+import * as Device from "expo-device";
+import * as Notifications from "expo-notifications";
+import { Platform } from "react-native";
 import { fetchWithAuth } from "./auth-fetch";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
 // Configure notification behavior
+// This ONLY handles foreground notifications - no background service
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
@@ -19,12 +20,16 @@ Notifications.setNotificationHandler({
 });
 
 // Request permissions and get push token
+// This uses Expo's push notification service, NOT Firebase directly
+// Backend should send notifications via Expo Push API
 export async function registerForPushNotificationsAsync(): Promise<
   string | undefined
 > {
   let token;
 
   if (Platform.OS === "android") {
+    // Create notification channels for Android 8.0+
+    // These channels only affect foreground notifications
     await Notifications.setNotificationChannelAsync("default", {
       name: "default",
       importance: Notifications.AndroidImportance.MAX,
@@ -60,14 +65,19 @@ export async function registerForPushNotificationsAsync(): Promise<
 
     try {
       const projectId = Constants.expoConfig?.extra?.eas?.projectId;
+
+      // Get Expo Push Token (not FCM token)
+      // This prevents Android 12+ BackgroundServiceStartNotAllowedException
+      // by using Expo's notification service instead of starting Firebase services
       token = (
         await Notifications.getExpoPushTokenAsync({
           projectId,
         })
       ).data;
     } catch (e: any) {
-      // Silently fail if Firebase is not configured
-      // This is common in development or if FCM credentials are not set up
+      // Silently fail if push notifications cannot be registered
+      // This prevents app crashes on Android 12+ when background services are restricted
+      console.warn("Push notification registration failed:", e.message);
       return undefined;
     }
   } else {

@@ -1,5 +1,5 @@
 import React, { useRef, useState } from "react";
-import { ScrollView, StyleSheet } from "react-native";
+import { ScrollView, StyleSheet, Alert } from "react-native";
 import * as Location from "expo-location";
 import MapView from "react-native-maps";
 import { ThemedText } from "@/components/themed-text";
@@ -15,9 +15,12 @@ import { Step3Props } from "./step3/types";
 export const Step3StoreSetup: React.FC<Step3Props> = ({ data, onChange }) => {
   const mapRef = useRef<MapView | null>(null);
   const primary = useThemeColor({}, "brandPrimary");
+
   const [openHours, setOpenHours] = useState<Record<string, OpenHour>>(
-    data.openHours || {}
+    data.openHours || {},
   );
+  const [hasLocationPermission, setHasLocationPermission] = useState(false);
+  const [isLocating, setIsLocating] = useState(false);
 
   const updateOpenHours = (next: Record<string, OpenHour>) => {
     setOpenHours(next);
@@ -25,23 +28,46 @@ export const Step3StoreSetup: React.FC<Step3Props> = ({ data, onChange }) => {
   };
 
   const useCurrentLocation = async () => {
-    const { status } = await Location.requestForegroundPermissionsAsync();
-    if (status !== "granted") return;
+    try {
+      setIsLocating(true);
 
-    const pos = await Location.getCurrentPositionAsync({});
-    const coords = {
-      lat: pos.coords.latitude,
-      lng: pos.coords.longitude,
-    };
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert(
+          "Permission required",
+          "Location access is needed to set your store location.",
+        );
+        return;
+      }
 
-    onChange("location", coords);
+      setHasLocationPermission(true);
 
-    mapRef.current?.animateToRegion({
-      latitude: coords.lat,
-      longitude: coords.lng,
-      latitudeDelta: 0.01,
-      longitudeDelta: 0.01,
-    });
+      const pos = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+
+      const coords = {
+        lat: pos.coords.latitude,
+        lng: pos.coords.longitude,
+      };
+
+      onChange("location", coords);
+
+      // wait for map to be mounted
+      requestAnimationFrame(() => {
+        mapRef.current?.animateToRegion({
+          latitude: coords.lat,
+          longitude: coords.lng,
+          latitudeDelta: 0.01,
+          longitudeDelta: 0.01,
+        });
+      });
+    } catch (err) {
+      console.warn("Location error:", err);
+      Alert.alert("Location error", "Unable to get your current location.");
+    } finally {
+      setIsLocating(false);
+    }
   };
 
   return (
@@ -70,12 +96,15 @@ export const Step3StoreSetup: React.FC<Step3Props> = ({ data, onChange }) => {
         onPick={(v) => onChange("storeBanner", v)}
       />
 
+      {/* Only render map after permission granted to avoid native crash */}
       <LocationBlock
-        mapRef={mapRef}
+        mapRef={hasLocationPermission ? mapRef : undefined}
         primary={primary}
         location={data.location}
+        loading={isLocating}
         onUseCurrent={useCurrentLocation}
         onPick={(v) => onChange("location", v)}
+        disabled={!hasLocationPermission && !data.location}
       />
 
       <OpenHoursBlock value={openHours} onChange={updateOpenHours} />
