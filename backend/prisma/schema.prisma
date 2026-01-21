@@ -173,6 +173,7 @@ model User {
   name      String
   phone     String?
   image     String?
+  googleId  String?    @unique @map("google_id")
   notifications Notification[]
   fcmToken  String?  @map("fcm_token")
   role      UserRole   @default(CUSTOMER)
@@ -197,6 +198,7 @@ model User {
   deliveriesAsCustomer Delivery[] @relation("DeliveryCustomer")
 
   @@index([email])
+  @@index([googleId])
   @@index([role, status])
   @@index([createdAt])
   @@index([status, createdAt(sort: Desc)])
@@ -294,9 +296,10 @@ model Rider {
   currentLng Float?
 
   // Financials & Stats
-  walletBalance Float @default(0)
-  rating        Float @default(5.0)
-  totalRides    Int   @default(0)
+  walletBalance  Float @default(0)
+  commissionRate Float @default(20.0) // Platform commission percentage
+  rating         Float @default(5.0)
+  totalRides     Int   @default(0)
 
   // Relations
   payouts                  RiderPayout[]

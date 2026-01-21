@@ -1,4 +1,4 @@
-import { IsEmail, IsString, MinLength } from 'class-validator';
+import { IsEmail, IsString, MinLength, IsOptional } from 'class-validator';
 import { Transform } from 'class-transformer';
 
 export class ResetPasswordDto {
@@ -9,4 +9,8 @@ export class ResetPasswordDto {
   @IsString()
   @MinLength(8, { message: 'Password must be at least 8 characters long' })
   newPassword: string;
+
+  @IsString()
+  @IsOptional()
+  token?: string; // OTP or reset token
 }

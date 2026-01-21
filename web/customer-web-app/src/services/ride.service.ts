@@ -1,121 +1,214 @@
-import { api } from './api';
+import { ApiService } from "./api.service";
 
-// --- Interfaces ---
+// --- Type Definitions ---
+export type RideStatus =
+  | "PENDING"
+  | "REQUESTED"
+  | "ACCEPTED"
+  | "IN_PROGRESS"
+  | "COMPLETED"
+  | "CANCELLED";
+export type VehicleType = "BIKE" | "CAR" | "VAN";
 
 export interface GeoLocation {
-  lat: number;
-  lng: number;
+  latitude: number;
+  longitude: number;
   address: string;
 }
 
-export interface PriceBreakdown {
-  baseFare: number;
-  distanceRate: number;
-  surgeMultiplier: number;
-  promotionDiscount: number;
-  total: number;
-}
-
-// Fixed Interface with Index Signature to allow dynamic access (e.g., priceEstimates['Standard'])
-export interface PriceEstimate {
-  [key: string]: PriceBreakdown | number | boolean | undefined;
-  distanceKm: number;
-  durationMin: number;
-  isSurgeActive: boolean;
-  // Optional specific keys for strict typing if needed
-  Standard?: PriceBreakdown;
-  Premium?: PriceBreakdown;
-  XL?: PriceBreakdown;
-}
-
-export interface RideType {
-  id: string;
-  displayName: string;
-  icon?: string;
+export interface RideEstimate {
+  estimatedFare: number;
+  distance: number;
+  duration: number;
+  breakdown: {
+    baseFare: number;
+    distanceFare: number;
+    timeFare: number;
+    platformFee: number;
+  };
 }
 
 export interface Driver {
   id: string;
   name: string;
+  phone: string;
+  image?: string;
   rating: number;
-  trips: number;
-  vehicle: string;
-  plate: string;
-  phone?: string;
-  location?: { lat: number; lng: number };
+  vehicleNumber: string;
+  vehicleModel?: string;
+  location?: {
+    latitude: number;
+    longitude: number;
+  };
 }
 
-export interface RideRequestPayload {
-  pickup: GeoLocation;
-  dropoff: GeoLocation;
-  rideType: string;
-  price: number;
-  paymentMethodId: string;
-}
-
-export interface RideResponse {
-  rideId: string;
-  status: string;
+export interface Ride {
+  id: string;
+  status: RideStatus;
+  customerId: string;
   driverId?: string;
-  eta?: number;
+  driver?: Driver;
+  pickupLocation: GeoLocation;
+  dropoffLocation: GeoLocation;
+  vehicleType: VehicleType;
+  estimatedFare: number;
+  actualFare?: number;
+  distance: number;
+  duration: number;
+  pickupOtp?: string;
+  paymentId?: string;
+  paymentStatus?: string;
+  scheduledTime?: string;
+  notes?: string;
+  cancelReason?: string;
+  createdAt: string;
+  updatedAt: string;
+  completedAt?: string;
 }
 
-// --- API Methods ---
+export interface CreateRideRequest {
+  pickupLocation: GeoLocation;
+  dropoffLocation: GeoLocation;
+  vehicleType: VehicleType;
+  scheduledTime?: string;
+  notes?: string;
+}
 
-/**
- * Get price estimates. 
- * NOW ACCEPTS 'signal' for request cancellation.
- */
-export const getRideEstimate = async (
-  pickup: GeoLocation, 
-  dropoff: GeoLocation,
-  signal?: AbortSignal // <--- FIXED: Added 3rd argument
-): Promise<PriceEstimate> => {
-  const { data } = await api.get<PriceEstimate>('/rides/estimate', {
-    params: {
-      pickupLat: pickup.lat,
-      pickupLng: pickup.lng,
-      dropoffLat: dropoff.lat,
-      dropoffLng: dropoff.lng
-    },
-    signal // Pass the signal to axios for cancellation
-  });
-  return data;
-};
+export interface RidePaymentResponse {
+  ride: Ride;
+  payment: {
+    id: string;
+    amount: number;
+    status: string;
+    reference: string;
+    authorizationUrl?: string;
+  };
+}
 
-/**
- * Fetch available ride configuration (types) from backend.
- */
-export const getRideTypes = async (): Promise<RideType[]> => {
-  const { data } = await api.get<RideType[]>('/config/ride-types');
-  return data;
-};
+// --- API Service Methods ---
 
-/**
- * Request a new ride.
- */
-export const requestRide = async (payload: RideRequestPayload): Promise<RideResponse> => {
-  const { data } = await api.post<RideResponse>('/rides/request', payload);
-  return data;
-};
-
-/**
- * Cancel an active ride.
- */
-export const cancelRide = async (rideId: string): Promise<void> => {
-  await api.post(`/rides/${rideId}/cancel`);
-};
-
-/**
- * Re-fetch state of current active ride (for page reload/reconnection).
- */
-export const getCurrentRide = async (): Promise<RideResponse | null> => {
-  try {
-    const { data } = await api.get<RideResponse>('/rides/current');
-    return data;
-  } catch (error: any) {
-    // If backend returns 404, it means no active ride
-    if (error.response?.status === 404) return null;
-    throw error;
+export class RideService {
+  /**
+   * Get fare estimate for a ride
+   */
+  static async getEstimate(data: {
+    pickupLat: number;
+    pickupLng: number;
+    dropoffLat: number;
+    dropoffLng: number;
+    vehicleType: VehicleType;
+  }): Promise<RideEstimate> {
+    return ApiService.post<RideEstimate>("/rides/estimate", data);
   }
-};
+
+  /**
+   * Create a new ride request with payment
+   */
+  static async createRide(
+    data: CreateRideRequest,
+  ): Promise<RidePaymentResponse> {
+    return ApiService.post<RidePaymentResponse>("/users/rides", data);
+  }
+
+  /**
+   * Get all user rides
+   */
+  static async getRides(status?: RideStatus): Promise<Ride[]> {
+    const query = status ? `?status=${status}` : "";
+    return ApiService.get<Ride[]>(`/users/rides${query}`);
+  }
+
+  /**
+   * Get specific ride details
+   */
+  static async getRide(rideId: string): Promise<Ride> {
+    return ApiService.get<Ride>(`/users/rides/${rideId}`);
+  }
+
+  /**
+   * Get current active ride
+   */
+  static async getCurrentRide(): Promise<Ride | null> {
+    try {
+      return await ApiService.get<Ride>("/users/rides/current");
+    } catch (error: any) {
+      if (error.message.includes("404")) return null;
+      throw error;
+    }
+  }
+
+  /**
+   * Cancel a ride
+   */
+  static async cancelRide(
+    rideId: string,
+    reason?: string,
+  ): Promise<{ message: string; refund?: any }> {
+    return ApiService.post<{ message: string; refund?: any }>(
+      `/users/rides/${rideId}/cancel`,
+      { reason },
+    );
+  }
+
+  /**
+   * Verify pickup OTP (when driver picks up customer)
+   */
+  static async verifyPickupOtp(
+    rideId: string,
+    otp: string,
+  ): Promise<{ message: string; ride: Ride }> {
+    return ApiService.post<{ message: string; ride: Ride }>(
+      `/users/rides/${rideId}/verify-pickup`,
+      { otp },
+    );
+  }
+
+  /**
+   * Rate driver after ride completion
+   */
+  static async rateRide(
+    rideId: string,
+    rating: number,
+    comment?: string,
+  ): Promise<{ message: string }> {
+    return ApiService.post<{ message: string }>(`/users/rides/${rideId}/rate`, {
+      rating,
+      comment,
+    });
+  }
+
+  /**
+   * Get driver's current location during active ride
+   */
+  static async getDriverLocation(rideId: string): Promise<{
+    latitude: number;
+    longitude: number;
+    heading?: number;
+  }> {
+    return ApiService.get<{
+      latitude: number;
+      longitude: number;
+      heading?: number;
+    }>(`/users/rides/${rideId}/driver-location`);
+  }
+
+  /**
+   * Get ride history with pagination
+   */
+  static async getRideHistory(
+    page: number = 1,
+    limit: number = 20,
+  ): Promise<{
+    rides: Ride[];
+    total: number;
+    page: number;
+    totalPages: number;
+  }> {
+    return ApiService.get<{
+      rides: Ride[];
+      total: number;
+      page: number;
+      totalPages: number;
+    }>(`/users/rides/history?page=${page}&limit=${limit}`);
+  }
+}

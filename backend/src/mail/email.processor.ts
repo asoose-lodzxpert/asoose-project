@@ -18,6 +18,8 @@ export class EmailProcessor extends WorkerHost {
         return this.sendOrderCreatedCustomer(job);
       case 'order-created-vendor':
         return this.sendOrderCreatedVendor(job);
+      case 'rider-password-reset-otp':
+        return this.sendPasswordResetOtp(job);
       case 'vendor-login-notification':
         return this.sendVendorLoginNotification(job);
       case 'vendor-account-created':
@@ -86,6 +88,21 @@ export class EmailProcessor extends WorkerHost {
         storeName: job.data.storeName,
         orderId: job.data.orderId,
         items: job.data.items,
+      },
+    });
+  }
+
+  private async sendPasswordResetOtp(
+    job: Job<{ email: string; name: string; otp: string }>,
+  ) {
+    await this.mailer.sendMail({
+      to: job.data.email,
+      subject: '🔑 Password Reset OTP - Asoose',
+      template: './password-reset-otp',
+      context: {
+        name: job.data.name,
+        otp: job.data.otp,
+        year: new Date().getFullYear(),
       },
     });
   }

@@ -8,7 +8,6 @@ import { PrismaModule } from 'src/prisma/prisma.module';
 import { OtpModule } from './otp.module';
 import {
   AuthController,
-  DriverAuthController,
   UserAuthController,
 } from './auth.controller';
 import { VendorAuthController } from './vendor-auth.controller';
@@ -41,7 +40,6 @@ import { MailModule } from 'src/mail/mail.module';
     AuthController,
     UserAuthController,
     RiderAuthController,
-    DriverAuthController,
     VendorAuthController,
   ],
   providers: [

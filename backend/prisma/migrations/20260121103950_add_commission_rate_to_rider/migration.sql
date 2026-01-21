@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Rider" ADD COLUMN     "commissionRate" DOUBLE PRECISION NOT NULL DEFAULT 20.0;

@@ -1,64 +1,44 @@
 "use client";
-import { createClient } from "../../../utils/supabase/client";
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useSession } from "next-auth/react";
 import { Copy, Check, User, Key } from "lucide-react";
 
 // Force dynamic rendering to prevent prerendering errors
 export const dynamic = "force-dynamic";
 
 const Dashboard = () => {
-  const supabase = createClient();
-  const [token, setToken] = useState<string>("");
-  const [role, setRole] = useState<string>("");
-  const [email, setEmail] = useState<string>("");
+  const { data: session, status } = useSession();
   const [copied, setCopied] = useState(false);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const getUserData = async () => {
-      try {
-        // Get the current session
-        const { data: sessionData } = await supabase.auth.getSession();
-
-        if (sessionData.session) {
-          setToken(sessionData.session.access_token);
-          setEmail(sessionData.session.user.email || "");
-
-          // Get user's role from profiles table
-          const { data: profile } = await supabase
-            .from("profiles")
-            .select("role")
-            .eq("id", sessionData.session.user.id)
-            .single();
-
-          setRole(profile?.role || "No role assigned");
-        } else {
-          console.log("No user is logged in");
-        }
-      } catch (error) {
-        console.error("Error fetching user data:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    getUserData();
-  }, []);
 
   const copyToken = async () => {
     try {
-      await navigator.clipboard.writeText(token);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      if (session?.accessToken) {
+        await navigator.clipboard.writeText(session.accessToken);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      }
     } catch (err) {
       console.error("Failed to copy:", err);
     }
   };
 
-  if (loading) {
+  if (status === "loading") {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white dark:bg-[#0a0a0a]">
-        <div className="text-gray-600 dark:text-gray-400">Loading...</div>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-500 mx-auto"></div>
+          <p className="mt-4 text-gray-600 dark:text-gray-400">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!session) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white dark:bg-[#0a0a0a]">
+        <div className="text-center">
+          <p className="text-gray-600 dark:text-gray-400">No session found</p>
+        </div>
       </div>
     );
   }
@@ -86,7 +66,7 @@ const Dashboard = () => {
                   Email
                 </label>
                 <p className="text-gray-900 dark:text-white font-mono text-sm mt-1">
-                  {email}
+                  {session.user?.email}
                 </p>
               </div>
 
@@ -97,12 +77,12 @@ const Dashboard = () => {
                 <div className="mt-1">
                   <span
                     className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-bold ${
-                      role.includes("ADMIN")
+                      session.user?.role?.includes("ADMIN")
                         ? "bg-yellow-100 dark:bg-yellow-500/20 text-yellow-800 dark:text-yellow-400"
                         : "bg-blue-100 dark:bg-blue-500/20 text-blue-800 dark:text-blue-400"
                     }`}
                   >
-                    {role}
+                    {session.user?.role || "No role assigned"}
                   </span>
                 </div>
               </div>
@@ -126,7 +106,7 @@ const Dashboard = () => {
                 <div className="relative">
                   <div className="bg-white dark:bg-black/30 border border-gray-200 dark:border-white/10 rounded-lg p-4 pr-12 overflow-auto">
                     <code className="text-xs font-mono text-gray-900 dark:text-white break-all">
-                      {token}
+                      {session.accessToken}
                     </code>
                   </div>
                   <button

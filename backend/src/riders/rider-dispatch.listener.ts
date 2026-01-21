@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationFacade } from '../users/notification.facade';
+import { TripsService } from '../users/trips/trips.service';
 
 @Injectable()
 export class RiderDispatchListener {
@@ -10,6 +11,7 @@ export class RiderDispatchListener {
   constructor(
     private prisma: PrismaService,
     private notificationFacade: NotificationFacade,
+    private tripsService: TripsService,
   ) {}
 
   @OnEvent('order.ready')
@@ -43,15 +45,10 @@ export class RiderDispatchListener {
 
     const selectedRider = nearbyRiders[0];
 
-    await this.prisma.delivery.update({
-      where: { id: order.delivery.id },
-      data: {
-        riderId: selectedRider.id,
-        status: 'ASSIGNED',
-        assignedAt: new Date(),
-      },
-    });
+    // Use TripsService to assign driver (includes real-time customer notification)
+    await this.tripsService.assignDriver(order.delivery.id, selectedRider.id);
 
+    // Notify the rider about the new assignment
     await this.notificationFacade.notifyRider(
       selectedRider.id,
       'New Delivery Assigned',

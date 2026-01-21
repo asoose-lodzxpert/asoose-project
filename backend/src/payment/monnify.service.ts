@@ -5,6 +5,7 @@ import {
   PaymentStatus,
   VerifyPaymentResponse,
   PaymentGateway,
+  DisbursementResponse,
 } from './interfaces/payment.interface';
 
 @Injectable()
@@ -152,6 +153,56 @@ export class MonnifyService {
       .update(JSON.stringify(payload))
       .digest('hex');
     return hash === signature;
+  }
+
+  async initiateTransfer(
+    amount: number,
+    accountNumber: string,
+    bankCode: string,
+    accountName: string,
+    reference: string,
+    narration?: string,
+  ): Promise<DisbursementResponse> {
+    try {
+      const token = await this.getAccessToken();
+
+      const response = await axios.post(
+        `${this.baseUrl}/api/v2/disbursements/single`,
+        {
+          amount,
+          reference,
+          narration: narration || 'Payment disbursement',
+          destinationBankCode: bankCode,
+          destinationAccountNumber: accountNumber,
+          currency: 'NGN',
+          sourceAccountNumber: this.contractCode, // Use contract code as source
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        },
+      );
+
+      const data = response.data.responseBody;
+
+      return {
+        success: data.status === 'SUCCESS',
+        reference,
+        amount,
+        recipientId: accountNumber,
+        gateway: PaymentGateway.MONNIFY,
+        transferCode: data.reference,
+        status: data.status,
+      };
+    } catch (error) {
+      this.logger.error(
+        'Monnify transfer error:',
+        error.response?.data || error.message,
+      );
+      throw new Error('Failed to initiate Monnify transfer');
+    }
   }
 
   private mapStatus(status: string): PaymentStatus {

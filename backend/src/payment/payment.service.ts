@@ -13,6 +13,7 @@ import { FlutterwaveService } from './flutterwave.service';
 import { MonnifyService } from './monnify.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { TripsService } from '../users/trips/trips.service';
+import { TransactionLedgerService } from '../super-admin/transactions/transaction-ledger.service';
 import {
   PaymentGateway,
   PaymentMethod,
@@ -41,6 +42,7 @@ export class PaymentService {
     private flutterwaveService: FlutterwaveService,
     private monnifyService: MonnifyService,
     private notificationsService: NotificationsService,
+    private ledger: TransactionLedgerService,
     @Optional()
     @Inject(forwardRef(() => TripsService))
     private tripsService?: TripsService,
@@ -260,7 +262,35 @@ export class PaymentService {
   private async updatePaymentStatus(
     verification: VerifyPaymentResponse,
   ): Promise<void> {
-    const payment = await this.prisma.payment.update({
+    const payment = await this.prisma.payment.findUnique({
+      where: { reference: verification.reference },
+      include: {
+        order: {
+          include: {
+            user: true,
+            store: true,
+            delivery: true,
+          },
+        },
+        ride: true,
+      },
+    });
+
+    if (!payment) {
+      this.logger.warn(`Payment not found: ${verification.reference}`);
+      return;
+    }
+
+    // Idempotency check - skip if already processed successfully
+    if ((payment.status as any) === PaymentStatus.SUCCESS) {
+      this.logger.log(
+        `Payment already processed successfully: ${verification.reference}`,
+      );
+      return;
+    }
+
+    // Update payment status
+    const updatedPayment = await this.prisma.payment.update({
       where: { reference: verification.reference },
       data: {
         status: verification.status as any,
@@ -272,17 +302,12 @@ export class PaymentService {
           include: {
             user: true,
             store: true,
-            delivery: true, // Include delivery to check if it exists
+            delivery: true,
           },
         },
-        ride: true, // Include ride if payment is for a ride
+        ride: true,
       },
     });
-
-    if (!payment) {
-      this.logger.warn(`Payment not found: ${verification.reference}`);
-      return;
-    }
 
     // Update order status if payment successful
     if (verification.status === PaymentStatus.SUCCESS && payment.orderId) {
@@ -293,12 +318,32 @@ export class PaymentService {
         },
       });
 
+      // Record payment in ledger
+      if (updatedPayment.order) {
+        await this.ledger.recordPayment({
+          id: payment.id,
+          amount: payment.amount,
+          userId: updatedPayment.order.userId,
+          orderId: payment.orderId,
+          method: payment.gateway,
+          status: 'COMPLETED',
+        });
+
+        // Record order commission and vendor earnings
+        await this.ledger.recordOrderCommission({
+          id: payment.orderId,
+          storeId: updatedPayment.order.storeId,
+          total: payment.amount,
+          commissionRate: 10, // 10% platform commission (deducted on withdrawal)
+        });
+      }
+
       // Send notifications
-      await this.sendPaymentNotifications(payment);
+      await this.sendPaymentNotifications(updatedPayment);
 
       // Start delivery matching if order has a delivery
-      if (payment.order?.delivery) {
-        await this.startDeliveryMatching(payment.order.delivery.id);
+      if (updatedPayment.order?.delivery) {
+        await this.startDeliveryMatching(updatedPayment.order.delivery.id);
       }
     } else if (
       verification.status === PaymentStatus.FAILED &&
@@ -314,6 +359,39 @@ export class PaymentService {
 
     // Start ride matching if payment is for a ride
     if (verification.status === PaymentStatus.SUCCESS && payment.rideId) {
+      // Get ride details
+      const ride = await this.prisma.ride.findUnique({
+        where: { id: payment.rideId },
+        include: {
+          customer: { select: { id: true } },
+        },
+      });
+
+      if (ride && ride.riderId) {
+        const platformFeeRate = 0.2; // 20% platform fee (deducted on withdrawal)
+        const platformFee = payment.amount * platformFeeRate;
+        const driverFee = payment.amount; // Driver gets full amount initially
+
+        // Record payment in ledger
+        await this.ledger.recordPayment({
+          id: payment.id,
+          amount: payment.amount,
+          userId: ride.customer.id,
+          rideId: payment.rideId,
+          method: payment.gateway,
+          status: 'COMPLETED',
+        });
+
+        // Record ride earnings (full amount credited, commission deducted on withdrawal)
+        await this.ledger.recordRideEarnings({
+          id: payment.rideId,
+          riderId: ride.riderId,
+          totalFare: payment.amount,
+          platformFee, // Stored for reference, deducted on withdrawal
+          driverFee, // Full amount
+        });
+      }
+
       await this.startRideMatching(payment.rideId);
     }
   }

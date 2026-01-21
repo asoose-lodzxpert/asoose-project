@@ -9,6 +9,7 @@ import {
   Put,
   Delete,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { VendorAuthService } from './vendor-auth.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guards';
@@ -32,16 +33,19 @@ export class VendorAuthController {
   }
 
   @Post('login')
+  @Throttle({ default: { limit: 10, ttl: 60 * 1000 } }) // 10 requests per minute
   login(@Body() dto: LoginVendorDto) {
     return this.vendorAuthService.loginVendor(dto);
   }
 
   @Post('register')
+  @Throttle({ default: { limit: 5, ttl: 60 * 60 * 1000 } }) // 5 requests per hour
   register(@Body() dto: CreateVendorDto) {
     return this.vendorAuthService.registerVendor(dto);
   }
 
   @Post('send-otp')
+  @Throttle({ default: { limit: 3, ttl: 60 * 60 * 1000 } }) // 3 requests per hour
   sendOtp(@Body() body: { email: string }) {
     return this.vendorAuthService.sendOtpForPasswordReset(body.email);
   }
@@ -52,6 +56,7 @@ export class VendorAuthController {
   }
 
   @Post('reset-password')
+  @Throttle({ default: { limit: 5, ttl: 60 * 60 * 1000 } }) // 5 requests per hour
   resetPassword(@Body() dto: ResetPasswordDto & { otp: string }) {
     // Only resets password if OTP is valid (frontend should verify first)
     return this.vendorAuthService.resetVendorPassword(dto);

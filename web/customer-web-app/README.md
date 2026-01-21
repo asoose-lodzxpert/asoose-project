@@ -1,6 +1,6 @@
 # Asoose Customer Web App
 
-A Next.js-based web application for managing customer orders, rides, and marketplace interactions.
+A Next.js-based web application for managing customer orders, rides, and marketplace interactions with NextAuth.js authentication.
 
 ## 🚀 Getting Started
 
@@ -9,6 +9,7 @@ A Next.js-based web application for managing customer orders, rides, and marketp
 - Node.js 18+
 - Yarn or npm
 - Backend API running (see `backend/README.md`)
+- Google OAuth credentials (for social sign-in)
 
 ### Installation
 
@@ -36,14 +37,18 @@ A Next.js-based web application for managing customer orders, rides, and marketp
 
    ```env
    # Backend API URL
-   NEXT_PUBLIC_API_URL=http://localhost:3001/api
+   NEXT_PUBLIC_API_URL=http://localhost:3000/api/v1
+
+   # NextAuth Configuration
+   NEXTAUTH_SECRET=your-generated-secret-key  # Generate: openssl rand -base64 32
+   NEXTAUTH_URL=http://localhost:3001
+
+   # Google OAuth
+   GOOGLE_CLIENT_ID=your-google-client-id
+   GOOGLE_CLIENT_SECRET=your-google-client-secret
 
    # Google Maps API Key (required for maps features)
    NEXT_PUBLIC_GOOGLE_MAPS_KEY=your_google_maps_api_key
-
-   # Supabase (legacy - optional if migrating from Supabase)
-   NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_key
    ```
 
 4. **Run the development server:**
@@ -56,46 +61,89 @@ A Next.js-based web application for managing customer orders, rides, and marketp
 
 5. **Open your browser:**
 
-   Navigate to [http://localhost:3000](http://localhost:3000)
+   Navigate to [http://localhost:3001](http://localhost:3001)
 
 ## 📋 Environment Variables
 
-| Variable                        | Required    | Description                            | Default                     |
-| ------------------------------- | ----------- | -------------------------------------- | --------------------------- |
-| `NEXT_PUBLIC_API_URL`           | ✅ Yes      | Backend API endpoint                   | `http://localhost:3001/api` |
-| `NEXT_PUBLIC_GOOGLE_MAPS_KEY`   | ✅ Yes      | Google Maps API key for maps/geocoding | -                           |
-| `NEXT_PUBLIC_SUPABASE_URL`      | ⚠️ Optional | Supabase project URL (legacy)          | -                           |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | ⚠️ Optional | Supabase anon key (legacy)             | -                           |
-| `NEXT_PUBLIC_APP_URL`           | ⚠️ Optional | App URL for redirects                  | `http://localhost:3000`     |
-| `NEXT_PUBLIC_APP_NAME`          | ⚠️ Optional | Application name                       | `Asoose Customer Portal`    |
+| Variable                      | Required    | Description                             | Default                        |
+| ----------------------------- | ----------- | --------------------------------------- | ------------------------------ |
+| `NEXT_PUBLIC_API_URL`         | ✅ Yes      | Backend API endpoint                    | `http://localhost:3000/api/v1` |
+| `NEXTAUTH_SECRET`             | ✅ Yes      | Secret for NextAuth.js token encryption | -                              |
+| `NEXTAUTH_URL`                | ✅ Yes      | Your app URL (auto-detected in dev)     | `http://localhost:3001`        |
+| `GOOGLE_CLIENT_ID`            | ✅ Yes      | Google OAuth Client ID                  | -                              |
+| `GOOGLE_CLIENT_SECRET`        | ✅ Yes      | Google OAuth Client Secret              | -                              |
+| `NEXT_PUBLIC_GOOGLE_MAPS_KEY` | ✅ Yes      | Google Maps API key for maps/geocoding  | -                              |
+| `NEXT_PUBLIC_APP_URL`         | ⚠️ Optional | App URL for redirects                   | `http://localhost:3000`        |
+| `NEXT_PUBLIC_APP_NAME`        | ⚠️ Optional | Application name                        | `Asoose Customer Portal`       |
 
 ### Getting API Keys
 
-- **Google Maps API Key**: [Google Cloud Console](https://console.cloud.google.com/google/maps-apis)
-  - Enable: Maps JavaScript API, Geocoding API, Places API, Directions API
-  - Set billing (free tier available)
+#### Google OAuth Credentials
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Create a new project or select existing
+3. Navigate to **APIs & Services** → **Credentials**
+4. Click **Create Credentials** → **OAuth 2.0 Client ID**
+5. Configure OAuth consent screen
+6. Add authorized redirect URIs:
+   - `http://localhost:3001/api/auth/callback/google` (development)
+   - `https://yourdomain.com/api/auth/callback/google` (production)
+7. Copy **Client ID** and **Client Secret**
+
+#### Google Maps API Key
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/google/maps-apis)
+2. Enable: Maps JavaScript API, Geocoding API, Places API, Directions API
+3. Create API key in **Credentials**
+4. Set billing (free tier available)
+
+#### NextAuth Secret
+
+Generate a secure secret:
+
+```bash
+openssl rand -base64 32
+```
+
+## 🔐 Authentication
+
+This app uses **NextAuth.js v5** for authentication with:
+
+- **Google OAuth**: Social sign-in with Google accounts
+- **Credentials**: Email/password authentication via backend API
+- **JWT Sessions**: Stateless session management
+- **Backend Integration**: All user data stored in backend database
+
+### Authentication Flow
+
+1. User signs in with Google or credentials
+2. NextAuth.js validates credentials
+3. Backend API creates/updates user and returns JWT
+4. Frontend stores JWT in NextAuth session
+5. Protected routes use JWT for API requests
 
 ## 🏗️ Project Structure
 
 ```
 src/
 ├── app/                    # Next.js App Router pages
+│   ├── api/auth/          # NextAuth.js API routes
 │   ├── dashboard/         # Customer dashboard
-│   ├── super-admin/       # Admin panel
+│   ├── sign-in/           # Sign-in page
 │   └── ...
+├── auth.ts                # NextAuth.js configuration
 ├── components/            # Reusable React components
 ├── hooks/                 # Custom React hooks
 ├── providers/             # Context providers (Google Maps, etc.)
-└── middleware.ts          # Next.js middleware (auth, etc.)
-utils/
-├── supabase/             # Supabase client utilities (legacy)
+├── middleware.ts          # Next.js middleware (auth, protected routes)
+└── types/                 # TypeScript type definitions
 ```
 
 ## 🔧 Available Scripts
 
 ```bash
 # Development
-yarn dev              # Start dev server on port 3000
+yarn dev              # Start dev server on port 3001
 
 # Production Build
 yarn build            # Create optimized production build
