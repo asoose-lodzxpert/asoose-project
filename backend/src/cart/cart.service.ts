@@ -54,8 +54,8 @@ export class CartService {
         return {
           id: product.id,
           name: product.name,
-          image: product.images[0] || null, // Use first image from array
-          description: product.slug, // Or fetch a short description if you add that column
+          image: product.images[0] || null, 
+          description: product.slug,
           price: itemPrice,
           quantity: itemDto.quantity,
           total: lineTotal,

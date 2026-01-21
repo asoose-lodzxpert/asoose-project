@@ -1,0 +1,124 @@
+Here is a breakdown of the implementation into actionable tasks, organized by domain. This plan prioritizes the Financial Core to ensure data integrity before connecting the logistics flows.
+
+Phase 1: Financial Core & Unified Ledger
+Goal: Establish the single source of truth for all money movement.
+
+Task 1.1: Finalize Transaction Model & Migrations
+
+Action: Verify the Transaction model in schema.prisma includes all necessary enums (TransactionType) and polymorphic relations (orderId, rideId, vendorPayoutId). Ensure indices are optimized for admin queries.
+
+Reference: as/backend/prisma/schema.prisma
+
+Task 1.2: Implement Ledger Service "Atomic" Methods
+
+Action: Review TransactionLedgerService to ensuring every method (e.g., recordOrderCommission) uses a prisma.$transaction block. This must update the User's walletBalance AND create the Transaction record in the same atomic operation.
+
+Reference: as/backend/src/super-admin/transactions/transaction-ledger.service.ts
+
+Task 1.3: Unit Test Ledger Scenarios
+
+Action: Write tests for:
+
+Commission splitting (ensure Vendor + Platform = Total).
+
+Rider fee splitting (ensure Driver + Platform = Total).
+
+Double-entry prevention (ensure a completed order cannot be paid out twice).
+
+Phase 2: Payment Gateway Integration
+Goal: Secure reliable inflows (Payments) and outflows (Payouts).
+
+Task 2.1: Payment Initiation & Router
+
+Action: Complete the switch statement in PaymentService.initiatePayment to route PAYSTACK, FLUTTERWAVE, and MONNIFY requests correctly. Ensure metadata (like userId, orderId) is passed to the gateway so it returns in the webhook.
+
+Reference: as/backend/src/payment/payment.service.ts
+
+Task 2.2: Webhook Security & Idempotency
+
+Action: Implement handleWebhook in PaymentService.
+
+Verify Signature: Ensure verifyWebhookSignature is strictly enforced for all providers.
+
+Idempotency Check: Before processing charge.success, check if Payment.status is already SUCCESS. If so, return 200 OK immediately to stop the gateway from retrying.
+
+Reference: as/backend/src/payment/payment.service.ts
+
+Task 2.3: Payout Adapters
+
+Action: Implement the initiateTransfer methods for Paystack and Flutterwave services. Ensure they handle "Recipient Code" generation (resolving a bank account to a gateway-specific recipient ID) before attempting transfer.
+
+Reference: as/backend/src/payment/paystack.service.ts, as/backend/src/payment/flutterwave.service.ts
+
+Phase 3: Logistics Connectivity (The "Handshake")
+Goal: Connect payment success to real-world service fulfillment.
+
+Task 3.1: The Payment->Matching Trigger
+
+Action: In PaymentService.updatePaymentStatus, ensure that when status flips to SUCCESS:
+
+If rideId exists: Call tripsService.startRideMatching.
+
+If orderId exists: Call tripsService.startDeliveryMatching (if delivery is needed).
+
+Reference: as/backend/src/payment/payment.service.ts
+
+Task 3.2: Ride Completion & Earning Logic
+
+Action: In TripsService (or a RidesController), upon "Trip End":
+
+Calculate final fares (base + distance + time).
+
+Call ledgerService.recordRideEarnings to distribute funds to the driver.
+
+Reference: as/backend/src/users/trips/trips.service.ts
+
+Task 3.3: Delivery Completion & Commission
+
+Action: In DeliveriesService.completeDelivery:
+
+Ensure it calls ledgerService.recordDeliveryEarnings (pay rider).
+
+Ensure it calls ledgerService.recordOrderCommission (pay vendor & platform).
+
+Reference: as/backend/src/super-admin/deliveries/delivery.service.ts
+
+Phase 4: Super Admin Controls
+Goal: Give admins visibility and control over the money.
+
+Task 4.1: Transaction History Endpoint
+
+Action: Finalize TransactionsService.findAll. Ensure it supports filtering by TransactionType (e.g., "Show me all Commission Deductions") and Entity (e.g., "Show me all transactions for Vendor X").
+
+Reference: as/backend/src/super-admin/transactions/transaction.service.ts
+
+Task 4.2: Payout Approval Workflow
+
+Action: Implement PayoutsService.approvePayout.
+
+This must fetch the PENDING payout.
+
+Trigger the Gateway Transfer (via PaymentService).
+
+On success, call ledgerService.recordVendorPayout with status PAID.
+
+Reference: as/backend/src/super-admin/payouts/payouts.service.ts
+
+Task 4.3: Manual Wallet Adjustments
+
+Action: Build the API for TransactionsService.adjustWallet. Validate that a DEBIT operation cannot result in a negative balance (unless explicitly allowed).
+
+Reference: as/backend/src/super-admin/transactions/transaction.service.ts
+
+Phase 5: Resilience & Deployment
+Goal: Prepare for production traffic.
+
+Task 5.1: Race Condition Handling
+
+Action: Review the Matching Processors (RideMatchingProcessor). Ensure the ATOMIC_LOCK_DRIVER Lua script is correctly loaded into Redis to prevent double-booking drivers.
+
+Reference: as/backend/src/matching/workers/ride-matching.processor.ts
+
+Task 5.2: Failed Payout Handling
+
+Action: Create a cron job or webhook listener for "Transfer Failed" events from gateways. If a payout fails asynchronously (after the API call), the system must reverse the Transaction ledger entry and refund the user's wallet.

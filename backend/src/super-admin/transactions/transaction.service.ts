@@ -271,7 +271,7 @@ export class TransactionsService {
             qty: i.quantity,
             price: i.price,
             total: i.quantity * i.price,
-            image: i.product?.images?.[0] || null, // Use first image from array
+            image: i.product?.images?.[0] || null,
             options: i.selectedOptions,
           })),
           subtotal,

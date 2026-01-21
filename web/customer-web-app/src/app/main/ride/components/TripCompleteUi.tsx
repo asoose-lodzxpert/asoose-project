@@ -1,15 +1,24 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Star, MessageCircle, AlertCircle, CheckCircle2, X } from 'lucide-react';
+import { Star, MessageCircle, AlertCircle, CheckCircle2, X, MapPin } from 'lucide-react';
 
 interface TripCompleteUIProps {
   driverName: string;
   price: number;
+  pickup?: string;   // Added optional prop
+  dropoff?: string;  // Added optional prop
+  date?: string;     // Added optional prop
   onClose: () => void;
 }
 
-export default function TripCompleteUI({ driverName, price, onClose }: TripCompleteUIProps) {
+export default function TripCompleteUI({ 
+  driverName, 
+  price, 
+  pickup,
+  dropoff,
+  onClose 
+}: TripCompleteUIProps) {
   const [rating, setRating] = useState(0);
   const [step, setStep] = useState<'RATING' | 'SUPPORT' | 'FINISHED'>('RATING');
 
@@ -21,7 +30,6 @@ export default function TripCompleteUI({ driverName, price, onClose }: TripCompl
   ];
 
   return (
-    /* Updated background to match globals.css dark mode */
     <div className="h-full flex flex-col bg-white dark:bg-[#0a0a0a] overflow-y-auto no-scrollbar transition-colors duration-300">
       {step === 'RATING' && (
         <div className="p-6 text-center animate-in zoom-in duration-300">
@@ -31,7 +39,21 @@ export default function TripCompleteUI({ driverName, price, onClose }: TripCompl
             </div>
           </div>
           <h2 className="text-2xl font-black mb-1 text-gray-900 dark:text-white">Arrived!</h2>
-          <p className="text-gray-500 dark:text-gray-400 mb-8">You paid ₦{price.toLocaleString()}</p>
+          <p className="text-gray-500 dark:text-gray-400 mb-6">You paid ₦{price.toLocaleString()}</p>
+
+          {/* Optional Trip Summary Section */}
+          {pickup && dropoff && (
+            <div className="mb-8 text-left bg-gray-50 dark:bg-zinc-900/30 p-4 rounded-xl border border-gray-100 dark:border-zinc-800">
+                <div className="flex items-start gap-3 mb-2">
+                    <MapPin size={16} className="text-emerald-500 mt-0.5 shrink-0" />
+                    <p className="text-xs text-gray-600 dark:text-zinc-400 line-clamp-1">{pickup}</p>
+                </div>
+                <div className="flex items-start gap-3">
+                    <MapPin size={16} className="text-red-500 mt-0.5 shrink-0" />
+                    <p className="text-xs text-gray-600 dark:text-zinc-400 line-clamp-1">{dropoff}</p>
+                </div>
+            </div>
+          )}
 
           <div className="bg-gray-50 dark:bg-zinc-900/50 rounded-3xl p-6 mb-6 border border-transparent dark:border-zinc-800">
             <p className="font-bold text-gray-900 dark:text-gray-100 mb-4">How was your ride with {driverName}?</p>

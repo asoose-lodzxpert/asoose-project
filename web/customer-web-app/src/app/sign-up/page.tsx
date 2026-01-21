@@ -45,7 +45,7 @@ const SignUpPage = () => {
         throw error;
       }
       
-      router.push("/dashboard");
+      router.push("/main/store");
     } catch(err: any){
       setError(err.message);
     } finally {

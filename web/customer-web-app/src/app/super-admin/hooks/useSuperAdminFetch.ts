@@ -1,12 +1,13 @@
 import { createClient } from "../../../../utils/supabase/client";
 // Validate environment variables at module load
+
 const BACKEND_URL = (() => {
   const url = process.env.NEXT_PUBLIC_API_URL;
   if (!url) {
-    console.error('NEXT_PUBLIC_API_URL is not defined, using fallback');
-    return 'http://localhost:3001/api';
+    console.warn('NEXT_PUBLIC_API_URL is not defined, using fallback');
+    return 'http://localhost:3000/api/v1';
   }
-  return url;
+  return url.replace(/\/$/, ''); 
 })();
 
 interface FetcherOptions {

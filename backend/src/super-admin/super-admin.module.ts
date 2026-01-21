@@ -16,6 +16,8 @@ import { AdminsModule } from './admins/admins.module';
 import { BannerModule } from './banners/banner.module';
 import { SettingsController } from './settings/settings.controller';
 import { SettingsService } from './settings/settings.service';
+import { ActivityLogService } from 'src/common/services/activity-log.services';
+
 @Module({
   imports: [
     DashboardModule,
@@ -34,6 +36,11 @@ import { SettingsService } from './settings/settings.service';
     BannerModule,
   ],
   controllers: [SettingsController],
-  providers: [PrismaService, SettingsService],
+  providers: [
+    PrismaService, 
+    SettingsService,
+    // 👇 2. Add to providers
+    ActivityLogService 
+  ],
 })
 export class SuperAdminModule {}

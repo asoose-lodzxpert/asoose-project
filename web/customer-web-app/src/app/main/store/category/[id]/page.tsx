@@ -5,11 +5,9 @@ import CategoryClient, { CategoryData } from './CategoryClient';
 import { StoreSkeleton } from '@/app/main/store/skeleton';
 
 // --- CONFIG ---
-const RAW_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-const API_URL = RAW_API_URL.replace(/\/$/, ''); // Remove trailing slash
+const RAW_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
+const API_URL = RAW_API_URL.replace(/\/$/, ''); 
 
-// Map UI Slugs to Backend API Values
-// Key: UI Label, Value: URL Slug
 const UI_FILTERS = {
   'All': 'all',
   'Top Rated': 'top-rated',
@@ -17,7 +15,6 @@ const UI_FILTERS = {
   'Low Delivery Fee': 'cheapest'
 };
 
-// Map URL Slugs to API Query Params
 const API_FILTER_MAP: Record<string, string> = {
   'top-rated': 'RATING_DESC',
   'fastest': 'TIME_ASC',
@@ -28,15 +25,13 @@ const API_FILTER_MAP: Record<string, string> = {
 async function getCategoryData(id: string, filterSlug: string = 'all'): Promise<CategoryData | null> {
   try {
     const apiSortParam = API_FILTER_MAP[filterSlug];
-    let url = `${API_URL}/v1/api/marketplace/categories/${id}`;
+    let url = `${API_URL}/marketplace/categories/${id}`;
     
-    // Append sort param if it exists
     if (apiSortParam) {
       url += `?sort=${apiSortParam}`;
     }
 
     const res = await fetch(url, {
-      // Revalidate this data every 60 seconds (ISR)
       next: { revalidate: 60 },
       headers: { 'Content-Type': 'application/json' },
     });
@@ -54,18 +49,25 @@ async function getCategoryData(id: string, filterSlug: string = 'all'): Promise<
 }
 
 // --- SERVER COMPONENT ---
+// 1. Update Types to be Promises
 interface PageProps {
-  params: { id: string };
-  searchParams: { filter?: string };
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ filter?: string }>;
 }
 
 export default async function CategoryPage({ params, searchParams }: PageProps) {
-  const filter = searchParams.filter || 'all';
+  // 2. Await the params and searchParams
+  const resolvedParams = await params;
+  const resolvedSearchParams = await searchParams;
+
+  const filter = resolvedSearchParams.filter || 'all';
+  const categoryId = resolvedParams.id;
+
   let categoryData: CategoryData | null = null;
   let error: string | null = null;
 
   try {
-    categoryData = await getCategoryData(params.id, filter);
+    categoryData = await getCategoryData(categoryId, filter);
   } catch (err) {
     error = err instanceof Error ? err.message : 'An unexpected error occurred';
   }
@@ -79,7 +81,7 @@ export default async function CategoryPage({ params, searchParams }: PageProps) 
         <h2 className="text-xl font-bold mb-2">Unable to load category</h2>
         <p className="text-gray-500 mb-6">{error}</p>
         <a 
-          href="/store"
+          href="/main/store"
           className="flex items-center gap-2 px-6 py-3 bg-gray-900 dark:bg-white text-white dark:text-black rounded-xl font-bold hover:opacity-90 transition-opacity"
         >
           <ArrowLeft className="w-4 h-4" /> Go Back
@@ -95,7 +97,7 @@ export default async function CategoryPage({ params, searchParams }: PageProps) 
   return (
     <CategoryClient 
       data={categoryData} 
-      categoryId={params.id}
+      categoryId={categoryId}
       activeFilter={filter}
       filters={UI_FILTERS}
     />

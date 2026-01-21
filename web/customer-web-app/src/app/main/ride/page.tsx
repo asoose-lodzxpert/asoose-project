@@ -1,197 +1,338 @@
 'use client';
 
-import { useEffect, Suspense } from 'react';
-import { ChevronRight, Home, Briefcase, Package, Box, Layers, Truck } from 'lucide-react';
-import { useGoogleMaps } from "@/providers/GoogleMapsProvider";
-import { useDeliveryStore } from '../store/useDeliveryStore';
-import LocationAutocomplete from './components/LocationAutocomplete';
-import BottomNav from '../components/layout/BottomNav';
+import React, { Suspense, useState, useEffect, useCallback, useRef } from 'react';
+import { useRouter } from 'next/navigation';
+import { Loader2, Crosshair, AlertTriangle } from 'lucide-react';
+import { useJsApiLoader, Libraries } from '@react-google-maps/api';
 
-// 1. Move the main logic to a separate component (not default exported)
-function RidePageContent() {
-  const { isLoaded } = useGoogleMaps();
-  const { 
-    packageInfo, 
-    setPackageInfo, 
-    setLocations, 
-    pickupPos, 
-    dropoffPos, 
-    setStage, 
-    stage 
-  } = useDeliveryStore();
+import GoogleMapView from './components/map';
+import RideSelector from './components/RideSelector';
+import DriverStatusUI from './components/DriverStatus';
+import TripProgressUI from './components/TripProgressUI';
+import TripCompleteUI from './components/TripCompleteUi';
+import { DriverStatusSkeleton } from './components/Skeleton';
+import { 
+  getRideEstimate, requestRide, cancelRide, getRideTypes, getCurrentRide,
+  RideRequestPayload, PriceEstimate, RideType, Driver
+} from '@/services/ride.service';
+import { useRideSocket } from '@/hooks/useRideSocket';
+import { paymentService } from '@/services/payment.service';
+import { createClient } from '../../../../utils/supabase/client';
+import { PAYMENT_METHODS } from './constants/config';
 
-  const packageSizes = [
-    { id: 'Small', label: 'Small', icon: Package, price: 500, type: 'Document' },
-    { id: 'Medium', label: 'Medium', icon: Box, price: 1000, type: 'Parcel' },
-    { id: 'Large', label: 'Large', icon: Layers, price: 2500, type: 'Bulk' },
-    { id: 'XL', label: 'Extra Large', icon: Truck, price: 5000, type: 'Heavy' },
-  ];
+const GOOGLE_LIBS: Libraries = ['places'];
 
+type PageView = 'IDLE' | 'FINDING_DRIVER' | 'ON_WAY' | 'ARRIVED' | 'IN_PROGRESS' | 'COMPLETED';
+
+export default function Page() {
+  return (
+    <Suspense fallback={<div className="h-screen flex items-center justify-center"><Loader2 className="animate-spin"/></div>}>
+      <HomeContent />
+    </Suspense>
+  );  
+}
+
+function HomeContent() {
+
+  const supabase = createClient();
+  const router = useRouter();
+  
+  const { isLoaded: isGoogleLoaded } = useJsApiLoader({
+    id: 'google-map-script',
+    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY || '',
+    libraries: GOOGLE_LIBS,
+  });
+
+  // --- State ---
+  const [rideStage, setRideStage] = useState<PageView>('IDLE');
+  const [activeRideId, setActiveRideId] = useState<string | null>(null);
+  const [errorState, setErrorState] = useState<{title: string, message: string} | null>(null);
+  const [rideTypes, setRideTypes] = useState<RideType[]>([]); // Dynamic config
+
+  const [userLocation, setUserLocation] = useState<google.maps.LatLngLiteral | null>(null);
+  const [destLocation, setDestLocation] = useState<google.maps.LatLngLiteral | null>(null);
+  const [pickupAddress, setPickupAddress] = useState('');
+  const [destinationAddress, setDestinationAddress] = useState('');
+  
+  const [priceEstimates, setPriceEstimates] = useState<PriceEstimate | null>(null);
+  const [driverInfo, setDriverInfo] = useState<Driver | null>(null);
+  const [driverLocation, setDriverLocation] = useState<google.maps.LatLngLiteral | undefined>(undefined);
+  const [isCalculating, setIsCalculating] = useState(false);
+
+  // Request Cancellation Ref
+  const estimateAbortController = useRef<AbortController | null>(null);
+
+  // --- Initialization ---
   useEffect(() => {
-    if (stage === 'IDLE') setStage('CONFIGURING');
-  }, [stage, setStage]);
+    // 1. Fetch Config
+    getRideTypes().then(setRideTypes).catch(console.error);
+    
+    // 2. Sync Active Ride (if user refreshes page)
+    getCurrentRide().then(ride => {
+      if (ride) {
+        setActiveRideId(ride.rideId);
+        setRideStage(ride.status as PageView);
+        // Note: Real app would need to fetch driver details here too
+      }
+    }).catch(() => {}); // Ignore 404
+  }, []);
 
-  const selectedPackage = packageSizes.find(s => s.type === packageInfo.type) || packageSizes[0];
+  // --- Socket Logic ---
+  const handleSocketEvent = useCallback((event: any) => {
+    console.log('Socket Event:', event.type, event);
+    switch (event.type) {
+      case 'DRIVER_FOUND':
+        setRideStage('ON_WAY');
+        setDriverInfo(event.metadata.driver);
+        setActiveRideId(event.metadata.rideId);
+        break;
+      case 'DRIVER_LOCATION_UPDATE':
+        if (event.metadata?.lat && event.metadata?.lng) {
+          setDriverLocation({ lat: event.metadata.lat, lng: event.metadata.lng });
+        }
+        break;
+      case 'DRIVER_ARRIVED':
+        setRideStage('ARRIVED');
+        break;
+      case 'TRIP_STARTED':
+        setRideStage('IN_PROGRESS');
+        break;
+      case 'TRIP_COMPLETED':
+        setRideStage('COMPLETED');
+        break;
+      case 'NO_DRIVERS_FOUND':
+        setRideStage('IDLE');
+        setErrorState({
+            title: "Busy Area",
+            message: "All drivers are currently busy. Please try again in a few moments."
+        });
+        break;
+      case 'RIDE_CANCELLED':
+        resetApp();
+        setErrorState({ title: "Ride Cancelled", message: "The ride was cancelled." });
+        break;
+    }
+  }, []);
+
+
+
+  const handleReconnected = useCallback(() => {
+    // Re-sync state on socket reconnection
+    getCurrentRide().then(ride => {
+      if (!ride && rideStage !== 'IDLE' && rideStage !== 'COMPLETED') {
+        // If backend says no ride, but frontend thinks there is one -> Reset
+        resetApp();
+      }
+    });
+  }, [rideStage]);
+
+  useRideSocket(handleSocketEvent, handleReconnected);
+
+  // --- Location & Estimates ---
+  const handleLocateMe = useCallback(() => {
+    if (!navigator.geolocation || !isGoogleLoaded) return;
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        setUserLocation(coords);
+        if (!pickupAddress) {
+            const geocoder = new google.maps.Geocoder();
+            const res = await geocoder.geocode({ location: coords });
+            if (res.results[0]) setPickupAddress(res.results[0].formatted_address);
+        }
+      },
+      (err) => console.error(err)
+    );
+  }, [isGoogleLoaded, pickupAddress]);
+
+  // Initial Location
+  useEffect(() => {
+    if (isGoogleLoaded && !userLocation) handleLocateMe();
+  }, [isGoogleLoaded, userLocation, handleLocateMe]);
+
+  // Calculate Estimates with Debounce & Abort
+  useEffect(() => {
+    if (userLocation && destLocation) {
+      // Cancel previous request
+      if (estimateAbortController.current) {
+        estimateAbortController.current.abort();
+      }
+
+      // Create new controller
+      estimateAbortController.current = new AbortController();
+      setIsCalculating(true);
+
+      getRideEstimate(
+        { ...userLocation, address: pickupAddress }, 
+        { ...destLocation, address: destinationAddress },
+        estimateAbortController.current.signal
+      )
+        .then(data => setPriceEstimates(data))
+        .catch(err => {
+          if (err.name !== 'CanceledError') {
+             console.error('Estimate failed', err);
+             // Only show error if it wasn't a manual cancel
+          }
+        })
+        .finally(() => setIsCalculating(false));
+    }
+  }, [userLocation, destLocation, pickupAddress, destinationAddress]);
+
+  // --- Actions ---
+ const handleRequestRide = async (data: RideRequestPayload) => {
+    if (!userLocation || !destLocation) return;
+    setRideStage('FINDING_DRIVER');
+    
+    try {
+      // 1. Request Ride (Creates Pending Ride)
+      const res = await requestRide({
+        ...data,
+        pickup: { ...userLocation, address: pickupAddress },
+        dropoff: { ...destLocation, address: destinationAddress }
+      });
+
+      const selectedMethod = PAYMENT_METHODS.find(m => m.id === data.paymentMethodId);
+
+      // 2. Process Payment if Online
+      if (selectedMethod && selectedMethod.type !== 'CASH' && selectedMethod.gateway) {
+        // Get user email
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        localStorage.setItem('pending_ride', 'true');
+        
+        const paymentRes = await paymentService.initiatePayment({
+            amount: data.price,
+            email: session?.user.email || '',
+            gateway: selectedMethod.gateway as any,
+            method: 'CARD',
+            type: 'RIDE',
+            rideId: res.rideId
+        });
+
+        if (paymentRes.authorizationUrl) {
+            window.location.href = paymentRes.authorizationUrl;
+            return; // Stop execution, browser handles redirect
+        }
+      }
+
+      // If Cash or Payment Init Success (but no redirect needed?), set ID
+      setActiveRideId(res.rideId); 
+    } catch (error: any) {
+      console.error(error);
+      setRideStage('IDLE');
+      const msg = error.response?.data?.message || "Unable to connect to server.";
+      setErrorState({ title: "Request Failed", message: msg });
+    }
+  };
+
+  const handleCancel = async () => {
+    if (activeRideId) {
+      try {
+        await cancelRide(activeRideId);
+      } catch (e) { console.error(e); }
+    }
+    resetApp();
+  };
+
+  const resetApp = () => {
+    setRideStage('IDLE');
+    setActiveRideId(null);
+    setDestLocation(null);
+    setDestinationAddress('');
+    setDriverInfo(null);
+    setDriverLocation(undefined);
+    setPriceEstimates(null);
+  };
+
+  // --- Render Helpers ---
+  const renderSidebar = () => {
+    switch (rideStage) {
+      case 'IDLE':
+        return (
+          <RideSelector 
+            pickupAddress={pickupAddress}
+            destinationAddress={destinationAddress}
+            onPickupSelect={(data) => {
+                setPickupAddress(data.address);
+                setUserLocation({ lat: data.lat, lng: data.lng });
+            }}
+            onDestinationSelect={(data) => {
+                setDestinationAddress(data.address);
+                setDestLocation({ lat: data.lat, lng: data.lng });
+            }}
+            priceEstimates={priceEstimates}
+            isCalculatingPrice={isCalculating}
+            onRequestRide={handleRequestRide}
+            isRequesting={false}
+            isGoogleLoaded={isGoogleLoaded}
+            availableRideTypes={rideTypes} // Pass dynamic types
+          />
+        );
+      case 'FINDING_DRIVER':
+        return <DriverStatusSkeleton />;
+      case 'ON_WAY':
+      case 'ARRIVED':
+        return driverInfo ? (
+          <DriverStatusUI 
+            status={rideStage} 
+            driver={driverInfo} 
+            tripDetails={{ pickup: pickupAddress, dropoff: destinationAddress }} 
+            onCancel={handleCancel} 
+          />
+        ) : <DriverStatusSkeleton />;
+      case 'IN_PROGRESS':
+        return <TripProgressUI destination={destinationAddress} driverName={driverInfo?.name || 'Driver'} etaMinutes={10} />;
+      case 'COMPLETED':
+        return <TripCompleteUI pickup={pickupAddress} dropoff={destinationAddress} price={0} driverName={driverInfo?.name || 'Driver'} onClose={resetApp} />;
+      default: return null;
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-white selection:bg-yellow-500/30">
-      {/* Background Decorative Text */}
-      <div className="fixed top-20 right-[-5%] pointer-events-none select-none">
-        <span className="text-[15rem] font-black text-white/[0.02] leading-none uppercase tracking-tighter">
-          Logistics
-        </span>
+    <div className="relative w-full h-screen overflow-hidden flex flex-col md:flex-row bg-gray-100">
+      <div className="absolute inset-0 z-0 md:relative md:flex-1">
+        {rideStage === 'IDLE' && (
+          <button 
+            onClick={handleLocateMe} 
+            className="absolute bottom-32 right-4 md:bottom-8 z-[50] bg-white p-3 rounded-lg shadow-lg hover:shadow-xl transition-shadow"
+            aria-label="Locate me"
+          >
+             <Crosshair className="w-6 h-6 text-gray-700" />
+          </button>
+        )}
+        <GoogleMapView 
+          isLoaded={isGoogleLoaded}
+          userPos={userLocation}
+          destPos={destLocation}
+          rideStage={rideStage}
+          driverPos={driverLocation}
+        />
       </div>
 
-      <main className="relative z-10 max-w-5xl mx-auto px-6 pt-16 pb-32">
-        {/* Header Section */}
-        <header className="mb-16">
-          <h1 className="text-4xl font-black uppercase tracking-tighter italic italic-bold">
-            Send <span className="text-yellow-500">Package</span>
-          </h1>
-          <p className="text-zinc-500 text-xs font-bold uppercase tracking-[0.4em] mt-2">
-            Automated Courier Dispatch System
-          </p>
-        </header>
-
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-16">
-          {/* Track 01: Route Configuration */}
-          <div className="lg:col-span-7 space-y-12">
-            <section>
-              <SectionHeader number="01" title="Route Configuration" />
-              <div className="relative space-y-6 mt-8">
-                {/* Vertical Indicator Line */}
-                <div className="absolute left-[18px] top-6 bottom-6 w-px bg-zinc-800" />
-                
-                {/* Pickup */}
-                <div className="relative pl-12">
-                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-9 h-9 bg-[#0a0a0a] border border-zinc-800 rounded-full flex items-center justify-center z-10">
-                    <div className="w-2 h-2 bg-yellow-500 rounded-full" />
-                  </div>
-                  <div className="group border-b border-zinc-800 focus-within:border-yellow-500 transition-colors">
-                    <label className="block text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-1">Source</label>
-                    <LocationAutocomplete 
-                      onSelect={(d) => setLocations({ lat: d.lat, lng: d.lng }, undefined)} 
-                      placeholder="Enter pickup location"
-                    />
-                  </div>
-                </div>
-
-                {/* Dropoff */}
-                <div className="relative pl-12">
-                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-9 h-9 bg-[#0a0a0a] border border-zinc-800 rounded-full flex items-center justify-center z-10">
-                    <div className="w-2 h-2 border border-yellow-500 rounded-full" />
-                  </div>
-                  <div className="group border-b border-zinc-800 focus-within:border-yellow-500 transition-colors">
-                    <label className="block text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-1">Destination</label>
-                    <LocationAutocomplete 
-                      onSelect={(d) => setLocations(undefined, { lat: d.lat, lng: d.lng })} 
-                      placeholder="Enter dropoff location"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Quick Shortcuts */}
-              <div className="flex gap-4 mt-8 ml-12">
-                <ShortcutButton icon={Home} label="Home" />
-                <ShortcutButton icon={Briefcase} label="Office" />
-              </div>
-            </section>
-
-            <section>
-              <SectionHeader number="02" title="Handling Notes" />
-              <textarea 
-                className="w-full bg-zinc-900/30 border border-zinc-800 p-6 rounded-2xl text-sm outline-none focus:border-yellow-500/50 transition-all min-h-[140px] mt-6 placeholder:text-zinc-700 font-medium"
-                placeholder="Fragile items, gate instructions, or recipient phone..."
-                value={packageInfo.instructions}
-                onChange={(e) => setPackageInfo({ instructions: e.target.value })}
-              />
-            </section>
-          </div>
-
-          {/* Track 02: Dimension & Payload */}
-          <div className="lg:col-span-5 space-y-12">
-            <section>
-              <SectionHeader number="03" title="Payload Size" />
-              <div className="grid grid-cols-2 gap-4 mt-8">
-                {packageSizes.map((size) => (
-                  <button
-                    key={size.id}
-                    onClick={() => setPackageInfo({ type: size.type })}
-                    className={`p-6 border transition-all duration-300 group flex flex-col gap-4 text-left ${
-                      packageInfo.type === size.type 
-                      ? 'border-yellow-500 bg-yellow-500/5' 
-                      : 'border-zinc-800 bg-zinc-900/20 hover:border-zinc-700'
-                    }`}
-                  >
-                    <size.icon className={`w-5 h-5 ${packageInfo.type === size.type ? 'text-yellow-500' : 'text-zinc-600'}`} />
-                    <div>
-                      <p className="font-black uppercase text-[10px] tracking-widest text-zinc-500 mb-1">Format</p>
-                      <p className="font-bold text-sm text-white">{size.label}</p>
+      <div className="absolute bottom-0 left-0 right-0 z-20 max-h-[85vh] md:static md:w-[450px] md:h-full md:max-h-none md:shadow-xl">
+        <div className="pointer-events-auto bg-white h-full rounded-t-3xl md:rounded-none shadow-2xl md:shadow-none overflow-hidden relative">
+          
+          {errorState && (
+            <div className="absolute inset-0 z-50 bg-black/50 flex items-center justify-center p-4 animate-in fade-in">
+                <div className="bg-white rounded-2xl p-6 w-full max-w-sm text-center shadow-xl">
+                    <div className="w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <AlertTriangle size={24} />
                     </div>
-                  </button>
-                ))}
-              </div>
-            </section>
-
-            {/* Footer Summary */}
-            <div className="pt-8 border-t border-zinc-800">
-              <div className="flex justify-between items-end mb-8">
-                <div>
-                  <p className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em] mb-1">Estimated Fare</p>
-                  <p className="text-3xl font-black tracking-tighter italic">
-                    ₦{selectedPackage.price.toLocaleString()}
-                  </p>
+                    <h3 className="text-lg font-bold mb-2">{errorState.title}</h3>
+                    <p className="text-gray-500 mb-6 text-sm">{errorState.message}</p>
+                    <button 
+                        onClick={() => setErrorState(null)}
+                        className="w-full py-3 bg-gray-900 text-white rounded-xl font-bold"
+                    >
+                        Dismiss
+                    </button>
                 </div>
-              </div>
-
-              <button 
-                onClick={() => setStage('SELECTING_VEHICLE')}
-                disabled={!pickupPos || !dropoffPos}
-                className="w-full group bg-white hover:bg-yellow-500 text-black py-5 px-8 flex items-center justify-between transition-all duration-500 disabled:opacity-10 disabled:grayscale"
-              >
-                <span className="font-black uppercase text-xs tracking-[0.3em]">Initialize Dispatch</span>
-                <ChevronRight className="w-5 h-5 transition-transform group-hover:translate-x-2" />
-              </button>
             </div>
-          </div>
+          )}
+
+          {renderSidebar()}
         </div>
-      </main>
-      <BottomNav />
+      </div>
     </div>
   );
 }
-
-// 2. Export the component wrapped in Suspense
-export default function SendPackage() {
-  return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
-        <div className="animate-pulse flex flex-col items-center">
-          <div className="w-12 h-12 bg-zinc-900 rounded-full mb-4"></div>
-          <div className="h-4 w-32 bg-zinc-900 rounded"></div>
-        </div>
-      </div>
-    }>
-      <RidePageContent />
-    </Suspense>
-  );
-}
-
-// Minimalist Sub-components
-const SectionHeader = ({ number, title }: { number: string; title: string }) => (
-  <div className="flex items-center gap-4">
-    <span className="text-[10px] font-black text-yellow-500 font-mono tracking-widest bg-yellow-500/10 px-2 py-1 rounded">
-      {number}
-    </span>
-    <h2 className="text-xs font-black uppercase tracking-[0.3em] text-white">
-      {title}
-    </h2>
-  </div>
-);
-
-const ShortcutButton = ({ icon: Icon, label }: { icon: any; label: string }) => (
-  <button className="flex items-center gap-2 px-4 py-2 bg-zinc-900/50 border border-zinc-800 text-[10px] font-black uppercase tracking-widest text-zinc-400 hover:text-white hover:border-zinc-600 transition-all">
-    <Icon size={12} className="text-yellow-500" /> {label}
-  </button>
-);

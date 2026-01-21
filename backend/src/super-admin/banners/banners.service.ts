@@ -1,72 +1,137 @@
+// as/backend/src/super-admin/banners/banners.service.ts
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
+import { StorageService } from 'src/storage/storage.service';
 import { CreateBannerDto, UpdateBannerDto } from './dto/create-banner.dto';
+
 @Injectable()
 export class BannersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private storage: StorageService,
+  ) {}
+
+  // ===========================================================================
+  // READ
+  // ===========================================================================
 
   async findAll() {
-    return this.prisma.banner.findMany({
+    const banners = await this.prisma.banner.findMany({
       orderBy: { priority: 'desc' },
+    });
+
+    return Promise.all(
+      banners.map(async (banner) => ({
+        ...banner,
+        image: banner.image ? await this.getSignedUrl(banner.image) : null,
+      })),
+    );
+  }
+
+  async findOne(id: string) {
+    const banner = await this.prisma.banner.findUnique({ where: { id } });
+    if (!banner) throw new NotFoundException(`Banner with ID ${id} not found`);
+
+    return {
+      ...banner,
+      image: banner.image ? await this.getSignedUrl(banner.image) : null,
+    };
+  }
+
+  // ===========================================================================
+  // WRITE (Create / Update)
+  // ===========================================================================
+
+  async create(data: CreateBannerDto, file?: Express.Multer.File) {
+    let imageKey: string | null = null;
+
+    if (file) {
+      const upload = await this.storage.uploadFile(file);
+      imageKey = upload.key;
+    }
+
+    return this.prisma.banner.create({
+      data: {
+        title: data.title,
+        subtitle: data.subtitle,
+        buttonText: data.buttonText ?? 'Order Now',
+        link: data.link ?? '/store',
+        type: data.type ?? 'PROMO',
+        priority: data.priority ? Number(data.priority) : 0,
+        isActive: data.isActive ?? true,
+        image: imageKey,
+      },
     });
   }
 
-  async create(data: CreateBannerDto) {
-    return this.prisma.banner.create({
+  async update(id: string, data: UpdateBannerDto, file?: Express.Multer.File) {
+    const banner = await this.prisma.banner.findUnique({ where: { id } });
+    if (!banner) throw new NotFoundException(`Banner not found`);
+
+    let imageKey = banner.image;
+
+    // Handle Image Replacement
+    if (file) {
+      // 1. Delete old image if it exists
+      if (banner.image) {
+        await this.storage.deleteFileByKey(banner.image).catch(console.error);
+      }
+      // 2. Upload new image
+      const upload = await this.storage.uploadFile(file);
+      imageKey = upload.key;
+    }
+
+    return this.prisma.banner.update({
+      where: { id },
       data: {
         title: data.title,
         subtitle: data.subtitle,
         buttonText: data.buttonText,
         link: data.link,
-        image: data.image,
         type: data.type,
-        priority: data.priority,
-        isActive: data.isActive ?? true,
+        isActive: data.isActive,
+        priority: data.priority ? Number(data.priority) : undefined,
+        image: imageKey,
       },
     });
   }
 
-  async update(id: string, data: UpdateBannerDto) {
-    try {
-      return await this.prisma.banner.update({
-        where: { id },
-        data: {
-          ...(data.title && { title: data.title }),
-          ...(data.subtitle && { subtitle: data.subtitle }),
-          ...(data.buttonText && { buttonText: data.buttonText }),
-          ...(data.link && { link: data.link }),
-          ...(data.image && { image: data.image }),
-          ...(data.type && { type: data.type }),
-          ...(data.priority !== undefined && { priority: data.priority }),
-          ...(data.isActive !== undefined && { isActive: data.isActive }),
-        },
-      });
-    } catch (error) {
-      if (error.code === 'P2025') {
-        throw new NotFoundException(`Banner with ID ${id} not found`);
-      }
-      throw error;
-    }
+  // ===========================================================================
+  // REORDERING & DELETE
+  // ===========================================================================
+
+  async reorder(ids: string[]) {
+    return this.prisma.$transaction(
+      ids.map((id, index) => {
+        // First item = Highest Priority
+        const priority = ids.length - index;
+        return this.prisma.banner.update({
+          where: { id },
+          data: { priority },
+        });
+      }),
+    );
   }
 
   async remove(id: string) {
-    try {
-      return await this.prisma.banner.delete({ where: { id } });
-    } catch (error) {
-      if (error.code === 'P2025') {
-        throw new NotFoundException(`Banner with ID ${id} not found`);
-      }
-      throw error;
+    const banner = await this.prisma.banner.findUnique({ where: { id } });
+    if (!banner) throw new NotFoundException(`Banner not found`);
+
+    if (banner.image) {
+      await this.storage.deleteFileByKey(banner.image).catch(console.error);
     }
+
+    return this.prisma.banner.delete({ where: { id } });
   }
 
-  async findOne(id: string) {
-    const banner = await this.prisma.banner.findUnique({ where: { id } });
-
-    if (!banner) {
-      throw new NotFoundException(`Banner with ID ${id} not found`);
+  
+  private async getSignedUrl(key: string): Promise<string> {
+    try {
+      if (key.startsWith('http')) return key;
+      return await this.storage.getSignedUrlForKey(key);
+    } catch (e) {
+      console.error(`Failed to sign URL for key ${key}`, e);
+      return '';
     }
-
-    return banner;
   }
 }

@@ -7,7 +7,7 @@ import {
   LayoutDashboard, Users, ShoppingCart, Car, Truck, 
   CreditCard, AlertTriangle, FileText, Settings, LogOut, 
   Menu, Bell, ChevronDown, ChevronRight, 
-  User
+  User, Banknote, ShieldCheck 
 } from 'lucide-react';
 import { createClient } from '../../../utils/supabase/client';
 
@@ -58,6 +58,20 @@ export default function AdminLayoutClient({ children, userRole }: AdminLayoutCli
       icon: CreditCard, 
       href: '/super-admin/transactions',
       allowed: ['SUPER_ADMIN', 'ADMIN_FINANCE']
+    },
+    // 👇 NEW: Payouts Link
+    { 
+      name: 'Payouts', 
+      icon: Banknote, 
+      href: '/super-admin/payouts',
+      allowed: ['SUPER_ADMIN', 'ADMIN_FINANCE']
+    },
+    // 👇 NEW: Verification Link
+    { 
+      name: 'Verification', 
+      icon: ShieldCheck, 
+      href: '/super-admin/verification',
+      allowed: ['SUPER_ADMIN', 'ADMIN_MANAGER', 'ADMIN_SUPPORT']
     },
     { 
       name: 'Disputes', 
@@ -169,17 +183,17 @@ export default function AdminLayoutClient({ children, userRole }: AdminLayoutCli
 
              return (
                <Link 
-                  key={item.name} 
-                  href={item.href}
-                  className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all mb-1 ${
-                    isActive(item.href) 
-                      ? 'bg-yellow-500 text-black font-bold shadow-lg shadow-yellow-500/20' 
-                      : 'text-gray-400 hover:bg-white/5 hover:text-white'
-                  }`}
-                >
-                  <item.icon className="w-5 h-5" />
-                  {item.name}
-                </Link>
+                 key={item.name} 
+                 href={item.href}
+                 className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all mb-1 ${
+                   isActive(item.href) 
+                     ? 'bg-yellow-500 text-black font-bold shadow-lg shadow-yellow-500/20' 
+                     : 'text-gray-400 hover:bg-white/5 hover:text-white'
+                 }`}
+               >
+                 <item.icon className="w-5 h-5" />
+                 {item.name}
+               </Link>
              );
           })}
         </nav>

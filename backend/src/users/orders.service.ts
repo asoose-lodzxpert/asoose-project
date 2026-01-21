@@ -17,14 +17,15 @@ import { NotificationFacade } from './notification.facade';
 import type { RedisClientType } from 'redis';
 import { InventoryService } from './inventory.service';
 import { VendorOrdersStreamService } from '../vendor/orders/vendor-orders-stream.service';
+import { NotificationsGateway } from '../notifications/notifications.gateway';
 
 const ORDER_STATUS = { PENDING: 'PENDING' } as const;
 const DELIVERY_STATUS = { REQUESTED: 'REQUESTED' } as const;
 
 // Redis Config
 const IDEMPOTENCY_PREFIX = 'idemp:order:';
-const LOCK_TTL_MS = 20000; // 20s lock for processing
-const COMPLETED_TTL_MS = 5 * 60 * 1000; // 5 mins cache for completed orders
+const LOCK_TTL_MS = 20000; 
+const COMPLETED_TTL_MS = 5 * 60 * 1000; 
 
 @Injectable()
 export class OrdersService {
@@ -37,13 +38,11 @@ export class OrdersService {
     private notificationFacade: NotificationFacade,
     private inventoryService: InventoryService,
     private vendorOrdersStreamService: VendorOrdersStreamService,
-    // CHANGED: Inject REDIS_CLIENT with correct type
+    private notificationsGateway: NotificationsGateway,
     @Inject('REDIS_CLIENT') private readonly redis: RedisClientType,
   ) {}
 
-  // ==================================================================
   // 1. QUOTE CALCULATION
-  // ==================================================================
 
   async calculateQuote(userId: string, data: CreateOrderDto) {
     const { addressId, restaurantId, items } = data;
@@ -88,7 +87,6 @@ export class OrdersService {
     );
 
     const deliveryFee = this.pricingService.calculateDeliveryFee(distance);
-    // Assumes PricingService has calculateServiceFee(amount)
     const serviceFee = this.pricingService.calculateServiceFee(subtotal);
     const total = subtotal + deliveryFee + serviceFee;
 
@@ -102,9 +100,7 @@ export class OrdersService {
     };
   }
 
-  // ==================================================================
   // 2. ORDER CREATION LOGIC
-  // ==================================================================
 
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   async createOrder(
@@ -217,7 +213,7 @@ export class OrdersService {
           notificationContext = {
             storeOwnerId: store.vendorId,
             storeName: store.name,
-            storeOwnerEmail: store.vendor?.email, // Fixed: Added optional chaining
+            storeOwnerEmail: store.vendor?.email,
             customerEmail: user.email,
           };
 
@@ -287,17 +283,24 @@ export class OrdersService {
         emailItems,
       );
 
+      // 6. EMIT REAL-TIME UPDATE TO CUSTOMER SOCKET
+      this.notificationsGateway.sendOrderUpdate(order.id, {
+        status: order.status,
+        total: order.total,
+        timeline: [
+          { status: 'PLACED', label: 'Order Placed', time: order.createdAt.toISOString(), icon: 'default' }
+        ]
+      });
+
       return order;
     } catch (error) {
-      // 6. Release Lock on Failure
+      // 7. Release Lock on Failure
       await this.releaseIdempotencyLock(redisKey);
       this.handleOrderError(userId, error);
     }
   }
 
-  // ==================================================================
   // 3. READ OPERATIONS
-  // ==================================================================
 
   async getUserOrders(userId: string) {
     try {
@@ -306,7 +309,7 @@ export class OrdersService {
         orderBy: { createdAt: 'desc' },
         include: {
           items: { select: { quantity: true, nameSnap: true } },
-          store: { select: { name: true, logo: true } }, // Fixed: logo not image
+          store: { select: { name: true, logo: true } },
         },
         take: 50,
       });
@@ -338,10 +341,24 @@ export class OrdersService {
         where: { id: orderId, userId: userId },
         include: {
           items: true,
-          delivery: { include: { dropoffAddress: true } },
+          delivery: { 
+            include: { 
+              dropoffAddress: true,
+              rider: { 
+                select: { 
+                  name: true, 
+                  phone: true, 
+                  image: true, 
+                  vehicle: { select: { model: true, color: true, plateNumber: true } }
+                } 
+              }
+            } 
+          },
           store: {
             select: {
               name: true,
+              lat: true,
+              lng: true,
               vendor: { select: { phone: true } },
             },
           },
@@ -351,12 +368,110 @@ export class OrdersService {
 
       if (!order) throw new NotFoundException('Order not found');
 
+      const timeline: { 
+        status: string; 
+        label: string; 
+        description: string; 
+        time: string | null; 
+        icon: string 
+      }[] = [];
+      
+      // 1. Placed
+      timeline.push({
+        status: 'PLACED',
+        label: 'Order Placed',
+        description: 'Your order has been received',
+        time: order.createdAt.toISOString(),
+        icon: 'default'
+      });
+
+      // 2. Confirmed
+      if (['CONFIRMED', 'PREPARING', 'READY', 'ON_THE_WAY', 'DELIVERED'].includes(order.status)) {
+        timeline.push({
+          status: 'CONFIRMED',
+          label: 'Order Confirmed',
+          description: 'The restaurant has accepted your order',
+          time: null, 
+          icon: 'kitchen'
+        });
+      }
+
+      // 3. Preparing
+      if (['PREPARING', 'READY', 'ON_THE_WAY', 'DELIVERED'].includes(order.status)) {
+        timeline.push({
+          status: 'PREPARING',
+          label: 'Preparing',
+          description: 'Your order is being processed', 
+          time: null, 
+          icon: 'kitchen'
+        });
+      }
+
+      // 4. Ready/Picked Up
+      if (['READY', 'ON_THE_WAY', 'DELIVERED'].includes(order.status)) {
+         timeline.push({
+          status: 'READY',
+          label: 'Order Ready',
+          description: 'Order is ready for pickup', 
+          time: null,
+          icon: 'package'
+        });
+      }
+
+      // 5. On the Way
+      if (['ON_THE_WAY', 'DELIVERED'].includes(order.status) || order.delivery?.status === 'PICKED_UP') {
+        timeline.push({
+          status: 'ON_THE_WAY',
+          label: 'Rider on the way',
+          description: `${order.delivery?.rider?.name || 'Rider'} is heading to you`,
+          time: order.delivery?.pickedUpAt?.toISOString() || null,
+          icon: 'rider'
+        });
+      }
+
+      // 6. Delivered
+      if (order.status === 'DELIVERED' || order.delivery?.status === 'DELIVERED') {
+         timeline.push({
+          status: 'DELIVERED',
+          label: 'Delivered',
+          description: 'Order delivered successfully', // Changed from "Enjoy your meal!"
+          time: order.deliveredAt?.toISOString() || order.delivery?.deliveredAt?.toISOString() || null,
+          icon: 'delivered'
+        });
+      }
+
+      // Handle Cancelled
+      if (order.status === 'CANCELLED' || order.status === 'REJECTED') {
+        timeline.push({
+          status: 'CANCELLED',
+          label: 'Order Cancelled',
+          description: 'This order was cancelled',
+          time: order.cancelledAt?.toISOString() || null,
+          icon: 'default'
+        });
+      }
+
       return {
         id: order.id,
         status: order.status,
         total: order.total,
         createdAt: order.createdAt,
         deliveredAt: order.deliveredAt,
+        
+        // Backend calculated fields for frontend display
+        eta: order.delivery?.distanceKm ? `${Math.ceil(order.delivery.distanceKm * 5 + 15)} mins` : '30-45 mins',
+        distance: order.delivery?.distanceKm ? `${order.delivery.distanceKm} km` : null,
+        
+        timeline: timeline,
+        
+        rider: order.delivery?.rider ? {
+          name: order.delivery.rider.name,
+          phone: order.delivery.rider.phone,
+          vehicle: order.delivery.rider.vehicle 
+            ? `${order.delivery.rider.vehicle.color} ${order.delivery.rider.vehicle.model} (${order.delivery.rider.vehicle.plateNumber})`
+            : 'Motorcycle'
+        } : null,
+
         dispute: order.disputes[0] || null,
         items: order.items.map((item) => ({
           id: item.id,
@@ -373,6 +488,7 @@ export class OrdersService {
         store: {
           name: order.store?.name,
           phone: order.store?.vendor?.phone,
+          location: { lat: order.store?.lat, lng: order.store?.lng }
         },
       };
     } catch (error) {
@@ -381,9 +497,7 @@ export class OrdersService {
     }
   }
 
-  // ==================================================================
   // 4. HELPER METHODS
-  // ==================================================================
 
   private async validateAndFetchProducts(
     tx: Prisma.TransactionClient,
@@ -433,12 +547,7 @@ export class OrdersService {
     throw new BadRequestException('Failed to create order');
   }
 
-  // ==================================================================
-  // 5. REDIS IDEMPOTENCY UTILS (UPDATED SYNTAX)
-  // ==================================================================
-
   private async acquireIdempotencyLock(key: string): Promise<string | null> {
-    // CHANGED: Use object syntax for options (Node-Redis v4+)
     const result = await this.redis.set(key, 'PROCESSING', {
       PX: LOCK_TTL_MS,
       NX: true,
@@ -463,7 +572,6 @@ export class OrdersService {
     key: string,
     orderId: string,
   ): Promise<void> {
-    // CHANGED: Use object syntax for options
     await this.redis.set(key, orderId, { PX: COMPLETED_TTL_MS });
   }
 

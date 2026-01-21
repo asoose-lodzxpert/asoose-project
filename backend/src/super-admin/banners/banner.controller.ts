@@ -9,12 +9,15 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { BannersService } from './banners.service';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { RolesGuard } from 'src/auth/roles.guards';
 import { Roles } from 'src/auth/roles.decorator';
-import { CreateBannerDto, UpdateBannerDto } from './dto/create-banner.dto';
+import { CreateBannerDto, UpdateBannerDto, ReorderBannersDto } from './dto/create-banner.dto';
 import { UserRole } from 'src/common/enums/user-role.enum';
 
 @Controller('super-admin/banners')
@@ -34,14 +37,29 @@ export class BannersController {
   }
 
   @Post()
+  @UseInterceptors(FileInterceptor('image')) // Intercept 'image' field
   @HttpCode(HttpStatus.CREATED)
-  create(@Body() createBannerDto: CreateBannerDto) {
-    return this.bannersService.create(createBannerDto);
+  create(
+    @Body() createBannerDto: CreateBannerDto,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    return this.bannersService.create(createBannerDto, file);
+  }
+
+  @Post('reorder')
+  @HttpCode(HttpStatus.OK)
+  reorder(@Body() reorderDto: ReorderBannersDto) {
+    return this.bannersService.reorder(reorderDto.ids);
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateBannerDto: UpdateBannerDto) {
-    return this.bannersService.update(id, updateBannerDto);
+  @UseInterceptors(FileInterceptor('image'))
+  update(
+    @Param('id') id: string,
+    @Body() updateBannerDto: UpdateBannerDto,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    return this.bannersService.update(id, updateBannerDto, file);
   }
 
   @Delete(':id')
