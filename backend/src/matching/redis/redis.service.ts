@@ -1,6 +1,6 @@
 import { Injectable, Inject, Logger } from '@nestjs/common';
 import Redis from 'ioredis';
-import { REDIS_CLIENT } from './redis.module';
+import { MATCHING_REDIS_CLIENT } from './redis.module';
 import {
   REDIS_KEYS,
   REDIS_TTL,
@@ -12,7 +12,7 @@ import {
 export class RedisService {
   private readonly logger = new Logger(RedisService.name);
 
-  constructor(@Inject(REDIS_CLIENT) private readonly redis: Redis) {}
+  constructor(@Inject(MATCHING_REDIS_CLIENT) private readonly redis: Redis) {}
 
   /**
    * Get Redis client for custom operations

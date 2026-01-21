@@ -7,7 +7,6 @@ import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis'
   imports: [
     ThrottlerModule.forRootAsync({
       useFactory: () => {
-        // Construct Redis connection from environment variables
         const redis = new Redis({
           host: process.env.REDIS_HOST || 'localhost',
           port: Number(process.env.REDIS_PORT) || 6379,

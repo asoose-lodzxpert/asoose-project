@@ -3,14 +3,17 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
 import { RedisService } from './redis.service';
 
-export const REDIS_CLIENT = 'REDIS_CLIENT';
+// Use a distinct token for the matching system Redis client to avoid
+// colliding with the application's global Redis provider (which uses
+// the 'REDIS_CLIENT' token).
+export const MATCHING_REDIS_CLIENT = 'MATCHING_REDIS_CLIENT';
 
 @Global()
 @Module({
   imports: [ConfigModule],
   providers: [
     {
-      provide: REDIS_CLIENT,
+      provide: MATCHING_REDIS_CLIENT,
       useFactory: (configService: ConfigService) => {
         const redis = new Redis({
           host: configService.get('REDIS_HOST', 'localhost'),
@@ -48,6 +51,6 @@ export const REDIS_CLIENT = 'REDIS_CLIENT';
     },
     RedisService,
   ],
-  exports: [REDIS_CLIENT, RedisService],
+  exports: [MATCHING_REDIS_CLIENT, RedisService],
 })
 export class RedisModule {}
