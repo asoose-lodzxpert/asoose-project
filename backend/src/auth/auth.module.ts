@@ -6,10 +6,7 @@ import { JwtAuthGuard } from './jwt-auth.guard';
 import { JwtStrategy } from './jwt-strategy';
 import { PrismaModule } from 'src/prisma/prisma.module';
 import { OtpModule } from './otp.module';
-import {
-  AuthController,
-  UserAuthController,
-} from './auth.controller';
+import { AuthController, UserAuthController } from './auth.controller';
 import { VendorAuthController } from './vendor-auth.controller';
 import { VendorAuthService } from './vendor-auth.service';
 import { RiderAuthController } from './rider-auth.controller';
