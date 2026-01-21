@@ -4,7 +4,7 @@
  * CRITICAL: Driver state (status, location, active trips) lives ONLY in Redis.
  * Database stores stable business records only.
  */
-
+export const REDIS_CLIENT = 'REDIS_CLIENT';
 export const REDIS_KEYS = {
   // ========================================
   // DRIVER STATE (SOURCE OF TRUTH)

@@ -18,10 +18,12 @@ export const NotificationListener = () => {
 
       if (!token) return;
 
-      const SOCKET_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+      // 👇 FIX: Extract only the origin (http://localhost:3000)
+      // This removes '/api/v1' so Socket.IO connects to the root namespace
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+      const SOCKET_URL = new URL(apiUrl).origin;
       
       // 2. Initialize socket with auth token
-      // Pass token in 'auth' object as expected by your backend gateway
       socketRef.current = io(SOCKET_URL, {
         transports: ['websocket'],
         auth: { token } 
@@ -51,13 +53,16 @@ export const NotificationListener = () => {
       });
 
       socketRef.current.on('connect_error', (err) => {
-        console.error('🔌 Socket Connection Error:', err.message);
+        // Suppress specific namespace errors if they persist during hot-reload
+        if (err.message !== 'Invalid namespace') {
+             console.error('🔌 Socket Connection Error:', err.message);
+        }
       });
     };
 
     setupConnection();
 
-    // 4. Proper cleanup to prevent memory leaks or multiple connections
+    // 4. Proper cleanup
     return () => {
       if (socketRef.current) {
         socketRef.current.disconnect();

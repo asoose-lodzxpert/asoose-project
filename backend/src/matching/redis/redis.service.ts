@@ -12,7 +12,7 @@ import {
 export class RedisService {
   private readonly logger = new Logger(RedisService.name);
 
-  constructor(@Inject(MATCHING_REDIS_CLIENT) private readonly redis: Redis) {}
+  constructor(@Inject(REDIS_CLIENT) private readonly redis: Redis) {}
 
   /**
    * Get Redis client for custom operations

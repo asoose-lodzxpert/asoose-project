@@ -19,6 +19,7 @@ interface PackageInfo {
   instructions: string;
   recipientName: string;
   recipientPhone: string;
+  pickupAddress: string; // Added for consistency
   destinationAddress: string;
 }
 
@@ -46,6 +47,7 @@ const initialPackageInfo: PackageInfo = {
   instructions: '',
   recipientName: '',
   recipientPhone: '',
+  pickupAddress: '',
   destinationAddress: '',
 };
 
@@ -85,9 +87,8 @@ export const useDeliveryStore = create<DeliveryState>()(
       }),
     }),
     {
-      name: 'asoose-delivery-storage', // Key used in localStorage
+      name: 'asoose-delivery-storage',
       storage: createJSONStorage(() => localStorage),
-      // Optional: Only persist these specific fields
       partialize: (state) => ({ 
         stage: state.stage, 
         packageInfo: state.packageInfo,

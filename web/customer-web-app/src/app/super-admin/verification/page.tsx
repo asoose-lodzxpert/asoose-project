@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import useSWR from 'swr';
 import { fetcher } from '../hooks/useSuperAdminFetch';
 import { ShieldCheck, ExternalLink, CheckCircle2, XCircle, Clock, User } from 'lucide-react';
+import VerificationSkeleton from './skeleton';
 
 interface VerificationDoc {
   id: string;
@@ -52,8 +53,7 @@ export default function VerificationManager() {
     }
   };
 
-  if (isLoading) return <div className="p-10 text-white">Loading Verification Queue...</div>;
-
+  if (isLoading) return<VerificationSkeleton/>
   return (
     <div className="p-6 bg-[#0F172A] min-h-screen text-white">
       <div className="max-w-7xl mx-auto">

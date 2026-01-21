@@ -48,7 +48,7 @@ const handleLogin = async (e?: React.FormEvent) => {
     if (profile?.role === 'super_admin') {
       router.push('/super-admin/dashboard');
     } else {
-      router.push('/store');
+      router.push('/main/store');
     }
     
   } catch (err: any) {

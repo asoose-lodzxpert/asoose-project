@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ShoppingBag, Car, Package, Settings } from 'lucide-react';
+import { ShoppingBag, Car, Package, Settings, User } from 'lucide-react';
 
 const NavItem = ({ 
   icon: Icon, 
@@ -38,7 +38,7 @@ export default function BottomNav() {
     { icon: ShoppingBag, label: 'Order', href: '/main/store' },
     { icon: Car, label: 'Ride', href: '/main/ride' },
     { icon: Package, label: 'Deliver', href: '/main/delivery' },
-    { icon: Settings, label: 'Settings', href: '/main/settings' }
+    { icon: User, label: 'Profile', href: '/main/profile' }
   ];
 
   return (

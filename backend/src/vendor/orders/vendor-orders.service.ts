@@ -8,6 +8,7 @@ import {
 import { OrderStatus } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { NotificationsGateway } from 'src/notifications/notifications.gateway';
 
 @Injectable()
 export class VendorOrdersService {
@@ -16,6 +17,7 @@ export class VendorOrdersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly notificationsGateway: NotificationsGateway,
   ) {}
 
   private async validateOrderAccess(userId: string, orderId: string) {
@@ -99,6 +101,15 @@ export class VendorOrdersService {
       data: { status: OrderStatus.CONFIRMED },
     });
 
+    // Real-time update
+    this.notificationsGateway.sendOrderUpdate(updated.id, {
+      status: 'CONFIRMED',
+      timeline: [
+        { status: 'PLACED', time: updated.createdAt.toISOString(), icon: 'default' },
+        { status: 'CONFIRMED', label: 'Order Confirmed', time: new Date().toISOString(), icon: 'kitchen' }
+      ]
+    });
+
     return updated;
   }
 
@@ -128,12 +139,14 @@ export class VendorOrdersService {
         },
       });
 
-      // =================================================================
-      // [TODO] FINANCIAL RESPONSIBILITY HANDOFF
-      // The actual refund logic (Payment update + Ledger transaction)
-      // should be handled here by the Finance Module (TransactionService).
-      // You should emit an event like 'order.cancelled' for them to listen to.
-      // =================================================================
+      // Real-time update
+      this.notificationsGateway.sendOrderUpdate(updated.id, {
+        status: 'REJECTED',
+        timeline: [
+           { status: 'PLACED', time: updated.createdAt.toISOString() },
+           { status: 'CANCELLED', label: 'Order Declined', description: reason, time: new Date().toISOString() }
+        ]
+      });
 
       return updated;
     });
@@ -158,6 +171,12 @@ export class VendorOrdersService {
       storeId: updated.storeId,
     });
 
+    // Real-time update
+    this.notificationsGateway.sendOrderUpdate(updated.id, {
+      status: 'READY',
+      // In a full implementation, you would reconstruct the whole timeline here
+    });
+
     return updated;
   }
 
@@ -168,9 +187,16 @@ export class VendorOrdersService {
       throw new BadRequestException('Order must be confirmed first');
     }
 
-    return this.prisma.order.update({
+    const updated = await this.prisma.order.update({
       where: { id: orderId },
       data: { status: OrderStatus.PREPARING },
     });
+
+    // Real-time update
+    this.notificationsGateway.sendOrderUpdate(updated.id, {
+      status: 'PREPARING',
+    });
+
+    return updated;
   }
 }

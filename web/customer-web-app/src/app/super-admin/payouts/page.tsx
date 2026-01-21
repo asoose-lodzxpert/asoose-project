@@ -4,6 +4,7 @@ import React from 'react';
 import useSWR from 'swr';
 import { fetcher } from '../hooks/useSuperAdminFetch';
 import { Check, X, Banknote, Clock } from 'lucide-react';
+import PayoutsSkeleton from './skeleton';
 
 // 1. Define the specific structures returned by the backend
 interface PayoutResponse {
@@ -53,7 +54,7 @@ export default function PayoutsManagement() {
     }
   };
 
-  if (isLoading) return <div className="p-8 text-white">Loading Payouts...</div>;
+  if (isLoading) return <PayoutsSkeleton/>;
 
   // Now 'data' is typed, so these property accesses are valid
   const allPayouts = [
