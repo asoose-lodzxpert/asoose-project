@@ -1,15 +1,21 @@
 'use client';
-import dynamic from 'next/dynamic';
 
-const Map = dynamic(() => import('./map'), { ssr: false });
+import React from 'react';
+import Map from './map'; 
 
+// ✅ FIX: Change [number, number] to { lat: number; lng: number }
 interface MapViewProps {
-  userPos: [number, number] | null;
-  destPos: [number, number] | null;
-  tripStatus?: string; // <--- ADDED
+  isLoaded: boolean;
+  userPos: { lat: number; lng: number } | null;
+  destPos: { lat: number; lng: number } | null;
+  tripStatus?: string;
   onRouteData?: (distance: number, duration: number) => void;
+  // Add any other props that 'Map' accepts if needed
+  driverPos?: { lat: number; lng: number }; 
+  rideStage?: string;
 }
 
 export default function MapView(props: MapViewProps) {
-  return <Map {...props} />;
+   // Now the types match what <Map /> expects
+   return <Map {...props} />;
 }

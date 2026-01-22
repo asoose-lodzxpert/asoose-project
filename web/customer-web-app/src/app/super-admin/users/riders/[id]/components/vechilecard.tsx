@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { Truck, Edit2, Save, X, Loader2 } from 'lucide-react';
 import { AppAlert } from '../../../customers/[id]/alerts';
-import { createClient } from '../../../../../../../utils/supabase/client'; // ✅ Import Supabase Client
+import { getSession } from 'next-auth/react'; // ✅ Import NextAuth
 
 interface VehicleCardProps {
   vehicle: any;
@@ -11,7 +11,6 @@ interface VehicleCardProps {
   onUpdate: () => void; // Trigger refresh after update
 }
 
-// ✅ Ensure API URL handles the prefix correctly
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001') + (process.env.NEXT_PUBLIC_API_URL?.endsWith('/api') ? '' : '/api');
 
 export const VehicleCard = ({ vehicle, riderId, onUpdate }: VehicleCardProps) => {
@@ -29,13 +28,13 @@ export const VehicleCard = ({ vehicle, riderId, onUpdate }: VehicleCardProps) =>
   const handleSave = async () => {
     setLoading(true);
     try {
-      // ✅ 1. Get Auth Header
-      const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
+      // ✅ 1. Get Session via NextAuth
+      const session = await getSession();
+      const token = (session as any)?.accessToken;
       
       const headers = {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${session?.access_token || ''}`
+        'Authorization': `Bearer ${token || ''}` // ✅ Added Token
       };
 
       // ✅ 2. Send Request with Headers

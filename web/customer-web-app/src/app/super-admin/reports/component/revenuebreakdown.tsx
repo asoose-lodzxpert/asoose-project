@@ -47,7 +47,8 @@ export default function RevenueBreakdown({ data }: { data: any[] }) {
             <Tooltip 
               contentStyle={{ backgroundColor: '#0F172A', borderColor: '#334155', borderRadius: '8px' }}
               itemStyle={{ color: '#fff', fontSize: '12px' }}
-              formatter={(value: number) => [`$${value.toLocaleString()}`, 'Revenue']}
+              // FIX: Changed type to 'any' to accept number | undefined without conflict
+              formatter={(value: any) => [`$${Number(value || 0).toLocaleString()}`, 'Revenue']}
             />
             <Legend 
               verticalAlign="bottom" 

@@ -4,6 +4,7 @@ import React, { useState, useMemo } from 'react';
 import { Download, Calendar, Loader2, Filter } from 'lucide-react';
 import { format, subDays, startOfWeek, startOfMonth, parseISO } from 'date-fns';
 import useSWR from 'swr'; 
+import { getSession } from 'next-auth/react'; 
 import { fetcher } from '../hooks/useSuperAdminFetch';
 import OverviewCards from './component/overviewcards';
 import ChartsSection from './component/chartsection';
@@ -14,7 +15,7 @@ import ReportsPageSkeleton from './component/skeleton';
 
 // --- Types ---
 interface API_ReportData {
-  overview: any;
+  overview: any; // You can replace 'any' with 'OverviewMetrics' if you have the type
   orderVolume: any[];
   growth: any[];
   revenueBreakdown: any[];
@@ -36,14 +37,13 @@ export default function ReportsPage() {
   const [showPeriodMenu, setShowPeriodMenu] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
 
-
   const { data, error, isLoading } = useSWR<API_ReportData>(
     `/super-admin/reports/analytics?days=${selectedPeriod}`,
     fetcher,
     {
-      keepPreviousData: true, // Key for dashboards: keeps old charts visible while new data loads
-      revalidateOnFocus: false, // Don't re-fetch expensive analytics just because user clicked away
-      refreshInterval: 0, // Disable auto-refresh for static historical reports
+      keepPreviousData: true, 
+      revalidateOnFocus: false, 
+      refreshInterval: 0, 
     }
   );
 
@@ -111,10 +111,8 @@ export default function ReportsPage() {
   const handleExport = async () => {
     setIsExporting(true);
     try {
-      // Note: We use fetch here instead of SWR because we need the blob response for download
-      // and we don't need to cache the CSV file in memory.
-      const session = await import('../../../../utils/supabase/client').then(m => m.createClient().auth.getSession());
-      const token = session.data.session?.access_token;
+      const session = await getSession();
+      const token = (session as any)?.accessToken;
       
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/super-admin/reports/export?days=${selectedPeriod}`, {
           headers: { 'Authorization': `Bearer ${token}` }
@@ -148,7 +146,7 @@ export default function ReportsPage() {
   return (
     <div className="min-h-screen bg-[#0F172A] pb-20">
       
-      {/* Sticky Header for Mobile Access */}
+      {/* Sticky Header */}
       <div className="sticky top-0 z-20 bg-[#0F172A]/95 backdrop-blur-md border-b border-gray-800 px-4 md:px-6 py-4 shadow-sm">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
@@ -207,15 +205,16 @@ export default function ReportsPage() {
 
       <div className="max-w-7xl mx-auto px-4 md:px-6 space-y-6 mt-6">
         
-        {/* Overview Cards with Explicit Date Context */}
+        {/* Overview Cards */}
         <div className="overflow-x-auto pb-2 -mx-4 px-4 md:overflow-visible md:pb-0 md:mx-0 md:px-0">
+            {/* ✅ FIXED: Added null fallback */}
             <OverviewCards 
-              metrics={data.overview} 
+              metrics={data?.overview ?? null} 
               subtext={comparisonText} 
             />
         </div>
 
-        {/* Charts with Drill-down capability & Aggregation Label */}
+        {/* Charts */}
         <ChartsSection 
           volumeData={processedChartData.volume}
           growthData={processedChartData.growth}
@@ -224,12 +223,8 @@ export default function ReportsPage() {
 
         {/* Breakdown & Rankings */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Revenue Breakdown - Now a Donut Chart */}
           <RevenueBreakdown data={data.revenueBreakdown} />
-          
           <RatingsDistribution ratings={data.ratings} avgRating={data.avgRating} />
-          
-          {/* Top Vendors - Now with Relative Revenue Bars */}
           <TopVendors vendors={data.topVendors} />
         </div>
       </div>

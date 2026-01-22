@@ -7,23 +7,27 @@ import {
   AlertCircle, Image as ImageIcon, Loader2 
 } from 'lucide-react';
 import Image from 'next/image';
-import { createClient } from '../../../../../utils/supabase/client';
+import { getSession } from 'next-auth/react'; // ✅ Import NextAuth
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 export default function DisputeDetailsPage() {
   const { id } = useParams();
   const router = useRouter();
-  const supabase = createClient();
   const [dispute, setDispute] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchDispute = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
+      // ✅ Get Session via NextAuth
+      const session = await getSession();
+      const token = (session as any)?.accessToken;
+
       try {
         const res = await fetch(`${API_URL}/super-admin/disputes/${id}`, {
-          headers: { Authorization: `Bearer ${session?.access_token}` }
+          headers: { Authorization: `Bearer ${token}` } // ✅ Use Token
         });
+        
         if (!res.ok) throw new Error('Dispute not found');
         setDispute(await res.json());
       } catch (error) {
@@ -33,7 +37,7 @@ export default function DisputeDetailsPage() {
       }
     };
     fetchDispute();
-  }, [id, supabase.auth]);
+  }, [id]);
 
   if (loading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin text-yellow-500" /></div>;
   if (!dispute) return <div className="p-8 text-center font-bold">Dispute not found.</div>;

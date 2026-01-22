@@ -8,9 +8,10 @@ import {
   ChevronLeft, Phone, User, CreditCard, 
   Loader2, AlertCircle, RefreshCw, WifiOff, Package 
 } from 'lucide-react';
-import { createClient } from '../../../../../utils/supabase/client';
+import { getSession } from 'next-auth/react'; // ✅ Import NextAuth
 import { toast } from 'react-toastify';
 import SmartTimeline, { TimelineStep } from './component/smartTimeline';
+
 // --- Configuration ---
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 const MAX_RECONNECT_ATTEMPTS = 5;
@@ -42,12 +43,15 @@ interface ApiError {
 // --- Fetcher ---
 const fetcher = async (url: string): Promise<OrderData> => {
   if (!API_URL) throw new Error('API URL not configured');
-  const supabase = createClient();
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) throw new Error('Authentication required');
+  
+  // ✅ Use NextAuth getSession
+  const session = await getSession();
+  const token = (session as any)?.accessToken;
+
+  if (!token) throw new Error('Authentication required');
   
   const res = await fetch(`${API_URL}${url}`, {
-    headers: { 'Authorization': `Bearer ${session.access_token}` }
+    headers: { 'Authorization': `Bearer ${token}` } // ✅ Use NextAuth Token
   });
   
   if (!res.ok) throw new Error('Failed to fetch order');
@@ -66,7 +70,6 @@ export default function TrackOrderPage() {
   const [reconnectAttempts, setReconnectAttempts] = useState(0);
   
   const socketRef = useRef<Socket | null>(null);
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // --- Data Fetching ---
   const { 
@@ -89,15 +92,17 @@ export default function TrackOrderPage() {
     if (socketRef.current?.connected) return;
 
     try {
-      const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
+      // ✅ Get Token from NextAuth Session
+      const session = await getSession();
+      const token = (session as any)?.accessToken;
+
+      if (!token) {
         setConnectionError('Authentication failed');
         return;
       }
 
       const newSocket = io(API_URL, {
-        auth: { token: session.access_token },
+        auth: { token }, // ✅ Pass NextAuth Token to Socket
         reconnectionAttempts: MAX_RECONNECT_ATTEMPTS,
         timeout: 10000
       });

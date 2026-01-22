@@ -1,5 +1,7 @@
+'use client';
+
 import { create } from 'zustand';
-import { getRideEstimate } from '@/services/ride.service';
+import { RideService, VehicleType } from '@/services/ride.service';
 
 export type RideStage = 
   | 'IDLE' 
@@ -83,13 +85,21 @@ export const useRideStore = create<RideState>((set, get) => ({
   calculatePrice: async () => {
     const { userLocation, destination } = get();
     if (!userLocation || !destination) return;
+    
     set({ isCalculating: true });
     try {
-      const estimates = await getRideEstimate(
-        { ...userLocation, address: 'Current Location' },
-        { ...destination }
-      );
+      // FIX: Use RideService.getEstimate and pass correct field names expected by the service
+      const estimates = await RideService.getEstimate({
+        pickupLat: userLocation.lat,
+        pickupLng: userLocation.lng,
+        dropoffLat: destination.lat,
+        dropoffLng: destination.lng,
+        vehicleType: 'CAR' as VehicleType // Defaults to CAR, can be made dynamic if needed
+      });
+      
       set({ priceEstimates: estimates });
+    } catch (error) {
+      console.error("Price Calculation Error:", error);
     } finally {
       set({ isCalculating: false });
     }

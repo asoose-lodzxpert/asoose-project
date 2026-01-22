@@ -4,20 +4,24 @@ import React, { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { MapPin, Clock, TrendingUp, AlertTriangle, RefreshCw } from 'lucide-react';
 import { VehicleCard } from './vechilecard';
-import { createClient } from '../../../../../../../utils/supabase/client'; // ✅ Import Supabase
+import { getSession } from 'next-auth/react'; // ✅ Import NextAuth
 
+// Dynamic import for the Map component
 const RiderMap = dynamic(() => import('./map'), { 
   ssr: false,
-  loading: () => <div className="h-full w-full bg-gray-800 animate-pulse flex items-center justify-center text-gray-500 text-sm">Loading Map...</div>
+  loading: () => (
+    <div className="h-full w-full bg-gray-800 animate-pulse flex items-center justify-center text-gray-500 text-sm">
+      Loading Map...
+    </div>
+  )
 });
 
-// ✅ Fix API URL Logic
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001') + (process.env.NEXT_PUBLIC_API_URL?.endsWith('/api') ? '' : '/api');
 
 export const RiderOverviewTab = ({ rider, onRefresh }: { rider: any, onRefresh: () => void }) => {
   const perf = rider.performance || { acceptanceRate: 0, cancellationRate: 0, hoursOnline: 0 };
   
-  // Live Location State
+  // Live Location State (Array format [lat, lng])
   const [position, setPosition] = useState<[number, number]>([
     rider.currentLat || 6.5244, 
     rider.currentLng || 3.3792
@@ -31,15 +35,15 @@ export const RiderOverviewTab = ({ rider, onRefresh }: { rider: any, onRefresh: 
       try {
         setIsRefreshing(true);
         
-        // ✅ 1. Get Session
-        const supabase = createClient();
-        const { data: { session } } = await supabase.auth.getSession();
+        // 1. Get Session
+        const session = await getSession();
+        const token = (session as any)?.accessToken;
 
-        // ✅ 2. Fetch with Auth Headers
+        // 2. Fetch with Auth Headers
         const res = await fetch(`${API_URL}/super-admin/riders/${rider.id}`, {
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session?.access_token || ''}`
+            'Authorization': `Bearer ${token || ''}`
           }
         });
 
@@ -57,7 +61,7 @@ export const RiderOverviewTab = ({ rider, onRefresh }: { rider: any, onRefresh: 
       }
     };
 
-    const interval = setInterval(fetchLocation, 10000); // 10 seconds
+    const interval = setInterval(fetchLocation, 10000); // Poll every 10s
     return () => clearInterval(interval);
   }, [rider.id]);
 
@@ -104,7 +108,8 @@ export const RiderOverviewTab = ({ rider, onRefresh }: { rider: any, onRefresh: 
             </span>
           </div>
           <div className="flex-1 relative z-0">
-             <RiderMap pos={position} popupText={`Rider Location`} />
+             {/* ✅ FIX: Pass 'pos' array instead of separate lat/lng props */}
+             <RiderMap pos={position} />
           </div>
         </div>
 
@@ -113,7 +118,7 @@ export const RiderOverviewTab = ({ rider, onRefresh }: { rider: any, onRefresh: 
            <VehicleCard 
              vehicle={rider.vehicle} 
              riderId={rider.id} 
-             onUpdate={onRefresh} // Refreshes parent data when saved
+             onUpdate={onRefresh} 
            />
         </div>
       </div>

@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { Loader2, DollarSign, TrendingUp } from 'lucide-react';
 import Swal from 'sweetalert2';
 import useSWR from 'swr'; 
-import { getSession } from 'next-auth/react'; // ✅ Import NextAuth
+import { getSession } from 'next-auth/react'; 
 import { fetcher } from '@/app/super-admin/hooks/useSuperAdminFetch';
 
 // --- Components ---
@@ -23,6 +23,44 @@ import PayoutsTabContent from './components/payoutstabcontent';
 import DocumentsTab from '@/app/super-admin/component/documentstab';
 
 // --- Types ---
+
+// ✅ FIXED: Updated to match what ProductsTabContent expects
+interface Product {
+  id: string;
+  name: string;
+  price: number;
+  status: string;
+  image?: string;
+  category: string; // Added required property
+  stock?: number;
+}
+
+// ✅ FIXED: Updated to match what ActivityLogTab expects
+interface ActivityLog {
+  id: string;
+  action: string;
+  details?: string;
+  user: string;      // Added required property
+  timestamp: string; // Added required property (replaces or maps to 'date')
+}
+
+// ✅ FIXED: Updated to match what PerformanceChart expects
+interface PerformanceData {
+  date: string;
+  revenue: number;   // Changed from 'value' to 'revenue'
+}
+
+interface VendorDocument {
+  id: string;
+  name: string;
+  url: string;
+  status: 'PENDING' | 'VERIFIED' | 'REJECTED';
+  rejectionReason?: string;
+  uploadedDate: string;
+  type?: string; 
+  createdAt?: string; 
+}
+
 interface VendorDetails {
   id: string;
   name: string;      
@@ -37,15 +75,11 @@ interface VendorDetails {
   orders: any[];
   reviews: any[];
   address?: string;
-  vendorDocuments: {
-    id: string;
-    name: string;        
-    url: string;
-    status: 'PENDING' | 'VERIFIED' | 'REJECTED';
-    rejectionReason?: string;
-    uploadedDate: string; 
-  }[];
+  vendorDocuments: VendorDocument[];
 }
+
+// Payouts response structure
+type PayoutsResponse = { history: any[] } | any[]; 
 
 // --- Validation Helper ---
 const validateEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -76,7 +110,6 @@ export default function VendorDetailPage() {
 
   // Helper to get auth token
   const getAuthHeader = async () => {
-    // ✅ Get Session from NextAuth
     const session = await getSession();
     const token = (session as any)?.accessToken;
     return {
@@ -111,20 +144,20 @@ export default function VendorDetailPage() {
     }
   );
 
-  // 2. Performance Charts (Always fetched if vendor exists)
-  const { data: performanceData } = useSWR(
+  // 2. Performance Charts
+  const { data: performanceData } = useSWR<PerformanceData[]>(
     vendor?.id ? `/super-admin/vendors/${vendor.id}/performance?days=30` : null,
     fetcher
   );
 
-  // 3. Tab Specific Data (Fetch on demand)
+  // 3. Tab Specific Data
   
   // -- Products --
   const { 
     data: products, 
     mutate: mutateProducts,
     isLoading: isProductsLoading 
-  } = useSWR(
+  } = useSWR<Product[]>(
     vendor?.id && activeTab === 'Products' ? `/super-admin/vendors/${vendor.id}/products` : null,
     fetcher
   );
@@ -134,7 +167,7 @@ export default function VendorDetailPage() {
     data: documentsData, 
     mutate: mutateDocuments,
     isLoading: isDocumentsLoading
-  } = useSWR(
+  } = useSWR<VendorDocument[]>(
     vendor?.id && activeTab === 'Documents' ? `/super-admin/vendors/${vendor.id}/documents` : null,
     fetcher
   );
@@ -144,18 +177,21 @@ export default function VendorDetailPage() {
     data: payoutsData, 
     mutate: mutatePayouts,
     isLoading: isPayoutsLoading
-  } = useSWR(
+  } = useSWR<PayoutsResponse>(
     vendor?.id && activeTab === 'Payouts' ? `/super-admin/vendors/${vendor.id}/payouts` : null,
     fetcher
   );
+
   // Normalize payouts structure
-  const payoutsHistory = payoutsData?.history || (Array.isArray(payoutsData) ? payoutsData : []) || [];
+  const payoutsHistory = (payoutsData && 'history' in payoutsData 
+    ? payoutsData.history 
+    : Array.isArray(payoutsData) ? payoutsData : []) || [];
 
   // -- Activity Log --
   const { 
     data: activityLogs,
     isLoading: isActivityLoading
-  } = useSWR(
+  } = useSWR<ActivityLog[]>(
     vendor?.id && activeTab === 'Activity Log' ? `/super-admin/vendors/${vendor.id}/activity` : null,
     fetcher
   );
@@ -164,7 +200,6 @@ export default function VendorDetailPage() {
   //  HANDLERS
   // ===========================================================================
 
-  // 📝 Save Profile
   const handleSave = async () => {
     if (!validateEmail(formData.email)) {
       Swal.fire({ icon: 'warning', title: 'Invalid Email', background: '#1E293B', color: '#fff' });
@@ -192,13 +227,12 @@ export default function VendorDetailPage() {
     }
   };
 
-  // 🛍️ Toggle Product Status
   const toggleProductBan = async (productId: string, currentStatus: string) => {
     const newStatus = (currentStatus === 'BANNED' || currentStatus === 'DISABLED') ? 'ACTIVE' : 'DISABLED';
     
     // Optimistic Update
     if (products) {
-        mutateProducts(products.map((p: any) => p.id === productId ? { ...p, status: newStatus } : p), false);
+        mutateProducts(products.map((p) => p.id === productId ? { ...p, status: newStatus } : p), false);
     }
 
     try {
@@ -216,7 +250,6 @@ export default function VendorDetailPage() {
     }
   };
 
-  // 📂 Verify Document
   const handleVerifyDocument = async (docId: string, status: 'VERIFIED' | 'REJECTED', rejectionReason?: string) => {
     try {
       const headers = await getAuthHeader();
@@ -238,13 +271,12 @@ export default function VendorDetailPage() {
         background: '#1E293B', color: '#fff'
       });
       mutateDocuments();
-      mutateVendor(); // Update main profile status if needed
+      mutateVendor(); 
     } catch (error) {
       Swal.fire({ title: 'Error', text: 'Could not update document', icon: 'error' });
     }
   };
 
-  // 💰 Process Payout
   const handleProcessPayout = async () => {
     if (!vendor?.unpaidBalance || vendor.unpaidBalance <= 0) return;
 
@@ -278,16 +310,12 @@ export default function VendorDetailPage() {
     }
   };
 
-
-const handleMessageVendor = async () => {
+  const handleMessageVendor = async () => {
     const { value: text } = await Swal.fire({
       title: 'Message Vendor',
       input: 'textarea',
       inputLabel: `Send an email to ${vendor?.name}`,
       inputPlaceholder: 'Type your message here...',
-      inputAttributes: {
-        'aria-label': 'Type your message here'
-      },
       showCancelButton: true,
       confirmButtonText: 'Send Email',
       confirmButtonColor: '#3b82f6', 
@@ -328,7 +356,6 @@ const handleMessageVendor = async () => {
       });
     }
   };
-
 
   // ===========================================================================
   //  RENDER
@@ -383,6 +410,7 @@ const handleMessageVendor = async () => {
               onClick={() => setActiveTab('Payouts')} 
             />
           </div>
+          {/* ✅ Passed array fallback */}
           <PerformanceChart data={performanceData || []} />
         </div>
       </div>
@@ -416,7 +444,7 @@ const handleMessageVendor = async () => {
               <ProductsTabContent 
                 products={products || []} 
                 onToggleBan={toggleProductBan} 
-                isLoading={isProductsLoading} // ✅ Passed explicit loading
+                isLoading={isProductsLoading} 
               />
             )}
 
@@ -435,9 +463,7 @@ const handleMessageVendor = async () => {
             {activeTab === 'Documents' && (
               isDocumentsLoading ? <TabLoader /> : (
                 <DocumentsTab 
-                  // ✅ FIX: Prioritize SWR data, fallback to vendor object, default to empty array
-                  // Also maps 'name' to 'type' and 'uploadedDate' to 'createdAt' to match the Document interface
-                  documents={(documentsData || vendor?.vendorDocuments || []).map((doc: any) => ({
+                  documents={(documentsData || vendor?.vendorDocuments || []).map((doc) => ({
                     id: doc.id,
                     url: doc.url,
                     status: doc.status,

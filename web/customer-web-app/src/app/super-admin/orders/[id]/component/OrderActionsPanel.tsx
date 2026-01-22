@@ -3,6 +3,7 @@
 import React from 'react';
 import { AlertTriangle, XCircle, CheckCircle, RefreshCcw } from 'lucide-react';
 import Swal from 'sweetalert2';
+import { getSession } from 'next-auth/react'; // ✅ Import NextAuth
 
 interface OrderActionsPanelProps {
   orderId: string;
@@ -30,13 +31,16 @@ export default function OrderActionsPanel({ orderId, currentStatus, onUpdate }: 
     if (reason) {
       try {
         const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-        const session = await import('../../../../../../utils/supabase/client').then(m => m.createClient().auth.getSession());
+        
+        // ✅ Get Session via NextAuth
+        const session = await getSession();
+        const token = (session as any)?.accessToken;
 
         const res = await fetch(`${API_URL}/super-admin/orders/${orderId}/override`, {
           method: 'PATCH',
           headers: { 
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.data.session?.access_token}`
+            'Authorization': `Bearer ${token}` // ✅ Use Token
           },
           body: JSON.stringify({ status: newStatus, reason })
         });

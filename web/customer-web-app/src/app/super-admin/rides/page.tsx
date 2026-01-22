@@ -10,9 +10,11 @@ import { DataTable } from '../component/datatable';
 import { createColumnHelper, ColumnDef } from '@tanstack/react-table';
 import Swal from 'sweetalert2';
 import { toast } from 'react-toastify'; 
-import useSWR from 'swr'; // ✅ Import SWR
+import useSWR from 'swr';
+import { getSession } from 'next-auth/react'; // ✅ Import NextAuth
 import RidesPageSkeleton from './skeleton';
 import { fetcher } from '../hooks/useSuperAdminFetch';
+
 // --- Types ---
 interface Ride {
   id: string;
@@ -109,11 +111,14 @@ export default function RidesPage() {
     if (result.isConfirmed) {
       try {
         const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-        const session = await import('../../../../utils/supabase/client').then(m => m.createClient().auth.getSession());
+        
+        // ✅ Get Session via NextAuth
+        const session = await getSession();
+        const token = (session as any)?.accessToken;
         
         const res = await fetch(`${API_URL}/super-admin/rides/${id}/cancel`, {
           method: 'PATCH',
-          headers: { 'Authorization': `Bearer ${session.data.session?.access_token}` }
+          headers: { 'Authorization': `Bearer ${token}` } // ✅ Use Token
         });
 
         if (!res.ok) throw new Error('Failed to cancel');
@@ -280,54 +285,6 @@ export default function RidesPage() {
     },
   ], [getStatusColor, handleCancelRide, isRideCancellable]);
 
-  // --- Mobile Card ---
-  const renderMobileCard = useCallback((ride: Ride) => (
-    <div className="bg-[#1E293B] border border-gray-800 rounded-lg p-4 mb-3">
-      <div className="flex justify-between items-start mb-3">
-        <Link 
-          href={`/super-admin/rides/${ride.id}`} 
-          className="text-yellow-500 font-mono font-bold text-sm hover:text-yellow-400 transition-colors"
-        >
-          {ride.id.substring(0, 10)}...
-        </Link>
-        <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase border ${getStatusColor(ride.status)}`}>
-          {ride.status}
-        </span>
-      </div>
-      
-      <div className="space-y-2 mb-4 text-sm">
-        <div className="flex justify-between">
-          <span className="text-gray-500">Passenger:</span>
-          <span className="text-white">{ride.passenger}</span>
-        </div>
-        <div className="flex justify-between">
-          <span className="text-gray-500">Driver:</span>
-          <span className="text-white">{ride.driver?.name || 'Finding...'}</span>
-        </div>
-        <div className="flex justify-between">
-          <span className="text-gray-500">Fare:</span>
-          <span className="text-white font-bold">{ride.fare}</span>
-        </div>
-      </div>
-
-      <div className="flex gap-2 pt-3 border-t border-gray-700">
-        <Link href={`/super-admin/rides/${ride.id}`} className="flex-1">
-          <button className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded-lg hover:bg-blue-500/20 transition-colors text-sm font-medium">
-            <Eye className="w-4 h-4" /> View Details
-          </button>
-        </Link>
-        {isRideCancellable(ride.status) && (
-          <button 
-            onClick={() => handleCancelRide(ride.id)}
-            className="flex items-center justify-center gap-2 px-3 py-2 bg-red-500/10 text-red-400 border border-red-500/20 rounded-lg hover:bg-red-500/20 transition-colors text-sm font-medium"
-          >
-            <AlertTriangle className="w-4 h-4" /> Cancel
-          </button>
-        )}
-      </div>
-    </div>
-  ), [getStatusColor, handleCancelRide, isRideCancellable]);
-
   return (
     <div className="min-h-screen bg-[#0F172A] p-4 md:p-6 pb-20">
       <div className="max-w-7xl mx-auto space-y-6">
@@ -410,13 +367,13 @@ export default function RidesPage() {
                 />
               </div>
               {(searchTerm || statusFilter !== 'All' || dateRange.from || dateRange.to) && (
-                 <button 
-                   onClick={handleClearFilters} 
-                   className="p-2 text-red-400 hover:bg-red-500/10 rounded-lg transition-colors" 
-                   title="Clear Filters"
-                 >
-                   <XCircle className="w-5 h-5" />
-                 </button>
+                  <button 
+                    onClick={handleClearFilters} 
+                    className="p-2 text-red-400 hover:bg-red-500/10 rounded-lg transition-colors" 
+                    title="Clear Filters"
+                  >
+                    <XCircle className="w-5 h-5" />
+                  </button>
               )}
             </div>
 
@@ -434,7 +391,52 @@ export default function RidesPage() {
                 data={rides}
                 rowSelection={rowSelection}
                 onRowSelectionChange={setRowSelection}
-                renderMobileCard={renderMobileCard}
+                renderMobileCard={(ride) => (
+                    <div className="bg-[#1E293B] border border-gray-800 rounded-lg p-4 mb-3">
+                      <div className="flex justify-between items-start mb-3">
+                        <Link 
+                          href={`/super-admin/rides/${ride.id}`} 
+                          className="text-yellow-500 font-mono font-bold text-sm hover:text-yellow-400 transition-colors"
+                        >
+                          {ride.id.substring(0, 10)}...
+                        </Link>
+                        <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase border ${getStatusColor(ride.status)}`}>
+                          {ride.status}
+                        </span>
+                      </div>
+                      
+                      <div className="space-y-2 mb-4 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">Passenger:</span>
+                          <span className="text-white">{ride.passenger}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">Driver:</span>
+                          <span className="text-white">{ride.driver?.name || 'Finding...'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">Fare:</span>
+                          <span className="text-white font-bold">{ride.fare}</span>
+                        </div>
+                      </div>
+
+                      <div className="flex gap-2 pt-3 border-t border-gray-700">
+                        <Link href={`/super-admin/rides/${ride.id}`} className="flex-1">
+                          <button className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded-lg hover:bg-blue-500/20 transition-colors text-sm font-medium">
+                            <Eye className="w-4 h-4" /> View Details
+                          </button>
+                        </Link>
+                        {isRideCancellable(ride.status) && (
+                          <button 
+                            onClick={() => handleCancelRide(ride.id)}
+                            className="flex items-center justify-center gap-2 px-3 py-2 bg-red-500/10 text-red-400 border border-red-500/20 rounded-lg hover:bg-red-500/20 transition-colors text-sm font-medium"
+                          >
+                            <AlertTriangle className="w-4 h-4" /> Cancel
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                )}
                 pageCount={Math.ceil(totalRides / pagination.pageSize)}
                 pagination={pagination}
                 onPaginationChange={setPagination}

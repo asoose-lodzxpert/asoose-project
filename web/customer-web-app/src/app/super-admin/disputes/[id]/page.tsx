@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
 import useSWR from 'swr';
+import { getSession } from 'next-auth/react'; // ✅ Import NextAuth
 import { fetcher } from '../../hooks/useSuperAdminFetch';
 import DisputeDetailSkeleton from './component/skeleton';
 import { DisputeDetail, ModalType } from './types';
@@ -83,8 +84,10 @@ export default function DisputeDetailPage({ params }: DisputeDetailPageProps) {
 
     try {
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-      const session = await import('../../../../../utils/supabase/client').then(m => m.createClient().auth.getSession());
-      const authToken = session.data.session?.access_token;
+      
+      // ✅ FIX: Use NextAuth Session
+      const session = await getSession();
+      const authToken = (session as any)?.accessToken;
 
       const res = await fetch(`${API_URL}/super-admin/disputes/${disputeId}/messages`, {
         method: 'POST',
@@ -109,8 +112,9 @@ export default function DisputeDetailPage({ params }: DisputeDetailPageProps) {
   const handleUpdatePriority = async (priority: string) => {
     if (!disputeId) return;
     try {
-      const session = await import('../../../../../utils/supabase/client').then(m => m.createClient().auth.getSession());
-      const authToken = session.data.session?.access_token;
+      // ✅ FIX: Use NextAuth Session
+      const session = await getSession();
+      const authToken = (session as any)?.accessToken;
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
       await fetch(`${API_URL}/super-admin/disputes/${disputeId}/priority`, {
@@ -133,8 +137,9 @@ export default function DisputeDetailPage({ params }: DisputeDetailPageProps) {
     if (!dispute || !disputeId) return;
     setProcessing(true);
     try {
-      const session = await import('../../../../../utils/supabase/client').then(m => m.createClient().auth.getSession());
-      const authToken = session.data.session?.access_token;
+      // ✅ FIX: Use NextAuth Session
+      const session = await getSession();
+      const authToken = (session as any)?.accessToken;
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
       let endpoint = `${API_URL}/super-admin/disputes/${disputeId}/resolve`;
