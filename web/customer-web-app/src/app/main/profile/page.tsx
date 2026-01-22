@@ -313,7 +313,7 @@ export default function ProfilePage() {
                  ) : (
                    orders.map((order) => (
                      <Link 
-                       href={`/orders/${order.id}`} 
+                       href={`/main/orders/${order.id}`} 
                        key={order.id} 
                        className="block hover:scale-[1.01] transition-transform"
                      >

@@ -10,11 +10,11 @@ const BACKEND_URL = (() => {
   return url.replace(/\/$/, ''); 
 })();
 
-interface FetcherOptions {
+// 1. FIX: Extend RequestInit to include standard fetch options (method, body, etc.)
+interface FetcherOptions extends RequestInit {
   retries?: number;
   retryDelay?: number;
   timeout?: number;
-  signal?: AbortSignal;
 }
 
 interface FetcherError extends Error {
@@ -25,7 +25,7 @@ interface FetcherError extends Error {
 /**
  * Production-ready fetcher for SWR with NextAuth authentication
  * @param url - API endpoint path (will be appended to BACKEND_URL)
- * @param options - Configuration options for retry logic and timeout
+ * @param options - Configuration options for retry logic, timeout, AND standard fetch options
  * @returns Promise with the JSON response
  */
 export const fetcher = async <T = any>(
@@ -37,6 +37,8 @@ export const fetcher = async <T = any>(
     retryDelay = 1000,
     timeout = 30000,
     signal,
+    headers, // 2. FIX: Extract headers to merge them later
+    ...fetchOptions // 3. FIX: Capture remaining standard options (method, body)
   } = options;
 
   // 1. Get and validate session using NextAuth
@@ -49,7 +51,6 @@ export const fetcher = async <T = any>(
   }
 
   // 2. Extract Token 
-  // Adjust property access based on where you stored the token in authOptions (jwt callback)
   const token = (session as any).accessToken || (session.user as any)?.accessToken;
 
   if (!token) {
@@ -73,9 +74,11 @@ export const fetcher = async <T = any>(
 
     try {
       const res = await fetch(fullUrl, {
+        ...fetchOptions, // 4. FIX: Spread the method, body, etc. here
         headers: {
           'Authorization': `Bearer ${token}`, // Use NextAuth Token
           'Content-Type': 'application/json',
+          ...headers as any, // 5. FIX: Merge in any custom headers passed in options
         },
         signal: combinedSignal,
       });
@@ -84,6 +87,10 @@ export const fetcher = async <T = any>(
 
       // Success case
       if (res.ok) {
+        // Handle empty responses (like 204 No Content) to avoid JSON parse errors
+        if (res.status === 204) {
+          return {} as T;
+        }
         const data = await res.json();
         return data as T;
       }

@@ -19,10 +19,10 @@ import { InventoryService } from './inventory.service';
 import { VendorOrdersStreamService } from '../vendor/orders/vendor-orders-stream.service';
 import { NotificationsGateway } from '../notifications/notifications.gateway';
 
+// FIX 1: Align constants with Prisma Schema
 const ORDER_STATUS = { PENDING: 'PENDING' } as const;
 const DELIVERY_STATUS = { REQUESTED: 'REQUESTED' } as const;
 
-// Redis Config
 const IDEMPOTENCY_PREFIX = 'idemp:order:';
 const LOCK_TTL_MS = 20000; 
 const COMPLETED_TTL_MS = 5 * 60 * 1000; 
@@ -42,7 +42,6 @@ export class OrdersService {
     @Inject('REDIS_CLIENT') private readonly redis: RedisClientType,
   ) {}
 
-  // 1. QUOTE CALCULATION
   async calculateQuote(userId: string, data: CreateOrderDto) {
     const { addressId, restaurantId, items } = data;
 
@@ -96,7 +95,6 @@ export class OrdersService {
     };
   }
 
-  // 2. ORDER CREATION LOGIC
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   async createOrder(
     userId: string,
@@ -109,9 +107,6 @@ export class OrdersService {
     const existingOrderId = await this.acquireIdempotencyLock(redisKey);
 
     if (existingOrderId) {
-      this.logger.log(
-        `Idempotency hit: Returning existing order ${existingOrderId}`,
-      );
       return this.prisma.order.findUnique({
         where: { id: existingOrderId },
         include: { user: { select: { email: true, name: true } } },
@@ -228,22 +223,14 @@ export class OrdersService {
 
           await this.inventoryService.decrementStock(tx, items);
 
-          this.logger.log(
-            `Order ${newOrder.id} created. Total: ₦${finalTotal}`,
-          );
-
           return newOrder;
         },
         { maxWait: 10000, timeout: 30000 },
       );
 
-      // 3. Mark Idempotency as COMPLETED
       await this.completeIdempotency(redisKey, order.id);
 
-      // ✅ FIX: Wrap post-order notifications in try/catch to prevent failing the request
-      // even if notifications fail (the order is already committed)
       try {
-        // 4. Emit SSE event for real-time vendor notification
         this.vendorOrdersStreamService.emitNewOrder(order.storeId, order.id, {
           id: order.id,
           status: order.status,
@@ -255,7 +242,6 @@ export class OrdersService {
           createdAt: order.createdAt,
         });
 
-        // 5. Notifications
         this.notificationFacade.sendOrderNotifications(
           userId,
           notificationContext.storeOwnerId,
@@ -267,7 +253,6 @@ export class OrdersService {
           emailItems,
         );
 
-        // 6. EMIT REAL-TIME UPDATE TO CUSTOMER SOCKET
         this.notificationsGateway.sendOrderUpdate(order.id, {
           status: order.status,
           total: order.total,
@@ -277,7 +262,6 @@ export class OrdersService {
         });
       } catch (notifyError) {
         this.logger.error(`Post-order notification failed for order ${order.id}`, notifyError);
-        // Do not throw here, order is already created
       }
 
       return order;
@@ -287,7 +271,6 @@ export class OrdersService {
     }
   }
 
-  // ... (Rest of the file remains unchanged)
   async getUserOrders(userId: string) {
     try {
       const orders = await this.prisma.order.findMany({
@@ -313,10 +296,7 @@ export class OrdersService {
         })),
       }));
     } catch (error: any) {
-      this.logger.error(
-        `Failed to fetch orders for user ${userId}`,
-        error.stack,
-      );
+      this.logger.error(`Failed to fetch orders for user ${userId}`, error.stack);
       throw new BadRequestException('Failed to retrieve orders');
     }
   }
@@ -354,6 +334,7 @@ export class OrdersService {
 
       if (!order) throw new NotFoundException('Order not found');
 
+      // FIX 2: Correct Timeline Status Checks based on Schema (DISPATCHED, IN_TRANSIT)
       const timeline: { 
         status: string; 
         label: string; 
@@ -371,8 +352,8 @@ export class OrdersService {
         icon: 'default'
       });
 
-      // 2. Confirmed
-      if (['CONFIRMED', 'PREPARING', 'READY', 'ON_THE_WAY', 'DELIVERED'].includes(order.status)) {
+      // 2. Confirmed (Includes DISPATCHED, which implies confirmation)
+      if (['CONFIRMED', 'PREPARING', 'READY', 'DISPATCHED', 'DELIVERED'].includes(order.status)) {
         timeline.push({
           status: 'CONFIRMED',
           label: 'Order Confirmed',
@@ -383,7 +364,7 @@ export class OrdersService {
       }
 
       // 3. Preparing
-      if (['PREPARING', 'READY', 'ON_THE_WAY', 'DELIVERED'].includes(order.status)) {
+      if (['PREPARING', 'READY', 'DISPATCHED', 'DELIVERED'].includes(order.status)) {
         timeline.push({
           status: 'PREPARING',
           label: 'Preparing',
@@ -394,7 +375,7 @@ export class OrdersService {
       }
 
       // 4. Ready/Picked Up
-      if (['READY', 'ON_THE_WAY', 'DELIVERED'].includes(order.status)) {
+      if (['READY', 'DISPATCHED', 'DELIVERED'].includes(order.status)) {
          timeline.push({
           status: 'READY',
           label: 'Order Ready',
@@ -404,8 +385,12 @@ export class OrdersService {
         });
       }
 
-      // 5. On the Way
-      if (['ON_THE_WAY', 'DELIVERED'].includes(order.status) || order.delivery?.status === 'PICKED_UP') {
+      // 5. On the Way (Uses DISPATCHED or Delivery status)
+      // Checks for Order Status: DISPATCHED or Delivery Status: IN_TRANSIT / PICKED_UP
+      const isDispatch = order.status === 'DISPATCHED' || order.status === 'DELIVERED';
+      const isDeliveryActive = order.delivery && ['PICKED_UP', 'IN_TRANSIT', 'DELIVERED'].includes(order.delivery.status);
+
+      if (isDispatch || isDeliveryActive) {
         timeline.push({
           status: 'ON_THE_WAY',
           label: 'Rider on the way',
@@ -416,22 +401,21 @@ export class OrdersService {
       }
 
       // 6. Delivered
-      if (order.status === 'DELIVERED' || order.delivery?.status === 'DELIVERED') {
+      if (order.status === 'DELIVERED') {
          timeline.push({
           status: 'DELIVERED',
           label: 'Delivered',
-          description: 'Order delivered successfully', // Changed from "Enjoy your meal!"
+          description: 'Order delivered successfully',
           time: order.deliveredAt?.toISOString() || order.delivery?.deliveredAt?.toISOString() || null,
           icon: 'delivered'
         });
       }
 
-      // Handle Cancelled
       if (order.status === 'CANCELLED' || order.status === 'REJECTED') {
         timeline.push({
           status: 'CANCELLED',
           label: 'Order Cancelled',
-          description: 'This order was cancelled',
+          description: order.status === 'REJECTED' ? 'Store rejected the order' : 'This order was cancelled',
           time: order.cancelledAt?.toISOString() || null,
           icon: 'default'
         });
@@ -443,13 +427,9 @@ export class OrdersService {
         total: order.total,
         createdAt: order.createdAt,
         deliveredAt: order.deliveredAt,
-        
-        // Backend calculated fields for frontend display
         eta: order.delivery?.distanceKm ? `${Math.ceil(order.delivery.distanceKm * 5 + 15)} mins` : '30-45 mins',
         distance: order.delivery?.distanceKm ? `${order.delivery.distanceKm} km` : null,
-        
         timeline: timeline,
-        
         rider: order.delivery?.rider ? {
           name: order.delivery.rider.name,
           phone: order.delivery.rider.phone,
@@ -457,7 +437,6 @@ export class OrdersService {
             ? `${order.delivery.rider.vehicle.color} ${order.delivery.rider.vehicle.model} (${order.delivery.rider.vehicle.plateNumber})`
             : 'Motorcycle'
         } : null,
-
         dispute: order.disputes[0] || null,
         items: order.items.map((item) => ({
           id: item.id,
@@ -482,8 +461,6 @@ export class OrdersService {
       throw new BadRequestException('Failed to retrieve order details');
     }
   }
-
-  // 4. HELPER METHODS
 
   private async validateAndFetchProducts(
     tx: Prisma.TransactionClient,
@@ -538,26 +515,15 @@ export class OrdersService {
       PX: LOCK_TTL_MS,
       NX: true,
     });
-
-    if (result === 'OK') {
-      return null;
-    }
-
+    if (result === 'OK') return null;
     const value = await this.redis.get(key);
-
     if (value === 'PROCESSING') {
-      throw new ConflictException(
-        'This order is currently being processed. Please wait.',
-      );
+      throw new ConflictException('This order is currently being processed. Please wait.');
     }
-
     return value;
   }
 
-  private async completeIdempotency(
-    key: string,
-    orderId: string,
-  ): Promise<void> {
+  private async completeIdempotency(key: string, orderId: string): Promise<void> {
     await this.redis.set(key, orderId, { PX: COMPLETED_TTL_MS });
   }
 
@@ -565,19 +531,10 @@ export class OrdersService {
     await this.redis.del(key);
   }
 
-  private generateIdempotencyKey(
-    userId: string,
-    data: CreateOrderDto,
-    clientKey?: string,
-  ): string {
-    if (clientKey) {
-      return `header:${userId}:${clientKey}`;
-    }
+  private generateIdempotencyKey(userId: string, data: CreateOrderDto, clientKey?: string): string {
+    if (clientKey) return `header:${userId}:${clientKey}`;
     const { addressId, restaurantId, items } = data;
-    const itemsString = items
-      .map((i) => `${i.id}:${i.quantity}`)
-      .sort()
-      .join('|');
+    const itemsString = items.map((i) => `${i.id}:${i.quantity}`).sort().join('|');
     const rawData = `${userId}:${addressId}:${restaurantId}:${itemsString}`;
     return crypto.createHash('sha256').update(rawData).digest('hex');
   }
