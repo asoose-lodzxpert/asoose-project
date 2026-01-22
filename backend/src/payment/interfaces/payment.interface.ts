@@ -22,6 +22,7 @@ export interface PaymentInitResponse {
   reference: string;
   authorizationUrl?: string;
   accessCode?: string;
+  transactionId?: string; // ✅ FIX: Added missing property
   accountNumber?: string;
   bankName?: string;
   accountName?: string;

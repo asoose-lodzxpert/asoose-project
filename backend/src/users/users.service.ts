@@ -196,4 +196,73 @@ export class UsersService {
   async getOrderQuote(userId: string, data: CreateOrderDto) {
     return this.ordersService.calculateQuote(userId, data);
   }
+
+
+  // ==================================================================
+  // PROFILE LOGIC (Missing!)
+  // ==================================================================
+  async getUserProfile(userId: string) {
+    try {
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          phone: true,
+          image: true, 
+          createdAt: true,
+          role: true,
+        },
+      });
+
+      if (!user) throw new NotFoundException('User not found');
+
+      return {
+        ...user,
+        // The frontend expects 'avatarUrl', so we map the database 'image' field to it
+        avatarUrl: user.image, 
+      };
+    } catch (error) {
+      if (error instanceof NotFoundException) throw error;
+      this.logger.error(`Failed to fetch profile for ${userId}`, error);
+      throw new BadRequestException('Failed to fetch profile');
+    }
+  }
+  async updateUserProfile(userId: string, data: { name: string; phone: string }) {
+    try {
+      // 1. Update the user in the database
+      const updatedUser = await this.prisma.user.update({
+        where: { id: userId },
+        data: {
+          name: data.name,
+          phone: data.phone,
+        },
+      });
+      
+      return updatedUser;
+    } catch (error) {
+      this.logger.error(`Failed to update profile for ${userId}`, error);
+      throw new BadRequestException('Failed to update profile');
+    }
+  }
+  async softDeleteUser(userId: string) {
+    try {
+      // Soft delete: Set deletedAt to now and change status to SUSPENDED
+      return await this.prisma.user.update({
+        where: { id: userId },
+        data: {
+          deletedAt: new Date(),
+          status: 'SUSPENDED', // Optional: Prevents login immediately
+        },
+      });
+    } catch (error) {
+      this.logger.error(`Failed to soft delete user ${userId}`, error);
+      throw new BadRequestException('Failed to delete account');
+    }
+  }
+
+  async deleteUserAddress(userId: string, addressId: string) {
+    return this.addressesService.deleteUserAddress(userId, addressId);
+  }
 }

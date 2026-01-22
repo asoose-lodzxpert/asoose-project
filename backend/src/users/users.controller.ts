@@ -7,7 +7,9 @@ import {
   NotFoundException,
   Post,
   Body,
-  Headers, // <--- Import Headers
+  Headers,
+  Patch,
+  Delete,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { UsersService } from './users.service';
@@ -18,11 +20,11 @@ import { CreateAddressDto, CreateOrderDto } from './dto/users.dto'; // <--- Impo
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
-  // ==================================================================
-  // ORDER ENDPOINTS
-  // ==================================================================
+@Get('profile')
+  async getProfile(@Request() req) {
+    return this.usersService.getUserProfile(req.user.id);
+  }
 
-  // NEW: This was missing!
   @Post('orders')
   async createOrder(
     @Request() req,
@@ -58,10 +60,10 @@ export class UsersController {
   // ADDRESS ENDPOINTS
   // ==================================================================
 
-  // @Get('addresses')
-  // async getMyAddresses(@Request() req) {
-  //   return this.usersService.getUserAddresses(req.user.id);
-  // }
+  @Get('addresses')
+  async getMyAddresses(@Request() req) {
+    return this.usersService.getUserAddresses(req.user.id);
+  }
 
   @Post('addresses')
   async addAddress(@Request() req, @Body() body: CreateAddressDto) {
@@ -98,5 +100,17 @@ export class UsersController {
     const ride = await this.usersService.getRideDetails(req.user.id, id);
     if (!ride) throw new NotFoundException('Ride not found');
     return ride;
+  }
+  @Patch('profile')
+  async updateProfile(@Request() req, @Body() body: { name: string; phone: string }) {
+    return this.usersService.updateUserProfile(req.user.id, body);
+  }
+  @Delete('profile')
+  async deleteProfile(@Request() req) {
+    return this.usersService.softDeleteUser(req.user.id);
+  }
+  @Delete('addresses/:id')
+  async deleteAddress(@Request() req, @Param('id') addressId: string) {
+    return this.usersService.deleteUserAddress(req.user.id, addressId);
   }
 }

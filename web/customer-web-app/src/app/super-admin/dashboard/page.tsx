@@ -2,7 +2,8 @@
 
 import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
-import useSWR from 'swr'; // ✅ Import SWR
+import useSWR from 'swr'; 
+import { getSession } from 'next-auth/react'; // ✅ Import NextAuth getSession
 import { 
   ShoppingCart, Car, Truck, DollarSign, CheckCircle, 
   ShieldAlert, UserCheck, MessageSquare, FileText, 
@@ -11,10 +12,7 @@ import {
 } from 'lucide-react';
 import { DataTable } from '@/app/super-admin/component/datatable';
 
-// ✅ Import the fetcher we created
 import { fetcher } from '../hooks/useSuperAdminFetch';
-import { createClient } from '../../../../utils/supabase/client'; // Keep for mutations
-
 import { Activity, Alert, Stat } from './component/data';
 import { createActivityColumns, createAlertColumns, renderActivityMobileCard, renderAlertMobileCard } from './component/columns';
 import SuperAdminDashboardSkeleton from './component/skeletom';
@@ -40,7 +38,7 @@ interface TrendingMetrics {
 // API Response Interfaces
 interface StatsResponse {
   stats: Stat[];
-  quickAccess: QuickStats; // Note: Backend maps this to 'quickAccess', ensure frontend matches
+  quickAccess: QuickStats; 
   trending?: TrendingMetrics;
 }
 
@@ -112,16 +110,21 @@ export default function SuperAdminDashboard() {
 
   const handleResolveAlert = async (id: string) => {
     try {
-      const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
+      // ✅ Use NextAuth getSession instead of Supabase
+      const session = await getSession();
+      const token = (session as any)?.accessToken;
+
+      if (!token) {
+        alert("Authentication expired. Please log in again.");
+        return;
+      }
 
       const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
       
       const res = await fetch(`${BACKEND_URL}/super-admin/dashboard/alerts/${id}/resolve`, {
         method: 'POST',
         headers: { 
-          'Authorization': `Bearer ${session.access_token}`,
+          'Authorization': `Bearer ${token}`, // ✅ Use NextAuth Token
           'Content-Type': 'application/json' 
         }
       });
@@ -129,7 +132,6 @@ export default function SuperAdminDashboard() {
       if (!res.ok) throw new Error('Failed to resolve');
 
       // ✅ SWR Magic: Optimistic update or Re-fetch
-      // This forces SWR to re-fetch the alerts endpoint immediately
       mutateAlerts(); 
 
     } catch (err) {
@@ -248,7 +250,6 @@ export default function SuperAdminDashboard() {
             <h1 className="text-2xl md:text-3xl font-bold text-white">System Overview</h1>
             <p className="text-gray-400 text-sm mt-1">
               Real-time platform performance monitoring
-              {/* Optional: Add Last Updated Time if needed, or remove to keep cleaner */}
             </p>
           </div>
           

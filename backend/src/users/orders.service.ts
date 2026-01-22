@@ -43,11 +43,9 @@ export class OrdersService {
   ) {}
 
   // 1. QUOTE CALCULATION
-
   async calculateQuote(userId: string, data: CreateOrderDto) {
     const { addressId, restaurantId, items } = data;
 
-    // A. Fetch Store & Address
     const store = await this.prisma.store.findUnique({
       where: { id: restaurantId },
       select: { lat: true, lng: true, name: true },
@@ -61,7 +59,6 @@ export class OrdersService {
       throw new BadRequestException('Invalid delivery address');
     }
 
-    // B. Calculate Subtotal
     const productIds = items.map((i) => i.id);
     const products = await this.prisma.product.findMany({
       where: { id: { in: productIds } },
@@ -75,7 +72,6 @@ export class OrdersService {
       }
     });
 
-    // C. Calculate Fees
     const storeLat = store.lat || 0;
     const storeLng = store.lng || 0;
 
@@ -101,18 +97,15 @@ export class OrdersService {
   }
 
   // 2. ORDER CREATION LOGIC
-
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   async createOrder(
     userId: string,
     data: CreateOrderDto,
     idempotencyHeader?: string,
   ) {
-    // 1. Generate Key
     const rawKey = this.generateIdempotencyKey(userId, data, idempotencyHeader);
     const redisKey = `${IDEMPOTENCY_PREFIX}${rawKey}`;
 
-    // 2. Acquire Lock (Redis Atomic Operation)
     const existingOrderId = await this.acquireIdempotencyLock(redisKey);
 
     if (existingOrderId) {
@@ -125,7 +118,6 @@ export class OrdersService {
       });
     }
 
-    // Context for notifications
     const emailItems: string[] = [];
     let notificationContext: any = {};
 
@@ -135,7 +127,6 @@ export class OrdersService {
 
       const order = await this.prisma.$transaction(
         async (tx) => {
-          // A. Fetch Entities
           const user = await tx.user.findUnique({
             where: { id: userId },
             select: { email: true, name: true, phone: true },
@@ -148,13 +139,9 @@ export class OrdersService {
           });
           if (!store) throw new NotFoundException('Store not found');
 
-          // B. Validate Products
           const productMap = await this.validateAndFetchProducts(tx, items);
-
-          // C. Validate Inventory
           this.inventoryService.validateStock(items, productMap);
 
-          // D. Handle Addresses
           const pickupAddress =
             await this.addressesService.getOrCreateStoreAddress(
               store.vendorId,
@@ -171,7 +158,6 @@ export class OrdersService {
             throw new BadRequestException('Invalid delivery address');
           }
 
-          // E. Pricing (Delivery)
           const distance = this.pricingService.calculateDistance(
             pickupAddress.lat,
             pickupAddress.lng,
@@ -181,7 +167,6 @@ export class OrdersService {
           const deliveryFee =
             this.pricingService.calculateDeliveryFee(distance);
 
-          // F. Prepare Items Data & Calculate Subtotal
           let itemsTotal = 0;
           const orderItemsData: {
             productId: string;
@@ -204,12 +189,10 @@ export class OrdersService {
             emailItems.push(`${item.quantity}x ${product.name}`);
           }
 
-          // Calculate Service Fee and Final Total
           const serviceFee =
             this.pricingService.calculateServiceFee(itemsTotal);
           const finalTotal = itemsTotal + deliveryFee + serviceFee;
 
-          // Set context for notifications
           notificationContext = {
             storeOwnerId: store.vendorId,
             storeName: store.name,
@@ -217,7 +200,6 @@ export class OrdersService {
             customerEmail: user.email,
           };
 
-          // G. Create Order
           const newOrder = await tx.order.create({
             data: {
               userId,
@@ -244,11 +226,10 @@ export class OrdersService {
             },
           });
 
-          // H. Decrement Stock
           await this.inventoryService.decrementStock(tx, items);
 
           this.logger.log(
-            `Order ${newOrder.id} created. Total: ₦${finalTotal} (Items: ${itemsTotal}, Del: ${deliveryFee}, Svc: ${serviceFee})`,
+            `Order ${newOrder.id} created. Total: ₦${finalTotal}`,
           );
 
           return newOrder;
@@ -259,49 +240,54 @@ export class OrdersService {
       // 3. Mark Idempotency as COMPLETED
       await this.completeIdempotency(redisKey, order.id);
 
-      // 4. Emit SSE event for real-time vendor notification
-      this.vendorOrdersStreamService.emitNewOrder(order.storeId, order.id, {
-        id: order.id,
-        status: order.status,
-        total: order.total,
-        customerName: order.user?.name || 'Unknown',
-        customerEmail: order.user?.email || 'Unknown',
-        storeName: order.store?.name || 'Unknown',
-        itemCount: items.length,
-        createdAt: order.createdAt,
-      });
+      // ✅ FIX: Wrap post-order notifications in try/catch to prevent failing the request
+      // even if notifications fail (the order is already committed)
+      try {
+        // 4. Emit SSE event for real-time vendor notification
+        this.vendorOrdersStreamService.emitNewOrder(order.storeId, order.id, {
+          id: order.id,
+          status: order.status,
+          total: order.total,
+          customerName: order.user?.name || 'Unknown',
+          customerEmail: order.user?.email || 'Unknown',
+          storeName: order.store?.name || 'Unknown',
+          itemCount: items.length,
+          createdAt: order.createdAt,
+        });
 
-      // 5. Notifications
-      this.notificationFacade.sendOrderNotifications(
-        userId,
-        notificationContext.storeOwnerId,
-        order.id,
-        notificationContext.storeName,
-        order.total,
-        notificationContext.customerEmail,
-        notificationContext.storeOwnerEmail,
-        emailItems,
-      );
+        // 5. Notifications
+        this.notificationFacade.sendOrderNotifications(
+          userId,
+          notificationContext.storeOwnerId,
+          order.id,
+          notificationContext.storeName,
+          order.total,
+          notificationContext.customerEmail,
+          notificationContext.storeOwnerEmail,
+          emailItems,
+        );
 
-      // 6. EMIT REAL-TIME UPDATE TO CUSTOMER SOCKET
-      this.notificationsGateway.sendOrderUpdate(order.id, {
-        status: order.status,
-        total: order.total,
-        timeline: [
-          { status: 'PLACED', label: 'Order Placed', time: order.createdAt.toISOString(), icon: 'default' }
-        ]
-      });
+        // 6. EMIT REAL-TIME UPDATE TO CUSTOMER SOCKET
+        this.notificationsGateway.sendOrderUpdate(order.id, {
+          status: order.status,
+          total: order.total,
+          timeline: [
+            { status: 'PLACED', label: 'Order Placed', time: order.createdAt.toISOString(), icon: 'default' }
+          ]
+        });
+      } catch (notifyError) {
+        this.logger.error(`Post-order notification failed for order ${order.id}`, notifyError);
+        // Do not throw here, order is already created
+      }
 
       return order;
     } catch (error) {
-      // 7. Release Lock on Failure
       await this.releaseIdempotencyLock(redisKey);
       this.handleOrderError(userId, error);
     }
   }
 
-  // 3. READ OPERATIONS
-
+  // ... (Rest of the file remains unchanged)
   async getUserOrders(userId: string) {
     try {
       const orders = await this.prisma.order.findMany({

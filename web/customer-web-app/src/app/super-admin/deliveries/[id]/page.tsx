@@ -6,7 +6,7 @@ import {
   ArrowLeft, Package, Truck, MapPin, 
   CheckCircle, AlertCircle, Loader2, 
   Copy, ExternalLink, Printer, User, 
-  Scale, Box, Camera, AlertTriangle
+  Scale, Box, Camera, AlertTriangle,FileText
 } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
 import { toast } from 'react-toastify';

@@ -9,10 +9,10 @@ import useSWRMutation from 'swr/mutation';
 import { toast } from 'react-toastify';
 import { Loader2, Trash2, ExternalLink, Edit2, X } from 'lucide-react';
 import Image from 'next/image';
+import { getSession } from 'next-auth/react'; // ✅ Import NextAuth getSession
 
 import ImageUpload from '@/app/main/components/ImageUpload';
 import { fetcher } from '../hooks/useSuperAdminFetch';
-import { createClient } from '../../../../utils/supabase/client';
 
 // 1. Define strict interfaces for type safety
 type BannerType = 'PROMO' | 'AD';
@@ -46,18 +46,19 @@ const bannerSchema = z.object({
 type BannerFormValues = z.infer<typeof bannerSchema>;
 
 /**
- * Helper to handle mutations (POST/PATCH/DELETE) with session logic
+ * Helper to handle mutations (POST/PATCH/DELETE) with NextAuth session logic
  */
 async function mutationFetcher(url: string, { arg }: { arg: { method: string, body?: any } }) {
-  const supabase = createClient();
-  const { data: { session } } = await supabase.auth.getSession();
+  // ✅ Get Session from NextAuth
+  const session = await getSession();
+  const token = (session as any)?.accessToken;
   
-  if (!session) throw new Error('Authentication required');
+  if (!token) throw new Error('Authentication required');
 
   const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}${url}`, {
     method: arg.method,
     headers: {
-      'Authorization': `Bearer ${session.access_token}`,
+      'Authorization': `Bearer ${token}`, // ✅ Use NextAuth Token
       'Content-Type': 'application/json',
     },
     body: arg.body ? JSON.stringify(arg.body) : undefined,
@@ -148,12 +149,24 @@ export default function BannerManagement() {
   const handleDelete = async (id: string) => {
     if (!window.confirm('Are you sure you want to delete this banner?')) return;
     try {
-      const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/super-admin/banners/${id}`, {
+      // ✅ Use NextAuth Session
+      const session = await getSession();
+      const token = (session as any)?.accessToken;
+
+      if (!token) {
+        throw new Error('Authentication required');
+      }
+
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/super-admin/banners/${id}`, {
         method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${session?.access_token}` },
+        headers: { 'Authorization': `Bearer ${token}` }, // ✅ Use NextAuth Token
       });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || 'Delete failed');
+      }
+
       toast.success('Banner deleted');
       refreshBanners();
     } catch (err: any) {

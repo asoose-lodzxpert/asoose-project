@@ -1,15 +1,16 @@
 'use client';
 
 import React, { useEffect, useState, useRef } from 'react';
-import { io, Socket } from 'socket.io-client'; // Socket for real-time
+import { io, Socket } from 'socket.io-client'; 
+import { useSession } from "next-auth/react"; 
 import { NotificationService } from './services/notifications.service';
 import NotificationCard from './components/NotificationCard';
 import { Notification } from './types';
-import { createClient } from '../../../../utils/supabase/client';
 import { Loader2, Check, BellOff, Wifi } from 'lucide-react';
 import { toast } from 'react-toastify';
 
 export default function NotificationsPage() {
+  const { data: session } = useSession(); 
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -42,24 +43,28 @@ export default function NotificationsPage() {
   }, [page]);
 
   useEffect(() => {
-    const supabase = createClient();
-    const setupSocket = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user) return;
+    // ✅ Check for NextAuth session
+    if (!session?.user?.id) return;
 
+    const setupSocket = async () => {
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
       
+      // Initialize socket
+      // You might also want to pass the access token for auth:
+      // auth: { token: (session as any).accessToken }
       socketRef.current = io(API_URL, {
         transports: ['websocket'],
+        query: { userId: session.user.id }, // Pass userId in query if needed by backend
       });
 
       socketRef.current.on('connect', () => {
+        // ✅ Use NextAuth user ID
         socketRef.current?.emit('join', session.user.id);
       });
 
       socketRef.current.on('notification', (newNotif: Notification) => {
         setNotifications(prev => [newNotif, ...prev]);
-        
+        // Optional: Add toast or sound here
       });
     };
 
@@ -68,7 +73,7 @@ export default function NotificationsPage() {
     return () => {
       if (socketRef.current) socketRef.current.disconnect();
     };
-  }, []);
+  }, [session]); // ✅ Re-run if session changes
 
   const handleMarkAsRead = async (id: string) => {
     try {
@@ -104,9 +109,9 @@ export default function NotificationsPage() {
            <div className="flex items-center gap-2">
              <h1 className="text-2xl font-bold text-white mb-1">Notifications</h1>
              {unreadCount > 0 && (
-                <span className="bg-yellow-500 text-black text-xs font-bold px-2 py-0.5 rounded-full">
-                  {unreadCount} New
-                </span>
+               <span className="bg-yellow-500 text-black text-xs font-bold px-2 py-0.5 rounded-full">
+                 {unreadCount} New
+               </span>
              )}
            </div>
            <p className="text-gray-400 text-sm flex items-center gap-2">

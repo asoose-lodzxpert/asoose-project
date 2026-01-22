@@ -1,4 +1,4 @@
-import { Injectable, Logger, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateAddressDto } from './dto/users.dto';
 import { Prisma } from '@prisma/client';
@@ -8,7 +8,6 @@ export const ADDRESS_LABELS = {
 } as const;
 
 // 1. Define City Boundaries (Example: Maiduguri, Nigeria)
-// Go to Google Maps, right click top-right and bottom-left of the city to get these.
 const CITY_BOUNDS = {
   MIN_LAT: 11.75, // South-most edge
   MAX_LAT: 11.95, // North-most edge
@@ -60,7 +59,7 @@ export class AddressesService {
 
         return tx.address.create({
           data: {
-            userId,
+            userId, // Explicitly linking to User
             street: sanitizedData.street,
             city: sanitizedData.city,
             state: sanitizedData.state || 'Maiduguri',
@@ -73,7 +72,6 @@ export class AddressesService {
         });
       });
     } catch (error) {
-      // Pass through our specific validation errors
       if (error instanceof BadRequestException) throw error;
 
       this.logger.error(
@@ -84,34 +82,42 @@ export class AddressesService {
     }
   }
 
+  /**
+   * FIX APPLIED:
+   * 1. Renamed ownerId -> vendorId for type safety.
+   * 2. Writes to 'vendorId' column instead of 'userId'.
+   * 3. Leaves 'userId' null for store addresses to prevent FK violations.
+   */
   async getOrCreateStoreAddress(
-    ownerId: string,
+    vendorId: string,
     storeAddress: string,
     lat: number,
     lng: number,
     tx: Prisma.TransactionClient = this.prisma,
   ) {
-    // Validate Store coordinates too (prevents admins from setting fake store locations)
+    // Validate Store coordinates
     if (!this.isWithinCity(lat, lng)) {
       this.logger.warn(
-        `Store ${ownerId} has invalid coordinates: ${lat}, ${lng}`,
+        `Store ${vendorId} has invalid coordinates: ${lat}, ${lng}`,
       );
-      // We might throw here, or fallback to a default if legacy data is bad
       throw new BadRequestException('Store location is outside service area');
     }
 
+    // Fix: Query against vendorId
     let pickupAddress = await tx.address.findFirst({
       where: {
-        userId: ownerId,
+        vendorId: vendorId, 
         label: ADDRESS_LABELS.STORE_LOCATION,
         street: storeAddress,
       },
     });
 
     if (!pickupAddress) {
+      // Fix: Create with vendorId, leaving userId null
       pickupAddress = await tx.address.create({
         data: {
-          userId: ownerId,
+          vendorId: vendorId,
+          userId: null, // Explicitly null ensuring no Foreign Key constraint violation
           label: ADDRESS_LABELS.STORE_LOCATION,
           street: storeAddress,
           city: 'Maiduguri',
@@ -126,6 +132,35 @@ export class AddressesService {
     return pickupAddress;
   }
 
+  async deleteUserAddress(userId: string, addressId: string) {
+    try {
+      // 1. Verify ownership
+      const address = await this.prisma.address.findUnique({
+        where: { id: addressId },
+      });
+
+      // Ensure we only delete if the userId matches (security check)
+      if (!address || address.userId !== userId) {
+        throw new NotFoundException('Address not found or access denied');
+      }
+
+      // 2. Delete
+      return await this.prisma.address.delete({
+        where: { id: addressId },
+      });
+    } catch (error) {
+      if (error instanceof NotFoundException) throw error;
+      
+      // Handle Foreign Key constraints (e.g. if address is used in an order)
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2003') { 
+        throw new BadRequestException('Cannot delete address used in previous orders/rides');
+      }
+
+      this.logger.error(`Failed to delete address ${addressId}`, error.stack);
+      throw new BadRequestException('Failed to delete address');
+    }
+  }
+
   // ==================================================================
   // VALIDATION HELPERS
   // ==================================================================
@@ -134,9 +169,6 @@ export class AddressesService {
     return input.trim().replace(/[<>]/g, '').substring(0, 500);
   }
 
-  /**
-   * Throws if coordinates are "fake" (0,0) or outside the city
-   */
   private validateCoordinates(lat: number, lng: number): void {
     if (!lat || !lng || (lat === 0 && lng === 0)) {
       throw new BadRequestException('Valid GPS coordinates are required');
@@ -149,9 +181,6 @@ export class AddressesService {
     }
   }
 
-  /**
-   * Checks if lat/lng are within the bounding box
-   */
   private isWithinCity(lat: number, lng: number): boolean {
     return (
       lat >= CITY_BOUNDS.MIN_LAT &&

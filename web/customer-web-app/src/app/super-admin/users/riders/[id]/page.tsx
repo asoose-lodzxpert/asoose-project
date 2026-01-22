@@ -5,9 +5,9 @@ import Link from 'next/link';
 import { ArrowLeft, Loader2, MessageSquare } from 'lucide-react'; // ✅ Imported MessageSquare
 import Swal from 'sweetalert2';
 import useSWR from 'swr'; 
+import { getSession } from 'next-auth/react'; // ✅ Import NextAuth getSession
 import { AppAlert } from '../../customers/[id]/alerts'; 
 import { fetcher } from '@/app/super-admin/hooks/useSuperAdminFetch';
-import { createClient } from '../../../../../../utils/supabase/client'; // ✅ Import Supabase
 
 // Components
 import RiderTabs from './components/ridertabs'; 
@@ -33,13 +33,13 @@ export default function RiderDetailPage({ params }: { params: Promise<{ id: stri
   const { id: riderId } = React.use(params);
   const [activeTab, setActiveTab] = useState('Overview');
 
-  // ✅ Helper: Get Auth Header
+  // ✅ Helper: Get Auth Header using NextAuth
   const getAuthHeader = async () => {
-    const supabase = createClient();
-    const { data: { session } } = await supabase.auth.getSession();
+    const session = await getSession();
+    const token = (session as any)?.accessToken;
     return {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${session?.access_token || ''}`
+        'Authorization': `Bearer ${token || ''}`
     };
   };
 
@@ -138,9 +138,9 @@ export default function RiderDetailPage({ params }: { params: Promise<{ id: stri
          try {
            const headers = await getAuthHeader();
            await fetch(`${API_URL}/super-admin/riders/${riderId}/status`, {
-              method: 'PATCH', 
-              headers, // ✅ Added Auth
-              body: JSON.stringify({ status: 'SUSPENDED' })
+             method: 'PATCH', 
+             headers, // ✅ Added Auth
+             body: JSON.stringify({ status: 'SUSPENDED' })
            });
            mutateRider();
            AppAlert.success('Rider Suspended');
@@ -268,59 +268,59 @@ export default function RiderDetailPage({ params }: { params: Promise<{ id: stri
                   
                   {/* Tab Navigation */}
                   <div className="flex border-b border-gray-800 overflow-x-auto hide-scrollbar">
-                     {['Overview', 'Ride History', 'Documents', 'Logs', 'Payouts'].map(tab => (
+                      {['Overview', 'Ride History', 'Documents', 'Logs', 'Payouts'].map(tab => (
                         <button 
                           key={tab} 
                           onClick={() => setActiveTab(tab)} 
                           className={`px-6 py-4 text-sm font-bold border-b-2 transition-colors whitespace-nowrap ${
                             activeTab === tab 
-                              ? 'text-yellow-500 border-yellow-500 bg-[#0F172A]' 
-                              : 'text-gray-400 border-transparent hover:text-white hover:bg-white/5'
+                            ? 'text-yellow-500 border-yellow-500 bg-[#0F172A]' 
+                            : 'text-gray-400 border-transparent hover:text-white hover:bg-white/5'
                           }`}
                         >
                           {tab}
                         </button>
-                     ))}
+                      ))}
                   </div>
 
                   {/* Tab Content with Loading States */}
                   <div className="flex-1">
-                     {activeTab === 'Overview' && (
-                       <RiderOverviewTab rider={rider} onRefresh={mutateRider} />
-                     )}
-                     
-                     {activeTab === 'Documents' && (
-                       <DocumentsTab 
+                      {activeTab === 'Overview' && (
+                        <RiderOverviewTab rider={rider} onRefresh={mutateRider} />
+                      )}
+                      
+                      {activeTab === 'Documents' && (
+                        <DocumentsTab 
                           documents={rider?.documents || []} 
                           onVerify={(id) => handleVerifyDocument(id, 'VERIFIED')}
                           onReject={(id, reason) => handleVerifyDocument(id, 'REJECTED', reason)}
-                       />
-                     )}
-                     
-                     {activeTab === 'Ride History' && (
-                       <RiderTabs 
-                         rides={rider.rides || []} 
-                         payouts={[]} 
-                         onDeleteRide={() => {}} 
-                         onProcessPayout={() => {}} 
-                         onRetryPayout={() => {}} 
-                         onDeletePayout={() => {}} 
-                       />
-                     )}
-                     
-                     {activeTab === 'Logs' && (
-                       <RiderLogsTab logs={rider.activityLogs || []} />
-                     )}
-                     
-                     {activeTab === 'Payouts' && (
-                       // ✅ Added Loading State for Payouts
-                       isPayoutsLoading ? <TabLoader /> : (
-                         <RiderPayoutsTab 
-                           payouts={payouts || []} 
-                           onProcess={handleProcessPayout} 
-                         />
-                       )
-                     )}
+                        />
+                      )}
+                      
+                      {activeTab === 'Ride History' && (
+                        <RiderTabs 
+                          rides={rider.rides || []} 
+                          payouts={[]} 
+                          onDeleteRide={() => {}} 
+                          onProcessPayout={() => {}} 
+                          onRetryPayout={() => {}} 
+                          onDeletePayout={() => {}} 
+                        />
+                      )}
+                      
+                      {activeTab === 'Logs' && (
+                        <RiderLogsTab logs={rider.activityLogs || []} />
+                      )}
+                      
+                      {activeTab === 'Payouts' && (
+                        // ✅ Added Loading State for Payouts
+                        isPayoutsLoading ? <TabLoader /> : (
+                          <RiderPayoutsTab 
+                            payouts={payouts || []} 
+                            onProcess={handleProcessPayout} 
+                          />
+                        )
+                      )}
                   </div>
               </div>
            </div>

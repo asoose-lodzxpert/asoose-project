@@ -6,13 +6,13 @@ import {
   Loader2, Star, Terminal, User, Phone, MapPin
 } from 'lucide-react';
 import { toast } from 'react-toastify';
+import { useSession } from 'next-auth/react'; // ✅ Import NextAuth
 import BottomNav from '../components/layout/BottomNav';
 import { useDeliveryStore } from '../store/useDeliveryStore';
 import LocationAutocomplete from '../ride/components/LocationAutocomplete';
 import DeliverySelector from './components/DeliverySelector';
 import DeliveryProgressUI from './components/DeliveryProgressUi';
 import { ReviewModal } from '@/store/ReviewModal';
-import { createClient } from '../../../../utils/supabase/client';
 import { paymentService } from '@/services/payment.service';
 import { PAYMENT_METHODS } from '../ride/constants/config';
 import { api } from '@/services/api';
@@ -26,7 +26,7 @@ export default function DeliveryPage() {
 
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
   const [showDevTools, setShowDevTools] = useState(false);
-  const supabase = createClient();
+  const { data: session } = useSession(); // ✅ Use NextAuth Session
 
   // Validate that we have Coordinates AND Address strings
   const isFormValid = useMemo(() => {
@@ -51,22 +51,18 @@ export default function DeliveryPage() {
     // ... existing review logic ...
   };
 
-
-
-const handleDeliveryRequest = async () => {
-    // Assuming 'selectedVehicle' logic exists or is part of state
-    // We default to Paystack/Card for deliveries for MVP unless specified otherwise
+  const handleDeliveryRequest = async () => {
     const gateway = 'PAYSTACK'; 
     
     try {
         setStage('FINDING_COURIER'); // Show loading state
 
-        const { data: { session } } = await supabase.auth.getSession();
+        // ✅ Get user info from session
+        const userEmail = session?.user?.email;
         
         // 1. Create Delivery Order
-        // Note: Using a specific endpoint for delivery creation or generic orders
         const orderRes = await api.post('/users/orders', {
-            type: 'DELIVERY', // Assuming backend distinguishes via type or separate endpoint
+            type: 'DELIVERY', 
             pickup: { ...pickupPos, address: packageInfo.pickupAddress },
             dropoff: { ...dropoffPos, address: packageInfo.destinationAddress },
             recipient: {
@@ -74,7 +70,6 @@ const handleDeliveryRequest = async () => {
                 phone: packageInfo.recipientPhone
             },
             packageDetails: packageInfo,
-            // Calculate price based on logic or backend estimate
             amount: 2500 // Replace with real calculation
         });
 
@@ -84,11 +79,11 @@ const handleDeliveryRequest = async () => {
         localStorage.setItem('pending_delivery', 'true');
         
         const paymentRes = await paymentService.initiatePayment({
-            amount: 2500, // Replace with dynamic amount
-            email: session?.user.email || '',
+            amount: 2500, 
+            email: userEmail || '', // ✅ Use email from NextAuth session
             gateway: gateway,
             method: 'CARD',
-            type: 'ORDER', // Delivery is technically an order in payment system
+            type: 'ORDER', 
             orderId: orderData.id
         });
 
@@ -101,7 +96,6 @@ const handleDeliveryRequest = async () => {
         setStage('CONFIGURING');
     }
   };
-
 
   useEffect(() => {
     if (stage === 'IDLE') setStage('CONFIGURING');

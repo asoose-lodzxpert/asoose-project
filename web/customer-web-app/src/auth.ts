@@ -51,10 +51,13 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     }),
   ],
   callbacks: {
-    async signIn({ user, account, profile }) {
+async signIn({ user, account, profile }) {
       // Handle OAuth sign-in (Google)
       if (account?.provider === "google") {
         try {
+          // ✅ FIX: Cast profile to 'any' to access Google-specific properties
+          const googleProfile = profile as any;
+
           // Send OAuth user data to backend
           const res = await fetch(`${API_URL}/auth/user/oauth/google`, {
             method: "POST",
@@ -64,9 +67,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             body: JSON.stringify({
               email: user.email,
               googleId: account.providerAccountId,
-              firstName: profile?.given_name || user.name?.split(" ")[0],
+              // ✅ Use the casted variable here
+              firstName: googleProfile?.given_name || user.name?.split(" ")[0],
               lastName:
-                profile?.family_name ||
+                googleProfile?.family_name ||
                 user.name?.split(" ").slice(1).join(" "),
               profilePicture: user.image,
             }),

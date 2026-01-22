@@ -68,7 +68,7 @@ const SignIn = () => {
             Sign in
           </h1>
           <p className="text-sm text-gray-600 dark:text-gray-400">
-            Welcome back to Asoosee
+            Welcome back to Asoose
           </p>
         </div>
 
@@ -175,7 +175,7 @@ const SignIn = () => {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full bg-yellow-500 text-black py-3 rounded-xl hover:bg-yellow-400 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-bold shadow-lg shadow-yellow-500/20 active:scale-[0.98]"
+              className="w-full bg-yellow-500 text-black py-3 rounded-xl hover:bg-yellow-400 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-bold   active:scale-[0.98]"
             >
               {isLoading ? (
                 <span className="flex items-center justify-center gap-2">

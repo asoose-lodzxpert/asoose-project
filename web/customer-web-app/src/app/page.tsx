@@ -6,30 +6,24 @@ import Link from 'next/link';
 import Image from 'next/image';
 import {
   ArrowRight,
-  Sun,
-  Moon,
   Zap,
   ChevronRight,
   ShieldCheck,
   MapPin,
   Clock,
   Wallet,
-  Menu,
-  X,
-  Plus,
-  Minus,
   UserCheck,
   Lock,
-  Bell
+  Minus,
+  Plus
 } from 'lucide-react';
 import Navbar from './components/layout/Navbar';
 import Footer from './components/layout/Footer';
 
 export default function AsooseLanding() {
-  const { resolvedTheme, setTheme } = useTheme();
+  const { resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const [activeService, setActiveService] = useState<'ride' | 'food' | 'package'>('ride');
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
 
   useEffect(() => setMounted(true), []);
@@ -37,62 +31,60 @@ export default function AsooseLanding() {
 
   const darkMode = resolvedTheme === 'dark';
 
+  // App Store Links
+  const CUSTOMER_ANDROID_URL = 'https://play.google.com/store/apps/details?id=com.asoose.customer';
+  const CUSTOMER_IOS_URL = '#'; // Replace with actual App Store URL
+  
   const RIDER_APP_URL = 'https://play.google.com/store/apps/details?id=com.asoose.rider';
   const MERCHANT_APP_URL = 'https://play.google.com/store/apps/details?id=com.asoose.vendor';
 
- const SERVICE_DATA = {
-  food: {
-    title: 'Order food or groceries',
-    cta: 'Order food & groceries',
-    link: '/main/store',
-    badge: 'Track your order live',
-  },
+  const SERVICE_DATA = {
+    food: {
+      title: 'Order food or groceries',
+      cta: 'Order food & groceries',
+      link: '/main/store',
+      badge: 'Track your order live',
+    },
+    ride: {
+      title: 'Where to?',
+      cta: 'Book a ride',
+      link: '/main/ride',
+      badge: 'Quick driver matching',
+    },
+    package: {
+      title: 'Send a package',
+      cta: 'Send a package',
+      link: '/main/delivery',
+      badge: 'Upfront pricing & secure delivery',
+    },
+  };
 
-  ride: {
-    title: 'Where to?',
-    cta: 'Book a ride',
-    link: '/main/ride',
-    badge: 'Quick driver matching',
-  },
-
-  package: {
-    title: 'Send a package',
-    cta: 'Send a package',
-    link: '/main/delivery',
-    badge: 'Upfront pricing & secure delivery',
-  },
-};
-
-
-const FAQ_DATA = [
-  {
-    q: "How are prices calculated?",
-    a: "Prices are calculated based on distance, time, and service type. You'll always see the total upfront — no surprises."
-  },
-  {
-    q: "How do I pay?",
-    a: "Pay safely using your wallet, bank card, or bank transfer. Transactions are fully encrypted for your security."
-  },
-  {
-    q: "What if there's an issue?",
-    a: "Our 24/7 support team is ready in the app to help with any issues — from trip problems to delivery questions."
-  },
-  {
-    q: "Is it safe?",
-    a: "All riders are verified, trips are GPS-tracked, and emergency assistance is available at all times for your peace of mind."
-  },
-  {
-    q: "Can I cancel a ride or delivery?",
-    a: "Yes — you can cancel anytime. Fees (if any) are shown before confirmation."
-  },
-  {
-    q: "How do I track my order or package?",
-    a: "Track your ride or delivery live on the map, right in the app."
-  }
-];
-
-
-
+  const FAQ_DATA = [
+    {
+      q: "How are prices calculated?",
+      a: "Prices are calculated based on distance, time, and service type. You'll always see the total upfront — no surprises."
+    },
+    {
+      q: "How do I pay?",
+      a: "Pay safely using your wallet, bank card, or bank transfer. Transactions are fully encrypted for your security."
+    },
+    {
+      q: "What if there's an issue?",
+      a: "Our 24/7 support team is ready in the app to help with any issues — from trip problems to delivery questions."
+    },
+    {
+      q: "Is it safe?",
+      a: "All riders are verified, trips are GPS-tracked, and emergency assistance is available at all times for your peace of mind."
+    },
+    {
+      q: "Can I cancel a ride or delivery?",
+      a: "Yes — you can cancel anytime. Fees (if any) are shown before confirmation."
+    },
+    {
+      q: "How do I track my order or package?",
+      a: "Track your ride or delivery live on the map, right in the app."
+    }
+  ];
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -159,26 +151,26 @@ const FAQ_DATA = [
         </header>
 
         {/* HOW IT WORKS */}
-     <section className="py-16 sm:py-20 md:py-24 px-4 sm:px-6 max-w-7xl mx-auto border-t border-black/5 dark:border-white/5">
-    <h3 className="text-2xl sm:text-3xl font-black mb-12 sm:mb-16 text-center tracking-tight">How it works</h3>
-    <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-8 sm:gap-10 md:gap-12 text-center">
-      {[
-        { icon: <MapPin className="text-yellow-500" />, title: "Choose a service", desc: "Ride, food, groceries, or delivery." },
-        { icon: <Wallet className="text-yellow-500" />, title: "Confirm price", desc: "See cost before you commit." },
-        { icon: <Clock className="text-yellow-500" />, title: "Track live", desc: "Follow progress in real time." }
-      ].map((step, i) => (
-        <div key={i} className="group flex flex-col items-center">
-          <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4 sm:mb-6 transition-transform group-hover:scale-110 ${darkMode ? 'bg-white/5' : 'bg-white'}`}>
-            {step.icon}
+        <section className="py-16 sm:py-20 md:py-24 px-4 sm:px-6 max-w-7xl mx-auto border-t border-black/5 dark:border-white/5">
+          <h3 className="text-2xl sm:text-3xl font-black mb-12 sm:mb-16 text-center tracking-tight">How it works</h3>
+          <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-8 sm:gap-10 md:gap-12 text-center">
+            {[
+              { icon: <MapPin className="text-yellow-500" />, title: "Choose a service", desc: "Ride, food, groceries, or delivery." },
+              { icon: <Wallet className="text-yellow-500" />, title: "Confirm price", desc: "See cost before you commit." },
+              { icon: <Clock className="text-yellow-500" />, title: "Track live", desc: "Follow progress in real time." }
+            ].map((step, i) => (
+              <div key={i} className="group flex flex-col items-center">
+                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4 sm:mb-6 transition-transform group-hover:scale-110 ${darkMode ? 'bg-white/5' : 'bg-white'}`}>
+                  {step.icon}
+                </div>
+                <h4 className="font-bold text-lg sm:text-xl mb-2">{step.title}</h4>
+                <p className="opacity-60 text-sm leading-relaxed max-w-xs">{step.desc}</p>
+              </div>
+            ))}
           </div>
-          <h4 className="font-bold text-lg sm:text-xl mb-2">{step.title}</h4>
-          <p className="opacity-60 text-sm leading-relaxed max-w-xs">{step.desc}</p>
-        </div>
-      ))}
-    </div>
-  </section>
+        </section>
 
-          {/* MERCHANT SECTION */}
+        {/* MERCHANT SECTION */}
         <section className="py-16 sm:py-20 md:py-24 px-4 sm:px-6 max-w-7xl mx-auto grid md:grid-cols-2 gap-10 sm:gap-12 md:gap-16 items-center border-t border-black/5 dark:border-white/5">
           <div className="order-2 md:order-1 space-y-6 sm:space-y-8">
             <h3 className="text-3xl sm:text-4xl font-black tracking-tight">Grow your business.<br/>Become a partner.</h3>
@@ -198,7 +190,6 @@ const FAQ_DATA = [
             <Image src="/store.svg" alt="Become a merchant" fill className="object-cover" />
           </div>
         </section>
-
 
         {/* RIDER SECTION */}
         <section className={`py-16 sm:py-20 md:py-24 px-4 sm:px-6 border-t ${darkMode ? 'bg-[#0a0a0a] border-white/5' : 'bg-white border-black/5'}`}>
@@ -223,7 +214,6 @@ const FAQ_DATA = [
           </div>
         </section>
 
-
         {/* SAFETY & TRUST */}
         <section className="py-16 sm:py-20 md:py-24 px-4 sm:px-6 max-w-7xl mx-auto border-t border-black/5 dark:border-white/5">
           <h3 className="text-2xl sm:text-3xl font-black mb-12 sm:mb-16 text-center tracking-tight">Your safety drives us</h3>
@@ -238,6 +228,46 @@ const FAQ_DATA = [
                 <div className="font-bold text-xs sm:text-sm uppercase tracking-widest group-hover:text-yellow-500 transition-colors">{item.text}</div>
               </div>
             ))}
+          </div>
+        </section>
+
+        {/* MINIMALIST DOWNLOAD APP SECTION */}
+        <section className="py-24 px-6 border-t border-black/5 dark:border-white/5">
+          <div className="max-w-5xl mx-auto text-center space-y-10">
+            <div className="space-y-4">
+              <h3 className="text-4xl md:text-6xl font-black tracking-tighter">
+                Get the app
+              </h3>
+              <p className="text-lg md:text-xl opacity-60 font-medium max-w-lg mx-auto leading-relaxed">
+                Experience the full Asoose ecosystem. Real-time tracking, exclusive offers, and seamless payments.
+              </p>
+            </div>
+
+            <div className="flex flex-col sm:flex-row justify-center items-center gap-4">
+              {/* Apple Button */}
+              <a 
+                href={CUSTOMER_IOS_URL} 
+                className={`group flex items-center gap-3 px-6 py-3.5 rounded-2xl transition-all border-2 ${darkMode ? 'border-white hover:bg-white hover:text-black' : 'border-black hover:bg-black hover:text-white'}`}
+              >
+                <svg className="w-6 h-6 fill-current" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.3-3.14-2.53-2.14-3.5-3.09-8.48 2-10.92 1.34-.65 2.62-.2 3.65-.2 1.27 0 2.21.72 2.87.72.65 0 2.05-.88 3.49-.75 2.49.19 3.98 1.5 4.38 1.87-.03.05-2.62 1.52-2.58 4.63.02 3.09 2.72 4.17 2.92 4.23-.05.19-.42 1.44-1.38 2.85M13 3.5c.73-.83 1.21-1.96 1.07-3.11-1.05.05-2.32.74-2.99 1.53-.61.72-1.15 1.86-1.01 2.98 1.17.09 2.33-.71 2.93-1.4z"/></svg>
+                <div className="text-left">
+                  <div className="text-[9px] uppercase font-bold tracking-wider opacity-70 leading-none mb-0.5">Download on the</div>
+                  <div className="text-sm font-bold leading-none">App Store</div>
+                </div>
+              </a>
+
+              {/* Android Button */}
+              <a 
+                href={CUSTOMER_ANDROID_URL} 
+                className={`group flex items-center gap-3 px-6 py-3.5 rounded-2xl transition-all border-2 ${darkMode ? 'border-white/20 hover:border-white hover:bg-white/5' : 'border-black/10 hover:border-black hover:bg-black/5'}`}
+              >
+                <svg className="w-6 h-6 fill-current" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M3,20.5V3.5C3,2.91 3.34,2.39 3.84,2.15L13.69,12L3.84,21.85C3.34,21.6 3,21.09 3,20.5M16.81,15.12L6.05,21.34L14.54,12.85L16.81,15.12M20.16,10.81C20.5,11.08 20.75,11.5 20.75,12C20.75,12.5 20.5,12.92 20.16,13.19L17.89,14.5L15.39,12L17.89,9.5L20.16,10.81M6.05,2.66L16.81,8.88L14.54,11.15L6.05,2.66Z"/></svg>
+                <div className="text-left">
+                  <div className="text-[9px] uppercase font-bold tracking-wider opacity-70 leading-none mb-0.5">Get it on</div>
+                  <div className="text-sm font-bold leading-none">Google Play</div>
+                </div>
+              </a>
+            </div>
           </div>
         </section>
 
@@ -263,7 +293,7 @@ const FAQ_DATA = [
             ))}
           </div>
         </section>
-     
+      
       </main>
       
       <Footer />

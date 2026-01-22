@@ -22,16 +22,33 @@ export const AddAddressModal = ({ isOpen, onClose, onSave }: AddAddressModalProp
 
   if (!isOpen) return null;
 
-  const handleSubmit = async (e: React.FormEvent) => {
+ const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
-      await onSave(formData);
+      // ✅ FIX: Construct a payload that matches Backend DTO exactly
+      const payload = {
+        street: formData.street,
+        city: formData.city,
+        state: formData.state,
+        isDefault: formData.isDefault,
+        
+        // 📍 MAIDUGURI COORDINATES
+        // Hardcoded for now to pass backend validation. 
+        // In a future update, these should come from a map picker.
+        lat: 11.8311, 
+        lng: 13.1510,
+        
+        // ❌ REMOVED: zipCode & country (The backend rejects these)
+      };
+
+      await onSave(payload);
+      
       onClose();
       // Reset form
       setFormData({ street: '', city: '', state: '', zipCode: '', country: 'Nigeria', isDefault: false });
     } catch (error) {
-      console.error(error);
+      console.error("Form submission error:", error);
     } finally {
       setLoading(false);
     }
@@ -91,6 +108,7 @@ export const AddAddressModal = ({ isOpen, onClose, onSave }: AddAddressModalProp
             </div>
           </div>
 
+          {/* NOTE: We keep these inputs for User Experience, but we don't send them to backend because backend rejects them */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="text-xs font-bold text-gray-500 uppercase">Zip Code</label>

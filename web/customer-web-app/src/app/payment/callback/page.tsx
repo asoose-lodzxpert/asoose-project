@@ -16,20 +16,20 @@ function CallbackContent() {
   useEffect(() => {
     const status = searchParams.get('status');
     const reference = searchParams.get('reference');
-    // Note: Backend might not pass order_id/ride_id in query params, 
-    // so we rely on the status and last known state or redirect to a dashboard.
     
+    // ✅ FIX: Rehydrate store to ensure we are interacting with persistent state
+    useCartStore.persist.rehydrate();
+
     const handleCompletion = async () => {
       if (status === 'SUCCESS' || status === 'successful') {
         toast.success('Payment Successful!');
         
-        // Cleanup stores based on context (local storage checks can be added here)
-        // For now, we clear the cart as a safety measure if coming from checkout
         if (localStorage.getItem('pending_checkout')) {
             clearCart();
             localStorage.removeItem('pending_checkout');
             const orderId = localStorage.getItem('last_order_id');
-            router.push(orderId ? `/main/orders/${orderId}` : '/main/orders');
+            // ✅ FIX: Redirect to the dedicated Confirmation page
+            router.push(orderId ? `/main/orders/confirmed?id=${orderId}` : '/main/orders');
             return;
         }
 

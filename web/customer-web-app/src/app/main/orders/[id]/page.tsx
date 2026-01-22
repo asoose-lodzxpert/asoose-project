@@ -8,31 +8,37 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'react-toastify';
-import useSWR from 'swr'; //
+import useSWR from 'swr'; 
+import { useSession } from "next-auth/react"; 
 
 import { OrderTimeline } from '@/app/main/components/order/OrderTimeline';
-import ReportDisputeModal from '../page';
-import { createClient } from '../../../../../utils/supabase/client';
+import ReportDisputeModal from '../component/reportDisputeModal';
+
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001').replace(/\/$/, '');
 
 export default function OrderDetailsPage() {
   const params = useParams();
   const router = useRouter();
+  const { data: session, status } = useSession(); 
   const orderId = params.id as string;
-  const supabase = createClient();
 
   const [isDisputeModalOpen, setIsDisputeModalOpen] = useState(false);
 
-  // 1. Production Fetcher with Auth
+  // 1. Production Fetcher with NextAuth Token
   const fetcher = async (url: string) => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      router.push('/sign-in');
-      throw new Error("Not authenticated");
+    if (status === 'unauthenticated') {
+        router.push('/sign-in');
+        throw new Error("Not authenticated");
     }
+    
+    // Access token from session
+    const token = (session as any)?.accessToken || (session as any)?.user?.accessToken;
 
     const res = await fetch(url, {
-      headers: { Authorization: `Bearer ${session.access_token}` }
+      headers: { 
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
     });
 
     if (!res.ok) {
@@ -44,9 +50,10 @@ export default function OrderDetailsPage() {
   };
 
   // 2. SWR Implementation with Polling
-  // refreshInterval: Polls every 10s unless the order is DELIVERED or CANCELLED
-  const { data: order, error, isLoading, mutate } = useSWR(
-    orderId ? `${API_URL}/users/orders/${orderId}` : null,
+  const shouldFetch = status === 'authenticated' && orderId ? `${API_URL}/users/orders/${orderId}` : null;
+
+  const { data: order, error, isLoading: isOrderLoading, mutate } = useSWR(
+    shouldFetch,
     fetcher,
     {
       refreshInterval: (data) => 
@@ -79,12 +86,19 @@ export default function OrderDetailsPage() {
     };
   }, [order]);
 
-  if (isLoading) return (
+  // Loading States
+  if (status === 'loading' || isOrderLoading) return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-[#0a0a0a]">
       <Loader2 className="w-8 h-8 animate-spin text-yellow-500" />
     </div>
   );
   
+  if (status === 'unauthenticated') {
+      router.push('/sign-in');
+      return null;
+  }
+
+  // Error State
   if (error || !order) return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-[#0a0a0a] p-4 text-center">
       <AlertCircle className="w-12 h-12 text-gray-400 mb-4" />
@@ -186,7 +200,7 @@ export default function OrderDetailsPage() {
         {/* Actions */}
         <div className="space-y-3">
            <Link href="/store" className="block w-full bg-yellow-500 text-black py-4 rounded-full font-black text-center shadow-xl shadow-yellow-500/20 active:scale-[0.98] transition-all">
-              Order Again
+             Order Again
            </Link>
            
            {canReport ? (
@@ -212,7 +226,7 @@ export default function OrderDetailsPage() {
         isOpen={isDisputeModalOpen} 
         onClose={() => setIsDisputeModalOpen(false)} 
         orderId={orderId} 
-        onSuccess={() => mutate()} // Refresh data after reporting
+        onSuccess={() => mutate()} 
       />
     </div>
   );

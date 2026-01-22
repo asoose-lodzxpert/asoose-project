@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { toast } from 'react-toastify';
 import useSWR from 'swr'; 
+import { getSession } from 'next-auth/react'; // ✅ Import NextAuth getSession
 import { fetcher } from '../../hooks/useSuperAdminFetch';
 
 import { TransactionDetail } from './types'; 
@@ -50,14 +51,19 @@ export default function TransactionDetailPage() {
     try {
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
       
-      // We use standard fetch here because this is a specific action (POST/Blob), not data retrieval
-      const session = await import('../../../../../utils/supabase/client').then(m => m.createClient().auth.getSession());
+      // ✅ Get Session from NextAuth
+      const session = await getSession();
+      const token = (session as any)?.accessToken;
+      
+      if (!token) {
+        throw new Error('Authentication required');
+      }
       
       const response = await fetch(`${API_URL}/super-admin/transactions/${txn.id}/receipt`, {
         method: 'POST',
         headers: { 
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.data.session?.access_token}`
+            'Authorization': `Bearer ${token}` // ✅ Use NextAuth Token
         },
         body: JSON.stringify(txn)
       });

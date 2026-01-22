@@ -9,6 +9,7 @@ import {
   Get,
   Query,
   Req,
+  Res,
   Logger,
 } from '@nestjs/common';
 import type { RawBodyRequest } from '@nestjs/common';
@@ -24,11 +25,12 @@ import { RolesGuard } from '../auth/roles.guards';
 import { Roles } from '../auth/roles.decorator';
 import { PaymentGateway } from './interfaces/payment.interface';
 import { UserRole } from '../common/enums/user-role.enum';
-import { Request } from 'express';
+import type { Request, Response } from 'express';
 
 @Controller('payment')
 export class PaymentController {
   private readonly logger = new Logger(PaymentController.name);
+  private readonly frontendUrl = process.env.CUSTOMER_WEB_URL || 'http://localhost:3001';
 
   constructor(private readonly paymentService: PaymentService) {}
 
@@ -41,7 +43,8 @@ export class PaymentController {
     if (!req.user) {
       throw new Error('User not authenticated');
     }
-    return this.paymentService.initiatePayment(dto, req.user['userId']);
+    const userId = req.user['userId'] || req.user['id'];
+    return this.paymentService.initiatePayment(dto, userId);
   }
 
   @Get('verify')
@@ -50,7 +53,10 @@ export class PaymentController {
     return this.paymentService.verifyPayment(query.reference, query.gateway);
   }
 
-  // Paystack Webhook
+  // =================================================================
+  // WEBHOOK HANDLERS (Server-to-Server)
+  // =================================================================
+
   @Post('webhook/paystack')
   @HttpCode(HttpStatus.OK)
   async paystackWebhook(
@@ -66,7 +72,6 @@ export class PaymentController {
     return { status: 'success' };
   }
 
-  // Flutterwave Webhook
   @Post('webhook/flutterwave')
   @HttpCode(HttpStatus.OK)
   async flutterwaveWebhook(
@@ -82,8 +87,6 @@ export class PaymentController {
     return { status: 'success' };
   }
 
-  // Monnify Webhooks
-  // Transaction Completion Webhook
   @Post('webhook/monnify/transaction')
   @HttpCode(HttpStatus.OK)
   async monnifyTransactionWebhook(
@@ -99,7 +102,6 @@ export class PaymentController {
     return { status: 'success' };
   }
 
-  // Refund Completion Webhook
   @Post('webhook/monnify/refund')
   @HttpCode(HttpStatus.OK)
   async monnifyRefundWebhook(
@@ -107,133 +109,90 @@ export class PaymentController {
     @Headers('monnify-signature') signature: string,
   ) {
     const payload = req.body;
-    this.logger.log('Monnify Refund Webhook received:', payload);
     await this.paymentService.handleMonnifyRefundWebhook(payload, signature);
     return { status: 'success' };
   }
 
-  // Disbursement Webhook (for payouts to vendors/riders)
-  @Post('webhook/monnify/disbursement')
-  @HttpCode(HttpStatus.OK)
-  async monnifyDisbursementWebhook(
-    @Req() req: RawBodyRequest<Request>,
-    @Headers('monnify-signature') signature: string,
+
+  // FIX: Removed duplicate @Get('webhook/paystack/callback')
+  // This is the ONLY route for Paystack browser redirects
+@Get('callback/paystack') 
+  async paystackCallback(
+    @Query('reference') reference: string,
+    @Res() res: Response,
   ) {
-    const payload = req.body;
-    this.logger.log('Monnify Disbursement Webhook received');
-    // TODO: Implement disbursement webhook handling
-    return { status: 'success' };
-  }
+    // 1. Validation
+    if (!reference) {
+       this.logger.error('Paystack callback missing reference');
+       return res.redirect(`${this.frontendUrl}/payment/callback?status=failed&reason=missing_reference`);
+    }
 
-  // Settlement Webhook
-  @Post('webhook/monnify/settlement')
-  @HttpCode(HttpStatus.OK)
-  async monnifySettlementWebhook(
-    @Req() req: RawBodyRequest<Request>,
-    @Headers('monnify-signature') signature: string,
-  ) {
-    const payload = req.body;
-    this.logger.log('Monnify Settlement Webhook received');
-    // TODO: Implement settlement webhook handling
-    return { status: 'success' };
-  }
+    try {
+      // 2. Verification
+      const verification = await this.paymentService.verifyPayment(
+        reference,
+        PaymentGateway.PAYSTACK,
+      );
 
-  // Mandate Webhook (for recurring payments)
-  @Post('webhook/monnify/mandate')
-  @HttpCode(HttpStatus.OK)
-  async monnifyMandateWebhook(
-    @Req() req: RawBodyRequest<Request>,
-    @Headers('monnify-signature') signature: string,
-  ) {
-    const payload = req.body;
-    this.logger.log('Monnify Mandate Webhook received');
-    // TODO: Implement mandate webhook handling
-    return { status: 'success' };
-  }
+      const status = verification.success ? 'success' : 'failed';
+      
+      // 3. Success Redirect
+      const redirectUrl = `${this.frontendUrl}/payment/callback?reference=${reference}&status=${status}`;
+      return res.redirect(redirectUrl);
 
-  // Wallet Activity Notification Webhook
-  @Post('webhook/monnify/wallet-activity')
-  @HttpCode(HttpStatus.OK)
-  async monnifyWalletActivityWebhook(
-    @Req() req: RawBodyRequest<Request>,
-    @Headers('monnify-signature') signature: string,
-  ) {
-    const payload = req.body;
-    this.logger.log('Monnify Wallet Activity Webhook received');
-    // TODO: Implement wallet activity webhook handling
-    return { status: 'success' };
-  }
-
-  // Low Balance Notification Webhook
-  @Post('webhook/monnify/low-balance')
-  @HttpCode(HttpStatus.OK)
-  async monnifyLowBalanceWebhook(
-    @Req() req: RawBodyRequest<Request>,
-    @Headers('monnify-signature') signature: string,
-  ) {
-    const payload = req.body;
-    this.logger.log('Monnify Low Balance Webhook received');
-    // TODO: Implement low balance notification handling
-    return { status: 'success' };
-  }
-
-  // Callback URLs (for redirects after payment)
-  @Get('webhook/paystack/callback')
-  @HttpCode(HttpStatus.OK)
-  async paystackCallback(@Query('reference') reference: string) {
-    const verification = await this.paymentService.verifyPayment(
-      reference,
-      PaymentGateway.PAYSTACK,
-    );
-
-    // Redirect to frontend with payment status
-    const frontendUrl = process.env.CUSTOMER_WEB_URL || 'http://localhost:3001';
-    const redirectUrl = `${frontendUrl}/payment/callback?reference=${reference}&status=${verification.status}`;
-
-    return {
-      message: 'Payment processed',
-      redirectUrl,
-      ...verification,
-    };
+    } catch (error) {
+      this.logger.error(`Paystack callback failed for ${reference}`, error);
+      
+      // 4. Failure Redirect (Graceful Fallback)
+      const redirectUrl = `${this.frontendUrl}/payment/callback?reference=${reference}&status=failed`;
+      return res.redirect(redirectUrl);
+    }
   }
 
   @Get('webhook/flutterwave/callback')
-  @HttpCode(HttpStatus.OK)
   async flutterwaveCallback(
     @Query('tx_ref') reference: string,
     @Query('transaction_id') transactionId: string,
+    @Res() res: Response,
   ) {
-    const verification = await this.paymentService.verifyPayment(
-      transactionId,
-      PaymentGateway.FLUTTERWAVE,
-    );
+    try {
+      const idToVerify = transactionId || reference;
+      const verification = await this.paymentService.verifyPayment(
+        idToVerify,
+        PaymentGateway.FLUTTERWAVE,
+      );
 
-    const frontendUrl = process.env.CUSTOMER_WEB_URL || 'http://localhost:3001';
-    const redirectUrl = `${frontendUrl}/payment/callback?reference=${reference}&status=${verification.status}`;
+      const status = verification.success ? 'success' : 'failed';
+      const redirectUrl = `${this.frontendUrl}/payment/callback?reference=${verification.reference}&status=${status}`;
+      return res.redirect(redirectUrl);
 
-    return {
-      message: 'Payment processed',
-      redirectUrl,
-      ...verification,
-    };
+    } catch (error) {
+      this.logger.error(`Flutterwave callback failed for ${reference}`, error);
+      const redirectUrl = `${this.frontendUrl}/payment/callback?reference=${reference}&status=failed`;
+      return res.redirect(redirectUrl);
+    }
   }
 
   @Get('webhook/monnify/callback')
-  @HttpCode(HttpStatus.OK)
-  async monnifyCallback(@Query('paymentReference') reference: string) {
-    const verification = await this.paymentService.verifyPayment(
-      reference,
-      PaymentGateway.MONNIFY,
-    );
+  async monnifyCallback(
+    @Query('paymentReference') reference: string,
+    @Res() res: Response,
+  ) {
+    try {
+      const verification = await this.paymentService.verifyPayment(
+        reference,
+        PaymentGateway.MONNIFY,
+      );
 
-    const frontendUrl = process.env.CUSTOMER_WEB_URL || 'http://localhost:3001';
-    const redirectUrl = `${frontendUrl}/payment/callback?reference=${reference}&status=${verification.status}`;
+      const status = verification.success ? 'success' : 'failed';
+      const redirectUrl = `${this.frontendUrl}/payment/callback?reference=${reference}&status=${status}`;
+      return res.redirect(redirectUrl);
 
-    return {
-      message: 'Payment processed',
-      redirectUrl,
-      ...verification,
-    };
+    } catch (error) {
+      this.logger.error(`Monnify callback failed for ${reference}`, error);
+      const redirectUrl = `${this.frontendUrl}/payment/callback?reference=${reference}&status=failed`;
+      return res.redirect(redirectUrl);
+    }
   }
 
   // Admin Endpoints

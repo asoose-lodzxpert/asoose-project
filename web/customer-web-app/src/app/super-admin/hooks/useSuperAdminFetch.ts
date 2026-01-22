@@ -1,6 +1,6 @@
-import { createClient } from "../../../../utils/supabase/client";
-// Validate environment variables at module load
+import { getSession } from "next-auth/react";
 
+// Validate environment variables at module load
 const BACKEND_URL = (() => {
   const url = process.env.NEXT_PUBLIC_API_URL;
   if (!url) {
@@ -23,7 +23,7 @@ interface FetcherError extends Error {
 }
 
 /**
- * Production-ready fetcher for SWR with Supabase authentication
+ * Production-ready fetcher for SWR with NextAuth authentication
  * @param url - API endpoint path (will be appended to BACKEND_URL)
  * @param options - Configuration options for retry logic and timeout
  * @returns Promise with the JSON response
@@ -39,16 +39,8 @@ export const fetcher = async <T = any>(
     signal,
   } = options;
 
-  const supabase = createClient();
-
-  // Get and validate session
-  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-
-  if (sessionError) {
-    const error: FetcherError = new Error('Session error: ' + sessionError.message);
-    error.status = 401;
-    throw error;
-  }
+  // 1. Get and validate session using NextAuth
+  const session = await getSession();
 
   if (!session) {
     const error: FetcherError = new Error('Authentication required');
@@ -56,20 +48,14 @@ export const fetcher = async <T = any>(
     throw error;
   }
 
-  // Check token expiration and refresh if needed (within 60 seconds of expiry)
-  let activeSession = session;
-  const expiresAt = session.expires_at;
-  const now = Math.floor(Date.now() / 1000);
+  // 2. Extract Token 
+  // Adjust property access based on where you stored the token in authOptions (jwt callback)
+  const token = (session as any).accessToken || (session.user as any)?.accessToken;
 
-  if (expiresAt && expiresAt - now < 60) {
-    const { data: { session: refreshedSession }, error: refreshError } = 
-      await supabase.auth.refreshSession();
-
-    if (refreshError) {
-      console.warn('Failed to refresh session:', refreshError.message);
-    } else if (refreshedSession) {
-      activeSession = refreshedSession;
-    }
+  if (!token) {
+    const error: FetcherError = new Error('No access token found in session');
+    error.status = 401;
+    throw error;
   }
 
   const fullUrl = `${BACKEND_URL}${url}`;
@@ -88,7 +74,7 @@ export const fetcher = async <T = any>(
     try {
       const res = await fetch(fullUrl, {
         headers: {
-          'Authorization': `Bearer ${activeSession.access_token}`,
+          'Authorization': `Bearer ${token}`, // Use NextAuth Token
           'Content-Type': 'application/json',
         },
         signal: combinedSignal,
@@ -242,4 +228,3 @@ export const createFetcher = (defaultOptions: FetcherOptions = {}) => {
     return fetcher<T>(url, { ...defaultOptions, ...options });
   };
 };
-
