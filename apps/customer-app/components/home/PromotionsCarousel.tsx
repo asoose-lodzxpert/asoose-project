@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   View,
   StyleSheet,
@@ -18,14 +18,17 @@ import { IconSymbol, IconSymbolName } from "@/components/ui/icon-symbol";
 export type Promotion = {
   id: string;
   title: string;
+  subtitle?: string;
   code?: string;
   actionText?: string;
   textColor?: string;
+  backgroundColor?: string;
 
   iconName?: IconSymbolName;
   iconImage?: any;
 
   backgroundImage?: any;
+  link?: string;
   onPress?: () => void;
 };
 
@@ -37,6 +40,9 @@ export function PromotionsCarousel({ data }: { data: Promotion[] }) {
   const textDefault = useThemeColor({}, "textPrimary");
   const surface = useThemeColor({}, "surfaceBackground");
 
+  const promotions = data ?? [];
+  const dataLength = promotions.length;
+
   const scrollX = useRef(new Animated.Value(0)).current;
   const flatListRef = useRef<Animated.FlatList<Promotion>>(null);
 
@@ -47,16 +53,18 @@ export function PromotionsCarousel({ data }: { data: Promotion[] }) {
   /** -------------------- */
   /** Auto scroll logic */
   /** -------------------- */
-  useEffect(() => {
-    startAutoScroll();
-    return stopAutoScroll;
-  }, [activeIndex]);
+  const stopAutoScroll = useCallback(() => {
+    if (autoScrollTimer.current) {
+      clearTimeout(autoScrollTimer.current);
+      autoScrollTimer.current = null;
+    }
+  }, []);
 
-  function startAutoScroll() {
-    if (autoScrollTimer.current || isInteracting.current) return;
+  const startAutoScroll = useCallback(() => {
+    if (autoScrollTimer.current || isInteracting.current || !dataLength) return;
 
     autoScrollTimer.current = setTimeout(() => {
-      const nextIndex = (activeIndex + 1) % data.length;
+      const nextIndex = (activeIndex + 1) % dataLength;
       flatListRef.current?.scrollToOffset({
         offset: nextIndex * CARD_WIDTH,
         animated: true,
@@ -64,14 +72,16 @@ export function PromotionsCarousel({ data }: { data: Promotion[] }) {
       setActiveIndex(nextIndex);
       autoScrollTimer.current = null;
     }, AUTO_SCROLL_INTERVAL);
-  }
+  }, [activeIndex, dataLength]);
 
-  function stopAutoScroll() {
-    if (autoScrollTimer.current) {
-      clearTimeout(autoScrollTimer.current);
-      autoScrollTimer.current = null;
+  useEffect(() => {
+    if (!dataLength) {
+      stopAutoScroll();
+      return;
     }
-  }
+    startAutoScroll();
+    return stopAutoScroll;
+  }, [startAutoScroll, stopAutoScroll, dataLength]);
 
   function onScrollEnd(e: NativeSyntheticEvent<NativeScrollEvent>) {
     const index = Math.round(e.nativeEvent.contentOffset.x / CARD_WIDTH);
@@ -79,11 +89,15 @@ export function PromotionsCarousel({ data }: { data: Promotion[] }) {
     isInteracting.current = false;
   }
 
+  if (!dataLength) {
+    return null;
+  }
+
   return (
     <View>
       <Animated.FlatList
         ref={flatListRef}
-        data={data}
+        data={promotions}
         keyExtractor={(item) => item.id}
         horizontal
         pagingEnabled
@@ -95,7 +109,7 @@ export function PromotionsCarousel({ data }: { data: Promotion[] }) {
         onMomentumScrollEnd={onScrollEnd}
         onScroll={Animated.event(
           [{ nativeEvent: { contentOffset: { x: scrollX } } }],
-          { useNativeDriver: true }
+          { useNativeDriver: true },
         )}
         renderItem={({ item, index }) => {
           const inputRange = [
@@ -110,6 +124,11 @@ export function PromotionsCarousel({ data }: { data: Promotion[] }) {
           });
 
           const color = item.textColor ?? "#000";
+          const subtitle = item.subtitle || null;
+          const backgroundSource =
+            typeof item.backgroundImage === "string"
+              ? { uri: item.backgroundImage }
+              : item.backgroundImage;
 
           const Content = (
             <Animated.View
@@ -129,14 +148,18 @@ export function PromotionsCarousel({ data }: { data: Promotion[] }) {
                     {item.title}
                   </ThemedText>
 
-                  {item.code && (
+                  {subtitle ? (
+                    <ThemedText style={[styles.subtitle, { color }]}>
+                      {subtitle}
+                    </ThemedText>
+                  ) : item.code ? (
                     <ThemedText style={[styles.code, { color }]}>
                       Use code:{" "}
                       <ThemedText style={{ fontWeight: "700", color }}>
                         {item.code}
                       </ThemedText>
                     </ThemedText>
-                  )}
+                  ) : null}
                 </View>
 
                 <Pressable
@@ -151,9 +174,9 @@ export function PromotionsCarousel({ data }: { data: Promotion[] }) {
             </Animated.View>
           );
 
-          return item.backgroundImage ? (
+          return backgroundSource ? (
             <ImageBackground
-              source={item.backgroundImage}
+              source={backgroundSource}
               style={styles.card}
               imageStyle={{ borderRadius: 12 }}
             >
@@ -164,7 +187,12 @@ export function PromotionsCarousel({ data }: { data: Promotion[] }) {
               {Content}
             </ImageBackground>
           ) : (
-            <View style={[styles.card, { backgroundColor: primary }]}>
+            <View
+              style={[
+                styles.card,
+                { backgroundColor: item.backgroundColor || primary },
+              ]}
+            >
               {Content}
             </View>
           );
@@ -173,7 +201,7 @@ export function PromotionsCarousel({ data }: { data: Promotion[] }) {
 
       {/* Pagination dots */}
       <View style={styles.dots}>
-        {data.map((_, i) => (
+        {promotions.map((_, i) => (
           <View
             key={i}
             style={[
@@ -218,6 +246,11 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 16,
     fontWeight: "700",
+  },
+  subtitle: {
+    marginTop: 4,
+    fontSize: 13,
+    opacity: 0.9,
   },
   code: {
     marginTop: 4,

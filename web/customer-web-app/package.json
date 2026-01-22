@@ -12,6 +12,7 @@
     "@auth/core": "^0.34.3",
     "@googlemaps/js-api-loader": "^2.0.2",
     "@hookform/resolvers": "^5.2.2",
+    "@react-google-maps/api": "^2.20.8",
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.89.0",
     "@tanstack/react-table": "^8.21.3",
@@ -35,6 +36,7 @@
     "socket.io-client": "^4.8.3",
     "sweetalert2": "^11.26.10",
     "swr": "^2.3.8",
+    "use-places-autocomplete": "^4.0.1",
     "zod": "^4.3.5",
     "zustand": "^5.0.9"
   },

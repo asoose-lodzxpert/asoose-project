@@ -1,13 +1,13 @@
 import { useCallback } from "react";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import {
+  authConfig,
+  getAccessToken,
+  refreshAccessToken,
+} from "@/services/auth.service";
 
-const DEFAULT_BACKEND = "https://asoose.com/api/v1/";
-const BACKEND_URL =
-  (process.env.BACKEND_URL || DEFAULT_BACKEND).replace(/\/+$/, "") + "/";
+const BACKEND_URL = `${authConfig.apiBase}/`;
 
 type FetchOpts = RequestInit & { absolute?: boolean };
-
-const ACCESS_TOKEN_KEY = "@auth/access_token";
 
 /**
  * Hook that returns helpers for making requests with the access token from AsyncStorage
@@ -25,27 +25,36 @@ export function useAuthFetch() {
         : {}),
     };
 
-    // Get token from AsyncStorage
-    const token = await AsyncStorage.getItem(ACCESS_TOKEN_KEY);
+    let token = await getAccessToken();
     if (token) headers["Authorization"] = `Bearer ${token}`;
 
-    const res = await fetch(url, { headers, ...rest });
-    const text = await res.text();
-    let body: any = null;
-    try {
-      body = text ? JSON.parse(text) : null;
-    } catch {
-      body = text;
+    async function execute() {
+      const response = await fetch(url, { headers, ...rest });
+      const parsed = await parseBody(response);
+      return { response, parsed };
     }
 
-    if (!res.ok) throw body || new Error(`HTTP ${res.status}`);
-    return body;
+    let { response, parsed } = await execute();
+
+    if (response.status === 401 && token) {
+      try {
+        const newToken = await refreshAccessToken();
+        token = newToken;
+        headers["Authorization"] = `Bearer ${newToken}`;
+        ({ response, parsed } = await execute());
+      } catch (error) {
+        throw error instanceof Error ? error : new Error("Session expired");
+      }
+    }
+
+    if (!response.ok) throw toError(parsed, response.statusText);
+    return parsed;
   }, []);
 
   const get = useCallback(
     (path: string, opts: FetchOpts = {}) =>
       request(path, { method: "GET", ...opts }),
-    [request]
+    [request],
   );
 
   const post = useCallback(
@@ -53,10 +62,28 @@ export function useAuthFetch() {
       const payload = body === undefined ? undefined : JSON.stringify(body);
       return request(path, { method: "POST", body: payload, ...opts });
     },
-    [request]
+    [request],
   );
 
   return { request, get, post, backendUrl: BACKEND_URL };
+}
+
+async function parseBody(res: Response) {
+  const text = await res.text();
+  if (!text) return null;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
+}
+
+function toError(body: any, fallback: string) {
+  if (!body) return new Error(fallback || "Request failed");
+  if (typeof body === "string") return new Error(body);
+  if (typeof body.message === "string") return new Error(body.message);
+  if (typeof body.error === "string") return new Error(body.error);
+  return new Error(fallback || "Request failed");
 }
 
 export default useAuthFetch;

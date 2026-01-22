@@ -1,33 +1,59 @@
-import { CartItem, Restaurant } from "@/types/cart";
-import useAuthFetch from "@/lib/authFetch";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { CartSummaryResponse } from "@/types/cart";
 
-export type CartApiResponse = {
-  items: CartItem[];
-  restaurants: Restaurant[];
+const DEFAULT_BACKEND = "https://asoose.com/api/v1/";
+const BACKEND_URL =
+  (process.env.BACKEND_URL || DEFAULT_BACKEND).replace(/\/+$/, "") + "/";
+const ACCESS_TOKEN_KEY = "@auth/access_token";
+
+type RequestOptions = {
+  path: string;
+  body: unknown;
 };
 
-// These functions are not hooks, so we need to get the fetch helpers outside of React hooks
-const { get, post } = useAuthFetch();
+async function authorizedPost<T>({ path, body }: RequestOptions): Promise<T> {
+  const token = await AsyncStorage.getItem(ACCESS_TOKEN_KEY);
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
 
-// GET /cart
-export async function fetchCart(): Promise<CartApiResponse> {
-  return await get("cart");
+  const response = await fetch(BACKEND_URL + path.replace(/^\/+/, ""), {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body),
+  });
+
+  const text = await response.text();
+  let data: any = null;
+  if (text) {
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = text;
+    }
+  }
+
+  if (!response.ok) {
+    const message = data?.message || data || response.statusText;
+    throw new Error(typeof message === "string" ? message : "Request failed");
+  }
+
+  return data as T;
 }
 
-// POST /cart/add
-export async function addCartItem(item: CartItem): Promise<CartApiResponse> {
-  return await post("cart/add", item);
-}
+export type CartSummaryPayload = {
+  items: {
+    productId: string;
+    quantity: number;
+  }[];
+};
 
-// POST /cart/remove
-export async function removeCartItem(id: string): Promise<CartApiResponse> {
-  return await post("cart/remove", { id });
-}
-
-// POST /cart/update-qty
-export async function updateCartItemQty(
-  id: string,
-  qty: number
-): Promise<CartApiResponse> {
-  return await post("cart/update-qty", { id, qty });
+export async function fetchCartSummary(
+  payload: CartSummaryPayload,
+): Promise<CartSummaryResponse> {
+  return authorizedPost<CartSummaryResponse>({
+    path: "cart/summary",
+    body: payload,
+  });
 }
