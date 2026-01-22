@@ -6,7 +6,9 @@ import useSWR, { mutate } from 'swr';
 import { Trash2, Map as MapIcon, Save, Plus, Loader2, X, AlertCircle } from 'lucide-react';
 import { toast } from 'react-toastify';
 import Swal from 'sweetalert2';
+import { getSession } from 'next-auth/react'; // ✅ Import NextAuth
 import { fetcher } from '../../hooks/useSuperAdminFetch';
+
 // --- 1. Dynamic Import ---
 // We must import the MapEditor dynamically because Leaflet depends on 'window',
 // which is not available during Next.js server-side rendering.
@@ -63,14 +65,17 @@ export default function ServiceZonesPage() {
 
     try {
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-      const session = await import('../../../../../utils/supabase/client').then(m => m.createClient().auth.getSession());
+      
+      // ✅ Get Session via NextAuth
+      const session = await getSession();
+      const token = (session as any)?.accessToken;
       
       // 2. API Call
       const res = await fetch(`${API_URL}/super-admin/zones`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.data.session?.access_token}`
+          'Authorization': `Bearer ${token || ''}` // ✅ Use Token
         },
         body: JSON.stringify({
           name: zoneName,
@@ -107,11 +112,14 @@ export default function ServiceZonesPage() {
     if (result.isConfirmed) {
       try {
         const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-        const session = await import('../../../../../utils/supabase/client').then(m => m.createClient().auth.getSession());
+        
+        // ✅ Get Session via NextAuth
+        const session = await getSession();
+        const token = (session as any)?.accessToken;
 
         await fetch(`${API_URL}/super-admin/zones/${id}`, {
           method: 'DELETE',
-          headers: { 'Authorization': `Bearer ${session.data.session?.access_token}` }
+          headers: { 'Authorization': `Bearer ${token || ''}` } // ✅ Use Token
         });
 
         mutate('/super-admin/zones');
@@ -256,16 +264,16 @@ export default function ServiceZonesPage() {
           
           {/* Map Legend Overlay */}
           <div className="absolute bottom-4 right-4 bg-[#0F172A]/90 backdrop-blur-md p-3 rounded-lg border border-gray-700 text-xs z-[400] shadow-lg">
-             <div className="flex items-center gap-2 mb-1.5">
-               <div className="w-3 h-3 bg-green-500 rounded-sm opacity-50 border border-green-400"></div> 
-               <span className="text-gray-300 font-medium">Active Zone</span>
-             </div>
-             {isCreating && (
-               <div className="flex items-center gap-2">
-                 <div className="w-3 h-3 border-2 border-blue-500 border-dashed rounded-sm"></div> 
-                 <span className="text-blue-300 font-bold animate-pulse">Drawing Now...</span>
-               </div>
-             )}
+              <div className="flex items-center gap-2 mb-1.5">
+                <div className="w-3 h-3 bg-green-500 rounded-sm opacity-50 border border-green-400"></div> 
+                <span className="text-gray-300 font-medium">Active Zone</span>
+              </div>
+              {isCreating && (
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 border-2 border-blue-500 border-dashed rounded-sm"></div> 
+                  <span className="text-blue-300 font-bold animate-pulse">Drawing Now...</span>
+                </div>
+              )}
           </div>
         </div>
 

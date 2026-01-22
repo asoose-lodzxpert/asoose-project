@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { createColumnHelper } from '@tanstack/react-table';
 import { AlertCircle, CheckCircle, XCircle, Clock, AlertTriangle, ArrowRight } from 'lucide-react';
 import { Dispute } from '../types';
+
 const columnHelper = createColumnHelper<Dispute>();
 
 // --- Helpers ---
@@ -112,7 +113,8 @@ export const disputeColumns = [
       </div>
     ),
   }),
-  {
+  // FIX: Wrapped in columnHelper.display() to infer types correctly
+  columnHelper.display({
     id: 'actions',
     header: '',
     cell: ({ row }) => (
@@ -122,7 +124,7 @@ export const disputeColumns = [
         </button>
       </Link>
     ),
-  },
+  }),
 ];
 
 // --- Mobile Card ---

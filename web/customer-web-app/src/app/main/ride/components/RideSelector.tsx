@@ -2,12 +2,33 @@
 
 import React, { useState, useEffect } from 'react';
 import { 
-  CreditCard, Banknote, ChevronLeft, Check, Loader2, ChevronDown, AlertCircle
+  CreditCard, Banknote, ChevronLeft, Check, Loader2, ChevronDown
 } from 'lucide-react';
-import { PriceEstimate, RideRequestPayload, RideType } from '@/services/ride.service';
 import FareBreakdown from './fareBreakdown';
 import LocationAutocomplete from './LocationAutocomplete';
-import { PAYMENT_METHODS } from '../constants/config'; // Ensure this exists or define inline if preferred
+import { PAYMENT_METHODS } from '../constants/config'; 
+
+// ✅ FIX 1: Define the missing types locally here
+export interface RideType {
+  id: string;
+  displayName: string;
+  icon?: string;
+}
+
+export interface RideRequestPayload {
+  pickup: { lat: number; lng: number; address: string };
+  dropoff: { lat: number; lng: number; address: string };
+  rideType: string;
+  paymentMethodId: string;
+  price: number;
+}
+
+// Flexible interface to handle specific ride keys (e.g., 'standard', 'premium') plus metadata
+export interface PriceEstimate {
+  durationMin: number;
+  isSurgeActive: boolean;
+  [key: string]: any; // Allows accessing dynamic keys like 'standard' or 'premium'
+}
 
 interface RideSelectorProps {
   pickupAddress: string;
@@ -19,7 +40,7 @@ interface RideSelectorProps {
   onRequestRide: (data: RideRequestPayload) => void;
   isRequesting: boolean;
   isGoogleLoaded: boolean;
-  availableRideTypes: RideType[]; // NEW: Dynamic types from backend
+  availableRideTypes: RideType[]; 
 }
 
 export default function RideSelector({ 
@@ -48,7 +69,7 @@ export default function RideSelector({
     }
   }, [availableRideTypes, selectedRideId]);
 
-const handleConfirm = () => {
+  const handleConfirm = () => {
     if (!priceEstimates || !selectedRideId) return;
     const tier = (priceEstimates as any)[selectedRideId];
     
@@ -56,7 +77,7 @@ const handleConfirm = () => {
       pickup: { lat: 0, lng: 0, address: pickupAddress },
       dropoff: { lat: 0, lng: 0, address: destinationAddress },
       rideType: selectedRideId, 
-      paymentMethodId: selectedPayment.id, // This is passed to parent
+      paymentMethodId: selectedPayment.id, 
       price: tier.total
     });
   };

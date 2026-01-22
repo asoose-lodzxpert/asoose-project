@@ -2,10 +2,10 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Loader2, MessageSquare } from 'lucide-react'; // ✅ Imported MessageSquare
+import { ArrowLeft, Loader2, MessageSquare } from 'lucide-react'; 
 import Swal from 'sweetalert2';
 import useSWR from 'swr'; 
-import { getSession } from 'next-auth/react'; // ✅ Import NextAuth getSession
+import { getSession } from 'next-auth/react'; 
 import { AppAlert } from '../../customers/[id]/alerts'; 
 import { fetcher } from '@/app/super-admin/hooks/useSuperAdminFetch';
 
@@ -29,11 +29,16 @@ const TabLoader = () => (
   </div>
 );
 
+// ✅ 1. Define the Interface for Payouts Response
+interface PayoutsResponse {
+  data: any[]; 
+  meta?: any;
+}
+
 export default function RiderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: riderId } = React.use(params);
   const [activeTab, setActiveTab] = useState('Overview');
 
-  // ✅ Helper: Get Auth Header using NextAuth
   const getAuthHeader = async () => {
     const session = await getSession();
     const token = (session as any)?.accessToken;
@@ -59,18 +64,18 @@ export default function RiderDetailPage({ params }: { params: Promise<{ id: stri
   );
 
   // 2. Fetch Payouts (Conditionally)
+  // ✅ 2. Pass the Generic Type here so TS knows 'data' exists
   const { 
     data: payouts, 
-    isLoading: isPayoutsLoading, // ✅ Extract loading state
+    isLoading: isPayoutsLoading, 
     mutate: mutatePayouts 
-  } = useSWR(
+  } = useSWR<PayoutsResponse>(
     riderId && activeTab === 'Payouts' ? `/super-admin/riders/${riderId}/payouts` : null,
     fetcher
   );
 
   // --- Handlers ---
 
-  // ✉️ Message Rider
   const handleMessageRider = async () => {
     const { value: text } = await Swal.fire({
       title: 'Message Rider',
@@ -101,13 +106,12 @@ export default function RiderDetailPage({ params }: { params: Promise<{ id: stri
     if (text) AppAlert.success('Email Sent to Rider');
   };
 
-  // ✏️ Update Profile
   const handleUpdateProfile = async (data: any) => {
     try {
       const headers = await getAuthHeader();
       const res = await fetch(`${API_URL}/super-admin/riders/${riderId}`, {
           method: 'PATCH',
-          headers, // ✅ Added Auth
+          headers, 
           body: JSON.stringify(data)
       });
       if (!res.ok) throw new Error('Update failed');
@@ -119,7 +123,6 @@ export default function RiderDetailPage({ params }: { params: Promise<{ id: stri
     }
   };
 
-  // 🚦 Suspend / Reactivate
   const handleToggleStatus = async () => {
     const isSuspending = rider.status !== 'SUSPENDED';
     
@@ -139,7 +142,7 @@ export default function RiderDetailPage({ params }: { params: Promise<{ id: stri
            const headers = await getAuthHeader();
            await fetch(`${API_URL}/super-admin/riders/${riderId}/status`, {
              method: 'PATCH', 
-             headers, // ✅ Added Auth
+             headers, 
              body: JSON.stringify({ status: 'SUSPENDED' })
            });
            mutateRider();
@@ -153,8 +156,8 @@ export default function RiderDetailPage({ params }: { params: Promise<{ id: stri
         const headers = await getAuthHeader();
         await fetch(`${API_URL}/super-admin/riders/${riderId}/status`, {
           method: 'PATCH', 
-          headers, // ✅ Added Auth
-          body: JSON.stringify({ status: 'ACTIVE' }) // ✅ Changed OFFLINE to ACTIVE
+          headers, 
+          body: JSON.stringify({ status: 'ACTIVE' }) 
         });
         mutateRider();
         AppAlert.success('Rider Reactivated');
@@ -164,13 +167,12 @@ export default function RiderDetailPage({ params }: { params: Promise<{ id: stri
     }
   };
 
-  // 📄 Verify Documents
   const handleVerifyDocument = async (docId: string, status: 'VERIFIED' | 'REJECTED', rejectionReason?: string) => {
     try {
       const headers = await getAuthHeader();
       const res = await fetch(`${API_URL}/super-admin/verification/documents/${docId}`, {
         method: 'PATCH',
-        headers, // ✅ Added Auth
+        headers, 
         body: JSON.stringify({ status, rejectionReason })
       });
 
@@ -189,13 +191,12 @@ export default function RiderDetailPage({ params }: { params: Promise<{ id: stri
     }
   };
 
-  // 💰 Process Payouts
   const handleProcessPayout = async (payoutId: string, status: string) => {
     try {
       const headers = await getAuthHeader();
       const res = await fetch(`${API_URL}/super-admin/riders/${riderId}/payouts/${payoutId}`, {
         method: 'PATCH',
-        headers, // ✅ Added Auth
+        headers, 
         body: JSON.stringify({ status })
       });
       if (!res.ok) throw new Error('Action failed');
@@ -207,8 +208,6 @@ export default function RiderDetailPage({ params }: { params: Promise<{ id: stri
       AppAlert.error('Error', 'Failed to process payout');
     }
   };
-
-  // --- Render ---
 
   if (isLoading) return <RiderDetailPageSkeleton/>;
 
@@ -225,7 +224,6 @@ export default function RiderDetailPage({ params }: { params: Promise<{ id: stri
     <div className="min-h-screen bg-[#0F172A] p-4 md:p-6 pb-20">
       <div className="max-w-7xl mx-auto space-y-6">
         
-        {/* Header */}
         <div className="flex justify-between items-end">
           <div>
             <Link href="/super-admin/users/riders" className="text-gray-400 hover:text-white flex items-center gap-1 text-sm mb-4">
@@ -243,7 +241,6 @@ export default function RiderDetailPage({ params }: { params: Promise<{ id: stri
             </div>
           </div>
           
-          {/* ✅ Message Button */}
           <button 
             onClick={handleMessageRider}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold rounded-lg transition-colors shadow-lg shadow-blue-500/20"
@@ -253,7 +250,6 @@ export default function RiderDetailPage({ params }: { params: Promise<{ id: stri
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-           {/* LEFT: Sidebar */}
            <div className="lg:col-span-1">
               <RiderSidebar 
                 rider={rider} 
@@ -262,11 +258,9 @@ export default function RiderDetailPage({ params }: { params: Promise<{ id: stri
               />
            </div>
 
-           {/* RIGHT: Content Tabs */}
            <div className="lg:col-span-2">
               <div className="bg-[#1E293B] border border-gray-800 rounded-xl overflow-hidden min-h-[600px] flex flex-col">
                   
-                  {/* Tab Navigation */}
                   <div className="flex border-b border-gray-800 overflow-x-auto hide-scrollbar">
                       {['Overview', 'Ride History', 'Documents', 'Logs', 'Payouts'].map(tab => (
                         <button 
@@ -283,7 +277,6 @@ export default function RiderDetailPage({ params }: { params: Promise<{ id: stri
                       ))}
                   </div>
 
-                  {/* Tab Content with Loading States */}
                   <div className="flex-1">
                       {activeTab === 'Overview' && (
                         <RiderOverviewTab rider={rider} onRefresh={mutateRider} />
@@ -313,10 +306,9 @@ export default function RiderDetailPage({ params }: { params: Promise<{ id: stri
                       )}
                       
                       {activeTab === 'Payouts' && (
-                        // ✅ Added Loading State for Payouts
                         isPayoutsLoading ? <TabLoader /> : (
                           <RiderPayoutsTab 
-                            payouts={payouts || []} 
+                            payouts={payouts?.data || []} 
                             onProcess={handleProcessPayout} 
                           />
                         )

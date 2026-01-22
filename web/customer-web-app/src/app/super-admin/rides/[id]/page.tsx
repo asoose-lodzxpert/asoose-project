@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import useSWR from 'swr'; 
+import { getSession } from 'next-auth/react'; // ✅ Import NextAuth
 import { fetcher } from '../../hooks/useSuperAdminFetch';
 import RideDetailSkeleton from './skeleton';
 
@@ -60,12 +61,16 @@ export default function RideDetailPage() {
     if (result.isConfirmed) {
       try {
         const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-        // Ideally use a fetcher wrapper or getting token here
-        const session = await import('../../../../../utils/supabase/client').then(m => m.createClient().auth.getSession());
+        
+        // ✅ FIX: Get Session via NextAuth
+        const session = await getSession();
+        const token = (session as any)?.accessToken;
         
         const res = await fetch(`${API_URL}/super-admin/rides/${id}/cancel`, {
           method: 'PATCH',
-          headers: { 'Authorization': `Bearer ${session.data.session?.access_token}` }
+          headers: { 
+            'Authorization': `Bearer ${token || ''}` // ✅ Use Token
+          }
         });
 
         if (!res.ok) throw new Error('Action failed');
@@ -238,7 +243,7 @@ export default function RideDetailPage() {
 
           {/* RIGHT COLUMN: Entities */}
           <div className="lg:col-span-1 space-y-6">
-             
+              
              {/* Driver Card */}
              <div className="bg-[#1E293B] border border-gray-800 rounded-2xl p-6">
                 <div className="flex justify-between items-center mb-4">

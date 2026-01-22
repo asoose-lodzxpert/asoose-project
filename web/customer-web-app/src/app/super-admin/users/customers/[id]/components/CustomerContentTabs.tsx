@@ -85,7 +85,8 @@ export const CustomerContentTabs: React.FC<CustomerContentTabsProps> = ({
                      </div>
                      <div>
                         <p className="text-white font-bold text-sm">
-                           Ride to {ride.dropoffAddress?.street || ride.dropoffAddress?.city || 'Unknown Destination'}
+                           {/* ✅ FIX: Cast to 'any' to allow accessing 'city' */}
+                           Ride to {ride.dropoffAddress?.street || (ride.dropoffAddress as any)?.city || 'Unknown Destination'}
                         </p>
                         <p className="text-xs text-gray-500">{safeDate(ride.createdAt)}</p>
                      </div>

@@ -2,15 +2,31 @@
 
 import React from 'react';
 
-const SkeletonBox = ({ className = "" }) => (
+// Interfaces for TypeScript type safety
+interface SkeletonProps {
+  className?: string;
+}
+
+interface SkeletonTextProps {
+  width?: string;
+  height?: string;
+  className?: string;
+}
+
+interface SkeletonCircleProps {
+  size?: string;
+}
+
+const SkeletonBox = ({ className = "" }: SkeletonProps) => (
   <div className={`bg-gray-700/30 rounded animate-pulse ${className}`} />
 );
 
-const SkeletonText = ({ width = "w-full", height = "h-4" }) => (
-  <div className={`${width} ${height} bg-gray-700/30 rounded animate-pulse`} />
+// FIX: Added className to the destructuring and applied it to the div
+const SkeletonText = ({ width = "w-full", height = "h-4", className = "" }: SkeletonTextProps) => (
+  <div className={`${width} ${height} bg-gray-700/30 rounded animate-pulse ${className}`} />
 );
 
-const SkeletonCircle = ({ size = "w-12 h-12" }) => (
+const SkeletonCircle = ({ size = "w-12 h-12" }: SkeletonCircleProps) => (
   <div className={`${size} bg-gray-700/30 rounded-full animate-pulse`} />
 );
 
@@ -38,6 +54,7 @@ export default function ReportsPageSkeleton() {
               <SkeletonBox className="w-16 h-6 rounded-full" />
             </div>
             <div>
+              {/* FIX: Corrected typo 'classNh' to 'className' */}
               <SkeletonText width="w-32" height="h-8" className="mb-2" />
               <SkeletonText width="w-24" height="h-4" />
               <SkeletonText width="w-28" height="h-3" className="mt-2" />
@@ -53,19 +70,16 @@ export default function ReportsPageSkeleton() {
         <div className="bg-[#1E293B] p-6 rounded-xl border border-gray-800">
           <SkeletonText width="w-56" height="h-6" className="mb-6" />
           <div className="h-[300px] relative">
-            {/* X Axis */}
             <div className="absolute bottom-0 left-0 right-0 flex justify-between px-8">
               {[1, 2, 3, 4, 5, 6, 7].map((day) => (
                 <SkeletonText key={day} width="w-8" height="h-3" />
               ))}
             </div>
-            {/* Y Axis */}
             <div className="absolute top-8 bottom-8 left-0 flex flex-col justify-between py-4">
               {[1, 2, 3, 4].map((tick) => (
                 <SkeletonText key={tick} width="w-8" height="h-3" />
               ))}
             </div>
-            {/* Chart Bars */}
             <div className="absolute bottom-8 left-8 right-8 flex items-end justify-between gap-2">
               {[1, 2, 3, 4, 5, 6, 7].map((bar) => (
                 <div key={bar} className="flex flex-col items-center gap-2" style={{ height: '100%' }}>
@@ -76,7 +90,6 @@ export default function ReportsPageSkeleton() {
                 </div>
               ))}
             </div>
-            {/* Legend */}
             <div className="absolute top-2 right-6 flex gap-4">
               <div className="flex items-center gap-2">
                 <SkeletonBox className="w-3 h-3 rounded-full" />
@@ -94,31 +107,25 @@ export default function ReportsPageSkeleton() {
         <div className="bg-[#1E293B] p-6 rounded-xl border border-gray-800">
           <SkeletonText width="w-56" height="h-6" className="mb-6" />
           <div className="h-[300px] relative">
-            {/* X Axis */}
             <div className="absolute bottom-0 left-0 right-0 flex justify-between px-8">
               {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'].map((month) => (
                 <SkeletonText key={month} width="w-8" height="h-3" />
               ))}
             </div>
-            {/* Y Axis */}
             <div className="absolute top-8 bottom-8 left-0 flex flex-col justify-between py-4">
               {[1, 2, 3, 4].map((tick) => (
                 <SkeletonText key={tick} width="w-8" height="h-3" />
               ))}
             </div>
-            {/* Chart Area */}
             <div className="absolute top-8 bottom-8 left-8 right-8">
-              {/* Grid Lines */}
               <div className="h-full flex flex-col justify-between">
                 {[1, 2, 3, 4].map((line) => (
                   <div key={line} className="border-b border-gray-700/50 w-full"></div>
                 ))}
               </div>
-              {/* Line Path Placeholder */}
               <div className="absolute top-0 left-0 right-0 h-1 bg-gray-700/50 rounded-full mt-16"></div>
               <div className="absolute top-0 left-0 right-0 h-1 bg-gray-700/50 rounded-full mt-32"></div>
             </div>
-            {/* Legend */}
             <div className="absolute top-2 right-6 flex gap-4">
               <div className="flex items-center gap-2">
                 <SkeletonBox className="w-4 h-1 rounded-full" />
@@ -131,13 +138,10 @@ export default function ReportsPageSkeleton() {
             </div>
           </div>
         </div>
-
       </div>
 
       {/* Detailed Metrics Skeleton */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        {/* Revenue Breakdown Skeleton */}
         <div className="bg-[#1E293B] p-6 rounded-xl border border-gray-800">
           <SkeletonText width="w-40" height="h-6" className="mb-6" />
           <div className="space-y-6">
@@ -153,7 +157,6 @@ export default function ReportsPageSkeleton() {
           </div>
         </div>
 
-        {/* User Ratings Distribution Skeleton */}
         <div className="bg-[#1E293B] p-6 rounded-xl border border-gray-800">
           <SkeletonText width="w-56" height="h-6" className="mb-6" />
           <div className="space-y-4">
@@ -177,7 +180,6 @@ export default function ReportsPageSkeleton() {
           </div>
         </div>
 
-        {/* Top 5 Vendors Skeleton */}
         <div className="bg-[#1E293B] p-6 rounded-xl border border-gray-800">
           <SkeletonText width="w-56" height="h-6" className="mb-6" />
           <div className="space-y-4">
@@ -196,9 +198,7 @@ export default function ReportsPageSkeleton() {
           </div>
           <SkeletonBox className="w-full h-10 rounded-lg mt-6" />
         </div>
-
       </div>
-
     </div>
   );
 }

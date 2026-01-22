@@ -82,8 +82,8 @@ columnHelperActivity.accessor("time", {
   {
     id: "actions",
     header: "Action",
-    cell: ({ row }) => (
-      <div className="flex items-center gap-2">
+cell: ({ row }: { row: any }) => (
+    <div className="flex items-center gap-2">
         <Link href={getActivityLink(row.original)}>
           <button className="flex items-center gap-1 text-yellow-500 hover:text-yellow-400 font-bold text-xs transition-colors">
             <ExternalLink className="w-3 h-3" /> {row.original.action}
@@ -128,8 +128,8 @@ export const createAlertColumns = ({ onResolve }: AlertActions) => [
   {
     id: "actions",
     header: "Actions",
-    cell: ({ row }) => (
-      <div className="flex items-center gap-2">
+cell: ({ row }: { row: any }) => (
+    <div className="flex items-center gap-2">
         <button className="p-1.5 hover:bg-blue-500/10 rounded text-gray-400 hover:text-blue-500 transition-colors" title="View Details">
           <Eye className="w-4 h-4" />
         </button>

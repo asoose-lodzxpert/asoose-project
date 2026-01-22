@@ -10,17 +10,16 @@ import React, {
 import { useRouter } from "next/navigation";
 import { Loader2, Crosshair, AlertTriangle } from "lucide-react";
 import { useJsApiLoader, Libraries } from "@react-google-maps/api";
-import { useSession } from "next-auth/react"; // ✅ Import NextAuth hook
+import { useSession } from "next-auth/react"; 
 
 import GoogleMapView from "./components/map";
-import RideSelector from "./components/RideSelector";
+import RideSelector, { RideRequestPayload, PriceEstimate } from "./components/RideSelector"; // ✅ Import types from RideSelector
 import DriverStatusUI from "./components/DriverStatus";
 import TripProgressUI from "./components/TripProgressUI";
 import TripCompleteUI from "./components/TripCompleteUi";
 import { DriverStatusSkeleton } from "./components/Skeleton";
 import {
   RideService,
-  RideEstimate,
   VehicleType,
   Driver,
   Ride,
@@ -39,6 +38,12 @@ type PageView =
   | "IN_PROGRESS"
   | "COMPLETED";
 
+// ✅ Mock Ride Types (or fetch from backend) to pass to RideSelector
+const AVAILABLE_RIDE_TYPES = [
+    { id: 'standard', displayName: 'Standard', icon: '/icons/car.png' },
+    { id: 'premium', displayName: 'Premium', icon: '/icons/premium.png' },
+];
+
 export default function Page() {
   return (
     <Suspense
@@ -55,7 +60,7 @@ export default function Page() {
 
 function HomeContent() {
   const router = useRouter();
-  const { data: session } = useSession(); // ✅ Use NextAuth session
+  const { data: session } = useSession(); 
 
   const { isLoaded: isGoogleLoaded } = useJsApiLoader({
     id: "google-map-script",
@@ -82,9 +87,9 @@ function HomeContent() {
   const [pickupAddress, setPickupAddress] = useState("");
   const [destinationAddress, setDestinationAddress] = useState("");
 
-  const [priceEstimates, setPriceEstimates] = useState<RideEstimate | null>(
-    null,
-  );
+  // ✅ Fix: Use PriceEstimate type to match RideSelector prop
+  const [priceEstimates, setPriceEstimates] = useState<PriceEstimate | null>(null);
+  
   const [driverInfo, setDriverInfo] = useState<Driver | null>(null);
   const [driverLocation, setDriverLocation] = useState<
     google.maps.LatLngLiteral | undefined
@@ -96,16 +101,14 @@ function HomeContent() {
 
   // --- Initialization ---
   useEffect(() => {
-    // Sync Active Ride (if user refreshes page)
     RideService.getCurrentRide()
       .then((ride: Ride | null) => {
         if (ride) {
           setActiveRideId(ride.id);
           setRideStage(ride.status as PageView);
-          // Note: Real app would need to fetch driver details here too
         }
       })
-      .catch(() => {}); // Ignore 404
+      .catch(() => {}); 
   }, []);
 
   // --- Socket Logic ---
@@ -153,10 +156,8 @@ function HomeContent() {
   }, []);
 
   const handleReconnected = useCallback(() => {
-    // Re-sync state on socket reconnection
     RideService.getCurrentRide().then((ride: Ride | null) => {
       if (!ride && rideStage !== "IDLE" && rideStage !== "COMPLETED") {
-        // If backend says no ride, but frontend thinks there is one -> Reset
         resetApp();
       }
     });
@@ -182,20 +183,16 @@ function HomeContent() {
     );
   }, [isGoogleLoaded, pickupAddress]);
 
-  // Initial Location
   useEffect(() => {
     if (isGoogleLoaded && !userLocation) handleLocateMe();
   }, [isGoogleLoaded, userLocation, handleLocateMe]);
 
-  // Calculate Estimates with Debounce & Abort
   useEffect(() => {
     if (userLocation && destLocation) {
-      // Cancel previous request
       if (estimateAbortController.current) {
         estimateAbortController.current.abort();
       }
 
-      // Create new controller
       estimateAbortController.current = new AbortController();
       setIsCalculating(true);
 
@@ -206,11 +203,11 @@ function HomeContent() {
         dropoffLng: destLocation.lng,
         vehicleType: selectedVehicleType,
       })
-        .then((data: RideEstimate) => setPriceEstimates(data))
+        // ✅ Fix: Ensure the API response matches PriceEstimate structure
+        .then((data: any) => setPriceEstimates(data)) 
         .catch((err: any) => {
           if (err.name !== "CanceledError") {
             console.error("Estimate failed", err);
-            // Only show error if it wasn't a manual cancel
           }
         })
         .finally(() => setIsCalculating(false));
@@ -218,7 +215,9 @@ function HomeContent() {
   }, [userLocation, destLocation, selectedVehicleType]);
 
   // --- Actions ---
-  const handleRequestRide = async (notes?: string) => {
+  
+  // ✅ FIX: Updated signature to match RideSelector expectations
+  const handleRequestRide = async (data: RideRequestPayload) => {
     if (!userLocation || !destLocation) return;
     setRideStage("FINDING_DRIVER");
 
@@ -226,21 +225,21 @@ function HomeContent() {
       // 1. Request Ride (Creates Pending Ride)
       const res = await RideService.createRide({
         pickupLocation: {
-          latitude: userLocation.lat,
-          longitude: userLocation.lng,
-          address: pickupAddress,
+          latitude: data.pickup.lat, // Use data from callback
+          longitude: data.pickup.lng,
+          address: data.pickup.address,
         },
         dropoffLocation: {
-          latitude: destLocation.lat,
-          longitude: destLocation.lng,
-          address: destinationAddress,
+          latitude: data.dropoff.lat, // Use data from callback
+          longitude: data.dropoff.lng,
+          address: data.dropoff.address,
         },
-        vehicleType: selectedVehicleType,
-        notes: notes,
+        vehicleType: data.rideType as VehicleType, // Cast string ID to VehicleType
+        // notes: data.notes // If your payload has notes
       });
 
       const selectedMethod = PAYMENT_METHODS.find(
-        (m) => m.id === selectedPaymentMethodId,
+        (m) => m.id === data.paymentMethodId,
       );
 
       // 2. Process Payment if Online
@@ -249,12 +248,11 @@ function HomeContent() {
         selectedMethod.type !== "CASH" &&
         selectedMethod.gateway
       ) {
-        // ✅ Use session from NextAuth for email
         localStorage.setItem("pending_ride", "true");
 
         const paymentRes = await paymentService.initiatePayment({
           amount: res.payment.amount,
-          email: session?.user?.email || "", // ✅ Accessed from NextAuth session
+          email: session?.user?.email || "", 
           gateway: selectedMethod.gateway as any,
           method: "CARD",
           type: "RIDE",
@@ -263,11 +261,10 @@ function HomeContent() {
 
         if (paymentRes.authorizationUrl) {
           window.location.href = paymentRes.authorizationUrl;
-          return; // Stop execution, browser handles redirect
+          return; 
         }
       }
 
-      // If Cash or Payment Init Success (but no redirect needed?), set ID
       setActiveRideId(res.ride.id);
     } catch (error: any) {
       console.error(error);
@@ -317,10 +314,10 @@ function HomeContent() {
             }}
             priceEstimates={priceEstimates}
             isCalculatingPrice={isCalculating}
-            onRequestRide={handleRequestRide}
+            onRequestRide={handleRequestRide} // ✅ Now matches signature
             isRequesting={false}
             isGoogleLoaded={isGoogleLoaded}
-            availableRideTypes={[]} // Can be populated from backend or config
+            availableRideTypes={AVAILABLE_RIDE_TYPES} // ✅ Pass available types
           />
         );
       case "FINDING_DRIVER":

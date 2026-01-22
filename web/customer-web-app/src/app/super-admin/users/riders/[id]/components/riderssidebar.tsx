@@ -7,15 +7,15 @@ import {
 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import { AppAlert } from '../../../customers/[id]/alerts';
-import { createClient } from '../../../../../../../utils/supabase/client'; // ✅ Import Supabase Client
+import { getSession } from 'next-auth/react'; // ✅ Import NextAuth
 import { Currency } from '@/app/main/components/Currency';
+
 interface RiderSidebarProps {
   rider: any;
   onToggleStatus: () => void;
   onUpdate: (data: any) => Promise<void>;
 }
 
-// ✅ Fix API URL Logic
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001') + (process.env.NEXT_PUBLIC_API_URL?.endsWith('/api') ? '' : '/api');
 
 export const RiderSidebar: React.FC<RiderSidebarProps> = ({ rider, onToggleStatus, onUpdate }) => {
@@ -92,16 +92,16 @@ export const RiderSidebar: React.FC<RiderSidebarProps> = ({ rider, onToggleStatu
 
     if (formValues) {
       try {
-        // ✅ 1. Get Auth Session
-        const supabase = createClient();
-        const { data: { session } } = await supabase.auth.getSession();
+        // ✅ 1. Get Session via NextAuth
+        const session = await getSession();
+        const token = (session as any)?.accessToken;
 
         // ✅ 2. Send Request with Headers
         const res = await fetch(`${API_URL}/super-admin/riders/${rider.id}/wallet`, {
           method: 'POST',
           headers: { 
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session?.access_token || ''}` // Added Token
+            'Authorization': `Bearer ${token || ''}` // ✅ Added Token
           },
           body: JSON.stringify(formValues)
         });
