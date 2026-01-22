@@ -71,27 +71,38 @@ function LoadingScreen() {
 
 function RootNavigator() {
   const { user, loading } = useAuth();
-  const normalizedStatus = user?.status?.trim().toUpperCase();
 
   if (loading) {
     return <LoadingScreen />;
   }
 
-  return (
-    <GestureHandlerRootView>
-      <Stack screenOptions={{ headerShown: false }}>
-        {!user ? (
+  if (!user) {
+    return (
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="(auth)" />
-        ) : normalizedStatus === "PENDING" ? (
+        </Stack>
+      </GestureHandlerRootView>
+    );
+  }
+
+  const status = user.status?.trim().toUpperCase() ?? "";
+
+  return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <Stack screenOptions={{ headerShown: false }}>
+        {status === "PENDING" ? (
           <Stack.Screen name="(status)/pending" />
-        ) : normalizedStatus === "SUSPENDED" ? (
+        ) : status === "SUSPENDED" ? (
           <Stack.Screen name="(status)/suspended" />
-        ) : normalizedStatus === "CLOSED_PERMANENTLY" ? (
+        ) : status === "CLOSED_PERMANENTLY" ? (
           <Stack.Screen name="(status)/closed-permanently" />
-        ) : normalizedStatus === "BANNED" ? (
+        ) : status === "BANNED" ? (
           <Stack.Screen name="(status)/banned" />
-        ) : (
+        ) : status === "ACTIVE" ? (
           <Stack.Screen name="(main)" />
+        ) : (
+          <Stack.Screen name="(auth)" />
         )}
       </Stack>
     </GestureHandlerRootView>

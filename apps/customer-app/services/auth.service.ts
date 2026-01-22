@@ -23,8 +23,18 @@ type LoginResponse<UserShape = any> = {
   refreshToken: string;
 };
 
-type RequestOptions = RequestInit & {
+type ResetPasswordPayload = {
+  email: string;
+  token: string;
+  newPassword: string;
+};
+
+type HttpRequestOptions = {
+  path: string;
+  method?: string;
+  body?: unknown;
   baseUrl?: string;
+  headers?: Record<string, string>;
 };
 
 function buildUrl(baseUrl: string, path: string) {
@@ -51,30 +61,47 @@ function toError(body: any, statusText: string) {
   return new Error(statusText || "Request failed");
 }
 
-async function requestJson(path: string, options: RequestOptions = {}) {
-  const { baseUrl = AUTH_BASE, headers: incomingHeaders, ...init } = options;
+async function httpRequest({
+  path,
+  method = "GET",
+  body,
+  baseUrl = AUTH_BASE,
+  headers = {},
+}: HttpRequestOptions) {
   const url = buildUrl(baseUrl, path);
+  const payload =
+    body === undefined || body === null
+      ? undefined
+      : typeof body === "string"
+        ? body
+        : JSON.stringify(body);
 
-  const headers: Record<string, string> = {
+  const composedHeaders: Record<string, string> = {
     "Content-Type": "application/json",
     "ngrok-skip-browser-warning": "true",
-    ...(incomingHeaders as Record<string, string> | undefined),
+    ...headers,
   };
 
-  const response = await fetch(url, { ...init, headers });
-  const body = await parseBody(response);
+  const response = await fetch(url, {
+    method,
+    headers: composedHeaders,
+    body: payload,
+  });
 
-  if (!response.ok) {
-    throw toError(body, response.statusText);
-  }
-
-  return body;
+  const parsed = await parseBody(response);
+  if (!response.ok) throw toError(parsed, response.statusText);
+  return parsed;
 }
 
 export async function signup(payload: SignupPayload) {
-  return requestJson("register", {
+  return httpRequest({ path: "register", method: "POST", body: payload });
+}
+
+export async function requestPasswordReset(email: string) {
+  return httpRequest({
+    path: "forgot-password",
     method: "POST",
-    body: JSON.stringify(payload),
+    body: { email },
   });
 }
 
@@ -82,9 +109,10 @@ export async function login<UserShape = any>(
   email: string,
   password: string,
 ): Promise<LoginResponse<UserShape>> {
-  const data = await requestJson("login", {
+  const data = await httpRequest({
+    path: "login",
     method: "POST",
-    body: JSON.stringify({ email, password }),
+    body: { email, password },
   });
 
   if (!data?.accessToken || !data?.refreshToken) {
@@ -103,9 +131,10 @@ export async function refreshAccessToken(): Promise<string> {
   const refreshToken = await getRefreshToken();
   if (!refreshToken) throw new Error("No refresh token available");
 
-  const data = await requestJson("refresh", {
+  const data = await httpRequest({
+    path: "refresh",
     method: "POST",
-    body: JSON.stringify({ refreshToken }),
+    body: { refreshToken },
     baseUrl: UNIVERSAL_AUTH_BASE,
   });
 
@@ -121,6 +150,18 @@ export async function refreshAccessToken(): Promise<string> {
 
 export async function refreshToken() {
   return refreshAccessToken();
+}
+
+export async function resetPasswordWithOtp(payload: ResetPasswordPayload) {
+  return httpRequest({
+    path: "reset-password",
+    method: "POST",
+    body: {
+      email: payload.email,
+      newPassword: payload.newPassword,
+      token: payload.token,
+    },
+  });
 }
 
 export async function logout() {
@@ -166,4 +207,12 @@ export const authConfig = {
   refreshTokenKey: REFRESH_TOKEN_KEY,
 };
 
-export default { signup, login, refreshAccessToken, logout, authConfig };
+export default {
+  signup,
+  login,
+  refreshAccessToken,
+  logout,
+  authConfig,
+  requestPasswordReset,
+  resetPasswordWithOtp,
+};
