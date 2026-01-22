@@ -612,8 +612,41 @@ export class RidersService {
     const deliveryWhere: any = { riderId };
 
     if (statusArray && statusArray.length > 0) {
-      rideWhere.status = { in: statusArray };
-      deliveryWhere.status = { in: statusArray };
+      // Filter valid statuses for each type
+      // RideStatus: PENDING, REQUESTED, ACCEPTED, IN_PROGRESS, COMPLETED, CANCELLED
+      const validRideStatuses = [
+        'PENDING',
+        'REQUESTED',
+        'ACCEPTED',
+        'IN_PROGRESS',
+        'COMPLETED',
+        'CANCELLED',
+      ];
+      const rideStatuses = statusArray.filter((s) =>
+        validRideStatuses.includes(s),
+      );
+
+      // DeliveryStatus: PENDING, REQUESTED, ASSIGNED, ACCEPTED, PICKED_UP, IN_TRANSIT, DELIVERED, CANCELLED
+      const validDeliveryStatuses = [
+        'PENDING',
+        'REQUESTED',
+        'ASSIGNED',
+        'ACCEPTED',
+        'PICKED_UP',
+        'IN_TRANSIT',
+        'DELIVERED',
+        'CANCELLED',
+      ];
+      const deliveryStatuses = statusArray.filter((s) =>
+        validDeliveryStatuses.includes(s),
+      );
+
+      if (rideStatuses.length > 0) {
+        rideWhere.status = { in: rideStatuses };
+      }
+      if (deliveryStatuses.length > 0) {
+        deliveryWhere.status = { in: deliveryStatuses };
+      }
     }
 
     // Fetch both rides and deliveries

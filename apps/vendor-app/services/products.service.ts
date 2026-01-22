@@ -1,6 +1,6 @@
 import { fetchWithAuth } from "./auth-fetch";
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL;
+const EXPO_PUBLIC_API_URL = process.env.EXPO_PUBLIC_API_URL;
 
 export interface Category {
   id: string;
@@ -49,24 +49,26 @@ export interface UpdateProductInput {
 
 // Get all categories
 export async function fetchCategories(): Promise<Category[]> {
-  return fetchWithAuth(`${API_URL}/vendor/products/categories`);
+  return fetchWithAuth(`${EXPO_PUBLIC_API_URL}/vendor/products/categories`);
 }
 
 // Get all products for a store
 export async function fetchProducts(storeId: string): Promise<Product[]> {
-  return fetchWithAuth(`${API_URL}/vendor/products?storeId=${storeId}`);
+  return fetchWithAuth(
+    `${EXPO_PUBLIC_API_URL}/vendor/products?storeId=${storeId}`,
+  );
 }
 
 // Get single product
 export async function fetchProduct(productId: string): Promise<Product> {
-  return fetchWithAuth(`${API_URL}/vendor/products/${productId}`);
+  return fetchWithAuth(`${EXPO_PUBLIC_API_URL}/vendor/products/${productId}`);
 }
 
 // Create product
 export async function createProduct(
-  data: CreateProductInput
+  data: CreateProductInput,
 ): Promise<Product> {
-  return fetchWithAuth(`${API_URL}/vendor/products`, {
+  return fetchWithAuth(`${EXPO_PUBLIC_API_URL}/vendor/products`, {
     method: "POST",
     body: JSON.stringify(data),
   });
@@ -75,9 +77,9 @@ export async function createProduct(
 // Update product
 export async function updateProduct(
   productId: string,
-  data: UpdateProductInput
+  data: UpdateProductInput,
 ): Promise<Product> {
-  return fetchWithAuth(`${API_URL}/vendor/products/${productId}`, {
+  return fetchWithAuth(`${EXPO_PUBLIC_API_URL}/vendor/products/${productId}`, {
     method: "PATCH",
     body: JSON.stringify(data),
   });
@@ -85,7 +87,7 @@ export async function updateProduct(
 
 // Delete product (soft delete)
 export async function deleteProduct(productId: string): Promise<Product> {
-  return fetchWithAuth(`${API_URL}/vendor/products/${productId}`, {
+  return fetchWithAuth(`${EXPO_PUBLIC_API_URL}/vendor/products/${productId}`, {
     method: "DELETE",
   });
 }
@@ -93,7 +95,7 @@ export async function deleteProduct(productId: string): Promise<Product> {
 // Toggle stock status
 export async function toggleProductStock(
   productId: string,
-  currentStatus: "ACTIVE" | "OUT_OF_STOCK" | "DISABLED"
+  currentStatus: "ACTIVE" | "OUT_OF_STOCK" | "DISABLED",
 ): Promise<Product> {
   const newStatus = currentStatus === "ACTIVE" ? "OUT_OF_STOCK" : "ACTIVE";
   return updateProduct(productId, { status: newStatus });

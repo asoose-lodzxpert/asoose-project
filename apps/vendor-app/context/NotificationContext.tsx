@@ -1,20 +1,21 @@
-import React, {
-  createContext,
-  useContext,
-  useEffect,
-  useState,
-  useRef,
-} from "react";
-import * as Notifications from "expo-notifications";
-import { RelativePathString, useRouter } from "expo-router";
-import Toast from "react-native-toast-message";
+import { getUnreadCount } from "@/services/notifications.service";
+import { acceptOrder } from "@/services/orders.service";
 import {
+  initializeNotificationHandler,
   registerForPushNotificationsAsync,
   savePushToken,
   setupNotificationCategories,
 } from "@/services/push-notifications.service";
-import { acceptOrder, declineOrder } from "@/services/orders.service";
-import { getUnreadCount } from "@/services/notifications.service";
+import * as Notifications from "expo-notifications";
+import { RelativePathString, useRouter } from "expo-router";
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
+import Toast from "react-native-toast-message";
 import { useAuth } from "./AuthContext";
 
 type NotificationContextType = {
@@ -54,6 +55,9 @@ export function NotificationProvider({
 
   useEffect(() => {
     if (!user) return;
+
+    // Initialize notification handler first (must be done after React Native is ready)
+    initializeNotificationHandler();
 
     // Setup notification categories
     setupNotificationCategories();
@@ -105,7 +109,7 @@ export function NotificationProvider({
           } else if (data.payoutId) {
             router.push("/(profile)/withdrawal" as RelativePathString);
           }
-        }
+        },
       );
 
     return () => {
@@ -137,7 +141,7 @@ export function useNotifications() {
   const ctx = useContext(NotificationContext);
   if (!ctx)
     throw new Error(
-      "useNotifications must be used within NotificationProvider"
+      "useNotifications must be used within NotificationProvider",
     );
   return ctx;
 }

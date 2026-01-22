@@ -1,3 +1,4 @@
+import { UserRole } from '@prisma/client';
 import {
   IsEmail,
   IsString,
@@ -5,6 +6,7 @@ import {
   IsOptional,
   IsObject,
   IsNumber,
+  IsEnum,
 } from 'class-validator';
 
 export class CreateRiderDto {
@@ -23,6 +25,9 @@ export class CreateRiderDto {
 
   @IsString()
   phone: string;
+
+  @IsEnum(UserRole)
+  role: UserRole;
 
   @IsOptional()
   @IsString()

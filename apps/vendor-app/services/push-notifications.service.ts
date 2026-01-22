@@ -4,20 +4,30 @@ import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
 import { fetchWithAuth } from "./auth-fetch";
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL;
+const EXPO_PUBLIC_API_URL = process.env.EXPO_PUBLIC_API_URL;
+
+// Flag to ensure handler is only set once
+let isNotificationHandlerSet = false;
 
 // Configure notification behavior
 // This ONLY handles foreground notifications - no background service
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-    shouldShowBanner: true,
-    shouldShowList: true,
-    priority: Notifications.AndroidNotificationPriority.HIGH,
-  }),
-});
+// MUST be called after React Native is initialized
+export function initializeNotificationHandler() {
+  if (isNotificationHandlerSet) return;
+
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+      shouldShowBanner: true,
+      shouldShowList: true,
+      priority: Notifications.AndroidNotificationPriority.HIGH,
+    }),
+  });
+
+  isNotificationHandlerSet = true;
+}
 
 // Request permissions and get push token
 // This uses Expo's push notification service, NOT Firebase directly
@@ -90,7 +100,7 @@ export async function registerForPushNotificationsAsync(): Promise<
 // Save push token to backend
 export async function savePushToken(token: string): Promise<void> {
   try {
-    await fetchWithAuth(`${API_URL}/auth/vendor/push-token`, {
+    await fetchWithAuth(`${EXPO_PUBLIC_API_URL}/auth/vendor/push-token`, {
       method: "POST",
       body: JSON.stringify({ token, platform: Platform.OS }),
     });
@@ -102,7 +112,7 @@ export async function savePushToken(token: string): Promise<void> {
 // Remove push token (on logout)
 export async function removePushToken(): Promise<void> {
   try {
-    await fetchWithAuth(`${API_URL}/auth/vendor/push-token`, {
+    await fetchWithAuth(`${EXPO_PUBLIC_API_URL}/auth/vendor/push-token`, {
       method: "DELETE",
     });
   } catch (error) {

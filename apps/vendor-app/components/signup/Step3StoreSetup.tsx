@@ -104,7 +104,7 @@ export const Step3StoreSetup: React.FC<Step3Props> = ({ data, onChange }) => {
         loading={isLocating}
         onUseCurrent={useCurrentLocation}
         onPick={(v) => onChange("location", v)}
-        disabled={!hasLocationPermission && !data.location}
+        disabled={false}
       />
 
       <OpenHoursBlock value={openHours} onChange={updateOpenHours} />

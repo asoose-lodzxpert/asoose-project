@@ -1,6 +1,6 @@
 import { fetchWithAuth } from "./auth-fetch";
 
-const API_URL =
+const EXPO_PUBLIC_API_URL =
   process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api/v1";
 
 export interface RiderStatusUpdate {
@@ -23,21 +23,26 @@ export interface CompleteDeliveryParams {
 
 export const riderApiService = {
   async updateStatus(data: RiderStatusUpdate) {
-    const response = await fetchWithAuth(`${API_URL}/riders/status`, {
-      method: "PATCH",
-      body: JSON.stringify(data),
-    });
+    const response = await fetchWithAuth(
+      `${EXPO_PUBLIC_API_URL}/riders/status`,
+      {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      },
+    );
     return response;
   },
 
   async getActiveDelivery() {
-    const response = await fetchWithAuth(`${API_URL}/riders/deliveries/active`);
+    const response = await fetchWithAuth(
+      `${EXPO_PUBLIC_API_URL}/riders/deliveries/active`,
+    );
     return response;
   },
 
   async acceptDelivery(data: AcceptDeliveryParams) {
     const response = await fetchWithAuth(
-      `${API_URL}/riders/deliveries/accept`,
+      `${EXPO_PUBLIC_API_URL}/riders/deliveries/accept`,
       {
         method: "POST",
         body: JSON.stringify(data),
@@ -48,7 +53,7 @@ export const riderApiService = {
 
   async confirmPickup(deliveryId: string) {
     const response = await fetchWithAuth(
-      `${API_URL}/riders/deliveries/${deliveryId}/pickup`,
+      `${EXPO_PUBLIC_API_URL}/riders/deliveries/${deliveryId}/pickup`,
       {
         method: "PATCH",
       },
@@ -58,7 +63,7 @@ export const riderApiService = {
 
   async completeDelivery(data: CompleteDeliveryParams) {
     const response = await fetchWithAuth(
-      `${API_URL}/riders/deliveries/complete`,
+      `${EXPO_PUBLIC_API_URL}/riders/deliveries/complete`,
       {
         method: "POST",
         body: JSON.stringify(data),
@@ -69,7 +74,7 @@ export const riderApiService = {
 
   async getEarningsStats(timeframe: string = "week") {
     const response = await fetchWithAuth(
-      `${API_URL}/riders/earnings?timeframe=${timeframe}`,
+      `${EXPO_PUBLIC_API_URL}/riders/earnings?timeframe=${timeframe}`,
     );
     return response;
   },
