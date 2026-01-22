@@ -32,7 +32,7 @@ function LoadingScreen() {
               duration: 400,
               useNativeDriver: true,
             }),
-          ])
+          ]),
         ),
       ]);
     };
@@ -71,6 +71,7 @@ function LoadingScreen() {
 
 function RootNavigator() {
   const { user, loading } = useAuth();
+  const normalizedStatus = user?.status?.trim().toUpperCase();
 
   if (loading) {
     return <LoadingScreen />;
@@ -81,11 +82,13 @@ function RootNavigator() {
       <Stack screenOptions={{ headerShown: false }}>
         {!user ? (
           <Stack.Screen name="(auth)" />
-        ) : user.status === "PENDING" ? (
+        ) : normalizedStatus === "PENDING" ? (
           <Stack.Screen name="(status)/pending" />
-        ) : user.status === "SUSPENDED" ? (
+        ) : normalizedStatus === "SUSPENDED" ? (
           <Stack.Screen name="(status)/suspended" />
-        ) : user.status === "BANNED" ? (
+        ) : normalizedStatus === "CLOSED_PERMANENTLY" ? (
+          <Stack.Screen name="(status)/closed-permanently" />
+        ) : normalizedStatus === "BANNED" ? (
           <Stack.Screen name="(status)/banned" />
         ) : (
           <Stack.Screen name="(main)" />
