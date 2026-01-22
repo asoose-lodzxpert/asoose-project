@@ -16,7 +16,7 @@ import {
   RecipientType,
 } from '../enums/payment.enums';
 
-export { PaymentType, RecipientType };
+export { PaymentType, RecipientType, PaymentGateway, PaymentMethod };
 
 export class InitiatePaymentDto {
   @IsNumber()

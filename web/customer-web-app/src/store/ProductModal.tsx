@@ -3,7 +3,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { X, Minus, Plus } from 'lucide-react';
 import { useCartStore } from '@/store/useCartStore';
-import Swal from 'sweetalert2';
+import { toast } from 'react-toastify'; // ✅ FIX: Use react-toastify instead of sweetalert2
 
 // --- Types must match what is passed from the page ---
 export interface Modifier { id: string; name: string; price: number; }
@@ -16,7 +16,7 @@ export interface Product {
   price: number;
   image?: string;
   category: { name: string };
-  modifierGroups: ModifierGroup[]; // Now included
+  modifierGroups: ModifierGroup[];
 }
 
 interface ProductModalProps {
@@ -89,16 +89,9 @@ export const ProductModal = ({ product, storeId, onClose }: ProductModalProps) =
     });
 
     onClose();
-    Swal.fire({
-      icon: 'success',
-      title: 'Added to basket',
-      toast: true,
-      position: 'bottom-end',
-      showConfirmButton: false,
-      timer: 1500,
-      background: '#1a1a1a',
-      color: '#fff'
-    });
+    
+    // ✅ FIX: Trigger standard app toast
+    toast.success('Added to basket'); 
   };
 
   if (!product) return null;

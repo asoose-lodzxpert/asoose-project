@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { X, Search, Loader2, AlertCircle, CheckCircle } from 'lucide-react';
-import { createClient } from '../../../../../utils/supabase/client';
+import { getSession } from 'next-auth/react'; // ✅ Import NextAuth
 import Swal from 'sweetalert2';
 
 interface WalletAdjustmentModalProps {
@@ -32,17 +32,19 @@ export default function WalletAdjustmentModal({ isOpen, onClose, onSuccess }: Wa
   const handleSearch = async () => {
     if (!searchQuery) return;
     setIsSearching(true);
-    const supabase = createClient();
-    const { data: { session } } = await supabase.auth.getSession();
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-
+    
     try {
+      // ✅ Get Session from NextAuth
+      const session = await getSession();
+      const token = (session as any)?.accessToken;
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
       const endpoint = targetType === 'VENDOR' 
         ? `/super-admin/vendors?search=${searchQuery}`
         : `/super-admin/riders?search=${searchQuery}`;
       
       const res = await fetch(`${API_URL}${endpoint}`, {
-        headers: { 'Authorization': `Bearer ${session?.access_token}` }
+        headers: { 'Authorization': `Bearer ${token}` } // ✅ Use NextAuth Token
       });
       const data = await res.json();
       setSearchResults(data.data || []);
@@ -58,16 +60,22 @@ export default function WalletAdjustmentModal({ isOpen, onClose, onSuccess }: Wa
     if (!selectedEntity || !amount || !description) return;
 
     setIsSubmitting(true);
-    const supabase = createClient();
-    const { data: { session } } = await supabase.auth.getSession();
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-
+    
     try {
+      // ✅ Get Session from NextAuth
+      const session = await getSession();
+      const token = (session as any)?.accessToken;
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
+      if (!token) {
+        throw new Error("Authentication required");
+      }
+
       const res = await fetch(`${API_URL}/super-admin/transactions/adjust-wallet`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.access_token}`
+          'Authorization': `Bearer ${token}` // ✅ Use NextAuth Token
         },
         body: JSON.stringify({
           targetId: selectedEntity.id,

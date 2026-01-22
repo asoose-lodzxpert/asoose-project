@@ -253,7 +253,15 @@ model Notification {
 
 model Address {
   id        String  @id @default(uuid())
-  userId    String
+
+  // 1. Make User Optional (Customers)
+  userId    String?
+  user      User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // 2. Add Vendor Relation (Store Locations)
+  vendorId  String?
+  vendor    Vendor? @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
   label     String
   street    String
   city      String
@@ -262,17 +270,18 @@ model Address {
   lng       Float
   isDefault Boolean @default(false)
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
+  // Reverse Relations
   ridesAsPickup       Ride[]     @relation("RidePickup")
   ridesAsDropoff      Ride[]     @relation("RideDropoff")
   deliveriesAsPickup  Delivery[] @relation("DeliveryPickup")
   deliveriesAsDropoff Delivery[] @relation("DeliveryDropoff")
 
+  // Indexes for performance
   @@index([userId])
   @@index([userId, isDefault])
+  @@index([vendorId])            // Fixed: Added index for vendor lookups
+  @@index([vendorId, isDefault]) // Fixed: Added compound index for vendor defaults
 }
-
 //// =====================
 //// RIDER & LOGISTICS
 //// =====================
@@ -418,34 +427,36 @@ model VehicleDocument {
 //// =====================
 
 model Vendor {
-  id             String     @id @default(uuid())
-  name           String
-  email          String     @unique
-  countryCode    String
-  phone          String
-  businessType   String
-  employees      String
-  password       String
-  image          String?
-  status         UserStatus @default(PENDING)
-  expoPushToken  String?    // Expo push notification token
-  fcmToken       String?    // Firebase Cloud Messaging token
-  
-  // Account Deletion Fields
-  deletionStatus         String?   // PENDING, APPROVED, REJECTED, null (not requested)
-  deletionRequestedAt    DateTime?
-  deletionReasons        String[]  @default([])
-  deletionAdditionalInfo String?
-  deletionApprovedBy     String?   // Admin user ID who approved
-  deletionApprovedAt     DateTime?
-  
-  createdAt      DateTime   @default(now())
-  updatedAt      DateTime   @updatedAt
+  id                     String     @id @default(uuid())
+  name                   String
+  email                  String     @unique
+  countryCode            String
+  phone                  String
+  businessType           String
+  employees              String
+  password               String
+  image                  String?
+  status                 UserStatus @default(PENDING)
+  expoPushToken          String?    // Expo push notification token
+  fcmToken               String?    // Firebase Cloud Messaging token
 
+  // Account Deletion Fields
+  deletionStatus         String?    // PENDING, APPROVED, REJECTED, null (not requested)
+  deletionRequestedAt    DateTime?
+  deletionReasons        String[]   @default([])
+  deletionAdditionalInfo String?
+  deletionApprovedBy     String?    // Admin user ID who approved
+  deletionApprovedAt     DateTime?
+
+  createdAt              DateTime   @default(now())
+  updatedAt              DateTime   @updatedAt
+
+  // Relations
   store                    Store?
   documents                VendorDocument[]
   notifications            Notification[]
-  notificationsPreferences Json? // Stores notification preferences for the vendor
+  notificationsPreferences Json?      // Stores notification preferences for the vendor
+  addresses                Address[]  // Fixed: Added relation to Address
 }
 
 model Store {

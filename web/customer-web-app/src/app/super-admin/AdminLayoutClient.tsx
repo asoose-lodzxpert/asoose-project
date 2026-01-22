@@ -9,7 +9,7 @@ import {
   Menu, Bell, ChevronDown, ChevronRight, 
   User, Banknote, ShieldCheck 
 } from 'lucide-react';
-import { createClient } from '../../../utils/supabase/client';
+import { signOut } from "next-auth/react"; // ✅ Import NextAuth signOut
 
 // Define the structure for permissions
 type AdminRole = 'SUPER_ADMIN' | 'ADMIN_MANAGER' | 'ADMIN_SUPPORT' | 'ADMIN_FINANCE';
@@ -22,7 +22,6 @@ interface AdminLayoutClientProps {
 export default function AdminLayoutClient({ children, userRole }: AdminLayoutClientProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const supabase = createClient();
   
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isUsersOpen, setIsUsersOpen] = useState(true);
@@ -99,10 +98,7 @@ export default function AdminLayoutClient({ children, userRole }: AdminLayoutCli
   const handleLogout = async () => {
     try {
       setIsLoggingOut(true);
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
-      router.push('/sign-in');
-      router.refresh();
+      await signOut({ callbackUrl: '/sign-in' }); // ✅ Use NextAuth signOut
     } catch (error) {
       console.error('Logout error:', error);
     } finally {

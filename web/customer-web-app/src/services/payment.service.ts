@@ -8,7 +8,7 @@ export interface InitiatePaymentPayload {
   type: 'ORDER' | 'RIDE';
   orderId?: string;
   rideId?: string;
-  callbackUrl?: string; // Optional: Used if backend allows dynamic overrides
+  callbackUrl?: string;
   metadata?: any;
 }
 
@@ -21,14 +21,24 @@ export interface PaymentInitResponse {
 export const paymentService = {
   /**
    * Initialize a payment transaction
+   * @param payload Payment details
+   * @param token Optional auth token to ensure authenticated request
    */
-  initiatePayment: async (payload: InitiatePaymentPayload) => {
-    const { data } = await api.post<PaymentInitResponse>('/payment/initialize', payload);
+  initiatePayment: async (payload: InitiatePaymentPayload, token?: string) => {
+    const config = token 
+      ? { headers: { Authorization: `Bearer ${token}` } } 
+      : {};
+
+    const { data } = await api.post<PaymentInitResponse>(
+      '/payment/initialize', 
+      payload,
+      config
+    );
     return data;
   },
 
   /**
-   * Verify a transaction (Optional: useful for client-side double-check)
+   * Verify a transaction
    */
   verifyPayment: async (reference: string, gateway: string) => {
     const { data } = await api.get(`/payment/verify?reference=${reference}&gateway=${gateway}`);

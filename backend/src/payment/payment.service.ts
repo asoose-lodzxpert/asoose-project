@@ -18,11 +18,13 @@ import {
   PaymentGateway,
   PaymentMethod,
   PaymentStatus,
+  TransactionType,
+} from './interfaces/payment.interface';
+import type {
   PaymentInitResponse,
   VerifyPaymentResponse,
   DisbursementResponse,
   RefundResponse,
-  TransactionType,
 } from './interfaces/payment.interface';
 import {
   InitiatePaymentDto,
@@ -52,10 +54,18 @@ export class PaymentService {
     dto: InitiatePaymentDto,
     userId: string,
   ): Promise<PaymentInitResponse> {
-    // Generate unique reference
+    
+    if (!userId) {
+      throw new BadRequestException("User ID missing for payment initialization");
+    }
+
     const reference = this.generateReference();
 
-    // Create payment record
+    // FIX: Nullish Coalescing for optional fields to avoid Prisma errors
+    // Use undefined for optional prisma fields if the DTO value is null/undefined
+    const customerName = dto.customerName ?? undefined;
+    
+    // Create initial Pending record
     await this.prisma.payment.create({
       data: {
         reference,
@@ -67,8 +77,8 @@ export class PaymentService {
         ...(dto.orderId && { orderId: dto.orderId }),
         ...(dto.rideId && { rideId: dto.rideId }),
         customerEmail: dto.email,
-        customerName: dto.customerName,
-        metadata: dto.metadata as any,
+        customerName: customerName, 
+        metadata: (dto.metadata as any) ?? {},
       },
     });
 
@@ -77,11 +87,16 @@ export class PaymentService {
     try {
       switch (dto.gateway) {
         case PaymentGateway.PAYSTACK:
+          // FIX: Pass the safe callback URL explicitly
+          // This points to the Backend Controller (@Get 'callback/paystack')
+          const callbackUrl = `${process.env.BACKEND_URL}/payment/callback/paystack`;
+          
           response = await this.paystackService.initializePayment(
             dto.amount,
             dto.email,
             reference,
             dto.metadata,
+            callbackUrl, // Passing the URL
           );
           break;
 
@@ -91,7 +106,7 @@ export class PaymentService {
             dto.email,
             reference,
             dto.customerName || 'Customer',
-            dto.phoneNumber,
+            dto.phoneNumber ?? undefined, // Fix null safety
             dto.metadata,
           );
           break;
@@ -115,7 +130,6 @@ export class PaymentService {
           throw new BadRequestException('Invalid payment gateway');
       }
 
-      // Update payment with gateway response
       await this.prisma.payment.update({
         where: { reference },
         data: {
@@ -130,7 +144,6 @@ export class PaymentService {
 
       return response;
     } catch (error) {
-      // Update payment status to failed
       await this.prisma.payment.update({
         where: { reference },
         data: { status: PaymentStatus.FAILED },
@@ -162,7 +175,6 @@ export class PaymentService {
         throw new BadRequestException('Invalid payment gateway');
     }
 
-    // Update payment record
     await this.updatePaymentStatus(verification);
 
     return verification;
@@ -173,7 +185,6 @@ export class PaymentService {
     payload: any,
     signature: string,
   ): Promise<void> {
-    // Verify webhook signature
     let isValid = false;
 
     switch (gateway) {
@@ -204,7 +215,6 @@ export class PaymentService {
       throw new BadRequestException('Invalid webhook signature');
     }
 
-    // Process webhook based on gateway
     await this.processWebhookPayload(gateway, payload);
   }
 
@@ -259,6 +269,7 @@ export class PaymentService {
     });
   }
 
+
   private async updatePaymentStatus(
     verification: VerifyPaymentResponse,
   ): Promise<void> {
@@ -266,13 +277,11 @@ export class PaymentService {
       where: { reference: verification.reference },
       include: {
         order: {
-          include: {
-            user: true,
-            store: true,
-            delivery: true,
-          },
+          include: { user: true, store: true, delivery: true },
         },
-        ride: true,
+        ride: {
+          include: { customer: true },
+        },
       },
     });
 
@@ -281,7 +290,6 @@ export class PaymentService {
       return;
     }
 
-    // Idempotency check - skip if already processed successfully
     if ((payment.status as any) === PaymentStatus.SUCCESS) {
       this.logger.log(
         `Payment already processed successfully: ${verification.reference}`,
@@ -289,59 +297,56 @@ export class PaymentService {
       return;
     }
 
-    // Update payment status
+    // ✅ FIX 1: Safety check for paidAt date
+    const paidAt = verification.paidAt ? new Date(verification.paidAt) : new Date();
+
     const updatedPayment = await this.prisma.payment.update({
       where: { reference: verification.reference },
       data: {
         status: verification.status as any,
-        paidAt: verification.paidAt,
+        paidAt: paidAt,
         verifiedAt: new Date(),
       },
       include: {
-        order: {
-          include: {
-            user: true,
-            store: true,
-            delivery: true,
-          },
-        },
-        ride: true,
+        order: { include: { user: true, store: true, delivery: true } },
+        ride: { include: { customer: true } },
       },
     });
 
-    // Update order status if payment successful
+    // Update ORDER
     if (verification.status === PaymentStatus.SUCCESS && payment.orderId) {
       await this.prisma.order.update({
         where: { id: payment.orderId },
-        data: {
-          status: 'CONFIRMED' as any,
-        },
+        data: { status: 'CONFIRMED' as any },
       });
 
-      // Record payment in ledger
       if (updatedPayment.order) {
-        await this.ledger.recordPayment({
-          id: payment.id,
-          amount: payment.amount,
-          userId: updatedPayment.order.userId,
-          orderId: payment.orderId,
-          method: payment.gateway,
-          status: 'COMPLETED',
-        });
+        try {
+          await this.ledger.recordPayment({
+            id: payment.id,
+            amount: payment.amount,
+            userId: updatedPayment.order.userId,
+            orderId: payment.orderId,
+            method: payment.gateway,
+            status: 'COMPLETED',
+          });
 
-        // Record order commission and vendor earnings
-        await this.ledger.recordOrderCommission({
-          id: payment.orderId,
-          storeId: updatedPayment.order.storeId,
-          total: payment.amount,
-          commissionRate: 10, // 10% platform commission (deducted on withdrawal)
-        });
+          await this.ledger.recordOrderCommission({
+            id: payment.orderId,
+            storeId: updatedPayment.order.storeId,
+            total: payment.amount,
+            commissionRate: 10,
+          });
+        } catch (ledgerError) {
+          this.logger.error(
+            `Ledger recording failed for order ${payment.orderId}`,
+            ledgerError,
+          );
+        }
       }
 
-      // Send notifications
       await this.sendPaymentNotifications(updatedPayment);
 
-      // Start delivery matching if order has a delivery
       if (updatedPayment.order?.delivery) {
         await this.startDeliveryMatching(updatedPayment.order.delivery.id);
       }
@@ -351,84 +356,66 @@ export class PaymentService {
     ) {
       await this.prisma.order.update({
         where: { id: payment.orderId },
-        data: {
-          status: 'FAILED' as any,
-        },
+        data: { status: 'FAILED' as any },
       });
     }
 
-    // Start ride matching if payment is for a ride
+    // Update RIDE
     if (verification.status === PaymentStatus.SUCCESS && payment.rideId) {
-      // Get ride details
       const ride = await this.prisma.ride.findUnique({
         where: { id: payment.rideId },
-        include: {
-          customer: { select: { id: true } },
-        },
+        include: { customer: { select: { id: true } } },
       });
 
       if (ride && ride.riderId) {
-        const platformFeeRate = 0.2; // 20% platform fee (deducted on withdrawal)
+        const platformFeeRate = 0.2;
         const platformFee = payment.amount * platformFeeRate;
-        const driverFee = payment.amount; // Driver gets full amount initially
+        const driverFee = payment.amount;
 
-        // Record payment in ledger
-        await this.ledger.recordPayment({
-          id: payment.id,
-          amount: payment.amount,
-          userId: ride.customer.id,
-          rideId: payment.rideId,
-          method: payment.gateway,
-          status: 'COMPLETED',
-        });
+        try {
+          await this.ledger.recordPayment({
+            id: payment.id,
+            amount: payment.amount,
+            userId: ride.customer.id,
+            rideId: payment.rideId,
+            method: payment.gateway,
+            status: 'COMPLETED',
+          });
 
-        // Record ride earnings (full amount credited, commission deducted on withdrawal)
-        await this.ledger.recordRideEarnings({
-          id: payment.rideId,
-          riderId: ride.riderId,
-          totalFare: payment.amount,
-          platformFee, // Stored for reference, deducted on withdrawal
-          driverFee, // Full amount
-        });
+          await this.ledger.recordRideEarnings({
+            id: payment.rideId,
+            riderId: ride.riderId,
+            totalFare: payment.amount,
+            platformFee,
+            driverFee,
+          });
+        } catch (ledgerError) {
+          this.logger.error(
+            `Ledger recording failed for ride ${payment.rideId}`,
+            ledgerError,
+          );
+        }
       }
 
       await this.startRideMatching(payment.rideId);
+      await this.sendPaymentNotifications(updatedPayment);
     }
   }
+ 
 
-  /**
-   * Start ride matching after payment is successful
-   */
   private async startRideMatching(rideId: string): Promise<void> {
     try {
-      if (!this.tripsService) {
-        this.logger.error(
-          `TripsService not available - cannot start ride matching for ${rideId}`,
-        );
-        return;
-      }
-
+      if (!this.tripsService) return;
       await this.tripsService.startRideMatching(rideId);
-      this.logger.log(`Started ride matching for ride ${rideId}`);
     } catch (error) {
       this.logger.error(`Failed to start ride matching for ${rideId}:`, error);
     }
   }
 
-  /**
-   * Start delivery matching after payment is successful
-   */
   private async startDeliveryMatching(deliveryId: string): Promise<void> {
     try {
-      if (!this.tripsService) {
-        this.logger.error(
-          `TripsService not available - cannot start delivery matching for ${deliveryId}`,
-        );
-        return;
-      }
-
+      if (!this.tripsService) return;
       await this.tripsService.startDeliveryMatching(deliveryId);
-      this.logger.log(`Started delivery matching for delivery ${deliveryId}`);
     } catch (error) {
       this.logger.error(
         `Failed to start delivery matching for ${deliveryId}:`,
@@ -437,25 +424,41 @@ export class PaymentService {
     }
   }
 
+  // File: as/backend/src/payment/payment.service.ts
+
   private async sendPaymentNotifications(payment: any): Promise<void> {
     try {
-      // Notify customer
-      await this.notificationsService.create({
-        userId: payment.order.userId,
-        title: 'Payment Successful',
-        message: `Your payment of ₦${payment.amount.toLocaleString()} was successful. Your order is being processed.`,
-        type: 'PAYMENT_SUCCESS',
-        metadata: {
-          orderId: payment.orderId,
-          reference: payment.reference,
-          amount: payment.amount,
-        },
-      });
+      // 1. Notify Customer
+      let customerId: string | undefined;
 
-      // Notify vendor (store owner)
-      if (payment.order?.store) {
+      if (payment.order?.userId) {
+        customerId = payment.order.userId;
+      } else if (payment.ride?.customerId) {
+        customerId = payment.ride.customerId;
+      } else if (payment.userId) {
+        customerId = payment.userId;
+      }
+
+      if (customerId) {
         await this.notificationsService.create({
-          userId: payment.order.store.vendorId,
+          userId: customerId,
+          title: 'Payment Successful',
+          message: `Your payment of ₦${payment.amount.toLocaleString()} was successful.`,
+          type: 'PAYMENT_SUCCESS',
+          metadata: {
+            orderId: payment.orderId,
+            rideId: payment.rideId,
+            reference: payment.reference,
+            amount: payment.amount,
+          },
+        });
+      }
+
+      // 2. Notify Vendor (Only for Orders)
+      // ✅ FIX 2: Use createForVendor method
+      if (payment.order?.store?.vendorId) {
+        await this.notificationsService.createForVendor({
+          vendorId: payment.order.store.vendorId, // Using vendorId
           title: 'New Order Payment',
           message: `Payment received for order #${payment.order.id}. Amount: ₦${payment.amount.toLocaleString()}`,
           type: 'ORDER_PAYMENT',
@@ -470,66 +473,45 @@ export class PaymentService {
       this.logger.error('Failed to send payment notifications:', error);
     }
   }
+ 
 
   async disbursePayment(
     dto: DisbursePaymentDto,
     adminId: string,
   ): Promise<DisbursementResponse> {
-    // Generate unique reference
     const reference = this.generateReference('DISB');
-
-    // Get recipient details based on type
     let bankAccount: any;
     let recipientName: string;
 
     if (dto.recipientType === RecipientType.VENDOR) {
-      // For vendors, get store and its bank account
       const vendor = await this.prisma.vendor.findUnique({
         where: { id: dto.recipientId },
-        include: {
-          store: {
-            include: {
-              bankAccount: true,
-            },
-          },
-        },
+        include: { store: { include: { bankAccount: true } } },
       });
 
-      if (!vendor || !vendor.store) {
-        throw new NotFoundException('Vendor or store not found');
-      }
-
+      if (!vendor || !vendor.store) throw new NotFoundException('Vendor or store not found');
       bankAccount = vendor.store.bankAccount;
       recipientName = vendor.name;
     } else if (dto.recipientType === RecipientType.RIDER) {
-      // For riders, get rider record and its bank account
       const rider = await this.prisma.rider.findUnique({
         where: { id: dto.recipientId },
-        include: {
-          bankAccount: true,
-        },
+        include: { bankAccount: true },
       });
 
-      if (!rider) {
-        throw new NotFoundException('Rider not found');
-      }
-
+      if (!rider) throw new NotFoundException('Rider not found');
       bankAccount = rider.bankAccount;
       recipientName = rider.name || 'Rider';
     } else {
       throw new BadRequestException('Invalid recipient type');
     }
 
-    if (!bankAccount) {
-      throw new BadRequestException('Recipient has no bank account configured');
-    }
+    if (!bankAccount) throw new BadRequestException('Recipient has no bank account configured');
 
     let disbursement: DisbursementResponse;
 
     try {
       switch (dto.gateway) {
         case PaymentGateway.PAYSTACK:
-          // Create or get transfer recipient
           let recipientCode = bankAccount.paystackRecipientCode;
           if (!recipientCode) {
             recipientCode = await this.paystackService.createTransferRecipient(
@@ -537,8 +519,6 @@ export class PaymentService {
               bankAccount.bankCode,
               bankAccount.accountName,
             );
-
-            // Save recipient code
             await this.prisma.bankAccount.update({
               where: { id: bankAccount.id },
               data: { paystackRecipientCode: recipientCode },
@@ -564,13 +544,21 @@ export class PaymentService {
           );
           break;
 
-        default:
-          throw new BadRequestException(
-            'Invalid payment gateway for disbursement',
+        case PaymentGateway.MONNIFY:
+          disbursement = await this.monnifyService.initiateTransfer(
+            dto.amount,
+            bankAccount.accountNumber,
+            bankAccount.bankCode,
+            bankAccount.accountName,
+            reference,
+            dto.reason,
           );
+          break;
+
+        default:
+          throw new BadRequestException(`Unsupported payment gateway: ${dto.gateway}`);
       }
 
-      // Record disbursement in database
       await this.prisma.payment.create({
         data: {
           reference,
@@ -591,16 +579,12 @@ export class PaymentService {
         },
       });
 
-      // Send notification to recipient
       await this.notificationsService.create({
         userId: dto.recipientId,
         title: 'Payment Disbursement',
         message: `₦${dto.amount.toLocaleString()} has been sent to your account ${bankAccount.accountNumber}`,
         type: 'DISBURSEMENT',
-        metadata: {
-          reference,
-          amount: dto.amount,
-        },
+        metadata: { reference, amount: dto.amount },
       });
 
       return disbursement;
@@ -614,37 +598,22 @@ export class PaymentService {
     dto: ProcessRefundDto,
     adminId: string,
   ): Promise<RefundResponse> {
-    // Get original payment
     const payment = await this.prisma.payment.findFirst({
       where: { reference: dto.paymentReference },
       include: {
-        order: {
-          include: {
-            user: true,
-          },
-        },
-        ride: {
-          include: {
-            customer: true,
-          },
-        },
+        order: { include: { user: true } },
+        ride: { include: { customer: true } },
       },
     });
 
-    if (!payment) {
-      throw new NotFoundException('Payment not found');
-    }
-
+    if (!payment) throw new NotFoundException('Payment not found');
     if ((payment.status as PaymentStatus) !== PaymentStatus.SUCCESS) {
       throw new BadRequestException('Can only refund successful payments');
     }
 
     const refundAmount = dto.amount || payment.amount;
-
     if (refundAmount > payment.amount) {
-      throw new BadRequestException(
-        'Refund amount cannot exceed original payment amount',
-      );
+      throw new BadRequestException('Refund exceeds original amount');
     }
 
     let refund: RefundResponse;
@@ -652,35 +621,19 @@ export class PaymentService {
     try {
       switch (payment.gateway as PaymentGateway) {
         case PaymentGateway.PAYSTACK:
-          refund = await this.paystackService.initiateRefund(
-            payment.reference,
-            refundAmount,
-          );
+          refund = await this.paystackService.initiateRefund(payment.reference, refundAmount);
           break;
-
         case PaymentGateway.FLUTTERWAVE:
-          if (!payment.transactionId) {
-            throw new BadRequestException(
-              'Transaction ID not found for Flutterwave refund',
-            );
-          }
-          refund = await this.flutterwaveService.initiateRefund(
-            payment.transactionId,
-            refundAmount,
-          );
+          if (!payment.transactionId) throw new BadRequestException('Transaction ID missing');
+          refund = await this.flutterwaveService.initiateRefund(payment.transactionId, refundAmount);
           break;
-
+        case PaymentGateway.MONNIFY:
+          throw new BadRequestException('Monnify API refunds not supported');
         default:
-          throw new BadRequestException(
-            'Refunds not supported for this gateway',
-          );
+          throw new BadRequestException('Refunds not supported for this gateway');
       }
 
-      // Update payment status
-      const newStatus =
-        refundAmount < payment.amount
-          ? PaymentStatus.PARTIAL_REFUND
-          : PaymentStatus.REFUNDED;
+      const newStatus = refundAmount < payment.amount ? PaymentStatus.PARTIAL_REFUND : PaymentStatus.REFUNDED;
 
       await this.prisma.payment.update({
         where: { id: payment.id },
@@ -699,32 +652,26 @@ export class PaymentService {
         },
       });
 
-      // Update order/ride status if applicable
       if (payment.orderId) {
         await this.prisma.order.update({
           where: { id: payment.orderId },
-          data: {
-            status: 'CANCELLED',
-          },
+          data: { status: 'CANCELLED' },
         });
       }
 
       if (payment.rideId) {
         await this.prisma.ride.update({
           where: { id: payment.rideId },
-          data: {
-            status: 'CANCELLED',
-          },
+          data: { status: 'CANCELLED' },
         });
       }
 
-      // Notify customer
       const customer = payment.order?.user || payment.ride?.customer;
       if (customer) {
         await this.notificationsService.create({
           userId: customer.id,
           title: 'Refund Processed',
-          message: `₦${refundAmount.toLocaleString()} has been refunded to your account. Reason: ${dto.reason}`,
+          message: `₦${refundAmount.toLocaleString()} has been refunded. Reason: ${dto.reason}`,
           type: 'REFUND',
           metadata: {
             reference: payment.reference,
@@ -741,72 +688,21 @@ export class PaymentService {
     }
   }
 
-  /**
-   * Handle Monnify Refund Webhook
-   * Called when a refund is completed on Monnify
-   */
-  async handleMonnifyRefundWebhook(
-    payload: any,
-    signature: string,
-  ): Promise<void> {
-    // Verify webhook signature
-    const isValid = this.monnifyService.verifyWebhookSignature(
-      payload,
-      signature,
-    );
+  async handleMonnifyRefundWebhook(payload: any, signature: string): Promise<void> {
+    const isValid = this.monnifyService.verifyWebhookSignature(payload, signature);
+    if (!isValid) throw new BadRequestException('Invalid webhook signature');
 
-    if (!isValid) {
-      this.logger.warn('Invalid Monnify refund webhook signature');
-      throw new BadRequestException('Invalid webhook signature');
-    }
-
-    // Extract refund data from payload
-    const {
-      eventType,
-      eventData,
-    }: {
-      eventType: string;
-      eventData: {
-        transactionReference: string;
-        refundReference: string;
-        refundAmount: number;
-        refundStatus: string;
-        destinationAccountNumber: string;
-        destinationBankCode: string;
-        completedOn?: string;
-      };
-    } = payload;
-
-    this.logger.log(`Monnify refund webhook: ${eventType}`, eventData);
-
-    // Only process successful refund completions
-    if (eventType !== 'SUCCESSFUL_REFUND') {
-      this.logger.log(`Ignoring refund event type: ${eventType}`);
-      return;
-    }
+    const { eventType, eventData } = payload;
+    if (eventType !== 'SUCCESSFUL_REFUND') return;
 
     try {
-      // Find the original payment by reference
       const payment = await this.prisma.payment.findUnique({
         where: { reference: eventData.transactionReference },
-        include: {
-          order: {
-            include: {
-              user: true,
-              store: true,
-            },
-          },
-        },
+        include: { order: { include: { user: true } } },
       });
 
-      if (!payment) {
-        this.logger.warn(
-          `Payment not found for refund: ${eventData.transactionReference}`,
-        );
-        return;
-      }
+      if (!payment) return;
 
-      // Update payment record with refund info
       await this.prisma.payment.update({
         where: { id: payment.id },
         data: {
@@ -823,12 +719,11 @@ export class PaymentService {
         },
       });
 
-      // Send refund notification to customer
       if (payment.order?.userId) {
         await this.notificationsService.create({
           userId: payment.order.userId,
           title: 'Refund Processed',
-          message: `Your refund of ₦${eventData.refundAmount.toLocaleString()} has been processed successfully.`,
+          message: `Refund of ₦${eventData.refundAmount.toLocaleString()} processed successfully.`,
           type: 'REFUND_SUCCESS',
           metadata: {
             orderId: payment.orderId,
@@ -838,10 +733,6 @@ export class PaymentService {
           },
         });
       }
-
-      this.logger.log(
-        `Refund processed successfully: ${eventData.refundReference}`,
-      );
     } catch (error) {
       this.logger.error('Error processing Monnify refund webhook:', error);
       throw error;

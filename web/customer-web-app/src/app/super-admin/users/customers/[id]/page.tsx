@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import useSWR from 'swr'; 
+import { getSession } from 'next-auth/react'; // ✅ Import NextAuth
 import { CustomerDetailPageSkeleton } from './components/skeleton';
 import { fetcher } from '@/app/super-admin/hooks/useSuperAdminFetch';
 import { CustomerHeader } from './components/customerHeader';
@@ -9,7 +10,6 @@ import { CustomerSidebar } from './components/customerSidebar';
 import { CustomerStats } from './components/CustomerStats';
 import { CustomerContentTabs } from './components/CustomerContentTabs';
 import { AppAlert } from './alerts';
-import { createClient } from '../../../../../../utils/supabase/client'; // ✅ Import Supabase
 
 import { CustomerProfile, Order, Ride } from './types';
 
@@ -20,13 +20,13 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
   const { id: customerId } = React.use(params);
   const [activeTab, setActiveTab] = useState<'Orders' | 'Rides' | 'Logs'>('Orders');
 
-  // ✅ Helper: Get Auth Header
+  // ✅ Helper: Get Auth Header using NextAuth
   const getAuthHeader = async () => {
-    const supabase = createClient();
-    const { data: { session } } = await supabase.auth.getSession();
+    const session = await getSession();
+    const token = (session as any)?.accessToken;
     return {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${session?.access_token || ''}`
+        'Authorization': `Bearer ${token || ''}`
     };
   };
 
@@ -88,9 +88,9 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
     const isBanning = customer.status !== 'BANNED'; // Logic: If not banned, action is to BAN
     
     const result = await AppAlert.confirm(
-      isBanning ? 'Ban Customer?' : 'Unban Customer?', // ✅ Fixed Text
+      isBanning ? 'Ban Customer?' : 'Unban Customer?', 
       isBanning ? 'User will be logged out immediately.' : 'User access will be restored.',
-      isBanning ? 'Yes, Ban' : 'Yes, Unban', // ✅ Fixed Text
+      isBanning ? 'Yes, Ban' : 'Yes, Unban', 
       isBanning 
     );
 
@@ -105,7 +105,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
           body: JSON.stringify({ status: newStatus })
         });
 
-        AppAlert.success(isBanning ? 'Customer Banned' : 'Customer Unbanned'); // ✅ Better Feedback
+        AppAlert.success(isBanning ? 'Customer Banned' : 'Customer Unbanned'); 
         mutateProfile();
       } catch (err) {
         AppAlert.error('Update Failed', 'Could not update user status.');

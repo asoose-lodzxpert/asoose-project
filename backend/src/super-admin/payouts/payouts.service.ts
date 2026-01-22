@@ -1,16 +1,20 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { TransactionLedgerService } from '../transactions/transaction-ledger.service';
 import { PayoutStatus } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
+import { PaymentService } from 'src/payment/payment.service';
+import { RecipientType, PaymentGateway } from 'src/payment/dto/payment.dto'; 
 
 @Injectable()
 export class PayoutsService {
+  private readonly logger = new Logger(PayoutsService.name);
+
   constructor(
     private prisma: PrismaService,
     private ledger: TransactionLedgerService,
+    private paymentService: PaymentService,
   ) {}
 
-  // REPLACE 'getPendingPayouts' method
   async getPendingPayouts() {
     const vendorPayouts = await this.prisma.vendorPayout.findMany({
       where: { status: PayoutStatus.PENDING },
@@ -20,7 +24,6 @@ export class PayoutsService {
     const riderPayouts = await this.prisma.riderPayout.findMany({
       where: { status: PayoutStatus.PENDING },
       include: {
-        // Fixed: Schema uses 'rider', not 'riderProfile'
         rider: {
           select: {
             name: true,
@@ -33,50 +36,109 @@ export class PayoutsService {
     return { vendorPayouts, riderPayouts };
   }
 
-  // REPLACE 'approvePayout' method
   async approvePayout(id: string, type: 'VENDOR' | 'RIDER', adminId: string) {
-    return this.prisma.$transaction(async (tx) => {
-      const commonUpdateData: any = {
-        status: 'PAID',
-        processedAt: new Date(),
-      };
+    // 1. Fetch Payout Details First (To get amount & recipient)
+    let payout: any;
+    let recipientId: string;
+    let recipientType: RecipientType;
 
-      if (type === 'VENDOR') {
-        const payout = await tx.vendorPayout.update({
-          where: { id },
-          data: commonUpdateData,
-        });
-
-        // Commission rate will be fetched from Store table by ledger service
-        await this.ledger.recordVendorPayout({
-          id: payout.id,
-          storeId: payout.storeId,
-          amount: payout.amount,
-          status: 'PAID',
-          reference: payout.reference || undefined,
-          // commissionRate not provided - will be fetched from Store.commissionRate
-        });
-
-        return payout;
-      } else {
-        const payout = await tx.riderPayout.update({
-          where: { id },
-          data: commonUpdateData,
-        });
-
-        // Commission rate will be fetched from Rider table by ledger service
-        await this.ledger.recordRiderPayout({
-          id: payout.id,
-          riderId: payout.riderId,
-          amount: payout.amount,
-          status: 'PAID',
-          reference: payout.reference || undefined,
-          // commissionRate not provided - will be fetched from Rider.commissionRate
-        });
-
-        return payout;
+    if (type === 'VENDOR') {
+      payout = await this.prisma.vendorPayout.findUnique({
+        where: { id },
+        include: { store: true }, // Need store to get vendorId
+      });
+      if (!payout) throw new BadRequestException('Vendor payout not found');
+      
+      // Check if already paid to prevent double-spending
+      if (payout.status === PayoutStatus.PAID) {
+         throw new BadRequestException('Payout already processed');
       }
-    });
+
+      recipientId = payout.store.vendorId; 
+      recipientType = RecipientType.VENDOR;
+    } else {
+      payout = await this.prisma.riderPayout.findUnique({
+        where: { id },
+        include: { rider: true },
+      });
+      if (!payout) throw new BadRequestException('Rider payout not found');
+      
+      if (payout.status === PayoutStatus.PAID) {
+         throw new BadRequestException('Payout already processed');
+      }
+
+      recipientId = payout.riderId;
+      recipientType = RecipientType.RIDER;
+    }
+
+    // 2. TRIGGER REAL MONEY TRANSFER
+    this.logger.log(`Initiating Gateway Transfer for ${type} ${id}`);
+    
+    // Default to PAYSTACK or fetch preference from system settings
+    const gateway = PaymentGateway.PAYSTACK; 
+
+    try {
+      // This actually talks to the bank
+      const disbursement = await this.paymentService.disbursePayment(
+        {
+          recipientId,
+          recipientType,
+          amount: payout.amount,
+          gateway,
+          reason: `Payout ${payout.reference || id}`,
+          metadata: { payoutId: id, adminId },
+        },
+        adminId
+      );
+
+      if (!disbursement.success && disbursement.status !== 'PENDING') {
+         throw new Error(`Gateway declined transfer: ${disbursement.status}`);
+      }
+
+      // 3. UPDATE DB ONLY IF GATEWAY ACCEPTED
+      return this.prisma.$transaction(async (tx) => {
+        const commonUpdateData: any = {
+          status: 'PAID',
+          processedAt: new Date(),
+          reference: disbursement.reference, // Store the REAL bank reference
+        };
+
+        if (type === 'VENDOR') {
+          const updated = await tx.vendorPayout.update({
+            where: { id },
+            data: commonUpdateData,
+          });
+
+          await this.ledger.recordVendorPayout({
+            id: updated.id,
+            storeId: updated.storeId,
+            amount: updated.amount,
+            status: 'PAID',
+            reference: disbursement.reference,
+          });
+          return updated;
+        } else {
+          const updated = await tx.riderPayout.update({
+            where: { id },
+            data: commonUpdateData,
+          });
+
+          await this.ledger.recordRiderPayout({
+            id: updated.id,
+            riderId: updated.riderId,
+            amount: updated.amount,
+            status: 'PAID',
+            reference: disbursement.reference,
+          });
+          return updated;
+        }
+      });
+
+    } catch (error) {
+      this.logger.error(`Payout Failed for ${id}`, error);
+      // Do NOT set status to PAID. Throw error so Admin knows it failed.
+      throw new BadRequestException(`Payout failed: ${error.message}`);
+    }
   }
 
   async rejectPayout(id: string, type: 'VENDOR' | 'RIDER', reason: string) {

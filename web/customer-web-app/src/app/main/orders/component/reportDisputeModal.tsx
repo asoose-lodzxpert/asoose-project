@@ -3,10 +3,10 @@
 import React, { useState } from 'react';
 import { X, Loader2 } from 'lucide-react';
 import { toast } from 'react-toastify';
-import { createClient } from '../../../../../utils/supabase/client';
+import { useSession } from 'next-auth/react'; // ✅ Switched to NextAuth
 import ImageUpload from '@/app/main/components/ImageUpload'; 
 
-interface ReportDisputeModalProps {
+export interface ReportDisputeModalProps {
   isOpen: boolean;
   onClose: () => void;
   orderId: string;
@@ -18,7 +18,9 @@ export default function ReportDisputeModal({ isOpen, onClose, orderId, onSuccess
   const [description, setDescription] = useState("");
   const [evidenceImages, setEvidenceImages] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const supabase = createClient();
+  
+  // ✅ Use NextAuth Hook
+  const { data: session } = useSession();
 
   const handleImageUpload = (url: string) => {
     if (url) setEvidenceImages(prev => [...prev, url]);
@@ -30,10 +32,10 @@ export default function ReportDisputeModal({ isOpen, onClose, orderId, onSuccess
 
     setIsSubmitting(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      // ✅ Check for NextAuth session
+      const token = (session as any)?.accessToken;
       
-      // Production Safety: Ensure session exists before fetching
-      if (!session) {
+      if (!token) {
         toast.error("Your session has expired. Please log in again.");
         return;
       }
@@ -44,14 +46,14 @@ export default function ReportDisputeModal({ isOpen, onClose, orderId, onSuccess
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`
+          'Authorization': `Bearer ${token}` // ✅ Use NextAuth Token
         },
         body: JSON.stringify({
           reason,
           description: description.trim(),
           orderId,
           evidenceImages, 
-          priority: 'MEDIUM' // Matches DisputePriority enum in schema
+          priority: 'MEDIUM' 
         })
       });
 
@@ -60,12 +62,11 @@ export default function ReportDisputeModal({ isOpen, onClose, orderId, onSuccess
         throw new Error(errorData.message || "Failed to submit dispute");
       }
 
-      // Success Flow
       toast.success("Dispute reported successfully.");
-      if (onSuccess) onSuccess(); // Trigger SWR refresh in parent
+      if (onSuccess) onSuccess();
       onClose();
       
-      // Reset local state for next use
+      // Reset form
       setReason("");
       setDescription("");
       setEvidenceImages([]);
@@ -120,8 +121,8 @@ export default function ReportDisputeModal({ isOpen, onClose, orderId, onSuccess
           <div className="space-y-2">
             <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-1">Evidence Photos</label>
             <div className="grid grid-cols-2 gap-3">
-              <ImageUpload bucket="marketplace_assets" onUpload={handleImageUpload} label="Photo 1" />
-              <ImageUpload bucket="marketplace_assets" onUpload={handleImageUpload} label="Photo 2" />
+              <ImageUpload value="" onUpload={handleImageUpload} label="Photo 1" />
+              <ImageUpload value="" onUpload={handleImageUpload} label="Photo 2" />
             </div>
           </div>
 

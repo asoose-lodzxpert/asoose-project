@@ -1,44 +1,58 @@
 'use client';
 import React, { useState } from 'react';
-import { createClient } from '../../../../utils/supabase/client';
 import { Upload, Loader2, X } from 'lucide-react';
 import Image from 'next/image';
 import { toast } from 'react-toastify';
+import { useSession } from "next-auth/react";
 
 interface ImageUploadProps {
   onUpload: (url: string) => void;
   value?: string;
   label?: string;
-  bucket: string; 
+  bucket?: string; // Kept for prop compatibility, though now handled by backend
 }
 
 export default function ImageUpload({ onUpload, value, label = "Upload Image", bucket }: ImageUploadProps) {
-  const supabase = createClient();
+  const { data: session } = useSession();
   const [uploading, setUploading] = useState(false);
   const [preview, setPreview] = useState<string | null>(value || null);
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     try {
       setUploading(true);
       if (!e.target.files || e.target.files.length === 0) return;
+      
+      const token = (session as any)?.accessToken;
+      if (!token) {
+        throw new Error("Authentication required to upload");
+      }
 
       const file = e.target.files[0];
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-      const filePath = `uploads/${fileName}`;
+      const formData = new FormData();
+      formData.append('file', file);
 
-      const { error: uploadError } = await supabase.storage
-        .from(bucket)
-        .upload(filePath, file);
+      // Use the backend upload endpoint
+      const response = await fetch(`${API_URL}/storage/upload`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
 
-      if (uploadError) throw uploadError;
+      if (!response.ok) {
+        throw new Error("Upload failed");
+      }
 
-      const { data } = supabase.storage.from(bucket).getPublicUrl(filePath);
-
-      setPreview(data.publicUrl);
-      onUpload(data.publicUrl);
+      const data = await response.json();
+      // Backend returns { url: string }
+      
+      setPreview(data.url);
+      onUpload(data.url);
       toast.success("Image uploaded!");
     } catch (error: any) {
+      console.error(error);
       toast.error(error.message || "Error uploading image");
     } finally {
       setUploading(false);
@@ -49,14 +63,19 @@ export default function ImageUpload({ onUpload, value, label = "Upload Image", b
     try {
       if (!preview) return;
       
-      // Robust path extraction: everything after the bucket name in the URL
-      const urlParts = preview.split(`${bucket}/`);
-      const path = urlParts.length > 1 ? urlParts[1] : null;
-      
-      if (path) {
-        const { error } = await supabase.storage.from(bucket).remove([path]);
-        if (error) throw error;
-      }
+      const token = (session as any)?.accessToken;
+      if (!token) throw new Error("Authentication required");
+
+      const response = await fetch(`${API_URL}/storage/delete`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ url: preview })
+      });
+
+      if (!response.ok) throw new Error("Delete failed");
 
       setPreview(null);
       onUpload('');

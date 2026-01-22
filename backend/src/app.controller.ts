@@ -2,7 +2,7 @@ import { Controller, Get, Inject } from '@nestjs/common';
 import { AppService } from './app.service';
 import { PrismaService } from './prisma/prisma.service';
 import type { RedisClientType } from 'redis';
-
+import { Public } from './auth/decorators/public.decorator';
 @Controller()
 export class AppController {
   constructor(
@@ -16,6 +16,7 @@ export class AppController {
     return this.appService.getHello();
   }
 
+  @Public() // Health checks should generally be public
   @Get('health')
   async health(): Promise<{
     backend: string;
@@ -52,28 +53,31 @@ export class AppController {
     };
   }
 
-  @Get('public/settings/maintenance')
-  async checkMaintenance() {
+  // ✅ THE FIX: Public access + Consistent Path + Correct Response Key
+  @Public()
+  @Get('settings/maintenance-mode')
+  async getMaintenanceMode() {
     const cacheKey = 'system:maintenance_mode';
 
-    // 1. Try to get from Redis first
+    // 1. Try to get from Redis first (Fast Path)
     const cachedValue = await this.redisClient.get(cacheKey);
     if (cachedValue !== null) {
-      return { active: cachedValue === 'true' };
+      return { isEnabled: cachedValue === 'true' };
     }
 
-    // 2. Fallback to Database
+    // 2. Fallback to Database (Slow Path)
     const setting = await this.prisma.systemSetting.findUnique({
       where: { key: 'maintenance_mode' },
     });
 
-    const isActive = setting?.value === 'true';
+    const isEnabled = setting?.value === 'true';
 
-    // 3. Store in Redis for future requests (e.g., expire in 1 minute)
-    await this.redisClient.set(cacheKey, String(isActive), {
-      EX: 60,
+    // 3. Store in Redis (1 hour expiration)
+    // We can cache longer because SettingsService invalidates this key on update.
+    await this.redisClient.set(cacheKey, String(isEnabled), {
+      EX: 3600,
     });
 
-    return { active: isActive };
+    return { isEnabled };
   }
 }

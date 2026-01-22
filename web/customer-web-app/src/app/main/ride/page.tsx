@@ -10,6 +10,7 @@ import React, {
 import { useRouter } from "next/navigation";
 import { Loader2, Crosshair, AlertTriangle } from "lucide-react";
 import { useJsApiLoader, Libraries } from "@react-google-maps/api";
+import { useSession } from "next-auth/react"; // ✅ Import NextAuth hook
 
 import GoogleMapView from "./components/map";
 import RideSelector from "./components/RideSelector";
@@ -23,11 +24,9 @@ import {
   VehicleType,
   Driver,
   Ride,
-  CreateRideRequest,
 } from "@/services/ride.service";
 import { useRideSocket } from "@/hooks/useRideSocket";
 import { paymentService } from "@/services/payment.service";
-import { createClient } from "../../../../utils/supabase/client";
 import { PAYMENT_METHODS } from "./constants/config";
 
 const GOOGLE_LIBS: Libraries = ["places"];
@@ -55,8 +54,8 @@ export default function Page() {
 }
 
 function HomeContent() {
-  const supabase = createClient();
   const router = useRouter();
+  const { data: session } = useSession(); // ✅ Use NextAuth session
 
   const { isLoaded: isGoogleLoaded } = useJsApiLoader({
     id: "google-map-script",
@@ -250,16 +249,12 @@ function HomeContent() {
         selectedMethod.type !== "CASH" &&
         selectedMethod.gateway
       ) {
-        // Get user email
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-
+        // ✅ Use session from NextAuth for email
         localStorage.setItem("pending_ride", "true");
 
         const paymentRes = await paymentService.initiatePayment({
           amount: res.payment.amount,
-          email: session?.user.email || "",
+          email: session?.user?.email || "", // ✅ Accessed from NextAuth session
           gateway: selectedMethod.gateway as any,
           method: "CARD",
           type: "RIDE",

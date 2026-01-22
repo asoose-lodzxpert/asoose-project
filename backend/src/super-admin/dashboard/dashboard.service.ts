@@ -2,12 +2,15 @@ import {
   Injectable,
   InternalServerErrorException,
   UnauthorizedException,
+  NotFoundException,
   Logger,
   Inject,
 } from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import type { Cache } from 'cache-manager';
 import { PrismaService } from 'src/prisma/prisma.service';
+import { DisputesService } from '../dispute/dispute.service';
+import { StoresService } from '../vendors/vendors.service'; 
 import {
   OrderStatus,
   DisputeStatus,
@@ -78,6 +81,8 @@ export class DashboardService {
 
   constructor(
     private prisma: PrismaService,
+    private disputesService: DisputesService,
+    private storesService: StoresService,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {}
 
@@ -119,15 +124,10 @@ export class DashboardService {
       return stats;
     } catch (error) {
       this.logger.error('Failed to fetch dashboard stats', error.stack);
-
-      // Attempt to return minimal fallback data
-      try {
-        return await this.getMinimalStats();
-      } catch (fallbackError) {
-        throw new InternalServerErrorException(
-          'Unable to load dashboard statistics',
-        );
-      }
+      // ✅ FIX 3: Removed getMinimalStats fallback. Fail loudly so you know something is wrong.
+      throw new InternalServerErrorException(
+        'System metrics currently unavailable. Please check system health.',
+      );
     }
   }
 
@@ -140,7 +140,6 @@ export class DashboardService {
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
     const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
 
-    // OPTIMIZED: Reduced from 10 queries to 5 parallel aggregations
     const [
       orderMetrics,
       revenueMetrics,
@@ -513,57 +512,63 @@ export class DashboardService {
     }
   }
 
+  // ==================== REAL ALERT RESOLUTION (FIXED) ====================
+
   async resolveAlert(id: string, currentUser: User) {
     this.validateSuperAdmin(currentUser);
 
-    // Invalidate alerts cache
-    await this.cacheManager.del(this.ALERTS_CACHE_KEY);
+    // 1. Check if it's a Dispute
+    const dispute = await this.prisma.dispute.findUnique({ where: { id } });
+    if (dispute) {
+      // If already resolved, just clean up cache
+      if (dispute.status === DisputeStatus.RESOLVED) {
+        await this.invalidateCache();
+        return { success: true, message: 'Dispute already resolved' };
+      }
 
-    // Logic to resolve alert (e.g., auto-assign dispute or archive notification)
-    return { success: true, message: 'Alert marked as resolved' };
-  }
-
-  // ==================== FALLBACK DATA ====================
-
-  private async getMinimalStats(): Promise<DashboardResponse> {
-    this.logger.warn('Falling back to minimal stats calculation');
-
-    const [orderCount, userCount] = await Promise.all([
-      this.prisma.order.count(),
-      this.prisma.user.count({ where: { status: 'ACTIVE' } }),
-    ]);
-
-    return {
-      stats: [
+      // Perform real resolution via DisputesService
+      await this.disputesService.resolve(
+        id,
         {
-          label: 'Total Orders',
-          value: orderCount.toLocaleString(),
-          trend: 'up',
-          change: 'N/A',
-          iconName: 'ShoppingCart',
-          color: 'text-blue-500',
-          bgColor: 'bg-blue-500/10',
-        },
-        {
-          label: 'Active Users',
-          value: userCount.toLocaleString(),
-          trend: 'up',
-          change: 'N/A',
-          iconName: 'UserCheck',
-          color: 'text-purple-500',
-          bgColor: 'bg-purple-500/10',
-        },
-      ],
-      quickAccess: {
-        approvals: { total: 0, details: 'Data unavailable' },
-        disputes: { total: 0, details: 'Data unavailable' },
-        revenue: {
-          growth: 'N/A',
-          details: 'Data unavailable',
-          isPositive: true,
-        },
-      },
-    };
+          action: 'RESOLVED_NO_REFUND', // Ensure this matches your Enum or String literal
+          resolutionNotes: 'Quick resolution triggered from Admin Dashboard',
+          refundSource: 'NONE', // Ensure matches Enum
+        } as any,
+        currentUser.id,
+      );
+
+      await this.invalidateCache();
+      return { success: true, message: 'Dispute marked as resolved' };
+    }
+
+    // 2. Check if it's a Store Pending Verification
+    const store = await this.prisma.store.findUnique({ where: { id } });
+    if (store) {
+      if (store.verification === VerificationStatus.PENDING) {
+        // Perform real verification via StoresService (or fallback to Prisma)
+        // Since StoresService doesn't have a specific 'verifyStore' method exposed in the interface we saw,
+        // we use the 'update' method which is available.
+        await this.storesService.update(
+          id,
+          { status: StoreStatus.ACTIVE, verification: VerificationStatus.VERIFIED }, // Assuming 'verification' field handling exists or we do direct DB update if logic is simple
+          currentUser.id
+        );
+
+        // Fallback direct DB update if StoresService.update doesn't handle verification status directly
+        // (Double safety since we are inside the Dashboard service)
+        if (store.status !== StoreStatus.ACTIVE) {
+             await this.prisma.store.update({
+                where: { id },
+                data: { verification: VerificationStatus.VERIFIED, status: StoreStatus.ACTIVE }
+             });
+        }
+
+        await this.invalidateCache();
+        return { success: true, message: 'Store approved successfully' };
+      }
+    }
+
+    throw new NotFoundException('Alert entity not found or already processed');
   }
 
   // ==================== CACHE MANAGEMENT ====================

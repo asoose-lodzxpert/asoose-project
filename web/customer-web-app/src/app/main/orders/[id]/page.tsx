@@ -26,12 +26,11 @@ const API_URL = (
 export default function OrderDetailsPage() {
   const params = useParams();
   const router = useRouter();
+  const { data: session, status } = useSession(); 
   const orderId = params.id as string;
-  const supabase = createClient();
-
   const [isDisputeModalOpen, setIsDisputeModalOpen] = useState(false);
 
-  // 1. Production Fetcher with Auth
+  // Fetcher
   const fetcher = async (url: string) => {
     const {
       data: { session },
@@ -40,16 +39,11 @@ export default function OrderDetailsPage() {
       router.push("/sign-in");
       throw new Error("Not authenticated");
     }
-
+    const token = (session as any)?.accessToken || (session as any)?.user?.accessToken;
     const res = await fetch(url, {
       headers: { Authorization: `Bearer ${session.access_token}` },
     });
-
-    if (!res.ok) {
-      const error = await res.json();
-      throw new Error(error.message || "Failed to fetch order");
-    }
-
+    if (!res.ok) throw new Error((await res.json()).message || "Failed to fetch order");
     return res.json();
   };
 
@@ -67,19 +61,18 @@ export default function OrderDetailsPage() {
     dedupingInterval: 5000,
   });
 
-  // 3. Dispute Eligibility Logic
+  // Logic
   const { canReport, isExpired, hasDispute } = useMemo(() => {
     if (!order)
       return { canReport: false, isExpired: false, hasDispute: false };
 
     const hasActiveDispute = !!order.dispute;
     let isPastWindow = false;
-
     if (order.deliveredAt) {
-      const deliveredDate = new Date(order.deliveredAt);
-      const sevenDaysAgo = new Date();
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-      isPastWindow = deliveredDate < sevenDaysAgo;
+      const delivered = new Date(order.deliveredAt);
+      const window = new Date();
+      window.setDate(window.getDate() - 7);
+      isPastWindow = delivered < window;
     }
 
     const eligibleStatus = ["DELIVERED", "CANCELLED"].includes(order.status);
@@ -155,10 +148,12 @@ export default function OrderDetailsPage() {
           </div>
         </div>
 
-        {/* Live Timeline */}
-        <OrderTimeline status={order.status} />
+        {/* Integrated Timeline */}
+        <div className="mb-12 opacity-90">
+            <OrderTimeline status={order.status} />
+        </div>
 
-        {/* Dispute Status */}
+        {/* Dispute Notice */}
         {hasDispute && (
           <div className="bg-blue-500/10 border border-blue-500/20 p-5 rounded-[2rem] flex items-start gap-4">
             <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center shrink-0">

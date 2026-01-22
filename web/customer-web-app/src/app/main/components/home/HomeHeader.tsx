@@ -6,7 +6,7 @@ import Image from 'next/image';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { Search, MapPin, ChevronDown, Moon, Sun, Car, Package, Utensils, User, Bell, ShoppingBag } from 'lucide-react';
 import { useTheme } from 'next-themes';
-import { createClient } from '../../../../../utils/supabase/client';
+import { useSession } from "next-auth/react"; // ✅ NextAuth Import
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -18,6 +18,7 @@ const sanitizeInput = (input: string): string => {
 };
 
 export const HomeHeader = () => {
+  const { data: session } = useSession(); // ✅ Get NextAuth Session
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -27,7 +28,6 @@ export const HomeHeader = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const pathname = usePathname();
-  const supabase = createClient();
 
   // Logic for Search visibility (Only on main store page)
   const isStorePage = pathname === '/main/store';
@@ -59,19 +59,21 @@ export const HomeHeader = () => {
 
     const fetchAddressAndNotifications = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        // ✅ Check for session via NextAuth hook
+        // Ensure your authOptions callbacks expose the accessToken
+        const token = (session as any)?.accessToken || (session as any)?.user?.accessToken;
         
-        if (!session) {
+        if (!session || !token) {
           setDeliveryAddress({ label: 'Guest', details: 'Login to set address' });
           return;
         }
 
         const [addressRes, notifRes] = await Promise.all([
           fetch(`${API_URL}/users/addresses`, {
-            headers: { Authorization: `Bearer ${session.access_token}` }
+            headers: { Authorization: `Bearer ${token}` } // ✅ Use NextAuth Token
           }),
           fetch(`${API_URL}/notifications`, {
-            headers: { Authorization: `Bearer ${session.access_token}` }
+            headers: { Authorization: `Bearer ${token}` } // ✅ Use NextAuth Token
           })
         ]);
 
@@ -89,8 +91,11 @@ export const HomeHeader = () => {
         }
 
         if (notifRes.ok) {
-          const notifications = await notifRes.json();
-          const unread = notifications.filter((n: any) => !n.isRead).length;
+          const response = await notifRes.json();
+          // ✅ FIX: Handle both Array (legacy) and Object (paginated) responses safely
+          const notificationsList = Array.isArray(response) ? response : (response.data || []);
+          
+          const unread = notificationsList.filter((n: any) => !n.isRead).length;
           setUnreadCount(unread);
         }
       } catch (error) {
@@ -99,7 +104,7 @@ export const HomeHeader = () => {
     };
 
     fetchAddressAndNotifications();
-  }, [searchParams, supabase.auth]);
+  }, [searchParams, session]); // ✅ Depend on session
 
   const toggleTheme = () => {
     setTheme(theme === 'dark' ? 'light' : 'dark');

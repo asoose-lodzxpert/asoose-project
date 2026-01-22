@@ -5,8 +5,8 @@ import { useParams, useRouter } from 'next/navigation';
 import { Loader2, DollarSign, TrendingUp } from 'lucide-react';
 import Swal from 'sweetalert2';
 import useSWR from 'swr'; 
+import { getSession } from 'next-auth/react'; // ✅ Import NextAuth
 import { fetcher } from '@/app/super-admin/hooks/useSuperAdminFetch';
-import { createClient } from '../../../../../../utils/supabase/client';
 
 // --- Components ---
 import SkeletonLoader from './components/skeletonLoader';
@@ -76,11 +76,12 @@ export default function VendorDetailPage() {
 
   // Helper to get auth token
   const getAuthHeader = async () => {
-    const supabase = createClient();
-    const { data: { session } } = await supabase.auth.getSession();
+    // ✅ Get Session from NextAuth
+    const session = await getSession();
+    const token = (session as any)?.accessToken;
     return {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${session?.access_token || ''}`
+        'Authorization': `Bearer ${token || ''}`
     };
   };
 
@@ -298,15 +299,11 @@ const handleMessageVendor = async () => {
         if (!message) return Swal.showValidationMessage('Message cannot be empty');
         
         try {
-          // Get auth session
-          const session = await import('../../../../../../utils/supabase/client').then(m => m.createClient().auth.getSession());
+          const headers = await getAuthHeader();
           
           const response = await fetch(`${API_URL}/super-admin/vendors/${vendor?.id}/message`, {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${session.data.session?.access_token}`
-            },
+            headers,
             body: JSON.stringify({ message })
           });
 
@@ -464,7 +461,7 @@ const handleMessageVendor = async () => {
             {/* --- ACTIVITY --- */}
             {activeTab === 'Activity Log' && (
                 isActivityLoading ? <TabLoader /> : (
-                   <ActivityLogTab logs={activityLogs || []} />
+                    <ActivityLogTab logs={activityLogs || []} />
                 )
             )}
         </div>

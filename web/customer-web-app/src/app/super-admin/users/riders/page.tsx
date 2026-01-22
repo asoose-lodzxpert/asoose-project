@@ -12,7 +12,7 @@ import { AppAlert } from '../customers/[id]/alerts';
 import useSWR from 'swr'; 
 import { fetcher } from '../../hooks/useSuperAdminFetch';
 import RidersPageSkeleton from './component/skeleton';
-import { createClient } from '../../../../../utils/supabase/client'; // ✅ Import Supabase Client
+import { getSession } from 'next-auth/react'; // ✅ Import NextAuth
 
 // --- Types ---
 interface Rider {
@@ -60,13 +60,13 @@ export default function RidersPage() {
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  // ✅ FIX 2: Helper to get Auth Headers
+  // ✅ FIX 2: Helper to get Auth Headers using NextAuth
   const getAuthHeader = async () => {
-    const supabase = createClient();
-    const { data: { session } } = await supabase.auth.getSession();
+    const session = await getSession();
+    const token = (session as any)?.accessToken;
     return {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${session?.access_token || ''}`
+        'Authorization': `Bearer ${token || ''}`
     };
   };
 
@@ -303,9 +303,9 @@ export default function RidersPage() {
            <button 
              onClick={() => handleToggleStatus(row.original)}
              className={`p-1.5 rounded transition-colors ${
-                row.original.status === 'SUSPENDED' 
-                ? 'text-green-500 hover:bg-green-500/10' 
-                : 'text-orange-500 hover:bg-orange-500/10'
+               row.original.status === 'SUSPENDED' 
+               ? 'text-green-500 hover:bg-green-500/10' 
+               : 'text-orange-500 hover:bg-orange-500/10'
              }`}
              title={row.original.status === 'SUSPENDED' ? 'Activate' : 'Suspend'}
            >
@@ -392,12 +392,12 @@ export default function RidersPage() {
              </div>
            ) : (
              <DataTable 
-                data={riders} 
-                columns={columns} 
-                rowSelection={rowSelection} 
-                onRowSelectionChange={setRowSelection} 
-                pageSize={10} 
-                renderMobileCard={RiderMobileCard} 
+               data={riders} 
+               columns={columns} 
+               rowSelection={rowSelection} 
+               onRowSelectionChange={setRowSelection} 
+               pageSize={10} 
+               renderMobileCard={RiderMobileCard} 
              />
            )}
         </div>

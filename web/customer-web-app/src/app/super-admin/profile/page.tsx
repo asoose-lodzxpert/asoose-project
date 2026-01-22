@@ -10,9 +10,9 @@ import {
   Lock, Save, Loader2, Key, CheckCircle 
 } from 'lucide-react';
 import { toast } from 'react-toastify';
+import { getSession } from 'next-auth/react'; // ✅ Import NextAuth
 
 import { fetcher } from '../hooks/useSuperAdminFetch';
-import { createClient } from '../../../../utils/supabase/client';
 import ImageUpload from '@/app/main/components/ImageUpload';
 import AdminProfileSkeleton from './skeleton';
 
@@ -53,10 +53,11 @@ type ProfileValues = z.infer<typeof profileSchema>;
 type PasswordValues = z.infer<typeof passwordSchema>;
 
 export default function AdminProfilePage() {
-  const supabase = createClient();
   const [isUpdating, setIsUpdating] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
+  
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
   // Fetch Profile with explicit AdminProfile type
   const { data: profile, mutate, isLoading, error } = useSWR<AdminProfile>('/users/profile', fetcher);
@@ -72,7 +73,7 @@ export default function AdminProfilePage() {
     defaultValues: { newPassword: '', confirmPassword: '' }
   });
 
-  // Sync data when loaded - FIXED: Remove profileForm from dependencies
+  // Sync data when loaded
   useEffect(() => {
     if (profile) {
       profileForm.reset({
@@ -87,19 +88,19 @@ export default function AdminProfilePage() {
   const onUpdateProfile = async (values: ProfileValues) => {
     setIsUpdating(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      // ✅ Get Session from NextAuth
+      const session = await getSession();
+      const token = (session as any)?.accessToken;
       
-      if (!session) {
+      if (!token) {
         throw new Error('No active session. Please login again.');
       }
-
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
       const res = await fetch(`${API_URL}/users/profile`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`
+          'Authorization': `Bearer ${token}` // ✅ Use NextAuth Token
         },
         body: JSON.stringify(values)
       });
@@ -122,11 +123,31 @@ export default function AdminProfilePage() {
   const onUpdatePassword = async (values: PasswordValues) => {
     setIsChangingPassword(true);
     try {
-      const { error } = await supabase.auth.updateUser({ 
-        password: values.newPassword 
+      // ✅ Get Session from NextAuth
+      const session = await getSession();
+      const token = (session as any)?.accessToken;
+      
+      if (!token) {
+        throw new Error('No active session. Please login again.');
+      }
+
+      // ✅ Use Backend Endpoint instead of Supabase Client
+      const res = await fetch(`${API_URL}/users/change-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ 
+          password: values.newPassword,
+          confirmPassword: values.confirmPassword
+        })
       });
 
-      if (error) throw error;
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to update password');
+      }
 
       toast.success('Password changed successfully');
       passwordForm.reset();
@@ -143,16 +164,17 @@ export default function AdminProfilePage() {
     try {
       profileForm.setValue('avatar_url', url, { shouldDirty: true });
       
-      // Auto-save avatar immediately
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error('No active session');
+      // ✅ Get Session from NextAuth
+      const session = await getSession();
+      const token = (session as any)?.accessToken;
+      
+      if (!token) throw new Error('No active session');
 
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
       const res = await fetch(`${API_URL}/users/profile`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`
+          'Authorization': `Bearer ${token}` // ✅ Use NextAuth Token
         },
         body: JSON.stringify({ avatar_url: url })
       });

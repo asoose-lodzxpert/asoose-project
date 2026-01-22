@@ -10,12 +10,12 @@ import { DataTable } from '@/app/super-admin/component/datatable';
 import { createColumnHelper, ColumnDef } from '@tanstack/react-table';
 import Swal from 'sweetalert2';
 import useSWR from 'swr'; 
+import { getSession } from 'next-auth/react'; // ✅ Import NextAuth
 import { fetcher } from '../../hooks/useSuperAdminFetch';
 import VendorManagementPageSkeleton from './component/skeleton';
 import AddVendorModal from './component/addvendorModal';
 import { FilterSelect } from './component/filterSelect';
 import { StatCard } from './component/statcard';
-import { createClient } from '../../../../../utils/supabase/client';
 
 interface Vendor {
   id: string;
@@ -73,12 +73,13 @@ export default function VendorManagementPage() {
     setCurrentPage(1);
   }, [debouncedSearch, statusFilter, categoryFilter, verificationFilter]);
 
+  // ✅ Updated Auth Header using NextAuth
   const getAuthHeader = async () => {
-    const supabase = createClient();
-    const { data: { session } } = await supabase.auth.getSession();
+    const session = await getSession();
+    const token = (session as any)?.accessToken;
     return {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${session?.access_token || ''}`
+      'Authorization': `Bearer ${token || ''}`
     };
   };
 

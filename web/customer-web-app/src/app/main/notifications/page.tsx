@@ -19,57 +19,82 @@ interface Notification {
   createdAt: string;
 }
 
-// 1. FIX: Define the paginated response structure
 interface PaginatedNotifications {
   data: Notification[];
-  total: number;
-  page: number;
-  lastPage: number;
+  meta: {
+    total: number;
+    page: number;
+    pages: number;
+  };
 }
 
 export default function NotificationsPage() {
   const [activeTab, setActiveTab] = useState<'all' | 'settings'>('all');
   
-  // 1. FIX: Update SWR type to the paginated object
   const { data: response, mutate, isLoading } = useSWR<PaginatedNotifications>(
     '/notifications',
     fetcher
   );
 
-  // 2. FIX: Safely extract the notifications array
   const notifications = response?.data || [];
+
+  const handleMarkAsRead = async (id: string, currentReadStatus: boolean) => {
+    // Prevent API call if already read
+    if (currentReadStatus) return;
+
+    // Optimistic Update
+    if (response) {
+      mutate({
+        ...response,
+        data: response.data.map((n) => 
+          n.id === id ? { ...n, isRead: true } : n
+        )
+      }, false);
+    }
+
+    try {
+      // Calls the specific route: PATCH /notifications/:id/read
+      await fetcher(`/notifications/${id}/read`, { method: 'PATCH' });
+    } catch (err) {
+      toast.error('Failed to mark as read');
+      mutate(); // Revert on error
+    }
+  };
 
   const handleMarkAllRead = async () => {
     try {
-      await fetcher('/notifications/read-all', { method: 'PATCH' } as any);
-      
-      // 3. FIX: Update optimistic mutate to preserve object structure
+      // Optimistic Update
       if (response) {
         mutate({
           ...response,
           data: response.data.map(n => ({ ...n, isRead: true }))
         }, false);
       }
-      
+
+      await fetcher('/notifications/read-all', { method: 'PATCH' });
       toast.success('Inbox updated');
     } catch (err) {
       toast.error('Failed to update notifications');
+      mutate();
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation(); // Prevent triggering handleMarkAsRead when deleting
+    
     try {
-      await fetcher(`/notifications/${id}`, { method: 'DELETE' } as any);
-      
-      // 3. FIX: Update optimistic mutate to preserve object structure
+      // Optimistic Update
       if (response) {
         mutate({
           ...response,
           data: response.data.filter(n => n.id !== id)
         }, false);
       }
+      
+      await fetcher(`/notifications/${id}`, { method: 'DELETE' });
     } catch (err) {
       toast.error('Could not delete notification');
+      mutate();
     }
   };
 
@@ -96,18 +121,17 @@ export default function NotificationsPage() {
             >
               Inbox
             </button>
-            <button 
+            {/* <button 
               onClick={() => setActiveTab('settings')}
               className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'settings' ? 'bg-yellow-500 text-black' : 'text-gray-500'}`}
             >
               Settings
-            </button>
+            </button> */}
           </div>
         </div>
 
         {activeTab === 'all' ? (
           <div className="space-y-4">
-            {/* 2. FIX: Call .some() on the extracted array */}
             {notifications.some(n => !n.isRead) && (
               <button onClick={handleMarkAllRead} className="text-xs font-bold text-yellow-600 dark:text-yellow-500 uppercase tracking-widest ml-auto block">
                 Mark all read
@@ -119,11 +143,14 @@ export default function NotificationsPage() {
             ) : notifications.length === 0 ? (
               <EmptyState icon={Bell} title="No notifications yet" desc="When you get updates, they'll show up here." />
             ) : (
-              /* 2. FIX: Call .map() on the extracted array */
               notifications.map((notif) => (
-                <div key={notif.id} className={`group relative p-5 rounded-[2rem] border transition-all flex gap-4 ${
-                  notif.isRead ? 'bg-white/50 dark:bg-[#111] border-gray-100 dark:border-white/5' : 'bg-white dark:bg-[#151515] border-yellow-500/30'
-                }`}>
+                <div 
+                  key={notif.id} 
+                  onClick={() => handleMarkAsRead(notif.id, notif.isRead)}
+                  className={`group relative p-5 rounded-[2rem] border transition-all flex gap-4 cursor-pointer ${
+                    notif.isRead ? 'bg-white/50 dark:bg-[#111] border-gray-100 dark:border-white/5' : 'bg-white dark:bg-[#151515] border-yellow-500/30 shadow-sm'
+                  }`}
+                >
                   <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${notif.isRead ? 'bg-gray-100 dark:bg-white/5' : 'bg-yellow-500/10'}`}>
                     {getIcon(notif.type)}
                   </div>
@@ -136,7 +163,10 @@ export default function NotificationsPage() {
                     </div>
                     <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">{notif.message}</p>
                   </div>
-                  <button onClick={() => handleDelete(notif.id)} className="opacity-0 group-hover:opacity-100 p-2 bg-red-500 text-white rounded-full transition-all">
+                  <button 
+                    onClick={(e) => handleDelete(e, notif.id)} 
+                    className="opacity-0 group-hover:opacity-100 p-2 bg-red-500 text-white rounded-full transition-all hover:bg-red-600"
+                  >
                     <Trash2 size={12} />
                   </button>
                 </div>

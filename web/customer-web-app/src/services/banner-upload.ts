@@ -1,19 +1,33 @@
-import { createClient } from "../../utils/supabase/client";
+import { getSession } from "next-auth/react";
+
 export async function uploadBannerImage(file: File) {
-  const supabase = createClient();
-  const fileExt = file.name.split('.').pop();
-  const fileName = `${Math.random()}.${fileExt}`;
-  const filePath = `banners/${fileName}`;
+  // 1. Get Session for Token
+  const session = await getSession();
+  const token = (session as any)?.accessToken;
+  
+  if (!token) {
+    throw new Error("Authentication required to upload banner");
+  }
 
-  const { error: uploadError } = await supabase.storage
-    .from('marketplace_assets') // Ensure this bucket exists in Supabase
-    .upload(filePath, file);
+  // 2. Prepare Form Data
+  const formData = new FormData();
+  formData.append('file', file);
 
-  if (uploadError) throw uploadError;
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
 
-  const { data } = supabase.storage
-    .from('marketplace_assets')
-    .getPublicUrl(filePath);
+  // 3. Upload to Backend
+  const res = await fetch(`${API_URL}/storage/upload`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`
+    },
+    body: formData
+  });
 
-  return data.publicUrl; // Use this URL in your form submission
+  if (!res.ok) {
+    throw new Error('Banner upload failed');
+  }
+
+  const data = await res.json();
+  return data.url; // Expecting { url: "..." } from backend
 }
