@@ -1,3 +1,4 @@
+import * as Location from "expo-location";
 import React, {
   forwardRef,
   useEffect,
@@ -7,17 +8,16 @@ import React, {
 } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import MapView, {
-  Circle,
-  Polyline,
-  Marker,
   AnimatedRegion,
+  Circle,
   LatLng,
+  Marker,
+  Polyline,
 } from "react-native-maps";
-import * as Location from "expo-location";
 
+import { IconSymbol } from "@/components/ui/icon-symbol";
 import { Keys } from "@/config/keys";
 import { useDelivery } from "@/context/DeliveryContext";
-import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { getDirections } from "@/services/maps";
 
@@ -32,7 +32,7 @@ const MapCanvas = forwardRef<MapCanvasHandle>((_, ref) => {
   const primary = useThemeColor({}, "brandPrimary");
 
   const [location, setLocation] = useState<Location.LocationObject | null>(
-    null
+    null,
   );
   const [routeCoords, setRouteCoords] = useState<LatLng[]>([]);
   const [distanceLeft, setDistanceLeft] = useState("");
@@ -44,7 +44,7 @@ const MapCanvas = forwardRef<MapCanvasHandle>((_, ref) => {
       longitude: 0,
       latitudeDelta: 0,
       longitudeDelta: 0,
-    })
+    }),
   ).current;
 
   /** Location tracking */
@@ -80,8 +80,17 @@ const MapCanvas = forwardRef<MapCanvasHandle>((_, ref) => {
               latitudeDelta: 0.01,
               longitudeDelta: 0.01,
             },
-            800
+            800,
           );
+
+          // mapRef.current?.animateCamera({
+          //   center: {
+          //     latitude: loc.coords.latitude,
+          //     longitude: loc.coords.longitude,
+          //   },
+          //   pitch: 55,
+          //   zoom: 17,
+          // });
 
           (vehicleRef as any)
             .timing({
@@ -95,7 +104,7 @@ const MapCanvas = forwardRef<MapCanvasHandle>((_, ref) => {
               useNativeDriver: false,
             })
             .start();
-        }
+        },
       );
     })();
   }, []);
@@ -119,7 +128,7 @@ const MapCanvas = forwardRef<MapCanvasHandle>((_, ref) => {
       try {
         const { coordinates, distance, duration, error } = await getDirections(
           location.coords,
-          destination as { latitude: number; longitude: number }
+          destination as { latitude: number; longitude: number },
         );
 
         if (error) {
@@ -143,13 +152,13 @@ const MapCanvas = forwardRef<MapCanvasHandle>((_, ref) => {
     animateToPickup() {
       mapRef.current?.animateToRegion(
         { ...Keys.VENDOR_COORD, latitudeDelta: 0.01, longitudeDelta: 0.01 },
-        800
+        800,
       );
     },
     animateToDropoff() {
       mapRef.current?.animateToRegion(
         { ...Keys.CUSTOMER_COORD, latitudeDelta: 0.01, longitudeDelta: 0.01 },
-        800
+        800,
       );
     },
   }));
@@ -160,6 +169,11 @@ const MapCanvas = forwardRef<MapCanvasHandle>((_, ref) => {
     <>
       <MapView
         ref={mapRef}
+        provider="google"
+        mapType="standard"
+        showsTraffic={false}
+        pitchEnabled={true}
+        rotateEnabled={true}
         style={StyleSheet.absoluteFillObject}
         initialRegion={{
           latitude: location.coords.latitude,
@@ -167,7 +181,7 @@ const MapCanvas = forwardRef<MapCanvasHandle>((_, ref) => {
           latitudeDelta: 0.02,
           longitudeDelta: 0.02,
         }}
-        showsUserLocation={false}
+        showsUserLocation={true}
       >
         {/* Accuracy */}
         <Circle
@@ -204,9 +218,9 @@ const MapCanvas = forwardRef<MapCanvasHandle>((_, ref) => {
         )}
 
         {/* Vehicle */}
-        <Marker.Animated coordinate={vehicleRef as any}>
+        {/* <Marker.Animated coordinate={vehicleRef as any}>
           <IconSymbol name="navigation" size={32} color={primary} />
-        </Marker.Animated>
+        </Marker.Animated> */}
       </MapView>
 
       {distanceLeft && eta && (

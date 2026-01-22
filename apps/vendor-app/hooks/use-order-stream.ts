@@ -1,8 +1,7 @@
-import { useEffect, useRef, useState, useCallback } from "react";
-import EventSource from "react-native-sse";
 import { useAuth } from "@/context/AuthContext";
+import { useCallback, useEffect, useRef, useState } from "react";
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL;
+const EXPO_PUBLIC_API_URL = process.env.EXPO_PUBLIC_API_URL;
 
 export interface OrderStreamEvent {
   id: string;
@@ -24,106 +23,82 @@ interface UseOrderStreamOptions {
 export function useOrderStream(options: UseOrderStreamOptions = {}) {
   const { onNewOrder, onOrderUpdate, enabled = true } = options;
   const { getToken } = useAuth();
-  const eventSourceRef = useRef<EventSource | null>(null);
+  const pollingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(
+    null,
+  );
+  const lastOrderIdRef = useRef<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
-    null
-  );
-  const reconnectAttemptsRef = useRef(0);
 
-  const MAX_RECONNECT_ATTEMPTS = 5;
-  const RECONNECT_DELAY = 3000; // 3 seconds
+  const POLL_INTERVAL = 3000; // Poll every 3 seconds
 
   const cleanup = useCallback(() => {
-    if (eventSourceRef.current) {
-      eventSourceRef.current.close();
-      eventSourceRef.current = null;
-    }
-    if (reconnectTimeoutRef.current) {
-      clearTimeout(reconnectTimeoutRef.current);
-      reconnectTimeoutRef.current = null;
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
     }
     setIsConnected(false);
   }, []);
 
-  const connect = useCallback(async () => {
-    const authToken = await getToken();
-
-    if (!authToken || !enabled) {
-      return;
-    }
-
-    if (eventSourceRef.current) {
-      return;
-    }
-
-    const url = `${API_URL}/vendor/orders/stream`;
-
+  const fetchLatestOrders = useCallback(async () => {
     try {
-      const es = new EventSource(url, {
-        headers: {
-          Authorization: `Bearer ${authToken}`,
+      const authToken = await getToken();
+      if (!authToken || !enabled) {
+        return;
+      }
+
+      const response = await fetch(
+        `${EXPO_PUBLIC_API_URL}/vendor/orders?limit=1&status=pending`,
+        {
+          headers: {
+            Authorization: `Bearer ${authToken}`,
+            "Content-Type": "application/json",
+          },
         },
-        pollingInterval: 0, // Disable polling, use pure SSE
-      });
+      );
 
-      // Connection opened
-      es.addEventListener("open", () => {
-        setIsConnected(true);
-        setError(null);
-        reconnectAttemptsRef.current = 0; // Reset on successful connection
-      });
+      if (!response.ok) {
+        throw new Error("Failed to fetch orders");
+      }
 
-      // New order created (use 'message' event with type checking)
-      es.addEventListener("message", (event: any) => {
-        try {
-          // Check if this is an order.created or order.updated event
-          const eventType = event.type || "order.created";
-          const orderData: OrderStreamEvent = JSON.parse(event.data);
+      const data = await response.json();
 
-          if (eventType === "order.created" || !event.type) {
-            onNewOrder?.(orderData);
-          } else if (eventType === "order.updated") {
-            onOrderUpdate?.(orderData);
+      if (data.orders && data.orders.length > 0) {
+        const latestOrder = data.orders[0];
+
+        // Check if this is a new order
+        if (lastOrderIdRef.current !== latestOrder.id) {
+          // First time or new order detected
+          if (lastOrderIdRef.current !== null) {
+            onNewOrder?.(latestOrder);
           }
-        } catch (err) {
-          // Silent fail
+          lastOrderIdRef.current = latestOrder.id;
         }
-      });
+      }
 
-      // Connection error
-      es.addEventListener("error", (event: any) => {
-        setIsConnected(false);
-        setError("Connection lost");
-
-        // Auto-reconnect with exponential backoff
-        if (reconnectAttemptsRef.current < MAX_RECONNECT_ATTEMPTS) {
-          const delay =
-            RECONNECT_DELAY * Math.pow(2, reconnectAttemptsRef.current);
-
-          reconnectTimeoutRef.current = setTimeout(() => {
-            cleanup();
-            reconnectAttemptsRef.current += 1;
-            connect();
-          }, delay);
-        } else {
-          setError("Failed to connect. Using fallback polling.");
-          cleanup();
-        }
-      });
-
-      // Connection closed
-      es.addEventListener("close", () => {
-        setIsConnected(false);
-      });
-
-      eventSourceRef.current = es;
+      setIsConnected(true);
+      setError(null);
     } catch (err: any) {
-      setError(err.message || "Failed to connect");
+      setError(err.message || "Failed to fetch orders");
       setIsConnected(false);
     }
-  }, [getToken, enabled, onNewOrder, onOrderUpdate, cleanup]);
+  }, [getToken, enabled, onNewOrder]);
+
+  const connect = useCallback(async () => {
+    if (!enabled) {
+      return;
+    }
+
+    // Initial fetch
+    await fetchLatestOrders();
+
+    // Set up polling
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+    }
+
+    pollingIntervalRef.current = setInterval(fetchLatestOrders, POLL_INTERVAL);
+  }, [enabled, fetchLatestOrders]);
 
   // Connect on mount, cleanup on unmount
   useEffect(() => {

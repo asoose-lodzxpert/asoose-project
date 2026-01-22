@@ -1,0 +1,264 @@
+<html>
+  <head>
+    <meta charset='utf-8' />
+    <style>
+      body {
+        font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+        background-color: #f6f6f6;
+        margin: 0;
+        padding: 0;
+      }
+      .container {
+        max-width: 600px;
+        margin: 20px auto;
+        background-color: #ffffff;
+        border-radius: 8px;
+        border-left: 6px solid #3b82f6;
+        overflow: hidden;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+      .header {
+        background-color: #dbeafe;
+        padding: 20px 30px;
+        border-bottom: 1px solid #bfdbfe;
+        text-align: center;
+      }
+      .content {
+        padding: 30px;
+      }
+      .welcome-box {
+        background-color: #dbeafe;
+        border: 1px solid #bfdbfe;
+        padding: 20px;
+        border-radius: 6px;
+        margin: 20px 0;
+        text-align: center;
+      }
+      .step-box {
+        background-color: #f9fafb;
+        padding: 15px;
+        margin: 15px 0;
+        border-left: 4px solid #3b82f6;
+        border-radius: 4px;
+      }
+      .step-number {
+        background-color: #3b82f6;
+        color: white;
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        display: inline-block;
+        text-align: center;
+        line-height: 30px;
+        font-weight: bold;
+        margin-right: 10px;
+      }
+      .footer {
+        padding: 20px 30px;
+        background-color: #f9fafb;
+        text-align: center;
+        font-size: 12px;
+        color: #6b7280;
+      }
+      .btn {
+        background-color: #3b82f6;
+        color: #ffffff;
+        padding: 12px 24px;
+        text-decoration: none;
+        border-radius: 6px;
+        font-weight: bold;
+        display: inline-block;
+        margin-top: 20px;
+      }
+      .btn:hover {
+        background-color: #2563eb;
+      }
+      .checklist {
+        list-style: none;
+        padding: 0;
+      }
+      .checklist li {
+        padding: 10px;
+        margin: 5px 0;
+        background-color: #f9fafb;
+        border-radius: 4px;
+      }
+      .checklist li:before {
+        content: '✓ ';
+        color: #3b82f6;
+        font-weight: bold;
+        margin-right: 10px;
+      }
+      .info-box {
+        background-color: #fef9c3;
+        border: 1px solid #fef08a;
+        color: #713f12;
+        padding: 15px;
+        border-radius: 6px;
+        margin: 20px 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div class='container'>
+      <div class='header'>
+        <h1 style='margin: 0; color: #1e40af; font-size: 32px;'>🏍️ Welcome to
+          Asoose Riders!</h1>
+      </div>
+      <div class='content'>
+        <div class='welcome-box'>
+          <h2 style='color: #1e40af; margin: 0;'>Hi {{name}}! 👋</h2>
+          <p style='color: #3730a3; margin: 10px 0 0 0; font-size: 16px;'>
+            Thank you for joining the Asoose rider community!
+          </p>
+        </div>
+
+        <p style='color: #374151; line-height: 1.6;'>
+          Your rider account has been successfully created. We're thrilled to
+          have you as part of our growing team of professional riders delivering
+          excellence across the city.
+        </p>
+
+        <div class='info-box'>
+          <strong>⏳ Account Under Review</strong><br />
+          Your account is currently being verified by our team. This process
+          typically takes 24-48 hours. We'll notify you via email once your
+          account is approved and you can start accepting rides.
+        </div>
+
+        <h3 style='color: #1f2937; margin-top: 30px;'>📋 What happens next?</h3>
+
+        <div class='step-box'>
+          <span class='step-number'>1</span>
+          <strong style='color: #1f2937;'>Document Verification</strong>
+          <p style='color: #6b7280; margin: 10px 0 0 40px; font-size: 14px;'>
+            Our team will review your submitted documents (driver's license,
+            vehicle registration, and insurance).
+          </p>
+        </div>
+
+        <div class='step-box'>
+          <span class='step-number'>2</span>
+          <strong style='color: #1f2937;'>Account Approval</strong>
+          <p style='color: #6b7280; margin: 10px 0 0 40px; font-size: 14px;'>
+            Once verified, you'll receive an email confirmation and your account
+            will be activated.
+          </p>
+        </div>
+
+        <div class='step-box'>
+          <span class='step-number'>3</span>
+          <strong style='color: #1f2937;'>Start Earning</strong>
+          <p style='color: #6b7280; margin: 10px 0 0 40px; font-size: 14px;'>
+            Download the Asoose Rider app, go online, and start accepting ride
+            requests!
+          </p>
+        </div>
+
+        <h3 style='color: #1f2937; margin-top: 30px;'>✨ While you wait:</h3>
+
+        <ul class='checklist'>
+          <li>Download the Asoose Rider mobile app</li>
+          <li>Complete your profile with a professional photo</li>
+          <li>Review our rider guidelines and safety protocols</li>
+          <li>Ensure your vehicle is in good condition</li>
+          <li>Familiarize yourself with the app interface</li>
+        </ul>
+
+        <h3 style='color: #1f2937; margin-top: 30px;'>💰 Rider Benefits:</h3>
+
+        <ul style='color: #6b7280; line-height: 1.8;'>
+          <li><strong>Flexible Schedule:</strong>
+            Work when you want, how you want</li>
+          <li><strong>Competitive Earnings:</strong>
+            Earn more with our fair commission structure</li>
+          <li><strong>Weekly Payouts:</strong>
+            Get paid directly to your bank account</li>
+          <li><strong>24/7 Support:</strong>
+            We're here to help whenever you need us</li>
+          <li><strong>Insurance Coverage:</strong> Ride with peace of mind</li>
+          <li><strong>Bonuses & Incentives:</strong>
+            Earn extra with our reward programs</li>
+        </ul>
+
+        <div
+          style='background-color: #ecfdf5; border-left: 4px solid #10b981; padding: 15px; border-radius: 4px; margin: 20px 0; color: #065f46;'
+        >
+          <strong>💡 Pro Tip:</strong><br />
+          Riders who maintain high ratings and complete more trips get priority
+          access to high-value ride requests. Start strong and build your
+          reputation!
+        </div>
+
+        <h3 style='color: #1f2937; margin-top: 30px;'>📱 Get the App:</h3>
+        <p style='color: #6b7280;'>
+          Download the Asoose Rider app from your app store to get started:
+        </p>
+        <div style='text-align: center; margin: 20px 0;'>
+          <a href='#' style='display: inline-block; margin: 0 10px;'>
+            <img
+              src='https://upload.wikimedia.org/wikipedia/commons/7/78/Google_Play_Store_badge_EN.svg'
+              alt='Get it on Google Play'
+              style='height: 50px;'
+            />
+          </a>
+          <a href='#' style='display: inline-block; margin: 0 10px;'>
+            <img
+              src='https://upload.wikimedia.org/wikipedia/commons/3/3c/Download_on_the_App_Store_Badge.svg'
+              alt='Download on the App Store'
+              style='height: 50px;'
+            />
+          </a>
+        </div>
+
+        <h3 style='color: #1f2937; margin-top: 30px;'>Need Help?</h3>
+        <p style='color: #6b7280; line-height: 1.6;'>
+          If you have any questions or need assistance, our rider support team
+          is here to help:
+        </p>
+        <ul style='color: #6b7280;'>
+          <li>Email: rider-support@asoose.com</li>
+          <li>Phone: +234 (0) 800 ASOOSE</li>
+          <li>Live Chat: Available in the rider app</li>
+        </ul>
+
+        <div style='text-align: center; margin-top: 30px;'>
+          <p style='color: #6b7280; font-size: 14px;'>
+            Welcome aboard! We can't wait to see you on the road.
+          </p>
+          <p style='color: #3b82f6; font-weight: bold; font-size: 16px;'>
+            The Asoose Team 🚀
+          </p>
+        </div>
+      </div>
+
+      <div class='footer'>
+        <p style='margin: 5px 0;'>
+          ©
+          {{year}}
+          Asoose. All rights reserved.
+        </p>
+        <p style='margin: 5px 0; color: #9ca3af;'>
+          You're receiving this email because you registered as a rider on
+          Asoose.
+        </p>
+        <p style='margin: 5px 0;'>
+          <a
+            href='#'
+            style='color: #3b82f6; text-decoration: none; margin: 0 10px;'
+          >Rider Portal</a>
+          |
+          <a
+            href='#'
+            style='color: #3b82f6; text-decoration: none; margin: 0 10px;'
+          >Help Center</a>
+          |
+          <a
+            href='#'
+            style='color: #3b82f6; text-decoration: none; margin: 0 10px;'
+          >Contact Support</a>
+        </p>
+      </div>
+    </div>
+  </body>
+</html>

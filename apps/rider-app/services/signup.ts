@@ -1,6 +1,6 @@
 import { SignupForm } from "@/types/signup";
 
-const API_URL =
+const EXPO_PUBLIC_API_URL =
   process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api/v1";
 
 export interface SignupResponse {
@@ -52,7 +52,7 @@ export async function registerRider(
       },
     };
 
-    const res = await fetch(`${API_URL}/auth/rider/register`, {
+    const res = await fetch(`${EXPO_PUBLIC_API_URL}/auth/rider/register`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -90,7 +90,7 @@ export async function uploadDocument(
     // Append file with proper metadata
     formData.append("file", blob as any, `${type}-${Date.now()}.jpg`);
 
-    const res = await fetch(`${API_URL}/storage/upload-public`, {
+    const res = await fetch(`${EXPO_PUBLIC_API_URL}/storage/upload-public`, {
       method: "POST",
       body: formData,
       headers: {

@@ -1,6 +1,6 @@
 import { fetchWithAuth } from "./auth-fetch";
 
-const API_URL =
+const EXPO_PUBLIC_API_URL =
   process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api/v1";
 
 export type OrderStatus =
@@ -61,7 +61,7 @@ export interface OrdersResponse {
 export async function getAllOrders(
   status?: string,
   page: number = 1,
-  limit: number = 20
+  limit: number = 20,
 ): Promise<OrdersResponse> {
   try {
     const params = new URLSearchParams({
@@ -74,7 +74,7 @@ export async function getAllOrders(
     }
 
     const data = await fetchWithAuth(
-      `${API_URL}/riders/orders/history?${params}`
+      `${EXPO_PUBLIC_API_URL}/riders/orders/history?${params}`,
     );
     return data;
   } catch (error) {
