@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'react-toastify';
 import Swal from 'sweetalert2';
@@ -34,11 +34,17 @@ export default function ProfilePage() {
   const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
 
-  const [profile, setProfile] = useState<any>({});
+  const [profile, setProfile] = useState<any>(null); // Changed from {} to null
   const [orders, setOrders] = useState<any[]>([]);
   const [rides, setRides] = useState<any[]>([]);
   const [deliveries, setDeliveries] = useState<any[]>([]);
   const [addresses, setAddresses] = useState<any[]>([]);
+
+  // Use ref to track current tab for race condition prevention
+  const activeTabRef = useRef(activeTab);
+  useEffect(() => {
+    activeTabRef.current = activeTab;
+  }, [activeTab]);
 
   const defaultAddr = useMemo(() => 
     addresses.find((a: any) => a.isDefault) || addresses[0] || null, 
@@ -50,10 +56,15 @@ export default function ProfilePage() {
     return hour < 12 ? 'Good Morning' : hour < 18 ? 'Good Afternoon' : 'Good Evening';
   };
 
-  const fetchWithAuth = useCallback(async (path: string, accessToken: string) => {
+  // Enhanced fetch with 401 handling
+  const fetchWithAuth = useCallback(async (path: string, accessToken: string, options: RequestInit = {}) => {
     try {
       const res = await fetch(`${API_URL}${path}`, {
-        headers: { Authorization: `Bearer ${accessToken}` },
+        ...options,
+        headers: { 
+          ...options.headers,
+          Authorization: `Bearer ${accessToken}` 
+        },
       });
       
       if (res.status === 401) {
@@ -62,36 +73,51 @@ export default function ProfilePage() {
       }
       
       if (!res.ok) {
-        throw new Error(`HTTP ${res.status}`);
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || `HTTP ${res.status}`);
       }
       
       return await res.json();
-    } catch (e) {
+    } catch (e: any) {
       console.error(`Fetch error for ${path}`, e);
-      const resource = path.split('/').pop();
-      toast.error(`Failed to load ${resource}`);
-      return [];
+      
+      // Don't show toast for session expiry (already redirecting)
+      if (e.message !== 'Session expired') {
+        const resource = path.split('/').pop();
+        toast.error(e.message || `Failed to load ${resource}`);
+      }
+      
+      throw e;
     }
   }, []);
 
   const fetchTabData = useCallback(async (tab: ProfileTab, accessToken: string) => {
     setIsTabLoading(true);
+    
     try {
+      let data;
       switch(tab) {
         case 'orders':
-          setOrders(await fetchWithAuth('/users/orders', accessToken));
+          data = await fetchWithAuth('/users/orders', accessToken);
+          // Only update if still on same tab (race condition check)
+          if (activeTabRef.current === 'orders') setOrders(data || []);
           break;
         case 'rides':
-          setRides(await fetchWithAuth('/users/rides', accessToken));
+          data = await fetchWithAuth('/users/rides', accessToken);
+          if (activeTabRef.current === 'rides') setRides(data || []);
           break;
         case 'deliveries':
-          setDeliveries(await fetchWithAuth('/users/deliveries', accessToken));
+          data = await fetchWithAuth('/users/deliveries', accessToken);
+          if (activeTabRef.current === 'deliveries') setDeliveries(data || []);
           break;
       }
     } catch (e) {
       console.error("Tab load error", e);
     } finally {
-      setIsTabLoading(false);
+      // Only clear loading if still on same tab
+      if (activeTabRef.current === tab) {
+        setIsTabLoading(false);
+      }
     }
   }, [fetchWithAuth]);
 
@@ -120,20 +146,28 @@ export default function ProfilePage() {
           fetchWithAuth('/users/addresses', accessToken)
         ]);
 
+        // Handle profile data properly
         if (prof) {
-          if (Array.isArray(prof) && prof.length === 0) {
-            console.warn("Received empty array for profile. Check backend implementation.");
+          if (Array.isArray(prof)) {
+            console.warn("Profile returned as array, expected object");
+            setProfile(prof.length > 0 ? prof[0] : null);
+          } else {
+            setProfile(prof);
           }
-          setProfile(prof);
         }
 
-        if (addr) setAddresses(addr);
+        if (addr && Array.isArray(addr)) {
+          setAddresses(addr);
+        }
         
         await fetchTabData('orders', accessToken);
         
       } catch (err) {
         console.error("Profile init failed", err);
-        toast.error("Failed to load profile data");
+        // Don't show error if it's session expiry (already handled)
+        if ((err as Error).message !== 'Session expired') {
+          toast.error("Failed to load profile data");
+        }
       } finally {
         setIsPageLoading(false);
       }
@@ -146,29 +180,30 @@ export default function ProfilePage() {
   }, [session, status, router]);
 
   useEffect(() => {
-    if (token) fetchTabData(activeTab, token);
-  }, [activeTab, token]);
+    if (token && activeTab !== 'addresses' && activeTab !== 'settings') {
+      fetchTabData(activeTab, token);
+    }
+  }, [activeTab, token, fetchTabData]);
 
   const handleUpdateProfile = async (data: { name: string; phone: string }) => {
-    if (!token) return;
+    if (!token) {
+      toast.error("Session expired. Please log in again.");
+      return;
+    }
+
     try {
-      const res = await fetch(`${API_URL}/users/profile`, {
+      const updatedProfile = await fetchWithAuth('/users/profile', token, {
         method: 'PATCH',
-        headers: { 
-          'Content-Type': 'application/json', 
-          Authorization: `Bearer ${token}` 
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       });
       
-      if (!res.ok) throw new Error('Update failed');
-      
-      setProfile((prev: any) => ({ ...prev, ...data }));
-      toast.success("Profile updated");
+      setProfile((prev: any) => ({ ...prev, ...updatedProfile }));
+      toast.success("Profile updated successfully");
       setIsEditProfileOpen(false);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Profile update error:", err);
-      toast.error("Update failed");
+      toast.error(err.message || "Failed to update profile");
     }
   };
 
@@ -179,33 +214,14 @@ export default function ProfilePage() {
     }
 
     try {
-      const res = await fetch(`${API_URL}/users/addresses`, {
+      await fetchWithAuth('/users/addresses', token, {
         method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json', 
-          Authorization: `Bearer ${token}` 
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(addressData),
       });
 
-      let data;
-      const text = await res.text();
-      try {
-        data = text ? JSON.parse(text) : {};
-      } catch (e) {
-        console.error("Could not parse backend response:", text);
-        throw new Error(`Invalid backend response (Status: ${res.status})`);
-      }
-
-      if (!res.ok) {
-        const message = data.message 
-          ? (Array.isArray(data.message) ? data.message.join(', ') : data.message)
-          : data.error || "Failed to create address";
-        throw new Error(message);
-      }
-
       const updatedAddresses = await fetchWithAuth('/users/addresses', token);
-      setAddresses(updatedAddresses);
+      setAddresses(updatedAddresses || []);
       setIsAddressModalOpen(false);
       toast.success("Address added successfully");
       
@@ -216,37 +232,52 @@ export default function ProfilePage() {
   };
 
   const handleDeleteAccount = async () => {
-    if (!token) return;
+    if (!token) {
+      toast.error("Session expired. Please log in again.");
+      return;
+    }
     
+    const isDark = document.documentElement.classList.contains('dark');
     const result = await Swal.fire({
-      title: 'Are you sure?',
-      text: "You won't be able to revert this!",
+      title: 'Delete Account?',
+      text: "This action cannot be undone. All your data will be permanently deleted.",
       icon: 'warning',
       showCancelButton: true,
-      confirmButtonColor: '#d33',
-      confirmButtonText: 'Yes, delete it!'
+      confirmButtonColor: '#dc2626',
+      cancelButtonColor: '#6b7280',
+      confirmButtonText: 'Yes, delete my account',
+      cancelButtonText: 'Cancel',
+      background: isDark ? '#1a1a1a' : '#fff',
+      color: isDark ? '#fff' : '#000',
     });
 
     if (result.isConfirmed) {
       try {
-        const res = await fetch(`${API_URL}/users/profile`, {
+        await fetchWithAuth('/users/profile', token, {
           method: 'DELETE',
-          headers: { Authorization: `Bearer ${token}` },
         });
 
-        if (!res.ok) throw new Error('Delete failed');
+        await Swal.fire({
+          title: 'Account Deleted',
+          text: 'Your account has been successfully deleted.',
+          icon: 'success',
+          background: isDark ? '#1a1a1a' : '#fff',
+          color: isDark ? '#fff' : '#000',
+        });
 
         await signOut({ callbackUrl: '/' });
-        toast.success('Account deleted successfully');
-      } catch (error) {
+      } catch (error: any) {
         console.error(error);
-        toast.error('Failed to delete account');
+        toast.error(error.message || 'Failed to delete account');
       }
     }
   };
 
   const handleDeleteAddress = async (id: string) => {
-    if (!token) return;
+    if (!token) {
+      toast.error("Session expired. Please log in again.");
+      return;
+    }
     
     const isDark = document.documentElement.classList.contains('dark');
     const result = await Swal.fire({
@@ -254,34 +285,55 @@ export default function ProfilePage() {
       text: 'This action cannot be undone.',
       icon: 'warning',
       showCancelButton: true,
-      confirmButtonColor: '#d33',
+      confirmButtonColor: '#dc2626',
       cancelButtonColor: '#6b7280',
       confirmButtonText: 'Delete',
+      cancelButtonText: 'Cancel',
       background: isDark ? '#1a1a1a' : '#fff',
       color: isDark ? '#fff' : '#000',
     });
 
     if (result.isConfirmed) {
       try {
-        const res = await fetch(`${API_URL}/users/addresses/${id}`, { 
-          method: 'DELETE', 
-          headers: { Authorization: `Bearer ${token}` }
+        await fetchWithAuth(`/users/addresses/${id}`, token, {
+          method: 'DELETE',
         });
 
-        if (!res.ok) throw new Error('Delete failed');
-
         setAddresses(prev => prev.filter(a => a.id !== id));
-        toast.success('Address deleted');
-      } catch (err) {
+        toast.success('Address deleted successfully');
+      } catch (err: any) {
         console.error('Delete error:', err);
-        toast.error('Delete failed');
-        const refreshed = await fetchWithAuth('/users/addresses', token);
-        setAddresses(refreshed);
+        toast.error(err.message || 'Failed to delete address');
+        
+        // Refresh addresses on error
+        try {
+          const refreshed = await fetchWithAuth('/users/addresses', token);
+          setAddresses(refreshed || []);
+        } catch (refreshErr) {
+          console.error('Failed to refresh addresses:', refreshErr);
+        }
       }
     }
   };
 
   if (status === 'loading' || isPageLoading) return <ProfileSkeleton />;
+
+  // Handle null profile
+  if (!profile) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-[#0a0a0a] flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-gray-500 mb-4">Failed to load profile</p>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="px-6 py-2 bg-yellow-500 text-white rounded-lg font-bold"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-[#0a0a0a] text-gray-900 dark:text-gray-100 pb-24">
@@ -371,11 +423,17 @@ export default function ProfilePage() {
                    <MapPin className="w-6 h-6" />
                    <span>Add New Address</span>
                  </button>
-                 <div className="grid sm:grid-cols-2 gap-4">
-                   {addresses.map((addr) => (
-                     <AddressCard key={addr.id} {...addr} onDelete={handleDeleteAddress} />
-                   ))}
-                 </div>
+                 {addresses.length === 0 ? (
+                   <div className="text-center py-12 text-gray-500">
+                     No addresses saved yet
+                   </div>
+                 ) : (
+                   <div className="grid sm:grid-cols-2 gap-4">
+                     {addresses.map((addr) => (
+                       <AddressCard key={addr.id} {...addr} onDelete={handleDeleteAddress} />
+                     ))}
+                   </div>
+                 )}
                </div>
              )}
 
@@ -406,8 +464,11 @@ export default function ProfilePage() {
                      </div>
                      <div>
                        <h4 className="font-bold text-red-600">Delete Account</h4>
-                       <p className="text-sm text-gray-500 mt-1 mb-4">This action is irreversible.</p>
-                       <button className="px-4 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 font-bold text-sm rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors">
+                       <p className="text-sm text-gray-500 mt-1 mb-4">This action is irreversible. All data will be permanently deleted.</p>
+                       <button 
+                         onClick={handleDeleteAccount}
+                         className="px-4 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 font-bold text-sm rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
+                       >
                          Request Deletion
                        </button>
                      </div>
@@ -429,7 +490,7 @@ export default function ProfilePage() {
       
       <EditProfileModal 
         isOpen={isEditProfileOpen} 
-        initialData={{ name: profile.name, phone: profile.phone }} 
+        initialData={{ name: profile?.name || '', phone: profile?.phone || '' }} 
         onClose={() => setIsEditProfileOpen(false)} 
         onSave={handleUpdateProfile} 
       />

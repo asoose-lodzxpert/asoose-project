@@ -4,6 +4,8 @@ import Image from 'next/image';
 interface RestaurantProps {
   name: string;
   image?: string | null;
+  banner?: string | null;   // ✅ Added banner prop
+  logo?: string | null;      // ✅ Added logo prop
   rating: number;
   time: string;
   delivery?: string;
@@ -15,6 +17,8 @@ interface RestaurantProps {
 export const RestaurantCard = ({ 
   name, 
   image, 
+  banner,     // ✅ Destructure banner
+  logo,       // ✅ Destructure logo
   rating, 
   time, 
   delivery,
@@ -24,22 +28,27 @@ export const RestaurantCard = ({
 }: RestaurantProps) => {
   
   const deliveryText = delivery || (deliveryFee ? `₦${deliveryFee}` : 'Free');
-  const safeImage = image || '/placeholder-store.jpg'; // Ensure you have a placeholder in /public
+  
+  // ✅ Use banner for main image, fallback to image/logo, then placeholder
+  const mainImage = banner || image || logo || '/placeholder-store.jpg';
+  
+  // ✅ Use logo for overlay, fallback to image/banner, then placeholder
+  const logoImage = logo || image || banner || '/placeholder-logo.png';
 
   return (
     <div className="group relative bg-white dark:bg-[#151515] rounded-2xl p-3 shadow-sm border border-gray-100 dark:border-white/5 active:scale-[0.98] transition-all duration-300 hover:shadow-md cursor-pointer h-full flex flex-col">
       
-      {/* Image Area */}
+      {/* Image Area - ✅ Using banner as main image */}
       <div className="aspect-[4/3] w-full bg-gray-100 dark:bg-white/5 rounded-xl relative overflow-hidden mb-3">
         <Image 
-          src={safeImage} 
+          src={mainImage} 
           alt={name}
           fill
           className="object-cover transition-transform duration-700 group-hover:scale-110"
           sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
         />
         
-        {/* Gradient Overlay for better text visibility if needed */}
+        {/* Gradient Overlay for better text visibility */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
 
         {discount && (
@@ -48,10 +57,15 @@ export const RestaurantCard = ({
           </div>
         )}
         
-        {/* Logo Overlay */}
+        {/* Logo Overlay - ✅ Using logo prop for circular overlay */}
         <div className="absolute -bottom-3 left-3 w-10 h-10 bg-white dark:bg-[#222] rounded-full p-1 shadow-md z-10 flex items-center justify-center">
           <div className="w-full h-full bg-gray-100 dark:bg-white/10 rounded-full flex items-center justify-center text-[8px] font-bold overflow-hidden relative">
-             <Image src={safeImage} alt="logo" fill className="object-cover" />
+             <Image 
+               src={logoImage} 
+               alt={`${name} logo`} 
+               fill 
+               className="object-cover" 
+             />
           </div>
         </div>
       </div>
@@ -71,13 +85,15 @@ export const RestaurantCard = ({
           <span className="flex items-center gap-1"><Bike className="w-3 h-3" /> {deliveryText}</span>
         </div>
 
-        <div className="flex flex-wrap gap-1 mt-3">
-          {tags.slice(0, 3).map(tag => (
-            <span key={tag} className="text-[10px] font-bold text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-white/5 px-2 py-1 rounded-md">
-              {tag}
-            </span>
-          ))}
-        </div>
+        {tags.length > 0 && (
+          <div className="flex flex-wrap gap-1 mt-3">
+            {tags.slice(0, 3).map(tag => (
+              <span key={tag} className="text-[10px] font-bold text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-white/5 px-2 py-1 rounded-md">
+                {tag}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

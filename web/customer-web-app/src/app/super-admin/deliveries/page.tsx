@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
-import useSWR from 'swr'; // ✅ Import SWR
+import useSWR from 'swr'; 
 import { 
   Download, Search, Eye, Filter, Package, Truck, 
   FileText, Trash2, Map as MapIcon, List, UserPlus, 
@@ -16,6 +16,7 @@ import { DataTable } from '@/app/super-admin/component/datatable';
 import { DeliveryCard } from './components/deliverycard';
 import { DeliveriesPageSkeleton } from './components/skeleton';
 import { fetcher } from '../hooks/useSuperAdminFetch';
+
 // --- Types ---
 interface Delivery {
   id: string;
@@ -26,7 +27,7 @@ interface Delivery {
   status: string;
   pickup: string;
   dropoff: string;
-  eta: string;
+  eta?: string; // ✅ FIX: Made optional to handle missing data
 }
 
 interface ApiResponse {
@@ -136,8 +137,11 @@ export default function DeliveriesPage() {
      toast.info(`Generating manifest for ${count} orders...`);
   };
 
-  const isLate = (eta: string, status: string) => {
+  // ✅ FIX: Updated signature to allow undefined eta and added safety check
+  const isLate = (eta: string | undefined, status: string) => {
      if(status === 'Delivered' || status === 'Cancelled') return false;
+     // Safety check: if eta is missing, we can't check 'includes'
+     if (!eta) return false; 
      return eta.includes('Late') || Math.random() > 0.8; 
   };
 

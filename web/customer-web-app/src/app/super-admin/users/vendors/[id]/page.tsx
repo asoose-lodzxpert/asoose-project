@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Loader2, DollarSign, TrendingUp } from 'lucide-react';
 import Swal from 'sweetalert2';
@@ -166,7 +166,6 @@ export default function VendorDetailPage() {
 
     setIsSaving(true);
     try {
-      // FIX: Using fetcher prevents path duplication and handles auth automatically
       await fetcher(`/super-admin/vendors/${vendor?.id}`, {
         method: 'PATCH',
         body: JSON.stringify(formData),
@@ -302,7 +301,7 @@ export default function VendorDetailPage() {
   if (error || !vendor) return <div className="min-h-screen bg-[#0F172A] flex items-center justify-center text-gray-400">Vendor not found</div>;
 
   return (
-    <div className="max-w-7xl mx-auto px-4 md:px-6 space-y-6 pb-20">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6 pb-20">
       
       <VendorHeader 
         name={vendor.name} 
@@ -316,7 +315,8 @@ export default function VendorDetailPage() {
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pt-2">
-        <div className="space-y-6">
+        {/* Left Column (Info) */}
+        <div className="space-y-6 order-2 lg:order-1">
             <HealthScoreCard totalOrders={vendor.totalOrders} />
             <BusinessInfoCard 
               vendor={vendor}
@@ -326,8 +326,9 @@ export default function VendorDetailPage() {
             />
         </div>
 
-        <div className="lg:col-span-2 space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Right Column (Metrics & Charts) */}
+        <div className="lg:col-span-2 space-y-6 order-1 lg:order-2 min-w-0">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <RevenueCard 
               title="Total Revenue" 
               amount={<Currency amount={vendor.totalRevenue} />} 
@@ -349,12 +350,12 @@ export default function VendorDetailPage() {
       </div>
 
       <div className="mt-8 w-full bg-[#1E293B] border-t border-gray-800 rounded-t-xl overflow-hidden min-h-[500px]">
-        <div className="flex border-b border-gray-800 overflow-x-auto px-6 hide-scrollbar">
+        <div className="flex border-b border-gray-800 overflow-x-auto px-4 md:px-6 hide-scrollbar">
           {['Order History', 'Products', 'Payouts', 'Documents', 'Reviews', 'Activity Log'].map((tab) => (
             <button 
               key={tab} 
               onClick={() => setActiveTab(tab)} 
-              className={`px-6 py-4 text-sm font-bold whitespace-nowrap border-b-2 transition-all ${
+              className={`px-4 md:px-6 py-4 text-sm font-bold whitespace-nowrap border-b-2 transition-all ${
                 activeTab === tab 
                   ? 'text-yellow-500 border-yellow-500 bg-[#0F172A]/50' 
                   : 'text-gray-400 border-transparent hover:text-white'
@@ -365,7 +366,7 @@ export default function VendorDetailPage() {
           ))}
         </div>
 
-        <div className="p-6">
+        <div className="p-4 md:p-6">
             {activeTab === 'Order History' && (
                 <OrderHistoryTab orders={vendor.orders || []} />
             )}

@@ -1,15 +1,16 @@
+import Link from 'next/link'; // ✅ Import Link
 import { Package, FileText, MapPin, MoreVertical, Truck } from 'lucide-react';
 
 type Delivery = {
   id: string;
-  type: string;
+  type?: string;
   sender: string;
   recipient: string;
   driver: string;
   status: string;
   pickup: string;
   dropoff: string;
-  eta: string;
+  eta?: string;
 };
 
 const getStatusColor = (status: string) => {
@@ -28,7 +29,7 @@ export function DeliveryCard({ delivery }: { delivery: Delivery }) {
       {/* Header: ID + Type */}
       <div className="flex justify-between items-start mb-3 gap-2">
         <div className="flex items-center gap-2">
-          {delivery.type.includes('Document') ? 
+          {delivery.type?.includes('Document') ? 
             <FileText className="w-4 h-4 text-blue-400 flex-shrink-0" /> : 
             <Package className="w-4 h-4 text-orange-400 flex-shrink-0" />
           }
@@ -43,7 +44,7 @@ export function DeliveryCard({ delivery }: { delivery: Delivery }) {
 
       {/* Type Badge */}
       <div className="mb-3">
-        <span className="text-xs text-gray-400 font-medium">{delivery.type}</span>
+        <span className="text-xs text-gray-400 font-medium">{delivery.type || 'Package'}</span>
       </div>
 
       {/* Route Information */}
@@ -83,16 +84,21 @@ export function DeliveryCard({ delivery }: { delivery: Delivery }) {
         </div>
         <div className="flex justify-between gap-2">
           <span className="text-gray-500 flex-shrink-0">ETA:</span>
-          <span className="text-gray-300 font-mono text-xs flex-shrink-0">{delivery.eta}</span>
+          <span className="text-gray-300 font-mono text-xs flex-shrink-0">{delivery.eta || 'N/A'}</span>
         </div>
       </div>
 
       {/* Actions */}
       <div className="flex gap-2 pt-3 border-t border-gray-800">
-        <button className="flex-1 flex items-center justify-center gap-2 py-2 bg-gray-700/50 rounded-lg hover:bg-white/10 text-gray-300 hover:text-white transition-colors">
+        {/* ✅ FIX: Changed button to Link and added href */}
+        <Link 
+          href={`/super-admin/deliveries/${delivery.id}`}
+          className="flex-1 flex items-center justify-center gap-2 py-2 bg-gray-700/50 rounded-lg hover:bg-white/10 text-gray-300 hover:text-white transition-colors"
+        >
           <Truck className="w-4 h-4" />
           <span className="text-sm">Track</span>
-        </button>
+        </Link>
+        
         <button className="px-4 py-2 bg-gray-700/50 rounded-lg hover:bg-white/10 text-gray-300 hover:text-white transition-colors">
           <MoreVertical className="w-4 h-4" />
         </button>

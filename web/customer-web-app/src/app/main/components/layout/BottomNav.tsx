@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ShoppingBag, Car, Package, Settings, User } from 'lucide-react';
+import { ShoppingBag, Car, Package, User } from 'lucide-react';
 
 const NavItem = ({ 
   icon: Icon, 
@@ -41,8 +41,15 @@ export default function BottomNav() {
     { icon: User, label: 'Profile', href: '/main/profile' }
   ];
 
+  const isActive = (href: string) => {
+    // If the link is exactly /main, active only on exact match (optional safety)
+    if (href === '/main') return pathname === href;
+    // Otherwise check if current path starts with the href
+    return pathname?.startsWith(href);
+  };
+
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-[#0a0a0a] border-t border-gray-100 dark:border-white/5 py-2 px-6 z-50">
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-[#0a0a0a] border-t border-gray-100 dark:border-white/5 py-2 px-6 z-50 safe-area-bottom">
       <div className="flex justify-between items-end max-w-md mx-auto">
         {navItems.map((item) => (
           <NavItem
@@ -50,7 +57,7 @@ export default function BottomNav() {
             icon={item.icon}
             label={item.label}
             href={item.href}
-            active={pathname === item.href}
+            active={isActive(item.href)}
           />
         ))}
       </div>

@@ -7,7 +7,7 @@ import {
   Download, Plus, Search, Eye, Trash2, Copy, UserCheck, X, CheckCircle, AlertCircle, Filter, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { DataTable } from '@/app/super-admin/component/datatable';
-import { createColumnHelper, ColumnDef, PaginationState } from '@tanstack/react-table'; // ✅ Import PaginationState
+import { createColumnHelper, ColumnDef, PaginationState } from '@tanstack/react-table';
 import Swal from 'sweetalert2';
 import useSWR from 'swr'; 
 import { getSession } from 'next-auth/react'; 
@@ -60,9 +60,8 @@ export default function VendorManagementPage() {
   const [isProcessingBulk, setIsProcessingBulk] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
-  // ✅ Use PaginationState compatible with TanStack Table
   const [pagination, setPagination] = useState<PaginationState>({
-    pageIndex: 0, // TanStack is 0-indexed
+    pageIndex: 0,
     pageSize: 20,
   });
   
@@ -87,7 +86,7 @@ export default function VendorManagementPage() {
 
   const queryString = useMemo(() => {
     const params = new URLSearchParams({
-      page: (pagination.pageIndex + 1).toString(), // Convert back to 1-indexed for API
+      page: (pagination.pageIndex + 1).toString(),
       limit: pagination.pageSize.toString()
     });
     
@@ -110,7 +109,16 @@ export default function VendorManagementPage() {
     { revalidateOnFocus: false }
   );
 
-  const vendors = apiResponse?.data || [];
+  // ✅ FIX: Filter out 'SUSPENDED' vendors (used for soft delete in backend)
+  const vendors = useMemo(() => {
+    const rawData = apiResponse?.data || [];
+    return rawData.filter(v => {
+      // Backend sets status to SUSPENDED and appends -deleted- to slug on delete
+      // We filter based on status 'SUSPENDED' or explicit slug check if available
+      return v.status !== 'SUSPENDED' && !v.slug?.includes('-deleted-');
+    });
+  }, [apiResponse?.data]);
+
   const meta = apiResponse?.meta || { total: 0, page: 1, limit: 20, totalPages: 0 };
 
   const { 
@@ -121,8 +129,11 @@ export default function VendorManagementPage() {
     { revalidateOnFocus: false }
   );
 
+  // ✅ FIX: Filter 'SUSPENDED' from stats to ensure counts are accurate
   const stats = useMemo(() => {
-    const allVendors = statsResponse?.data || [];
+    const rawVendors = statsResponse?.data || [];
+    const allVendors = rawVendors.filter(v => v.status !== 'SUSPENDED' && !v.slug?.includes('-deleted-'));
+    
     return {
       total: allVendors.length,
       pending: allVendors.filter(v => v.verification === 'PENDING').length,
@@ -153,7 +164,7 @@ export default function VendorManagementPage() {
   const handleDelete = async (id: string) => {
     const result = await Swal.fire({
       title: 'Delete Vendor?',
-      text: "This acts as a soft-delete.",
+      text: "This acts as a soft-delete (Vendor will be hidden).",
       icon: 'warning',
       showCancelButton: true,
       confirmButtonColor: '#ef4444',
@@ -394,12 +405,6 @@ export default function VendorManagementPage() {
       header: 'Actions',
       cell: ({ row }) => (
         <div className="flex items-center gap-1">
-          {/* <button 
-            className="p-2 hover:bg-purple-500/10 rounded-lg text-gray-400 hover:text-purple-400 transition-colors" 
-            title="Impersonate"
-          >
-            <UserCheck className="w-4 h-4" />
-          </button> */}
           <Link href={`/super-admin/users/vendors/${row.original.slug || row.original.id}`}>
             <button 
               className="p-2 hover:bg-blue-500/10 rounded-lg text-gray-400 hover:text-blue-500 transition-colors" 
@@ -425,9 +430,6 @@ export default function VendorManagementPage() {
   return (
     <div className="min-h-screen bg-[#0F172A] p-4 md:p-6 overflow-x-hidden relative pb-20">
       <div className="max-w-7xl mx-auto flex flex-col gap-6">
-        
-        {/* ... (Header and Stats logic remains same, omitting for brevity) ... */}
-        {/* Use the header section from previous code */}
         
         <div className="flex flex-col gap-6">
           <div className="flex flex-col md:flex-row justify-between items-start gap-4">
@@ -538,7 +540,6 @@ export default function VendorManagementPage() {
                 rowSelection={rowSelection}
                 onRowSelectionChange={setRowSelection}
                 
-                // ✅ CORRECT FIX: Manual Pagination Setup
                 pageCount={meta.totalPages} 
                 pagination={pagination}
                 onPaginationChange={setPagination}
