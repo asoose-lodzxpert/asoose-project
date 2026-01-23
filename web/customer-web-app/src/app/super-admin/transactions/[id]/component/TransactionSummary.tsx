@@ -1,6 +1,8 @@
 import { DollarSign, CreditCard, AlertCircle, CheckCircle, XCircle, Clock } from 'lucide-react';
 import { CopyButton } from './CopyButton';
 import { TransactionDetail } from '../types';
+import { Currency } from '@/app/main/components/Currency'; // ✅ Added centralized formatter
+
 export const TransactionSummary = ({ txn }: { txn: TransactionDetail }) => {
   const isCredit = txn.type.includes('Payment') || txn.type.includes('Earning') || txn.type.includes('Top-up') || txn.type.includes('Received');
   
@@ -27,8 +29,10 @@ export const TransactionSummary = ({ txn }: { txn: TransactionDetail }) => {
             </div>
           </div>
           <div>
-            <h2 className="text-white text-3xl font-bold">
-              {isCredit ? '+' : '-'}${Math.abs(txn.amount).toFixed(2)}
+            <h2 className="text-white text-3xl font-bold flex items-center gap-1">
+              {/* ✅ Fixed: Using Currency component */}
+              <span>{isCredit ? '+' : '-'}</span>
+              <Currency amount={Math.abs(txn.amount)} />
             </h2>
             <p className="text-gray-400 text-sm">{txn.description}</p>
           </div>

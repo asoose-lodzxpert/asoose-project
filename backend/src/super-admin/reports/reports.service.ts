@@ -183,16 +183,17 @@ export class AnalyticsService {
         revenue: number;
       }>
     >`
-  SELECT 
-    "createdAt"::date as date, 
-    COUNT(*)::bigint as orders, 
-    SUM("total")::numeric as revenue
-  FROM "Order"
-  WHERE "createdAt" >= ${startDate}
-    AND status = ${OrderStatus.DELIVERED}
-  GROUP BY "createdAt"::date
-  ORDER BY date ASC
-`;
+      SELECT 
+        "createdAt"::date as date, 
+        COUNT(*)::bigint as orders, 
+        SUM("total")::numeric as revenue
+      FROM "Order"
+      WHERE "createdAt" >= ${startDate}
+        -- FIX: Explicit casting for OrderStatus enum in raw SQL
+        AND status = ${OrderStatus.DELIVERED}::"OrderStatus"
+      GROUP BY "createdAt"::date
+      ORDER BY date ASC
+    `;
 
     return results.map((row) => ({
       date: row.date.toISOString().split('T')[0],
@@ -206,12 +207,7 @@ export class AnalyticsService {
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 
     const [storeGrowth, orderGrowth, riderGrowth] = await Promise.all([
-      this.prisma.$queryRaw<
-        Array<{
-          month: string;
-          count: bigint;
-        }>
-      >`
+      this.prisma.$queryRaw<Array<{ month: string; count: bigint }>>`
         SELECT 
           TO_CHAR("createdAt", 'Mon YYYY') as month,
           COUNT(*)::bigint as count
@@ -220,12 +216,7 @@ export class AnalyticsService {
         GROUP BY TO_CHAR("createdAt", 'Mon YYYY'), DATE_TRUNC('month', "createdAt")
         ORDER BY DATE_TRUNC('month', "createdAt") ASC
       `,
-      this.prisma.$queryRaw<
-        Array<{
-          month: string;
-          count: bigint;
-        }>
-      >`
+      this.prisma.$queryRaw<Array<{ month: string; count: bigint }>>`
         SELECT 
           TO_CHAR("createdAt", 'Mon YYYY') as month,
           COUNT(*)::bigint as count
@@ -234,16 +225,12 @@ export class AnalyticsService {
         GROUP BY TO_CHAR("createdAt", 'Mon YYYY'), DATE_TRUNC('month', "createdAt")
         ORDER BY DATE_TRUNC('month', "createdAt") ASC
       `,
-      this.prisma.$queryRaw<
-        Array<{
-          month: string;
-          count: bigint;
-        }>
-      >`
+      this.prisma.$queryRaw<Array<{ month: string; count: bigint }>>`
         SELECT 
           TO_CHAR("createdAt", 'Mon YYYY') as month,
           COUNT(*)::bigint as count
-        FROM "RiderProfile"
+        -- FIX: Corrected table name from "RiderProfile" to "Rider"
+        FROM "Rider"
         WHERE "createdAt" >= ${sixMonthsAgo}
         GROUP BY TO_CHAR("createdAt", 'Mon YYYY'), DATE_TRUNC('month', "createdAt")
         ORDER BY DATE_TRUNC('month', "createdAt") ASC
@@ -256,31 +243,19 @@ export class AnalyticsService {
     >();
 
     storeGrowth.forEach((row) => {
-      const existing = monthMap.get(row.month) || {
-        stores: 0,
-        orders: 0,
-        riders: 0,
-      };
+      const existing = monthMap.get(row.month) || { stores: 0, orders: 0, riders: 0 };
       existing.stores = Number(row.count);
       monthMap.set(row.month, existing);
     });
 
     orderGrowth.forEach((row) => {
-      const existing = monthMap.get(row.month) || {
-        stores: 0,
-        orders: 0,
-        riders: 0,
-      };
+      const existing = monthMap.get(row.month) || { stores: 0, orders: 0, riders: 0 };
       existing.orders = Number(row.count);
       monthMap.set(row.month, existing);
     });
 
     riderGrowth.forEach((row) => {
-      const existing = monthMap.get(row.month) || {
-        stores: 0,
-        orders: 0,
-        riders: 0,
-      };
+      const existing = monthMap.get(row.month) || { stores: 0, orders: 0, riders: 0 };
       existing.riders = Number(row.count);
       monthMap.set(row.month, existing);
     });
@@ -299,12 +274,7 @@ export class AnalyticsService {
     const previousStartDate = new Date(startDate.getTime() - periodLength);
 
     const [currentBreakdown, previousBreakdown] = await Promise.all([
-      this.prisma.$queryRaw<
-        Array<{
-          category: string;
-          amount: number;
-        }>
-      >`
+      this.prisma.$queryRaw<Array<{ category: string; amount: number }>>`
         SELECT 
           s.type as category,
           SUM(o.total)::numeric as amount
@@ -312,16 +282,12 @@ export class AnalyticsService {
         INNER JOIN "Store" s ON o."storeId" = s.id
         WHERE o."createdAt" >= ${startDate}
           AND o."createdAt" <= ${endDate}
-          AND o.status = ${OrderStatus.DELIVERED}
+          -- FIX: Explicit casting for OrderStatus enum
+          AND o.status = ${OrderStatus.DELIVERED}::"OrderStatus"
         GROUP BY s.type
         ORDER BY amount DESC
       `,
-      this.prisma.$queryRaw<
-        Array<{
-          category: string;
-          amount: number;
-        }>
-      >`
+      this.prisma.$queryRaw<Array<{ category: string; amount: number }>>`
         SELECT 
           s.type as category,
           SUM(o.total)::numeric as amount
@@ -329,18 +295,14 @@ export class AnalyticsService {
         INNER JOIN "Store" s ON o."storeId" = s.id
         WHERE o."createdAt" >= ${previousStartDate}
           AND o."createdAt" < ${startDate}
-          AND o.status = ${OrderStatus.DELIVERED}
+          -- FIX: Explicit casting for OrderStatus enum
+          AND o.status = ${OrderStatus.DELIVERED}::"OrderStatus"
         GROUP BY s.type
       `,
     ]);
 
-    const previousMap = new Map(
-      previousBreakdown.map((p) => [p.category, Number(p.amount)]),
-    );
-    const totalRevenue = currentBreakdown.reduce(
-      (sum, item) => sum + Number(item.amount),
-      0,
-    );
+    const previousMap = new Map(previousBreakdown.map((p) => [p.category, Number(p.amount)]));
+    const totalRevenue = currentBreakdown.reduce((sum, item) => sum + Number(item.amount), 0);
 
     return currentBreakdown.map((item) => {
       const amount = Number(item.amount);
@@ -356,31 +318,20 @@ export class AnalyticsService {
   }
 
   private async getRatingsDistribution(): Promise<RatingsDistribution[]> {
-    const results = await this.prisma.$queryRaw<
-      Array<{
-        rating: number;
-        count: bigint;
-      }>
-    >`
-      SELECT 
-        rating,
-        COUNT(*)::bigint as count
+    const results = await this.prisma.$queryRaw<Array<{ rating: number; count: bigint }>>`
+      SELECT rating, COUNT(*)::bigint as count
       FROM "Review"
       GROUP BY rating
       ORDER BY rating DESC
     `;
 
     const totalReviews = results.reduce((sum, r) => sum + Number(r.count), 0);
-
     const ratingsMap = new Map(results.map((r) => [r.rating, Number(r.count)]));
 
     return [5, 4, 3, 2, 1].map((star) => ({
       star,
       count: ratingsMap.get(star) || 0,
-      percentage:
-        totalReviews > 0
-          ? ((ratingsMap.get(star) || 0) / totalReviews) * 100
-          : 0,
+      percentage: totalReviews > 0 ? ((ratingsMap.get(star) || 0) / totalReviews) * 100 : 0,
     }));
   }
 
@@ -402,56 +353,37 @@ export class AnalyticsService {
     const previousStartDate = new Date(startDate.getTime() - periodLength);
 
     const currentTopVendors = await this.prisma.$queryRaw<
-      Array<{
-        id: string;
-        name: string;
-        revenue: number;
-        orders: bigint;
-        rating: number;
-      }>
+      Array<{ id: string; name: string; revenue: number; orders: bigint; rating: number }>
     >`
       SELECT 
-        s.id,
-        s.name,
-        SUM(o.total)::numeric as revenue,
-        COUNT(o.id)::bigint as orders,
-        s.rating
+        s.id, s.name, SUM(o.total)::numeric as revenue, COUNT(o.id)::bigint as orders, s.rating
       FROM "Store" s
       INNER JOIN "Order" o ON o."storeId" = s.id
       WHERE o."createdAt" >= ${startDate}
         AND o."createdAt" <= ${endDate}
-        AND o.status = ${OrderStatus.DELIVERED}
+        -- FIX: Explicit casting for OrderStatus enum
+        AND o.status = ${OrderStatus.DELIVERED}::"OrderStatus"
       GROUP BY s.id, s.name, s.rating
       ORDER BY revenue DESC
       LIMIT ${limit}
     `;
 
-    if (currentTopVendors.length === 0) {
-      return [];
-    }
+    if (currentTopVendors.length === 0) return [];
 
     const storeIds = currentTopVendors.map((v) => v.id);
 
-    const previousRevenue = await this.prisma.$queryRaw<
-      Array<{
-        storeId: string;
-        revenue: number;
-      }>
-    >`
-      SELECT 
-        "storeId",
-        SUM(total)::numeric as revenue
+    const previousRevenue = await this.prisma.$queryRaw<Array<{ storeId: string; revenue: number }>>`
+      SELECT "storeId", SUM(total)::numeric as revenue
       FROM "Order"
       WHERE "createdAt" >= ${previousStartDate}
         AND "createdAt" < ${startDate}
-        AND status = ${OrderStatus.DELIVERED}
+        -- FIX: Explicit casting for OrderStatus enum
+        AND status = ${OrderStatus.DELIVERED}::"OrderStatus"
         AND "storeId" = ANY(${storeIds})
       GROUP BY "storeId"
     `;
 
-    const previousMap = new Map(
-      previousRevenue.map((p) => [p.storeId, Number(p.revenue)]),
-    );
+    const previousMap = new Map(previousRevenue.map((p) => [p.storeId, Number(p.revenue)]));
 
     return currentTopVendors.map((vendor) => ({
       id: vendor.id,
@@ -473,12 +405,10 @@ export class AnalyticsService {
 
   async exportAnalyticsToCSV(days: number = 30): Promise<string> {
     const data = await this.getAnalyticsReport(days);
-
     let csv = 'Date,Orders,Revenue\n';
     data.orderVolume.forEach((row) => {
       csv += `${row.date},${row.orders},${row.revenue}\n`;
     });
-
     return csv;
   }
 }
