@@ -1,7 +1,7 @@
 import { fetchWithAuth } from "./auth-fetch";
 
 const EXPO_PUBLIC_API_URL =
-  process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api/v1";
+  process.env.EXPO_PUBLIC_API_URL;
 
 export interface EarningsData {
   total: number;

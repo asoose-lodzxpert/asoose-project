@@ -20,6 +20,7 @@ import {
   DisbursePaymentDto,
   ProcessRefundDto,
 } from './dto/payment.dto';
+
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guards';
 import { Roles } from '../auth/roles.decorator';
@@ -30,14 +31,13 @@ import type { Request, Response } from 'express';
 @Controller('payment')
 export class PaymentController {
   private readonly logger = new Logger(PaymentController.name);
-  private readonly frontendUrl = process.env.CUSTOMER_WEB_URL || 'http://localhost:3001';
 
   constructor(private readonly paymentService: PaymentService) {}
 
   @Post('initialize')
   @UseGuards(JwtAuthGuard)
   async initiatePayment(
-    @Body() dto: InitiatePaymentDto,
+    @Body() dto: InitiatePaymentDto & { callbackUrl?: string },
     @Req() req: Request & { user?: { userId: string } },
   ) {
     if (!req.user) {
@@ -113,39 +113,43 @@ export class PaymentController {
     return { status: 'success' };
   }
 
-
-  // FIX: Removed duplicate @Get('webhook/paystack/callback')
-  // This is the ONLY route for Paystack browser redirects
-@Get('callback/paystack') 
+  @Get('callback/paystack')
   async paystackCallback(
     @Query('reference') reference: string,
     @Res() res: Response,
   ) {
     // 1. Validation
     if (!reference) {
-       this.logger.error('Paystack callback missing reference');
-       return res.redirect(`${this.frontendUrl}/payment/callback?status=failed&reason=missing_reference`);
+      this.logger.error('Paystack callback missing reference');
+      return res.redirect(
+        `/payment/callback?status=failed&reason=missing_reference`,
+      );
     }
 
     try {
-      // 2. Verification
+      // Get verification and callbackUrl (if stored)
       const verification = await this.paymentService.verifyPayment(
         reference,
         PaymentGateway.PAYSTACK,
       );
-
+      // Use callbackUrl from metadata (no fallback)
+      const callbackUrl = verification.meta?.callbackUrl;
+      if (!callbackUrl) {
+        this.logger.error(
+          `Paystack callback missing callbackUrl for ${reference}`,
+        );
+        return res.redirect(
+          `/payment/callback?status=failed&reason=missing_callback`,
+        );
+      }
       const status = verification.success ? 'success' : 'failed';
-      
-      // 3. Success Redirect
-      const redirectUrl = `${this.frontendUrl}/payment/callback?reference=${reference}&status=${status}`;
+      const redirectUrl = `${callbackUrl}/payment/callback?reference=${reference}&status=${status}`;
       return res.redirect(redirectUrl);
-
     } catch (error) {
       this.logger.error(`Paystack callback failed for ${reference}`, error);
-      
-      // 4. Failure Redirect (Graceful Fallback)
-      const redirectUrl = `${this.frontendUrl}/payment/callback?reference=${reference}&status=failed`;
-      return res.redirect(redirectUrl);
+      return res.redirect(
+        `/payment/callback?reference=${reference}&status=failed`,
+      );
     }
   }
 
@@ -161,15 +165,24 @@ export class PaymentController {
         idToVerify,
         PaymentGateway.FLUTTERWAVE,
       );
-
+      // Use callbackUrl from metadata (no fallback)
+      const callbackUrl = verification.meta?.callbackUrl;
+      if (!callbackUrl) {
+        this.logger.error(
+          `Flutterwave callback missing callbackUrl for ${reference}`,
+        );
+        return res.redirect(
+          `/payment/callback?status=failed&reason=missing_callback`,
+        );
+      }
       const status = verification.success ? 'success' : 'failed';
-      const redirectUrl = `${this.frontendUrl}/payment/callback?reference=${verification.reference}&status=${status}`;
+      const redirectUrl = `${callbackUrl}/payment/callback?reference=${verification.reference}&status=${status}`;
       return res.redirect(redirectUrl);
-
     } catch (error) {
       this.logger.error(`Flutterwave callback failed for ${reference}`, error);
-      const redirectUrl = `${this.frontendUrl}/payment/callback?reference=${reference}&status=failed`;
-      return res.redirect(redirectUrl);
+      return res.redirect(
+        `/payment/callback?reference=${reference}&status=failed`,
+      );
     }
   }
 
@@ -183,19 +196,27 @@ export class PaymentController {
         reference,
         PaymentGateway.MONNIFY,
       );
-
+      // Use callbackUrl from metadata (no fallback)
+      const callbackUrl = verification.meta?.callbackUrl;
+      if (!callbackUrl) {
+        this.logger.error(
+          `Monnify callback missing callbackUrl for ${reference}`,
+        );
+        return res.redirect(
+          `/payment/callback?status=failed&reason=missing_callback`,
+        );
+      }
       const status = verification.success ? 'success' : 'failed';
-      const redirectUrl = `${this.frontendUrl}/payment/callback?reference=${reference}&status=${status}`;
+      const redirectUrl = `${callbackUrl}/payment/callback?reference=${reference}&status=${status}`;
       return res.redirect(redirectUrl);
-
     } catch (error) {
       this.logger.error(`Monnify callback failed for ${reference}`, error);
-      const redirectUrl = `${this.frontendUrl}/payment/callback?reference=${reference}&status=failed`;
-      return res.redirect(redirectUrl);
+      return res.redirect(
+        `/payment/callback?reference=${reference}&status=failed`,
+      );
     }
   }
 
-  // Admin Endpoints
   @Post('admin/disburse')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)

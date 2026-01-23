@@ -245,7 +245,7 @@ export default function SettingsScreen() {
 
           <Pressable
             style={[styles.row, { borderBottomColor: border }]}
-            onPress={() => router.push("/orders" as any)}
+            onPress={() => router.push("/(settings)/order-history")}
           >
             <View
               style={[styles.iconBox, { backgroundColor: accentGreen + "22" }]}

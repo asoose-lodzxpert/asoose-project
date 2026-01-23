@@ -54,9 +54,10 @@ export class PaymentService {
     dto: InitiatePaymentDto,
     userId: string,
   ): Promise<PaymentInitResponse> {
-    
     if (!userId) {
-      throw new BadRequestException("User ID missing for payment initialization");
+      throw new BadRequestException(
+        'User ID missing for payment initialization',
+      );
     }
 
     const reference = this.generateReference();
@@ -64,7 +65,13 @@ export class PaymentService {
     // FIX: Nullish Coalescing for optional fields to avoid Prisma errors
     // Use undefined for optional prisma fields if the DTO value is null/undefined
     const customerName = dto.customerName ?? undefined;
-    
+
+    // Merge callbackUrl into metadata for later retrieval
+    const metadata = {
+      ...(dto.metadata || {}),
+      ...(dto.callbackUrl ? { callbackUrl: dto.callbackUrl } : {}),
+    };
+
     // Create initial Pending record
     await this.prisma.payment.create({
       data: {
@@ -77,8 +84,8 @@ export class PaymentService {
         ...(dto.orderId && { orderId: dto.orderId }),
         ...(dto.rideId && { rideId: dto.rideId }),
         customerEmail: dto.email,
-        customerName: customerName, 
-        metadata: (dto.metadata as any) ?? {},
+        customerName: customerName,
+        metadata,
       },
     });
 
@@ -87,16 +94,13 @@ export class PaymentService {
     try {
       switch (dto.gateway) {
         case PaymentGateway.PAYSTACK:
-          // FIX: Pass the safe callback URL explicitly
-          // This points to the Backend Controller (@Get 'callback/paystack')
-          const callbackUrl = `${process.env.BACKEND_URL}/payment/callback/paystack`;
-          
+          const paystackCallbackUrl = `${process.env.BACKEND_URL}/payment/callback/paystack`;
           response = await this.paystackService.initializePayment(
             dto.amount,
             dto.email,
             reference,
-            dto.metadata,
-            callbackUrl, // Passing the URL
+            metadata,
+            paystackCallbackUrl,
           );
           break;
 
@@ -106,8 +110,8 @@ export class PaymentService {
             dto.email,
             reference,
             dto.customerName || 'Customer',
-            dto.phoneNumber ?? undefined, // Fix null safety
-            dto.metadata,
+            dto.phoneNumber ?? undefined,
+            metadata,
           );
           break;
 
@@ -155,7 +159,7 @@ export class PaymentService {
   async verifyPayment(
     reference: string,
     gateway: PaymentGateway,
-  ): Promise<VerifyPaymentResponse> {
+  ): Promise<VerifyPaymentResponse & { meta?: { callbackUrl?: string } }> {
     let verification: VerifyPaymentResponse;
 
     switch (gateway) {
@@ -177,7 +181,23 @@ export class PaymentService {
 
     await this.updatePaymentStatus(verification);
 
-    return verification;
+    // Fetch callbackUrl from payment record's metadata
+    const payment = await this.prisma.payment.findUnique({
+      where: { reference },
+      select: { metadata: true },
+    });
+    let callbackUrl: string | undefined = undefined;
+    if (
+      payment &&
+      payment.metadata &&
+      typeof payment.metadata === 'object' &&
+      !Array.isArray(payment.metadata) &&
+      'callbackUrl' in payment.metadata
+    ) {
+      callbackUrl = (payment.metadata as Record<string, any>).callbackUrl;
+    }
+
+    return { ...verification, meta: { callbackUrl } };
   }
 
   async handleWebhook(
@@ -269,7 +289,6 @@ export class PaymentService {
     });
   }
 
-
   private async updatePaymentStatus(
     verification: VerifyPaymentResponse,
   ): Promise<void> {
@@ -297,8 +316,9 @@ export class PaymentService {
       return;
     }
 
-    // ✅ FIX 1: Safety check for paidAt date
-    const paidAt = verification.paidAt ? new Date(verification.paidAt) : new Date();
+    const paidAt = verification.paidAt
+      ? new Date(verification.paidAt)
+      : new Date();
 
     const updatedPayment = await this.prisma.payment.update({
       where: { reference: verification.reference },
@@ -401,7 +421,6 @@ export class PaymentService {
       await this.sendPaymentNotifications(updatedPayment);
     }
   }
- 
 
   private async startRideMatching(rideId: string): Promise<void> {
     try {
@@ -424,11 +443,8 @@ export class PaymentService {
     }
   }
 
-  // File: as/backend/src/payment/payment.service.ts
-
   private async sendPaymentNotifications(payment: any): Promise<void> {
     try {
-      // 1. Notify Customer
       let customerId: string | undefined;
 
       if (payment.order?.userId) {
@@ -454,11 +470,9 @@ export class PaymentService {
         });
       }
 
-      // 2. Notify Vendor (Only for Orders)
-      // ✅ FIX 2: Use createForVendor method
       if (payment.order?.store?.vendorId) {
         await this.notificationsService.createForVendor({
-          vendorId: payment.order.store.vendorId, // Using vendorId
+          vendorId: payment.order.store.vendorId,
           title: 'New Order Payment',
           message: `Payment received for order #${payment.order.id}. Amount: ₦${payment.amount.toLocaleString()}`,
           type: 'ORDER_PAYMENT',
@@ -473,7 +487,6 @@ export class PaymentService {
       this.logger.error('Failed to send payment notifications:', error);
     }
   }
- 
 
   async disbursePayment(
     dto: DisbursePaymentDto,
@@ -489,7 +502,8 @@ export class PaymentService {
         include: { store: { include: { bankAccount: true } } },
       });
 
-      if (!vendor || !vendor.store) throw new NotFoundException('Vendor or store not found');
+      if (!vendor || !vendor.store)
+        throw new NotFoundException('Vendor or store not found');
       bankAccount = vendor.store.bankAccount;
       recipientName = vendor.name;
     } else if (dto.recipientType === RecipientType.RIDER) {
@@ -505,7 +519,8 @@ export class PaymentService {
       throw new BadRequestException('Invalid recipient type');
     }
 
-    if (!bankAccount) throw new BadRequestException('Recipient has no bank account configured');
+    if (!bankAccount)
+      throw new BadRequestException('Recipient has no bank account configured');
 
     let disbursement: DisbursementResponse;
 
@@ -556,7 +571,9 @@ export class PaymentService {
           break;
 
         default:
-          throw new BadRequestException(`Unsupported payment gateway: ${dto.gateway}`);
+          throw new BadRequestException(
+            `Unsupported payment gateway: ${dto.gateway}`,
+          );
       }
 
       await this.prisma.payment.create({
@@ -621,19 +638,31 @@ export class PaymentService {
     try {
       switch (payment.gateway as PaymentGateway) {
         case PaymentGateway.PAYSTACK:
-          refund = await this.paystackService.initiateRefund(payment.reference, refundAmount);
+          refund = await this.paystackService.initiateRefund(
+            payment.reference,
+            refundAmount,
+          );
           break;
         case PaymentGateway.FLUTTERWAVE:
-          if (!payment.transactionId) throw new BadRequestException('Transaction ID missing');
-          refund = await this.flutterwaveService.initiateRefund(payment.transactionId, refundAmount);
+          if (!payment.transactionId)
+            throw new BadRequestException('Transaction ID missing');
+          refund = await this.flutterwaveService.initiateRefund(
+            payment.transactionId,
+            refundAmount,
+          );
           break;
         case PaymentGateway.MONNIFY:
           throw new BadRequestException('Monnify API refunds not supported');
         default:
-          throw new BadRequestException('Refunds not supported for this gateway');
+          throw new BadRequestException(
+            'Refunds not supported for this gateway',
+          );
       }
 
-      const newStatus = refundAmount < payment.amount ? PaymentStatus.PARTIAL_REFUND : PaymentStatus.REFUNDED;
+      const newStatus =
+        refundAmount < payment.amount
+          ? PaymentStatus.PARTIAL_REFUND
+          : PaymentStatus.REFUNDED;
 
       await this.prisma.payment.update({
         where: { id: payment.id },
@@ -688,8 +717,14 @@ export class PaymentService {
     }
   }
 
-  async handleMonnifyRefundWebhook(payload: any, signature: string): Promise<void> {
-    const isValid = this.monnifyService.verifyWebhookSignature(payload, signature);
+  async handleMonnifyRefundWebhook(
+    payload: any,
+    signature: string,
+  ): Promise<void> {
+    const isValid = this.monnifyService.verifyWebhookSignature(
+      payload,
+      signature,
+    );
     if (!isValid) throw new BadRequestException('Invalid webhook signature');
 
     const { eventType, eventData } = payload;

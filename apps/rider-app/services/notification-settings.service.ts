@@ -4,8 +4,7 @@ import type {
 } from "@/types/notification-settings";
 import { fetchWithAuth } from "./auth-fetch";
 
-const EXPO_PUBLIC_API_URL =
-  process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api/v1";
+const EXPO_PUBLIC_API_URL = process.env.EXPO_PUBLIC_API_URL;
 
 export async function getNotificationSettings(): Promise<NotificationSettings> {
   try {

@@ -134,7 +134,9 @@ export type IconSymbolName =
   | "message-square"
   | "mail"
   | "x"
-  | "cart";
+  | "cart"
+  | "star"
+  | "heart";
 
 export const MAPPING: Record<
   IconSymbolName,
@@ -264,6 +266,8 @@ export const MAPPING: Record<
   "alert-triangle": "warning",
   x: "close",
   cart: "shopping-cart",
+  star: "star",
+  heart: "monitor-heart",
 };
 
 interface IconSymbolProps {

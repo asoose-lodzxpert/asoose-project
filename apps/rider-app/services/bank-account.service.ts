@@ -1,8 +1,7 @@
 import type { BankAccount, UpdateBankAccountDto } from "@/types/bank-account";
 import { fetchWithAuth } from "./auth-fetch";
 
-const EXPO_PUBLIC_API_URL =
-  process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api/v1";
+const EXPO_PUBLIC_API_URL = process.env.EXPO_PUBLIC_API_URL;
 
 export async function getBankAccount(): Promise<BankAccount | null> {
   try {

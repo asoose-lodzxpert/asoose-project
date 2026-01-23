@@ -1,24 +1,27 @@
-'use client';
+"use client";
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
-import { useCartStore } from '@/store/useCartStore';
-import { useSession } from 'next-auth/react';
-import { WifiOff, Loader2 } from 'lucide-react';
-import Swal from 'sweetalert2';
-import { toast } from 'react-toastify';
-import { paymentService, InitiatePaymentPayload } from '@/services/payment.service';
-import { PAYMENT_METHODS } from '../ride/constants/config';
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import { useCartStore } from "@/store/useCartStore";
+import { useSession } from "next-auth/react";
+import { WifiOff, Loader2 } from "lucide-react";
+import Swal from "sweetalert2";
+import { toast } from "react-toastify";
+import {
+  paymentService,
+  InitiatePaymentPayload,
+} from "@/services/payment.service";
+import { PAYMENT_METHODS } from "../ride/constants/config";
 
 // Components
-import { Address } from './types';
-import { AddAddressModal } from '@/app/main/components/checkout/addadressmodal';
-import { CartItemsList } from '@/app/main/components/checkout/cartitemslist';
-import { OrderSummary } from '@/app/main/components/checkout/ordersummary';
-import { AddressSection } from '@/app/main/components/checkout/addresssection';
+import { Address } from "./types";
+import { AddAddressModal } from "@/app/main/components/checkout/addadressmodal";
+import { CartItemsList } from "@/app/main/components/checkout/cartitemslist";
+import { OrderSummary } from "@/app/main/components/checkout/ordersummary";
+import { AddressSection } from "@/app/main/components/checkout/addresssection";
 
 // Constants
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 const SERVICE_FEE_PERCENTAGE = 0.05;
 const BASE_DELIVERY_FEE = 1500;
 
@@ -37,10 +40,19 @@ export default function CheckoutForm() {
   const [isLoadingAddresses, setIsLoadingAddresses] = useState(true);
   const [isOnline, setIsOnline] = useState(true);
   const [showAddAddressModal, setShowAddAddressModal] = useState(false);
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<typeof PAYMENT_METHODS[number] | null>(null);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<
+    (typeof PAYMENT_METHODS)[number] | null
+  >(null);
 
   // Store
-  const { items: cartItems, getTotalPrice, addItem, decreaseItem, removeItem, clearCart } = useCartStore();
+  const {
+    items: cartItems,
+    getTotalPrice,
+    addItem,
+    decreaseItem,
+    removeItem,
+    clearCart,
+  } = useCartStore();
 
   // Fees
   const cartTotal = getTotalPrice();
@@ -53,21 +65,21 @@ export default function CheckoutForm() {
 
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
-    
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
+
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
 
     return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
       abortControllerRef.current?.abort();
       setIsProcessing(false);
     };
   }, []);
 
   const fetchAddresses = useCallback(async () => {
-    if (status !== 'authenticated') {
-      if (status === 'unauthenticated') setIsLoadingAddresses(false);
+    if (status !== "authenticated") {
+      if (status === "unauthenticated") setIsLoadingAddresses(false);
       return;
     }
 
@@ -82,7 +94,7 @@ export default function CheckoutForm() {
       abortControllerRef.current = new AbortController();
 
       setIsLoadingAddresses(true);
-      
+
       const res = await fetch(`${API_URL}/users/addresses`, {
         headers: { Authorization: `Bearer ${token}` },
         signal: abortControllerRef.current.signal,
@@ -94,11 +106,11 @@ export default function CheckoutForm() {
         const defaultAddr = data.find((a: Address) => a.isDefault) || data[0];
         if (defaultAddr) setSelectedAddress(defaultAddr);
       } else {
-        toast.error('Failed to load addresses');
+        toast.error("Failed to load addresses");
       }
     } catch (error: any) {
-      if (error.name !== 'AbortError') {
-        toast.error('Failed to load addresses');
+      if (error.name !== "AbortError") {
+        toast.error("Failed to load addresses");
       }
     } finally {
       setIsLoadingAddresses(false);
@@ -106,7 +118,7 @@ export default function CheckoutForm() {
   }, [session?.accessToken, status]);
 
   useEffect(() => {
-    if (status === 'authenticated') {
+    if (status === "authenticated") {
       fetchAddresses();
     }
   }, [status, fetchAddresses]);
@@ -114,7 +126,7 @@ export default function CheckoutForm() {
   // Prevent redirect if order was just created
   useEffect(() => {
     if (mounted && cartItems.length === 0 && !isOrderCreated.current) {
-      router.push('/');
+      router.push("/");
     }
   }, [mounted, cartItems, router]);
 
@@ -124,23 +136,23 @@ export default function CheckoutForm() {
 
     try {
       const res = await fetch(`${API_URL}/users/addresses`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify(addressData),
       });
 
       const json = await res.json();
-      if (!res.ok) throw new Error(json.message || 'Failed to add address');
+      if (!res.ok) throw new Error(json.message || "Failed to add address");
 
       await fetchAddresses();
       setSelectedAddress(json);
-      toast.success('Address added successfully');
+      toast.success("Address added successfully");
       setShowAddAddressModal(false);
     } catch (error: any) {
-      toast.error(error.message || 'Failed to save address');
+      toast.error(error.message || "Failed to save address");
     }
   };
 
@@ -149,51 +161,57 @@ export default function CheckoutForm() {
     try {
       if (!selectedPaymentMethod) return;
 
-      localStorage.setItem('pending_checkout', 'true');
-      localStorage.setItem('last_order_id', orderId);
+      localStorage.setItem("pending_checkout", "true");
+      localStorage.setItem("last_order_id", orderId);
 
       const paymentPayload: InitiatePaymentPayload = {
         amount: orderTotal,
-        email: session?.user?.email || 'customer@example.com',
+        email: session?.user?.email || "customer@example.com",
         gateway: selectedPaymentMethod.gateway as any,
-        method: 'CARD',
-        type: 'ORDER',
+        method: "CARD",
+        type: "ORDER",
         orderId: orderId,
+        callbackUrl: process.env.NEXT_PUBLIC_APP_URL,
       };
 
       // ✅ Pass token explicitly to avoid 401
       const token = session?.accessToken;
       if (!token) throw new Error("Authentication missing");
 
-      const paymentRes = await paymentService.initiatePayment(paymentPayload, token);
+      const paymentRes = await paymentService.initiatePayment(
+        paymentPayload,
+        token,
+      );
 
       if (paymentRes.authorizationUrl) {
         window.location.href = paymentRes.authorizationUrl;
       } else {
-        throw new Error('Payment authorization URL not received');
+        throw new Error("Payment authorization URL not received");
       }
     } catch (paymentError: any) {
-      console.error('Payment initialization error:', paymentError);
-      
+      console.error("Payment initialization error:", paymentError);
+
       // ✅ Handle graceful failure: Order is created, but payment failed.
       // Do NOT clear pending_checkout flag here; allow recovery.
-      
-      toast.warn("Payment initialization failed. Please try paying from Order Details.");
+
+      toast.warn(
+        "Payment initialization failed. Please try paying from Order Details.",
+      );
       router.push(`/main/orders/confirmed?id=${orderId}`);
     }
   };
 
   const handlePlaceOrder = async () => {
     if (!isOnline) {
-      toast.error('No internet connection.');
+      toast.error("No internet connection.");
       return;
     }
     if (!selectedAddress || !selectedPaymentMethod) {
-      toast.error('Please select address and payment method');
+      toast.error("Please select address and payment method");
       return;
     }
     if (cartItems.length === 0) {
-      toast.error('Your cart is empty');
+      toast.error("Your cart is empty");
       return;
     }
 
@@ -201,7 +219,7 @@ export default function CheckoutForm() {
     const token = session?.accessToken;
 
     if (!token) {
-      toast.error('Please log in to place an order');
+      toast.error("Please log in to place an order");
       return;
     }
 
@@ -212,22 +230,25 @@ export default function CheckoutForm() {
       const payload = {
         addressId: selectedAddress.id,
         restaurantId: restaurantId,
-        items: cartItems.map((item) => ({ id: item.id, quantity: item.quantity })),
+        items: cartItems.map((item) => ({
+          id: item.id,
+          quantity: item.quantity,
+        })),
       };
 
       // 1. Create Order
       const res = await fetch(`${API_URL}/users/orders`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
-          'Idempotency-Key': idempotencyKey,
+          "Idempotency-Key": idempotencyKey,
         },
         body: JSON.stringify(payload),
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Order creation failed');
+      if (!res.ok) throw new Error(data.message || "Order creation failed");
 
       // ✅ CRITICAL FIX: Order created successfully. Clear cart immediately.
       // This prevents "Cart not cleared" bugs if payment logic throws/redirects.
@@ -235,26 +256,26 @@ export default function CheckoutForm() {
       clearCart();
 
       // 2. Handle Payment
-      if (selectedPaymentMethod.type === 'CASH') {
-        localStorage.removeItem('pending_checkout');
-        localStorage.removeItem('last_order_id');
-        
+      if (selectedPaymentMethod.type === "CASH") {
+        localStorage.removeItem("pending_checkout");
+        localStorage.removeItem("last_order_id");
+
         await Swal.fire({
-          icon: 'success',
-          title: 'Order Placed!',
+          icon: "success",
+          title: "Order Placed!",
           text: `Order #${data.id.slice(0, 8)} confirmed.`,
-          confirmButtonColor: '#EAB308',
-          timer: 2000
+          confirmButtonColor: "#EAB308",
+          timer: 2000,
         });
-        
+
         router.push(`/main/orders/confirmed?id=${data.id}`);
       } else {
         // Attempt Online Payment
         await processPayment(data.id, data.total);
       }
     } catch (error: any) {
-      console.error('Order placement error:', error);
-      toast.error(error.message || 'Something went wrong.');
+      console.error("Order placement error:", error);
+      toast.error(error.message || "Something went wrong.");
       setIsProcessing(false);
     }
   };

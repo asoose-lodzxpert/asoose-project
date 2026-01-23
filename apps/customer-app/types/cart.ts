@@ -5,7 +5,7 @@ export type CartItem = {
   price: number;
   qty: number;
   options?: string;
-  restaurantId: string;
+  vendorId: string;
   description?: string | null;
   available?: boolean;
 };
@@ -24,7 +24,7 @@ export type CartSelection = {
   image?: string | null;
   price: number;
   qty: number;
-  restaurantId: string;
+  vendorId: string;
   options?: string;
 };
 

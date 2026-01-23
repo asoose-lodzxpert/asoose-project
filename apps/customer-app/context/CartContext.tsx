@@ -97,7 +97,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({
 
         const mergedItems = response.items.map((serverItem) => {
           const local = nextItems.find((item) => item.id === serverItem.id);
-          const restaurantId = local?.restaurantId ?? restaurant?.id ?? "";
+          const vendorId = local?.vendorId ?? restaurant?.id ?? "";
           return {
             id: serverItem.id,
             name: serverItem.name || local?.name || "",
@@ -105,7 +105,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({
             price: serverItem.price,
             qty: serverItem.quantity,
             options: local?.options,
-            restaurantId,
+            vendorId,
             description: serverItem.description ?? local?.description,
             available: serverItem.available,
           } as CartItem;
@@ -151,10 +151,10 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [syncSummary]);
 
   async function addItem(item: CartItem) {
-    const existingRestaurantId = items[0]?.restaurantId;
-    if (existingRestaurantId && existingRestaurantId !== item.restaurantId) {
+    const existingVendorId = items[0]?.vendorId;
+    if (existingVendorId && existingVendorId !== item.vendorId) {
       throw new Error(
-        "You can only checkout items from one restaurant at a time. Clear your cart to continue.",
+        "You can only checkout items from one vendor at a time. Clear your cart to continue.",
       );
     }
 
@@ -216,8 +216,8 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const canCheckout = useMemo(() => {
     if (!items.length) return false;
-    const restaurantIds = new Set(items.map((i) => i.restaurantId));
-    return restaurantIds.size <= 1;
+    const vendorIds = new Set(items.map((i) => i.vendorId));
+    return vendorIds.size <= 1;
   }, [items]);
 
   return (

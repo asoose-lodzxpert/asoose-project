@@ -5,7 +5,7 @@ import {
   ActivityIndicator,
   Linking,
 } from "react-native";
-import { useState, useCallback, useMemo, useEffect } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { ThemedView } from "@/components/themed-view";
 import {
   PromotionsCarousel,
@@ -20,14 +20,11 @@ import { SectionHeader } from "@/components/home/SectionHeader";
 import { SkeletonCard } from "@/components/home/SkeletonCard";
 import { HorizontalSpacer } from "@/components/home/HorizontalSpacer";
 import { ThemedText } from "@/components/themed-text";
-import {
-  fetchMarketplaceHome,
-  fetchPaginatedStores,
-} from "@/services/marketplace.service";
-import { Banner, HomeVertical, StoreFilterSlug, Vendor } from "@/types/home";
+import { useHomeContext } from "@/context/HomeContext";
+import type { StoreFilterSlug, Banner } from "@/types/home";
 import type { IconSymbolName } from "@/components/ui/icon-symbol";
 
-type CategoryOption = {
+export type CategoryOption = {
   key: StoreFilterSlug | string;
   label: string;
   icon?: IconSymbolName;
@@ -65,169 +62,41 @@ function transformBannerToPromotion(banner: Banner): Promotion {
   };
 }
 
-function useBanners() {
-  const [banners, setBanners] = useState<Banner[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const response = await fetchMarketplaceHome();
-      setBanners(response.banners ?? []);
-    } catch (error) {
-      console.error("Failed to fetch banners", error);
-      setError(
-        error instanceof Error ? error.message : "Unable to load promotions",
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  const refresh = useCallback(async () => {
-    await load();
-  }, [load]);
-
-  return { banners, loading, error, refresh };
-}
-
-function useVerticals() {
-  const [verticals, setVerticals] = useState<HomeVertical[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const response = await fetchMarketplaceHome();
-      setVerticals(response.verticals ?? []);
-    } catch (error) {
-      console.error("Failed to fetch verticals", error);
-      setError(
-        error instanceof Error ? error.message : "Unable to load sections",
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  const refresh = useCallback(async () => {
-    await load();
-  }, [load]);
-
-  return { verticals, loading, error, refresh };
-}
-
-function usePaginatedStores(category: StoreFilterSlug | string) {
-  const [stores, setStores] = useState<Vendor[]>([]);
-  const [storesError, setStoresError] = useState<string | null>(null);
-  const [initialStoreLoading, setInitialStoreLoading] = useState(true);
-  const [storeLoading, setStoreLoading] = useState(false);
-  const [hasMore, setHasMore] = useState(true);
-  const [nextPage, setNextPage] = useState(1);
-
-  const loadStores = useCallback(
-    async (pageToLoad: number, reset = false) => {
-      try {
-        setStoreLoading(true);
-        if (reset) {
-          setStoresError(null);
-        }
-
-        const { stores: fetchedStores, meta } = await fetchPaginatedStores({
-          page: pageToLoad,
-          limit: 10,
-          type: category === "all" ? undefined : category,
-        });
-
-        setStores((prev) =>
-          reset ? fetchedStores : [...prev, ...fetchedStores],
-        );
-        setHasMore(meta.hasMore);
-        setNextPage(meta.hasMore ? meta.page + 1 : meta.page);
-      } catch (error) {
-        console.error("Failed to fetch stores", error);
-        setStoresError(
-          error instanceof Error ? error.message : "Unable to load stores",
-        );
-      } finally {
-        setStoreLoading(false);
-        if (reset) {
-          setInitialStoreLoading(false);
-        }
-      }
-    },
-    [category],
-  );
-
-  const refresh = useCallback(async () => {
-    setInitialStoreLoading(true);
-    setStores([]);
-    setHasMore(true);
-    setNextPage(1);
-    await loadStores(1, true);
-  }, [loadStores]);
-
-  useEffect(() => {
-    refresh();
-  }, [refresh]);
-
-  const loadMore = useCallback(() => {
-    if (storeLoading || initialStoreLoading || !hasMore) return;
-    loadStores(nextPage);
-  }, [storeLoading, initialStoreLoading, hasMore, loadStores, nextPage]);
-
-  return {
-    stores,
-    storesError,
-    initialStoreLoading,
-    storeLoading,
-    hasMore,
-    loadMore,
-    refresh,
-  };
-}
-
 export default function HomeScreen() {
-  const [category, setCategory] = useState<StoreFilterSlug | string>("all");
-  const [refreshing, setRefreshing] = useState(false);
-
-  const { banners, promotionsError, refresh: refreshPromotions } = useBanners();
   const {
+    banners,
+    bannersLoading,
+    bannersError,
+    refreshBanners,
     verticals,
-    sectionsLoading,
-    sectionsError,
-    refresh: refreshSections,
-  } = useVerticals();
-  const {
+    verticalsLoading,
+    verticalsError,
+    refreshVerticals,
     stores,
     storesError,
     initialStoreLoading,
     storeLoading,
     hasMore,
     loadMore,
-    refresh: refreshStores,
-  } = usePaginatedStores(category);
+    refreshStores,
+    category,
+    setCategory,
+  } = useHomeContext();
 
-  useEffect(() => {
-    Promise.all([refreshPromotions(), refreshSections(), refreshStores()]);
-  }, [refreshPromotions, refreshSections, refreshStores]);
+  const [refreshing, setRefreshing] = useState(false);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
       await Promise.all([
-        refreshPromotions(),
-        refreshSections(),
+        refreshBanners(),
+        refreshVerticals(),
         refreshStores(),
       ]);
     } finally {
       setRefreshing(false);
     }
-  }, [refreshPromotions, refreshSections, refreshStores]);
+  }, [refreshBanners, refreshVerticals, refreshStores]);
 
   const promotions = useMemo<Promotion[]>(
     () => (banners?.length ? banners.map(transformBannerToPromotion) : []),
@@ -238,13 +107,11 @@ export default function HomeScreen() {
     const base: CategoryOption[] = [
       { key: "all", label: "All", icon: "storefront" },
     ];
-
     const dynamic = verticals.map((section) => ({
       key: section.id,
       label: section.title,
       icon: getIconForType(section.type),
     }));
-
     const seen = new Set(base.map((item) => item.key));
     const merged = [...base];
     for (const item of dynamic) {
@@ -254,10 +121,6 @@ export default function HomeScreen() {
     }
     return merged;
   }, [verticals]);
-
-  useEffect(() => {
-    refreshStores();
-  }, [category, refreshStores]);
 
   return (
     <ThemedView style={{ flex: 1 }} pointerEvents="box-none">
@@ -279,19 +142,19 @@ export default function HomeScreen() {
           <>
             <PromotionsCarousel data={promotions} />
 
-            {promotionsError && promotions.length === 0 ? (
+            {bannersError && banners.length === 0 ? (
               <ThemedText style={{ marginVertical: 12 }}>
-                {promotionsError}
+                {bannersError}
               </ThemedText>
             ) : null}
 
-            {sectionsError && verticals.length === 0 ? (
+            {verticalsError && verticals.length === 0 ? (
               <ThemedText style={{ marginVertical: 12 }}>
-                {sectionsError}
+                {verticalsError}
               </ThemedText>
             ) : null}
 
-            {sectionsLoading && verticals.length === 0 ? (
+            {verticalsLoading && verticals.length === 0 ? (
               <FlatList
                 horizontal
                 data={[1, 2, 3]}
