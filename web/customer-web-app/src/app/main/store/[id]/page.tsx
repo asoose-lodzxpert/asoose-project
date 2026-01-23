@@ -277,12 +277,12 @@ export default function StorePage() {
                     <h2 className="text-2xl font-black">
                       Ratings & Reviews <span className="text-gray-400 text-lg ml-2">({reviews.length})</span>
                     </h2>
-                    <button 
-                        onClick={() => setIsReviewModalOpen(true)}
-                        className="flex items-center gap-2 bg-gray-900 dark:bg-white text-white dark:text-black px-4 py-2 rounded-xl font-bold text-sm"
-                    >
-                        <PenLine className="w-4 h-4" /> Write Review
-                    </button>
+                 <button 
+    onClick={() => setIsReviewModalOpen(true)}
+    className="flex items-center gap-1.5 md:gap-2 bg-gray-900 dark:bg-white text-white dark:text-black px-3 py-1.5 md:px-4 md:py-2 rounded-lg md:rounded-xl font-bold text-xs md:text-sm transition-transform active:scale-95 shadow-sm"
+>
+    <PenLine className="w-3.5 h-3.5 md:w-4 md:h-4" /> Write Review
+</button>
                 </div>
                 <StoreReviews 
                    reviews={reviews} currentUserId={currentUserId}

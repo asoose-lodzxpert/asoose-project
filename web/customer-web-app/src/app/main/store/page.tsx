@@ -1,13 +1,13 @@
 'use client';
 
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useSearchParams } from 'next/navigation';
 import { 
   Store, X, ChevronRight, Utensils, Loader2, 
   ShoppingBasket, Pizza, Coffee, Gift, BriefcaseMedical, 
-  Carrot, Sandwich, Truck // Added new icons
+  Carrot, Sandwich, Truck
 } from 'lucide-react';
 
 // Components
@@ -25,13 +25,39 @@ interface BannerData {
   buttonText: string; link: string; image?: string; type: 'PROMO' | 'AD';
 }
 
-interface Vendor {
-  id: string; name: string; image?: string; slug?: string;
-  rating: number; deliveryTime?: string; deliveryFee: number; type: string;
+interface RawVendor {
+  id: string; 
+  name: string; 
+  image?: string; 
+  banner?: string;
+  logo?: string;
+  slug?: string;
+  rating: number; 
+  deliveryTime?: string; 
+  deliveryFee: number; 
+  type: string;
+}
+
+interface Vendor extends RawVendor {
+  // Normalized fields will be guaranteed
 }
 
 interface VerticalSection {
-  id: string; title: string; vendors: Vendor[];
+  id: string; title: string; vendors: RawVendor[];
+}
+
+// ✅ NEW: Normalize vendor data to ensure all image fields exist
+function normalizeVendor(vendor: RawVendor): Vendor {
+  // Create fallback chain: prefer logo/banner, fall back to image, then placeholders
+  const normalizedLogo = vendor.logo || vendor.image || '/placeholder-logo.png';
+  const normalizedBanner = vendor.banner || vendor.image || vendor.logo || '/placeholder-banner.png';
+  
+  return {
+    ...vendor,
+    image: normalizedLogo,      // For backwards compatibility
+    logo: normalizedLogo,        // Explicit logo
+    banner: normalizedBanner,    // Explicit banner
+  };
 }
 
 // --- HELPER: GET CATEGORY ICON ---
@@ -47,7 +73,6 @@ const getCategoryIcon = (title: string) => {
   if (t.includes('courier') || t.includes('send')) return <Truck className="w-7 h-7" />;
   if (t.includes('gift')) return <Gift className="w-7 h-7" />;
   
-  // Default fallback
   return <Store className="w-7 h-7" />;
 };
 
@@ -95,7 +120,7 @@ function useStoreData(query: string | null) {
 
 // --- INFINITE SCROLL HOOK ---
 function useInfiniteStores(enabled: boolean) {
-  const [stores, setStores] = useState<Vendor[]>([]);
+  const [stores, setStores] = useState<RawVendor[]>([]);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
@@ -133,6 +158,18 @@ export default function StorePage() {
   const observerTarget = useRef(null);
 
   useEffect(() => { fetchData(query); }, [query, fetchData]);
+
+  // ✅ NEW: Normalize all vendor data with useMemo
+  const normalizedVerticals = useMemo(() => {
+    return verticals.map(vertical => ({
+      ...vertical,
+      vendors: vertical.vendors.map(normalizeVendor)
+    }));
+  }, [verticals]);
+
+  const normalizedStores = useMemo(() => {
+    return stores.map(normalizeVendor);
+  }, [stores]);
 
   // Intersection Observer implementation
   useEffect(() => {
@@ -195,10 +232,9 @@ export default function StorePage() {
                  <Utensils className="w-5 h-5 text-yellow-500" /> Shop by Category
                </h2>
                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-4">
-                  {verticals.map((v) => (
+                  {normalizedVerticals.map((v) => (
                     <Link key={v.id} href={`/main/store/category/${v.id}`} className="flex flex-col items-center p-5 rounded-3xl bg-white dark:bg-[#151515] border border-gray-100 dark:border-white/5 hover:border-yellow-500/30 transition-all group">
                       <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-yellow-50 dark:bg-yellow-900/10 text-yellow-600 transition-transform group-hover:scale-110">
-                        {/* ✅ DYNAMIC ICON HERE */}
                         {getCategoryIcon(v.title)}
                       </div>
                       <span className="mt-4 text-sm font-bold text-center capitalize">{v.title}</span>
@@ -207,9 +243,9 @@ export default function StorePage() {
                </div>
             </section>
 
-            {/* 3. DYNAMIC VERTICAL SECTIONS */}
+            {/* 3. DYNAMIC VERTICAL SECTIONS - ✅ Using normalized data */}
             <div className="space-y-12">
-              {verticals.map((section) => (
+              {normalizedVerticals.map((section) => (
                 <section key={section.id} className="px-4">
                   <div className="flex justify-between items-end mb-6">
                     <h2 className="text-2xl font-black capitalize">{section.title}</h2>
@@ -220,9 +256,13 @@ export default function StorePage() {
                   <div className="flex gap-5 overflow-x-auto pb-6 scrollbar-hide snap-x">
                     {section.vendors.map((vendor) => (
                       <div key={vendor.id} className="min-w-[300px] snap-start">
-                        {/* ✅ FIXED LINK: Added /main prefix */}
                         <Link href={`/main/store/${vendor.slug || vendor.id}`}>
-                          <RestaurantCard {...vendor} time={vendor.deliveryTime || '30 min'} />
+                          <RestaurantCard 
+                            {...vendor} 
+                            banner={vendor.banner}
+                            logo={vendor.logo}
+                            time={vendor.deliveryTime || '30 min'} 
+                          />
                         </Link>
                       </div>
                     ))}
@@ -231,14 +271,18 @@ export default function StorePage() {
               ))}
             </div>
 
-            {/* 4. INFINITE SCROLL: DISCOVER MORE */}
+            {/* 4. INFINITE SCROLL: DISCOVER MORE - ✅ Using normalized data */}
             <section className="px-4 pb-12">
               <h2 className="text-2xl font-black mb-6">Discover More</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {stores.map((vendor) => (
-                  /* ✅ FIXED LINK: Added /main prefix */
+                {normalizedStores.map((vendor) => (
                   <Link key={vendor.id} href={`/main/store/${vendor.slug || vendor.id}`}>
-                    <RestaurantCard {...vendor} time={vendor.deliveryTime || '30 min'} />
+                    <RestaurantCard 
+                      {...vendor} 
+                      banner={vendor.banner}
+                      logo={vendor.logo}
+                      time={vendor.deliveryTime || '30 min'} 
+                    />
                   </Link>
                 ))}
               </div>

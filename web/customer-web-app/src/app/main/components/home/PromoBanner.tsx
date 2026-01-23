@@ -1,7 +1,7 @@
 import { X, Bike, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
+import Image from 'next/image'; // 1. Import Image component
 
-// Type-safe interface matching backend response
 interface BannerData {
   id: string;
   title: string;
@@ -20,7 +20,6 @@ interface PromoBannerProps {
 }
 
 export const PromoBanner = ({ banner, onClose }: PromoBannerProps) => {
-  // Don't render inactive banners
   if (!banner.isActive) {
     return null;
   }
@@ -33,30 +32,38 @@ export const PromoBanner = ({ banner, onClose }: PromoBannerProps) => {
             ? 'bg-indigo-600' 
             : 'bg-gradient-to-r from-yellow-500 to-orange-500'
           }`}
-        style={banner.image ? {
-          backgroundImage: `url(${banner.image})`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-        } : undefined}
+        // 2. Removed inline style for background image
       >
-        {/* Overlay for better text readability when image is present */}
+        {/* 3. Next.js Image Component for Optimization */}
         {banner.image && (
-          <div className="absolute inset-0 bg-black/30" />
+          <Image
+            src={banner.image}
+            alt={banner.title}
+            fill
+            className="object-cover absolute inset-0 z-0"
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 90vw, 800px"
+            priority={true} // Banners are usually "above the fold"
+          />
+        )}
+
+        {/* Overlay for better text readability */}
+        {banner.image && (
+          <div className="absolute inset-0 bg-black/40 z-0" />
         )}
         
         <button 
           onClick={onClose} 
-          className="absolute top-4 right-4 z-20 p-2 bg-black/10 hover:bg-black/20 text-white rounded-full transition-colors"
+          className="absolute top-4 right-4 z-20 p-2 bg-black/10 hover:bg-black/20 text-white rounded-full transition-colors backdrop-blur-sm"
           aria-label="Close banner"
         >
           <X className="w-4 h-4" />
         </button>
 
         <div className="relative z-10 text-white max-w-md">
-          <h2 className="text-2xl sm:text-3xl font-black mb-1">
+          <h2 className="text-2xl sm:text-3xl font-black mb-1 drop-shadow-md">
             {banner.title}
           </h2>
-          <p className="font-medium opacity-90 mb-4">
+          <p className="font-medium opacity-90 mb-4 drop-shadow-sm text-sm sm:text-base">
             {banner.subtitle}
           </p>
           <Link 
@@ -67,7 +74,7 @@ export const PromoBanner = ({ banner, onClose }: PromoBannerProps) => {
           </Link>
         </div>
 
-        {/* Dynamic Icon based on type (only show if no background image) */}
+        {/* Dynamic Icon fallback (only show if no image) */}
         {!banner.image && (
           banner.type === 'AD' ? (
             <ExternalLink className="absolute right-8 bottom-8 w-24 h-24 text-white/10 -rotate-12" />
