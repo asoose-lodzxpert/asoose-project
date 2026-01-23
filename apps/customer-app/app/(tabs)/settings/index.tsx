@@ -16,7 +16,7 @@ import { useThemeColor } from "@/hooks/use-theme-color";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "expo-router";
 import { useConfirm } from "@/components/ui/ConfirmDialogProvider";
-import { useAuthFetch } from "@/lib/authFetch";
+import { get } from "@/lib/authFetch";
 
 type UserProfile = {
   id: string;
@@ -39,7 +39,6 @@ export default function SettingsScreen() {
   const textOnPrimary = useThemeColor({}, "textOnPrimary");
 
   const { user, logout } = useAuth();
-  const { get } = useAuthFetch();
   const router = useRouter();
   const showConfirm = useConfirm();
 

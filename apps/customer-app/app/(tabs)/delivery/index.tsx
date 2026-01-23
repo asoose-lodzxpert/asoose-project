@@ -22,10 +22,10 @@ function Screen() {
 
   useEffect(() => {
     const showSub = Keyboard.addListener("keyboardDidShow", () =>
-      setKeyboardVisible(true)
+      setKeyboardVisible(true),
     );
     const hideSub = Keyboard.addListener("keyboardDidHide", () =>
-      setKeyboardVisible(false)
+      setKeyboardVisible(false),
     );
     return () => {
       showSub.remove();
@@ -34,8 +34,6 @@ function Screen() {
   }, []);
   return (
     <ThemedView style={{ flex: 1 }}>
-      {/* <SendPackageHeader /> */}
-
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : "height"}

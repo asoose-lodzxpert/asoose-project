@@ -14,13 +14,17 @@ import {
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { UsersService } from './users.service';
 import { CreateAddressDto, CreateOrderDto } from './dto/users.dto'; // <--- Import DTOs
+import {
+  CreateEmergencyContactDto,
+  UpdateEmergencyContactDto,
+} from './dto/emergency-contact.dto';
 
 @Controller('users')
 @UseGuards(JwtAuthGuard)
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
-@Get('profile')
+  @Get('profile')
   async getProfile(@Request() req) {
     return this.usersService.getUserProfile(req.user.id);
   }
@@ -67,7 +71,6 @@ export class UsersController {
 
   @Post('addresses')
   async addAddress(@Request() req, @Body() body: CreateAddressDto) {
-    // Use DTO
     return this.usersService.addUserAddress(req.user.id, body);
   }
 
@@ -102,7 +105,10 @@ export class UsersController {
     return ride;
   }
   @Patch('profile')
-  async updateProfile(@Request() req, @Body() body: { name: string; phone: string }) {
+  async updateProfile(
+    @Request() req,
+    @Body() body: { name: string; phone: string },
+  ) {
     return this.usersService.updateUserProfile(req.user.id, body);
   }
   @Delete('profile')
@@ -112,5 +118,51 @@ export class UsersController {
   @Delete('addresses/:id')
   async deleteAddress(@Request() req, @Param('id') addressId: string) {
     return this.usersService.deleteUserAddress(req.user.id, addressId);
+  }
+
+  // ==================================================================
+  // EMERGENCY CONTACT ENDPOINTS
+  // ==================================================================
+
+  @Get('emergency-contacts')
+  async getEmergencyContacts(@Request() req) {
+    return this.usersService.getEmergencyContacts(req.user.id);
+  }
+
+  @Post('emergency-contacts')
+  async addEmergencyContact(
+    @Request() req,
+    @Body() body: CreateEmergencyContactDto,
+  ) {
+    return this.usersService.addEmergencyContact(req.user.id, body);
+  }
+
+  @Patch('emergency-contacts/:id')
+  async updateEmergencyContact(
+    @Request() req,
+    @Param('id') id: string,
+    @Body() body: UpdateEmergencyContactDto,
+  ) {
+    return this.usersService.updateEmergencyContact(req.user.id, id, body);
+  }
+
+  @Delete('emergency-contacts/:id')
+  async deleteEmergencyContact(@Request() req, @Param('id') id: string) {
+    return this.usersService.deleteEmergencyContact(req.user.id, id);
+  }
+
+  @Delete('delete-account')
+  async deleteAccount(@Request() req) {
+    return this.usersService.softDeleteUser(req.user.id);
+  }
+
+  @Get('notification-config')
+  async getNotificationConfig(@Request() req) {
+    return this.usersService.getNotificationConfig(req.user.id);
+  }
+
+  @Patch('notification-config')
+  async updateNotificationConfig(@Request() req, @Body() body: any) {
+    return this.usersService.updateNotificationConfig(req.user.id, body);
   }
 }

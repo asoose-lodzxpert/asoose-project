@@ -27,6 +27,7 @@ import { MapsModule } from './maps/maps.module';
 import { StorageModule } from './storage/storage.module';
 import { PaymentModule } from './payment/payment.module';
 import { MatchingModule } from './matching/matching.module';
+import { ProductsModule } from './products/products.module';
 
 @Module({
   imports: [
@@ -80,6 +81,7 @@ import { MatchingModule } from './matching/matching.module';
     StorageModule,
     PaymentModule,
     MatchingModule,
+    ProductsModule,
   ],
   controllers: [AppController],
   providers: [

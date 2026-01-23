@@ -6,10 +6,7 @@ import React, {
   useCallback,
 } from "react";
 
-import {
-  fetchSavedAddresses,
-  fetchDeliveryQuote,
-} from "../services/sendPackage.api";
+import { fetchSavedAddresses } from "../services/sendPackage.api";
 
 import type {
   Address,
@@ -65,8 +62,16 @@ type SendPackageContextType = {
 };
 
 const SendPackageContext = createContext<SendPackageContextType | undefined>(
-  undefined
+  undefined,
 );
+
+// Price table for package sizes
+const PACKAGE_SIZE_PRICES: Record<PackageSize, number> = {
+  small: 500,
+  medium: 1000,
+  large: 2500,
+  extra_large: 5000,
+};
 
 /* ---------------------------------- */
 /* Provider */
@@ -90,7 +95,7 @@ export function SendPackageProvider({
     phone: "",
     instructions: "",
   });
-wwwwwwwwwwwww
+
   const [packageOptions, setPackageOptions] = useState<PackageOptions>({
     fragile: false,
     perishable: false,
@@ -134,55 +139,30 @@ wwwwwwwwwwwww
 
     // require pickup and dropoff to be present
     const locationsReady = !!(pickup?.address && dropoff?.address);
-    // require weight and declared value
-    const weightOk = !!(
-      packageOptions?.weightKg && packageOptions.weightKg > 0
-    );
-    const declaredOk = !!(
-      packageOptions?.declaredValue &&
-      packageOptions.declaredValue.trim() !== ""
-    );
-
-    const shouldFetch = locationsReady && weightOk && declaredOk;
 
     if (!locationsReady) {
-      // reset quote when locations are incomplete
       setQuote(null);
       setLoadingQuote(false);
       return;
     }
 
-    // if locations are set but weight/declared value are missing, don't fetch
-    if (!weightOk || !declaredOk) {
-      setQuote(null);
-      setLoadingQuote(false);
-      // don't attempt to fetch until required fields are provided
-      return;
-    }
-
-    // debounce rapid changes (user typing / selecting)
+    // Just set quote based on package size
     setLoadingQuote(true);
     timer = setTimeout(() => {
-      fetchDeliveryQuote(pickup, dropoff, packageSize, packageOptions)
-        .then((q) => {
-          if (!mounted) return;
-          setQuote(q);
-        })
-        .catch(() => {
-          if (!mounted) return;
-          setQuote(null);
-        })
-        .finally(() => {
-          if (!mounted) return;
-          setLoadingQuote(false);
-        });
-    }, 350);
+      if (!mounted) return;
+      setQuote({
+        distanceKm: 0,
+        etaMinutes: 0,
+        price: PACKAGE_SIZE_PRICES[packageSize] ?? 0,
+      });
+      setLoadingQuote(false);
+    }, 200);
 
     return () => {
       mounted = false;
       if (timer) clearTimeout(timer);
     };
-  }, [pickup, dropoff, packageSize, packageOptions]);
+  }, [pickup, dropoff, packageSize]);
 
   /* ---------------------------------- */
   /* Helpers to prevent invalid selections */

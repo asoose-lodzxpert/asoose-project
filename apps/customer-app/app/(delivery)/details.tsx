@@ -1,13 +1,19 @@
 import React, { useEffect, useState } from "react";
-import { View, StyleSheet, Pressable, ScrollView } from "react-native";
+import {
+  View,
+  StyleSheet,
+  Pressable,
+  ScrollView,
+  RefreshControl,
+} from "react-native";
 import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { useRouter, useLocalSearchParams } from "expo-router";
-import deliveries from "@/mock/delivery-history-data.json";
+import { fetchDeliveryDetails } from "@/services/delivery-details.service";
 
-type Delivery = (typeof deliveries)[number];
+type Delivery = any;
 
 export default function DeliveryDetailsScreen() {
   const router = useRouter();
@@ -19,24 +25,39 @@ export default function DeliveryDetailsScreen() {
   const muted = useThemeColor({}, "textMuted");
 
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [delivery, setDelivery] = useState<Delivery | null>(null);
 
-  useEffect(() => {
-    const t = setTimeout(() => {
+  const fetchData = async () => {
+    setLoading(true);
+    try {
       const deliveryId = Array.isArray(id) ? id[0] : id;
-      // @ts-ignore
-      setDelivery(deliveries.find((d) => d.id === deliveryId) ?? null);
+      const data = await fetchDeliveryDetails(deliveryId as string);
+      setDelivery(data);
+    } catch (e) {
+      setDelivery(null);
+    } finally {
       setLoading(false);
-    }, 600);
-    return () => clearTimeout(t);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchData();
+    setRefreshing(false);
+  };
 
   return (
     <ThemedView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} style={styles.backBtn}>
-          <IconSymbol name="arrow-left" size={22} color={primary} />
+          <IconSymbol name="chevron.left" size={22} color={primary} />
         </Pressable>
         <ThemedText type="title" style={styles.headerTitle}>
           Delivery Details
@@ -46,14 +67,22 @@ export default function DeliveryDetailsScreen() {
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
       >
-        {loading && <SkeletonCard />}
-
-        {!loading && !delivery && (
-          <ThemedText style={styles.centerText}>Delivery not found</ThemedText>
-        )}
-
-        {!loading && delivery && (
+        {loading ? (
+          <SkeletonCard />
+        ) : !delivery ? (
+          <View style={{ alignItems: "center", marginTop: 32 }}>
+            <ThemedText style={styles.centerText}>
+              Delivery not found
+            </ThemedText>
+            <ThemedText style={styles.pullToRefresh}>
+              Pull down to refresh
+            </ThemedText>
+          </View>
+        ) : (
           <>
             {/* ROUTE */}
             <View
@@ -215,6 +244,11 @@ function SkeletonCard() {
 /* ---------------- Styles ---------------- */
 
 const styles = StyleSheet.create({
+  pullToRefresh: {
+    color: "#888",
+    fontSize: 13,
+    marginTop: 8,
+  },
   container: {
     flex: 1,
   },
@@ -228,6 +262,8 @@ const styles = StyleSheet.create({
   backBtn: {
     marginRight: 12,
     padding: 4,
+    flexDirection: "row",
+    alignItems: "center",
   },
   headerTitle: {
     fontSize: 20,

@@ -38,7 +38,7 @@ export default function DeliveryHistoryScreen() {
         const result = await fetchDeliveryHistory(
           currentTab,
           currentPage,
-          PAGE_SIZE
+          PAGE_SIZE,
         );
         setData((prev) => (refresh ? result : [...prev, ...result]));
         setPage(currentPage);
@@ -48,7 +48,7 @@ export default function DeliveryHistoryScreen() {
         setRefreshing(false);
       }
     },
-    [tab, page, loading]
+    [tab, page, loading],
   );
 
   useEffect(() => {
@@ -94,7 +94,6 @@ export default function DeliveryHistoryScreen() {
     </ThemedView>
   );
 }
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,

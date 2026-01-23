@@ -1,4 +1,9 @@
-import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateAddressDto } from './dto/users.dto';
 import { Prisma } from '@prisma/client';
@@ -7,7 +12,6 @@ export const ADDRESS_LABELS = {
   STORE_LOCATION: 'Store Location',
 } as const;
 
-// 1. Define City Boundaries (Example: Maiduguri, Nigeria)
 const CITY_BOUNDS = {
   MIN_LAT: 11.75, // South-most edge
   MAX_LAT: 11.95, // North-most edge
@@ -106,7 +110,7 @@ export class AddressesService {
     // Fix: Query against vendorId
     let pickupAddress = await tx.address.findFirst({
       where: {
-        vendorId: vendorId, 
+        vendorId: vendorId,
         label: ADDRESS_LABELS.STORE_LOCATION,
         street: storeAddress,
       },
@@ -150,10 +154,15 @@ export class AddressesService {
       });
     } catch (error) {
       if (error instanceof NotFoundException) throw error;
-      
+
       // Handle Foreign Key constraints (e.g. if address is used in an order)
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2003') { 
-        throw new BadRequestException('Cannot delete address used in previous orders/rides');
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2003'
+      ) {
+        throw new BadRequestException(
+          'Cannot delete address used in previous orders/rides',
+        );
       }
 
       this.logger.error(`Failed to delete address ${addressId}`, error.stack);

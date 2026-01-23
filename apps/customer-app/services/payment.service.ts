@@ -1,111 +1,73 @@
-export type PaymentMethod = "transfer" | "paystack" | "monnify" | "flutterwave";
+import { request } from "@/lib/authFetch";
+import type { PaymentMethod, BankAccount, InAppTx } from "@/types/payment";
 
 export async function initiatePayment(method: PaymentMethod, payload: any) {
-  // Placeholder: integrate with payment providers here.
-  // For now, simulate network call and return a success object.
-  await new Promise((res) => setTimeout(res, 1000));
-
-  return {
-    success: true,
-    method,
-    transactionId: `txn_${Date.now()}`,
-    payload,
-  };
+  const { parsed } = await request("payment/initialize", {
+    method: "POST",
+    body: JSON.stringify({ ...payload, method }),
+  });
+  return parsed;
 }
 
-// ------------------------------
-// Mock bank-transfer & in-app checkout services
-// ------------------------------
-
-type BankAccount = {
-  accountNumber: string;
-  bankName: string;
-  accountName: string;
-  reference: string;
-  amount: number;
-  expiresAt: number;
-  status: "pending" | "paid" | "failed";
-};
-
-type InAppTx = {
-  transactionId: string;
-  checkoutUrl: string;
-  amount: number;
-  method: PaymentMethod;
-  status: "pending" | "paid" | "failed";
-};
-
-const bankStore = new Map<string, BankAccount>();
-const inAppStore = new Map<string, InAppTx>();
-
-function randomAccountNumber() {
-  return Math.floor(1000000000 + Math.random() * 8999999999).toString();
+export async function checkPaymentStatus(reference: string) {
+  const { parsed } = await request(
+    `payment/verify?reference=${encodeURIComponent(reference)}`,
+    { method: "GET" },
+  );
+  return parsed;
 }
 
-export async function createBankTransfer(amount: number, payload: any) {
-  const reference = `BTX-${Date.now()}`;
-  const acct: BankAccount = {
-    accountNumber: randomAccountNumber(),
-    bankName: "Mock Bank",
-    accountName: "Asoose Payments",
-    reference,
-    amount,
-    expiresAt: Date.now() + 1000 * 60 * 60, // 1 hour
-    status: "pending",
-  };
-  bankStore.set(reference, acct);
-
-  // Simulate the user paying after a short delay (for demo only)
-  setTimeout(() => {
-    const existing = bankStore.get(reference);
-    if (existing) {
-      existing.status = "paid";
-      bankStore.set(reference, existing);
-    }
-  }, 8_000);
-
-  return acct;
+// Bank transfer support (real backend)
+export async function createBankTransfer(
+  amount: number,
+  payload: any,
+): Promise<BankAccount> {
+  const { parsed } = await request("payment/initialize", {
+    method: "POST",
+    body: JSON.stringify({ ...payload, method: "transfer", amount }),
+  });
+  return parsed;
 }
 
 export async function checkBankTransferStatus(reference: string) {
-  // simulate network latency
-  await new Promise((r) => setTimeout(r, 300));
-  const entry = bankStore.get(reference);
-  if (!entry) return { status: "failed" as const };
-  return { status: entry.status };
+  return checkPaymentStatus(reference);
 }
 
+// In-app checkout (if supported by backend, otherwise remove)
 export async function openInAppCheckout(
   method: PaymentMethod,
   amount: number,
-  payload: any
-) {
-  const transactionId = `ia_${Date.now()}`;
-  const checkoutUrl = `https://mock-payments.example.com/checkout/${transactionId}`;
-  const tx: InAppTx = {
-    transactionId,
-    checkoutUrl,
-    amount,
-    method,
-    status: "pending",
-  };
-  inAppStore.set(transactionId, tx);
-
-  // Simulate provider completing payment after a short delay
-  setTimeout(() => {
-    const existing = inAppStore.get(transactionId);
-    if (existing) {
-      existing.status = "paid";
-      inAppStore.set(transactionId, existing);
-    }
-  }, 6_000);
-
-  return { transactionId, checkoutUrl };
+  payload: any,
+): Promise<InAppTx> {
+  // If backend supports, implement here. Otherwise, remove this function.
+  throw new Error("In-app checkout is not implemented on backend");
 }
 
+// Checks the payment status for a given transactionId using the backend
 export async function checkInAppPaymentStatus(transactionId: string) {
-  await new Promise((r) => setTimeout(r, 300));
-  const entry = inAppStore.get(transactionId);
-  if (!entry) return { status: "failed" as const };
-  return { status: entry.status };
+  // Try all gateways if needed, but default to Paystack for now
+  // You may want to pass the gateway if you support multiple
+  const gateways = ["PAYSTACK", "FLUTTERWAVE", "MONNIFY"];
+  for (const gateway of gateways) {
+    try {
+      const res = await request(
+        "payment/verify?reference=" +
+          encodeURIComponent(transactionId) +
+          "&gateway=" +
+          gateway,
+      );
+      if (
+        res &&
+        (res.status === "SUCCESS" || res.status === "PAID" || res.success)
+      ) {
+        return { status: "paid", ...res };
+      }
+      if (res && (res.status === "PENDING" || res.status === "pending")) {
+        return { status: "pending", ...res };
+      }
+    } catch (e) {
+      // Try next gateway
+    }
+  }
+  return { status: "pending" };
 }

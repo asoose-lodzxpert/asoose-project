@@ -65,38 +65,69 @@ function transformBannerToPromotion(banner: Banner): Promotion {
   };
 }
 
-export default function HomeScreen() {
-  const [category, setCategory] = useState<StoreFilterSlug | string>("all");
-  const [refreshing, setRefreshing] = useState(false);
-
-  const [homeSections, setHomeSections] = useState<HomeVertical[]>([]);
-  const [homeLoading, setHomeLoading] = useState(true);
+function useBanners() {
   const [banners, setBanners] = useState<Banner[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
+  const load = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await fetchMarketplaceHome();
+      setBanners(response.banners ?? []);
+    } catch (error) {
+      console.error("Failed to fetch banners", error);
+      setError(
+        error instanceof Error ? error.message : "Unable to load promotions",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const refresh = useCallback(async () => {
+    await load();
+  }, [load]);
+
+  return { banners, loading, error, refresh };
+}
+
+function useVerticals() {
+  const [verticals, setVerticals] = useState<HomeVertical[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await fetchMarketplaceHome();
+      setVerticals(response.verticals ?? []);
+    } catch (error) {
+      console.error("Failed to fetch verticals", error);
+      setError(
+        error instanceof Error ? error.message : "Unable to load sections",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const refresh = useCallback(async () => {
+    await load();
+  }, [load]);
+
+  return { verticals, loading, error, refresh };
+}
+
+function usePaginatedStores(category: StoreFilterSlug | string) {
   const [stores, setStores] = useState<Vendor[]>([]);
   const [storesError, setStoresError] = useState<string | null>(null);
-  const [homeError, setHomeError] = useState<string | null>(null);
   const [initialStoreLoading, setInitialStoreLoading] = useState(true);
   const [storeLoading, setStoreLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [nextPage, setNextPage] = useState(1);
-
-  const loadHomeData = useCallback(async () => {
-    try {
-      setHomeLoading(true);
-      setHomeError(null);
-      const response = await fetchMarketplaceHome();
-      setHomeSections(response.verticals ?? []);
-      setBanners(response.banners ?? []);
-    } catch (error) {
-      console.error("Failed to fetch home data", error);
-      setHomeError(
-        error instanceof Error ? error.message : "Unable to load promotions",
-      );
-    } finally {
-      setHomeLoading(false);
-    }
-  }, []);
 
   const loadStores = useCallback(
     async (pageToLoad: number, reset = false) => {
@@ -132,7 +163,7 @@ export default function HomeScreen() {
     [category],
   );
 
-  const refreshStores = useCallback(async () => {
+  const refresh = useCallback(async () => {
     setInitialStoreLoading(true);
     setStores([]);
     setHasMore(true);
@@ -141,26 +172,62 @@ export default function HomeScreen() {
   }, [loadStores]);
 
   useEffect(() => {
-    loadHomeData();
-  }, [loadHomeData]);
-
-  useEffect(() => {
-    refreshStores();
-  }, [refreshStores]);
-
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    try {
-      await Promise.all([loadHomeData(), refreshStores()]);
-    } finally {
-      setRefreshing(false);
-    }
-  }, [loadHomeData, refreshStores]);
+    refresh();
+  }, [refresh]);
 
   const loadMore = useCallback(() => {
     if (storeLoading || initialStoreLoading || !hasMore) return;
     loadStores(nextPage);
   }, [storeLoading, initialStoreLoading, hasMore, loadStores, nextPage]);
+
+  return {
+    stores,
+    storesError,
+    initialStoreLoading,
+    storeLoading,
+    hasMore,
+    loadMore,
+    refresh,
+  };
+}
+
+export default function HomeScreen() {
+  const [category, setCategory] = useState<StoreFilterSlug | string>("all");
+  const [refreshing, setRefreshing] = useState(false);
+
+  const { banners, promotionsError, refresh: refreshPromotions } = useBanners();
+  const {
+    verticals,
+    sectionsLoading,
+    sectionsError,
+    refresh: refreshSections,
+  } = useVerticals();
+  const {
+    stores,
+    storesError,
+    initialStoreLoading,
+    storeLoading,
+    hasMore,
+    loadMore,
+    refresh: refreshStores,
+  } = usePaginatedStores(category);
+
+  useEffect(() => {
+    Promise.all([refreshPromotions(), refreshSections(), refreshStores()]);
+  }, [refreshPromotions, refreshSections, refreshStores]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([
+        refreshPromotions(),
+        refreshSections(),
+        refreshStores(),
+      ]);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refreshPromotions, refreshSections, refreshStores]);
 
   const promotions = useMemo<Promotion[]>(
     () => (banners?.length ? banners.map(transformBannerToPromotion) : []),
@@ -172,7 +239,7 @@ export default function HomeScreen() {
       { key: "all", label: "All", icon: "storefront" },
     ];
 
-    const dynamic = homeSections.map((section) => ({
+    const dynamic = verticals.map((section) => ({
       key: section.id,
       label: section.title,
       icon: getIconForType(section.type),
@@ -186,7 +253,11 @@ export default function HomeScreen() {
       merged.push(item);
     }
     return merged;
-  }, [homeSections]);
+  }, [verticals]);
+
+  useEffect(() => {
+    refreshStores();
+  }, [category, refreshStores]);
 
   return (
     <ThemedView style={{ flex: 1 }} pointerEvents="box-none">
@@ -208,13 +279,19 @@ export default function HomeScreen() {
           <>
             <PromotionsCarousel data={promotions} />
 
-            {homeError && !homeSections.length ? (
+            {promotionsError && promotions.length === 0 ? (
               <ThemedText style={{ marginVertical: 12 }}>
-                {homeError}
+                {promotionsError}
               </ThemedText>
             ) : null}
 
-            {homeLoading && !homeSections.length ? (
+            {sectionsError && verticals.length === 0 ? (
+              <ThemedText style={{ marginVertical: 12 }}>
+                {sectionsError}
+              </ThemedText>
+            ) : null}
+
+            {sectionsLoading && verticals.length === 0 ? (
               <FlatList
                 horizontal
                 data={[1, 2, 3]}
@@ -223,7 +300,7 @@ export default function HomeScreen() {
                 showsHorizontalScrollIndicator={false}
               />
             ) : (
-              homeSections
+              verticals
                 .filter((section) => section.vendors?.length)
                 .map((section) => (
                   <View key={section.id} style={{ marginTop: 16 }}>
@@ -269,7 +346,7 @@ export default function HomeScreen() {
             {storeLoading && stores.length > 0 ? <ActivityIndicator /> : null}
             {!hasMore && stores.length > 0 ? (
               <ThemedText style={{ color: "#6B7280", marginTop: 8 }}>
-                {"You\u2019ve reached the end."}
+                {"You've reached the end."}
               </ThemedText>
             ) : null}
           </View>

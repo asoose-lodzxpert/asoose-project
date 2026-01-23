@@ -1,4 +1,3 @@
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -167,7 +166,6 @@ model SystemSetting {
   updatedAt   DateTime @updatedAt
 }
 
-
 model User {
   id        String     @id @default(uuid())
   email     String     @unique
@@ -199,13 +197,18 @@ model User {
   ridesAsCustomer      Ride[]     @relation("RideCustomer")
   deliveriesAsCustomer Delivery[] @relation("DeliveryCustomer")
 
+  // Emergency Contacts
+  emergencyContacts    EmergencyContact[]
+
+  // Notification Preferences
+  notificationsPreferences Json? // Stores notification preferences
+
   @@index([email])
   @@index([googleId])
   @@index([role, status])
   @@index([createdAt])
   @@index([status, createdAt(sort: Desc)])
 }
-
 
 model UserDocument {
   id        String   @id @default(uuid())
@@ -225,7 +228,6 @@ model UserDocument {
   @@index([userId])
   @@map("user_documents")
 }
-
 
 model Notification {
   id        String   @id @default(uuid())
@@ -282,6 +284,37 @@ model Address {
   @@index([vendorId])            // Fixed: Added index for vendor lookups
   @@index([vendorId, isDefault]) // Fixed: Added compound index for vendor defaults
 }
+
+//// =====================
+//// EMERGENCY CONTACT
+//// =====================
+
+model EmergencyContact {
+  id          String   @id @default(uuid())
+  userId      String?
+  riderId     String?
+  vendorId    String?
+  name        String
+  phone       String
+  relationship String? // e.g., "Spouse", "Parent", "Colleague"
+  isPrimary   Boolean  @default(false)
+
+  user        User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rider       Rider?   @relation(fields: [riderId], references: [id], onDelete: Cascade)
+  vendor      Vendor?  @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, phone])
+  @@unique([riderId, phone])
+  @@unique([vendorId, phone])
+  @@index([userId])
+  @@index([riderId])
+  @@index([vendorId])
+  @@index([isPrimary])
+}
+
 //// =====================
 //// RIDER & LOGISTICS
 //// =====================
@@ -317,6 +350,7 @@ model Rider {
   bankAccount              BankAccount?
   vehicle                  Vehicle?
   documents                RiderDocument[]
+  emergencyContacts        EmergencyContact[]
   notificationSettings     RiderNotificationSettings? @relation("RiderNotificationSettings")
   rides                    Ride[]         @relation("RideRider")
   deliveries               Delivery[]     @relation("DeliveryRider")
@@ -454,6 +488,7 @@ model Vendor {
   // Relations
   store                    Store?
   documents                VendorDocument[]
+  emergencyContacts        EmergencyContact[]
   notifications            Notification[]
   notificationsPreferences Json?      // Stores notification preferences for the vendor
   addresses                Address[]  // Fixed: Added relation to Address
@@ -462,7 +497,7 @@ model Vendor {
 model Store {
   id           String             @id @default(uuid())
   name         String
-description String @default("No description provided")
+  description  String             @default("No description provided")
   slug         String             @unique
   type         StoreType
   address      String?
@@ -472,10 +507,10 @@ description String @default("No description provided")
   banner       String?
   openHours    Json?
   rating       Float              @default(0)
-  ratingCount  Int   @default(0)
+  ratingCount  Int                @default(0)
   status       StoreStatus        @default(PENDING)
   verification VerificationStatus @default(PENDING)
-    vendorId     String   @unique
+  vendorId     String             @unique
   createdAt    DateTime           @default(now())
   updatedAt    DateTime           @updatedAt
 
@@ -680,13 +715,14 @@ model Order {
   paymentStatus String?  @default("PENDING") // PENDING, PAID, FAILED
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
-  disputes Dispute[]
+  disputes  Dispute[]
 
   deliveredAt DateTime?
   cancelledAt DateTime?
 
   user     User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   store    Store       @relation(fields: [storeId], references: [id], onDelete: Restrict)
+
   items    OrderItem[]
   delivery Delivery?   @relation("OrderDelivery")
   payment  Payment?    @relation("OrderPayment")
@@ -774,7 +810,8 @@ model Ride {
   status           RideStatus @default(REQUESTED)
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
-  disputes Dispute[]
+  disputes         Dispute[]
+
   // Security
   startOtp           String?
   cancellationReason String?
@@ -821,7 +858,8 @@ model Delivery {
   status           DeliveryStatus @default(REQUESTED)
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
-  disputes Dispute[]
+  disputes         Dispute[]
+
   // Security & Proof
   deliveryOtp   String?
   pickupProof   String?
@@ -943,8 +981,8 @@ model ActivityLog {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-@@index([action, createdAt], map: "ActivityLog_action_createdAt_idx")      
-@@index([action, createdAt(sort: Desc)], map: "ActivityLog_action_createdAt_desc_idx")
+  @@index([action, createdAt], map: "ActivityLog_action_createdAt_idx")      
+  @@index([action, createdAt(sort: Desc)], map: "ActivityLog_action_createdAt_desc_idx")
 }
 
 model Dispute {

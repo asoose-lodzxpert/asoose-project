@@ -8,6 +8,10 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateAddressDto, CreateOrderDto } from './dto/users.dto';
 import { OrdersService } from './orders.service';
 import { AddressesService } from './addresses.service';
+import {
+  CreateEmergencyContactDto,
+  UpdateEmergencyContactDto,
+} from './dto/emergency-contact.dto';
 
 @Injectable()
 export class UsersService {
@@ -197,7 +201,6 @@ export class UsersService {
     return this.ordersService.calculateQuote(userId, data);
   }
 
-
   // ==================================================================
   // PROFILE LOGIC (Missing!)
   // ==================================================================
@@ -210,7 +213,7 @@ export class UsersService {
           name: true,
           email: true,
           phone: true,
-          image: true, 
+          image: true,
           createdAt: true,
           role: true,
         },
@@ -221,7 +224,7 @@ export class UsersService {
       return {
         ...user,
         // The frontend expects 'avatarUrl', so we map the database 'image' field to it
-        avatarUrl: user.image, 
+        avatarUrl: user.image,
       };
     } catch (error) {
       if (error instanceof NotFoundException) throw error;
@@ -229,7 +232,10 @@ export class UsersService {
       throw new BadRequestException('Failed to fetch profile');
     }
   }
-  async updateUserProfile(userId: string, data: { name: string; phone: string }) {
+  async updateUserProfile(
+    userId: string,
+    data: { name: string; phone: string },
+  ) {
     try {
       // 1. Update the user in the database
       const updatedUser = await this.prisma.user.update({
@@ -239,7 +245,7 @@ export class UsersService {
           phone: data.phone,
         },
       });
-      
+
       return updatedUser;
     } catch (error) {
       this.logger.error(`Failed to update profile for ${userId}`, error);
@@ -264,5 +270,93 @@ export class UsersService {
 
   async deleteUserAddress(userId: string, addressId: string) {
     return this.addressesService.deleteUserAddress(userId, addressId);
+  }
+
+  // ==================================================================
+  // EMERGENCY CONTACT SERVICE METHODS
+  // ==================================================================
+
+  async getEmergencyContacts(userId: string) {
+    return this.prisma.emergencyContact.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async addEmergencyContact(userId: string, data: CreateEmergencyContactDto) {
+    return this.prisma.emergencyContact.create({
+      data: {
+        ...data,
+        user: { connect: { id: userId } },
+      },
+    });
+  }
+
+  async updateEmergencyContact(
+    userId: string,
+    id: string,
+    data: UpdateEmergencyContactDto,
+  ) {
+    // Ensure the contact belongs to the user
+    const contact = await this.prisma.emergencyContact.findFirst({
+      where: { id, userId },
+    });
+    if (!contact) throw new NotFoundException('Contact not found');
+    return this.prisma.emergencyContact.update({
+      where: { id },
+      data,
+    });
+  }
+
+  async deleteEmergencyContact(userId: string, id: string) {
+    // Ensure the contact belongs to the user
+    const contact = await this.prisma.emergencyContact.findFirst({
+      where: { id, userId },
+    });
+    if (!contact) throw new NotFoundException('Contact not found');
+    return this.prisma.emergencyContact.delete({
+      where: { id },
+    });
+  }
+
+  // ==================================================================
+  // NOTIFICATION CONFIG SERVICE METHODS
+  // ==================================================================
+
+  async getNotificationConfig(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { notificationsPreferences: true },
+    });
+    let prefs: any = {};
+    if (user?.notificationsPreferences) {
+      try {
+        prefs =
+          typeof user.notificationsPreferences === 'string'
+            ? JSON.parse(user.notificationsPreferences)
+            : user.notificationsPreferences;
+      } catch {
+        prefs = {};
+      }
+    }
+    return {
+      push: prefs.push ?? true,
+      sms: prefs.sms ?? false,
+      email: prefs.email ?? true,
+      emergencyAlerts: prefs.emergencyAlerts ?? true,
+      tripUpdates: prefs.tripUpdates ?? true,
+    };
+  }
+
+  async updateNotificationConfig(userId: string, config: any) {
+    const allowed = ['push', 'sms', 'email', 'emergencyAlerts', 'tripUpdates'];
+    const filtered = Object.fromEntries(
+      Object.entries(config).filter(([k]) => allowed.includes(k)),
+    );
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { notificationsPreferences: JSON.stringify(filtered) },
+    });
+    return { success: true };
   }
 }
