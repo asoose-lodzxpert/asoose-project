@@ -3,10 +3,15 @@ import { request } from "@/lib/authFetch";
 
 export const fetchNotificationConfig =
   async (): Promise<NotificationConfig> => {
-    const { parsed } = await request("users/notification-config", {
+    const response = await request("users/notification-config", {
       method: "GET",
     });
-    return parsed;
+
+    if (response && response.parsed) {
+      return response.parsed;
+    }
+
+    return response;
   };
 
 export const saveNotificationConfig = async (

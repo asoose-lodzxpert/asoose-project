@@ -156,7 +156,6 @@ export default function CheckoutForm() {
     }
   };
 
-  // ✅ FIXED: Payment Processing Logic
   const processPayment = async (orderId: string, orderTotal: number) => {
     try {
       if (!selectedPaymentMethod) return;
@@ -168,13 +167,12 @@ export default function CheckoutForm() {
         amount: orderTotal,
         email: session?.user?.email || "customer@example.com",
         gateway: selectedPaymentMethod.gateway as any,
-        method: "CARD",
+        method: selectedPaymentMethod.type as "CARD" | "BANK_TRANSFER" | "CASH",
         type: "ORDER",
         orderId: orderId,
         callbackUrl: process.env.NEXT_PUBLIC_APP_URL,
       };
 
-      // ✅ Pass token explicitly to avoid 401
       const token = session?.accessToken;
       if (!token) throw new Error("Authentication missing");
 
@@ -190,9 +188,6 @@ export default function CheckoutForm() {
       }
     } catch (paymentError: any) {
       console.error("Payment initialization error:", paymentError);
-
-      // ✅ Handle graceful failure: Order is created, but payment failed.
-      // Do NOT clear pending_checkout flag here; allow recovery.
 
       toast.warn(
         "Payment initialization failed. Please try paying from Order Details.",
