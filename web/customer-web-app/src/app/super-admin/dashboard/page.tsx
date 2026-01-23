@@ -3,26 +3,34 @@
 import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
 import useSWR from 'swr'; 
-import { getSession } from 'next-auth/react'; // ✅ Import NextAuth getSession
 import { 
-  ShoppingCart, Car, Truck, DollarSign, CheckCircle, 
+  ShoppingCart, DollarSign, CheckCircle, 
   ShieldAlert, UserCheck, MessageSquare, FileText, 
   TrendingUp, TrendingDown, Loader2, AlertTriangle, Download,
-  Zap, RefreshCw
+  Zap, RefreshCw, Truck
 } from 'lucide-react';
 import { DataTable } from '@/app/super-admin/component/datatable';
 
 import { fetcher } from '../hooks/useSuperAdminFetch';
-import { Activity, Alert, Stat } from './component/data';
 import { createActivityColumns, createAlertColumns, renderActivityMobileCard, renderAlertMobileCard } from './component/columns';
 import SuperAdminDashboardSkeleton from './component/skeletom';
 
-// --- Types ---
+// --- Types (Matching Backend) ---
 interface SelectedCardState {
   [key: string]: boolean;
 }
 
-interface QuickStats {
+interface StatCard {
+  label: string;
+  value: string;
+  trend: 'up' | 'down';
+  change: string;
+  iconName: string;
+  color: string;
+  bgColor: string;
+}
+
+interface QuickAccessStats {
   approvals: { total: number; details: string };
   disputes: { total: number; details: string };
   revenue: { growth: string; details: string; isPositive: boolean };
@@ -35,10 +43,32 @@ interface TrendingMetrics {
   criticalAlerts: number;
 }
 
-// API Response Interfaces
+interface DashboardActivity {
+  id: string;
+  type: 'order' | 'ride' | 'vendor' | 'delivery' | 'customer' | 'admin';
+  event: string;
+  entity: string;
+  entityId: string;
+  entityType: 'orders' | 'rides' | 'deliveries' | 'users/vendors' | 'users/customers' | 'admin';
+  time: string;
+  action: string;
+}
+
+interface DashboardAlert {
+  id: string;
+  entityId: string;
+  entityType: 'disputes' | 'verification';
+  severity: 'HIGH' | 'MEDIUM' | 'LOW';
+  message: string;
+  category: string;
+  time: string;
+  status: 'New' | 'Ack' | 'Resolved' | 'Investigating';
+}
+
+// API Response Interface
 interface StatsResponse {
-  stats: Stat[];
-  quickAccess: QuickStats; 
+  stats: StatCard[];
+  quickAccess: QuickAccessStats; 
   trending?: TrendingMetrics;
 }
 
@@ -72,7 +102,7 @@ export default function SuperAdminDashboard() {
     error: activitiesError, 
     isLoading: activitiesLoading,
     mutate: mutateActivities
-  } = useSWR<Activity[]>('/super-admin/dashboard/activities', fetcher, swrConfig);
+  } = useSWR<DashboardActivity[]>('/super-admin/dashboard/activities', fetcher, swrConfig);
 
   // 3. Fetch Alerts
   const { 
@@ -80,7 +110,7 @@ export default function SuperAdminDashboard() {
     error: alertsError, 
     isLoading: alertsLoading,
     mutate: mutateAlerts 
-  } = useSWR<Alert[]>('/super-admin/dashboard/alerts', fetcher, swrConfig);
+  } = useSWR<DashboardAlert[]>('/super-admin/dashboard/alerts', fetcher, swrConfig);
 
   // Combined States
   const isLoading = statsLoading || activitiesLoading || alertsLoading;
@@ -110,30 +140,13 @@ export default function SuperAdminDashboard() {
 
   const handleResolveAlert = async (id: string) => {
     try {
-      // ✅ Use NextAuth getSession instead of Supabase
-      const session = await getSession();
-      const token = (session as any)?.accessToken;
-
-      if (!token) {
-        alert("Authentication expired. Please log in again.");
-        return;
-      }
-
-      const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
-      
-      const res = await fetch(`${BACKEND_URL}/super-admin/dashboard/alerts/${id}/resolve`, {
+      await fetcher(`/super-admin/dashboard/alerts/${id}/resolve`, {
         method: 'POST',
-        headers: { 
-          'Authorization': `Bearer ${token}`, // ✅ Use NextAuth Token
-          'Content-Type': 'application/json' 
-        }
       });
 
-      if (!res.ok) throw new Error('Failed to resolve');
-
-      // ✅ SWR Magic: Optimistic update or Re-fetch
+      // SWR Re-fetch to update UI state
       mutateAlerts(); 
-
+      mutateStats(); 
     } catch (err) {
       console.error("Failed to resolve alert", err);
       alert("Failed to resolve alert. Please try again.");
@@ -207,9 +220,8 @@ export default function SuperAdminDashboard() {
   const getIcon = (iconName: string) => {
     switch(iconName) {
       case 'ShoppingCart': return ShoppingCart;
-      case 'Car': return Car;
-      case 'Truck': return Truck;
       case 'DollarSign': return DollarSign;
+      case 'Truck': return Truck;
       case 'UserCheck': return UserCheck;
       default: return ShoppingCart;
     }
@@ -455,7 +467,7 @@ export default function SuperAdminDashboard() {
         {/* Quick Access Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 pt-4">
           
-          {/* Pending Approvals Card */}
+          {/* Pending Approvals */}
           <div 
             className={`bg-[#1E293B] p-4 md:p-6 rounded-xl border ${
               selectedCards['pending-approvals'] 
@@ -476,14 +488,14 @@ export default function SuperAdminDashboard() {
                 <UserCheck className="w-5 h-5" />
               </div>
             </div>
-            <Link href="/super-admin/approvals">
+            <Link href="/super-admin/verification">
               <button className="w-full py-2 bg-yellow-500 hover:bg-yellow-400 text-black font-bold rounded-lg text-sm transition-colors">
                 Review Now
               </button>
             </Link>
           </div>
 
-          {/* Open Disputes Card */}
+          {/* Open Disputes */}
           <div 
             className={`bg-[#1E293B] p-4 md:p-6 rounded-xl border ${
               selectedCards['open-disputes'] 
@@ -511,7 +523,7 @@ export default function SuperAdminDashboard() {
             </Link>
           </div>
 
-          {/* Revenue Report Card */}
+          {/* Revenue Report */}
           <div 
             className={`bg-[#1E293B] p-4 md:p-6 rounded-xl border ${
               selectedCards['revenue-report'] 
@@ -532,7 +544,7 @@ export default function SuperAdminDashboard() {
                 <FileText className="w-5 h-5" />
               </div>
             </div>
-            <Link href="/super-admin/reports/revenue">
+            <Link href="/super-admin/reports">
               <button className="w-full py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg text-sm transition-colors">
                 View Report
               </button>

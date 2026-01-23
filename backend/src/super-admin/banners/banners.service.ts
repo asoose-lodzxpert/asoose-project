@@ -41,60 +41,64 @@ export class BannersService {
   // ===========================================================================
   // WRITE (Create / Update)
   // ===========================================================================
+async create(data: CreateBannerDto, file?: Express.Multer.File) {
+  let imageKey: string | null = null;
 
-  async create(data: CreateBannerDto, file?: Express.Multer.File) {
-    let imageKey: string | null = null;
-
-    if (file) {
-      const upload = await this.storage.uploadFile(file);
-      imageKey = upload.key;
-    }
-
-    return this.prisma.banner.create({
-      data: {
-        title: data.title,
-        subtitle: data.subtitle,
-        buttonText: data.buttonText ?? 'Order Now',
-        link: data.link ?? '/store',
-        type: data.type ?? 'PROMO',
-        priority: data.priority ? Number(data.priority) : 0,
-        isActive: data.isActive ?? true,
-        image: imageKey,
-      },
-    });
+  if (file) {
+    const upload = await this.storage.uploadFile(file);
+    imageKey = upload.key;
+  } else if (data.image) {
+    // FIX: Persist the pre-uploaded URL if no file is present in the request
+    imageKey = data.image; 
   }
 
-  async update(id: string, data: UpdateBannerDto, file?: Express.Multer.File) {
-    const banner = await this.prisma.banner.findUnique({ where: { id } });
-    if (!banner) throw new NotFoundException(`Banner not found`);
+  return this.prisma.banner.create({
+    data: {
+      title: data.title,
+      subtitle: data.subtitle,
+      buttonText: data.buttonText ?? 'Order Now',
+      link: data.link ?? '/store',
+      type: data.type ?? 'PROMO',
+      priority: data.priority ? Number(data.priority) : 0,
+      isActive: data.isActive ?? true,
+      image: imageKey,
+    },
+  });
+}
 
-    let imageKey = banner.image;
+async update(id: string, data: UpdateBannerDto, file?: Express.Multer.File) {
+  const banner = await this.prisma.banner.findUnique({ where: { id } });
+  if (!banner) throw new NotFoundException(`Banner not found`);
 
-    // Handle Image Replacement
-    if (file) {
-      // 1. Delete old image if it exists
-      if (banner.image) {
-        await this.storage.deleteFileByKey(banner.image).catch(console.error);
-      }
-      // 2. Upload new image
-      const upload = await this.storage.uploadFile(file);
-      imageKey = upload.key;
+  let imageKey = banner.image;
+
+  if (file) {
+    if (banner.image) {
+      await this.storage.deleteFileByKey(banner.image).catch(console.error);
     }
-
-    return this.prisma.banner.update({
-      where: { id },
-      data: {
-        title: data.title,
-        subtitle: data.subtitle,
-        buttonText: data.buttonText,
-        link: data.link,
-        type: data.type,
-        isActive: data.isActive,
-        priority: data.priority ? Number(data.priority) : undefined,
-        image: imageKey,
-      },
-    });
+    const upload = await this.storage.uploadFile(file);
+    imageKey = upload.key;
+  } else if (data.image !== undefined) {
+    // FIX: Respect the updated image URL from the JSON body
+    imageKey = data.image;
   }
+
+  return this.prisma.banner.update({
+    where: { id },
+    data: {
+      title: data.title,
+      subtitle: data.subtitle,
+      buttonText: data.buttonText,
+      link: data.link,
+      type: data.type,
+      isActive: data.isActive,
+      priority: data.priority ? Number(data.priority) : undefined,
+      image: imageKey,
+    },
+  });
+}
+
+
 
   // ===========================================================================
   // REORDERING & DELETE

@@ -15,38 +15,49 @@ const SignIn = () => {
     password: "",
   });
 
-  const handleLogin = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
+ const handleLogin = async (e?: React.FormEvent) => {
+  if (e) e.preventDefault();
 
-    if (!loginData.email || !loginData.password) {
-      setError("Please fill in all fields");
+  if (!loginData.email || !loginData.password) {
+    setError("Please fill in all fields");
+    return;
+  }
+
+  setIsLoading(true);
+  setError("");
+
+  try {
+    const result = await signIn("credentials", {
+      email: loginData.email,
+      password: loginData.password,
+      redirect: false, // Keep false so we can handle the redirect manually
+    });
+
+    if (result?.error) {
+      setError("Invalid email or password");
       return;
     }
 
-    setIsLoading(true);
-    setError("");
+    // 1. Fetch the updated session to determine the user's role
+    const { getSession } = await import("next-auth/react");
+    const session = await getSession();
 
-    try {
-      const result = await signIn("credentials", {
-        email: loginData.email,
-        password: loginData.password,
-        redirect: false,
-      });
-
-      if (result?.error) {
-        setError("Invalid email or password");
-        return;
-      }
-
-      // Successful login - redirect to main store
+    // 2. Define the admin roles allowed to access the dashboard
+    const ADMIN_ROLES = ['SUPER_ADMIN', 'ADMIN_MANAGER', 'ADMIN_SUPPORT', 'ADMIN_FINANCE'];
+    
+    // 3. Perform dynamic redirection based on the role found in the session
+    if (session?.user?.role && ADMIN_ROLES.includes(session.user.role)) {
+      router.push("/super-admin/dashboard");
+    } else {
       router.push("/main/store");
-    } catch (err: any) {
-      setError(err.message || "Login failed");
-    } finally {
-      setIsLoading(false);
     }
-  };
 
+  } catch (err: any) {
+    setError(err.message || "Login failed");
+  } finally {
+    setIsLoading(false);
+  }
+};
   const handleGoogleSignIn = async () => {
     try {
       setIsLoading(true);
@@ -175,7 +186,7 @@ const SignIn = () => {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full bg-yellow-500 text-black py-3 rounded-xl hover:bg-yellow-400 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-bold   active:scale-[0.98]"
+              className="w-full bg-yellow-500 text-black py-3 rounded-xl hover:bg-yellow-400 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-bold  active:scale-[0.98]"
             >
               {isLoading ? (
                 <span className="flex items-center justify-center gap-2">

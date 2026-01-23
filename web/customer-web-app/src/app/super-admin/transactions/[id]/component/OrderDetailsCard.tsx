@@ -3,6 +3,8 @@ import Link from 'next/link';
 import { Package, ExternalLink } from 'lucide-react';
 import { SectionCard } from './SectionCard';
 import { TransactionDetail } from '../types';
+import { Currency } from '@/app/main/components/Currency'; // ✅ Added
+
 interface OrderDetailsProps {
   details: NonNullable<TransactionDetail['orderDetails']>;
   financialBreakdown?: TransactionDetail['financialBreakdown'];
@@ -58,10 +60,12 @@ export const OrderDetailsCard = ({ details, financialBreakdown }: OrderDetailsPr
                   )}
                   <div>
                     <p className="text-white font-medium">{item.name}</p>
-                    <p className="text-gray-400 text-sm">Qty: {item.qty} × ${item.price.toFixed(2)}</p>
+                    {/* ✅ Fixed: Formatted item price */}
+                    <p className="text-gray-400 text-sm">Qty: {item.qty} × <Currency amount={item.price} /></p>
                   </div>
                 </div>
-                <span className="text-white font-bold">${item.total.toFixed(2)}</span>
+                {/* ✅ Fixed: Formatted item total */}
+                <span className="text-white font-bold"><Currency amount={item.total} /></span>
               </div>
             ))}
           </div>
@@ -74,16 +78,19 @@ export const OrderDetailsCard = ({ details, financialBreakdown }: OrderDetailsPr
             <div className="space-y-3">
               <div className="flex justify-between">
                 <span className="text-gray-400">Subtotal</span>
-                <span className="text-white">${details.subtotal.toFixed(2)}</span>
+                {/* ✅ Fixed: Formatted subtotal */}
+                <span className="text-white"><Currency amount={details.subtotal} /></span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-400">Platform Commission ({details.commissionRate}%)</span>
-                <span className="text-orange-500">-${financialBreakdown.platformCommission?.toFixed(2)}</span>
+                {/* ✅ Fixed: Formatted commission */}
+                <span className="text-orange-500">-<Currency amount={financialBreakdown.platformCommission} /></span>
               </div>
               <div className="flex justify-between pt-3 border-t border-gray-700">
                 <span className="text-gray-300 font-medium">Vendor Receives</span>
                 <span className="text-green-500 font-bold text-lg">
-                  ${financialBreakdown.vendorReceives?.toFixed(2)}
+                  {/* ✅ Fixed: Formatted vendor amount */}
+                  <Currency amount={financialBreakdown.vendorReceives} />
                 </span>
               </div>
             </div>

@@ -1,12 +1,10 @@
 import React from 'react';
 import Link from 'next/link';
 import { createColumnHelper } from '@tanstack/react-table';
-import { Activity,Alert } from './data';
-import { 
-  Clock, ShoppingCart, Car, Package, Truck, Users, ExternalLink, 
-  MoreHorizontal, AlertCircle, Eye 
-} from 'lucide-react';
+import { Activity, Alert } from './data';
+import { Clock, ShoppingCart, Car, Package, Truck, Users, ExternalLink, AlertCircle, Eye, MoreHorizontal } from 'lucide-react';
 import { formatDistanceToNow, parseISO } from 'date-fns';
+
 const columnHelperActivity = createColumnHelper<Activity>();
 const columnHelperAlert = createColumnHelper<Alert>();
 
@@ -41,31 +39,25 @@ export const getStatusColor = (status: string) => {
   }
 };
 
+// Architecture Fix: Removed fragile regex extraction
 export const getActivityLink = (activity: Activity) => {
-  switch (activity.type) {
-    case 'order': return `/super-admin/orders/${activity.event.match(/#ORD-\d+/)?.[0] || ''}`;
-    case 'ride': return `/super-admin/rides/${activity.event.match(/#RID-\d+/)?.[0] || ''}`;
-    case 'vendor': return `/super-admin/users/vendors/${activity.entity.match(/#VEN-\d+/)?.[0] || ''}`;
-    case 'delivery': return `/super-admin/deliveries/${activity.event.match(/#DEL-\d+/)?.[0] || ''}`;
-    case 'customer': return `/super-admin/users/customers/${activity.entity.match(/Customer (.+)/)?.[1] || ''}`;
-    default: return '#';
-  }
+  if (!activity.entityId || !activity.entityType) return '#';
+  return `/super-admin/${activity.entityType}/${activity.entityId}`;
 };
 
 // --- Activity Columns ---
 export const createActivityColumns = () => [
-columnHelperActivity.accessor("time", {
-  header: "Timestamp",
-  cell: info => (
-    <div className="flex items-center gap-2">
-      <Clock className="w-3 h-3 text-gray-500" />
-      {/* Parse the ISO string from backend */}
-      <span className="font-mono text-gray-400 text-xs">
-        {formatDistanceToNow(parseISO(info.getValue()), { addSuffix: true })}
-      </span>
-    </div>
-  ),
-}),
+  columnHelperActivity.accessor("time", {
+    header: "Timestamp",
+    cell: info => (
+      <div className="flex items-center gap-2">
+        <Clock className="w-3 h-3 text-gray-500" />
+        <span className="font-mono text-gray-400 text-xs">
+          {formatDistanceToNow(parseISO(info.getValue()), { addSuffix: true })}
+        </span>
+      </div>
+    ),
+  }),
   columnHelperActivity.accessor("event", {
     header: "Event",
     cell: info => (
@@ -82,8 +74,8 @@ columnHelperActivity.accessor("time", {
   {
     id: "actions",
     header: "Action",
-cell: ({ row }: { row: any }) => (
-    <div className="flex items-center gap-2">
+    cell: ({ row }: { row: any }) => (
+      <div className="flex items-center gap-2">
         <Link href={getActivityLink(row.original)}>
           <button className="flex items-center gap-1 text-yellow-500 hover:text-yellow-400 font-bold text-xs transition-colors">
             <ExternalLink className="w-3 h-3" /> {row.original.action}
@@ -113,14 +105,8 @@ export const createAlertColumns = ({ onResolve }: AlertActions) => [
       </div>
     ),
   }),
-  columnHelperAlert.accessor("category", {
-    header: "Category",
-    cell: info => <span className="text-gray-400 text-xs">{info.getValue()}</span>,
-  }),
-  columnHelperAlert.accessor("time", {
-    header: "Timestamp",
-    cell: info => <span className="text-gray-400 text-xs">{info.getValue()}</span>,
-  }),
+  columnHelperAlert.accessor("category", { header: "Category", cell: info => <span className="text-gray-400 text-xs">{info.getValue()}</span> }),
+  columnHelperAlert.accessor("time", { header: "Timestamp", cell: info => <span className="text-gray-400 text-xs">{info.getValue()}</span> }),
   columnHelperAlert.accessor("status", {
     header: "Status",
     cell: info => <span className={`px-2 py-1 rounded text-xs ${getStatusColor(info.getValue())}`}>{info.getValue()}</span>,
@@ -128,11 +114,14 @@ export const createAlertColumns = ({ onResolve }: AlertActions) => [
   {
     id: "actions",
     header: "Actions",
-cell: ({ row }: { row: any }) => (
-    <div className="flex items-center gap-2">
-        <button className="p-1.5 hover:bg-blue-500/10 rounded text-gray-400 hover:text-blue-500 transition-colors" title="View Details">
-          <Eye className="w-4 h-4" />
-        </button>
+    cell: ({ row }: { row: any }) => (
+      <div className="flex items-center gap-2">
+        {/* Fix: View deep-link */}
+        <Link href={`/super-admin/${row.original.entityType}/${row.original.entityId}`}>
+          <button className="p-1.5 hover:bg-blue-500/10 rounded text-gray-400 hover:text-blue-500 transition-colors" title="View Details">
+            <Eye className="w-4 h-4" />
+          </button>
+        </Link>
         <button 
           onClick={() => onResolve(row.original.id)}
           className={`px-3 py-1 rounded font-bold text-xs ${row.original.status === 'New' ? 'bg-yellow-500 hover:bg-yellow-400 text-black' : 'bg-green-500 hover:bg-green-400 text-black'}`}
@@ -190,9 +179,11 @@ export const renderAlertMobileCard = (alert: Alert) => (
       </div>
     </div>
     <div className="flex gap-2 pt-3 border-t border-gray-800">
-      <button className="flex-1 flex items-center justify-center gap-2 py-2 bg-gray-700/50 rounded-lg hover:bg-white/10 text-gray-300 hover:text-white transition-colors text-sm">
-        <Eye className="w-4 h-4" /><span>View</span>
-      </button>
+      <Link href={`/super-admin/${alert.entityType}/${alert.entityId}`} className="flex-1">
+        <button className="w-full flex items-center justify-center gap-2 py-2 bg-gray-700/50 rounded-lg hover:bg-white/10 text-gray-300 hover:text-white transition-colors text-sm">
+          <Eye className="w-4 h-4" /><span>View</span>
+        </button>
+      </Link>
       <button className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-bold ${alert.status === 'New' ? 'bg-yellow-500 text-black' : 'bg-green-500 text-black'}`}>
         {alert.status === 'New' ? 'Resolve' : 'Reopen'}
       </button>

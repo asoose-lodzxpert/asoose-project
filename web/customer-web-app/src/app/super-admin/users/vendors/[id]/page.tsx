@@ -1,11 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Loader2, DollarSign, TrendingUp } from 'lucide-react';
 import Swal from 'sweetalert2';
 import useSWR from 'swr'; 
-import { getSession } from 'next-auth/react'; 
 import { fetcher } from '@/app/super-admin/hooks/useSuperAdminFetch';
 
 // --- Components ---
@@ -21,33 +20,30 @@ import HealthScoreCard from './components/healthcard';
 import ProductsTabContent from './components/productstabcontent';
 import PayoutsTabContent from './components/payoutstabcontent';
 import DocumentsTab from '@/app/super-admin/component/documentstab';
+import { Currency } from '@/app/main/components/Currency';
 
 // --- Types ---
-
-// ✅ FIXED: Updated to match what ProductsTabContent expects
 interface Product {
   id: string;
   name: string;
   price: number;
   status: string;
   image?: string;
-  category: string; // Added required property
+  category: string; 
   stock?: number;
 }
 
-// ✅ FIXED: Updated to match what ActivityLogTab expects
 interface ActivityLog {
   id: string;
   action: string;
   details?: string;
-  user: string;      // Added required property
-  timestamp: string; // Added required property (replaces or maps to 'date')
+  user: string;      
+  timestamp: string; 
 }
 
-// ✅ FIXED: Updated to match what PerformanceChart expects
 interface PerformanceData {
   date: string;
-  revenue: number;   // Changed from 'value' to 'revenue'
+  revenue: number;   
 }
 
 interface VendorDocument {
@@ -78,15 +74,12 @@ interface VendorDetails {
   vendorDocuments: VendorDocument[];
 }
 
-// Payouts response structure
 type PayoutsResponse = { history: any[] } | any[]; 
 
-// --- Validation Helper ---
 const validateEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
-// --- Simple Tab Loader Component ---
 const TabLoader = () => (
-  <div className="flex flex-col items-center justify-center h-64 space-y-4 animate-in fade-in">
+  <div className="flex flex-col items-center justify-center h-64 space-y-4">
     <Loader2 className="w-8 h-8 text-yellow-500 animate-spin" />
     <p className="text-gray-500 text-sm font-medium">Loading tab data...</p>
   </div>
@@ -96,29 +89,15 @@ export default function VendorDetailPage() {
   const params = useParams();
   const router = useRouter();
   const slugOrId = params?.id as string; 
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
   // --- UI State ---
   const [activeTab, setActiveTab] = useState('Order History');
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   
-  // Local form state
   const [formData, setFormData] = useState({ 
     storeName: '', ownerName: '', phone: '', email: '' , address: ''
   });
-
-  // Helper to get auth token
-  const getAuthHeader = async () => {
-    const session = await getSession();
-    const token = (session as any)?.accessToken;
-    return {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token || ''}`
-    };
-  };
-
-  // DATA FETCHING (Main & Tabs)
 
   // 1. Main Vendor Profile
   const { 
@@ -151,53 +130,32 @@ export default function VendorDetailPage() {
   );
 
   // 3. Tab Specific Data
-  
-  // -- Products --
-  const { 
-    data: products, 
-    mutate: mutateProducts,
-    isLoading: isProductsLoading 
-  } = useSWR<Product[]>(
+  const { data: products, mutate: mutateProducts, isLoading: isProductsLoading } = useSWR<Product[]>(
     vendor?.id && activeTab === 'Products' ? `/super-admin/vendors/${vendor.id}/products` : null,
     fetcher
   );
 
-  // -- Documents --
-  const { 
-    data: documentsData, 
-    mutate: mutateDocuments,
-    isLoading: isDocumentsLoading
-  } = useSWR<VendorDocument[]>(
+  const { data: documentsData, mutate: mutateDocuments, isLoading: isDocumentsLoading } = useSWR<VendorDocument[]>(
     vendor?.id && activeTab === 'Documents' ? `/super-admin/vendors/${vendor.id}/documents` : null,
     fetcher
   );
 
-  // -- Payouts --
-  const { 
-    data: payoutsData, 
-    mutate: mutatePayouts,
-    isLoading: isPayoutsLoading
-  } = useSWR<PayoutsResponse>(
+  const { data: payoutsData, mutate: mutatePayouts, isLoading: isPayoutsLoading } = useSWR<PayoutsResponse>(
     vendor?.id && activeTab === 'Payouts' ? `/super-admin/vendors/${vendor.id}/payouts` : null,
     fetcher
   );
 
-  // Normalize payouts structure
   const payoutsHistory = (payoutsData && 'history' in payoutsData 
     ? payoutsData.history 
     : Array.isArray(payoutsData) ? payoutsData : []) || [];
 
-  // -- Activity Log --
-  const { 
-    data: activityLogs,
-    isLoading: isActivityLoading
-  } = useSWR<ActivityLog[]>(
+  const { data: activityLogs, isLoading: isActivityLoading } = useSWR<ActivityLog[]>(
     vendor?.id && activeTab === 'Activity Log' ? `/super-admin/vendors/${vendor.id}/activity` : null,
     fetcher
   );
 
   // ===========================================================================
-  //  HANDLERS
+  //  HANDLERS (Standardized with Fetcher)
   // ===========================================================================
 
   const handleSave = async () => {
@@ -208,20 +166,17 @@ export default function VendorDetailPage() {
 
     setIsSaving(true);
     try {
-      const headers = await getAuthHeader();
-      const res = await fetch(`${API_URL}/api/super-admin/vendors/${vendor?.id}`, {
+      // FIX: Using fetcher prevents path duplication and handles auth automatically
+      await fetcher(`/super-admin/vendors/${vendor?.id}`, {
         method: 'PATCH',
-        headers,
         body: JSON.stringify(formData),
       });
-
-      if (!res.ok) throw new Error('Failed');
       
       mutateVendor();
       setIsEditing(false);
       Swal.fire({ icon: 'success', title: 'Updated!', timer: 1500, showConfirmButton: false, background: '#1E293B', color: '#fff' });
-    } catch {
-      Swal.fire({ icon: 'error', title: 'Error', text: 'Could not save changes.', background: '#1E293B', color: '#fff' });
+    } catch (err: any) {
+      Swal.fire({ icon: 'error', title: 'Error', text: err.message || 'Could not save changes.', background: '#1E293B', color: '#fff' });
     } finally {
       setIsSaving(false);
     }
@@ -230,16 +185,13 @@ export default function VendorDetailPage() {
   const toggleProductBan = async (productId: string, currentStatus: string) => {
     const newStatus = (currentStatus === 'BANNED' || currentStatus === 'DISABLED') ? 'ACTIVE' : 'DISABLED';
     
-    // Optimistic Update
     if (products) {
         mutateProducts(products.map((p) => p.id === productId ? { ...p, status: newStatus } : p), false);
     }
 
     try {
-      const headers = await getAuthHeader();
-      await fetch(`${API_URL}/api/super-admin/vendors/products/${productId}/status`, {
+      await fetcher(`/super-admin/vendors/products/${productId}/status`, {
         method: 'PATCH',
-        headers,
         body: JSON.stringify({ status: newStatus })
       });
       Swal.fire({ icon: 'success', title: `Product ${newStatus === 'ACTIVE' ? 'Activated' : 'Banned'}`, toast: true, position: 'bottom-end', timer: 1500, showConfirmButton: false, background: '#1E293B', color: '#fff' });
@@ -252,14 +204,10 @@ export default function VendorDetailPage() {
 
   const handleVerifyDocument = async (docId: string, status: 'VERIFIED' | 'REJECTED', rejectionReason?: string) => {
     try {
-      const headers = await getAuthHeader();
-      const res = await fetch(`${API_URL}/api/super-admin/verification/documents/${docId}`, {
+      await fetcher(`/super-admin/verification/documents/${docId}`, {
         method: 'PATCH',
-        headers,
         body: JSON.stringify({ status, rejectionReason })
       });
-
-      if (!res.ok) throw new Error('Action failed');
 
       Swal.fire({
         title: status === 'VERIFIED' ? 'Verified' : 'Rejected',
@@ -282,7 +230,7 @@ export default function VendorDetailPage() {
 
     const result = await Swal.fire({
       title: 'Confirm Payout',
-      text: `Send $${vendor.unpaidBalance.toLocaleString()} to vendor?`,
+      text: `Process payout to vendor?`,
       icon: 'question',
       showCancelButton: true,
       confirmButtonText: 'Yes, Pay',
@@ -292,14 +240,10 @@ export default function VendorDetailPage() {
 
     if (result.isConfirmed) {
       try {
-        const headers = await getAuthHeader();
-        const res = await fetch(`${API_URL}/api/super-admin/vendors/${vendor.id}/payouts`, {
+        await fetcher(`/super-admin/vendors/${vendor.id}/payouts`, {
           method: 'POST',
-          headers,
           body: JSON.stringify({ amount: vendor.unpaidBalance })
         });
-        
-        if (!res.ok) throw new Error('Payout failed');
         
         mutatePayouts();
         mutateVendor();
@@ -325,20 +269,13 @@ export default function VendorDetailPage() {
       showLoaderOnConfirm: true,
       preConfirm: async (message) => {
         if (!message) return Swal.showValidationMessage('Message cannot be empty');
-        
         try {
-          const headers = await getAuthHeader();
-          
-          const response = await fetch(`${API_URL}/super-admin/vendors/${vendor?.id}/message`, {
+          return await fetcher(`/super-admin/vendors/${vendor?.id}/message`, {
             method: 'POST',
-            headers,
             body: JSON.stringify({ message })
           });
-
-          if (!response.ok) throw new Error(response.statusText);
-          return await response.json();
-        } catch (error) {
-          Swal.showValidationMessage(`Request failed: ${error}`);
+        } catch (error: any) {
+          Swal.showValidationMessage(`Request failed: ${error.message}`);
         }
       },
       allowOutsideClick: () => !Swal.isLoading()
@@ -367,7 +304,6 @@ export default function VendorDetailPage() {
   return (
     <div className="max-w-7xl mx-auto px-4 md:px-6 space-y-6 pb-20">
       
-      {/* 1. Header Component */}
       <VendorHeader 
         name={vendor.name} 
         status={vendor.status} 
@@ -380,7 +316,6 @@ export default function VendorDetailPage() {
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pt-2">
-        {/* 2. Info Columns */}
         <div className="space-y-6">
             <HealthScoreCard totalOrders={vendor.totalOrders} />
             <BusinessInfoCard 
@@ -391,12 +326,11 @@ export default function VendorDetailPage() {
             />
         </div>
 
-        {/* 3. Financials Column */}
         <div className="lg:col-span-2 space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <RevenueCard 
               title="Total Revenue" 
-              amount={`$${vendor.totalRevenue?.toLocaleString() || '0.00'}`} 
+              amount={<Currency amount={vendor.totalRevenue} />} 
               change={0} 
               icon={DollarSign} 
               color="green" 
@@ -404,18 +338,16 @@ export default function VendorDetailPage() {
             />
             <RevenueCard 
               title="Unpaid Balance" 
-              amount={`$${vendor.unpaidBalance?.toLocaleString() || '0.00'}`} 
+              amount={<Currency amount={vendor.unpaidBalance} />} 
               icon={TrendingUp} 
               color="yellow" 
               onClick={() => setActiveTab('Payouts')} 
             />
           </div>
-          {/* ✅ Passed array fallback */}
           <PerformanceChart data={performanceData || []} />
         </div>
       </div>
 
-      {/* 4. Tabs Section */}
       <div className="mt-8 w-full bg-[#1E293B] border-t border-gray-800 rounded-t-xl overflow-hidden min-h-[500px]">
         <div className="flex border-b border-gray-800 overflow-x-auto px-6 hide-scrollbar">
           {['Order History', 'Products', 'Payouts', 'Documents', 'Reviews', 'Activity Log'].map((tab) => (
@@ -434,12 +366,10 @@ export default function VendorDetailPage() {
         </div>
 
         <div className="p-6">
-            {/* --- ORDERS --- */}
             {activeTab === 'Order History' && (
                 <OrderHistoryTab orders={vendor.orders || []} />
             )}
             
-            {/* --- PRODUCTS --- */}
             {activeTab === 'Products' && (
               <ProductsTabContent 
                 products={products || []} 
@@ -448,7 +378,6 @@ export default function VendorDetailPage() {
               />
             )}
 
-            {/* --- PAYOUTS --- */}
             {activeTab === 'Payouts' && (
               isPayoutsLoading ? <TabLoader /> : (
                 <PayoutsTabContent 
@@ -459,7 +388,6 @@ export default function VendorDetailPage() {
               )
             )}
 
-            {/* --- DOCUMENTS --- */}
             {activeTab === 'Documents' && (
               isDocumentsLoading ? <TabLoader /> : (
                 <DocumentsTab 
@@ -471,7 +399,6 @@ export default function VendorDetailPage() {
                     type: doc.type || doc.name || 'Document', 
                     createdAt: doc.createdAt || doc.uploadedDate || new Date().toISOString()
                   }))} 
-                  
                   onVerify={(id) => handleVerifyDocument(id, 'VERIFIED')}
                   onReject={(id, reason) => handleVerifyDocument(id, 'REJECTED', reason)}
                   showUploadButton={true}
@@ -479,12 +406,10 @@ export default function VendorDetailPage() {
               )
             )}
 
-            {/* --- REVIEWS --- */}
             {activeTab === 'Reviews' && (
                 <ReviewsTab reviews={vendor.reviews || []} />
             )}
 
-            {/* --- ACTIVITY --- */}
             {activeTab === 'Activity Log' && (
                 isActivityLoading ? <TabLoader /> : (
                     <ActivityLogTab logs={activityLogs || []} />

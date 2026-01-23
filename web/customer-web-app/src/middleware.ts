@@ -17,6 +17,7 @@ export async function middleware(req: NextRequest) {
   }
 
   // 2. Get User Session (NextAuth v4)
+  // Utilizes the NextAuth secret to retrieve the JWT token containing user data like role
   const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
   const isLoggedIn = !!token;
   const userRole = token?.role as string | undefined;
@@ -25,20 +26,19 @@ export async function middleware(req: NextRequest) {
   let isMaintenanceActive = false;
   
   try {
-    // Ensure you have this endpoint or similar in your NestJS backend
     const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/settings/maintenance-mode`, {
-      next: { revalidate: 60 }, // Cache for 60 seconds to reduce backend load
+      next: { revalidate: 60 }, 
     });
     
     if (res.ok) {
       const data = await res.json();
-      isMaintenanceActive = data.isEnabled === true; // Adjust based on your API response structure
+      isMaintenanceActive = data.isEnabled === true; 
     }
   } catch (error) {
-    // If backend is down, default to false (or true if you prefer safety)
     console.error("Middleware fetch error:", error);
   }
 
+  // Checks if the logged-in user possesses an authorized admin role
   const isAdmin = isLoggedIn && userRole && ADMIN_ROLES.includes(userRole);
 
   // 4. Redirect Logic
@@ -56,7 +56,9 @@ export async function middleware(req: NextRequest) {
 
   // Auth Page Redirect
   if (isLoggedIn && (url.pathname === '/sign-in' || url.pathname === '/sign-up')) {
-    return NextResponse.redirect(new URL('/main/store', req.url));
+    // FIX: Dynamically redirect based on the user's role instead of hardcoding /main/store
+    const target = isAdmin ? '/super-admin' : '/main/store';
+    return NextResponse.redirect(new URL(target, req.url));
   }
 
   return NextResponse.next();

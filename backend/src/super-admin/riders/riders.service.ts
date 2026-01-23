@@ -439,4 +439,15 @@ export class RidersService {
       },
     });
   }
+async getRiderPayouts(riderId: string) {
+  return this.prisma.riderPayout.findMany({
+    where: { 
+      riderId: riderId 
+    },
+    orderBy: { 
+      createdAt: 'desc' 
+    }
+  });
+}
+
 }
