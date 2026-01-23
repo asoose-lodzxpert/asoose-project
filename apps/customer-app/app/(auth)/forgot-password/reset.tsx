@@ -39,7 +39,7 @@ export default function ForgotPasswordResetScreen() {
 
   useEffect(() => {
     if (!email || !token) {
-      router.replace("/(auth)/forgot-password");
+      router.replace("/login");
     }
   }, [email, token, router]);
 

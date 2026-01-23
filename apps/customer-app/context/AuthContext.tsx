@@ -65,7 +65,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const saveSession = async (
     u: User,
     accessToken?: string | null,
-    refreshToken?: string | null
+    refreshToken?: string | null,
   ) => {
     setUser(u);
     await AsyncStorage.setItem(USER_KEY, JSON.stringify(u));
@@ -88,18 +88,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     async ({ email, password }: { email: string; password: string }) => {
       setLoading(true);
       try {
+        console.log("[AuthContext] login called", { email });
         const resp = await loginService(email, password);
+        console.log("[AuthContext] loginService response", resp);
         // resp expected: { user, accessToken, refreshToken }
         await saveSession(
           resp.user,
           resp.accessToken || null,
-          resp.refreshToken || null
+          resp.refreshToken || null,
         );
+        console.log("[AuthContext] saveSession complete", {
+          user: resp.user,
+          accessToken: resp.accessToken,
+          refreshToken: resp.refreshToken,
+        });
+      } catch (err) {
+        console.error("[AuthContext] login error", err);
+        throw err;
       } finally {
         setLoading(false);
+        console.log("[AuthContext] login finished, loading:", false);
       }
     },
-    []
+    [],
   );
 
   const logout = useCallback(async () => {
@@ -119,10 +130,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // WARNING: For production, use SecureStore / Keychain instead of AsyncStorage
       await AsyncStorage.setItem(
         BIOMETRIC_KEY,
-        JSON.stringify({ email, password })
+        JSON.stringify({ email, password }),
       );
     },
-    []
+    [],
   );
 
   const biometricLogin = useCallback(async () => {

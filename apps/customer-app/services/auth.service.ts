@@ -115,16 +115,25 @@ export async function login<UserShape = any>(
     body: { email, password },
   });
 
-  if (!data?.accessToken || !data?.refreshToken) {
+  // Accept both snake_case and camelCase from backend
+  const accessToken = data.accessToken || data.access_token;
+  const refreshToken = data.refreshToken || data.refresh_token;
+
+  if (!accessToken || !refreshToken) {
     throw new Error("Login response missing tokens");
   }
 
   await setTokens({
-    accessToken: data.accessToken,
-    refreshToken: data.refreshToken,
+    accessToken,
+    refreshToken,
   });
 
-  return data as LoginResponse<UserShape>;
+  // Always return camelCase for frontend
+  return {
+    ...data,
+    accessToken,
+    refreshToken,
+  } as LoginResponse<UserShape>;
 }
 
 export async function refreshAccessToken(): Promise<string> {

@@ -26,8 +26,8 @@ export class AuthController {
 
   // Universal refresh route
   @Post('refresh')
+  @Throttle({ default: { limit: 10, ttl: 60 * 1000 } })
   refresh(@Body() body) {
-    // body: { refreshToken }
     return this.authService.refresh(body.refreshToken);
   }
 }

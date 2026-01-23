@@ -8,7 +8,7 @@ import {
   Platform,
   ActivityIndicator,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { RelativePathString, useRouter } from "expo-router";
 
 import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
@@ -117,7 +117,9 @@ export default function LoginScreen() {
           <Pressable
             style={styles.forgot}
             disabled={loading}
-            onPress={() => router.push("/forgot-password")}
+            onPress={() =>
+              router.push("/(auth)/forgot-password/" as RelativePathString)
+            }
           >
             <ThemedText style={{ color: primary, fontWeight: "600" }}>
               Forgot password?

@@ -48,7 +48,7 @@ export default function ForgotPasswordEmailScreen() {
         message: "Check your email for the 6-digit code.",
       });
       router.push({
-        pathname: "/forgot-password/otp",
+        pathname: "/(auth)/forgot-password/otp",
         params: { email: email.trim().toLowerCase() },
       });
     } catch (err: any) {
@@ -80,7 +80,7 @@ export default function ForgotPasswordEmailScreen() {
             Forgot password?
           </ThemedText>
           <ThemedText style={{ color: textMuted }}>
-            Enter the email linked to your account and we'll send you a
+            Enter the email linked to your account and we&apos;ll send you a
             one-time code to reset your password.
           </ThemedText>
         </View>
@@ -111,9 +111,7 @@ export default function ForgotPasswordEmailScreen() {
             {loading ? (
               <ActivityIndicator color="#000" />
             ) : (
-              <ThemedText style={styles.primaryButtonText}>
-                Send OTP
-              </ThemedText>
+              <ThemedText style={styles.primaryButtonText}>Send OTP</ThemedText>
             )}
           </Pressable>
         </View>

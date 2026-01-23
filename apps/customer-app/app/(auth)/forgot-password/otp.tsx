@@ -7,7 +7,7 @@ import {
   Platform,
   ActivityIndicator,
 } from "react-native";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter, type Href } from "expo-router";
 
 import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
@@ -37,7 +37,7 @@ export default function ForgotPasswordOtpScreen() {
 
   useEffect(() => {
     if (!email) {
-      router.replace("/forgot-password");
+      router.replace("/(auth)/forgot-password/reset");
     }
   }, [email, router]);
 
@@ -55,7 +55,7 @@ export default function ForgotPasswordOtpScreen() {
       return;
     }
     router.push({
-      pathname: "/forgot-password/reset",
+      pathname: "/(auth)/forgot-password/reset",
       params: { email, token: otp.trim() },
     });
   };
@@ -115,7 +115,6 @@ export default function ForgotPasswordOtpScreen() {
               setOtp(value.replace(/[^0-9]/g, ""));
               if (error) setError(null);
             }}
-            editable={!loading}
           />
 
           {error && <ThemedText style={styles.errorText}>{error}</ThemedText>}
