@@ -3,8 +3,7 @@
 import React from 'react';
 import { AlertTriangle, XCircle, CheckCircle, RefreshCcw } from 'lucide-react';
 import Swal from 'sweetalert2';
-import { getSession } from 'next-auth/react'; // ✅ Import NextAuth
-
+import { fetcher } from '@/app/super-admin/hooks/useSuperAdminFetch';
 interface OrderActionsPanelProps {
   orderId: string;
   currentStatus: string;
@@ -30,22 +29,11 @@ export default function OrderActionsPanel({ orderId, currentStatus, onUpdate }: 
 
     if (reason) {
       try {
-        const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-        
-        // ✅ Get Session via NextAuth
-        const session = await getSession();
-        const token = (session as any)?.accessToken;
-
-        const res = await fetch(`${API_URL}/super-admin/orders/${orderId}/override`, {
+        // ✅ Use standardized fetcher. It handles API_URL, Tokens, and Headers automatically.
+        await fetcher(`/super-admin/orders/${orderId}/override`, {
           method: 'PATCH',
-          headers: { 
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}` // ✅ Use Token
-          },
           body: JSON.stringify({ status: newStatus, reason })
         });
-
-        if (!res.ok) throw new Error('Failed');
 
         Swal.fire({ 
             title: 'Updated', icon: 'success', timer: 1500, showConfirmButton: false, 
@@ -54,8 +42,15 @@ export default function OrderActionsPanel({ orderId, currentStatus, onUpdate }: 
         
         onUpdate(); // Refresh the parent page
 
-      } catch (e) {
-        Swal.fire({ title: 'Error', text: 'Action failed', icon: 'error' });
+      } catch (e: any) {
+        // Fetcher throws a FetcherError with detailed info if available
+        Swal.fire({ 
+          title: 'Error', 
+          text: e.message || 'Action failed', 
+          icon: 'error',
+          background: '#1E293B', 
+          color: '#fff' 
+        });
       }
     }
   };

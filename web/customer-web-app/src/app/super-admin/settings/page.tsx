@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import useSWR, { mutate } from 'swr';
-import { useSession } from "next-auth/react"; // ✅ NextAuth Import
+import { useSession } from "next-auth/react";
 import { fetcher } from '../hooks/useSuperAdminFetch';
 import { 
   Settings, Users, CreditCard, Shield, Truck, 
@@ -56,7 +56,6 @@ const TABS = [
 ];
 
 export default function SettingsPage() {
-  const { data: session } = useSession(); // ✅ Get NextAuth Session
   const [activeTab, setActiveTab] = useState('General');
   const [localSettings, setLocalSettings] = useState<{ key: string, value: any }[]>([]);
   const [isSaving, setIsSaving] = useState(false);
@@ -83,9 +82,6 @@ export default function SettingsPage() {
     }
   }, [remoteSettings]);
 
-  // --- Helper to get token ---
-  const getToken = () => (session as any)?.accessToken || (session as any)?.user?.accessToken;
-
   // --- Handlers: Settings ---
   const handleSettingChange = (key: string, newValue: any) => {
     setLocalSettings(prev => prev.map(s => s.key === key ? { ...s, value: newValue } : s));
@@ -94,34 +90,21 @@ export default function SettingsPage() {
   const saveSettings = async () => {
     setIsSaving(true);
     try {
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-      const token = getToken();
-
-      if (!token) {
-        throw new Error("You are not authenticated");
-      }
-
       const payload = localSettings.map(s => ({
         key: s.key,
         value: String(s.value)
       }));
 
-      // Patch endpoint expects: { settings: [{ key, value }] }
-      const res = await fetch(`${API_URL}/super-admin/settings`, {
+      // FIX: Added /bulk suffix and switched to centralized fetcher
+      await fetcher('/super-admin/settings/bulk', {
         method: 'PATCH',
-        headers: { 
-           'Content-Type': 'application/json',
-           'Authorization': `Bearer ${token}` // ✅ Use NextAuth Token
-        },
         body: JSON.stringify({ settings: payload })
       });
 
-      if (!res.ok) throw new Error('Failed to save settings');
-
       toast.success('System settings updated');
       mutateSettings(); 
-    } catch (error) {
-      toast.error('Could not sync settings');
+    } catch (error: any) {
+      toast.error(error.message || 'Could not sync settings');
     } finally {
       setIsSaving(false);
     }
@@ -136,23 +119,11 @@ export default function SettingsPage() {
     e.preventDefault();
     setIsCreatingAdmin(true);
     try {
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-      const token = getToken();
-
-      if (!token) {
-        throw new Error("You are not authenticated");
-      }
-
-      const res = await fetch(`${API_URL}/super-admin/admins`, {
+      // FIX: Using standardized fetcher
+      await fetcher('/super-admin/admins', {
         method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}` // ✅ Use NextAuth Token
-        },
         body: JSON.stringify(newAdmin)
       });
-
-      if (!res.ok) throw new Error('Failed to create admin');
 
       toast.success('Admin added');
       mutate('/super-admin/admins');
@@ -177,23 +148,16 @@ export default function SettingsPage() {
 
     if (result.isConfirmed) {
       try {
-        const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-        const token = getToken();
-
-        if (!token) {
-            throw new Error("You are not authenticated");
-        }
-        
-        const res = await fetch(`${API_URL}/super-admin/admins/${id}`, {
-            method: 'DELETE',
-            headers: { 'Authorization': `Bearer ${token}` } // ✅ Use NextAuth Token
+        // FIX: Using standardized fetcher
+        await fetcher(`/super-admin/admins/${id}`, {
+            method: 'DELETE'
         });
-
-        if (!res.ok) throw new Error();
         
         mutate('/super-admin/admins');
         toast.success('Access revoked');
-      } catch(e) { toast.error('Failed to remove admin'); }
+      } catch(e) { 
+        toast.error('Failed to remove admin'); 
+      }
     }
   };
 

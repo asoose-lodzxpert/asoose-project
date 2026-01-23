@@ -34,9 +34,9 @@ export default function VendorHeader({ name, status, isEditing, isSaving, onEdit
         className="p-2 border border-gray-700 rounded-lg text-gray-300 hover:text-white hover:bg-gray-800" title="Message Vendor">
           <MessageSquare className="w-4 h-4" />
         </button>
-        <button className="p-2 border border-blue-500/30 text-blue-400 hover:bg-blue-500/10 rounded-lg" title="Impersonate">
+        {/* <button className="p-2 border border-blue-500/30 text-blue-400 hover:bg-blue-500/10 rounded-lg" title="Impersonate">
           <UserCheck className="w-4 h-4" />
-        </button>
+        </button> */}
         {isEditing ? (
           <button onClick={onSave} disabled={isSaving} className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white font-bold rounded-lg hover:bg-green-500 text-sm disabled:opacity-50">
             {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Save

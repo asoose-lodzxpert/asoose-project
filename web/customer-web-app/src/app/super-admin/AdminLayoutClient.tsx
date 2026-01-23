@@ -7,16 +7,18 @@ import {
   LayoutDashboard, Users, ShoppingCart, Car, Truck, 
   CreditCard, AlertTriangle, FileText, Settings, LogOut, 
   Menu, Bell, ChevronDown, ChevronRight, 
-  User, Banknote, ShieldCheck 
+  User, Banknote, ShieldCheck, Image 
 } from 'lucide-react';
-import { signOut } from "next-auth/react"; // ✅ Import NextAuth signOut
+import { signOut } from "next-auth/react";
+import useSWR from 'swr'; //
+import { fetcher } from './hooks/useSuperAdminFetch'; //
+import { NotificationResponse } from './notifications/types'; //
 
-// Define the structure for permissions
 type AdminRole = 'SUPER_ADMIN' | 'ADMIN_MANAGER' | 'ADMIN_SUPPORT' | 'ADMIN_FINANCE';
 
 interface AdminLayoutClientProps {
   children: React.ReactNode;
-  userRole: string; // Passed from server layout
+  userRole: string; 
 }
 
 export default function AdminLayoutClient({ children, userRole }: AdminLayoutClientProps) {
@@ -29,10 +31,21 @@ export default function AdminLayoutClient({ children, userRole }: AdminLayoutCli
 
   const role = userRole as AdminRole;
 
-  // --- PERMISSION LOGIC ---
+  // 1. Fetch notifications to check for unread status
+  const { data: notificationsData } = useSWR<NotificationResponse>(
+    '/notifications', 
+    fetcher,
+    { 
+      refreshInterval: 30000, // Re-check every 30 seconds
+      revalidateOnFocus: true 
+    }
+  );
+
+  // 2. Determine if any notifications are unread
+  const hasUnread = notificationsData?.data?.some(n => !n.isRead) ?? false;
+
   const hasAccess = (allowedRoles: AdminRole[]) => allowedRoles.includes(role);
 
-  // Define Menu Items with Permissions
   const menuItems = [
     { 
       name: 'Orders', 
@@ -53,30 +66,34 @@ export default function AdminLayoutClient({ children, userRole }: AdminLayoutCli
       allowed: ['SUPER_ADMIN', 'ADMIN_MANAGER', 'ADMIN_SUPPORT']
     },
     { 
-      name: 'Transactions', 
-      icon: CreditCard, 
-      href: '/super-admin/transactions',
-      allowed: ['SUPER_ADMIN', 'ADMIN_FINANCE']
-    },
-    // 👇 NEW: Payouts Link
-    { 
-      name: 'Payouts', 
-      icon: Banknote, 
-      href: '/super-admin/payouts',
-      allowed: ['SUPER_ADMIN', 'ADMIN_FINANCE']
-    },
-    // 👇 NEW: Verification Link
-    { 
       name: 'Verification', 
       icon: ShieldCheck, 
       href: '/super-admin/verification',
       allowed: ['SUPER_ADMIN', 'ADMIN_MANAGER', 'ADMIN_SUPPORT']
     },
     { 
+      name: 'Transactions', 
+      icon: CreditCard, 
+      href: '/super-admin/transactions',
+      allowed: ['SUPER_ADMIN', 'ADMIN_FINANCE']
+    },
+    { 
+      name: 'Payouts', 
+      icon: Banknote, 
+      href: '/super-admin/payouts',
+      allowed: ['SUPER_ADMIN', 'ADMIN_FINANCE']
+    },
+    { 
       name: 'Disputes', 
       icon: AlertTriangle, 
       href: '/super-admin/disputes',
       allowed: ['SUPER_ADMIN', 'ADMIN_SUPPORT']
+    },
+    { 
+      name: 'Banners', 
+      icon: Image, 
+      href: '/super-admin/banners',
+      allowed: ['SUPER_ADMIN', 'ADMIN_MANAGER']
     },
     { 
       name: 'Reports', 
@@ -92,13 +109,12 @@ export default function AdminLayoutClient({ children, userRole }: AdminLayoutCli
     },
   ];
 
-  // User Management Permission (Grouped)
   const canViewUsers = hasAccess(['SUPER_ADMIN', 'ADMIN_MANAGER', 'ADMIN_SUPPORT']);
 
   const handleLogout = async () => {
     try {
       setIsLoggingOut(true);
-      await signOut({ callbackUrl: '/sign-in' }); // ✅ Use NextAuth signOut
+      await signOut({ callbackUrl: '/sign-in' });
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
@@ -128,7 +144,6 @@ export default function AdminLayoutClient({ children, userRole }: AdminLayoutCli
         </div>
 
         <nav className="p-4 space-y-1 overflow-y-auto max-h-[calc(100vh-140px)] scrollbar-hide">
-          {/* Dashboard - Accessible to All Admins */}
           <Link 
             href="/super-admin/dashboard"
             className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all mb-1 ${
@@ -141,7 +156,6 @@ export default function AdminLayoutClient({ children, userRole }: AdminLayoutCli
             Dashboard
           </Link>
 
-          {/* User Management Section */}
           {canViewUsers && (
             <div className="mb-1">
               <button 
@@ -173,7 +187,6 @@ export default function AdminLayoutClient({ children, userRole }: AdminLayoutCli
             </div>
           )}
 
-          {/* Dynamic Menu Items based on Role */}
           {menuItems.map((item) => {
              if (!hasAccess(item.allowed as AdminRole[])) return null;
 
@@ -210,7 +223,6 @@ export default function AdminLayoutClient({ children, userRole }: AdminLayoutCli
         </div>
       </aside>
 
-      {/* Main Content Area */}
       <main className="flex-1 md:ml-64 relative bg-[#0F172A] min-h-screen">
         <header className="h-16 border-b border-gray-800 flex items-center justify-between px-6 bg-[#0F172A]/80 backdrop-blur-md sticky top-0 z-40">
            <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="md:hidden text-gray-400">
@@ -233,7 +245,10 @@ export default function AdminLayoutClient({ children, userRole }: AdminLayoutCli
                 }`}
               >
                  <Bell className="w-5 h-5" />
-                 <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full" />
+                 {/* ✅ Render the red dot only if there are unread notifications */}
+                 {hasUnread && (
+                   <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full" />
+                 )}
               </Link>
               
               <div className="flex items-center gap-3 pl-4 border-l border-gray-700">
@@ -256,7 +271,6 @@ export default function AdminLayoutClient({ children, userRole }: AdminLayoutCli
         </div>
       </main>
 
-      {/* Mobile Overlay */}
       {isMobileMenuOpen && (
         <div className="fixed inset-0 bg-black/50 z-40 md:hidden backdrop-blur-sm" onClick={() => setIsMobileMenuOpen(false)} />
       )}

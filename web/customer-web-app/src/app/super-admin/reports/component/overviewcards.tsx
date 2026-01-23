@@ -1,16 +1,14 @@
 import React from 'react';
 import { ArrowUpRight, ArrowDownRight, DollarSign, ShoppingBag, Users, Activity, Minus } from 'lucide-react';
 
-// Define the shape of a single metric
 export interface OverviewMetric {
   label: string;
   value: string | number;
   change: number;
   trend: 'up' | 'down' | 'neutral';
-  icon?: any; // Optional icon override
+  icon?: any;
 }
 
-// ✅ FIX: Update interface to accept 'subtext' and allow 'metrics' to be null
 interface OverviewCardsProps {
   metrics: OverviewMetric[] | null; 
   subtext?: string; 
@@ -25,8 +23,8 @@ const getIcon = (label: string) => {
 };
 
 export default function OverviewCards({ metrics, subtext }: OverviewCardsProps) {
-  // Handle loading/null state gracefully
-  if (!metrics) {
+  // Handle loading or invalid data gracefully
+  if (!metrics || !Array.isArray(metrics)) {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {[1, 2, 3, 4].map((i) => (
@@ -53,7 +51,6 @@ export default function OverviewCards({ metrics, subtext }: OverviewCardsProps) 
                 <Icon className="w-5 h-5" />
               </div>
               
-              {/* Change Indicator */}
               <div className={`flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-full ${
                 isNeutral ? 'bg-gray-800 text-gray-400' :
                 isPositive ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'
@@ -67,7 +64,6 @@ export default function OverviewCards({ metrics, subtext }: OverviewCardsProps) 
               <p className="text-gray-400 text-sm font-medium mb-1">{metric.label}</p>
               <h3 className="text-2xl font-bold text-white tracking-tight">{metric.value}</h3>
               
-              {/* ✅ FIX: Display the subtext here */}
               {subtext && (
                 <p className="text-xs text-gray-500 mt-2 font-medium">
                   {subtext}

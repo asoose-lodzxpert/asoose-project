@@ -10,7 +10,7 @@ import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import type { Cache } from 'cache-manager';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { DisputesService } from '../dispute/dispute.service';
-import { StoresService } from '../vendors/vendors.service'; 
+import { StoresService } from '../vendors/vendors.service';
 import {
   OrderStatus,
   DisputeStatus,
@@ -19,11 +19,42 @@ import {
   UserRole,
   User,
 } from '@prisma/client';
+import { z } from 'zod';
+import { subDays } from 'date-fns';
+
+// ==================== VALIDATION SCHEMAS ====================
+
+const StatCardSchema = z.object({
+  label: z.string(),
+  value: z.string(),
+  trend: z.enum(['up', 'down']),
+  change: z.string(),
+  iconName: z.string(),
+  color: z.string(),
+  bgColor: z.string(),
+});
+
+const DashboardResponseSchema = z.object({
+  stats: z.array(StatCardSchema),
+  quickAccess: z.object({
+    approvals: z.object({ total: z.number(), details: z.string() }),
+    disputes: z.object({ total: z.number(), details: z.string() }),
+    revenue: z.object({ growth: z.string(), details: z.string(), isPositive: z.boolean() }),
+  }),
+  trending: z.object({
+    ordersWeekly: z.number(),
+    revenueWeekly: z.number(),
+    isAccelerating: z.boolean(),
+    criticalAlerts: z.number(),
+  }).optional(),
+});
 
 // ==================== INTERFACES ====================
 
 export interface DashboardAlert {
   id: string;
+  entityId: string;
+  entityType: 'disputes' | 'verification';
   severity: 'HIGH' | 'MEDIUM' | 'LOW';
   message: string;
   category: string;
@@ -36,6 +67,8 @@ export interface DashboardActivity {
   type: 'order' | 'ride' | 'vendor' | 'delivery' | 'customer' | 'admin';
   event: string;
   entity: string;
+  entityId: string;
+  entityType: 'orders' | 'rides' | 'deliveries' | 'users/vendors' | 'users/customers' | 'admin';
   time: string;
   action: string;
 }
@@ -69,15 +102,32 @@ interface StatCard {
   bgColor: string;
 }
 
+interface ActivityLogWithUser {
+  id: string;
+  action: string;
+  target: string | null;
+  metadata: any;
+  createdAt: Date;
+  user: { name: string; role: UserRole };
+}
+
+// ==================== CONSTANTS ====================
+
+const CACHE_TTL_SECONDS = 5 * 60; // 5 minutes
+const ACTIVITY_CACHE_TTL_SECONDS = 60; // 1 minute
+const ALERTS_CACHE_TTL_SECONDS = 2 * 60; // 2 minutes
+const MAX_RECENT_ACTIVITIES = 10;
+const MAX_ALERTS_DISPLAYED = 5;
+const QUERY_TIMEOUT_MS = 5000; // 5 seconds
+
 // ==================== SERVICE ====================
 
 @Injectable()
 export class DashboardService {
   private readonly logger = new Logger(DashboardService.name);
-  private readonly CACHE_TTL = 300; // 5 minutes
-  private readonly STATS_CACHE_KEY = 'dashboard:stats:v2';
-  private readonly ACTIVITY_CACHE_KEY = 'dashboard:activity';
-  private readonly ALERTS_CACHE_KEY = 'dashboard:alerts';
+  private readonly STATS_CACHE_KEY = 'dashboard:stats:v3';
+  private readonly ACTIVITY_CACHE_KEY = 'dashboard:activity:v2';
+  private readonly ALERTS_CACHE_KEY = 'dashboard:alerts:v2';
 
   constructor(
     private prisma: PrismaService,
@@ -93,11 +143,18 @@ export class DashboardService {
       !user ||
       (user.role !== UserRole.SUPER_ADMIN && user.role !== UserRole.ADMIN)
     ) {
-      this.logger.warn(
-        `Unauthorized dashboard access attempt by user: ${user?.id}`,
-      );
+      this.logger.warn(`Unauthorized dashboard access attempt: ${user?.id || 'unknown'}`);
       throw new UnauthorizedException('Super admin access required');
     }
+  }
+
+  // ==================== TIMEOUT WRAPPER ====================
+
+  private async withTimeout<T>(promise: Promise<T>, ms: number = QUERY_TIMEOUT_MS): Promise<T> {
+    const timeout = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Query timeout exceeded')), ms)
+    );
+    return Promise.race([promise, timeout]);
   }
 
   // ==================== MAIN STATS ENDPOINT ====================
@@ -106,25 +163,24 @@ export class DashboardService {
     this.validateSuperAdmin(currentUser);
 
     try {
-      // Try cache first
-      const cached = await this.cacheManager.get<DashboardResponse>(
-        this.STATS_CACHE_KEY,
-      );
+      const cached = await this.cacheManager.get<DashboardResponse>(this.STATS_CACHE_KEY);
       if (cached) {
-        this.logger.debug('Returning cached dashboard stats');
-        return cached;
+        try {
+          const validated = DashboardResponseSchema.parse(cached);
+          this.logger.debug('Returning validated cached dashboard stats');
+          return validated;
+        } catch (validationError) {
+          this.logger.warn('Cached data validation failed, clearing cache', validationError);
+          await this.cacheManager.del(this.STATS_CACHE_KEY);
+        }
       }
 
-      // Calculate fresh stats
-      const stats = await this.calculateStats();
-
-      // Cache for next request
-      await this.cacheManager.set(this.STATS_CACHE_KEY, stats, this.CACHE_TTL);
+      const stats = await this.withTimeout(this.calculateStats());
+      await this.cacheManager.set(this.STATS_CACHE_KEY, stats, CACHE_TTL_SECONDS * 1000);
 
       return stats;
     } catch (error) {
       this.logger.error('Failed to fetch dashboard stats', error.stack);
-      // ✅ FIX 3: Removed getMinimalStats fallback. Fail loudly so you know something is wrong.
       throw new InternalServerErrorException(
         'System metrics currently unavailable. Please check system health.',
       );
@@ -135,10 +191,10 @@ export class DashboardService {
 
   private async calculateStats(): Promise<DashboardResponse> {
     const now = new Date();
-    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
-    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-    const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
+    const sevenDaysAgo = subDays(now, 7);
+    const fourteenDaysAgo = subDays(now, 14);
+    const thirtyDaysAgo = subDays(now, 30);
+    const sixtyDaysAgo = subDays(now, 60);
 
     const [
       orderMetrics,
@@ -147,46 +203,19 @@ export class DashboardService {
       storeMetrics,
       disputeCount,
     ] = await Promise.all([
-      this.getOrderMetrics(
-        sevenDaysAgo,
-        fourteenDaysAgo,
-        thirtyDaysAgo,
-        sixtyDaysAgo,
-      ),
-      this.getRevenueMetrics(
-        sevenDaysAgo,
-        fourteenDaysAgo,
-        thirtyDaysAgo,
-        sixtyDaysAgo,
-      ),
-      this.getUserMetrics(thirtyDaysAgo),
-      this.getStoreMetrics(),
-      this.prisma.dispute.count({ where: { status: DisputeStatus.OPEN } }),
+      this.withTimeout(this.getOrderMetrics(sevenDaysAgo, fourteenDaysAgo, thirtyDaysAgo, sixtyDaysAgo)),
+      this.withTimeout(this.getRevenueMetrics(sevenDaysAgo, fourteenDaysAgo, thirtyDaysAgo, sixtyDaysAgo)),
+      this.withTimeout(this.getUserMetrics(thirtyDaysAgo)),
+      this.withTimeout(this.getStoreMetrics()),
+      this.withTimeout(this.prisma.dispute.count({ where: { status: DisputeStatus.OPEN } })),
     ]);
 
-    // Calculate growth percentages
-    const orderGrowth = this.calculatePercentageChange(
-      orderMetrics.currentMonth,
-      orderMetrics.previousMonth,
-    );
-    const userGrowth = this.calculatePercentageChange(
-      userMetrics.active,
-      userMetrics.priorToMonth,
-    );
-    const revenueGrowth = this.calculatePercentageChange(
-      revenueMetrics.currentMonth,
-      revenueMetrics.previousMonth,
-    );
-    const weeklyOrderGrowth = this.calculatePercentageChange(
-      orderMetrics.lastWeek,
-      orderMetrics.previousWeek,
-    );
-    const weeklyRevenueGrowth = this.calculatePercentageChange(
-      revenueMetrics.lastWeek,
-      revenueMetrics.previousWeek,
-    );
+    const orderGrowth = this.calculatePercentageChange(orderMetrics.currentMonth, orderMetrics.previousMonth);
+    const userGrowth = this.calculatePercentageChange(userMetrics.active, userMetrics.priorToMonth);
+    const revenueGrowth = this.calculatePercentageChange(revenueMetrics.currentMonth, revenueMetrics.previousMonth);
+    const weeklyOrderGrowth = this.calculatePercentageChange(orderMetrics.lastWeek, orderMetrics.previousWeek);
+    const weeklyRevenueGrowth = this.calculatePercentageChange(revenueMetrics.lastWeek, revenueMetrics.previousWeek);
 
-    // Build stat cards
     const stats: StatCard[] = [
       {
         label: 'Total Revenue',
@@ -226,7 +255,6 @@ export class DashboardService {
       },
     ];
 
-    // Quick access data
     const quickAccess: QuickAccessStats = {
       approvals: {
         total: storeMetrics.pendingApprovals,
@@ -243,7 +271,6 @@ export class DashboardService {
       },
     };
 
-    // Trending metrics (velocity indicators)
     const trending: TrendingMetrics = {
       ordersWeekly: weeklyOrderGrowth,
       revenueWeekly: weeklyRevenueGrowth,
@@ -260,90 +287,72 @@ export class DashboardService {
     sevenDaysAgo: Date,
     fourteenDaysAgo: Date,
     thirtyDaysAgo: Date,
-    sixtyDaysAgo: Date,
+    sixtyDaysAgo: Date
   ) {
-    // Single aggregation with time-based grouping
-    const results = await this.prisma.$queryRaw<
-      Array<{
-        period: string;
-        count: bigint;
-      }>
-    >`
-      SELECT 
-        CASE 
-          WHEN "createdAt" >= ${sevenDaysAgo} THEN 'lastWeek'
-          WHEN "createdAt" >= ${fourteenDaysAgo} THEN 'previousWeek'
-          WHEN "createdAt" >= ${thirtyDaysAgo} THEN 'currentMonth'
-          WHEN "createdAt" >= ${sixtyDaysAgo} THEN 'previousMonth'
-        END as period,
-        COUNT(*)::bigint as count
-      FROM "Order"
-      WHERE "createdAt" >= ${sixtyDaysAgo}
-      GROUP BY period
-    `;
+    const [lastWeek, previousWeek, currentMonth, previousMonth] = await Promise.all([
+      this.prisma.order.count({ where: { createdAt: { gte: sevenDaysAgo } } }),
+      this.prisma.order.count({
+        where: { createdAt: { gte: fourteenDaysAgo, lt: sevenDaysAgo } },
+      }),
+      this.prisma.order.count({
+        where: { createdAt: { gte: thirtyDaysAgo, lt: fourteenDaysAgo } },
+      }),
+      this.prisma.order.count({
+        where: { createdAt: { gte: sixtyDaysAgo, lt: thirtyDaysAgo } },
+      }),
+    ]);
 
-    const metrics = {
-      lastWeek: 0,
-      previousWeek: 0,
-      currentMonth: 0,
-      previousMonth: 0,
-    };
-
-    results.forEach((row) => {
-      if (row.period) {
-        metrics[row.period as keyof typeof metrics] = Number(row.count);
-      }
-    });
-
-    return metrics;
+    return { lastWeek, previousWeek, currentMonth, previousMonth };
   }
 
   private async getRevenueMetrics(
     sevenDaysAgo: Date,
     fourteenDaysAgo: Date,
     thirtyDaysAgo: Date,
-    sixtyDaysAgo: Date,
+    sixtyDaysAgo: Date
   ) {
-    const results = await this.prisma.$queryRaw<
-      Array<{
-        period: string | null;
-        total: number;
-      }>
-    >`
-      SELECT 
-        CASE 
-          WHEN "deliveredAt" >= ${sevenDaysAgo} THEN 'lastWeek'
-          WHEN "deliveredAt" >= ${fourteenDaysAgo} THEN 'previousWeek'
-          WHEN "deliveredAt" >= ${thirtyDaysAgo} THEN 'currentMonth'
-          WHEN "deliveredAt" >= ${sixtyDaysAgo} THEN 'previousMonth'
-          ELSE NULL
-        END as period,
-        COALESCE(SUM("total"), 0)::float as total
-      FROM "Order"
-      WHERE "status" = ${OrderStatus.DELIVERED}
-      GROUP BY period
-    `;
+    const [lifetime, lastWeek, previousWeek, currentMonth, previousMonth] = await Promise.all([
+      this.prisma.order.aggregate({
+        where: { status: OrderStatus.DELIVERED },
+        _sum: { total: true },
+      }),
+      this.prisma.order.aggregate({
+        where: {
+          status: OrderStatus.DELIVERED,
+          deliveredAt: { gte: sevenDaysAgo },
+        },
+        _sum: { total: true },
+      }),
+      this.prisma.order.aggregate({
+        where: {
+          status: OrderStatus.DELIVERED,
+          deliveredAt: { gte: fourteenDaysAgo, lt: sevenDaysAgo },
+        },
+        _sum: { total: true },
+      }),
+      this.prisma.order.aggregate({
+        where: {
+          status: OrderStatus.DELIVERED,
+          deliveredAt: { gte: thirtyDaysAgo, lt: fourteenDaysAgo },
+        },
+        _sum: { total: true },
+      }),
+      this.prisma.order.aggregate({
+        where: {
+          status: OrderStatus.DELIVERED,
+          deliveredAt: { gte: sixtyDaysAgo, lt: thirtyDaysAgo },
+        },
+        _sum: { total: true },
+      }),
+    ]);
 
-    const lifetime = await this.prisma.order.aggregate({
-      where: { status: OrderStatus.DELIVERED },
-      _sum: { total: true },
-    });
-
-    const metrics = {
+    return {
       lifetime: lifetime._sum.total || 0,
-      lastWeek: 0,
-      previousWeek: 0,
-      currentMonth: 0,
-      previousMonth: 0,
+      lastWeek: lastWeek._sum.total || 0,
+      previousWeek: previousWeek._sum.total || 0,
+      currentMonth: currentMonth._sum.total || 0,
+      previousMonth: previousMonth._sum.total || 0,
     };
-
-    results.forEach((row) => {
-      if (row.period) {
-        metrics[row.period as keyof typeof metrics] = row.total;
-      }
-    });
-
-    return metrics;
   }
 
   private async getUserMetrics(thirtyDaysAgo: Date) {
@@ -353,7 +362,6 @@ export class DashboardService {
         where: { status: 'ACTIVE', createdAt: { lt: thirtyDaysAgo } },
       }),
     ]);
-
     return { active, priorToMonth };
   }
 
@@ -367,14 +375,9 @@ export class DashboardService {
     let pendingApprovals = 0;
 
     results.forEach((group) => {
-      if (group.status === StoreStatus.ACTIVE) {
-        activeStores += group._count;
-      }
-      if (group.verification === VerificationStatus.PENDING) {
-        pendingApprovals += group._count;
-      }
+      if (group.status === StoreStatus.ACTIVE) activeStores += group._count;
+      if (group.verification === VerificationStatus.PENDING) pendingApprovals += group._count;
     });
-
     return { activeStores, pendingApprovals };
   }
 
@@ -384,44 +387,52 @@ export class DashboardService {
     this.validateSuperAdmin(currentUser);
 
     try {
-      // Check cache
-      const cached = await this.cacheManager.get<DashboardActivity[]>(
-        this.ACTIVITY_CACHE_KEY,
-      );
+      const cached = await this.cacheManager.get<DashboardActivity[]>(this.ACTIVITY_CACHE_KEY);
       if (cached) return cached;
 
-      const logs = await this.prisma.activityLog.findMany({
-        take: 10,
-        orderBy: { createdAt: 'desc' },
-        include: { user: { select: { name: true, role: true } } },
-      });
+      const logs = await this.withTimeout(
+        this.prisma.activityLog.findMany({
+          take: MAX_RECENT_ACTIVITIES,
+          orderBy: { createdAt: 'desc' },
+          include: { user: { select: { name: true, role: true } } },
+        })
+      );
 
       const activities = logs.map((log) => this.mapActivityLog(log));
-
-      // Cache for 1 minute (more frequent updates)
-      await this.cacheManager.set(this.ACTIVITY_CACHE_KEY, activities, 60);
+      await this.cacheManager.set(
+        this.ACTIVITY_CACHE_KEY,
+        activities,
+        ACTIVITY_CACHE_TTL_SECONDS * 1000
+      );
 
       return activities;
     } catch (error) {
       this.logger.error('Failed to fetch recent activity', error.stack);
-      return []; // Graceful degradation
+      return [];
     }
   }
 
-  private mapActivityLog(log: any): DashboardActivity {
+  private mapActivityLog(log: ActivityLogWithUser): DashboardActivity {
     const action = log.action?.toLowerCase() || '';
-
-    // Intelligent type detection based on action context
     let type: DashboardActivity['type'] = 'admin';
+    let entityType: DashboardActivity['entityType'] = 'admin';
 
-    if (action.includes('order')) type = 'order';
-    else if (action.includes('ride')) type = 'ride';
-    else if (action.includes('delivery')) type = 'delivery';
-    else if (action.includes('store') || action.includes('vendor'))
+    if (action.includes('order')) {
+      type = 'order';
+      entityType = 'orders';
+    } else if (action.includes('ride')) {
+      type = 'ride';
+      entityType = 'rides';
+    } else if (action.includes('delivery')) {
+      type = 'delivery';
+      entityType = 'deliveries';
+    } else if (action.includes('store') || action.includes('vendor')) {
       type = 'vendor';
-    else if (action.includes('customer')) type = 'customer';
-    else {
-      // Fallback to role-based mapping
+      entityType = 'users/vendors';
+    } else if (action.includes('customer')) {
+      type = 'customer';
+      entityType = 'users/customers';
+    } else {
       const roleMap: Record<string, DashboardActivity['type']> = {
         CUSTOMER: 'customer',
         VENDOR: 'vendor',
@@ -437,8 +448,10 @@ export class DashboardService {
       type,
       event: log.action,
       entity: log.target || log.user.name,
+      entityId: log.metadata?.entityId || '',
+      entityType,
       time: log.createdAt.toISOString(),
-      action: 'View',
+      action: '',
     };
   }
 
@@ -448,47 +461,47 @@ export class DashboardService {
     this.validateSuperAdmin(currentUser);
 
     try {
-      // Check cache
-      const cached = await this.cacheManager.get<DashboardAlert[]>(
-        this.ALERTS_CACHE_KEY,
-      );
+      const cached = await this.cacheManager.get<DashboardAlert[]>(this.ALERTS_CACHE_KEY);
       if (cached) return cached;
 
       const [disputes, pendingStores] = await Promise.all([
-        this.prisma.dispute.findMany({
-          where: { status: DisputeStatus.OPEN },
-          take: 5,
-          orderBy: { createdAt: 'desc' },
-          include: { openedByUser: { select: { name: true } } },
-        }),
-        this.prisma.store.findMany({
-          where: { verification: VerificationStatus.PENDING },
-          take: 5,
-          orderBy: { createdAt: 'desc' },
-        }),
+        this.withTimeout(
+          this.prisma.dispute.findMany({
+            where: { status: DisputeStatus.OPEN },
+            take: MAX_ALERTS_DISPLAYED,
+            orderBy: { createdAt: 'desc' },
+            include: { openedByUser: { select: { name: true } } },
+          })
+        ),
+        this.withTimeout(
+          this.prisma.store.findMany({
+            where: { verification: VerificationStatus.PENDING },
+            take: MAX_ALERTS_DISPLAYED,
+            orderBy: { createdAt: 'desc' },
+          })
+        ),
       ]);
 
       const alerts: DashboardAlert[] = [];
 
-      // High priority disputes
       disputes.forEach((d) => {
         alerts.push({
           id: d.id,
+          entityId: d.id,
+          entityType: 'disputes',
           category: 'Dispute',
           message: `Dispute from ${d.openedByUser.name}: ${d.reason}`,
-          severity:
-            d.priority === 'HIGH' || d.priority === 'URGENT'
-              ? 'HIGH'
-              : 'MEDIUM',
+          severity: d.priority === 'HIGH' || d.priority === 'URGENT' ? 'HIGH' : 'MEDIUM',
           status: 'New',
           time: d.createdAt.toISOString(),
         });
       });
 
-      // Pending verifications
       pendingStores.forEach((s) => {
         alerts.push({
           id: s.id,
+          entityId: s.id,
+          entityType: 'verification',
           category: 'Verification',
           message: `New store registration: ${s.name}`,
           severity: 'MEDIUM',
@@ -497,89 +510,90 @@ export class DashboardService {
         });
       });
 
-      // Sort by time (newest first)
       const sortedAlerts = alerts.sort(
-        (a, b) => new Date(b.time).getTime() - new Date(a.time).getTime(),
+        (a, b) => new Date(b.time).getTime() - new Date(a.time).getTime()
       );
-
-      // Cache for 2 minutes
-      await this.cacheManager.set(this.ALERTS_CACHE_KEY, sortedAlerts, 120);
+      await this.cacheManager.set(
+        this.ALERTS_CACHE_KEY,
+        sortedAlerts,
+        ALERTS_CACHE_TTL_SECONDS * 1000
+      );
 
       return sortedAlerts;
     } catch (error) {
       this.logger.error('Failed to fetch alerts', error.stack);
-      return []; // Graceful degradation
+      return [];
     }
   }
 
-  // ==================== REAL ALERT RESOLUTION (FIXED) ====================
+  // ==================== ALERT RESOLUTION (ATOMIC & IDEMPOTENT) ====================
 
   async resolveAlert(id: string, currentUser: User) {
     this.validateSuperAdmin(currentUser);
 
-    // 1. Check if it's a Dispute
-    const dispute = await this.prisma.dispute.findUnique({ where: { id } });
-    if (dispute) {
-      // If already resolved, just clean up cache
-      if (dispute.status === DisputeStatus.RESOLVED) {
-        await this.invalidateCache();
+    try {
+      // Try dispute first (atomic update)
+      const dispute = await this.prisma.dispute.updateMany({
+        where: {
+          id,
+          status: { not: DisputeStatus.RESOLVED },
+        },
+        data: { status: DisputeStatus.RESOLVED },
+      });
+
+      if (dispute.count > 0) {
+        await this.invalidateCache([this.STATS_CACHE_KEY, this.ALERTS_CACHE_KEY]);
+        return { success: true, message: 'Dispute marked as resolved' };
+      }
+
+      // Check if already resolved
+      const existingDispute = await this.prisma.dispute.findUnique({ where: { id } });
+      if (existingDispute) {
         return { success: true, message: 'Dispute already resolved' };
       }
 
-      // Perform real resolution via DisputesService
-      await this.disputesService.resolve(
-        id,
-        {
-          action: 'RESOLVED_NO_REFUND', // Ensure this matches your Enum or String literal
-          resolutionNotes: 'Quick resolution triggered from Admin Dashboard',
-          refundSource: 'NONE', // Ensure matches Enum
-        } as any,
-        currentUser.id,
-      );
-
-      await this.invalidateCache();
-      return { success: true, message: 'Dispute marked as resolved' };
-    }
-
-    // 2. Check if it's a Store Pending Verification
-    const store = await this.prisma.store.findUnique({ where: { id } });
-    if (store) {
-      if (store.verification === VerificationStatus.PENDING) {
-        // Perform real verification via StoresService (or fallback to Prisma)
-        // Since StoresService doesn't have a specific 'verifyStore' method exposed in the interface we saw,
-        // we use the 'update' method which is available.
-        await this.storesService.update(
+      // Try store approval (atomic update)
+      const store = await this.prisma.store.updateMany({
+        where: {
           id,
-          { status: StoreStatus.ACTIVE, verification: VerificationStatus.VERIFIED }, // Assuming 'verification' field handling exists or we do direct DB update if logic is simple
-          currentUser.id
-        );
+          verification: VerificationStatus.PENDING,
+        },
+        data: {
+          verification: VerificationStatus.VERIFIED,
+          status: StoreStatus.ACTIVE,
+        },
+      });
 
-        // Fallback direct DB update if StoresService.update doesn't handle verification status directly
-        // (Double safety since we are inside the Dashboard service)
-        if (store.status !== StoreStatus.ACTIVE) {
-             await this.prisma.store.update({
-                where: { id },
-                data: { verification: VerificationStatus.VERIFIED, status: StoreStatus.ACTIVE }
-             });
-        }
-
-        await this.invalidateCache();
+      if (store.count > 0) {
+        await this.invalidateCache([this.STATS_CACHE_KEY, this.ALERTS_CACHE_KEY]);
         return { success: true, message: 'Store approved successfully' };
       }
-    }
 
-    throw new NotFoundException('Alert entity not found or already processed');
+      // Check if already approved
+      const existingStore = await this.prisma.store.findUnique({ where: { id } });
+      if (existingStore) {
+        return { success: true, message: 'Store already approved' };
+      }
+
+      throw new NotFoundException('Alert entity not found');
+    } catch (error) {
+      if (error instanceof NotFoundException) throw error;
+      this.logger.error('Failed to resolve alert', error.stack);
+      throw new InternalServerErrorException('Failed to resolve alert');
+    }
   }
 
-  // ==================== CACHE MANAGEMENT ====================
+  // ==================== CACHE MANAGEMENT (SELECTIVE) ====================
 
-  async invalidateCache() {
-    await Promise.all([
-      this.cacheManager.del(this.STATS_CACHE_KEY),
-      this.cacheManager.del(this.ACTIVITY_CACHE_KEY),
-      this.cacheManager.del(this.ALERTS_CACHE_KEY),
-    ]);
-    this.logger.log('Dashboard cache invalidated');
+  async invalidateCache(keys?: string[]) {
+    const keysToInvalidate = keys || [
+      this.STATS_CACHE_KEY,
+      this.ACTIVITY_CACHE_KEY,
+      this.ALERTS_CACHE_KEY,
+    ];
+
+    await Promise.all(keysToInvalidate.map((key) => this.cacheManager.del(key)));
+    this.logger.log(`Dashboard cache invalidated: ${keysToInvalidate.join(', ')}`);
   }
 
   // ==================== HELPERS ====================
@@ -591,9 +605,9 @@ export class DashboardService {
   }
 
   private formatCurrency(amount: number): string {
-    return new Intl.NumberFormat('en-US', {
+    return new Intl.NumberFormat('en-NG', {
       style: 'currency',
-      currency: 'USD',
+      currency: 'NGN',
       maximumFractionDigits: 0,
     }).format(amount);
   }

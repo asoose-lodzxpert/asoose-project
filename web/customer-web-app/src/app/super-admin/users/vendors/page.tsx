@@ -394,12 +394,12 @@ export default function VendorManagementPage() {
       header: 'Actions',
       cell: ({ row }) => (
         <div className="flex items-center gap-1">
-          <button 
+          {/* <button 
             className="p-2 hover:bg-purple-500/10 rounded-lg text-gray-400 hover:text-purple-400 transition-colors" 
             title="Impersonate"
           >
             <UserCheck className="w-4 h-4" />
-          </button>
+          </button> */}
           <Link href={`/super-admin/users/vendors/${row.original.slug || row.original.id}`}>
             <button 
               className="p-2 hover:bg-blue-500/10 rounded-lg text-gray-400 hover:text-blue-500 transition-colors" 
