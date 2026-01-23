@@ -45,7 +45,7 @@ export class StorageController {
     }
 
     const result = await this.storageService.uploadFile(file);
-    return { url: result.signedUrl };
+    return { url: result.url };
   }
 
   @Post('upload-public')
@@ -75,7 +75,7 @@ export class StorageController {
     }
 
     const result = await this.storageService.uploadFile(file);
-    return { url: result.signedUrl };
+    return { url: result.url };
   }
 
   @Post('upload-bulk')
@@ -118,7 +118,7 @@ export class StorageController {
     const results = await this.storageService.uploadBulk(validFiles);
 
     // Extract just the URLs (signedUrl) from results
-    const urls = results.map((result) => result.signedUrl);
+    const urls = results.map((result) => result.url);
 
     return {
       urls,
@@ -155,7 +155,7 @@ export class StorageController {
     }
 
     const result = await this.storageService.uploadFile(file);
-    return { url: result.signedUrl };
+    return { url: result.url };
   }
 
   @Delete('delete')

@@ -1,11 +1,13 @@
-import React from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   View,
   StyleSheet,
   Pressable,
   Image,
   ScrollView,
   Platform,
+  RefreshControl,
 } from "react-native";
 import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
@@ -14,39 +16,92 @@ import { useThemeColor } from "@/hooks/use-theme-color";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "expo-router";
 import { useConfirm } from "@/components/ui/ConfirmDialogProvider";
+import { useAuthFetch } from "@/lib/authFetch";
+
+type UserProfile = {
+  id: string;
+  name: string;
+  email: string;
+  avatarUrl?: string | null;
+  phone?: string | null;
+  createdAt?: string;
+  role?: string;
+};
 
 export default function SettingsScreen() {
   const primary = useThemeColor({}, "brandPrimary");
   const muted = useThemeColor({}, "textMuted");
   const card = useThemeColor({}, "surfaceCard");
-    const border = useThemeColor({}, "borderDefault");
-    const accentRed = useThemeColor({}, "statusError");
-    const accentBlue = useThemeColor({}, "brandPrimary");
-    const accentGreen = useThemeColor({}, "statusSuccess");
-    const textOnPrimary = useThemeColor({}, "textOnPrimary");
+  const border = useThemeColor({}, "borderDefault");
+  const accentRed = useThemeColor({}, "statusError");
+  const accentBlue = useThemeColor({}, "brandPrimary");
+  const accentGreen = useThemeColor({}, "statusSuccess");
+  const textOnPrimary = useThemeColor({}, "textOnPrimary");
 
-    const { user, logout } = useAuth();
+  const { user, logout } = useAuth();
+  const { get } = useAuthFetch();
   const router = useRouter();
   const showConfirm = useConfirm();
 
-  const profileCompletion = 0.75;
-  const profileCompletionLabel = `Profile Complete: ${Math.round(
-    profileCompletion * 100
-  )}%`;
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [profileError, setProfileError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
-    const handleLogout = async () => {
-      const ok = await showConfirm({
-        title: "Sign out",
-        message: "Are you sure you want to sign out?",
-        icon: "alert-circle",
-        variant: "danger",
-        confirmLabel: "Sign out",
-      });
+  const loadProfile = useCallback(
+    async (options: { silent?: boolean } = {}) => {
+      const { silent = false } = options;
+      if (!silent) setProfileLoading(true);
+      try {
+        const data = (await get("users/profile")) as UserProfile;
+        setProfile(data);
+        setProfileError(null);
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Failed to load profile";
+        setProfileError(message);
+      } finally {
+        if (!silent) setProfileLoading(false);
+      }
+    },
+    [get],
+  );
+
+  useEffect(() => {
+    loadProfile();
+  }, [loadProfile]);
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await loadProfile({ silent: true });
+    setRefreshing(false);
+  }, [loadProfile]);
+
+  const displayName = profile?.name ?? user?.name;
+  const displayPhone = profile?.phone ?? user?.phone;
+  const displayEmail = profile?.email ?? user?.email;
+  const displayAvatar = profile?.avatarUrl ?? user?.avatarUrl;
+  const joinedDate = profile?.createdAt
+    ? new Date(profile.createdAt).toLocaleDateString(undefined, {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      })
+    : null;
+
+  const handleLogout = async () => {
+    const ok = await showConfirm({
+      title: "Sign out",
+      message: "Are you sure you want to sign out?",
+      icon: "alert-circle",
+      variant: "danger",
+      confirmLabel: "Sign out",
+    });
 
     if (!ok) return;
 
-      await logout();
-      router.replace("/(auth)/login");
+    await logout();
+    router.replace("/(auth)/login");
   };
 
   return (
@@ -54,6 +109,14 @@ export default function SettingsScreen() {
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor={primary}
+            colors={[primary]}
+          />
+        }
       >
         {/* Profile */}
         <Pressable
@@ -69,8 +132,8 @@ export default function SettingsScreen() {
             >
               <Image
                 source={
-                  user?.avatarUrl
-                    ? { uri: user.avatarUrl }
+                  displayAvatar
+                    ? { uri: displayAvatar }
                     : require("@/assets/default-avatar.png")
                 }
                 style={styles.avatar}
@@ -81,44 +144,49 @@ export default function SettingsScreen() {
               type="title"
               style={[styles.heroName, { color: textOnPrimary }]}
             >
-              {user ? `Hey, ${user.name}!` : "Hey there!"}
+              {displayName ? `Hey, ${displayName}!` : "Hey there!"}
             </ThemedText>
 
-            {user?.phone && (
-              <ThemedText type="caption">{user.phone}</ThemedText>
+            {displayPhone && (
+              <ThemedText type="caption" style={{ color: textOnPrimary }}>
+                {displayPhone}
+              </ThemedText>
             )}
 
-            <View style={styles.profileProgressRow}>
+            {displayEmail && (
+              <ThemedText type="caption" style={{ color: textOnPrimary }}>
+                {displayEmail}
+              </ThemedText>
+            )}
+
+            {joinedDate && (
+              <ThemedText type="caption" style={{ color: textOnPrimary }}>
+                Member since {joinedDate}
+              </ThemedText>
+            )}
+
+            {profileLoading && (
+              <ActivityIndicator
+                color={textOnPrimary}
+                style={{ marginTop: 12 }}
+              />
+            )}
+
+            {profileError && !profileLoading && (
               <ThemedText
                 type="caption"
-                style={[styles.profileProgressLabel, { color: textOnPrimary }]}
+                style={[styles.heroError, { color: textOnPrimary }]}
               >
-                {profileCompletionLabel}
+                {profileError}
               </ThemedText>
+            )}
 
-              <View
-                style={[
-                  styles.profileProgressBarWrap,
-                  { backgroundColor: textOnPrimary + "44" },
-                ]}
-              >
-                <View
-                  style={[
-                    styles.profileProgressBar,
-                    {
-                      width: `${profileCompletion * 100}%`,
-                      backgroundColor: textOnPrimary,
-                    },
-                  ]}
-                />
-              </View>
-
-              <IconSymbol
-                name="chevron.right"
-                size={18}
-                color={textOnPrimary}
-              />
-            </View>
+            <IconSymbol
+              name="chevron.right"
+              size={18}
+              color={textOnPrimary}
+              style={styles.heroChevron}
+            />
           </View>
         </Pressable>
 
@@ -291,10 +359,10 @@ export default function SettingsScreen() {
         </ThemedView>
 
         {/* Logout */}
-         <Pressable
-           style={[styles.logoutButton, { borderColor: border }]}
-           onPress={handleLogout}
-         >
+        <Pressable
+          style={[styles.logoutButton, { borderColor: border }]}
+          onPress={handleLogout}
+        >
           <IconSymbol
             name="log-out"
             size={18}
@@ -344,26 +412,15 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     marginTop: 8,
   },
-
-  profileProgressRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 8,
-  },
-  profileProgressLabel: {
-    marginRight: 8,
+  heroError: {
+    marginTop: 12,
+    textAlign: "center",
     fontWeight: "600",
   },
-  profileProgressBarWrap: {
-    height: 6,
-    width: 72,
-    borderRadius: 3,
-    overflow: "hidden",
-    marginRight: 6,
-  },
-  profileProgressBar: {
-    height: 6,
-    borderRadius: 3,
+  heroChevron: {
+    position: "absolute",
+    right: 16,
+    top: 16,
   },
 
   sectionGroup: {

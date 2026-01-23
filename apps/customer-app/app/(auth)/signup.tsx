@@ -89,17 +89,23 @@ export default function Signup() {
     setLoading(true);
     try {
       const phone = `${phoneCode}${phoneNumber}`;
-      await signup({ name: fullName, email, phone, password });
-      setLoading(false);
+      await signup({
+        name: fullName.trim(),
+        email: email.trim().toLowerCase(),
+        phone,
+        password,
+      });
+      showToast({ variant: "success", message: "Account created!" });
       router.replace("/login");
-    } catch (err: any) {
-      setLoading(false);
+    } catch (err: unknown) {
       console.error("signup error", err);
-      const msg =
-        err?.message ||
-        err?.error ||
-        "Could not create account. Please try again.";
-      showToast({ variant: "error", message: String(msg) });
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Could not create account. Please try again.";
+      showToast({ variant: "error", message });
+    } finally {
+      setLoading(false);
     }
   };
 

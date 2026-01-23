@@ -1,32 +1,36 @@
-import React, { useRef, useState, useEffect } from "react";
-import {
-  ScrollView,
-  StyleSheet,
-  View,
-  Pressable,
-  KeyboardAvoidingView,
-  Platform,
-} from "react-native";
-import Toast from "react-native-toast-message";
 import { getBusinessDetails } from "@/services/business-details.service";
 import { updateStoreDetails } from "@/services/business.service";
 import * as Location from "expo-location";
-import MapView from "react-native-maps";
 import { useRouter } from "expo-router";
+import React, { useEffect, useRef, useState } from "react";
+import {
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+} from "react-native";
+import MapView from "react-native-maps";
+import Toast from "react-native-toast-message";
 
-import { ThemedText } from "@/components/themed-text";
-import { useThemeColor } from "@/hooks/use-theme-color";
-import { OpenHour, SignupStep3Data } from "@/types/signup";
-import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ImageUpload } from "@/components/signup/step3/ImageUpload";
 import { LocationBlock } from "@/components/signup/step3/LocationBlock";
 import { OpenHoursBlock } from "@/components/signup/step3/OpenHoursBlock";
 import { StoreInfo } from "@/components/signup/step3/StoreInfo";
+import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
+import { IconSymbol } from "@/components/ui/icon-symbol";
+import { useThemeColor } from "@/hooks/use-theme-color";
+import { OpenHour, SignupStep3Data } from "@/types/signup";
 
 export default function EditStoreDetailsScreen() {
   const router = useRouter();
   const mapRef = useRef<MapView | null>(null);
+  const isMountedRef = useRef(true);
+
+  const [locating, setLocating] = useState(false);
+
   const primary = useThemeColor({}, "brandPrimary");
   const borderColor = useThemeColor({}, "borderDefault");
   const surfaceCard = useThemeColor({}, "surfaceCard");
@@ -38,11 +42,12 @@ export default function EditStoreDetailsScreen() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    let mounted = true;
+    isMountedRef.current = true;
+
     (async () => {
       try {
         const details = await getBusinessDetails();
-        if (mounted && details?.step3) {
+        if (isMountedRef.current && details?.step3) {
           setStoreData({
             storeName: details.step3.storeName || "",
             storeDescription: details.step3.storeDescription || "",
@@ -53,21 +58,22 @@ export default function EditStoreDetailsScreen() {
           });
           setOpenHours(details.step3.openHours || {});
         }
-      } catch (err) {
+      } catch {
         Toast.show({ type: "error", text1: "Failed to load store details" });
       } finally {
-        if (mounted) setLoading(false);
+        if (isMountedRef.current) setLoading(false);
       }
     })();
+
     return () => {
-      mounted = false;
+      isMountedRef.current = false;
     };
   }, []);
 
   /** Update store data */
   const handleChange = <K extends keyof SignupStep3Data>(
     key: K,
-    value: SignupStep3Data[K]
+    value: SignupStep3Data[K],
   ) => {
     setStoreData((prev) => (prev ? { ...prev, [key]: value } : prev));
   };
@@ -98,22 +104,38 @@ export default function EditStoreDetailsScreen() {
     }
   };
 
-  /** Use device current location */
   const useCurrentLocation = async () => {
-    const { status } = await Location.requestForegroundPermissionsAsync();
-    if (status !== "granted") return;
+    if (locating) return;
 
-    const pos = await Location.getCurrentPositionAsync({});
-    const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+    try {
+      setLocating(true);
 
-    handleChange("location", coords);
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") return;
 
-    mapRef.current?.animateToRegion({
-      latitude: coords.lat,
-      longitude: coords.lng,
-      latitudeDelta: 0.01,
-      longitudeDelta: 0.01,
-    });
+      const pos = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+
+      const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+
+      if (!isMountedRef.current) return;
+
+      handleChange("location", coords);
+
+      requestAnimationFrame(() => {
+        mapRef.current?.animateToRegion({
+          latitude: coords.lat,
+          longitude: coords.lng,
+          latitudeDelta: 0.01,
+          longitudeDelta: 0.01,
+        });
+      });
+    } catch (e) {
+      Toast.show({ type: "error", text1: "Unable to get location" });
+    } finally {
+      if (isMountedRef.current) setLocating(false);
+    }
   };
 
   if (loading || !storeData) {
@@ -327,14 +349,19 @@ export default function EditStoreDetailsScreen() {
           />
 
           {/* ================= Location ================= */}
-          <ThemedText type="subtitle">Location</ThemedText>
-          <LocationBlock
-            mapRef={mapRef}
-            primary={primary}
-            location={storeData?.location || { lat: 6.5244, lng: 3.3792 }}
-            onUseCurrent={useCurrentLocation}
-            onPick={(v) => handleChange("location", v)}
-          />
+          {storeData?.location && (
+            <>
+              <ThemedText type="subtitle">Location</ThemedText>
+              <LocationBlock
+                mapRef={mapRef}
+                primary={primary}
+                location={storeData.location}
+                loading={locating}
+                onUseCurrent={useCurrentLocation}
+                onPick={(v) => handleChange("location", v)}
+              />
+            </>
+          )}
 
           {/* ================= Open Hours ================= */}
           <ThemedText type="subtitle">Open Hours</ThemedText>

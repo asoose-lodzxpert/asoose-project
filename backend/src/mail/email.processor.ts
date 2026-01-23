@@ -34,6 +34,15 @@ export class EmailProcessor extends WorkerHost {
         return this.sendVendorWithdrawal(job);
       case 'vendor-deletion-request':
         return this.sendVendorDeletionRequest(job);
+      // Rider email jobs
+      case 'rider-welcome':
+        return this.sendRiderWelcome(job);
+      case 'rider-password-reset':
+        return this.sendRiderPasswordReset(job);
+      case 'rider-password-changed':
+        return this.sendRiderPasswordChanged(job);
+      case 'rider-account-approved':
+        return this.sendRiderAccountApproved(job);
       default:
         throw new Error(`Unknown job name: ${job.name}`);
     }
@@ -274,6 +283,84 @@ export class EmailProcessor extends WorkerHost {
       context: {
         vendorName: job.data.vendorName,
         supportUrl: job.data.supportUrl,
+        year: job.data.year,
+      },
+    });
+  }
+
+  // ========== RIDER EMAIL HANDLERS ==========
+
+  private async sendRiderWelcome(
+    job: Job<{ email: string; name: string; year: number }>,
+  ) {
+    await this.mailer.sendMail({
+      to: job.data.email,
+      subject: '🏍️ Welcome to Asoose Riders!',
+      template: 'rider-welcome',
+      context: {
+        name: job.data.name,
+        year: job.data.year,
+      },
+    });
+  }
+
+  private async sendRiderPasswordReset(
+    job: Job<{ email: string; name: string; otp: string; year: number }>,
+  ) {
+    await this.mailer.sendMail({
+      to: job.data.email,
+      subject: '🔑 Rider Password Reset Request',
+      template: 'rider-password-reset',
+      context: {
+        name: job.data.name,
+        otp: job.data.otp,
+        year: job.data.year,
+      },
+    });
+  }
+
+  private async sendRiderPasswordChanged(
+    job: Job<{
+      email: string;
+      name: string;
+      timestamp: string;
+      ipAddress: string;
+      securityUrl: string;
+      year: number;
+    }>,
+  ) {
+    await this.mailer.sendMail({
+      to: job.data.email,
+      subject: '🔒 Your Rider Password Has Been Changed',
+      template: 'rider-password-changed',
+      context: {
+        name: job.data.name,
+        email: job.data.email,
+        timestamp: job.data.timestamp,
+        ipAddress: job.data.ipAddress,
+        securityUrl: job.data.securityUrl,
+        year: job.data.year,
+      },
+    });
+  }
+
+  private async sendRiderAccountApproved(
+    job: Job<{
+      email: string;
+      name: string;
+      commissionRate: number;
+      appUrl: string;
+      year: number;
+    }>,
+  ) {
+    await this.mailer.sendMail({
+      to: job.data.email,
+      subject: '🎉 Your Rider Account is Approved!',
+      template: 'rider-account-approved',
+      context: {
+        name: job.data.name,
+        commissionRate: job.data.commissionRate,
+        appUrl: job.data.appUrl,
         year: job.data.year,
       },
     });

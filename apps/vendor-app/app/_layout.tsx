@@ -32,7 +32,7 @@ function LoadingScreen() {
               duration: 400,
               useNativeDriver: true,
             }),
-          ])
+          ]),
         ),
       ]);
     };
@@ -76,19 +76,33 @@ function RootNavigator() {
     return <LoadingScreen />;
   }
 
-  return (
-    <GestureHandlerRootView>
-      <Stack screenOptions={{ headerShown: false }}>
-        {!user ? (
+  if (!user) {
+    return (
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="(auth)" />
-        ) : user.status === "PENDING" ? (
+        </Stack>
+      </GestureHandlerRootView>
+    );
+  }
+
+  const status = user.status?.trim().toUpperCase() ?? "";
+
+  return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <Stack screenOptions={{ headerShown: false }}>
+        {status === "PENDING" ? (
           <Stack.Screen name="(status)/pending" />
-        ) : user.status === "SUSPENDED" ? (
+        ) : status === "SUSPENDED" ? (
           <Stack.Screen name="(status)/suspended" />
-        ) : user.status === "BANNED" ? (
+        ) : status === "CLOSED_PERMANENTLY" ? (
+          <Stack.Screen name="(status)/closed-permanently" />
+        ) : status === "BANNED" ? (
           <Stack.Screen name="(status)/banned" />
-        ) : (
+        ) : status === "ACTIVE" ? (
           <Stack.Screen name="(main)" />
+        ) : (
+          <Stack.Screen name="(auth)" />
         )}
       </Stack>
     </GestureHandlerRootView>

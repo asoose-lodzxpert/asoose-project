@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-const API_URL =
+const EXPO_PUBLIC_API_URL =
   process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api/v1";
 
 interface DirectionsResponse {
@@ -12,13 +12,13 @@ interface DirectionsResponse {
 
 export async function getDirections(
   origin: { latitude: number; longitude: number },
-  destination: { latitude: number; longitude: number }
+  destination: { latitude: number; longitude: number },
 ): Promise<DirectionsResponse> {
   try {
     // Get auth token
     const token = await AsyncStorage.getItem("access_token");
 
-    const url = `${API_URL}/maps/directions?originLat=${origin.latitude}&originLng=${origin.longitude}&destLat=${destination.latitude}&destLng=${destination.longitude}`;
+    const url = `${EXPO_PUBLIC_API_URL}/maps/directions?originLat=${origin.latitude}&originLng=${origin.longitude}&destLat=${destination.latitude}&destLng=${destination.longitude}`;
 
     const response = await fetch(url, {
       method: "GET",

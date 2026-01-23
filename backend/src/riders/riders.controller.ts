@@ -202,9 +202,9 @@ export class RidersController {
 
     // Update rider's image field
     const { id } = req.user || {};
-    await this.ridersService.updateRiderImage(id, result.signedUrl);
+    await this.ridersService.updateRiderImage(id, result.url);
 
-    return { imageUrl: result.signedUrl };
+    return { imageUrl: result.url };
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)

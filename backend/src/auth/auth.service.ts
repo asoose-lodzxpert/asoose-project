@@ -32,11 +32,6 @@ export class AuthService {
     return { message: 'Login not implemented', body };
   }
 
-  refresh(refreshToken: string) {
-    // TODO: Implement refresh logic
-    return { message: 'Refresh not implemented', refreshToken };
-  }
-
   // User
   async loginUser(body: { email: string; password: string }) {
     try {
@@ -65,13 +60,14 @@ export class AuthService {
         throw new UnauthorizedException('Invalid email or password');
       }
 
-      // Generate JWT access token
+      // Generate JWT access and refresh tokens
       const payload = {
         sub: user.id,
         email: user.email,
         role: user.role,
       };
       const access_token = this.jwtService.sign(payload);
+      const refresh_token = this.jwtService.sign(payload, { expiresIn: '30d' });
 
       // Split name into firstName and lastName for response
       const nameParts = user.name.split(' ');
@@ -80,6 +76,7 @@ export class AuthService {
 
       return {
         access_token,
+        refresh_token,
         user: {
           id: user.id,
           email: user.email,
@@ -128,13 +125,14 @@ export class AuthService {
         },
       });
 
-      // Generate JWT access token
+      // Generate JWT access and refresh tokens
       const payload = {
         sub: user.id,
         email: user.email,
         role: user.role,
       };
       const access_token = this.jwtService.sign(payload);
+      const refresh_token = this.jwtService.sign(payload, { expiresIn: '30d' });
 
       // Split name back for response
       const nameParts = user.name.split(' ');
@@ -143,6 +141,7 @@ export class AuthService {
 
       return {
         access_token,
+        refresh_token,
         user: {
           id: user.id,
           email: user.email,
@@ -213,13 +212,14 @@ export class AuthService {
         }
       }
 
-      // Generate JWT access token
+      // Generate JWT access and refresh tokens
       const payload = {
         sub: user.id,
         email: user.email,
         role: user.role,
       };
       const access_token = this.jwtService.sign(payload);
+      const refresh_token = this.jwtService.sign(payload, { expiresIn: '30d' });
 
       // Split name into firstName and lastName for response
       const nameParts = user.name.split(' ');
@@ -228,6 +228,7 @@ export class AuthService {
 
       return {
         access_token,
+        refresh_token,
         user: {
           id: user.id,
           email: user.email,
@@ -245,6 +246,31 @@ export class AuthService {
     }
   }
 
+  // Universal refresh token logic
+  async refresh(refreshToken: string) {
+    try {
+      // Verify refresh token
+      const payload = this.jwtService.verify(refreshToken);
+      // Optionally: check user existence/status
+      const user = await this.prisma.user.findUnique({
+        where: { id: payload.sub },
+      });
+      if (!user || user.status !== 'ACTIVE') {
+        throw new UnauthorizedException('Invalid user or inactive');
+      }
+      // Generate new access token
+      const newPayload = {
+        sub: user.id,
+        email: user.email,
+        role: user.role,
+      };
+      const access_token = this.jwtService.sign(newPayload);
+      return { access_token };
+    } catch (error) {
+      throw new UnauthorizedException('Invalid or expired refresh token');
+    }
+  }
+
   async forgotUserPassword(dto: ForgotPasswordDto) {
     try {
       // Find user by email
@@ -259,13 +285,11 @@ export class AuthService {
         };
       }
 
-      // Generate OTP
       const otp = await this.otpService.generateOtp(
         `password-reset:${dto.email}`,
-        600, // 10 minutes
+        600,
       );
 
-      // Send OTP via email
       await this.emailProducer.sendPasswordResetOtp(user.email, user.name, otp);
 
       return {
