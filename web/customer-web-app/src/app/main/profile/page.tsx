@@ -129,6 +129,15 @@ export default function ProfilePage() {
       return;
     }
 
+    // ✅ ADDED: Super Admin Redirect Check
+    // If the user is a Super Admin, redirect immediately to the dashboard.
+    // We return early so 'init()' is never called, keeping 'isPageLoading' true
+    // which prevents the profile content from flashing.
+    if (session?.user?.role === 'SUPER_ADMIN') {
+      router.push('/super-admin/dashboard');
+      return;
+    }
+
     const init = async () => {
       try {
         const accessToken = session?.accessToken;

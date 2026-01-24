@@ -30,9 +30,9 @@ import {
   InitiatePaymentDto,
   DisbursePaymentDto,
   ProcessRefundDto,
-  PaymentType,
   RecipientType,
 } from './dto/payment.dto';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class PaymentService {
@@ -61,31 +61,27 @@ export class PaymentService {
     }
 
     const reference = this.generateReference();
-
-    // FIX: Nullish Coalescing for optional fields to avoid Prisma errors
-    // Use undefined for optional prisma fields if the DTO value is null/undefined
     const customerName = dto.customerName ?? undefined;
 
-    // Merge callbackUrl into metadata for later retrieval
     const metadata = {
       ...(dto.metadata || {}),
       ...(dto.callbackUrl ? { callbackUrl: dto.callbackUrl } : {}),
     };
 
-    // Create initial Pending record
+    // Use string 'PENDING' to satisfy Prisma's strict Enum expectation
     await this.prisma.payment.create({
       data: {
         reference,
         amount: dto.amount,
         gateway: dto.gateway,
         method: dto.method as any,
-        status: PaymentStatus.PENDING,
+        status: 'PENDING',
         userId,
-        ...(dto.orderId && { orderId: dto.orderId }),
-        ...(dto.rideId && { rideId: dto.rideId }),
+        orderId: dto.orderId,
+        rideId: dto.rideId,
         customerEmail: dto.email,
         customerName: customerName,
-        metadata,
+        metadata: metadata as Prisma.InputJsonValue,
       },
     });
 
@@ -150,7 +146,7 @@ export class PaymentService {
     } catch (error) {
       await this.prisma.payment.update({
         where: { reference },
-        data: { status: PaymentStatus.FAILED },
+        data: { status: 'FAILED' },
       });
       throw error;
     }
@@ -162,39 +158,43 @@ export class PaymentService {
   ): Promise<VerifyPaymentResponse & { meta?: { callbackUrl?: string } }> {
     let verification: VerifyPaymentResponse;
 
-    switch (gateway) {
-      case PaymentGateway.PAYSTACK:
-        verification = await this.paystackService.verifyPayment(reference);
-        break;
-
-      case PaymentGateway.FLUTTERWAVE:
-        verification = await this.flutterwaveService.verifyPayment(reference);
-        break;
-
-      case PaymentGateway.MONNIFY:
-        verification = await this.monnifyService.verifyPayment(reference);
-        break;
-
-      default:
-        throw new BadRequestException('Invalid payment gateway');
+    try {
+      switch (gateway) {
+        case PaymentGateway.PAYSTACK:
+          verification = await this.paystackService.verifyPayment(reference);
+          break;
+        case PaymentGateway.FLUTTERWAVE:
+          verification = await this.flutterwaveService.verifyPayment(reference);
+          break;
+        case PaymentGateway.MONNIFY:
+          verification = await this.monnifyService.verifyPayment(reference);
+          break;
+        default:
+          throw new BadRequestException('Invalid payment gateway');
+      }
+    } catch (err) {
+      this.logger.error(
+        `Verification failed at gateway level for ${reference}`,
+        err,
+      );
+      throw err;
     }
 
     await this.updatePaymentStatus(verification);
 
-    // Fetch callbackUrl from payment record's metadata
     const payment = await this.prisma.payment.findUnique({
       where: { reference },
       select: { metadata: true },
     });
+
     let callbackUrl: string | undefined = undefined;
     if (
-      payment &&
-      payment.metadata &&
+      payment?.metadata &&
       typeof payment.metadata === 'object' &&
-      !Array.isArray(payment.metadata) &&
-      'callbackUrl' in payment.metadata
+      !Array.isArray(payment.metadata)
     ) {
-      callbackUrl = (payment.metadata as Record<string, any>).callbackUrl;
+      const meta = payment.metadata as Record<string, any>;
+      callbackUrl = meta.callbackUrl;
     }
 
     return { ...verification, meta: { callbackUrl } };
@@ -214,14 +214,12 @@ export class PaymentService {
           signature,
         );
         break;
-
       case PaymentGateway.FLUTTERWAVE:
         isValid = this.flutterwaveService.verifyWebhookSignature(
           payload,
           signature,
         );
         break;
-
       case PaymentGateway.MONNIFY:
         isValid = this.monnifyService.verifyWebhookSignature(
           payload,
@@ -289,6 +287,9 @@ export class PaymentService {
     });
   }
 
+  // =================================================================
+  //  CORE STATUS UPDATE LOGIC (FIXED TYPES)
+  // =================================================================
   private async updatePaymentStatus(
     verification: VerifyPaymentResponse,
   ): Promise<void> {
@@ -309,10 +310,28 @@ export class PaymentService {
       return;
     }
 
+    // Cast to any to compare Prisma Enum (generated) vs App Enum (interface)
     if ((payment.status as any) === PaymentStatus.SUCCESS) {
-      this.logger.log(
-        `Payment already processed successfully: ${verification.reference}`,
+      this.logger.log(`Payment ${verification.reference} already processed.`);
+      return;
+    }
+
+    const tolerance = 0.5;
+    if (Math.abs(payment.amount - verification.amount) > tolerance) {
+      this.logger.error(
+        `FRAUD ALERT: Amount Mismatch! Expected: ${payment.amount}, Received: ${verification.amount}. Ref: ${payment.reference}`,
       );
+      await this.prisma.payment.update({
+        where: { id: payment.id },
+        data: {
+          status: 'FAILED',
+          metadata: {
+            ...(payment.metadata as object),
+            failReason: 'AMOUNT_MISMATCH',
+            receivedAmount: verification.amount,
+          },
+        },
+      });
       return;
     }
 
@@ -320,107 +339,127 @@ export class PaymentService {
       ? new Date(verification.paidAt)
       : new Date();
 
-    const updatedPayment = await this.prisma.payment.update({
-      where: { reference: verification.reference },
-      data: {
-        status: verification.status as any,
-        paidAt: paidAt,
-        verifiedAt: new Date(),
-      },
-      include: {
-        order: { include: { user: true, store: true, delivery: true } },
-        ride: { include: { customer: true } },
-      },
-    });
+    // Map Interface Enum to Prisma String/Enum
+    let targetStatus = 'PENDING';
+    if ((verification.status as any) === PaymentStatus.SUCCESS) {
+      targetStatus = 'COMPLETED'; // Prisma often uses COMPLETED for success
+    } else if ((verification.status as any) === PaymentStatus.FAILED) {
+      targetStatus = 'FAILED';
+    }
 
-    // Update ORDER
-    if (verification.status === PaymentStatus.SUCCESS && payment.orderId) {
-      await this.prisma.order.update({
-        where: { id: payment.orderId },
-        data: { status: 'CONFIRMED' as any },
+    // Perform atomic update
+    const result = await this.prisma.$transaction(async (tx) => {
+      const updatedPayment = await tx.payment.update({
+        where: { reference: verification.reference },
+        data: {
+          status: targetStatus as any,
+          paidAt: paidAt,
+          verifiedAt: new Date(),
+        },
+        include: {
+          order: { include: { user: true, store: true, delivery: true } },
+          ride: { include: { customer: true } },
+        },
       });
 
-      if (updatedPayment.order) {
-        try {
+      if (targetStatus === 'COMPLETED') {
+        if (payment.orderId) {
+          await tx.order.update({
+            where: { id: payment.orderId },
+            data: { status: 'CONFIRMED' as any },
+          });
+        }
+      } else if (targetStatus === 'FAILED') {
+        if (payment.orderId) {
+          await tx.order.update({
+            where: { id: payment.orderId },
+            data: { status: 'FAILED' as any },
+          });
+        }
+      }
+
+      return updatedPayment;
+    });
+
+    // Post-Processing (Ledger & Notifications)
+    // Fix: Cast result.status to 'any' to compare with PaymentStatus.SUCCESS
+    // Or check against the 'COMPLETED' string we know is there
+    if ((result.status as any) === 'COMPLETED' || (result.status as any) === PaymentStatus.SUCCESS) {
+      try {
+        if (result.order) {
           await this.ledger.recordPayment({
             id: payment.id,
             amount: payment.amount,
-            userId: updatedPayment.order.userId,
-            orderId: payment.orderId,
+            userId: result.order.userId,
+            // FIX: Use nullish coalescing to pass undefined instead of null
+            orderId: payment.orderId ?? undefined,
             method: payment.gateway,
             status: 'COMPLETED',
           });
 
           await this.ledger.recordOrderCommission({
-            id: payment.orderId,
-            storeId: updatedPayment.order.storeId,
+            // FIX: Assert non-null (!) since we know orderId exists if result.order exists
+            id: payment.orderId!,
+            storeId: result.order.storeId,
             total: payment.amount,
             commissionRate: 10,
           });
-        } catch (ledgerError) {
-          this.logger.error(
-            `Ledger recording failed for order ${payment.orderId}`,
-            ledgerError,
-          );
+        } else if (result.ride) {
+          const ride = result.ride;
+          if (ride.riderId) {
+            const platformFeeRate = 0.2;
+            const platformFee = payment.amount * platformFeeRate;
+            const driverFee = payment.amount;
+
+            await this.ledger.recordPayment({
+              id: payment.id,
+              amount: payment.amount,
+              userId: ride.customer.id,
+              // FIX: Use nullish coalescing to pass undefined instead of null
+              rideId: payment.rideId ?? undefined,
+              method: payment.gateway,
+              status: 'COMPLETED',
+            });
+
+            await this.ledger.recordRideEarnings({
+              // FIX: Assert non-null (!) since rideId must exist here
+              id: payment.rideId!,
+              riderId: ride.riderId,
+              totalFare: payment.amount,
+              platformFee,
+              driverFee,
+            });
+          }
         }
+      } catch (ledgerError) {
+        this.logger.error(
+          `Ledger recording failed for ${payment.reference}`,
+          ledgerError,
+        );
+        await this.prisma.payment.update({
+          where: { id: payment.id },
+          data: {
+            metadata: {
+              ...(payment.metadata as object),
+              ledgerStatus: 'FAILED',
+            },
+          },
+        });
       }
 
-      await this.sendPaymentNotifications(updatedPayment);
-
-      if (updatedPayment.order?.delivery) {
-        await this.startDeliveryMatching(updatedPayment.order.delivery.id);
-      }
-    } else if (
-      verification.status === PaymentStatus.FAILED &&
-      payment.orderId
-    ) {
-      await this.prisma.order.update({
-        where: { id: payment.orderId },
-        data: { status: 'FAILED' as any },
-      });
-    }
-
-    // Update RIDE
-    if (verification.status === PaymentStatus.SUCCESS && payment.rideId) {
-      const ride = await this.prisma.ride.findUnique({
-        where: { id: payment.rideId },
-        include: { customer: { select: { id: true } } },
-      });
-
-      if (ride && ride.riderId) {
-        const platformFeeRate = 0.2;
-        const platformFee = payment.amount * platformFeeRate;
-        const driverFee = payment.amount;
-
-        try {
-          await this.ledger.recordPayment({
-            id: payment.id,
-            amount: payment.amount,
-            userId: ride.customer.id,
-            rideId: payment.rideId,
-            method: payment.gateway,
-            status: 'COMPLETED',
-          });
-
-          await this.ledger.recordRideEarnings({
-            id: payment.rideId,
-            riderId: ride.riderId,
-            totalFare: payment.amount,
-            platformFee,
-            driverFee,
-          });
-        } catch (ledgerError) {
-          this.logger.error(
-            `Ledger recording failed for ride ${payment.rideId}`,
-            ledgerError,
-          );
-        }
+      if (result.order?.delivery) {
+        await this.startDeliveryMatching(result.order.delivery.id);
+      } else if (result.rideId) {
+        await this.startRideMatching(result.rideId);
       }
 
-      await this.startRideMatching(payment.rideId);
-      await this.sendPaymentNotifications(updatedPayment);
+      await this.sendPaymentNotifications(result);
     }
   }
+
+  // =================================================================
+  //  SAFE HELPERS
+  // =================================================================
 
   private async startRideMatching(rideId: string): Promise<void> {
     try {
@@ -455,7 +494,11 @@ export class PaymentService {
         customerId = payment.userId;
       }
 
-      if (customerId) {
+      if (
+        customerId &&
+        typeof customerId === 'string' &&
+        customerId !== 'undefined'
+      ) {
         await this.notificationsService.create({
           userId: customerId,
           title: 'Payment Successful',
@@ -468,11 +511,16 @@ export class PaymentService {
             amount: payment.amount,
           },
         });
+      } else {
+        this.logger.warn(
+          `Skipping user notification: No valid Customer ID for payment ${payment.reference}`,
+        );
       }
 
-      if (payment.order?.store?.vendorId) {
+      const vendorId = payment.order?.store?.vendorId;
+      if (vendorId && typeof vendorId === 'string') {
         await this.notificationsService.createForVendor({
-          vendorId: payment.order.store.vendorId,
+          vendorId: vendorId,
           title: 'New Order Payment',
           message: `Payment received for order #${payment.order.id}. Amount: ₦${payment.amount.toLocaleString()}`,
           type: 'ORDER_PAYMENT',
@@ -484,7 +532,10 @@ export class PaymentService {
         });
       }
     } catch (error) {
-      this.logger.error('Failed to send payment notifications:', error);
+      this.logger.error(
+        'Failed to send payment notifications (non-fatal):',
+        error,
+      );
     }
   }
 
@@ -501,7 +552,6 @@ export class PaymentService {
         where: { id: dto.recipientId },
         include: { store: { include: { bankAccount: true } } },
       });
-
       if (!vendor || !vendor.store)
         throw new NotFoundException('Vendor or store not found');
       bankAccount = vendor.store.bankAccount;
@@ -511,7 +561,6 @@ export class PaymentService {
         where: { id: dto.recipientId },
         include: { bankAccount: true },
       });
-
       if (!rider) throw new NotFoundException('Rider not found');
       bankAccount = rider.bankAccount;
       recipientName = rider.name || 'Rider';
@@ -539,7 +588,6 @@ export class PaymentService {
               data: { paystackRecipientCode: recipientCode },
             });
           }
-
           disbursement = await this.paystackService.initiateTransfer(
             dto.amount,
             recipientCode,
@@ -582,7 +630,7 @@ export class PaymentService {
           amount: dto.amount,
           gateway: dto.gateway,
           method: PaymentMethod.BANK_TRANSFER as any,
-          status: PaymentStatus.PENDING,
+          status: 'PENDING',
           userId: dto.recipientId,
           ...(dto.orderId && { orderId: dto.orderId }),
           ...(dto.rideId && { rideId: dto.rideId }),
@@ -624,7 +672,7 @@ export class PaymentService {
     });
 
     if (!payment) throw new NotFoundException('Payment not found');
-    if ((payment.status as PaymentStatus) !== PaymentStatus.SUCCESS) {
+    if ((payment.status as any) !== 'COMPLETED' && (payment.status as any) !== PaymentStatus.SUCCESS) {
       throw new BadRequestException('Can only refund successful payments');
     }
 
@@ -644,10 +692,10 @@ export class PaymentService {
           );
           break;
         case PaymentGateway.FLUTTERWAVE:
-          if (!payment.transactionId)
+          if (!payment.authorizationUrl)
             throw new BadRequestException('Transaction ID missing');
           refund = await this.flutterwaveService.initiateRefund(
-            payment.transactionId,
+            payment.accessCode || payment.reference,
             refundAmount,
           );
           break;
@@ -661,15 +709,15 @@ export class PaymentService {
 
       const newStatus =
         refundAmount < payment.amount
-          ? PaymentStatus.PARTIAL_REFUND
-          : PaymentStatus.REFUNDED;
+          ? 'PARTIALLY_REFUNDED'
+          : 'REFUNDED';
 
       await this.prisma.payment.update({
         where: { id: payment.id },
         data: {
           status: newStatus as any,
           metadata: {
-            ...(payment.metadata as any),
+            ...(payment.metadata as object),
             refund: {
               amount: refundAmount,
               reason: dto.reason,
@@ -684,14 +732,7 @@ export class PaymentService {
       if (payment.orderId) {
         await this.prisma.order.update({
           where: { id: payment.orderId },
-          data: { status: 'CANCELLED' },
-        });
-      }
-
-      if (payment.rideId) {
-        await this.prisma.ride.update({
-          where: { id: payment.rideId },
-          data: { status: 'CANCELLED' },
+          data: { status: 'CANCELLED' as any },
         });
       }
 
@@ -743,7 +784,7 @@ export class PaymentService {
         data: {
           status: 'REFUNDED' as any,
           metadata: {
-            ...((payment.metadata as Record<string, any>) || {}),
+            ...(payment.metadata as object),
             refund: {
               refundReference: eventData.refundReference,
               refundAmount: eventData.refundAmount,

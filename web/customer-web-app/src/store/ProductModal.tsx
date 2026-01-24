@@ -3,7 +3,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { X, Minus, Plus } from 'lucide-react';
 import { useCartStore } from '@/store/useCartStore';
-import { toast } from 'react-toastify'; // ✅ FIX: Use react-toastify instead of sweetalert2
+import { toast } from 'react-toastify'; 
 
 // --- Types must match what is passed from the page ---
 export interface Modifier { id: string; name: string; price: number; }
@@ -76,10 +76,11 @@ export const ProductModal = ({ product, storeId, onClose }: ProductModalProps) =
     });
   }, [product, selectedModifiers]);
 
-  const handleAddToOrder = () => {
+  const handleAddToOrder = async () => {
     if (!product || !isValid) return;
 
-    addItem({
+    // ✅ FIX: Await result to check if item was actually added (vs cancelled)
+    const success = await addItem({
       id: product.id,
       name: product.name,
       price: totalPrice / quantity, // Unit price (base + mods)
@@ -88,10 +89,11 @@ export const ProductModal = ({ product, storeId, onClose }: ProductModalProps) =
       image: product.image
     });
 
-    onClose();
-    
-    // ✅ FIX: Trigger standard app toast
-    toast.success('Added to basket'); 
+    // Only close and show toast if confirmed
+    if (success) {
+        onClose();
+        toast.success('Added to basket'); 
+    }
   };
 
   if (!product) return null;

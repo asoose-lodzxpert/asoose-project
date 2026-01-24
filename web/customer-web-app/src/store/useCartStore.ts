@@ -1,20 +1,22 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import Swal from 'sweetalert2'; // ✅ Import SweetAlert2
 
 export interface CartItem {
   id: string;
   name: string;
   price: number;
   quantity: number;
-  restaurantId: string; // Ensure this is here
-  image?: string | null; // <--- FIX: Add this line
+  restaurantId: string;
+  image?: string | null;
 }
 
 interface CartState {
   items: CartItem[];
   restaurantId: string | null;
   
-  addItem: (item: CartItem) => void;
+  // ✅ FIX: Return Promise<boolean> to let callers know if add succeeded
+  addItem: (item: CartItem) => Promise<boolean>; 
   decreaseItem: (itemId: string) => void;
   removeItem: (itemId: string) => void;
   clearCart: () => void;
@@ -29,16 +31,29 @@ export const useCartStore = create<CartState>()(
       items: [],
       restaurantId: null,
 
-      addItem: (newItem) => {
+      addItem: async (newItem) => { // ✅ FIX: Made async
         const currentItems = get().items;
         const currentRestaurant = get().restaurantId;
 
         // Validation: Prevent mixing orders from different vendors
         if (currentRestaurant && currentRestaurant !== newItem.restaurantId) {
-            const confirmSwitch = window.confirm("Start a new basket? You have items from another vendor.");
-            if (!confirmSwitch) return;
+            // ✅ FIX: Replaced window.confirm with SweetAlert2
+            const result = await Swal.fire({
+                title: 'Start a new basket?',
+                text: "You have items from another vendor. Adding this item will clear your current cart.",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#eab308', // Yellow-500 (Matches app theme)
+                cancelButtonColor: '#d33',
+                confirmButtonText: 'Yes, start new',
+                cancelButtonText: 'Cancel',
+                backdrop: `rgba(0,0,0,0.4)`
+            });
+
+            if (!result.isConfirmed) return false; // User cancelled
+            
             set({ items: [newItem], restaurantId: newItem.restaurantId });
-            return;
+            return true; // Success
         }
 
         const existingItem = currentItems.find(i => i.id === newItem.id);
@@ -58,6 +73,7 @@ export const useCartStore = create<CartState>()(
             restaurantId: newItem.restaurantId
           });
         }
+        return true; // Success
       },
 
       decreaseItem: (itemId) => {

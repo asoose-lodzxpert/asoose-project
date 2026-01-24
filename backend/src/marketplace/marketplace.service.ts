@@ -1,13 +1,14 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import {
+  Store,
   StoreType,
   StoreStatus,
   VerificationStatus,
   Prisma,
 } from '@prisma/client';
 import { CreateReviewDto } from './dto/create-review.dto';
-
+import { StorageService } from '../storage/storage.service';
 const isUUID = (str: string) =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
 
@@ -23,7 +24,10 @@ export interface HomeVertical {
 export class MarketplaceService {
   private readonly logger = new Logger(MarketplaceService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private storage: StorageService,
+  ) {}
 
   async getHomeData() {
     const verticalTypes: StoreType[] = [
@@ -39,6 +43,17 @@ export class MarketplaceService {
         where: { type, status: 'ACTIVE', verification: 'VERIFIED' },
         take: 10,
         orderBy: { rating: 'desc' },
+        select: {
+          id: true,
+          name: true,
+          logo: true,
+          slug: true,
+          rating: true,
+          ratingCount: true,
+          prepTime: true,
+          address: true,
+          type: true,
+        },
       });
 
       if (stores.length === 0) continue;
@@ -67,9 +82,27 @@ export class MarketplaceService {
       orderBy: { priority: 'desc' },
       take: 5,
     });
-    return { verticals, banners };
+
+    const resolvedBanners = await Promise.all(
+      banners.map(async (banner) => ({
+        ...banner,
+        image: await this.resolveImage(banner.image),
+      })),
+    );
+    return { verticals, banners: resolvedBanners };
   }
 
+  private async resolveImage(key: string | null): Promise<string | null> {
+    if (!key) return null;
+    if (key.startsWith('http')) return key; // Handle legacy or external URLs
+    try {
+      // Generates a valid URL (Signed or Public based on config)
+      return await this.storage.getSignedUrlForKey(key); 
+    } catch (error) {
+      this.logger.warn(`Failed to resolve image for key: ${key}`);
+      return null;
+    }
+  }
   async getPaginatedStores(page: number, limit: number, type?: string) {
     const skip = (page - 1) * limit;
 
@@ -252,6 +285,7 @@ export class MarketplaceService {
       name: store.name,
       type: store.type,
       image: store.logo,
+      banner: store.banner,
       address: store.address || 'Address not available',
       rating: store.rating || 0,
       deliveryTime: `${store.prepTime || 20} - ${(store.prepTime || 20) + 15} mins`,
@@ -302,12 +336,12 @@ export class MarketplaceService {
     return '/icons/default.png';
   }
 
-  private mapStoresToVendors(stores: any[]) {
+  private mapStoresToVendors(stores: Partial<Store>[]) {
     return stores.map((store) => ({
       id: store.id,
       slug: store.slug,
       name: store.name,
-      image: store.image,
+      image: store.logo || null,
       rating: store.rating || 0,
       ratingCount: store.ratingCount || 0,
       deliveryTime: `${store.prepTime || 20} - ${(store.prepTime || 20) + 15} mins`,
