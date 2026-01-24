@@ -7,12 +7,12 @@ import {
   LayoutDashboard, Users, ShoppingCart, Car, Truck, 
   CreditCard, AlertTriangle, FileText, Settings, LogOut, 
   Menu, Bell, ChevronDown, ChevronRight, 
-  User, Banknote, ShieldCheck, Image 
+  User, Banknote, ShieldCheck, Image, Activity
 } from 'lucide-react';
 import { signOut } from "next-auth/react";
-import useSWR from 'swr'; //
-import { fetcher } from './hooks/useSuperAdminFetch'; //
-import { NotificationResponse } from './notifications/types'; //
+import useSWR from 'swr';
+import { fetcher } from './hooks/useSuperAdminFetch';
+import { NotificationResponse } from './notifications/types';
 
 type AdminRole = 'SUPER_ADMIN' | 'ADMIN_MANAGER' | 'ADMIN_SUPPORT' | 'ADMIN_FINANCE';
 
@@ -27,26 +27,31 @@ export default function AdminLayoutClient({ children, userRole }: AdminLayoutCli
   
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isUsersOpen, setIsUsersOpen] = useState(true);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const role = userRole as AdminRole;
 
-  // 1. Fetch notifications to check for unread status
+  // 1. Fetch notifications
   const { data: notificationsData } = useSWR<NotificationResponse>(
     '/notifications', 
     fetcher,
     { 
-      refreshInterval: 30000, // Re-check every 30 seconds
+      refreshInterval: 30000, 
       revalidateOnFocus: true 
     }
   );
 
-  // 2. Determine if any notifications are unread
   const hasUnread = notificationsData?.data?.some(n => !n.isRead) ?? false;
-
   const hasAccess = (allowedRoles: AdminRole[]) => allowedRoles.includes(role);
 
   const menuItems = [
+    { 
+      name: 'Activity Logs', 
+      icon: Activity, 
+      href: '/super-admin/activity-logs',
+      allowed: ['SUPER_ADMIN'] 
+    },
     { 
       name: 'Orders', 
       icon: ShoppingCart, 
@@ -101,15 +106,10 @@ export default function AdminLayoutClient({ children, userRole }: AdminLayoutCli
       href: '/super-admin/reports',
       allowed: ['SUPER_ADMIN', 'ADMIN_FINANCE', 'ADMIN_MANAGER']
     },
-    { 
-      name: 'Settings', 
-      icon: Settings, 
-      href: '/super-admin/settings',
-      allowed: ['SUPER_ADMIN']
-    },
   ];
 
   const canViewUsers = hasAccess(['SUPER_ADMIN', 'ADMIN_MANAGER', 'ADMIN_SUPPORT']);
+  const canViewSettings = hasAccess(['SUPER_ADMIN']);
 
   const handleLogout = async () => {
     try {
@@ -130,10 +130,11 @@ export default function AdminLayoutClient({ children, userRole }: AdminLayoutCli
       
       {/* Sidebar */}
       <aside className={`
-        fixed inset-y-0 left-0 z-50 w-64 bg-[#1E293B] border-r border-gray-800 transition-transform duration-200 ease-in-out
+        fixed inset-y-0 left-0 z-50 w-64 bg-[#1E293B] border-r border-gray-800 transition-transform duration-200 ease-in-out flex flex-col
         ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0
       `}>
-        <div className="p-6 border-b border-gray-800 flex items-center gap-3">
+        {/* Sidebar Header */}
+        <div className="p-6 border-b border-gray-800 flex items-center gap-3 shrink-0">
           <div className="w-8 h-8 bg-yellow-500 rounded-lg flex items-center justify-center text-black font-black">
             {role === 'SUPER_ADMIN' ? 'SA' : role === 'ADMIN_FINANCE' ? 'FN' : role === 'ADMIN_SUPPORT' ? 'SP' : 'MG'}
           </div>
@@ -143,7 +144,8 @@ export default function AdminLayoutClient({ children, userRole }: AdminLayoutCli
           </div>
         </div>
 
-        <nav className="p-4 space-y-1 overflow-y-auto max-h-[calc(100vh-140px)] scrollbar-hide">
+        {/* Navigation - kept pb-24 for spacing */}
+        <nav className="flex-1 p-4 space-y-1 overflow-y-auto scrollbar-hide pb-24">
           <Link 
             href="/super-admin/dashboard"
             className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all mb-1 ${
@@ -205,9 +207,38 @@ export default function AdminLayoutClient({ children, userRole }: AdminLayoutCli
                </Link>
              );
           })}
+
+          {canViewSettings && (
+            <div className="mb-1">
+              <button 
+                onClick={() => setIsSettingsOpen(!isSettingsOpen)}
+                className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-colors ${
+                   isChildActive('/super-admin/settings') ? 'text-white bg-white/5' : 'text-gray-400 hover:bg-white/5 hover:text-white'
+                }`}
+              >
+                  <div className="flex items-center gap-3">
+                    <Settings className="w-5 h-5" />
+                    <span className={isChildActive('/super-admin/settings') ? 'font-bold' : ''}>Settings</span>
+                  </div>
+                  {isSettingsOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+              </button>
+              
+              {isSettingsOpen && (
+                <div className="ml-4 mt-1 space-y-1 border-l border-gray-700 pl-3">
+                   <Link href="/super-admin/settings" className={`block px-4 py-2 text-sm rounded-lg transition-colors ${pathname === '/super-admin/settings' ? 'text-yellow-500 font-bold bg-yellow-500/10' : 'text-gray-400 hover:text-white'}`}>
+                     General
+                   </Link>
+                   <Link href="/super-admin/settings/zones" className={`block px-4 py-2 text-sm rounded-lg transition-colors ${isActive('/super-admin/settings/zones') ? 'text-yellow-500 font-bold bg-yellow-500/10' : 'text-gray-400 hover:text-white'}`}>
+                     Service Zones
+                   </Link>
+                </div>
+              )}
+            </div>
+          )}
         </nav>
 
-        <div className="absolute bottom-0 w-full p-4 border-t border-gray-800 bg-[#1E293B]">
+        {/* Logout Button */}
+        <div className="absolute bottom-0 w-full p-4 border-t border-gray-800 bg-[#1E293B] z-10">
            <button 
              onClick={handleLogout}
              disabled={isLoggingOut}
@@ -229,15 +260,8 @@ export default function AdminLayoutClient({ children, userRole }: AdminLayoutCli
              <Menu />
            </button>
 
-           <div className="flex-1 max-w-xl mx-4 hidden md:block">
-             <input 
-               type="text" 
-               placeholder="Search..." 
-               className="w-full bg-[#1E293B] border border-gray-700 rounded-lg px-4 py-2 text-sm text-gray-300 focus:outline-none focus:border-yellow-500 transition-colors"
-             />
-           </div>
-
-           <div className="flex items-center gap-4">
+           {/* Layout Fix: ml-auto pushes these icons to the right since the middle search div is gone */}
+           <div className="flex items-center gap-4 ml-auto">
               <Link 
                 href={"/super-admin/notifications"} 
                 className={`relative p-2 transition-colors ${
@@ -245,7 +269,6 @@ export default function AdminLayoutClient({ children, userRole }: AdminLayoutCli
                 }`}
               >
                  <Bell className="w-5 h-5" />
-                 {/* ✅ Render the red dot only if there are unread notifications */}
                  {hasUnread && (
                    <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full" />
                  )}

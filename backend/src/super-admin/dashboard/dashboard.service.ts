@@ -222,7 +222,7 @@ export class DashboardService {
         value: this.formatCurrency(revenueMetrics.lifetime),
         trend: revenueGrowth >= 0 ? 'up' : 'down',
         change: `${revenueGrowth > 0 ? '+' : ''}${revenueGrowth}%`,
-        iconName: 'DollarSign',
+        iconName: 'Banknote',
         color: 'text-green-500',
         bgColor: 'bg-green-500/10',
       },

@@ -17,6 +17,7 @@ import { BannerModule } from './banners/banner.module';
 import { SettingsController } from './settings/settings.controller';
 import { SettingsService } from './settings/settings.service';
 import { ActivityLogService } from 'src/common/services/activity-log.services';
+import { ActivityLogController } from './activity-logs/activity-log.controller';
 
 @Module({
   imports: [
@@ -35,7 +36,7 @@ import { ActivityLogService } from 'src/common/services/activity-log.services';
     AdminsModule,
     BannerModule,
   ],
-  controllers: [SettingsController],
+  controllers: [SettingsController,ActivityLogController],
   providers: [
     PrismaService, 
     SettingsService,

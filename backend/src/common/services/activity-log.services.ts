@@ -14,6 +14,9 @@ interface LogOptions {
 export class ActivityLogService {
   constructor(private prisma: PrismaService) {}
 
+  /**
+   * Records a new activity log entry
+   */
   async record(options: LogOptions) {
     return this.prisma.activityLog.create({
       data: {
@@ -25,5 +28,47 @@ export class ActivityLogService {
         metadata: options.metadata || {},
       },
     });
+  }
+
+  /**
+   * Fetches paginated activity logs with optional filtering
+   * This resolves the error in ActivityLogController
+   */
+  async getLogs(query: any) {
+    const { page = 1, limit = 10, action, userId } = query;
+    const skip = (Number(page) - 1) * Number(limit);
+
+    // Build filter object based on query parameters
+    const where: any = {};
+    if (action) where.action = action;
+    if (userId) where.userId = userId;
+
+    const [logs, total] = await Promise.all([
+      this.prisma.activityLog.findMany({
+        where,
+        skip,
+        take: Number(limit),
+        orderBy: { createdAt: 'desc' },
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
+        },
+      }),
+      this.prisma.activityLog.count({ where }),
+    ]);
+
+    return {
+      logs,
+      meta: {
+        total,
+        page: Number(page),
+        lastPage: Math.ceil(total / Number(limit)),
+      },
+    };
   }
 }
