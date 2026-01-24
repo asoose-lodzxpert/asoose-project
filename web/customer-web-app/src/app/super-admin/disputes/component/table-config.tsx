@@ -7,13 +7,13 @@ import { Dispute } from '../types';
 
 const columnHelper = createColumnHelper<Dispute>();
 
-// --- Helpers ---
+// Fix 1.1: Remove IN_REVIEW status (Phantom State)
 const getStatusColor = (status: string) => {
   switch (status) {
     case 'OPEN': return 'bg-red-500/20 text-red-500 border-red-500/20';
     case 'RESOLVED': return 'bg-green-500/20 text-green-500 border-green-500/20';
     case 'REJECTED': return 'bg-gray-500/20 text-gray-400 border-gray-500/20';
-    default: return 'bg-yellow-500/20 text-yellow-500 border-yellow-500/20';
+    default: return 'bg-gray-500/20 text-gray-400 border-gray-500/20';
   }
 };
 
@@ -36,7 +36,6 @@ const getStatusIcon = (status: string) => {
   }
 };
 
-// --- Columns ---
 export const disputeColumns = [
   columnHelper.accessor('id', {
     header: 'Dispute ID',
@@ -85,20 +84,22 @@ export const disputeColumns = [
       </span>
     ),
   }),
+  // Backend now returns this string directly
   columnHelper.accessor('relatedAmount', {
     header: 'Value',
     cell: info => (
       <div className="flex flex-col">
-         <span className="text-white font-semibold text-sm">{info.getValue()}</span>
+         <span className="text-white font-semibold text-sm">{info.getValue() || 'N/A'}</span>
          <span className="text-[10px] text-gray-500">{info.row.original.category}</span>
       </div>
     ),
   }),
+  // Backend now returns this string directly
   columnHelper.accessor('parties', {
     header: 'Parties Involved',
     cell: info => (
       <span className="text-gray-400 text-xs truncate max-w-[180px] block" title={info.getValue()}>
-        {info.getValue()}
+        {info.getValue() || 'Unknown'}
       </span>
     ),
   }),
@@ -113,7 +114,6 @@ export const disputeColumns = [
       </div>
     ),
   }),
-  // FIX: Wrapped in columnHelper.display() to infer types correctly
   columnHelper.display({
     id: 'actions',
     header: '',
@@ -127,7 +127,6 @@ export const disputeColumns = [
   }),
 ];
 
-// --- Mobile Card ---
 export const renderMobileDisputeCard = (dispute: Dispute) => (
   <div className={`bg-[#1E293B] border-l-4 ${dispute.breachedSLA ? 'border-l-red-500' : dispute.priority === 'URGENT' ? 'border-l-orange-500' : 'border-l-gray-700'} border-y border-r border-gray-800 rounded-r-lg p-4 mb-3 shadow-lg`}>
     <div className="flex justify-between items-start mb-3">

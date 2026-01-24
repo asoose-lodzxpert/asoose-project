@@ -5,6 +5,7 @@ import { Calendar, User, Target, Activity } from 'lucide-react';
 import { DataTable } from '../component/datatable';
 import { fetcher } from '../hooks/useSuperAdminFetch';
 import ActivityLogSkeleton from './skeleton';
+
 interface ActivityLog {
   id: string;
   action: string;
@@ -45,8 +46,9 @@ export default function ActivityLogsPage() {
     }
   ];
 
-  if(isLoading){
-    <ActivityLogSkeleton/>
+  // ✅ FIX: Explicitly return the skeleton component
+  if (isLoading) {
+    return <ActivityLogSkeleton />;
   }
 
   return (
@@ -69,16 +71,7 @@ export default function ActivityLogsPage() {
 
       {/* Mobile View: Card List (Hidden on Desktop) */}
       <div className="md:hidden space-y-4">
-        {isLoading ? (
-          // Mobile Skeleton Loader
-          [...Array(5)].map((_, i) => (
-            <div key={i} className="bg-[#1E293B] border border-gray-800 rounded-xl p-4 animate-pulse">
-              <div className="h-4 bg-gray-700 rounded w-1/3 mb-3"></div>
-              <div className="h-3 bg-gray-800 rounded w-full mb-2"></div>
-              <div className="h-3 bg-gray-800 rounded w-2/3"></div>
-            </div>
-          ))
-        ) : data?.logs && data.logs.length > 0 ? (
+        {data?.logs && data.logs.length > 0 ? (
           data.logs.map((log) => (
             <div key={log.id} className="bg-[#1E293B] border border-gray-800 rounded-xl p-4 shadow-sm">
               <div className="flex justify-between items-start mb-3">

@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { Download, Calendar, Loader2, Filter } from 'lucide-react';
-import { format, subDays, startOfWeek, startOfMonth, parseISO } from 'date-fns';
+import { Download, Calendar, Loader2 } from 'lucide-react';
+import { format, subDays } from 'date-fns';
 import useSWR from 'swr'; 
 import { getSession } from 'next-auth/react'; 
 import { fetcher } from '../hooks/useSuperAdminFetch';
@@ -49,7 +49,6 @@ const TIME_PERIODS = [
 
 export default function ReportsPage() {
   const [selectedPeriod, setSelectedPeriod] = useState(30);
-  const [isCustomRange, setIsCustomRange] = useState(false);
   const [showPeriodMenu, setShowPeriodMenu] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
 
@@ -59,24 +58,13 @@ export default function ReportsPage() {
     {
       keepPreviousData: true, 
       revalidateOnFocus: false, 
-      refreshInterval: 0, 
+      refreshInterval: 60000, // Refresh every minute
     }
   );
 
   /**
-   * ✅ CURRENCY FORMATTER (Naira ₦)
-   */
-  const formatNGN = (val: number) => 
-    new Intl.NumberFormat('en-NG', { 
-      style: 'currency', 
-      currency: 'NGN', 
-      maximumFractionDigits: 0 // Removes decimals for dashboard overview
-    }).format(val);
-
-  /**
-   * ✅ FIX: Transform Backend Object to OverviewMetric Array
-   * This solves the "metrics.map is not a function" error and handles the 
-   * "trend" type mismatch.
+   * ✅ TRANSFORM: Pass RAW numbers to OverviewCards.
+   * Formatting happens inside the component to prevent NaN/calculation errors.
    */
   const transformedMetrics = useMemo((): OverviewMetric[] | null => {
     if (!data?.overview) return null;
@@ -86,74 +74,46 @@ export default function ReportsPage() {
     return [
       {
         label: 'Total Revenue',
-        value: formatNGN(ov.totalRevenue),
+        value: ov.totalRevenue, // Raw Number
         change: ov.revenueChange,
-        trend: (ov.revenueChange > 0 ? 'up' : ov.revenueChange < 0 ? 'down' : 'neutral') as "up" | "down" | "neutral"
+        trend: (ov.revenueChange > 0 ? 'up' : ov.revenueChange < 0 ? 'down' : 'neutral')
       },
       {
         label: 'Total Orders',
-        value: ov.totalOrders.toLocaleString(),
+        value: ov.totalOrders, // Raw Number
         change: ov.ordersChange,
-        trend: (ov.ordersChange > 0 ? 'up' : ov.ordersChange < 0 ? 'down' : 'neutral') as "up" | "down" | "neutral"
+        trend: (ov.ordersChange > 0 ? 'up' : ov.ordersChange < 0 ? 'down' : 'neutral')
       },
       {
         label: 'Active Stores',
-        value: ov.activeStores.toLocaleString(),
+        value: ov.activeStores, // Raw Number
         change: ov.storesChange,
-        trend: (ov.storesChange > 0 ? 'up' : ov.storesChange < 0 ? 'down' : 'neutral') as "up" | "down" | "neutral"
+        trend: (ov.storesChange > 0 ? 'up' : ov.storesChange < 0 ? 'down' : 'neutral')
       },
       {
         label: 'Avg Order Value',
-        value: formatNGN(ov.avgOrderValue),
+        value: ov.avgOrderValue, // Raw Number
         change: ov.avgOrderValueChange,
-        trend: (ov.avgOrderValueChange > 0 ? 'up' : ov.avgOrderValueChange < 0 ? 'down' : 'neutral') as "up" | "down" | "neutral"
+        trend: (ov.avgOrderValueChange > 0 ? 'up' : ov.avgOrderValueChange < 0 ? 'down' : 'neutral')
       }
     ];
   }, [data]);
 
   /**
-   * ✅ FORMAT DATA FOR SUB-COMPONENTS (Currencies to strings where needed)
+   * ✅ CHART DATA: Use backend aggregation directly.
    */
-  const formattedTopVendors = useMemo(() => {
-    return data?.topVendors.map(v => ({
-      ...v,
-      revenue: formatNGN(v.revenue),
-      change: `${v.change > 0 ? '+' : ''}${v.change}%`
-    })) ?? [];
-  }, [data]);
-
   const processedChartData = useMemo(() => {
     if (!data) return { volume: [], growth: [], granularity: 'Day' };
 
-    let volumeData = [...data.orderVolume];
-    let granularity = 'Day';
-
-    if (selectedPeriod > 30 && selectedPeriod <= 90) {
-      granularity = 'Week';
-      const weeklyMap = new Map();
-      volumeData.forEach(d => {
-        const weekStart = format(startOfWeek(parseISO(d.date)), 'MMM d');
-        const prev = weeklyMap.get(weekStart) || { orders: 0, revenue: 0 };
-        weeklyMap.set(weekStart, { orders: prev.orders + d.orders, revenue: prev.revenue + d.revenue });
-      });
-      volumeData = Array.from(weeklyMap.entries()).map(([date, val]) => ({ date, ...val }));
-    } else if (selectedPeriod > 90) {
-      granularity = 'Month';
-      const monthlyMap = new Map();
-      volumeData.forEach(d => {
-        const monthStart = format(startOfMonth(parseISO(d.date)), 'MMM yyyy');
-        const prev = monthlyMap.get(monthStart) || { orders: 0, revenue: 0 };
-        monthlyMap.set(monthStart, { orders: prev.orders + d.orders, revenue: prev.revenue + d.revenue });
-      });
-      volumeData = Array.from(monthlyMap.entries()).map(([date, val]) => ({ date, ...val }));
-    }
+    // Determine label based on period selection
+    const granularity = selectedPeriod > 90 ? 'Month' : selectedPeriod > 30 ? 'Week' : 'Day';
 
     return {
       granularity,
-      volume: volumeData.map(d => ({
-        name: granularity === 'Day' ? format(parseISO(d.date), 'MMM d') : d.date,
+      volume: data.orderVolume.map(d => ({
+        name: d.date, // Backend returns formatted date string
         orders: d.orders,
-        revenue: d.revenue // Numbers passed for Charting engine
+        revenue: d.revenue 
       })),
       growth: data.growth.map(g => ({
         name: g.month,
@@ -170,6 +130,9 @@ export default function ReportsPage() {
     return `vs ${format(prevStart, 'MMM d')} - ${format(prevEnd, 'MMM d')}`;
   }, [selectedPeriod]);
 
+  /**
+   * ✅ EXPORT: Updated to use POST method for security
+   */
   const handleExport = async () => {
     setIsExporting(true);
     try {
@@ -177,7 +140,11 @@ export default function ReportsPage() {
       const token = (session as any)?.accessToken;
       
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/super-admin/reports/export?days=${selectedPeriod}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
+          method: 'POST',
+          headers: { 
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
       });
       
       if (!response.ok) throw new Error('Export failed');
@@ -191,7 +158,7 @@ export default function ReportsPage() {
       a.click();
       document.body.removeChild(a);
     } catch(e) { 
-        alert('Export failed'); 
+        alert('Export failed. Please try again.'); 
     } finally { 
         setIsExporting(false); 
     }
@@ -253,7 +220,7 @@ export default function ReportsPage() {
 
       <div className="max-w-7xl mx-auto px-4 md:px-6 space-y-6 mt-6">
         
-        {/* Overview Cards (Transformed Naira Array) */}
+        {/* Overview Cards: Receives raw numeric data */}
         <div className="overflow-x-auto pb-2 -mx-4 px-4 md:overflow-visible md:pb-0 md:mx-0 md:px-0">
             <OverviewCards 
               metrics={transformedMetrics} 
@@ -268,14 +235,10 @@ export default function ReportsPage() {
           granularity={processedChartData.granularity}
         />
 
-        {/* Breakdown & Rankings */}
+        {/* Breakdown & Rankings: Pass raw arrays */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Categorical Revenue Breakdown */}
           <RevenueBreakdown 
-            data={data?.revenueBreakdown.map(item => ({
-              ...item,
-              amount: formatNGN(item.amount) // Format kobo in specific list
-            })) ?? []} 
+            data={data?.revenueBreakdown ?? []} 
           />
           
           <RatingsDistribution 
@@ -283,8 +246,7 @@ export default function ReportsPage() {
             avgRating={data?.avgRating ?? 0} 
           />
           
-          {/* Top Performing Vendors */}
-          <TopVendors vendors={formattedTopVendors} />
+          <TopVendors vendors={data?.topVendors ?? []} />
         </div>
       </div>
     </div>

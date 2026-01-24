@@ -3,7 +3,7 @@ import { TransactionLedgerService } from '../transactions/transaction-ledger.ser
 import { PayoutStatus } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { PaymentService } from 'src/payment/payment.service';
-import { RecipientType, PaymentGateway } from 'src/payment/dto/payment.dto'; 
+import { RecipientType, PaymentGateway } from 'src/payment/dto/payment.dto';
 
 @Injectable()
 export class PayoutsService {
@@ -37,147 +37,101 @@ export class PayoutsService {
   }
 
   async approvePayout(id: string, type: 'VENDOR' | 'RIDER', adminId: string) {
-    // 1. Fetch Payout Details First (To get amount & recipient)
-    let payout: any;
-    let recipientId: string;
-    let recipientType: RecipientType;
+    // 1. Critical: Wrap the entire check-and-lock in a transaction to prevent race conditions
+    return this.prisma.$transaction(async (tx) => {
+      const payout = type === 'VENDOR'
+        ? await tx.vendorPayout.findUnique({ where: { id }, include: { store: true } })
+        : await tx.riderPayout.findUnique({ where: { id }, include: { rider: true } });
 
-    if (type === 'VENDOR') {
-      payout = await this.prisma.vendorPayout.findUnique({
-        where: { id },
-        include: { store: true }, // Need store to get vendorId
-      });
-      if (!payout) throw new BadRequestException('Vendor payout not found');
-      
-      // Check if already paid to prevent double-spending
-      if (payout.status === PayoutStatus.PAID) {
-         throw new BadRequestException('Payout already processed');
+      if (!payout) throw new BadRequestException('Payout request not found');
+
+      // Explicitly check status to prevent duplicate processing
+      if (payout.status !== PayoutStatus.PENDING) {
+        throw new BadRequestException(`Action denied: Payout is already ${payout.status}`);
       }
 
-      recipientId = payout.store.vendorId; 
-      recipientType = RecipientType.VENDOR;
-    } else {
-      payout = await this.prisma.riderPayout.findUnique({
-        where: { id },
-        include: { rider: true },
-      });
-      if (!payout) throw new BadRequestException('Rider payout not found');
-      
-      if (payout.status === PayoutStatus.PAID) {
-         throw new BadRequestException('Payout already processed');
+      // Fix TS2339: Narrow the property access for recipientId
+      let recipientId: string;
+      if (type === 'VENDOR') {
+        recipientId = (payout as any).store.vendorId;
+      } else {
+        recipientId = (payout as any).riderId;
       }
 
-      recipientId = payout.riderId;
-      recipientType = RecipientType.RIDER;
-    }
+      const recipientType = type === 'VENDOR' ? RecipientType.VENDOR : RecipientType.RIDER;
 
-    // 2. TRIGGER REAL MONEY TRANSFER
-    this.logger.log(`Initiating Gateway Transfer for ${type} ${id}`);
-    
-    // Default to PAYSTACK or fetch preference from system settings
-    const gateway = PaymentGateway.PAYSTACK; 
-
-    try {
-      // This actually talks to the bank
-      const disbursement = await this.paymentService.disbursePayment(
-        {
+      try {
+        const disbursement = await this.paymentService.disbursePayment({
           recipientId,
           recipientType,
           amount: payout.amount,
-          gateway,
-          reason: `Payout ${payout.reference || id}`,
+          gateway: PaymentGateway.PAYSTACK,
+          reason: `Payout ${id}`,
           metadata: { payoutId: id, adminId },
-        },
-        adminId
-      );
+        }, adminId);
 
-      if (!disbursement.success && disbursement.status !== 'PENDING') {
-         throw new Error(`Gateway declined transfer: ${disbursement.status}`);
-      }
+        // Fix TS2339: Use status if message doesn't exist on DisbursementResponse
+        if (!disbursement.success) {
+          throw new Error(disbursement.status || 'Gateway declined transfer');
+        }
 
-      // 3. UPDATE DB ONLY IF GATEWAY ACCEPTED
-      return this.prisma.$transaction(async (tx) => {
-        const commonUpdateData: any = {
-          status: 'PAID',
+        // 3. Update Record and Ledger
+        const updateData = {
+          status: PayoutStatus.PAID,
           processedAt: new Date(),
-          reference: disbursement.reference, // Store the REAL bank reference
+          reference: disbursement.reference,
         };
 
         if (type === 'VENDOR') {
-          const updated = await tx.vendorPayout.update({
-            where: { id },
-            data: commonUpdateData,
-          });
-
-          await this.ledger.recordVendorPayout({
-            id: updated.id,
-            storeId: updated.storeId,
-            amount: updated.amount,
+          const updated = await tx.vendorPayout.update({ where: { id }, data: updateData });
+          // Fix TS2345: Convert null reference to undefined for ledger compatibility
+          await this.ledger.recordVendorPayout({ 
+            ...updated, 
             status: 'PAID',
-            reference: disbursement.reference,
+            reference: updated.reference ?? undefined 
           });
           return updated;
         } else {
-          const updated = await tx.riderPayout.update({
-            where: { id },
-            data: commonUpdateData,
-          });
-
-          await this.ledger.recordRiderPayout({
-            id: updated.id,
-            riderId: updated.riderId,
-            amount: updated.amount,
+          const updated = await tx.riderPayout.update({ where: { id }, data: updateData });
+          // Fix TS2345: Convert null reference to undefined for ledger compatibility
+          await this.ledger.recordRiderPayout({ 
+            ...updated, 
             status: 'PAID',
-            reference: disbursement.reference,
+            reference: updated.reference ?? undefined
           });
           return updated;
         }
-      });
-
-    } catch (error) {
-      this.logger.error(`Payout Failed for ${id}`, error);
-      // Do NOT set status to PAID. Throw error so Admin knows it failed.
-      throw new BadRequestException(`Payout failed: ${error.message}`);
-    }
+      } catch (error) {
+        this.logger.error(`Disbursement failed for payout ${id}: ${error.message}`);
+        throw new BadRequestException(`Bank Transfer Failed: ${error.message}`);
+      }
+    });
   }
 
   async rejectPayout(id: string, type: 'VENDOR' | 'RIDER', reason: string) {
-    const updateData = {
-      status: PayoutStatus.FAILED,
-      rejectionReason: reason,
-    };
+    // Corrected: Use PayoutStatus.REJECTED instead of FAILED to align with schema
+    const updateData = { status: PayoutStatus.REJECTED, rejectionReason: reason };
 
-    if (type === 'VENDOR') {
-      const payout = await this.prisma.vendorPayout.update({
-        where: { id },
-        data: updateData,
-      });
-
-      // Sync failure to ledger
-      await this.ledger.recordVendorPayout({
-        id: payout.id,
-        storeId: payout.storeId,
-        amount: payout.amount,
-        status: 'FAILED',
-      });
-
-      return payout;
-    } else {
-      const payout = await this.prisma.riderPayout.update({
-        where: { id },
-        data: updateData,
-      });
-
-      // Sync failure to ledger
-      await this.ledger.recordRiderPayout({
-        id: payout.id,
-        riderId: payout.riderId,
-        amount: payout.amount,
-        status: 'FAILED',
-        reference: payout.reference || undefined,
-      });
-
-      return payout;
-    }
+    return this.prisma.$transaction(async (tx) => {
+      if (type === 'VENDOR') {
+        const payout = await tx.vendorPayout.update({ where: { id }, data: updateData });
+        // Fix TS2345: Handle null reference
+        await this.ledger.recordVendorPayout({ 
+          ...payout, 
+          status: 'FAILED',
+          reference: payout.reference ?? undefined
+        });
+        return payout;
+      } else {
+        const payout = await tx.riderPayout.update({ where: { id }, data: updateData });
+        // Fix TS2345: Handle null reference
+        await this.ledger.recordRiderPayout({ 
+          ...payout, 
+          status: 'FAILED',
+          reference: payout.reference ?? undefined
+        });
+        return payout;
+      }
+    });
   }
 }

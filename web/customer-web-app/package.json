@@ -6,7 +6,8 @@
     "dev": "next dev --turbopack",
     "build": "next build ",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:payouts": "playwright test tests/super-admin/payout-concurrency.spec.ts"
   },
   "dependencies": {
     "@auth/core": "^0.34.3",
@@ -41,6 +42,7 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
+    "@playwright/test": "^1.58.0",
     "@tailwindcss/postcss": "^4",
     "@types/leaflet": "^1.9.21",
     "@types/node": "^20",

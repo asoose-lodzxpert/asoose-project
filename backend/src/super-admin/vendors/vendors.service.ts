@@ -111,6 +111,7 @@ export class StoresService {
               phone: true,
               name: true,
               status: true,
+              image: true,
             },
           },
           orders: {
@@ -344,7 +345,9 @@ export class StoresService {
       status: store.status,
       verification: store.verification,
       rating: store.rating,
-
+      image: store.logo || store.vendor?.image || null,
+      createdAt: store.createdAt,
+      updatedAt: store.updatedAt,
       totalRevenue,
       unpaidBalance: Math.max(0, totalRevenue - paidOut),
       totalOrders: store.orders.length,

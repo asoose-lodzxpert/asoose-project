@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from 'react';
 import useSWR, { mutate } from 'swr';
-import { useSession } from "next-auth/react";
 import { fetcher } from '../hooks/useSuperAdminFetch';
 import { 
   Settings, Users, CreditCard, Shield, Truck, 
@@ -95,7 +94,6 @@ export default function SettingsPage() {
         value: String(s.value)
       }));
 
-      // FIX: Added /bulk suffix and switched to centralized fetcher
       await fetcher('/super-admin/settings/bulk', {
         method: 'PATCH',
         body: JSON.stringify({ settings: payload })
@@ -119,7 +117,6 @@ export default function SettingsPage() {
     e.preventDefault();
     setIsCreatingAdmin(true);
     try {
-      // FIX: Using standardized fetcher
       await fetcher('/super-admin/admins', {
         method: 'POST',
         body: JSON.stringify(newAdmin)
@@ -148,7 +145,6 @@ export default function SettingsPage() {
 
     if (result.isConfirmed) {
       try {
-        // FIX: Using standardized fetcher
         await fetcher(`/super-admin/admins/${id}`, {
             method: 'DELETE'
         });
@@ -164,7 +160,8 @@ export default function SettingsPage() {
   return (
     <div className="min-h-screen bg-[#0F172A] p-4 md:p-6 pb-20">
       <div className="max-w-7xl mx-auto">
-        <header className="flex justify-between items-center mb-8">
+        {/* Responsive Header */}
+        <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
           <div>
             <h1 className="text-2xl font-black text-white">Platform Settings</h1>
             <p className="text-gray-400 text-sm">Configure system logic and administrative access.</p>
@@ -173,7 +170,7 @@ export default function SettingsPage() {
             <button 
               onClick={saveSettings}
               disabled={isSaving}
-              className="flex items-center gap-2 px-6 py-2.5 bg-yellow-500 text-black font-black rounded-xl hover:bg-yellow-400 disabled:opacity-50 transition-all shadow-xl shadow-yellow-500/10"
+              className="w-full md:w-auto flex items-center justify-center gap-2 px-6 py-2.5 bg-yellow-500 text-black font-black rounded-xl hover:bg-yellow-400 disabled:opacity-50 transition-all "
             >
               {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
               {isSaving ? 'Saving...' : 'Save Settings'}
@@ -182,34 +179,38 @@ export default function SettingsPage() {
         </header>
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          <aside className="lg:col-span-1 space-y-2">
-            {TABS.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
-                  activeTab === tab.id 
-                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20' 
-                    : 'text-gray-400 hover:bg-[#1E293B] hover:text-white'
-                }`}
-              >
-                <tab.icon className="w-5 h-5" />
-                <span className="font-bold">{tab.label}</span>
-              </button>
-            ))}
+          {/* Tabs Sidebar - Scrollable on Mobile */}
+          <aside className="lg:col-span-1">
+            <div className="flex lg:flex-col overflow-x-auto lg:overflow-visible gap-2 pb-2 lg:pb-0 scrollbar-hide">
+              {TABS.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex-shrink-0 lg:w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all border lg:border-transparent ${
+                    activeTab === tab.id 
+                      ? 'bg-blue-600 text-white  border-blue-500' 
+                      : 'text-gray-400 border-gray-800 hover:bg-[#1E293B] hover:text-white'
+                  }`}
+                >
+                  <tab.icon className="w-5 h-5" />
+                  <span className="font-bold whitespace-nowrap">{tab.label}</span>
+                </button>
+              ))}
+            </div>
           </aside>
 
           <main className="lg:col-span-3">
             {activeTab === 'Team' ? (
-              <section className="bg-[#1E293B] border border-gray-800 rounded-3xl p-6 shadow-xl">
-                <div className="flex justify-between items-center mb-8">
+              <section className="bg-[#1E293B] border border-gray-800 rounded-3xl p-4 md:p-6 ">
+                {/* Responsive Section Header */}
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 md:mb-8">
                   <div>
                     <h2 className="text-lg font-black text-white">Administrative Team</h2>
                     <p className="text-gray-400 text-sm">Authorized accounts for the admin panel.</p>
                   </div>
                   <button 
                     onClick={() => setIsTeamModalOpen(true)}
-                    className="flex items-center gap-2 px-4 py-2 bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded-xl hover:bg-blue-500 hover:text-white transition-all font-black text-xs"
+                    className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2 bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded-xl hover:bg-blue-500 hover:text-white transition-all font-black text-xs"
                   >
                     <Plus className="w-4 h-4" /> Add Member
                   </button>
@@ -219,18 +220,25 @@ export default function SettingsPage() {
                   {isLoadingAdmins ? (
                       <div className="text-center py-10 text-gray-500"><Loader2 className="w-8 h-8 animate-spin mx-auto mb-2"/>Loading team...</div>
                   ) : admins?.map((admin) => (
-                    <div key={admin.id} className="flex items-center justify-between p-4 bg-[#0F172A] border border-gray-800 rounded-2xl group hover:border-blue-500/50 transition-all">
-                      <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center font-black text-white border border-gray-700">
+                    // Responsive Admin Card
+                    <div key={admin.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-[#0F172A] border border-gray-800 rounded-2xl group hover:border-blue-500/50 transition-all gap-4">
+                      
+                      {/* User Info - with min-w-0 for truncating */}
+                      <div className="flex items-center gap-4 min-w-0">
+                        <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center font-black text-white border border-gray-700 shrink-0">
                           {admin.name.charAt(0)}
                         </div>
-                        <div>
-                          <p className="text-white font-black text-sm">{admin.name}</p>
-                          <p className="text-gray-500 text-xs flex items-center gap-1"><Mail size={12}/> {admin.email}</p>
+                        <div className="min-w-0">
+                          <p className="text-white font-black text-sm truncate">{admin.name}</p>
+                          <p className="text-gray-500 text-xs flex items-center gap-1 truncate">
+                            <Mail size={12} className="shrink-0"/> <span className="truncate">{admin.email}</span>
+                          </p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-4">
-                        <span className="text-[10px] uppercase font-black px-2 py-1 rounded border bg-slate-800 text-gray-300 border-gray-700">
+
+                      {/* Actions - Stacked w/ border on mobile */}
+                      <div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto pt-3 sm:pt-0 border-t border-gray-800 sm:border-0">
+                        <span className="text-[10px] uppercase font-black px-2 py-1 rounded border bg-slate-800 text-gray-300 border-gray-700 whitespace-nowrap">
                           {admin.role.replace('ADMIN_', '')}
                         </span>
                         {admin.role !== 'SUPER_ADMIN' && (
@@ -248,7 +256,7 @@ export default function SettingsPage() {
                 {SETTING_DEFINITIONS.filter(s => s.category === activeTab).map((def) => {
                   const currentValue = localSettings.find(s => s.key === def.key)?.value ?? def.defaultValue;
                   return (
-                    <div key={def.key} className="bg-[#1E293B] border border-gray-800 rounded-3xl p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-xl">
+                    <div key={def.key} className="bg-[#1E293B] border border-gray-800 rounded-3xl p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 ">
                       <div>
                         <h3 className="text-white font-black mb-1">{def.label}</h3>
                         {def.description && <p className="text-gray-400 text-sm">{def.description}</p>}
@@ -286,7 +294,7 @@ export default function SettingsPage() {
       {/* --- ADD ADMIN MODAL --- */}
       {isTeamModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-[#1E293B] border border-gray-700 rounded-3xl w-full max-w-md shadow-2xl p-8">
+          <div className="bg-[#1E293B] border border-gray-700 rounded-3xl w-full max-w-md  p-8">
             <div className="flex justify-between items-center mb-8">
               <h2 className="text-xl font-black text-white">Add Team Member</h2>
               <button onClick={() => setIsTeamModalOpen(false)} className="text-gray-500 hover:text-white"><X size={20}/></button>

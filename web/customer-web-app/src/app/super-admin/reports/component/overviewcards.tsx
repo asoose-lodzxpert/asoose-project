@@ -1,5 +1,7 @@
-import React from 'react';
-import { ArrowUpRight, ArrowDownRight, DollarSign, ShoppingBag, Users, Activity, Minus } from 'lucide-react';
+'use client';
+
+import React, { useMemo } from 'react';
+import { ArrowUpRight, ArrowDownRight, Banknote, ShoppingBag, Users, Activity, Minus } from 'lucide-react';
 
 export interface OverviewMetric {
   label: string;
@@ -16,13 +18,23 @@ interface OverviewCardsProps {
 
 const getIcon = (label: string) => {
   const l = label.toLowerCase();
-  if (l.includes('revenue') || l.includes('sales')) return DollarSign;
+  if (l.includes('revenue') || l.includes('sales') || l.includes('value')) return Banknote;
   if (l.includes('order')) return ShoppingBag;
-  if (l.includes('user') || l.includes('customer')) return Users;
+  if (l.includes('user') || l.includes('customer') || l.includes('store')) return Users;
   return Activity;
 };
 
 export default function OverviewCards({ metrics, subtext }: OverviewCardsProps) {
+  // Memoize formatters to prevent recreation on every render
+  const nairaFormatter = useMemo(() => new Intl.NumberFormat('en-NG', { 
+    style: 'currency', 
+    currency: 'NGN',
+    maximumFractionDigits: 0, // Keep dashboard clean
+    minimumFractionDigits: 0
+  }), []);
+
+  const numberFormatter = useMemo(() => new Intl.NumberFormat('en-NG'), []);
+
   // Handle loading or invalid data gracefully
   if (!metrics || !Array.isArray(metrics)) {
     return (
@@ -40,6 +52,12 @@ export default function OverviewCards({ metrics, subtext }: OverviewCardsProps) 
         const Icon = metric.icon || getIcon(metric.label);
         const isPositive = metric.trend === 'up';
         const isNeutral = metric.trend === 'neutral';
+        const isRevenue = metric.label.toLowerCase().includes('revenue') || metric.label.toLowerCase().includes('value');
+
+        // Format value based on type and context
+        const displayValue = typeof metric.value === 'number' 
+          ? (isRevenue ? nairaFormatter.format(metric.value) : numberFormatter.format(metric.value))
+          : metric.value;
 
         return (
           <div 
@@ -62,7 +80,7 @@ export default function OverviewCards({ metrics, subtext }: OverviewCardsProps) 
 
             <div>
               <p className="text-gray-400 text-sm font-medium mb-1">{metric.label}</p>
-              <h3 className="text-2xl font-bold text-white tracking-tight">{metric.value}</h3>
+              <h3 className="text-2xl font-bold text-white tracking-tight">{displayValue}</h3>
               
               {subtext && (
                 <p className="text-xs text-gray-500 mt-2 font-medium">
