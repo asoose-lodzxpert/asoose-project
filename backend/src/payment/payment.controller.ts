@@ -113,45 +113,43 @@ export class PaymentController {
     return { status: 'success' };
   }
 
-  @Get('callback/paystack')
-  async paystackCallback(
-    @Query('reference') reference: string,
-    @Res() res: Response,
-  ) {
-    // 1. Validation
+  // =================================================================
+  // USER CALLBACK HANDLERS (Browser Redirects)
+  // =================================================================
+
+// ... imports ...
+
+@Get('callback/paystack')
+async paystackCallback(
+@Query('reference') reference: string,
+@Res() res: Response,
+) {
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
+
     if (!reference) {
-      this.logger.error('Paystack callback missing reference');
-      return res.redirect(
-        `/payment/callback?status=failed&reason=missing_reference`,
-      );
+        return res.redirect(`${frontendUrl}/payment/callback?status=failed&reason=missing_reference`);
     }
 
     try {
-      // Get verification and callbackUrl (if stored)
-      const verification = await this.paymentService.verifyPayment(
-        reference,
-        PaymentGateway.PAYSTACK,
-      );
-      // Use callbackUrl from metadata (no fallback)
-      const callbackUrl = verification.meta?.callbackUrl;
-      if (!callbackUrl) {
-        this.logger.error(
-          `Paystack callback missing callbackUrl for ${reference}`,
+        // Backend performs the heavy lifting
+        const verification = await this.paymentService.verifyPayment(
+            reference,
+            PaymentGateway.PAYSTACK,
         );
-        return res.redirect(
-          `/payment/callback?status=failed&reason=missing_callback`,
-        );
-      }
-      const status = verification.success ? 'success' : 'failed';
-      const redirectUrl = `${callbackUrl}/payment/callback?reference=${reference}&status=${status}`;
-      return res.redirect(redirectUrl);
+
+        // Normalize status for URL param (Frontend will still verify independently)
+        const statusParam = verification.status === 'SUCCESS' ? 'success' : 'failed';
+        
+        let callbackUrl = verification.meta?.callbackUrl || frontendUrl;
+        if (callbackUrl.includes('localhost:3000')) callbackUrl = frontendUrl;
+
+        return res.redirect(`${callbackUrl}/payment/callback?reference=${reference}&status=${statusParam}`);
     } catch (error) {
-      this.logger.error(`Paystack callback failed for ${reference}`, error);
-      return res.redirect(
-        `/payment/callback?reference=${reference}&status=failed`,
-      );
+        this.logger.error(`Paystack callback failed for ${reference}`, error);
+        return res.redirect(`${frontendUrl}/payment/callback?reference=${reference}&status=failed`);
     }
-  }
+}
+
 
   @Get('webhook/flutterwave/callback')
   async flutterwaveCallback(
@@ -159,29 +157,29 @@ export class PaymentController {
     @Query('transaction_id') transactionId: string,
     @Res() res: Response,
   ) {
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
+
     try {
       const idToVerify = transactionId || reference;
       const verification = await this.paymentService.verifyPayment(
         idToVerify,
         PaymentGateway.FLUTTERWAVE,
       );
-      // Use callbackUrl from metadata (no fallback)
-      const callbackUrl = verification.meta?.callbackUrl;
-      if (!callbackUrl) {
-        this.logger.error(
-          `Flutterwave callback missing callbackUrl for ${reference}`,
-        );
-        return res.redirect(
-          `/payment/callback?status=failed&reason=missing_callback`,
-        );
+
+      let callbackUrl = verification.meta?.callbackUrl;
+
+      // FIX: Force Frontend URL if missing or incorrect
+      if (!callbackUrl || callbackUrl.includes('localhost:3000')) {
+        callbackUrl = frontendUrl;
       }
+
       const status = verification.success ? 'success' : 'failed';
       const redirectUrl = `${callbackUrl}/payment/callback?reference=${verification.reference}&status=${status}`;
       return res.redirect(redirectUrl);
     } catch (error) {
       this.logger.error(`Flutterwave callback failed for ${reference}`, error);
       return res.redirect(
-        `/payment/callback?reference=${reference}&status=failed`,
+        `${frontendUrl}/payment/callback?reference=${reference}&status=failed`,
       );
     }
   }
@@ -191,31 +189,35 @@ export class PaymentController {
     @Query('paymentReference') reference: string,
     @Res() res: Response,
   ) {
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
+
     try {
       const verification = await this.paymentService.verifyPayment(
         reference,
         PaymentGateway.MONNIFY,
       );
-      // Use callbackUrl from metadata (no fallback)
-      const callbackUrl = verification.meta?.callbackUrl;
-      if (!callbackUrl) {
-        this.logger.error(
-          `Monnify callback missing callbackUrl for ${reference}`,
-        );
-        return res.redirect(
-          `/payment/callback?status=failed&reason=missing_callback`,
-        );
+
+      let callbackUrl = verification.meta?.callbackUrl;
+
+      // FIX: Force Frontend URL if missing or incorrect
+      if (!callbackUrl || callbackUrl.includes('localhost:3000')) {
+        callbackUrl = frontendUrl;
       }
+
       const status = verification.success ? 'success' : 'failed';
       const redirectUrl = `${callbackUrl}/payment/callback?reference=${reference}&status=${status}`;
       return res.redirect(redirectUrl);
     } catch (error) {
       this.logger.error(`Monnify callback failed for ${reference}`, error);
       return res.redirect(
-        `/payment/callback?reference=${reference}&status=failed`,
+        `${frontendUrl}/payment/callback?reference=${reference}&status=failed`,
       );
     }
   }
+
+  // =================================================================
+  // ADMIN ACTIONS
+  // =================================================================
 
   @Post('admin/disburse')
   @UseGuards(JwtAuthGuard, RolesGuard)

@@ -263,7 +263,7 @@ model Address {
   // 2. Add Vendor Relation (Store Locations)
   vendorId  String?
   vendor    Vendor? @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-
+  phone     String?
   label     String
   street    String
   city      String

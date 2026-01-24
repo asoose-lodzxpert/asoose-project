@@ -1,13 +1,13 @@
 'use client';
 
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useSearchParams } from 'next/navigation';
 import { 
   Store, X, ChevronRight, Utensils, Loader2, 
   ShoppingBasket, Pizza, Coffee, Gift, BriefcaseMedical, 
-  Carrot, Sandwich, Truck // Added new icons
+  Carrot, Sandwich, Truck, Heart, Star, Zap, Percent, SearchX
 } from 'lucide-react';
 
 // Components
@@ -28,6 +28,7 @@ interface BannerData {
 interface Vendor {
   id: string; name: string; image?: string; slug?: string;
   rating: number; deliveryTime?: string; deliveryFee: number; type: string;
+  isNew?: boolean; 
 }
 
 interface VerticalSection {
@@ -37,21 +38,19 @@ interface VerticalSection {
 // --- HELPER: GET CATEGORY ICON ---
 const getCategoryIcon = (title: string) => {
   const t = title.toLowerCase();
-  if (t.includes('restaurant') || t.includes('food')) return <Utensils className="w-7 h-7" />;
-  if (t.includes('grocery') || t.includes('market')) return <ShoppingBasket className="w-7 h-7" />;
-  if (t.includes('pharmacy') || t.includes('health') || t.includes('med')) return <BriefcaseMedical className="w-7 h-7" />;
-  if (t.includes('fast food') || t.includes('burger')) return <Sandwich className="w-7 h-7" />;
-  if (t.includes('pizza')) return <Pizza className="w-7 h-7" />;
-  if (t.includes('coffee') || t.includes('cafe')) return <Coffee className="w-7 h-7" />;
-  if (t.includes('fresh') || t.includes('veg')) return <Carrot className="w-7 h-7" />;
-  if (t.includes('courier') || t.includes('send')) return <Truck className="w-7 h-7" />;
-  if (t.includes('gift')) return <Gift className="w-7 h-7" />;
-  
-  // Default fallback
-  return <Store className="w-7 h-7" />;
+  if (t.includes('restaurant') || t.includes('food')) return <Utensils className="w-6 h-6" />;
+  if (t.includes('grocery') || t.includes('market')) return <ShoppingBasket className="w-6 h-6" />;
+  if (t.includes('pharmacy') || t.includes('health') || t.includes('med')) return <BriefcaseMedical className="w-6 h-6" />;
+  if (t.includes('fast food') || t.includes('burger')) return <Sandwich className="w-6 h-6" />;
+  if (t.includes('pizza')) return <Pizza className="w-6 h-6" />;
+  if (t.includes('coffee') || t.includes('cafe')) return <Coffee className="w-6 h-6" />;
+  if (t.includes('fresh') || t.includes('veg')) return <Carrot className="w-6 h-6" />;
+  if (t.includes('courier') || t.includes('send')) return <Truck className="w-6 h-6" />;
+  if (t.includes('gift')) return <Gift className="w-6 h-6" />;
+  return <Store className="w-6 h-6" />;
 };
 
-// --- DATA HOOK (CURATED CONTENT) ---
+// --- DATA HOOK ---
 function useStoreData(query: string | null) {
   const [data, setData] = useState<{
     verticals: VerticalSection[];
@@ -85,6 +84,8 @@ function useStoreData(query: string | null) {
       setData({ verticals: json.verticals || [], banners: json.banners || [] });
     } catch (err) {
       console.error(err);
+      // In case of error, set empty to stop loading spinner
+      setData({ verticals: [], banners: [] });
     } finally {
       setLoading(false);
     }
@@ -122,105 +123,183 @@ function useInfiniteStores(enabled: boolean) {
   return { stores, loading, hasMore, fetchMore };
 }
 
-// --- MAIN COMPONENT ---
+// --- MAIN PAGE COMPONENT ---
 export default function StorePage() {
   const searchParams = useSearchParams();
   const query = searchParams.get('q')?.trim() || null;
+  
+  // Data
   const { verticals, banners, loading: initialLoading, fetchData } = useStoreData(query);
   const { stores, loading: moreLoading, hasMore, fetchMore } = useInfiniteStores(!query);
   
-  const [showBanner, setShowBanner] = useState(true);
+  // UI State
+  const [activeBannerIndex, setActiveBannerIndex] = useState(0);
+  const [filter, setFilter] = useState<'ALL' | 'RATING' | 'FAST' | 'OFFERS'>('ALL');
+  const [favorites, setFavorites] = useState<string[]>([]);
   const observerTarget = useRef(null);
 
   useEffect(() => { fetchData(query); }, [query, fetchData]);
 
-  // Intersection Observer implementation
+  // Banner Carousel Logic
+  useEffect(() => {
+    if (banners.length <= 1) return;
+    const interval = setInterval(() => {
+      setActiveBannerIndex(prev => (prev + 1) % banners.length);
+    }, 6000);
+    return () => clearInterval(interval);
+  }, [banners.length]);
+
+  // Infinite Scroll Observer
   useEffect(() => {
     const observer = new IntersectionObserver(
-      entries => {
-        if (entries[0].isIntersecting && hasMore && !query) {
-          fetchMore();
-        }
-      },
+      entries => { if (entries[0].isIntersecting && hasMore && !query) fetchMore(); },
       { threshold: 0.1 }
     );
-
-    if (observerTarget.current) {
-      observer.observe(observerTarget.current);
-    }
-
+    if (observerTarget.current) observer.observe(observerTarget.current);
     return () => observer.disconnect();
   }, [fetchMore, hasMore, query]);
 
-  if (initialLoading && verticals.length === 0) return <StoreSkeleton />;
+  // Toggle Favorite
+  const toggleFavorite = (e: React.MouseEvent, id: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setFavorites(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
 
-  const activeBanner = banners.length > 0 ? banners[0] : null;
+  // Client-Side Filter Logic
+  const filteredStores = useMemo(() => {
+    let result = [...stores];
+    if (filter === 'RATING') result.sort((a, b) => b.rating - a.rating);
+    if (filter === 'FAST') result.sort((a, b) => parseInt(a.deliveryTime || '30') - parseInt(b.deliveryTime || '30'));
+    if (filter === 'OFFERS') result = result.filter(s => s.deliveryFee === 0);
+    return result;
+  }, [stores, filter]);
+
+  // Flatten Search Results (since API returns verticals)
+  const searchResults = useMemo(() => {
+    if (!query) return [];
+    return verticals.flatMap(v => v.vendors);
+  }, [verticals, query]);
+
+  // Show skeleton only on initial load
+  if (initialLoading) return <StoreSkeleton />;
+
+  const activeBanner = banners[activeBannerIndex];
 
   return (
-    <div className="min-h-screen bg-gray-50 mt-4 dark:bg-[#0a0a0a] text-gray-900 dark:text-gray-100 pb-32">
-      <main className="max-w-7xl mx-auto space-y-10 min-h-[60vh]">
+    <div className="min-h-screen bg-gray-50 dark:bg-[#0a0a0a] text-gray-900 dark:text-gray-100 pb-32 font-sans">
+      <main className="max-w-7xl mx-auto space-y-8 min-h-[60vh]">
+        
+        {/* =========================================
+            SCENARIO 1: HOME PAGE (NO SEARCH)
+           ========================================= */}
         {!query && (
           <>
-            {/* 1. DYNAMIC BANNER */}
-            {showBanner && activeBanner && (
-              <section className="px-4 pt-6">
-                <div className={`w-full h-44 sm:h-56 rounded-[2rem] relative overflow-hidden flex items-center px-6 sm:px-12 shadow-2xl group
-                  ${activeBanner.type === 'AD' ? 'bg-indigo-900' : 'bg-gradient-to-br from-yellow-500 to-orange-600'}`}>
-                  
+            {/* 1. CAROUSEL BANNER SECTION */}
+            {activeBanner && (
+              <section className="px-4 pt-4 sm:pt-6 relative group">
+                <div className={`
+                  w-full h-[180px] xs:h-[200px] sm:h-56 md:h-64 
+                  rounded-3xl sm:rounded-[2rem] 
+                  relative overflow-hidden flex items-center 
+                  px-6 sm:px-12 shadow-xl transition-all duration-500 ease-in-out
+                  ${activeBanner.type === 'AD' ? 'bg-indigo-900' : 'bg-gradient-to-r from-yellow-500 to-orange-600'}
+                `}>
                   {activeBanner.image && (
                     <div className="absolute inset-0 z-0">
-                      <Image src={activeBanner.image} alt={activeBanner.title} fill className="object-cover opacity-40" priority />
-                      <div className="absolute inset-0 bg-gradient-to-r from-black/50 via-transparent to-transparent" />
+                      <Image 
+                        src={activeBanner.image} 
+                        alt={activeBanner.title} 
+                        fill 
+                        className="object-cover opacity-30 mix-blend-overlay"
+                        priority 
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/40 to-transparent" />
                     </div>
                   )}
 
-                  <button onClick={() => setShowBanner(false)} className="absolute top-5 right-5 z-20 p-2 bg-black/20 hover:bg-black/40 text-white rounded-full backdrop-blur-md">
-                    <X className="w-4 h-4" />
-                  </button>
-
-                  <div className="relative z-10 text-white max-w-lg">
-                    <h2 className="text-3xl font-black mb-2 leading-tight">{activeBanner.title}</h2>
-                    <p className="text-base font-medium opacity-90 mb-6">{activeBanner.subtitle}</p>
-                    <Link href={activeBanner.link} className="bg-white text-orange-600 px-6 py-3 rounded-2xl font-extrabold text-sm shadow-xl inline-flex items-center gap-2">
-                      {activeBanner.buttonText} <ChevronRight className="w-4 h-4" />
+                  <div className="relative z-10 text-white max-w-lg space-y-3 sm:space-y-4 animate-in slide-in-from-bottom-4 duration-700">
+                    <span className="inline-block px-3 py-1 bg-white/20 backdrop-blur-md rounded-full text-[10px] sm:text-xs font-bold uppercase tracking-widest border border-white/10">
+                      {activeBanner.type === 'AD' ? 'Sponsored' : 'Featured'}
+                    </span>
+                    <h2 className="text-2xl sm:text-4xl font-black leading-tight tracking-tight">
+                      {activeBanner.title}
+                    </h2>
+                    <p className="text-sm sm:text-base font-medium opacity-90 line-clamp-2">
+                      {activeBanner.subtitle}
+                    </p>
+                    <Link 
+                      href={activeBanner.link}
+                      className="inline-flex items-center gap-2 bg-white text-black px-6 py-3 rounded-xl font-bold text-sm hover:scale-105 active:scale-95 transition-transform"
+                    >
+                      {activeBanner.buttonText}
+                      <ChevronRight className="w-4 h-4" />
                     </Link>
                   </div>
                 </div>
+
+                {/* Carousel Dots */}
+                {banners.length > 1 && (
+                  <div className="absolute bottom-6 right-8 z-20 flex gap-2">
+                    {banners.map((_, idx) => (
+                      <button 
+                        key={idx}
+                        onClick={() => setActiveBannerIndex(idx)}
+                        className={`w-2 h-2 rounded-full transition-all ${idx === activeBannerIndex ? 'bg-white w-6' : 'bg-white/40 hover:bg-white/60'}`}
+                      />
+                    ))}
+                  </div>
+                )}
               </section>
             )}
 
-            {/* 2. CATEGORY QUICK-LINKS */}
+            {/* 2. CATEGORY RAIL (Mobile Friendly Horizontal Scroll) */}
             <section className="px-4">
-               <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
-                 <Utensils className="w-5 h-5 text-yellow-500" /> Shop by Category
-               </h2>
-               <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-4">
+               <div className="flex justify-between items-center mb-4 px-1">
+                  <h2 className="text-lg font-bold">Categories</h2>
+                  <Link href="/main/store/categories" className="text-yellow-600 dark:text-yellow-500 text-xs font-bold hover:underline">
+                    View All
+                  </Link>
+               </div>
+               <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide snap-x -mx-4 px-4 sm:mx-0 sm:px-0 sm:grid sm:grid-cols-6 lg:grid-cols-8">
                   {verticals.map((v) => (
-                    <Link key={v.id} href={`/main/store/category/${v.id}`} className="flex flex-col items-center p-5 rounded-3xl bg-white dark:bg-[#151515] border border-gray-100 dark:border-white/5 hover:border-yellow-500/30 transition-all group">
-                      <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-yellow-50 dark:bg-yellow-900/10 text-yellow-600 transition-transform group-hover:scale-110">
-                        {/* ✅ DYNAMIC ICON HERE */}
+                    <Link key={v.id} href={`/main/store/category/${v.id}`} className="min-w-[72px] snap-start flex flex-col items-center gap-2 group cursor-pointer">
+                      <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl sm:rounded-3xl bg-white dark:bg-[#151515] border border-gray-100 dark:border-white/5 flex items-center justify-center text-gray-400 group-hover:bg-yellow-500 group-hover:text-black group-hover:border-yellow-500 transition-all shadow-sm">
                         {getCategoryIcon(v.title)}
                       </div>
-                      <span className="mt-4 text-sm font-bold text-center capitalize">{v.title}</span>
+                      <span className="text-[11px] sm:text-xs font-bold text-center truncate w-full text-gray-600 dark:text-gray-400 group-hover:text-black dark:group-hover:text-white transition-colors capitalize">
+                        {v.title}
+                      </span>
                     </Link>
                   ))}
                </div>
             </section>
 
-            {/* 3. DYNAMIC VERTICAL SECTIONS */}
-            <div className="space-y-12">
-              {verticals.map((section) => (
-                <section key={section.id} className="px-4">
+            {/* 3. DYNAMIC VERTICALS (Curated Rows) */}
+            <div className="space-y-10">
+              {verticals.slice(0, 3).map((section) => (
+                <section key={section.id} className="border-t border-gray-100 dark:border-white/5 pt-8 px-4">
                   <div className="flex justify-between items-end mb-6">
-                    <h2 className="text-2xl font-black capitalize">{section.title}</h2>
-                    <Link href={`/main/store/category/${section.id}`} className="text-xs font-bold text-yellow-600 bg-yellow-50 dark:bg-yellow-900/20 px-4 py-2 rounded-full">
-                      See all
+                    <div>
+                      <h2 className="text-xl font-black capitalize mb-1">{section.title}</h2>
+                      <p className="text-xs text-gray-400 font-medium">Curated for you</p>
+                    </div>
+                    <Link href={`/main/store/category/${section.id}`} className="w-8 h-8 rounded-full bg-gray-100 dark:bg-white/10 flex items-center justify-center hover:bg-yellow-500 hover:text-black transition-colors">
+                      <ChevronRight className="w-4 h-4" />
                     </Link>
                   </div>
-                  <div className="flex gap-5 overflow-x-auto pb-6 scrollbar-hide snap-x">
+                  
+                  <div className="flex gap-4 overflow-x-auto pb-6 scrollbar-hide snap-x -mx-4 px-4">
                     {section.vendors.map((vendor) => (
-                      <div key={vendor.id} className="min-w-[300px] snap-start">
-                        {/* ✅ FIXED LINK: Added /main prefix */}
+                      <div key={vendor.id} className="min-w-[280px] sm:min-w-[320px] snap-start relative group">
+                        {/* Micro-Interaction: Heart Button Overlay */}
+                        <button 
+                          onClick={(e) => toggleFavorite(e, vendor.id)}
+                          className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center text-white hover:bg-white hover:text-red-500 transition-all opacity-0 group-hover:opacity-100"
+                        >
+                          <Heart className={`w-4 h-4 ${favorites.includes(vendor.id) ? 'fill-red-500 text-red-500' : ''}`} />
+                        </button>
+
                         <Link href={`/main/store/${vendor.slug || vendor.id}`}>
                           <RestaurantCard {...vendor} time={vendor.deliveryTime || '30 min'} />
                         </Link>
@@ -231,31 +310,128 @@ export default function StorePage() {
               ))}
             </div>
 
-            {/* 4. INFINITE SCROLL: DISCOVER MORE */}
-            <section className="px-4 pb-12">
-              <h2 className="text-2xl font-black mb-6">Discover More</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {stores.map((vendor) => (
-                  /* ✅ FIXED LINK: Added /main prefix */
-                  <Link key={vendor.id} href={`/main/store/${vendor.slug || vendor.id}`}>
-                    <RestaurantCard {...vendor} time={vendor.deliveryTime || '30 min'} />
-                  </Link>
-                ))}
+            {/* 4. DISCOVER MORE (Sticky Filters & Infinite Grid) */}
+            <section className="relative min-h-screen pb-12">
+              {/* Sticky Filter Header */}
+              <div className="sticky top-[68px] z-20 bg-gray-50/95 dark:bg-[#0a0a0a]/95 backdrop-blur-xl border-b border-gray-100 dark:border-white/5 px-4 py-3 mb-6 transition-all">
+                 <div className="max-w-7xl mx-auto flex items-center justify-between">
+                    <h2 className="text-lg font-black flex items-center gap-2">
+                      <Store className="w-5 h-5 text-yellow-500" />
+                      All Stores
+                    </h2>
+                    
+                    <div className="flex gap-2 overflow-x-auto scrollbar-hide">
+                       {[
+                         { id: 'ALL', label: 'All', icon: null },
+                         { id: 'RATING', label: 'Top Rated', icon: Star },
+                         { id: 'FAST', label: 'Fastest', icon: Zap },
+                         { id: 'OFFERS', label: 'Offers', icon: Percent },
+                       ].map(f => (
+                         <button 
+                           key={f.id}
+                           onClick={() => setFilter(f.id as any)}
+                           className={`
+                             px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 whitespace-nowrap transition-all
+                             ${filter === f.id 
+                               ? 'bg-black dark:bg-white text-white dark:text-black shadow-lg' 
+                               : 'bg-white dark:bg-[#151515] border border-gray-200 dark:border-white/10 text-gray-500 hover:border-yellow-500'}
+                           `}
+                         >
+                           {f.icon && <f.icon className="w-3 h-3" />}
+                           {f.label}
+                         </button>
+                       ))}
+                    </div>
+                 </div>
               </div>
 
-              {/* Observer Element */}
-              <div ref={observerTarget} className="h-24 flex items-center justify-center mt-8">
-                {moreLoading && (
-                  <Loader2 className="w-8 h-8 animate-spin text-yellow-500" />
+              {/* Grid Content */}
+              <div className="px-4">
+                {filteredStores.length === 0 && !moreLoading ? (
+                  <div className="flex flex-col items-center justify-center py-20 text-center opacity-60">
+                    <ShoppingBasket className="w-12 h-12 mb-4 text-gray-300" />
+                    <p className="text-sm font-bold">No stores found</p>
+                    <p className="text-xs">Try adjusting your filters</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {filteredStores.map((vendor) => (
+                      <div key={vendor.id} className="relative group">
+                         <Link href={`/main/store/${vendor.slug || vendor.id}`}>
+                           {/* Vendor Badge Logic */}
+                           {vendor.rating >= 4.8 && (
+                             <div className="absolute top-3 left-3 z-10 px-2 py-1 bg-yellow-500 text-black text-[10px] font-black uppercase tracking-wider rounded">
+                               Top Rated
+                             </div>
+                           )}
+                           <RestaurantCard {...vendor} time={vendor.deliveryTime || '30 min'} />
+                         </Link>
+                      </div>
+                    ))}
+                  </div>
                 )}
-                {!hasMore && stores.length > 0 && (
-                  <p className="text-sm text-gray-400 font-bold uppercase tracking-widest">
-                    No more stores to show
-                  </p>
-                )}
+
+                {/* Loading Observer */}
+                <div ref={observerTarget} className="h-24 flex items-center justify-center mt-12">
+                  {moreLoading && <Loader2 className="w-8 h-8 animate-spin text-yellow-500" />}
+                  {!hasMore && stores.length > 0 && (
+                    <div className="flex items-center gap-2 text-xs font-bold text-gray-300 uppercase tracking-widest">
+                      <span className="w-2 h-2 rounded-full bg-gray-300"></span>
+                      End of list
+                    </div>
+                  )}
+                </div>
               </div>
             </section>
           </>
+        )}
+
+        {/* =========================================
+            SCENARIO 2: SEARCH RESULTS
+           ========================================= */}
+        {query && (
+          <section className="px-4 pt-4 sm:pt-6">
+             <div className="mb-6 border-b border-gray-100 dark:border-white/5 pb-4">
+                <h1 className="text-2xl font-black mb-1">Results for "{query}"</h1>
+                <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">
+                  Found {searchResults.length} {searchResults.length === 1 ? 'result' : 'results'}
+                </p>
+             </div>
+
+             {searchResults.length === 0 ? (
+               <div className="flex flex-col items-center justify-center py-24 text-center">
+                  <div className="w-20 h-20 bg-gray-100 dark:bg-white/5 rounded-full flex items-center justify-center mb-4">
+                    <SearchX className="w-10 h-10 text-gray-400" />
+                  </div>
+                  <h3 className="text-lg font-bold mb-1">No matches found</h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 max-w-xs mx-auto">
+                    We couldn't find any stores or items matching "{query}"
+                  </p>
+                  <Link 
+                    href="/main/store" 
+                    className="mt-6 px-6 py-3 bg-yellow-500 text-black font-bold rounded-xl hover:bg-yellow-400 transition-colors"
+                  >
+                    Clear Search
+                  </Link>
+               </div>
+             ) : (
+               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 animate-in slide-in-from-bottom-4 duration-500">
+                  {searchResults.map((vendor) => (
+                    <div key={vendor.id} className="relative group">
+                       <Link href={`/main/store/${vendor.slug || vendor.id}`}>
+                         {/* Optional Search Badges */}
+                         {vendor.deliveryFee === 0 && (
+                           <div className="absolute top-3 left-3 z-10 px-2 py-1 bg-green-500 text-white text-[10px] font-black uppercase tracking-wider rounded">
+                             Free Delivery
+                           </div>
+                         )}
+                         <RestaurantCard {...vendor} time={vendor.deliveryTime || '30 min'} />
+                       </Link>
+                    </div>
+                  ))}
+               </div>
+             )}
+          </section>
         )}
       </main>
 

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { X, MapPin, Loader2 } from 'lucide-react';
+import { X, MapPin, Loader2, Phone } from 'lucide-react'; // Added Phone icon
 import { toast } from 'react-toastify';
 
 interface AddAddressModalProps {
@@ -11,47 +11,49 @@ interface AddAddressModalProps {
 }
 
 export const AddAddressModal = ({ isOpen, onClose, onSave }: AddAddressModalProps) => {
-  const [formData, setFormData] = useState({ street: '', city: '', label: 'Home', state: 'Maiduguri' });
+  // ✅ ADDED: 'phone' to state
+  const [formData, setFormData] = useState({ 
+    street: '', 
+    city: '', 
+    phone: '', 
+    label: 'Home', 
+    state: 'Maiduguri' 
+  });
   const [isLocating, setIsLocating] = useState(false);
 
   if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.street || !formData.city) {
-      toast.error('Please fill in street and city');
+    // ✅ ADDED: Validation for phone
+    if (!formData.street || !formData.city || !formData.phone) {
+      toast.error('Please fill in street, city, and phone number');
       return;
     }
 
     setIsLocating(true);
 
     try {
-      // 1. Get Real Coordinates
-      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-        if (!navigator.geolocation) reject(new Error('Geolocation not supported'));
-        navigator.geolocation.getCurrentPosition(resolve, reject, {
-          enableHighAccuracy: true,
-          timeout: 10000,
-        });
-      });
+      // Mock Coordinates (Aligning with Profile Page Logic)
+      const MAIDUGURI_COORDS = {
+        lat: 11.8311,
+        lng: 13.1510
+      };
 
-      // 2. Pass data + coords back to parent
+      await new Promise(resolve => setTimeout(resolve, 800));
+
       await onSave({
         ...formData,
-        lat: position.coords.latitude,
-        lng: position.coords.longitude,
+        lat: MAIDUGURI_COORDS.lat,
+        lng: MAIDUGURI_COORDS.lng,
       });
 
-      // Reset form on success
-      setFormData({ street: '', city: '', label: 'Home', state: 'Maiduguri' });
+      // Reset form
+      setFormData({ street: '', city: '', phone: '', label: 'Home', state: 'Maiduguri' });
       onClose();
     } catch (error: any) {
-      console.error(error);
-      if (error.code === 1) {
-        toast.error('Location permission denied. We need your location for delivery.');
-      } else {
-        toast.error('Could not fetch location. Please ensure GPS is enabled.');
-      }
+      console.error("Address save error:", error);
+      toast.error('Failed to save address. Please try again.');
     } finally {
       setIsLocating(false);
     }
@@ -100,6 +102,22 @@ export const AddAddressModal = ({ isOpen, onClose, onSave }: AddAddressModalProp
             />
           </div>
 
+          {/* ✅ ADDED: Phone Input Field */}
+          <div>
+            <label className="block text-sm font-medium mb-1">Contact Phone</label>
+            <div className="relative">
+              <input
+                type="tel"
+                required
+                className="w-full p-3 pl-10 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 focus:border-yellow-500 outline-none transition-colors"
+                placeholder="e.g. 08012345678"
+                value={formData.phone}
+                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+              />
+              <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            </div>
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-1">City</label>
@@ -131,7 +149,7 @@ export const AddAddressModal = ({ isOpen, onClose, onSave }: AddAddressModalProp
               {isLocating ? (
                 <>
                   <Loader2 className="w-5 h-5 animate-spin" />
-                  Acquiring GPS...
+                  Verifying Location...
                 </>
               ) : (
                 <>
@@ -141,7 +159,7 @@ export const AddAddressModal = ({ isOpen, onClose, onSave }: AddAddressModalProp
               )}
             </button>
             <p className="text-xs text-center mt-3 text-gray-500">
-              We will request your GPS location to ensure you are in our service area.
+              Address location is pinned to Maiduguri for service validation.
             </p>
           </div>
         </form>

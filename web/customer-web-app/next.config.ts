@@ -1,6 +1,13 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   images: {
+    // ✅ FIX: Enable SVG support for placehold.co and other sources
+    dangerouslyAllowSVG: true,
+    
+    // ✅ Recommended security settings when SVGs are enabled
+    contentDispositionType: 'attachment',
+    contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
+
     remotePatterns: [
       {
         protocol: 'https',
@@ -40,6 +47,12 @@ const nextConfig = {
       {
         protocol: 'https',
         hostname: 'stackable-eclair-kzms-p62.storage.railway.app',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'storage.railway.app',
         port: '',
         pathname: '/**',
       },
