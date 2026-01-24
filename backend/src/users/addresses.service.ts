@@ -50,6 +50,7 @@ export class AddressesService {
       city: this.sanitizeString(data.city),
       state: data.state ? this.sanitizeString(data.state) : undefined,
       label: data.label ? this.sanitizeString(data.label) : undefined,
+      phone: data.phone ? this.sanitizeString(data.phone) : undefined,
     };
 
     try {
@@ -71,6 +72,7 @@ export class AddressesService {
             isDefault: sanitizedData.isDefault || false,
             // 3. Use Real Coordinates
             lat: data.lat,
+            phone: sanitizedData.phone,
             lng: data.lng,
           },
         });

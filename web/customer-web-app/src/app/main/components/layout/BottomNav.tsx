@@ -41,11 +41,13 @@ export default function BottomNav() {
     { icon: User, label: 'Profile', href: '/main/profile' }
   ];
 
-  const isActive = (href: string) => {
-    // If the link is exactly /main, active only on exact match (optional safety)
-    if (href === '/main') return pathname === href;
-    // Otherwise check if current path starts with the href
-    return pathname?.startsWith(href);
+  // Helper function to check if current route matches or is a sub-route
+  const isActiveRoute = (href: string) => {
+    if (pathname === href) return true;
+    
+    // Check if current path starts with the nav item's href (sub-route detection)
+    // But ensure we're not just matching partial strings (e.g., /main/store-settings shouldn't match /main/store)
+    return pathname.startsWith(href + '/');
   };
 
   return (
@@ -57,7 +59,7 @@ export default function BottomNav() {
             icon={item.icon}
             label={item.label}
             href={item.href}
-            active={isActive(item.href)}
+            active={isActiveRoute(item.href)}
           />
         ))}
       </div>

@@ -211,7 +211,7 @@ export class OrdersService {
                   deliveryFee: deliveryFee,
                   distanceKm: parseFloat(distance.toFixed(2)),
                   recipientName: user.name,
-                  recipientPhone: user.phone || 'N/A',
+                  recipientPhone: dropoffAddress.phone || user.phone || 'N/A',
                 },
               },
             },
