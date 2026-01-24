@@ -97,20 +97,17 @@ export default function DeliveryDetailsScreen() {
                   Live Route
                 </ThemedText>
               </View>
-
               <RouteItem
                 icon="map-pin"
                 label="Pickup"
-                value={delivery.from.address}
+                value={delivery.pickupAddress?.address || "Unknown Address"}
                 color={primary}
               />
-
               <View style={styles.routeDivider} />
-
               <RouteItem
                 icon="flag"
                 label="Drop-off"
-                value={delivery.to.address}
+                value={delivery.dropoffAddress?.address || "Unknown Address"}
                 color={primary}
               />
             </View>
@@ -124,44 +121,42 @@ export default function DeliveryDetailsScreen() {
             >
               <SummaryItem
                 icon="wallet"
-                label="Price"
-                value={`₦${delivery.price.toLocaleString()}`}
+                label="Delivery Fee"
+                value={`₦${delivery.deliveryFee?.toLocaleString?.() ?? delivery.deliveryFee}`}
                 highlight
               />
               <SummaryItem
-                icon="credit-card"
-                label="Payment"
-                value={delivery.paymentMethod}
-              />
-              <SummaryItem
                 icon="box"
-                label="Package"
-                value={delivery.details.packageSize}
-              />
-            </View>
-
-            {/* PEOPLE & NOTES */}
-            <View
-              style={[
-                styles.card,
-                { backgroundColor: surface, borderColor: border },
-              ]}
-            >
-              <SummaryItem
-                icon="user"
-                label="Sender"
-                value={`${delivery.details.sender} (${delivery.details.senderPhone})`}
+                label="Package Details"
+                value={delivery.packageDetails || "-"}
               />
               <SummaryItem
                 icon="user-check"
-                label="Receiver"
-                value={`${delivery.details.receiver} (${delivery.details.receiverPhone})`}
+                label="Recipient"
+                value={`${delivery.recipientName} (${delivery.recipientPhone})`}
               />
               <SummaryItem
-                icon="file-text"
-                label="Instructions"
-                value={delivery.details.instructions || "None"}
+                icon="user"
+                label="Rider"
+                value={
+                  delivery.riderName
+                    ? `${delivery.riderName} (${delivery.riderPhone || "-"})`
+                    : "Not assigned"
+                }
               />
+              <SummaryItem icon="flag" label="Status" value={delivery.status} />
+              <SummaryItem
+                icon="clock"
+                label="Created At"
+                value={new Date(delivery.createdAt).toLocaleString()}
+              />
+              {delivery.deliveredAt && (
+                <SummaryItem
+                  icon="check-circle"
+                  label="Delivered At"
+                  value={new Date(delivery.deliveredAt).toLocaleString()}
+                />
+              )}
             </View>
           </>
         )}

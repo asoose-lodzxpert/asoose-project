@@ -62,11 +62,8 @@ export class PaymentService {
 
     const reference = this.generateReference();
 
-    // FIX: Nullish Coalescing for optional fields to avoid Prisma errors
-    // Use undefined for optional prisma fields if the DTO value is null/undefined
     const customerName = dto.customerName ?? undefined;
 
-    // Merge callbackUrl into metadata for later retrieval
     const metadata = {
       ...(dto.metadata || {}),
       ...(dto.callbackUrl ? { callbackUrl: dto.callbackUrl } : {}),

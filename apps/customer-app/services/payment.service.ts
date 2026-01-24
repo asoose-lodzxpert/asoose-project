@@ -1,10 +1,64 @@
 import { request } from "@/lib/authFetch";
 import type { PaymentMethod, BankAccount, InAppTx } from "@/types/payment";
 
-export async function initiatePayment(method: PaymentMethod, payload: any) {
+// Map frontend payment method to backend enums
+const gatewayMap: Record<PaymentMethod, string> = {
+  transfer: "MONNIFY",
+  paystack: "PAYSTACK",
+  monnify: "MONNIFY",
+  flutterwave: "FLUTTERWAVE",
+};
+
+const methodMap: Record<PaymentMethod, string> = {
+  transfer: "BANK_TRANSFER",
+  paystack: "CARD",
+  monnify: "BANK_TRANSFER",
+  flutterwave: "CARD",
+};
+
+// All payment functions now require a user object for identity fields
+type UserIdentity = { email: string; name: string; phone?: string };
+
+export async function initiatePayment(
+  method: PaymentMethod,
+  payload: any,
+  user: UserIdentity,
+) {
+  const gateway = gatewayMap[method];
+  const mappedMethod = methodMap[method];
+  const email = user.email;
+  const customerName = user.name;
+  const phoneNumber = user.phone;
+  const amount =
+    payload.amount ||
+    payload.price ||
+    payload.estimatedPrice ||
+    payload.quote?.amount ||
+    payload.quote?.price ||
+    payload.price ||
+    0;
+  const type = payload.type || "ORDER";
+  const orderId = payload.orderId;
+  const rideId = payload.rideId;
+  const callbackUrl = payload.callbackUrl;
+  const metadata = { ...payload };
+
+  const body = {
+    amount,
+    email,
+    customerName,
+    phoneNumber,
+    gateway,
+    method: mappedMethod,
+    type,
+    orderId,
+    rideId,
+    callbackUrl,
+    metadata,
+  };
   const { parsed } = await request("payment/initialize", {
     method: "POST",
-    body: JSON.stringify({ ...payload, method }),
+    body: JSON.stringify(body),
   });
   return parsed;
 }
@@ -21,10 +75,36 @@ export async function checkPaymentStatus(reference: string) {
 export async function createBankTransfer(
   amount: number,
   payload: any,
+  user: UserIdentity,
 ): Promise<BankAccount> {
+  // Always use MONNIFY for bank transfer
+  const gateway = "MONNIFY";
+  const method = "BANK_TRANSFER";
+  const email = user.email;
+  const customerName = user.name;
+  const phoneNumber = user.phone;
+  const type = payload.type || "ORDER";
+  const orderId = payload.orderId;
+  const rideId = payload.rideId;
+  const callbackUrl = payload.callbackUrl;
+  const metadata = { ...payload };
+
+  const body = {
+    amount,
+    email,
+    customerName,
+    phoneNumber,
+    gateway,
+    method,
+    type,
+    orderId,
+    rideId,
+    callbackUrl,
+    metadata,
+  };
   const { parsed } = await request("payment/initialize", {
     method: "POST",
-    body: JSON.stringify({ ...payload, method: "transfer", amount }),
+    body: JSON.stringify(body),
   });
   return parsed;
 }
@@ -33,14 +113,49 @@ export async function checkBankTransferStatus(reference: string) {
   return checkPaymentStatus(reference);
 }
 
-// In-app checkout (if supported by backend, otherwise remove)
+// In-app checkout (Paystack, Flutterwave, Monnify)
 export async function openInAppCheckout(
   method: PaymentMethod,
   amount: number,
   payload: any,
+  user: UserIdentity,
 ): Promise<InAppTx> {
-  // If backend supports, implement here. Otherwise, remove this function.
-  throw new Error("In-app checkout is not implemented on backend");
+  const gateway = gatewayMap[method];
+  const mappedMethod = methodMap[method];
+  const email = user.email;
+  const customerName = user.name;
+  const phoneNumber = user.phone;
+  const type = payload.type || "ORDER";
+  const orderId = payload.orderId;
+  const rideId = payload.rideId;
+  const callbackUrl = payload.callbackUrl;
+  const metadata = { ...payload };
+
+  const body = {
+    amount,
+    email,
+    customerName,
+    phoneNumber,
+    gateway,
+    method: mappedMethod,
+    type,
+    orderId,
+    rideId,
+    callbackUrl,
+    metadata,
+  };
+  const { parsed } = await request("payment/initialize", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+  // The backend should return authorizationUrl or checkoutUrl and reference/transactionId
+  return {
+    transactionId: parsed.reference || parsed.transactionId,
+    checkoutUrl: parsed.authorizationUrl || parsed.checkoutUrl,
+    amount: parsed.amount,
+    method,
+    status: "pending",
+  };
 }
 
 // Checks the payment status for a given transactionId using the backend

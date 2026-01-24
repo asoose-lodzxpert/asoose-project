@@ -45,7 +45,10 @@ export class UsersController {
   @Get('orders')
   async getMyOrders(@Request() req) {
     const userId = req.user.id;
-    return this.usersService.getUserOrders(userId);
+    const page = parseInt(req.query.page) || 1;
+    const pageSize = parseInt(req.query.pageSize) || 10;
+    const status = req.query.status as string | undefined;
+    return this.usersService.getUserOrders(userId, { page, pageSize, status });
   }
 
   @Get('orders/:id')

@@ -28,38 +28,42 @@ export function PackageSizeSelector() {
   const primary = useThemeColor({}, "brandPrimary");
   const border = useThemeColor({}, "borderDefault");
 
+  // Split SIZES into 2 rows of 2
+  const rows = [SIZES.slice(0, 2), SIZES.slice(2, 4)];
+
   return (
     <View style={styles.container}>
       <ThemedText type="subtitle">Package Size</ThemedText>
-
-      <View style={styles.row}>
-        {SIZES.map((s) => {
-          const active = s.key === packageSize;
-          return (
-            <Pressable
-              key={s.key}
-              style={[
-                styles.card,
-                active && styles.activeCard,
-                {
-                  backgroundColor: card,
-                  borderColor: active ? primary : border,
-                },
-              ]}
-              onPress={() => setPackageSize(s.key)}
-            >
-              <ThemedText style={{ fontWeight: "700" }}>{s.label}</ThemedText>
-              <ThemedText type="caption">{s.desc}</ThemedText>
-              <ThemedText
-                type="caption"
-                style={{ marginTop: 4, color: primary }}
+      {rows.map((row, i) => (
+        <View style={styles.row} key={i}>
+          {row.map((s) => {
+            const active = s.key === packageSize;
+            return (
+              <Pressable
+                key={s.key}
+                style={[
+                  styles.card,
+                  active && styles.activeCard,
+                  {
+                    backgroundColor: card,
+                    borderColor: active ? primary : border,
+                  },
+                ]}
+                onPress={() => setPackageSize(s.key)}
               >
-                ₦{s.price.toLocaleString()}
-              </ThemedText>
-            </Pressable>
-          );
-        })}
-      </View>
+                <ThemedText style={{ fontWeight: "700" }}>{s.label}</ThemedText>
+                <ThemedText type="caption">{s.desc}</ThemedText>
+                <ThemedText
+                  type="caption"
+                  style={{ marginTop: 4, color: primary }}
+                >
+                  ₦{s.price.toLocaleString()}
+                </ThemedText>
+              </Pressable>
+            );
+          })}
+        </View>
+      ))}
     </View>
   );
 }

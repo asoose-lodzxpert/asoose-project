@@ -55,9 +55,8 @@ export default function DeliveryHistoryScreen() {
     setData([]);
     setPage(1);
     setHasMore(true);
-    // Wait for state to update, then load data for new tab
+
     loadData(true, tab, 1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab]);
 
   const onRefresh = useCallback(() => {

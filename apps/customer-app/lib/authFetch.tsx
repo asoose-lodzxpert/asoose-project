@@ -59,6 +59,11 @@ export function post(path: string, body?: any, opts: FetchOpts = {}) {
   return request(path, { method: "POST", body: payload, ...opts });
 }
 
+export function patch(path: string, body?: any, opts: FetchOpts = {}) {
+  const payload = body === undefined ? undefined : JSON.stringify(body);
+  return request(path, { method: "PATCH", body: payload, ...opts });
+}
+
 export { BACKEND_URL as backendUrl };
 
 async function parseBody(res: Response) {

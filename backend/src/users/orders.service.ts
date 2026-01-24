@@ -24,8 +24,8 @@ const ORDER_STATUS = { PENDING: 'PENDING' } as const;
 const DELIVERY_STATUS = { REQUESTED: 'REQUESTED' } as const;
 
 const IDEMPOTENCY_PREFIX = 'idemp:order:';
-const LOCK_TTL_MS = 20000; 
-const COMPLETED_TTL_MS = 5 * 60 * 1000; 
+const LOCK_TTL_MS = 20000;
+const COMPLETED_TTL_MS = 5 * 60 * 1000;
 
 @Injectable()
 export class OrdersService {
@@ -257,11 +257,19 @@ export class OrdersService {
           status: order.status,
           total: order.total,
           timeline: [
-            { status: 'PLACED', label: 'Order Placed', time: order.createdAt.toISOString(), icon: 'default' }
-          ]
+            {
+              status: 'PLACED',
+              label: 'Order Placed',
+              time: order.createdAt.toISOString(),
+              icon: 'default',
+            },
+          ],
         });
       } catch (notifyError) {
-        this.logger.error(`Post-order notification failed for order ${order.id}`, notifyError);
+        this.logger.error(
+          `Post-order notification failed for order ${order.id}`,
+          notifyError,
+        );
       }
 
       return order;
@@ -271,32 +279,52 @@ export class OrdersService {
     }
   }
 
-  async getUserOrders(userId: string) {
+  async getUserOrders(
+    userId: string,
+    opts?: { page?: number; pageSize?: number; status?: string },
+  ) {
     try {
-      const orders = await this.prisma.order.findMany({
-        where: { userId },
-        orderBy: { createdAt: 'desc' },
-        include: {
-          items: { select: { quantity: true, nameSnap: true } },
-          store: { select: { name: true, logo: true } },
-        },
-        take: 50,
-      });
-
-      return orders.map((order) => ({
-        id: order.id,
-        status: order.status,
-        total: order.total,
-        createdAt: order.createdAt,
-        storeName: order.store?.name,
-        storeLogo: order.store?.logo,
-        items: order.items?.map((i) => ({
-          name: i.nameSnap,
-          quantity: i.quantity,
+      const page = opts?.page || 1;
+      const pageSize = opts?.pageSize || 10;
+      const status = opts?.status;
+      const where: any = { userId };
+      if (status) where.status = status;
+      const [orders, total] = await this.prisma.$transaction([
+        this.prisma.order.findMany({
+          where,
+          orderBy: { createdAt: 'desc' },
+          include: {
+            items: { select: { quantity: true, nameSnap: true } },
+            store: { select: { name: true, logo: true } },
+          },
+          skip: (page - 1) * pageSize,
+          take: pageSize,
+        }),
+        this.prisma.order.count({ where }),
+      ]);
+      return {
+        data: orders.map((order) => ({
+          id: order.id,
+          status: order.status,
+          total: order.total,
+          createdAt: order.createdAt,
+          storeName: order.store?.name,
+          storeLogo: order.store?.logo,
+          items: order.items?.map((i) => ({
+            name: i.nameSnap,
+            quantity: i.quantity,
+          })),
         })),
-      }));
+        total,
+        page,
+        pageSize,
+        hasMore: page * pageSize < total,
+      };
     } catch (error: any) {
-      this.logger.error(`Failed to fetch orders for user ${userId}`, error.stack);
+      this.logger.error(
+        `Failed to fetch orders for user ${userId}`,
+        error.stack,
+      );
       throw new BadRequestException('Failed to retrieve orders');
     }
   }
@@ -307,18 +335,20 @@ export class OrdersService {
         where: { id: orderId, userId: userId },
         include: {
           items: true,
-          delivery: { 
-            include: { 
+          delivery: {
+            include: {
               dropoffAddress: true,
-              rider: { 
-                select: { 
-                  name: true, 
-                  phone: true, 
-                  image: true, 
-                  vehicle: { select: { model: true, color: true, plateNumber: true } }
-                } 
-              }
-            } 
+              rider: {
+                select: {
+                  name: true,
+                  phone: true,
+                  image: true,
+                  vehicle: {
+                    select: { model: true, color: true, plateNumber: true },
+                  },
+                },
+              },
+            },
           },
           store: {
             select: {
@@ -335,60 +365,71 @@ export class OrdersService {
       if (!order) throw new NotFoundException('Order not found');
 
       // FIX 2: Correct Timeline Status Checks based on Schema (DISPATCHED, IN_TRANSIT)
-      const timeline: { 
-        status: string; 
-        label: string; 
-        description: string; 
-        time: string | null; 
-        icon: string 
+      const timeline: {
+        status: string;
+        label: string;
+        description: string;
+        time: string | null;
+        icon: string;
       }[] = [];
-      
+
       // 1. Placed
       timeline.push({
         status: 'PLACED',
         label: 'Order Placed',
         description: 'Your order has been received',
         time: order.createdAt.toISOString(),
-        icon: 'default'
+        icon: 'default',
       });
 
       // 2. Confirmed (Includes DISPATCHED, which implies confirmation)
-      if (['CONFIRMED', 'PREPARING', 'READY', 'DISPATCHED', 'DELIVERED'].includes(order.status)) {
+      if (
+        ['CONFIRMED', 'PREPARING', 'READY', 'DISPATCHED', 'DELIVERED'].includes(
+          order.status,
+        )
+      ) {
         timeline.push({
           status: 'CONFIRMED',
           label: 'Order Confirmed',
           description: 'The restaurant has accepted your order',
-          time: null, 
-          icon: 'kitchen'
+          time: null,
+          icon: 'kitchen',
         });
       }
 
       // 3. Preparing
-      if (['PREPARING', 'READY', 'DISPATCHED', 'DELIVERED'].includes(order.status)) {
+      if (
+        ['PREPARING', 'READY', 'DISPATCHED', 'DELIVERED'].includes(order.status)
+      ) {
         timeline.push({
           status: 'PREPARING',
           label: 'Preparing',
-          description: 'Your order is being processed', 
-          time: null, 
-          icon: 'kitchen'
+          description: 'Your order is being processed',
+          time: null,
+          icon: 'kitchen',
         });
       }
 
       // 4. Ready/Picked Up
       if (['READY', 'DISPATCHED', 'DELIVERED'].includes(order.status)) {
-         timeline.push({
+        timeline.push({
           status: 'READY',
           label: 'Order Ready',
-          description: 'Order is ready for pickup', 
+          description: 'Order is ready for pickup',
           time: null,
-          icon: 'package'
+          icon: 'package',
         });
       }
 
       // 5. On the Way (Uses DISPATCHED or Delivery status)
       // Checks for Order Status: DISPATCHED or Delivery Status: IN_TRANSIT / PICKED_UP
-      const isDispatch = order.status === 'DISPATCHED' || order.status === 'DELIVERED';
-      const isDeliveryActive = order.delivery && ['PICKED_UP', 'IN_TRANSIT', 'DELIVERED'].includes(order.delivery.status);
+      const isDispatch =
+        order.status === 'DISPATCHED' || order.status === 'DELIVERED';
+      const isDeliveryActive =
+        order.delivery &&
+        ['PICKED_UP', 'IN_TRANSIT', 'DELIVERED'].includes(
+          order.delivery.status,
+        );
 
       if (isDispatch || isDeliveryActive) {
         timeline.push({
@@ -396,18 +437,21 @@ export class OrdersService {
           label: 'Rider on the way',
           description: `${order.delivery?.rider?.name || 'Rider'} is heading to you`,
           time: order.delivery?.pickedUpAt?.toISOString() || null,
-          icon: 'rider'
+          icon: 'rider',
         });
       }
 
       // 6. Delivered
       if (order.status === 'DELIVERED') {
-         timeline.push({
+        timeline.push({
           status: 'DELIVERED',
           label: 'Delivered',
           description: 'Order delivered successfully',
-          time: order.deliveredAt?.toISOString() || order.delivery?.deliveredAt?.toISOString() || null,
-          icon: 'delivered'
+          time:
+            order.deliveredAt?.toISOString() ||
+            order.delivery?.deliveredAt?.toISOString() ||
+            null,
+          icon: 'delivered',
         });
       }
 
@@ -415,9 +459,12 @@ export class OrdersService {
         timeline.push({
           status: 'CANCELLED',
           label: 'Order Cancelled',
-          description: order.status === 'REJECTED' ? 'Store rejected the order' : 'This order was cancelled',
+          description:
+            order.status === 'REJECTED'
+              ? 'Store rejected the order'
+              : 'This order was cancelled',
           time: order.cancelledAt?.toISOString() || null,
-          icon: 'default'
+          icon: 'default',
         });
       }
 
@@ -427,16 +474,22 @@ export class OrdersService {
         total: order.total,
         createdAt: order.createdAt,
         deliveredAt: order.deliveredAt,
-        eta: order.delivery?.distanceKm ? `${Math.ceil(order.delivery.distanceKm * 5 + 15)} mins` : '30-45 mins',
-        distance: order.delivery?.distanceKm ? `${order.delivery.distanceKm} km` : null,
+        eta: order.delivery?.distanceKm
+          ? `${Math.ceil(order.delivery.distanceKm * 5 + 15)} mins`
+          : '30-45 mins',
+        distance: order.delivery?.distanceKm
+          ? `${order.delivery.distanceKm} km`
+          : null,
         timeline: timeline,
-        rider: order.delivery?.rider ? {
-          name: order.delivery.rider.name,
-          phone: order.delivery.rider.phone,
-          vehicle: order.delivery.rider.vehicle 
-            ? `${order.delivery.rider.vehicle.color} ${order.delivery.rider.vehicle.model} (${order.delivery.rider.vehicle.plateNumber})`
-            : 'Motorcycle'
-        } : null,
+        rider: order.delivery?.rider
+          ? {
+              name: order.delivery.rider.name,
+              phone: order.delivery.rider.phone,
+              vehicle: order.delivery.rider.vehicle
+                ? `${order.delivery.rider.vehicle.color} ${order.delivery.rider.vehicle.model} (${order.delivery.rider.vehicle.plateNumber})`
+                : 'Motorcycle',
+            }
+          : null,
         dispute: order.disputes[0] || null,
         items: order.items.map((item) => ({
           id: item.id,
@@ -453,7 +506,7 @@ export class OrdersService {
         store: {
           name: order.store?.name,
           phone: order.store?.vendor?.phone,
-          location: { lat: order.store?.lat, lng: order.store?.lng }
+          location: { lat: order.store?.lat, lng: order.store?.lng },
         },
       };
     } catch (error) {
@@ -518,12 +571,17 @@ export class OrdersService {
     if (result === 'OK') return null;
     const value = await this.redis.get(key);
     if (value === 'PROCESSING') {
-      throw new ConflictException('This order is currently being processed. Please wait.');
+      throw new ConflictException(
+        'This order is currently being processed. Please wait.',
+      );
     }
     return value;
   }
 
-  private async completeIdempotency(key: string, orderId: string): Promise<void> {
+  private async completeIdempotency(
+    key: string,
+    orderId: string,
+  ): Promise<void> {
     await this.redis.set(key, orderId, { PX: COMPLETED_TTL_MS });
   }
 
@@ -531,10 +589,17 @@ export class OrdersService {
     await this.redis.del(key);
   }
 
-  private generateIdempotencyKey(userId: string, data: CreateOrderDto, clientKey?: string): string {
+  private generateIdempotencyKey(
+    userId: string,
+    data: CreateOrderDto,
+    clientKey?: string,
+  ): string {
     if (clientKey) return `header:${userId}:${clientKey}`;
     const { addressId, restaurantId, items } = data;
-    const itemsString = items.map((i) => `${i.id}:${i.quantity}`).sort().join('|');
+    const itemsString = items
+      .map((i) => `${i.id}:${i.quantity}`)
+      .sort()
+      .join('|');
     const rawData = `${userId}:${addressId}:${restaurantId}:${itemsString}`;
     return crypto.createHash('sha256').update(rawData).digest('hex');
   }

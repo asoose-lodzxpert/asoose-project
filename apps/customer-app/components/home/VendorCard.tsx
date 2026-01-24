@@ -4,6 +4,7 @@ import { ThemedText } from "@/components/themed-text";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { Vendor } from "@/types/home";
+import { RelativePathString, useRouter } from "expo-router";
 
 /* ---------------------------------- */
 /* Assets (placeholders) */
@@ -31,8 +32,12 @@ export function VendorCard({ item }: Props) {
   const coverUri = item.cover || item.image || null;
   const logoUri = item.logo || item.image || null;
 
+  const router = useRouter();
   function handlePress() {
-    // Future: navigate to vendor details
+    router.push({
+      pathname: "/(store)/store-screen" as RelativePathString,
+      params: { slug: item.slug },
+    });
   }
 
   return (

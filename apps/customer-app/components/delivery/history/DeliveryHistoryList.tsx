@@ -13,17 +13,11 @@ import { useRouter } from "expo-router";
 
 export type DeliveryHistoryItem = {
   id: string;
-  from: {
-    address: string;
-    coordinates: { lat: number; lng: number };
-  };
-  to: {
-    address: string;
-    coordinates: { lat: number; lng: number };
-  };
-  price: number;
   status: string;
-  time_initiated: string; // ISO string or timestamp
+  total: number;
+  createdAt: string;
+  description: string;
+  recipient: string;
 };
 
 interface Props {
@@ -45,12 +39,16 @@ export const DeliveryHistoryList: React.FC<Props> = ({
   const brandPrimary = useThemeColor({}, "brandPrimary");
   const surfaceCard = useThemeColor({}, "surfaceCard");
   const border = useThemeColor({}, "borderDefault");
+  const skeletonBg = useThemeColor({}, "surfaceBackground");
+  const skeletonBorder = useThemeColor({}, "borderDefault");
+  const textColor = useThemeColor({}, "textPrimary");
+  const captionColor = useThemeColor({}, "textSecondary");
 
   const renderItem = ({ item }: { item: DeliveryHistoryItem }) => {
-    // Format time_initiated as e.g. 'Jan 5, 2026, 2:30 PM'
+    // Format createdAt as e.g. 'Jan 5, 2026, 2:30 PM'
     let timeString = "";
-    if (item.time_initiated) {
-      const date = new Date(item.time_initiated);
+    if (item.createdAt) {
+      const date = new Date(item.createdAt);
       timeString = date.toLocaleString(undefined, {
         year: "numeric",
         month: "short",
@@ -74,30 +72,53 @@ export const DeliveryHistoryList: React.FC<Props> = ({
             color={brandPrimary}
             style={styles.icon}
           />
-
           <View style={styles.cardContent}>
-            <ThemedText style={styles.cardFromTo}>
-              {item.from.address} → {item.to.address}
+            <ThemedText style={[styles.cardFromTo, { color: textColor }]}>
+              {item.description}
             </ThemedText>
-            <ThemedText type="caption">
-              ₦{item.price.toLocaleString()}
+            <ThemedText type="caption" style={{ color: captionColor }}>
+              Recipient: {item.recipient}
+            </ThemedText>
+            <ThemedText type="caption" style={{ color: captionColor }}>
+              ₦{item.total.toLocaleString()}
+            </ThemedText>
+            <ThemedText type="caption" style={{ color: captionColor }}>
+              Status: {item.status}
             </ThemedText>
             {timeString && (
-              <ThemedText type="caption" style={styles.timeInitiated}>
+              <ThemedText
+                type="caption"
+                style={[styles.timeInitiated, { color: captionColor }]}
+              >
                 {timeString}
               </ThemedText>
             )}
           </View>
-
           <IconSymbol name="chevron.right" size={18} color={brandPrimary} />
         </View>
       </Pressable>
     );
   };
 
+  // Skeleton loader
   if (loading && data.length === 0) {
     return (
-      <ThemedText style={styles.centerText}>Loading deliveries…</ThemedText>
+      <View style={styles.listContent}>
+        {[...Array(4)].map((_, i) => (
+          <View
+            key={i}
+            style={[
+              styles.card,
+              {
+                backgroundColor: skeletonBg,
+                borderColor: skeletonBorder,
+                minHeight: 70,
+                marginBottom: 12,
+              },
+            ]}
+          />
+        ))}
+      </View>
     );
   }
 
@@ -114,7 +135,7 @@ export const DeliveryHistoryList: React.FC<Props> = ({
       onEndReachedThreshold={0.4}
       ListEmptyComponent={
         !loading ? (
-          <ThemedText style={styles.centerText}>
+          <ThemedText style={[styles.centerText, { color: textColor }]}>
             No deliveries found.
           </ThemedText>
         ) : null
@@ -153,10 +174,8 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     marginBottom: 2,
   },
-
   timeInitiated: {
     fontSize: 12,
-    color: "#888",
     marginTop: 2,
   },
 });

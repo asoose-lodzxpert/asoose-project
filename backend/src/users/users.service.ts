@@ -36,8 +36,11 @@ export class UsersService {
     return this.ordersService.createOrder(userId, data, idempotencyKey);
   }
 
-  async getUserOrders(userId: string) {
-    return this.ordersService.getUserOrders(userId);
+  async getUserOrders(
+    userId: string,
+    opts?: { page?: number; pageSize?: number; status?: string },
+  ) {
+    return this.ordersService.getUserOrders(userId, opts);
   }
 
   async getOrderDetails(userId: string, orderId: string) {
@@ -62,13 +65,47 @@ export class UsersService {
   /**
    * Retrieves all deliveries for a user
    */
-  async getUserDeliveries(userId: string) {
+  async getUserDeliveries(
+    userId: string,
+    opts?: { status?: string; page?: number; pageSize?: number },
+  ) {
     try {
+      // Determine status filter
+      let statusFilter: any = undefined;
+      if (opts?.status === 'active') {
+        // All statuses that are considered 'active'
+        statusFilter = {
+          in: [
+            'PENDING',
+            'REQUESTED',
+            'ASSIGNED',
+            'ACCEPTED',
+            'PICKED_UP',
+            'IN_TRANSIT',
+          ],
+        };
+      } else if (opts?.status === 'completed') {
+        // All statuses that are considered 'completed'
+        statusFilter = {
+          in: ['DELIVERED', 'CANCELLED'],
+        };
+      } else if (opts?.status) {
+        // If a specific status is provided
+        statusFilter = opts.status;
+      }
+
+      const page = opts?.page ?? 1;
+      const pageSize = opts?.pageSize ?? 50;
+
       const deliveries = await this.prisma.delivery.findMany({
-        where: { customerId: userId },
+        where: {
+          customerId: userId,
+          ...(statusFilter ? { status: statusFilter } : {}),
+        },
         orderBy: { createdAt: 'desc' },
         include: { dropoffAddress: true },
-        take: 50,
+        skip: (page - 1) * pageSize,
+        take: pageSize,
       });
 
       return deliveries.map((d) => ({
@@ -109,10 +146,39 @@ export class UsersService {
         throw new NotFoundException('Delivery not found');
       }
 
+      // Resolve addresses into single strings
+      const pickupAddressResolved = delivery.pickupAddress
+        ? [
+            delivery.pickupAddress.street,
+            delivery.pickupAddress.city,
+            delivery.pickupAddress.state,
+          ]
+            .filter(Boolean)
+            .join(', ')
+        : '';
+
+      const dropoffAddressResolved = delivery.dropoffAddress
+        ? [
+            delivery.dropoffAddress.street,
+            delivery.dropoffAddress.city,
+            delivery.dropoffAddress.state,
+          ]
+            .filter(Boolean)
+            .join(', ')
+        : '';
+
       return {
         ...delivery,
         riderName: delivery.rider?.name,
         riderPhone: delivery.rider?.phone,
+        pickupAddress: {
+          ...delivery.pickupAddress,
+          address: pickupAddressResolved,
+        },
+        dropoffAddress: {
+          ...delivery.dropoffAddress,
+          address: dropoffAddressResolved,
+        },
       };
     } catch (error) {
       if (error instanceof NotFoundException) throw error;

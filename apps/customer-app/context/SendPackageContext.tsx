@@ -181,10 +181,9 @@ export function SendPackageProvider({
   }, []);
 
   const setPickupHandler = (p: LocationPoint) => {
-    // prevent user from selecting same address for pickup and dropoff
+    // Always update, but warn if same as dropoff
     if (addressesEqual(p, dropoff)) {
       console.warn("Pickup and dropoff cannot be the same address");
-      return;
     }
     setPickup(p);
   };
@@ -192,7 +191,6 @@ export function SendPackageProvider({
   const setDropoffHandler = (d: LocationPoint) => {
     if (addressesEqual(pickup, d)) {
       console.warn("Pickup and dropoff cannot be the same address");
-      return;
     }
     setDropoff(d);
   };

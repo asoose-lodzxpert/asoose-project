@@ -120,7 +120,7 @@ export default function SettingsScreen() {
         {/* Profile */}
         <Pressable
           style={[styles.heroCard, { backgroundColor: primary }]}
-          onPress={() => router.push("/profile" as any)}
+          onPress={() => router.push("/(settings)/profile")}
         >
           <View style={styles.heroContent}>
             <View
@@ -245,7 +245,7 @@ export default function SettingsScreen() {
 
           <Pressable
             style={[styles.row, { borderBottomColor: border }]}
-            onPress={() => router.push("/(settings)/order-history")}
+            onPress={() => router.push("/(settings)/order-history-screen")}
           >
             <View
               style={[styles.iconBox, { backgroundColor: accentGreen + "22" }]}

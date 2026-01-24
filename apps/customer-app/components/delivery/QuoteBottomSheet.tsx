@@ -13,10 +13,6 @@ export function QuoteBottomSheet() {
 
   const surface = useThemeColor({}, "surfaceBackground");
   const primary = useThemeColor({}, "brandPrimary");
-  const muted = useThemeColor({}, "textMuted");
-  const border = useThemeColor({}, "borderDefault");
-
-  const [showDetails, setShowDetails] = useState(false);
 
   const isReady = Boolean(quote && !loadingQuote);
 
@@ -24,28 +20,11 @@ export function QuoteBottomSheet() {
     if (!quote) return null;
 
     const data = returnData();
-    return calculatePrice(
-      quote.distanceKm,
-      data.packageSize ?? "small",
-      data.packageOptions?.weightKg ?? 0,
-      data.packageOptions
-    );
+    return calculatePrice(data.packageSize ?? "small");
   }, [quote, returnData]);
 
   return (
     <View style={[styles.container, { backgroundColor: surface }]}>
-      {/* ---------- Tap Hint (Top, Centered) ---------- */}
-      {isReady && (
-        <Pressable
-          onPress={() => setShowDetails((v) => !v)}
-          style={styles.tapHint}
-        >
-          <ThemedText style={{ color: muted }}>
-            Tap to {showDetails ? "hide" : "view"} full breakdown
-          </ThemedText>
-        </Pressable>
-      )}
-
       <View style={styles.summary}>
         {loadingQuote && (
           <View style={styles.loadingRow}>
@@ -70,56 +49,10 @@ export function QuoteBottomSheet() {
           {loadingQuote
             ? "Preparing quote…"
             : pricing
-              ? `Request delivery – ${formatCurrency(pricing.price)}`
+              ? `Request delivery – ${formatCurrency(pricing)}`
               : "Request delivery"}
         </ThemedText>
       </Pressable>
-
-      {/* ---------- Breakdown ---------- */}
-      {showDetails && pricing && quote && (
-        <>
-          <View style={[styles.divider, { backgroundColor: border }]} />
-
-          <View style={styles.details}>
-            <Detail label="Distance" value={`${quote.distanceKm} km`} />
-            <Detail label="ETA" value={`${quote.etaMinutes} mins`} />
-
-            {pricing.fragileSurcharge > 0 && (
-              <Detail
-                label="Fragile handling"
-                value={formatCurrency(pricing.fragileSurcharge)}
-              />
-            )}
-
-            {pricing.liquidSurcharge > 0 && (
-              <Detail
-                label="Contains liquid"
-                value={formatCurrency(pricing.liquidSurcharge)}
-              />
-            )}
-
-            {pricing.perishableSurcharge > 0 && (
-              <Detail
-                label="Perishable"
-                value={formatCurrency(pricing.perishableSurcharge)}
-              />
-            )}
-
-            {pricing.insuranceFee > 0 && (
-              <Detail
-                label="Declared value (insurance)"
-                value={formatCurrency(pricing.insuranceFee)}
-              />
-            )}
-
-            <Detail
-              label="Total"
-              value={formatCurrency(pricing.price)}
-              highlight
-            />
-          </View>
-        </>
-      )}
     </View>
   );
 }
