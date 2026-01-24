@@ -1,21 +1,13 @@
 'use client';
 
-<<<<<<< HEAD
-import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
-=======
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
->>>>>>> store_production_ready
 import Link from 'next/link';
 import Image from 'next/image';
 import { useSearchParams } from 'next/navigation';
 import { 
   Store, X, ChevronRight, Utensils, Loader2, 
   ShoppingBasket, Pizza, Coffee, Gift, BriefcaseMedical, 
-<<<<<<< HEAD
-  Carrot, Sandwich, Truck
-=======
   Carrot, Sandwich, Truck, Heart, Star, Zap, Percent, SearchX
->>>>>>> store_production_ready
 } from 'lucide-react';
 
 // Components
@@ -33,64 +25,19 @@ interface BannerData {
   buttonText: string; link: string; image?: string; type: 'PROMO' | 'AD';
 }
 
-<<<<<<< HEAD
-interface RawVendor {
-  id: string; 
-  name: string; 
-  image?: string; 
-  banner?: string;
-  logo?: string;
-  slug?: string;
-  rating: number; 
-  deliveryTime?: string; 
-  deliveryFee: number; 
-  type: string;
-}
-
-interface Vendor extends RawVendor {
-  // Normalized fields will be guaranteed
-=======
 interface Vendor {
   id: string; name: string; image?: string; slug?: string;
   rating: number; deliveryTime?: string; deliveryFee: number; type: string;
   isNew?: boolean; 
->>>>>>> store_production_ready
 }
 
 interface VerticalSection {
-  id: string; title: string; vendors: RawVendor[];
-}
-
-// ✅ NEW: Normalize vendor data to ensure all image fields exist
-function normalizeVendor(vendor: RawVendor): Vendor {
-  // Create fallback chain: prefer logo/banner, fall back to image, then placeholders
-  const normalizedLogo = vendor.logo || vendor.image || '/placeholder-logo.png';
-  const normalizedBanner = vendor.banner || vendor.image || vendor.logo || '/placeholder-banner.png';
-  
-  return {
-    ...vendor,
-    image: normalizedLogo,      // For backwards compatibility
-    logo: normalizedLogo,        // Explicit logo
-    banner: normalizedBanner,    // Explicit banner
-  };
+  id: string; title: string; vendors: Vendor[];
 }
 
 // --- HELPER: GET CATEGORY ICON ---
 const getCategoryIcon = (title: string) => {
   const t = title.toLowerCase();
-<<<<<<< HEAD
-  if (t.includes('restaurant') || t.includes('food')) return <Utensils className="w-7 h-7" />;
-  if (t.includes('grocery') || t.includes('market')) return <ShoppingBasket className="w-7 h-7" />;
-  if (t.includes('pharmacy') || t.includes('health') || t.includes('med')) return <BriefcaseMedical className="w-7 h-7" />;
-  if (t.includes('fast food') || t.includes('burger')) return <Sandwich className="w-7 h-7" />;
-  if (t.includes('pizza')) return <Pizza className="w-7 h-7" />;
-  if (t.includes('coffee') || t.includes('cafe')) return <Coffee className="w-7 h-7" />;
-  if (t.includes('fresh') || t.includes('veg')) return <Carrot className="w-7 h-7" />;
-  if (t.includes('courier') || t.includes('send')) return <Truck className="w-7 h-7" />;
-  if (t.includes('gift')) return <Gift className="w-7 h-7" />;
-  
-  return <Store className="w-7 h-7" />;
-=======
   if (t.includes('restaurant') || t.includes('food')) return <Utensils className="w-6 h-6" />;
   if (t.includes('grocery') || t.includes('market')) return <ShoppingBasket className="w-6 h-6" />;
   if (t.includes('pharmacy') || t.includes('health') || t.includes('med')) return <BriefcaseMedical className="w-6 h-6" />;
@@ -101,7 +48,6 @@ const getCategoryIcon = (title: string) => {
   if (t.includes('courier') || t.includes('send')) return <Truck className="w-6 h-6" />;
   if (t.includes('gift')) return <Gift className="w-6 h-6" />;
   return <Store className="w-6 h-6" />;
->>>>>>> store_production_ready
 };
 
 // --- DATA HOOK ---
@@ -150,7 +96,7 @@ function useStoreData(query: string | null) {
 
 // --- INFINITE SCROLL HOOK ---
 function useInfiniteStores(enabled: boolean) {
-  const [stores, setStores] = useState<RawVendor[]>([]);
+  const [stores, setStores] = useState<Vendor[]>([]);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
@@ -194,21 +140,6 @@ export default function StorePage() {
 
   useEffect(() => { fetchData(query); }, [query, fetchData]);
 
-<<<<<<< HEAD
-  // ✅ NEW: Normalize all vendor data with useMemo
-  const normalizedVerticals = useMemo(() => {
-    return verticals.map(vertical => ({
-      ...vertical,
-      vendors: vertical.vendors.map(normalizeVendor)
-    }));
-  }, [verticals]);
-
-  const normalizedStores = useMemo(() => {
-    return stores.map(normalizeVendor);
-  }, [stores]);
-
-  // Intersection Observer implementation
-=======
   // Banner Carousel Logic
   useEffect(() => {
     if (banners.length <= 1) return;
@@ -219,7 +150,6 @@ export default function StorePage() {
   }, [banners.length]);
 
   // Infinite Scroll Observer
->>>>>>> store_production_ready
   useEffect(() => {
     const observer = new IntersectionObserver(
       entries => { if (entries[0].isIntersecting && hasMore && !query) fetchMore(); },
@@ -325,15 +255,6 @@ export default function StorePage() {
 
             {/* 2. CATEGORY RAIL (Mobile Friendly Horizontal Scroll) */}
             <section className="px-4">
-<<<<<<< HEAD
-               <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
-                 <Utensils className="w-5 h-5 text-yellow-500" /> Shop by Category
-               </h2>
-               <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-4">
-                  {normalizedVerticals.map((v) => (
-                    <Link key={v.id} href={`/main/store/category/${v.id}`} className="flex flex-col items-center p-5 rounded-3xl bg-white dark:bg-[#151515] border border-gray-100 dark:border-white/5 hover:border-yellow-500/30 transition-all group">
-                      <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-yellow-50 dark:bg-yellow-900/10 text-yellow-600 transition-transform group-hover:scale-110">
-=======
                <div className="flex justify-between items-center mb-4 px-1">
                   <h2 className="text-lg font-bold">Categories</h2>
                   <Link href="/main/store/categories" className="text-yellow-600 dark:text-yellow-500 text-xs font-bold hover:underline">
@@ -344,7 +265,6 @@ export default function StorePage() {
                   {verticals.map((v) => (
                     <Link key={v.id} href={`/main/store/category/${v.id}`} className="min-w-[72px] snap-start flex flex-col items-center gap-2 group cursor-pointer">
                       <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl sm:rounded-3xl bg-white dark:bg-[#151515] border border-gray-100 dark:border-white/5 flex items-center justify-center text-gray-400 group-hover:bg-yellow-500 group-hover:text-black group-hover:border-yellow-500 transition-all shadow-sm">
->>>>>>> store_production_ready
                         {getCategoryIcon(v.title)}
                       </div>
                       <span className="text-[11px] sm:text-xs font-bold text-center truncate w-full text-gray-600 dark:text-gray-400 group-hover:text-black dark:group-hover:text-white transition-colors capitalize">
@@ -355,17 +275,10 @@ export default function StorePage() {
                </div>
             </section>
 
-<<<<<<< HEAD
-            {/* 3. DYNAMIC VERTICAL SECTIONS - ✅ Using normalized data */}
-            <div className="space-y-12">
-              {normalizedVerticals.map((section) => (
-                <section key={section.id} className="px-4">
-=======
             {/* 3. DYNAMIC VERTICALS (Curated Rows) */}
             <div className="space-y-10">
               {verticals.slice(0, 3).map((section) => (
                 <section key={section.id} className="border-t border-gray-100 dark:border-white/5 pt-8 px-4">
->>>>>>> store_production_ready
                   <div className="flex justify-between items-end mb-6">
                     <div>
                       <h2 className="text-xl font-black capitalize mb-1">{section.title}</h2>
@@ -378,9 +291,6 @@ export default function StorePage() {
                   
                   <div className="flex gap-4 overflow-x-auto pb-6 scrollbar-hide snap-x -mx-4 px-4">
                     {section.vendors.map((vendor) => (
-<<<<<<< HEAD
-                      <div key={vendor.id} className="min-w-[300px] snap-start">
-=======
                       <div key={vendor.id} className="min-w-[280px] sm:min-w-[320px] snap-start relative group">
                         {/* Micro-Interaction: Heart Button Overlay */}
                         <button 
@@ -390,14 +300,8 @@ export default function StorePage() {
                           <Heart className={`w-4 h-4 ${favorites.includes(vendor.id) ? 'fill-red-500 text-red-500' : ''}`} />
                         </button>
 
->>>>>>> store_production_ready
                         <Link href={`/main/store/${vendor.slug || vendor.id}`}>
-                          <RestaurantCard 
-                            {...vendor} 
-                            banner={vendor.banner}
-                            logo={vendor.logo}
-                            time={vendor.deliveryTime || '30 min'} 
-                          />
+                          <RestaurantCard {...vendor} time={vendor.deliveryTime || '30 min'} />
                         </Link>
                       </div>
                     ))}
@@ -406,22 +310,6 @@ export default function StorePage() {
               ))}
             </div>
 
-<<<<<<< HEAD
-            {/* 4. INFINITE SCROLL: DISCOVER MORE - ✅ Using normalized data */}
-            <section className="px-4 pb-12">
-              <h2 className="text-2xl font-black mb-6">Discover More</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {normalizedStores.map((vendor) => (
-                  <Link key={vendor.id} href={`/main/store/${vendor.slug || vendor.id}`}>
-                    <RestaurantCard 
-                      {...vendor} 
-                      banner={vendor.banner}
-                      logo={vendor.logo}
-                      time={vendor.deliveryTime || '30 min'} 
-                    />
-                  </Link>
-                ))}
-=======
             {/* 4. DISCOVER MORE (Sticky Filters & Infinite Grid) */}
             <section className="relative min-h-screen pb-12">
               {/* Sticky Filter Header */}
@@ -455,7 +343,6 @@ export default function StorePage() {
                        ))}
                     </div>
                  </div>
->>>>>>> store_production_ready
               </div>
 
               {/* Grid Content */}
