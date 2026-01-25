@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Package, Info, ChevronRight, Box, FileText, Truck } from 'lucide-react';
-import { useDeliveryStore } from '@/app/main/store/useDeliveryStore';
+import { useDeliveryStore } from '@/store/useDeliveryStore';
 
 
 interface PackageFormProps {

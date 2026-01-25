@@ -4,9 +4,9 @@ import { useEffect, useRef, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'react-toastify';
-import { useSession } from 'next-auth/react'; // 1. Import useSession
+import { useSession } from 'next-auth/react';
 import { useCartStore } from '@/store/useCartStore';
-import { useDeliveryStore } from '@/app/main/store/useDeliveryStore';
+import { useDeliveryStore } from '@/store/useDeliveryStore';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
@@ -14,17 +14,14 @@ function CallbackContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { clearCart } = useCartStore();
-  const { resetDelivery } = useDeliveryStore();
+  const { resetDelivery } = useDeliveryStore(); // We still need this for 'reset' logic elsewhere, but not for success
   
-  // 2. Get Session Data
   const { data: session } = useSession();
-
   const processedRef = useRef(false);
 
   useEffect(() => {
     if (processedRef.current) return;
     
-    // 3. Wait for session to load before verifying
     if (!session) return; 
 
     const reference = searchParams.get('reference');
@@ -42,7 +39,6 @@ function CallbackContent() {
         await useCartStore.persist.rehydrate();
         await useDeliveryStore.persist.rehydrate();
 
-        // 4. Attach Token to Request
         const res = await fetch(`${API_URL}/payment/verify?reference=${reference}&gateway=PAYSTACK`, {
             method: 'GET',
             headers: {
@@ -58,7 +54,6 @@ function CallbackContent() {
 
         const data = await res.json();
 
-        // 5. Check Verified Status
         if (data.status === 'SUCCESS' || data.data?.status === 'SUCCESS' || data.status === 'COMPLETED') {
             toast.success('Payment Verified & Completed');
 
@@ -75,7 +70,8 @@ function CallbackContent() {
                 localStorage.removeItem('pending_ride');
                 router.replace('/main/ride');
             } else if (isDelivery) {
-                resetDelivery();
+                // 🛑 CRITICAL FIX: Removed resetDelivery() 
+                // We MUST keep the store state so the main page can track the delivery
                 localStorage.removeItem('pending_delivery');
                 router.replace('/main/delivery');
             } else {
@@ -94,7 +90,7 @@ function CallbackContent() {
     };
 
     verifyAndComplete();
-  }, [searchParams, router, clearCart, resetDelivery, session]); // Add session dependency
+  }, [searchParams, router, clearCart, resetDelivery, session]);
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-[#0a0a0a]">
