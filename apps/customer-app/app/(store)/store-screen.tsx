@@ -95,7 +95,7 @@ export default function StoreScreen() {
         await addItem({
           id: product.id,
           name: product.name,
-          image: product.image,
+          image: product.images[0],
           price: product.price,
           qty: 1,
           vendorId: storeData.id,

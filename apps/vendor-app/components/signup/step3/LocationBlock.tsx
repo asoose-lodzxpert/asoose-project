@@ -1,16 +1,15 @@
 import { ThemedText } from "@/components/themed-text";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Dimensions,
   Modal,
   Pressable,
   StyleSheet,
   View,
 } from "react-native";
-import MapView, { Marker } from "react-native-maps";
+import MapView, { Marker, Region } from "react-native-maps";
 
 interface Props {
   mapRef?: React.RefObject<MapView | null>;
@@ -32,9 +31,31 @@ export const LocationBlock: React.FC<Props> = ({
   loading = false,
 }) => {
   const [fullMapVisible, setFullMapVisible] = useState(false);
-  const [tempLocation, setTempLocation] = useState(location);
+  const [tempLocation, setTempLocation] = useState<{
+    lat: number;
+    lng: number;
+  } | null>(null);
+  const [mapReady, setMapReady] = useState(false);
+
   const textOnPrimary = useThemeColor({}, "textOnPrimary");
   const brandPrimary = useThemeColor({}, "brandPrimary");
+
+  const safeLat = location?.lat ?? 37.78825;
+  const safeLng = location?.lng ?? -122.4324;
+
+  const region: Region = {
+    latitude: safeLat,
+    longitude: safeLng,
+    latitudeDelta: 0.01,
+    longitudeDelta: 0.01,
+  };
+
+  const modalRegion: Region = {
+    latitude: tempLocation?.lat ?? safeLat,
+    longitude: tempLocation?.lng ?? safeLng,
+    latitudeDelta: 0.05,
+    longitudeDelta: 0.05,
+  };
 
   const handleUseCurrent = async () => {
     if (loading || disabled) return;
@@ -43,7 +64,7 @@ export const LocationBlock: React.FC<Props> = ({
 
   const openFullMap = () => {
     if (disabled) return;
-    setTempLocation(location);
+    setTempLocation(location ?? { lat: safeLat, lng: safeLng });
     setFullMapVisible(true);
   };
 
@@ -51,9 +72,6 @@ export const LocationBlock: React.FC<Props> = ({
     if (tempLocation) onPick(tempLocation);
     setFullMapVisible(false);
   };
-
-  const initialLat = location?.lat ?? 37.78825;
-  const initialLng = location?.lng ?? -122.4324;
 
   return (
     <View>
@@ -83,17 +101,13 @@ export const LocationBlock: React.FC<Props> = ({
         <ThemedText>View full map</ThemedText>
       </Pressable>
 
-      {/* Small map – render only when allowed */}
+      {/* Small inline map */}
       {!disabled && (
         <MapView
           ref={mapRef}
           style={styles.map}
-          initialRegion={{
-            latitude: initialLat,
-            longitude: initialLng,
-            latitudeDelta: 0.01,
-            longitudeDelta: 0.01,
-          }}
+          initialRegion={region}
+          onMapReady={() => setMapReady(true)}
           onPress={(e) =>
             onPick({
               lat: e.nativeEvent.coordinate.latitude,
@@ -101,7 +115,7 @@ export const LocationBlock: React.FC<Props> = ({
             })
           }
         >
-          {location && (
+          {location && mapReady && (
             <Marker
               coordinate={{
                 latitude: location.lat,
@@ -112,17 +126,12 @@ export const LocationBlock: React.FC<Props> = ({
         </MapView>
       )}
 
-      {/* Full-screen map modal */}
+      {/* Full screen map modal */}
       <Modal visible={fullMapVisible} animationType="slide">
         <View style={styles.fullMapContainer}>
           <MapView
             style={styles.fullMap}
-            initialRegion={{
-              latitude: tempLocation?.lat ?? initialLat,
-              longitude: tempLocation?.lng ?? initialLng,
-              latitudeDelta: 0.05,
-              longitudeDelta: 0.05,
-            }}
+            initialRegion={modalRegion}
             onPress={(e) =>
               setTempLocation({
                 lat: e.nativeEvent.coordinate.latitude,
@@ -161,8 +170,6 @@ export const LocationBlock: React.FC<Props> = ({
   );
 };
 
-const { width, height } = Dimensions.get("window");
-
 const styles = StyleSheet.create({
   row: {
     flexDirection: "row",
@@ -183,8 +190,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   fullMap: {
-    width,
-    height,
+    flex: 1, // safer than Dimensions
   },
   confirmButton: {
     position: "absolute",

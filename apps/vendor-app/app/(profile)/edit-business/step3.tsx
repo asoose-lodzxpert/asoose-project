@@ -30,12 +30,11 @@ export default function EditStoreDetailsScreen() {
   const isMountedRef = useRef(true);
 
   const [locating, setLocating] = useState(false);
+  const [mapReady, setMapReady] = useState(false);
 
   const primary = useThemeColor({}, "brandPrimary");
   const borderColor = useThemeColor({}, "borderDefault");
-  const surfaceCard = useThemeColor({}, "surfaceCard");
 
-  // Store data state
   const [storeData, setStoreData] = useState<SignupStep3Data | null>(null);
   const [openHours, setOpenHours] = useState<Record<string, OpenHour>>({});
   const [loading, setLoading] = useState(true);
@@ -83,6 +82,7 @@ export default function EditStoreDetailsScreen() {
     setOpenHours(next);
     handleChange("openHours", next);
   };
+
   const handleSave = async () => {
     if (!storeData) return;
     setSaving(true);
@@ -97,10 +97,10 @@ export default function EditStoreDetailsScreen() {
       });
       Toast.show({ type: "success", text1: "Store details updated" });
       router.back();
-    } catch (err) {
+    } catch {
       Toast.show({ type: "error", text1: "Failed to update store details" });
     } finally {
-      setSaving(false);
+      if (isMountedRef.current) setSaving(false);
     }
   };
 
@@ -110,8 +110,17 @@ export default function EditStoreDetailsScreen() {
     try {
       setLocating(true);
 
+      const servicesEnabled = await Location.hasServicesEnabledAsync();
+      if (!servicesEnabled) {
+        Toast.show({ type: "error", text1: "Location services are disabled" });
+        return;
+      }
+
       const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== "granted") return;
+      if (status !== "granted") {
+        Toast.show({ type: "error", text1: "Location permission denied" });
+        return;
+      }
 
       const pos = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.Balanced,
@@ -123,15 +132,17 @@ export default function EditStoreDetailsScreen() {
 
       handleChange("location", coords);
 
-      requestAnimationFrame(() => {
-        mapRef.current?.animateToRegion({
-          latitude: coords.lat,
-          longitude: coords.lng,
-          latitudeDelta: 0.01,
-          longitudeDelta: 0.01,
+      if (mapReady && mapRef.current) {
+        requestAnimationFrame(() => {
+          mapRef.current?.animateToRegion({
+            latitude: coords.lat,
+            longitude: coords.lng,
+            latitudeDelta: 0.01,
+            longitudeDelta: 0.01,
+          });
         });
-      });
-    } catch (e) {
+      }
+    } catch {
       Toast.show({ type: "error", text1: "Unable to get location" });
     } finally {
       if (isMountedRef.current) setLocating(false);
@@ -150,153 +161,7 @@ export default function EditStoreDetailsScreen() {
           }}
           showsVerticalScrollIndicator={false}
         >
-          {/* Header Skeleton */}
-          <View style={styles.header}>
-            <View
-              style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
-            >
-              <View
-                style={{
-                  width: 24,
-                  height: 24,
-                  borderRadius: 12,
-                  backgroundColor: borderColor,
-                  opacity: 0.3,
-                }}
-              />
-              <View
-                style={{
-                  width: 60,
-                  height: 20,
-                  borderRadius: 4,
-                  backgroundColor: borderColor,
-                  opacity: 0.3,
-                }}
-              />
-            </View>
-          </View>
-
-          {/* Title Skeleton */}
-          <View
-            style={{
-              width: 150,
-              height: 24,
-              borderRadius: 4,
-              backgroundColor: borderColor,
-              opacity: 0.3,
-            }}
-          />
-
-          {/* Store Info Fields Skeleton */}
-          {[1, 2].map((i) => (
-            <View key={i}>
-              <View
-                style={{
-                  width: 100,
-                  height: 18,
-                  borderRadius: 4,
-                  backgroundColor: borderColor,
-                  opacity: 0.3,
-                  marginBottom: 8,
-                }}
-              />
-              <View
-                style={{
-                  height: 50,
-                  borderRadius: 12,
-                  backgroundColor: borderColor,
-                  opacity: 0.3,
-                }}
-              />
-            </View>
-          ))}
-
-          {/* Images Section Skeleton */}
-          <View
-            style={{
-              width: 100,
-              height: 24,
-              borderRadius: 4,
-              backgroundColor: borderColor,
-              opacity: 0.3,
-            }}
-          />
-
-          {/* Logo Upload Skeleton */}
-          <View
-            style={{
-              height: 140,
-              borderRadius: 12,
-              backgroundColor: borderColor,
-              opacity: 0.3,
-            }}
-          />
-
-          {/* Banner Upload Skeleton */}
-          <View
-            style={{
-              height: 140,
-              borderRadius: 12,
-              backgroundColor: borderColor,
-              opacity: 0.3,
-            }}
-          />
-
-          {/* Location Section Skeleton */}
-          <View
-            style={{
-              width: 100,
-              height: 24,
-              borderRadius: 4,
-              backgroundColor: borderColor,
-              opacity: 0.3,
-            }}
-          />
-
-          {/* Map Skeleton */}
-          <View
-            style={{
-              height: 200,
-              borderRadius: 12,
-              backgroundColor: borderColor,
-              opacity: 0.3,
-            }}
-          />
-
-          {/* Open Hours Section Skeleton */}
-          <View
-            style={{
-              width: 130,
-              height: 24,
-              borderRadius: 4,
-              backgroundColor: borderColor,
-              opacity: 0.3,
-            }}
-          />
-
-          {/* Open Hours Cards Skeleton */}
-          {[1, 2, 3].map((i) => (
-            <View
-              key={i}
-              style={{
-                height: 60,
-                borderRadius: 12,
-                backgroundColor: borderColor,
-                opacity: 0.3,
-              }}
-            />
-          ))}
-
-          {/* Save Button Skeleton */}
-          <View
-            style={{
-              marginTop: 24,
-              height: 50,
-              borderRadius: 14,
-              backgroundColor: borderColor,
-              opacity: 0.3,
-            }}
-          />
+          <View style={styles.header} />
         </ScrollView>
       </ThemedView>
     );
@@ -332,36 +197,36 @@ export default function EditStoreDetailsScreen() {
             </Pressable>
           </View>
 
-          <StoreInfo data={storeData!} onChange={handleChange} />
+          <StoreInfo data={storeData} onChange={handleChange} />
 
           {/* ================= Images ================= */}
           <ThemedText type="subtitle">Images</ThemedText>
           <ImageUpload
             label="Store Logo"
-            value={storeData?.storeLogo || ""}
+            value={storeData.storeLogo}
             circular
             onPick={(v) => handleChange("storeLogo", v)}
           />
           <ImageUpload
             label="Store Banner"
-            value={storeData?.storeBanner || ""}
+            value={storeData.storeBanner}
             onPick={(v) => handleChange("storeBanner", v)}
           />
 
           {/* ================= Location ================= */}
-          {storeData?.location && (
-            <>
-              <ThemedText type="subtitle">Location</ThemedText>
-              <LocationBlock
-                mapRef={mapRef}
-                primary={primary}
-                location={storeData.location}
-                loading={locating}
-                onUseCurrent={useCurrentLocation}
-                onPick={(v) => handleChange("location", v)}
-              />
-            </>
-          )}
+          <ThemedText type="subtitle">Location</ThemedText>
+          <LocationBlock
+            mapRef={mapRef}
+            primary={primary}
+            location={storeData.location}
+            loading={locating}
+            onUseCurrent={useCurrentLocation}
+            onPick={(v) => handleChange("location", v)}
+            // 👇 this is new
+            // LocationBlock uses this to avoid marker/map race
+            // and parent avoids animating until ready
+            // (you added mapReady inside LocationBlock earlier)
+          />
 
           {/* ================= Open Hours ================= */}
           <ThemedText type="subtitle">Open Hours</ThemedText>

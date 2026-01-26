@@ -105,9 +105,18 @@ export class VendorOrdersService {
     this.notificationsGateway.sendOrderUpdate(updated.id, {
       status: 'CONFIRMED',
       timeline: [
-        { status: 'PLACED', time: updated.createdAt.toISOString(), icon: 'default' },
-        { status: 'CONFIRMED', label: 'Order Confirmed', time: new Date().toISOString(), icon: 'kitchen' }
-      ]
+        {
+          status: 'PLACED',
+          time: updated.createdAt.toISOString(),
+          icon: 'default',
+        },
+        {
+          status: 'CONFIRMED',
+          label: 'Order Confirmed',
+          time: new Date().toISOString(),
+          icon: 'kitchen',
+        },
+      ],
     });
 
     return updated;
@@ -143,9 +152,14 @@ export class VendorOrdersService {
       this.notificationsGateway.sendOrderUpdate(updated.id, {
         status: 'REJECTED',
         timeline: [
-           { status: 'PLACED', time: updated.createdAt.toISOString() },
-           { status: 'CANCELLED', label: 'Order Declined', description: reason, time: new Date().toISOString() }
-        ]
+          { status: 'PLACED', time: updated.createdAt.toISOString() },
+          {
+            status: 'CANCELLED',
+            label: 'Order Declined',
+            description: reason,
+            time: new Date().toISOString(),
+          },
+        ],
       });
 
       return updated;
@@ -171,10 +185,8 @@ export class VendorOrdersService {
       storeId: updated.storeId,
     });
 
-    // Real-time update
     this.notificationsGateway.sendOrderUpdate(updated.id, {
       status: 'READY',
-      // In a full implementation, you would reconstruct the whole timeline here
     });
 
     return updated;
@@ -192,7 +204,6 @@ export class VendorOrdersService {
       data: { status: OrderStatus.PREPARING },
     });
 
-    // Real-time update
     this.notificationsGateway.sendOrderUpdate(updated.id, {
       status: 'PREPARING',
     });

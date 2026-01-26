@@ -44,8 +44,8 @@ export default function CartScreen() {
     if (!items.length) return [] as CartGroup[];
     const buckets = new Map<string, CartGroup>();
     items.forEach((item) => {
-      const restaurant = restaurants.find((r) => r.id === item.restaurantId);
-      const key = restaurant?.id || item.restaurantId || `unknown-${item.id}`;
+      const restaurant = restaurants.find((r) => r.id === item.vendorId);
+      const key = restaurant?.id || item.vendorId || `unknown-${item.id}`;
       if (!buckets.has(key)) {
         buckets.set(key, {
           id: key,

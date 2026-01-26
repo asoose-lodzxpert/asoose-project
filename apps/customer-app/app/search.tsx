@@ -17,8 +17,7 @@ const MOCK_PRODUCTS = [
     id: "1",
     name: "Apple",
     price: 100,
-    images: [],
-    image: "https://via.placeholder.com/150",
+    images: ["https://via.placeholder.com/150"],
     description: "Fresh apple",
     category: { name: "Fruits" },
     modifierGroups: [],
@@ -27,8 +26,7 @@ const MOCK_PRODUCTS = [
     id: "2",
     name: "Banana",
     price: 80,
-    images: [],
-    image: "https://via.placeholder.com/150",
+    images: ["https://via.placeholder.com/150"],
     description: "Sweet banana",
     category: { name: "Fruits" },
     modifierGroups: [],
@@ -37,8 +35,7 @@ const MOCK_PRODUCTS = [
     id: "3",
     name: "Carrot",
     price: 50,
-    images: [],
-    image: "https://via.placeholder.com/150",
+    images: ["https://via.placeholder.com/150"],
     description: "Organic carrot",
     category: { name: "Vegetables" },
     modifierGroups: [],
@@ -47,8 +44,7 @@ const MOCK_PRODUCTS = [
     id: "4",
     name: "Milk",
     price: 200,
-    images: [],
-    image: "https://via.placeholder.com/150",
+    images: ["https://via.placeholder.com/150"],
     description: "Dairy milk",
     category: { name: "Dairy" },
     modifierGroups: [],
@@ -128,11 +124,13 @@ export default function SearchScreen() {
             <View style={styles.resultImageBorder}>
               <View style={styles.resultImageShadow}>
                 <View style={styles.resultImage}>
-                  <img
-                    src={item.image}
-                    alt={item.name}
-                    style={{ width: 60, height: 60, borderRadius: 8 }}
-                  />
+                  {item.images && item.images[0] ? (
+                    <img
+                      src={item.images[0]}
+                      alt={item.name}
+                      style={{ width: 60, height: 60, borderRadius: 8 }}
+                    />
+                  ) : null}
                 </View>
               </View>
             </View>

@@ -6,7 +6,10 @@ import React, {
   useCallback,
 } from "react";
 
-import { fetchSavedAddresses } from "../services/sendPackage.api";
+import {
+  fetchSavedAddresses,
+  fetchDeliveryQuote,
+} from "../services/sendPackage.api";
 
 import type {
   Address,
@@ -146,16 +149,35 @@ export function SendPackageProvider({
       return;
     }
 
-    // Just set quote based on package size
+    // Fetch quote from backend (debounced)
     setLoadingQuote(true);
     timer = setTimeout(() => {
       if (!mounted) return;
-      setQuote({
-        distanceKm: 0,
-        etaMinutes: 0,
-        price: PACKAGE_SIZE_PRICES[packageSize] ?? 0,
-      });
-      setLoadingQuote(false);
+      (async () => {
+        try {
+          const p = pickup?.address?.coords;
+          const d = dropoff?.address?.coords;
+          if (!p || !d) {
+            setQuote(null);
+            setLoadingQuote(false);
+            return;
+          }
+          const q = await fetchDeliveryQuote(
+            p.latitude,
+            p.longitude,
+            d.latitude,
+            d.longitude,
+            packageSize,
+          );
+          if (!mounted) return;
+          setQuote(q);
+        } catch (e) {
+          console.error("Failed to fetch delivery quote", e);
+          if (mounted) setQuote(null);
+        } finally {
+          if (mounted) setLoadingQuote(false);
+        }
+      })();
     }, 200);
 
     return () => {

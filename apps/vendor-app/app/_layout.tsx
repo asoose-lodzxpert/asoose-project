@@ -9,7 +9,11 @@ import { ThemedText } from "@/components/themed-text";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { toastConfig } from "@/components/ThemedToast";
 import Toast from "react-native-toast-message";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import {
+  checkStartupPermissions,
+  requestStartupPermissions,
+} from "@/utils/permissions";
 
 function LoadingScreen() {
   const dot1 = useRef(new Animated.Value(0)).current;
@@ -110,6 +114,32 @@ function RootNavigator() {
 }
 
 export default function RootLayout() {
+  const [permissionsReady, setPermissionsReady] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const initPermissions = async () => {
+      try {
+        await requestStartupPermissions();
+        await checkStartupPermissions();
+      } catch (e) {
+        console.warn("Startup permission check failed:", e);
+      } finally {
+        if (mounted) setPermissionsReady(true);
+      }
+    };
+
+    initPermissions();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  if (!permissionsReady) {
+    return <LoadingScreen />;
+  }
   return (
     <ErrorBoundary>
       <AuthProvider>

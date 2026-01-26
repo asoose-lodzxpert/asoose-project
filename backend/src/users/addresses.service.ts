@@ -72,9 +72,9 @@ export class AddressesService {
             isDefault: sanitizedData.isDefault || false,
             // 3. Use Real Coordinates
             lat: data.lat,
-            phone: sanitizedData.phone,
             lng: data.lng,
-          },
+            ...(sanitizedData.phone ? { phone: sanitizedData.phone } : {}),
+          } as Prisma.AddressCreateInput,
         });
       });
     } catch (error) {

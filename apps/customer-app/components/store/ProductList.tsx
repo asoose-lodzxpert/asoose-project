@@ -53,7 +53,7 @@ export function ProductList({
       onPress={() => handleOpenModal(item)}
       style={[styles.menuCard, { backgroundColor: cardBg }]}
     >
-      <Image source={{ uri: item.image }} style={styles.menuImage} />
+      <Image source={{ uri: item.images[0] }} style={styles.menuImage} />
       <ThemedText style={[styles.menuTitle, { color: text }]}>
         {item.name}
       </ThemedText>

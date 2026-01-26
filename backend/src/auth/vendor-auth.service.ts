@@ -52,11 +52,7 @@ export class VendorAuthService {
   // ---------------- LOGIN ----------------
 
   async loginVendor(body: { email: string; password: string }) {
-    // Normalize email to lowercase
     const normalizedEmail = body.email.toLowerCase().trim();
-
-    console.log('=== VENDOR LOGIN ATTEMPT ===');
-    console.log('Email:', normalizedEmail);
 
     const vendor = await this.prisma.vendor.findUnique({
       where: { email: normalizedEmail },
@@ -64,13 +60,10 @@ export class VendorAuthService {
     });
 
     if (!vendor) {
-      console.log('❌ Vendor not found in database');
       throw new UnauthorizedException(
         'No account found with this email address. Please check your email or register for a new account.',
       );
     }
-
-    console.log('✓ Vendor found:', vendor.id);
 
     const isPasswordValid = await bcrypt.compare(
       body.password,
@@ -78,25 +71,15 @@ export class VendorAuthService {
     );
 
     if (!isPasswordValid) {
-      console.log('❌ Password validation failed');
       throw new UnauthorizedException(
         'Incorrect password. Please try again or reset your password.',
       );
     }
 
-    console.log('✓ Password validated');
-
     const payload = { sub: vendor.id, role: 'VENDOR', email: vendor.email };
-    console.log('Creating JWT with payload:', JSON.stringify(payload));
 
     const accessToken = this.jwtService.sign(payload, { expiresIn: '15m' });
     const refreshToken = this.jwtService.sign(payload, { expiresIn: '7d' });
-
-    console.log('✓ Tokens generated');
-    console.log(
-      'Access Token (first 50 chars):',
-      accessToken.substring(0, 50) + '...',
-    );
 
     // Send login notification
     if (this.securityNotificationsService) {
@@ -107,7 +90,7 @@ export class VendorAuthService {
           vendor.name,
           {
             timestamp: new Date(),
-            device: 'Web/Mobile', // Can be enhanced with actual device info
+            device: 'Web/Mobile',
           },
         );
       } catch (error) {

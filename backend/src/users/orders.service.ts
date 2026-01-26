@@ -19,7 +19,6 @@ import { InventoryService } from './inventory.service';
 import { VendorOrdersStreamService } from '../vendor/orders/vendor-orders-stream.service';
 import { NotificationsGateway } from '../notifications/notifications.gateway';
 
-// FIX 1: Align constants with Prisma Schema
 const ORDER_STATUS = { PENDING: 'PENDING' } as const;
 const DELIVERY_STATUS = { REQUESTED: 'REQUESTED' } as const;
 
@@ -148,6 +147,18 @@ export class OrdersService {
 
           const dropoffAddress = await tx.address.findUnique({
             where: { id: addressId },
+            select: {
+              id: true,
+              userId: true,
+              street: true,
+              city: true,
+              state: true,
+              lat: true,
+              lng: true,
+              label: true,
+              vendorId: true,
+              isDefault: true,
+            },
           });
           if (!dropoffAddress || dropoffAddress.userId !== userId) {
             throw new BadRequestException('Invalid delivery address');
@@ -211,7 +222,7 @@ export class OrdersService {
                   deliveryFee: deliveryFee,
                   distanceKm: parseFloat(distance.toFixed(2)),
                   recipientName: user.name,
-                  recipientPhone: dropoffAddress.phone || user.phone || 'N/A',
+                  recipientPhone: user.phone || 'N/A',
                 },
               },
             },

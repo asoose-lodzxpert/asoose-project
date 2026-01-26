@@ -34,11 +34,7 @@ export function ProductModal({
   const { items, addItem, increaseQty, decreaseQty } = useCart();
   const showToast = useToast();
   const [imgIdx, setImgIdx] = useState(0);
-  const images = product?.images?.length
-    ? product.images
-    : product?.image
-      ? [product.image]
-      : [];
+  const images = product?.images?.length ? product.images : [];
   const cardBg = useThemeColor({}, "surfaceCard");
   const text = useThemeColor({}, "textPrimary");
   const muted = useThemeColor({}, "textMuted");
@@ -153,7 +149,7 @@ export function ProductModal({
                   await addItem({
                     id: product.id,
                     name: product.name,
-                    image: product.image,
+                    image: product.images[0],
                     price: product.price,
                     qty: qty,
                     vendorId: vendorId,
