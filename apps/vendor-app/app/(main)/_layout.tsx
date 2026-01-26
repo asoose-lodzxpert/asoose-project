@@ -54,7 +54,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="(menu)"
         options={{
-          title: "Menu",
+          title: "Listings",
           tabBarIcon: ({ color }) => (
             <IconSymbol size={28} name="fork.knife" color={color} />
           ),

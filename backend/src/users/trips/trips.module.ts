@@ -7,7 +7,7 @@ import { PaymentModule } from '../../payment/payment.module';
 import { TestController } from 'src/test/test.controller';
 @Module({
   imports: [PrismaModule, MatchingModule, forwardRef(() => PaymentModule)],
-  controllers: [TripsController,TestController],
+  controllers: [TripsController, TestController],
   providers: [TripsService],
   exports: [TripsService],
 })

@@ -139,6 +139,7 @@ export class VendorService {
         items: true,
       },
     });
+
     return orders.map((order) => ({
       id: order.id,
       customerName: order.user?.name || '',
@@ -147,8 +148,13 @@ export class VendorService {
         id: i.id,
         name: i.nameSnap,
         quantity: i.quantity,
+        price: i.price,
       })),
-      total: order.total,
+      total: order.items.reduce(
+        (s: number, i: any) =>
+          s + (Number(i.price) || 0) * (Number(i.quantity) || 0),
+        0,
+      ),
       status: order.status.toLowerCase(),
       timestamp: order.createdAt.toISOString(),
     }));
@@ -169,7 +175,7 @@ export class VendorService {
       },
     });
 
-    return bankAccount ? [bankAccount] : [];
+    return bankAccount;
   }
 
   // Get single bank account for vendor

@@ -152,6 +152,41 @@ export default function EditStoreDetailsScreen() {
   if (loading || !storeData) {
     return (
       <ThemedView style={{ flex: 1 }}>
+        <View style={styles.header}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            <View
+              style={{
+                width: 24,
+                height: 24,
+                borderRadius: 12,
+                backgroundColor: borderColor,
+                opacity: 0.3,
+              }}
+            />
+            <View
+              style={{
+                width: 60,
+                height: 20,
+                borderRadius: 4,
+                backgroundColor: borderColor,
+                opacity: 0.3,
+              }}
+            />
+          </View>
+
+          <View
+            style={{
+              width: 140,
+              height: 24,
+              borderRadius: 4,
+              backgroundColor: borderColor,
+              opacity: 0.3,
+            }}
+          />
+
+          <View style={{ width: 40 }} />
+        </View>
+
         <ScrollView
           style={{ flex: 1 }}
           contentContainerStyle={{
@@ -161,7 +196,136 @@ export default function EditStoreDetailsScreen() {
           }}
           showsVerticalScrollIndicator={false}
         >
-          <View style={styles.header} />
+          {/* Store Info Skeleton */}
+          <View
+            style={{
+              borderRadius: 14,
+              padding: 16,
+              gap: 12,
+              backgroundColor: "transparent",
+            }}
+          >
+            <View
+              style={{
+                width: 180,
+                height: 20,
+                borderRadius: 4,
+                backgroundColor: borderColor,
+                opacity: 0.3,
+              }}
+            />
+            <View style={{ gap: 12 }}>
+              {[1, 2, 3, 4].map((i) => (
+                <View key={i} style={{ gap: 6 }}>
+                  <View
+                    style={{
+                      width: 120,
+                      height: 12,
+                      borderRadius: 4,
+                      backgroundColor: borderColor,
+                      opacity: 0.3,
+                    }}
+                  />
+                  <View
+                    style={{
+                      width: "80%",
+                      height: 18,
+                      borderRadius: 4,
+                      backgroundColor: borderColor,
+                      opacity: 0.3,
+                    }}
+                  />
+                </View>
+              ))}
+            </View>
+          </View>
+
+          {/* Images skeleton */}
+          <View style={{ gap: 8 }}>
+            <View
+              style={{
+                width: "100%",
+                height: 110,
+                borderRadius: 12,
+                backgroundColor: borderColor,
+                opacity: 0.3,
+              }}
+            />
+            <View
+              style={{
+                width: "100%",
+                height: 110,
+                borderRadius: 12,
+                backgroundColor: borderColor,
+                opacity: 0.3,
+              }}
+            />
+          </View>
+
+          {/* Location skeleton (map) */}
+          <View>
+            <View
+              style={{
+                width: "100%",
+                height: 200,
+                borderRadius: 12,
+                backgroundColor: borderColor,
+                opacity: 0.3,
+              }}
+            />
+          </View>
+
+          {/* Open hours skeleton */}
+          <View style={{ gap: 8 }}>
+            <View
+              style={{
+                width: 140,
+                height: 18,
+                borderRadius: 4,
+                backgroundColor: borderColor,
+                opacity: 0.3,
+              }}
+            />
+            {["Mon", "Tue", "Wed"].map((d) => (
+              <View
+                key={d}
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                }}
+              >
+                <View
+                  style={{
+                    width: "30%",
+                    height: 14,
+                    borderRadius: 4,
+                    backgroundColor: borderColor,
+                    opacity: 0.3,
+                  }}
+                />
+                <View
+                  style={{
+                    width: "50%",
+                    height: 14,
+                    borderRadius: 4,
+                    backgroundColor: borderColor,
+                    opacity: 0.3,
+                  }}
+                />
+              </View>
+            ))}
+          </View>
+
+          {/* Save button skeleton */}
+          <View
+            style={{
+              marginTop: 12,
+              height: 50,
+              borderRadius: 14,
+              backgroundColor: borderColor,
+              opacity: 0.3,
+            }}
+          />
         </ScrollView>
       </ThemedView>
     );

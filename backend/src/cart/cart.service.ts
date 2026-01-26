@@ -54,7 +54,7 @@ export class CartService {
         return {
           id: product.id,
           name: product.name,
-          image: product.images[0] || null, 
+          image: product.images[0] || null,
           description: product.slug,
           price: itemPrice,
           quantity: itemDto.quantity,

@@ -146,4 +146,3 @@ export class DisputesController {
     return this.disputesService.reject(id, reason, req.user.id);
   }
 }
-

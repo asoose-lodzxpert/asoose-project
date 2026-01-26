@@ -435,13 +435,13 @@ export class StoresService {
     return { success: true, message: 'Email queued successfully' };
   }
   async getVendorPayouts(storeId: string) {
-  return this.prisma.vendorPayout.findMany({
-    where: { 
-      storeId: storeId 
-    },
-    orderBy: { 
-      createdAt: 'desc' 
-    }
-  });
-}
+    return this.prisma.vendorPayout.findMany({
+      where: {
+        storeId: storeId,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+  }
 }

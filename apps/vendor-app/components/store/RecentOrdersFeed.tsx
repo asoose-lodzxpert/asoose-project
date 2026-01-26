@@ -52,7 +52,7 @@ export const RecentOrdersFeed: React.FC<Props> = ({
       // Refresh the feed
       onRefresh?.();
     },
-    [onRefresh]
+    [onRefresh],
   );
 
   const handleOrderUpdate = useCallback(
@@ -60,7 +60,7 @@ export const RecentOrdersFeed: React.FC<Props> = ({
       // Refresh the feed
       onRefresh?.();
     },
-    [onRefresh]
+    [onRefresh],
   );
 
   // SSE Connection
@@ -266,7 +266,20 @@ export const RecentOrdersFeed: React.FC<Props> = ({
           data={orders}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
-            <OrderCard order={item as any} tab={getTab(item.status)} />
+            <OrderCard
+              order={
+                {
+                  ...item,
+                  user: {
+                    name: item.customerName,
+                    phone: "",
+                    image: item.customerProfile,
+                  },
+                  total: item.total,
+                } as any
+              }
+              tab={getTab(item.status)}
+            />
           )}
           contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24 }}
           showsVerticalScrollIndicator={false}

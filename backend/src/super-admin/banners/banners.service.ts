@@ -41,64 +41,62 @@ export class BannersService {
   // ===========================================================================
   // WRITE (Create / Update)
   // ===========================================================================
-async create(data: CreateBannerDto, file?: Express.Multer.File) {
-  let imageKey: string | null = null;
+  async create(data: CreateBannerDto, file?: Express.Multer.File) {
+    let imageKey: string | null = null;
 
-  if (file) {
-    const upload = await this.storage.uploadFile(file);
-    imageKey = upload.key;
-  } else if (data.image) {
-    // FIX: Persist the pre-uploaded URL if no file is present in the request
-    imageKey = data.image; 
-  }
-
-  return this.prisma.banner.create({
-    data: {
-      title: data.title,
-      subtitle: data.subtitle,
-      buttonText: data.buttonText ?? 'Order Now',
-      link: data.link ?? '/store',
-      type: data.type ?? 'PROMO',
-      priority: data.priority ? Number(data.priority) : 0,
-      isActive: data.isActive ?? true,
-      image: imageKey,
-    },
-  });
-}
-
-async update(id: string, data: UpdateBannerDto, file?: Express.Multer.File) {
-  const banner = await this.prisma.banner.findUnique({ where: { id } });
-  if (!banner) throw new NotFoundException(`Banner not found`);
-
-  let imageKey = banner.image;
-
-  if (file) {
-    if (banner.image) {
-      await this.storage.deleteFileByKey(banner.image).catch(console.error);
+    if (file) {
+      const upload = await this.storage.uploadFile(file);
+      imageKey = upload.key;
+    } else if (data.image) {
+      // FIX: Persist the pre-uploaded URL if no file is present in the request
+      imageKey = data.image;
     }
-    const upload = await this.storage.uploadFile(file);
-    imageKey = upload.key;
-  } else if (data.image !== undefined) {
-    // FIX: Respect the updated image URL from the JSON body
-    imageKey = data.image;
+
+    return this.prisma.banner.create({
+      data: {
+        title: data.title,
+        subtitle: data.subtitle,
+        buttonText: data.buttonText ?? 'Order Now',
+        link: data.link ?? '/store',
+        type: data.type ?? 'PROMO',
+        priority: data.priority ? Number(data.priority) : 0,
+        isActive: data.isActive ?? true,
+        image: imageKey,
+      },
+    });
   }
 
-  return this.prisma.banner.update({
-    where: { id },
-    data: {
-      title: data.title,
-      subtitle: data.subtitle,
-      buttonText: data.buttonText,
-      link: data.link,
-      type: data.type,
-      isActive: data.isActive,
-      priority: data.priority ? Number(data.priority) : undefined,
-      image: imageKey,
-    },
-  });
-}
+  async update(id: string, data: UpdateBannerDto, file?: Express.Multer.File) {
+    const banner = await this.prisma.banner.findUnique({ where: { id } });
+    if (!banner) throw new NotFoundException(`Banner not found`);
 
+    let imageKey = banner.image;
 
+    if (file) {
+      if (banner.image) {
+        await this.storage.deleteFileByKey(banner.image).catch(console.error);
+      }
+      const upload = await this.storage.uploadFile(file);
+      imageKey = upload.key;
+    } else if (data.image !== undefined) {
+      // FIX: Respect the updated image URL from the JSON body
+      imageKey = data.image;
+    }
+
+    return this.prisma.banner.update({
+      where: { id },
+      data: {
+        title: data.title,
+        subtitle: data.subtitle,
+        buttonText: data.buttonText,
+        link: data.link,
+        type: data.type,
+        isActive: data.isActive,
+        priority: data.priority ? Number(data.priority) : undefined,
+        image: imageKey,
+      },
+    });
+  }
 
   // ===========================================================================
   // REORDERING & DELETE
@@ -128,7 +126,6 @@ async update(id: string, data: UpdateBannerDto, file?: Express.Multer.File) {
     return this.prisma.banner.delete({ where: { id } });
   }
 
-  
   private async getSignedUrl(key: string): Promise<string> {
     try {
       if (key.startsWith('http')) return key;

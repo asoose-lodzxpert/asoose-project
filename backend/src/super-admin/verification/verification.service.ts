@@ -1,10 +1,15 @@
 import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { VerificationStatus, UserStatus, StoreStatus, Prisma } from '@prisma/client';
+import {
+  VerificationStatus,
+  UserStatus,
+  StoreStatus,
+  Prisma,
+} from '@prisma/client';
 
 export enum VerificationEntityType {
   VENDOR = 'vendor',
-  RIDER = 'rider'
+  RIDER = 'rider',
 }
 
 @Injectable()
@@ -15,16 +20,33 @@ export class VerificationService {
   /**
    * 1.3 Server-Side Search & Pagination
    */
-  async getPendingVerifications(query: { search?: string; type: string; page: number; limit: number }) {
+  async getPendingVerifications(query: {
+    search?: string;
+    type: string;
+    page: number;
+    limit: number;
+  }) {
     const skip = (query.page - 1) * query.limit;
     const isVendor = query.type === 'vendor';
 
-    const searchFilter: any = query.search ? {
-      OR: [
-        { name: { contains: query.search, mode: 'insensitive' as Prisma.QueryMode } },
-        { email: { contains: query.search, mode: 'insensitive' as Prisma.QueryMode } }
-      ]
-    } : {};
+    const searchFilter: any = query.search
+      ? {
+          OR: [
+            {
+              name: {
+                contains: query.search,
+                mode: 'insensitive' as Prisma.QueryMode,
+              },
+            },
+            {
+              email: {
+                contains: query.search,
+                mode: 'insensitive' as Prisma.QueryMode,
+              },
+            },
+          ],
+        }
+      : {};
 
     if (isVendor) {
       const [data, total] = await Promise.all([
@@ -33,9 +55,11 @@ export class VerificationService {
           include: { store: true, documents: true },
           skip,
           take: query.limit,
-          orderBy: { createdAt: 'desc' }
+          orderBy: { createdAt: 'desc' },
         }),
-        this.prisma.vendor.count({ where: { ...searchFilter, status: UserStatus.PENDING } })
+        this.prisma.vendor.count({
+          where: { ...searchFilter, status: UserStatus.PENDING },
+        }),
       ]);
       return { data, total, page: query.page };
     } else {
@@ -45,9 +69,11 @@ export class VerificationService {
           include: { documents: true, vehicle: true },
           skip,
           take: query.limit,
-          orderBy: { createdAt: 'desc' }
+          orderBy: { createdAt: 'desc' },
         }),
-        this.prisma.rider.count({ where: { ...searchFilter, status: UserStatus.PENDING } })
+        this.prisma.rider.count({
+          where: { ...searchFilter, status: UserStatus.PENDING },
+        }),
       ]);
       return { data, total, page: query.page };
     }
@@ -57,28 +83,43 @@ export class VerificationService {
    * 1.2 Multi-Step Decision Flow
    * FIX: Captures updated store object to avoid the null-reference error on findUnique
    */
-  async handleDecision(id: string, type: string, action: string, adminId: string, note?: string) {
+  async handleDecision(
+    id: string,
+    type: string,
+    action: string,
+    adminId: string,
+    note?: string,
+  ) {
     const isVendor = type === 'vendor';
-    const vStatus = action === 'APPROVE' ? VerificationStatus.VERIFIED : 
-                    action === 'REJECT' ? VerificationStatus.REJECTED : VerificationStatus.PENDING;
-    const uStatus = action === 'APPROVE' ? UserStatus.ACTIVE : 
-                    action === 'REJECT' ? UserStatus.SUSPENDED : UserStatus.PENDING;
+    const vStatus =
+      action === 'APPROVE'
+        ? VerificationStatus.VERIFIED
+        : action === 'REJECT'
+          ? VerificationStatus.REJECTED
+          : VerificationStatus.PENDING;
+    const uStatus =
+      action === 'APPROVE'
+        ? UserStatus.ACTIVE
+        : action === 'REJECT'
+          ? UserStatus.SUSPENDED
+          : UserStatus.PENDING;
 
     return await this.prisma.$transaction(async (tx) => {
       if (isVendor) {
         // 1. Update Vendor Account
         const vendor = await tx.vendor.update({
           where: { id },
-          data: { status: uStatus }
+          data: { status: uStatus },
         });
 
         // 2. Update Store Entity and Verification status - CAPTURE THE RESULT
         const store = await tx.store.update({
           where: { vendorId: id },
-          data: { 
+          data: {
             verification: vStatus,
-            status: action === 'APPROVE' ? StoreStatus.ACTIVE : StoreStatus.PENDING 
-          }
+            status:
+              action === 'APPROVE' ? StoreStatus.ACTIVE : StoreStatus.PENDING,
+          },
         });
 
         // 3. Use the captured 'store.id' for the log entry
@@ -87,8 +128,8 @@ export class VerificationService {
             storeId: store.id,
             action: `VERIFICATION_${action}`,
             details: note || `Admin ${action}ed vendor verification`,
-            performedBy: adminId
-          }
+            performedBy: adminId,
+          },
         });
 
         return vendor;
@@ -96,13 +137,13 @@ export class VerificationService {
         // 1. Update Rider Account
         const rider = await tx.rider.update({
           where: { id },
-          data: { status: uStatus }
+          data: { status: uStatus },
         });
 
         // 2. Update all Rider documents to match decision
         await tx.riderDocument.updateMany({
           where: { riderId: id },
-          data: { status: vStatus }
+          data: { status: vStatus },
         });
 
         return rider;
@@ -110,14 +151,14 @@ export class VerificationService {
     });
   }
 
-async getVerificationById(id: string) {
+  async getVerificationById(id: string) {
     // 1. Try to find as Vendor
     const vendor = await this.prisma.vendor.findUnique({
       where: { id },
-      include: { 
-        store: true, 
-        documents: true 
-      }
+      include: {
+        store: true,
+        documents: true,
+      },
     });
 
     if (vendor) {
@@ -127,10 +168,10 @@ async getVerificationById(id: string) {
     // 2. If not found, try to find as Rider
     const rider = await this.prisma.rider.findUnique({
       where: { id },
-      include: { 
-        vehicle: true, 
-        documents: true 
-      }
+      include: {
+        vehicle: true,
+        documents: true,
+      },
     });
 
     if (rider) {
@@ -141,4 +182,3 @@ async getVerificationById(id: string) {
     throw new NotFoundException(`Verification request with ID ${id} not found`);
   }
 }
-

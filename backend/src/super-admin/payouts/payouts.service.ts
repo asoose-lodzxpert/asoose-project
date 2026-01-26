@@ -39,15 +39,24 @@ export class PayoutsService {
   async approvePayout(id: string, type: 'VENDOR' | 'RIDER', adminId: string) {
     // 1. Critical: Wrap the entire check-and-lock in a transaction to prevent race conditions
     return this.prisma.$transaction(async (tx) => {
-      const payout = type === 'VENDOR'
-        ? await tx.vendorPayout.findUnique({ where: { id }, include: { store: true } })
-        : await tx.riderPayout.findUnique({ where: { id }, include: { rider: true } });
+      const payout =
+        type === 'VENDOR'
+          ? await tx.vendorPayout.findUnique({
+              where: { id },
+              include: { store: true },
+            })
+          : await tx.riderPayout.findUnique({
+              where: { id },
+              include: { rider: true },
+            });
 
       if (!payout) throw new BadRequestException('Payout request not found');
 
       // Explicitly check status to prevent duplicate processing
       if (payout.status !== PayoutStatus.PENDING) {
-        throw new BadRequestException(`Action denied: Payout is already ${payout.status}`);
+        throw new BadRequestException(
+          `Action denied: Payout is already ${payout.status}`,
+        );
       }
 
       // Fix TS2339: Narrow the property access for recipientId
@@ -58,17 +67,21 @@ export class PayoutsService {
         recipientId = (payout as any).riderId;
       }
 
-      const recipientType = type === 'VENDOR' ? RecipientType.VENDOR : RecipientType.RIDER;
+      const recipientType =
+        type === 'VENDOR' ? RecipientType.VENDOR : RecipientType.RIDER;
 
       try {
-        const disbursement = await this.paymentService.disbursePayment({
-          recipientId,
-          recipientType,
-          amount: payout.amount,
-          gateway: PaymentGateway.PAYSTACK,
-          reason: `Payout ${id}`,
-          metadata: { payoutId: id, adminId },
-        }, adminId);
+        const disbursement = await this.paymentService.disbursePayment(
+          {
+            recipientId,
+            recipientType,
+            amount: payout.amount,
+            gateway: PaymentGateway.PAYSTACK,
+            reason: `Payout ${id}`,
+            metadata: { payoutId: id, adminId },
+          },
+          adminId,
+        );
 
         // Fix TS2339: Use status if message doesn't exist on DisbursementResponse
         if (!disbursement.success) {
@@ -83,26 +96,34 @@ export class PayoutsService {
         };
 
         if (type === 'VENDOR') {
-          const updated = await tx.vendorPayout.update({ where: { id }, data: updateData });
+          const updated = await tx.vendorPayout.update({
+            where: { id },
+            data: updateData,
+          });
           // Fix TS2345: Convert null reference to undefined for ledger compatibility
-          await this.ledger.recordVendorPayout({ 
-            ...updated, 
+          await this.ledger.recordVendorPayout({
+            ...updated,
             status: 'PAID',
-            reference: updated.reference ?? undefined 
+            reference: updated.reference ?? undefined,
           });
           return updated;
         } else {
-          const updated = await tx.riderPayout.update({ where: { id }, data: updateData });
+          const updated = await tx.riderPayout.update({
+            where: { id },
+            data: updateData,
+          });
           // Fix TS2345: Convert null reference to undefined for ledger compatibility
-          await this.ledger.recordRiderPayout({ 
-            ...updated, 
+          await this.ledger.recordRiderPayout({
+            ...updated,
             status: 'PAID',
-            reference: updated.reference ?? undefined
+            reference: updated.reference ?? undefined,
           });
           return updated;
         }
       } catch (error) {
-        this.logger.error(`Disbursement failed for payout ${id}: ${error.message}`);
+        this.logger.error(
+          `Disbursement failed for payout ${id}: ${error.message}`,
+        );
         throw new BadRequestException(`Bank Transfer Failed: ${error.message}`);
       }
     });
@@ -110,25 +131,34 @@ export class PayoutsService {
 
   async rejectPayout(id: string, type: 'VENDOR' | 'RIDER', reason: string) {
     // Corrected: Use PayoutStatus.REJECTED instead of FAILED to align with schema
-    const updateData = { status: PayoutStatus.REJECTED, rejectionReason: reason };
+    const updateData = {
+      status: PayoutStatus.REJECTED,
+      rejectionReason: reason,
+    };
 
     return this.prisma.$transaction(async (tx) => {
       if (type === 'VENDOR') {
-        const payout = await tx.vendorPayout.update({ where: { id }, data: updateData });
+        const payout = await tx.vendorPayout.update({
+          where: { id },
+          data: updateData,
+        });
         // Fix TS2345: Handle null reference
-        await this.ledger.recordVendorPayout({ 
-          ...payout, 
+        await this.ledger.recordVendorPayout({
+          ...payout,
           status: 'FAILED',
-          reference: payout.reference ?? undefined
+          reference: payout.reference ?? undefined,
         });
         return payout;
       } else {
-        const payout = await tx.riderPayout.update({ where: { id }, data: updateData });
+        const payout = await tx.riderPayout.update({
+          where: { id },
+          data: updateData,
+        });
         // Fix TS2345: Handle null reference
-        await this.ledger.recordRiderPayout({ 
-          ...payout, 
+        await this.ledger.recordRiderPayout({
+          ...payout,
           status: 'FAILED',
-          reference: payout.reference ?? undefined
+          reference: payout.reference ?? undefined,
         });
         return payout;
       }

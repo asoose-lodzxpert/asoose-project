@@ -152,7 +152,9 @@ export class TripsService {
         });
 
         if (activeRide) {
-          throw new ConflictException('You already have an active ride request');
+          throw new ConflictException(
+            'You already have an active ride request',
+          );
         }
 
         const [pickupAddress, dropoffAddress] = await Promise.all([
@@ -169,7 +171,8 @@ export class TripsService {
         }
         if (
           !dropoffAddress ||
-          (dropoffAddress.userId !== userId && !(dropoffAddress as any).isPublic)
+          (dropoffAddress.userId !== userId &&
+            !(dropoffAddress as any).isPublic)
         ) {
           throw new BadRequestException('Invalid dropoff address');
         }
@@ -314,7 +317,8 @@ export class TripsService {
       include: { rider: { include: { vehicle: true } } },
     });
 
-    if (!ride?.rider) throw new InternalServerErrorException('Rider link failed');
+    if (!ride?.rider)
+      throw new InternalServerErrorException('Rider link failed');
 
     try {
       this.notificationsGateway.server
@@ -393,7 +397,8 @@ export class TripsService {
       });
 
       if (!ride) throw new NotFoundException('Ride not found');
-      if (ride.riderId !== riderId) throw new ForbiddenException('Unauthorized');
+      if (ride.riderId !== riderId)
+        throw new ForbiddenException('Unauthorized');
       if (ride.status !== RideStatus.IN_PROGRESS)
         throw new BadRequestException('Ride not in progress');
 
@@ -529,12 +534,12 @@ export class TripsService {
 
       const deliveryFee = this.geo.calculateDeliveryFee(
         distanceKm,
-        dto.weightKg || 1
+        dto.weightKg || 1,
       );
 
       // 5. Create Delivery Record
       const deliveryOtp = this.geo.generateOTP(CONFIG.OTP_LENGTH);
-      
+
       const delivery = await tx.delivery.create({
         data: {
           customerId: userId,
@@ -542,7 +547,7 @@ export class TripsService {
           pickupAddressId: dto.pickupAddressId,
           dropoffAddressId: dto.dropoffAddressId,
           status: DeliveryStatus.PENDING,
-          deliveryFee: this.round(deliveryFee), 
+          deliveryFee: this.round(deliveryFee),
           distanceKm: this.round(distanceKm),
           recipientName: this.sanitizeText(dto.recipientName),
           recipientPhone: dto.recipientPhone,
@@ -658,7 +663,11 @@ export class TripsService {
 
     const result = await this.prisma.delivery.updateMany({
       where: { id: deliveryId, status: DeliveryStatus.REQUESTED },
-      data: { status: DeliveryStatus.ASSIGNED, riderId, assignedAt: new Date() },
+      data: {
+        status: DeliveryStatus.ASSIGNED,
+        riderId,
+        assignedAt: new Date(),
+      },
     });
 
     if (result.count === 0) throw new ConflictException('Delivery unavailable');
@@ -933,12 +942,14 @@ export class TripsService {
       include: { rider: { include: { vehicle: true } } },
     });
 
-    if (!delivery?.rider) throw new InternalServerErrorException('Rider link failed');
+    if (!delivery?.rider)
+      throw new InternalServerErrorException('Rider link failed');
 
     try {
       this.notificationsGateway.server
         .to(`user_${delivery.customerId}`)
-        .emit('delivery_update', { // Make sure frontend listens for this event
+        .emit('delivery_update', {
+          // Make sure frontend listens for this event
           deliveryId: delivery.id,
           status: 'ASSIGNED', // UI expects 'COURIER_ASSIGNED' mapping
           label: 'Courier Assigned',

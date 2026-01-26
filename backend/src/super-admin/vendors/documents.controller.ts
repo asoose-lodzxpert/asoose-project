@@ -26,4 +26,3 @@ export class DocumentsController {
     return this.documentsService.rejectDocument(documentId);
   }
 }
-

@@ -1,4 +1,13 @@
-import { Controller, Get, Param, Query, UseGuards,Post,Body,Req } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Param,
+  Query,
+  UseGuards,
+  Post,
+  Body,
+  Req,
+} from '@nestjs/common';
 import { TransactionsService } from './transaction.service';
 import { TransactionFilterDto } from './dto/transaction-filter.dto';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
@@ -22,12 +31,10 @@ export class TransactionsController {
     return this.transactionsService.findOne(id);
   }
 
-@Post('adjust-wallet')
-@Roles(UserRole.SUPER_ADMIN)
-@UseGuards(JwtAuthGuard, RolesGuard)
-async adjustWallet(@Body() dto: AdjustWalletDto, @Req() req) {
-  return this.transactionsService.adjustWallet(dto, req.user.id);
+  @Post('adjust-wallet')
+  @Roles(UserRole.SUPER_ADMIN)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  async adjustWallet(@Body() dto: AdjustWalletDto, @Req() req) {
+    return this.transactionsService.adjustWallet(dto, req.user.id);
+  }
 }
-
-}
-

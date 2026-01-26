@@ -46,7 +46,7 @@ export class DisputesService {
       });
 
       if (order && !order.payment && order.paymentStatus !== 'PENDING') {
-         // Invariant check
+        // Invariant check
       }
 
       paymentId = order?.payment?.id;
@@ -209,12 +209,14 @@ export class DisputesService {
     }
 
     // ✅ FIX 1: Cast array to UserRole[] to prevent type mismatch
-    const isAdmin = ([
-      UserRole.SUPER_ADMIN, 
-      UserRole.ADMIN, 
-      UserRole.ADMIN_SUPPORT, 
-      UserRole.ADMIN_MANAGER
-    ] as UserRole[]).includes(role as UserRole);
+    const isAdmin = (
+      [
+        UserRole.SUPER_ADMIN,
+        UserRole.ADMIN,
+        UserRole.ADMIN_SUPPORT,
+        UserRole.ADMIN_MANAGER,
+      ] as UserRole[]
+    ).includes(role as UserRole);
 
     if (!isAdmin && userId) {
       whereClause.openedByUserId = userId;
@@ -251,8 +253,15 @@ export class DisputesService {
 
     return {
       data: data.map((d) => {
-        const amount = d.order?.total || d.ride?.totalFare || d.delivery?.deliveryFee || 0;
-        const category = d.order ? 'Order' : d.ride ? 'Ride' : d.delivery ? 'Delivery' : 'General';
+        const amount =
+          d.order?.total || d.ride?.totalFare || d.delivery?.deliveryFee || 0;
+        const category = d.order
+          ? 'Order'
+          : d.ride
+            ? 'Ride'
+            : d.delivery
+              ? 'Delivery'
+              : 'General';
         const parties = `${d.openedByUser?.name || 'Unknown'} vs ${d.targetUser?.name || 'Platform'}`;
 
         return {
@@ -291,12 +300,14 @@ export class DisputesService {
   // ==================== GET SINGLE DISPUTE ====================
   async findOne(id: string, userId: string, role: string | UserRole) {
     // ✅ FIX 2: Cast array to UserRole[]
-    const isAdmin = ([
-      UserRole.SUPER_ADMIN, 
-      UserRole.ADMIN, 
-      UserRole.ADMIN_SUPPORT, 
-      UserRole.ADMIN_MANAGER
-    ] as UserRole[]).includes(role as UserRole);
+    const isAdmin = (
+      [
+        UserRole.SUPER_ADMIN,
+        UserRole.ADMIN,
+        UserRole.ADMIN_SUPPORT,
+        UserRole.ADMIN_MANAGER,
+      ] as UserRole[]
+    ).includes(role as UserRole);
 
     const dispute = await this.prisma.dispute.findUnique({
       where: { id },
@@ -341,8 +352,8 @@ export class DisputesService {
         },
         ride: {
           include: {
-            rider: { 
-              select: { id: true, name: true, vehicle: true, image: true } 
+            rider: {
+              select: { id: true, name: true, vehicle: true, image: true },
             },
             pickupAddress: true,
             dropoffAddress: true,
@@ -350,8 +361,8 @@ export class DisputesService {
         },
         delivery: {
           include: {
-            rider: { 
-              select: { id: true, name: true, vehicle: true, image: true } 
+            rider: {
+              select: { id: true, name: true, vehicle: true, image: true },
             },
             pickupAddress: true,
             dropoffAddress: true,
@@ -403,12 +414,14 @@ export class DisputesService {
     }
 
     // ✅ FIX 3: Cast array to UserRole[]
-    const isAdmin = ([
-      UserRole.SUPER_ADMIN, 
-      UserRole.ADMIN, 
-      UserRole.ADMIN_SUPPORT, 
-      UserRole.ADMIN_MANAGER
-    ] as UserRole[]).includes(role as UserRole);
+    const isAdmin = (
+      [
+        UserRole.SUPER_ADMIN,
+        UserRole.ADMIN,
+        UserRole.ADMIN_SUPPORT,
+        UserRole.ADMIN_MANAGER,
+      ] as UserRole[]
+    ).includes(role as UserRole);
 
     const canMessage =
       userId === dispute.openedByUserId ||
@@ -468,7 +481,9 @@ export class DisputesService {
     }
 
     if (dto.refundSource === RefundSource.VENDOR_WALLET && !dispute.orderId) {
-       throw new BadRequestException('Vendor wallet refunds are only allowed for order disputes');
+      throw new BadRequestException(
+        'Vendor wallet refunds are only allowed for order disputes',
+      );
     }
 
     return this.prisma.$transaction(async (tx) => {

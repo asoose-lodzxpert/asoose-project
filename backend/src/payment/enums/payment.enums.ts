@@ -28,7 +28,7 @@ export enum TransactionType {
 export enum PaymentType {
   ORDER = 'ORDER',
   RIDE = 'RIDE',
-  DELIVERY = 'DELIVERY', 
+  DELIVERY = 'DELIVERY',
 }
 
 export enum RecipientType {

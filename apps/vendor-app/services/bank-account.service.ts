@@ -23,10 +23,10 @@ export async function getBanks(): Promise<Bank[]> {
         method: "GET",
       },
     );
-    // Ensure we always return an array
+
     return Array.isArray(response) ? response : [];
   } catch (error) {
-    return []; // Return empty array on error
+    return [];
   }
 }
 

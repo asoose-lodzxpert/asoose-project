@@ -74,7 +74,7 @@ export class VendorOrdersService {
         skip,
         include: {
           items: true,
-          user: { select: { name: true, phone: true } },
+          user: { select: { name: true, phone: true, image: true } },
           delivery: { select: { status: true, riderId: true } },
         },
       }),
@@ -114,7 +114,12 @@ export class VendorOrdersService {
           status: 'CONFIRMED',
           label: 'Order Confirmed',
           time: new Date().toISOString(),
-          icon: 'kitchen',
+          icon: 'store',
+        },
+        {
+          status: 'PREPARING',
+          label: 'Store is packaging your order',
+          time: new Date().toISOString(),
         },
       ],
     });

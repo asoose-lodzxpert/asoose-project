@@ -52,11 +52,12 @@ async function bootstrap() {
   } else {
     // Validate CORS_ORIGIN is set in production
     if (!process.env.CORS_ORIGIN) {
-      throw new Error('CORS_ORIGIN environment variable must be set in production');
+      throw new Error(
+        'CORS_ORIGIN environment variable must be set in production',
+      );
     }
 
-    const allowedOrigins = process.env.CORS_ORIGIN
-      .split(',')
+    const allowedOrigins = process.env.CORS_ORIGIN.split(',')
       .map((origin) => origin.trim())
       .filter((origin) => origin.length > 0);
 

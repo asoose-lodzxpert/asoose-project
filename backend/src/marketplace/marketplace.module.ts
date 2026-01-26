@@ -4,7 +4,7 @@ import { MarketplaceService } from './marketplace.service';
 import { PrismaModule } from '../prisma/prisma.module';
 import { StorageModule } from '../storage/storage.module';
 @Module({
-imports: [PrismaModule, StorageModule],
+  imports: [PrismaModule, StorageModule],
   controllers: [MarketplaceController],
   providers: [MarketplaceService],
 })

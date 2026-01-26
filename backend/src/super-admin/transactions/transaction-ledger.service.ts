@@ -43,8 +43,8 @@ export class TransactionLedgerService {
       const description = payment.orderId
         ? 'Payment for order'
         : payment.rideId
-        ? 'Payment for ride'
-        : 'Wallet top-up';
+          ? 'Payment for ride'
+          : 'Wallet top-up';
 
       return client.transaction.create({
         data: {

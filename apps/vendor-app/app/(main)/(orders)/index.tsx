@@ -18,6 +18,7 @@ import {
   acceptOrder,
   declineOrder,
   markAsPreparing,
+  markAsReady,
   Order,
 } from "@/services/orders.service";
 import { useFocusEffect } from "expo-router";
@@ -43,6 +44,7 @@ export default function OrderScreen() {
   const [acceptingId, setAcceptingId] = useState<string | null>(null);
   const [decliningId, setDecliningId] = useState<string | null>(null);
   const [preparingId, setPreparingId] = useState<string | null>(null);
+  const [markingReadyId, setMarkingReadyId] = useState<string | null>(null);
 
   // Decline modal
   const [showDeclineModal, setShowDeclineModal] = useState(false);
@@ -67,7 +69,7 @@ export default function OrderScreen() {
         loadOrders(1, true);
       }
     },
-    [tab]
+    [tab],
   );
 
   const handleOrderUpdate = useCallback(
@@ -77,7 +79,7 @@ export default function OrderScreen() {
         loadOrders(1, true);
       }
     },
-    [tab]
+    [tab],
   );
 
   // SSE Connection (disabled for history tab)
@@ -162,7 +164,7 @@ export default function OrderScreen() {
       return () => {
         mounted = false;
       };
-    }, [tab, user?.storeId])
+    }, [tab, user?.storeId]),
   );
 
   // Auto-refresh every 30 seconds for pending and active tabs (FALLBACK when SSE fails)
@@ -282,8 +284,8 @@ export default function OrderScreen() {
       // Update order status in list
       setOrders((prev) =>
         prev.map((o) =>
-          o.id === orderId ? { ...o, status: "PREPARING" as const } : o
-        )
+          o.id === orderId ? { ...o, status: "PREPARING" as const } : o,
+        ),
       );
     } catch (error: any) {
       if (isMountedRef.current) {
@@ -294,6 +296,37 @@ export default function OrderScreen() {
       }
     } finally {
       if (isMountedRef.current) setPreparingId(null);
+    }
+  };
+
+  const handleMarkReady = async (orderId: string) => {
+    if (isMountedRef.current) setMarkingReadyId(orderId);
+    try {
+      await markAsReady(orderId);
+
+      if (!isMountedRef.current) return;
+
+      Toast.show({
+        type: "success",
+        text1: "Order ready",
+        text2: "Order status updated to READY",
+      });
+
+      // Update order status in list
+      setOrders((prev) =>
+        prev.map((o) =>
+          o.id === orderId ? { ...o, status: "READY" as const } : o,
+        ),
+      );
+    } catch (error: any) {
+      if (isMountedRef.current) {
+        Toast.show({
+          type: "error",
+          text1: error.message || "Failed to mark order ready",
+        });
+      }
+    } finally {
+      if (isMountedRef.current) setMarkingReadyId(null);
     }
   };
 
@@ -517,9 +550,11 @@ export default function OrderScreen() {
               onAccept={() => handleAccept(item.id)}
               onDecline={() => handleDeclineClick(item.id)}
               onPrepare={() => handlePrepare(item.id)}
+              onMarkReady={() => handleMarkReady(item.id)}
               accepting={acceptingId === item.id}
               declining={decliningId === item.id}
               preparing={preparingId === item.id}
+              markingReady={markingReadyId === item.id}
             />
           )}
           contentContainerStyle={styles.listContent}

@@ -37,4 +37,3 @@ export class DeliveriesController {
     return this.deliveriesService.remove(id);
   }
 }
-

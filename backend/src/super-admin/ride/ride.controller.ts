@@ -34,4 +34,3 @@ export class RidesController {
     return this.ridesService.cancel(id);
   }
 }
-

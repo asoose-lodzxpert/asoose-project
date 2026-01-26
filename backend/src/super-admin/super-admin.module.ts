@@ -36,12 +36,12 @@ import { ActivityLogController } from './activity-logs/activity-log.controller';
     AdminsModule,
     BannerModule,
   ],
-  controllers: [SettingsController,ActivityLogController],
+  controllers: [SettingsController, ActivityLogController],
   providers: [
-    PrismaService, 
+    PrismaService,
     SettingsService,
     // 👇 2. Add to providers
-    ActivityLogService 
+    ActivityLogService,
   ],
 })
 export class SuperAdminModule {}

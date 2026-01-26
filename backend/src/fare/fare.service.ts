@@ -75,7 +75,7 @@ export class FareService {
         durationText: element.duration.text,
       };
     } catch (err) {
-      this.logger.error('Failed to fetch distance matrix', err as any);
+      this.logger.error('Failed to fetch distance matrix', err);
       throw err;
     }
   }

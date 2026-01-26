@@ -1,4 +1,13 @@
-import { Controller, Get, Patch, Delete, Param, UseGuards, Request, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Patch,
+  Delete,
+  Param,
+  UseGuards,
+  Request,
+  Query,
+} from '@nestjs/common';
 import { NotificationsService } from './notifications.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
@@ -31,7 +40,10 @@ export class NotificationsController {
 
   @Patch(':id/read')
   async markAsRead(@Request() req, @Param('id') id: string) {
-    return this.notificationsService.markAsRead(req.user.userId || req.user.id, id);
+    return this.notificationsService.markAsRead(
+      req.user.userId || req.user.id,
+      id,
+    );
   }
 
   // FIX: Added missing Delete endpoint

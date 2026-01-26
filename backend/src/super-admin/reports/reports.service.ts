@@ -184,7 +184,6 @@ export class AnalyticsService {
     startDate: Date,
     granularity: 'day' | 'week' | 'month',
   ): Promise<OrderVolumeDataPoint[]> {
-    
     // Switch SQL grouping based on granularity
     let truncType = 'day';
     if (granularity === 'week') truncType = 'week';
