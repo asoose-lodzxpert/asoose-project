@@ -75,7 +75,8 @@ export default function DisputeDetailPage({ params }: DisputeDetailPageProps) {
          id: 'temp-' + Date.now(),
          message,
          isInternal,
-         sender: 'You',
+         // FIX: Use object for sender to prevent UI crash
+         sender: { id: 'self', name: 'You', role: 'ADMIN' },
          createdAt: new Date().toISOString(),
          isAdmin: true
        };
@@ -133,7 +134,8 @@ export default function DisputeDetailPage({ params }: DisputeDetailPageProps) {
     }
   };
 
-  const handleResolution = async (input: string) => {
+  // FIX: Accept refundSource from Modal
+  const handleResolution = async (input: string, refundSource: string) => {
     if (!dispute || !disputeId) return;
     setProcessing(true);
     try {
@@ -156,12 +158,20 @@ export default function DisputeDetailPage({ params }: DisputeDetailPageProps) {
           refundAmount = getMaxRefundAmount() || 0;
         } else if (modalType === 'REFUND_PARTIAL') {
           action = 'REFUND_PARTIAL';
-          refundAmount = parseFloat(input);
+          refundAmount = parseFloat(input); // Modal passes amount as input for partial
         }
+
+        // For partial refund, 'input' is the amount. For others, 'input' is notes.
+        const notes = modalType === 'REFUND_PARTIAL' ? `Partial Refund of ${input}` : input;
+
         body = {
           action,
-          resolutionNotes: `Resolution: ${action}. ${modalType === 'RESOLVE_NO_REFUND' ? input : ''}`,
-          ...(refundAmount > 0 && { refundAmount, refundSource: 'PLATFORM' })
+          resolutionNotes: notes,
+          // FIX: Include dynamic refundSource
+          ...(refundAmount > 0 && { 
+             refundAmount, 
+             refundSource: refundSource 
+          })
         };
       }
 
@@ -174,14 +184,17 @@ export default function DisputeDetailPage({ params }: DisputeDetailPageProps) {
         body: JSON.stringify(body)
       });
 
-      if (!res.ok) throw new Error('Action failed');
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || 'Action failed');
+      }
       
       toast.success('Dispute resolved. Action has been recorded in audit logs.');
       setModalType(null);
       mutate(); 
 
-    } catch (e) {
-      toast.error('Failed to process request');
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to process request');
     } finally {
       setProcessing(false);
     }
@@ -211,7 +224,6 @@ export default function DisputeDetailPage({ params }: DisputeDetailPageProps) {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
-            {/* DisputeOverview now handles the Evidence Gallery layout internally */}
             <DisputeOverview 
               dispute={dispute} 
               onImageClick={setSelectedImage} 

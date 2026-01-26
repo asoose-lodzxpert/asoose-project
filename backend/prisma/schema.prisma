@@ -716,7 +716,7 @@ model Order {
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
   disputes  Dispute[]
-
+  transactions Transaction[]
   deliveredAt DateTime?
   cancelledAt DateTime?
 
@@ -811,7 +811,7 @@ model Ride {
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
   disputes         Dispute[]
-
+  transactions Transaction[]
   // Security
   startOtp           String?
   cancellationReason String?
@@ -859,7 +859,7 @@ model Delivery {
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
   disputes         Dispute[]
-
+  transactions   Transaction[]
   // Security & Proof
   deliveryOtp   String?
   pickupProof   String?
@@ -934,6 +934,11 @@ model Transaction {
   payment       Payment?      @relation(fields: [paymentId], references: [id], onDelete: Restrict)
   vendorPayout  VendorPayout? @relation(fields: [vendorPayoutId], references: [id], onDelete: Restrict)
   riderPayout   RiderPayout?  @relation(fields: [riderPayoutId], references: [id], onDelete: Restrict)
+  
+  // 👇 ADD THESE LINES
+  delivery      Delivery?     @relation(fields: [deliveryId], references: [id])
+  order         Order?        @relation(fields: [orderId], references: [id])
+  ride          Ride?         @relation(fields: [rideId], references: [id])
   
   @@index([entityType, entityId, createdAt])
   @@index([type, status, createdAt])

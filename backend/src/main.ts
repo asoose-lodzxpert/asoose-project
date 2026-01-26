@@ -38,6 +38,15 @@ async function bootstrap() {
       origin: true,
       credentials: true,
       methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+      // Explicitly allowing Idempotency-Key in dev as well to prevent issues
+      allowedHeaders: [
+        'Content-Type',
+        'Authorization',
+        'X-Requested-With',
+        'Accept',
+        'Origin',
+        'Idempotency-Key',
+      ],
     });
     appLogger.warn('⚠️  CORS allows ALL ORIGINS (development mode)');
   } else {
@@ -48,8 +57,8 @@ async function bootstrap() {
 
     const allowedOrigins = process.env.CORS_ORIGIN
       .split(',')
-      .map(origin => origin.trim())
-      .filter(origin => origin.length > 0);
+      .map((origin) => origin.trim())
+      .filter((origin) => origin.length > 0);
 
     app.enableCors({
       origin: (origin, callback) => {
@@ -71,6 +80,7 @@ async function bootstrap() {
         'X-Requested-With',
         'Accept',
         'Origin',
+        'Idempotency-Key', // ✅ FIX: Added Idempotency-Key to allowed headers
       ],
       exposedHeaders: ['X-Total-Count', 'X-Page-Number'], // Add custom headers you expose
       maxAge: 86400, // Cache preflight for 24 hours
@@ -82,7 +92,7 @@ async function bootstrap() {
   // 5. Start the server
   const port = process.env.PORT ?? 3000;
   await app.listen(port, '0.0.0.0');
-  
+
   appLogger.log(
     `🚀 Backend running on: ${await app.getUrl()}/${process.env.API_PREFIX || 'api/v1'}`,
   );

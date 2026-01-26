@@ -1,5 +1,5 @@
 import React from 'react';
-import { DollarSign } from 'lucide-react';
+import { Banknote } from 'lucide-react';
 import { SectionCard } from './SectionCard';
 import { Currency } from '@/app/main/components/Currency'; // ✅ Added
 
@@ -12,7 +12,7 @@ interface WalletBalanceProps {
 
 export const WalletBalanceCard = ({ before, after, amount, isCredit }: WalletBalanceProps) => {
   return (
-    <SectionCard title="Wallet Balance" icon={DollarSign} iconColorClass="bg-emerald-500/20 text-emerald-500">
+    <SectionCard title="Wallet Balance" icon={Banknote} iconColorClass="bg-emerald-500/20 text-emerald-500">
       <div className="space-y-4">
         <div className="flex justify-between items-center">
           <span className="text-gray-400">Before</span>

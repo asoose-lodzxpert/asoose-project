@@ -37,4 +37,8 @@ export class VerificationController {
     const adminId = req.user.id || req.user.userId;
     return this.verificationService.handleDecision(id, type, body.action, adminId, body.note);
   }
+  @Get(':id')
+  async findOne(@Param('id') id: string) {
+    return this.verificationService.getVerificationById(id);
+  }
 }

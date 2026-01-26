@@ -4,6 +4,7 @@ import {
   StoreStatus,
   RideStatus,
   DeliveryStatus,
+  Prisma,
 } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 
@@ -72,6 +73,11 @@ export class AnalyticsService {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
 
+    // Determine granularity based on days (Backend Logic)
+    let granularity: 'day' | 'week' | 'month' = 'day';
+    if (days > 30 && days <= 90) granularity = 'week';
+    if (days > 90) granularity = 'month';
+
     const [
       overview,
       orderVolume,
@@ -81,7 +87,7 @@ export class AnalyticsService {
       topVendors,
     ] = await Promise.all([
       this.getOverviewMetrics(startDate),
-      this.getOrderVolumeData(startDate),
+      this.getOrderVolumeData(startDate, granularity),
       this.getGrowthData(),
       this.getRevenueBreakdown(startDate),
       this.getRatingsDistribution(),
@@ -140,8 +146,9 @@ export class AnalyticsService {
         }),
       ]);
 
-    const totalRevenue = currentOrders._sum.total || 0;
-    const previousRevenue = previousOrders._sum.total || 0;
+    // Use Number() to ensure we don't return Prisma Decimals to client directly if not serialized
+    const totalRevenue = Number(currentOrders._sum.total || 0);
+    const previousRevenue = Number(previousOrders._sum.total || 0);
     const totalOrders = currentOrders._count;
     const previousOrderCount = previousOrders._count;
 
@@ -150,7 +157,7 @@ export class AnalyticsService {
       previousOrderCount > 0 ? previousRevenue / previousOrderCount : 0;
 
     return {
-      totalRevenue,
+      totalRevenue: this.toTwoDecimals(totalRevenue),
       revenueChange: this.calculatePercentageChange(
         totalRevenue,
         previousRevenue,
@@ -165,7 +172,7 @@ export class AnalyticsService {
         activeStores,
         previousActiveStores,
       ),
-      avgOrderValue,
+      avgOrderValue: this.toTwoDecimals(avgOrderValue),
       avgOrderValueChange: this.calculatePercentageChange(
         avgOrderValue,
         previousAvgOrderValue,
@@ -175,7 +182,14 @@ export class AnalyticsService {
 
   private async getOrderVolumeData(
     startDate: Date,
+    granularity: 'day' | 'week' | 'month',
   ): Promise<OrderVolumeDataPoint[]> {
+    
+    // Switch SQL grouping based on granularity
+    let truncType = 'day';
+    if (granularity === 'week') truncType = 'week';
+    if (granularity === 'month') truncType = 'month';
+
     const results = await this.prisma.$queryRaw<
       Array<{
         date: Date;
@@ -184,21 +198,20 @@ export class AnalyticsService {
       }>
     >`
       SELECT 
-        "createdAt"::date as date, 
+        DATE_TRUNC(${Prisma.raw(`'${truncType}'`)}, "createdAt")::date as date, 
         COUNT(*)::bigint as orders, 
         SUM("total")::numeric as revenue
       FROM "Order"
       WHERE "createdAt" >= ${startDate}
-        -- FIX: Explicit casting for OrderStatus enum in raw SQL
         AND status = ${OrderStatus.DELIVERED}::"OrderStatus"
-      GROUP BY "createdAt"::date
+      GROUP BY DATE_TRUNC(${Prisma.raw(`'${truncType}'`)}, "createdAt")
       ORDER BY date ASC
     `;
 
     return results.map((row) => ({
       date: row.date.toISOString().split('T')[0],
       orders: Number(row.orders),
-      revenue: Math.round(Number(row.revenue) * 100) / 100,
+      revenue: this.toTwoDecimals(Number(row.revenue)),
     }));
   }
 
@@ -210,30 +223,32 @@ export class AnalyticsService {
       this.prisma.$queryRaw<Array<{ month: string; count: bigint }>>`
         SELECT 
           TO_CHAR("createdAt", 'Mon YYYY') as month,
-          COUNT(*)::bigint as count
+          COUNT(*)::bigint as count,
+          DATE_TRUNC('month', "createdAt") as sort_date
         FROM "Store"
         WHERE "createdAt" >= ${sixMonthsAgo}
         GROUP BY TO_CHAR("createdAt", 'Mon YYYY'), DATE_TRUNC('month', "createdAt")
-        ORDER BY DATE_TRUNC('month', "createdAt") ASC
+        ORDER BY sort_date ASC
       `,
       this.prisma.$queryRaw<Array<{ month: string; count: bigint }>>`
         SELECT 
           TO_CHAR("createdAt", 'Mon YYYY') as month,
-          COUNT(*)::bigint as count
+          COUNT(*)::bigint as count,
+          DATE_TRUNC('month', "createdAt") as sort_date
         FROM "Order"
         WHERE "createdAt" >= ${sixMonthsAgo}
         GROUP BY TO_CHAR("createdAt", 'Mon YYYY'), DATE_TRUNC('month', "createdAt")
-        ORDER BY DATE_TRUNC('month', "createdAt") ASC
+        ORDER BY sort_date ASC
       `,
       this.prisma.$queryRaw<Array<{ month: string; count: bigint }>>`
         SELECT 
           TO_CHAR("createdAt", 'Mon YYYY') as month,
-          COUNT(*)::bigint as count
-        -- FIX: Corrected table name from "RiderProfile" to "Rider"
+          COUNT(*)::bigint as count,
+          DATE_TRUNC('month', "createdAt") as sort_date
         FROM "Rider"
         WHERE "createdAt" >= ${sixMonthsAgo}
         GROUP BY TO_CHAR("createdAt", 'Mon YYYY'), DATE_TRUNC('month', "createdAt")
-        ORDER BY DATE_TRUNC('month', "createdAt") ASC
+        ORDER BY sort_date ASC
       `,
     ]);
 
@@ -242,23 +257,24 @@ export class AnalyticsService {
       { stores: number; orders: number; riders: number }
     >();
 
-    storeGrowth.forEach((row) => {
-      const existing = monthMap.get(row.month) || { stores: 0, orders: 0, riders: 0 };
-      existing.stores = Number(row.count);
-      monthMap.set(row.month, existing);
-    });
+    const processGrowth = (
+      data: Array<{ month: string; count: bigint }>,
+      key: 'stores' | 'orders' | 'riders',
+    ) => {
+      data.forEach((row) => {
+        const existing = monthMap.get(row.month) || {
+          stores: 0,
+          orders: 0,
+          riders: 0,
+        };
+        existing[key] = Number(row.count);
+        monthMap.set(row.month, existing);
+      });
+    };
 
-    orderGrowth.forEach((row) => {
-      const existing = monthMap.get(row.month) || { stores: 0, orders: 0, riders: 0 };
-      existing.orders = Number(row.count);
-      monthMap.set(row.month, existing);
-    });
-
-    riderGrowth.forEach((row) => {
-      const existing = monthMap.get(row.month) || { stores: 0, orders: 0, riders: 0 };
-      existing.riders = Number(row.count);
-      monthMap.set(row.month, existing);
-    });
+    processGrowth(storeGrowth, 'stores');
+    processGrowth(orderGrowth, 'orders');
+    processGrowth(riderGrowth, 'riders');
 
     return Array.from(monthMap.entries()).map(([month, data]) => ({
       month,
@@ -282,7 +298,6 @@ export class AnalyticsService {
         INNER JOIN "Store" s ON o."storeId" = s.id
         WHERE o."createdAt" >= ${startDate}
           AND o."createdAt" <= ${endDate}
-          -- FIX: Explicit casting for OrderStatus enum
           AND o.status = ${OrderStatus.DELIVERED}::"OrderStatus"
         GROUP BY s.type
         ORDER BY amount DESC
@@ -295,14 +310,18 @@ export class AnalyticsService {
         INNER JOIN "Store" s ON o."storeId" = s.id
         WHERE o."createdAt" >= ${previousStartDate}
           AND o."createdAt" < ${startDate}
-          -- FIX: Explicit casting for OrderStatus enum
           AND o.status = ${OrderStatus.DELIVERED}::"OrderStatus"
         GROUP BY s.type
       `,
     ]);
 
-    const previousMap = new Map(previousBreakdown.map((p) => [p.category, Number(p.amount)]));
-    const totalRevenue = currentBreakdown.reduce((sum, item) => sum + Number(item.amount), 0);
+    const previousMap = new Map(
+      previousBreakdown.map((p) => [p.category, Number(p.amount)]),
+    );
+    const totalRevenue = currentBreakdown.reduce(
+      (sum, item) => sum + Number(item.amount),
+      0,
+    );
 
     return currentBreakdown.map((item) => {
       const amount = Number(item.amount);
@@ -310,15 +329,20 @@ export class AnalyticsService {
 
       return {
         category: item.category,
-        amount: Math.round(amount * 100) / 100,
-        percentage: totalRevenue > 0 ? (amount / totalRevenue) * 100 : 0,
+        amount: this.toTwoDecimals(amount),
+        percentage:
+          totalRevenue > 0
+            ? this.toTwoDecimals((amount / totalRevenue) * 100)
+            : 0,
         change: this.calculatePercentageChange(amount, previousAmount),
       };
     });
   }
 
   private async getRatingsDistribution(): Promise<RatingsDistribution[]> {
-    const results = await this.prisma.$queryRaw<Array<{ rating: number; count: bigint }>>`
+    const results = await this.prisma.$queryRaw<
+      Array<{ rating: number; count: bigint }>
+    >`
       SELECT rating, COUNT(*)::bigint as count
       FROM "Review"
       GROUP BY rating
@@ -331,7 +355,12 @@ export class AnalyticsService {
     return [5, 4, 3, 2, 1].map((star) => ({
       star,
       count: ratingsMap.get(star) || 0,
-      percentage: totalReviews > 0 ? ((ratingsMap.get(star) || 0) / totalReviews) * 100 : 0,
+      percentage:
+        totalReviews > 0
+          ? this.toTwoDecimals(
+              ((ratingsMap.get(star) || 0) / totalReviews) * 100,
+            )
+          : 0,
     }));
   }
 
@@ -341,7 +370,7 @@ export class AnalyticsService {
       FROM "Review"
     `;
 
-    return Math.round((result[0]?.avg || 0) * 10) / 10;
+    return this.toOneDecimal(Number(result[0]?.avg || 0));
   }
 
   private async getTopVendors(
@@ -353,7 +382,13 @@ export class AnalyticsService {
     const previousStartDate = new Date(startDate.getTime() - periodLength);
 
     const currentTopVendors = await this.prisma.$queryRaw<
-      Array<{ id: string; name: string; revenue: number; orders: bigint; rating: number }>
+      Array<{
+        id: string;
+        name: string;
+        revenue: number;
+        orders: bigint;
+        rating: number;
+      }>
     >`
       SELECT 
         s.id, s.name, SUM(o.total)::numeric as revenue, COUNT(o.id)::bigint as orders, s.rating
@@ -361,7 +396,6 @@ export class AnalyticsService {
       INNER JOIN "Order" o ON o."storeId" = s.id
       WHERE o."createdAt" >= ${startDate}
         AND o."createdAt" <= ${endDate}
-        -- FIX: Explicit casting for OrderStatus enum
         AND o.status = ${OrderStatus.DELIVERED}::"OrderStatus"
       GROUP BY s.id, s.name, s.rating
       ORDER BY revenue DESC
@@ -372,25 +406,28 @@ export class AnalyticsService {
 
     const storeIds = currentTopVendors.map((v) => v.id);
 
-    const previousRevenue = await this.prisma.$queryRaw<Array<{ storeId: string; revenue: number }>>`
+    const previousRevenue = await this.prisma.$queryRaw<
+      Array<{ storeId: string; revenue: number }>
+    >`
       SELECT "storeId", SUM(total)::numeric as revenue
       FROM "Order"
       WHERE "createdAt" >= ${previousStartDate}
         AND "createdAt" < ${startDate}
-        -- FIX: Explicit casting for OrderStatus enum
         AND status = ${OrderStatus.DELIVERED}::"OrderStatus"
         AND "storeId" = ANY(${storeIds})
       GROUP BY "storeId"
     `;
 
-    const previousMap = new Map(previousRevenue.map((p) => [p.storeId, Number(p.revenue)]));
+    const previousMap = new Map(
+      previousRevenue.map((p) => [p.storeId, Number(p.revenue)]),
+    );
 
     return currentTopVendors.map((vendor) => ({
       id: vendor.id,
       name: vendor.name,
-      revenue: Math.round(Number(vendor.revenue) * 100) / 100,
+      revenue: this.toTwoDecimals(Number(vendor.revenue)),
       orders: Number(vendor.orders),
-      rating: vendor.rating,
+      rating: this.toOneDecimal(Number(vendor.rating)),
       change: this.calculatePercentageChange(
         Number(vendor.revenue),
         previousMap.get(vendor.id) || 0,
@@ -400,7 +437,18 @@ export class AnalyticsService {
 
   private calculatePercentageChange(current: number, previous: number): number {
     if (previous === 0) return current > 0 ? 100 : 0;
-    return Math.round(((current - previous) / previous) * 100 * 10) / 10;
+    const change = ((current - previous) / previous) * 100;
+    // Guard against Infinity/NaN
+    if (!Number.isFinite(change)) return 0;
+    return this.toTwoDecimals(change);
+  }
+
+  private toTwoDecimals(val: number): number {
+    return Math.round((val + Number.EPSILON) * 100) / 100;
+  }
+
+  private toOneDecimal(val: number): number {
+    return Math.round((val + Number.EPSILON) * 10) / 10;
   }
 
   async exportAnalyticsToCSV(days: number = 30): Promise<string> {

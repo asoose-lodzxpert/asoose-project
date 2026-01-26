@@ -19,6 +19,7 @@ import {
   PaymentMethod,
   PaymentStatus,
   TransactionType,
+  PaymentType,
 } from './interfaces/payment.interface';
 import type {
   PaymentInitResponse,
@@ -60,15 +61,30 @@ export class PaymentService {
       );
     }
 
+    // 1. Validate Delivery Specifics
+    // Check if type is DELIVERY (using 'as any' to avoid TS error if Enum isn't updated yet)
+    if ((dto.type as any) === 'DELIVERY' || dto.type === PaymentType.DELIVERY) {
+      if (!dto.metadata?.deliveryId) {
+        throw new BadRequestException(
+          'Delivery ID is required in metadata for delivery payments',
+        );
+      }
+    }
+
     const reference = this.generateReference();
     const customerName = dto.customerName ?? undefined;
 
+    // 2. Prepare Metadata
+    // Crucial: Persist 'type' and 'deliveryId' so we know what this payment is for later
     const metadata = {
       ...(dto.metadata || {}),
       ...(dto.callbackUrl ? { callbackUrl: dto.callbackUrl } : {}),
+      type: dto.type, // Save the payment type (RIDE/DELIVERY/ORDER)
+      deliveryId: dto.metadata?.deliveryId, // Ensure deliveryId is saved
     };
 
-    // Use string 'PENDING' to satisfy Prisma's strict Enum expectation
+    // 3. Create Payment Record
+    // Note: We store delivery info in metadata because Payment schema lacks deliveryId field
     await this.prisma.payment.create({
       data: {
         reference,
@@ -382,8 +398,6 @@ export class PaymentService {
     });
 
     // Post-Processing (Ledger & Notifications)
-    // Fix: Cast result.status to 'any' to compare with PaymentStatus.SUCCESS
-    // Or check against the 'COMPLETED' string we know is there
     if (
       (result.status as any) === 'COMPLETED' ||
       (result.status as any) === PaymentStatus.SUCCESS
@@ -394,14 +408,12 @@ export class PaymentService {
             id: payment.id,
             amount: payment.amount,
             userId: result.order.userId,
-            // FIX: Use nullish coalescing to pass undefined instead of null
             orderId: payment.orderId ?? undefined,
             method: payment.gateway,
             status: 'COMPLETED',
           });
 
           await this.ledger.recordOrderCommission({
-            // FIX: Assert non-null (!) since we know orderId exists if result.order exists
             id: payment.orderId!,
             storeId: result.order.storeId,
             total: payment.amount,
@@ -418,14 +430,12 @@ export class PaymentService {
               id: payment.id,
               amount: payment.amount,
               userId: ride.customer.id,
-              // FIX: Use nullish coalescing to pass undefined instead of null
               rideId: payment.rideId ?? undefined,
               method: payment.gateway,
               status: 'COMPLETED',
             });
 
             await this.ledger.recordRideEarnings({
-              // FIX: Assert non-null (!) since rideId must exist here
               id: payment.rideId!,
               riderId: ride.riderId,
               totalFare: payment.amount,
@@ -450,9 +460,17 @@ export class PaymentService {
         });
       }
 
+      // =========================================================
+      // 👇 MATCHING LOGIC FIXED HERE
+      // =========================================================
       if (result.order?.delivery) {
+        // Case A: Delivery linked to an E-commerce Order
         await this.startDeliveryMatching(result.order.delivery.id);
+      } else if (payment.metadata && (payment.metadata as any).deliveryId) {
+        // Case B: Direct Delivery Request (This fixes the stuck "Finding Courier" screen)
+        await this.startDeliveryMatching((payment.metadata as any).deliveryId);
       } else if (result.rideId) {
+        // Case C: Ride Request
         await this.startRideMatching(result.rideId);
       }
 

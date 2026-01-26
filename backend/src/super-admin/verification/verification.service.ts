@@ -109,4 +109,36 @@ export class VerificationService {
       }
     });
   }
+
+async getVerificationById(id: string) {
+    // 1. Try to find as Vendor
+    const vendor = await this.prisma.vendor.findUnique({
+      where: { id },
+      include: { 
+        store: true, 
+        documents: true 
+      }
+    });
+
+    if (vendor) {
+      return vendor;
+    }
+
+    // 2. If not found, try to find as Rider
+    const rider = await this.prisma.rider.findUnique({
+      where: { id },
+      include: { 
+        vehicle: true, 
+        documents: true 
+      }
+    });
+
+    if (rider) {
+      return rider;
+    }
+
+    // 3. If neither, throw error
+    throw new NotFoundException(`Verification request with ID ${id} not found`);
+  }
 }
+

@@ -1,6 +1,6 @@
 import React from 'react';
 import { ArrowUpRight, ArrowDownRight, Store } from 'lucide-react';
-
+import Link from 'next/link';
 export default function TopVendors({ vendors }: { vendors: any[] }) {
   if (!vendors || vendors.length === 0) return null;
 
@@ -11,7 +11,7 @@ export default function TopVendors({ vendors }: { vendors: any[] }) {
     <div className="bg-[#1E293B] p-6 rounded-xl border border-gray-800">
       <div className="flex justify-between items-center mb-6">
         <h3 className="font-bold text-white">Top Vendors</h3>
-        <button className="text-xs text-yellow-500 hover:text-yellow-400 font-bold">View All</button>
+        <Link href={"/super-admin/users/vendors"} className="text-xs text-yellow-500 hover:text-yellow-400 font-bold">View All</Link>
       </div>
       
       <div className="space-y-3">
@@ -42,11 +42,11 @@ export default function TopVendors({ vendors }: { vendors: any[] }) {
               
               <div className="text-right">
                 <p className="text-sm font-mono font-bold text-white">
-                  ${vendor.revenue.toLocaleString()}
+                  {vendor.revenue.toLocaleString()}
                 </p>
                 <span className={`text-[10px] flex items-center justify-end gap-0.5 ${vendor.change >= 0 ? 'text-green-500' : 'text-red-500'}`}>
                   {vendor.change >= 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
-                  {Math.abs(vendor.change)}%
+                  {(vendor.change)}
                 </span>
               </div>
             </div>

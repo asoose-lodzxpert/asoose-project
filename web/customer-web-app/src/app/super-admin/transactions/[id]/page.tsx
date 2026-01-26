@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { toast } from 'react-toastify';
 import useSWR from 'swr'; 
 import { getSession } from 'next-auth/react';
+import { Inter } from 'next/font/google'; //
 import { fetcher } from '../../hooks/useSuperAdminFetch';
 import { TransactionDetail } from './types'; 
 import TransactionHeader from './component/transactionheader';
@@ -19,7 +20,10 @@ import { PayoutInfoCard } from './component/PayoutInfoCard';
 import { RecentActivityCard } from './component/RecentActivityCard';
 import { WalletBalanceCard } from './component/WalletBalanceCard';
 import { TransactionDetailSkeleton } from './component/skeleton';
-import { Currency } from '@/app/main/components/Currency'; // ✅ Standardized Naira Display
+import { Currency } from '@/app/main/components/Currency';
+
+// Initialize font to match app-wide settings
+const inter = Inter({ subsets: ['latin'] });
 
 export default function TransactionDetailPage() {
   const params = useParams();
@@ -46,10 +50,6 @@ export default function TransactionDetailPage() {
   //  HANDLERS
   // ===========================================================================
 
-  /**
-   * Functional Download Receipt Handler
-   * Requests a PDF blob from the backend and triggers a browser download.
-   */
   const handleDownload = async () => {
     if (!txn) return;
     setDownloading(true);
@@ -116,7 +116,7 @@ export default function TransactionDetailPage() {
   if (isLoading) return <TransactionDetailSkeleton />;
   if (error || !txn) {
     return (
-      <div className="min-h-screen bg-[#0F172A] flex items-center justify-center">
+      <div className={`min-h-screen bg-[#0F172A] flex items-center justify-center ${inter.className}`}>
         <div className="text-center space-y-4">
           <p className="text-gray-400 text-lg">Transaction record not found</p>
           <button 
@@ -131,7 +131,8 @@ export default function TransactionDetailPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0F172A] p-4 md:p-8">
+    // Applied inter.className here to enforce the font
+    <div className={`min-h-screen bg-[#0F172A] p-4 md:p-8 ${inter.className}`}>
       <div className="max-w-7xl mx-auto space-y-6">
         
         <TransactionHeader 
@@ -140,7 +141,6 @@ export default function TransactionDetailPage() {
           isDownloading={downloading} 
           reference={txn.reference}
           status={txn.status}
-          // The header can optionally display the main amount in NGN
           amount={<Currency amount={txn.amount} className="text-xl" />}
         />
 
@@ -148,7 +148,6 @@ export default function TransactionDetailPage() {
           
           {/* Left Column - Financial Ledger Details */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Note: Sub-components below are expected to use the Currency component internally */}
             <TransactionSummary txn={txn} />
             
             {txn.orderDetails && (

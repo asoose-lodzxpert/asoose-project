@@ -1,87 +1,93 @@
 'use client';
 import React, { useState } from 'react';
-import { AlertCircle, Loader2 } from 'lucide-react';
+import { X, CheckCircle, AlertTriangle } from 'lucide-react';
 import { ModalType } from '../types';
+
 interface Props {
   isOpen: boolean;
   type: ModalType;
   maxRefundAmount: number;
   isProcessing: boolean;
   onClose: () => void;
-  onConfirm: (input: string) => void;
+  // Fix 3.2: Updated signature to accept refundSource
+  onConfirm: (notes: string, refundSource: string) => void; 
 }
 
 export default function ResolutionModal({ isOpen, type, maxRefundAmount, isProcessing, onClose, onConfirm }: Props) {
-  const [input, setInput] = useState('');
+  const [notes, setNotes] = useState('');
+  const [refundSource, setRefundSource] = useState('PLATFORM'); // Fix 3.2: State for source
 
-  if (!isOpen || !type) return null;
+  if (!isOpen) return null;
 
-  const isRefund = type.includes('REFUND');
-  const isPartial = type === 'REFUND_PARTIAL';
-  const isValid = isPartial 
-    ? (input && parseFloat(input) > 0 && parseFloat(input) <= maxRefundAmount)
-    : (isRefund ? true : input.trim().length > 0);
+  const isRefund = type === 'REFUND_FULL' || type === 'REFUND_PARTIAL';
+  const isReject = type === 'REJECT';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in">
-      <div className="bg-[#1E293B] border border-gray-700 rounded-2xl w-full max-w-md p-6 shadow-2xl">
-        <h3 className="text-xl font-bold text-white mb-4">
-          {type === 'REFUND_FULL' && 'Confirm Full Refund'}
-          {type === 'REFUND_PARTIAL' && 'Issue Partial Refund'}
-          {type === 'REJECT' && 'Reject Dispute'}
-          {type === 'RESOLVE_NO_REFUND' && 'Resolve Without Refund'}
-        </h3>
-        
-        <div className="space-y-4">
-          {type === 'REFUND_FULL' && (
-            <p className="text-gray-300 text-sm">
-              Refund full amount of <span className="text-white font-bold">${maxRefundAmount.toFixed(2)}</span>?
-            </p>
-          )}
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+      <div className="bg-[#1E293B] border border-gray-700 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
+        <div className="p-6 border-b border-gray-700 flex justify-between items-center">
+          <h3 className="text-white font-bold text-lg flex items-center gap-2">
+            {isReject ? <AlertTriangle className="text-red-500" /> : <CheckCircle className="text-green-500" />}
+            {isReject ? 'Reject Dispute' : isRefund ? 'Issue Refund' : 'Resolve Dispute'}
+          </h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-white">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
 
-          {isPartial && (
+        <div className="p-6 space-y-4">
+           {/* Fix 3.2: Refund Source Selector */}
+           {isRefund && (
             <div>
-              <label className="block text-sm text-gray-400 mb-2">Amount ($)</label>
-              <input 
-                type="number" 
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                className="w-full bg-[#0F172A] border border-gray-600 rounded-lg p-3 text-white focus:border-blue-500 outline-none"
-                placeholder="0.00"
-                autoFocus
-              />
-              {parseFloat(input) > maxRefundAmount && (
-                <p className="text-red-400 text-xs mt-2 flex items-center gap-1">
-                  <AlertCircle className="w-3 h-3" /> Exceeds total ${maxRefundAmount}
-                </p>
-              )}
+              <label className="block text-xs font-bold text-gray-400 mb-2 uppercase">Refund Source</label>
+              <select 
+                value={refundSource}
+                onChange={(e) => setRefundSource(e.target.value)}
+                className="w-full bg-[#0F172A] border border-gray-700 rounded-lg p-3 text-white text-sm focus:outline-none focus:border-green-500"
+              >
+                <option value="PLATFORM">Platform Treasury</option>
+                <option value="VENDOR_WALLET">Vendor Wallet (Order Only)</option>
+              </select>
             </div>
-          )}
+           )}
 
-          {(!isRefund || type === 'REJECT') && (
-            <div>
-              <label className="block text-sm text-gray-400 mb-2">Note/Reason</label>
-              <textarea 
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                className="w-full bg-[#0F172A] border border-gray-600 rounded-lg p-3 text-white focus:border-blue-500 outline-none h-32 resize-none"
-                placeholder="Explanation..."
-              />
-            </div>
-          )}
-
-          <div className="flex gap-3 mt-6">
-            <button onClick={onClose} className="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-bold">Cancel</button>
-            <button 
-              onClick={() => onConfirm(input)}
-              disabled={isProcessing || !isValid}
-              className={`flex-1 px-4 py-2 text-white font-bold rounded-lg flex justify-center items-center gap-2 disabled:opacity-50 ${
-                type === 'REJECT' ? 'bg-red-600 hover:bg-red-500' : 'bg-blue-600 hover:bg-blue-500'
-              }`}
-            >
-              {isProcessing && <Loader2 className="w-4 h-4 animate-spin" />} Confirm
-            </button>
+          <div>
+            <label className="block text-xs font-bold text-gray-400 mb-2 uppercase">
+              {isReject ? 'Rejection Reason' : 'Resolution Notes'}
+            </label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              className="w-full bg-[#0F172A] border border-gray-700 rounded-lg p-3 text-white text-sm focus:outline-none focus:border-blue-500 h-32 resize-none"
+              placeholder={isReject ? "Explain why this is being rejected..." : "Describe the resolution details..."}
+            />
           </div>
+
+          {isRefund && (
+             <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 text-xs text-blue-400">
+                Max Refund: <strong>${maxRefundAmount.toFixed(2)}</strong>
+             </div>
+          )}
+        </div>
+
+        <div className="p-6 border-t border-gray-700 flex gap-3">
+          <button 
+            onClick={onClose}
+            className="flex-1 py-3 bg-transparent border border-gray-600 rounded-xl text-gray-300 font-bold hover:bg-gray-800 transition-all"
+          >
+            Cancel
+          </button>
+          <button 
+            onClick={() => onConfirm(notes, refundSource)}
+            disabled={!notes || isProcessing}
+            className={`flex-1 py-3 rounded-xl font-bold text-white transition-all flex items-center justify-center gap-2
+              ${isReject 
+                ? 'bg-red-500 hover:bg-red-600 disabled:bg-red-500/50' 
+                : 'bg-green-500 hover:bg-green-600 disabled:bg-green-500/50'
+              }`}
+          >
+            {isProcessing ? 'Processing...' : 'Confirm'}
+          </button>
         </div>
       </div>
     </div>

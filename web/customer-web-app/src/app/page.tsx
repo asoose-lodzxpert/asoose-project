@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useTheme } from 'next-themes';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -23,33 +23,36 @@ import Footer from './components/layout/Footer';
 export default function AsooseLanding() {
   const { resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
+  
+  // Carousel State
   const [activeService, setActiveService] = useState<'ride' | 'food' | 'package'>('ride');
+  const [isPaused, setIsPaused] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
 
   useEffect(() => setMounted(true), []);
-  if (!mounted) return null;
 
   const darkMode = resolvedTheme === 'dark';
 
   // App Store Links
   const CUSTOMER_ANDROID_URL = 'https://play.google.com/store/apps/details?id=com.asoose.customer';
-  const CUSTOMER_IOS_URL = '#'; // Replace with actual App Store URL
-  
+  const CUSTOMER_IOS_URL = '#'; 
   const RIDER_APP_URL = 'https://play.google.com/store/apps/details?id=com.asoose.rider';
   const MERCHANT_APP_URL = 'https://play.google.com/store/apps/details?id=com.asoose.vendor';
 
+  const SERVICE_KEYS = ['ride', 'food', 'package'] as const;
+
   const SERVICE_DATA = {
-    food: {
-      title: 'Order food or groceries',
-      cta: 'Order food & groceries',
-      link: '/main/store',
-      badge: 'Track your order live',
-    },
     ride: {
       title: 'Where to?',
       cta: 'Book a ride',
       link: '/main/ride',
       badge: 'Quick driver matching',
+    },
+    food: {
+      title: 'Order food or groceries',
+      cta: 'Order food & groceries',
+      link: '/main/store',
+      badge: 'Track your order live',
     },
     package: {
       title: 'Send a package',
@@ -86,6 +89,23 @@ export default function AsooseLanding() {
     }
   ];
 
+  // Carousel Logic
+  const handleNext = useCallback(() => {
+    setActiveService((current) => {
+      const currentIndex = SERVICE_KEYS.indexOf(current);
+      const nextIndex = (currentIndex + 1) % SERVICE_KEYS.length;
+      return SERVICE_KEYS[nextIndex];
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!mounted || isPaused) return;
+    const interval = setInterval(handleNext, 4000); // Switch every 4 seconds
+    return () => clearInterval(interval);
+  }, [mounted, isPaused, handleNext]);
+
+  if (!mounted) return null;
+
   return (
     <div className="flex flex-col min-h-screen">
       <Navbar />
@@ -96,21 +116,28 @@ export default function AsooseLanding() {
         <header className="pt-24 sm:pt-32 md:pt-40 pb-12 sm:pb-16 md:pb-24 px-4 sm:px-6 max-w-7xl mx-auto">
           <div className="grid lg:grid-cols-12 gap-8 sm:gap-10 md:gap-12 items-center">
 
-            {/* ACTION CARD */}
+            {/* ACTION CARD CAROUSEL */}
             <div className="lg:col-span-5">
-              <div className={`rounded-3xl p-6 sm:p-8 border transition-all duration-500 ${
-                darkMode ? 'bg-[#121212] border-white/10' : 'bg-white border-black/5'
-              }`}>
-
-                <div className="flex bg-gray-100 dark:bg-white/5 p-1.5 rounded-2xl mb-6 sm:mb-8">
-                  {Object.keys(SERVICE_DATA).map((key) => (
+              <div 
+                className={`rounded-3xl p-6 sm:p-8 border transition-all duration-500 relative overflow-hidden ${
+                  darkMode ? 'bg-[#121212] border-white/10' : 'bg-white border-black/5'
+                }`}
+                onMouseEnter={() => setIsPaused(true)}
+                onMouseLeave={() => setIsPaused(false)}
+              >
+                {/* Progress Indicators / Tabs */}
+                <div className="flex bg-gray-100 dark:bg-white/5 p-1.5 rounded-2xl mb-6 sm:mb-8 z-10 relative">
+                  {SERVICE_KEYS.map((key) => (
                     <button
                       key={key}
-                      onClick={() => setActiveService(key as any)}
+                      onClick={() => {
+                        setActiveService(key);
+                        setIsPaused(true); // Pause if user manually clicks
+                      }}
                       className={`flex-1 py-2 sm:py-3 rounded-xl text-[10px] sm:text-xs font-black uppercase tracking-widest transition-all ${
                         activeService === key
-                          ? 'bg-white text-black dark:bg-yellow-400 dark:text-black'
-                          : 'opacity-40 hover:opacity-100'
+                          ? 'bg-white text-black dark:bg-yellow-400 dark:text-black shadow-sm scale-100'
+                          : 'opacity-40 hover:opacity-100 scale-95'
                       }`}
                     >
                       {key}
@@ -118,22 +145,32 @@ export default function AsooseLanding() {
                   ))}
                 </div>
 
-                <h1 className="text-3xl sm:text-4xl font-black mb-4 sm:mb-6 tracking-tighter leading-tight">
-                  {SERVICE_DATA[activeService].title}
-                </h1>
+                {/* Animated Content */}
+                <div key={activeService} className="animate-in fade-in slide-in-from-right-4 duration-500 fill-mode-forwards">
+                    <h1 className="text-3xl sm:text-4xl font-black mb-4 sm:mb-6 tracking-tighter leading-tight min-h-[80px] flex items-center">
+                      {SERVICE_DATA[activeService].title}
+                    </h1>
 
-                <Link
-                  href={SERVICE_DATA[activeService].link}
-                  className="w-full h-14 sm:h-16 flex justify-between items-center px-6 sm:px-8 rounded-2xl font-black text-base sm:text-lg bg-yellow-400 text-black hover:bg-yellow-300 transition-all active:scale-95"
-                >
-                  <span className="truncate">{SERVICE_DATA[activeService].cta}</span>
-                  <ArrowRight size={20} className="flex-shrink-0 ml-2" />
-                </Link>
+                    <Link
+                      href={SERVICE_DATA[activeService].link}
+                      className="w-full h-14 sm:h-16 flex justify-between items-center px-6 sm:px-8 rounded-2xl font-black text-base sm:text-lg bg-yellow-400 text-black hover:bg-yellow-300 transition-all active:scale-95 group"
+                    >
+                      <span className="truncate">{SERVICE_DATA[activeService].cta}</span>
+                      <ArrowRight size={20} className="flex-shrink-0 ml-2 group-hover:translate-x-1 transition-transform" />
+                    </Link>
 
-                <div className="mt-4 sm:mt-6 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-yellow-600 dark:text-yellow-400">
-                  <Zap size={14} className="fill-current flex-shrink-0" />
-                  <span className="leading-tight">{SERVICE_DATA[activeService].badge}</span>
+                    <div className="mt-4 sm:mt-6 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-yellow-600 dark:text-yellow-400">
+                      <Zap size={14} className="fill-current flex-shrink-0 animate-pulse" />
+                      <span className="leading-tight">{SERVICE_DATA[activeService].badge}</span>
+                    </div>
                 </div>
+
+                {/* Progress Bar (Optional Visual Flair) */}
+                {!isPaused && (
+                  <div className="absolute bottom-0 left-0 h-1 bg-yellow-400/20 w-full">
+                     <div className="h-full bg-yellow-400 w-full origin-left animate-[progress_4s_linear_infinite]" />
+                  </div>
+                )}
               </div>
             </div>
 

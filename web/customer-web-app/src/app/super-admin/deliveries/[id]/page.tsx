@@ -12,6 +12,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { toast } from 'react-toastify';
 import useSWR from 'swr';
 import { fetcher } from '../../hooks/useSuperAdminFetch';
+import { DeliveryDetailsSkeleton } from './skeleton';
 
 // --- Types ---
 interface DeliveryHistoryStep {
@@ -86,7 +87,7 @@ export default function DeliveryDetailPage() {
   //  RENDER
   // ===========================================================================
 
-  if (isLoading) return <div className="min-h-screen bg-[#0F172A] flex items-center justify-center"><Loader2 className="w-8 h-8 text-yellow-500 animate-spin" /></div>;
+  if (isLoading) return <DeliveryDetailsSkeleton/>
   
   if (error || !delivery) return null;
 

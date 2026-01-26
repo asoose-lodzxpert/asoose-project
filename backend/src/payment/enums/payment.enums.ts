@@ -1,12 +1,8 @@
-// Runtime enums for payment validation
-// These enums are used in DTOs with @IsEnum() decorator
-
 export enum PaymentGateway {
   PAYSTACK = 'PAYSTACK',
   FLUTTERWAVE = 'FLUTTERWAVE',
   MONNIFY = 'MONNIFY',
 }
-
 export enum PaymentStatus {
   PENDING = 'PENDING',
   SUCCESS = 'SUCCESS',
@@ -32,6 +28,7 @@ export enum TransactionType {
 export enum PaymentType {
   ORDER = 'ORDER',
   RIDE = 'RIDE',
+  DELIVERY = 'DELIVERY', 
 }
 
 export enum RecipientType {

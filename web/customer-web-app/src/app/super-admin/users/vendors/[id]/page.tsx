@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Loader2, DollarSign, TrendingUp } from 'lucide-react';
+import { Loader2, Banknote, TrendingUp } from 'lucide-react';
 import Swal from 'sweetalert2';
 import useSWR from 'swr'; 
 import { fetcher } from '@/app/super-admin/hooks/useSuperAdminFetch';
@@ -63,6 +63,7 @@ interface VendorDetails {
   ownerName: string; 
   email: string;
   phone: string;
+  image?: string;
   status: string;
   verification: string;
   totalRevenue: number;
@@ -72,6 +73,8 @@ interface VendorDetails {
   reviews: any[];
   address?: string;
   vendorDocuments: VendorDocument[];
+  createdAt: string; 
+  updatedAt: string;
 }
 
 type PayoutsResponse = { history: any[] } | any[]; 
@@ -155,7 +158,7 @@ export default function VendorDetailPage() {
   );
 
   // ===========================================================================
-  //  HANDLERS (Standardized with Fetcher)
+  //  HANDLERS
   // ===========================================================================
 
   const handleSave = async () => {
@@ -303,6 +306,8 @@ export default function VendorDetailPage() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6 pb-20">
       
+      {/* FIX: Passed down explicitly to ensure header is flexible 
+      */}
       <VendorHeader 
         name={vendor.name} 
         status={vendor.status} 
@@ -315,8 +320,12 @@ export default function VendorDetailPage() {
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pt-2">
+        {/* FIX: Added min-w-0 to prevent flex/grid overflow issues on mobile
+          Mobile Order: Metrics first (order-1), Info second (order-2)
+        */}
+        
         {/* Left Column (Info) */}
-        <div className="space-y-6 order-2 lg:order-1">
+        <div className="space-y-6 order-2 lg:order-1 min-w-0">
             <HealthScoreCard totalOrders={vendor.totalOrders} />
             <BusinessInfoCard 
               vendor={vendor}
@@ -331,15 +340,15 @@ export default function VendorDetailPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <RevenueCard 
               title="Total Revenue" 
-              amount={<Currency amount={vendor.totalRevenue} />} 
+            amount={vendor.totalRevenue}
               change={0} 
-              icon={DollarSign} 
+              icon={Banknote} 
               color="green" 
               onClick={() => setActiveTab('Order History')} 
             />
             <RevenueCard 
               title="Unpaid Balance" 
-              amount={<Currency amount={vendor.unpaidBalance} />} 
+            amount={vendor.totalRevenue}
               icon={TrendingUp} 
               color="yellow" 
               onClick={() => setActiveTab('Payouts')} 
@@ -349,13 +358,16 @@ export default function VendorDetailPage() {
         </div>
       </div>
 
+      {/* Tabs Container */}
       <div className="mt-8 w-full bg-[#1E293B] border-t border-gray-800 rounded-t-xl overflow-hidden min-h-[500px]">
+        {/* FIX: Enhanced scrollbar handling for mobile touch scrolling 
+        */}
         <div className="flex border-b border-gray-800 overflow-x-auto px-4 md:px-6 hide-scrollbar">
           {['Order History', 'Products', 'Payouts', 'Documents', 'Reviews', 'Activity Log'].map((tab) => (
             <button 
               key={tab} 
               onClick={() => setActiveTab(tab)} 
-              className={`px-4 md:px-6 py-4 text-sm font-bold whitespace-nowrap border-b-2 transition-all ${
+              className={`px-4 md:px-6 py-4 text-sm font-bold whitespace-nowrap border-b-2 transition-all shrink-0 ${
                 activeTab === tab 
                   ? 'text-yellow-500 border-yellow-500 bg-[#0F172A]/50' 
                   : 'text-gray-400 border-transparent hover:text-white'
@@ -366,7 +378,8 @@ export default function VendorDetailPage() {
           ))}
         </div>
 
-        <div className="p-4 md:p-6">
+        {/* Tab Content Area */}
+        <div className="p-4 md:p-6 overflow-x-hidden">
             {activeTab === 'Order History' && (
                 <OrderHistoryTab orders={vendor.orders || []} />
             )}

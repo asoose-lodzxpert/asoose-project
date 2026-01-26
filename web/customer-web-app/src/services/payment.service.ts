@@ -5,9 +5,12 @@ export interface InitiatePaymentPayload {
   email: string;
   gateway: 'PAYSTACK' | 'FLUTTERWAVE' | 'MONNIFY';
   method: 'CARD' | 'BANK_TRANSFER' | 'CASH';
-  type: 'ORDER' | 'RIDE';
+  // FIX: Added 'DELIVERY' to the type definition
+  type: 'ORDER' | 'RIDE' | 'DELIVERY';
   orderId?: string;
   rideId?: string;
+  // FIX: Added deliveryId field
+  deliveryId?: string;
   callbackUrl?: string;
   metadata?: any;
 }
