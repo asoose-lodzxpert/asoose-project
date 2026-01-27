@@ -1,7 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter'; // <--- Added for Task 4
 import { RedisService } from '../redis/redis.service';
 import { GeoService } from '../geo/geo.service';
 import { EventBusService } from '../events/event-bus.service';
+import { DRIVER_EVENTS, DriverLocationUpdatedEvent } from '../events/event-types'; // <--- Added
 import {
   DriverStatus,
   REDIS_TTL,
@@ -30,6 +32,7 @@ export class DriverStateService {
     private readonly redis: RedisService,
     private readonly geo: GeoService,
     private readonly eventBus: EventBusService,
+    private readonly eventEmitter: EventEmitter2, // <--- Injected for Real-Time Updates
   ) {}
 
   // ========================================
@@ -128,6 +131,7 @@ export class DriverStateService {
     driverId: string,
     lat: number,
     lng: number,
+    heading: number = 0, // <--- Added heading parameter
   ): Promise<void> {
     // Validate coordinates
     if (!this.geo.validateCoordinates(lat, lng)) {
@@ -168,16 +172,26 @@ export class DriverStateService {
       `📍 Driver ${driverId} location updated (hex: ${newHexId}, changed: ${hexChanged})`,
     );
 
-    // Emit event
-    this.eventBus.emitDriverLocationUpdated({
+    // Create Event Payload
+    // Note: 'heading' is cast as 'any' if not yet present in DriverLocationUpdatedEvent interface, 
+    // but passed here for the listener to pick up.
+    const eventPayload: DriverLocationUpdatedEvent & { heading: number } = {
       driverId,
       lat,
       lng,
+      heading,
       hexId: newHexId,
       oldHexId,
       hexChanged,
       timestamp,
-    });
+    };
+
+    // 1. Emit to System Event Bus (existing logic)
+    this.eventBus.emitDriverLocationUpdated(eventPayload);
+
+    // 2. Emit to Real-Time Socket Listener (FIX for Task 4)
+    // This bridges the gap to the DriverLocationListener
+    this.eventEmitter.emitAsync(DRIVER_EVENTS.LOCATION_UPDATED, eventPayload);
   }
 
   // ========================================
