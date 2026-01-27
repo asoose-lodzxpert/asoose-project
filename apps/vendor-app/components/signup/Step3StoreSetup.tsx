@@ -1,13 +1,13 @@
-import React, { useEffect, useRef, useState } from "react";
-import { ScrollView, StyleSheet, Alert } from "react-native";
-import * as Location from "expo-location";
-import MapView from "react-native-maps";
 import { ThemedText } from "@/components/themed-text";
+import { ThemedInput } from "@/components/ThemedInput";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { OpenHour } from "@/types/signup";
+import * as Location from "expo-location";
+import React, { useEffect, useRef, useState } from "react";
+import { Alert, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import MapView from "react-native-maps";
 
 import { ImageUpload } from "./step3/ImageUpload";
-import { LocationBlock } from "./step3/LocationBlock";
 import { OpenHoursBlock } from "./step3/OpenHoursBlock";
 import { StoreInfo } from "./step3/StoreInfo";
 import { Step3Props } from "./step3/types";
@@ -87,6 +87,23 @@ export const Step3StoreSetup: React.FC<Step3Props> = ({ data, onChange }) => {
     }
   };
 
+  // Manual location input state
+  const [manualLat, setManualLat] = useState(
+    data.location?.lat?.toString() || "6.5244",
+  );
+  const [manualLng, setManualLng] = useState(
+    data.location?.lng?.toString() || "3.3792",
+  );
+
+  // Update parent when manual input changes
+  useEffect(() => {
+    onChange("location", {
+      lat: parseFloat(manualLat),
+      lng: parseFloat(manualLng),
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [manualLat, manualLng]);
+
   return (
     <ScrollView
       style={styles.container}
@@ -114,16 +131,52 @@ export const Step3StoreSetup: React.FC<Step3Props> = ({ data, onChange }) => {
         onPick={(v) => onChange("storeBanner", v)}
       />
 
-      <LocationBlock
-        mapRef={mapRef}
-        primary={primary}
-        location={data.location}
-        loading={isLocating}
-        onUseCurrent={useCurrentLocation}
-        onPick={(v) => onChange("location", v)}
-        disabled={false}
-        // map readiness is handled inside LocationBlock now
-      />
+      {/* Manual Location Input */}
+      <View style={{ gap: 8 }}>
+        <ThemedText type="subtitle">Store Location (manual entry)</ThemedText>
+        <View style={{ flexDirection: "row", gap: 12 }}>
+          <View style={{ flex: 1 }}>
+            <ThemedText style={{ marginBottom: 4 }}>Latitude</ThemedText>
+            <ThemedInput
+              value={manualLat}
+              onChangeText={setManualLat}
+              keyboardType="numeric"
+              placeholder="Latitude"
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+          </View>
+          <View style={{ flex: 1 }}>
+            <ThemedText style={{ marginBottom: 4 }}>Longitude</ThemedText>
+            <ThemedInput
+              value={manualLng}
+              onChangeText={setManualLng}
+              keyboardType="numeric"
+              placeholder="Longitude"
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+          </View>
+        </View>
+        <View style={{ marginTop: 8 }}>
+          <Pressable
+            style={{
+              backgroundColor: primary,
+              paddingVertical: 12,
+              borderRadius: 8,
+              alignItems: "center",
+              justifyContent: "center",
+              opacity: isLocating ? 0.7 : 1,
+            }}
+            onPress={useCurrentLocation}
+            disabled={isLocating}
+          >
+            <ThemedText style={{ color: "#fff", fontWeight: "600" }}>
+              {isLocating ? "Locating..." : "Use Current Location"}
+            </ThemedText>
+          </Pressable>
+        </View>
+      </View>
 
       <OpenHoursBlock value={openHours} onChange={updateOpenHours} />
     </ScrollView>
@@ -132,4 +185,13 @@ export const Step3StoreSetup: React.FC<Step3Props> = ({ data, onChange }) => {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  input: {
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 8,
+    padding: 10,
+    fontSize: 16,
+    backgroundColor: "#FAFAFA",
+  },
+  // input: removed, now using ThemedInput
 });

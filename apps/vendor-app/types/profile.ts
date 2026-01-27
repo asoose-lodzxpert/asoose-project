@@ -1,4 +1,4 @@
-export type VendorStatus = "pending" | "approved" | "suspended";
+export type VendorStatus = "PENDING" | "APPROVED" | "SUSPENDED";
 
 export interface ProfileData {
   profilePicture?: string;

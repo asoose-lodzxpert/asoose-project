@@ -1,31 +1,31 @@
-import React, { useState, useEffect, useRef } from "react";
 import {
-  fetchVendorProfile,
-  fetchStorePublicDetails,
   fetchStoreBalance,
+  fetchStorePublicDetails,
+  fetchVendorProfile,
   updateVendorProfileImage,
 } from "@/services/profile.service";
-import {
-  View,
-  StyleSheet,
-  Pressable,
-  Image,
-  ScrollView,
-  Text,
-  RefreshControl,
-  ActivityIndicator,
-} from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { RelativePathString, useRouter } from "expo-router";
+import React, { useEffect, useRef, useState } from "react";
+import {
+  ActivityIndicator,
+  Image,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import Toast from "react-native-toast-message";
 
 import { ThemedText } from "@/components/themed-text";
-import { IconSymbol } from "@/components/ui/icon-symbol";
-import { useThemeColor } from "@/hooks/use-theme-color";
 import { ThemedView } from "@/components/themed-view";
-import { ProfileData, VendorStatus } from "@/types/profile";
-import { useAuth } from "@/context/AuthContext";
 import { ConfirmationModal } from "@/components/ui/ConfirmationModal";
+import { IconSymbol } from "@/components/ui/icon-symbol";
+import { useAuth } from "@/context/AuthContext";
+import { useThemeColor } from "@/hooks/use-theme-color";
+import { ProfileData, VendorStatus } from "@/types/profile";
 
 type AllowedRoute =
   | "/(profile)/edit-business"
@@ -55,7 +55,7 @@ const INITIAL_PROFILE: ProfileData & { balance: number } = {
   profilePicture: "",
   businessName: "",
   shopName: "",
-  status: "pending",
+  status: "PENDING",
   balance: 0,
 };
 
@@ -193,11 +193,11 @@ export default function ProfileScreen() {
   /** Get badge color */
   const getStatusColor = (status: VendorStatus) => {
     switch (status) {
-      case "pending":
+      case "PENDING":
         return statusPending;
-      case "approved":
+      case "APPROVED":
         return statusSuccess;
-      case "suspended":
+      case "SUSPENDED":
         return statusError;
     }
   };
@@ -366,29 +366,38 @@ export default function ProfileScreen() {
         {/* Profile Card */}
         <View style={[styles.card, { backgroundColor: surfaceCard }]}>
           <View style={styles.profileRow}>
-            {/* Left: Info */}
-            <View style={styles.profileInfo}>
-              <ThemedText type="defaultSemiBold" style={{ fontSize: 18 }}>
-                {profile.businessName}
-              </ThemedText>
-              <ThemedText style={{ fontSize: 14, color: mutedText }}>
-                {profile.shopName}
-              </ThemedText>
-              <View
-                style={[
-                  styles.statusBadge,
-                  { backgroundColor: getStatusColor(profile.status) },
-                ]}
-              >
-                <ThemedText
-                  type="defaultSemiBold"
-                  style={{ color: textOnPrimary, fontSize: 12 }}
+            {/* Left: Enhanced Info */}
+            <View style={styles.profileInfoEnhanced}>
+              <View style={styles.nameRow}>
+                <View style={styles.avatarCircle}>
+                  <IconSymbol name="home" size={28} color={primary} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <ThemedText type="title" style={styles.businessName}>
+                    {profile.businessName}
+                  </ThemedText>
+                  <ThemedText style={styles.shopName}>
+                    {profile.shopName}
+                  </ThemedText>
+                </View>
+              </View>
+              <View style={styles.statusRow}>
+                <View
+                  style={[
+                    styles.statusBadge,
+                    { backgroundColor: getStatusColor(profile.status) },
+                  ]}
                 >
-                  {profile.status === "approved"
-                    ? "Approved Vendor"
-                    : profile.status.charAt(0).toUpperCase() +
-                      profile.status.slice(1)}
-                </ThemedText>
+                  <ThemedText
+                    type="defaultSemiBold"
+                    style={{ color: textOnPrimary, fontSize: 12 }}
+                  >
+                    {profile.status === "APPROVED"
+                      ? "Approved Vendor"
+                      : profile.status.charAt(0).toUpperCase() +
+                        profile.status.slice(1)}
+                  </ThemedText>
+                </View>
               </View>
             </View>
 
@@ -499,7 +508,47 @@ const styles = StyleSheet.create({
   },
   profileInfo: {
     flex: 1,
-    gap: 4,
+    gap: 8,
+    justifyContent: "center",
+  },
+  profileInfoEnhanced: {
+    flex: 1,
+    gap: 8,
+    justifyContent: "center",
+  },
+  nameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 2,
+  },
+  avatarCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "#F6F6F6",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  businessName: {
+    fontSize: 20,
+    fontWeight: "bold",
+    marginBottom: 2,
+    color: "#222",
+  },
+  shopName: {
+    fontSize: 15,
+    color: "#888",
+    marginBottom: 0,
+  },
+  statusRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 6,
+    gap: 8,
   },
   statusBadge: {
     borderRadius: 12,

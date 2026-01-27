@@ -1,16 +1,13 @@
-import React, { useRef, useEffect } from "react";
-import {
-  View,
-  StyleSheet,
-  Pressable,
-  Animated,
-  ActivityIndicator,
-} from "react-native";
-import * as Haptics from "expo-haptics";
+import React from "react";
+import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
+
+import { Ionicons } from "@expo/vector-icons";
 
 import { ThemedText } from "@/components/themed-text";
-import { useThemeColor } from "@/hooks/use-theme-color";
 import { useAuth } from "@/context/AuthContext";
+import { useThemeColor } from "@/hooks/use-theme-color";
+
+import * as Haptics from "expo-haptics";
 
 interface Props {
   storeName: string;
@@ -27,42 +24,11 @@ export const StoreHeader: React.FC<Props> = ({
 }) => {
   const { user } = useAuth();
 
-  const yellow = useThemeColor({}, "brandPrimary");
   const green = useThemeColor({}, "statusSuccess");
   const orange = useThemeColor({}, "statusPending");
   const red = useThemeColor({}, "statusError");
   const borderColor = useThemeColor({}, "borderDefault");
   const surfaceCard = useThemeColor({}, "surfaceCard");
-
-  // Animation values
-  const translateX = useRef(new Animated.Value(isOnline ? 1 : 0)).current;
-  const backgroundAnim = useRef(new Animated.Value(isOnline ? 1 : 0)).current;
-
-  useEffect(() => {
-    Animated.parallel([
-      Animated.spring(translateX, {
-        toValue: isOnline ? 1 : 0,
-        useNativeDriver: true,
-        tension: 60,
-        friction: 8,
-      }),
-      Animated.timing(backgroundAnim, {
-        toValue: isOnline ? 1 : 0,
-        duration: 200,
-        useNativeDriver: false,
-      }),
-    ]).start();
-  }, [isOnline]);
-
-  const thumbTranslateX = translateX.interpolate({
-    inputRange: [0, 1],
-    outputRange: [2, 22],
-  });
-
-  const switchBackgroundColor = backgroundAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [borderColor, yellow],
-  });
 
   // Status badge info
   const getStatusInfo = () => {
@@ -89,7 +55,7 @@ export const StoreHeader: React.FC<Props> = ({
           <View style={styles.skeletonLineLarge} />
           <View style={styles.skeletonLineSmall} />
         </View>
-        <View style={styles.skeletonSwitch} />
+        <View style={styles.skeletonToggle} />
       </View>
     );
   }
@@ -116,7 +82,7 @@ export const StoreHeader: React.FC<Props> = ({
         </View>
       </View>
 
-      {/* Right: Compact Switch */}
+      {/* Right: Circular Toggle Button */}
       <Pressable
         disabled={loading}
         onPress={() => {
@@ -129,27 +95,27 @@ export const StoreHeader: React.FC<Props> = ({
             onToggleOnline();
           }
         }}
-        style={styles.switchPressable}
+        style={styles.togglePressable}
       >
-        <Animated.View
+        <View
           style={[
-            styles.switchTrack,
+            styles.toggleCircle,
             {
-              backgroundColor: switchBackgroundColor,
+              backgroundColor: isOnline ? green : red,
               opacity: loading ? 0.7 : 1,
             },
           ]}
         >
-          <Animated.View
-            style={[
-              styles.switchThumb,
-              { backgroundColor: surfaceCard },
-              { transform: [{ translateX: thumbTranslateX }] },
-            ]}
-          >
-            {loading && <ActivityIndicator size="small" color="#999" />}
-          </Animated.View>
-        </Animated.View>
+          {loading ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <Ionicons
+              name={isOnline ? "checkmark" : "close"}
+              size={20}
+              color="#fff"
+            />
+          )}
+        </View>
       </Pressable>
     </View>
   );
@@ -179,32 +145,21 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
 
-  /* ===== Switch ===== */
-
-  switchPressable: {
+  togglePressable: {
     marginLeft: 12,
   },
 
-  switchTrack: {
-    width: 44,
-    height: 24,
-    borderRadius: 12,
-    justifyContent: "center",
-    paddingHorizontal: 2,
-  },
-
-  switchThumb: {
-    position: "absolute",
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+  toggleCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     justifyContent: "center",
     alignItems: "center",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.25,
+    shadowOpacity: 0.15,
     shadowRadius: 2,
-    elevation: 3,
+    elevation: 2,
   },
 
   /* ===== Skeleton ===== */
@@ -226,10 +181,10 @@ const styles = StyleSheet.create({
     opacity: 0.3,
   },
 
-  skeletonSwitch: {
-    width: 44,
-    height: 24,
-    borderRadius: 12,
+  skeletonToggle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: "#ccc",
     opacity: 0.3,
   },

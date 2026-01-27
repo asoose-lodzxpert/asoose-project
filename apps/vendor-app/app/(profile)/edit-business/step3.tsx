@@ -15,7 +15,6 @@ import MapView from "react-native-maps";
 import Toast from "react-native-toast-message";
 
 import { ImageUpload } from "@/components/signup/step3/ImageUpload";
-import { LocationBlock } from "@/components/signup/step3/LocationBlock";
 import { OpenHoursBlock } from "@/components/signup/step3/OpenHoursBlock";
 import { StoreInfo } from "@/components/signup/step3/StoreInfo";
 import { ThemedText } from "@/components/themed-text";
@@ -378,6 +377,7 @@ export default function EditStoreDetailsScreen() {
           />
 
           {/* ================= Location ================= */}
+          {/**
           <ThemedText type="subtitle">Location</ThemedText>
           <LocationBlock
             mapRef={mapRef}
@@ -391,6 +391,7 @@ export default function EditStoreDetailsScreen() {
             // and parent avoids animating until ready
             // (you added mapReady inside LocationBlock earlier)
           />
+          */}
 
           {/* ================= Open Hours ================= */}
           <ThemedText type="subtitle">Open Hours</ThemedText>

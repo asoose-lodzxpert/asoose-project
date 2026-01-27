@@ -1,22 +1,22 @@
-import React, { useState } from "react";
-import { View, StyleSheet, Pressable, Platform } from "react-native";
-import { useRouter } from "expo-router";
-import Toast from "react-native-toast-message";
-import { signupVendor } from "@/services/signup.service";
-import { ThemedView } from "@/components/themed-view";
-import { ThemedText } from "@/components/themed-text";
 import { ProgressBar } from "@/components/signup/ProgressBar";
 import { Step1BusinessInfo } from "@/components/signup/Step1BusinessInfo";
 import { Step2VerifyDocs } from "@/components/signup/Step2VerifyDocs";
 import { Step3StoreSetup } from "@/components/signup/Step3StoreSetup";
 import { Step4Review } from "@/components/signup/Step4Review";
+import { ThemedText } from "@/components/themed-text";
+import { ThemedView } from "@/components/themed-view";
+import { useThemeColor } from "@/hooks/use-theme-color";
+import { signupVendor } from "@/services/signup.service";
 import {
   SignupData,
   SignupStep1Data,
   SignupStep2Data,
   SignupStep3Data,
 } from "@/types/signup";
-import { useThemeColor } from "@/hooks/use-theme-color";
+import { useRouter } from "expo-router";
+import React, { useState } from "react";
+import { Platform, Pressable, StyleSheet, View } from "react-native";
+import Toast from "react-native-toast-message";
 
 export default function Signup() {
   const router = useRouter();
@@ -44,7 +44,7 @@ export default function Signup() {
   // Change handlers
   const handleChangeStep1 = <K extends keyof SignupStep1Data>(
     key: K,
-    value: SignupStep1Data[K]
+    value: SignupStep1Data[K],
   ) => {
     setData((prev: SignupData) => ({
       ...prev,
@@ -54,7 +54,7 @@ export default function Signup() {
 
   const handleChangeStep2 = <K extends keyof SignupStep2Data>(
     key: K,
-    value: SignupStep2Data[K]
+    value: SignupStep2Data[K],
   ) => {
     setData((prev: SignupData) => ({
       ...prev,
@@ -64,7 +64,7 @@ export default function Signup() {
 
   const handleChangeStep3 = <K extends keyof SignupStep3Data>(
     key: K,
-    value: SignupStep3Data[K]
+    value: SignupStep3Data[K],
   ) => {
     setData((prev: SignupData) => ({
       ...prev,
@@ -93,7 +93,7 @@ export default function Signup() {
 
         if (!passwordRegex.test(s1.password)) {
           showToast(
-            "Password must be at least 8 characters long and include an uppercase letter, a lowercase letter, a number, and a symbol."
+            "Password must be at least 8 characters long and include an uppercase letter, a lowercase letter, a number, and a symbol.",
           );
           return false;
         }

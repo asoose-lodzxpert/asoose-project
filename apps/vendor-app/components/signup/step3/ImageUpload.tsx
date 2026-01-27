@@ -1,17 +1,17 @@
-import React, { useState } from "react";
-import {
-  View,
-  Pressable,
-  Image,
-  StyleSheet,
-  ActivityIndicator,
-} from "react-native";
-import * as ImagePicker from "expo-image-picker";
-import Toast from "react-native-toast-message";
 import { ThemedText } from "@/components/themed-text";
 import { IconSymbol } from "@/components/ui/icon-symbol";
-import { uploadFile } from "@/services/storage.service";
 import { useThemeColor } from "@/hooks/use-theme-color";
+import { uploadFile } from "@/services/storage.service";
+import * as ImagePicker from "expo-image-picker";
+import React, { useState } from "react";
+import {
+  ActivityIndicator,
+  Image,
+  Pressable,
+  StyleSheet,
+  View,
+} from "react-native";
+import Toast from "react-native-toast-message";
 
 interface Props {
   label: string;
@@ -69,9 +69,7 @@ export const ImageUpload: React.FC<Props> = ({
             name: filename,
             type: fileType,
           },
-          (progress) => {
-            // console.log(`Upload progress: ${progress.percentage}%`);
-          }
+          (progress) => {},
         );
 
         onPick(uploadedUrl);
