@@ -20,6 +20,8 @@ export type IconSymbolName =
   | "camera.fill"
   | "check"
   | "circle.fill"
+  | "car.fill"
+  | "mappin.circle.fill"
   | "map.marker"
   | "location.fill"
   | "arrow.up.left.and.arrow.down.right"
@@ -98,7 +100,10 @@ export type IconSymbolName =
   | "creditcard"
   | "car"
   | "box.truck"
-  | "calendar";
+  | "shippingbox.fill"
+  | "calendar"
+  | "exclamationmark.triangle"
+  | "exclamationmark.triangle.fill";
 
 export const MAPPING: Record<
   IconSymbolName,
@@ -128,6 +133,8 @@ export const MAPPING: Record<
 
   check: "check",
   "circle.fill": "circle",
+  "car.fill": "directions-car",
+  "mappin.circle.fill": "location-on",
 
   "map.marker": "place",
   "location.fill": "location-on",
@@ -209,7 +216,10 @@ export const MAPPING: Record<
   creditcard: "credit-card",
   car: "directions-car",
   "box.truck": "local-shipping",
+  "shippingbox.fill": "inventory",
   calendar: "calendar-today",
+  "exclamationmark.triangle": "warning",
+  "exclamationmark.triangle.fill": "warning",
 };
 
 interface IconSymbolProps {

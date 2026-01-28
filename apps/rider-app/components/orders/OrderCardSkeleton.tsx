@@ -21,7 +21,7 @@ export function OrderCardSkeleton() {
           duration: 1000,
           useNativeDriver: true,
         }),
-      ])
+      ]),
     ).start();
   }, [shimmerAnimation]);
 
@@ -127,7 +127,7 @@ export function OrderCardSkeleton() {
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: 20,
+    borderRadius: 12,
     padding: 20,
     gap: 18,
   },

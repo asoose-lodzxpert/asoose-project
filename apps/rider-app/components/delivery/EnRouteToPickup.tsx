@@ -1,19 +1,19 @@
-import React, { useEffect, useState } from "react";
-import { View, StyleSheet, Pressable, Text } from "react-native";
 import { ThemedText } from "@/components/themed-text";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { useJobs } from "@/context/JobContext";
 import { useThemeColor } from "@/hooks/use-theme-color";
-import { useDelivery } from "@/context/DeliveryContext";
 import * as Location from "expo-location";
-import { Keys } from "@/config/keys";
-import axios from "axios";
+import React, { useEffect, useState } from "react";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+
+import { getDirections, getDistanceMeters } from "@/services/maps";
 
 export default function EnRouteToPickup({
   onAnimateToPickup,
 }: {
   onAnimateToPickup?: () => void;
 }) {
-  const { activeDelivery, arriveAtPickup } = useDelivery();
+  const { activeJob, arriveAtPickup } = useJobs();
 
   const primary = useThemeColor({}, "brandPrimary");
   const surface = useThemeColor({}, "surfaceBackground");
@@ -21,7 +21,7 @@ export default function EnRouteToPickup({
 
   const [riderLocation, setRiderLocation] =
     useState<Location.LocationObject | null>(null);
-  const [distanceToVendor, setDistanceToVendor] = useState<number | null>(null);
+  const [distanceToPickup, setDistanceToPickup] = useState<number | null>(null);
   const [eta, setEta] = useState<string>("");
   const [currentStep, setCurrentStep] = useState<{
     text: string;
@@ -33,10 +33,8 @@ export default function EnRouteToPickup({
     (async () => {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== "granted") return;
-
       const loc = await Location.getCurrentPositionAsync({});
       setRiderLocation(loc);
-
       subscription = await Location.watchPositionAsync(
         {
           accuracy: Location.Accuracy.High,
@@ -45,79 +43,90 @@ export default function EnRouteToPickup({
         },
         async (newLoc) => {
           setRiderLocation(newLoc);
-
-          if (activeDelivery) {
-            const d = getDistanceMeters(
-              newLoc.coords.latitude,
-              newLoc.coords.longitude,
-              Keys.VENDOR_COORD.latitude,
-              Keys.VENDOR_COORD.longitude
-            );
-            setDistanceToVendor(d);
-
-            try {
-              const res = await axios.get(
-                `https://maps.googleapis.com/maps/api/directions/json?origin=${newLoc.coords.latitude},${newLoc.coords.longitude}&destination=${Keys.VENDOR_COORD.latitude},${Keys.VENDOR_COORD.longitude}&key=${Keys.GOOGLE_MAPS_API_KEY}&mode=driving`
-              );
-
-              if (res.data.status === "OK") {
-                const leg = res.data.routes[0].legs[0];
-                setEta(leg.duration.text);
-
-                let closestStep = null;
-                let minDistance = Infinity;
-
-                for (const step of leg.steps) {
-                  const stepLat = step.end_location.lat;
-                  const stepLng = step.end_location.lng;
-                  const dist = getDistanceMeters(
-                    newLoc.coords.latitude,
-                    newLoc.coords.longitude,
-                    stepLat,
-                    stepLng
-                  );
-                  if (dist < minDistance) {
-                    minDistance = dist;
-                    closestStep = step;
+          if (activeJob) {
+            const pickupLat =
+              activeJob.pickupAddress?.latitude ?? activeJob.pickupAddress?.lat;
+            const pickupLng =
+              activeJob.pickupAddress?.longitude ??
+              activeJob.pickupAddress?.lng;
+            if (
+              typeof pickupLat === "number" &&
+              typeof pickupLng === "number"
+            ) {
+              try {
+                const distData = await getDistanceMeters({
+                  originLat: newLoc.coords.latitude,
+                  originLng: newLoc.coords.longitude,
+                  destLat: pickupLat,
+                  destLng: pickupLng,
+                });
+                if (typeof distData.distance === "number") {
+                  setDistanceToPickup(distData.distance);
+                }
+              } catch (err) {
+                setDistanceToPickup(null);
+              }
+              try {
+                const data = await getDirections({
+                  originLat: newLoc.coords.latitude,
+                  originLng: newLoc.coords.longitude,
+                  destLat: pickupLat,
+                  destLng: pickupLng,
+                });
+                if (!data.error && data.duration && data.coordinates) {
+                  setEta(data.duration.text);
+                  let closestStep = null;
+                  let minDistance = Infinity;
+                  for (const coord of data.coordinates) {
+                    const stepDistData = await getDistanceMeters({
+                      originLat: newLoc.coords.latitude,
+                      originLng: newLoc.coords.longitude,
+                      destLat: coord.latitude,
+                      destLng: coord.longitude,
+                    });
+                    const dist =
+                      typeof stepDistData.distance === "number"
+                        ? stepDistData.distance
+                        : Infinity;
+                    if (dist < minDistance) {
+                      minDistance = dist;
+                      closestStep = coord;
+                    }
+                  }
+                  if (closestStep) {
+                    setCurrentStep({
+                      text: `Continue to pickup`,
+                      maneuver: undefined,
+                    });
                   }
                 }
-
-                if (closestStep) {
-                  setCurrentStep({
-                    text: closestStep.html_instructions.replace(/<[^>]+>/g, ""),
-                    maneuver: closestStep.maneuver,
-                  });
-                }
+              } catch (err) {
+                console.log("Directions API error:", err);
               }
-            } catch (err) {
-              console.log("Directions API error:", err);
             }
           }
-        }
+        },
       );
     })();
-
     return () => subscription?.remove();
-  }, [activeDelivery]);
+  }, [activeJob]);
 
-  if (!activeDelivery) return null;
+  if (!activeJob) return null;
+  const isRide = activeJob.jobType === "ride";
 
-  const canArrive = true;
-  //   const canArrive = distanceToVendor !== null && distanceToVendor <= 15.24;
+  const canArrive = distanceToPickup !== null && distanceToPickup <= 15.24;
 
   const getManeuverIcon = (maneuver?: string) => {
     switch (maneuver) {
       case "turn-left":
-        return "arrow-left";
+        return "arrow.left";
       case "turn-right":
-        return "arrow-right";
+        return "arrow.right";
       case "uturn-left":
-        return "arrow-u-turn-left";
       case "uturn-right":
-        return "arrow-u-turn-right";
-      case "straight":
+        return "arrow.clockwise";
       default:
-        return "arrow-up";
+        return "arrow.up";
     }
   };
 
@@ -126,33 +135,38 @@ export default function EnRouteToPickup({
       <View style={[styles.bottomContainer, { backgroundColor: surface }]}>
         <View style={[styles.vendorCard, { backgroundColor: cardBg }]}>
           <View style={styles.vendorInfo}>
-            <IconSymbol name="pizza" size={36} color={primary} />
+            <IconSymbol
+              name={isRide ? "car" : "storefront"}
+              size={36}
+              color={primary}
+            />
             <View style={{ flex: 1 }}>
               <ThemedText type="defaultSemiBold">
-                {activeDelivery.vendorName}
+                {isRide
+                  ? activeJob.customerName
+                  : activeJob.pickupAddress?.name || "Pickup"}
               </ThemedText>
               <ThemedText style={{ color: "#666", fontSize: 14 }}>
-                {activeDelivery.vendorAddress}
+                {isRide
+                  ? activeJob.pickupAddress?.address || activeJob.pickupAddress
+                  : activeJob.pickupAddress?.address || activeJob.pickupAddress}
               </ThemedText>
             </View>
           </View>
-
           <Pressable style={styles.callBtn}>
             <IconSymbol name="phone" size={22} color={primary} />
           </Pressable>
         </View>
 
-        {/* Distance and ETA in a row */}
         <View style={styles.row}>
-          {distanceToVendor !== null && (
+          {distanceToPickup !== null && (
             <Text style={[styles.infoText, { marginRight: 16 }]}>
-              Distance: {(distanceToVendor / 1000).toFixed(2)} km
+              {(distanceToPickup / 1000).toFixed(2)} km
             </Text>
           )}
-          {eta && <Text style={styles.infoText}>ETA: {eta}</Text>}
+          {eta && <Text style={styles.infoText}>{eta}</Text>}
         </View>
 
-        {/* Current step */}
         {currentStep && (
           <View style={styles.currentStepContainer}>
             <IconSymbol
@@ -177,30 +191,13 @@ export default function EnRouteToPickup({
             }}
           >
             <ThemedText style={styles.arrivedText}>
-              ARRIVED AT PICKUP
+              {isRide ? "ARRIVED AT PICKUP" : "ARRIVED AT PICKUP"}
             </ThemedText>
           </Pressable>
         )}
       </View>
     </View>
   );
-}
-
-function getDistanceMeters(
-  lat1: number,
-  lon1: number,
-  lat2: number,
-  lon2: number
-) {
-  const toRad = (x: number) => (x * Math.PI) / 180;
-  const R = 6371000;
-  const dLat = toRad(lat2 - lat1);
-  const dLon = toRad(lon2 - lon1);
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
 }
 
 const styles = StyleSheet.create({

@@ -61,10 +61,10 @@ export function StepVehicleInfo({ data, onChange }: Props) {
 
   // Determine required documents based on vehicle type
   const getRequiredDocuments = () => {
-    const docs: Array<{
+    const docs: {
       key: keyof SignupForm["documents"];
       label: string;
-    }> = [{ key: "idCard", label: "ID Document (National ID/Passport)" }];
+    }[] = [{ key: "idCard", label: "ID Document (National ID/Passport)" }];
 
     if (!data.vehicleType || data.vehicleType === "walking") {
       return docs;

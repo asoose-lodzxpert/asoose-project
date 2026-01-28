@@ -26,12 +26,12 @@ export interface RiderProfile {
     color: string;
     year: number;
   } | null;
-  documents?: Array<{
+  documents?: {
     id: string;
     type: string;
     url: string;
     status: string;
-  }>;
+  }[];
   bankAccount?: {
     id: string;
     bankName: string;
@@ -59,12 +59,8 @@ export async function getRiderProfile(): Promise<RiderProfile> {
 
 export async function getProfileStats(): Promise<ProfileStats> {
   try {
-    // Get current week's deliveries
-    const now = new Date();
-    const weekStart = new Date(now.setDate(now.getDate() - 7));
-
     const earningsData = await fetchWithAuth(
-      `${EXPO_PUBLIC_API_URL}/riders/earnings?timeframe=week`,
+      `${EXPO_PUBLIC_API_URL}/riders/earnings?timeframe={week}`,
     );
 
     return {

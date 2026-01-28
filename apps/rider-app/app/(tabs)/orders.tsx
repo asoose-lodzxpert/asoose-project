@@ -1,30 +1,23 @@
-import React, { useState, useEffect, useCallback } from "react";
-import {
-  View,
-  StyleSheet,
-  ScrollView,
-  RefreshControl,
-  Pressable,
-} from "react-native";
-import { RelativePathString, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
+import React, { useCallback, useEffect, useState } from "react";
+import { RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 
-import { ThemedView } from "@/components/themed-view";
-import { ThemedText } from "@/components/themed-text";
-import { IconSymbol } from "@/components/ui/icon-symbol";
-import { useThemeColor } from "@/hooks/use-theme-color";
+import { EmptyState } from "@/components/orders/EmptyState";
+import { OrderCard } from "@/components/orders/OrderCard";
 import { OrderCardSkeleton } from "@/components/orders/OrderCardSkeleton";
-import {
-  getAllOrders,
-  type CombinedOrder,
-  type OrderStatus,
-} from "@/services/orders.service";
+import { OrderTabs } from "@/components/orders/OrderTabs";
+import { ThemedText } from "@/components/themed-text";
+import { ThemedView } from "@/components/themed-view";
+import { useThemeColor } from "@/hooks/use-theme-color";
+import { getAllJobs } from "@/services/orders.service";
+import type { CurrentJob } from "@/types/job";
 import Toast from "react-native-toast-message";
 
 /* ---------------------------------- */
 /* Types */
 /* ---------------------------------- */
 
-type OrderTab = "pending" | "active" | "completed";
+type OrderTab = "active" | "completed";
 
 /* ---------------------------------- */
 /* Main Component */
@@ -43,30 +36,33 @@ export default function OrdersScreen() {
   const [activeTab, setActiveTab] = useState<OrderTab>("active");
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [orders, setOrders] = useState<CombinedOrder[]>([]);
+  const [orders, setOrders] = useState<CurrentJob[]>([]);
+  const [pagination, setPagination] = useState<{
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  } | null>(null);
 
   // Fetch orders from backend
   const fetchOrders = useCallback(async () => {
     try {
       setLoading(true);
-
       // Determine status filter based on tab
       let statusFilter: string | undefined;
-      if (activeTab === "pending") {
-        statusFilter = "PENDING,REQUESTED,ASSIGNED";
-      } else if (activeTab === "active") {
+      if (activeTab === "active") {
         statusFilter = "ACCEPTED,PICKED_UP,IN_PROGRESS";
       } else if (activeTab === "completed") {
         statusFilter = "DELIVERED,COMPLETED,CANCELLED,REJECTED";
       }
-
-      const response = await getAllOrders(statusFilter);
+      const response = await getAllJobs(statusFilter);
       setOrders(response.data);
+      setPagination(response.pagination);
     } catch (error) {
-      console.error("Error fetching orders:", error);
+      console.error("Error fetching jobs:", error);
       Toast.show({
         type: "error",
-        text1: "Failed to fetch orders",
+        text1: "Failed to fetch jobs",
         text2: "Please try again",
       });
     } finally {
@@ -85,32 +81,29 @@ export default function OrdersScreen() {
     setRefreshing(false);
   };
 
-  const getStatusColor = (status: OrderStatus): string => {
+  const getStatusColor = (status: string): string => {
     switch (status) {
-      case "PENDING":
       case "REQUESTED":
       case "ASSIGNED":
-        return "#F59E0B"; // Orange
+        return "#F59E0B";
       case "ACCEPTED":
       case "PICKED_UP":
-        return "#3B82F6"; // Blue
+        return "#3B82F6";
       case "IN_PROGRESS":
-        return "#8B5CF6"; // Purple
+        return "#8B5CF6";
       case "DELIVERED":
       case "COMPLETED":
-        return success || "#10B981"; // Green
+        return success || "#10B981";
       case "CANCELLED":
       case "REJECTED":
-        return danger; // Red
+        return danger;
       default:
         return muted;
     }
   };
 
-  const getStatusLabel = (status: OrderStatus): string => {
+  const getStatusLabel = (status: string): string => {
     switch (status) {
-      case "PENDING":
-        return "Pending";
       case "REQUESTED":
         return "Requested";
       case "ASSIGNED":
@@ -134,83 +127,18 @@ export default function OrdersScreen() {
     }
   };
 
-  const renderOrderCard = (order: CombinedOrder) => (
-    <View key={order.id} style={styles.orderCard}>
-      <View style={styles.orderHeader}>
-        <View style={styles.orderIdRow}>
-          <ThemedText style={styles.orderId}>#{order.id}</ThemedText>
-          <View
-            style={[
-              styles.typeBadge,
-              {
-                backgroundColor:
-                  order.type === "ride" ? primary + "20" : "#8B5CF6" + "20",
-              },
-            ]}
-          >
-            <ThemedText
-              style={[
-                styles.typeBadgeText,
-                { color: order.type === "ride" ? primary : "#8B5CF6" },
-              ]}
-            >
-              {order.type === "ride" ? "Ride" : "Delivery"}
-            </ThemedText>
-          </View>
-        </View>
-        <View
-          style={[
-            styles.statusBadge,
-            { backgroundColor: getStatusColor(order.status) + "20" },
-          ]}
-        >
-          <ThemedText
-            style={[styles.statusText, { color: getStatusColor(order.status) }]}
-          >
-            {getStatusLabel(order.status)}
-          </ThemedText>
-        </View>
-      </View>
-
-      <View style={styles.locationContainer}>
-        <View style={styles.locationRow}>
-          <View style={[styles.locationDot, { backgroundColor: primary }]} />
-          <ThemedText style={styles.locationText}>
-            {order.pickupLocation || "Pickup Location"}
-          </ThemedText>
-        </View>
-        <View style={styles.dashedLine} />
-        <View style={styles.locationRow}>
-          <View style={[styles.locationDot, { backgroundColor: danger }]} />
-          <ThemedText style={styles.locationText}>
-            {order.dropoffLocation || "Dropoff Location"}
-          </ThemedText>
-        </View>
-      </View>
-
-      <View style={styles.orderFooter}>
-        <ThemedText style={styles.dateText}>
-          {new Date(order.createdAt).toLocaleDateString("en-US", {
-            month: "short",
-            day: "numeric",
-            year: "numeric",
-          })}
-        </ThemedText>
-        <ThemedText style={styles.earningsText}>
-          ₦{order.totalAmount?.toLocaleString() || "0"}
-        </ThemedText>
-      </View>
-    </View>
-  );
-
   return (
     <ThemedView style={[styles.container, { backgroundColor: surface }]}>
       <ThemedText type="title" style={styles.pageTitle}>
         Orders
       </ThemedText>
 
-      {/* Custom Order Tabs */}
-      <OrderTabs active={activeTab} onChange={setActiveTab} />
+      {/* Custom Order Tabs (no pending tab) */}
+      <OrderTabs
+        active={activeTab}
+        onChange={setActiveTab}
+        tabs={["active", "completed"]}
+      />
 
       <ScrollView
         refreshControl={
@@ -232,7 +160,16 @@ export default function OrdersScreen() {
         ) : orders.length === 0 ? (
           <EmptyState message="No orders in this section" />
         ) : (
-          <View style={styles.cardsList}>{orders.map(renderOrderCard)}</View>
+          <View style={styles.cardsList}>
+            {orders.map((order) => (
+              <OrderCard
+                key={order.id}
+                order={order}
+                getStatusColor={getStatusColor}
+                getStatusLabel={getStatusLabel}
+              />
+            ))}
+          </View>
         )}
       </ScrollView>
     </ThemedView>
@@ -240,77 +177,6 @@ export default function OrdersScreen() {
 }
 
 /* ---------------------------------- */
-/* OrderTabs Component (Exactly as provided) */
-/* ---------------------------------- */
-
-// import { OrderTab } from "@/types/order"; // Assuming you have this type
-
-interface OrderTabsProps {
-  active: OrderTab;
-  onChange: (tab: OrderTab) => void;
-}
-
-export const OrderTabs: React.FC<OrderTabsProps> = ({ active, onChange }) => {
-  const primary = useThemeColor({}, "brandPrimary");
-  const inactive = useThemeColor({}, "textSecondary");
-
-  const tabs: { key: OrderTab; label: string }[] = [
-    { key: "pending", label: "Pending" },
-    { key: "active", label: "Active" },
-    { key: "completed", label: "History" },
-  ];
-
-  return (
-    <View style={tabStyles.container}>
-      {tabs.map((tab) => (
-        <Pressable
-          key={tab.key}
-          onPress={() => onChange(tab.key)}
-          style={[
-            tabStyles.tab,
-            active === tab.key && { borderBottomColor: primary },
-          ]}
-        >
-          <ThemedText
-            type={active === tab.key ? "defaultSemiBold" : "default"}
-            style={{ color: active === tab.key ? primary : inactive }}
-          >
-            {tab.label}
-          </ThemedText>
-        </Pressable>
-      ))}
-    </View>
-  );
-};
-
-const tabStyles = StyleSheet.create({
-  container: {
-    flexDirection: "row",
-    marginBottom: 20,
-  },
-  tab: {
-    flex: 1,
-    alignItems: "center",
-    paddingVertical: 12,
-    borderBottomWidth: 2,
-    borderBottomColor: "transparent",
-  },
-});
-
-/* ---------------------------------- */
-/* Empty State */
-/* ---------------------------------- */
-
-function EmptyState({ message }: { message: string }) {
-  const muted = useThemeColor({}, "textMuted");
-  return (
-    <View style={styles.emptyState}>
-      <ThemedText style={{ color: muted, textAlign: "center", fontSize: 16 }}>
-        {message}
-      </ThemedText>
-    </View>
-  );
-}
 
 /* ---------------------------------- */
 /* Styles */

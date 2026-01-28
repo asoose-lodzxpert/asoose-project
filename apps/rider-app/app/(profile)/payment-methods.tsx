@@ -46,7 +46,7 @@ const SkeletonBox = ({
           duration: 800,
           useNativeDriver: true,
         }),
-      ])
+      ]),
     );
     animation.start();
     return () => animation.stop();
@@ -164,8 +164,16 @@ export default function PaymentMethodsScreen() {
     <ThemedView style={[styles.container, { backgroundColor: surface }]}>
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: primary + "40" }]}>
-        <Pressable onPress={() => router.back()}>
+        <Pressable
+          onPress={() => router.back()}
+          style={{ flexDirection: "row", alignItems: "center" }}
+        >
           <IconSymbol name="chevron.left" size={24} color={primary} />
+          <ThemedText
+            style={{ color: primary, marginLeft: 4, fontWeight: "500" }}
+          >
+            Back
+          </ThemedText>
         </Pressable>
         <ThemedText type="subtitle" style={{ flex: 1, textAlign: "center" }}>
           Bank Account

@@ -1,31 +1,39 @@
-import React from "react";
-import { View, Pressable, StyleSheet } from "react-native";
 import { ThemedText } from "@/components/themed-text";
 import { useThemeColor } from "@/hooks/use-theme-color";
+import React from "react";
+import { Pressable, StyleSheet, View } from "react-native";
 
 export type OrderTab = "pending" | "active" | "completed";
 
-interface OrderTabsProps {
-  active: OrderTab;
-  onChange: (tab: OrderTab) => void;
+interface OrderTabsProps<T extends OrderTab = OrderTab> {
+  active: T;
+  onChange: (tab: T) => void;
+  tabs?: T[];
 }
 
-export const OrderTabs: React.FC<OrderTabsProps> = ({ active, onChange }) => {
+export const OrderTabs = <T extends OrderTab = OrderTab>({
+  active,
+  onChange,
+  tabs,
+}: OrderTabsProps<T>) => {
   const primary = useThemeColor({}, "brandPrimary");
   const inactive = useThemeColor({}, "textSecondary");
 
-  const tabs: { key: OrderTab; label: string }[] = [
+  const allTabs: { key: OrderTab; label: string }[] = [
     { key: "pending", label: "Pending" },
     { key: "active", label: "Active" },
     { key: "completed", label: "History" },
   ];
+  const shownTabs = tabs
+    ? allTabs.filter((tab) => tabs.includes(tab.key as T))
+    : allTabs;
 
   return (
     <View style={styles.container}>
-      {tabs.map((tab) => (
+      {shownTabs.map((tab) => (
         <Pressable
           key={tab.key}
-          onPress={() => onChange(tab.key)}
+          onPress={() => onChange(tab.key as T)}
           style={[
             styles.tab,
             active === tab.key && { borderBottomColor: primary },

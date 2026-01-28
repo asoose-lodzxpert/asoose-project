@@ -32,8 +32,6 @@ type VehicleInfo = {
   };
 };
 
-const MAX_SIZE = 5 * 1024 * 1024;
-
 const VEHICLES = [
   {
     key: "bicycle",
@@ -57,177 +55,144 @@ export default function VehicleInfoScreen() {
   const router = useRouter();
   const primary = useThemeColor({}, "brandPrimary");
   const surface = useThemeColor({}, "surfaceBackground");
-
   const [data, setData] = useState<VehicleInfo | null>(null);
-  const [editing, setEditing] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
-    const timeout = setTimeout(() => {
-      const fetchedData: VehicleInfo = {
+    // Simulate loading and fetch data
+    setTimeout(() => {
+      setData({
         vehicleType: "motorcycle",
         make: "Honda",
         model: "CBR",
         color: "Red",
         plateNumber: "ABC-123XY",
         documents: { id: null, license: null, insurance: null },
-      };
-      setData(fetchedData);
+      });
       setLoading(false);
     }, 1200);
-    return () => clearTimeout(timeout);
   }, []);
 
-  const onRefresh = useCallback(() => {
-    setRefreshing(true);
-    setTimeout(() => {
-      setData((prev) => ({ ...(prev as any) }));
-      setRefreshing(false);
-    }, 1000);
-  }, []);
-
-  const onChange = <K extends keyof VehicleInfo>(
-    key: K,
-    value: VehicleInfo[K]
-  ) => {
-    setData((prev) => (prev ? { ...prev, [key]: value } : prev));
-  };
-
-  const pickFile = async (key: keyof VehicleInfo["documents"]) => {
-    const result = await DocumentPicker.getDocumentAsync({
-      type: ["application/pdf", "image/jpeg", "image/png"],
-      multiple: false,
-      copyToCacheDirectory: true,
-    });
-    if (result.canceled) return;
-
-    const asset = result.assets?.[0];
-    if (!asset) return;
-    if (asset.size && asset.size > MAX_SIZE) {
-      Alert.alert("File too large", "Maximum file size is 5MB");
-      return;
-    }
-    onChange("documents", { ...data!.documents, [key]: asset });
-  };
-
-  const removeFile = (key: keyof VehicleInfo["documents"]) => {
-    onChange("documents", { ...data!.documents, [key]: null });
-  };
-
-  const handleDone = () => {
-    // TODO: Save action
-    setEditing(false);
-  };
-
-  if (loading || !data) {
+  if (loading) {
     return (
-      <ThemedView
-        style={[styles.loadingContainer, { backgroundColor: surface }]}
-      >
-        <ThemedText style={{ textAlign: "center", marginTop: 200 }}>
-          Loading vehicle information...
-        </ThemedText>
-      </ThemedView>
-    );
-  }
-
-  return (
-    <ThemedView style={{ flex: 1, backgroundColor: surface }}>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 80 : 0}
-      >
-        {/* Header */}
+      <ThemedView style={{ flex: 1, backgroundColor: surface }}>
         <View style={[styles.header, { borderBottomColor: primary + "40" }]}>
           <Pressable onPress={() => router.back()}>
             <IconSymbol name="chevron.left" size={24} color={primary} />
           </Pressable>
-          <ThemedText type="title" style={{ flex: 1, textAlign: "center" }}>
+          <ThemedText type="subtitle" style={{ flex: 1, textAlign: "center" }}>
             Vehicle Information
           </ThemedText>
-          {editing ? (
-            <Pressable onPress={handleDone}>
-              <ThemedText style={{ color: primary, fontWeight: "600" }}>
-                Done
-              </ThemedText>
-            </Pressable>
-          ) : (
-            <Pressable onPress={() => setEditing(true)}>
-              <ThemedText style={{ color: primary, fontWeight: "600" }}>
-                Edit
-              </ThemedText>
-            </Pressable>
-          )}
+          <View style={{ width: 40 }} />
         </View>
-
-        <ScrollView
-          contentContainerStyle={{ padding: 20 }}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-          }
-        >
-          {/* Vehicle Type */}
+        <ScrollView contentContainerStyle={{ padding: 20 }}>
           <Field label="Vehicle Type">
             <View style={styles.grid}>
-              {VEHICLES.map((v) => (
-                <Pressable
-                  key={v.key}
-                  style={[
-                    styles.vehicle,
-                    data.vehicleType === v.key && { borderColor: primary },
-                  ]}
-                  onPress={() => editing && onChange("vehicleType", v.key)}
-                >
-                  <Image source={v.icon} style={styles.vehicleIcon} />
-                  <ThemedText>{v.label}</ThemedText>
-                </Pressable>
-              ))}
+              <View
+                style={[
+                  styles.vehicle,
+                  { borderColor: primary, backgroundColor: "#F3F4F6" },
+                ]}
+              />
             </View>
           </Field>
-
-          {/* Make */}
           <Field label="Make">
-            <ThemedInput
-              placeholder="Honda"
-              value={data.make}
-              onChangeText={(v) => onChange("make", v)}
-              editable={editing}
+            <View
+              style={{
+                height: 44,
+                borderRadius: 8,
+                backgroundColor: "#F3F4F6",
+                marginTop: 6,
+              }}
             />
           </Field>
-
-          {/* Model */}
           <Field label="Model">
-            <ThemedInput
-              placeholder="CBR"
-              value={data.model}
-              onChangeText={(v) => onChange("model", v)}
-              editable={editing}
+            <View
+              style={{
+                height: 44,
+                borderRadius: 8,
+                backgroundColor: "#F3F4F6",
+                marginTop: 6,
+              }}
             />
           </Field>
-
-          {/* Color */}
           <Field label="Color">
-            <ThemedInput
-              placeholder="Red"
-              value={data.color}
-              onChangeText={(v) => onChange("color", v)}
-              editable={editing}
+            <View
+              style={{
+                height: 44,
+                borderRadius: 8,
+                backgroundColor: "#F3F4F6",
+                marginTop: 6,
+              }}
             />
           </Field>
-
-          {/* Plate Number */}
           <Field label="Plate Number">
-            <ThemedInput
-              placeholder="ABC-123XY"
-              value={data.plateNumber}
-              onChangeText={(v) => onChange("plateNumber", v)}
-              editable={editing}
+            <View
+              style={{
+                height: 44,
+                borderRadius: 8,
+                backgroundColor: "#F3F4F6",
+                marginTop: 6,
+              }}
             />
           </Field>
         </ScrollView>
-      </KeyboardAvoidingView>
+      </ThemedView>
+    );
+  }
+
+  if (!data) return null;
+
+  return (
+    <ThemedView style={{ flex: 1, backgroundColor: surface }}>
+      <View style={[styles.header, { borderBottomColor: primary + "40" }]}>
+        <Pressable
+          onPress={() => router.back()}
+          style={{ flexDirection: "row", alignItems: "center" }}
+        >
+          <IconSymbol name="chevron.left" size={24} color={primary} />
+          <ThemedText
+            style={{ color: primary, marginLeft: 4, fontWeight: "500" }}
+          >
+            Back
+          </ThemedText>
+        </Pressable>
+        <ThemedText type="subtitle" style={{ flex: 1, textAlign: "center" }}>
+          Vehicle Information
+        </ThemedText>
+        <View style={{ width: 40 }} />
+      </View>
+      <ScrollView contentContainerStyle={{ padding: 20 }}>
+        <Field label="Vehicle Type">
+          <View style={styles.grid}>
+            {VEHICLES.filter((v) => v.key === data.vehicleType).map((v) => (
+              <View
+                key={v.key}
+                style={[styles.vehicle, { borderColor: primary }]}
+              >
+                <Image source={v.icon} style={styles.vehicleIcon} />
+                <ThemedText>{v.label}</ThemedText>
+              </View>
+            ))}
+          </View>
+        </Field>
+        <Field label="Make">
+          <ThemedInput placeholder="Honda" value={data.make} editable={false} />
+        </Field>
+        <Field label="Model">
+          <ThemedInput placeholder="CBR" value={data.model} editable={false} />
+        </Field>
+        <Field label="Color">
+          <ThemedInput placeholder="Red" value={data.color} editable={false} />
+        </Field>
+        <Field label="Plate Number">
+          <ThemedInput
+            placeholder="ABC-123XY"
+            value={data.plateNumber}
+            editable={false}
+          />
+        </Field>
+      </ScrollView>
     </ThemedView>
   );
 }

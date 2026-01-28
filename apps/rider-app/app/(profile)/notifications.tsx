@@ -45,7 +45,7 @@ const SkeletonBox = ({
           duration: 800,
           useNativeDriver: true,
         }),
-      ])
+      ]),
     );
     animation.start();
     return () => animation.stop();
@@ -220,15 +220,16 @@ export default function NotificationsScreen() {
     <ThemedView style={[styles.container, { backgroundColor: surface }]}>
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: border + "40" }]}>
-        <Pressable onPress={() => router.back()}>
+        <Pressable style={styles.backButton} onPress={() => router.back()}>
           <IconSymbol name="chevron.left" size={24} color={primary} />
+          <ThemedText type="link">Back</ThemedText>
         </Pressable>
-        <ThemedText type="title" style={{ flex: 1, textAlign: "center" }}>
+        <ThemedText type="subtitle" style={{ flex: 1, textAlign: "center" }}>
           Notifications
         </ThemedText>
         <View style={{ width: 40 }} />
       </View>
-      
+
       <ScrollView
         contentContainerStyle={{ padding: 20, gap: 28 }}
         refreshControl={
@@ -405,6 +406,11 @@ function ToggleRow({
 /* ───────── Styles ───────── */
 
 const styles = StyleSheet.create({
+  backButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
   container: { flex: 1 },
 
   header: {

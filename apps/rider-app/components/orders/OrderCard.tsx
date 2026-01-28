@@ -1,14 +1,16 @@
-import React from "react";
-import { View, StyleSheet } from "react-native";
 import { ThemedText } from "@/components/themed-text";
 import { useThemeColor } from "@/hooks/use-theme-color";
-import { CombinedOrder, OrderStatus } from "@/services/orders.service";
+import React from "react";
+import { StyleSheet, View } from "react-native";
+
+import type { CurrentJob } from "../../types/job";
+
 import { IconSymbol } from "@/components/ui/icon-symbol";
 
 interface OrderCardProps {
-  order: CombinedOrder;
-  getStatusColor: (status: OrderStatus) => string;
-  getStatusLabel: (status: OrderStatus) => string;
+  order: CurrentJob;
+  getStatusColor: (status: string) => string;
+  getStatusLabel: (status: string) => string;
 }
 
 export const OrderCard: React.FC<OrderCardProps> = ({
@@ -32,7 +34,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({
               numberOfLines={1}
               style={[styles.locationText, { color: primaryText }]}
             >
-              {order.pickupLocation || "Pickup location"}
+              {order.pickupAddress?.address || "Pickup location"}
             </ThemedText>
           </View>
 
@@ -44,7 +46,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({
               numberOfLines={1}
               style={[styles.locationText, { color: primaryText }]}
             >
-              {order.dropoffLocation || "Dropoff location"}
+              {order.dropoffAddress?.address || "Dropoff location"}
             </ThemedText>
           </View>
         </View>
@@ -53,21 +55,29 @@ export const OrderCard: React.FC<OrderCardProps> = ({
         <View style={styles.metaRow}>
           <IconSymbol name="clock" size={14} color={muted} />
           <ThemedText style={[styles.metaText, { color: muted }]}>
-            {new Date(order.createdAt).toLocaleDateString("en-US", {
-              month: "short",
-              day: "numeric",
-            })}
+            {/* createdAt is not in CurrentJob, fallback to assignedAt or pickedUpAt */}
+            {order.assignedAt
+              ? new Date(order.assignedAt).toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                })
+              : order.pickedUpAt
+                ? new Date(order.pickedUpAt).toLocaleDateString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                  })
+                : "-"}
           </ThemedText>
 
           <View style={styles.metaDot} />
 
           <IconSymbol
-            name={order.type === "ride" ? "car.fill" : "shippingbox.fill"}
+            name={order.jobType === "ride" ? "car.fill" : "shippingbox.fill"}
             size={14}
             color={muted}
           />
           <ThemedText style={[styles.metaText, { color: muted }]}>
-            {order.type === "ride" ? "Ride" : "Delivery"}
+            {order.jobType === "ride" ? "Ride" : "Delivery"}
           </ThemedText>
         </View>
       </View>
@@ -75,7 +85,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({
       {/* RIGHT: Amount + Status */}
       <View style={styles.rightColumn}>
         <ThemedText style={styles.amountText}>
-          ₦{order.totalAmount?.toLocaleString() || "0"}
+          ₦{order.earnings?.toLocaleString() || "0"}
         </ThemedText>
 
         <View style={styles.statusRow}>

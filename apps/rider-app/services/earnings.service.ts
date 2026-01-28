@@ -1,16 +1,15 @@
 import { fetchWithAuth } from "./auth-fetch";
 
-const EXPO_PUBLIC_API_URL =
-  process.env.EXPO_PUBLIC_API_URL;
+const EXPO_PUBLIC_API_URL = process.env.EXPO_PUBLIC_API_URL;
 
 export interface EarningsData {
   total: number;
-  deliveries: number;
-  avgPerDelivery: number;
+  rides: number;
+  avgPerRide: number;
   hoursOnline: number;
   rating: number;
   breakdown: {
-    deliveryFees: number;
+    rideFees: number;
     bonuses: number;
     serviceFees: number;
   };

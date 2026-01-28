@@ -12,6 +12,7 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { RelativePathString, useRouter } from "expo-router";
 import Toast from "react-native-toast-message";
+import { LogoutButton } from "@/components/LogoutButton";
 import {
   getRiderProfile,
   getProfileStats,
@@ -204,7 +205,7 @@ export default function ProfileScreen() {
                   {profile.rating.toFixed(2)}
                 </ThemedText>
                 <ThemedText style={styles.subText}>
-                  ({profile.totalRides} deliveries)
+                  ({profile.totalRides} rides)
                 </ThemedText>
                 <Pressable>
                   <ThemedText style={[styles.link, { color: primary }]}>
@@ -222,7 +223,7 @@ export default function ProfileScreen() {
         ) : stats ? (
           <View style={styles.statsRow}>
             <StatCard
-              label="Deliveries"
+              label="Rides"
               value={stats.totalDeliveries.toString()}
               icon="box.truck"
               border={border}
@@ -242,10 +243,8 @@ export default function ProfileScreen() {
           </View>
         ) : null}
 
-        {/* Account Management */}
-        {loading && !profile ? (
-          <SectionSkeleton border={border} />
-        ) : profile ? (
+        {/* Account Management Section */}
+        {loading && !profile ? null : profile ? (
           <Section title="Account Management" border={border}>
             {accountManagementItems.map((item) => (
               <MenuItem
@@ -259,17 +258,28 @@ export default function ProfileScreen() {
           </Section>
         ) : null}
 
-        {/* App Preferences */}
+        {/* Settings & Actions Section */}
         {loading && !profile ? (
           <SectionSkeleton border={border} />
         ) : profile ? (
-          <Section title="App Preferences" border={border}>
+          <Section title="Settings & Actions" border={border}>
             <MenuItem
               icon="bell"
               label="Notifications"
               border={border}
               onPress={() => router.push("/(profile)/notifications")}
             />
+            <MenuItem
+              icon="trash"
+              label="Delete Account"
+              border={border}
+              onPress={() =>
+                router.push("/(profile)/delete-account" as RelativePathString)
+              }
+              destructive
+            />
+            {/* Logout button as a separate component */}
+            <LogoutButton />
           </Section>
         ) : null}
       </ScrollView>
@@ -322,11 +332,13 @@ function MenuItem({
   label,
   onPress,
   border,
+  destructive = false,
 }: {
   icon: any;
   label: string;
   onPress?: () => void;
   border: string;
+  destructive?: boolean;
 }) {
   const primary = useThemeColor({}, "brandPrimary");
   return (
@@ -335,8 +347,18 @@ function MenuItem({
       onPress={onPress}
     >
       <View style={styles.menuLeft}>
-        <IconSymbol name={icon} size={22} color={primary} />
-        <ThemedText>{label}</ThemedText>
+        <IconSymbol
+          name={icon}
+          size={22}
+          color={destructive ? "#EF4444" : primary}
+        />
+        <ThemedText
+          style={
+            destructive ? { color: "#EF4444", fontWeight: "600" } : undefined
+          }
+        >
+          {label}
+        </ThemedText>
       </View>
       <IconSymbol name="chevron.right" size={18} color="#9CA3AF" />
     </Pressable>

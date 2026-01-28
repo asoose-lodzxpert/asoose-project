@@ -8,8 +8,11 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { DeliveryProvider } from "@/context/DeliveryContext";
 import Toast from "react-native-toast-message";
+import { useConfirm } from "@/hooks/use-confirm";
+import { useThemeColor } from "@/hooks/use-theme-color";
 
 function LoadingScreen() {
+  const primary = useThemeColor({}, "brandPrimary");
   const [dot1] = useState(new Animated.Value(0));
   const [dot2] = useState(new Animated.Value(0));
   const [dot3] = useState(new Animated.Value(0));
@@ -64,13 +67,31 @@ function LoadingScreen() {
       />
       <View style={styles.dotsContainer}>
         <Animated.View
-          style={[styles.dot, { transform: [{ translateY: translateY1 }] }]}
+          style={[
+            styles.dot,
+            {
+              transform: [{ translateY: translateY1 }],
+              backgroundColor: primary,
+            },
+          ]}
         />
         <Animated.View
-          style={[styles.dot, { transform: [{ translateY: translateY2 }] }]}
+          style={[
+            styles.dot,
+            {
+              transform: [{ translateY: translateY2 }],
+              backgroundColor: primary,
+            },
+          ]}
         />
         <Animated.View
-          style={[styles.dot, { transform: [{ translateY: translateY3 }] }]}
+          style={[
+            styles.dot,
+            {
+              transform: [{ translateY: translateY3 }],
+              backgroundColor: primary,
+            },
+          ]}
         />
       </View>
     </View>
@@ -82,6 +103,7 @@ function RootNavigator() {
   const [hasLaunched, setHasLaunched] = useState<boolean | null>(null);
   const segments = useSegments();
   const router = useRouter();
+  const { ConfirmModal } = useConfirm();
 
   useEffect(() => {
     async function checkFirstLaunch() {
@@ -100,16 +122,15 @@ function RootNavigator() {
   useEffect(() => {
     if (loading || hasLaunched === null) return;
 
-    const inAuthGroup = segments[0] === "(auth)";
-    const inTabsGroup = segments[0] === "(tabs)";
     const onWelcome = segments[0] === "welcome";
 
-    if (!hasLaunched && !onWelcome) {
+    const atRoot = segments.length === 1 && !segments[0];
+    if (!hasLaunched && !onWelcome && atRoot) {
       router.replace("/welcome");
     } else if (hasLaunched) {
-      if (user && !inTabsGroup) {
+      if (user && atRoot) {
         router.replace("/(tabs)");
-      } else if (!user && !inAuthGroup) {
+      } else if (!user && atRoot) {
         router.replace("/(auth)/signin");
       }
     }
@@ -126,6 +147,7 @@ function RootNavigator() {
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="(auth)" />
       </Stack>
+      <ConfirmModal />
       <Toast />
     </GestureHandlerRootView>
   );

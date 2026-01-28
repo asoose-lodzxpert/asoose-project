@@ -54,7 +54,7 @@ const SkeletonBox = ({
           duration: 800,
           useNativeDriver: true,
         }),
-      ])
+      ]),
     );
     animation.start();
     return () => animation.stop();
@@ -104,7 +104,7 @@ export default function EditPersonalInfoScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedState, setSelectedState] = useState<string | undefined>(
-    undefined
+    undefined,
   );
 
   const fetchPersonalInfo = useCallback(async () => {
@@ -136,7 +136,7 @@ export default function EditPersonalInfoScreen() {
 
   const onChange = <K extends keyof PersonalInfo>(
     key: K,
-    value: PersonalInfo[K]
+    value: PersonalInfo[K],
   ) => {
     setData((prev) => (prev ? { ...prev, [key]: value } : prev));
   };
@@ -218,10 +218,18 @@ export default function EditPersonalInfoScreen() {
       >
         {/* Header */}
         <View style={[styles.header, { borderBottomColor: primary + "40" }]}>
-          <Pressable onPress={() => router.back()}>
+          <Pressable
+            onPress={() => router.back()}
+            style={{ flexDirection: "row", alignItems: "center" }}
+          >
             <IconSymbol name="chevron.left" size={24} color={primary} />
+            <ThemedText
+              style={{ color: primary, marginLeft: 4, fontWeight: "500" }}
+            >
+              Back
+            </ThemedText>
           </Pressable>
-          <ThemedText type="title" style={{ flex: 1, textAlign: "center" }}>
+          <ThemedText type="subtitle" style={{ flex: 1, textAlign: "center" }}>
             Personal Information
           </ThemedText>
           {!loading &&

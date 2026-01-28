@@ -1,18 +1,18 @@
-import React from "react";
-import { View, StyleSheet, Pressable } from "react-native";
 import { ThemedText } from "@/components/themed-text";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { useJobs } from "@/context/JobContext";
 import { useThemeColor } from "@/hooks/use-theme-color";
-import { useDelivery } from "@/context/DeliveryContext";
+import React from "react";
+import { Pressable, StyleSheet, View } from "react-native";
 
 export default function AtPickupScreen() {
-  const { activeDelivery, confirmPickup } = useDelivery();
-
+  const { activeJob, confirmPickup } = useJobs();
   const primary = useThemeColor({}, "brandPrimary");
   const surface = useThemeColor({}, "surfaceBackground");
   const cardBg = useThemeColor({}, "surfaceSubtle");
 
-  if (!activeDelivery) return null;
+  if (!activeJob) return null;
+  const isRide = activeJob.jobType === "ride";
 
   return (
     <View style={styles.container}>
@@ -20,26 +20,41 @@ export default function AtPickupScreen() {
         <View style={styles.arrivedSection}>
           <IconSymbol name="checkmark.circle.fill" size={48} color="#10B981" />
           <ThemedText type="title" style={styles.arrivedTitle}>
-            You’ve arrived at pickup
+            {isRide ? "You’ve arrived at pickup" : "You’ve arrived at pickup"}
           </ThemedText>
           <ThemedText style={styles.arrivedSubtitle}>
-            Collect the order from the vendor
+            {isRide
+              ? "Pick up your passenger"
+              : "Collect the order from the vendor"}
           </ThemedText>
         </View>
 
         <View style={[styles.vendorCard, { backgroundColor: cardBg }]}>
           <View style={styles.vendorInfo}>
-            <IconSymbol name="pizza" size={36} color={primary} />
+            <IconSymbol
+              name={isRide ? "car" : "pizza"}
+              size={36}
+              color={primary}
+            />
             <View style={{ flex: 1 }}>
               <ThemedText type="defaultSemiBold">
-                {activeDelivery.vendorName}
+                {isRide
+                  ? activeJob.customerName
+                  : activeJob.pickupAddress?.name ||
+                    activeJob.pickupAddress?.label ||
+                    activeJob.customerName}
               </ThemedText>
               <ThemedText style={styles.vendorAddress}>
-                {activeDelivery.vendorAddress}
+                {isRide
+                  ? activeJob.pickupAddress?.address ||
+                    activeJob.pickupAddress ||
+                    ""
+                  : activeJob.pickupAddress?.address ||
+                    activeJob.pickupAddress ||
+                    ""}
               </ThemedText>
             </View>
           </View>
-
           <Pressable style={styles.callBtn}>
             <IconSymbol name="phone" size={22} color={primary} />
           </Pressable>
@@ -50,7 +65,9 @@ export default function AtPickupScreen() {
           onPress={confirmPickup}
         >
           <IconSymbol name="checkmark" size={20} color="#fff" />
-          <ThemedText style={styles.confirmText}>CONFIRM PICKUP</ThemedText>
+          <ThemedText style={styles.confirmText}>
+            {isRide ? "CONFIRM PICKUP" : "CONFIRM PICKUP"}
+          </ThemedText>
         </Pressable>
       </View>
     </View>

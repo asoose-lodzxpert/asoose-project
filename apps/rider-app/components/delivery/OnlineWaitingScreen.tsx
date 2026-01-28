@@ -1,22 +1,30 @@
-import React, { useState, useEffect } from "react";
-import { View, StyleSheet, Pressable, ActivityIndicator } from "react-native";
 import { ThemedText } from "@/components/themed-text";
-import { useThemeColor } from "@/hooks/use-theme-color";
 import { IconSymbol } from "@/components/ui/icon-symbol";
-import { useDelivery } from "@/context/DeliveryContext";
+import { useJobs } from "@/context/JobContext";
+import { useConfirm } from "@/hooks/use-confirm";
+import { useThemeColor } from "@/hooks/use-theme-color";
 import { riderApiService } from "@/services/rider-api.service";
+import React, { useEffect, useState } from "react";
+import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
 
 export default function OnlineWaitingScreen() {
-  const { goOffline } = useDelivery();
+  const { goOffline, activeJob, incomingJob } = useJobs();
+  const { confirm } = useConfirm();
   const primary = useThemeColor({}, "brandPrimary");
   const surface = useThemeColor({}, "surfaceBackground");
 
   const [stats, setStats] = useState({
     totalEarnings: 0,
     totalDeliveries: 0,
+    totalRides: 0,
     onlineHours: 0,
+    jobType: "delivery",
   });
   const [loading, setLoading] = useState(true);
+
+  const jobType = activeJob?.jobType || incomingJob?.jobType || "delivery";
+
+  const isRide = jobType === "ride";
 
   useEffect(() => {
     const loadStats = async () => {
@@ -26,7 +34,9 @@ export default function OnlineWaitingScreen() {
         setStats({
           totalEarnings: data.totalEarnings || 0,
           totalDeliveries: data.totalDeliveries || 0,
+          totalRides: data.totalRides || 0,
           onlineHours: data.onlineHours || 0,
+          jobType: data.jobType || "delivery",
         });
       } catch (error) {
       } finally {
@@ -46,19 +56,27 @@ export default function OnlineWaitingScreen() {
       </View>
 
       <View style={[styles.bottomCard, { backgroundColor: surface }]}>
-        <IconSymbol name="package" size={60} color={primary} />
+        ...
+        <IconSymbol
+          name={isRide ? "car" : "package"}
+          size={60}
+          color={primary}
+        />
         <ThemedText type="title" style={styles.waitingTitle}>
-          Waiting for Orders...
+          {isRide ? "Waiting for Ride Requests..." : "Waiting for Orders..."}
         </ThemedText>
-
         <View style={styles.statsRow}>
           <View style={styles.stat}>
             {loading ? (
               <ActivityIndicator size="small" color="#666" />
             ) : (
-              <ThemedText type="title">{stats.totalDeliveries}</ThemedText>
+              <ThemedText type="title">
+                {isRide ? stats.totalRides : stats.totalDeliveries}
+              </ThemedText>
             )}
-            <ThemedText style={styles.statLabel}>Orders</ThemedText>
+            <ThemedText style={styles.statLabel}>
+              {isRide ? "Rides" : "Orders"}
+            </ThemedText>
           </View>
 
           <View style={styles.stat}>
@@ -83,9 +101,22 @@ export default function OnlineWaitingScreen() {
             <ThemedText style={styles.statLabel}>Online</ThemedText>
           </View>
         </View>
-
         <View style={styles.actionRow}>
-          <Pressable style={styles.goOfflineBtn} onPress={goOffline}>
+          <Pressable
+            style={styles.goOfflineBtn}
+            onPress={async () => {
+              const confirmed = await confirm({
+                title: "Go Offline",
+                message:
+                  "Are you sure you want to go offline and stop receiving requests?",
+                confirmText: "Yes, Go Offline",
+                cancelText: "Cancel",
+              });
+              if (confirmed) {
+                goOffline();
+              }
+            }}
+          >
             <IconSymbol name="power" size={18} color="#EF4444" />
             <ThemedText style={{ color: "#EF4444", fontWeight: "600" }}>
               Go Offline

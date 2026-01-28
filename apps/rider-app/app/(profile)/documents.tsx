@@ -29,7 +29,7 @@ export default function DocumentsScreen() {
     license: null,
     insurance: null,
   });
-  const [editing, setEditing] = useState(false);
+  // Editing is disabled; documents are view-only
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -38,7 +38,6 @@ export default function DocumentsScreen() {
   /* Simulate fetch */
   useEffect(() => {
     const timeout = setTimeout(() => {
-      // Simulated preloaded documents
       setDocuments({
         id: null,
         license: null,
@@ -57,39 +56,71 @@ export default function DocumentsScreen() {
     }, 1000);
   }, []);
 
-  const pickFile = async (key: DocumentKey) => {
-    if (!editing) return;
-
-    const result = await DocumentPicker.getDocumentAsync({
-      type: ["application/pdf", "image/jpeg", "image/png"],
-      multiple: false,
-      copyToCacheDirectory: true,
-    });
-
-    if (result.canceled) return;
-
-    const asset = result.assets?.[0];
-    if (!asset) return;
-
-    if (asset.size && asset.size > MAX_SIZE) {
-      Alert.alert("File too large", "Maximum file size is 5MB");
-      return;
-    }
-
-    setDocuments((prev) => ({ ...prev, [key]: asset }));
-  };
-
-  const removeFile = (key: DocumentKey) => {
-    if (!editing) return;
-    setDocuments((prev) => ({ ...prev, [key]: null }));
-  };
+  // Remove pickFile and removeFile logic; view-only
 
   if (loading) {
     return (
       <ThemedView style={[styles.container, { backgroundColor: surface }]}>
-        <ThemedText style={{ textAlign: "center", marginTop: 200 }}>
-          Loading documents...
-        </ThemedText>
+        {/* Header */}
+        <View style={[styles.header, { borderBottomColor: primary + "40" }]}>
+          <Pressable
+            onPress={() => router.back()}
+            style={{ flexDirection: "row", alignItems: "center" }}
+          >
+            <IconSymbol name="chevron.left" size={24} color={primary} />
+            <ThemedText
+              style={{ color: primary, marginLeft: 4, fontWeight: "500" }}
+            >
+              Back
+            </ThemedText>
+          </Pressable>
+          <ThemedText type="subtitle" style={{ flex: 1, textAlign: "center" }}>
+            Documents
+          </ThemedText>
+          <View style={{ width: 40 }} />
+        </View>
+        <ScrollView contentContainerStyle={{ padding: 20, gap: 20 }}>
+          {["ID Document", "Driver's License", "Vehicle Insurance"].map(
+            (label, idx) => (
+              <View key={label} style={styles.section}>
+                <ThemedText type="defaultSemiBold">{label}</ThemedText>
+                <View
+                  style={[
+                    styles.uploadCard,
+                    { backgroundColor: "#F3F4F6", borderColor: "#E5E7EB" },
+                  ]}
+                >
+                  <View
+                    style={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: 16,
+                      backgroundColor: "#E5E7EB",
+                    }}
+                  />
+                  <View
+                    style={{
+                      height: 18,
+                      width: 120,
+                      backgroundColor: "#E5E7EB",
+                      borderRadius: 4,
+                      marginTop: 8,
+                    }}
+                  />
+                  <View
+                    style={{
+                      height: 14,
+                      width: 100,
+                      backgroundColor: "#E5E7EB",
+                      borderRadius: 4,
+                      marginTop: 6,
+                    }}
+                  />
+                </View>
+              </View>
+            ),
+          )}
+        </ScrollView>
       </ThemedView>
     );
   }
@@ -98,24 +129,21 @@ export default function DocumentsScreen() {
     <ThemedView style={[styles.container, { backgroundColor: surface }]}>
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: primary + "40" }]}>
-        <Pressable onPress={() => router.back()}>
+        <Pressable
+          onPress={() => router.back()}
+          style={{ flexDirection: "row", alignItems: "center" }}
+        >
           <IconSymbol name="chevron.left" size={24} color={primary} />
+          <ThemedText
+            style={{ color: primary, marginLeft: 4, fontWeight: "500" }}
+          >
+            Back
+          </ThemedText>
         </Pressable>
         <ThemedText type="title" style={{ flex: 1, textAlign: "center" }}>
           Documents
         </ThemedText>
-        <Pressable
-          onPress={() => {
-            if (editing) {
-              Alert.alert("Saved", "Documents have been saved successfully");
-            }
-            setEditing(!editing);
-          }}
-        >
-          <ThemedText style={{ color: primary, fontWeight: "600" }}>
-            {editing ? "Done" : "Edit"}
-          </ThemedText>
-        </Pressable>
+        <View style={{ width: 40 }} />
       </View>
 
       <ScrollView
@@ -124,22 +152,18 @@ export default function DocumentsScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
-        {(
-          [
-            { key: "id", label: "ID Document" },
-            { key: "license", label: "Driver's License" },
-            { key: "insurance", label: "Vehicle Insurance" },
-          ] as const
-        ).map(({ key, label }) => {
-          const file = documents[key];
+        {[
+          { key: "id", label: "ID Document" },
+          { key: "license", label: "Driver's License" },
+          { key: "insurance", label: "Vehicle Insurance" },
+        ].map(({ key, label }) => {
+          const docKey = key as DocumentKey;
+          const file = documents[docKey];
           const uploaded = Boolean(file);
-
           return (
             <View key={key} style={styles.section}>
               <ThemedText type="defaultSemiBold">{label}</ThemedText>
-              <Pressable
-                disabled={!editing || uploaded}
-                onPress={() => pickFile(key)}
+              <View
                 style={[
                   styles.uploadCard,
                   uploaded && { borderColor: primary, opacity: 0.9 },
@@ -151,9 +175,7 @@ export default function DocumentsScreen() {
                   color={uploaded ? "#22C55E" : "#9CA3AF"}
                 />
                 <ThemedText style={styles.uploadText}>
-                  {uploaded
-                    ? "File uploaded successfully"
-                    : "Tap to upload or drag & drop"}
+                  {uploaded ? "File uploaded successfully" : "No file uploaded"}
                 </ThemedText>
                 <ThemedText style={styles.hintText}>
                   {uploaded && file
@@ -162,15 +184,7 @@ export default function DocumentsScreen() {
                       ""
                     : "PDF, JPG, PNG (max 5MB)"}
                 </ThemedText>
-                {uploaded && editing && (
-                  <Pressable
-                    onPress={() => removeFile(key)}
-                    style={styles.removeButton}
-                  >
-                    <ThemedText type="link">Remove</ThemedText>
-                  </Pressable>
-                )}
-              </Pressable>
+              </View>
             </View>
           );
         })}

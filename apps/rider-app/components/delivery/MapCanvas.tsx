@@ -7,17 +7,10 @@ import React, {
   useState,
 } from "react";
 import { StyleSheet, Text, View } from "react-native";
-import MapView, {
-  AnimatedRegion,
-  Circle,
-  LatLng,
-  Marker,
-  Polyline,
-} from "react-native-maps";
+import MapView, { Circle, LatLng, Marker, Polyline } from "react-native-maps";
 
 import { IconSymbol } from "@/components/ui/icon-symbol";
-import { Keys } from "@/config/keys";
-import { useDelivery } from "@/context/DeliveryContext";
+import { useJobs } from "@/context/JobContext";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { getDirections } from "@/services/maps";
 
@@ -28,7 +21,7 @@ export type MapCanvasHandle = {
 
 const MapCanvas = forwardRef<MapCanvasHandle>((_, ref) => {
   const mapRef = useRef<MapView>(null);
-  const { status } = useDelivery();
+  const { activeJob, status } = useJobs();
   const primary = useThemeColor({}, "brandPrimary");
 
   const [location, setLocation] = useState<Location.LocationObject | null>(
@@ -38,14 +31,7 @@ const MapCanvas = forwardRef<MapCanvasHandle>((_, ref) => {
   const [distanceLeft, setDistanceLeft] = useState("");
   const [eta, setEta] = useState("");
 
-  const vehicleRef = useRef(
-    new AnimatedRegion({
-      latitude: 0,
-      longitude: 0,
-      latitudeDelta: 0,
-      longitudeDelta: 0,
-    }),
-  ).current;
+  // vehicleRef is not used for animated marker, so can be removed for now
 
   /** Location tracking */
   useEffect(() => {
@@ -57,13 +43,6 @@ const MapCanvas = forwardRef<MapCanvasHandle>((_, ref) => {
       const current = await Location.getCurrentPositionAsync({});
       setLocation(current);
 
-      vehicleRef.setValue({
-        latitude: current.coords.latitude,
-        longitude: current.coords.longitude,
-        latitudeDelta: 0,
-        longitudeDelta: 0,
-      });
-
       Location.watchPositionAsync(
         {
           accuracy: Location.Accuracy.High,
@@ -72,7 +51,6 @@ const MapCanvas = forwardRef<MapCanvasHandle>((_, ref) => {
         },
         (loc) => {
           setLocation(loc);
-
           mapRef.current?.animateToRegion(
             {
               latitude: loc.coords.latitude,
@@ -82,28 +60,6 @@ const MapCanvas = forwardRef<MapCanvasHandle>((_, ref) => {
             },
             800,
           );
-
-          // mapRef.current?.animateCamera({
-          //   center: {
-          //     latitude: loc.coords.latitude,
-          //     longitude: loc.coords.longitude,
-          //   },
-          //   pitch: 55,
-          //   zoom: 17,
-          // });
-
-          (vehicleRef as any)
-            .timing({
-              toValue: {
-                latitude: loc.coords.latitude,
-                longitude: loc.coords.longitude,
-                latitudeDelta: 0,
-                longitudeDelta: 0,
-              },
-              duration: 1000,
-              useNativeDriver: false,
-            })
-            .start();
         },
       );
     })();
@@ -112,24 +68,34 @@ const MapCanvas = forwardRef<MapCanvasHandle>((_, ref) => {
   /** Route + ETA */
   useEffect(() => {
     async function fetchRoute() {
-      if (!location) return;
+      if (!location || !activeJob) return;
 
       let destination: LatLng | null = null;
-
-      if (status === "en-route-pickup") destination = Keys.VENDOR_COORD;
-      else if (status === "en-route-dropoff") destination = Keys.CUSTOMER_COORD;
-      else {
+      if (status === "en-route-pickup") {
+        destination = activeJob.pickupAddress?.coords || {
+          latitude: 6.5244,
+          longitude: 3.3792,
+        };
+      } else if (status === "en-route-dropoff") {
+        destination = activeJob.dropoffAddress?.coords || {
+          latitude: 6.4654,
+          longitude: 3.4064,
+        };
+      } else {
         setRouteCoords([]);
         setDistanceLeft("");
         setEta("");
         return;
       }
 
+      if (!destination) return;
       try {
-        const { coordinates, distance, duration, error } = await getDirections(
-          location.coords,
-          destination as { latitude: number; longitude: number },
-        );
+        const { coordinates, distance, duration, error } = await getDirections({
+          originLat: location.coords.latitude,
+          originLng: location.coords.longitude,
+          destLat: destination.latitude,
+          destLng: destination.longitude,
+        });
 
         if (error) {
           console.error("Failed to fetch route:", error);
@@ -145,19 +111,29 @@ const MapCanvas = forwardRef<MapCanvasHandle>((_, ref) => {
     }
 
     fetchRoute();
-  }, [location, status]);
+  }, [location, status, activeJob]);
 
   /** Expose controls */
   useImperativeHandle(ref, () => ({
     animateToPickup() {
       mapRef.current?.animateToRegion(
-        { ...Keys.VENDOR_COORD, latitudeDelta: 0.01, longitudeDelta: 0.01 },
+        {
+          latitude: 6.5244,
+          longitude: 3.3792,
+          latitudeDelta: 0.01,
+          longitudeDelta: 0.01,
+        },
         800,
       );
     },
     animateToDropoff() {
       mapRef.current?.animateToRegion(
-        { ...Keys.CUSTOMER_COORD, latitudeDelta: 0.01, longitudeDelta: 0.01 },
+        {
+          latitude: 6.4654,
+          longitude: 3.4064,
+          latitudeDelta: 0.01,
+          longitudeDelta: 0.01,
+        },
         800,
       );
     },
@@ -203,17 +179,50 @@ const MapCanvas = forwardRef<MapCanvasHandle>((_, ref) => {
           />
         )}
 
-        {/* Vendor marker */}
-        {(status === "en-route-pickup" || status === "en-route-dropoff") && (
-          <Marker coordinate={Keys.VENDOR_COORD} title="Pickup Location">
-            <IconSymbol name="storefront" size={28} color={primary} />
-          </Marker>
-        )}
+        {/* Pickup marker (Vendor or Ride origin) */}
+        {(status === "en-route-pickup" || status === "en-route-dropoff") &&
+          activeJob && (
+            <Marker
+              coordinate={
+                activeJob.pickupAddress?.coords || {
+                  latitude: 6.5244,
+                  longitude: 3.3792,
+                }
+              }
+              title={
+                activeJob.jobType === "ride"
+                  ? "Pickup Location"
+                  : "Vendor Location"
+              }
+            >
+              <IconSymbol
+                name={activeJob.jobType === "ride" ? "car" : "storefront"}
+                size={28}
+                color={primary}
+              />
+            </Marker>
+          )}
 
-        {/* Customer marker */}
-        {status === "en-route-dropoff" && (
-          <Marker coordinate={Keys.CUSTOMER_COORD} title="Drop-off Location">
-            <IconSymbol name="home" size={28} color={primary} />
+        {/* Dropoff marker (Customer or Ride destination) */}
+        {status === "en-route-dropoff" && activeJob && (
+          <Marker
+            coordinate={
+              activeJob.dropoffAddress?.coords || {
+                latitude: 6.4654,
+                longitude: 3.4064,
+              }
+            }
+            title={
+              activeJob.jobType === "ride"
+                ? "Drop-off Location"
+                : "Customer Location"
+            }
+          >
+            <IconSymbol
+              name={activeJob.jobType === "ride" ? "car" : "home"}
+              size={28}
+              color={primary}
+            />
           </Marker>
         )}
 
@@ -223,9 +232,13 @@ const MapCanvas = forwardRef<MapCanvasHandle>((_, ref) => {
         </Marker.Animated> */}
       </MapView>
 
-      {distanceLeft && eta && (
+      {distanceLeft && eta && activeJob && (
         <View style={styles.overlay}>
-          <Text style={styles.text}>{distanceLeft}</Text>
+          <Text style={styles.text}>
+            {activeJob.jobType === "ride"
+              ? `${distanceLeft} left`
+              : distanceLeft}
+          </Text>
           <Text style={styles.text}>ETA {eta}</Text>
         </View>
       )}

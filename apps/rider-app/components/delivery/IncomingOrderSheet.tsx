@@ -1,14 +1,14 @@
-import React, { useEffect, useState } from "react";
-import { View, StyleSheet, Pressable, ActivityIndicator } from "react-native";
 import { ThemedText } from "@/components/themed-text";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { useJobs } from "@/context/JobContext";
 import { useThemeColor } from "@/hooks/use-theme-color";
-import { useDelivery } from "@/context/DeliveryContext";
+import React, { useEffect, useState } from "react";
+import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
 
 const AUTO_DECLINE_TIMEOUT = 90;
 
-export default function IncomingOrderSheet() {
-  const { incomingOrder, acceptOrder, declineOrder } = useDelivery();
+export default function incomingJobSheet() {
+  const { incomingJob, acceptJob, declineJob } = useJobs();
 
   const primary = useThemeColor({}, "brandPrimary");
   const surface = useThemeColor({}, "surfaceBackground");
@@ -17,8 +17,11 @@ export default function IncomingOrderSheet() {
   const [timer, setTimer] = useState(AUTO_DECLINE_TIMEOUT);
   const [loadingAccept, setLoadingAccept] = useState(false);
 
+  const isRide = incomingJob && incomingJob.jobType === "ride";
+  const isDelivery = incomingJob && incomingJob.jobType === "delivery";
+
   useEffect(() => {
-    if (!incomingOrder) return;
+    if (!incomingJob) return;
 
     setTimer(AUTO_DECLINE_TIMEOUT);
 
@@ -26,7 +29,9 @@ export default function IncomingOrderSheet() {
       setTimer((prev) => {
         if (prev <= 1) {
           clearInterval(interval);
-          declineOrder();
+          if (incomingJob) {
+            declineJob(incomingJob.id, incomingJob.jobType);
+          }
           return 0;
         }
         return prev - 1;
@@ -34,21 +39,21 @@ export default function IncomingOrderSheet() {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [incomingOrder]);
+  }, [incomingJob]);
 
-  if (!incomingOrder) return null;
+  if (!incomingJob) return null;
 
   const handleAccept = async () => {
     setLoadingAccept(true);
     try {
-      await acceptOrder(incomingOrder.id);
+      await acceptJob(incomingJob.id, incomingJob.jobType);
     } catch (error) {
       setLoadingAccept(false);
     }
   };
 
   const handleDecline = async () => {
-    await declineOrder();
+    await declineJob(incomingJob.id, incomingJob.jobType);
   };
 
   const minutes = Math.floor(timer / 60);
@@ -59,9 +64,10 @@ export default function IncomingOrderSheet() {
       <View style={styles.mapPlaceholder} />
 
       <View style={[styles.sheet, { backgroundColor: surface }]}>
+        ...
         <View style={styles.newDeliveryBadge}>
           <ThemedText style={{ color: primary, fontWeight: "600" }}>
-            NEW DELIVERY
+            {isRide ? "NEW RIDE" : "NEW DELIVERY"}
           </ThemedText>
           <View style={styles.timerBadge}>
             <ThemedText style={{ color: "#fff", fontWeight: "600" }}>
@@ -69,60 +75,65 @@ export default function IncomingOrderSheet() {
             </ThemedText>
           </View>
         </View>
-
         <View style={styles.vendorRow}>
-          <IconSymbol name="pizza" size={32} color={primary} />
+          <IconSymbol
+            name={isRide ? "car" : "storefront"}
+            size={32}
+            color={primary}
+          />
           <View style={{ flex: 1 }}>
             <ThemedText type="defaultSemiBold">
-              {incomingOrder.vendorName}
+              {isRide
+                ? incomingJob.customerName
+                : incomingJob.pickupAddress?.name || "Pickup"}
             </ThemedText>
             <ThemedText style={{ color: "#666" }}>
-              Restaurant • {incomingOrder.distanceToVendor} mi away
+              {isRide
+                ? `Pickup • ${incomingJob.pickupAddress?.address || incomingJob.pickupAddress}`
+                : `Pickup • ${incomingJob.pickupAddress?.address || incomingJob.pickupAddress}`}
             </ThemedText>
           </View>
         </View>
-
         <View style={styles.addressRow}>
           <View style={styles.iconCircle}>
             <IconSymbol name="p.square" size={18} color="#fff" />
           </View>
-          <ThemedText>Pickup: {incomingOrder.vendorAddress}</ThemedText>
+          <ThemedText>
+            {`Pickup: ${incomingJob.pickupAddress?.address || incomingJob.pickupAddress}`}
+          </ThemedText>
         </View>
-
         <View style={styles.addressRow}>
           <View style={[styles.iconCircle, { backgroundColor: "#EF4444" }]}>
             <IconSymbol name="d.square" size={18} color="#fff" />
           </View>
-          <ThemedText>Drop-off: {incomingOrder.customerAddress}</ThemedText>
+          <ThemedText>
+            {`Drop-off: ${incomingJob.dropoffAddress?.address || incomingJob.dropoffAddress}`}
+          </ThemedText>
         </View>
-
         <View style={styles.infoRow}>
           <View style={styles.infoItem}>
             <IconSymbol name="clock" size={18} color="#666" />
-            <ThemedText>~{incomingOrder.estimatedTime} min</ThemedText>
+            <ThemedText>
+              {isRide && incomingJob.durationMin !== undefined
+                ? `~${incomingJob.durationMin} min`
+                : isDelivery && incomingJob.packageDetails
+                  ? incomingJob.packageDetails
+                  : ""}
+            </ThemedText>
           </View>
           <View style={styles.infoItem}>
             <IconSymbol name="arrow.right.circle" size={18} color="#666" />
-            <ThemedText>{incomingOrder.totalDistance} mi</ThemedText>
-          </View>
-          <ThemedText type="title" style={{ color: primary }}>
-            ₦{incomingOrder.earnings.toFixed(2)}
-          </ThemedText>
-        </View>
-
-        {incomingOrder.note && (
-          <View style={styles.noteBanner}>
-            <IconSymbol name="info" size={16} color={primary} />
-            <ThemedText style={{ fontSize: 14, color: primary }}>
-              {incomingOrder.note}
+            <ThemedText>
+              {isRide && incomingJob.distanceKm !== undefined
+                ? `${incomingJob.distanceKm} km`
+                : ""}
             </ThemedText>
           </View>
-        )}
-
-        <ThemedText style={{ color: "#666", marginBottom: 16 }}>
-          {incomingOrder.items}
-        </ThemedText>
-
+          <ThemedText type="title" style={{ color: primary }}>
+            ₦{incomingJob.earnings?.toFixed(2)}
+          </ThemedText>
+        </View>
+        {/* No note or items on IncomingJobOffer. If needed, add custom UI here. */}
         <View style={styles.actionButtons}>
           <Pressable style={styles.declineBtn} onPress={handleDecline}>
             <ThemedText style={{ color: danger, fontWeight: "600" }}>
