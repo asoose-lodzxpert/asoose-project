@@ -2,14 +2,11 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
-  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class RiderNotificationsService {
-  private readonly logger = new Logger(RiderNotificationsService.name);
-
   constructor(private readonly prisma: PrismaService) {}
 
   async findAll(
@@ -23,12 +20,10 @@ export class RiderNotificationsService {
 
     const whereClause: any = { riderId };
 
-    // Filter by type (ORDER, PAYOUT, SYSTEM)
     if (type) {
       whereClause.type = type.toUpperCase();
     }
 
-    // Filter by read status
     if (isRead !== undefined) {
       whereClause.isRead = isRead;
     }
@@ -75,7 +70,6 @@ export class RiderNotificationsService {
   }
 
   async markAsRead(riderId: string, notificationId: string) {
-    // Validate ownership
     const notification = await this.prisma.notification.findUnique({
       where: { id: notificationId },
       select: { riderId: true },
@@ -86,9 +80,6 @@ export class RiderNotificationsService {
     }
 
     if (notification.riderId !== riderId) {
-      this.logger.warn(
-        `Rider ${riderId} attempted to access notification ${notificationId} belonging to another rider`,
-      );
       throw new ForbiddenException('Access denied');
     }
 

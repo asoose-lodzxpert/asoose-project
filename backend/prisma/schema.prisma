@@ -189,13 +189,12 @@ model User {
   activityLogs ActivityLog[]
   disputesOpened    Dispute[]        @relation("DisputeOpener")
   disputesTargeted  Dispute[]        @relation("DisputeTarget")
-  documents UserDocument[]
   disputeMessages   DisputeMessage[]
   payments     Payment[]
 
   // Trip Relations
-  ridesAsCustomer      Ride[]     @relation("RideCustomer")
-  deliveriesAsCustomer Delivery[] @relation("DeliveryCustomer")
+  rides      Ride[]     @relation("RideCustomer")
+  deliveries Delivery[] @relation("DeliveryCustomer")
 
   // Emergency Contacts
   emergencyContacts    EmergencyContact[]
@@ -208,25 +207,6 @@ model User {
   @@index([role, status])
   @@index([createdAt])
   @@index([status, createdAt(sort: Desc)])
-}
-
-model UserDocument {
-  id        String   @id @default(uuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  type      String   // e.g., "DRIVER_LICENSE", "VEHICLE_INSURANCE", "CAC_CERT"
-  url       String   // Storage URL (Railway S3 or S3-compatible)
-  
-  status    VerificationStatus @default(PENDING)
-  rejectionReason String?      // Required if status is REJECTED
-  
-  expiresAt DateTime? // For tracking license expiry
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-
-  @@index([userId])
-  @@map("user_documents")
 }
 
 model Notification {

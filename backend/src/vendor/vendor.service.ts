@@ -131,7 +131,7 @@ export class VendorService {
     const store = await this.prisma.store.findUnique({ where: { vendorId } });
     if (!store) return [];
     const orders = await this.prisma.order.findMany({
-      where: { storeId: store.id },
+      where: { storeId: store.id, paymentStatus: 'PAID' },
       orderBy: { createdAt: 'desc' },
       take: 5,
       include: {

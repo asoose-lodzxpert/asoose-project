@@ -57,6 +57,8 @@ export class VendorOrdersService {
 
     const whereClause: any = { storeId: store.id };
 
+    whereClause.paymentStatus = 'PAID';
+
     if (status) {
       const statuses = status.split(',').map((s) => s.trim());
       if (statuses.length === 1) {
@@ -89,6 +91,10 @@ export class VendorOrdersService {
 
   async acceptOrder(userId: string, orderId: string) {
     const order = await this.validateOrderAccess(userId, orderId);
+
+    if (order.paymentStatus !== 'PAID') {
+      throw new BadRequestException(`Order has not been paid yet!`);
+    }
 
     if (order.status !== 'PENDING') {
       throw new BadRequestException(

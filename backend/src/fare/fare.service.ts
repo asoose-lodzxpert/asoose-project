@@ -95,7 +95,17 @@ export class FareService {
       );
 
     const distanceKm = distanceMeters / 1000;
-    const variableFare = Math.round(distanceKm * this.RiderPerKm);
+
+    // Get current time in Africa/Lagos
+    const now = new Date();
+    const lagosTime = new Date(
+      now.toLocaleString('en-US', { timeZone: 'Africa/Lagos' }),
+    );
+    const hour = lagosTime.getHours();
+
+    // After 10pm (22:00), use 1000 NGN per km
+    const perKm = hour >= 22 ? 1000 : this.RiderPerKm;
+    const variableFare = Math.round(distanceKm * perKm);
     const price = this.BaseRideFare + variableFare;
 
     return {

@@ -20,9 +20,6 @@ export class RolesGuard implements CanActivate {
       [context.getHandler(), context.getClass()],
     );
 
-    this.logger.log('=== RolesGuard ===');
-    this.logger.log(`Required Roles: ${JSON.stringify(requiredRoles)}`);
-
     // If no roles are required, allow access
     if (!requiredRoles) {
       this.logger.log('No roles required, allowing access');
@@ -31,10 +28,6 @@ export class RolesGuard implements CanActivate {
 
     // Get the user object (attached by JwtAuthGuard)
     const { user } = context.switchToHttp().getRequest();
-
-    this.logger.log(`User object: ${JSON.stringify(user)}`);
-    this.logger.log(`User role: ${user?.role}`);
-    this.logger.log(`User role type: ${typeof user?.role}`);
 
     // Accept all roles - use enum values for comparison
     const validRoles = [
@@ -47,12 +40,10 @@ export class RolesGuard implements CanActivate {
     ];
 
     if (!validRoles.includes(user.role)) {
-      this.logger.error(`Invalid role: ${user.role}`);
       return false;
     }
 
     const hasRole = requiredRoles.includes(user.role);
-    this.logger.log(`Has required role: ${hasRole}`);
 
     return hasRole;
   }

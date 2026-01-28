@@ -1,3 +1,6 @@
+import { Roles } from '../auth/roles.decorator';
+import { RolesGuard } from '../auth/roles.guards';
+import { UserRole } from '../common/enums/user-role.enum';
 import {
   Controller,
   Post,
@@ -16,6 +19,14 @@ import { StorageService } from './storage.service';
 @Controller('storage')
 export class StorageController {
   constructor(private readonly storageService: StorageService) {}
+
+  @Post('list')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  async listFiles() {
+    const files = await this.storageService.listFiles();
+    return { files };
+  }
 
   @Post('upload')
   @UseGuards(JwtAuthGuard)
