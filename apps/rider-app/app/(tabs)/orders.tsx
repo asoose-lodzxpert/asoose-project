@@ -1,6 +1,11 @@
-import { useRouter } from "expo-router";
-import React, { useCallback, useEffect, useState } from "react";
-import { RefreshControl, ScrollView, StyleSheet, View } from "react-native";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import {
+  ActivityIndicator,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  View,
+} from "react-native";
 
 import { EmptyState } from "@/components/orders/EmptyState";
 import { OrderCard } from "@/components/orders/OrderCard";
@@ -24,10 +29,7 @@ type OrderTab = "active" | "completed";
 /* ---------------------------------- */
 
 export default function OrdersScreen() {
-  const router = useRouter();
-
   const surface = useThemeColor({}, "surfaceBackground");
-  const cardBg = useThemeColor({}, "surfaceSubtle");
   const primary = useThemeColor({}, "brandPrimary");
   const muted = useThemeColor({}, "textMuted");
   const success = useThemeColor({}, "statusSuccess");
@@ -42,44 +44,86 @@ export default function OrdersScreen() {
     limit: number;
     total: number;
     totalPages: number;
-  } | null>(null);
+  }>({ page: 1, limit: 10, total: 0, totalPages: 1 });
+  const [loadingMore, setLoadingMore] = useState(false);
+  const scrollViewRef = useRef<ScrollView>(null);
 
   // Fetch orders from backend
-  const fetchOrders = useCallback(async () => {
-    try {
-      setLoading(true);
-      // Determine status filter based on tab
-      let statusFilter: string | undefined;
-      if (activeTab === "active") {
-        statusFilter = "ACCEPTED,PICKED_UP,IN_PROGRESS";
-      } else if (activeTab === "completed") {
-        statusFilter = "DELIVERED,COMPLETED,CANCELLED,REJECTED";
+  const fetchOrders = useCallback(
+    async (page = 1, append = false) => {
+      try {
+        if (page === 1) {
+          setLoading(true);
+        } else {
+          setLoadingMore(true);
+        }
+        // Determine status filter based on tab
+        let statusFilter: string | undefined;
+        if (activeTab === "active") {
+          statusFilter = "ACCEPTED,PICKED_UP,IN_PROGRESS";
+        } else if (activeTab === "completed") {
+          statusFilter = "DELIVERED,COMPLETED,CANCELLED,REJECTED";
+        }
+        const response = await getAllJobs(statusFilter, page, pagination.limit);
+        if (append) {
+          setOrders((prev) => [...prev, ...response.data]);
+        } else {
+          setOrders(response.data);
+        }
+        setPagination(response.pagination);
+      } catch (error) {
+        console.error("Error fetching jobs:", error);
+        Toast.show({
+          type: "error",
+          text1: "Failed to fetch jobs",
+          text2: "Please try again",
+        });
+      } finally {
+        setLoading(false);
+        setLoadingMore(false);
       }
-      const response = await getAllJobs(statusFilter);
-      setOrders(response.data);
-      setPagination(response.pagination);
-    } catch (error) {
-      console.error("Error fetching jobs:", error);
-      Toast.show({
-        type: "error",
-        text1: "Failed to fetch jobs",
-        text2: "Please try again",
-      });
-    } finally {
-      setLoading(false);
-    }
-  }, [activeTab]);
+    },
+    [activeTab, pagination.limit],
+  );
 
   // Fetch on mount and when tab changes
   useEffect(() => {
-    fetchOrders();
-  }, [fetchOrders]);
+    setPagination((prev) => ({ ...prev, page: 1 }));
+    fetchOrders(1, false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await fetchOrders();
+    await fetchOrders(1, false);
     setRefreshing(false);
   };
+
+  // Infinite scroll handler
+  const handleScroll = useCallback(
+    async (event: {
+      nativeEvent: {
+        layoutMeasurement: { height: number };
+        contentOffset: { y: number };
+        contentSize: { height: number };
+      };
+    }) => {
+      const { layoutMeasurement, contentOffset, contentSize } =
+        event.nativeEvent;
+      const isCloseToBottom =
+        layoutMeasurement.height + contentOffset.y >= contentSize.height - 100;
+      if (
+        isCloseToBottom &&
+        !loadingMore &&
+        !loading &&
+        pagination.page < pagination.totalPages
+      ) {
+        await fetchOrders(pagination.page + 1, true);
+        setPagination((prev) => ({ ...prev, page: prev.page + 1 }));
+      }
+    },
+    [loadingMore, loading, pagination, fetchOrders],
+  );
 
   const getStatusColor = (status: string): string => {
     switch (status) {
@@ -141,6 +185,7 @@ export default function OrdersScreen() {
       />
 
       <ScrollView
+        ref={scrollViewRef}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -150,6 +195,8 @@ export default function OrdersScreen() {
         }
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 40 }}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
       >
         {loading ? (
           <View style={styles.cardsList}>
@@ -169,6 +216,11 @@ export default function OrdersScreen() {
                 getStatusLabel={getStatusLabel}
               />
             ))}
+            {loadingMore && (
+              <View style={{ paddingVertical: 16, alignItems: "center" }}>
+                <ActivityIndicator size="small" color={primary} />
+              </View>
+            )}
           </View>
         )}
       </ScrollView>
@@ -194,95 +246,5 @@ const styles = StyleSheet.create({
   },
   cardsList: {
     gap: 16,
-  },
-  orderCard: {
-    borderRadius: 16,
-    padding: 16,
-    gap: 16,
-    backgroundColor: "#fff",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  orderHeader: {
-    gap: 12,
-  },
-  orderIdRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  orderId: {
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  typeBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  typeBadgeText: {
-    fontSize: 12,
-    fontWeight: "600",
-    textTransform: "uppercase",
-  },
-  statusBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-    alignSelf: "flex-start",
-  },
-  statusText: {
-    fontSize: 13,
-    fontWeight: "600",
-  },
-  locationContainer: {
-    gap: 8,
-  },
-  locationRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  locationDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-  },
-  locationText: {
-    fontSize: 14,
-    flex: 1,
-    color: "#333",
-  },
-  dashedLine: {
-    height: 20,
-    width: 2,
-    borderLeftWidth: 2,
-    borderLeftColor: "#ddd",
-    borderStyle: "dashed",
-    marginLeft: 4,
-  },
-  orderFooter: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: "#f0f0f0",
-  },
-  dateText: {
-    fontSize: 13,
-    color: "#888",
-  },
-  earningsText: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#10B981",
-  },
-  emptyState: {
-    padding: 60,
-    alignItems: "center",
   },
 });

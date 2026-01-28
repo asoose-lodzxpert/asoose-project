@@ -5,9 +5,8 @@ import {
   ScrollView,
   Pressable,
   RefreshControl,
-  Alert,
 } from "react-native";
-import * as DocumentPicker from "expo-document-picker";
+
 import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
 import { IconSymbol } from "@/components/ui/icon-symbol";
@@ -32,8 +31,6 @@ export default function DocumentsScreen() {
   // Editing is disabled; documents are view-only
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-
-  const MAX_SIZE = 5 * 1024 * 1024;
 
   /* Simulate fetch */
   useEffect(() => {

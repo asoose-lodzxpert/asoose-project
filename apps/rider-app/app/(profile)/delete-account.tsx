@@ -1,12 +1,12 @@
-import React, { useState } from "react";
-import { View, StyleSheet, ScrollView, Pressable, Alert } from "react-native";
-import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
+import { ThemedView } from "@/components/themed-view";
 import { IconSymbol } from "@/components/ui/icon-symbol";
-import { useThemeColor } from "@/hooks/use-theme-color";
-import { useRouter } from "expo-router";
-import { deleteAccount } from "@/services/delete-account.service";
 import { useConfirm } from "@/hooks/use-confirm";
+import { useThemeColor } from "@/hooks/use-theme-color";
+import { deleteAccount } from "@/services/delete-account.service";
+import { useRouter } from "expo-router";
+import React, { useState } from "react";
+import { Alert, Pressable, ScrollView, StyleSheet, View } from "react-native";
 
 const REASONS = [
   "I have another account",
@@ -154,7 +154,7 @@ export default function DeleteAccountScreen() {
             <ThemedText
               style={{ color: "#6B7280", marginTop: 8, textAlign: "center" }}
             >
-              Your account has been deleted. We're sorry to see you go.
+              Your account has been deleted. We&apos;re sorry to see you go.
             </ThemedText>
             <Pressable
               style={[

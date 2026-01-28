@@ -1,15 +1,14 @@
-import React, { useMemo, useRef, useState, useEffect } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  Pressable,
-  Modal,
-  FlatList,
-  Dimensions,
-} from "react-native";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedInput } from "@/components/ThemedInput";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import {
+  FlatList,
+  Modal,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 
 /* ------------------------------------------------------------------ */
 /* Types */
@@ -158,7 +157,7 @@ function WheelDateModal({
 
   const daysInMonth = useMemo(
     () => new Date(year, month + 1, 0).getDate(),
-    [year, month]
+    [year, month],
   );
 
   const years = useMemo(() => {
@@ -169,7 +168,7 @@ function WheelDateModal({
 
   useEffect(() => {
     if (day > daysInMonth) setDay(daysInMonth);
-  }, [daysInMonth]);
+  }, [daysInMonth, day]);
 
   // Scroll wheels to initial index when modal opens
   useEffect(() => {
@@ -275,7 +274,7 @@ type WheelProps<T extends string | number> = {
 const Wheel = React.forwardRef<FlatList<any>, WheelProps<any>>(
   (
     { data, index, onChange, activeTextColor, inactiveTextColor, ready },
-    ref
+    ref,
   ) => {
     return (
       <FlatList
@@ -310,8 +309,9 @@ const Wheel = React.forwardRef<FlatList<any>, WheelProps<any>>(
         }}
       />
     );
-  }
+  },
 );
+Wheel.displayName = "Wheel";
 
 /* ------------------------------------------------------------------ */
 /* Styles */

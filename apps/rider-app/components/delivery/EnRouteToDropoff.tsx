@@ -59,7 +59,7 @@ export default function EnRouteToDropoff({
               if (typeof distData.distance === "number") {
                 setDistanceToCustomer(distData.distance);
               }
-            } catch (err) {
+            } catch {
               setDistanceToCustomer(null);
             }
             try {

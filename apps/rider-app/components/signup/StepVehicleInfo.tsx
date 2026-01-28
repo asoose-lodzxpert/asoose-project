@@ -19,7 +19,7 @@ type Props = {
   onChange: <K extends keyof SignupForm>(key: K, value: SignupForm[K]) => void;
 };
 
-const MAX_SIZE = 5 * 1024 * 1024;
+// const MAX_SIZE = 5 * 1024 * 1024; // 5MB
 
 const VEHICLES: { key: VehicleType; label: string; icon: any }[] = [
   {

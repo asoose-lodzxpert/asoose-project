@@ -78,8 +78,6 @@ export async function uploadDocument(
   type: "idCard" | "driverLicense" | "vehicleInsurance" | "vehicleRegistration",
 ): Promise<string> {
   try {
-    // For signup, documents are uploaded to public endpoint (no auth required)
-    // Create FormData for file upload
     const formData = new FormData();
 
     // Convert URI to blob
@@ -94,7 +92,6 @@ export async function uploadDocument(
       body: formData,
       headers: {
         "ngrok-skip-browser-warning": "true",
-        // Don't set Content-Type - let browser set it with boundary for multipart/form-data
       },
     });
 

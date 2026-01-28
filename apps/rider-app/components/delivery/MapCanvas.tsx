@@ -246,6 +246,8 @@ const MapCanvas = forwardRef<MapCanvasHandle>((_, ref) => {
   );
 });
 
+MapCanvas.displayName = "MapCanvas";
+
 export default MapCanvas;
 
 /* ───────── styles ───────── */

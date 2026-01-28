@@ -6,10 +6,10 @@ import { Animated, StyleSheet, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 import { AuthProvider, useAuth } from "@/context/AuthContext";
-import { DeliveryProvider } from "@/context/DeliveryContext";
-import Toast from "react-native-toast-message";
+import { JobsProvider } from "@/context/JobContext";
 import { useConfirm } from "@/hooks/use-confirm";
 import { useThemeColor } from "@/hooks/use-theme-color";
+import Toast from "react-native-toast-message";
 
 function LoadingScreen() {
   const primary = useThemeColor({}, "brandPrimary");
@@ -41,7 +41,7 @@ function LoadingScreen() {
       createAnimation(dot2, 200),
       createAnimation(dot3, 400),
     ]).start();
-  }, []);
+  }, [dot1, dot2, dot3]);
 
   const translateY1 = dot1.interpolate({
     inputRange: [0, 1],
@@ -134,7 +134,7 @@ function RootNavigator() {
         router.replace("/(auth)/signin");
       }
     }
-  }, [user, segments, loading, hasLaunched]);
+  }, [user, segments, loading, hasLaunched, router]);
 
   if (loading || hasLaunched === null) {
     return <LoadingScreen />;
@@ -156,9 +156,9 @@ function RootNavigator() {
 export default function RootLayout() {
   return (
     <AuthProvider>
-      <DeliveryProvider>
+      <JobsProvider>
         <RootNavigator />
-      </DeliveryProvider>
+      </JobsProvider>
     </AuthProvider>
   );
 }

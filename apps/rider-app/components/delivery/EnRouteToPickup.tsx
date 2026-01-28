@@ -19,8 +19,7 @@ export default function EnRouteToPickup({
   const surface = useThemeColor({}, "surfaceBackground");
   const cardBg = useThemeColor({}, "surfaceSubtle");
 
-  const [riderLocation, setRiderLocation] =
-    useState<Location.LocationObject | null>(null);
+  // const [riderLocation, setRiderLocation] = useState<Location.LocationObject | null>(null);
   const [distanceToPickup, setDistanceToPickup] = useState<number | null>(null);
   const [eta, setEta] = useState<string>("");
   const [currentStep, setCurrentStep] = useState<{
@@ -33,8 +32,8 @@ export default function EnRouteToPickup({
     (async () => {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== "granted") return;
-      const loc = await Location.getCurrentPositionAsync({});
-      setRiderLocation(loc);
+      await Location.getCurrentPositionAsync({});
+      // setRiderLocation(loc); // removed unused state
       subscription = await Location.watchPositionAsync(
         {
           accuracy: Location.Accuracy.High,
@@ -42,7 +41,7 @@ export default function EnRouteToPickup({
           timeInterval: 3000,
         },
         async (newLoc) => {
-          setRiderLocation(newLoc);
+          // setRiderLocation(newLoc); // removed unused state
           if (activeJob) {
             const pickupLat =
               activeJob.pickupAddress?.latitude ?? activeJob.pickupAddress?.lat;
@@ -63,7 +62,7 @@ export default function EnRouteToPickup({
                 if (typeof distData.distance === "number") {
                   setDistanceToPickup(distData.distance);
                 }
-              } catch (err) {
+              } catch {
                 setDistanceToPickup(null);
               }
               try {

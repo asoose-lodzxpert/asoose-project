@@ -3,8 +3,8 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useJobs } from "@/context/JobContext";
 import { useConfirm } from "@/hooks/use-confirm";
 import { useThemeColor } from "@/hooks/use-theme-color";
+import { getEarnings } from "@/services/earnings.service";
 import { getRiderProfile, type RiderProfile } from "@/services/profile.service";
-import { riderApiService } from "@/services/rider-api.service";
 import React, { useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
 
@@ -32,14 +32,14 @@ export default function OfflineScreen() {
       try {
         const [profile, data] = await Promise.all([
           getRiderProfile(),
-          riderApiService.getEarningsStats("today"),
+          getEarnings("today"),
         ]);
 
         setRole(profile.role);
         setStats({
-          totalDeliveries: data.totalDeliveries || 0,
-          totalRides: data.totalRides || 0,
-          totalEarnings: data.totalEarnings || 0,
+          totalDeliveries: data.rides || 0,
+          totalRides: data.rides || 0,
+          totalEarnings: data.total || 0,
           rating: data.rating || 0,
         });
       } finally {
@@ -56,7 +56,7 @@ export default function OfflineScreen() {
         <IconSymbol name={isDriver ? "car" : "bag"} size={60} color="#999" />
 
         <ThemedText type="title" style={styles.offlineTitle}>
-          You're currently offline
+          You&apos;re currently offline
         </ThemedText>
 
         <ThemedText style={styles.subtitle}>

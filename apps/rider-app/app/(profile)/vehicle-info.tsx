@@ -1,16 +1,5 @@
-import React, { useState, useEffect, useCallback } from "react";
-import {
-  View,
-  StyleSheet,
-  ScrollView,
-  Pressable,
-  Image,
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  RefreshControl,
-} from "react-native";
-import * as DocumentPicker from "expo-document-picker";
+import React, { useState, useEffect } from "react";
+import { View, StyleSheet, ScrollView, Pressable, Image } from "react-native";
 
 import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";

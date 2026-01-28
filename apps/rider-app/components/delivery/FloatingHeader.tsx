@@ -1,18 +1,18 @@
-import React from "react";
-import { StyleSheet, View, Pressable, Dimensions, Switch } from "react-native";
-import { useThemeColor } from "@/hooks/use-theme-color";
 import { ThemedText } from "@/components/themed-text";
 import { IconSymbol } from "@/components/ui/icon-symbol";
-import { useDelivery } from "@/context/DeliveryContext";
+import { useJobs } from "@/context/JobContext";
+import { useThemeColor } from "@/hooks/use-theme-color";
+import React from "react";
+import { Dimensions, Pressable, StyleSheet, Switch, View } from "react-native";
 
-import { useRouter } from "expo-router";
 import { useConfirm } from "@/hooks/use-confirm";
+import { useRouter } from "expo-router";
 
 const { width } = Dimensions.get("window");
 
 export default function FloatingHeader() {
   const router = useRouter();
-  const { status, goOnline, goOffline } = useDelivery();
+  const { status, goOnline, goOffline } = useJobs();
   const { confirm, ConfirmModal } = useConfirm();
 
   const card = useThemeColor({}, "surfaceCard");

@@ -1,25 +1,24 @@
-import React, { useState, useEffect, useCallback } from "react";
-import {
-  View,
-  StyleSheet,
-  ScrollView,
-  Pressable,
-  Alert,
-  RefreshControl,
-  Animated,
-} from "react-native";
-import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
+import { ThemedView } from "@/components/themed-view";
 import { ThemedInput } from "@/components/ThemedInput";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
-import { useRouter } from "expo-router";
-import Toast from "react-native-toast-message";
 import {
   getBankAccount,
   updateBankAccount,
 } from "@/services/bank-account.service";
 import type { BankAccount } from "@/types/bank-account";
+import { useRouter } from "expo-router";
+import React, { useCallback, useEffect, useState } from "react";
+import {
+  Animated,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  View,
+} from "react-native";
+import Toast from "react-native-toast-message";
 
 // Skeleton loader component
 const SkeletonBox = ({
@@ -260,8 +259,8 @@ export default function PaymentMethodsScreen() {
               No Bank Account
             </ThemedText>
             <ThemedText style={{ color: "#9CA3AF", textAlign: "center" }}>
-              You haven't added a bank account yet. Contact support to add your
-              withdrawal account.
+              You haven&apos;t added a bank account yet. Contact support to add
+              your withdrawal account.
             </ThemedText>
           </View>
         )}

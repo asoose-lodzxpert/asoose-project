@@ -7,7 +7,7 @@ import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
 
 const AUTO_DECLINE_TIMEOUT = 90;
 
-export default function incomingJobSheet() {
+export default function IncomingJobSheet() {
   const { incomingJob, acceptJob, declineJob } = useJobs();
 
   const primary = useThemeColor({}, "brandPrimary");
@@ -39,7 +39,7 @@ export default function incomingJobSheet() {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [incomingJob]);
+  }, [incomingJob, declineJob]);
 
   if (!incomingJob) return null;
 
@@ -47,7 +47,7 @@ export default function incomingJobSheet() {
     setLoadingAccept(true);
     try {
       await acceptJob(incomingJob.id, incomingJob.jobType);
-    } catch (error) {
+    } catch {
       setLoadingAccept(false);
     }
   };

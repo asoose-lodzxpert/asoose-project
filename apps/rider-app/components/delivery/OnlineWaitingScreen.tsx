@@ -3,7 +3,7 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useJobs } from "@/context/JobContext";
 import { useConfirm } from "@/hooks/use-confirm";
 import { useThemeColor } from "@/hooks/use-theme-color";
-import { riderApiService } from "@/services/rider-api.service";
+import { getEarnings } from "@/services/earnings.service";
 import React, { useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
 
@@ -30,22 +30,21 @@ export default function OnlineWaitingScreen() {
     const loadStats = async () => {
       setLoading(true);
       try {
-        const data = await riderApiService.getEarningsStats("today");
+        const data = await getEarnings("today");
         setStats({
-          totalEarnings: data.totalEarnings || 0,
-          totalDeliveries: data.totalDeliveries || 0,
-          totalRides: data.totalRides || 0,
-          onlineHours: data.onlineHours || 0,
-          jobType: data.jobType || "delivery",
+          totalEarnings: data.total || 0,
+          totalDeliveries: data.rides || 0,
+          totalRides: data.rides || 0,
+          onlineHours: data.hoursOnline || 0,
+          jobType: jobType,
         });
-      } catch (error) {
       } finally {
         setLoading(false);
       }
     };
 
     loadStats();
-  }, []);
+  }, [jobType]);
 
   return (
     <View style={styles.container}>

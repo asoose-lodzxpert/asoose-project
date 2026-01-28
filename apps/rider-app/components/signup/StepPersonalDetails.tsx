@@ -1,13 +1,13 @@
-import React, { useState, useMemo } from "react";
-import { View, StyleSheet, Platform, Pressable } from "react-native";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedInput } from "@/components/ThemedInput";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { STATE_CITIES, STATES } from "@/config/states";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { SignupForm } from "@/types/signup";
-import { DatePicker } from "../DatePicker";
+import React, { useMemo, useState } from "react";
+import { Pressable, StyleSheet, View } from "react-native";
 import { CustomDropdown } from "../CustomDropdown";
-import { STATE_CITIES, STATES } from "@/config/states";
+import { DatePicker } from "../DatePicker";
 
 type Props = {
   data: SignupForm;
@@ -20,7 +20,7 @@ export function StepPersonalDetails({ data, onChange }: Props) {
   const surface = useThemeColor({}, "surfaceBackground");
 
   const [selectedState, setSelectedState] = useState<string | undefined>(
-    undefined
+    undefined,
   );
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);

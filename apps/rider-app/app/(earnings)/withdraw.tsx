@@ -84,7 +84,6 @@ export default function WithdrawEarningsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [withdrawing, setWithdrawing] = useState(false);
-  const [accountModalLoading, setAccountModalLoading] = useState(false);
 
   const [amountDisplay, setAmountDisplay] = useState("");
   const [error, setError] = useState<string | null>(null);

@@ -1,26 +1,24 @@
+import { ThemedView } from "@/components/themed-view";
 import React, { useState } from "react";
 import {
-  View,
-  ScrollView,
-  StyleSheet,
-  Alert,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
+  StyleSheet,
   TouchableWithoutFeedback,
-  Keyboard,
 } from "react-native";
-import { ThemedView } from "@/components/themed-view";
 import Toast from "react-native-toast-message";
 
-import { SignupStepper } from "@/components/signup/SignupStepper";
 import { SignupNavigation } from "@/components/signup/SignupNavigation";
+import { SignupStepper } from "@/components/signup/SignupStepper";
 import { StepPersonalDetails } from "@/components/signup/StepPersonalDetails";
 import { StepVehicleInfo } from "@/components/signup/StepVehicleInfo";
 
-import { SignupForm, SignupStep } from "@/types/signup";
-import { StepAccountDetails } from "@/components/signup/StepAccountDetails";
 import { SignupSuccess } from "@/components/signup/SignupSuccess";
-import { registerRider, uploadDocument } from "@/services/signup";
+import { StepAccountDetails } from "@/components/signup/StepAccountDetails";
+import { registerRider } from "@/services/signup";
+import { SignupForm, SignupStep } from "@/types/signup";
 import { useRouter } from "expo-router";
 
 export default function SignupScreen() {
@@ -175,8 +173,7 @@ export default function SignupScreen() {
     try {
       setLoading(true);
 
-      // Register rider
-      const response = await registerRider(form);
+      await registerRider(form);
 
       Toast.show({
         type: "success",
@@ -184,13 +181,11 @@ export default function SignupScreen() {
         text2: "Your account has been created.",
       });
 
-      // Move to success screen
       setStep(4);
 
-      // Redirect to login after 3 seconds
       setTimeout(() => {
         router.replace("/(auth)/signin");
-      }, 3000);
+      }, 5000);
     } catch (e: any) {
       setError(e.message || "Registration failed");
       Toast.show({
