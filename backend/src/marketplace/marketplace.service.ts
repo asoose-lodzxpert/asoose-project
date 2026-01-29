@@ -83,26 +83,9 @@ export class MarketplaceService {
       take: 5,
     });
 
-    const resolvedBanners = await Promise.all(
-      banners.map(async (banner) => ({
-        ...banner,
-        image: await this.resolveImage(banner.image),
-      })),
-    );
-    return { verticals, banners: resolvedBanners };
+    return { verticals, banners };
   }
 
-  private async resolveImage(key: string | null): Promise<string | null> {
-    if (!key) return null;
-    if (key.startsWith('http')) return key; // Handle legacy or external URLs
-    try {
-      // Generates a valid URL (Signed or Public based on config)
-      return await this.storage.getSignedUrlForKey(key);
-    } catch (error) {
-      this.logger.warn(`Failed to resolve image for key: ${key}`);
-      return null;
-    }
-  }
   async getPaginatedStores(page: number, limit: number, type?: string) {
     const skip = (page - 1) * limit;
 

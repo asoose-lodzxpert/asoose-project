@@ -1,26 +1,31 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import {
-  View,
-  StyleSheet,
-  Pressable,
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
   Image,
   Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
   TouchableWithoutFeedback,
-  Animated,
+  View,
 } from "react-native";
-import { useThemeColor } from "@/hooks/use-theme-color";
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
+
+import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { ThemedInput } from "@/components/ThemedInput";
-import { ThemedText } from "@/components/themed-text";
-import { useAuth } from "@/context/AuthContext";
-import { useRouter } from "expo-router";
 import { IconSymbol } from "@/components/ui/icon-symbol";
-import Toast from "react-native-toast-message";
+import { useAuth } from "@/context/AuthContext";
 import { useConfirm } from "@/hooks/use-confirm";
+import { useThemeColor } from "@/hooks/use-theme-color";
+import { useRouter } from "expo-router";
+import Toast from "react-native-toast-message";
 
 export default function LoginScreen() {
   const [identifier, setIdentifier] = useState("");
@@ -39,30 +44,30 @@ export default function LoginScreen() {
   const textOnPrimary = useThemeColor({}, "textOnPrimary");
   const muted = useThemeColor({}, "textMuted");
 
-  const logoAnim = useRef(new Animated.Value(0)).current;
+  /* ------------------ Reanimated logo shift ------------------ */
+
+  const logoTranslateY = useSharedValue(0);
 
   useEffect(() => {
     const showSub = Keyboard.addListener("keyboardWillShow", () => {
-      Animated.timing(logoAnim, {
-        toValue: -60,
-        duration: 300,
-        useNativeDriver: true,
-      }).start();
+      logoTranslateY.value = withTiming(-60, { duration: 300 });
     });
 
     const hideSub = Keyboard.addListener("keyboardWillHide", () => {
-      Animated.timing(logoAnim, {
-        toValue: 0,
-        duration: 300,
-        useNativeDriver: true,
-      }).start();
+      logoTranslateY.value = withTiming(0, { duration: 300 });
     });
 
     return () => {
       showSub.remove();
       hideSub.remove();
     };
-  }, [logoAnim]);
+  }, []);
+
+  const logoStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: logoTranslateY.value }],
+  }));
+
+  /* ------------------ Logic ------------------ */
 
   function validateForm() {
     if (!identifier) {
@@ -171,17 +176,14 @@ export default function LoginScreen() {
     }
   }
 
+  /* ------------------ UI ------------------ */
+
   return (
     <ThemedView style={styles.container}>
       <ConfirmModal />
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <View style={{ flex: 1 }}>
-          <Animated.View
-            style={[
-              styles.logoContainer,
-              { transform: [{ translateY: logoAnim }] },
-            ]}
-          >
+          <Animated.View style={[styles.logoContainer, logoStyle]}>
             <Image
               source={require("@/assets/images/icon.png")}
               style={styles.logoImage}
@@ -307,6 +309,8 @@ export default function LoginScreen() {
     </ThemedView>
   );
 }
+
+/* ------------------ Styles ------------------ */
 
 const styles = StyleSheet.create({
   container: {

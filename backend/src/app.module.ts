@@ -8,6 +8,7 @@ import { BullModule } from '@nestjs/bullmq';
 import { CacheModule } from '@nestjs/cache-manager';
 
 import { AppController } from './app.controller';
+import { BullBoardController } from './system/bullboard.controller';
 import { AppService } from './app.service';
 
 import { AuthModule } from './auth/auth.module';
@@ -22,6 +23,7 @@ import { UsersModule } from './users/users.module';
 import { NotificationsModule } from './notifications/notifications.module';
 
 import { QueueModule } from './queue/queue.module';
+import { MailModule } from './mail/mail.module';
 import { FcmModule } from './libs/fcm/fcm.module';
 import { MapsModule } from './maps/maps.module';
 import { StorageModule } from './storage/storage.module';
@@ -44,7 +46,7 @@ import { ProductsModule } from './products/products.module';
     // ---------- Rate Limiting ----------
     ThrottlerModule.forRoot(),
 
-    // ---------- BullMQ / Redis ----------
+    // ----------     yarn add @bull-board/expressMQ / Redis ----------
     BullModule.forRoot({
       connection: {
         host: process.env.REDIS_HOST || 'localhost',
@@ -76,6 +78,7 @@ import { ProductsModule } from './products/products.module';
     UsersModule,
     NotificationsModule,
     QueueModule,
+    MailModule,
     FcmModule,
     MapsModule,
     StorageModule,
@@ -83,7 +86,7 @@ import { ProductsModule } from './products/products.module';
     MatchingModule,
     ProductsModule,
   ],
-  controllers: [AppController],
+  controllers: [AppController, BullBoardController],
   providers: [
     AppService,
     {

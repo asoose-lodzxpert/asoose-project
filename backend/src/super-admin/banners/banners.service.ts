@@ -20,22 +20,14 @@ export class BannersService {
       orderBy: { priority: 'desc' },
     });
 
-    return Promise.all(
-      banners.map(async (banner) => ({
-        ...banner,
-        image: banner.image ? await this.getSignedUrl(banner.image) : null,
-      })),
-    );
+    return banners;
   }
 
   async findOne(id: string) {
     const banner = await this.prisma.banner.findUnique({ where: { id } });
     if (!banner) throw new NotFoundException(`Banner with ID ${id} not found`);
 
-    return {
-      ...banner,
-      image: banner.image ? await this.getSignedUrl(banner.image) : null,
-    };
+    return banner;
   }
 
   // ===========================================================================
@@ -74,7 +66,7 @@ export class BannersService {
 
     if (file) {
       if (banner.image) {
-        await this.storage.deleteFileByKey(banner.image).catch(console.error);
+        await this.storage.deleteFile(banner.image).catch(console.error);
       }
       const upload = await this.storage.uploadFile(file);
       imageKey = upload.key;
@@ -120,19 +112,9 @@ export class BannersService {
     if (!banner) throw new NotFoundException(`Banner not found`);
 
     if (banner.image) {
-      await this.storage.deleteFileByKey(banner.image).catch(console.error);
+      await this.storage.deleteFile(banner.image).catch(console.error);
     }
 
     return this.prisma.banner.delete({ where: { id } });
-  }
-
-  private async getSignedUrl(key: string): Promise<string> {
-    try {
-      if (key.startsWith('http')) return key;
-      return await this.storage.getSignedUrlForKey(key);
-    } catch (e) {
-      console.error(`Failed to sign URL for key ${key}`, e);
-      return '';
-    }
   }
 }

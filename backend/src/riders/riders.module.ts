@@ -16,7 +16,9 @@ import { RiderNotificationsService } from './rider-notifications.service';
 import { RiderDispatchListener } from './rider-dispatch.listener';
 import { RidersStreamService } from './riders-stream.service';
 import { PrismaModule } from '../prisma/prisma.module';
+import { RiderStateModule } from '../matching/rider-state/rider-state.module';
 import { UsersModule } from '../users/users.module';
+import { DriverStateModule } from '../matching/driver-state/driver-state.module';
 import { TripsModule } from '../users/trips/trips.module';
 import { StorageModule } from '../storage/storage.module';
 import { RidersController } from './riders.controller';
@@ -27,6 +29,8 @@ import { RidersController } from './riders.controller';
     StorageModule,
     forwardRef(() => UsersModule),
     TripsModule,
+    RiderStateModule,
+    DriverStateModule,
   ],
   controllers: [
     ProfileController,

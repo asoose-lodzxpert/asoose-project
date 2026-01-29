@@ -2,8 +2,15 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Image } from "expo-image";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { useEffect, useState } from "react";
-import { Animated, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withRepeat,
+  withTiming,
+} from "react-native-reanimated";
 
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { JobsProvider } from "@/context/JobContext";
@@ -11,52 +18,46 @@ import { useConfirm } from "@/hooks/use-confirm";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import Toast from "react-native-toast-message";
 
+/* -------------------- Loading Screen -------------------- */
+
 function LoadingScreen() {
   const primary = useThemeColor({}, "brandPrimary");
-  const [dot1] = useState(new Animated.Value(0));
-  const [dot2] = useState(new Animated.Value(0));
-  const [dot3] = useState(new Animated.Value(0));
+
+  const dot1 = useSharedValue(0);
+  const dot2 = useSharedValue(0);
+  const dot3 = useSharedValue(0);
 
   useEffect(() => {
-    const createAnimation = (dot: Animated.Value, delay: number) => {
-      return Animated.loop(
-        Animated.sequence([
-          Animated.delay(delay),
-          Animated.timing(dot, {
-            toValue: 1,
-            duration: 400,
-            useNativeDriver: true,
-          }),
-          Animated.timing(dot, {
-            toValue: 0,
-            duration: 400,
-            useNativeDriver: true,
-          }),
-        ]),
+    const animate = (dot: typeof dot1, delay: number) => {
+      dot.value = withDelay(
+        delay,
+        withRepeat(
+          withTiming(1, { duration: 400 }),
+          -1,
+          true, // reverse
+        ),
       );
     };
 
-    Animated.parallel([
-      createAnimation(dot1, 0),
-      createAnimation(dot2, 200),
-      createAnimation(dot3, 400),
-    ]).start();
-  }, [dot1, dot2, dot3]);
+    animate(dot1, 0);
+    animate(dot2, 200);
+    animate(dot3, 400);
+  }, []);
 
-  const translateY1 = dot1.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, -10],
-  });
+  const style1 = useAnimatedStyle(() => ({
+    transform: [{ translateY: -10 * dot1.value }],
+    backgroundColor: primary,
+  }));
 
-  const translateY2 = dot2.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, -10],
-  });
+  const style2 = useAnimatedStyle(() => ({
+    transform: [{ translateY: -10 * dot2.value }],
+    backgroundColor: primary,
+  }));
 
-  const translateY3 = dot3.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, -10],
-  });
+  const style3 = useAnimatedStyle(() => ({
+    transform: [{ translateY: -10 * dot3.value }],
+    backgroundColor: primary,
+  }));
 
   return (
     <View style={styles.loadingContainer}>
@@ -66,41 +67,21 @@ function LoadingScreen() {
         contentFit="contain"
       />
       <View style={styles.dotsContainer}>
-        <Animated.View
-          style={[
-            styles.dot,
-            {
-              transform: [{ translateY: translateY1 }],
-              backgroundColor: primary,
-            },
-          ]}
-        />
-        <Animated.View
-          style={[
-            styles.dot,
-            {
-              transform: [{ translateY: translateY2 }],
-              backgroundColor: primary,
-            },
-          ]}
-        />
-        <Animated.View
-          style={[
-            styles.dot,
-            {
-              transform: [{ translateY: translateY3 }],
-              backgroundColor: primary,
-            },
-          ]}
-        />
+        <Animated.View style={[styles.dot, style1]} />
+        <Animated.View style={[styles.dot, style2]} />
+        <Animated.View style={[styles.dot, style3]} />
       </View>
     </View>
   );
 }
 
+/* -------------------- Root Navigator -------------------- */
+
 function RootNavigator() {
   const { user, loading } = useAuth();
   const [hasLaunched, setHasLaunched] = useState<boolean | null>(null);
+  const [navReady, setNavReady] = useState(false);
+
   const segments = useSegments();
   const router = useRouter();
   const { ConfirmModal } = useConfirm();
@@ -123,8 +104,8 @@ function RootNavigator() {
     if (loading || hasLaunched === null) return;
 
     const onWelcome = segments[0] === "welcome";
-
     const atRoot = segments.length === 1 && !segments[0];
+
     if (!hasLaunched && !onWelcome && atRoot) {
       router.replace("/welcome");
     } else if (hasLaunched) {
@@ -134,9 +115,11 @@ function RootNavigator() {
         router.replace("/(auth)/signin");
       }
     }
+
+    setNavReady(true);
   }, [user, segments, loading, hasLaunched, router]);
 
-  if (loading || hasLaunched === null) {
+  if (loading || hasLaunched === null || !navReady) {
     return <LoadingScreen />;
   }
 
@@ -153,6 +136,8 @@ function RootNavigator() {
   );
 }
 
+/* -------------------- Root Layout -------------------- */
+
 export default function RootLayout() {
   return (
     <AuthProvider>
@@ -162,6 +147,8 @@ export default function RootLayout() {
     </AuthProvider>
   );
 }
+
+/* -------------------- Styles -------------------- */
 
 const styles = StyleSheet.create({
   loadingContainer: {
@@ -183,6 +170,5 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: "#007AFF",
   },
 });

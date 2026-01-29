@@ -1,13 +1,12 @@
 import React from "react";
 import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
 
-import { Ionicons } from "@expo/vector-icons";
-
 import { ThemedText } from "@/components/themed-text";
 import { useAuth } from "@/context/AuthContext";
 import { useThemeColor } from "@/hooks/use-theme-color";
 
 import * as Haptics from "expo-haptics";
+import { IconSymbol } from "../ui/icon-symbol";
 
 interface Props {
   storeName: string;
@@ -109,11 +108,7 @@ export const StoreHeader: React.FC<Props> = ({
           {loading ? (
             <ActivityIndicator size="small" color="#fff" />
           ) : (
-            <Ionicons
-              name={isOnline ? "checkmark" : "close"}
-              size={20}
-              color="#fff"
-            />
+            <IconSymbol name="power-on" size={20} color="#fff" />
           )}
         </View>
       </Pressable>

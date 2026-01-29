@@ -1,0 +1,58 @@
+import { Controller, Get, Req, Res } from '@nestjs/common';
+import { createBullBoard } from '@bull-board/api';
+import { ExpressAdapter } from '@bull-board/express';
+import { BullMQAdapter } from '@bull-board/api/bullMQAdapter';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
+import type { Request, Response } from 'express';
+
+import { QUEUE_NAMES } from '../matching/queue/queue.constants';
+
+@Controller('system/queues')
+export class BullBoardController {
+  private static serverAdapter: ExpressAdapter;
+
+  constructor(
+    @InjectQueue(QUEUE_NAMES.RIDE_MATCHING)
+    private readonly rideMatchingQueue: Queue,
+    @InjectQueue(QUEUE_NAMES.DELIVERY_MATCHING)
+    private readonly deliveryMatchingQueue: Queue,
+    @InjectQueue(QUEUE_NAMES.DRIVER_INACTIVITY)
+    private readonly driverInactivityQueue: Queue,
+    @InjectQueue(QUEUE_NAMES.NOTIFICATION)
+    private readonly notificationQueue: Queue,
+    @InjectQueue(QUEUE_NAMES.ASSIGNMENT_TIMEOUT)
+    private readonly assignmentTimeoutQueue: Queue,
+    @InjectQueue('email')
+    private readonly emailQueue: Queue,
+  ) {
+    // Initialize Bull Board only once
+    if (!BullBoardController.serverAdapter) {
+      const serverAdapter = new ExpressAdapter();
+      serverAdapter.setBasePath('/system/queues');
+
+      createBullBoard({
+        queues: [
+          new BullMQAdapter(this.rideMatchingQueue),
+          new BullMQAdapter(this.deliveryMatchingQueue),
+          new BullMQAdapter(this.driverInactivityQueue),
+          new BullMQAdapter(this.notificationQueue),
+          new BullMQAdapter(this.assignmentTimeoutQueue),
+          new BullMQAdapter(this.emailQueue),
+        ],
+        serverAdapter,
+      });
+
+      BullBoardController.serverAdapter = serverAdapter;
+    }
+  }
+
+  // Serve Bull Board dashboard
+  @Get('*path')
+  serveBullBoard(@Req() req: Request, @Res() res: Response) {
+    if (BullBoardController.serverAdapter) {
+      return BullBoardController.serverAdapter.getRouter()(req, res);
+    }
+    res.status(500).send('Bull Board not initialized');
+  }
+}
