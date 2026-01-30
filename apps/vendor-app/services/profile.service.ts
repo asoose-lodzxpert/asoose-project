@@ -15,7 +15,10 @@ export async function fetchStoreBalance() {
   return await fetchWithAuth(`${API}/vendor/dashboard/balance`);
 }
 
-export async function updateVendorProfileImage(imageUri: string) {
+export async function updateVendorProfileImage(
+  imageUri: string,
+  type?: string,
+) {
   try {
     // Extract filename from URI
     const filename = imageUri.split("/").pop() || "profile.jpg";
@@ -35,8 +38,8 @@ export async function updateVendorProfileImage(imageUri: string) {
       `${API}/vendor/dashboard/update-image`,
       {
         method: "PATCH",
-        body: JSON.stringify({ image: imageUrl }),
-      }
+        body: JSON.stringify({ image: imageUrl, type }),
+      },
     );
 
     return response;

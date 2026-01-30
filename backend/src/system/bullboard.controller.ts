@@ -47,7 +47,14 @@ export class BullBoardController {
     }
   }
 
-  // Serve Bull Board dashboard
+  @Get()
+  serveBullBoardRoot(@Req() req: Request, @Res() res: Response) {
+    if (BullBoardController.serverAdapter) {
+      return BullBoardController.serverAdapter.getRouter()(req, res);
+    }
+    res.status(500).send('Bull Board not initialized');
+  }
+
   @Get('*path')
   serveBullBoard(@Req() req: Request, @Res() res: Response) {
     if (BullBoardController.serverAdapter) {

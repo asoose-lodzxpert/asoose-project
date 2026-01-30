@@ -281,7 +281,7 @@ export class RiderAuthService {
     try {
       const payload = this.jwtService.verify(refreshToken);
       const rider = await this.prisma.rider.findUnique({
-        where: { id: payload.sub || payload.id }, // Support both for backward compatibility
+        where: { id: payload.sub || payload.id },
       });
 
       if (!rider) {
@@ -338,6 +338,17 @@ export class RiderAuthService {
     });
 
     return { message: 'Push token saved' };
+  }
+
+  // ============== DELETE PUSH TOKEN ==============
+  async deletePushToken(riderId: string) {
+    await this.prisma.rider.update({
+      where: { id: riderId },
+      data: {
+        expoPushToken: null,
+      },
+    });
+    return { message: 'Push token deleted' };
   }
 
   // ============== RIDER DETAILS (Vehicle, Documents, Bank) ==============

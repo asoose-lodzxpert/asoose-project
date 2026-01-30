@@ -18,7 +18,7 @@ export class RidersController {
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.RIDER, UserRole.DRIVER)
-  @Sse('stream')
+  @Sse('jobs/stream')
   streamEvents(@Request() req): Observable<MessageEvent> {
     const riderId = req.user.id;
     return this.streamService.getRiderStream(riderId);

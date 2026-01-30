@@ -1,12 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
-  RIDE_EVENTS,
-  DELIVERY_EVENTS,
+  JOB_EVENTS,
   DRIVER_EVENTS,
   NOTIFICATION_EVENTS,
-  RideEvent,
-  DeliveryEvent,
+  JobEvent,
+  JobAssignedEvent,
+  JobUpdatedEvent,
+  JobCancelledEvent,
   DriverEvent,
   NotificationEvent,
 } from './event-types';
@@ -15,7 +16,7 @@ import {
  * Event Bus Service
  *
  * Central event emitter for the matching system.
- * All events are emitted through this service for consistency and logging.
+ * Works for all job types, driver-only emits ride jobs.
  */
 @Injectable()
 export class EventBusService {
@@ -24,139 +25,26 @@ export class EventBusService {
   constructor(private readonly eventEmitter: EventEmitter2) {}
 
   // ========================================
-  // RIDE EVENTS
+  // JOB EVENTS
   // ========================================
 
-  emitRideRequested(event: RideEvent) {
-    this.logger.log(`[RIDE] Requested: ${(event as any).rideId}`);
-    this.eventEmitter.emit(RIDE_EVENTS.REQUESTED, event);
-  }
-
-  emitRideAssignmentRequested(event: RideEvent) {
+  emitJobAssigned(event: JobAssignedEvent) {
     this.logger.log(
-      `[RIDE] Assignment requested: ${(event as any).rideId} -> Driver ${(event as any).driverId}`,
+      `[JOB] Assigned: ${event.jobId} -> Driver ${event.driverId}`,
     );
-    this.eventEmitter.emit(RIDE_EVENTS.ASSIGNMENT_REQUESTED, event);
+    this.eventEmitter.emit(JOB_EVENTS.ASSIGNED, event);
   }
 
-  emitRideAssigned(event: RideEvent) {
+  emitJobUpdated(event: JobUpdatedEvent) {
+    this.logger.log(`[JOB] Updated: ${event.jobId} -> status ${event.status}`);
+    this.eventEmitter.emit(JOB_EVENTS.UPDATED, event);
+  }
+
+  emitJobCancelled(event: JobCancelledEvent) {
     this.logger.log(
-      `[RIDE] Assigned: ${(event as any).rideId} -> Driver ${(event as any).driverId}`,
+      `[JOB] Cancelled: ${event.jobId} -> Driver ${event.driverId}`,
     );
-    this.eventEmitter.emit(RIDE_EVENTS.ASSIGNED, event);
-  }
-
-  emitRideAccepted(event: RideEvent) {
-    this.logger.log(
-      `[RIDE] Accepted: ${(event as any).rideId} by Driver ${(event as any).driverId}`,
-    );
-    this.eventEmitter.emit(RIDE_EVENTS.ACCEPTED, event);
-  }
-
-  emitRideDeclined(event: RideEvent) {
-    this.logger.log(
-      `[RIDE] Declined: ${(event as any).rideId} by Driver ${(event as any).driverId}`,
-    );
-    this.eventEmitter.emit(RIDE_EVENTS.DECLINED, event);
-  }
-
-  emitRideTimeout(event: RideEvent) {
-    this.logger.log(
-      `[RIDE] Timeout: ${(event as any).rideId} for Driver ${(event as any).driverId}`,
-    );
-    this.eventEmitter.emit(RIDE_EVENTS.TIMEOUT, event);
-  }
-
-  emitRideStarted(event: RideEvent) {
-    this.logger.log(`[RIDE] Started: ${(event as any).rideId}`);
-    this.eventEmitter.emit(RIDE_EVENTS.STARTED, event);
-  }
-
-  emitRideCompleted(event: RideEvent) {
-    this.logger.log(`[RIDE] Completed: ${(event as any).rideId}`);
-    this.eventEmitter.emit(RIDE_EVENTS.COMPLETED, event);
-  }
-
-  emitRideCancelled(event: RideEvent) {
-    this.logger.log(
-      `[RIDE] Cancelled: ${(event as any).rideId} by ${(event as any).cancelledBy}`,
-    );
-    this.eventEmitter.emit(RIDE_EVENTS.CANCELLED, event);
-  }
-
-  emitRideNoDriverFound(event: RideEvent) {
-    this.logger.warn(
-      `[RIDE] No driver found: ${(event as any).rideId} after ${(event as any).attempts} attempts`,
-    );
-    this.eventEmitter.emit(RIDE_EVENTS.NO_DRIVER_FOUND, event);
-  }
-
-  // ========================================
-  // DELIVERY EVENTS
-  // ========================================
-
-  emitDeliveryRequested(event: DeliveryEvent) {
-    this.logger.log(`[DELIVERY] Requested: ${(event as any).deliveryId}`);
-    this.eventEmitter.emit(DELIVERY_EVENTS.REQUESTED, event);
-  }
-
-  emitDeliveryAssignmentRequested(event: DeliveryEvent) {
-    this.logger.log(
-      `[DELIVERY] Assignment requested: ${(event as any).deliveryId} -> Driver ${(event as any).driverId}`,
-    );
-    this.eventEmitter.emit(DELIVERY_EVENTS.ASSIGNMENT_REQUESTED, event);
-  }
-
-  emitDeliveryAssigned(event: DeliveryEvent) {
-    this.logger.log(
-      `[DELIVERY] Assigned: ${(event as any).deliveryId} -> Driver ${(event as any).driverId}`,
-    );
-    this.eventEmitter.emit(DELIVERY_EVENTS.ASSIGNED, event);
-  }
-
-  emitDeliveryAccepted(event: DeliveryEvent) {
-    this.logger.log(
-      `[DELIVERY] Accepted: ${(event as any).deliveryId} by Driver ${(event as any).driverId}`,
-    );
-    this.eventEmitter.emit(DELIVERY_EVENTS.ACCEPTED, event);
-  }
-
-  emitDeliveryDeclined(event: DeliveryEvent) {
-    this.logger.log(
-      `[DELIVERY] Declined: ${(event as any).deliveryId} by Driver ${(event as any).driverId}`,
-    );
-    this.eventEmitter.emit(DELIVERY_EVENTS.DECLINED, event);
-  }
-
-  emitDeliveryTimeout(event: DeliveryEvent) {
-    this.logger.log(
-      `[DELIVERY] Timeout: ${(event as any).deliveryId} for Driver ${(event as any).driverId}`,
-    );
-    this.eventEmitter.emit(DELIVERY_EVENTS.TIMEOUT, event);
-  }
-
-  emitDeliveryPickedUp(event: DeliveryEvent) {
-    this.logger.log(`[DELIVERY] Picked up: ${(event as any).deliveryId}`);
-    this.eventEmitter.emit(DELIVERY_EVENTS.PICKED_UP, event);
-  }
-
-  emitDeliveryDelivered(event: DeliveryEvent) {
-    this.logger.log(`[DELIVERY] Delivered: ${(event as any).deliveryId}`);
-    this.eventEmitter.emit(DELIVERY_EVENTS.DELIVERED, event);
-  }
-
-  emitDeliveryCancelled(event: DeliveryEvent) {
-    this.logger.log(
-      `[DELIVERY] Cancelled: ${(event as any).deliveryId} by ${(event as any).cancelledBy}`,
-    );
-    this.eventEmitter.emit(DELIVERY_EVENTS.CANCELLED, event);
-  }
-
-  emitDeliveryNoDriverFound(event: DeliveryEvent) {
-    this.logger.warn(
-      `[DELIVERY] No driver found: ${(event as any).deliveryId} after ${(event as any).attempts} attempts`,
-    );
-    this.eventEmitter.emit(DELIVERY_EVENTS.NO_DRIVER_FOUND, event);
+    this.eventEmitter.emit(JOB_EVENTS.CANCELLED, event);
   }
 
   // ========================================
@@ -222,12 +110,16 @@ export class EventBusService {
   // EVENT LISTENERS (for testing/debugging)
   // ========================================
 
-  onRideRequested(handler: (event: RideEvent) => void) {
-    this.eventEmitter.on(RIDE_EVENTS.REQUESTED, handler);
+  onJobAssigned(handler: (event: JobAssignedEvent) => void) {
+    this.eventEmitter.on(JOB_EVENTS.ASSIGNED, handler);
   }
 
-  onDeliveryRequested(handler: (event: DeliveryEvent) => void) {
-    this.eventEmitter.on(DELIVERY_EVENTS.REQUESTED, handler);
+  onJobUpdated(handler: (event: JobUpdatedEvent) => void) {
+    this.eventEmitter.on(JOB_EVENTS.UPDATED, handler);
+  }
+
+  onJobCancelled(handler: (event: JobCancelledEvent) => void) {
+    this.eventEmitter.on(JOB_EVENTS.CANCELLED, handler);
   }
 
   onDriverLocationUpdated(handler: (event: DriverEvent) => void) {

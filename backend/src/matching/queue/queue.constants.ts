@@ -1,7 +1,12 @@
 /**
- * Queue Names and Job Types
+ * Queue Names and Job Types (Job-Based Standardized)
  */
 
+import { JobSummaryDto } from 'src/jobs/job.dto';
+
+/* ========================================
+   QUEUE NAMES
+   ======================================== */
 export const QUEUE_NAMES = {
   RIDE_MATCHING: 'ride-matching',
   DELIVERY_MATCHING: 'delivery-matching',
@@ -10,6 +15,9 @@ export const QUEUE_NAMES = {
   ASSIGNMENT_TIMEOUT: 'assignment-timeout',
 } as const;
 
+/* ========================================
+   JOB TYPES
+   ======================================== */
 export const JOB_TYPES = {
   MATCH_RIDE: 'match-ride',
   MATCH_DELIVERY: 'match-delivery',
@@ -19,44 +27,36 @@ export const JOB_TYPES = {
   HANDLE_ASSIGNMENT_TIMEOUT: 'handle-assignment-timeout',
 } as const;
 
-// ========================================
-// JOB DATA INTERFACES
-// ========================================
+/* ========================================
+   JOB DATA INTERFACES
+   ======================================== */
 
+/**
+ * Matching jobs now use the full JobSummaryDto payload
+ * with additional metadata for attempts and driver exclusions
+ */
 export interface MatchRideJobData {
-  rideId: string;
-  customerId: string;
-  pickupLat: number;
-  pickupLng: number;
-  dropoffLat: number;
-  dropoffLng: number;
-  distanceKm: number;
-  totalFare: number;
+  job: JobSummaryDto; // jobType must be 'ride'
   attempt: number;
   excludeDriverIds?: string[];
 }
 
 export interface MatchDeliveryJobData {
-  deliveryId: string;
-  customerId: string;
-  orderId?: string;
-  pickupLat: number;
-  pickupLng: number;
-  dropoffLat: number;
-  dropoffLng: number;
-  distanceKm: number;
-  deliveryFee: number;
-  packageDetails?: string;
-  recipientName: string;
-  recipientPhone: string;
+  job: JobSummaryDto; // jobType must be 'delivery'
   attempt: number;
   excludeDriverIds?: string[];
 }
 
+/**
+ * Driver inactivity checks
+ */
 export interface CheckInactivityJobData {
   scheduledAt: number;
 }
 
+/**
+ * Notifications
+ */
 export interface SendPushNotificationJobData {
   userId?: string;
   driverId?: string;
@@ -74,17 +74,17 @@ export interface SendSMSJobData {
   message: string;
 }
 
+/**
+ * Assignment timeout handling for both ride & delivery
+ */
 export interface HandleAssignmentTimeoutJobData {
-  tripType: 'ride' | 'delivery';
-  tripId: string;
-  driverId: string;
+  job: JobSummaryDto; // ride or delivery
   scheduledFor: number;
 }
 
-// ========================================
-// QUEUE OPTIONS
-// ========================================
-
+/* ========================================
+   QUEUE OPTIONS
+   ======================================== */
 export const QUEUE_OPTIONS = {
   defaultJobOptions: {
     attempts: 3,
@@ -125,7 +125,7 @@ export const QUEUE_OPTIONS = {
       type: 'fixed' as const,
       delay: 5000,
     },
-    timeout: 60000, // 60 seconds for inactivity check
+    timeout: 60000,
   },
 
   notification: {
@@ -134,7 +134,7 @@ export const QUEUE_OPTIONS = {
       type: 'exponential' as const,
       delay: 500,
     },
-    timeout: 10000, // 10 seconds for notification
+    timeout: 10000,
   },
 
   assignmentTimeout: {
@@ -143,22 +143,20 @@ export const QUEUE_OPTIONS = {
   },
 } as const;
 
-// ========================================
-// CONCURRENCY SETTINGS
-// ========================================
-
+/* ========================================
+   WORKER CONCURRENCY
+   ======================================== */
 export const WORKER_CONCURRENCY = {
-  RIDE_MATCHING: 10, // Process up to 10 ride matches concurrently
+  RIDE_MATCHING: 10, // Handle up to 10 ride match jobs concurrently
   DELIVERY_MATCHING: 10,
   DRIVER_INACTIVITY: 1, // Single worker for inactivity check
   NOTIFICATION: 20, // High concurrency for notifications
   ASSIGNMENT_TIMEOUT: 5,
 } as const;
 
-// ========================================
-// REPEAT SCHEDULES (CRON)
-// ========================================
-
+/* ========================================
+   REPEAT SCHEDULES (CRON)
+   ======================================== */
 export const REPEAT_SCHEDULES = {
   INACTIVITY_CHECK: {
     pattern: '*/30 * * * * *', // Every 30 seconds

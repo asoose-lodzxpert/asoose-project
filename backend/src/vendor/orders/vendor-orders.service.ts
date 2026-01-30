@@ -60,10 +60,21 @@ export class VendorOrdersService {
     whereClause.paymentStatus = 'PAID';
 
     if (status) {
-      const statuses = status.split(',').map((s) => s.trim());
+      const statusMap = Object.values(OrderStatus).reduce(
+        (acc, os) => {
+          acc[os.toLowerCase()] = os;
+          return acc;
+        },
+        {} as Record<string, OrderStatus>,
+      );
+      const statuses = status
+        .split(',')
+        .map((s) => s.trim().toLowerCase())
+        .map((s) => statusMap[s])
+        .filter((s): s is OrderStatus => !!s);
       if (statuses.length === 1) {
         whereClause.status = statuses[0];
-      } else {
+      } else if (statuses.length > 1) {
         whereClause.status = { in: statuses };
       }
     }

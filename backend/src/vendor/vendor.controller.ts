@@ -36,8 +36,15 @@ export class VendorController {
 
   @Patch('update-image')
   @Roles(UserRole.VENDOR)
-  async updateProfileImage(@Req() req, @Body() body: { image: string }) {
-    return await this.vendorService.updateVendorImage(req.user.id, body.image);
+  async updateProfileImage(
+    @Req() req,
+    @Body() body: { image: string; type?: string },
+  ) {
+    return await this.vendorService.updateVendorImage(
+      req.user.id,
+      body.image,
+      body.type,
+    );
   }
 
   @Get('public')

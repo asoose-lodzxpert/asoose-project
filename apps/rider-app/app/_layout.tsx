@@ -14,6 +14,7 @@ import Animated, {
 
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { JobsProvider } from "@/context/JobContext";
+import { NotificationProvider } from "@/context/NotificationContext";
 import { useConfirm } from "@/hooks/use-confirm";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import Toast from "react-native-toast-message";
@@ -108,16 +109,16 @@ function RootNavigator() {
 
     if (!hasLaunched && !onWelcome && atRoot) {
       router.replace("/welcome");
-    } else if (hasLaunched) {
-      if (user && atRoot) {
+    } else if (hasLaunched && atRoot) {
+      if (user && segments[0] !== "(tabs)") {
         router.replace("/(tabs)");
-      } else if (!user && atRoot) {
+      } else if (!user && segments[0] !== "(auth)") {
         router.replace("/(auth)/signin");
       }
     }
 
     setNavReady(true);
-  }, [user, segments, loading, hasLaunched, router]);
+  }, [user, segments, loading, hasLaunched]);
 
   if (loading || hasLaunched === null || !navReady) {
     return <LoadingScreen />;
@@ -142,7 +143,9 @@ export default function RootLayout() {
   return (
     <AuthProvider>
       <JobsProvider>
-        <RootNavigator />
+        <NotificationProvider>
+          <RootNavigator />
+        </NotificationProvider>
       </JobsProvider>
     </AuthProvider>
   );

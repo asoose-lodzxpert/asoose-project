@@ -4,7 +4,9 @@ import {
   UnauthorizedException,
   NotFoundException,
   forwardRef,
+  Logger,
 } from '@nestjs/common';
+import { AppLogger } from '../libs/logger/app-logger.service';
 import { EmailProducer } from '../mail/email.producer';
 import { PrismaService } from '../prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
@@ -25,6 +27,7 @@ export class VendorAuthService {
     private readonly otpService: OtpService,
     @Inject('REDIS_CLIENT') private readonly redisClient: RedisClientType,
     private readonly emailProducer: EmailProducer,
+    private readonly appLogger: AppLogger,
   ) {}
 
   // Lazy injection to avoid circular dependency
@@ -94,7 +97,11 @@ export class VendorAuthService {
           },
         );
       } catch (error) {
-        console.error('Failed to send login notification:', error);
+        this.appLogger.error(
+          'Failed to send login notification',
+          error?.stack,
+          { error },
+        );
       }
     }
 
@@ -200,7 +207,11 @@ export class VendorAuthService {
           vendor.store?.name || 'Your Store',
         );
       } catch (error) {
-        console.error('Failed to send account creation notification:', error);
+        this.appLogger.error(
+          'Failed to send account creation notification',
+          error?.stack,
+          { error },
+        );
       }
     }
 
@@ -266,7 +277,11 @@ export class VendorAuthService {
           { timestamp: new Date() },
         );
       } catch (error) {
-        console.error('Failed to send password reset notification:', error);
+        this.appLogger.error(
+          'Failed to send password reset notification',
+          error?.stack,
+          { error },
+        );
       }
     }
 
@@ -316,7 +331,11 @@ export class VendorAuthService {
           { timestamp: new Date() },
         );
       } catch (error) {
-        console.error('Failed to send password change notification:', error);
+        this.appLogger.error(
+          'Failed to send password change notification',
+          error?.stack,
+          { error },
+        );
       }
     }
 

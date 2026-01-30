@@ -7,6 +7,7 @@ import {
   UseGuards,
   Get,
   Put,
+  Delete,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { RiderAuthService } from './rider-auth.service';
@@ -144,5 +145,12 @@ export class RiderAuthController {
   ) {
     const { id } = req.user || {};
     return this.riderAuthService.savePushToken(id, body.token, body.platform);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Delete('push-token')
+  async deletePushToken(@Req() req) {
+    const { id } = req.user || {};
+    return this.riderAuthService.deletePushToken(id);
   }
 }

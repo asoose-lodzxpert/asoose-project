@@ -1,5 +1,6 @@
 // as/backend/src/super-admin/banners/banners.service.ts
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { AppLogger } from 'src/libs/logger/app-logger.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { StorageService } from 'src/storage/storage.service';
 import { CreateBannerDto, UpdateBannerDto } from './dto/create-banner.dto';
@@ -9,6 +10,7 @@ export class BannersService {
   constructor(
     private prisma: PrismaService,
     private storage: StorageService,
+    private readonly appLogger: AppLogger,
   ) {}
 
   // ===========================================================================
@@ -66,7 +68,11 @@ export class BannersService {
 
     if (file) {
       if (banner.image) {
-        await this.storage.deleteFile(banner.image).catch(console.error);
+        await this.storage.deleteFile(banner.image).catch((error) => {
+          this.appLogger.error('Failed to delete banner image', error?.stack, {
+            error,
+          });
+        });
       }
       const upload = await this.storage.uploadFile(file);
       imageKey = upload.key;
@@ -112,7 +118,11 @@ export class BannersService {
     if (!banner) throw new NotFoundException(`Banner not found`);
 
     if (banner.image) {
-      await this.storage.deleteFile(banner.image).catch(console.error);
+      await this.storage.deleteFile(banner.image).catch((error) => {
+        this.appLogger.error('Failed to delete banner image', error?.stack, {
+          error,
+        });
+      });
     }
 
     return this.prisma.banner.delete({ where: { id } });

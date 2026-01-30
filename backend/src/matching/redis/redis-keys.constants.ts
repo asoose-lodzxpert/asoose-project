@@ -1,10 +1,14 @@
 /**
  * Redis Key Structures for Real-Time Matching System
  *
- * CRITICAL: Driver state (status, location, active trips) lives ONLY in Redis.
- * Database stores stable business records only.
+ * CRITICAL:
+ * - Live state (availability, location, assignments) lives ONLY in Redis
+ * - Database stores stable business records only
+ * - Redis keys are job-centric to avoid duplication and race conditions
  */
+
 export const REDIS_CLIENT = 'REDIS_CLIENT';
+
 export const REDIS_KEYS = {
   // ========================================
   // DRIVER STATE (SOURCE OF TRUTH)
@@ -13,110 +17,112 @@ export const REDIS_KEYS = {
   /** Driver online status: OFFLINE | ONLINE | ACTIVE */
   DRIVER_STATUS: (driverId: string) => `driver:${driverId}:status`,
 
+  /** Driver role: DRIVER | RIDER */
+  DRIVER_ROLE: (driverId: string) => `driver:${driverId}:role`,
+
   /** Current hex ID where driver is located */
   DRIVER_HEX: (driverId: string) => `driver:${driverId}:hex`,
 
-  /** Unix timestamp of last location update */
+  /** Unix timestamp of last heartbeat / location update */
   DRIVER_LAST_SEEN: (driverId: string) => `driver:${driverId}:lastSeen`,
 
-  /** Current active ride ID (only if status = ACTIVE) */
-  DRIVER_CURRENT_RIDE: (driverId: string) => `driver:${driverId}:currentRide`,
+  /** Current active job ID (only if status = ACTIVE) */
+  DRIVER_CURRENT_JOB: (driverId: string) => `driver:${driverId}:currentJob`,
 
-  /** Current active delivery ID (only if status = ACTIVE) */
-  DRIVER_CURRENT_DELIVERY: (driverId: string) =>
-    `driver:${driverId}:currentDelivery`,
+  /** Current active job type (ride | delivery) */
+  DRIVER_CURRENT_JOB_TYPE: (driverId: string) =>
+    `driver:${driverId}:currentJobType`,
 
-  /** Pending ride assignment (TTL 90s) */
-  DRIVER_PENDING_RIDE: (driverId: string) => `driver:${driverId}:pendingRide`,
+  /** Pending job assignment (TTL enforced) */
+  DRIVER_PENDING_JOB: (driverId: string) => `driver:${driverId}:pendingJob`,
 
-  /** Pending delivery assignment (TTL 90s) */
-  DRIVER_PENDING_DELIVERY: (driverId: string) =>
-    `driver:${driverId}:pendingDelivery`,
+  /** Pending job type (ride | delivery) */
+  DRIVER_PENDING_JOB_TYPE: (driverId: string) =>
+    `driver:${driverId}:pendingJobType`,
 
-  /** Driver's current location (lat, lng) stored as GeoJSON */
+  /** Driver's last known location (GeoJSON) */
   DRIVER_LOCATION: (driverId: string) => `driver:${driverId}:location`,
 
   // ========================================
   // HEX GEOSPATIAL INDEX
   // ========================================
 
-  /** Set of available driver IDs in a hex (only ONLINE, not ACTIVE, no pending) */
-  HEX_DRIVERS: (hexId: string) => `hex:${hexId}:drivers`,
+  /**
+   * Available drivers in a hex
+   * - status = ONLINE
+   * - no active job
+   * - no pending job
+   * - role-compatible with job
+   */
+  HEX_AVAILABLE_DRIVERS: (hexId: string) => `hex:${hexId}:drivers`,
 
-  /** Geospatial index for all online drivers (for fallback queries) */
+  /** Global geospatial index for fallback queries */
   DRIVERS_GEO_INDEX: 'drivers:geo',
 
   // ========================================
-  // ASSIGNMENT LOCKS (PREVENT DOUBLE ASSIGNMENT)
+  // ASSIGNMENT LOCKS (ATOMICITY GUARANTEES)
   // ========================================
 
-  /** Lock to prevent race condition during ride assignment (TTL 90s) */
-  LOCK_RIDE_DRIVER: (rideId: string, driverId: string) =>
-    `lock:ride:${rideId}:driver:${driverId}`,
+  /** Lock a driver for a specific job (TTL enforced) */
+  LOCK_JOB_DRIVER: (jobId: string, driverId: string) =>
+    `lock:job:${jobId}:driver:${driverId}`,
 
-  /** Lock to prevent race condition during delivery assignment (TTL 90s) */
-  LOCK_DELIVERY_DRIVER: (deliveryId: string, driverId: string) =>
-    `lock:delivery:${deliveryId}:driver:${driverId}`,
-
-  /** Global lock for a ride to prevent multiple simultaneous matches */
-  LOCK_RIDE: (rideId: string) => `lock:ride:${rideId}`,
-
-  /** Global lock for a delivery to prevent multiple simultaneous matches */
-  LOCK_DELIVERY: (deliveryId: string) => `lock:delivery:${deliveryId}`,
+  /** Global job lock to prevent concurrent matching */
+  LOCK_JOB: (jobId: string) => `lock:job:${jobId}`,
 
   // ========================================
   // MATCHING METADATA
   // ========================================
 
-  /** Track matching attempts for a ride/delivery */
-  MATCHING_ATTEMPTS: (tripType: 'ride' | 'delivery', tripId: string) =>
-    `matching:${tripType}:${tripId}:attempts`,
+  /** Track matching attempts per job */
+  MATCHING_ATTEMPTS: (jobId: string) => `matching:${jobId}:attempts`,
 
-  /** List of drivers who declined this trip */
-  DECLINED_DRIVERS: (tripType: 'ride' | 'delivery', tripId: string) =>
-    `matching:${tripType}:${tripId}:declined`,
+  /** Drivers who declined this job */
+  DECLINED_DRIVERS: (jobId: string) => `matching:${jobId}:declined`,
 
-  /** Current matching state for a trip */
-  MATCHING_STATE: (tripType: 'ride' | 'delivery', tripId: string) =>
-    `matching:${tripType}:${tripId}:state`,
+  /** Matching state snapshot */
+  MATCHING_STATE: (jobId: string) => `matching:${jobId}:state`,
 
   // ========================================
   // ANALYTICS & MONITORING
   // ========================================
 
-  /** Real-time count of online drivers per hex */
+  /** Real-time count of available drivers per hex */
   HEX_DRIVER_COUNT: (hexId: string) => `hex:${hexId}:count`,
 
-  /** Real-time active trips counter */
-  ACTIVE_TRIPS_COUNT: (tripType: 'ride' | 'delivery') =>
-    `trips:${tripType}:active`,
+  /** Active jobs counter by type */
+  ACTIVE_JOBS_COUNT: (jobType: 'ride' | 'delivery') => `jobs:${jobType}:active`,
 
-  /** Driver performance metrics */
+  /** Driver performance & quality metrics */
   DRIVER_METRICS: (driverId: string) => `driver:${driverId}:metrics`,
 } as const;
 
 export const REDIS_TTL = {
-  /** Pending assignment TTL (driver has 90s to respond) */
+  /** Pending assignment TTL (driver response window) */
   PENDING_ASSIGNMENT: 90,
 
   /** Assignment lock TTL */
   ASSIGNMENT_LOCK: 90,
 
-  /** Driver considered inactive after 2 minutes */
+  /** Driver inactivity threshold */
   DRIVER_INACTIVITY: 120,
 
   /** Matching state cache */
-  MATCHING_STATE: 300, // 5 minutes
+  MATCHING_STATE: 300,
 
-  /** Declined drivers list expires after 1 hour */
+  /** Declined drivers list */
   DECLINED_DRIVERS: 3600,
 
-  /** Matching attempts counter expires after 1 hour */
+  /** Matching attempts counter */
   MATCHING_ATTEMPTS: 3600,
 
   /** Metrics cache */
   METRICS: 300,
 } as const;
+
+// ========================================
+// ENUMS & STATE SHAPES
+// ========================================
 
 export enum DriverStatus {
   OFFLINE = 'OFFLINE',
@@ -124,20 +130,54 @@ export enum DriverStatus {
   ACTIVE = 'ACTIVE',
 }
 
-export enum TripType {
+export enum RiderStatus {
+  OFFLINE = 'OFFLINE',
+  ONLINE = 'ONLINE',
+  ACTIVE = 'ACTIVE',
+}
+
+export enum JobType {
   RIDE = 'ride',
   DELIVERY = 'delivery',
 }
 
+export enum DriverRole {
+  DRIVER = 'DRIVER', // accepts ride jobs
+  RIDER = 'RIDER', // accepts delivery jobs
+}
+
 export interface DriverState {
   id: string;
+  role: DriverRole;
   status: DriverStatus;
   hexId: string | null;
   lastSeen: number;
-  currentRide: string | null;
-  currentDelivery: string | null;
-  pendingRide: string | null;
-  pendingDelivery: string | null;
+
+  currentJobId: string | null;
+  currentJobType: JobType | null;
+
+  pendingJobId: string | null;
+  pendingJobType: JobType | null;
+
+  location: {
+    lat: number;
+    lng: number;
+  } | null;
+}
+
+export interface RiderState {
+  id: string;
+  role: DriverRole;
+  status: DriverStatus;
+  hexId: string | null;
+  lastSeen: number;
+
+  currentJobId: string | null;
+  currentJobType: JobType | null;
+
+  pendingJobId: string | null;
+  pendingJobType: JobType | null;
+
   location: {
     lat: number;
     lng: number;
@@ -145,8 +185,8 @@ export interface DriverState {
 }
 
 export interface MatchingState {
-  tripId: string;
-  tripType: TripType;
+  jobId: string;
+  jobType: JobType;
   attempts: number;
   currentRing: number;
   declinedDrivers: string[];
