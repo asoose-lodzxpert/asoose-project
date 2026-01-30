@@ -20,7 +20,6 @@ import { UsersModule } from '../users/users.module';
 import { TripsModule } from '../users/trips/trips.module';
 import { StorageModule } from '../storage/storage.module';
 import { RidersController } from './riders.controller';
-import { MatchingModule } from '../matching/matching.module'; // <--- ADD IMPORT
 
 @Module({
   imports: [
