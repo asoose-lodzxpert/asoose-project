@@ -174,7 +174,6 @@ export class RidersService {
     };
   }
 
-
   async updateStatus(id: string, status: UserStatus, adminId?: string) {
     const rider = await this.prisma.rider.findUnique({ where: { id } });
     if (!rider) throw new NotFoundException('Rider not found');
@@ -190,22 +189,25 @@ export class RidersService {
         await tx.activityLog.create({
           data: {
             userId: adminId,
-            action: status === 'ACTIVE' ? 'RIDER_REACTIVATED' : 'RIDER_STATUS_UPDATE',
+            action:
+              status === 'ACTIVE' ? 'RIDER_REACTIVATED' : 'RIDER_STATUS_UPDATE',
             target: id,
             details: `Rider status changed from ${rider.status} to ${status}`,
             metadata: {
               previousStatus: rider.status,
               newStatus: status,
-              reason: status === 'ACTIVE' ? 'Manual Reactivation (Reverse Kill Switch)' : undefined
-            }
-          }
+              reason:
+                status === 'ACTIVE'
+                  ? 'Manual Reactivation (Reverse Kill Switch)'
+                  : undefined,
+            },
+          },
         });
       }
 
       return updatedRider;
     });
   }
-
 
   async verifyDocument(
     _riderId: string,
@@ -465,27 +467,30 @@ export class RidersService {
       },
     });
   }
-async getRiderPayouts(riderId: string) {
-  return this.prisma.riderPayout.findMany({
-    where: { 
-      riderId: riderId 
-    },
-    orderBy: { 
-      createdAt: 'desc' 
-    }
-  });
-}
+  async getRiderPayouts(riderId: string) {
+    return this.prisma.riderPayout.findMany({
+      where: {
+        riderId: riderId,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+  }
 
-async executeKillSwitch(
-    riderId: string, 
-    action: 'SUSPEND' | 'BAN', 
-    reason: string, 
-    adminId: string
+  async executeKillSwitch(
+    riderId: string,
+    action: 'SUSPEND' | 'BAN',
+    reason: string,
+    adminId: string,
   ) {
-    const rider = await this.prisma.rider.findUnique({ where: { id: riderId } });
+    const rider = await this.prisma.rider.findUnique({
+      where: { id: riderId },
+    });
     if (!rider) throw new NotFoundException('Rider not found');
 
-    const targetStatus = action === 'BAN' ? UserStatus.BANNED : UserStatus.SUSPENDED;
+    const targetStatus =
+      action === 'BAN' ? UserStatus.BANNED : UserStatus.SUSPENDED;
 
     // Atomic Update with Side Effects
     await this.prisma.$transaction(async (tx) => {
@@ -495,9 +500,9 @@ async executeKillSwitch(
         data: {
           status: targetStatus,
           isOnline: false, // Force offline immediately
-          fcmToken: null,  // Revoke Push Notification Access
+          fcmToken: null, // Revoke Push Notification Access
           // expoPushToken: null // If using Expo, clear this too
-        }
+        },
       });
 
       // 2. Log High-Priority Audit Event
@@ -510,9 +515,9 @@ async executeKillSwitch(
           metadata: {
             previousStatus: rider.status,
             reason,
-            actionType: action
-          }
-        }
+            actionType: action,
+          },
+        },
       });
     });
 
@@ -521,5 +526,4 @@ async executeKillSwitch(
 
     return { success: true, message: `Rider has been ${action}ED.` };
   }
-
 }

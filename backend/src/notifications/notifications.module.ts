@@ -12,7 +12,12 @@ import { DriverLocationListener } from './listeners/driver-location.listener';
 @Module({
   imports: [PrismaModule, AuthModule, ExpoModule, FcmModule],
   controllers: [NotificationsController],
-  providers: [NotificationsGateway, NotificationsService,MatchingEventsListener,DriverLocationListener],
+  providers: [
+    NotificationsGateway,
+    NotificationsService,
+    MatchingEventsListener,
+    DriverLocationListener,
+  ],
   exports: [NotificationsService, NotificationsGateway],
 })
 export class NotificationsModule {}

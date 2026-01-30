@@ -1,13 +1,12 @@
-
-import { 
-  Controller, 
-  Get, 
-  Param, 
-  Query, 
-  Patch, 
-  Body, 
-  UseGuards, 
-  ParseIntPipe, 
+import {
+  Controller,
+  Get,
+  Param,
+  Query,
+  Patch,
+  Body,
+  UseGuards,
+  ParseIntPipe,
   Delete,
   Post,
   Req,
@@ -55,16 +54,16 @@ export class CustomersController {
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN_MANAGER)
   async update(
     @Param('id') id: string,
-    @Body() body: { name?: string; phone?: string; email?: string }
+    @Body() body: { name?: string; phone?: string; email?: string },
   ) {
     return this.customersService.update(id, body);
   }
 
-@Patch(':id/status')
+  @Patch(':id/status')
   async updateStatus(
-    @Param('id') id: string, 
+    @Param('id') id: string,
     @Body() body: { status: UserStatus },
-    @Req() req: any // ✅ Inject Request
+    @Req() req: any, // ✅ Inject Request
   ) {
     const adminId = req.user?.id || req.user?.sub;
     return this.customersService.updateStatus(id, body.status, adminId);
@@ -75,15 +74,19 @@ export class CustomersController {
     return this.customersService.remove(id);
   }
 
-@Post(':id/kill-switch')
+  @Post(':id/kill-switch')
   @Roles(UserRole.SUPER_ADMIN)
   async killSwitch(
     @Param('id') id: string,
     @Body() body: { action: 'SUSPEND' | 'BAN'; reason: string },
-    @Req() req: any
+    @Req() req: any,
   ) {
     const adminId = req.user?.id || 'SYSTEM';
-    return this.customersService.executeKillSwitch(id, body.action, body.reason, adminId);
+    return this.customersService.executeKillSwitch(
+      id,
+      body.action,
+      body.reason,
+      adminId,
+    );
   }
-
 }

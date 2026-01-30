@@ -33,12 +33,28 @@ import {
 import { uploadBulk, UploadProgress } from "@/services/storage.service";
 import { Category } from "@/types/menu";
 
+/* ---------- Types ---------- */
+
 interface ImageItem {
   uri: string;
   isNew: boolean;
   isEdited?: boolean;
   originalUri?: string;
 }
+
+interface Modifier {
+  name: string;
+  price: string;
+}
+
+interface ModifierGroup {
+  name: string;
+  minSelect: string;
+  maxSelect: string;
+  modifiers: Modifier[];
+}
+
+/* ---------- Screen ---------- */
 
 export default function AddEditItemScreen() {
   const router = useRouter();
@@ -62,26 +78,21 @@ export default function AddEditItemScreen() {
   const [price, setPrice] = useState("");
   const [stock, setStock] = useState("");
   const [images, setImages] = useState<ImageItem[]>([]);
-  const [categoryId, setCategoryId] = useState<string>("");
+  const [categoryId, setCategoryId] = useState("");
 
   const [categories, setCategories] = useState<Category[]>([]);
+  const [modifierGroups, setModifierGroups] = useState<ModifierGroup[]>([]);
 
   useEffect(() => {
     loadCategories();
-    if (isEdit) {
-      loadItem();
-    }
+    if (isEdit) loadItem();
   }, [itemId]);
 
   const loadCategories = async () => {
     try {
-      const cats = await fetchCategories();
-      setCategories(cats);
-    } catch (error: any) {
-      Toast.show({
-        type: "error",
-        text1: "Failed to load categories",
-      });
+      setCategories(await fetchCategories());
+    } catch {
+      Toast.show({ type: "error", text1: "Failed to load categories" });
     }
   };
 
@@ -98,67 +109,65 @@ export default function AddEditItemScreen() {
       setStock(item.stock?.toString() || "0");
       setCategoryId(item.categoryId);
 
-      // Load existing images as not new
-      if (item.images && item.images.length > 0) {
-        setImages(item.images.map((uri) => ({ uri, isNew: false })));
+      if (item.images?.length) {
+        setImages(item.images.map((uri: string) => ({ uri, isNew: false })));
       }
-    } catch (error: any) {
-      Toast.show({
-        type: "error",
-        text1: "Failed to load item",
-      });
+
+      if (item.modifierGroups?.length) {
+        setModifierGroups(
+          item.modifierGroups.map((g: any) => ({
+            name: g.name,
+            minSelect: g.minSelect.toString(),
+            maxSelect: g.maxSelect.toString(),
+            modifiers: g.modifiers.map((m: any) => ({
+              name: m.name,
+              price: m.price.toString(),
+            })),
+          })),
+        );
+      }
+    } catch {
+      Toast.show({ type: "error", text1: "Failed to load item" });
       router.back();
     } finally {
       setLoading(false);
     }
   };
 
+  /* ---------- Images ---------- */
+
   const pickImage = async (): Promise<string | null> => {
-    try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ["images"],
-        quality: 0.7,
-        allowsEditing: true,
-        aspect: [1, 1], // Square aspect ratio
-      });
-      if (!result.canceled && result.assets.length > 0) {
-        return result.assets[0].uri;
-      }
-    } catch (error) {
-      // Silent error handling
-    }
-    return null;
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      quality: 0.7,
+      allowsEditing: true,
+      aspect: [1, 1],
+    });
+    return !result.canceled ? result.assets[0].uri : null;
   };
 
   const handleAddImage = async () => {
     if (images.length >= 8) {
-      Toast.show({
-        type: "info",
-        text1: "Maximum 8 images allowed",
-      });
+      Toast.show({ type: "info", text1: "Maximum 8 images allowed" });
       return;
     }
-
     const uri = await pickImage();
-    if (uri) {
-      setImages((prev) => [...prev, { uri, isNew: true }]);
-    }
+    if (uri) setImages((p) => [...p, { uri, isNew: true }]);
   };
 
   const handleReplaceImage = async (index: number) => {
     const uri = await pickImage();
-    if (uri) {
-      setImages((prev) => {
-        const newImages = [...prev];
-        newImages[index] = {
-          uri,
-          isNew: true,
-          isEdited: true,
-          originalUri: newImages[index].uri,
-        };
-        return newImages;
-      });
-    }
+    if (!uri) return;
+    setImages((prev) => {
+      const copy = [...prev];
+      copy[index] = {
+        uri,
+        isNew: true,
+        isEdited: true,
+        originalUri: copy[index].uri,
+      };
+      return copy;
+    });
   };
 
   const handleDeleteImage = (idx: number) => {
@@ -166,190 +175,109 @@ export default function AddEditItemScreen() {
   };
 
   const uploadImages = async (): Promise<string[]> => {
-    // Separate images into existing (unchanged) and new/edited
-    const existingImages = images.filter((img) => !img.isNew && !img.isEdited);
-    const imagesToUpload = images.filter((img) => img.isNew || img.isEdited);
+    const existing = images.filter((i) => !i.isNew && !i.isEdited);
+    const toUpload = images.filter((i) => i.isNew || i.isEdited);
 
-    // If no new images to upload, return existing images
-    if (imagesToUpload.length === 0) {
-      return existingImages.map((img) => img.uri);
-    }
+    if (!toUpload.length) return existing.map((i) => i.uri);
 
     setUploadingImages(true);
     try {
-      // Prepare files for bulk upload
-      const filesToUpload = imagesToUpload.map((img, index) => ({
-        uri: img.uri,
-        name: `product-${Date.now()}-${index}.jpg`,
-        type: "image/jpeg",
-      }));
-
-      // Upload all new/edited images at once
-      const uploadedUrls = await uploadBulk(
-        filesToUpload,
-        (progress: UploadProgress) => {}
+      const uploaded = await uploadBulk(
+        toUpload.map((img, i) => ({
+          uri: img.uri,
+          name: `product-${Date.now()}-${i}.jpg`,
+          type: "image/jpeg",
+        })),
+        (_: UploadProgress) => {},
       );
 
-      // Combine existing unchanged URLs with newly uploaded URLs
-      // For edit mode: preserve position of existing images
-      const finalUrls: string[] = [];
-      let uploadedIndex = 0;
-
-      images.forEach((img) => {
-        if (img.isNew || img.isEdited) {
-          // Use newly uploaded URL
-          finalUrls.push(uploadedUrls[uploadedIndex]);
-          uploadedIndex++;
-        } else {
-          // Keep existing URL
-          finalUrls.push(img.uri);
-        }
-      });
-
-      // Return all URLs as array
-      return finalUrls;
-    } catch (error: any) {
-      const errorMessage = error?.message || "Failed to upload images";
-      throw new Error(errorMessage);
+      let idx = 0;
+      return images.map((img) =>
+        img.isNew || img.isEdited ? uploaded[idx++] : img.uri,
+      );
     } finally {
       setUploadingImages(false);
     }
   };
 
-  const validateForm = (): boolean => {
-    if (!name.trim()) {
-      Toast.show({ type: "error", text1: "Item name is required" });
-      return false;
-    }
-    if (!price.trim() || isNaN(Number(price)) || Number(price) <= 0) {
-      Toast.show({ type: "error", text1: "Valid price is required" });
-      return false;
-    }
-    if (!categoryId) {
-      Toast.show({ type: "error", text1: "Select a category" });
-      return false;
-    }
-    if (images.length === 0) {
-      Toast.show({ type: "error", text1: "Add at least one image" });
-      return false;
-    }
-    return true;
-  };
+  /* ---------- Save ---------- */
 
   const handleSave = async () => {
-    if (!validateForm()) return;
+    if (!name.trim() || !price || !categoryId || !images.length) {
+      Toast.show({ type: "error", text1: "Complete all required fields" });
+      return;
+    }
+
     if (!user?.storeId) {
       Toast.show({ type: "error", text1: "Store not found" });
       return;
     }
 
-    // Show confirmation for updates
     if (isEdit) {
-      const confirmed = await confirm({
+      const ok = await confirm({
         title: "Update Product",
-        message: "Are you sure you want to update this product?",
+        message: "Are you sure?",
         confirmText: "Update",
         type: "warning",
       });
-      if (!confirmed) return;
+      if (!ok) return;
     }
 
     setSaving(true);
     try {
-      // Upload images first
       const imageUrls = await uploadImages();
 
+      const payload = {
+        name,
+        description: description || undefined,
+        price: Number(price),
+        categoryId,
+        stock: Number(stock) || 0,
+        images: imageUrls,
+        modifierGroups: modifierGroups.map((g) => ({
+          name: g.name,
+          minSelect: Number(g.minSelect) || 0,
+          maxSelect: Number(g.maxSelect) || 1,
+          modifiers: g.modifiers.map((m) => ({
+            name: m.name,
+            price: Number(m.price) || 0,
+          })),
+        })),
+      };
+
       if (isEdit && itemId) {
-        // Update existing product
-        await updateProduct(itemId, {
-          name,
-          description: description || undefined,
-          price: Number(price),
-          categoryId,
-          stock: Number(stock) || 0,
-          images: imageUrls,
-        });
-
-        Toast.show({
-          type: "success",
-          text1: "Product updated successfully",
-        });
+        await updateProduct(itemId, payload);
       } else {
-        // Create new product
-        await createProduct({
-          storeId: user.storeId,
-          name,
-          description: description || undefined,
-          price: Number(price),
-          categoryId,
-          stock: Number(stock) || 0,
-          images: imageUrls,
-        });
-
-        Toast.show({
-          type: "success",
-          text1: "Product created successfully",
-        });
+        await createProduct({ storeId: user.storeId, ...payload });
       }
 
-      router.back();
-    } catch (error: any) {
       Toast.show({
-        type: "error",
-        text1: error.message || "Failed to save product",
+        type: "success",
+        text1: isEdit ? "Product updated" : "Product created",
       });
+      router.back();
+    } catch (e: any) {
+      Toast.show({ type: "error", text1: e.message || "Save failed" });
     } finally {
       setSaving(false);
     }
   };
 
-  const handleCancel = async () => {
-    const confirmed = await confirm({
-      title: "Discard Changes",
-      message: "Are you sure you want to discard your changes?",
-      confirmText: "Discard",
-      cancelText: "Keep Editing",
-      type: "warning",
-    });
+  /* ---------- Render ---------- */
 
-    if (confirmed) {
-      router.back();
-    }
-  };
-
-  const renderImage = ({
-    item,
-    drag,
-    isActive,
-  }: RenderItemParams<ImageItem>) => {
+  const renderImage = ({ item, drag }: RenderItemParams<ImageItem>) => {
     const idx = images.findIndex((i) => i.uri === item.uri);
 
     return (
-      <View style={[styles.imageWrapper, isActive && { opacity: 0.8 }]}>
-        <Pressable
-          onLongPress={drag}
-          onPress={() => handleReplaceImage(idx)}
-          style={styles.imageContainer}
-        >
-          <Image
-            source={{ uri: item.uri }}
-            style={styles.image}
-            resizeMode="cover"
-          />
-          {item.isNew && (
-            <View style={styles.newBadge}>
-              <ThemedText style={{ fontSize: 8, color: "#fff" }}>
-                NEW
-              </ThemedText>
-            </View>
-          )}
+      <View style={styles.imageWrapper}>
+        <Pressable onLongPress={drag} onPress={() => handleReplaceImage(idx)}>
+          <Image source={{ uri: item.uri }} style={styles.image} />
         </Pressable>
-
         <Pressable
           style={styles.deleteIcon}
           onPress={() => handleDeleteImage(idx)}
         >
-          <IconSymbol name="trash" size={16} color="#fff" />
+          <IconSymbol name="trash" size={14} color="#fff" />
         </Pressable>
       </View>
     );
@@ -357,263 +285,169 @@ export default function AddEditItemScreen() {
 
   if (loading) {
     return (
-      <ThemedView style={{ flex: 1 }}>
-        {/* Header Skeleton */}
-        <View style={styles.header}>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-            <View
-              style={{
-                width: 24,
-                height: 24,
-                borderRadius: 12,
-                backgroundColor: borderColor,
-                opacity: 0.3,
-              }}
-            />
-            <View
-              style={{
-                width: 60,
-                height: 20,
-                borderRadius: 4,
-                backgroundColor: borderColor,
-                opacity: 0.3,
-              }}
-            />
-          </View>
-        </View>
-
-        <ScrollView contentContainerStyle={styles.container}>
-          {/* Title Skeleton */}
-          <View
-            style={{
-              width: 150,
-              height: 28,
-              borderRadius: 4,
-              backgroundColor: borderColor,
-              opacity: 0.3,
-              marginBottom: 24,
-            }}
-          />
-
-          {/* Form Fields Skeleton */}
-          {[1, 2, 3, 4, 5, 6].map((i) => (
-            <View key={i} style={styles.section}>
-              <View
-                style={{
-                  width: 100,
-                  height: 16,
-                  borderRadius: 4,
-                  backgroundColor: borderColor,
-                  opacity: 0.3,
-                  marginBottom: 8,
-                }}
-              />
-              <View
-                style={{
-                  height: 50,
-                  borderRadius: 12,
-                  backgroundColor: borderColor,
-                  opacity: 0.3,
-                }}
-              />
-            </View>
-          ))}
-        </ScrollView>
+      <ThemedView style={{ flex: 1, justifyContent: "center" }}>
+        <ActivityIndicator />
       </ThemedView>
     );
   }
 
   return (
     <ThemedView style={{ flex: 1 }}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Pressable
-          onPress={handleCancel}
-          style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
-        >
-          <IconSymbol name="chevron.left" size={24} color={primary} />
-          <ThemedText type="defaultSemiBold" style={{ color: primary }}>
-            Cancel
-          </ThemedText>
-        </Pressable>
-      </View>
-
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={{ flex: 1 }}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
       >
-        <ScrollView
-          contentContainerStyle={styles.container}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
-          <ThemedText type="title" style={{ marginBottom: 24 }}>
-            {isEdit ? "Edit Product" : "Add New Product"}
+        <ScrollView contentContainerStyle={styles.container}>
+          <ThemedText type="title">
+            {isEdit ? "Edit Product" : "Add Product"}
           </ThemedText>
 
-          {/* Item Name */}
-          <View style={styles.section}>
-            <ThemedText type="defaultSemiBold" style={styles.label}>
-              Product Name *
-            </ThemedText>
-            <ThemedInput
-              placeholder="Enter product name"
-              value={name}
-              onChangeText={setName}
-            />
-          </View>
+          {/* Basic Fields */}
+          <ThemedInput
+            placeholder="Product name *"
+            value={name}
+            onChangeText={setName}
+          />
+          <ThemedInput
+            placeholder="Description"
+            value={description}
+            onChangeText={setDescription}
+          />
+          <ThemedInput
+            placeholder="Price *"
+            value={price}
+            keyboardType="numeric"
+            onChangeText={setPrice}
+          />
+          <ThemedInput
+            placeholder="Stock"
+            value={stock}
+            keyboardType="numeric"
+            onChangeText={setStock}
+          />
 
-          {/* Description */}
+          <CustomDropdown
+            label="Category *"
+            data={categories.map((c) => ({ label: c.name, value: c.id }))}
+            value={categoryId}
+            onChange={(v) => setCategoryId(v as string)}
+          />
+
+          {/* Modifier Groups */}
           <View style={styles.section}>
-            <ThemedText type="defaultSemiBold" style={styles.label}>
-              Description
-            </ThemedText>
-            <ThemedInput
-              placeholder="Product description (optional)"
-              value={description}
-              onChangeText={setDescription}
-              style={{ height: 80, textAlignVertical: "top" }}
-              multiline
-              maxLength={200}
-            />
-            <ThemedText
-              type="caption"
-              style={{ marginTop: 4, color: mutedText }}
+            <ThemedText type="defaultSemiBold">Modifier Groups</ThemedText>
+
+            {modifierGroups.map((g, gi) => (
+              <View key={gi} style={styles.modGroup}>
+                <ThemedInput
+                  placeholder="Group name"
+                  value={g.name}
+                  onChangeText={(t) => {
+                    const c = [...modifierGroups];
+                    c[gi].name = t;
+                    setModifierGroups(c);
+                  }}
+                />
+
+                <View style={{ flexDirection: "row", gap: 8 }}>
+                  <ThemedInput
+                    placeholder="Min"
+                    keyboardType="numeric"
+                    value={g.minSelect}
+                    onChangeText={(t) => {
+                      const c = [...modifierGroups];
+                      c[gi].minSelect = t;
+                      setModifierGroups(c);
+                    }}
+                  />
+                  <ThemedInput
+                    placeholder="Max"
+                    keyboardType="numeric"
+                    value={g.maxSelect}
+                    onChangeText={(t) => {
+                      const c = [...modifierGroups];
+                      c[gi].maxSelect = t;
+                      setModifierGroups(c);
+                    }}
+                  />
+                </View>
+
+                {g.modifiers.map((m, mi) => (
+                  <View key={mi} style={{ flexDirection: "row", gap: 8 }}>
+                    <ThemedInput
+                      placeholder="Modifier name"
+                      value={m.name}
+                      onChangeText={(t) => {
+                        const c = [...modifierGroups];
+                        c[gi].modifiers[mi].name = t;
+                        setModifierGroups(c);
+                      }}
+                    />
+                    <ThemedInput
+                      placeholder="Price"
+                      keyboardType="numeric"
+                      value={m.price}
+                      onChangeText={(t) => {
+                        const c = [...modifierGroups];
+                        c[gi].modifiers[mi].price = t;
+                        setModifierGroups(c);
+                      }}
+                    />
+                  </View>
+                ))}
+
+                <Pressable
+                  onPress={() => {
+                    const c = [...modifierGroups];
+                    c[gi].modifiers.push({ name: "", price: "0" });
+                    setModifierGroups(c);
+                  }}
+                >
+                  <ThemedText type="caption" style={{ color: primary }}>
+                    + Add Modifier
+                  </ThemedText>
+                </Pressable>
+              </View>
+            ))}
+
+            <Pressable
+              onPress={() =>
+                setModifierGroups((p) => [
+                  ...p,
+                  { name: "", minSelect: "0", maxSelect: "1", modifiers: [] },
+                ])
+              }
             >
-              {description.length}/200
-            </ThemedText>
-          </View>
-
-          {/* Price */}
-          <View style={styles.section}>
-            <ThemedText type="defaultSemiBold" style={styles.label}>
-              Price (₦) *
-            </ThemedText>
-            <ThemedInput
-              placeholder="0.00"
-              value={price}
-              onChangeText={(t) => setPrice(t.replace(/[^0-9.]/g, ""))}
-              keyboardType="numeric"
-            />
-          </View>
-
-          {/* Stock */}
-          <View style={styles.section}>
-            <ThemedText type="defaultSemiBold" style={styles.label}>
-              Stock Quantity
-            </ThemedText>
-            <ThemedInput
-              placeholder="0"
-              value={stock}
-              onChangeText={(t) => setStock(t.replace(/[^0-9]/g, ""))}
-              keyboardType="numeric"
-            />
-          </View>
-
-          {/* Category */}
-          <View style={styles.section}>
-            <CustomDropdown
-              label="Category *"
-              placeholder="Select category"
-              data={categories.map((cat) => ({
-                label: cat.name,
-                value: cat.id,
-              }))}
-              value={categoryId}
-              onChange={(value) => setCategoryId(value as string)}
-              modal={true}
-            />
+              <ThemedText style={{ color: primary }}>+ Add Group</ThemedText>
+            </Pressable>
           </View>
 
           {/* Images */}
-          <View style={styles.section}>
-            <ThemedText type="defaultSemiBold" style={styles.label}>
-              Product Images * (Max 8)
-            </ThemedText>
-            <ThemedText
-              type="caption"
-              style={{ marginBottom: 12, color: mutedText }}
-            >
-              Tap to replace image. Long press to reorder.
-            </ThemedText>
+          <DraggableFlatList
+            horizontal
+            data={images}
+            keyExtractor={(i, idx) => `${i.uri}-${idx}`}
+            renderItem={renderImage}
+            onDragEnd={({ data }) => setImages(data)}
+          />
+          <Pressable onPress={handleAddImage}>
+            <ThemedText style={{ color: primary }}>+ Add Image</ThemedText>
+          </Pressable>
 
-            {images.length === 0 ? (
-              // Show placeholder when no images
-              <Pressable
-                style={[styles.image, styles.placeholder, { borderColor }]}
-                onPress={handleAddImage}
-              >
-                <IconSymbol name="plus" size={24} color={mutedText} />
-                <ThemedText
-                  style={{ fontSize: 10, marginTop: 4, color: mutedText }}
-                >
-                  Add Image
-                </ThemedText>
-              </Pressable>
+          {/* Save */}
+          <Pressable
+            style={[styles.saveButton, { backgroundColor: primary }]}
+            onPress={handleSave}
+            disabled={saving || uploadingImages}
+          >
+            {saving ? (
+              <ActivityIndicator color="#fff" />
             ) : (
-              // Show images with add button on the side
-              <View style={{ flexDirection: "row", gap: 12 }}>
-                <DraggableFlatList
-                  horizontal
-                  data={images}
-                  keyExtractor={(item, i) => `${item.uri}-${i}`}
-                  renderItem={renderImage}
-                  onDragEnd={({ data }) => setImages(data)}
-                  contentContainerStyle={{ gap: 12 }}
-                  showsHorizontalScrollIndicator={false}
-                  style={{ flex: 1 }}
-                />
-
-                {images.length < 8 && (
-                  <Pressable
-                    style={[styles.image, styles.placeholder, { borderColor }]}
-                    onPress={handleAddImage}
-                  >
-                    <IconSymbol name="plus" size={24} color={mutedText} />
-                  </Pressable>
-                )}
-              </View>
-            )}
-          </View>
-
-          {/* Action Buttons */}
-          <View style={styles.actions}>
-            <Pressable
-              style={[
-                styles.button,
-                styles.cancelButton,
-                { borderColor: primary },
-              ]}
-              onPress={handleCancel}
-              disabled={saving || uploadingImages}
-            >
-              <ThemedText type="defaultSemiBold" style={{ color: primary }}>
-                Cancel
+              <ThemedText style={{ color: "#fff" }}>
+                {isEdit ? "Update" : "Create"}
               </ThemedText>
-            </Pressable>
-
-            <Pressable
-              style={[
-                styles.button,
-                styles.saveButton,
-                {
-                  backgroundColor: primary,
-                  opacity: saving || uploadingImages ? 0.7 : 1,
-                },
-              ]}
-              onPress={handleSave}
-              disabled={saving || uploadingImages}
-            >
-              {saving || uploadingImages ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <ThemedText type="defaultSemiBold" style={{ color: "#fff" }}>
-                  {isEdit ? "Update Product" : "Create Product"}
-                </ThemedText>
-              )}
-            </Pressable>
-          </View>
+            )}
+          </Pressable>
         </ScrollView>
       </KeyboardAvoidingView>
 
@@ -623,46 +457,31 @@ export default function AddEditItemScreen() {
   );
 }
 
+/* ---------- Styles ---------- */
+
 const styles = StyleSheet.create({
-  header: {
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
   container: {
     padding: 16,
-    paddingBottom: 100,
+    gap: 16,
   },
   section: {
-    marginBottom: 20,
+    marginTop: 16,
   },
-  label: {
-    marginBottom: 8,
+  modGroup: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
   },
   imageWrapper: {
-    position: "relative",
-    width: 100,
-    height: 100,
-  },
-  imageContainer: {
-    width: 100,
-    height: 100,
-    borderRadius: 12,
-    overflow: "hidden",
+    width: 90,
+    height: 90,
+    marginRight: 12,
   },
   image: {
-    width: 100,
-    height: 100,
+    width: 90,
+    height: 90,
     borderRadius: 12,
-  },
-  placeholder: {
-    borderWidth: 2,
-    borderStyle: "dashed",
-    backgroundColor: "transparent",
-    justifyContent: "center",
-    alignItems: "center",
   },
   deleteIcon: {
     position: "absolute",
@@ -670,41 +489,13 @@ const styles = StyleSheet.create({
     right: -6,
     backgroundColor: "#EF4444",
     borderRadius: 12,
-    width: 24,
-    height: 24,
-    justifyContent: "center",
-    alignItems: "center",
-    zIndex: 999,
-    elevation: 5, // For Android
-    shadowColor: "#000", // For iOS
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
+    padding: 4,
   },
-  newBadge: {
-    position: "absolute",
-    bottom: 4,
-    right: 4,
-    backgroundColor: "#10B981",
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  actions: {
-    flexDirection: "row",
-    gap: 12,
-    marginTop: 32,
-  },
-  button: {
-    flex: 1,
+  saveButton: {
     height: 50,
     borderRadius: 12,
-    alignItems: "center",
     justifyContent: "center",
+    alignItems: "center",
+    marginTop: 24,
   },
-  cancelButton: {
-    borderWidth: 1,
-    backgroundColor: "transparent",
-  },
-  saveButton: {},
 });

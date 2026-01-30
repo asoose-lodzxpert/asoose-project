@@ -1,5 +1,23 @@
 export type MenuTab = "items" | "categories";
 
+/* ---------- Modifiers ---------- */
+
+export interface Modifier {
+  id: string;
+  name: string;
+  price: number;
+}
+
+export interface ModifierGroup {
+  id: string;
+  name: string;
+  minSelect: number;
+  maxSelect: number;
+  modifiers: Modifier[];
+}
+
+/* ---------- Menu Item ---------- */
+
 export interface MenuItem {
   id: string;
   name: string;
@@ -15,15 +33,23 @@ export interface MenuItem {
   salesCount: number;
   createdAt: string;
   updatedAt: string;
+
   category?: {
     name: string;
   };
+
+  /** 🔹 Optional modifier groups */
+  modifierGroups?: ModifierGroup[];
 }
+
+/* ---------- Category ---------- */
 
 export interface Category {
   id: string;
   name: string;
 }
+
+/* ---------- Delete ---------- */
 
 export type DeleteTarget =
   | { type: "item"; id: string }

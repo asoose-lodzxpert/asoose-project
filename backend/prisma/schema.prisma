@@ -680,6 +680,8 @@ model Modifier {
   name  String
   price Float  @default(0)
 
+  orderItemModifiers OrderItemModifier[]
+
   @@index([modifierGroupId])
 }
 
@@ -716,6 +718,15 @@ model Order {
   @@index([createdAt(sort: Desc), status]) 
 }
 
+model OrderItemModifier {
+  id         String    @id @default(uuid())
+  orderItemId String
+  modifierId  String
+
+  orderItem OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  modifier  Modifier  @relation(fields: [modifierId], references: [id], onDelete: Cascade)
+}
+
 model OrderItem {
   id        String  @id @default(uuid())
   orderId   String
@@ -728,6 +739,7 @@ model OrderItem {
 
   order   Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  modifiers      OrderItemModifier[] 
 
   @@index([orderId])
   @@index([productId])

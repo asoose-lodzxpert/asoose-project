@@ -16,6 +16,31 @@ import {
 export class RedisService {
   private readonly logger = new Logger(RedisService.name);
 
+  /**
+   * Returns the active ride/job ID for a driver (if any)
+   */
+  async getDriverActiveRide(driverId: string): Promise<string | null> {
+    // Uses the current job key, which is set when a driver is on a ride
+    const rideId = await this.redis.get(
+      REDIS_KEYS.DRIVER_CURRENT_JOB(driverId),
+    );
+    return rideId || null;
+  }
+
+  /**
+   * Returns the customer/user ID for a given ride/job (if any)
+   */
+  async getRideCustomer(rideId: string): Promise<string | null> {
+    // Assumes a key like ride:{rideId}:customer exists
+    if (!REDIS_KEYS.RIDE_CUSTOMER) {
+      throw new Error(
+        'REDIS_KEYS.RIDE_CUSTOMER is not defined. Please add it to redis-keys.constants.ts',
+      );
+    }
+    const customerId = await this.redis.get(REDIS_KEYS.RIDE_CUSTOMER(rideId));
+    return customerId || null;
+  }
+
   constructor(@Inject(MATCHING_REDIS_CLIENT) private readonly redis: Redis) {}
 
   getClient(): Redis {

@@ -19,8 +19,10 @@ export class DriverLocationListener {
   async handleDriverLocationUpdate(payload: DriverLocationUpdatedEvent) {
     try {
       // 1. Check if driver is in an active ride (Fast Redis Lookup)
-      const activeRideId = await this.redis.getDriverActiveRide(payload.driverId);
-      
+      const activeRideId = await this.redis.getDriverActiveRide(
+        payload.driverId,
+      );
+
       if (!activeRideId) return; // Driver is idle, no need to broadcast to specific users
 
       // 2. Get the customer for this ride
@@ -29,19 +31,21 @@ export class DriverLocationListener {
       if (customerId) {
         // 3. Emit Direct Socket Event
         // We only send to the specific customer, saving massive bandwidth
-        this.gateway.server.to(`user_${customerId}`).emit('DRIVER_LOCATION_UPDATE', {
-          type: 'DRIVER_LOCATION_UPDATE',
-          metadata: {
-            lat: payload.lat,
-            lng: payload.lng,
-            heading: (payload as any).heading || 0, // Handle optional property
-            rideId: activeRideId
-          }
-        });
+        this.gateway.server
+          .to(`user_${customerId}`)
+          .emit('DRIVER_LOCATION_UPDATE', {
+            type: 'DRIVER_LOCATION_UPDATE',
+            metadata: {
+              lat: payload.lat,
+              lng: payload.lng,
+              heading: (payload as any).heading || 0, // Handle optional property
+              rideId: activeRideId,
+            },
+          });
       }
     } catch (error) {
       // Suppress errors here to prevent crashing the event loop for a single failed ping
-      // this.logger.error(error); 
+      // this.logger.error(error);
     }
   }
 }

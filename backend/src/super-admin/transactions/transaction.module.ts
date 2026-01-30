@@ -5,9 +5,7 @@ import { PaymentModule } from 'src/payment/payment.module';
 import { TransactionsController } from './transaction.controller';
 import { TransactionsService } from './transaction.service';
 @Module({
-  imports: [
-    forwardRef(() => PaymentModule), 
-  ],
+  imports: [forwardRef(() => PaymentModule)],
   controllers: [TransactionsController],
   providers: [TransactionsService, TransactionLedgerService, PrismaService],
   exports: [TransactionLedgerService, TransactionsService],

@@ -2,9 +2,25 @@ import { fetchWithAuth } from "./auth-fetch";
 
 const EXPO_PUBLIC_API_URL = process.env.EXPO_PUBLIC_API_URL;
 
+/* ---------- Types ---------- */
+
 export interface Category {
   id: string;
   name: string;
+}
+
+export interface Modifier {
+  id?: string;
+  name: string;
+  price: number;
+}
+
+export interface ModifierGroup {
+  id?: string;
+  name: string;
+  minSelect: number;
+  maxSelect: number;
+  modifiers: Modifier[];
 }
 
 export interface Product {
@@ -22,10 +38,16 @@ export interface Product {
   salesCount: number;
   createdAt: string;
   updatedAt: string;
+
   category?: {
     name: string;
   };
+
+  /** 🔹 Modifiers */
+  modifierGroups?: ModifierGroup[];
 }
+
+/* ---------- Inputs ---------- */
 
 export interface CreateProductInput {
   storeId: string;
@@ -35,6 +57,17 @@ export interface CreateProductInput {
   images?: string[];
   categoryId: string;
   stock?: number;
+
+  /** 🔹 Optional modifiers */
+  modifierGroups?: {
+    name: string;
+    minSelect?: number;
+    maxSelect?: number;
+    modifiers?: {
+      name: string;
+      price?: number;
+    }[];
+  }[];
 }
 
 export interface UpdateProductInput {
@@ -45,7 +78,20 @@ export interface UpdateProductInput {
   categoryId?: string;
   stock?: number;
   status?: "ACTIVE" | "OUT_OF_STOCK" | "DISABLED";
+
+  /** 🔹 Optional modifiers */
+  modifierGroups?: {
+    name: string;
+    minSelect?: number;
+    maxSelect?: number;
+    modifiers?: {
+      name: string;
+      price?: number;
+    }[];
+  }[];
 }
+
+/* ---------- API Calls ---------- */
 
 // Get all categories
 export async function fetchCategories(): Promise<Category[]> {
@@ -59,12 +105,12 @@ export async function fetchProducts(storeId: string): Promise<Product[]> {
   );
 }
 
-// Get single product
+// Get single product (includes modifiers)
 export async function fetchProduct(productId: string): Promise<Product> {
   return fetchWithAuth(`${EXPO_PUBLIC_API_URL}/vendor/products/${productId}`);
 }
 
-// Create product
+// Create product (with modifiers)
 export async function createProduct(
   data: CreateProductInput,
 ): Promise<Product> {
@@ -74,7 +120,7 @@ export async function createProduct(
   });
 }
 
-// Update product
+// Update product (with modifiers)
 export async function updateProduct(
   productId: string,
   data: UpdateProductInput,
@@ -98,5 +144,6 @@ export async function toggleProductStock(
   currentStatus: "ACTIVE" | "OUT_OF_STOCK" | "DISABLED",
 ): Promise<Product> {
   const newStatus = currentStatus === "ACTIVE" ? "OUT_OF_STOCK" : "ACTIVE";
+
   return updateProduct(productId, { status: newStatus });
 }

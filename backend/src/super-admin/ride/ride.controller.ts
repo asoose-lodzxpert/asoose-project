@@ -37,16 +37,14 @@ export class RidesController {
     return this.ridesService.cancel(id);
   }
 
-@Post(':id/assign')
+  @Post(':id/assign')
   @Roles('SUPER_ADMIN', 'ADMIN_MANAGER') // Higher privilege
   async assignDriver(
-    @Param('id') id: string, 
+    @Param('id') id: string,
     @Body('riderId') riderId: string,
-    @Req() req: any
+    @Req() req: any,
   ) {
     const adminId = req.user.id || req.user.sub;
     return this.ridesService.manualAssignDriver(id, riderId, adminId);
   }
-
-
 }

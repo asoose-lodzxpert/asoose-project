@@ -8,17 +8,17 @@ import {
   deliveryToJobSummary,
 } from './job.dto';
 import { RidersStreamService } from 'src/riders/riders-stream.service';
-import { RideService } from 'src/ride/ride.service';
-import { DeliveryService } from 'src/delivery/delivery.service';
+import { DeliveriesService } from 'src/users/trips/deliveries.service';
 import { RideStatus } from '@prisma/client';
+import { RidesService } from 'src/users/trips/rides.service';
 
 @Injectable()
 export class JobsService {
   constructor(
-    @Inject(forwardRef(() => RideService))
-    private readonly rideService: RideService,
-    @Inject(forwardRef(() => DeliveryService))
-    private readonly deliveryService: DeliveryService,
+    @Inject(forwardRef(() => RidesService))
+    private readonly rideService: RidesService,
+    @Inject(forwardRef(() => DeliveriesService))
+    private readonly deliveryService: DeliveriesService,
     private readonly ridersStreamService: RidersStreamService,
   ) {}
 
@@ -106,7 +106,7 @@ export class JobsService {
   async completeJob(jobId: string, jobType: JobType, payload: any) {
     let job;
     if (jobType === 'ride') {
-      job = await this.rideService.completeRide(jobId, payload);
+      job = await this.rideService.completeRide(jobId, payload, 14.11, 23.32);
       if (job)
         this.ridersStreamService.emitJobUpdate(
           job.riderId,
@@ -115,7 +115,16 @@ export class JobsService {
           rideToJobSummary(job),
         );
     } else if (jobType === 'delivery') {
-      job = await this.deliveryService.completeDelivery(jobId, payload);
+      // Expecting payload to have: riderId, otp, proof, lat, lng
+      const { riderId, otp, proof, lat, lng } = payload;
+      job = await this.deliveryService.completeDelivery(
+        jobId,
+        riderId,
+        otp,
+        proof,
+        lat,
+        lng,
+      );
       if (job)
         this.ridersStreamService.emitJobUpdate(
           job.riderId,

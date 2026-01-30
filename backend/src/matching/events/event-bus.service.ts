@@ -54,6 +54,16 @@ export class EventBusService {
 
   constructor(private readonly eventEmitter: EventEmitter2) {}
 
+  emitDeliveryRequested(event: any) {
+    this.logger.log(`[DELIVERY] Requested: ${event.deliveryId}`);
+    this.eventEmitter.emit('delivery.requested', event);
+  }
+
+  emitRideRequested(event: any) {
+    this.logger.log(`[RIDE] Requested: ${event.rideId}`);
+    this.eventEmitter.emit('ride.requested', event);
+  }
+
   // ========================================
   // JOB EVENTS
   // ========================================

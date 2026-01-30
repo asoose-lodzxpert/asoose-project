@@ -15,7 +15,7 @@ export const appLogger = WinstonModule.createLogger({
         winston.format.colorize(),
         winston.format.timestamp(),
         winston.format.printf(({ timestamp, level, message, ...meta }) => {
-          let metaStr = Object.keys(meta).length
+          const metaStr = Object.keys(meta).length
             ? ` ${JSON.stringify(meta, null, 2)}`
             : '';
           return `[${timestamp}] [${level}]: ${message}${metaStr}`;

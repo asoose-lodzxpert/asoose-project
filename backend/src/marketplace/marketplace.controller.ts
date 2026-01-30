@@ -1,4 +1,16 @@
-import { Controller, Get, Param, NotFoundException, Body, Request, UseGuards, Post, Delete, Query, ParseIntPipe } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Param,
+  NotFoundException,
+  Body,
+  Request,
+  UseGuards,
+  Post,
+  Delete,
+  Query,
+  ParseIntPipe,
+} from '@nestjs/common';
 import { MarketplaceService } from './marketplace.service';
 import { CreateReviewDto } from './dto/create-review.dto';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
@@ -24,12 +36,12 @@ export class MarketplaceController {
   }
 
   @Get('categories/:id')
-  async getCategory(
-    @Param('id') id: string,
-    @Query('sort') sort?: string 
-  ) {
-    const categoryData = await this.marketplaceService.getCategoryData(id, sort || 'all');
-    
+  async getCategory(@Param('id') id: string, @Query('sort') sort?: string) {
+    const categoryData = await this.marketplaceService.getCategoryData(
+      id,
+      sort || 'all',
+    );
+
     if (!categoryData) {
       throw new NotFoundException(`Category vertical not found: ${id}`);
     }

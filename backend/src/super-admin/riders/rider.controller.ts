@@ -43,9 +43,9 @@ export class RidersController {
   @Patch(':id/status')
   // Ensure Roles guard is present if not global
   async updateStatus(
-    @Param('id') id: string, 
+    @Param('id') id: string,
     @Body('status') status: UserStatus,
-    @Req() req: any 
+    @Req() req: any,
   ) {
     const adminId = req.user?.id || req.user?.sub; // Get Admin ID from JWT
     return this.ridersService.updateStatus(id, status, adminId);
@@ -151,23 +151,26 @@ export class RidersController {
     return this.ridersService.updateVehicle(id, body);
   }
   @Get(':id/payouts')
-@Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN) // Ensure proper authorization
-async getRiderPayouts(@Param('id') id: string) {
-  // This calls the service to fetch payouts linked to this specific rider
-  return this.ridersService.getRiderPayouts(id);
-}
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN) // Ensure proper authorization
+  async getRiderPayouts(@Param('id') id: string) {
+    // This calls the service to fetch payouts linked to this specific rider
+    return this.ridersService.getRiderPayouts(id);
+  }
 
-@Post(':id/kill-switch')
-  @Roles(UserRole.SUPER_ADMIN) 
+  @Post(':id/kill-switch')
+  @Roles(UserRole.SUPER_ADMIN)
   async killSwitch(
     @Param('id') id: string,
     @Body() body: { action: 'SUSPEND' | 'BAN'; reason: string },
-    @Req() req: any // Inject Request to get Admin ID
+    @Req() req: any, // Inject Request to get Admin ID
   ) {
     // Note: Assuming you have a custom decorator or extracting from req.user
-    const adminId = req.user?.id || 'SYSTEM'; 
-    return this.ridersService.executeKillSwitch(id, body.action, body.reason, adminId);
+    const adminId = req.user?.id || 'SYSTEM';
+    return this.ridersService.executeKillSwitch(
+      id,
+      body.action,
+      body.reason,
+      adminId,
+    );
   }
-
-
 }

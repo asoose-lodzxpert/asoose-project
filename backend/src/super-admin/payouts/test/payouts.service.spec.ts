@@ -40,7 +40,7 @@ describe('PayoutsService', () => {
   describe('approvePayout', () => {
     const adminId = 'admin-1';
     const payoutId = 'payout-123';
-    
+
     const mockVendorPayout = {
       id: payoutId,
       amount: 5000,
@@ -50,8 +50,14 @@ describe('PayoutsService', () => {
 
     it('should successfully approve a pending payout', async () => {
       mockPrisma.vendorPayout.findUnique.mockResolvedValue(mockVendorPayout);
-      mockPaymentService.disbursePayment.mockResolvedValue({ success: true, reference: 'REF-BANK-1' });
-      mockPrisma.vendorPayout.update.mockResolvedValue({ ...mockVendorPayout, status: PayoutStatus.PAID });
+      mockPaymentService.disbursePayment.mockResolvedValue({
+        success: true,
+        reference: 'REF-BANK-1',
+      });
+      mockPrisma.vendorPayout.update.mockResolvedValue({
+        ...mockVendorPayout,
+        status: PayoutStatus.PAID,
+      });
 
       await service.approvePayout(payoutId, 'VENDOR', adminId);
 
@@ -81,7 +87,9 @@ describe('PayoutsService', () => {
         status: PayoutStatus.PAID, // Already Paid
       });
 
-      await expect(service.approvePayout(payoutId, 'VENDOR', adminId)).rejects.toThrow(
+      await expect(
+        service.approvePayout(payoutId, 'VENDOR', adminId),
+      ).rejects.toThrow(
         BadRequestException, // "Action denied: Payout is already PAID"
       );
 
@@ -91,9 +99,14 @@ describe('PayoutsService', () => {
     it('should handle bank failure safely without double-updating ledger', async () => {
       mockPrisma.vendorPayout.findUnique.mockResolvedValue(mockVendorPayout);
       // Simulate Bank Failure
-      mockPaymentService.disbursePayment.mockResolvedValue({ success: false, status: 'Insufficient Funds' });
+      mockPaymentService.disbursePayment.mockResolvedValue({
+        success: false,
+        status: 'Insufficient Funds',
+      });
 
-      await expect(service.approvePayout(payoutId, 'VENDOR', adminId)).rejects.toThrow(
+      await expect(
+        service.approvePayout(payoutId, 'VENDOR', adminId),
+      ).rejects.toThrow(
         BadRequestException, // "Bank Transfer Failed"
       );
 

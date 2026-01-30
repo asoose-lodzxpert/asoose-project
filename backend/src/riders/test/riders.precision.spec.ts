@@ -3,7 +3,7 @@ import { RidersService } from '../riders.service';
 // Mock Prisma
 const mockPrisma = {
   delivery: { findMany: jest.fn() },
-  rider: { findUnique: jest.fn() }
+  rider: { findUnique: jest.fn() },
 };
 
 describe('Monetary Precision', () => {
@@ -31,16 +31,18 @@ describe('Monetary Precision', () => {
     // bonus = 0.015
     // serviceFee = -0.045
     // total = 0.27
-    
+
     const total = earnings.total;
-    
+
     // Check for artifacts like 0.27000000000000003
     const decimalPlaces = total.toString().split('.')[1]?.length || 0;
-    
+
     if (decimalPlaces > 2) {
-      throw new Error(`PRECISION FAILURE: Earnings calculated as ${total}. Gateways reject >2 decimal places.`);
+      throw new Error(
+        `PRECISION FAILURE: Earnings calculated as ${total}. Gateways reject >2 decimal places.`,
+      );
     }
-    
+
     expect(total).toBeCloseTo(0.27, 2);
   });
 });

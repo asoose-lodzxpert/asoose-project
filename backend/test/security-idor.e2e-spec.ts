@@ -14,7 +14,10 @@ describe('Security: IDOR Checks', () => {
         RidersService,
         PrismaService,
         // Mock dependencies required by RidersService to avoid errors during instantiation
-        { provide: 'RidersStreamService', useValue: { emitDeliveryUpdate: jest.fn() } },
+        {
+          provide: 'RidersStreamService',
+          useValue: { emitDeliveryUpdate: jest.fn() },
+        },
         { provide: 'NotificationsService', useValue: { create: jest.fn() } },
         { provide: 'PaystackService', useValue: {} },
         { provide: 'FlutterwaveService', useValue: {} },
@@ -65,9 +68,9 @@ describe('Security: IDOR Checks', () => {
 
     // 2. Execute: Rider A (Attacker) tries to withdraw funds from Rider B's account
     // Note: In a pure service test, we check if the method allows arbitrary ID access.
-    // If RidersService.requestWithdrawal takes a `riderId` argument, it MUST verify ownership 
+    // If RidersService.requestWithdrawal takes a `riderId` argument, it MUST verify ownership
     // or rely on the Controller to pass the *Authenticated User's ID* only.
-    
+
     // We simulate a scenario where the controller might pass "riderB.id" directly.
     const withdrawalDto: CreateWithdrawalDto = {
       amount: 5000,
@@ -77,26 +80,28 @@ describe('Security: IDOR Checks', () => {
     // If the service is properly secured or designed, it should either:
     // A) Not expose this method with an arbitrary ID (it should use a context user).
     // B) Throw an error if we try to access it this way (if logic exists).
-    
+
     // For this test, we assume the vulnerability exists if the call succeeds without error.
     console.log(`Attempting IDOR: Using Rider B ID: ${riderB.id}`);
 
     try {
-        await ridersService.requestWithdrawal(riderB.id, withdrawalDto);
-        
-        // If we reach here, the withdrawal succeeded for the victim.
-        // We need to check if we can conceptually "prevent" this or if it marks a failure.
-        // Usually, Service methods trust the Controller. 
-        // This test highlights that the Service layer ITSELF has no ownership check.
-        
-        // Uncomment below to enforce Service-level security (Recommended):
-        // throw new Error('IDOR VULNERABILITY: Service layer allowed withdrawal for arbitrary ID without context check');
+      await ridersService.requestWithdrawal(riderB.id, withdrawalDto);
+
+      // If we reach here, the withdrawal succeeded for the victim.
+      // We need to check if we can conceptually "prevent" this or if it marks a failure.
+      // Usually, Service methods trust the Controller.
+      // This test highlights that the Service layer ITSELF has no ownership check.
+
+      // Uncomment below to enforce Service-level security (Recommended):
+      // throw new Error('IDOR VULNERABILITY: Service layer allowed withdrawal for arbitrary ID without context check');
     } catch (error) {
-        // If it throws an error, that's good!
+      // If it throws an error, that's good!
     }
-    
+
     // Cleanup
-    await prisma.riderPayout.deleteMany({ where: { riderId: riderB.id }});
-    await prisma.rider.deleteMany({ where: { id: { in: [riderA.id, riderB.id]}}});
+    await prisma.riderPayout.deleteMany({ where: { riderId: riderB.id } });
+    await prisma.rider.deleteMany({
+      where: { id: { in: [riderA.id, riderB.id] } },
+    });
   });
 });

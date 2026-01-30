@@ -26,7 +26,10 @@ describe('Payment Security & Reliability', () => {
   describe('Webhook Security', () => {
     it('should reject spoofed webhooks before processing payload', async () => {
       // Setup
-      const maliciousPayload = { event: 'charge.success', data: { amount: 1000000 } };
+      const maliciousPayload = {
+        event: 'charge.success',
+        data: { amount: 1000000 },
+      };
       const fakeSignature = 'bad_signature';
 
       // Mock service to THROW if called (simulating that logic is inside service, ensuring it fails correctly)
@@ -36,7 +39,10 @@ describe('Payment Security & Reliability', () => {
 
       // Execute & Assert
       await expect(
-        controller.paystackWebhook({ body: maliciousPayload } as any, fakeSignature)
+        controller.paystackWebhook(
+          { body: maliciousPayload } as any,
+          fakeSignature,
+        ),
       ).rejects.toThrow(BadRequestException);
     });
   });
@@ -45,14 +51,19 @@ describe('Payment Security & Reliability', () => {
     it('should handle Gateway Timeouts (504) without leaving system in unknown state', async () => {
       // In a real integration test, we would use nock/msw to simulate the timeout
       // Here we simulate the Service throwing a timeout error
-      mockPaymentService.initiatePayment.mockRejectedValue(new Error('Gateway Timeout 504'));
+      mockPaymentService.initiatePayment.mockRejectedValue(
+        new Error('Gateway Timeout 504'),
+      );
 
       // If the controller simply returns 500/Failed, the user might retry.
       // But if the gateway actually created the tx, we have a double-charge risk.
       // This test checks if specific timeout handling exists (e.g. queueing a check).
-      
+
       try {
-        await controller.initiatePayment({} as any, { user: { id: '1' } } as any);
+        await controller.initiatePayment(
+          {} as any,
+          { user: { id: '1' } } as any,
+        );
       } catch (e) {
         expect(e.message).not.toBe('Gateway Timeout 504'); // Should be wrapped or handled
         // If it throws the raw error, it means no reconciliation logic exists for ambiguous states

@@ -10,6 +10,8 @@
 export const REDIS_CLIENT = 'REDIS_CLIENT';
 
 export const REDIS_KEYS = {
+  /** Customer ID for a given ride/job */
+  RIDE_CUSTOMER: (rideId: string) => `ride:${rideId}:customer`,
   // ========================================
   // DRIVER STATE (SOURCE OF TRUTH)
   // ========================================

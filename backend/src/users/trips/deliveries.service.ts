@@ -9,10 +9,10 @@ import {
 } from '@nestjs/common';
 import {
   DeliveryStatus,
-  TransactionType,
-  TransactionStatus,
-  WalletEntityType,
   PaymentStatus,
+  TransactionStatus,
+  TransactionType,
+  WalletEntityType,
 } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { GeoService } from '../../matching/geo/geo.service';
@@ -21,6 +21,7 @@ import { QueueService } from '../../matching/queue/queue.service';
 import { NotificationsGateway } from '../../notifications/notifications.gateway';
 import { RequestDeliveryDto, CancelTripDto } from './dto/trip.dto';
 import { TripsCommonService, TRIPS_CONFIG } from './trips.common.service';
+import { deliveryToJobSummary } from '../../jobs/job.dto';
 
 @Injectable()
 export class DeliveriesService {
@@ -34,6 +35,42 @@ export class DeliveriesService {
     private readonly notificationsGateway: NotificationsGateway,
     private readonly common: TripsCommonService,
   ) {}
+
+  // --- JOBS SERVICE STUBS ---
+  async findActiveDeliveryForRider(riderId: string): Promise<any> {
+    // TODO: Implement actual logic
+    return null;
+  }
+
+  async findIncomingDeliveriesForRider(riderId: string): Promise<any[]> {
+    // TODO: Implement actual logic
+    return [];
+  }
+
+  async updateDeliveryStatus(deliveryId: string, status: string): Promise<any> {
+    // TODO: Implement actual logic
+    return null;
+  }
+
+  async declineDelivery(deliveryId: string, riderId: string): Promise<any> {
+    // TODO: Implement actual logic
+    return { success: false };
+  }
+
+  async arrivePickup(deliveryId: string, riderId: string): Promise<any> {
+    // TODO: Implement actual logic
+    return { success: false };
+  }
+
+  async confirmPickup(deliveryId: string, riderId: string): Promise<any> {
+    // TODO: Implement actual logic
+    return { success: false };
+  }
+
+  async arriveDropoff(deliveryId: string, riderId: string): Promise<any> {
+    // TODO: Implement actual logic
+    return { success: false };
+  }
 
   async requestDelivery(userId: string, dto: RequestDeliveryDto) {
     if (
@@ -175,27 +212,10 @@ export class DeliveriesService {
       }
     }
 
-    const eventPayload = {
-      deliveryId: delivery.id,
-      customerId: delivery.customerId,
-      orderId: delivery.orderId || undefined,
-      pickupLat: delivery.pickupAddress.lat,
-      pickupLng: delivery.pickupAddress.lng,
-      dropoffLat: delivery.dropoffAddress.lat,
-      dropoffLng: delivery.dropoffAddress.lng,
-      distanceKm: delivery.distanceKm || 0,
-      deliveryFee: Number(delivery.deliveryFee),
-      packageDetails: delivery.packageDetails || undefined,
-      recipientName: delivery.recipientName,
-      recipientPhone: delivery.recipientPhone,
-      timestamp: Date.now(),
-    };
-
+    const job = deliveryToJobSummary(delivery);
+    const eventPayload = { job, attempt: 1 };
     this.eventBus.emitDeliveryRequested(eventPayload);
-    await this.queue.enqueueDeliveryMatching({
-      ...eventPayload,
-      attempt: 1,
-    });
+    await this.queue.enqueueDeliveryMatching(eventPayload);
 
     return {
       message: 'Delivery matching started',
@@ -208,33 +228,14 @@ export class DeliveriesService {
 
     const result = await this.prisma.delivery.updateMany({
       where: { id: deliveryId, status: DeliveryStatus.REQUESTED },
-      data: { status: DeliveryStatus.ASSIGNED, riderId, assignedAt: new Date() },
+      data: {
+        status: DeliveryStatus.ASSIGNED,
+        riderId,
+        assignedAt: new Date(),
+      },
     });
 
     if (result.count === 0) throw new ConflictException('Delivery unavailable');
-    return { success: true };
-  }
-
-  async confirmPickup(deliveryId: string, riderId: string, proof: string) {
-    if (!riderId) throw new ForbiddenException();
-    if (!proof || proof.length > 2048)
-      throw new BadRequestException('Invalid proof');
-
-    const result = await this.prisma.delivery.updateMany({
-      where: {
-        id: deliveryId,
-        riderId: riderId,
-        status: DeliveryStatus.ASSIGNED,
-      },
-      data: {
-        status: DeliveryStatus.PICKED_UP,
-        pickedUpAt: new Date(),
-        pickupProof: proof,
-      },
-    });
-
-    if (result.count === 0)
-      throw new BadRequestException('Invalid state for pickup');
     return { success: true };
   }
 
@@ -425,7 +426,8 @@ export class DeliveriesService {
       include: { rider: { include: { vehicle: true } } },
     });
 
-    if (!delivery?.rider) throw new InternalServerErrorException('Rider link failed');
+    if (!delivery?.rider)
+      throw new InternalServerErrorException('Rider link failed');
 
     try {
       this.notificationsGateway.server

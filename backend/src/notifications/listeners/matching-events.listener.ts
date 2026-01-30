@@ -1,9 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { NotificationsGateway } from '../notifications.gateway';
-// Split the import: Use 'import type' for the interface
-import { RIDE_EVENTS } from '../../matching/events/event-types';
-import type { RideNoDriverFoundEvent } from '../../matching/events/event-types'; 
 
 @Injectable()
 export class MatchingEventsListener {
@@ -11,8 +8,8 @@ export class MatchingEventsListener {
 
   constructor(private readonly gateway: NotificationsGateway) {}
 
-  @OnEvent(RIDE_EVENTS.NO_DRIVER_FOUND)
-  handleNoDriverFound(payload: RideNoDriverFoundEvent) {
+  @OnEvent('no_driver_found')
+  handleNoDriverFound(payload: { rideId: string; customerId: string }) {
     this.logger.log(`Emitting NO_DRIVERS_FOUND for ride ${payload.rideId}`);
 
     this.gateway.server

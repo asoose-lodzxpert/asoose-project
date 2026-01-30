@@ -19,6 +19,7 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { UsersModule } from '../users/users.module';
 import { TripsModule } from '../users/trips/trips.module';
 import { StorageModule } from '../storage/storage.module';
+import { MatchingModule } from '../matching/matching.module';
 import { RidersController } from './riders.controller';
 
 @Module({
@@ -27,6 +28,7 @@ import { RidersController } from './riders.controller';
     StorageModule,
     forwardRef(() => UsersModule),
     TripsModule,
+    MatchingModule,
   ],
   controllers: [
     ProfileController,

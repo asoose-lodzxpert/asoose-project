@@ -55,9 +55,7 @@ export class VendorOrdersService {
 
     const skip = (page - 1) * limit;
 
-    const whereClause: any = { storeId: store.id };
-
-    whereClause.paymentStatus = 'PAID';
+    const whereClause: any = { storeId: store.id, paymentStatus: 'PAID' };
 
     if (status) {
       const statusMap = Object.values(OrderStatus).reduce(
@@ -86,7 +84,15 @@ export class VendorOrdersService {
         take: limit,
         skip,
         include: {
-          items: true,
+          items: {
+            include: {
+              modifiers: {
+                include: {
+                  modifier: true,
+                },
+              },
+            },
+          },
           user: { select: { name: true, phone: true, image: true } },
           delivery: { select: { status: true, riderId: true } },
         },
@@ -118,7 +124,6 @@ export class VendorOrdersService {
       data: { status: OrderStatus.CONFIRMED },
     });
 
-    // Real-time update
     this.notificationsGateway.sendOrderUpdate(updated.id, {
       status: 'CONFIRMED',
       timeline: [
@@ -154,10 +159,7 @@ export class VendorOrdersService {
     return this.prisma.$transaction(async (tx) => {
       const updated = await tx.order.update({
         where: { id: orderId },
-        data: {
-          status: OrderStatus.REJECTED,
-          cancelledAt: new Date(),
-        },
+        data: { status: OrderStatus.REJECTED, cancelledAt: new Date() },
       });
 
       await tx.activityLog.create({
@@ -170,7 +172,6 @@ export class VendorOrdersService {
         },
       });
 
-      // Real-time update
       this.notificationsGateway.sendOrderUpdate(updated.id, {
         status: 'REJECTED',
         timeline: [
@@ -191,7 +192,11 @@ export class VendorOrdersService {
   async markReady(userId: string, orderId: string) {
     const order = await this.validateOrderAccess(userId, orderId);
 
-    if (order.status !== 'PREPARING' && order.status !== 'CONFIRMED') {
+    if (
+      ![OrderStatus.PREPARING, OrderStatus.CONFIRMED]
+        .map(String)
+        .includes(order.status)
+    ) {
       throw new BadRequestException(
         'Order must be Confirmed or Preparing to mark as Ready',
       );
@@ -206,10 +211,7 @@ export class VendorOrdersService {
       orderId: updated.id,
       storeId: updated.storeId,
     });
-
-    this.notificationsGateway.sendOrderUpdate(updated.id, {
-      status: 'READY',
-    });
+    this.notificationsGateway.sendOrderUpdate(updated.id, { status: 'READY' });
 
     return updated;
   }

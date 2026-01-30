@@ -1,4 +1,4 @@
-import { Injectable,NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 interface LogOptions {
   userId: string;
@@ -71,15 +71,15 @@ export class ActivityLogService {
     };
   }
   async findOne(id: string) {
-  const log = await this.prisma.activityLog.findUnique({
-    where: { id },
-    include: {
-      user: {
-        select: { id: true, name: true, email: true, role: true } 
-      }
-    }
-  });
-  if (!log) throw new NotFoundException(`Log entry ${id} not found`);
-  return log;
-}
+    const log = await this.prisma.activityLog.findUnique({
+      where: { id },
+      include: {
+        user: {
+          select: { id: true, name: true, email: true, role: true },
+        },
+      },
+    });
+    if (!log) throw new NotFoundException(`Log entry ${id} not found`);
+    return log;
+  }
 }

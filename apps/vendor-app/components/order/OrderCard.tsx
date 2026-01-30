@@ -107,16 +107,34 @@ export const OrderCard: React.FC<Props> = ({
       {/* Items */}
       <View style={[styles.itemsSection, { borderTopColor: borderColor }]}>
         {order.items.map((item) => (
-          <View key={item.id} style={styles.itemRow}>
-            <ThemedText>
-              {item.quantity}x {item.nameSnap}
-            </ThemedText>
-            <ThemedText style={{ color: grey }}>
-              ₦
-              {(
-                (Number(item.price) || 0) * (Number(item.quantity) || 0)
-              ).toLocaleString()}
-            </ThemedText>
+          <View key={item.id} style={styles.itemBlock}>
+            <View style={styles.itemRow}>
+              <ThemedText>
+                {item.quantity}x {item.nameSnap}
+              </ThemedText>
+              <ThemedText style={{ color: grey }}>
+                ₦
+                {(
+                  (Number(item.price) || 0) * (Number(item.quantity) || 0)
+                ).toLocaleString()}
+              </ThemedText>
+            </View>
+
+            {/* 🔹 Minimal modifiers */}
+            {item.modifierGroups?.length ? (
+              <View style={styles.modifiers}>
+                {item.modifierGroups.map((group, idx) => (
+                  <ThemedText
+                    key={idx}
+                    style={styles.modifierText}
+                    numberOfLines={2}
+                  >
+                    • {group.name}:{" "}
+                    {group.modifiers.map((m) => m.name).join(", ")}
+                  </ThemedText>
+                ))}
+              </View>
+            ) : null}
           </View>
         ))}
       </View>
@@ -147,14 +165,12 @@ export const OrderCard: React.FC<Props> = ({
       {/* Total */}
       <View style={styles.totalRow}>
         <ThemedText type="defaultSemiBold">Total</ThemedText>
-        <View style={{ alignItems: "flex-end" }}>
-          <ThemedText type="defaultSemiBold" style={{ fontSize: 18 }}>
-            ₦{(Number(order.total) || 0).toLocaleString()}
-          </ThemedText>
-        </View>
+        <ThemedText type="defaultSemiBold" style={{ fontSize: 18 }}>
+          ₦{(Number(order.total) || 0).toLocaleString()}
+        </ThemedText>
       </View>
 
-      {/* Mark as Ready (when preparing) */}
+      {/* Mark as Ready */}
       {order.status === "PREPARING" && (
         <Pressable
           style={[
@@ -192,6 +208,7 @@ export const OrderCard: React.FC<Props> = ({
               <ThemedText style={{ color: "#fff" }}>Accept</ThemedText>
             )}
           </Pressable>
+
           <Pressable
             style={[
               styles.button,
@@ -259,12 +276,23 @@ const styles = StyleSheet.create({
   itemsSection: {
     paddingTop: 12,
     borderTopWidth: 1,
-    gap: 8,
+    gap: 10,
+  },
+  itemBlock: {
+    gap: 4,
   },
   itemRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+  },
+  modifiers: {
+    paddingLeft: 8,
+    gap: 2,
+  },
+  modifierText: {
+    fontSize: 11,
+    color: "#6B7280",
   },
   instructionsSection: {
     padding: 12,
@@ -286,13 +314,11 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 8,
     alignItems: "center",
-    justifyContent: "center",
   },
   fullButton: {
     width: "100%",
     paddingVertical: 14,
     borderRadius: 8,
     alignItems: "center",
-    justifyContent: "center",
   },
 });

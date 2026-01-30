@@ -4,8 +4,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { RiderStateService } from '../../matching/rider-state';
 import { DriverStateService } from '../../matching/driver-state/driver-state.service';
+import { RiderStateService } from '../../matching/rider-state/rider-state.service';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { UpdateRiderStatusDto } from '../dto/update-status.dto';
 
@@ -13,8 +13,8 @@ import { UpdateRiderStatusDto } from '../dto/update-status.dto';
 export class StatusService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly riderStateService: RiderStateService,
     private readonly driverStateService: DriverStateService,
+    private readonly riderStateService: RiderStateService,
   ) {}
 
   async goOnline(
