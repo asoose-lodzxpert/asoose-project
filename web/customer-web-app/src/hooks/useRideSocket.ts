@@ -1,68 +1,92 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
-import { getCookie } from 'cookies-next';
+import { z } from 'zod';
 
-// Use env var, fallback to relative path (proxy) or localhost
+// Phase 2.2: Schema Validation
+// Define strict schemas for incoming data to prevent runtime errors and injection attacks
+const DriverSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  phone: z.string(),
+  vehicle: z.object({
+    brand: z.string(),
+    model: z.string(),
+    plateNumber: z.string(),
+    color: z.string(),
+  }),
+  rating: z.number().optional(),
+});
+
+const LocationSchema = z.object({
+  lat: z.number(),
+  lng: z.number(),
+});
+
+// Phase 3.2: Event Schemas
+const SocketEventSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("DRIVER_FOUND"), metadata: z.object({ driver: DriverSchema, rideId: z.string() }) }),
+  z.object({ type: z.literal("DRIVER_LOCATION_UPDATE"), metadata: LocationSchema }),
+  z.object({ type: z.literal("DRIVER_ARRIVED"), metadata: z.any().optional() }),
+  z.object({ type: z.literal("TRIP_STARTED"), metadata: z.any().optional() }),
+  z.object({ type: z.literal("TRIP_COMPLETED"), metadata: z.any().optional() }),
+  z.object({ type: z.literal("NO_DRIVERS_FOUND"), metadata: z.any().optional() }),
+  z.object({ type: z.literal("RIDE_CANCELLED"), metadata: z.any().optional() }),
+]);
+
 const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
 export const useRideSocket = (
-  onEvent: (event: any) => void, 
+  token: string | null, // Phase 1.1: Explicit Token Injection
+  onEvent: (event: z.infer<typeof SocketEventSchema>) => void, 
   onReconnected?: () => void
 ) => {
   const socketRef = useRef<Socket | null>(null);
 
   useEffect(() => {
-    const token = getCookie('accessToken');
-    
-    // Initialize Socket with explicit Auth
+    if (!token) return; // Don't connect without auth
+
     socketRef.current = io(SOCKET_URL, {
       path: '/socket.io',
-      auth: { token }, // Handshake auth
+      auth: { token }, // Secure handshake
       reconnection: true,
       reconnectionAttempts: 5,
       reconnectionDelay: 1000,
-      transports: ['websocket'], // Prefer WebSocket for lower latency
+      transports: ['websocket'],
     });
 
     const socket = socketRef.current;
 
-    // --- Core Events ---
     socket.on('connect', () => {
-      console.log('Socket connected:', socket.id);
-      // If this is a reconnection, trigger state sync
-      if (socket.recovered && onReconnected) {
-        onReconnected();
+      console.log('Socket connected safe:', socket.id);
+      if (socket.recovered && onReconnected) onReconnected();
+    });
+
+    // Validated Event Listener
+    const handleEvent = (type: string, data: any) => {
+      const payload = { type, ...data };
+      const result = SocketEventSchema.safeParse(payload);
+
+      if (result.success) {
+        onEvent(result.data);
+      } else {
+        console.error(`Socket Security Warning: Invalid payload for ${type}`, result.error);
+        // Phase 3.3: You could track this in Sentry
       }
-    });
+    };
 
-    socket.on('connect_error', (err) => {
-      console.error('Socket connection error:', err.message);
-    });
-
-    socket.on('disconnect', (reason) => {
-      console.warn('Socket disconnected:', reason);
-    });
-
-    // --- Ride Events ---
-    // Listen to all ride-related events and pass to handler
     const events = [
-      'DRIVER_FOUND', 
-      'DRIVER_LOCATION_UPDATE', 
-      'DRIVER_ARRIVED', 
-      'TRIP_STARTED', 
-      'TRIP_COMPLETED', 
-      'NO_DRIVERS_FOUND',
-      'RIDE_CANCELLED'
+      'DRIVER_FOUND', 'DRIVER_LOCATION_UPDATE', 'DRIVER_ARRIVED', 
+      'TRIP_STARTED', 'TRIP_COMPLETED', 'NO_DRIVERS_FOUND', 'RIDE_CANCELLED'
     ];
 
     events.forEach((evt) => {
-      socket.on(evt, (data) => onEvent({ type: evt, ...data }));
+      socket.on(evt, (data) => handleEvent(evt, data));
     });
 
     return () => {
       socket.disconnect();
     };
-  }, [onEvent, onReconnected]);
+  }, [token, onEvent, onReconnected]); // Re-connect only if token changes
 
   return socketRef.current;
 };

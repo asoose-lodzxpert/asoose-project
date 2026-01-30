@@ -15,6 +15,7 @@ import {
   RequestRideDto,
   RequestDeliveryDto,
   CancelTripDto,
+  RideEstimateDto,
 } from './dto/trip.dto';
 
 @Controller('trips')
@@ -22,26 +23,39 @@ import {
 export class TripsController {
   constructor(private readonly tripsService: TripsService) {}
 
-  // ========================================
   // RIDE ENDPOINTS
-  // ========================================
+
+@Post('rides/estimate')
+  async getRideEstimate(@Body() dto: RideEstimateDto) {
+    // Returns keyed object now
+    return this.tripsService.getRideEstimate(dto);
+  }
 
   /**
    * Request a new ride
    * POST /trips/rides/request
    */
-  @Post('rides/request')
+@Post('rides/request')
   async requestRide(@Request() req, @Body() dto: RequestRideDto) {
     return this.tripsService.requestRide(req.user.id, dto);
   }
 
   /**
-   * Get all user's rides
-   * GET /trips/rides?status=REQUESTED
+   * Get current active ride
+   * GET /trips/rides/current
    */
-  @Get('rides')
-  async getUserRides(@Request() req, @Query('status') status?: string) {
-    return this.tripsService.getUserRides(req.user.id, status);
+@Get('rides/current')
+  async getCurrentRide(@Request() req) {
+    return this.tripsService.getCurrentRide(req.user.id);
+  }
+
+  @Post('rides/:id/confirm')
+  async confirmRide(
+      @Request() req, 
+      @Param('id') rideId: string,
+      @Body('paymentMethod') paymentMethod: string
+  ) {
+      return this.tripsService.confirmRide(req.user.id, rideId, paymentMethod);
   }
 
   /**
@@ -51,6 +65,24 @@ export class TripsController {
   @Get('rides/:id')
   async getRideById(@Request() req, @Param('id') rideId: string) {
     return this.tripsService.getRideById(req.user.id, rideId);
+  }
+
+  /**
+   * Get Driver Location for a specific ride
+   * GET /trips/rides/:id/driver-location
+   */
+@Get('rides/:id/driver-location')
+  async getDriverLocation(@Request() req, @Param('id') rideId: string) {
+    return this.tripsService.getDriverLocation(req.user.id, rideId);
+  }
+
+  /**
+   * Get all user's rides
+   * GET /trips/rides?status=REQUESTED
+   */
+  @Get('rides')
+  async getUserRides(@Request() req, @Query('status') status?: string) {
+    return this.tripsService.getUserRides(req.user.id, status);
   }
 
   /**
@@ -66,41 +98,23 @@ export class TripsController {
     return this.tripsService.cancelRide(req.user.id, rideId, dto);
   }
 
-  // ========================================
-  // DELIVERY ENDPOINTS
-  // ========================================
+  // DELIVERY ENDPOINTS (Unchanged)
 
-  /**
-   * Request a new delivery
-   * POST /trips/deliveries/request
-   */
   @Post('deliveries/request')
   async requestDelivery(@Request() req, @Body() dto: RequestDeliveryDto) {
     return this.tripsService.requestDelivery(req.user.id, dto);
   }
 
-  /**
-   * Get all user's deliveries
-   * GET /trips/deliveries?status=REQUESTED
-   */
   @Get('deliveries')
   async getUserDeliveries(@Request() req, @Query('status') status?: string) {
     return this.tripsService.getUserDeliveries(req.user.id, status);
   }
 
-  /**
-   * Get specific delivery by ID
-   * GET /trips/deliveries/:id
-   */
   @Get('deliveries/:id')
   async getDeliveryById(@Request() req, @Param('id') deliveryId: string) {
     return this.tripsService.getDeliveryById(req.user.id, deliveryId);
   }
 
-  /**
-   * Cancel a delivery
-   * PATCH /trips/deliveries/:id/cancel
-   */
   @Patch('deliveries/:id/cancel')
   async cancelDelivery(
     @Request() req,
@@ -108,5 +122,9 @@ export class TripsController {
     @Body() dto: CancelTripDto,
   ) {
     return this.tripsService.cancelDelivery(req.user.id, deliveryId, dto);
+  }
+  @Patch('rides/:id/arrived')
+  async driverArrived(@Request() req, @Param('id') rideId: string) {
+    return this.tripsService.driverArrived(rideId, req.user.id);
   }
 }

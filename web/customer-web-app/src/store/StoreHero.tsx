@@ -1,5 +1,8 @@
+'use client';
+
 import { ArrowLeft, Share2, Star, Clock, MapPin } from 'lucide-react';
 import Link from 'next/link';
+import { toast } from 'react-toastify';
 
 interface HeroProps {
   name: string;
@@ -15,6 +18,27 @@ export const StoreHero = ({ name, image, rating, type, time, address }: HeroProp
   const typeIcon = type === 'RESTAURANT' ? '🍔' : type === 'GROCERY' ? '🥦' : type === 'PHARMACY' ? '💊' : '🏪';
   const typeLabel = type === 'RESTAURANT' ? 'Restaurant' : type.charAt(0) + type.slice(1).toLowerCase();
 
+  const handleShare = async () => {
+    const shareData = {
+      title: name,
+      text: `Check out ${name} on Asoose!`,
+      url: window.location.href,
+    };
+
+    try {
+      if (navigator.share) {
+        // Use native share on mobile/supported browsers
+        await navigator.share(shareData);
+      } else {
+        // Fallback: Copy to clipboard
+        await navigator.clipboard.writeText(window.location.href);
+        toast.success('Link copied to clipboard!');
+      }
+    } catch (err) {
+      console.error('Error sharing:', err);
+    }
+  };
+
   return (
     <div className="relative h-[280px] w-full bg-gray-900">
       {/* Background with overlay */}
@@ -25,10 +49,13 @@ export const StoreHero = ({ name, image, rating, type, time, address }: HeroProp
 
       {/* Nav */}
       <div className="absolute top-0 left-0 right-0 z-20 p-4 pt-safe flex justify-between">
-        <Link href="/home" className="w-10 h-10 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center text-white hover:bg-white/30 transition">
+        <Link href="/main/store" className="w-10 h-10 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center text-white hover:bg-white/30 transition">
           <ArrowLeft className="w-5 h-5" />
         </Link>
-        <button className="w-10 h-10 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center text-white hover:bg-white/30 transition">
+        <button 
+          onClick={handleShare}
+          className="w-10 h-10 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center text-white hover:bg-white/30 transition"
+        >
           <Share2 className="w-5 h-5" />
         </button>
       </div>

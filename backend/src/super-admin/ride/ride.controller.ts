@@ -5,6 +5,9 @@ import {
   Patch,
   Query,
   UseGuards,
+  Post,
+  Body,
+  Req,
 } from '@nestjs/common';
 import { RideFilterDto } from './dto/ride-filter.dto';
 import { RidesService } from './ride.service';
@@ -33,4 +36,17 @@ export class RidesController {
   cancel(@Param('id') id: string) {
     return this.ridesService.cancel(id);
   }
+
+@Post(':id/assign')
+  @Roles('SUPER_ADMIN', 'ADMIN_MANAGER') // Higher privilege
+  async assignDriver(
+    @Param('id') id: string, 
+    @Body('riderId') riderId: string,
+    @Req() req: any
+  ) {
+    const adminId = req.user.id || req.user.sub;
+    return this.ridesService.manualAssignDriver(id, riderId, adminId);
+  }
+
+
 }

@@ -6,12 +6,13 @@ import { AuthModule } from '../auth/auth.module';
 import { NotificationsController } from './notifications.controller';
 import { ExpoModule } from '../libs/expo/expo.module';
 import { FcmModule } from '../libs/fcm/fcm.module';
-
+import { MatchingEventsListener } from './listeners/matching-events.listener';
+import { DriverLocationListener } from './listeners/driver-location.listener';
 @Global()
 @Module({
   imports: [PrismaModule, AuthModule, ExpoModule, FcmModule],
   controllers: [NotificationsController],
-  providers: [NotificationsGateway, NotificationsService],
+  providers: [NotificationsGateway, NotificationsService,MatchingEventsListener,DriverLocationListener],
   exports: [NotificationsService, NotificationsGateway],
 })
 export class NotificationsModule {}

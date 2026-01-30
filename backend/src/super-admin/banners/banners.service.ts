@@ -1,4 +1,3 @@
-// as/backend/src/super-admin/banners/banners.service.ts
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { AppLogger } from 'src/libs/logger/app-logger.service';
 import { PrismaService } from 'src/prisma/prisma.service';
@@ -42,7 +41,7 @@ export class BannersService {
       const upload = await this.storage.uploadFile(file);
       imageKey = upload.key;
     } else if (data.image) {
-      // FIX: Persist the pre-uploaded URL if no file is present in the request
+      // Persist the pre-uploaded URL/Key if no file is present
       imageKey = data.image;
     }
 
@@ -68,16 +67,12 @@ export class BannersService {
 
     if (file) {
       if (banner.image) {
-        await this.storage.deleteFile(banner.image).catch((error) => {
-          this.appLogger.error('Failed to delete banner image', error?.stack, {
-            error,
-          });
-        });
+        // FIX 1: Changed deleteFileByKey -> deleteFile
+        await this.storage.deleteFile(banner.image).catch(console.error);
       }
       const upload = await this.storage.uploadFile(file);
       imageKey = upload.key;
     } else if (data.image !== undefined) {
-      // FIX: Respect the updated image URL from the JSON body
       imageKey = data.image;
     }
 

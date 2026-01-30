@@ -79,11 +79,12 @@ export default function DisputesPage() {
         priority: d.priority,
         category: d.order ? 'Order' : d.ride ? 'Ride' : d.delivery ? 'Delivery' : 'General',
         relatedType: d.order ? 'Order' : d.ride ? 'Ride' : 'N/A',
+        // ✅ FIX: Replaced $ with ₦
         relatedAmount: d.order 
-          ? `$${d.order.total.toFixed(2)}` 
+          ? `₦${d.order.total.toFixed(2)}` 
           : d.ride 
-            ? `$${d.ride.totalFare?.toFixed(2) || '0.00'}` 
-            : '$0.00',
+            ? `₦${d.ride.totalFare?.toFixed(2) || '0.00'}` 
+            : '₦0.00',
         parties: d.targetUser 
           ? `${d.openedByUser?.name} vs ${d.targetUser.name}` 
           : `${d.openedByUser?.name} vs Platform`,
@@ -167,17 +168,17 @@ export default function DisputesPage() {
         
         <DisputeHeader total={total} onExport={handleExport} />
         
-        {/* ✅ FIX: Pass null if stats is undefined to avoid type mismatch */}
+        {/* Pass null if stats is undefined to avoid type mismatch */}
         <DisputeStatsCard stats={stats ?? null} />
         
-     <DisputeFilters 
+       <DisputeFilters 
           activeTab={activeTab} 
           onTabChange={handleTabChange}
           searchTerm={searchTerm}
           onSearchChange={setSearchTerm}
           categoryFilter={categoryFilter}
           onCategoryChange={setCategoryFilter}
-          stats={stats ?? null} // ✅ Fix: Convert undefined to null
+          stats={stats ?? null} 
         />
         <div className="bg-[#1E293B] border border-gray-800 rounded-xl overflow-hidden min-h-[400px]">
           {filteredDisputes.length === 0 && !isLoading ? (

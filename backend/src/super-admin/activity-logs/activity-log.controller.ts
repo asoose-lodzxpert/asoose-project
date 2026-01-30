@@ -1,4 +1,11 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { 
+  Controller, 
+  Get, 
+  Query, 
+  UseGuards,
+  Param,
+  
+} from '@nestjs/common';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { RolesGuard } from '../../auth/roles.guards';
 import { Roles } from '../../auth/roles.decorator';
@@ -14,5 +21,9 @@ export class ActivityLogController {
   @Get()
   async findAll(@Query() query: any) {
     return this.activityLogService.getLogs(query);
+  }
+  @Get(':id')
+  async findOne(@Param('id') id: string) {
+    return this.activityLogService.findOne(id);
   }
 }

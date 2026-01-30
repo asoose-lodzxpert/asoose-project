@@ -11,6 +11,7 @@ import {
   Req,
   Res,
   Logger,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import type { RawBodyRequest } from '@nestjs/common';
 import { PaymentService } from './payment.service';
@@ -44,7 +45,24 @@ export class PaymentController {
       throw new Error('User not authenticated');
     }
     const userId = req.user['userId'] || req.user['id'];
-    return this.paymentService.initiatePayment(dto, userId);
+
+    try {
+      return await this.paymentService.initiatePayment(dto, userId);
+    } catch (error) {
+      // FIX: Mask internal gateway errors (like 504 Gateway Timeout)
+      if (
+        error.message &&
+        (error.message.includes('Gateway Timeout') ||
+          error.message.includes('504') ||
+          error.message.includes('502'))
+      ) {
+        this.logger.error(`Payment Gateway Timeout: ${error.message}`);
+        throw new ServiceUnavailableException(
+          'Payment provider is temporarily unavailable. Please try again later.',
+        );
+      }
+      throw error;
+    }
   }
 
   @Get('verify')
@@ -53,9 +71,7 @@ export class PaymentController {
     return this.paymentService.verifyPayment(query.reference, query.gateway);
   }
 
-  // =================================================================
   // WEBHOOK HANDLERS (Server-to-Server)
-  // =================================================================
 
   @Post('webhook/paystack')
   @HttpCode(HttpStatus.OK)
@@ -113,9 +129,7 @@ export class PaymentController {
     return { status: 'success' };
   }
 
-  // =================================================================
   // USER CALLBACK HANDLERS (Browser Redirects)
-  // =================================================================
 
   @Get('callback/paystack')
   async paystackCallback(
@@ -219,9 +233,7 @@ export class PaymentController {
     }
   }
 
-  // =================================================================
   // ADMIN ACTIONS
-  // =================================================================
 
   @Post('admin/disburse')
   @UseGuards(JwtAuthGuard, RolesGuard)

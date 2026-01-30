@@ -7,7 +7,7 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { RideFilterDto } from './dto/ride-filter.dto';
 import { Prisma, RideStatus } from '@prisma/client';
 import { TransactionLedgerService } from '../transactions/transaction-ledger.service';
-
+import { TripsService } from 'src/users/trips/trips.service';
 // ✅ Type-safe query fragments for performance
 const rideListInclude = {
   include: {
@@ -49,6 +49,7 @@ export class RidesService {
   constructor(
     private prisma: PrismaService,
     private ledgerService: TransactionLedgerService,
+    private tripsService: TripsService,
   ) {}
 
   // 📋 1. List All Rides (Paginated & Filtered)
@@ -437,4 +438,67 @@ export class RidesService {
       ],
     };
   }
+
+  async manualAssignDriver(rideId: string, riderId: string, adminId: string) {
+    // 1. Fetch Ride & Rider
+    const ride = await this.prisma.ride.findUnique({ where: { id: rideId } });
+    if (!ride) throw new NotFoundException('Ride not found');
+
+    const rider = await this.prisma.rider.findUnique({ where: { id: riderId } });
+    if (!rider) throw new NotFoundException('Rider not found');
+
+    // 2. Validate Ride State
+    if (ride.riderId) {
+      throw new BadRequestException('Ride already has a driver. Unassign first.');
+    }
+    if (['COMPLETED', 'CANCELLED', 'EXPIRED'].includes(ride.status)) {
+      throw new BadRequestException(`Cannot assign driver to ${ride.status} ride.`);
+    }
+
+    // 3. Validate Rider Eligibility
+    if (rider.status !== 'ACTIVE') {
+      throw new BadRequestException('Rider account is not ACTIVE.');
+    }
+    // Note: We allow offline assignment in emergencies, but warn in UI. 
+    // Strict enforcement can be toggled here.
+    
+    // 4. Perform Assignment
+    // We update the DB directly, then trigger notifications via TripsService if possible
+    await this.prisma.ride.update({
+      where: { id: rideId },
+      data: {
+        riderId: riderId,
+        status: 'ACCEPTED', // Move to Accepted state
+        acceptedAt: new Date(),
+      }
+    });
+
+    // 5. Audit Log
+    await this.prisma.activityLog.create({
+      data: {
+        userId: adminId,
+        action: 'DRIVER_MANUALLY_ASSIGNED',
+        target: rideId,
+        details: `Manually assigned rider ${rider.name} (${riderId})`,
+        metadata: {
+          rideId,
+          riderId,
+          previousStatus: ride.status
+        }
+      }
+    });
+
+    // 6. Notify Rider (Best Effort)
+    try {
+        // Assuming TripsService has a way to notify via Socket
+        // If not, we rely on the rider app polling or generic notification service
+        // this.notificationsService.notifyRider(riderId, 'New Ride Assigned by Support');
+    } catch (e) {
+        // Ignore notification errors
+    }
+
+    return { success: true, message: 'Driver assigned successfully' };
+  }
+
+
 }

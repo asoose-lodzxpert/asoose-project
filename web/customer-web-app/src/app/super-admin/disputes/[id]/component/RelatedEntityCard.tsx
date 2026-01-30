@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { ShoppingBag, Car, Package, FileText, ArrowLeft, Copy } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { DisputeDetail } from '../types';
+
 interface Props {
   order: DisputeDetail['order'];
   ride: DisputeDetail['ride'];
@@ -62,7 +63,10 @@ export default function RelatedEntityCard({ order, ride, delivery }: Props) {
       <div className="bg-[#0F172A] p-4 rounded-xl border border-gray-700 flex items-center justify-between mb-4">
         <div>
           <p className="text-xs text-gray-400 uppercase">Total Value</p>
-          <p className="text-white font-bold text-xl">${amount?.toFixed(2) || '0.00'}</p>
+          <p className="text-white font-bold text-xl">
+            {/* Replaced $ symbol with Naira symbol and formatting */}
+            {amount?.toLocaleString('en-NG', { style: 'currency', currency: 'NGN' }) || '₦0.00'}
+          </p>
         </div>
         <div className="text-right">
             <p className="text-xs text-gray-400 uppercase">Status</p>

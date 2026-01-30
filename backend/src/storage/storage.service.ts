@@ -122,7 +122,8 @@ export class StorageService {
     return `uploads/${timestamp}-${randomStr}.${ext}`;
   }
 
-  private getPublicUrl(key: string): string {
+  // FIX: Changed from private to public
+  public getPublicUrl(key: string): string {
     return `${this.publicBaseUrl.replace(/\/$/, '')}/${key.replace(/^\//, '')}`;
   }
 
