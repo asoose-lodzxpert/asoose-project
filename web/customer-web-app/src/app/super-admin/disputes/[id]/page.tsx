@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
 import useSWR from 'swr';
-import { getSession } from 'next-auth/react'; // ✅ Import NextAuth
+import { getSession } from 'next-auth/react';
 import { fetcher } from '../../hooks/useSuperAdminFetch';
 import DisputeDetailSkeleton from './component/skeleton';
 import { DisputeDetail, ModalType } from './types';
@@ -75,7 +75,6 @@ export default function DisputeDetailPage({ params }: DisputeDetailPageProps) {
          id: 'temp-' + Date.now(),
          message,
          isInternal,
-         // FIX: Use object for sender to prevent UI crash
          sender: { id: 'self', name: 'You', role: 'ADMIN' },
          createdAt: new Date().toISOString(),
          isAdmin: true
@@ -85,8 +84,6 @@ export default function DisputeDetailPage({ params }: DisputeDetailPageProps) {
 
     try {
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-      
-      // ✅ FIX: Use NextAuth Session
       const session = await getSession();
       const authToken = (session as any)?.accessToken;
 
@@ -113,7 +110,6 @@ export default function DisputeDetailPage({ params }: DisputeDetailPageProps) {
   const handleUpdatePriority = async (priority: string) => {
     if (!disputeId) return;
     try {
-      // ✅ FIX: Use NextAuth Session
       const session = await getSession();
       const authToken = (session as any)?.accessToken;
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
@@ -134,12 +130,12 @@ export default function DisputeDetailPage({ params }: DisputeDetailPageProps) {
     }
   };
 
-  // FIX: Accept refundSource from Modal
-  const handleResolution = async (input: string, refundSource: string) => {
+  // ✅ FIX: Updated signature to accept (notes, refundSource, amountInput)
+  // This matches the updated ResolutionModal logic
+  const handleResolution = async (notes: string, refundSource: string, amountInput?: string) => {
     if (!dispute || !disputeId) return;
     setProcessing(true);
     try {
-      // ✅ FIX: Use NextAuth Session
       const session = await getSession();
       const authToken = (session as any)?.accessToken;
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
@@ -149,31 +145,36 @@ export default function DisputeDetailPage({ params }: DisputeDetailPageProps) {
 
       if (modalType === 'REJECT') {
         endpoint = `${API_URL}/super-admin/disputes/${disputeId}/reject`;
-        body = { reason: input };
+        body = { reason: notes }; // For reject, the first arg is the reason
       } else {
         let action = 'NO_REFUND';
         let refundAmount = 0;
+
         if (modalType === 'REFUND_FULL') {
           action = 'REFUND_FULL';
           refundAmount = getMaxRefundAmount() || 0;
         } else if (modalType === 'REFUND_PARTIAL') {
           action = 'REFUND_PARTIAL';
-          refundAmount = parseFloat(input); // Modal passes amount as input for partial
+          // ✅ FIX: Use the 3rd argument (amountInput) for partial amount
+          refundAmount = parseFloat(amountInput || '0'); 
         }
 
-        // For partial refund, 'input' is the amount. For others, 'input' is notes.
-        const notes = modalType === 'REFUND_PARTIAL' ? `Partial Refund of ${input}` : input;
+        // ✅ FIX: Formatted string with Naira (₦) symbol
+        const resolutionNotes = modalType === 'REFUND_PARTIAL' 
+          ? `Partial Refund of ₦${amountInput} | ${notes}` 
+          : notes;
 
         body = {
           action,
-          resolutionNotes: notes,
-          // FIX: Include dynamic refundSource
+          resolutionNotes: resolutionNotes,
           ...(refundAmount > 0 && { 
              refundAmount, 
              refundSource: refundSource 
           })
         };
       }
+
+      console.log('Sending Payload:', body); // Debug check
 
       const res = await fetch(endpoint, {
         method: 'POST',
@@ -263,7 +264,7 @@ export default function DisputeDetailPage({ params }: DisputeDetailPageProps) {
         maxRefundAmount={getMaxRefundAmount() || 0}
         isProcessing={processing}
         onClose={() => setModalType(null)}
-        onConfirm={handleResolution}
+        onConfirm={handleResolution} // Logic matches updated signature
       />
 
       <ImageLightbox 

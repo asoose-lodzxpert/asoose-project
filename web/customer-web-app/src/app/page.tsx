@@ -7,7 +7,6 @@ import Image from 'next/image';
 import {
   ArrowRight,
   Zap,
-  ChevronRight,
   ShieldCheck,
   MapPin,
   Clock,
@@ -24,8 +23,8 @@ export default function AsooseLanding() {
   const { resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   
-  // Carousel State
-  const [activeService, setActiveService] = useState<'ride' | 'food' | 'package'>('ride');
+  // Carousel State - Default to 'food' so it shows first
+  const [activeService, setActiveService] = useState<'ride' | 'food' | 'package'>('food');
   const [isPaused, setIsPaused] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
 
@@ -39,26 +38,33 @@ export default function AsooseLanding() {
   const RIDER_APP_URL = 'https://play.google.com/store/apps/details?id=com.asoose.rider';
   const MERCHANT_APP_URL = 'https://play.google.com/store/apps/details?id=com.asoose.vendor';
 
-  const SERVICE_KEYS = ['ride', 'food', 'package'] as const;
+  // UPDATED: Reordered keys to put 'food' (Marketplace) first
+  const SERVICE_KEYS = ['food', 'ride', 'package'] as const;
 
   const SERVICE_DATA = {
+    food: {
+      title: 'Local Marketplace',
+      desc: 'Explore thousands of items from nearby stores. Groceries, meals, pharmacy, and retail delivered fast',
+      cta: 'Make order',
+      link: '/main/store',
+      badge: 'Track your order live',
+      image: '/shopping.png', 
+    },
     ride: {
       title: 'Where to?',
+      desc: 'Get to your destination quickly and safely. Reliable rides with verified drivers and upfront pricing.',
       cta: 'Book a ride',
       link: '/main/ride',
       badge: 'Quick driver matching',
-    },
-    food: {
-      title: 'Order food or groceries',
-      cta: 'Order food & groceries',
-      link: '/main/store',
-      badge: 'Track your order live',
+      image: '/ride.png', 
     },
     package: {
       title: 'Send a package',
+      desc: 'Secure delivery for your parcels. From documents to bulk items, we ensure it gets there safely.',
       cta: 'Send a package',
       link: '/main/delivery',
-      badge: 'Upfront pricing & secure delivery',
+      badge: 'Upfront pricing & secure',
+      image: '/package.png', 
     },
   };
 
@@ -100,11 +106,13 @@ export default function AsooseLanding() {
 
   useEffect(() => {
     if (!mounted || isPaused) return;
-    const interval = setInterval(handleNext, 4000); // Switch every 4 seconds
+    const interval = setInterval(handleNext, 5000); 
     return () => clearInterval(interval);
   }, [mounted, isPaused, handleNext]);
 
   if (!mounted) return null;
+
+  const activeIndex = SERVICE_KEYS.indexOf(activeService);
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -112,78 +120,92 @@ export default function AsooseLanding() {
       
       <main className={`flex-grow selection:bg-yellow-500/30 transition-colors duration-300 ${darkMode ? 'bg-[#0a0a0a] text-gray-100' : 'bg-white text-gray-900'}`}>
 
-        {/* HERO */}
+        {/* HERO HEADER - Full Width Carousel */}
         <header className="pt-24 sm:pt-32 md:pt-40 pb-12 sm:pb-16 md:pb-24 px-4 sm:px-6 max-w-7xl mx-auto">
-          <div className="grid lg:grid-cols-12 gap-8 sm:gap-10 md:gap-12 items-center">
+          
+          <div 
+            className={`relative w-full rounded-[2.5rem] overflow-hidden border transition-all duration-500 group min-h-[500px] flex ${
+              darkMode ? 'bg-[#121212] border-white/10' : 'bg-white border-black/5'
+            }`}
+            onMouseEnter={() => setIsPaused(true)}
+            onMouseLeave={() => setIsPaused(false)}
+          >
+            {/* Slides Container */}
+            <div 
+              className="flex transition-transform duration-700 ease-in-out w-full"
+              style={{ transform: `translateX(-${activeIndex * 100}%)` }}
+            >
+              {SERVICE_KEYS.map((key) => (
+                <div key={key} className="w-full flex-shrink-0 grid md:grid-cols-2 gap-8 md:gap-12 items-center px-6 py-12 sm:px-12 md:px-16">
+                  
+                  {/* LEFT: CONTENT */}
+                  <div className="flex flex-col items-start text-left z-10 order-2 md:order-1">
+                    
+                    {/* Badge */}
+                    <div className="mb-6 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 text-xs font-black uppercase tracking-widest animate-in fade-in zoom-in duration-500 delay-100">
+                      <Zap size={14} className="fill-current" />
+                      {SERVICE_DATA[key].badge}
+                    </div>
 
-            {/* ACTION CARD CAROUSEL */}
-            <div className="lg:col-span-5">
-              <div 
-                className={`rounded-3xl p-6 sm:p-8 border transition-all duration-500 relative overflow-hidden ${
-                  darkMode ? 'bg-[#121212] border-white/10' : 'bg-white border-black/5'
-                }`}
-                onMouseEnter={() => setIsPaused(true)}
-                onMouseLeave={() => setIsPaused(false)}
-              >
-                {/* Progress Indicators / Tabs */}
-                <div className="flex bg-gray-100 dark:bg-white/5 p-1.5 rounded-2xl mb-6 sm:mb-8 z-10 relative">
-                  {SERVICE_KEYS.map((key) => (
-                    <button
-                      key={key}
-                      onClick={() => {
-                        setActiveService(key);
-                        setIsPaused(true); // Pause if user manually clicks
-                      }}
-                      className={`flex-1 py-2 sm:py-3 rounded-xl text-[10px] sm:text-xs font-black uppercase tracking-widest transition-all ${
-                        activeService === key
-                          ? 'bg-white text-black dark:bg-yellow-400 dark:text-black shadow-sm scale-100'
-                          : 'opacity-40 hover:opacity-100 scale-95'
-                      }`}
-                    >
-                      {key}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Animated Content */}
-                <div key={activeService} className="animate-in fade-in slide-in-from-right-4 duration-500 fill-mode-forwards">
-                    <h1 className="text-3xl sm:text-4xl font-black mb-4 sm:mb-6 tracking-tighter leading-tight min-h-[80px] flex items-center">
-                      {SERVICE_DATA[activeService].title}
+                    {/* Title */}
+                    <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black tracking-tighter leading-[1.1] mb-6">
+                      {SERVICE_DATA[key].title}
                     </h1>
 
+                    {/* Description */}
+                    <p className="text-lg sm:text-xl font-medium opacity-70 max-w-xl mb-10 leading-relaxed">
+                      {SERVICE_DATA[key].desc}
+                    </p>
+
+                    {/* CTA Button */}
                     <Link
-                      href={SERVICE_DATA[activeService].link}
-                      className="w-full h-14 sm:h-16 flex justify-between items-center px-6 sm:px-8 rounded-2xl font-black text-base sm:text-lg bg-yellow-400 text-black hover:bg-yellow-300 transition-all active:scale-95 group"
+                      href={SERVICE_DATA[key].link}
+                      className="inline-flex items-center gap-3 px-8 py-4 sm:px-10 sm:py-5 rounded-2xl bg-yellow-400 text-black font-black text-lg hover:bg-yellow-300 transition-all active:scale-95 hover:scale-105"
                     >
-                      <span className="truncate">{SERVICE_DATA[activeService].cta}</span>
-                      <ArrowRight size={20} className="flex-shrink-0 ml-2 group-hover:translate-x-1 transition-transform" />
+                      {SERVICE_DATA[key].cta}
+                      <ArrowRight size={24} />
                     </Link>
-
-                    <div className="mt-4 sm:mt-6 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-yellow-600 dark:text-yellow-400">
-                      <Zap size={14} className="fill-current flex-shrink-0 animate-pulse" />
-                      <span className="leading-tight">{SERVICE_DATA[activeService].badge}</span>
-                    </div>
-                </div>
-
-                {/* Progress Bar (Optional Visual Flair) */}
-                {!isPaused && (
-                  <div className="absolute bottom-0 left-0 h-1 bg-yellow-400/20 w-full">
-                     <div className="h-full bg-yellow-400 w-full origin-left animate-[progress_4s_linear_infinite]" />
                   </div>
-                )}
-              </div>
+
+                  {/* RIGHT: IMAGE */}
+                  <div className="relative w-full h-[300px] md:h-[450px] rounded-3xl overflow-hidden order-1 md:order-2">
+                     <Image 
+                      src={SERVICE_DATA[key].image} 
+                      alt={SERVICE_DATA[key].title}
+                      fill
+                      className="object-cover hover:scale-105 transition-transform duration-700"
+                      priority
+                    />
+                     {/* Subtle overlay for depth if needed, mostly clean image */}
+                    <div className="absolute inset-0 bg-black/5 dark:bg-white/5 pointer-events-none" />
+                  </div>
+
+                </div>
+              ))}
             </div>
 
-            {/* COPY */}
-            <div className="lg:col-span-7 space-y-4 sm:space-y-6 text-center lg:text-left">
-              <h2 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black tracking-tight leading-[1.1]">
-                Rides, food, groceries and essentials deliveries on demand
-              </h2>
-              <p className="text-lg sm:text-xl max-w-xl mx-auto lg:mx-0 opacity-80 font-medium">
-                One app to move people, goods, and meals.
-                Prices upfront. Real-time tracking. No guessing.
-              </p>
+            {/* Pagination Indicators (Centered at bottom) */}
+            <div className="absolute bottom-8 left-0 right-0 flex justify-center gap-3 z-20">
+              {SERVICE_KEYS.map((key, i) => (
+                <button
+                  key={key}
+                  onClick={() => setActiveService(key)}
+                  className={`h-1.5 rounded-full transition-all duration-300 ${
+                    i === activeIndex 
+                      ? 'w-8 bg-yellow-400' 
+                      : 'w-2 bg-gray-300 dark:bg-white/20 hover:bg-yellow-400/50'
+                  }`}
+                  aria-label={`Go to ${key} slide`}
+                />
+              ))}
             </div>
+
+            {/* Progress Bar */}
+            {!isPaused && (
+              <div className="absolute bottom-0 left-0 h-1 bg-yellow-400/20 w-full z-20">
+                  <div key={activeService} className="h-full bg-yellow-400 w-full origin-left animate-[progress_5s_linear_forwards]" />
+              </div>
+            )}
           </div>
         </header>
 
@@ -220,7 +242,8 @@ export default function AsooseLanding() {
               <li className="flex items-center gap-3"><div className="w-1.5 h-1.5 bg-yellow-500 rounded-full flex-shrink-0" /> Reliable delivery network</li>
             </ul>
             <a href={MERCHANT_APP_URL} className="inline-flex items-center gap-2 font-black uppercase tracking-widest text-xs sm:text-sm text-yellow-500 hover:text-yellow-400 transition-colors">
-              Download Vendors App <ChevronRight size={18} className="flex-shrink-0" />
+              Download Vendors App <Minus size={18} className="flex-shrink-0 hidden" />
+              <ArrowRight size={18} className="flex-shrink-0" />
             </a>
           </div>
           <div className="order-1 md:order-2 relative h-[300px] sm:h-[400px] md:h-[450px] rounded-3xl overflow-hidden">
@@ -232,7 +255,7 @@ export default function AsooseLanding() {
         <section className={`py-16 sm:py-20 md:py-24 px-4 sm:px-6 border-t ${darkMode ? 'bg-[#0a0a0a] border-white/5' : 'bg-white border-black/5'}`}>
           <div className="max-w-7xl mx-auto grid md:grid-cols-2 gap-10 sm:gap-12 md:gap-16 items-center">
             <div className="relative h-[300px] sm:h-[400px] md:h-[450px] rounded-3xl overflow-hidden">
-              <Image src="/rider.svg" alt="Become a rider" fill className="object-cover" />
+              <Image src="/rider.png" alt="Become a rider" fill className="object-cover" />
             </div>
             <div className="space-y-6 sm:space-y-8">
               <h3 className="text-3xl sm:text-4xl font-black tracking-tight">Be the boss.<br/>Drive with Asoose.</h3>
@@ -245,7 +268,7 @@ export default function AsooseLanding() {
                 <li className="flex items-center gap-3"><div className="w-1.5 h-1.5 bg-yellow-500 rounded-full flex-shrink-0" /> In-app navigation & support</li>
               </ul>
               <a href={RIDER_APP_URL} className="inline-flex items-center gap-2 font-black uppercase tracking-widest text-xs sm:text-sm text-yellow-500 hover:text-yellow-400 transition-colors">
-                Download Rider App <ChevronRight size={18} className="flex-shrink-0" />
+                Download Rider App <ArrowRight size={18} className="flex-shrink-0" />
               </a>
             </div>
           </div>

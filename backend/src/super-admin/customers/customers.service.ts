@@ -158,10 +158,33 @@ export class CustomersService {
     });
   }
 
-  async updateStatus(id: string, status: UserStatus) {
-    return this.prisma.user.update({
-      where: { id },
-      data: { status },
+async updateStatus(id: string, status: UserStatus, adminId?: string) {
+    const customer = await this.prisma.user.findUnique({ where: { id } });
+    if (!customer) throw new NotFoundException('Customer not found');
+
+    return this.prisma.$transaction(async (tx) => {
+      const updatedCustomer = await tx.user.update({
+        where: { id },
+        data: { status },
+      });
+
+      if (adminId) {
+        await tx.activityLog.create({
+          data: {
+            userId: adminId,
+            action: status === 'ACTIVE' ? 'CUSTOMER_REACTIVATED' : 'CUSTOMER_STATUS_UPDATE',
+            target: id,
+            details: `Customer status changed from ${customer.status} to ${status}`,
+            metadata: {
+              previousStatus: customer.status,
+              newStatus: status,
+              reason: status === 'ACTIVE' ? 'Manual Reactivation (Reverse Kill Switch)' : undefined
+            }
+          }
+        });
+      }
+
+      return updatedCustomer;
     });
   }
 
@@ -208,4 +231,43 @@ export class CustomersService {
       totalRides: rides._count?.id ?? 0,
     };
   }
+
+  async executeKillSwitch(
+    customerId: string, 
+    action: 'SUSPEND' | 'BAN', 
+    reason: string, 
+    adminId: string
+  ) {
+    const customer = await this.prisma.user.findUnique({ where: { id: customerId } });
+    if (!customer) throw new NotFoundException('Customer not found');
+
+    const targetStatus = action === 'BAN' ? UserStatus.BANNED : UserStatus.SUSPENDED;
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: customerId },
+        data: {
+          status: targetStatus,
+          fcmToken: null, // Revoke access
+        }
+      });
+
+      await tx.activityLog.create({
+        data: {
+          userId: adminId,
+          action: `CUSTOMER_EMERGENCY_${action}`,
+          target: customerId,
+          details: `Emergency ${action} triggered. Reason: ${reason}`,
+          metadata: {
+            previousStatus: customer.status,
+            reason,
+            actionType: action
+          }
+        }
+      });
+    });
+
+    return { success: true, message: `Customer has been ${action}ED.` };
+  }
+
 }

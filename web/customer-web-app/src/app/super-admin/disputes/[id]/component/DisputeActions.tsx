@@ -1,6 +1,6 @@
 'use client';
 import React from 'react';
-import { RotateCcw, DollarSign, CheckCircle, Ban } from 'lucide-react';
+import { RotateCcw, CheckCircle, Ban } from 'lucide-react';
 import { ModalType } from '../types';
 
 interface Props {
@@ -45,7 +45,9 @@ export default function DisputeActions({ priority, canResolve, status, totalAmou
           onClick={() => onOpenModal('REFUND_PARTIAL')}
           className="w-full py-3 bg-[#0F172A] hover:bg-gray-700 text-gray-300 border border-gray-700 rounded-lg font-bold text-sm flex items-center justify-center gap-2 transition-all"
         >
-          <DollarSign className="w-4 h-4" /> Partial Refund
+          {/* Replaced DollarSign icon with Naira symbol */}
+          <span className="w-4 h-4 flex items-center justify-center font-bold text-base leading-none">₦</span> 
+          Partial Refund
         </button>
         
         <button 

@@ -136,10 +136,11 @@ export class RidersService {
       0,
     );
 
-    // Mock bonuses and service fees (you can implement actual logic)
-    const bonuses = deliveryFees * 0.05; // 5% bonus
-    const serviceFees = deliveryFees * -0.15; // 15% service fee
-    const total = deliveryFees + bonuses + serviceFees;
+    // FIX: Round to 2 decimal places to prevent floating point errors
+    // JavaScript floats can result in 0.300000000004 without this explicit rounding
+    const bonuses = Number((deliveryFees * 0.05).toFixed(2)); // 5% bonus
+    const serviceFees = Number((deliveryFees * -0.15).toFixed(2)); // 15% service fee
+    const total = Number((deliveryFees + bonuses + serviceFees).toFixed(2));
 
     // Calculate average per delivery
     const avgPerDelivery = totalDeliveries > 0 ? total / totalDeliveries : 0;

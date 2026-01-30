@@ -5,15 +5,17 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useSearchParams } from 'next/navigation';
 import { 
-  Store, X, ChevronRight, Utensils, Loader2, 
+  Store, ChevronRight, Utensils, Loader2, 
   ShoppingBasket, Pizza, Coffee, Gift, BriefcaseMedical, 
-  Carrot, Sandwich, Truck, Heart, Star, Zap, Percent, SearchX
+  Carrot, Sandwich, Truck, Heart, Star, Zap, Percent, SearchX, Package
 } from 'lucide-react';
 
 // Components
 import { RestaurantCard } from '@/app/main/components/home/RestaurantCard';
+import { ProductCard, ProductProps } from '@/app/main/components/store/ProductCard';
 import { FloatingCart } from '@/app/main/components/home/FloatingCart';
 import { StoreSkeleton } from './skeleton';
+// import { ProductCard,ProductProps } from '@/store/ProductCard';
 
 // --- CONFIG & TYPES ---
 
@@ -35,10 +37,15 @@ interface VerticalSection {
   id: string; title: string; vendors: Vendor[];
 }
 
+interface SearchResults {
+  stores: Vendor[];
+  products: ProductProps[];
+}
+
 // --- HELPER: GET CATEGORY ICON ---
 const getCategoryIcon = (title: string) => {
   const t = title.toLowerCase();
-  if (t.includes('restaurant') || t.includes('food')) return <Utensils className="w-6 h-6" />;
+  if (t.includes('food') || t.includes('food')) return <Utensils className="w-6 h-6" />;
   if (t.includes('grocery') || t.includes('market')) return <ShoppingBasket className="w-6 h-6" />;
   if (t.includes('pharmacy') || t.includes('health') || t.includes('med')) return <BriefcaseMedical className="w-6 h-6" />;
   if (t.includes('fast food') || t.includes('burger')) return <Sandwich className="w-6 h-6" />;
@@ -55,7 +62,8 @@ function useStoreData(query: string | null) {
   const [data, setData] = useState<{
     verticals: VerticalSection[];
     banners: BannerData[];
-  }>({ verticals: [], banners: [] });
+    searchResults: SearchResults | null; // Added Search Results State
+  }>({ verticals: [], banners: [], searchResults: null });
   
   const [loading, setLoading] = useState(true);
   const cacheRef = useRef<Map<string, { data: any, timestamp: number }>>(new Map());
@@ -65,10 +73,7 @@ function useStoreData(query: string | null) {
     const cached = cacheRef.current.get(cacheKey);
 
     if (cached && (Date.now() - cached.timestamp < CACHE_DURATION)) {
-      setData({
-        verticals: cached.data.verticals || [],
-        banners: cached.data.banners || []
-      });
+      setData(cached.data);
       setLoading(false);
       return;
     }
@@ -80,12 +85,49 @@ function useStoreData(query: string | null) {
       if (!res.ok) throw new Error('Fetch failed');
       const json = await res.json();
 
-      cacheRef.current.set(cacheKey, { data: json, timestamp: Date.now() });
-      setData({ verticals: json.verticals || [], banners: json.banners || [] });
+      let processedData;
+      
+      if (q) {
+        // Handle Search Response (stores, products)
+        processedData = {
+          verticals: [],
+          banners: [],
+          searchResults: {
+            stores: json.stores.map((s: any) => ({
+              id: s.id,
+              name: s.name,
+              slug: s.slug,
+              image: s.logo || s.banner, // Map backend logo to image
+              rating: s.rating || 0,
+              deliveryTime: `${s.prepTime || 20} min`,
+              deliveryFee: 500, // Default fee
+              type: s.type
+            })),
+            products: json.products.map((p: any) => ({
+              id: p.id,
+              name: p.name,
+              description: p.description || '',
+              price: p.price,
+              image: p.images?.[0] || null,
+              storeId: p.storeId,
+              storeName: p.store?.name
+            }))
+          }
+        };
+      } else {
+        // Handle Home Response (verticals)
+        processedData = { 
+          verticals: json.verticals || [], 
+          banners: json.banners || [],
+          searchResults: null
+        };
+      }
+
+      cacheRef.current.set(cacheKey, { data: processedData, timestamp: Date.now() });
+      setData(processedData);
     } catch (err) {
       console.error(err);
-      // In case of error, set empty to stop loading spinner
-      setData({ verticals: [], banners: [] });
+      setData({ verticals: [], banners: [], searchResults: null });
     } finally {
       setLoading(false);
     }
@@ -94,49 +136,17 @@ function useStoreData(query: string | null) {
   return { ...data, loading, fetchData };
 }
 
-// --- INFINITE SCROLL HOOK ---
-function useInfiniteStores(enabled: boolean) {
-  const [stores, setStores] = useState<Vendor[]>([]);
-  const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(false);
-  const [hasMore, setHasMore] = useState(true);
-
-  const fetchMore = useCallback(async () => {
-    if (loading || !hasMore || !enabled) return;
-
-    setLoading(true);
-    try {
-      const res = await fetch(`${API_URL}/marketplace/stores?page=${page}&limit=10`);
-      if (!res.ok) throw new Error('Failed to load more stores');
-      const data = await res.json();
-      
-      setStores(prev => [...prev, ...data.stores]);
-      setHasMore(data.meta.hasMore);
-      setPage(prev => prev + 1);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  }, [page, loading, hasMore, enabled]);
-
-  return { stores, loading, hasMore, fetchMore };
-}
-
 // --- MAIN PAGE COMPONENT ---
 export default function StorePage() {
   const searchParams = useSearchParams();
   const query = searchParams.get('q')?.trim() || null;
   
   // Data
-  const { verticals, banners, loading: initialLoading, fetchData } = useStoreData(query);
-  const { stores, loading: moreLoading, hasMore, fetchMore } = useInfiniteStores(!query);
+  const { verticals, banners, searchResults, loading: initialLoading, fetchData } = useStoreData(query);
   
   // UI State
   const [activeBannerIndex, setActiveBannerIndex] = useState(0);
-  const [filter, setFilter] = useState<'ALL' | 'RATING' | 'FAST' | 'OFFERS'>('ALL');
   const [favorites, setFavorites] = useState<string[]>([]);
-  const observerTarget = useRef(null);
 
   useEffect(() => { fetchData(query); }, [query, fetchData]);
 
@@ -149,37 +159,12 @@ export default function StorePage() {
     return () => clearInterval(interval);
   }, [banners.length]);
 
-  // Infinite Scroll Observer
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      entries => { if (entries[0].isIntersecting && hasMore && !query) fetchMore(); },
-      { threshold: 0.1 }
-    );
-    if (observerTarget.current) observer.observe(observerTarget.current);
-    return () => observer.disconnect();
-  }, [fetchMore, hasMore, query]);
-
   // Toggle Favorite
   const toggleFavorite = (e: React.MouseEvent, id: string) => {
     e.preventDefault();
     e.stopPropagation();
     setFavorites(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   };
-
-  // Client-Side Filter Logic
-  const filteredStores = useMemo(() => {
-    let result = [...stores];
-    if (filter === 'RATING') result.sort((a, b) => b.rating - a.rating);
-    if (filter === 'FAST') result.sort((a, b) => parseInt(a.deliveryTime || '30') - parseInt(b.deliveryTime || '30'));
-    if (filter === 'OFFERS') result = result.filter(s => s.deliveryFee === 0);
-    return result;
-  }, [stores, filter]);
-
-  // Flatten Search Results (since API returns verticals)
-  const searchResults = useMemo(() => {
-    if (!query) return [];
-    return verticals.flatMap(v => v.vendors);
-  }, [verticals, query]);
 
   // Show skeleton only on initial load
   if (initialLoading) return <StoreSkeleton />;
@@ -253,7 +238,7 @@ export default function StorePage() {
               </section>
             )}
 
-            {/* 2. CATEGORY RAIL (Mobile Friendly Horizontal Scroll) */}
+            {/* 2. CATEGORY RAIL */}
             <section className="px-4">
                <div className="flex justify-between items-center mb-4 px-1">
                   <h2 className="text-lg font-bold">Categories</h2>
@@ -275,9 +260,9 @@ export default function StorePage() {
                </div>
             </section>
 
-            {/* 3. DYNAMIC VERTICALS (Curated Rows) */}
+            {/* 3. DYNAMIC VERTICALS */}
             <div className="space-y-10">
-              {verticals.slice(0, 3).map((section) => (
+              {verticals.map((section) => (
                 <section key={section.id} className="border-t border-gray-100 dark:border-white/5 pt-8 px-4">
                   <div className="flex justify-between items-end mb-6">
                     <div>
@@ -292,7 +277,6 @@ export default function StorePage() {
                   <div className="flex gap-4 overflow-x-auto pb-6 scrollbar-hide snap-x -mx-4 px-4">
                     {section.vendors.map((vendor) => (
                       <div key={vendor.id} className="min-w-[280px] sm:min-w-[320px] snap-start relative group">
-                        {/* Micro-Interaction: Heart Button Overlay */}
                         <button 
                           onClick={(e) => toggleFavorite(e, vendor.id)}
                           className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center text-white hover:bg-white hover:text-red-500 transition-all opacity-0 group-hover:opacity-100"
@@ -309,96 +293,23 @@ export default function StorePage() {
                 </section>
               ))}
             </div>
-
-            {/* 4. DISCOVER MORE (Sticky Filters & Infinite Grid) */}
-            <section className="relative min-h-screen pb-12">
-              {/* Sticky Filter Header */}
-              <div className="sticky top-[68px] z-20 bg-gray-50/95 dark:bg-[#0a0a0a]/95 backdrop-blur-xl border-b border-gray-100 dark:border-white/5 px-4 py-3 mb-6 transition-all">
-                 <div className="max-w-7xl mx-auto flex items-center justify-between">
-                    <h2 className="text-lg font-black flex items-center gap-2">
-                      <Store className="w-5 h-5 text-yellow-500" />
-                      All Stores
-                    </h2>
-                    
-                    <div className="flex gap-2 overflow-x-auto scrollbar-hide">
-                       {[
-                         { id: 'ALL', label: 'All', icon: null },
-                         { id: 'RATING', label: 'Top Rated', icon: Star },
-                         { id: 'FAST', label: 'Fastest', icon: Zap },
-                         { id: 'OFFERS', label: 'Offers', icon: Percent },
-                       ].map(f => (
-                         <button 
-                           key={f.id}
-                           onClick={() => setFilter(f.id as any)}
-                           className={`
-                             px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 whitespace-nowrap transition-all
-                             ${filter === f.id 
-                               ? 'bg-black dark:bg-white text-white dark:text-black shadow-lg' 
-                               : 'bg-white dark:bg-[#151515] border border-gray-200 dark:border-white/10 text-gray-500 hover:border-yellow-500'}
-                           `}
-                         >
-                           {f.icon && <f.icon className="w-3 h-3" />}
-                           {f.label}
-                         </button>
-                       ))}
-                    </div>
-                 </div>
-              </div>
-
-              {/* Grid Content */}
-              <div className="px-4">
-                {filteredStores.length === 0 && !moreLoading ? (
-                  <div className="flex flex-col items-center justify-center py-20 text-center opacity-60">
-                    <ShoppingBasket className="w-12 h-12 mb-4 text-gray-300" />
-                    <p className="text-sm font-bold">No stores found</p>
-                    <p className="text-xs">Try adjusting your filters</p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {filteredStores.map((vendor) => (
-                      <div key={vendor.id} className="relative group">
-                         <Link href={`/main/store/${vendor.slug || vendor.id}`}>
-                           {/* Vendor Badge Logic */}
-                           {vendor.rating >= 4.8 && (
-                             <div className="absolute top-3 left-3 z-10 px-2 py-1 bg-yellow-500 text-black text-[10px] font-black uppercase tracking-wider rounded">
-                               Top Rated
-                             </div>
-                           )}
-                           <RestaurantCard {...vendor} time={vendor.deliveryTime || '30 min'} />
-                         </Link>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Loading Observer */}
-                <div ref={observerTarget} className="h-24 flex items-center justify-center mt-12">
-                  {moreLoading && <Loader2 className="w-8 h-8 animate-spin text-yellow-500" />}
-                  {!hasMore && stores.length > 0 && (
-                    <div className="flex items-center gap-2 text-xs font-bold text-gray-300 uppercase tracking-widest">
-                      <span className="w-2 h-2 rounded-full bg-gray-300"></span>
-                      End of list
-                    </div>
-                  )}
-                </div>
-              </div>
-            </section>
           </>
         )}
 
         {/* =========================================
-            SCENARIO 2: SEARCH RESULTS
+            SCENARIO 2: SEARCH RESULTS (FIXED)
            ========================================= */}
-        {query && (
+        {query && searchResults && (
           <section className="px-4 pt-4 sm:pt-6">
              <div className="mb-6 border-b border-gray-100 dark:border-white/5 pb-4">
                 <h1 className="text-2xl font-black mb-1">Results for "{query}"</h1>
                 <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">
-                  Found {searchResults.length} {searchResults.length === 1 ? 'result' : 'results'}
+                  Found {searchResults.stores.length} stores and {searchResults.products.length} items
                 </p>
              </div>
 
-             {searchResults.length === 0 ? (
+             {/* EMPTY STATE */}
+             {searchResults.stores.length === 0 && searchResults.products.length === 0 && (
                <div className="flex flex-col items-center justify-center py-24 text-center">
                   <div className="w-20 h-20 bg-gray-100 dark:bg-white/5 rounded-full flex items-center justify-center mb-4">
                     <SearchX className="w-10 h-10 text-gray-400" />
@@ -414,21 +325,37 @@ export default function StorePage() {
                     Clear Search
                   </Link>
                </div>
-             ) : (
-               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 animate-in slide-in-from-bottom-4 duration-500">
-                  {searchResults.map((vendor) => (
-                    <div key={vendor.id} className="relative group">
-                       <Link href={`/main/store/${vendor.slug || vendor.id}`}>
-                         {/* Optional Search Badges */}
-                         {vendor.deliveryFee === 0 && (
-                           <div className="absolute top-3 left-3 z-10 px-2 py-1 bg-green-500 text-white text-[10px] font-black uppercase tracking-wider rounded">
-                             Free Delivery
-                           </div>
-                         )}
-                         <RestaurantCard {...vendor} time={vendor.deliveryTime || '30 min'} />
-                       </Link>
-                    </div>
-                  ))}
+             )}
+
+             {/* STORES GRID */}
+             {searchResults.stores.length > 0 && (
+               <div className="mb-12">
+                 <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+                   <Store className="w-5 h-5" /> Matching Stores
+                 </h3>
+                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 animate-in slide-in-from-bottom-4 duration-500">
+                    {searchResults.stores.map((vendor) => (
+                      <div key={vendor.id} className="relative group">
+                         <Link href={`/main/store/${vendor.slug || vendor.id}`}>
+                           <RestaurantCard {...vendor} time={vendor.deliveryTime || '30 min'} />
+                         </Link>
+                      </div>
+                    ))}
+                 </div>
+               </div>
+             )}
+
+             {/* PRODUCTS GRID */}
+             {searchResults.products.length > 0 && (
+               <div className="mb-12">
+                  <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+                   <Package className="w-5 h-5" /> Matching Items
+                 </h3>
+                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 animate-in slide-in-from-bottom-4 duration-500 delay-100">
+                    {searchResults.products.map((product) => (
+                      <ProductCard key={product.id} {...product} />
+                    ))}
+                 </div>
                </div>
              )}
           </section>

@@ -2,6 +2,8 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  Inject,      
+  forwardRef,
 } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { TransactionFilterDto } from './dto/transaction-filter.dto';
@@ -17,10 +19,15 @@ import {
   WalletEntityType,
   Prisma,
 } from '@prisma/client';
-
+import { PaymentService } from 'src/payment/payment.service';
+import { PaymentGateway } from 'src/payment/enums/payment.enums';
 @Injectable()
 export class TransactionsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    @Inject(forwardRef(() => PaymentService))
+    private paymentService: PaymentService,
+  ) {}
 
   /**
    * Get all transactions with filters and pagination
@@ -979,4 +986,56 @@ export class TransactionsService {
       return transaction;
     });
   }
+
+async verifyTransactionPayment(id: string, adminId: string) {
+    // 1. Fetch Transaction with Payment relation
+    const transaction = await this.prisma.transaction.findUnique({
+      where: { id },
+      include: {
+        payment: true, // Required to get reference and gateway
+      }
+    });
+
+    if (!transaction) throw new NotFoundException('Transaction not found');
+
+    // 2. Validate Links
+    // The transaction MUST be linked to a payment to be verified via this flow
+    if (!transaction.payment) {
+      throw new BadRequestException('This transaction is not linked to a verifyable payment record.');
+    }
+
+    const { reference, gateway } = transaction.payment;
+
+    if (!reference) {
+      throw new BadRequestException('Payment record has no reference.');
+    }
+
+    const verificationResult = await this.paymentService.verifyPayment(
+      reference, 
+      gateway as PaymentGateway // Cast string from DB to Enum
+    );
+
+    // 4. Audit Log
+    await this.prisma.activityLog.create({
+      data: {
+        userId: adminId,
+        action: 'PAYMENT_MANUAL_VERIFICATION',
+        target: id,
+        details: `Admin manually triggered verification for ref: ${reference}`,
+        metadata: {
+          transactionId: id,
+          reference,
+          gatewayResponse: verificationResult?.status || 'N/A'
+        }
+      }
+    });
+
+    return {
+      success: true,
+      message: 'Verification process completed.',
+      data: verificationResult
+    };
+  }
+
+
 }
