@@ -1,7 +1,6 @@
-// as/backend/src/super-admin/banners/banners.service.ts
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from 'src/prisma/prisma.service';
-import { StorageService } from 'src/storage/storage.service';
+import { PrismaService } from '../../prisma/prisma.service'; // Adjusted import path if needed, or keep 'src/prisma/...'
+import { StorageService } from '../../storage/storage.service'; // Adjusted import path if needed
 import { CreateBannerDto, UpdateBannerDto } from './dto/create-banner.dto';
 
 @Injectable()
@@ -23,7 +22,7 @@ export class BannersService {
     return Promise.all(
       banners.map(async (banner) => ({
         ...banner,
-        image: banner.image ? await this.getSignedUrl(banner.image) : null,
+        image: banner.image ? await this.resolveImage(banner.image) : null,
       })),
     );
   }
@@ -34,7 +33,7 @@ export class BannersService {
 
     return {
       ...banner,
-      image: banner.image ? await this.getSignedUrl(banner.image) : null,
+      image: banner.image ? await this.resolveImage(banner.image) : null,
     };
   }
 
@@ -48,7 +47,7 @@ export class BannersService {
       const upload = await this.storage.uploadFile(file);
       imageKey = upload.key;
     } else if (data.image) {
-      // FIX: Persist the pre-uploaded URL if no file is present in the request
+      // Persist the pre-uploaded URL/Key if no file is present
       imageKey = data.image;
     }
 
@@ -74,12 +73,12 @@ export class BannersService {
 
     if (file) {
       if (banner.image) {
-        await this.storage.deleteFileByKey(banner.image).catch(console.error);
+        // FIX 1: Changed deleteFileByKey -> deleteFile
+        await this.storage.deleteFile(banner.image).catch(console.error);
       }
       const upload = await this.storage.uploadFile(file);
       imageKey = upload.key;
     } else if (data.image !== undefined) {
-      // FIX: Respect the updated image URL from the JSON body
       imageKey = data.image;
     }
 
@@ -120,18 +119,21 @@ export class BannersService {
     if (!banner) throw new NotFoundException(`Banner not found`);
 
     if (banner.image) {
-      await this.storage.deleteFileByKey(banner.image).catch(console.error);
+      // FIX 2: Changed deleteFileByKey -> deleteFile
+      await this.storage.deleteFile(banner.image).catch(console.error);
     }
 
     return this.prisma.banner.delete({ where: { id } });
   }
 
-  private async getSignedUrl(key: string): Promise<string> {
+  // Renamed helper to be more accurate (resolveImage instead of getSignedUrl)
+  private async resolveImage(key: string): Promise<string> {
     try {
       if (key.startsWith('http')) return key;
-      return await this.storage.getSignedUrlForKey(key);
+      // FIX 3: Changed getSignedUrlForKey -> getPublicUrl
+      return this.storage.getPublicUrl(key);
     } catch (e) {
-      console.error(`Failed to sign URL for key ${key}`, e);
+      console.error(`Failed to resolve URL for key ${key}`, e);
       return '';
     }
   }

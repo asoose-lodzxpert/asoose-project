@@ -53,13 +53,9 @@ export class DisputesService {
 
       //  INVARIANT CHECK: Order is processed but has no payment record
       if (order && !order.payment && order.paymentStatus !== 'PENDING') {
-<<<<<<< HEAD
-        // Invariant check
-=======
         throw new BadRequestException(
           'System Error: This order is confirmed but has no payment record. Please contact support.',
         );
->>>>>>> ride_refactored
       }
 
       paymentId = order?.payment?.id;
@@ -533,13 +529,7 @@ export class DisputesService {
 
     // Validation: Vendor Wallet logic
     if (dto.refundSource === RefundSource.VENDOR_WALLET && !dispute.orderId) {
-<<<<<<< HEAD
-      throw new BadRequestException(
-        'Vendor wallet refunds are only allowed for order disputes',
-      );
-=======
       throw new BadRequestException('Vendor wallet refunds are only allowed for order disputes');
->>>>>>> ride_refactored
     }
 
     return this.prisma.$transaction(async (tx) => {

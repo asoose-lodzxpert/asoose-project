@@ -13,11 +13,6 @@ import { MatchingRedisModule } from 'src/matching/redis/redis.module';
 import { TestController } from 'src/test/test.controller';
 
 @Module({
-<<<<<<< HEAD
-  imports: [PrismaModule, MatchingModule, forwardRef(() => PaymentModule)],
-  controllers: [TripsController, TestController],
-  providers: [TripsService],
-=======
   imports: [
     PrismaModule,
     MatchingModule,
@@ -33,7 +28,6 @@ import { TestController } from 'src/test/test.controller';
     TripsCommonService,
     RidesCleanupService, // <--- Register Provider
   ],
->>>>>>> ride_refactored
   exports: [TripsService],
 })
 export class TripsModule {}

@@ -1,6 +1,3 @@
-<<<<<<< HEAD
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
-=======
 import { 
   Controller, 
   Get, 
@@ -9,7 +6,6 @@ import {
   Param,
   
 } from '@nestjs/common';
->>>>>>> ride_refactored
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { RolesGuard } from '../../auth/roles.guards';
 import { Roles } from '../../auth/roles.decorator';
@@ -26,12 +22,8 @@ export class ActivityLogController {
   async findAll(@Query() query: any) {
     return this.activityLogService.getLogs(query);
   }
-<<<<<<< HEAD
-}
-=======
   @Get(':id')
   async findOne(@Param('id') id: string) {
     return this.activityLogService.findOne(id);
   }
 }
->>>>>>> ride_refactored

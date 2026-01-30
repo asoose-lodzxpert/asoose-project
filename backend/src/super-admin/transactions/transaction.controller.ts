@@ -31,14 +31,6 @@ export class TransactionsController {
     return this.transactionsService.findOne(id);
   }
 
-<<<<<<< HEAD
-  @Post('adjust-wallet')
-  @Roles(UserRole.SUPER_ADMIN)
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  async adjustWallet(@Body() dto: AdjustWalletDto, @Req() req) {
-    return this.transactionsService.adjustWallet(dto, req.user.id);
-  }
-=======
 @Post('adjust-wallet')
 @Roles(UserRole.SUPER_ADMIN)
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -54,5 +46,4 @@ async adjustWallet(@Body() dto: AdjustWalletDto, @Req() req) {
     return this.transactionsService.verifyTransactionPayment(id, adminId);
   }
 
->>>>>>> ride_refactored
 }

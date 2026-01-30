@@ -151,13 +151,6 @@ export class RidersController {
     return this.ridersService.updateVehicle(id, body);
   }
   @Get(':id/payouts')
-<<<<<<< HEAD
-  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN) // Ensure proper authorization
-  async getRiderPayouts(@Param('id') id: string) {
-    // This calls the service to fetch payouts linked to this specific rider
-    return this.ridersService.getRiderPayouts(id);
-  }
-=======
 @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN) // Ensure proper authorization
 async getRiderPayouts(@Param('id') id: string) {
   // This calls the service to fetch payouts linked to this specific rider
@@ -177,5 +170,4 @@ async getRiderPayouts(@Param('id') id: string) {
   }
 
 
->>>>>>> ride_refactored
 }
