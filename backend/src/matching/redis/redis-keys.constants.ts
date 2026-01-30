@@ -168,7 +168,7 @@ export interface DriverState {
 export interface RiderState {
   id: string;
   role: DriverRole;
-  status: DriverStatus;
+  status: RiderStatus;
   hexId: string | null;
   lastSeen: number;
 

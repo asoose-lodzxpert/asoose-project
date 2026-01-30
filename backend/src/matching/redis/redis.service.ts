@@ -345,18 +345,4 @@ export class RedisService {
       return false;
     }
   }
-
-  // Add this method to RedisService class
-async getDriverActiveRide(driverId: string): Promise<string | null> {
-  // Assuming you store active ride mappings. 
-  // If not, we use the standard key pattern "driver_active_ride:{driverId}"
-  // This key should be set when a ride is ACCEPTED and deleted when COMPLETED.
-  return this.redis.get(`driver_active_ride:${driverId}`);
-}
-
-async getRideCustomer(rideId: string): Promise<string | null> {
-    // Helper to get customerId from a cached ride object or key
-    // For speed, we might store "ride_customer:{rideId}" -> customerId
-    return this.redis.get(`ride_customer:${rideId}`);
-}
 }

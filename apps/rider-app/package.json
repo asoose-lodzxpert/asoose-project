@@ -10,7 +10,7 @@
     "lint": "expo lint",
     "eas-build-dev-android": "eas build --platform android --profile development",
     "eas-build-prod-android": "eas build --platform android --profile production",
-    "eas-build-prev-android": "eas build --platform android --profile preview"
+    "eas-build-prev": "eas build --platform android --profile preview"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.2",
