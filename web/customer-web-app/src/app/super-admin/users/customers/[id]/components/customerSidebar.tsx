@@ -17,7 +17,6 @@ export const CustomerSidebar: React.FC<CustomerSidebarProps> = ({ customer, onUp
     phone: customer.phone || '',
   });
 
-  // Reset form if customer prop updates
   useEffect(() => {
     setFormData({
       name: customer.name,
@@ -38,8 +37,24 @@ export const CustomerSidebar: React.FC<CustomerSidebarProps> = ({ customer, onUp
     }
   };
 
-  const formatDate = (date: string) => 
-    new Date(date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+  // ✅ FIX 1: Robust Date Formatter
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString);
+    // Check if date is valid
+    if (isNaN(date.getTime())) return 'Invalid Date';
+    
+    return date.toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'short', 
+      day: 'numeric' 
+    });
+  };
+
+  // ✅ FIX 2: Handle Backend Property Mismatch
+  // The backend returns 'createdAt', but your interface might expect 'joinedAt'
+  const joinDate = customer.joinedAt || (customer as any).createdAt;
+  const updateDate = customer.updatedAt;
 
   return (
     <div className="space-y-6">
@@ -86,7 +101,6 @@ export const CustomerSidebar: React.FC<CustomerSidebarProps> = ({ customer, onUp
              )}
           </div>
 
-          {/* Name Input */}
           <div className="w-full mb-1 px-4">
             {isEditing ? (
               <input
@@ -104,7 +118,6 @@ export const CustomerSidebar: React.FC<CustomerSidebarProps> = ({ customer, onUp
           <p className="text-gray-500 text-xs font-mono mt-1 mb-6">{customer.id}</p>
 
           <div className="w-full space-y-3 text-left bg-[#0F172A] p-4 rounded-lg border border-gray-800">
-            {/* Email Input */}
             <div className="flex items-center gap-3 text-sm text-gray-300">
               <Mail className="w-4 h-4 text-gray-500 shrink-0" /> 
               {isEditing ? (
@@ -119,7 +132,6 @@ export const CustomerSidebar: React.FC<CustomerSidebarProps> = ({ customer, onUp
               )}
             </div>
 
-            {/* Phone Input */}
             <div className="flex items-center gap-3 text-sm text-gray-300">
               <Phone className="w-4 h-4 text-gray-500 shrink-0" /> 
               {isEditing ? (
@@ -135,19 +147,20 @@ export const CustomerSidebar: React.FC<CustomerSidebarProps> = ({ customer, onUp
               )}
             </div>
 
+            {/* ✅ FIX 3: Use the resolved Date Variables */}
             <div className="flex items-center gap-3 text-sm text-gray-300">
               <Calendar className="w-4 h-4 text-gray-500" /> 
-              <span>Joined {formatDate(customer.joinedAt)}</span>
+              <span>Joined {formatDate(joinDate)}</span>
             </div>
             <div className="flex items-center gap-3 text-sm text-gray-300">
               <Clock className="w-4 h-4 text-gray-500" /> 
-              <span>Updated {formatDate(customer.updatedAt)}</span>
+              <span>Updated {formatDate(updateDate)}</span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Addresses (Read Only for now) */}
+      {/* Addresses Section */}
       <div className="bg-[#1E293B] border border-gray-800 rounded-xl p-6">
         <h3 className="text-sm font-bold text-gray-400 uppercase mb-4 flex items-center gap-2">
            <MapPin className="w-4 h-4" /> Saved Addresses

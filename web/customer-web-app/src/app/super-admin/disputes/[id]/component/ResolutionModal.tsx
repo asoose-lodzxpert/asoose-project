@@ -9,17 +9,19 @@ interface Props {
   maxRefundAmount: number;
   isProcessing: boolean;
   onClose: () => void;
-  // Fix 3.2: Updated signature to accept refundSource
-  onConfirm: (notes: string, refundSource: string) => void; 
+  // ✅ FIX: Updated signature to accept optional amount
+  onConfirm: (notes: string, refundSource: string, amount?: string) => void; 
 }
 
 export default function ResolutionModal({ isOpen, type, maxRefundAmount, isProcessing, onClose, onConfirm }: Props) {
   const [notes, setNotes] = useState('');
-  const [refundSource, setRefundSource] = useState('PLATFORM'); // Fix 3.2: State for source
+  const [amount, setAmount] = useState(''); // ✅ FIX: State for partial amount
+  const [refundSource, setRefundSource] = useState('PLATFORM');
 
   if (!isOpen) return null;
 
   const isRefund = type === 'REFUND_FULL' || type === 'REFUND_PARTIAL';
+  const isPartial = type === 'REFUND_PARTIAL';
   const isReject = type === 'REJECT';
 
   return (
@@ -36,7 +38,7 @@ export default function ResolutionModal({ isOpen, type, maxRefundAmount, isProce
         </div>
 
         <div className="p-6 space-y-4">
-           {/* Fix 3.2: Refund Source Selector */}
+           {/* Refund Source Selector */}
            {isRefund && (
             <div>
               <label className="block text-xs font-bold text-gray-400 mb-2 uppercase">Refund Source</label>
@@ -48,6 +50,22 @@ export default function ResolutionModal({ isOpen, type, maxRefundAmount, isProce
                 <option value="PLATFORM">Platform Treasury</option>
                 <option value="VENDOR_WALLET">Vendor Wallet (Order Only)</option>
               </select>
+            </div>
+           )}
+
+           {/* ✅ FIX: Amount Input for Partial Refunds */}
+           {isPartial && (
+            <div>
+              <label className="block text-xs font-bold text-gray-400 mb-2 uppercase">
+                Partial Refund Amount (Max: {maxRefundAmount.toLocaleString('en-NG', { style: 'currency', currency: 'NGN' })})
+              </label>
+              <input
+                type="number"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                placeholder="0.00"
+                className="w-full bg-[#0F172A] border border-gray-700 rounded-lg p-3 text-white text-sm focus:outline-none focus:border-blue-500 font-mono"
+              />
             </div>
            )}
 
@@ -63,9 +81,9 @@ export default function ResolutionModal({ isOpen, type, maxRefundAmount, isProce
             />
           </div>
 
-          {isRefund && (
+          {isRefund && !isPartial && (
              <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 text-xs text-blue-400">
-                Max Refund: <strong>${maxRefundAmount.toFixed(2)}</strong>
+                Max Refund: <strong>{maxRefundAmount.toLocaleString('en-NG', { style: 'currency', currency: 'NGN' })}</strong>
              </div>
           )}
         </div>
@@ -77,9 +95,14 @@ export default function ResolutionModal({ isOpen, type, maxRefundAmount, isProce
           >
             Cancel
           </button>
+          
           <button 
-            onClick={() => onConfirm(notes, refundSource)}
-            disabled={!notes || isProcessing}
+            // ✅ FIX: Pass 'amount' to the confirm handler
+            onClick={() => onConfirm(notes, refundSource, amount)}
+            
+            // ✅ FIX: Disable if partial refund but no amount entered
+            disabled={!notes || isProcessing || (isPartial && !amount)}
+            
             className={`flex-1 py-3 rounded-xl font-bold text-white transition-all flex items-center justify-center gap-2
               ${isReject 
                 ? 'bg-red-500 hover:bg-red-600 disabled:bg-red-500/50' 

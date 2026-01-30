@@ -15,14 +15,8 @@ export const PAYMENT_METHODS = [
     gateway: "FLUTTERWAVE",
     icon: Smartphone,
   },
-  {
-    id: "monnify",
-    label: "Bank Transfer",
-    type: "BANK_TRANSFER",
-    gateway: "MONNIFY",
-    icon: Banknote,
-  },
-  // { id: 'cash', label: 'Cash', type: 'CASH', gateway: null, icon: Banknote },
+  // FIX: Uncommented Cash to enable the logic in page.tsx
+  { id: 'cash', label: 'Cash', type: 'CASH', gateway: null, icon: Banknote },
 ];
 
 export const RIDE_OPTIONS = ["Standard", "Premium", "XL"] as const;

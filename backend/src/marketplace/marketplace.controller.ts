@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import {
   Controller,
   Get,
@@ -11,9 +12,18 @@ import {
   Query,
   ParseIntPipe,
 } from '@nestjs/common';
+=======
+import { Controller, Get, Param, NotFoundException, Body, Request, UseGuards, Post, Delete, Query, ParseIntPipe } from '@nestjs/common';
+>>>>>>> ride_refactored
 import { MarketplaceService } from './marketplace.service';
 import { CreateReviewDto } from './dto/create-review.dto';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
+
+// DTO for Search Response
+export interface SearchResponseDto {
+  stores: any[];
+  products: any[];
+}
 
 @Controller('marketplace')
 export class MarketplaceController {
@@ -25,12 +35,13 @@ export class MarketplaceController {
   }
 
   @Get('search')
-  async search(@Query('q') q: string) {
+  async search(@Query('q') q: string): Promise<SearchResponseDto> {
     if (!q) return { stores: [], products: [] };
     return this.marketplaceService.search(q);
   }
 
   @Get('categories/:id')
+<<<<<<< HEAD
   async getCategory(@Param('id') id: string, @Query('sort') sort?: string) {
     // FIX: Changed @Query('filter') to @Query('sort') to match frontend
     // Default to 'all' if undefined
@@ -39,6 +50,14 @@ export class MarketplaceController {
       sort || 'all',
     );
 
+=======
+  async getCategory(
+    @Param('id') id: string,
+    @Query('sort') sort?: string 
+  ) {
+    const categoryData = await this.marketplaceService.getCategoryData(id, sort || 'all');
+    
+>>>>>>> ride_refactored
     if (!categoryData) {
       throw new NotFoundException(`Category vertical not found: ${id}`);
     }

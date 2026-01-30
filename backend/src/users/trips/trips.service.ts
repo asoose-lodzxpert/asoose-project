@@ -1,90 +1,42 @@
-import {
-  Injectable,
-  Logger,
-  BadRequestException,
-  NotFoundException,
-  ConflictException,
-  ForbiddenException,
-  InternalServerErrorException,
-} from '@nestjs/common';
-import {
-  RideStatus,
-  DeliveryStatus,
-  Prisma,
-  TransactionType,
-  TransactionStatus,
-  WalletEntityType,
-  PaymentStatus,
-} from '@prisma/client';
-import { PrismaService } from '../../prisma/prisma.service';
-import { GeoService } from '../../matching/geo/geo.service';
-import { EventBusService } from '../../matching/events/event-bus.service';
-import { QueueService } from '../../matching/queue/queue.service';
-import { NotificationsGateway } from '../../notifications/notifications.gateway';
-import { RedisService } from '../../matching/redis/redis.service';
+import { Injectable } from '@nestjs/common';
+import { RidesService } from './rides.service';
+import { DeliveriesService } from './deliveries.service';
 import {
   RequestRideDto,
   RequestDeliveryDto,
   CancelTripDto,
+  RideEstimateDto,
 } from './dto/trip.dto';
-
-const CONFIG = {
-  OTP_LENGTH: 6,
-  OTP_TTL_MS: 15 * 60 * 1000,
-  MAX_OTP_ATTEMPTS: 3,
-  MAX_DELIVERY_WEIGHT_KG: 100,
-  MIN_DELIVERY_WEIGHT_KG: 0.1,
-  COMPLETION_RADIUS_KM: 0.5,
-  PAGINATION_MAX_LIMIT: 50,
-  PAGINATION_DEFAULT_LIMIT: 20,
-  PHONE_MASK_VISIBLE_DIGITS: 4,
-  MAX_TEXT_LENGTH: 500,
-};
 
 @Injectable()
 export class TripsService {
-  private readonly logger = new Logger(TripsService.name);
-
   constructor(
-    private readonly prisma: PrismaService,
-    private readonly geo: GeoService,
-    private readonly eventBus: EventBusService,
-    private readonly queue: QueueService,
-    private readonly notificationsGateway: NotificationsGateway,
-    private readonly redis: RedisService,
+    private readonly ridesService: RidesService,
+    private readonly deliveriesService: DeliveriesService,
   ) {}
 
   // ========================================
-  // SHARED UTILITIES
+  // RIDE DELEGATION
   // ========================================
 
-  /**
-   * Safe Rounding Utility to prevent Float errors
-   * e.g. rounds 10.99999999 to 11.00
-   */
-  private round(value: number): number {
-    return Math.round((value + Number.EPSILON) * 100) / 100;
+  async getRideEstimate(dto: RideEstimateDto) {
+    return this.ridesService.getEstimate(dto);
   }
 
-  private maskPhoneNumber(phone: string): string {
-    if (!phone || phone.length < 8) return '***';
-    const visible = phone.slice(-CONFIG.PHONE_MASK_VISIBLE_DIGITS);
-    return `***${visible}`;
+  async requestRide(userId: string, dto: RequestRideDto) {
+    return this.ridesService.requestRide(userId, dto);
   }
 
-  private sanitizeText(text?: string): string {
-    return text ? text.trim().slice(0, CONFIG.MAX_TEXT_LENGTH) : '';
+  // FIX: Added method required by TripsController
+  async confirmRide(userId: string, rideId: string, paymentMethod: string) {
+    return this.ridesService.confirmRide(userId, rideId, paymentMethod);
   }
 
-  private validatePagination(page: number, limit: number) {
-    const safePage = Math.max(1, page || 1);
-    const safeLimit = Math.min(
-      Math.max(1, limit || CONFIG.PAGINATION_DEFAULT_LIMIT),
-      CONFIG.PAGINATION_MAX_LIMIT,
-    );
-    return { page: safePage, limit: safeLimit };
+  async getCurrentRide(userId: string) {
+    return this.ridesService.getCurrentRide(userId);
   }
 
+<<<<<<< HEAD
   private async checkOtpRateLimit(
     entityId: string,
     action: string,
@@ -223,77 +175,18 @@ export class TripsService {
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     );
+=======
+  async getDriverLocation(userId: string, rideId: string) {
+    return this.ridesService.getDriverLocation(userId, rideId);
+>>>>>>> ride_refactored
   }
 
   async startRideMatching(rideId: string) {
-    const payment = await this.prisma.payment.findUnique({
-      where: { rideId },
-    });
-
-    if (
-      payment &&
-      payment.status !== PaymentStatus.COMPLETED &&
-      payment.status !== PaymentStatus.PENDING
-    ) {
-      this.logger.warn(`Payment not ready for ride ${rideId}`);
-    }
-
-    const result = await this.prisma.ride.updateMany({
-      where: {
-        id: rideId,
-        status: RideStatus.PENDING,
-      },
-      data: { status: RideStatus.REQUESTED },
-    });
-
-    if (result.count === 0) {
-      this.logger.warn(`Idempotency: Ride ${rideId} match request skipped.`);
-      return;
-    }
-
-    const ride = await this.prisma.ride.findUnique({
-      where: { id: rideId },
-      include: { pickupAddress: true, dropoffAddress: true, customer: true },
-    });
-
-    // Fix: Strict null check to resolve TS18047
-    if (!ride) {
-      throw new NotFoundException('Ride not found after status update');
-    }
-
-    try {
-      this.notificationsGateway.server
-        .to(`user_${ride.customerId}`)
-        .emit('ride_update', {
-          rideId: ride.id,
-          status: 'DRIVER_SEARCHING',
-          label: 'Finding a Driver',
-        });
-    } catch (e) {
-      this.logger.error(`Notification failed for ride ${rideId}`, e);
-    }
-
-    const eventPayload = {
-      rideId: ride.id,
-      customerId: ride.customerId,
-      pickupLat: ride.pickupAddress.lat,
-      pickupLng: ride.pickupAddress.lng,
-      dropoffLat: ride.dropoffAddress.lat,
-      dropoffLng: ride.dropoffAddress.lng,
-      distanceKm: ride.distanceKm || 0,
-      totalFare: Number(ride.totalFare) || 0,
-      timestamp: Date.now(),
-      expiresAt: Date.now() + CONFIG.OTP_TTL_MS,
-    };
-
-    this.eventBus.emitRideRequested(eventPayload);
-    await this.queue.enqueueRideMatching({
-      ...eventPayload,
-      attempt: 1,
-    });
+    return this.ridesService.startRideMatching(rideId);
   }
 
   async acceptRide(rideId: string, riderId: string) {
+<<<<<<< HEAD
     if (!riderId) throw new ForbiddenException('Rider identity missing');
 
     const result = await this.prisma.ride.updateMany({
@@ -342,45 +235,16 @@ export class TripsService {
 
     await this.logActivity(riderId, 'RIDE_ACCEPTED', { rideId });
     return ride;
+=======
+    return this.ridesService.acceptRide(rideId, riderId);
+>>>>>>> ride_refactored
   }
 
   async startRide(rideId: string, riderId: string, otp: string) {
-    await this.checkOtpRateLimit(rideId, 'start_ride');
-
-    const result = await this.prisma.ride.updateMany({
-      where: {
-        id: rideId,
-        riderId: riderId,
-        startOtp: otp,
-        status: RideStatus.ACCEPTED,
-      },
-      data: {
-        status: RideStatus.IN_PROGRESS,
-        startedAt: new Date(),
-      },
-    });
-
-    if (result.count === 0) {
-      throw new BadRequestException('Invalid OTP or Ride not available');
-    }
-
-    const ride = await this.prisma.ride.findUnique({ where: { id: rideId } });
-
-    // Fix: Optional chain or check if ride exists, though updateMany passed.
-    if (ride) {
-      this.notificationsGateway.server
-        .to(`user_${ride.customerId}`)
-        .emit('ride_update', {
-          rideId: ride.id,
-          status: 'IN_PROGRESS',
-          label: 'Trip Started',
-        });
-    }
-
-    await this.logActivity(riderId, 'RIDE_STARTED', { rideId });
-    return { success: true };
+    return this.ridesService.startRide(rideId, riderId, otp);
   }
 
+<<<<<<< HEAD
   async completeRide(
     rideId: string,
     riderId: string,
@@ -451,87 +315,21 @@ export class TripsService {
 
       return { message: 'Ride completed' };
     });
+=======
+  async completeRide(rideId: string, riderId: string, lat: number, lng: number) {
+    return this.ridesService.completeRide(rideId, riderId, lat, lng);
+>>>>>>> ride_refactored
   }
 
   async cancelRide(userId: string, rideId: string, dto: CancelTripDto) {
-    const reason = this.sanitizeText(dto.reason);
-
-    const result = await this.prisma.ride.updateMany({
-      where: {
-        id: rideId,
-        customerId: userId,
-        status: {
-          notIn: [
-            RideStatus.COMPLETED,
-            RideStatus.CANCELLED,
-            RideStatus.IN_PROGRESS,
-          ],
-        },
-      },
-      data: {
-        status: RideStatus.CANCELLED,
-        cancelledBy: 'CUSTOMER',
-        cancellationReason: reason,
-        cancelledAt: new Date(),
-      },
-    });
-
-    if (result.count === 0) {
-      throw new BadRequestException('Cannot cancel ride in current status');
-    }
-
-    await this.logActivity(userId, 'RIDE_CANCELLED', { rideId, reason });
-    return { message: 'Ride cancelled' };
+    return this.ridesService.cancelRide(userId, rideId, dto);
   }
 
-  async requestDelivery(userId: string, dto: RequestDeliveryDto) {
-    if (
-      dto.weightKg &&
-      (dto.weightKg < CONFIG.MIN_DELIVERY_WEIGHT_KG ||
-        dto.weightKg > CONFIG.MAX_DELIVERY_WEIGHT_KG)
-    ) {
-      throw new BadRequestException('Invalid weight');
-    }
+  async getUserRides(userId: string, status?: string, page = 1, limit = 20) {
+    return this.ridesService.getUserRides(userId, status, page, limit);
+  }
 
-    return this.prisma.$transaction(async (tx) => {
-      // 1. Validate Order Link (if provided)
-      if (dto.orderId) {
-        const order = await tx.order.findUnique({
-          where: { id: dto.orderId },
-        });
-        if (!order || order.userId !== userId)
-          throw new ForbiddenException('Invalid order link');
-      }
-
-      // 2. Fetch Addresses
-      const [pickupAddress, dropoffAddress] = await Promise.all([
-        tx.address.findUnique({ where: { id: dto.pickupAddressId } }),
-        tx.address.findUnique({ where: { id: dto.dropoffAddressId } }),
-      ]);
-
-      // 3. Validate Address Ownership
-      if (!pickupAddress || pickupAddress.userId !== userId) {
-        throw new BadRequestException('Invalid pickup address');
-      }
-      if (!dropoffAddress || dropoffAddress.userId !== userId) {
-        throw new BadRequestException('Invalid dropoff address');
-      }
-
-      // 4. Calculate Logistics (Distance & Fee)
-      if (
-        !this.geo.validateCoordinates(pickupAddress.lat, pickupAddress.lng) ||
-        !this.geo.validateCoordinates(dropoffAddress.lat, dropoffAddress.lng)
-      ) {
-        throw new BadRequestException('Invalid coordinates');
-      }
-
-      const distanceKm = this.geo.calculateDistance(
-        pickupAddress.lat,
-        pickupAddress.lng,
-        dropoffAddress.lat,
-        dropoffAddress.lng,
-      );
-
+<<<<<<< HEAD
       const deliveryFee = this.geo.calculateDeliveryFee(
         distanceKm,
         dto.weightKg || 1,
@@ -556,109 +354,26 @@ export class TripsService {
           deliveryOtp,
         },
       });
+=======
+  async getRideById(userId: string, rideId: string) {
+    return this.ridesService.getRideById(userId, rideId);
+  }
 
-      return {
-        delivery,
-        deliveryFee: delivery.deliveryFee,
-        distance: delivery.distanceKm,
-        message: 'Delivery request created',
-      };
-    });
+  // ========================================
+  // DELIVERY DELEGATION
+  // ========================================
+>>>>>>> ride_refactored
+
+  async requestDelivery(userId: string, dto: RequestDeliveryDto) {
+    return this.deliveriesService.requestDelivery(userId, dto);
   }
 
   async startDeliveryMatching(deliveryId: string) {
-    const deliveryCheck = await this.prisma.delivery.findUnique({
-      where: { id: deliveryId },
-    });
-
-    if (!deliveryCheck) throw new NotFoundException('Delivery not found');
-
-    if (deliveryCheck.orderId) {
-      const payment = await this.prisma.payment.findUnique({
-        where: { orderId: deliveryCheck.orderId },
-      });
-
-      if (
-        payment &&
-        payment.status !== PaymentStatus.COMPLETED &&
-        payment.status !== PaymentStatus.PENDING
-      ) {
-        this.logger.warn(
-          `Payment not ready for delivery ${deliveryId} (Order ${deliveryCheck.orderId})`,
-        );
-      }
-    }
-
-    const result = await this.prisma.delivery.updateMany({
-      where: {
-        id: deliveryId,
-        status: DeliveryStatus.PENDING,
-      },
-      data: { status: DeliveryStatus.REQUESTED },
-    });
-
-    if (result.count === 0) {
-      this.logger.warn(
-        `Idempotency: Delivery ${deliveryId} match request skipped.`,
-      );
-      return;
-    }
-
-    const delivery = await this.prisma.delivery.findUnique({
-      where: { id: deliveryId },
-      include: {
-        pickupAddress: true,
-        dropoffAddress: true,
-      },
-    });
-
-    // Fix: Strict null check to resolve TS18047
-    if (!delivery) {
-      throw new NotFoundException('Delivery not found after status update');
-    }
-
-    if (delivery.orderId) {
-      try {
-        this.notificationsGateway.sendOrderUpdate(delivery.orderId, {
-          status: 'DRIVER_SEARCHING',
-          label: 'Finding a Rider',
-          description: 'Searching for nearby riders...',
-          eta: 'Calculating...',
-        });
-      } catch (e) {
-        this.logger.error(`Notification failed for delivery ${deliveryId}`, e);
-      }
-    }
-
-    const eventPayload = {
-      deliveryId: delivery.id,
-      customerId: delivery.customerId,
-      orderId: delivery.orderId || undefined,
-      pickupLat: delivery.pickupAddress.lat,
-      pickupLng: delivery.pickupAddress.lng,
-      dropoffLat: delivery.dropoffAddress.lat,
-      dropoffLng: delivery.dropoffAddress.lng,
-      distanceKm: delivery.distanceKm || 0,
-      deliveryFee: Number(delivery.deliveryFee),
-      packageDetails: delivery.packageDetails || undefined,
-      recipientName: delivery.recipientName,
-      recipientPhone: delivery.recipientPhone,
-      timestamp: Date.now(),
-    };
-
-    this.eventBus.emitDeliveryRequested(eventPayload);
-    await this.queue.enqueueDeliveryMatching({
-      ...eventPayload,
-      attempt: 1,
-    });
-
-    return {
-      message: 'Delivery matching started',
-      status: DeliveryStatus.REQUESTED,
-    };
+    return this.deliveriesService.startDeliveryMatching(deliveryId);
   }
 
   async assignDriver(deliveryId: string, riderId: string) {
+<<<<<<< HEAD
     if (!riderId) throw new ForbiddenException();
 
     const result = await this.prisma.delivery.updateMany({
@@ -669,32 +384,17 @@ export class TripsService {
         assignedAt: new Date(),
       },
     });
+=======
+    return this.deliveriesService.assignDriver(deliveryId, riderId);
+  }
+>>>>>>> ride_refactored
 
-    if (result.count === 0) throw new ConflictException('Delivery unavailable');
-    return { success: true };
+  async acceptDelivery(deliveryId: string, riderId: string) {
+    return this.deliveriesService.acceptDelivery(deliveryId, riderId);
   }
 
   async confirmPickup(deliveryId: string, riderId: string, proof: string) {
-    if (!riderId) throw new ForbiddenException();
-    if (!proof || proof.length > 2048)
-      throw new BadRequestException('Invalid proof');
-
-    const result = await this.prisma.delivery.updateMany({
-      where: {
-        id: deliveryId,
-        riderId: riderId,
-        status: DeliveryStatus.ASSIGNED,
-      },
-      data: {
-        status: DeliveryStatus.PICKED_UP,
-        pickedUpAt: new Date(),
-        pickupProof: proof,
-      },
-    });
-
-    if (result.count === 0)
-      throw new BadRequestException('Invalid state for pickup');
-    return { success: true };
+    return this.deliveriesService.confirmPickup(deliveryId, riderId, proof);
   }
 
   async completeDelivery(
@@ -705,218 +405,21 @@ export class TripsService {
     lat: number,
     lng: number,
   ) {
-    if (!riderId) throw new ForbiddenException();
-    if (!this.geo.validateCoordinates(lat, lng))
-      throw new BadRequestException('Invalid coords');
-
-    await this.checkOtpRateLimit(deliveryId, 'complete_delivery');
-
-    return this.prisma.$transaction(async (tx) => {
-      const delivery = await tx.delivery.findUnique({
-        where: { id: deliveryId },
-        include: { dropoffAddress: true },
-      });
-
-      if (!delivery || delivery.riderId !== riderId)
-        throw new ForbiddenException();
-      if (delivery.status !== DeliveryStatus.PICKED_UP)
-        throw new BadRequestException('Invalid state');
-      if (delivery.deliveryOtp !== otp)
-        throw new BadRequestException('Invalid OTP');
-
-      const dist = this.geo.calculateDistance(
-        lat,
-        lng,
-        delivery.dropoffAddress.lat,
-        delivery.dropoffAddress.lng,
-      );
-      if (dist > CONFIG.COMPLETION_RADIUS_KM)
-        throw new BadRequestException('Too far from dropoff');
-
-      await tx.delivery.update({
-        where: { id: deliveryId },
-        data: {
-          status: DeliveryStatus.DELIVERED,
-          deliveredAt: new Date(),
-          deliveryProof: proof,
-        },
-      });
-
-      if (delivery.orderId) {
-        await tx.order.update({
-          where: { id: delivery.orderId },
-          data: { status: 'DELIVERED', deliveredAt: new Date() },
-        });
-      }
-
-      const rider = await tx.rider.findUnique({ where: { id: riderId } });
-
-      if (!rider)
-        throw new InternalServerErrorException(
-          'Rider profile missing during delivery completion',
-        );
-
-      const fee = Number(delivery.deliveryFee) || 0;
-      const earning = this.round(fee * 0.8);
-      const balanceBefore = Number(rider.walletBalance);
-      const balanceAfter = this.round(balanceBefore + earning);
-
-      await tx.rider.update({
-        where: { id: riderId },
-        data: { walletBalance: balanceAfter },
-      });
-
-      await tx.transaction.create({
-        data: {
-          type: TransactionType.RIDER_EARNING,
-          amount: earning,
-          balanceBefore: balanceBefore,
-          balanceAfter: balanceAfter,
-          entityId: riderId,
-          entityType: WalletEntityType.RIDER,
-          deliveryId: delivery.id,
-          status: TransactionStatus.COMPLETED,
-          description: `Earnings for delivery ${delivery.id}`,
-        },
-      });
-
-      return { success: true };
-    });
+    return this.deliveriesService.completeDelivery(deliveryId, riderId, otp, proof, lat, lng);
   }
 
   async cancelDelivery(userId: string, deliveryId: string, dto: CancelTripDto) {
-    const reason = this.sanitizeText(dto.reason);
-    const result = await this.prisma.delivery.updateMany({
-      where: {
-        id: deliveryId,
-        customerId: userId,
-        status: {
-          notIn: [DeliveryStatus.DELIVERED, DeliveryStatus.CANCELLED],
-        },
-      },
-      data: {
-        status: DeliveryStatus.CANCELLED,
-      },
-    });
-
-    if (result.count === 0) {
-      throw new BadRequestException('Cannot cancel delivery');
-    }
-
-    await this.logActivity(userId, 'DELIVERY_CANCELLED', {
-      deliveryId,
-      reason,
-    });
-    return { message: 'Delivery cancelled' };
+    return this.deliveriesService.cancelDelivery(userId, deliveryId, dto);
   }
 
-  // ========================================
-  // FETCHING (DATA ACCESS)
-  // ========================================
-
-  async getUserRides(userId: string, status?: string, page = 1, limit = 20) {
-    const { page: safePage, limit: safeLimit } = this.validatePagination(
-      page,
-      limit,
-    );
-    const skip = (safePage - 1) * safeLimit;
-
-    const allowedStatuses = Object.values(RideStatus) as string[];
-    const statusFilter =
-      status && allowedStatuses.includes(status) ? status : undefined;
-
-    return this.prisma.ride.findMany({
-      where: {
-        customerId: userId,
-        ...(statusFilter && { status: statusFilter as RideStatus }),
-      },
-      take: safeLimit,
-      skip,
-      orderBy: { createdAt: 'desc' },
-      select: {
-        id: true,
-        status: true,
-        totalFare: true,
-        createdAt: true,
-        pickupAddress: { select: { street: true } },
-        dropoffAddress: { select: { street: true } },
-      },
-    });
-  }
-
-  async getRideById(userId: string, rideId: string) {
-    const ride = await this.prisma.ride.findUnique({
-      where: { id: rideId },
-      include: {
-        pickupAddress: true,
-        dropoffAddress: true,
-        rider: {
-          include: { vehicle: true },
-        },
-        payment: true,
-      },
-    });
-
-    if (!ride || ride.customerId !== userId) {
-      throw new NotFoundException('Ride not found');
-    }
-
-    if (ride.rider) {
-      ride.rider.phone = this.maskPhoneNumber(ride.rider.phone);
-    }
-
-    return ride;
-  }
-
-  async getUserDeliveries(
-    userId: string,
-    status?: string,
-    page = 1,
-    limit = 20,
-  ) {
-    const { page: safePage, limit: safeLimit } = this.validatePagination(
-      page,
-      limit,
-    );
-    const skip = (safePage - 1) * safeLimit;
-
-    const allowedStatuses = Object.values(DeliveryStatus) as string[];
-    const statusFilter =
-      status && allowedStatuses.includes(status) ? status : undefined;
-
-    return this.prisma.delivery.findMany({
-      where: {
-        customerId: userId,
-        ...(statusFilter && { status: statusFilter as DeliveryStatus }),
-      },
-      take: safeLimit,
-      skip,
-      orderBy: { createdAt: 'desc' },
-    });
+  async getUserDeliveries(userId: string, status?: string, page = 1, limit = 20) {
+    return this.deliveriesService.getUserDeliveries(userId, status, page, limit);
   }
 
   async getDeliveryById(userId: string, deliveryId: string) {
-    const delivery = await this.prisma.delivery.findUnique({
-      where: { id: deliveryId },
-      include: {
-        pickupAddress: true,
-        dropoffAddress: true,
-        rider: {
-          include: { vehicle: true },
-        },
-      },
-    });
-
-    if (!delivery || delivery.customerId !== userId) {
-      throw new NotFoundException('Delivery not found');
-    }
-
-    if (delivery.rider) {
-      delivery.rider.phone = this.maskPhoneNumber(delivery.rider.phone);
-    }
-
-    return delivery;
+    return this.deliveriesService.getDeliveryById(userId, deliveryId);
   }
+<<<<<<< HEAD
 
   async acceptDelivery(deliveryId: string, riderId: string) {
     if (!riderId) throw new ForbiddenException('Rider identity missing');
@@ -967,5 +470,9 @@ export class TripsService {
 
     await this.logActivity(riderId, 'DELIVERY_ACCEPTED', { deliveryId });
     return delivery;
+=======
+  async driverArrived(rideId: string, riderId: string) {
+    return this.ridesService.driverArrived(rideId, riderId);
+>>>>>>> ride_refactored
   }
 }

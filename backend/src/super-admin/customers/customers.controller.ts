@@ -1,17 +1,19 @@
-import {
-  Controller,
-  Get,
-  Param,
-  Query,
-  Patch,
-  Body,
-  UseGuards,
-  ParseIntPipe,
+
+import { 
+  Controller, 
+  Get, 
+  Param, 
+  Query, 
+  Patch, 
+  Body, 
+  UseGuards, 
+  ParseIntPipe, 
   Delete,
+  Post,
+  Req,
 } from '@nestjs/common';
 import { CustomersService } from './customers.service';
-import { UserStatus } from '@prisma/client';
-import { UserRole } from '../../common/enums/user-role.enum';
+import { UserStatus, UserRole } from '@prisma/client';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { RolesGuard } from '../../auth/roles.guards';
 import { Roles } from '../../auth/roles.decorator';
@@ -21,7 +23,6 @@ import { Roles } from '../../auth/roles.decorator';
 export class CustomersController {
   constructor(private readonly customersService: CustomersService) {}
 
-  // 🔓 READ ACCESS: Support needs to view customer history to resolve tickets
   @Get()
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN_MANAGER, UserRole.ADMIN_SUPPORT)
   async findAll(
@@ -50,28 +51,39 @@ export class CustomersController {
     return this.customersService.getCustomerRides(id);
   }
 
-  // 🔒 WRITE ACCESS: Only Managers can edit profiles or ban users
   @Patch(':id')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN_MANAGER)
   async update(
     @Param('id') id: string,
-    @Body() body: { name?: string; phone?: string; email?: string },
+    @Body() body: { name?: string; phone?: string; email?: string }
   ) {
     return this.customersService.update(id, body);
   }
 
-  @Patch(':id/status')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN_MANAGER)
+@Patch(':id/status')
   async updateStatus(
-    @Param('id') id: string,
-    @Body('status') status: UserStatus,
+    @Param('id') id: string, 
+    @Body() body: { status: UserStatus },
+    @Req() req: any // ✅ Inject Request
   ) {
-    return this.customersService.updateStatus(id, status);
+    const adminId = req.user?.id || req.user?.sub;
+    return this.customersService.updateStatus(id, body.status, adminId);
   }
-
   @Delete(':id')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN_MANAGER)
   async remove(@Param('id') id: string) {
     return this.customersService.remove(id);
   }
+
+@Post(':id/kill-switch')
+  @Roles(UserRole.SUPER_ADMIN)
+  async killSwitch(
+    @Param('id') id: string,
+    @Body() body: { action: 'SUSPEND' | 'BAN'; reason: string },
+    @Req() req: any
+  ) {
+    const adminId = req.user?.id || 'SYSTEM';
+    return this.customersService.executeKillSwitch(id, body.action, body.reason, adminId);
+  }
+
 }

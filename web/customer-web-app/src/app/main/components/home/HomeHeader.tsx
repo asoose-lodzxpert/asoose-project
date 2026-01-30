@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
-import { Search, MapPin, ChevronDown, Moon, Sun, Car, Package, Utensils, User, Bell, ShoppingBag } from 'lucide-react';
+import { Search, MapPin, ChevronDown, Moon, Sun, Car, Package, Store, User, Bell, ShoppingBag } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useSession } from "next-auth/react"; 
 
@@ -207,13 +207,13 @@ export const HomeHeader = () => {
         <div className="flex items-center gap-4">
           <nav className="hidden lg:flex items-center gap-1 bg-gray-100 dark:bg-white/5 p-1 rounded-xl mr-2">
             <Link href="/main/store" className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-yellow-500 ${isActive('/main/store') ? 'bg-white dark:bg-zinc-800 text-yellow-500 shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}>
-              <Utensils className="w-3.5 h-3.5" /> Food
+              <Store className="w-3.5 h-3.5" /> make order
             </Link>
             <Link href="/main/ride" className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-yellow-500 ${isActive('/main/ride') ? 'bg-white dark:bg-zinc-800 text-yellow-500 shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}>
-              <Car className="w-3.5 h-3.5" /> Ride
+              <Car className="w-3.5 h-3.5" /> Book a ride 
             </Link>
             <Link href="/main/delivery" className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-yellow-500 ${isActive('/main/delivery') ? 'bg-white dark:bg-zinc-800 text-yellow-500 shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}>
-              <Package className="w-3.5 h-3.5" /> Send
+              <Package className="w-3.5 h-3.5" /> Send a package
             </Link>
             
             <Link href="/main/checkout" className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-yellow-500 ${isActive('/main/checkout') ? 'bg-white dark:bg-zinc-800 text-yellow-500 shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}>

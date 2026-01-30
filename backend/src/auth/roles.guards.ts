@@ -22,7 +22,6 @@ export class RolesGuard implements CanActivate {
 
     // If no roles are required, allow access
     if (!requiredRoles) {
-      this.logger.log('No roles required, allowing access');
       return true;
     }
 
@@ -37,6 +36,10 @@ export class RolesGuard implements CanActivate {
       UserRole.RIDER,
       UserRole.ADMIN,
       UserRole.SUPER_ADMIN,
+      // 👇 ADD THESE MISSING ROLES
+      UserRole.ADMIN_MANAGER,
+      UserRole.ADMIN_SUPPORT,
+      UserRole.ADMIN_FINANCE,
     ];
 
     if (!validRoles.includes(user.role)) {

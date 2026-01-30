@@ -5,7 +5,8 @@ import { useParams, useRouter } from 'next/navigation';
 import { toast } from 'react-toastify';
 import useSWR from 'swr'; 
 import { getSession } from 'next-auth/react';
-import { Inter } from 'next/font/google'; //
+import { Inter } from 'next/font/google'; 
+import Swal from 'sweetalert2'; // ✅ Added Missing Import
 import { fetcher } from '../../hooks/useSuperAdminFetch';
 import { TransactionDetail } from './types'; 
 import TransactionHeader from './component/transactionheader';
@@ -22,21 +23,21 @@ import { WalletBalanceCard } from './component/WalletBalanceCard';
 import { TransactionDetailSkeleton } from './component/skeleton';
 import { Currency } from '@/app/main/components/Currency';
 
-// Initialize font to match app-wide settings
+// Initialize font
 const inter = Inter({ subsets: ['latin'] });
 
 export default function TransactionDetailPage() {
   const params = useParams();
   const router = useRouter();
   const transactionId = Array.isArray(params?.id) ? params.id[0] : params?.id;
-  
+  const [isVerifying, setIsVerifying] = useState(false);
   const [downloading, setDownloading] = useState(false);
 
   // ===========================================================================
   //  DATA FETCHING
   // ===========================================================================
 
-  const { data: txn, error, isLoading } = useSWR<TransactionDetail>(
+  const { data: txn, error, isLoading, mutate } = useSWR<TransactionDetail>(
     transactionId ? `/super-admin/transactions/${transactionId}` : null,
     fetcher,
     {
@@ -81,7 +82,6 @@ export default function TransactionDetailPage() {
       document.body.appendChild(link);
       link.click();
       
-      // Cleanup
       window.URL.revokeObjectURL(url);
       document.body.removeChild(link);
       
@@ -109,11 +109,51 @@ export default function TransactionDetailPage() {
     toast.success('Transaction link copied to clipboard');
   };
 
-  // ===========================================================================
-  //  UI STATES
-  // ===========================================================================
+  // ✅ FEATURE 3: Re-Verify Action
+  const handleVerify = async () => {
+    if (!transactionId) return;
+
+    setIsVerifying(true);
+    try {
+      const session = await getSession();
+      const token = (session as any)?.accessToken;
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
+      // Call the new backend endpoint
+      const res = await fetch(`${API_URL}/super-admin/transactions/${transactionId}/verify`, {
+        method: 'POST',
+        headers: { 
+          'Authorization': `Bearer ${token || ''}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.message || 'Verification failed');
+
+      Swal.fire({
+        title: 'Verified',
+        text: `Gateway Response: ${result.data?.status || 'Processed'}`,
+        icon: 'success',
+        background: '#1E293B', color: '#fff',
+        timer: 2000, showConfirmButton: false
+      });
+
+      mutate(); // Refresh UI to show new status (e.g., CONFIRMED)
+    } catch (error: any) {
+      Swal.fire({
+        title: 'Error',
+        text: error.message,
+        icon: 'error',
+        background: '#1E293B', color: '#fff'
+      });
+    } finally {
+      setIsVerifying(false);
+    }
+  };
 
   if (isLoading) return <TransactionDetailSkeleton />;
+  
   if (error || !txn) {
     return (
       <div className={`min-h-screen bg-[#0F172A] flex items-center justify-center ${inter.className}`}>
@@ -130,11 +170,14 @@ export default function TransactionDetailPage() {
     );
   }
 
+  // Logic: Show button only for PENDING/FAILED transactions that have a reference to check
+  const canVerify = ['PENDING', 'FAILED', 'PROCESSING'].includes(txn.status) && !!txn.reference;
+
   return (
-    // Applied inter.className here to enforce the font
     <div className={`min-h-screen bg-[#0F172A] p-4 md:p-8 ${inter.className}`}>
       <div className="max-w-7xl mx-auto space-y-6">
         
+        {/* ✅ Pass Verification Props to Header */}
         <TransactionHeader 
           onDownload={handleDownload} 
           onShare={handleShare} 
@@ -142,6 +185,11 @@ export default function TransactionDetailPage() {
           reference={txn.reference}
           status={txn.status}
           amount={<Currency amount={txn.amount} className="text-xl" />}
+          
+          // New props
+          onVerify={handleVerify}
+          isVerifying={isVerifying}
+          canVerify={canVerify}
         />
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

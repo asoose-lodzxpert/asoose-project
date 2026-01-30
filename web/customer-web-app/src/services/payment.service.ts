@@ -5,14 +5,13 @@ export interface InitiatePaymentPayload {
   email: string;
   gateway: 'PAYSTACK' | 'FLUTTERWAVE' | 'MONNIFY';
   method: 'CARD' | 'BANK_TRANSFER' | 'CASH';
-  // FIX: Added 'DELIVERY' to the type definition
   type: 'ORDER' | 'RIDE' | 'DELIVERY';
   orderId?: string;
   rideId?: string;
-  // FIX: Added deliveryId field
   deliveryId?: string;
   callbackUrl?: string;
   metadata?: any;
+  state?: string; // <--- FIX: Added this field
 }
 
 export interface PaymentInitResponse {

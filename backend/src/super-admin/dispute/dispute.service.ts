@@ -5,6 +5,7 @@ import {
   ForbiddenException,
   Inject,
   forwardRef,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { TransactionLedgerService } from '../transactions/transaction-ledger.service';
@@ -20,6 +21,7 @@ import {
 
 @Injectable()
 export class DisputesService {
+  private readonly logger = new Logger(DisputesService.name);
   constructor(
     private prisma: PrismaService,
     private ledger: TransactionLedgerService,
@@ -27,10 +29,12 @@ export class DisputesService {
     private paymentService: PaymentService,
   ) {}
 
-  // ==================== CREATE DISPUTE ====================
+// ==================== CREATE DISPUTE ====================
   async create(dto: CreateDisputeDto, userId: string) {
+    // 1. Validate Business Rules (Time limits, ownership, status)
     await this.validateDisputeEligibility(dto, userId);
 
+    // 2. Check for Duplicates
     const existingDispute = await this.checkExistingDispute(dto);
     if (existingDispute) {
       throw new BadRequestException(
@@ -39,14 +43,23 @@ export class DisputesService {
     }
 
     let paymentId: string | undefined;
+
+    // 3. Resolve Payment ID & Data Integrity Checks
     if (dto.orderId) {
       const order = await this.prisma.order.findUnique({
         where: { id: dto.orderId },
         include: { payment: true },
       });
 
+      //  INVARIANT CHECK: Order is processed but has no payment record
       if (order && !order.payment && order.paymentStatus !== 'PENDING') {
+<<<<<<< HEAD
         // Invariant check
+=======
+        throw new BadRequestException(
+          'System Error: This order is confirmed but has no payment record. Please contact support.',
+        );
+>>>>>>> ride_refactored
       }
 
       paymentId = order?.payment?.id;
@@ -58,36 +71,61 @@ export class DisputesService {
       paymentId = ride?.payment?.id;
     }
 
-    return this.prisma.dispute.create({
-      data: {
-        reason: dto.reason,
-        description: dto.description,
-        priority: dto.priority || 'MEDIUM',
-        evidenceImages: dto.evidenceImages || [],
-        openedByUser: { connect: { id: userId } },
-        ...(dto.targetUserId && {
-          targetUser: { connect: { id: dto.targetUserId } },
-        }),
-        ...(paymentId && { payment: { connect: { id: paymentId } } }),
-        ...(dto.orderId && { order: { connect: { id: dto.orderId } } }),
-        ...(dto.rideId && { ride: { connect: { id: dto.rideId } } }),
-        ...(dto.deliveryId && {
-          delivery: { connect: { id: dto.deliveryId } },
-        }),
-        messages: {
-          create: {
-            senderId: userId,
-            message: `Dispute opened: ${dto.reason}\n\n${dto.description || ''}`,
-            isInternal: false,
+    // 4. Atomic Creation (Dispute + Log)
+    return this.prisma.$transaction(async (tx) => {
+      // A. Create the Dispute
+      const dispute = await tx.dispute.create({
+        data: {
+          reason: dto.reason,
+          description: dto.description,
+          priority: dto.priority || 'MEDIUM',
+          evidenceImages: dto.evidenceImages || [],
+          openedByUser: { connect: { id: userId } },
+          // Connect optional relations
+          ...(dto.targetUserId && {
+            targetUser: { connect: { id: dto.targetUserId } },
+          }),
+          ...(paymentId && { payment: { connect: { id: paymentId } } }),
+          ...(dto.orderId && { order: { connect: { id: dto.orderId } } }),
+          ...(dto.rideId && { ride: { connect: { id: dto.rideId } } }),
+          ...(dto.deliveryId && {
+            delivery: { connect: { id: dto.deliveryId } },
+          }),
+          // Initial Message
+          messages: {
+            create: {
+              senderId: userId,
+              message: `Dispute opened: ${dto.reason}\n\n${dto.description || ''}`,
+              isInternal: false,
+            },
           },
         },
-      },
-      include: {
-        openedByUser: { select: { id: true, name: true, email: true } },
-        order: { select: { id: true, total: true, status: true } },
-        ride: { select: { id: true, totalFare: true, status: true } },
-        delivery: { select: { id: true, deliveryFee: true, status: true } },
-      },
+        include: {
+          openedByUser: { select: { id: true, name: true, email: true } },
+          order: { select: { id: true, total: true, status: true } },
+          ride: { select: { id: true, totalFare: true, status: true } },
+          delivery: { select: { id: true, deliveryFee: true, status: true } },
+        },
+      });
+
+      // B. Create Activity Log
+      await tx.activityLog.create({
+        data: {
+          userId: userId,
+          action: 'DISPUTE_OPENED',
+          target: `Dispute #${dispute.id.substring(0, 8)}`,
+          status: 'SUCCESS',
+          details: `Opened dispute for reason: ${dto.reason}`,
+          metadata: {
+            disputeId: dispute.id,
+            priority: dispute.priority,
+            category: dto.orderId ? 'ORDER' : dto.rideId ? 'RIDE' : 'DELIVERY',
+          },
+        },
+      });
+
+      this.logger.log(`Dispute ${dispute.id} created by user ${userId}`);
+      return dispute;
     });
   }
 
@@ -447,49 +485,68 @@ export class DisputesService {
     });
   }
 
-  // ==================== ADD ADMIN NOTE ====================
+// ==================== ADD ADMIN NOTE  ====================
   async addAdminNote(id: string, note: string, adminId: string) {
     const dispute = await this.prisma.dispute.findUnique({ where: { id } });
     if (!dispute) throw new NotFoundException('Dispute not found');
 
-    return this.prisma.dispute.update({
-      where: { id },
-      data: {
-        adminNotes: dispute.adminNotes
-          ? `${dispute.adminNotes}\n\n[${new Date().toISOString()}] ${note}`
-          : note,
-        messages: {
-          create: {
-            senderId: adminId,
-            message: note,
-            isInternal: true,
+    return this.prisma.$transaction(async (tx) => {
+      const updatedDispute = await tx.dispute.update({
+        where: { id },
+        data: {
+          adminNotes: dispute.adminNotes
+            ? `${dispute.adminNotes}\n\n[${new Date().toISOString()}] ${note}`
+            : note,
+          messages: {
+            create: {
+              senderId: adminId,
+              message: note,
+              isInternal: true,
+            },
           },
         },
-      },
+      });
+
+      // 👇 LOG ACTIVITY
+      await tx.activityLog.create({
+        data: {
+          userId: adminId,
+          action: 'DISPUTE_NOTE_ADDED',
+          target: `Dispute #${id.substring(0, 8)}`,
+          status: 'SUCCESS',
+          details: 'Internal admin note added',
+          metadata: { disputeId: id },
+        },
+      });
+
+      return updatedDispute;
     });
   }
-
+ //  RESOLVE DISPUTE 
   // ==================== RESOLVE DISPUTE ====================
   async resolve(id: string, dto: ResolveDisputeDto, adminId: string) {
+    this.logger.log(`Admin ${adminId} resolving dispute ${id}`);
+
     const dispute = await this.findOne(id, adminId, UserRole.SUPER_ADMIN);
-    if (!dispute) {
-      throw new NotFoundException('Dispute not found');
-    }
+    if (!dispute) throw new NotFoundException('Dispute not found');
+    if (dispute.status !== 'OPEN') throw new BadRequestException('Dispute is already closed');
 
-    if (dispute.status !== 'OPEN') {
-      throw new BadRequestException('Dispute is already closed');
-    }
-
+    // Validation: Vendor Wallet logic
     if (dto.refundSource === RefundSource.VENDOR_WALLET && !dispute.orderId) {
+<<<<<<< HEAD
       throw new BadRequestException(
         'Vendor wallet refunds are only allowed for order disputes',
       );
+=======
+      throw new BadRequestException('Vendor wallet refunds are only allowed for order disputes');
+>>>>>>> ride_refactored
     }
 
     return this.prisma.$transaction(async (tx) => {
       let resolutionText = dto.resolutionNotes;
       let refundAmount = 0;
 
+      // --- 1. REFUND CALCULATION ---
       if (dto.action.includes('REFUND')) {
         const maxRefund =
           dispute.payment?.amount ||
@@ -500,50 +557,52 @@ export class DisputesService {
 
         if (dto.action === ResolutionAction.REFUND_PARTIAL) {
           if (!dto.refundAmount || dto.refundAmount <= 0) {
-            throw new BadRequestException(
-              'Refund amount must be greater than 0',
-            );
+            throw new BadRequestException('Refund amount must be greater than 0');
           }
           if (dto.refundAmount > maxRefund) {
-            throw new BadRequestException(
-              `Refund amount cannot exceed ${maxRefund}`,
-            );
+            throw new BadRequestException(`Refund amount cannot exceed ₦${maxRefund}`);
           }
           refundAmount = dto.refundAmount;
         } else {
           refundAmount = maxRefund;
         }
 
+        // --- 2. PAYMENT GATEWAY INTERACTION ---
         if (refundAmount > 0) {
-          if (!dispute.payment?.reference) {
-            throw new BadRequestException(
-              'No payment reference found. Cannot process automatic refund.',
-            );
-          }
+          const paymentRef = dispute.payment?.reference;
 
-          try {
-            await this.paymentService.processRefund(
-              {
-                paymentReference: dispute.payment.reference,
-                amount: refundAmount,
-                reason: `Resolution for Dispute ${id}`,
-                metadata: {
-                  disputeId: id,
+          if (!paymentRef) {
+            this.logger.warn(`Dispute ${id} has no payment reference. Recording as internal refund.`);
+            resolutionText += ` (Manual Refund - No Gateway Reference)`;
+          } else {
+            const isTestTransaction = paymentRef.startsWith('PAY-REF-') || paymentRef.startsWith('REF-');
+
+            if (isTestTransaction) {
+              this.logger.warn(`Skipping Gateway Refund for Test Transaction: ${paymentRef}`);
+            } else {
+              try {
+                this.logger.log(`Initiating Gateway Refund: ${paymentRef} | Amount: ₦${refundAmount}`);
+                
+                await this.paymentService.processRefund(
+                  {
+                    paymentReference: paymentRef,
+                    amount: refundAmount,
+                    reason: `Resolution for Dispute ${id}`,
+                    metadata: { disputeId: id, refundType: dto.action },
+                  },
                   adminId,
-                  refundType: dto.action,
-                },
-              },
-              adminId,
-            );
-          } catch (error) {
-            throw new BadRequestException(
-              `Payment Gateway Refund Failed: ${error.message}`,
-            );
+                );
+              } catch (error) {
+                this.logger.error(`Gateway Refund Failed: ${error.message}`, error.stack);
+                throw new BadRequestException(`Payment Gateway Failed: ${error.message}`);
+              }
+            }
           }
         }
 
         const customerId = dispute.openedByUserId;
 
+        // --- 3. PLATFORM LEDGER ENTRY ---
         await tx.transaction.create({
           data: {
             type: 'REFUND_ISSUED',
@@ -551,46 +610,41 @@ export class DisputesService {
             status: 'COMPLETED',
             description: `Refund for Dispute #${id.substring(0, 8)}`,
             entityType: 'PLATFORM',
-            balanceBefore: 0,
+            balanceBefore: 0, 
             balanceAfter: 0,
             ...(dispute.paymentId && { paymentId: dispute.paymentId }),
             ...(dispute.orderId && { orderId: dispute.orderId }),
             ...(dispute.rideId && { rideId: dispute.rideId }),
             ...(dispute.deliveryId && { deliveryId: dispute.deliveryId }),
+            
+            processedBy: adminId, 
+
             metadata: {
               disputeId: id,
               refundSource: dto.refundSource,
-              adminId: adminId,
               customerId: customerId,
+              adminId: adminId,
             },
           },
         });
 
         if (dispute.paymentId) {
-          const newStatus =
-            dto.action === ResolutionAction.REFUND_FULL
-              ? 'REFUNDED'
-              : 'PARTIALLY_REFUNDED';
-
+          const newStatus = dto.action === ResolutionAction.REFUND_FULL ? 'REFUNDED' : 'PARTIALLY_REFUNDED';
           await tx.payment.update({
             where: { id: dispute.paymentId },
             data: { status: newStatus },
           });
         }
 
-        if (
-          dto.refundSource === RefundSource.VENDOR_WALLET &&
-          dispute.order?.storeId
-        ) {
+        // --- 4. VENDOR WALLET ADJUSTMENT ---
+        if (dto.refundSource === RefundSource.VENDOR_WALLET && dispute.order?.storeId) {
           const store = await tx.store.findUnique({
             where: { id: dispute.order.storeId },
             select: { walletBalance: true },
           });
 
           if ((store?.walletBalance || 0) < refundAmount) {
-            throw new BadRequestException(
-              'Vendor wallet has insufficient balance for refund',
-            );
+            throw new BadRequestException('Vendor wallet has insufficient balance for refund');
           }
 
           const currentBalance = store?.walletBalance || 0;
@@ -616,9 +670,10 @@ export class DisputesService {
           });
         }
 
-        resolutionText += ` | Refunded: $${refundAmount.toFixed(2)} via ${dto.refundSource}`;
+        resolutionText += ` | Refunded: ₦${refundAmount.toFixed(2)} via ${dto.refundSource}`;
       }
 
+      // --- 5. FINALIZE DISPUTE ---
       const updatedDispute = await tx.dispute.update({
         where: { id },
         data: {
@@ -632,10 +687,10 @@ export class DisputesService {
               message: `━━━━━━━━━━━━━━━━━━━━
 🔨 DISPUTE RESOLVED
 
-Action Taken: ${dto.action}
-${refundAmount > 0 ? `Refund Amount: $${refundAmount.toFixed(2)}` : ''}
+Action: ${dto.action}
+${refundAmount > 0 ? `Refund: ₦${refundAmount.toFixed(2)}` : ''}
 
-Admin Notes:
+Notes:
 ${dto.resolutionNotes}
 ━━━━━━━━━━━━━━━━━━━━`,
               isInternal: false,
@@ -650,12 +705,31 @@ ${dto.resolutionNotes}
         },
       });
 
+      // --- 6. LOG ACTIVITY (NEW) ---
+      await tx.activityLog.create({
+        data: {
+          userId: adminId,
+          action: 'DISPUTE_RESOLVED',
+          target: `Dispute #${id.substring(0, 8)}`,
+          status: 'SUCCESS',
+          details: `Resolved with action: ${dto.action}. Notes: ${dto.resolutionNotes}`,
+          metadata: {
+            disputeId: id,
+            refundAmount,
+            refundSource: dto.refundSource,
+            resolutionAction: dto.action,
+          },
+        },
+      });
+
+      this.logger.log(`Dispute ${id} resolved successfully.`);
       return updatedDispute;
     });
   }
-
-  // ==================== REJECT DISPUTE ====================
+  //  REJECT DISPUTE 
   async reject(id: string, reason: string, adminId: string) {
+    this.logger.log(`Admin ${adminId} rejecting dispute ${id}`);
+
     const dispute = await this.prisma.dispute.findUnique({ where: { id } });
 
     if (!dispute) throw new NotFoundException('Dispute not found');
@@ -663,25 +737,83 @@ ${dto.resolutionNotes}
       throw new BadRequestException('Dispute is already closed');
     }
 
-    return this.prisma.dispute.update({
-      where: { id },
-      data: {
-        status: 'REJECTED',
-        resolvedAt: new Date(),
-        resolution: reason,
-        messages: {
-          create: {
-            senderId: adminId,
-            message: `━━━━━━━━━━━━━━━━━━━━
-❌ DISPUTE REJECTED
+    return this.prisma.$transaction(async (tx) => {
+      // 1. Update Dispute Status
+      const updatedDispute = await tx.dispute.update({
+        where: { id },
+        data: {
+          status: 'REJECTED',
+          resolvedAt: new Date(),
+          resolution: reason,
+          messages: {
+            create: {
+              senderId: adminId,
+              message: `DISPUTE REJECTED
 
 Reason:
 ${reason}
 ━━━━━━━━━━━━━━━━━━━━`,
-            isInternal: false,
+              isInternal: false,
+            },
           },
         },
-      },
+      });
+
+      // 2. Log Activity
+      await tx.activityLog.create({
+        data: {
+          userId: adminId,
+          action: 'DISPUTE_REJECTED',
+          target: `Dispute #${id.substring(0, 8)}`,
+          status: 'SUCCESS',
+          details: `Rejected with reason: ${reason}`,
+          metadata: {
+            disputeId: id,
+            reason: reason,
+          },
+        },
+      });
+
+      this.logger.log(`Dispute ${id} rejected successfully.`);
+      return updatedDispute;
+    });
+  }
+
+  // ==================== UPDATE PRIORITY (NEW) ====================
+  async updatePriority(id: string, priority: string, adminId: string) {
+    // Validate Priority Enum (Optional if DTO handles it, but good safety)
+    const validPriorities = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'];
+    if (!validPriorities.includes(priority)) {
+      throw new BadRequestException('Invalid priority level');
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const oldDispute = await tx.dispute.findUnique({ where: { id } });
+      if (!oldDispute) throw new NotFoundException('Dispute not found');
+
+      const updatedDispute = await tx.dispute.update({
+        where: { id },
+        data: { priority: priority as any }, // Cast to Enum
+      });
+
+      // 👇 LOG ACTIVITY
+      await tx.activityLog.create({
+        data: {
+          userId: adminId,
+          action: 'DISPUTE_PRIORITY_UPDATED',
+          target: `Dispute #${id.substring(0, 8)}`,
+          status: 'SUCCESS',
+          details: `Priority changed from ${oldDispute.priority} to ${priority}`,
+          metadata: { 
+            disputeId: id, 
+            oldPriority: oldDispute.priority, 
+            newPriority: priority 
+          },
+        },
+      });
+
+      this.logger.log(`Priority for Dispute ${id} updated to ${priority} by ${adminId}`);
+      return updatedDispute;
     });
   }
 
