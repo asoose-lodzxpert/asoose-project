@@ -78,8 +78,7 @@ export interface SendSMSJobData {
  * Assignment timeout handling for both ride & delivery
  */
 export interface HandleAssignmentTimeoutJobData {
-  job: JobSummaryDto; // ride or delivery
-  scheduledFor: number;
+  job: JobSummaryDto;
 }
 
 /* ========================================

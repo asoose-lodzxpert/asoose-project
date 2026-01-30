@@ -154,18 +154,30 @@ export class RedisService {
     const results = await pipeline.exec();
     if (!results) return null;
 
-    const [status, hexId, lastSeen, currentJobId, pendingJobId, location] =
-      results.map((r) => r[1]);
+    const [
+      status,
+      hexId,
+      lastSeen,
+      currentJobId,
+      currentJobType,
+      pendingJobId,
+      pendingJobType,
+      role,
+      location,
+    ] = results.map((r) => r[1]);
 
-    if (!status) return null;
+    if (!status || !role) return null;
 
     return {
       id: riderId,
       status: status as RiderStatus,
+      role: role as DriverRole, // or RiderRole if defined separately
       hexId: hexId as string | null,
       lastSeen: lastSeen ? parseInt(lastSeen as string, 10) : 0,
       currentJobId: currentJobId as string | null,
+      currentJobType: currentJobType as JobType | null,
       pendingJobId: pendingJobId as string | null,
+      pendingJobType: pendingJobType as JobType | null,
       location: location ? JSON.parse(location as string) : null,
     };
   }

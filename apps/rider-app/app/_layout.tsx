@@ -1,9 +1,6 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Image } from "expo-image";
-import { Stack, useRouter, useSegments } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { StyleSheet, View } from "react-native";
-import { GestureHandlerRootView } from "react-native-gesture-handler";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -12,12 +9,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 
-import { AuthProvider, useAuth } from "@/context/AuthContext";
-import { JobsProvider } from "@/context/JobContext";
-import { NotificationProvider } from "@/context/NotificationContext";
-import { useConfirm } from "@/hooks/use-confirm";
 import { useThemeColor } from "@/hooks/use-theme-color";
-import Toast from "react-native-toast-message";
 
 /* -------------------- Loading Screen -------------------- */
 
@@ -79,75 +71,10 @@ function LoadingScreen() {
 /* -------------------- Root Navigator -------------------- */
 
 function RootNavigator() {
-  const { user, loading } = useAuth();
-  const [hasLaunched, setHasLaunched] = useState<boolean | null>(null);
-  const [navReady, setNavReady] = useState(false);
-
-  const segments = useSegments();
-  const router = useRouter();
-  const { ConfirmModal } = useConfirm();
-
-  useEffect(() => {
-    async function checkFirstLaunch() {
-      const value = await AsyncStorage.getItem("hasLaunched");
-      if (!value) {
-        await AsyncStorage.setItem("hasLaunched", "true");
-        setHasLaunched(false);
-      } else {
-        setHasLaunched(true);
-      }
-    }
-
-    checkFirstLaunch();
-  }, []);
-
-  useEffect(() => {
-    if (loading || hasLaunched === null) return;
-
-    const onWelcome = segments[0] === "welcome";
-    const atRoot = segments.length === 1 && !segments[0];
-
-    if (!hasLaunched && !onWelcome && atRoot) {
-      router.replace("/welcome");
-    } else if (hasLaunched && atRoot) {
-      if (user && segments[0] !== "(tabs)") {
-        router.replace("/(tabs)");
-      } else if (!user && segments[0] !== "(auth)") {
-        router.replace("/(auth)/signin");
-      }
-    }
-
-    setNavReady(true);
-  }, [user, segments, loading, hasLaunched]);
-
-  if (loading || hasLaunched === null || !navReady) {
-    return <LoadingScreen />;
-  }
-
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="welcome" />
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="(auth)" />
-      </Stack>
-      <ConfirmModal />
-      <Toast />
-    </GestureHandlerRootView>
-  );
-}
-
-/* -------------------- Root Layout -------------------- */
-
-export default function RootLayout() {
-  return (
-    <AuthProvider>
-      <JobsProvider>
-        <NotificationProvider>
-          <RootNavigator />
-        </NotificationProvider>
-      </JobsProvider>
-    </AuthProvider>
+    <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+      <Animated.Text style={{ fontSize: 24 }}>Hello</Animated.Text>
+    </View>
   );
 }
 
