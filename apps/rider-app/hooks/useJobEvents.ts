@@ -1,12 +1,16 @@
 import { IncomingJobOffer } from "@/types/job";
 import { useCallback, useEffect, useRef } from "react";
-import { JobEventsService } from "../services/job-events.service";
+import {
+  JobEventsService,
+  ConnectionStatus,
+} from "../services/job-events.service";
 
 interface UseJobEventsOptions {
   onJobAssigned?: (job: IncomingJobOffer) => void;
   onJobUpdated?: (jobId: string, status: string) => void;
   onJobCancelled?: (jobId: string) => void;
   onError?: (error: Error) => void;
+  onConnectionStatusChange?: (status: ConnectionStatus) => void;
   enabled?: boolean;
 }
 
@@ -16,6 +20,7 @@ export function useJobEvents(options: UseJobEventsOptions) {
     onJobUpdated,
     onJobCancelled,
     onError,
+    onConnectionStatusChange,
     enabled = true,
   } = options;
   const serviceRef = useRef<JobEventsService | null>(null);
@@ -31,11 +36,19 @@ export function useJobEvents(options: UseJobEventsOptions) {
         onJobUpdated,
         onJobCancelled,
         onError,
+        onConnectionStatusChange,
       });
     } catch (error) {
       onError?.(error as Error);
     }
-  }, [enabled, onJobAssigned, onJobUpdated, onJobCancelled, onError]);
+  }, [
+    enabled,
+    onJobAssigned,
+    onJobUpdated,
+    onJobCancelled,
+    onError,
+    onConnectionStatusChange,
+  ]);
 
   const disconnect = useCallback(() => {
     if (serviceRef.current) {

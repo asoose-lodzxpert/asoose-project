@@ -1,6 +1,7 @@
 import { useJobEvents } from "@/hooks/useJobEvents";
 import { jobsService } from "@/services/jobs.service";
 import { getCurrentCoords } from "@/services/location";
+import { ConnectionStatus } from "@/services/job-events.service";
 import { CurrentJob, IncomingJobOffer, JobStatus, JobType } from "@/types/job";
 import React, { createContext, ReactNode, useContext, useState } from "react";
 import Toast from "react-native-toast-message";
@@ -10,6 +11,7 @@ interface JobsContextState {
   isOnline: boolean;
   incomingJob: IncomingJobOffer | null;
   activeJob: CurrentJob | null;
+  connectionStatus: ConnectionStatus;
   goOnline(): Promise<void>;
   goOffline(): Promise<void>;
   acceptJob(jobId: string, jobType: JobType): Promise<void>;
@@ -19,6 +21,7 @@ interface JobsContextState {
   arriveAtDropoff(): Promise<void>;
   completeJob(payload?: any): Promise<void>;
   resetJob(): void;
+  manualReconnect(): void;
 }
 
 const JobsContext = createContext<JobsContextState | undefined>(undefined);
@@ -28,9 +31,11 @@ export const JobsProvider = ({ children }: { children: ReactNode }) => {
   const [isOnline, setIsOnline] = useState(false);
   const [incomingJob, setIncomingJob] = useState<IncomingJobOffer | null>(null);
   const [activeJob, setActiveJob] = useState<CurrentJob | null>(null);
+  const [connectionStatus, setConnectionStatus] =
+    useState<ConnectionStatus>("disconnected");
 
   // Unified job event handlers
-  useJobEvents({
+  const { reconnect } = useJobEvents({
     onJobAssigned: (job: IncomingJobOffer) => {
       setIncomingJob(job);
       setStatus("incoming-job");
@@ -53,6 +58,24 @@ export const JobsProvider = ({ children }: { children: ReactNode }) => {
       if (incomingJob && incomingJob.id === jobId) {
         setIncomingJob(null);
         setStatus("online-waiting");
+      }
+    },
+    onConnectionStatusChange: (status: ConnectionStatus) => {
+      setConnectionStatus(status);
+
+      if (status === "failed") {
+        Toast.show({
+          type: "error",
+          text1: "Connection Lost",
+          text2: "Tap to reconnect",
+          visibilityTime: 10000,
+        });
+      } else if (status === "connected") {
+        Toast.show({
+          type: "success",
+          text1: "Connected",
+          text2: "You're back online",
+        });
       }
     },
     enabled: isOnline,
@@ -85,52 +108,150 @@ export const JobsProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const acceptJob = async (jobId: string, jobType: JobType) => {
-    await jobsService.acceptJob(jobId, jobType);
-    setStatus("en-route-pickup");
-    setIncomingJob(null);
+    const previousJob = incomingJob;
+    const previousStatus = status;
+
+    try {
+      // Optimistic update
+      setStatus("en-route-pickup");
+      setActiveJob(incomingJob as CurrentJob);
+      setIncomingJob(null);
+
+      await jobsService.acceptJob(jobId, jobType);
+    } catch (error: any) {
+      // Rollback on error
+      setIncomingJob(previousJob);
+      setStatus(previousStatus);
+      setActiveJob(null);
+
+      Toast.show({
+        type: "error",
+        text1: "Failed to accept job",
+        text2: error.message || "Please try again",
+        visibilityTime: 5000,
+      });
+      throw error;
+    }
   };
 
   const declineJob = async (jobId: string, jobType: JobType) => {
-    await jobsService.declineJob(jobId, jobType);
-    setIncomingJob(null);
-    setStatus("online-waiting");
+    const previousJob = incomingJob;
+    const previousStatus = status;
+
+    try {
+      // Optimistic update
+      setIncomingJob(null);
+      setStatus("online-waiting");
+
+      await jobsService.declineJob(jobId, jobType);
+    } catch (error: any) {
+      // Rollback on error
+      setIncomingJob(previousJob);
+      setStatus(previousStatus);
+
+      Toast.show({
+        type: "error",
+        text1: "Failed to decline job",
+        text2: error.message || "Please try again",
+        visibilityTime: 5000,
+      });
+      throw error;
+    }
   };
 
   const arriveAtPickup = async () => {
     if (!activeJob) return;
-    await jobsService.updateJobStatus(
-      activeJob.id,
-      activeJob.jobType,
-      "at-pickup",
-    );
-    setStatus("at-pickup");
+
+    const previousStatus = status;
+
+    try {
+      setStatus("at-pickup");
+      await jobsService.updateJobStatus(
+        activeJob.id,
+        activeJob.jobType,
+        "at-pickup",
+      );
+    } catch (error: any) {
+      setStatus(previousStatus);
+      Toast.show({
+        type: "error",
+        text1: "Failed to update status",
+        text2: error.message || "Please try again",
+        visibilityTime: 5000,
+      });
+      throw error;
+    }
   };
 
   const confirmPickup = async () => {
     if (!activeJob) return;
-    await jobsService.updateJobStatus(
-      activeJob.id,
-      activeJob.jobType,
-      "en-route-dropoff",
-    );
-    setStatus("en-route-dropoff");
+
+    const previousStatus = status;
+
+    try {
+      setStatus("en-route-dropoff");
+      await jobsService.updateJobStatus(
+        activeJob.id,
+        activeJob.jobType,
+        "en-route-dropoff",
+      );
+    } catch (error: any) {
+      setStatus(previousStatus);
+      Toast.show({
+        type: "error",
+        text1: "Failed to confirm pickup",
+        text2: error.message || "Please try again",
+        visibilityTime: 5000,
+      });
+      throw error;
+    }
   };
 
   const arriveAtDropoff = async () => {
     if (!activeJob) return;
-    await jobsService.updateJobStatus(
-      activeJob.id,
-      activeJob.jobType,
-      "confirm-job",
-    );
-    setStatus("confirm-job");
+
+    const previousStatus = status;
+
+    try {
+      setStatus("confirm-job");
+      await jobsService.updateJobStatus(
+        activeJob.id,
+        activeJob.jobType,
+        "confirm-job",
+      );
+    } catch (error: any) {
+      setStatus(previousStatus);
+      Toast.show({
+        type: "error",
+        text1: "Failed to update status",
+        text2: error.message || "Please try again",
+        visibilityTime: 5000,
+      });
+      throw error;
+    }
   };
 
   const completeJob = async (payload?: any) => {
     if (!activeJob) return;
-    await jobsService.completeJob(activeJob.id, activeJob.jobType, payload);
-    setStatus("online-waiting");
-    setActiveJob(null);
+
+    const previousStatus = status;
+    const previousActiveJob = activeJob;
+
+    try {
+      setStatus("online-waiting");
+      setActiveJob(null);
+      await jobsService.completeJob(activeJob.id, activeJob.jobType, payload);
+    } catch (error: any) {
+      setStatus(previousStatus);
+      setActiveJob(previousActiveJob);
+      Toast.show({
+        type: "error",
+        text1: "Failed to complete job",
+        text2: error.message || "Please try again",
+        visibilityTime: 5000,
+      });
+      throw error;
+    }
   };
 
   const resetJob = () => {
@@ -140,6 +261,16 @@ export const JobsProvider = ({ children }: { children: ReactNode }) => {
     setIsOnline(false);
   };
 
+  const manualReconnect = () => {
+    if (reconnect) {
+      reconnect();
+      Toast.show({
+        type: "info",
+        text1: "Reconnecting...",
+      });
+    }
+  };
+
   return (
     <JobsContext.Provider
       value={{
@@ -147,6 +278,7 @@ export const JobsProvider = ({ children }: { children: ReactNode }) => {
         isOnline,
         incomingJob,
         activeJob,
+        connectionStatus,
         goOnline,
         goOffline,
         acceptJob,
@@ -156,6 +288,7 @@ export const JobsProvider = ({ children }: { children: ReactNode }) => {
         arriveAtDropoff,
         completeJob,
         resetJob,
+        manualReconnect,
       }}
     >
       {children}

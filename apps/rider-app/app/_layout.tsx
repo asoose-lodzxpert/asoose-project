@@ -1,35 +1,56 @@
 import { Image } from "expo-image";
-import { useEffect } from "react";
-import { StyleSheet, View } from "react-native";
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withDelay,
-  withRepeat,
-  withTiming,
-} from "react-native-reanimated";
+import { useEffect, useRef, useState } from "react";
+import { Animated, StyleSheet, View, Text } from "react-native";
+import { Stack, useRouter, useSegments, ErrorBoundaryProps } from "expo-router";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import Toast from "react-native-toast-message";
 
 import { useThemeColor } from "@/hooks/use-theme-color";
+import { AuthProvider, useAuth } from "@/context/AuthContext";
+import { JobsProvider } from "@/context/JobContext";
+import { useConfirm } from "@/hooks/use-confirm";
+
+/* -------------------- Error Boundary -------------------- */
+
+export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
+  return (
+    <View style={styles.errorContainer}>
+      <Text style={styles.errorTitle}>Oops! Something went wrong</Text>
+      <Text style={styles.errorMessage}>{error.message}</Text>
+      <Text style={styles.errorRetry} onPress={retry}>
+        Try Again
+      </Text>
+    </View>
+  );
+}
 
 /* -------------------- Loading Screen -------------------- */
 
 function LoadingScreen() {
   const primary = useThemeColor({}, "brandPrimary");
 
-  const dot1 = useSharedValue(0);
-  const dot2 = useSharedValue(0);
-  const dot3 = useSharedValue(0);
+  const dot1 = useRef(new Animated.Value(0)).current;
+  const dot2 = useRef(new Animated.Value(0)).current;
+  const dot3 = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    const animate = (dot: typeof dot1, delay: number) => {
-      dot.value = withDelay(
-        delay,
-        withRepeat(
-          withTiming(1, { duration: 400 }),
-          -1,
-          true, // reverse
-        ),
-      );
+    const animate = (dot: Animated.Value, delay: number) => {
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(delay),
+          Animated.timing(dot, {
+            toValue: 1,
+            duration: 400,
+            useNativeDriver: true,
+          }),
+          Animated.timing(dot, {
+            toValue: 0,
+            duration: 400,
+            useNativeDriver: true,
+          }),
+        ]),
+      ).start();
     };
 
     animate(dot1, 0);
@@ -37,20 +58,41 @@ function LoadingScreen() {
     animate(dot3, 400);
   }, []);
 
-  const style1 = useAnimatedStyle(() => ({
-    transform: [{ translateY: -10 * dot1.value }],
+  const style1 = {
+    transform: [
+      {
+        translateY: dot1.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0, -10],
+        }),
+      },
+    ],
     backgroundColor: primary,
-  }));
+  };
 
-  const style2 = useAnimatedStyle(() => ({
-    transform: [{ translateY: -10 * dot2.value }],
+  const style2 = {
+    transform: [
+      {
+        translateY: dot2.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0, -10],
+        }),
+      },
+    ],
     backgroundColor: primary,
-  }));
+  };
 
-  const style3 = useAnimatedStyle(() => ({
-    transform: [{ translateY: -10 * dot3.value }],
+  const style3 = {
+    transform: [
+      {
+        translateY: dot3.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0, -10],
+        }),
+      },
+    ],
     backgroundColor: primary,
-  }));
+  };
 
   return (
     <View style={styles.loadingContainer}>
@@ -71,10 +113,67 @@ function LoadingScreen() {
 /* -------------------- Root Navigator -------------------- */
 
 function RootNavigator() {
+  const { user, loading } = useAuth();
+  const [hasLaunched, setHasLaunched] = useState<boolean | null>(null);
+  const segments = useSegments();
+  const router = useRouter();
+  const { ConfirmModal } = useConfirm();
+
+  useEffect(() => {
+    async function checkFirstLaunch() {
+      const value = await AsyncStorage.getItem("hasLaunched");
+      if (!value) {
+        await AsyncStorage.setItem("hasLaunched", "true");
+        setHasLaunched(false);
+      } else {
+        setHasLaunched(true);
+      }
+    }
+
+    checkFirstLaunch();
+  }, []);
+
+  useEffect(() => {
+    if (loading || hasLaunched === null) return;
+
+    const onWelcome = segments[0] === "welcome";
+
+    const atRoot = segments.length === 1 && !segments[0];
+    if (!hasLaunched && !onWelcome && atRoot) {
+      router.replace("/welcome");
+    } else if (hasLaunched) {
+      if (user && atRoot) {
+        router.replace("/(tabs)");
+      } else if (!user && atRoot) {
+        router.replace("/(auth)/signin");
+      }
+    }
+  }, [user, segments, loading, hasLaunched, router]);
+
+  if (loading || hasLaunched === null) {
+    return <LoadingScreen />;
+  }
+
   return (
-    <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-      <Animated.Text style={{ fontSize: 24 }}>Hello</Animated.Text>
-    </View>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="welcome" />
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="(auth)" />
+      </Stack>
+      <ConfirmModal />
+      <Toast />
+    </GestureHandlerRootView>
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <AuthProvider>
+      <JobsProvider>
+        <RootNavigator />
+      </JobsProvider>
+    </AuthProvider>
   );
 }
 
@@ -100,5 +199,31 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+    backgroundColor: "#fff",
+  },
+  errorTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    marginBottom: 10,
+    color: "#333",
+  },
+  errorMessage: {
+    fontSize: 14,
+    color: "#666",
+    textAlign: "center",
+    marginBottom: 20,
+  },
+  errorRetry: {
+    fontSize: 16,
+    color: "#E5A503",
+    fontWeight: "600",
+    paddingVertical: 10,
+    paddingHorizontal: 20,
   },
 });

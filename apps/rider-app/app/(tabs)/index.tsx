@@ -7,6 +7,7 @@ import { useThemeColor } from "@/hooks/use-theme-color";
 import BottomOverlay from "@/components/delivery/BottomOverlay";
 import FloatingHeader from "@/components/delivery/FloatingHeader";
 import MapCanvas, { MapCanvasHandle } from "@/components/delivery/MapCanvas";
+import { ConnectionStatusIndicator } from "@/components/ConnectionStatusIndicator";
 import { useConfirm } from "@/hooks/use-confirm";
 
 export default function HomeScreen() {
@@ -29,6 +30,11 @@ export default function HomeScreen() {
       {/* Map */}
       <MapCanvas ref={mapRef} />
 
+      {/* Connection Status Indicator */}
+      <View style={styles.statusIndicator}>
+        <ConnectionStatusIndicator />
+      </View>
+
       {/* Floating header */}
       <FloatingHeader />
 
@@ -47,6 +53,13 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  statusIndicator: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 100,
   },
   bottomOverlay: {
     position: "absolute",

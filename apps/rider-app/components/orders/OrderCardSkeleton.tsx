@@ -1,27 +1,39 @@
 import { useThemeColor } from "@/hooks/use-theme-color";
-import React, { useEffect } from "react";
-import { StyleSheet, View } from "react-native";
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withRepeat,
-  withTiming,
-} from "react-native-reanimated";
+import React, { useEffect, useRef } from "react";
+import { Animated, StyleSheet, View } from "react-native";
 
 export function OrderCardSkeleton() {
   const cardBg = useThemeColor({}, "surfaceSubtle");
   const shimmerColor = useThemeColor({}, "borderDefault");
 
-  const shimmer = useSharedValue(0);
+  const shimmer = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    shimmer.value = withRepeat(withTiming(1, { duration: 1000 }), -1, true);
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(shimmer, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: false,
+        }),
+        Animated.timing(shimmer, {
+          toValue: 0,
+          duration: 1000,
+          useNativeDriver: false,
+        }),
+      ]),
+    ).start();
   }, []);
 
-  const shimmerStyle = useAnimatedStyle(() => ({
-    opacity: 0.3 + shimmer.value * 0.4,
+  const shimmerOpacity = shimmer.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.3, 0.7],
+  });
+
+  const shimmerStyle = {
+    opacity: shimmerOpacity,
     backgroundColor: shimmerColor,
-  }));
+  };
 
   return (
     <View style={[styles.card, { backgroundColor: cardBg }]}>
