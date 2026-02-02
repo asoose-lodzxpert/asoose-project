@@ -89,15 +89,37 @@ export class RequestDeliveryDto {
   @IsUUID()
   orderId?: string;
 
-  @ApiProperty()
-  @IsNotEmpty()
+  @ApiPropertyOptional({
+    description: 'Pickup address ID (optional if coordinates provided)',
+  })
+  @IsOptional()
   @IsUUID()
-  pickupAddressId: string;
+  pickupAddressId?: string;
 
-  @ApiProperty()
-  @IsNotEmpty()
+  @ApiPropertyOptional({
+    description: 'Dropoff address ID (optional if coordinates provided)',
+  })
+  @IsOptional()
   @IsUUID()
-  dropoffAddressId: string;
+  dropoffAddressId?: string;
+
+  @ApiPropertyOptional({
+    type: LocationDto,
+    description: 'Pickup location with coordinates and address',
+  })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => LocationDto)
+  pickupLocation?: LocationDto;
+
+  @ApiPropertyOptional({
+    type: LocationDto,
+    description: 'Dropoff location with coordinates and address',
+  })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => LocationDto)
+  dropoffLocation?: LocationDto;
 
   @ApiProperty()
   @IsNotEmpty()
@@ -112,11 +134,53 @@ export class RequestDeliveryDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
+  senderName?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  senderPhone?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  senderInstructions?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  recipientInstructions?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
   packageDetails?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  packageSize?: string;
 
   @ApiPropertyOptional()
   @IsOptional()
   @IsNumber()
   @Min(0)
   weightKg?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  declaredValue?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  fragile?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  perishable?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  containsLiquid?: boolean;
 }

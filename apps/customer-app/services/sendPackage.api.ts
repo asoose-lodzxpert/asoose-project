@@ -44,25 +44,18 @@ export async function fetchDeliveryQuote(
   // Some request wrappers return { parsed } while others return the parsed body directly.
   const data = res && (res as any).parsed ? (res as any).parsed : res;
 
-  // backend returns price and distance/eta details. Normalize fields safely.
-  const priceFromServer = Number(data?.price ?? data?.totalFare ?? 0);
-  const distanceMeters = Number(
-    data?.distance?.meters ?? data?.distanceMeters ?? 0,
-  );
-  const durationSeconds = Number(
-    data?.eta?.seconds ?? data?.durationSeconds ?? data?.duration ?? 0,
-  );
+  // backend returns price, distance (meters + text), and eta (seconds + text)
+  const price = Number(data?.price ?? 0);
+  const distanceMeters = Number(data?.distance?.meters ?? 0);
+  const durationSeconds = Number(data?.eta?.seconds ?? 0);
 
   const distanceKm = Math.round((distanceMeters / 1000) * 10) / 10;
   const etaMinutes = Math.max(0, Math.round(durationSeconds / 60));
 
-  const packagePrice = calculatePrice(packageSize);
-
   return {
     distanceKm,
     etaMinutes,
-    // total price = server-calculated delivery fare + package base price
-    price: Math.round(priceFromServer + packagePrice),
+    price, // Use only the backend price
   };
 }
 
@@ -75,4 +68,40 @@ export async function fetchSavedAddresses(): Promise<Address[]> {
     fullAddress: `${a.street}, ${a.city}${a.state ? ", " + a.state : ""}`,
     coords: { latitude: a.lat, longitude: a.lng },
   }));
+}
+
+// Create delivery request in backend
+export async function createDelivery(deliveryData: any) {
+  const body = {
+    pickupLocation: {
+      latitude: deliveryData.pickup.address.coords.latitude,
+      longitude: deliveryData.pickup.address.coords.longitude,
+      address: deliveryData.pickup.address.fullAddress,
+    },
+    dropoffLocation: {
+      latitude: deliveryData.dropoff.address.coords.latitude,
+      longitude: deliveryData.dropoff.address.coords.longitude,
+      address: deliveryData.dropoff.address.fullAddress,
+    },
+    recipientName: deliveryData.deliveryDetails.name,
+    recipientPhone: deliveryData.deliveryDetails.phone,
+    recipientInstructions: deliveryData.deliveryDetails.instructions,
+    senderName: deliveryData.pickupDetails.name,
+    senderPhone: deliveryData.pickupDetails.phone,
+    senderInstructions: deliveryData.pickupDetails.instructions,
+    packageSize: deliveryData.packageSize,
+    weightKg: deliveryData.packageOptions.weightKg,
+    declaredValue: deliveryData.packageOptions.declaredValue,
+    fragile: deliveryData.packageOptions.fragile,
+    perishable: deliveryData.packageOptions.perishable,
+    containsLiquid: deliveryData.packageOptions.containsLiquid,
+    packageDetails: `${deliveryData.packageSize} package${deliveryData.packageOptions.fragile ? ", Fragile" : ""}${deliveryData.packageOptions.perishable ? ", Perishable" : ""}${deliveryData.packageOptions.containsLiquid ? ", Contains Liquid" : ""}`,
+  };
+
+  const { parsed } = await request("trips/deliveries/request", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+
+  return parsed;
 }

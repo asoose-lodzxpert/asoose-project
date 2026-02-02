@@ -72,6 +72,41 @@ export class DeliveriesService {
     return { success: false };
   }
 
+  /**
+   * Parse address string to extract city and state
+   * Expected format: "Street, City, State" or "Street, City"
+   */
+  private parseAddress(fullAddress: string): {
+    street: string;
+    city: string;
+    state: string;
+  } {
+    const parts = fullAddress.split(',').map((p) => p.trim());
+
+    if (parts.length >= 3) {
+      // Format: "Street, City, State"
+      return {
+        street: parts[0] || fullAddress,
+        city: parts[1] || '',
+        state: parts[2] || '',
+      };
+    } else if (parts.length === 2) {
+      // Format: "Street, City"
+      return {
+        street: parts[0] || fullAddress,
+        city: parts[1] || '',
+        state: '',
+      };
+    } else {
+      // Single string, treat as street
+      return {
+        street: fullAddress,
+        city: '',
+        state: '',
+      };
+    }
+  }
+
   async requestDelivery(userId: string, dto: RequestDeliveryDto) {
     if (
       dto.weightKg &&
@@ -90,16 +125,70 @@ export class DeliveriesService {
           throw new ForbiddenException('Invalid order link');
       }
 
-      const [pickupAddress, dropoffAddress] = await Promise.all([
-        tx.address.findUnique({ where: { id: dto.pickupAddressId } }),
-        tx.address.findUnique({ where: { id: dto.dropoffAddressId } }),
-      ]);
+      let pickupAddress: any;
+      let dropoffAddress: any;
 
-      if (!pickupAddress || pickupAddress.userId !== userId) {
-        throw new BadRequestException('Invalid pickup address');
+      // If address IDs are provided, use them
+      if (dto.pickupAddressId && dto.dropoffAddressId) {
+        [pickupAddress, dropoffAddress] = await Promise.all([
+          tx.address.findUnique({ where: { id: dto.pickupAddressId } }),
+          tx.address.findUnique({ where: { id: dto.dropoffAddressId } }),
+        ]);
+
+        if (!pickupAddress || pickupAddress.userId !== userId) {
+          throw new BadRequestException('Invalid pickup address');
+        }
+        if (!dropoffAddress || dropoffAddress.userId !== userId) {
+          throw new BadRequestException('Invalid dropoff address');
+        }
       }
-      if (!dropoffAddress || dropoffAddress.userId !== userId) {
-        throw new BadRequestException('Invalid dropoff address');
+      // Otherwise, create new addresses from location data
+      else if (dto.pickupLocation && dto.dropoffLocation) {
+        if (
+          !this.geo.validateCoordinates(
+            dto.pickupLocation.latitude,
+            dto.pickupLocation.longitude,
+          ) ||
+          !this.geo.validateCoordinates(
+            dto.dropoffLocation.latitude,
+            dto.dropoffLocation.longitude,
+          )
+        ) {
+          throw new BadRequestException('Invalid coordinates');
+        }
+
+        // Create addresses for the delivery
+        const pickupParsed = this.parseAddress(dto.pickupLocation.address);
+        const dropoffParsed = this.parseAddress(dto.dropoffLocation.address);
+
+        [pickupAddress, dropoffAddress] = await Promise.all([
+          tx.address.create({
+            data: {
+              userId,
+              street: pickupParsed.street,
+              city: pickupParsed.city,
+              state: pickupParsed.state,
+              lat: dto.pickupLocation.latitude,
+              lng: dto.pickupLocation.longitude,
+              label: 'Pickup Location',
+            },
+          }),
+          tx.address.create({
+            data: {
+              userId,
+              street: dropoffParsed.street,
+              city: dropoffParsed.city,
+              state: dropoffParsed.state,
+              lat: dto.dropoffLocation.latitude,
+              lng: dto.dropoffLocation.longitude,
+              label: 'Dropoff Location',
+            },
+          }),
+        ]);
+      } else {
+        throw new BadRequestException(
+          'Either address IDs or location coordinates must be provided',
+        );
       }
 
       if (
@@ -127,8 +216,8 @@ export class DeliveriesService {
         data: {
           customerId: userId,
           orderId: dto.orderId,
-          pickupAddressId: dto.pickupAddressId,
-          dropoffAddressId: dto.dropoffAddressId,
+          pickupAddressId: pickupAddress.id,
+          dropoffAddressId: dropoffAddress.id,
           status: DeliveryStatus.PENDING,
           deliveryFee: this.common.round(deliveryFee),
           distanceKm: this.common.round(distanceKm),
@@ -142,6 +231,7 @@ export class DeliveriesService {
 
       return {
         delivery,
+        deliveryId: delivery.id,
         deliveryFee: delivery.deliveryFee,
         distance: delivery.distanceKm,
         message: 'Delivery request created',

@@ -56,6 +56,10 @@ export function NotificationProvider({
   useEffect(() => {
     if (!user) return;
 
+    console.log(
+      "[NotificationContext] User logged in, setting up notifications...",
+    );
+
     // Initialize notification handler first (must be done after React Native is ready)
     initializeNotificationHandler();
 
@@ -63,12 +67,34 @@ export function NotificationProvider({
     setupNotificationCategories();
 
     // Register for push notifications
-    registerForPushNotificationsAsync().then((token) => {
-      if (token) {
-        setExpoPushToken(token);
-        savePushToken(token);
-      }
-    });
+    registerForPushNotificationsAsync()
+      .then((token) => {
+        console.log("[NotificationContext] Push token received:", token);
+        if (token) {
+          setExpoPushToken(token);
+          // Save token to backend
+          savePushToken(token)
+            .then(() => {
+              console.log(
+                "[NotificationContext] Push token saved to backend successfully",
+              );
+            })
+            .catch((error) => {
+              console.error(
+                "[NotificationContext] Failed to save push token to backend:",
+                error,
+              );
+            });
+        } else {
+          console.warn("[NotificationContext] No push token received");
+        }
+      })
+      .catch((error) => {
+        console.error(
+          "[NotificationContext] Failed to register for push notifications:",
+          error,
+        );
+      });
 
     // Load initial unread count
     refreshUnreadCount();

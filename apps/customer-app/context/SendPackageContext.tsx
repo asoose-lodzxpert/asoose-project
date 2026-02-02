@@ -62,6 +62,9 @@ type SendPackageContextType = {
 
   /* Return the data for the delivery options */
   returnData: () => any;
+
+  /* Reset delivery form */
+  resetDelivery: () => void;
 };
 
 const SendPackageContext = createContext<SendPackageContextType | undefined>(
@@ -242,6 +245,23 @@ export function SendPackageProvider({
     };
   };
 
+  const resetDelivery = () => {
+    setPickup({ address: null });
+    setDropoff({ address: null });
+    setPickupDetails({ name: "", phone: "", instructions: "" });
+    setDeliveryDetails({ name: "", phone: "", instructions: "" });
+    setPackageSize("small");
+    setPackageOptions({
+      fragile: false,
+      perishable: false,
+      containsLiquid: false,
+      declaredValue: "",
+      weightKg: 0,
+    });
+    setQuote(null);
+    setLoadingQuote(false);
+  };
+
   /* ---------------------------------- */
   /* Context Value */
   /* ---------------------------------- */
@@ -269,6 +289,7 @@ export function SendPackageProvider({
     openLocationPicker,
     closeLocationPicker,
     returnData,
+    resetDelivery,
   };
 
   return (

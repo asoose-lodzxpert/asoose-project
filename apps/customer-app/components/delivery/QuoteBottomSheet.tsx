@@ -9,7 +9,7 @@ import { calculatePrice, formatCurrency } from "@/services/sendPackage.api";
 
 export function QuoteBottomSheet() {
   const router = useRouter();
-  const { quote, loadingQuote, returnData } = useSendPackage();
+  const { quote, loadingQuote } = useSendPackage();
 
   const surface = useThemeColor({}, "surfaceBackground");
   const primary = useThemeColor({}, "brandPrimary");
@@ -18,10 +18,8 @@ export function QuoteBottomSheet() {
 
   const pricing = useMemo(() => {
     if (!quote) return null;
-
-    const data = returnData();
-    return calculatePrice(data.packageSize ?? "small");
-  }, [quote, returnData]);
+    return quote.price;
+  }, [quote]);
 
   return (
     <View style={[styles.container, { backgroundColor: surface }]}>

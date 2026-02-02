@@ -35,11 +35,11 @@ export async function initiatePayment(
     payload.estimatedPrice ||
     payload.quote?.amount ||
     payload.quote?.price ||
-    payload.price ||
     0;
-  const type = payload.type || "ORDER";
+  const type = payload.type || "DELIVERY";
   const orderId = payload.orderId;
   const rideId = payload.rideId;
+  const deliveryId = payload.deliveryId;
   const callbackUrl = payload.callbackUrl;
   const metadata = { ...payload };
 
@@ -53,6 +53,7 @@ export async function initiatePayment(
     type,
     orderId,
     rideId,
+    deliveryId,
     callbackUrl,
     metadata,
   };
@@ -83,9 +84,10 @@ export async function createBankTransfer(
   const email = user.email;
   const customerName = user.name;
   const phoneNumber = user.phone;
-  const type = payload.type || "ORDER";
+  const type = payload.type || "DELIVERY";
   const orderId = payload.orderId;
   const rideId = payload.rideId;
+  const deliveryId = payload.deliveryId;
   const callbackUrl = payload.callbackUrl;
   const metadata = { ...payload };
 
@@ -99,6 +101,7 @@ export async function createBankTransfer(
     type,
     orderId,
     rideId,
+    deliveryId,
     callbackUrl,
     metadata,
   };
@@ -125,9 +128,10 @@ export async function openInAppCheckout(
   const email = user.email;
   const customerName = user.name;
   const phoneNumber = user.phone;
-  const type = payload.type || "ORDER";
+  const type = payload.type || "DELIVERY";
   const orderId = payload.orderId;
   const rideId = payload.rideId;
+  const deliveryId = payload.deliveryId;
   const callbackUrl = payload.callbackUrl;
   const metadata = { ...payload };
 
@@ -141,6 +145,7 @@ export async function openInAppCheckout(
     type,
     orderId,
     rideId,
+    deliveryId,
     callbackUrl,
     metadata,
   };

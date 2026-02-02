@@ -9,7 +9,8 @@ import { useState, useMemo, useEffect, useRef } from "react";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { useSendPackage } from "@/context/SendPackageContext";
-import { calculatePrice, formatCurrency } from "@/services/sendPackage.api";
+import { formatCurrency } from "@/services/sendPackage.api";
+import { createDelivery } from "@/services/sendPackage.api";
 import {
   initiatePayment,
   createBankTransfer,
@@ -45,11 +46,11 @@ export default function PaymentScreen() {
   const [processing, setProcessing] = useState(false);
   const [bankAccount, setBankAccount] = useState<any | null>(null);
   const [checkoutTx, setCheckoutTx] = useState<any | null>(null);
+  const [deliveryId, setDeliveryId] = useState<string | null>(null);
   const pollRef = useRef<number | null>(null);
 
   const price = useMemo(() => {
-    const packageSize = data.packageSize ?? ("small" as any);
-    return calculatePrice(packageSize);
+    return data.quote?.price ?? 0;
   }, [data]);
 
   async function confirmPayment() {
@@ -59,18 +60,34 @@ export default function PaymentScreen() {
     }
     setProcessing(true);
     try {
-      if (method === "transfer") {
-        const acct = await createBankTransfer(price, data, user);
-        setBankAccount(acct);
-        startBankPolling(acct.reference);
-      } else {
-        // Compose callback URL to return to the app (deep link or expo scheme)
-        // Use your app's actual scheme (e.g., asoose-app://payment-callback)
+      // First, create the delivery in the backend
+      const deliveryResponse = await createDelivery(data);
+      const createdDeliveryId =
+        deliveryResponse.deliveryId || deliveryResponse.delivery?.id;
 
+      if (!createdDeliveryId) {
+        throw new Error("Failed to create delivery");
+      }
+
+      setDeliveryId(createdDeliveryId);
+
+      // Now initiate payment with delivery info
+      const paymentPayload = {
+        ...data,
+        amount: price,
+        type: "DELIVERY",
+        deliveryId: createdDeliveryId,
+      };
+
+      if (method === "transfer") {
+        const acct = await createBankTransfer(price, paymentPayload, user);
+        setBankAccount(acct);
+        startBankPolling(acct.reference, createdDeliveryId);
+      } else {
         const callbackUrl = "asoose-app://payment-callback";
         const paymentInit = await initiatePayment(
           method,
-          { ...data, callbackUrl, amount: price },
+          { ...paymentPayload, callbackUrl },
           user,
         );
         const checkoutUrl =
@@ -81,7 +98,7 @@ export default function PaymentScreen() {
         if (checkoutUrl) {
           WebBrowser.openBrowserAsync(checkoutUrl);
         }
-        startInAppPolling(transactionId);
+        startInAppPolling(transactionId, createdDeliveryId);
       }
     } catch (err) {
       const msg =
@@ -109,6 +126,7 @@ export default function PaymentScreen() {
             distanceKm: data.quote?.distanceKm ?? 0,
             etaMinutes: data.quote?.etaMinutes ?? 0,
             method: "transfer",
+            deliveryId: deliveryId || "",
           },
         });
       }
@@ -146,7 +164,7 @@ export default function PaymentScreen() {
     }
   }
 
-  function startBankPolling(reference: string) {
+  function startBankPolling(reference: string, deliveryId: string) {
     clearPolling();
     pollRef.current = setInterval(async () => {
       const res = await checkBankTransferStatus(reference);
@@ -159,13 +177,14 @@ export default function PaymentScreen() {
             distanceKm: data.quote?.distanceKm ?? 0,
             etaMinutes: data.quote?.etaMinutes ?? 0,
             method: "transfer",
+            deliveryId: deliveryId,
           },
         });
       }
     }, 10000) as any;
   }
 
-  function startInAppPolling(transactionId: string) {
+  function startInAppPolling(transactionId: string, deliveryId: string) {
     clearPolling();
     pollRef.current = setInterval(async () => {
       const res = await checkInAppPaymentStatus(transactionId);
@@ -184,6 +203,7 @@ export default function PaymentScreen() {
             distanceKm: data.quote?.distanceKm ?? 0,
             etaMinutes: data.quote?.etaMinutes ?? 0,
             method: method,
+            deliveryId: deliveryId,
           },
         });
       }

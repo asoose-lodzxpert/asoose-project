@@ -100,8 +100,33 @@ export class VendorOrdersService {
       this.prisma.order.count({ where: whereClause }),
     ]);
 
+    // Transform the data to match the expected frontend format
+    const transformedData = data.map((order) => ({
+      ...order,
+      items: order.items.map((item) => ({
+        ...item,
+        // Transform modifiers into modifierGroups format expected by frontend
+        modifierGroups:
+          item.modifiers && item.modifiers.length > 0
+            ? [
+                {
+                  id: 'default-group',
+                  name: 'Selected Options',
+                  modifiers: item.modifiers.map((mod) => ({
+                    id: mod.modifier.id,
+                    name: mod.modifier.name,
+                    price: mod.modifier.price,
+                  })),
+                },
+              ]
+            : [],
+        // Remove the raw modifiers field to avoid confusion
+        modifiers: undefined,
+      })),
+    }));
+
     return {
-      data,
+      data: transformedData,
       meta: { total, page, limit, pages: Math.ceil(total / limit) },
     };
   }
