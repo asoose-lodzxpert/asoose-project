@@ -2,6 +2,7 @@ import Constants from "expo-constants";
 import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
+import Toast from "react-native-toast-message";
 import { fetchWithAuth } from "./auth-fetch";
 
 const EXPO_PUBLIC_API_URL = process.env.EXPO_PUBLIC_API_URL;
@@ -104,8 +105,13 @@ export async function savePushToken(token: string): Promise<void> {
       method: "POST",
       body: JSON.stringify({ token, platform: Platform.OS }),
     });
-  } catch (error) {
-    // Silent error handling
+  } catch (error: any) {
+    // Surface error for debugging
+    console.log("Failed to send push token:", error);
+    Toast.show({
+      type: "error",
+      text1: error.message || "Failed to send push token",
+    });
   }
 }
 

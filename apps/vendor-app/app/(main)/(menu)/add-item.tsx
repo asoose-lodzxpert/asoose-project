@@ -1,33 +1,33 @@
-import React, { useState, useEffect } from "react";
+import * as ImagePicker from "expo-image-picker";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import React, { useEffect, useState } from "react";
 import {
-  View,
-  StyleSheet,
-  Pressable,
-  Image,
-  ScrollView,
   ActivityIndicator,
+  Image,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
 } from "react-native";
-import { useRouter, useLocalSearchParams } from "expo-router";
-import * as ImagePicker from "expo-image-picker";
 import DraggableFlatList, {
   RenderItemParams,
 } from "react-native-draggable-flatlist";
 import Toast from "react-native-toast-message";
 
+import { CustomDropdown } from "@/components/CustomDropdown";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { ThemedInput } from "@/components/ThemedInput";
 import { IconSymbol } from "@/components/ui/icon-symbol";
-import { CustomDropdown } from "@/components/CustomDropdown";
-import { useThemeColor } from "@/hooks/use-theme-color";
-import { useConfirm } from "@/hooks/use-confirm";
 import { useAuth } from "@/context/AuthContext";
+import { useConfirm } from "@/hooks/use-confirm";
+import { useThemeColor } from "@/hooks/use-theme-color";
 import {
+  createProduct,
   fetchCategories,
   fetchProduct,
-  createProduct,
   updateProduct,
 } from "@/services/products.service";
 import { uploadBulk, UploadProgress } from "@/services/storage.service";
@@ -303,96 +303,202 @@ export default function AddEditItemScreen() {
           </ThemedText>
 
           {/* Basic Fields */}
-          <ThemedInput
-            placeholder="Product name *"
-            value={name}
-            onChangeText={setName}
-          />
-          <ThemedInput
-            placeholder="Description"
-            value={description}
-            onChangeText={setDescription}
-          />
-          <ThemedInput
-            placeholder="Price *"
-            value={price}
-            keyboardType="numeric"
-            onChangeText={setPrice}
-          />
-          <ThemedInput
-            placeholder="Stock"
-            value={stock}
-            keyboardType="numeric"
-            onChangeText={setStock}
-          />
+          <View style={styles.section}>
+            <ThemedText type="defaultSemiBold">Product Name *</ThemedText>
+            <ThemedInput
+              placeholder="Enter product name"
+              value={name}
+              onChangeText={setName}
+            />
+          </View>
 
-          <CustomDropdown
-            label="Category *"
-            data={categories.map((c) => ({ label: c.name, value: c.id }))}
-            value={categoryId}
-            onChange={(v) => setCategoryId(v as string)}
-          />
+          <View style={styles.section}>
+            <ThemedText type="defaultSemiBold">
+              Product Description *
+            </ThemedText>
+            <ThemedInput
+              placeholder="Enter product description"
+              value={description}
+              onChangeText={setDescription}
+            />
+          </View>
+
+          <View style={styles.section}>
+            <ThemedText type="defaultSemiBold">Product Price *</ThemedText>
+            <ThemedInput
+              placeholder="Enter product price"
+              value={price}
+              keyboardType="numeric"
+              onChangeText={setPrice}
+            />
+          </View>
+
+          <View style={styles.section}>
+            <ThemedText type="defaultSemiBold">Stock (Optional)</ThemedText>
+            <ThemedInput
+              placeholder="Enter no. of items in stock"
+              value={stock}
+              keyboardType="numeric"
+              onChangeText={setStock}
+            />
+          </View>
+
+          <View style={styles.section}>
+            {/* <ThemedText type="defaultSemiBold">Category *</ThemedText> */}
+            <CustomDropdown
+              label="Choose product category *"
+              data={categories.map((c) => ({ label: c.name, value: c.id }))}
+              value={categoryId}
+              onChange={(v) => setCategoryId(v as string)}
+            />
+          </View>
 
           {/* Modifier Groups */}
           <View style={styles.section}>
-            <ThemedText type="defaultSemiBold">Modifier Groups</ThemedText>
+            <ThemedText type="defaultSemiBold" style={{ marginBottom: 8 }}>
+              Modifier Groups
+            </ThemedText>
 
             {modifierGroups.map((g, gi) => (
-              <View key={gi} style={styles.modGroup}>
-                <ThemedInput
-                  placeholder="Group name"
-                  value={g.name}
-                  onChangeText={(t) => {
-                    const c = [...modifierGroups];
-                    c[gi].name = t;
-                    setModifierGroups(c);
-                  }}
-                />
-
-                <View style={{ flexDirection: "row", gap: 8 }}>
+              <View
+                key={gi}
+                style={{
+                  ...styles.modGroup,
+                  borderColor: borderColor,
+                  borderWidth: 1,
+                }}
+              >
+                <View
+                  style={{ ...styles.section, paddingTop: 0, marginTop: 0 }}
+                >
+                  <ThemedText
+                    type="defaultSemiBold"
+                    style={{ marginTop: 0, paddingTop: 0 }}
+                  >
+                    Group name *
+                  </ThemedText>
                   <ThemedInput
-                    placeholder="Min"
-                    keyboardType="numeric"
-                    value={g.minSelect}
+                    placeholder="Enter group name"
+                    value={g.name}
                     onChangeText={(t) => {
                       const c = [...modifierGroups];
-                      c[gi].minSelect = t;
-                      setModifierGroups(c);
-                    }}
-                  />
-                  <ThemedInput
-                    placeholder="Max"
-                    keyboardType="numeric"
-                    value={g.maxSelect}
-                    onChangeText={(t) => {
-                      const c = [...modifierGroups];
-                      c[gi].maxSelect = t;
+                      c[gi].name = t;
                       setModifierGroups(c);
                     }}
                   />
                 </View>
 
-                {g.modifiers.map((m, mi) => (
-                  <View key={mi} style={{ flexDirection: "row", gap: 8 }}>
+                <View style={{ flexDirection: "row", gap: 8 }}>
+                  <View
+                    style={{
+                      ...styles.section,
+                      paddingTop: 0,
+                      marginTop: 0,
+                      flex: 1,
+                    }}
+                  >
+                    <ThemedText
+                      type="defaultSemiBold"
+                      style={{ marginTop: 0, paddingTop: 0 }}
+                    >
+                      Min *
+                    </ThemedText>
                     <ThemedInput
-                      placeholder="Modifier name"
-                      value={m.name}
-                      onChangeText={(t) => {
-                        const c = [...modifierGroups];
-                        c[gi].modifiers[mi].name = t;
-                        setModifierGroups(c);
-                      }}
-                    />
-                    <ThemedInput
-                      placeholder="Price"
+                      placeholder="Min"
                       keyboardType="numeric"
-                      value={m.price}
+                      value={g.minSelect}
                       onChangeText={(t) => {
                         const c = [...modifierGroups];
-                        c[gi].modifiers[mi].price = t;
+                        c[gi].minSelect = t;
                         setModifierGroups(c);
                       }}
+                      containerStyle={{ flex: 1 }}
                     />
+                  </View>
+                  <View
+                    style={{
+                      ...styles.section,
+                      paddingTop: 0,
+                      marginTop: 0,
+                      flex: 1,
+                    }}
+                  >
+                    <ThemedText
+                      type="defaultSemiBold"
+                      style={{ marginTop: 0, paddingTop: 0 }}
+                    >
+                      Max *
+                    </ThemedText>
+                    <ThemedInput
+                      placeholder="Max"
+                      keyboardType="numeric"
+                      value={g.maxSelect}
+                      onChangeText={(t) => {
+                        const c = [...modifierGroups];
+                        c[gi].maxSelect = t;
+                        setModifierGroups(c);
+                      }}
+                      containerStyle={{ flex: 1 }}
+                    />
+                  </View>
+                </View>
+
+                {g.modifiers.map((m, mi) => (
+                  <View key={mi} style={{ flexDirection: "column", gap: 8 }}>
+                    <ThemedText type="defaultSemiBold" style={{ marginTop: 8 }}>
+                      Modifier {mi + 1}
+                    </ThemedText>
+                    <View style={{ flexDirection: "row", gap: 8 }}>
+                      <View
+                        style={{
+                          ...styles.section,
+                          paddingTop: 0,
+                          marginTop: 0,
+                          flex: 1,
+                        }}
+                      >
+                        <ThemedText
+                          type="defaultSemiBold"
+                          style={{ marginTop: 0, paddingTop: 0 }}
+                        >
+                          Name *
+                        </ThemedText>
+                        <ThemedInput
+                          placeholder="Modifier name"
+                          value={m.name}
+                          onChangeText={(t) => {
+                            const c = [...modifierGroups];
+                            c[gi].modifiers[mi].name = t;
+                            setModifierGroups(c);
+                          }}
+                        />
+                      </View>
+                      <View
+                        style={{
+                          ...styles.section,
+                          paddingTop: 0,
+                          marginTop: 0,
+                          flex: 1,
+                        }}
+                      >
+                        <ThemedText
+                          type="defaultSemiBold"
+                          style={{ marginTop: 0, paddingTop: 0 }}
+                        >
+                          Price *
+                        </ThemedText>
+                        <ThemedInput
+                          placeholder="Price"
+                          keyboardType="numeric"
+                          value={m.price}
+                          onChangeText={(t) => {
+                            const c = [...modifierGroups];
+                            c[gi].modifiers[mi].price = t;
+                            setModifierGroups(c);
+                          }}
+                        />
+                      </View>
+                    </View>
                   </View>
                 ))}
 
@@ -472,6 +578,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 12,
     marginBottom: 12,
+    gap: 8,
   },
   imageWrapper: {
     width: 90,
