@@ -3,7 +3,7 @@
 import React from 'react';
 import { AlertTriangle, XCircle, CheckCircle, RefreshCcw } from 'lucide-react';
 import Swal from 'sweetalert2';
-
+import { fetcher } from '@/app/super-admin/hooks/useSuperAdminFetch';
 interface OrderActionsPanelProps {
   orderId: string;
   currentStatus: string;
@@ -29,19 +29,11 @@ export default function OrderActionsPanel({ orderId, currentStatus, onUpdate }: 
 
     if (reason) {
       try {
-        const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-        const session = await import('../../../../../../utils/supabase/client').then(m => m.createClient().auth.getSession());
-
-        const res = await fetch(`${API_URL}/super-admin/orders/${orderId}/override`, {
+        // ✅ Use standardized fetcher. It handles API_URL, Tokens, and Headers automatically.
+        await fetcher(`/super-admin/orders/${orderId}/override`, {
           method: 'PATCH',
-          headers: { 
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.data.session?.access_token}`
-          },
           body: JSON.stringify({ status: newStatus, reason })
         });
-
-        if (!res.ok) throw new Error('Failed');
 
         Swal.fire({ 
             title: 'Updated', icon: 'success', timer: 1500, showConfirmButton: false, 
@@ -50,8 +42,15 @@ export default function OrderActionsPanel({ orderId, currentStatus, onUpdate }: 
         
         onUpdate(); // Refresh the parent page
 
-      } catch (e) {
-        Swal.fire({ title: 'Error', text: 'Action failed', icon: 'error' });
+      } catch (e: any) {
+        // Fetcher throws a FetcherError with detailed info if available
+        Swal.fire({ 
+          title: 'Error', 
+          text: e.message || 'Action failed', 
+          icon: 'error',
+          background: '#1E293B', 
+          color: '#fff' 
+        });
       }
     }
   };

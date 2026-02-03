@@ -5,59 +5,74 @@ import {
   IsString,
   IsNumber,
   Min,
+  IsEnum,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
-export class RequestRideDto {
-  @ApiProperty({ description: 'Pickup address ID' })
-  @IsNotEmpty()
-  @IsUUID()
-  pickupAddressId: string;
-
-  @ApiProperty({ description: 'Dropoff address ID' })
-  @IsNotEmpty()
-  @IsUUID()
-  dropoffAddressId: string;
+export enum VehicleType {
+  BIKE = 'BIKE',
+  CAR = 'CAR',
+  VAN = 'VAN',
 }
 
-export class RequestDeliveryDto {
-  @ApiPropertyOptional({
-    description: 'Order ID if this delivery is for an order',
-  })
-  @IsOptional()
-  @IsUUID()
-  orderId?: string;
-
-  @ApiProperty({ description: 'Pickup address ID' })
-  @IsNotEmpty()
-  @IsUUID()
-  pickupAddressId: string;
-
-  @ApiProperty({ description: 'Dropoff address ID' })
-  @IsNotEmpty()
-  @IsUUID()
-  dropoffAddressId: string;
-
-  @ApiProperty({ description: 'Recipient name' })
-  @IsNotEmpty()
-  @IsString()
-  recipientName: string;
-
-  @ApiProperty({ description: 'Recipient phone number' })
-  @IsNotEmpty()
-  @IsString()
-  recipientPhone: string;
-
-  @ApiPropertyOptional({ description: 'Package details' })
-  @IsOptional()
-  @IsString()
-  packageDetails?: string;
-
-  @ApiPropertyOptional({ description: 'Package weight in kg' })
-  @IsOptional()
+export class LocationDto {
+  @ApiProperty()
   @IsNumber()
-  @Min(0)
-  weightKg?: number;
+  latitude: number;
+
+  @ApiProperty()
+  @IsNumber()
+  longitude: number;
+
+  @ApiProperty()
+  @IsString()
+  address: string;
+}
+
+export class RequestRideDto {
+  @ApiProperty({ type: LocationDto })
+  @ValidateNested()
+  @Type(() => LocationDto)
+  pickupLocation: LocationDto;
+
+  @ApiProperty({ type: LocationDto })
+  @ValidateNested()
+  @Type(() => LocationDto)
+  dropoffLocation: LocationDto;
+
+  @ApiProperty({ enum: VehicleType })
+  @IsEnum(VehicleType)
+  vehicleType: VehicleType;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  notes?: string;
+}
+
+export class RideEstimateDto {
+  @ApiProperty()
+  @IsNumber()
+  pickupLat: number;
+
+  @ApiProperty()
+  @IsNumber()
+  pickupLng: number;
+
+  @ApiProperty()
+  @IsNumber()
+  dropoffLat: number;
+
+  @ApiProperty()
+  @IsNumber()
+  dropoffLng: number;
+
+  @ApiPropertyOptional({ enum: VehicleType })
+  @IsOptional()
+  @IsEnum(VehicleType)
+  vehicleType?: VehicleType;
 }
 
 export class CancelTripDto {
@@ -65,4 +80,43 @@ export class CancelTripDto {
   @IsOptional()
   @IsString()
   reason?: string;
+}
+
+// Keep RequestDeliveryDto as is, or update similarly if needed...
+export class RequestDeliveryDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsUUID()
+  orderId?: string;
+
+  @ApiProperty()
+  @IsNotEmpty()
+  @IsUUID()
+  pickupAddressId: string;
+
+  @ApiProperty()
+  @IsNotEmpty()
+  @IsUUID()
+  dropoffAddressId: string;
+
+  @ApiProperty()
+  @IsNotEmpty()
+  @IsString()
+  recipientName: string;
+
+  @ApiProperty()
+  @IsNotEmpty()
+  @IsString()
+  recipientPhone: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  packageDetails?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  weightKg?: number;
 }

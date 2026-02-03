@@ -1,15 +1,15 @@
 import React from "react";
 import { StyleSheet, View } from "react-native";
 
-import { useDelivery } from "@/context/DeliveryContext";
+import { useJobs } from "@/context/JobContext";
 
+import AtPickupScreen from "./AtPickupScreen";
+import ConfirmJobScreen from "./ConfirmJobScreen";
+import EnRouteToDropoff from "./EnRouteToDropoff";
+import EnRouteToPickup from "./EnRouteToPickup";
+import IncomingOrderSheet from "./IncomingOrderSheet";
 import OfflineScreen from "./OfflineScreen";
 import OnlineWaitingScreen from "./OnlineWaitingScreen";
-import IncomingOrderSheet from "./IncomingOrderSheet";
-import EnRouteToPickup from "./EnRouteToPickup";
-import AtPickupScreen from "./AtPickupScreen";
-import EnRouteToDropoff from "./EnRouteToDropoff";
-import ConfirmDeliveryScreen from "./ConfirmDeliveryScreen";
 
 type Props = {
   onAnimateToPickup?: () => void;
@@ -20,7 +20,7 @@ export default function BottomOverlay({
   onAnimateToPickup,
   onAnimateToDropoff,
 }: Props) {
-  const { status, activeDelivery, incomingOrder } = useDelivery();
+  const { status, activeJob, incomingJob } = useJobs();
 
   return (
     <View style={styles.container} pointerEvents="box-none">
@@ -28,19 +28,19 @@ export default function BottomOverlay({
 
       {status === "online-waiting" && <OnlineWaitingScreen />}
 
-      {status === "incoming-order" && incomingOrder && <IncomingOrderSheet />}
+      {status === "incoming-job" && incomingJob && <IncomingOrderSheet />}
 
-      {status === "en-route-pickup" && activeDelivery && (
+      {status === "en-route-pickup" && activeJob && (
         <EnRouteToPickup onAnimateToPickup={onAnimateToPickup} />
       )}
 
-      {status === "at-pickup" && activeDelivery && <AtPickupScreen />}
+      {status === "at-pickup" && activeJob && <AtPickupScreen />}
 
-      {status === "en-route-dropoff" && activeDelivery && <EnRouteToDropoff />}
-
-      {status === "confirm-delivery" && activeDelivery && (
-        <ConfirmDeliveryScreen />
+      {status === "en-route-dropoff" && activeJob && (
+        <EnRouteToDropoff onAnimateToDropoff={onAnimateToDropoff} />
       )}
+
+      {status === "confirm-job" && activeJob && <ConfirmJobScreen />}
     </View>
   );
 }

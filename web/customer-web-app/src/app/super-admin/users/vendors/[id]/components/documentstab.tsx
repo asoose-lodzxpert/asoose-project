@@ -49,12 +49,12 @@ const DocumentsTab = ({ documents, onVerify, onReject }: any) => {
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h3 className="text-lg font-bold text-white">Document Verification</h3>
-        <button 
+        {/* <button 
           onClick={handleUpload}
           className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg flex items-center gap-2 transition-all"
         >
           <Upload className="w-4 h-4" /> Upload New
-        </button>
+        </button> */}
       </div>
 
       <div className="space-y-3">

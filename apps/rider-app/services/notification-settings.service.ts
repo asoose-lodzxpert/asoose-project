@@ -1,16 +1,15 @@
-import { fetchWithAuth } from "./auth-fetch";
 import type {
   NotificationSettings,
   UpdateNotificationSettingsDto,
 } from "@/types/notification-settings";
+import { fetchWithAuth } from "./auth-fetch";
 
-const API_URL =
-  process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api/v1";
+const EXPO_PUBLIC_API_URL = process.env.EXPO_PUBLIC_API_URL;
 
 export async function getNotificationSettings(): Promise<NotificationSettings> {
   try {
     const response = await fetchWithAuth(
-      `${API_URL}/riders/notification-settings`
+      `${EXPO_PUBLIC_API_URL}/riders/notification/settings`,
     );
     return response.settings;
   } catch (error) {
@@ -20,15 +19,15 @@ export async function getNotificationSettings(): Promise<NotificationSettings> {
 }
 
 export async function updateNotificationSettings(
-  data: UpdateNotificationSettingsDto
+  data: UpdateNotificationSettingsDto,
 ): Promise<NotificationSettings> {
   try {
     const response = await fetchWithAuth(
-      `${API_URL}/riders/notification-settings`,
+      `${EXPO_PUBLIC_API_URL}/riders/notification/settings`,
       {
         method: "PATCH",
         body: JSON.stringify(data),
-      }
+      },
     );
     return response.settings;
   } catch (error) {

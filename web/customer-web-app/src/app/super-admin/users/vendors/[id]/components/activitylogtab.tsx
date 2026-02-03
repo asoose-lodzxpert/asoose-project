@@ -1,11 +1,15 @@
-import { Activity,RefreshCw } from "lucide-react";
-interface ActivityLog {
+import React from 'react';
+import { Activity, RefreshCw } from "lucide-react";
+
+// ✅ Fix: Match the interface from the parent page
+export interface ActivityLog {
   id: string;
   action: string;
   user: string;
   timestamp: string;
-  details: string;
+  details?: string; // ✅ Made Optional to match parent
 }
+
 const ActivityLogTab = ({ logs }: { logs: ActivityLog[] }) => (
   <div className="space-y-4">
     <div className="flex items-center justify-between">
@@ -29,7 +33,8 @@ const ActivityLogTab = ({ logs }: { logs: ActivityLog[] }) => (
               <div className="flex items-start justify-between gap-2">
                 <div>
                   <h4 className="font-bold text-white">{log.action}</h4>
-                  <p className="text-sm text-gray-400 mt-1">{log.details}</p>
+                  {/* ✅ Handle optional details gracefully */}
+                  {log.details && <p className="text-sm text-gray-400 mt-1">{log.details}</p>}
                 </div>
                 <span className="text-xs text-gray-500 whitespace-nowrap">{log.timestamp}</span>
               </div>
@@ -42,4 +47,4 @@ const ActivityLogTab = ({ logs }: { logs: ActivityLog[] }) => (
   </div>
 );
 
-export default ActivityLogTab
+export default ActivityLogTab;

@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { Filter, RefreshCw } from 'lucide-react';
-import useSWR from 'swr'; // ✅ Import SWR
+import useSWR from 'swr'; 
 import { DataTable } from '@/app/super-admin/component/datatable';
 import DisputesPageSkeleton from './component/skeleton';
 import { fetcher } from '../hooks/useSuperAdminFetch';
@@ -15,7 +15,7 @@ import { Dispute, DisputeStats } from './types';
 
 // API Response Interface
 interface DisputesApiResponse {
-  data: any[]; // Raw data from backend before mapping
+  data: any[]; 
   total: number;
 }
 
@@ -35,7 +35,7 @@ export default function DisputesPage() {
   //  ✅ SWR DATA FETCHING
   // ===========================================================================
 
-  // 1. Fetch Stats (Independent of filters)
+  // 1. Fetch Stats
   const { 
     data: stats, 
     isLoading: statsLoading 
@@ -70,8 +70,6 @@ export default function DisputesPage() {
   //  DATA MAPPING & PROCESSING
   // ===========================================================================
 
-  // Map raw backend data to UI Dispute objects
-  // We use useMemo so this only runs when the API data actually changes
   const mappedDisputes: Dispute[] = useMemo(() => {
     if (!disputesData?.data) return [];
 
@@ -79,16 +77,14 @@ export default function DisputesPage() {
         id: d.id,
         status: d.status,
         priority: d.priority,
-        // Determine category based on relations
         category: d.order ? 'Order' : d.ride ? 'Ride' : d.delivery ? 'Delivery' : 'General',
         relatedType: d.order ? 'Order' : d.ride ? 'Ride' : 'N/A',
-        // Format Currency
+        // ✅ FIX: Replaced $ with ₦
         relatedAmount: d.order 
-          ? `$${d.order.total.toFixed(2)}` 
+          ? `₦${d.order.total.toFixed(2)}` 
           : d.ride 
-            ? `$${d.ride.totalFare?.toFixed(2) || '0.00'}` 
-            : '$0.00',
-        // Format Parties
+            ? `₦${d.ride.totalFare?.toFixed(2) || '0.00'}` 
+            : '₦0.00',
         parties: d.targetUser 
           ? `${d.openedByUser?.name} vs ${d.targetUser.name}` 
           : `${d.openedByUser?.name} vs Platform`,
@@ -101,7 +97,6 @@ export default function DisputesPage() {
     }));
   }, [disputesData]);
 
-  // Client-side category filtering (if needed locally)
   const filteredDisputes = useMemo(() => {
     return mappedDisputes.filter(d => categoryFilter === 'All' || d.category === categoryFilter);
   }, [categoryFilter, mappedDisputes]);
@@ -115,7 +110,7 @@ export default function DisputesPage() {
 
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
-    setPagination(prev => ({ ...prev, pageIndex: 0 })); // Reset page on tab change
+    setPagination(prev => ({ ...prev, pageIndex: 0 })); 
 
     switch (tab) {
       case 'All':
@@ -173,19 +168,18 @@ export default function DisputesPage() {
         
         <DisputeHeader total={total} onExport={handleExport} />
         
-        <DisputeStatsCard stats={stats || { open: 0, urgent: 0, resolved: 0, slaBreached: 0 }} />
+        {/* Pass null if stats is undefined to avoid type mismatch */}
+        <DisputeStatsCard stats={stats ?? null} />
         
-        <DisputeFilters 
+       <DisputeFilters 
           activeTab={activeTab} 
           onTabChange={handleTabChange}
           searchTerm={searchTerm}
           onSearchChange={setSearchTerm}
           categoryFilter={categoryFilter}
           onCategoryChange={setCategoryFilter}
-          stats={stats}
+          stats={stats ?? null} 
         />
-
-        {/* Data Table */}
         <div className="bg-[#1E293B] border border-gray-800 rounded-xl overflow-hidden min-h-[400px]">
           {filteredDisputes.length === 0 && !isLoading ? (
             <div className="flex flex-col items-center justify-center h-[400px] text-center">
@@ -205,7 +199,6 @@ export default function DisputesPage() {
             </div>
           ) : (
             <>
-                {/* Optional: Add manual refresh if data seems stale */}
                 <div className="w-full flex justify-end p-2 md:hidden">
                     <button onClick={() => mutate()} className="text-gray-500 text-xs flex items-center gap-1">
                         <RefreshCw className="w-3 h-3" /> Refresh

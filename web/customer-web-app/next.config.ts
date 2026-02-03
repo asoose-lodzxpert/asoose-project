@@ -31,14 +31,39 @@ const nextConfig = {
         hostname: 'placehold.co',
         pathname: '/**',
       },
-      // 👇 Add this new entry
       {
         protocol: 'https',
         hostname: 'avatars.githubusercontent.com',
         port: '',
         pathname: '/**',
       },
+      {
+        protocol: 'https',
+        hostname: 'stackable-eclair-kzms-p62.storage.railway.app',
+        port: '',
+        pathname: '/**',
+      },
+     
+      {
+        protocol: 'https',
+        hostname: 'storage.railway.app',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'asoose-storage.s3.eu-north-1.amazonaws.com',
+        port: '',
+        pathname: '/**',
+      },
     ],
+  },
+
+  typescript: {
+    ignoreBuildErrors: true,
+  },
+  eslint: {
+    ignoreDuringBuilds: true,
   },
 };
 

@@ -10,9 +10,9 @@ export class SupportController {
   async handleInquiry(@Body() dto: SupportInquiryDto) {
     // We reuse the existing vendor message logic to notify admin
     await this.emailProducer.sendVendorMessage(
-      'solomonpaul232@gmail.com', 
+      'solomonpaul232@gmail.com',
       `[Support] ${dto.subject}`,
-      `Sender: ${dto.name} (${dto.email})\n\nMessage:\n${dto.message}`
+      `Sender: ${dto.name} (${dto.email})\n\nMessage:\n${dto.message}`,
     );
     return { success: true };
   }

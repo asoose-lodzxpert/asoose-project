@@ -1,26 +1,39 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { Download, Calendar, Loader2, Filter } from 'lucide-react';
-import { format, subDays, startOfWeek, startOfMonth, parseISO } from 'date-fns';
+import { Download, Calendar, Loader2 } from 'lucide-react';
+import { format, subDays } from 'date-fns';
 import useSWR from 'swr'; 
+import { getSession } from 'next-auth/react'; 
 import { fetcher } from '../hooks/useSuperAdminFetch';
-import OverviewCards from './component/overviewcards';
+import OverviewCards, { OverviewMetric } from './component/overviewcards';
 import ChartsSection from './component/chartsection';
 import RevenueBreakdown from './component/revenuebreakdown';
 import RatingsDistribution from './component/ratingdistribution';
 import TopVendors from './component/topvendors';
 import ReportsPageSkeleton from './component/skeleton';
 
-// --- Types ---
+// ===========================================================================
+//  TYPES (Synchronized with Backend AnalyticsReport DTO)
+// ===========================================================================
+
 interface API_ReportData {
-  overview: any;
-  orderVolume: any[];
-  growth: any[];
-  revenueBreakdown: any[];
-  ratings: any[];
+  overview: {
+    totalRevenue: number;
+    revenueChange: number;
+    totalOrders: number;
+    ordersChange: number;
+    activeStores: number;
+    storesChange: number;
+    avgOrderValue: number;
+    avgOrderValueChange: number;
+  };
+  orderVolume: { date: string; orders: number; revenue: number }[];
+  growth: { month: string; stores: number; orders: number; riders: number }[];
+  revenueBreakdown: { category: string; amount: number; percentage: number; change: number }[];
+  ratings: { star: number; count: number; percentage: number }[];
   avgRating: number;
-  topVendors: any[];
+  topVendors: { id: string; name: string; revenue: number; orders: number; rating: number; change: number }[];
 }
 
 const TIME_PERIODS = [
@@ -30,64 +43,77 @@ const TIME_PERIODS = [
   { label: 'Last Year', value: 365 },
 ];
 
+// ===========================================================================
+//  MAIN COMPONENT
+// ===========================================================================
+
 export default function ReportsPage() {
   const [selectedPeriod, setSelectedPeriod] = useState(30);
-  const [isCustomRange, setIsCustomRange] = useState(false);
   const [showPeriodMenu, setShowPeriodMenu] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
-
 
   const { data, error, isLoading } = useSWR<API_ReportData>(
     `/super-admin/reports/analytics?days=${selectedPeriod}`,
     fetcher,
     {
-      keepPreviousData: true, // Key for dashboards: keeps old charts visible while new data loads
-      revalidateOnFocus: false, // Don't re-fetch expensive analytics just because user clicked away
-      refreshInterval: 0, // Disable auto-refresh for static historical reports
+      keepPreviousData: true, 
+      revalidateOnFocus: false, 
+      refreshInterval: 60000, // Refresh every minute
     }
   );
 
+  /**
+   * ✅ TRANSFORM: Pass RAW numbers to OverviewCards.
+   * Formatting happens inside the component to prevent NaN/calculation errors.
+   */
+  const transformedMetrics = useMemo((): OverviewMetric[] | null => {
+    if (!data?.overview) return null;
+
+    const ov = data.overview;
+
+    return [
+      {
+        label: 'Total Revenue',
+        value: ov.totalRevenue, // Raw Number
+        change: ov.revenueChange,
+        trend: (ov.revenueChange > 0 ? 'up' : ov.revenueChange < 0 ? 'down' : 'neutral')
+      },
+      {
+        label: 'Total Orders',
+        value: ov.totalOrders, // Raw Number
+        change: ov.ordersChange,
+        trend: (ov.ordersChange > 0 ? 'up' : ov.ordersChange < 0 ? 'down' : 'neutral')
+      },
+      {
+        label: 'Active Stores',
+        value: ov.activeStores, // Raw Number
+        change: ov.storesChange,
+        trend: (ov.storesChange > 0 ? 'up' : ov.storesChange < 0 ? 'down' : 'neutral')
+      },
+      {
+        label: 'Avg Order Value',
+        value: ov.avgOrderValue, // Raw Number
+        change: ov.avgOrderValueChange,
+        trend: (ov.avgOrderValueChange > 0 ? 'up' : ov.avgOrderValueChange < 0 ? 'down' : 'neutral')
+      }
+    ];
+  }, [data]);
+
+  /**
+   * ✅ CHART DATA: Use backend aggregation directly.
+   */
   const processedChartData = useMemo(() => {
     if (!data) return { volume: [], growth: [], granularity: 'Day' };
 
-    let volumeData = [...data.orderVolume];
-    let granularity = 'Day';
-
-    // 1. If period > 30 days, Group by Week
-    if (selectedPeriod > 30 && selectedPeriod <= 90) {
-      granularity = 'Week';
-      const weeklyMap = new Map();
-      volumeData.forEach(d => {
-        const weekStart = format(startOfWeek(parseISO(d.date)), 'MMM d');
-        const prev = weeklyMap.get(weekStart) || { orders: 0, revenue: 0 };
-        weeklyMap.set(weekStart, {
-          orders: prev.orders + d.orders,
-          revenue: prev.revenue + d.revenue
-        });
-      });
-      volumeData = Array.from(weeklyMap.entries()).map(([date, val]) => ({ date, ...val }));
-    } 
-    // 2. If period > 90 days, Group by Month
-    else if (selectedPeriod > 90) {
-      granularity = 'Month';
-      const monthlyMap = new Map();
-      volumeData.forEach(d => {
-        const monthStart = format(startOfMonth(parseISO(d.date)), 'MMM yyyy');
-        const prev = monthlyMap.get(monthStart) || { orders: 0, revenue: 0 };
-        monthlyMap.set(monthStart, {
-          orders: prev.orders + d.orders,
-          revenue: prev.revenue + d.revenue
-        });
-      });
-      volumeData = Array.from(monthlyMap.entries()).map(([date, val]) => ({ date, ...val }));
-    }
+    // Determine label based on period selection
+    const granularity = selectedPeriod > 90 ? 'Month' : selectedPeriod > 30 ? 'Week' : 'Day';
 
     return {
       granularity,
-      volume: volumeData.map(d => ({
-        name: granularity === 'Day' ? format(parseISO(d.date), 'MMM d') : d.date,
+      volume: data.orderVolume.map(d => ({
+        name: d.date, // Backend returns formatted date string
         orders: d.orders,
-        revenue: d.revenue
+        revenue: d.revenue 
       })),
       growth: data.growth.map(g => ({
         name: g.month,
@@ -97,27 +123,28 @@ export default function ReportsPage() {
     };
   }, [data, selectedPeriod]);
 
-  // --- Comparison Text Logic ---
   const comparisonText = useMemo(() => {
     const end = new Date();
-    const start = subDays(end, selectedPeriod);
-    const prevStart = subDays(start, selectedPeriod);
     const prevEnd = subDays(end, selectedPeriod);
-    
+    const prevStart = subDays(prevEnd, selectedPeriod);
     return `vs ${format(prevStart, 'MMM d')} - ${format(prevEnd, 'MMM d')}`;
   }, [selectedPeriod]);
 
-  // --- Export Handler ---
+  /**
+   * ✅ EXPORT: Updated to use POST method for security
+   */
   const handleExport = async () => {
     setIsExporting(true);
     try {
-      // Note: We use fetch here instead of SWR because we need the blob response for download
-      // and we don't need to cache the CSV file in memory.
-      const session = await import('../../../../utils/supabase/client').then(m => m.createClient().auth.getSession());
-      const token = session.data.session?.access_token;
+      const session = await getSession();
+      const token = (session as any)?.accessToken;
       
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/super-admin/reports/export?days=${selectedPeriod}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
+          method: 'POST',
+          headers: { 
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
       });
       
       if (!response.ok) throw new Error('Export failed');
@@ -126,69 +153,55 @@ export default function ReportsPage() {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `report-${selectedPeriod}d.csv`;
+      a.download = `analytics-report-${selectedPeriod}d.csv`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
     } catch(e) { 
-        alert('Export failed'); 
+        alert('Export failed. Please try again.'); 
     } finally { 
         setIsExporting(false); 
     }
   };
 
-  // ===========================================================================
-  //  RENDER
-  // ===========================================================================
-
   if (isLoading && !data) return <ReportsPageSkeleton />;
   if (error) return <div className="p-10 text-center text-red-500">Failed to load analytics data.</div>;
-  if (!data) return null;
 
   return (
     <div className="min-h-screen bg-[#0F172A] pb-20">
       
-      {/* Sticky Header for Mobile Access */}
       <div className="sticky top-0 z-20 bg-[#0F172A]/95 backdrop-blur-md border-b border-gray-800 px-4 md:px-6 py-4 shadow-sm">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
-            <h1 className="text-xl md:text-2xl font-bold text-white">Analytics Dashboard</h1>
-            <p className="text-gray-400 text-xs md:text-sm">
-              Overview for <span className="text-yellow-500 font-bold">{selectedPeriod} days</span> ending {format(new Date(), 'MMM d, yyyy')}
+            <h1 className="text-xl md:text-2xl font-bold text-white ">System Analytics</h1>
+            <p className="text-gray-500 text-xs md:text-sm font-medium">
+              Data overview for <span className="text-blue-500 font-bold">{selectedPeriod} days</span> ending {format(new Date(), 'MMM d, yyyy')}
             </p>
           </div>
 
           <div className="flex gap-2 w-full md:w-auto">
-            {/* Period Dropdown */}
             <div className="relative flex-1 md:flex-none">
               <button
                 onClick={() => setShowPeriodMenu(!showPeriodMenu)}
-                className="w-full md:w-auto flex items-center justify-between gap-2 px-4 py-2 bg-[#1E293B] border border-gray-700 rounded-lg text-gray-300 hover:text-white text-sm font-medium"
+                className="w-full md:w-auto flex items-center justify-between gap-2 px-4 py-2 bg-[#1E293B] border border-slate-800 rounded-xl text-gray-300 hover:text-white text-sm font-bold transition-all"
               >
                 <div className="flex items-center gap-2">
-                  <Calendar className="w-4 h-4" />
-                  {isCustomRange ? 'Custom Range' : TIME_PERIODS.find(p => p.value === selectedPeriod)?.label}
+                  <Calendar className="w-4 h-4 text-blue-500" />
+                  {TIME_PERIODS.find(p => p.value === selectedPeriod)?.label}
                 </div>
               </button>
               
               {showPeriodMenu && (
-                <div className="absolute right-0 top-full mt-2 w-48 bg-[#1E293B] border border-gray-700 rounded-lg shadow-xl z-30 overflow-hidden">
+                <div className="absolute right-0 top-full mt-2 w-48 bg-[#1E293B] border border-slate-800 rounded-xl shadow-2xl z-30 overflow-hidden">
                   {TIME_PERIODS.map((p) => (
                     <button
                       key={p.value}
-                      onClick={() => { setSelectedPeriod(p.value); setIsCustomRange(false); setShowPeriodMenu(false); }}
-                      className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-700 ${selectedPeriod === p.value && !isCustomRange ? 'text-yellow-500 bg-yellow-500/10' : 'text-gray-300'}`}
+                      onClick={() => { setSelectedPeriod(p.value); setShowPeriodMenu(false); }}
+                      className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-700 transition-colors ${selectedPeriod === p.value ? 'text-blue-500 bg-blue-500/10 font-bold' : 'text-gray-300'}`}
                     >
                       {p.label}
                     </button>
                   ))}
-                  <div className="border-t border-gray-700 my-1"></div>
-                  <button 
-                    onClick={() => { setIsCustomRange(true); setShowPeriodMenu(false); }}
-                    className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 flex items-center gap-2"
-                  >
-                     <Filter className="w-3 h-3" /> Custom Range
-                  </button>
                 </div>
               )}
             </div>
@@ -196,10 +209,10 @@ export default function ReportsPage() {
             <button
               onClick={handleExport}
               disabled={isExporting}
-              className="px-4 py-2 bg-yellow-500 text-black font-bold rounded-lg hover:bg-yellow-400 text-sm flex items-center gap-2 shadow-lg shadow-yellow-500/20"
+              className="px-4 py-2 bg-blue-600 text-white font-black uppercase tracking-widest rounded-xl hover:bg-blue-500 text-[10px] flex items-center gap-2 shadow-lg shadow-blue-900/20 transition-all disabled:opacity-50"
             >
-              {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-              <span className="hidden md:inline">Export</span>
+              {isExporting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
+              <span>Export CSV</span>
             </button>
           </div>
         </div>
@@ -207,30 +220,33 @@ export default function ReportsPage() {
 
       <div className="max-w-7xl mx-auto px-4 md:px-6 space-y-6 mt-6">
         
-        {/* Overview Cards with Explicit Date Context */}
+        {/* Overview Cards: Receives raw numeric data */}
         <div className="overflow-x-auto pb-2 -mx-4 px-4 md:overflow-visible md:pb-0 md:mx-0 md:px-0">
             <OverviewCards 
-              metrics={data.overview} 
+              metrics={transformedMetrics} 
               subtext={comparisonText} 
             />
         </div>
 
-        {/* Charts with Drill-down capability & Aggregation Label */}
+        {/* Analytics Charts */}
         <ChartsSection 
           volumeData={processedChartData.volume}
           growthData={processedChartData.growth}
           granularity={processedChartData.granularity}
         />
 
-        {/* Breakdown & Rankings */}
+        {/* Breakdown & Rankings: Pass raw arrays */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Revenue Breakdown - Now a Donut Chart */}
-          <RevenueBreakdown data={data.revenueBreakdown} />
+          <RevenueBreakdown 
+            data={data?.revenueBreakdown ?? []} 
+          />
           
-          <RatingsDistribution ratings={data.ratings} avgRating={data.avgRating} />
+          <RatingsDistribution 
+            ratings={data?.ratings ?? []} 
+            avgRating={data?.avgRating ?? 0} 
+          />
           
-          {/* Top Vendors - Now with Relative Revenue Bars */}
-          <TopVendors vendors={data.topVendors} />
+          <TopVendors vendors={data?.topVendors ?? []} />
         </div>
       </div>
     </div>

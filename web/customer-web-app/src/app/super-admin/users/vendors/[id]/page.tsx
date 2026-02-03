@@ -2,11 +2,10 @@
 
 import React, { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Loader2, DollarSign, TrendingUp } from 'lucide-react';
+import { Loader2, Banknote, TrendingUp } from 'lucide-react';
 import Swal from 'sweetalert2';
 import useSWR from 'swr'; 
 import { fetcher } from '@/app/super-admin/hooks/useSuperAdminFetch';
-import { createClient } from '../../../../../../utils/supabase/client';
 
 // --- Components ---
 import SkeletonLoader from './components/skeletonLoader';
@@ -21,14 +20,50 @@ import HealthScoreCard from './components/healthcard';
 import ProductsTabContent from './components/productstabcontent';
 import PayoutsTabContent from './components/payoutstabcontent';
 import DocumentsTab from '@/app/super-admin/component/documentstab';
+import { Currency } from '@/app/main/components/Currency';
 
 // --- Types ---
+interface Product {
+  id: string;
+  name: string;
+  price: number;
+  status: string;
+  image?: string;
+  category: string; 
+  stock?: number;
+}
+
+interface ActivityLog {
+  id: string;
+  action: string;
+  details?: string;
+  user: string;      
+  timestamp: string; 
+}
+
+interface PerformanceData {
+  date: string;
+  revenue: number;   
+}
+
+interface VendorDocument {
+  id: string;
+  name: string;
+  url: string;
+  status: 'PENDING' | 'VERIFIED' | 'REJECTED';
+  rejectionReason?: string;
+  uploadedDate: string;
+  type?: string; 
+  createdAt?: string; 
+}
+
 interface VendorDetails {
   id: string;
   name: string;      
   ownerName: string; 
   email: string;
   phone: string;
+  image?: string;
   status: string;
   verification: string;
   totalRevenue: number;
@@ -37,22 +72,17 @@ interface VendorDetails {
   orders: any[];
   reviews: any[];
   address?: string;
-  vendorDocuments: {
-    id: string;
-    name: string;        
-    url: string;
-    status: 'PENDING' | 'VERIFIED' | 'REJECTED';
-    rejectionReason?: string;
-    uploadedDate: string; 
-  }[];
+  vendorDocuments: VendorDocument[];
+  createdAt: string; 
+  updatedAt: string;
 }
 
-// --- Validation Helper ---
+type PayoutsResponse = { history: any[] } | any[]; 
+
 const validateEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
-// --- Simple Tab Loader Component ---
 const TabLoader = () => (
-  <div className="flex flex-col items-center justify-center h-64 space-y-4 animate-in fade-in">
+  <div className="flex flex-col items-center justify-center h-64 space-y-4">
     <Loader2 className="w-8 h-8 text-yellow-500 animate-spin" />
     <p className="text-gray-500 text-sm font-medium">Loading tab data...</p>
   </div>
@@ -62,29 +92,15 @@ export default function VendorDetailPage() {
   const params = useParams();
   const router = useRouter();
   const slugOrId = params?.id as string; 
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
   // --- UI State ---
   const [activeTab, setActiveTab] = useState('Order History');
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   
-  // Local form state
   const [formData, setFormData] = useState({ 
     storeName: '', ownerName: '', phone: '', email: '' , address: ''
   });
-
-  // Helper to get auth token
-  const getAuthHeader = async () => {
-    const supabase = createClient();
-    const { data: { session } } = await supabase.auth.getSession();
-    return {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${session?.access_token || ''}`
-    };
-  };
-
-  // DATA FETCHING (Main & Tabs)
 
   // 1. Main Vendor Profile
   const { 
@@ -110,51 +126,33 @@ export default function VendorDetailPage() {
     }
   );
 
-  // 2. Performance Charts (Always fetched if vendor exists)
-  const { data: performanceData } = useSWR(
+  // 2. Performance Charts
+  const { data: performanceData } = useSWR<PerformanceData[]>(
     vendor?.id ? `/super-admin/vendors/${vendor.id}/performance?days=30` : null,
     fetcher
   );
 
-  // 3. Tab Specific Data (Fetch on demand)
-  
-  // -- Products --
-  const { 
-    data: products, 
-    mutate: mutateProducts,
-    isLoading: isProductsLoading 
-  } = useSWR(
+  // 3. Tab Specific Data
+  const { data: products, mutate: mutateProducts, isLoading: isProductsLoading } = useSWR<Product[]>(
     vendor?.id && activeTab === 'Products' ? `/super-admin/vendors/${vendor.id}/products` : null,
     fetcher
   );
 
-  // -- Documents --
-  const { 
-    data: documentsData, 
-    mutate: mutateDocuments,
-    isLoading: isDocumentsLoading
-  } = useSWR(
+  const { data: documentsData, mutate: mutateDocuments, isLoading: isDocumentsLoading } = useSWR<VendorDocument[]>(
     vendor?.id && activeTab === 'Documents' ? `/super-admin/vendors/${vendor.id}/documents` : null,
     fetcher
   );
 
-  // -- Payouts --
-  const { 
-    data: payoutsData, 
-    mutate: mutatePayouts,
-    isLoading: isPayoutsLoading
-  } = useSWR(
+  const { data: payoutsData, mutate: mutatePayouts, isLoading: isPayoutsLoading } = useSWR<PayoutsResponse>(
     vendor?.id && activeTab === 'Payouts' ? `/super-admin/vendors/${vendor.id}/payouts` : null,
     fetcher
   );
-  // Normalize payouts structure
-  const payoutsHistory = payoutsData?.history || (Array.isArray(payoutsData) ? payoutsData : []) || [];
 
-  // -- Activity Log --
-  const { 
-    data: activityLogs,
-    isLoading: isActivityLoading
-  } = useSWR(
+  const payoutsHistory = (payoutsData && 'history' in payoutsData 
+    ? payoutsData.history 
+    : Array.isArray(payoutsData) ? payoutsData : []) || [];
+
+  const { data: activityLogs, isLoading: isActivityLoading } = useSWR<ActivityLog[]>(
     vendor?.id && activeTab === 'Activity Log' ? `/super-admin/vendors/${vendor.id}/activity` : null,
     fetcher
   );
@@ -163,7 +161,6 @@ export default function VendorDetailPage() {
   //  HANDLERS
   // ===========================================================================
 
-  // 📝 Save Profile
   const handleSave = async () => {
     if (!validateEmail(formData.email)) {
       Swal.fire({ icon: 'warning', title: 'Invalid Email', background: '#1E293B', color: '#fff' });
@@ -172,39 +169,31 @@ export default function VendorDetailPage() {
 
     setIsSaving(true);
     try {
-      const headers = await getAuthHeader();
-      const res = await fetch(`${API_URL}/api/super-admin/vendors/${vendor?.id}`, {
+      await fetcher(`/super-admin/vendors/${vendor?.id}`, {
         method: 'PATCH',
-        headers,
         body: JSON.stringify(formData),
       });
-
-      if (!res.ok) throw new Error('Failed');
       
       mutateVendor();
       setIsEditing(false);
       Swal.fire({ icon: 'success', title: 'Updated!', timer: 1500, showConfirmButton: false, background: '#1E293B', color: '#fff' });
-    } catch {
-      Swal.fire({ icon: 'error', title: 'Error', text: 'Could not save changes.', background: '#1E293B', color: '#fff' });
+    } catch (err: any) {
+      Swal.fire({ icon: 'error', title: 'Error', text: err.message || 'Could not save changes.', background: '#1E293B', color: '#fff' });
     } finally {
       setIsSaving(false);
     }
   };
 
-  // 🛍️ Toggle Product Status
   const toggleProductBan = async (productId: string, currentStatus: string) => {
     const newStatus = (currentStatus === 'BANNED' || currentStatus === 'DISABLED') ? 'ACTIVE' : 'DISABLED';
     
-    // Optimistic Update
     if (products) {
-        mutateProducts(products.map((p: any) => p.id === productId ? { ...p, status: newStatus } : p), false);
+        mutateProducts(products.map((p) => p.id === productId ? { ...p, status: newStatus } : p), false);
     }
 
     try {
-      const headers = await getAuthHeader();
-      await fetch(`${API_URL}/api/super-admin/vendors/products/${productId}/status`, {
+      await fetcher(`/super-admin/vendors/products/${productId}/status`, {
         method: 'PATCH',
-        headers,
         body: JSON.stringify({ status: newStatus })
       });
       Swal.fire({ icon: 'success', title: `Product ${newStatus === 'ACTIVE' ? 'Activated' : 'Banned'}`, toast: true, position: 'bottom-end', timer: 1500, showConfirmButton: false, background: '#1E293B', color: '#fff' });
@@ -215,17 +204,12 @@ export default function VendorDetailPage() {
     }
   };
 
-  // 📂 Verify Document
   const handleVerifyDocument = async (docId: string, status: 'VERIFIED' | 'REJECTED', rejectionReason?: string) => {
     try {
-      const headers = await getAuthHeader();
-      const res = await fetch(`${API_URL}/api/super-admin/verification/documents/${docId}`, {
+      await fetcher(`/super-admin/verification/documents/${docId}`, {
         method: 'PATCH',
-        headers,
         body: JSON.stringify({ status, rejectionReason })
       });
-
-      if (!res.ok) throw new Error('Action failed');
 
       Swal.fire({
         title: status === 'VERIFIED' ? 'Verified' : 'Rejected',
@@ -237,19 +221,18 @@ export default function VendorDetailPage() {
         background: '#1E293B', color: '#fff'
       });
       mutateDocuments();
-      mutateVendor(); // Update main profile status if needed
+      mutateVendor(); 
     } catch (error) {
       Swal.fire({ title: 'Error', text: 'Could not update document', icon: 'error' });
     }
   };
 
-  // 💰 Process Payout
   const handleProcessPayout = async () => {
     if (!vendor?.unpaidBalance || vendor.unpaidBalance <= 0) return;
 
     const result = await Swal.fire({
       title: 'Confirm Payout',
-      text: `Send $${vendor.unpaidBalance.toLocaleString()} to vendor?`,
+      text: `Process payout to vendor?`,
       icon: 'question',
       showCancelButton: true,
       confirmButtonText: 'Yes, Pay',
@@ -259,14 +242,10 @@ export default function VendorDetailPage() {
 
     if (result.isConfirmed) {
       try {
-        const headers = await getAuthHeader();
-        const res = await fetch(`${API_URL}/api/super-admin/vendors/${vendor.id}/payouts`, {
+        await fetcher(`/super-admin/vendors/${vendor.id}/payouts`, {
           method: 'POST',
-          headers,
           body: JSON.stringify({ amount: vendor.unpaidBalance })
         });
-        
-        if (!res.ok) throw new Error('Payout failed');
         
         mutatePayouts();
         mutateVendor();
@@ -277,16 +256,12 @@ export default function VendorDetailPage() {
     }
   };
 
-
-const handleMessageVendor = async () => {
+  const handleMessageVendor = async () => {
     const { value: text } = await Swal.fire({
       title: 'Message Vendor',
       input: 'textarea',
       inputLabel: `Send an email to ${vendor?.name}`,
       inputPlaceholder: 'Type your message here...',
-      inputAttributes: {
-        'aria-label': 'Type your message here'
-      },
       showCancelButton: true,
       confirmButtonText: 'Send Email',
       confirmButtonColor: '#3b82f6', 
@@ -296,24 +271,13 @@ const handleMessageVendor = async () => {
       showLoaderOnConfirm: true,
       preConfirm: async (message) => {
         if (!message) return Swal.showValidationMessage('Message cannot be empty');
-        
         try {
-          // Get auth session
-          const session = await import('../../../../../../utils/supabase/client').then(m => m.createClient().auth.getSession());
-          
-          const response = await fetch(`${API_URL}/super-admin/vendors/${vendor?.id}/message`, {
+          return await fetcher(`/super-admin/vendors/${vendor?.id}/message`, {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${session.data.session?.access_token}`
-            },
             body: JSON.stringify({ message })
           });
-
-          if (!response.ok) throw new Error(response.statusText);
-          return await response.json();
-        } catch (error) {
-          Swal.showValidationMessage(`Request failed: ${error}`);
+        } catch (error: any) {
+          Swal.showValidationMessage(`Request failed: ${error.message}`);
         }
       },
       allowOutsideClick: () => !Swal.isLoading()
@@ -332,7 +296,6 @@ const handleMessageVendor = async () => {
     }
   };
 
-
   // ===========================================================================
   //  RENDER
   // ===========================================================================
@@ -341,9 +304,10 @@ const handleMessageVendor = async () => {
   if (error || !vendor) return <div className="min-h-screen bg-[#0F172A] flex items-center justify-center text-gray-400">Vendor not found</div>;
 
   return (
-    <div className="max-w-7xl mx-auto px-4 md:px-6 space-y-6 pb-20">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6 pb-20">
       
-      {/* 1. Header Component */}
+      {/* FIX: Passed down explicitly to ensure header is flexible 
+      */}
       <VendorHeader 
         name={vendor.name} 
         status={vendor.status} 
@@ -356,8 +320,12 @@ const handleMessageVendor = async () => {
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pt-2">
-        {/* 2. Info Columns */}
-        <div className="space-y-6">
+        {/* FIX: Added min-w-0 to prevent flex/grid overflow issues on mobile
+          Mobile Order: Metrics first (order-1), Info second (order-2)
+        */}
+        
+        {/* Left Column (Info) */}
+        <div className="space-y-6 order-2 lg:order-1 min-w-0">
             <HealthScoreCard totalOrders={vendor.totalOrders} />
             <BusinessInfoCard 
               vendor={vendor}
@@ -367,20 +335,20 @@ const handleMessageVendor = async () => {
             />
         </div>
 
-        {/* 3. Financials Column */}
-        <div className="lg:col-span-2 space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Right Column (Metrics & Charts) */}
+        <div className="lg:col-span-2 space-y-6 order-1 lg:order-2 min-w-0">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <RevenueCard 
               title="Total Revenue" 
-              amount={`$${vendor.totalRevenue?.toLocaleString() || '0.00'}`} 
+            amount={vendor.totalRevenue}
               change={0} 
-              icon={DollarSign} 
+              icon={Banknote} 
               color="green" 
               onClick={() => setActiveTab('Order History')} 
             />
             <RevenueCard 
               title="Unpaid Balance" 
-              amount={`$${vendor.unpaidBalance?.toLocaleString() || '0.00'}`} 
+            amount={vendor.totalRevenue}
               icon={TrendingUp} 
               color="yellow" 
               onClick={() => setActiveTab('Payouts')} 
@@ -390,14 +358,16 @@ const handleMessageVendor = async () => {
         </div>
       </div>
 
-      {/* 4. Tabs Section */}
+      {/* Tabs Container */}
       <div className="mt-8 w-full bg-[#1E293B] border-t border-gray-800 rounded-t-xl overflow-hidden min-h-[500px]">
-        <div className="flex border-b border-gray-800 overflow-x-auto px-6 hide-scrollbar">
+        {/* FIX: Enhanced scrollbar handling for mobile touch scrolling 
+        */}
+        <div className="flex border-b border-gray-800 overflow-x-auto px-4 md:px-6 hide-scrollbar">
           {['Order History', 'Products', 'Payouts', 'Documents', 'Reviews', 'Activity Log'].map((tab) => (
             <button 
               key={tab} 
               onClick={() => setActiveTab(tab)} 
-              className={`px-6 py-4 text-sm font-bold whitespace-nowrap border-b-2 transition-all ${
+              className={`px-4 md:px-6 py-4 text-sm font-bold whitespace-nowrap border-b-2 transition-all shrink-0 ${
                 activeTab === tab 
                   ? 'text-yellow-500 border-yellow-500 bg-[#0F172A]/50' 
                   : 'text-gray-400 border-transparent hover:text-white'
@@ -408,22 +378,20 @@ const handleMessageVendor = async () => {
           ))}
         </div>
 
-        <div className="p-6">
-            {/* --- ORDERS --- */}
+        {/* Tab Content Area */}
+        <div className="p-4 md:p-6 overflow-x-hidden">
             {activeTab === 'Order History' && (
                 <OrderHistoryTab orders={vendor.orders || []} />
             )}
             
-            {/* --- PRODUCTS --- */}
             {activeTab === 'Products' && (
               <ProductsTabContent 
                 products={products || []} 
                 onToggleBan={toggleProductBan} 
-                isLoading={isProductsLoading} // ✅ Passed explicit loading
+                isLoading={isProductsLoading} 
               />
             )}
 
-            {/* --- PAYOUTS --- */}
             {activeTab === 'Payouts' && (
               isPayoutsLoading ? <TabLoader /> : (
                 <PayoutsTabContent 
@@ -434,13 +402,10 @@ const handleMessageVendor = async () => {
               )
             )}
 
-            {/* --- DOCUMENTS --- */}
             {activeTab === 'Documents' && (
               isDocumentsLoading ? <TabLoader /> : (
                 <DocumentsTab 
-                  // ✅ FIX: Prioritize SWR data, fallback to vendor object, default to empty array
-                  // Also maps 'name' to 'type' and 'uploadedDate' to 'createdAt' to match the Document interface
-                  documents={(documentsData || vendor?.vendorDocuments || []).map((doc: any) => ({
+                  documents={(documentsData || vendor?.vendorDocuments || []).map((doc) => ({
                     id: doc.id,
                     url: doc.url,
                     status: doc.status,
@@ -448,7 +413,6 @@ const handleMessageVendor = async () => {
                     type: doc.type || doc.name || 'Document', 
                     createdAt: doc.createdAt || doc.uploadedDate || new Date().toISOString()
                   }))} 
-                  
                   onVerify={(id) => handleVerifyDocument(id, 'VERIFIED')}
                   onReject={(id, reason) => handleVerifyDocument(id, 'REJECTED', reason)}
                   showUploadButton={true}
@@ -456,15 +420,13 @@ const handleMessageVendor = async () => {
               )
             )}
 
-            {/* --- REVIEWS --- */}
             {activeTab === 'Reviews' && (
                 <ReviewsTab reviews={vendor.reviews || []} />
             )}
 
-            {/* --- ACTIVITY --- */}
             {activeTab === 'Activity Log' && (
                 isActivityLoading ? <TabLoader /> : (
-                   <ActivityLogTab logs={activityLogs || []} />
+                    <ActivityLogTab logs={activityLogs || []} />
                 )
             )}
         </div>

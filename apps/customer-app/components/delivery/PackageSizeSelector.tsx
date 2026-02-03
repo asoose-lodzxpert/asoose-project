@@ -4,10 +4,21 @@ import { PackageSize } from "@/types/delivery";
 import { useSendPackage } from "@/context/SendPackageContext";
 import { useThemeColor } from "@/hooks/use-theme-color";
 
-const SIZES: { key: PackageSize; label: string; desc: string }[] = [
-  { key: "small", label: "Small", desc: "Documents / Envelope" },
-  { key: "medium", label: "Medium", desc: "Shoebox size" },
-  { key: "large", label: "Large", desc: "Bulk items" },
+const SIZES: {
+  key: PackageSize;
+  label: string;
+  desc: string;
+  price: number;
+}[] = [
+  { key: "small", label: "Small", desc: "Documents / Envelope", price: 500 },
+  { key: "medium", label: "Medium", desc: "Shoebox size", price: 1000 },
+  { key: "large", label: "Large", desc: "Bulk items", price: 2500 },
+  {
+    key: "extra_large",
+    label: "Extra Large",
+    desc: "Very large or heavy items",
+    price: 5000,
+  },
 ];
 
 export function PackageSizeSelector() {
@@ -17,32 +28,42 @@ export function PackageSizeSelector() {
   const primary = useThemeColor({}, "brandPrimary");
   const border = useThemeColor({}, "borderDefault");
 
+  // Split SIZES into 2 rows of 2
+  const rows = [SIZES.slice(0, 2), SIZES.slice(2, 4)];
+
   return (
     <View style={styles.container}>
       <ThemedText type="subtitle">Package Size</ThemedText>
-
-      <View style={styles.row}>
-        {SIZES.map((s) => {
-          const active = s.key === packageSize;
-          return (
-            <Pressable
-              key={s.key}
-              style={[
-                styles.card,
-                active && styles.activeCard,
-                {
-                  backgroundColor: card,
-                  borderColor: active ? primary : border,
-                },
-              ]}
-              onPress={() => setPackageSize(s.key)}
-            >
-              <ThemedText style={{ fontWeight: "700" }}>{s.label}</ThemedText>
-              <ThemedText type="caption">{s.desc}</ThemedText>
-            </Pressable>
-          );
-        })}
-      </View>
+      {rows.map((row, i) => (
+        <View style={styles.row} key={i}>
+          {row.map((s) => {
+            const active = s.key === packageSize;
+            return (
+              <Pressable
+                key={s.key}
+                style={[
+                  styles.card,
+                  active && styles.activeCard,
+                  {
+                    backgroundColor: card,
+                    borderColor: active ? primary : border,
+                  },
+                ]}
+                onPress={() => setPackageSize(s.key)}
+              >
+                <ThemedText style={{ fontWeight: "700" }}>{s.label}</ThemedText>
+                <ThemedText type="caption">{s.desc}</ThemedText>
+                <ThemedText
+                  type="caption"
+                  style={{ marginTop: 4, color: primary }}
+                >
+                  ₦{s.price.toLocaleString()}
+                </ThemedText>
+              </Pressable>
+            );
+          })}
+        </View>
+      ))}
     </View>
   );
 }

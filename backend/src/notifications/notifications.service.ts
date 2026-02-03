@@ -26,6 +26,10 @@ export class NotificationsService {
     category?: string;
     metadata?: any;
   }) {
+    if (!data.userId) {
+      this.logger.warn('Skipping notification creation: userId is missing');
+      return null;
+    }
     const notification = await this.prisma.notification.create({
       data: {
         userId: data.userId,

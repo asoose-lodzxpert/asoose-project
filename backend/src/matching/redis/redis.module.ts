@@ -3,6 +3,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
 import { RedisService } from './redis.service';
 import { MATCHING_REDIS_CLIENT } from './redis.constants';
+import { AppLogger } from '../../libs/logger/app-logger.service';
 
 export { MATCHING_REDIS_CLIENT } from './redis.constants';
 
@@ -27,20 +28,22 @@ export { MATCHING_REDIS_CLIENT } from './redis.constants';
           lazyConnect: false,
         });
 
+        const logger = new AppLogger();
+
         redis.on('connect', () => {
-          console.log(
-            '✅ Redis connected for Matching System (DB: ' +
+          logger.log(
+            'Redis connected for Matching System (DB: ' +
               configService.get('MATCHING_REDIS_DB', 1) +
               ')',
           );
         });
 
         redis.on('error', (err) => {
-          console.error('❌ Redis error:', err);
+          logger.error('Redis error:', err?.stack);
         });
 
         redis.on('reconnecting', () => {
-          console.log('🔄 Redis reconnecting...');
+          logger.warn('Redis reconnecting...');
         });
 
         return redis;

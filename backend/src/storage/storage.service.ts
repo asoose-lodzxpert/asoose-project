@@ -1,55 +1,55 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
-import * as dotenv from 'dotenv';
 import {
   S3Client,
   PutObjectCommand,
   DeleteObjectCommand,
-  GetObjectCommand,
+  ListObjectsV2Command,
 } from '@aws-sdk/client-s3';
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-
-dotenv.config();
 
 @Injectable()
 export class StorageService {
   private s3Client: S3Client;
   private readonly bucket: string;
+  private readonly region: string;
+  private readonly publicBaseUrl: string;
 
   constructor() {
-    const endpoint = process.env.RAILWAY_S3_ENDPOINT;
-    const bucket = process.env.RAILWAY_S3_BUCKET;
-    const region = process.env.RAILWAY_S3_REGION || 'us-east-1';
-    const accessKeyId = process.env.RAILWAY_S3_ACCESS_KEY_ID;
-    const secretAccessKey = process.env.RAILWAY_S3_SECRET_ACCESS_KEY;
+    const bucket = process.env.AWS_S3_BUCKET;
+    const region = process.env.AWS_REGION;
+    const accessKeyId = process.env.AWS_ACCESS_KEY_ID;
+    const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY;
+    const publicBaseUrl = process.env.AWS_S3_PUBLIC_URL;
 
-    if (!endpoint || !bucket || !accessKeyId || !secretAccessKey) {
+    if (
+      !bucket ||
+      !region ||
+      !accessKeyId ||
+      !secretAccessKey ||
+      !publicBaseUrl
+    ) {
       throw new InternalServerErrorException(
-        'Missing Railway S3 env vars. Set RAILWAY_S3_ENDPOINT, RAILWAY_S3_BUCKET, RAILWAY_S3_ACCESS_KEY_ID, RAILWAY_S3_SECRET_ACCESS_KEY',
+        'Missing AWS S3 env vars. Set AWS_S3_BUCKET, AWS_REGION, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_S3_PUBLIC_URL',
       );
     }
 
     this.bucket = bucket;
+    this.region = region;
+    this.publicBaseUrl = publicBaseUrl.replace(/\/$/, '');
 
     this.s3Client = new S3Client({
-      endpoint,
       region,
-      credentials: {
-        accessKeyId,
-        secretAccessKey,
-      },
-      forcePathStyle: true,
+      credentials: { accessKeyId, secretAccessKey },
     });
   }
 
   // =========================
-  // Upload single + signed URL
+  // Upload single file (public URL)
   // =========================
   async uploadFile(
     file: Express.Multer.File,
-  ): Promise<{ key: string; signedUrl: string }> {
+  ): Promise<{ key: string; url: string }> {
     try {
       const key = this.generateKey(file.originalname);
-
       await this.s3Client.send(
         new PutObjectCommand({
           Bucket: this.bucket,
@@ -58,10 +58,7 @@ export class StorageService {
           ContentType: file.mimetype,
         }),
       );
-
-      const signedUrl = await this.getSignedGetUrl(key);
-
-      return { key, signedUrl };
+      return { key, url: this.getPublicUrl(key) };
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       throw new InternalServerErrorException(`Failed to upload file: ${msg}`);
@@ -69,16 +66,15 @@ export class StorageService {
   }
 
   // =========================
-  // Upload bulk + signed URLs
+  // Upload multiple files (public URLs)
   // =========================
   async uploadBulk(
     files: Express.Multer.File[],
-  ): Promise<{ key: string; signedUrl: string }[]> {
+  ): Promise<{ key: string; url: string }[]> {
     try {
-      const results = await Promise.all(
+      return await Promise.all(
         files.map(async (file) => {
           const key = this.generateKey(file.originalname);
-
           await this.s3Client.send(
             new PutObjectCommand({
               Bucket: this.bucket,
@@ -87,14 +83,9 @@ export class StorageService {
               ContentType: file.mimetype,
             }),
           );
-
-          const signedUrl = await this.getSignedGetUrl(key);
-
-          return { key, signedUrl };
+          return { key, url: this.getPublicUrl(key) };
         }),
       );
-
-      return results;
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       throw new InternalServerErrorException(`Failed to upload files: ${msg}`);
@@ -102,54 +93,20 @@ export class StorageService {
   }
 
   // =========================
-  // Delete by FULL URL
+  // Delete file by public URL
   // =========================
-  async deleteFile(fileUrl: string): Promise<void> {
+  async deleteFile(fileUrlOrKey: string): Promise<void> {
     try {
-      const key = this.extractKeyFromUrl(fileUrl);
-
+      let key = fileUrlOrKey;
+      if (fileUrlOrKey.startsWith('http')) {
+        key = this.extractKeyFromUrl(fileUrlOrKey);
+      }
       await this.s3Client.send(
-        new DeleteObjectCommand({
-          Bucket: this.bucket,
-          Key: key,
-        }),
+        new DeleteObjectCommand({ Bucket: this.bucket, Key: key }),
       );
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       throw new InternalServerErrorException(`Failed to delete file: ${msg}`);
-    }
-  }
-
-
-  // =========================
-  // Delete by KEY (recommended)
-  // =========================
-  async deleteFileByKey(key: string): Promise<void> {
-    try {
-      await this.s3Client.send(
-        new DeleteObjectCommand({
-          Bucket: this.bucket,
-          Key: key,
-        }),
-      );
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error);
-      throw new InternalServerErrorException(`Failed to delete file: ${msg}`);
-    }
-  }
-
-  // =========================
-  // Generate signed URL later
-  // =========================
-  async getSignedUrlForKey(
-    key: string,
-    expiresInSeconds = 60 * 60,
-  ): Promise<string> {
-    try {
-      return await this.getSignedGetUrl(key, expiresInSeconds);
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error);
-      throw new InternalServerErrorException(`Failed to sign url: ${msg}`);
     }
   }
 
@@ -157,6 +114,7 @@ export class StorageService {
   // Helpers
   // =========================
 
+  // Keep generateKey method for unique file names
   private generateKey(originalName: string): string {
     const timestamp = Date.now();
     const randomStr = Math.random().toString(36).slice(2);
@@ -164,38 +122,50 @@ export class StorageService {
     return `uploads/${timestamp}-${randomStr}.${ext}`;
   }
 
-  private async getSignedGetUrl(
-    key: string,
-    expiresIn = 60 * 60,
-  ): Promise<string> {
-    return getSignedUrl(
-      this.s3Client,
-      new GetObjectCommand({
-        Bucket: this.bucket,
-        Key: key,
-      }),
-      { expiresIn },
-    );
+  // FIX: Changed from private to public
+  public getPublicUrl(key: string): string {
+    return `${this.publicBaseUrl.replace(/\/$/, '')}/${key.replace(/^\//, '')}`;
   }
 
-    private extractKeyFromUrl(url: string): string {
+  // =========================
+  // List all files in the bucket (public URLs)
+  // =========================
+  async listFiles(): Promise<{ key: string; url: string }[]> {
     try {
-      const parsed = new URL(url);
-
-      // pathname = /bucket-name/uploads/xxx.png
-      const parts = parsed.pathname.split('/').filter(Boolean);
-
-      const bucketIndex = parts.indexOf(this.bucket);
-
-      if (bucketIndex === -1 || bucketIndex + 1 >= parts.length) {
-        throw new Error('Invalid Railway storage URL');
-      }
-
-      // everything after bucket name is the key
-      return parts.slice(bucketIndex + 1).join('/');
-    } catch {
-      throw new Error('Invalid file URL format');
+      const files: { key: string; url: string }[] = [];
+      let ContinuationToken: string | undefined = undefined;
+      do {
+        const response = await this.s3Client.send(
+          new ListObjectsV2Command({
+            Bucket: this.bucket,
+            ContinuationToken,
+          }),
+        );
+        if (response.Contents) {
+          for (const obj of response.Contents) {
+            if (obj.Key) {
+              files.push({ key: obj.Key, url: this.getPublicUrl(obj.Key) });
+            }
+          }
+        }
+        ContinuationToken = response.IsTruncated
+          ? response.NextContinuationToken
+          : undefined;
+      } while (ContinuationToken);
+      return files;
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      throw new InternalServerErrorException(`Failed to list files: ${msg}`);
     }
   }
 
+  private extractKeyFromUrl(url: string): string {
+    // Remove the public base URL from the start
+    if (!url.startsWith(this.publicBaseUrl)) {
+      throw new Error('URL does not match storage public base URL');
+    }
+    let key = url.replace(this.publicBaseUrl, '');
+    if (key.startsWith('/')) key = key.slice(1);
+    return key;
+  }
 }

@@ -1,25 +1,31 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import {
-  View,
-  StyleSheet,
-  Pressable,
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
   Image,
   Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
   TouchableWithoutFeedback,
-  Animated,
-  Alert,
+  View,
 } from "react-native";
-import { useThemeColor } from "@/hooks/use-theme-color";
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
+
+import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { ThemedInput } from "@/components/ThemedInput";
-import { ThemedText } from "@/components/themed-text";
-import { useAuth } from "@/context/AuthContext";
-import { useRouter } from "expo-router";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { useAuth } from "@/context/AuthContext";
+import { useConfirm } from "@/hooks/use-confirm";
+import { useThemeColor } from "@/hooks/use-theme-color";
+import { useRouter } from "expo-router";
+import Toast from "react-native-toast-message";
 
 export default function LoginScreen() {
   const [identifier, setIdentifier] = useState("");
@@ -29,36 +35,39 @@ export default function LoginScreen() {
   const [biometricLoading, setBiometricLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const { signIn, signInWithBiometric, biometric } = useAuth();
+  const { signIn, signInWithBiometric, biometric, enableBiometricAuth } =
+    useAuth();
+  const { confirm, ConfirmModal } = useConfirm();
   const router = useRouter();
 
   const primary = useThemeColor({}, "brandPrimary");
   const textOnPrimary = useThemeColor({}, "textOnPrimary");
   const muted = useThemeColor({}, "textMuted");
 
-  const logoAnim = useRef(new Animated.Value(0)).current;
+  /* ------------------ Reanimated logo shift ------------------ */
+
+  const logoTranslateY = useSharedValue(0);
 
   useEffect(() => {
     const showSub = Keyboard.addListener("keyboardWillShow", () => {
-      Animated.timing(logoAnim, {
-        toValue: -60,
-        duration: 300,
-        useNativeDriver: true,
-      }).start();
+      logoTranslateY.value = withTiming(-60, { duration: 300 });
     });
+
     const hideSub = Keyboard.addListener("keyboardWillHide", () => {
-      Animated.timing(logoAnim, {
-        toValue: 0,
-        duration: 300,
-        useNativeDriver: true,
-      }).start();
+      logoTranslateY.value = withTiming(0, { duration: 300 });
     });
 
     return () => {
       showSub.remove();
       hideSub.remove();
     };
-  }, [logoAnim]);
+  }, []);
+
+  const logoStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: logoTranslateY.value }],
+  }));
+
+  /* ------------------ Logic ------------------ */
 
   function validateForm() {
     if (!identifier) {
@@ -80,7 +89,43 @@ export default function LoginScreen() {
 
     try {
       await signIn(identifier, password);
-      router.replace("/(tabs)");
+
+      if (biometric.isSupported && !biometric.isEnabled) {
+        const wantsBiometric = await confirm({
+          title: "Enable Biometric Login?",
+          message:
+            "Would you like to enable biometric authentication for faster login in the future?",
+          confirmText: "Yes",
+          cancelText: "No",
+          type: "info",
+          icon: "touchid",
+        });
+
+        if (wantsBiometric) {
+          try {
+            setBiometricLoading(true);
+            await enableBiometricAuth(identifier, password);
+            Toast.show({
+              type: "success",
+              text1: "Biometric Enabled",
+              text2: "You can now use biometric login.",
+            });
+          } catch (e: any) {
+            Toast.show({
+              type: "error",
+              text1: "Biometric Setup Failed",
+              text2: e.message || "Could not enable biometric login.",
+            });
+          } finally {
+            setBiometricLoading(false);
+            router.replace("/(tabs)");
+          }
+        } else {
+          router.replace("/(tabs)");
+        }
+      } else {
+        router.replace("/(tabs)");
+      }
     } catch (e: any) {
       setError(e.message || "Login failed. Please try again.");
     } finally {
@@ -90,26 +135,31 @@ export default function LoginScreen() {
 
   async function handleBiometricLogin() {
     if (!biometric.isSupported) {
-      Alert.alert(
-        "Not Supported",
-        "Your device doesn't support biometric authentication."
-      );
+      Toast.show({
+        type: "error",
+        text1: "Not Supported",
+        text2: "Your device doesn't support biometric authentication.",
+      });
       return;
     }
 
     if (!biometric.isEnrolled) {
-      Alert.alert(
-        "Not Enrolled",
-        "Please set up biometric authentication in your device settings."
-      );
+      Toast.show({
+        type: "error",
+        text1: "Not Enrolled",
+        text2:
+          "Please set up biometric authentication in your device settings.",
+      });
       return;
     }
 
     if (!biometric.isEnabled) {
-      Alert.alert(
-        "Biometric Login Disabled",
-        "Please login with your credentials first and enable biometric login in settings."
-      );
+      Toast.show({
+        type: "info",
+        text1: "Biometric Login Disabled",
+        text2:
+          "Please login with your credentials first and enable biometric login in settings.",
+      });
       return;
     }
 
@@ -126,17 +176,14 @@ export default function LoginScreen() {
     }
   }
 
+  /* ------------------ UI ------------------ */
+
   return (
     <ThemedView style={styles.container}>
+      <ConfirmModal />
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <View style={{ flex: 1 }}>
-          {/* Animated Logo + App Name */}
-          <Animated.View
-            style={[
-              styles.logoContainer,
-              { transform: [{ translateY: logoAnim }] },
-            ]}
-          >
+          <Animated.View style={[styles.logoContainer, logoStyle]}>
             <Image
               source={require("@/assets/images/icon.png")}
               style={styles.logoImage}
@@ -157,7 +204,6 @@ export default function LoginScreen() {
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
             >
-              {/* Form */}
               <View style={styles.form}>
                 <ThemedText type="title">Welcome back</ThemedText>
                 <ThemedText style={[styles.subtitle, { color: muted }]}>
@@ -201,19 +247,11 @@ export default function LoginScreen() {
                   <ThemedText style={styles.inputError}>{error}</ThemedText>
                 ) : null}
 
-                <Pressable
-                  style={styles.forgot}
-                  // onPress={() => router.push("/(auth)/resetpassword")}
-                >
-                  <ThemedText type="link">Forgot password?</ThemedText>
-                </Pressable>
-
-                {/* Login + Fingerprint */}
                 <View style={styles.actionsRow}>
                   <Pressable
                     style={[styles.loginButton, { backgroundColor: primary }]}
                     onPress={handleLogin}
-                    disabled={loading}
+                    disabled={loading || biometricLoading}
                   >
                     {loading ? (
                       <ActivityIndicator color={textOnPrimary} />
@@ -246,14 +284,12 @@ export default function LoginScreen() {
                   </Pressable>
                 </View>
 
-                {/* OR divider */}
                 <View style={styles.divider}>
                   <View style={styles.line} />
                   <ThemedText style={styles.orText}>OR</ThemedText>
                   <View style={styles.line} />
                 </View>
 
-                {/* Sign up */}
                 <View style={styles.signup}>
                   <ThemedText>
                     New partner?{" "}
@@ -274,12 +310,13 @@ export default function LoginScreen() {
   );
 }
 
+/* ------------------ Styles ------------------ */
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     paddingHorizontal: 24,
   },
-
   logoContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -287,43 +324,31 @@ const styles = StyleSheet.create({
     marginTop: 64,
     gap: 12,
   },
-
   logoImage: {
     width: 48,
     height: 48,
   },
-
   logoText: {
     fontSize: 32,
     fontWeight: "bold",
   },
-
   form: {
     flex: 1,
     justifyContent: "center",
     gap: 16,
   },
-
   subtitle: {
     marginTop: -8,
     fontSize: 14,
   },
-
   field: {
     marginTop: 12,
   },
-
-  forgot: {
-    alignItems: "flex-end",
-    marginTop: 4,
-  },
-
   actionsRow: {
     flexDirection: "row",
     gap: 12,
     marginTop: 24,
   },
-
   loginButton: {
     flex: 1,
     height: 52,
@@ -331,7 +356,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-
   fingerprintButton: {
     width: 52,
     height: 52,
@@ -340,30 +364,25 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-
   divider: {
     flexDirection: "row",
     alignItems: "center",
     marginVertical: 24,
   },
-
   line: {
     flex: 1,
     height: 1,
     backgroundColor: "#E5E7EB",
   },
-
   orText: {
     marginHorizontal: 12,
     fontSize: 12,
     opacity: 0.6,
   },
-
   signup: {
     alignItems: "center",
     marginBottom: 24,
   },
-
   inputError: {
     marginTop: 4,
     color: "#EF4444",

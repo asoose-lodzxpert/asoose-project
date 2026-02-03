@@ -1,25 +1,25 @@
-import React, { useState } from "react";
-import {
-  View,
-  StyleSheet,
-  Pressable,
-  ScrollView,
-  Image,
-  Alert,
-} from "react-native";
-import * as ImagePicker from "expo-image-picker";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedInput } from "@/components/ThemedInput";
+import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { SignupForm, VehicleType } from "@/types/signup";
-import { IconSymbol } from "@/components/ui/icon-symbol";
+import * as ImagePicker from "expo-image-picker";
+import React, { useState } from "react";
+import {
+  Alert,
+  Image,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+} from "react-native";
 
 type Props = {
   data: SignupForm;
   onChange: <K extends keyof SignupForm>(key: K, value: SignupForm[K]) => void;
 };
 
-const MAX_SIZE = 5 * 1024 * 1024;
+// const MAX_SIZE = 5 * 1024 * 1024; // 5MB
 
 const VEHICLES: { key: VehicleType; label: string; icon: any }[] = [
   {
@@ -44,6 +44,51 @@ export function StepVehicleInfo({ data, onChange }: Props) {
   const primary = useThemeColor({}, "brandPrimary");
   const [uploading, setUploading] = useState<string | null>(null);
 
+  // Filter vehicles based on role and state
+  const availableVehicles = VEHICLES.filter((vehicle) => {
+    // If role is DRIVER, only show car
+    if (data.role === "DRIVER") {
+      return vehicle.key === "car";
+    }
+
+    // If state is Borno, exclude motorcycle
+    if (data.state === "Borno") {
+      return vehicle.key !== "motorcycle";
+    }
+
+    return true;
+  });
+
+  // Determine required documents based on vehicle type
+  const getRequiredDocuments = () => {
+    const docs: {
+      key: keyof SignupForm["documents"];
+      label: string;
+    }[] = [{ key: "idCard", label: "ID Document (National ID/Passport)" }];
+
+    if (!data.vehicleType || data.vehicleType === "walking") {
+      return docs;
+    }
+
+    if (data.vehicleType === "bicycle") {
+      // Bicycle doesn't need driver's license
+      return docs;
+    }
+
+    // Motorcycle and Car need all documents
+    if (data.vehicleType === "motorcycle" || data.vehicleType === "car") {
+      docs.push(
+        { key: "driverLicense", label: "Driver's License" },
+        { key: "vehicleInsurance", label: "Vehicle Insurance" },
+        { key: "vehicleRegistration", label: "Vehicle Registration" },
+      );
+    }
+
+    return docs;
+  };
+
+  const requiredDocuments = getRequiredDocuments();
+
   const pickImage = async (key: keyof SignupForm["documents"]) => {
     try {
       setUploading(key);
@@ -53,7 +98,7 @@ export function StepVehicleInfo({ data, onChange }: Props) {
       if (status !== "granted") {
         Alert.alert(
           "Permission Required",
-          "Please grant camera roll permissions to upload documents."
+          "Please grant camera roll permissions to upload documents.",
         );
         setUploading(null);
         return;
@@ -107,7 +152,7 @@ export function StepVehicleInfo({ data, onChange }: Props) {
       {/* Vehicle Type */}
       <Field label="Vehicle type">
         <View style={styles.grid}>
-          {VEHICLES.map((v) => (
+          {availableVehicles.map((v) => (
             <Pressable
               key={v.key}
               style={[
@@ -172,14 +217,7 @@ export function StepVehicleInfo({ data, onChange }: Props) {
 
       {/* Document Uploads */}
       <Field label="Upload Documents">
-        {(
-          [
-            { key: "idCard", label: "ID Document (National ID/Passport)" },
-            { key: "driverLicense", label: "Driver's License" },
-            { key: "vehicleInsurance", label: "Vehicle Insurance" },
-            { key: "vehicleRegistration", label: "Vehicle Registration" },
-          ] as const
-        ).map(({ key, label }) => {
+        {requiredDocuments.map(({ key, label }) => {
           const file = data.documents[key];
           const uploaded = Boolean(file);
           const isUploading = uploading === key;

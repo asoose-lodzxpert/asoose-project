@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
 import useSWR from 'swr';
+import { getSession } from 'next-auth/react';
 import { fetcher } from '../../hooks/useSuperAdminFetch';
 import DisputeDetailSkeleton from './component/skeleton';
 import { DisputeDetail, ModalType } from './types';
@@ -74,7 +75,7 @@ export default function DisputeDetailPage({ params }: DisputeDetailPageProps) {
          id: 'temp-' + Date.now(),
          message,
          isInternal,
-         sender: 'You',
+         sender: { id: 'self', name: 'You', role: 'ADMIN' },
          createdAt: new Date().toISOString(),
          isAdmin: true
        };
@@ -83,8 +84,8 @@ export default function DisputeDetailPage({ params }: DisputeDetailPageProps) {
 
     try {
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-      const session = await import('../../../../../utils/supabase/client').then(m => m.createClient().auth.getSession());
-      const authToken = session.data.session?.access_token;
+      const session = await getSession();
+      const authToken = (session as any)?.accessToken;
 
       const res = await fetch(`${API_URL}/super-admin/disputes/${disputeId}/messages`, {
         method: 'POST',
@@ -109,8 +110,8 @@ export default function DisputeDetailPage({ params }: DisputeDetailPageProps) {
   const handleUpdatePriority = async (priority: string) => {
     if (!disputeId) return;
     try {
-      const session = await import('../../../../../utils/supabase/client').then(m => m.createClient().auth.getSession());
-      const authToken = session.data.session?.access_token;
+      const session = await getSession();
+      const authToken = (session as any)?.accessToken;
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
       await fetch(`${API_URL}/super-admin/disputes/${disputeId}/priority`, {
@@ -129,12 +130,14 @@ export default function DisputeDetailPage({ params }: DisputeDetailPageProps) {
     }
   };
 
-  const handleResolution = async (input: string) => {
+  // ✅ FIX: Updated signature to accept (notes, refundSource, amountInput)
+  // This matches the updated ResolutionModal logic
+  const handleResolution = async (notes: string, refundSource: string, amountInput?: string) => {
     if (!dispute || !disputeId) return;
     setProcessing(true);
     try {
-      const session = await import('../../../../../utils/supabase/client').then(m => m.createClient().auth.getSession());
-      const authToken = session.data.session?.access_token;
+      const session = await getSession();
+      const authToken = (session as any)?.accessToken;
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
       let endpoint = `${API_URL}/super-admin/disputes/${disputeId}/resolve`;
@@ -142,23 +145,36 @@ export default function DisputeDetailPage({ params }: DisputeDetailPageProps) {
 
       if (modalType === 'REJECT') {
         endpoint = `${API_URL}/super-admin/disputes/${disputeId}/reject`;
-        body = { reason: input };
+        body = { reason: notes }; // For reject, the first arg is the reason
       } else {
         let action = 'NO_REFUND';
         let refundAmount = 0;
+
         if (modalType === 'REFUND_FULL') {
           action = 'REFUND_FULL';
           refundAmount = getMaxRefundAmount() || 0;
         } else if (modalType === 'REFUND_PARTIAL') {
           action = 'REFUND_PARTIAL';
-          refundAmount = parseFloat(input);
+          // ✅ FIX: Use the 3rd argument (amountInput) for partial amount
+          refundAmount = parseFloat(amountInput || '0'); 
         }
+
+        // ✅ FIX: Formatted string with Naira (₦) symbol
+        const resolutionNotes = modalType === 'REFUND_PARTIAL' 
+          ? `Partial Refund of ₦${amountInput} | ${notes}` 
+          : notes;
+
         body = {
           action,
-          resolutionNotes: `Resolution: ${action}. ${modalType === 'RESOLVE_NO_REFUND' ? input : ''}`,
-          ...(refundAmount > 0 && { refundAmount, refundSource: 'PLATFORM' })
+          resolutionNotes: resolutionNotes,
+          ...(refundAmount > 0 && { 
+             refundAmount, 
+             refundSource: refundSource 
+          })
         };
       }
+
+      console.log('Sending Payload:', body); // Debug check
 
       const res = await fetch(endpoint, {
         method: 'POST',
@@ -169,14 +185,17 @@ export default function DisputeDetailPage({ params }: DisputeDetailPageProps) {
         body: JSON.stringify(body)
       });
 
-      if (!res.ok) throw new Error('Action failed');
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || 'Action failed');
+      }
       
       toast.success('Dispute resolved. Action has been recorded in audit logs.');
       setModalType(null);
       mutate(); 
 
-    } catch (e) {
-      toast.error('Failed to process request');
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to process request');
     } finally {
       setProcessing(false);
     }
@@ -206,7 +225,6 @@ export default function DisputeDetailPage({ params }: DisputeDetailPageProps) {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
-            {/* DisputeOverview now handles the Evidence Gallery layout internally */}
             <DisputeOverview 
               dispute={dispute} 
               onImageClick={setSelectedImage} 
@@ -246,7 +264,7 @@ export default function DisputeDetailPage({ params }: DisputeDetailPageProps) {
         maxRefundAmount={getMaxRefundAmount() || 0}
         isProcessing={processing}
         onClose={() => setModalType(null)}
-        onConfirm={handleResolution}
+        onConfirm={handleResolution} // Logic matches updated signature
       />
 
       <ImageLightbox 

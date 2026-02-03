@@ -22,10 +22,9 @@ import { NotificationsGateway } from '../notifications/notifications.gateway';
 const ORDER_STATUS = { PENDING: 'PENDING' } as const;
 const DELIVERY_STATUS = { REQUESTED: 'REQUESTED' } as const;
 
-// Redis Config
 const IDEMPOTENCY_PREFIX = 'idemp:order:';
-const LOCK_TTL_MS = 20000; 
-const COMPLETED_TTL_MS = 5 * 60 * 1000; 
+const LOCK_TTL_MS = 20000;
+const COMPLETED_TTL_MS = 5 * 60 * 1000;
 
 @Injectable()
 export class OrdersService {
@@ -42,12 +41,9 @@ export class OrdersService {
     @Inject('REDIS_CLIENT') private readonly redis: RedisClientType,
   ) {}
 
-  // 1. QUOTE CALCULATION
-
   async calculateQuote(userId: string, data: CreateOrderDto) {
     const { addressId, restaurantId, items } = data;
 
-    // A. Fetch Store & Address
     const store = await this.prisma.store.findUnique({
       where: { id: restaurantId },
       select: { lat: true, lng: true, name: true },
@@ -61,7 +57,6 @@ export class OrdersService {
       throw new BadRequestException('Invalid delivery address');
     }
 
-    // B. Calculate Subtotal
     const productIds = items.map((i) => i.id);
     const products = await this.prisma.product.findMany({
       where: { id: { in: productIds } },
@@ -75,7 +70,6 @@ export class OrdersService {
       }
     });
 
-    // C. Calculate Fees
     const storeLat = store.lat || 0;
     const storeLng = store.lng || 0;
 
@@ -100,32 +94,24 @@ export class OrdersService {
     };
   }
 
-  // 2. ORDER CREATION LOGIC
-
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   async createOrder(
     userId: string,
     data: CreateOrderDto,
     idempotencyHeader?: string,
   ) {
-    // 1. Generate Key
     const rawKey = this.generateIdempotencyKey(userId, data, idempotencyHeader);
     const redisKey = `${IDEMPOTENCY_PREFIX}${rawKey}`;
 
-    // 2. Acquire Lock (Redis Atomic Operation)
     const existingOrderId = await this.acquireIdempotencyLock(redisKey);
 
     if (existingOrderId) {
-      this.logger.log(
-        `Idempotency hit: Returning existing order ${existingOrderId}`,
-      );
       return this.prisma.order.findUnique({
         where: { id: existingOrderId },
         include: { user: { select: { email: true, name: true } } },
       });
     }
 
-    // Context for notifications
     const emailItems: string[] = [];
     let notificationContext: any = {};
 
@@ -135,7 +121,6 @@ export class OrdersService {
 
       const order = await this.prisma.$transaction(
         async (tx) => {
-          // A. Fetch Entities
           const user = await tx.user.findUnique({
             where: { id: userId },
             select: { email: true, name: true, phone: true },
@@ -148,13 +133,9 @@ export class OrdersService {
           });
           if (!store) throw new NotFoundException('Store not found');
 
-          // B. Validate Products
           const productMap = await this.validateAndFetchProducts(tx, items);
-
-          // C. Validate Inventory
           this.inventoryService.validateStock(items, productMap);
 
-          // D. Handle Addresses
           const pickupAddress =
             await this.addressesService.getOrCreateStoreAddress(
               store.vendorId,
@@ -166,12 +147,23 @@ export class OrdersService {
 
           const dropoffAddress = await tx.address.findUnique({
             where: { id: addressId },
+            select: {
+              id: true,
+              userId: true,
+              street: true,
+              city: true,
+              state: true,
+              lat: true,
+              lng: true,
+              label: true,
+              vendorId: true,
+              isDefault: true,
+            },
           });
           if (!dropoffAddress || dropoffAddress.userId !== userId) {
             throw new BadRequestException('Invalid delivery address');
           }
 
-          // E. Pricing (Delivery)
           const distance = this.pricingService.calculateDistance(
             pickupAddress.lat,
             pickupAddress.lng,
@@ -181,7 +173,6 @@ export class OrdersService {
           const deliveryFee =
             this.pricingService.calculateDeliveryFee(distance);
 
-          // F. Prepare Items Data & Calculate Subtotal
           let itemsTotal = 0;
           const orderItemsData: {
             productId: string;
@@ -204,12 +195,10 @@ export class OrdersService {
             emailItems.push(`${item.quantity}x ${product.name}`);
           }
 
-          // Calculate Service Fee and Final Total
           const serviceFee =
             this.pricingService.calculateServiceFee(itemsTotal);
           const finalTotal = itemsTotal + deliveryFee + serviceFee;
 
-          // Set context for notifications
           notificationContext = {
             storeOwnerId: store.vendorId,
             storeName: store.name,
@@ -217,7 +206,6 @@ export class OrdersService {
             customerEmail: user.email,
           };
 
-          // G. Create Order
           const newOrder = await tx.order.create({
             data: {
               userId,
@@ -244,88 +232,105 @@ export class OrdersService {
             },
           });
 
-          // H. Decrement Stock
           await this.inventoryService.decrementStock(tx, items);
-
-          this.logger.log(
-            `Order ${newOrder.id} created. Total: ₦${finalTotal} (Items: ${itemsTotal}, Del: ${deliveryFee}, Svc: ${serviceFee})`,
-          );
 
           return newOrder;
         },
         { maxWait: 10000, timeout: 30000 },
       );
 
-      // 3. Mark Idempotency as COMPLETED
       await this.completeIdempotency(redisKey, order.id);
 
-      // 4. Emit SSE event for real-time vendor notification
-      this.vendorOrdersStreamService.emitNewOrder(order.storeId, order.id, {
-        id: order.id,
-        status: order.status,
-        total: order.total,
-        customerName: order.user?.name || 'Unknown',
-        customerEmail: order.user?.email || 'Unknown',
-        storeName: order.store?.name || 'Unknown',
-        itemCount: items.length,
-        createdAt: order.createdAt,
-      });
+      try {
+        this.vendorOrdersStreamService.emitNewOrder(order.storeId, order.id, {
+          id: order.id,
+          status: order.status,
+          total: order.total,
+          customerName: order.user?.name || 'Unknown',
+          customerEmail: order.user?.email || 'Unknown',
+          storeName: order.store?.name || 'Unknown',
+          itemCount: items.length,
+          createdAt: order.createdAt,
+        });
 
-      // 5. Notifications
-      this.notificationFacade.sendOrderNotifications(
-        userId,
-        notificationContext.storeOwnerId,
-        order.id,
-        notificationContext.storeName,
-        order.total,
-        notificationContext.customerEmail,
-        notificationContext.storeOwnerEmail,
-        emailItems,
-      );
+        this.notificationFacade.sendOrderNotifications(
+          userId,
+          notificationContext.storeOwnerId,
+          order.id,
+          notificationContext.storeName,
+          order.total,
+          notificationContext.customerEmail,
+          notificationContext.storeOwnerEmail,
+          emailItems,
+        );
 
-      // 6. EMIT REAL-TIME UPDATE TO CUSTOMER SOCKET
-      this.notificationsGateway.sendOrderUpdate(order.id, {
-        status: order.status,
-        total: order.total,
-        timeline: [
-          { status: 'PLACED', label: 'Order Placed', time: order.createdAt.toISOString(), icon: 'default' }
-        ]
-      });
+        this.notificationsGateway.sendOrderUpdate(order.id, {
+          status: order.status,
+          total: order.total,
+          timeline: [
+            {
+              status: 'PLACED',
+              label: 'Order Placed',
+              time: order.createdAt.toISOString(),
+              icon: 'default',
+            },
+          ],
+        });
+      } catch (notifyError) {
+        this.logger.error(
+          `Post-order notification failed for order ${order.id}`,
+          notifyError,
+        );
+      }
 
       return order;
     } catch (error) {
-      // 7. Release Lock on Failure
       await this.releaseIdempotencyLock(redisKey);
       this.handleOrderError(userId, error);
     }
   }
 
-  // 3. READ OPERATIONS
-
-  async getUserOrders(userId: string) {
+  async getUserOrders(
+    userId: string,
+    opts?: { page?: number; pageSize?: number; status?: string },
+  ) {
     try {
-      const orders = await this.prisma.order.findMany({
-        where: { userId },
-        orderBy: { createdAt: 'desc' },
-        include: {
-          items: { select: { quantity: true, nameSnap: true } },
-          store: { select: { name: true, logo: true } },
-        },
-        take: 50,
-      });
-
-      return orders.map((order) => ({
-        id: order.id,
-        status: order.status,
-        total: order.total,
-        createdAt: order.createdAt,
-        storeName: order.store?.name,
-        storeLogo: order.store?.logo,
-        items: order.items?.map((i) => ({
-          name: i.nameSnap,
-          quantity: i.quantity,
+      const page = opts?.page || 1;
+      const pageSize = opts?.pageSize || 10;
+      const status = opts?.status;
+      const where: any = { userId };
+      if (status) where.status = status;
+      const [orders, total] = await this.prisma.$transaction([
+        this.prisma.order.findMany({
+          where,
+          orderBy: { createdAt: 'desc' },
+          include: {
+            items: { select: { quantity: true, nameSnap: true } },
+            store: { select: { name: true, logo: true } },
+          },
+          skip: (page - 1) * pageSize,
+          take: pageSize,
+        }),
+        this.prisma.order.count({ where }),
+      ]);
+      return {
+        data: orders.map((order) => ({
+          id: order.id,
+          status: order.status,
+          total: order.total,
+          createdAt: order.createdAt,
+          storeName: order.store?.name,
+          storeLogo: order.store?.logo,
+          items: order.items?.map((i) => ({
+            name: i.nameSnap,
+            quantity: i.quantity,
+          })),
         })),
-      }));
+        total,
+        page,
+        pageSize,
+        hasMore: page * pageSize < total,
+      };
     } catch (error: any) {
       this.logger.error(
         `Failed to fetch orders for user ${userId}`,
@@ -341,18 +346,20 @@ export class OrdersService {
         where: { id: orderId, userId: userId },
         include: {
           items: true,
-          delivery: { 
-            include: { 
+          delivery: {
+            include: {
               dropoffAddress: true,
-              rider: { 
-                select: { 
-                  name: true, 
-                  phone: true, 
-                  image: true, 
-                  vehicle: { select: { model: true, color: true, plateNumber: true } }
-                } 
-              }
-            } 
+              rider: {
+                select: {
+                  name: true,
+                  phone: true,
+                  image: true,
+                  vehicle: {
+                    select: { model: true, color: true, plateNumber: true },
+                  },
+                },
+              },
+            },
           },
           store: {
             select: {
@@ -368,86 +375,107 @@ export class OrdersService {
 
       if (!order) throw new NotFoundException('Order not found');
 
-      const timeline: { 
-        status: string; 
-        label: string; 
-        description: string; 
-        time: string | null; 
-        icon: string 
+      // FIX 2: Correct Timeline Status Checks based on Schema (DISPATCHED, IN_TRANSIT)
+      const timeline: {
+        status: string;
+        label: string;
+        description: string;
+        time: string | null;
+        icon: string;
       }[] = [];
-      
+
       // 1. Placed
       timeline.push({
         status: 'PLACED',
         label: 'Order Placed',
         description: 'Your order has been received',
         time: order.createdAt.toISOString(),
-        icon: 'default'
+        icon: 'default',
       });
 
-      // 2. Confirmed
-      if (['CONFIRMED', 'PREPARING', 'READY', 'ON_THE_WAY', 'DELIVERED'].includes(order.status)) {
+      // 2. Confirmed (Includes DISPATCHED, which implies confirmation)
+      if (
+        ['CONFIRMED', 'PREPARING', 'READY', 'DISPATCHED', 'DELIVERED'].includes(
+          order.status,
+        )
+      ) {
         timeline.push({
           status: 'CONFIRMED',
           label: 'Order Confirmed',
           description: 'The restaurant has accepted your order',
-          time: null, 
-          icon: 'kitchen'
+          time: null,
+          icon: 'kitchen',
         });
       }
 
       // 3. Preparing
-      if (['PREPARING', 'READY', 'ON_THE_WAY', 'DELIVERED'].includes(order.status)) {
+      if (
+        ['PREPARING', 'READY', 'DISPATCHED', 'DELIVERED'].includes(order.status)
+      ) {
         timeline.push({
           status: 'PREPARING',
           label: 'Preparing',
-          description: 'Your order is being processed', 
-          time: null, 
-          icon: 'kitchen'
+          description: 'Your order is being processed',
+          time: null,
+          icon: 'kitchen',
         });
       }
 
       // 4. Ready/Picked Up
-      if (['READY', 'ON_THE_WAY', 'DELIVERED'].includes(order.status)) {
-         timeline.push({
+      if (['READY', 'DISPATCHED', 'DELIVERED'].includes(order.status)) {
+        timeline.push({
           status: 'READY',
           label: 'Order Ready',
-          description: 'Order is ready for pickup', 
+          description: 'Order is ready for pickup',
           time: null,
-          icon: 'package'
+          icon: 'package',
         });
       }
 
-      // 5. On the Way
-      if (['ON_THE_WAY', 'DELIVERED'].includes(order.status) || order.delivery?.status === 'PICKED_UP') {
+      // 5. On the Way (Uses DISPATCHED or Delivery status)
+      // Checks for Order Status: DISPATCHED or Delivery Status: IN_TRANSIT / PICKED_UP
+      const isDispatch =
+        order.status === 'DISPATCHED' || order.status === 'DELIVERED';
+      const isDeliveryActive =
+        order.delivery &&
+        ['PICKED_UP', 'IN_TRANSIT', 'DELIVERED'].includes(
+          order.delivery.status,
+        );
+
+      if (isDispatch || isDeliveryActive) {
         timeline.push({
           status: 'ON_THE_WAY',
           label: 'Rider on the way',
           description: `${order.delivery?.rider?.name || 'Rider'} is heading to you`,
           time: order.delivery?.pickedUpAt?.toISOString() || null,
-          icon: 'rider'
+          icon: 'rider',
         });
       }
 
       // 6. Delivered
-      if (order.status === 'DELIVERED' || order.delivery?.status === 'DELIVERED') {
-         timeline.push({
+      if (order.status === 'DELIVERED') {
+        timeline.push({
           status: 'DELIVERED',
           label: 'Delivered',
-          description: 'Order delivered successfully', // Changed from "Enjoy your meal!"
-          time: order.deliveredAt?.toISOString() || order.delivery?.deliveredAt?.toISOString() || null,
-          icon: 'delivered'
+          description: 'Order delivered successfully',
+          time:
+            order.deliveredAt?.toISOString() ||
+            order.delivery?.deliveredAt?.toISOString() ||
+            null,
+          icon: 'delivered',
         });
       }
 
-      // Handle Cancelled
       if (order.status === 'CANCELLED' || order.status === 'REJECTED') {
         timeline.push({
           status: 'CANCELLED',
           label: 'Order Cancelled',
-          description: 'This order was cancelled',
+          description:
+            order.status === 'REJECTED'
+              ? 'Store rejected the order'
+              : 'This order was cancelled',
           time: order.cancelledAt?.toISOString() || null,
-          icon: 'default'
+          icon: 'default',
         });
       }
 
@@ -457,21 +485,22 @@ export class OrdersService {
         total: order.total,
         createdAt: order.createdAt,
         deliveredAt: order.deliveredAt,
-        
-        // Backend calculated fields for frontend display
-        eta: order.delivery?.distanceKm ? `${Math.ceil(order.delivery.distanceKm * 5 + 15)} mins` : '30-45 mins',
-        distance: order.delivery?.distanceKm ? `${order.delivery.distanceKm} km` : null,
-        
+        eta: order.delivery?.distanceKm
+          ? `${Math.ceil(order.delivery.distanceKm * 5 + 15)} mins`
+          : '30-45 mins',
+        distance: order.delivery?.distanceKm
+          ? `${order.delivery.distanceKm} km`
+          : null,
         timeline: timeline,
-        
-        rider: order.delivery?.rider ? {
-          name: order.delivery.rider.name,
-          phone: order.delivery.rider.phone,
-          vehicle: order.delivery.rider.vehicle 
-            ? `${order.delivery.rider.vehicle.color} ${order.delivery.rider.vehicle.model} (${order.delivery.rider.vehicle.plateNumber})`
-            : 'Motorcycle'
-        } : null,
-
+        rider: order.delivery?.rider
+          ? {
+              name: order.delivery.rider.name,
+              phone: order.delivery.rider.phone,
+              vehicle: order.delivery.rider.vehicle
+                ? `${order.delivery.rider.vehicle.color} ${order.delivery.rider.vehicle.model} (${order.delivery.rider.vehicle.plateNumber})`
+                : 'Motorcycle',
+            }
+          : null,
         dispute: order.disputes[0] || null,
         items: order.items.map((item) => ({
           id: item.id,
@@ -488,7 +517,7 @@ export class OrdersService {
         store: {
           name: order.store?.name,
           phone: order.store?.vendor?.phone,
-          location: { lat: order.store?.lat, lng: order.store?.lng }
+          location: { lat: order.store?.lat, lng: order.store?.lng },
         },
       };
     } catch (error) {
@@ -496,8 +525,6 @@ export class OrdersService {
       throw new BadRequestException('Failed to retrieve order details');
     }
   }
-
-  // 4. HELPER METHODS
 
   private async validateAndFetchProducts(
     tx: Prisma.TransactionClient,
@@ -552,19 +579,13 @@ export class OrdersService {
       PX: LOCK_TTL_MS,
       NX: true,
     });
-
-    if (result === 'OK') {
-      return null;
-    }
-
+    if (result === 'OK') return null;
     const value = await this.redis.get(key);
-
     if (value === 'PROCESSING') {
       throw new ConflictException(
         'This order is currently being processed. Please wait.',
       );
     }
-
     return value;
   }
 
@@ -584,9 +605,7 @@ export class OrdersService {
     data: CreateOrderDto,
     clientKey?: string,
   ): string {
-    if (clientKey) {
-      return `header:${userId}:${clientKey}`;
-    }
+    if (clientKey) return `header:${userId}:${clientKey}`;
     const { addressId, restaurantId, items } = data;
     const itemsString = items
       .map((i) => `${i.id}:${i.quantity}`)

@@ -1,16 +1,15 @@
 import { fetchWithAuth } from "./auth-fetch";
 
-const API_URL =
-  process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api/v1";
+const EXPO_PUBLIC_API_URL = process.env.EXPO_PUBLIC_API_URL;
 
 export interface EarningsData {
   total: number;
-  deliveries: number;
-  avgPerDelivery: number;
+  rides: number;
+  avgPerRide: number;
   hoursOnline: number;
   rating: number;
   breakdown: {
-    deliveryFees: number;
+    rideFees: number;
     bonuses: number;
     serviceFees: number;
   };
@@ -19,11 +18,11 @@ export interface EarningsData {
 export type Timeframe = "today" | "week" | "month" | "year";
 
 export async function getEarnings(
-  timeframe: Timeframe = "week"
+  timeframe: Timeframe = "week",
 ): Promise<EarningsData> {
   try {
     const data = await fetchWithAuth(
-      `${API_URL}/riders/earnings?timeframe=${timeframe}`
+      `${EXPO_PUBLIC_API_URL}/riders/earnings?timeframe=${timeframe}`,
     );
     return data;
   } catch (error) {
@@ -34,7 +33,9 @@ export async function getEarnings(
 
 export async function getWalletBalance(): Promise<{ balance: number }> {
   try {
-    const data = await fetchWithAuth(`${API_URL}/riders/wallet/balance`);
+    const data = await fetchWithAuth(
+      `${EXPO_PUBLIC_API_URL}/riders/wallet/balance`,
+    );
     return data;
   } catch (error) {
     console.error("Error fetching wallet balance:", error);

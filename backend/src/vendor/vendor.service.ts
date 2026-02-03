@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { AppLogger } from '../libs/logger/app-logger.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { NubanService } from '../libs/nuban/nuban.service';
 import { VendorSecurityNotificationsService } from './notifications/vendor-security-notifications.service';
@@ -9,6 +10,7 @@ export class VendorService {
     private readonly prisma: PrismaService,
     private readonly nubanService: NubanService,
     private readonly securityNotifications: VendorSecurityNotificationsService,
+    private readonly appLogger: AppLogger,
   ) {}
 
   async getStorePublicDetails(vendorId: string) {
@@ -33,19 +35,41 @@ export class VendorService {
     return store;
   }
 
-  async updateVendorImage(vendorId: string, imageUrl: string) {
-    const vendor = await this.prisma.vendor.update({
-      where: { id: vendorId },
-      data: { image: imageUrl },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        phone: true,
-        image: true,
-        status: true,
-      },
-    });
+  async updateVendorImage(vendorId: string, imageUrl: string, type?: string) {
+    let vendor;
+    if (type === 'banner') {
+      // update store banner
+      const store = await this.prisma.store.update({
+        where: { vendorId },
+        data: { banner: imageUrl },
+        select: { vendorId: true },
+      });
+      // fetch vendor details to return
+      vendor = await this.prisma.vendor.findUnique({
+        where: { id: vendorId },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          phone: true,
+          image: true,
+          status: true,
+        },
+      });
+    } else {
+      vendor = await this.prisma.vendor.update({
+        where: { id: vendorId },
+        data: { image: imageUrl },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          phone: true,
+          image: true,
+          status: true,
+        },
+      });
+    }
 
     // Send profile update notification
     try {
@@ -55,7 +79,11 @@ export class VendorService {
         vendor.name,
       );
     } catch (error) {
-      console.error('Failed to send profile update notification:', error);
+      this.appLogger.error(
+        'Failed to send profile update notification',
+        error?.stack,
+        { error },
+      );
     }
 
     return vendor;
@@ -131,7 +159,7 @@ export class VendorService {
     const store = await this.prisma.store.findUnique({ where: { vendorId } });
     if (!store) return [];
     const orders = await this.prisma.order.findMany({
-      where: { storeId: store.id },
+      where: { storeId: store.id, paymentStatus: 'PAID' },
       orderBy: { createdAt: 'desc' },
       take: 5,
       include: {
@@ -139,6 +167,7 @@ export class VendorService {
         items: true,
       },
     });
+
     return orders.map((order) => ({
       id: order.id,
       customerName: order.user?.name || '',
@@ -147,8 +176,13 @@ export class VendorService {
         id: i.id,
         name: i.nameSnap,
         quantity: i.quantity,
+        price: i.price,
       })),
-      total: order.total,
+      total: order.items.reduce(
+        (s: number, i: any) =>
+          s + (Number(i.price) || 0) * (Number(i.quantity) || 0),
+        0,
+      ),
       status: order.status.toLowerCase(),
       timestamp: order.createdAt.toISOString(),
     }));
@@ -169,7 +203,7 @@ export class VendorService {
       },
     });
 
-    return bankAccount ? [bankAccount] : [];
+    return bankAccount;
   }
 
   // Get single bank account for vendor
@@ -277,7 +311,11 @@ export class VendorService {
           );
         }
       } catch (error) {
-        console.error('Failed to send bank account notification:', error);
+        this.appLogger.error(
+          'Failed to send bank account notification',
+          error?.stack,
+          { error },
+        );
       }
 
       return newBankAccount;
@@ -330,7 +368,11 @@ export class VendorService {
         );
       }
     } catch (error) {
-      console.error('Failed to send bank account update notification:', error);
+      this.appLogger.error(
+        'Failed to send bank account update notification',
+        error?.stack,
+        { error },
+      );
     }
 
     return updated;
@@ -369,9 +411,10 @@ export class VendorService {
         );
       }
     } catch (error) {
-      console.error(
-        'Failed to send bank account deletion notification:',
-        error,
+      this.appLogger.error(
+        'Failed to send bank account deletion notification',
+        error?.stack,
+        { error },
       );
     }
 
@@ -462,7 +505,11 @@ export class VendorService {
         );
       }
     } catch (error) {
-      console.error('Failed to send withdrawal notification:', error);
+      this.appLogger.error(
+        'Failed to send withdrawal notification',
+        error?.stack,
+        { error },
+      );
     }
 
     return {
@@ -518,7 +565,11 @@ export class VendorService {
         vendor.name,
       );
     } catch (error) {
-      console.error('Failed to send deletion request notification:', error);
+      this.appLogger.error(
+        'Failed to send deletion request notification',
+        error?.stack,
+        { error },
+      );
     }
 
     return {

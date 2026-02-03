@@ -28,4 +28,3 @@ export class ReviewsController {
     return this.reviewsService.getVendorReviews(storeId, page, limit);
   }
 }
-

@@ -11,9 +11,10 @@ import { ThemedText } from "@/components/themed-text";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { MenuItem } from "@/types/menu";
+import { Product } from "@/services/products.service";
 
 interface Props {
-  item: MenuItem;
+  item: Product;
   onToggleStock: () => void;
   onEdit: () => void;
   onDelete: () => void;

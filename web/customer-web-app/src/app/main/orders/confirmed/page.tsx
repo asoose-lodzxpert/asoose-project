@@ -1,9 +1,16 @@
 'use client';
 
-import { Check, Clock, CreditCard, ArrowRight } from 'lucide-react';
+import { Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { Check, Clock, CreditCard } from 'lucide-react';
 import Link from 'next/link';
 import { OrderTimeline } from '@/app/main/components/order/OrderTimeline';
-export default function OrderConfirmedPage() {
+
+function OrderConfirmedContent() {
+  const searchParams = useSearchParams();
+  const orderId = searchParams.get('id');
+  const displayId = orderId ? `#${orderId.slice(0, 8).toUpperCase()}` : '#ORDER-CONFIRMED';
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-[#0a0a0a] flex flex-col items-center justify-center p-4 transition-colors duration-300">
       
@@ -26,60 +33,43 @@ export default function OrderConfirmedPage() {
            {/* Order Number Banner */}
            <div className="bg-gray-50 dark:bg-white/5 p-4 rounded-2xl text-center">
               <span className="text-xs text-gray-500 dark:text-gray-400 uppercase font-bold tracking-wider">Order Number</span>
-              <p className="text-xl font-black text-gray-900 dark:text-white mt-0.5 tracking-tight">#ORD-12345</p>
-           </div>
-
-           {/* Restaurant Info */}
-           <div className="flex items-center gap-4 pb-6 border-b border-gray-100 dark:border-white/5">
-              <div className="w-12 h-12 bg-yellow-100 dark:bg-yellow-500/10 rounded-full flex items-center justify-center text-xl">
-                 🍕
-              </div>
-              <div>
-                 <h3 className="font-bold text-gray-900 dark:text-white">Joe's Pizza</h3>
-                 <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">Italian • Pizza</p>
-              </div>
-           </div>
-
-           {/* Address & Payment Info */}
-           <div className="space-y-4">
-              <div className="flex items-start gap-3">
-                 <div className="mt-1 w-2 h-2 rounded-full bg-red-500 shadow-md shadow-red-500/30" />
-                 <div>
-                    <p className="text-xs text-gray-400 font-bold mb-0.5">Delivery Address</p>
-                    <p className="text-sm font-bold text-gray-900 dark:text-white">123 Main St, Apt 4B</p>
-                 </div>
-              </div>
-              
-              <div className="flex items-center justify-between">
-                 <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300 font-medium">
-                    <CreditCard className="w-4 h-4 text-gray-400" />
-                    <span>Paid with Visa ••1234</span>
-                 </div>
-                 <span className="font-black text-lg text-gray-900 dark:text-white">$27.98</span>
-              </div>
+              <p className="text-xl font-black text-gray-900 dark:text-white mt-0.5 tracking-tight">
+                {displayId}
+              </p>
            </div>
 
            {/* Delivery Estimate Banner */}
            <div className="bg-yellow-500 text-black p-4 rounded-xl flex items-center justify-center gap-2 font-bold shadow-lg shadow-yellow-500/20">
               <Clock className="w-5 h-5" />
-              <span>Delivery in 25-35 minutes</span>
+              <span>Delivery estimate sent to email</span>
            </div>
         </div>
 
         {/* 3. TIMELINE SECTION */}
-        <OrderTimeline />
+        {/* FIX: Added status prop to prevent crash */}
+        <OrderTimeline status="PENDING" />
 
         {/* 4. ACTIONS */}
         <div className="pb-8 space-y-3">
-           <Link href="/dashboard" className="block w-full bg-gray-900 dark:bg-white text-white dark:text-black py-4 rounded-2xl font-bold text-center shadow-lg active:scale-[0.98] transition-all">
-              Track Order
-           </Link>
-           <Link href="/dashboard" className="block w-full text-center py-3 text-gray-500 dark:text-gray-400 font-bold text-sm hover:text-gray-900 dark:hover:text-white transition-colors">
+           {orderId && (
+             <Link href={`/main/orders/${orderId}`} className="block w-full bg-gray-900 dark:bg-white text-white dark:text-black py-4 rounded-2xl font-bold text-center shadow-lg active:scale-[0.98] transition-all">
+                Track Order
+             </Link>
+           )}
+           <Link href="/" className="block w-full text-center py-3 text-gray-500 dark:text-gray-400 font-bold text-sm hover:text-gray-900 dark:hover:text-white transition-colors">
               Back to Home
            </Link>
         </div>
 
       </div>
     </div>
+  );
+}
+
+export default function OrderConfirmedPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading...</div>}>
+      <OrderConfirmedContent />
+    </Suspense>
   );
 }

@@ -21,6 +21,7 @@ import {
   fetchCategories,
   deleteProduct,
   toggleProductStock,
+  Product,
 } from "@/services/products.service";
 import { useFocusEffect, useRouter } from "expo-router";
 
@@ -31,10 +32,10 @@ export default function MenuScreen() {
 
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
 
-  const [items, setItems] = useState<MenuItem[]>([]);
+  const [items, setItems] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
 
-  const [deleteTarget, setDeleteTarget] = useState<MenuItem | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Product | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const [loading, setLoading] = useState(true);
@@ -76,7 +77,7 @@ export default function MenuScreen() {
   useFocusEffect(
     useCallback(() => {
       loadData();
-    }, [user?.storeId])
+    }, [user?.storeId]),
   );
 
   /* -------------------- Computed -------------------- */
@@ -87,7 +88,7 @@ export default function MenuScreen() {
 
   const categoryOptions = useMemo(() => {
     const categoriesWithItems = categories.filter((c) =>
-      items.some((item) => item.categoryId === c.id)
+      items.some((item) => item.categoryId === c.id),
     );
     return categoriesWithItems.map((c) => ({ id: c.id, name: c.name }));
   }, [categories, items]);
@@ -109,7 +110,7 @@ export default function MenuScreen() {
     try {
       const updated = await toggleProductStock(id, item.status);
       setItems((prev) =>
-        prev.map((i) => (i.id === id ? { ...i, status: updated.status } : i))
+        prev.map((i) => (i.id === id ? { ...i, status: updated.status } : i)),
       );
       Toast.show({
         type: "success",
@@ -151,7 +152,7 @@ export default function MenuScreen() {
   }, [user?.storeId]);
 
   /* -------------------- Renderers -------------------- */
-  const renderMenuItem = ({ item }: { item: MenuItem }) => (
+  const renderMenuItem = ({ item }: { item: Product }) => (
     <MenuItemCard
       item={item}
       onToggleStock={() => handleToggleStock(item.id)}

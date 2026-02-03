@@ -3,17 +3,10 @@ import { Subject, Observable } from 'rxjs';
 import { filter, map } from 'rxjs/operators';
 
 export interface RiderEvent {
-  type:
-    | 'delivery.assigned'
-    | 'delivery.cancelled'
-    | 'delivery.updated'
-    | 'ride.assigned'
-    | 'ride.cancelled'
-    | 'ride.updated'
-    | 'status.changed';
+  type: 'job.assigned' | 'job.cancelled' | 'job.updated' | 'status.changed';
   riderId: string;
-  deliveryId?: string;
-  rideId?: string;
+  jobId: string;
+  jobType: 'RIDE' | 'DELIVERY';
   data: any;
   timestamp: string;
 }
@@ -30,75 +23,62 @@ export class RidersStreamService {
 
   getRiderStream(riderId: string): Observable<MessageEvent> {
     this.logger.log(`Rider ${riderId} connected to event stream`);
-
     return this.riderEvents$.pipe(
       filter((event) => event.riderId === riderId),
       map(
         (event): MessageEvent => ({
           data: event.data,
           type: event.type,
-          id: event.deliveryId || event.rideId || '',
+          id: event.jobId,
           retry: 10000,
         }),
       ),
     );
   }
 
-  emitDeliveryAssigned(riderId: string, deliveryId: string, deliveryData: any) {
+  emitJobAssigned(
+    riderId: string,
+    jobId: string,
+    jobType: 'RIDE' | 'DELIVERY',
+    jobData: any,
+  ) {
     this.emitRiderEvent({
-      type: 'delivery.assigned',
+      type: 'job.assigned',
       riderId,
-      deliveryId,
-      data: deliveryData,
+      jobId,
+      jobType,
+      data: jobData,
       timestamp: new Date().toISOString(),
     });
   }
 
-  emitDeliveryUpdate(riderId: string, deliveryId: string, deliveryData: any) {
+  emitJobUpdate(
+    riderId: string,
+    jobId: string,
+    jobType: 'RIDE' | 'DELIVERY',
+    jobData: any,
+  ) {
     this.emitRiderEvent({
-      type: 'delivery.updated',
+      type: 'job.updated',
       riderId,
-      deliveryId,
-      data: deliveryData,
+      jobId,
+      jobType,
+      data: jobData,
       timestamp: new Date().toISOString(),
     });
   }
 
-  emitDeliveryCancelled(riderId: string, deliveryId: string, reason: string) {
+  emitJobCancelled(
+    riderId: string,
+    jobId: string,
+    jobType: 'RIDE' | 'DELIVERY',
+    reason: string,
+  ) {
     this.emitRiderEvent({
-      type: 'delivery.cancelled',
+      type: 'job.cancelled',
       riderId,
-      deliveryId,
-      data: { reason },
-      timestamp: new Date().toISOString(),
-    });
-  }
-
-  emitRideAssigned(riderId: string, rideId: string, rideData: any) {
-    this.emitRiderEvent({
-      type: 'ride.assigned',
-      riderId,
-      rideId,
-      data: rideData,
-      timestamp: new Date().toISOString(),
-    });
-  }
-
-  emitRideUpdate(riderId: string, rideId: string, rideData: any) {
-    this.emitRiderEvent({
-      type: 'ride.updated',
-      riderId,
-      rideId,
-      data: rideData,
-      timestamp: new Date().toISOString(),
-    });
-  }
-
-  emitRideCancelled(riderId: string, rideId: string, reason: string) {
-    this.emitRiderEvent({
-      type: 'ride.cancelled',
-      riderId,
-      rideId,
+      jobId,
+      jobType,
       data: { reason },
       timestamp: new Date().toISOString(),
     });

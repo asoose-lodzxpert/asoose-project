@@ -1,6 +1,6 @@
 'use client';
 
-import React, { Dispatch, SetStateAction } from 'react';
+import React, { Dispatch, SetStateAction, useState } from 'react';
 import {
   useReactTable,
   getCoreRowModel,
@@ -10,9 +10,11 @@ import {
   ColumnDef,
   RowSelectionState,
   PaginationState,
+  SortingState, // ✅ Import SortingState
+  OnChangeFn,   // ✅ Import OnChangeFn
 } from "@tanstack/react-table";
 
-// 1. Updated Interface to support both local and manual pagination
+// 1. Updated Interface to support Pagination AND Sorting
 interface DataTableProps<T> {
   data: T[];
   columns: ColumnDef<T, any>[];
@@ -21,10 +23,14 @@ interface DataTableProps<T> {
   pageSize?: number;
   renderMobileCard?: (item: T) => React.ReactNode;
   
-  // ✅ Properties for Manual/Server-side Pagination
+  // Manual Pagination
   pageCount?: number;
   pagination?: PaginationState;
   onPaginationChange?: Dispatch<SetStateAction<PaginationState>>;
+
+  // ✅ New Sorting Props (Optional)
+  sorting?: SortingState;
+  onSortingChange?: OnChangeFn<SortingState>;
 }
 
 export function DataTable<T>({
@@ -37,28 +43,42 @@ export function DataTable<T>({
   pageCount,
   pagination,
   onPaginationChange,
+  sorting,          // ✅ Destructure sorting
+  onSortingChange,  // ✅ Destructure onSortingChange
 }: DataTableProps<T>) {
+  
   // 2. Logic to detect if we are in manual mode (server-side fetching)
   const isManual = pagination !== undefined && onPaginationChange !== undefined;
+
+  // ✅ Local sorting state fallback (allows client-side sorting if props aren't passed)
+  const [localSorting, setLocalSorting] = useState<SortingState>([]);
 
   const table = useReactTable({
     data,
     columns,
     state: { 
       rowSelection,
+      // ✅ Use provided sorting state OR fall back to local state
+      sorting: sorting ?? localSorting,
       // Use the external pagination state only if provided
       ...(isManual ? { pagination } : {}),
     },
-    // ✅ Essential for fixing the pagination logic
+    
+    // Pagination Config
     manualPagination: isManual,
     pageCount: pageCount ?? -1, 
     
+    // Selection Config
     enableRowSelection: !!onRowSelectionChange,
     onRowSelectionChange,
     onPaginationChange,
     
-    getCoreRowModel: getCoreRowModel(),
+    // ✅ Sorting Config
+    onSortingChange: onSortingChange ?? setLocalSorting,
     getSortedRowModel: getSortedRowModel(),
+
+    // Core Config
+    getCoreRowModel: getCoreRowModel(),
     // Only use local pagination logic if NOT in manual mode
     getPaginationRowModel: isManual ? undefined : getPaginationRowModel(),
     
@@ -81,14 +101,19 @@ export function DataTable<T>({
                   {headerGroup.headers.map(header => (
                     <th
                       key={header.id}
-                      className="px-4 py-3 text-left cursor-pointer hover:text-white transition-colors"
-                      onClick={header.column.getToggleSortingHandler()}
+                      className="px-4 py-3 text-left cursor-pointer hover:text-white transition-colors select-none"
+                      onClick={header.column.getToggleSortingHandler()} // ✅ Sorting Trigger
                     >
-                      <div className="truncate">
+                      <div className="flex items-center gap-2 truncate">
                         {flexRender(
                           header.column.columnDef.header,
                           header.getContext()
                         )}
+                        {/* ✅ Optional: Add Sorting Indicators */}
+                        {{
+                          asc: ' 🔼',
+                          desc: ' 🔽',
+                        }[header.column.getIsSorted() as string] ?? null}
                       </div>
                     </th>
                   ))}

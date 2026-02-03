@@ -36,6 +36,10 @@ export class CreateAddressDto {
   @IsOptional()
   isDefault?: boolean;
 
+  @IsString()
+  @IsOptional() // Optional in DTO to support legacy apps, but validated on frontend
+  phone?: string;
+
   @IsNumber()
   @Min(-90)
   @Max(90)

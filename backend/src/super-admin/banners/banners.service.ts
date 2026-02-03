@@ -1,5 +1,5 @@
-// as/backend/src/super-admin/banners/banners.service.ts
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { AppLogger } from 'src/libs/logger/app-logger.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { StorageService } from 'src/storage/storage.service';
 import { CreateBannerDto, UpdateBannerDto } from './dto/create-banner.dto';
@@ -9,6 +9,7 @@ export class BannersService {
   constructor(
     private prisma: PrismaService,
     private storage: StorageService,
+    private readonly appLogger: AppLogger,
   ) {}
 
   // ===========================================================================
@@ -20,34 +21,28 @@ export class BannersService {
       orderBy: { priority: 'desc' },
     });
 
-    return Promise.all(
-      banners.map(async (banner) => ({
-        ...banner,
-        image: banner.image ? await this.getSignedUrl(banner.image) : null,
-      })),
-    );
+    return banners;
   }
 
   async findOne(id: string) {
     const banner = await this.prisma.banner.findUnique({ where: { id } });
     if (!banner) throw new NotFoundException(`Banner with ID ${id} not found`);
 
-    return {
-      ...banner,
-      image: banner.image ? await this.getSignedUrl(banner.image) : null,
-    };
+    return banner;
   }
 
   // ===========================================================================
   // WRITE (Create / Update)
   // ===========================================================================
-
   async create(data: CreateBannerDto, file?: Express.Multer.File) {
     let imageKey: string | null = null;
 
     if (file) {
       const upload = await this.storage.uploadFile(file);
       imageKey = upload.key;
+    } else if (data.image) {
+      // Persist the pre-uploaded URL/Key if no file is present
+      imageKey = data.image;
     }
 
     return this.prisma.banner.create({
@@ -70,15 +65,15 @@ export class BannersService {
 
     let imageKey = banner.image;
 
-    // Handle Image Replacement
     if (file) {
-      // 1. Delete old image if it exists
       if (banner.image) {
-        await this.storage.deleteFileByKey(banner.image).catch(console.error);
+        // FIX 1: Changed deleteFileByKey -> deleteFile
+        await this.storage.deleteFile(banner.image).catch(console.error);
       }
-      // 2. Upload new image
       const upload = await this.storage.uploadFile(file);
       imageKey = upload.key;
+    } else if (data.image !== undefined) {
+      imageKey = data.image;
     }
 
     return this.prisma.banner.update({
@@ -118,20 +113,13 @@ export class BannersService {
     if (!banner) throw new NotFoundException(`Banner not found`);
 
     if (banner.image) {
-      await this.storage.deleteFileByKey(banner.image).catch(console.error);
+      await this.storage.deleteFile(banner.image).catch((error) => {
+        this.appLogger.error('Failed to delete banner image', error?.stack, {
+          error,
+        });
+      });
     }
 
     return this.prisma.banner.delete({ where: { id } });
-  }
-
-  
-  private async getSignedUrl(key: string): Promise<string> {
-    try {
-      if (key.startsWith('http')) return key;
-      return await this.storage.getSignedUrlForKey(key);
-    } catch (e) {
-      console.error(`Failed to sign URL for key ${key}`, e);
-      return '';
-    }
   }
 }

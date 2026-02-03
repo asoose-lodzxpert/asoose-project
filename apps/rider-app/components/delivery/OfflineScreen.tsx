@@ -1,53 +1,68 @@
-import React, { useState, useEffect } from "react";
-import { View, StyleSheet, Pressable, ActivityIndicator } from "react-native";
 import { ThemedText } from "@/components/themed-text";
-import { useThemeColor } from "@/hooks/use-theme-color";
 import { IconSymbol } from "@/components/ui/icon-symbol";
-import { useDelivery } from "@/context/DeliveryContext";
-import { riderApiService } from "@/services/rider-api.service";
+import { useJobs } from "@/context/JobContext";
+import { useConfirm } from "@/hooks/use-confirm";
+import { useThemeColor } from "@/hooks/use-theme-color";
+import { getEarnings } from "@/services/earnings.service";
+import { getRiderProfile, type RiderProfile } from "@/services/profile.service";
+import React, { useEffect, useState } from "react";
+import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
 
 export default function OfflineScreen() {
-  const { goOnline } = useDelivery();
+  const { goOnline } = useJobs();
+  const { confirm } = useConfirm();
   const primary = useThemeColor({}, "brandPrimary");
   const surface = useThemeColor({}, "surfaceBackground");
 
   const [stats, setStats] = useState({
     totalDeliveries: 0,
-    totalEarnings: 0.0,
+    totalRides: 0,
+    totalEarnings: 0,
     rating: 0,
   });
+
+  const [role, setRole] = useState<RiderProfile["role"]>("RIDER");
   const [loading, setLoading] = useState(true);
 
+  const isDriver = role === "DRIVER";
+
   useEffect(() => {
-    const loadStats = async () => {
+    const loadStatsAndRole = async () => {
       setLoading(true);
       try {
-        const data = await riderApiService.getEarningsStats("today");
+        const [profile, data] = await Promise.all([
+          getRiderProfile(),
+          getEarnings("today"),
+        ]);
+
+        setRole(profile.role);
         setStats({
-          totalDeliveries: data.totalDeliveries || 0,
-          totalEarnings: data.totalEarnings || 0.0,
+          totalDeliveries: data.rides || 0,
+          totalRides: data.rides || 0,
+          totalEarnings: data.total || 0,
           rating: data.rating || 0,
         });
-      } catch (error) {
       } finally {
         setLoading(false);
       }
     };
 
-    loadStats();
+    loadStatsAndRole();
   }, []);
 
   return (
     <View style={styles.container}>
       <View style={[styles.bottomCard, { backgroundColor: surface }]}>
-        <IconSymbol name="bag" size={60} color="#999" />
+        <IconSymbol name={isDriver ? "car" : "bag"} size={60} color="#999" />
 
         <ThemedText type="title" style={styles.offlineTitle}>
-          You're currently offline
+          You&apos;re currently offline
         </ThemedText>
 
         <ThemedText style={styles.subtitle}>
-          Go online to receive delivery requests
+          {isDriver
+            ? "Go online to receive ride requests"
+            : "Go online to receive delivery requests"}
         </ThemedText>
 
         <View style={styles.statsRow}>
@@ -55,9 +70,13 @@ export default function OfflineScreen() {
             {loading ? (
               <ActivityIndicator size="small" color="#666" />
             ) : (
-              <ThemedText type="title">{stats.totalDeliveries}</ThemedText>
+              <ThemedText type="title">
+                {isDriver ? stats.totalRides : stats.totalDeliveries}
+              </ThemedText>
             )}
-            <ThemedText style={styles.statLabel}>Deliveries Today</ThemedText>
+            <ThemedText style={styles.statLabel}>
+              {isDriver ? "Rides Today" : "Deliveries Today"}
+            </ThemedText>
           </View>
 
           <View style={styles.stat}>
@@ -83,7 +102,18 @@ export default function OfflineScreen() {
 
         <Pressable
           style={[styles.goOnlineBtn, { backgroundColor: primary }]}
-          onPress={goOnline}
+          onPress={async () => {
+            const confirmed = await confirm({
+              title: "Go Online",
+              message:
+                "Are you sure you want to go online and start receiving requests?",
+              confirmText: "Yes, Go Online",
+              cancelText: "Cancel",
+            });
+            if (confirmed) {
+              goOnline();
+            }
+          }}
         >
           <IconSymbol name="power" size={20} color="#fff" />
           <ThemedText style={styles.goOnlineText}>Go Online</ThemedText>

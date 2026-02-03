@@ -16,7 +16,7 @@ import {
   RecipientType,
 } from '../enums/payment.enums';
 
-export { PaymentType, RecipientType };
+export { PaymentType, RecipientType, PaymentGateway, PaymentMethod };
 
 export class InitiatePaymentDto {
   @IsNumber()
@@ -50,6 +50,11 @@ export class InitiatePaymentDto {
   @ValidateIf((o) => o.type === PaymentType.RIDE)
   @IsString()
   rideId?: string;
+
+  // FIX: Added validation for Delivery ID
+  @ValidateIf((o) => o.type === PaymentType.DELIVERY)
+  @IsString()
+  deliveryId?: string;
 
   @IsString()
   @IsOptional()
@@ -93,6 +98,11 @@ export class DisbursePaymentDto {
   @IsString()
   @IsOptional()
   rideId?: string;
+
+  // FIX: Added support for Delivery Disbursements
+  @IsString()
+  @IsOptional()
+  deliveryId?: string;
 
   @IsObject()
   @IsOptional()

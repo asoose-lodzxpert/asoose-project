@@ -18,24 +18,55 @@ export class NotificationFacade {
     private readonly prisma: PrismaService,
   ) {}
 
+  /**
+   * Unified notification sender (DB + Socket + FCM)
+   */
   async sendInAppNotification(
-    userId: string,
+    recipientId: string,
     title: string,
     message: string,
     metadata?: Record<string, any>,
+    role: 'USER' | 'VENDOR' | 'RIDER' = 'USER',
   ) {
+    // Guard against undefined recipientId
+    if (!recipientId) {
+      this.logger.warn(
+        `Notification skipped: recipientId is undefined (Role: ${role})`,
+      );
+      return;
+    }
+
     try {
-      // 1. Persist
-      const notification = await this.notificationsService.create({
-        userId,
+      // 1. Persist (Handle Schema Relationships)
+      const createDto: any = {
         title,
         message,
         type: metadata?.type || 'INFO',
         metadata,
-      });
+      };
+
+      if (role === 'VENDOR') {
+        createDto.vendorId = recipientId;
+      } else if (role === 'RIDER') {
+        createDto.riderId = recipientId;
+      } else {
+        createDto.userId = recipientId;
+      }
+
+      // NOTE: Ensure your NotificationsService handles the 'any' DTO correctly
+      // or switches methods based on keys (userId vs vendorId).
+      const notification = await this.notificationsService.create(createDto);
+
+      // ✅ FIX: Check if notification was created before accessing properties
+      if (!notification) {
+        this.logger.warn(
+          `Notification creation failed or skipped for ${role} ${recipientId}`,
+        );
+        return;
+      }
 
       // 2. WebSocket
-      this.notificationsGateway.sendToUser(userId, {
+      this.notificationsGateway.sendToUser(recipientId, {
         id: notification.id,
         title,
         message,
@@ -44,38 +75,55 @@ export class NotificationFacade {
         metadata,
       });
 
-      // 3. FCM Push Notification
-      const user = await this.prisma.user.findUnique({
-        where: { id: userId },
-        select: { fcmToken: true },
-      });
+      // 3. FCM Push Notification (Fetch token from correct table)
+      let fcmToken: string | null | undefined = null;
 
-      if (user?.fcmToken) {
-        await this.fcmService.sendToDevice(user.fcmToken, title, message, {
+      if (role === 'VENDOR') {
+        const vendor = await this.prisma.vendor.findUnique({
+          where: { id: recipientId },
+          select: { fcmToken: true },
+        });
+        fcmToken = vendor?.fcmToken;
+      } else if (role === 'RIDER') {
+        const rider = await this.prisma.rider.findUnique({
+          where: { id: recipientId },
+          select: { fcmToken: true },
+        });
+        fcmToken = rider?.fcmToken;
+      } else {
+        const user = await this.prisma.user.findUnique({
+          where: { id: recipientId },
+          select: { fcmToken: true },
+        });
+        fcmToken = user?.fcmToken;
+      }
+
+      if (fcmToken) {
+        await this.fcmService.sendToDevice(fcmToken, title, message, {
           ...metadata,
           notificationId: notification.id,
         });
       }
 
       return notification;
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(
-        `Failed to send notification to user ${userId}`,
+        `Failed to send notification to ${role} ${recipientId}: ${error.message}`,
         error.stack,
       );
     }
   }
 
   async sendEmail(to: string, subject: string, template: string, context: any) {
+    if (!to) return;
     try {
-      // [!code ++] Actual Queue Logic
       await this.emailQueue.add(
         'send-email',
         { to, subject, template, context },
         { attempts: 3, removeOnComplete: true },
       );
       this.logger.log(`Email queued for ${to}: "${subject}"`);
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Failed to queue email for ${to}`, error.stack);
     }
   }
@@ -86,7 +134,14 @@ export class NotificationFacade {
     message: string,
     metadata?: any,
   ) {
-    return this.sendInAppNotification(storeOwnerId, title, message, metadata);
+    if (!storeOwnerId) return;
+    return this.sendInAppNotification(
+      storeOwnerId,
+      title,
+      message,
+      metadata,
+      'VENDOR',
+    );
   }
 
   async sendOrderNotifications(
@@ -99,43 +154,55 @@ export class NotificationFacade {
     storeOwnerEmail: string,
     items: string[],
   ) {
-    // Notify Customer
-    await this.sendInAppNotification(
-      customerId,
-      'Order Placed',
-      `Your order #${orderId.slice(0, 8).toUpperCase()} is pending acceptance.`,
-      { orderId, type: 'ORDER_CREATED' },
-    );
-    await this.sendEmail(
-      customerEmail,
-      'Order Confirmation',
-      'customer-order-placed',
-      {
-        name: 'Customer',
-        orderId: orderId.slice(0, 8).toUpperCase(),
-        storeName,
-        total,
-        items,
-      },
-    );
+    // Notify Customer (USER)
+    if (customerId) {
+      await this.sendInAppNotification(
+        customerId,
+        'Order Placed',
+        `Your order #${orderId.slice(0, 8).toUpperCase()} is pending acceptance.`,
+        { orderId, type: 'ORDER_CREATED' },
+        'USER',
+      );
+    }
 
-    // Notify Vendor
-    await this.sendInAppNotification(
-      storeOwnerId,
-      'New Order Received',
-      `You have a new order for ₦${total}.`,
-      { orderId, type: 'ORDER_INCOMING' },
-    );
-    await this.sendEmail(
-      storeOwnerEmail,
-      'New Order Received',
-      'vendor-new-order',
-      {
-        orderId: orderId.slice(0, 8).toUpperCase(),
-        total,
-        items,
-      },
-    );
+    if (customerEmail) {
+      await this.sendEmail(
+        customerEmail,
+        'Order Confirmation',
+        'customer-order-placed',
+        {
+          name: 'Customer',
+          orderId: orderId.slice(0, 8).toUpperCase(),
+          storeName,
+          total,
+          items,
+        },
+      );
+    }
+
+    // Notify Vendor (VENDOR)
+    if (storeOwnerId) {
+      await this.sendInAppNotification(
+        storeOwnerId,
+        'New Order Received',
+        `You have a new order for ₦${total.toLocaleString()}.`,
+        { orderId, type: 'ORDER_INCOMING' },
+        'VENDOR',
+      );
+    }
+
+    if (storeOwnerEmail) {
+      await this.sendEmail(
+        storeOwnerEmail,
+        'New Order Received',
+        'vendor-new-order',
+        {
+          orderId: orderId.slice(0, 8).toUpperCase(),
+          total,
+          items,
+        },
+      );
+    }
   }
 
   async notifyRider(
@@ -144,6 +211,7 @@ export class NotificationFacade {
     message: string,
     metadata?: Record<string, any>,
   ) {
+    if (!riderId) return;
     try {
       const rider = await this.prisma.rider.findUnique({
         where: { id: riderId },
@@ -167,12 +235,8 @@ export class NotificationFacade {
           message,
           metadata,
         );
-      } else {
-        this.logger.warn(
-          `Rider ${riderId} has no FCM token configured; skipping push notification`,
-        );
       }
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Failed to notify rider ${riderId}`, error.stack);
     }
   }

@@ -7,10 +7,11 @@ import * as Location from "expo-location";
 
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import ConfirmProvider from "@/components/ui/ConfirmDialogProvider";
-import Toast from "react-native-toast-message";
 import { LocationProvider } from "@/context/LocationContext";
 import { CartProvider } from "@/context/CartContext";
 import { SendPackageProvider } from "@/context/SendPackageContext";
+import ThemedToastProvider from "@/components/ui/ThemedToast";
+import { HomeProvider } from "@/context/HomeContext";
 import { ToastProvider } from "@/components/ui/toast";
 
 /* ---------------------------------- */
@@ -22,16 +23,18 @@ function RootNavigator() {
   const [hasLaunched, setHasLaunched] = useState<boolean | null>(null);
   const [locationGranted, setLocationGranted] = useState<boolean | null>(null);
 
-  /* ---------------------------------- */
-  /* Check first launch */
-  /* ---------------------------------- */
+  /* ---------- First Launch ---------- */
   useEffect(() => {
     async function checkFirstLaunch() {
-      const value = await AsyncStorage.getItem("hasLaunched");
-      if (!value) {
-        await AsyncStorage.setItem("hasLaunched", "true");
-        setHasLaunched(false);
-      } else {
+      try {
+        const value = await AsyncStorage.getItem("hasLaunched");
+        if (!value) {
+          await AsyncStorage.setItem("hasLaunched", "true");
+          setHasLaunched(false);
+        } else {
+          setHasLaunched(true);
+        }
+      } catch {
         setHasLaunched(true);
       }
     }
@@ -39,9 +42,7 @@ function RootNavigator() {
     checkFirstLaunch();
   }, []);
 
-  /* ---------------------------------- */
-  /* Check location permission (only if logged in) */
-  /* ---------------------------------- */
+  /* ---------- Location Permission ---------- */
   useEffect(() => {
     async function checkLocationPermission() {
       if (!user) {
@@ -56,9 +57,7 @@ function RootNavigator() {
     checkLocationPermission();
   }, [user]);
 
-  /* ---------------------------------- */
-  /* Loading */
-  /* ---------------------------------- */
+  /* ---------- Loading State ---------- */
   if (loading || hasLaunched === null || (user && locationGranted === null)) {
     return (
       <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
@@ -67,9 +66,7 @@ function RootNavigator() {
     );
   }
 
-  /* ---------------------------------- */
-  /* Navigation */
-  /* ---------------------------------- */
+  /* ---------- Navigation ---------- */
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <Stack screenOptions={{ headerShown: false }}>
@@ -85,7 +82,7 @@ function RootNavigator() {
           <Stack.Screen name="(tabs)" />
         )}
 
-        {/* Global modal routes (appear above tabs) */}
+        {/* Global modal routes */}
         <Stack.Screen
           name="location-picker"
           options={{
@@ -99,23 +96,25 @@ function RootNavigator() {
 }
 
 /* ---------------------------------- */
-/* Root Layout */
+/* Root Layout (MUST be default export) */
 /* ---------------------------------- */
 export default function RootLayout() {
   return (
-    <ToastProvider>
-      <AuthProvider>
-        <LocationProvider>
-          <ConfirmProvider>
-            <CartProvider>
+    <AuthProvider>
+      <LocationProvider>
+        <ConfirmProvider>
+          <CartProvider>
+            <HomeProvider>
               <SendPackageProvider>
-                <RootNavigator />
-                <Toast />
+                <ToastProvider>
+                  <RootNavigator />
+                  <ThemedToastProvider />
+                </ToastProvider>
               </SendPackageProvider>
-            </CartProvider>
-          </ConfirmProvider>
-        </LocationProvider>
-      </AuthProvider>
-    </ToastProvider>
+            </HomeProvider>
+          </CartProvider>
+        </ConfirmProvider>
+      </LocationProvider>
+    </AuthProvider>
   );
 }

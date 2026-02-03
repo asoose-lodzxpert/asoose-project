@@ -1,6 +1,7 @@
 import { ApiService } from "./api.service";
 
 // --- Type Definitions ---
+
 export type DeliveryStatus =
   | "PENDING"
   | "REQUESTED"
@@ -9,13 +10,33 @@ export type DeliveryStatus =
   | "DELIVERED"
   | "CANCELLED";
 
+// Address Interface for UI display
 export interface DeliveryAddress {
+  id?: string; // Added ID
   latitude: number;
   longitude: number;
   address: string;
-  recipientName: string;
-  recipientPhone: string;
+  recipientName?: string;
+  recipientPhone?: string;
   notes?: string;
+}
+
+// Payload for saving an address to the backend
+export interface CreateAddressPayload {
+  street: string;
+  city: string;
+  state?: string;
+  lat: number;
+  lng: number;
+  label?: string;
+}
+
+export interface AddressResponse {
+  id: string;
+  street: string;
+  city: string;
+  lat: number;
+  lng: number;
 }
 
 export interface DeliveryEstimate {
@@ -51,15 +72,10 @@ export interface Delivery {
   rider?: Rider;
   pickupAddress: DeliveryAddress;
   dropoffAddress: DeliveryAddress;
-  packageDetails: {
-    description: string;
-    weight?: number;
-    value?: number;
-    fragile?: boolean;
-  };
+  packageDetails: string; // Backend sends this as string
   deliveryFee: number;
   actualFee?: number;
-  distance: number;
+  distance: number; // mapped from distanceKm usually
   duration: number;
   pickupOtp?: string;
   deliveryOtp?: string;
@@ -73,34 +89,56 @@ export interface Delivery {
   deliveredAt?: string;
 }
 
+// Backend DTO for Request
 export interface CreateDeliveryRequest {
-  pickupAddress: DeliveryAddress;
-  dropoffAddress: DeliveryAddress;
-  packageDetails: {
-    description: string;
-    weight?: number;
-    value?: number;
-    fragile?: boolean;
-  };
-  scheduledTime?: string;
+  pickupAddressId: string;
+  dropoffAddressId: string;
+  recipientName: string;
+  recipientPhone: string;
+  packageDetails: string;
+  weightKg: number;
+  orderId?: string;
 }
 
-export interface DeliveryPaymentResponse {
+// Response from /trips/deliveries/request
+export interface DeliveryRequestResponse {
   delivery: Delivery;
-  payment: {
-    id: string;
-    amount: number;
-    status: string;
-    reference: string;
-    authorizationUrl?: string;
-  };
+  deliveryFee: number;
+  distance: number;
+  message: string;
 }
 
 // --- API Service Methods ---
 
 export class DeliveryService {
   /**
-   * Get delivery fee estimate
+   * 1. Save Address
+   * Persist coordinates to backend to get an Address ID.
+   * Required before creating a delivery.
+   */
+  static async saveAddress(
+    data: CreateAddressPayload
+  ): Promise<AddressResponse> {
+    return ApiService.post<AddressResponse>("/users/addresses", data);
+  }
+
+  /**
+   * 2. Create Delivery Request
+   * Creates a delivery in PENDING state and calculates the fee.
+   * Uses /trips/deliveries/request
+   */
+  static async createDelivery(
+    data: CreateDeliveryRequest
+  ): Promise<DeliveryRequestResponse> {
+    return ApiService.post<DeliveryRequestResponse>(
+      "/trips/deliveries/request",
+      data
+    );
+  }
+
+  /**
+   * Get delivery fee estimate (Optional/Legacy)
+   * Note: The createDelivery response also returns the calculated fee.
    */
   static async getEstimate(data: {
     pickupLat: number;
@@ -114,64 +152,82 @@ export class DeliveryService {
   }
 
   /**
-   * Create a new delivery request with payment
-   */
-  static async createDelivery(
-    data: CreateDeliveryRequest,
-  ): Promise<DeliveryPaymentResponse> {
-    return ApiService.post<DeliveryPaymentResponse>("/users/deliveries", data);
-  }
-
-  /**
    * Get all user deliveries
+   * Updated to use TripsController endpoint
    */
   static async getDeliveries(status?: DeliveryStatus): Promise<Delivery[]> {
     const query = status ? `?status=${status}` : "";
-    return ApiService.get<Delivery[]>(`/users/deliveries${query}`);
+    return ApiService.get<Delivery[]>(`/trips/deliveries${query}`);
   }
 
   /**
    * Get specific delivery details
+   * Updated to use TripsController endpoint
    */
   static async getDelivery(deliveryId: string): Promise<Delivery> {
-    return ApiService.get<Delivery>(`/users/deliveries/${deliveryId}`);
-  }
-
-  /**
-   * Get current active delivery
-   */
-  static async getCurrentDelivery(): Promise<Delivery | null> {
-    try {
-      return await ApiService.get<Delivery>("/users/deliveries/current");
-    } catch (error: any) {
-      if (error.message.includes("404")) return null;
-      throw error;
-    }
+    return ApiService.get<Delivery>(`/trips/deliveries/${deliveryId}`);
   }
 
   /**
    * Cancel a delivery
+   * Updated to use TripsController endpoint
    */
   static async cancelDelivery(
     deliveryId: string,
-    reason?: string,
-  ): Promise<{ message: string; refund?: any }> {
-    return ApiService.post<{ message: string; refund?: any }>(
-      `/users/deliveries/${deliveryId}/cancel`,
-      { reason },
+    reason?: string
+  ): Promise<{ message: string }> {
+    return ApiService.patch<{ message: string }>(
+      `/trips/deliveries/${deliveryId}/cancel`,
+      { reason }
     );
   }
+
+  /**
+   * Poll for delivery status change (e.g., waiting for Payment -> Requested)
+   */
+  static async pollDeliveryStatus(
+    deliveryId: string,
+    targetStatus: DeliveryStatus = "REQUESTED",
+    maxAttempts: number = 20,
+    intervalMs: number = 3000
+  ): Promise<boolean> {
+    let attempts = 0;
+    while (attempts < maxAttempts) {
+      try {
+        const data = await this.getDelivery(deliveryId);
+        // Check if we reached target status or advanced past it (e.g. ASSIGNED)
+        if (
+          data.status === targetStatus ||
+          data.status === "ASSIGNED" ||
+          data.status === "PICKED_UP"
+        ) {
+          return true;
+        }
+        if (data.status === "CANCELLED") {
+          throw new Error("Delivery was cancelled");
+        }
+      } catch (e) {
+        console.warn("Polling error:", e);
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, intervalMs));
+      attempts++;
+    }
+    return false;
+  }
+
+  // --- Interaction Methods ---
 
   /**
    * Verify pickup OTP (when rider picks up package)
    */
   static async verifyPickupOtp(
     deliveryId: string,
-    otp: string,
+    otp: string
   ): Promise<{ message: string; delivery: Delivery }> {
     return ApiService.post<{ message: string; delivery: Delivery }>(
-      `/users/deliveries/${deliveryId}/verify-pickup`,
-      { otp },
+      `/users/deliveries/${deliveryId}/verify-pickup`, // Note: Check if backend moved this to Trips
+      { otp }
     );
   }
 
@@ -180,11 +236,11 @@ export class DeliveryService {
    */
   static async verifyDeliveryOtp(
     deliveryId: string,
-    otp: string,
+    otp: string
   ): Promise<{ message: string; delivery: Delivery }> {
     return ApiService.post<{ message: string; delivery: Delivery }>(
-      `/users/deliveries/${deliveryId}/verify-delivery`,
-      { otp },
+      `/users/deliveries/${deliveryId}/verify-delivery`, // Note: Check if backend moved this to Trips
+      { otp }
     );
   }
 
@@ -194,14 +250,14 @@ export class DeliveryService {
   static async rateDelivery(
     deliveryId: string,
     rating: number,
-    comment?: string,
+    comment?: string
   ): Promise<{ message: string }> {
     return ApiService.post<{ message: string }>(
       `/users/deliveries/${deliveryId}/rate`,
       {
         rating,
         comment,
-      },
+      }
     );
   }
 
@@ -218,26 +274,6 @@ export class DeliveryService {
       longitude: number;
       heading?: number;
     }>(`/users/deliveries/${deliveryId}/rider-location`);
-  }
-
-  /**
-   * Get delivery history with pagination
-   */
-  static async getDeliveryHistory(
-    page: number = 1,
-    limit: number = 20,
-  ): Promise<{
-    deliveries: Delivery[];
-    total: number;
-    page: number;
-    totalPages: number;
-  }> {
-    return ApiService.get<{
-      deliveries: Delivery[];
-      total: number;
-      page: number;
-      totalPages: number;
-    }>(`/users/deliveries/history?page=${page}&limit=${limit}`);
   }
 
   /**

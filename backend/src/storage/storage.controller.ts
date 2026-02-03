@@ -1,3 +1,6 @@
+import { Roles } from '../auth/roles.decorator';
+import { RolesGuard } from '../auth/roles.guards';
+import { UserRole } from '../common/enums/user-role.enum';
 import {
   Controller,
   Post,
@@ -16,6 +19,14 @@ import { StorageService } from './storage.service';
 @Controller('storage')
 export class StorageController {
   constructor(private readonly storageService: StorageService) {}
+
+  @Post('list')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  async listFiles() {
+    const files = await this.storageService.listFiles();
+    return { files };
+  }
 
   @Post('upload')
   @UseGuards(JwtAuthGuard)
@@ -45,7 +56,7 @@ export class StorageController {
     }
 
     const result = await this.storageService.uploadFile(file);
-    return { url: result.signedUrl };
+    return { url: result.url };
   }
 
   @Post('upload-public')
@@ -75,7 +86,7 @@ export class StorageController {
     }
 
     const result = await this.storageService.uploadFile(file);
-    return { url: result.signedUrl };
+    return { url: result.url };
   }
 
   @Post('upload-bulk')
@@ -118,7 +129,7 @@ export class StorageController {
     const results = await this.storageService.uploadBulk(validFiles);
 
     // Extract just the URLs (signedUrl) from results
-    const urls = results.map((result) => result.signedUrl);
+    const urls = results.map((result) => result.url);
 
     return {
       urls,
@@ -155,7 +166,7 @@ export class StorageController {
     }
 
     const result = await this.storageService.uploadFile(file);
-    return { url: result.signedUrl };
+    return { url: result.url };
   }
 
   @Delete('delete')

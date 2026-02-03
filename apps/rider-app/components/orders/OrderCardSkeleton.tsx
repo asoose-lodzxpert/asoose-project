@@ -1,78 +1,51 @@
-import React, { useEffect, useRef } from "react";
-import { View, StyleSheet, Animated } from "react-native";
 import { useThemeColor } from "@/hooks/use-theme-color";
+import React, { useEffect } from "react";
+import { StyleSheet, View } from "react-native";
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withTiming,
+} from "react-native-reanimated";
 
 export function OrderCardSkeleton() {
   const cardBg = useThemeColor({}, "surfaceSubtle");
   const shimmerColor = useThemeColor({}, "borderDefault");
 
-  const shimmerAnimation = useRef(new Animated.Value(0)).current;
+  const shimmer = useSharedValue(0);
 
   useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(shimmerAnimation, {
-          toValue: 1,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
-        Animated.timing(shimmerAnimation, {
-          toValue: 0,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
-      ])
-    ).start();
-  }, [shimmerAnimation]);
+    shimmer.value = withRepeat(withTiming(1, { duration: 1000 }), -1, true);
+  }, []);
 
-  const opacity = shimmerAnimation.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.3, 0.7],
-  });
+  const shimmerStyle = useAnimatedStyle(() => ({
+    opacity: 0.3 + shimmer.value * 0.4,
+    backgroundColor: shimmerColor,
+  }));
 
   return (
     <View style={[styles.card, { backgroundColor: cardBg }]}>
       {/* Header */}
       <View style={styles.header}>
         <Animated.View
-          style={[
-            styles.skeletonBox,
-            styles.orderId,
-            { backgroundColor: shimmerColor, opacity },
-          ]}
+          style={[styles.skeletonBox, styles.orderId, shimmerStyle]}
         />
         <Animated.View
-          style={[
-            styles.skeletonBox,
-            styles.badge,
-            { backgroundColor: shimmerColor, opacity },
-          ]}
+          style={[styles.skeletonBox, styles.badge, shimmerStyle]}
         />
       </View>
 
       {/* From Location */}
       <View style={styles.locationRow}>
         <Animated.View
-          style={[
-            styles.skeletonBox,
-            styles.icon,
-            { backgroundColor: shimmerColor, opacity },
-          ]}
+          style={[styles.skeletonBox, styles.icon, shimmerStyle]}
         />
         <View style={{ flex: 1, gap: 4 }}>
           <Animated.View
-            style={[
-              styles.skeletonBox,
-              styles.label,
-              { backgroundColor: shimmerColor, opacity },
-            ]}
+            style={[styles.skeletonBox, styles.label, shimmerStyle]}
           />
           <Animated.View
-            style={[
-              styles.skeletonBox,
-              styles.text,
-              { backgroundColor: shimmerColor, opacity },
-            ]}
+            style={[styles.skeletonBox, styles.text, shimmerStyle]}
           />
         </View>
       </View>
@@ -80,26 +53,14 @@ export function OrderCardSkeleton() {
       {/* To Location */}
       <View style={styles.locationRow}>
         <Animated.View
-          style={[
-            styles.skeletonBox,
-            styles.icon,
-            { backgroundColor: shimmerColor, opacity },
-          ]}
+          style={[styles.skeletonBox, styles.icon, shimmerStyle]}
         />
         <View style={{ flex: 1, gap: 4 }}>
           <Animated.View
-            style={[
-              styles.skeletonBox,
-              styles.label,
-              { backgroundColor: shimmerColor, opacity },
-            ]}
+            style={[styles.skeletonBox, styles.label, shimmerStyle]}
           />
           <Animated.View
-            style={[
-              styles.skeletonBox,
-              styles.text,
-              { backgroundColor: shimmerColor, opacity },
-            ]}
+            style={[styles.skeletonBox, styles.text, shimmerStyle]}
           />
         </View>
       </View>
@@ -107,18 +68,10 @@ export function OrderCardSkeleton() {
       {/* Earnings */}
       <View style={styles.earningsRow}>
         <Animated.View
-          style={[
-            styles.skeletonBox,
-            styles.earningsLabel,
-            { backgroundColor: shimmerColor, opacity },
-          ]}
+          style={[styles.skeletonBox, styles.earningsLabel, shimmerStyle]}
         />
         <Animated.View
-          style={[
-            styles.skeletonBox,
-            styles.earningsAmount,
-            { backgroundColor: shimmerColor, opacity },
-          ]}
+          style={[styles.skeletonBox, styles.earningsAmount, shimmerStyle]}
         />
       </View>
     </View>
@@ -127,7 +80,7 @@ export function OrderCardSkeleton() {
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: 20,
+    borderRadius: 12,
     padding: 20,
     gap: 18,
   },

@@ -4,12 +4,23 @@ import * as winston from 'winston';
 const isProd = process.env.NODE_ENV === 'production';
 
 export const appLogger = WinstonModule.createLogger({
-  level: isProd ? 'info' : 'debug',
-  format: winston.format.combine(
-    winston.format.timestamp(),
-    winston.format.errors({ stack: true }),
-    winston.format.json(),
-  ),
+  level: isProd ? 'error' : 'debug',
+  format: isProd
+    ? winston.format.combine(
+        winston.format.timestamp(),
+        winston.format.errors({ stack: true }),
+        winston.format.json(),
+      )
+    : winston.format.combine(
+        winston.format.colorize(),
+        winston.format.timestamp(),
+        winston.format.printf(({ timestamp, level, message, ...meta }) => {
+          let metaStr = Object.keys(meta).length
+            ? ` ${JSON.stringify(meta, null, 2)}`
+            : '';
+          return `[${timestamp}] [${level}]: ${message}${metaStr}`;
+        }),
+      ),
   transports: [
     new winston.transports.Console({
       silent: process.env.NODE_ENV === 'test',

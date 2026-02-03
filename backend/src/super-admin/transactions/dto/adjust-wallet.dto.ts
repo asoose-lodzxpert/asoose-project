@@ -1,4 +1,11 @@
-import { IsEnum, IsNotEmpty, IsNumber, IsString, Min, IsUUID } from 'class-validator';
+import {
+  IsEnum,
+  IsNotEmpty,
+  IsNumber,
+  IsString,
+  Min,
+  IsUUID,
+} from 'class-validator';
 
 export enum AdjustmentType {
   CREDIT = 'CREDIT',

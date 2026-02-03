@@ -2,11 +2,11 @@
 
 import React from 'react';
 
-const SkeletonBox = ({ className = "" }) => (
+const SkeletonBox = ({ className = "" }: { className?: string }) => (
   <div className={`bg-gray-700/30 rounded animate-pulse ${className}`} />
 );
 
-const SkeletonText = ({ width = "w-full", height = "h-4" }) => (
+const SkeletonText = ({ width = "w-full", height = "h-4" }: { width?: string, height?: string }) => (
   <div className={`${width} ${height} bg-gray-700/30 rounded animate-pulse`} />
 );
 
@@ -64,25 +64,12 @@ export default function DisputesPageSkeleton() {
             {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((row) => (
               <div key={row} className="p-4">
                 <div className="grid grid-cols-7 gap-4 items-center">
-                  {/* Dispute ID */}
                   <SkeletonText width="w-20" height="h-4" />
-                  
-                  {/* Status */}
                   <SkeletonBox className="w-24 h-6 rounded" />
-                  
-                  {/* Category */}
                   <SkeletonText width="w-24" height="h-4" />
-                  
-                  {/* Parties */}
                   <SkeletonText width="w-32" height="h-4" />
-                  
-                  {/* Reported By */}
                   <SkeletonText width="w-24" height="h-4" />
-                  
-                  {/* Reported At */}
                   <SkeletonText width="w-32" height="h-4" />
-                  
-                  {/* Actions */}
                   <div className="flex items-center gap-2">
                     <SkeletonBox className="w-8 h-8 rounded-lg" />
                     <SkeletonBox className="w-8 h-8 rounded-lg" />
@@ -108,13 +95,10 @@ export default function DisputesPageSkeleton() {
         <div className="md:hidden space-y-3">
           {[1, 2, 3, 4, 5].map((card) => (
             <div key={card} className="bg-[#1E293B] border border-gray-800 rounded-lg p-4">
-              {/* Header */}
               <div className="flex justify-between items-start mb-3">
                 <SkeletonText width="w-24" height="h-5" />
                 <SkeletonBox className="w-24 h-6 rounded" />
               </div>
-
-              {/* Details */}
               <div className="space-y-3 mb-4">
                 <div className="flex justify-between">
                   <SkeletonText width="w-20" height="h-4" />
@@ -124,13 +108,7 @@ export default function DisputesPageSkeleton() {
                   <SkeletonText width="w-20" height="h-4" />
                   <SkeletonText width="w-32" height="h-4" />
                 </div>
-                <div className="flex justify-between">
-                  <SkeletonText width="w-20" height="h-4" />
-                  <SkeletonText width="w-32" height="h-4" />
-                </div>
               </div>
-
-              {/* Actions */}
               <div className="flex gap-2 pt-3 border-t border-gray-800">
                 <SkeletonBox className="flex-1 h-10 rounded-lg" />
                 <SkeletonBox className="flex-1 h-10 rounded-lg" />
@@ -138,7 +116,6 @@ export default function DisputesPageSkeleton() {
             </div>
           ))}
         </div>
-
       </div>
     </div>
   );

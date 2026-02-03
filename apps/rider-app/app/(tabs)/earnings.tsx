@@ -1,24 +1,24 @@
-import React, { useCallback, useState, useEffect } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
-  View,
-  StyleSheet,
   Pressable,
-  ScrollView,
   RefreshControl,
+  ScrollView,
+  StyleSheet,
+  View,
 } from "react-native";
 import Toast from "react-native-toast-message";
 
-import { ThemedView } from "@/components/themed-view";
-import { ThemedText } from "@/components/themed-text";
 import { CustomDropdown } from "@/components/CustomDropdown";
+import { ThemedText } from "@/components/themed-text";
+import { ThemedView } from "@/components/themed-view";
 import { useThemeColor } from "@/hooks/use-theme-color";
-import { useRouter } from "expo-router";
 import {
   getEarnings,
   getWalletBalance,
   type EarningsData,
   type Timeframe,
 } from "@/services/earnings.service";
+import { useRouter } from "expo-router";
 
 /* ---------------------------------- */
 /* Timeframes */
@@ -178,13 +178,10 @@ export default function EarningsScreen() {
           </View>
         ) : (
           <View style={styles.metricsGrid}>
+            <MetricCard label="Rides" value={data ? `${data.rides}` : "—"} />
             <MetricCard
-              label="Deliveries"
-              value={data ? `${data.deliveries}` : "—"}
-            />
-            <MetricCard
-              label="Avg / Delivery"
-              value={data ? formatCurrency(data.avgPerDelivery) : "—"}
+              label="Avg / Ride"
+              value={data ? formatCurrency(data.avgPerRide) : "—"}
             />
             <MetricCard
               label="Hours Online"
@@ -204,9 +201,9 @@ export default function EarningsScreen() {
         ) : (
           <View style={[styles.breakdownCard, { backgroundColor: cardBg }]}>
             <BreakdownRow
-              label="Delivery fees"
-              subtitle="Base pay for completed deliveries"
-              value={data?.breakdown.deliveryFees || 0}
+              label="Ride fees"
+              subtitle="Base pay for completed rides"
+              value={data?.breakdown.rideFees || 0}
               valueColor={text}
             />
             <BreakdownRow
@@ -238,8 +235,8 @@ export default function EarningsScreen() {
             How Earnings Work
           </ThemedText>
           <ThemedText style={{ color: muted, lineHeight: 20 }}>
-            • Delivery fees are calculated per trip based on distance and
-            demand.{"\n"}• Bonuses reward you for working during busy periods or
+            • Ride fees are calculated per trip based on distance and demand.
+            {"\n"}• Bonuses reward you for working during busy periods or
             hitting milestones.{"\n"}• Service fees help maintain the platform
             and ensure reliable service.{"\n"}• Your total earnings are
             available for withdrawal anytime with no hidden charges.
@@ -253,8 +250,6 @@ export default function EarningsScreen() {
     </ThemedView>
   );
 }
-
-/* Components */
 
 /* Skeleton Loaders */
 function SkeletonBox({

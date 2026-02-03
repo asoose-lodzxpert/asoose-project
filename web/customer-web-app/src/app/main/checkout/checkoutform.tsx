@@ -1,27 +1,36 @@
-'use client';
+"use client";
 
-import React, { useState, useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
-import { useCartStore } from '@/store/useCartStore';
-import { createClient } from '../../../../utils/supabase/client';
-import { ChevronLeft, WifiOff, AlertCircle, Loader2 } from 'lucide-react';
-import Swal from 'sweetalert2';
-import { toast } from 'react-toastify';
-import { paymentService, InitiatePaymentPayload } from '@/services/payment.service';
-import { PAYMENT_METHODS } from '../ride/constants/config';
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import { useCartStore } from "@/store/useCartStore";
+import { useSession } from "next-auth/react";
+import { WifiOff, Loader2 } from "lucide-react";
+import Swal from "sweetalert2";
+import { toast } from "react-toastify";
+import {
+  paymentService,
+  InitiatePaymentPayload,
+} from "@/services/payment.service";
+import { PAYMENT_METHODS } from "../ride/constants/config";
+
 // Components
-import { Address } from './types';
-import { AddAddressModal } from '@/app/main/components/checkout/addadressmodal';
-import { CartItemsList } from '@/app/main/components/checkout/cartitemslist';
-import { OrderSummary } from '@/app/main/components/checkout/ordersummary';
-import { AddressSection } from '@/app/main/components/checkout/addresssection';
+import { Address } from "./types";
+import { AddAddressModal } from "@/app/main/components/checkout/addadressmodal";
+import { CartItemsList } from "@/app/main/components/checkout/cartitemslist";
+import { OrderSummary } from "@/app/main/components/checkout/ordersummary";
+import { AddressSection } from "@/app/main/components/checkout/addresssection";
+
 // Constants
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+const SERVICE_FEE_PERCENTAGE = 0.05;
+const BASE_DELIVERY_FEE = 1500;
 
 export default function CheckoutForm() {
   const router = useRouter();
-  const supabase = createClient();
+  const { data: session, status } = useSession();
   const abortControllerRef = useRef<AbortController | null>(null);
+  // Track if order was created to prevent phantom redirects
+  const isOrderCreated = useRef(false);
 
   // State
   const [mounted, setMounted] = useState(false);
@@ -31,182 +40,240 @@ export default function CheckoutForm() {
   const [isLoadingAddresses, setIsLoadingAddresses] = useState(true);
   const [isOnline, setIsOnline] = useState(true);
   const [showAddAddressModal, setShowAddAddressModal] = useState(false);
-  const [retryCount, setRetryCount] = useState(0);
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(PAYMENT_METHODS[0])
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<
+    (typeof PAYMENT_METHODS)[number] | null
+  >(null);
+
   // Store
-  const { items: cartItems, getTotalPrice, addItem, decreaseItem, removeItem, clearCart } = useCartStore();
-  
+  const {
+    items: cartItems,
+    getTotalPrice,
+    addItem,
+    decreaseItem,
+    removeItem,
+    clearCart,
+  } = useCartStore();
+
   // Fees
   const cartTotal = getTotalPrice();
-  const estimatedDeliveryFee = 1500; // Client-side estimate
-  const serviceFee = Math.round(cartTotal * 0.05);
+  const estimatedDeliveryFee = BASE_DELIVERY_FEE;
+  const serviceFee = Math.round(cartTotal * SERVICE_FEE_PERCENTAGE);
 
   useEffect(() => {
     useCartStore.persist.rehydrate();
     setMounted(true);
-    fetchAddresses();
 
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
+
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
 
     return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
       abortControllerRef.current?.abort();
+      setIsProcessing(false);
     };
   }, []);
 
-  useEffect(() => {
-    if (mounted && cartItems.length === 0) router.push('/');
-  }, [mounted, cartItems, router]);
-
-  // --- API Helpers ---
-
-  const getSession = async () => {
-    const { data: { session }, error } = await supabase.auth.getSession();
-    if (error || !session) {
-      toast.error('Session expired');
-      router.push('/sign-in');
-      return null;
+  const fetchAddresses = useCallback(async () => {
+    if (status !== "authenticated") {
+      if (status === "unauthenticated") setIsLoadingAddresses(false);
+      return;
     }
-    return session;
-  };
 
-  const fetchAddresses = async () => {
-    const session = await getSession();
-    if (!session) return;
+    const token = session?.accessToken;
+    if (!token) {
+      setIsLoadingAddresses(false);
+      return;
+    }
 
     try {
+      abortControllerRef.current?.abort();
+      abortControllerRef.current = new AbortController();
+
       setIsLoadingAddresses(true);
+
       const res = await fetch(`${API_URL}/users/addresses`, {
-        headers: { Authorization: `Bearer ${session.access_token}` },
+        headers: { Authorization: `Bearer ${token}` },
+        signal: abortControllerRef.current.signal,
       });
+
       if (res.ok) {
         const data = await res.json();
         setAddresses(data);
         const defaultAddr = data.find((a: Address) => a.isDefault) || data[0];
         if (defaultAddr) setSelectedAddress(defaultAddr);
+      } else {
+        toast.error("Failed to load addresses");
       }
-    } catch (error) {
-      toast.error('Failed to load addresses');
+    } catch (error: any) {
+      if (error.name !== "AbortError") {
+        toast.error("Failed to load addresses");
+      }
     } finally {
       setIsLoadingAddresses(false);
     }
-  };
+  }, [session?.accessToken, status]);
 
-  // --- Actions ---
+  useEffect(() => {
+    if (status === "authenticated") {
+      fetchAddresses();
+    }
+  }, [status, fetchAddresses]);
 
-  const handleSaveAddress = async (data: any) => {
-    const session = await getSession();
-    if (!session) return;
+  // Prevent redirect if order was just created
+  useEffect(() => {
+    if (mounted && cartItems.length === 0 && !isOrderCreated.current) {
+      router.push("/");
+    }
+  }, [mounted, cartItems, router]);
+
+  const handleSaveAddress = async (addressData: Partial<Address>) => {
+    const token = session?.accessToken;
+    if (!token) return;
 
     try {
       const res = await fetch(`${API_URL}/users/addresses`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}`,
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify(addressData),
       });
 
       const json = await res.json();
-      
-      if (!res.ok) {
-        // Handle Backend Geofencing Error
-        if (json.message && json.message.includes('outside')) {
-          throw new Error('This location is outside our service area.');
-        }
-        throw new Error(json.message || 'Failed to add address');
-      }
+      if (!res.ok) throw new Error(json.message || "Failed to add address");
 
       await fetchAddresses();
       setSelectedAddress(json);
-      toast.success('Address added');
+      toast.success("Address added successfully");
+      setShowAddAddressModal(false);
     } catch (error: any) {
-      toast.error(error.message);
+      toast.error(error.message || "Failed to save address");
     }
   };
 
-const handlePlaceOrder = async () => {
-    if (!isOnline) return toast.error('No internet connection');
-    if (!selectedAddress) return toast.error('Select an address');
-    
-    const session = await getSession();
-    if (!session) return;
+  const processPayment = async (orderId: string, orderTotal: number) => {
+    try {
+      if (!selectedPaymentMethod) return;
+
+      localStorage.setItem("pending_checkout", "true");
+      localStorage.setItem("last_order_id", orderId);
+
+      const paymentPayload: InitiatePaymentPayload = {
+        amount: orderTotal,
+        email: session?.user?.email || "customer@example.com",
+        gateway: selectedPaymentMethod.gateway as any,
+        method: selectedPaymentMethod.type as "CARD" | "BANK_TRANSFER" | "CASH",
+        type: "ORDER",
+        orderId: orderId,
+        callbackUrl: process.env.NEXT_PUBLIC_APP_URL,
+      };
+
+      const token = session?.accessToken;
+      if (!token) throw new Error("Authentication missing");
+
+      const paymentRes = await paymentService.initiatePayment(
+        paymentPayload,
+        token,
+      );
+
+      if (paymentRes.authorizationUrl) {
+        window.location.href = paymentRes.authorizationUrl;
+      } else {
+        throw new Error("Payment authorization URL not received");
+      }
+    } catch (paymentError: any) {
+      console.error("Payment initialization error:", paymentError);
+
+      toast.warn(
+        "Payment initialization failed. Please try paying from Order Details.",
+      );
+      router.push(`/main/orders/confirmed?id=${orderId}`);
+    }
+  };
+
+  const handlePlaceOrder = async () => {
+    if (!isOnline) {
+      toast.error("No internet connection.");
+      return;
+    }
+    if (!selectedAddress || !selectedPaymentMethod) {
+      toast.error("Please select address and payment method");
+      return;
+    }
+    if (cartItems.length === 0) {
+      toast.error("Your cart is empty");
+      return;
+    }
+
+    const restaurantId = cartItems[0].restaurantId;
+    const token = session?.accessToken;
+
+    if (!token) {
+      toast.error("Please log in to place an order");
+      return;
+    }
 
     setIsProcessing(true);
-    setRetryCount(0);
 
     try {
-      const idempotencyKey = crypto.randomUUID(); 
-
+      const idempotencyKey = crypto.randomUUID();
       const payload = {
         addressId: selectedAddress.id,
-        restaurantId: cartItems[0].restaurantId,
-        items: cartItems.map((i) => ({ id: i.id, quantity: i.quantity })),
-        // Backend should support paymentMethod in CreateOrderDto ideally, 
-        // if not, we create order first then pay.
+        restaurantId: restaurantId,
+        items: cartItems.map((item) => ({
+          id: item.id,
+          quantity: item.quantity,
+        })),
       };
 
       // 1. Create Order
       const res = await fetch(`${API_URL}/users/orders`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}`,
-          'Idempotency-Key': idempotencyKey,
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+          "Idempotency-Key": idempotencyKey,
         },
         body: JSON.stringify(payload),
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Order failed');
+      if (!res.ok) throw new Error(data.message || "Order creation failed");
+
+      // ✅ CRITICAL FIX: Order created successfully. Clear cart immediately.
+      // This prevents "Cart not cleared" bugs if payment logic throws/redirects.
+      isOrderCreated.current = true;
+      clearCart();
 
       // 2. Handle Payment
-      if (selectedPaymentMethod.type === 'CASH') {
+      if (selectedPaymentMethod.type === "CASH") {
+        localStorage.removeItem("pending_checkout");
+        localStorage.removeItem("last_order_id");
+
         await Swal.fire({
-          icon: 'success',
-          title: 'Order Placed!',
-          text: `Order #${data.id.slice(0, 8)} confirmed. Pay cash on delivery.`,
-          confirmButtonColor: '#EAB308',
+          icon: "success",
+          title: "Order Placed!",
+          text: `Order #${data.id.slice(0, 8)} confirmed.`,
+          confirmButtonColor: "#EAB308",
+          timer: 2000,
         });
-        clearCart();
-        router.push(`/profile/orders/${data.id}`);
+
+        router.push(`/main/orders/confirmed?id=${data.id}`);
       } else {
-        // Initialize Online Payment
-        localStorage.setItem('pending_checkout', 'true');
-        localStorage.setItem('last_order_id', data.id);
-        
-        const paymentPayload: InitiatePaymentPayload = {
-          amount: data.total, // Ensure backend returns total
-          email: session.user.email || 'customer@example.com',
-          gateway: selectedPaymentMethod.gateway as any,
-          method: 'CARD',
-          type: 'ORDER',
-          orderId: data.id,
-        };
-
-        const paymentRes = await paymentService.initiatePayment(paymentPayload);
-        
-        if (paymentRes.authorizationUrl) {
-           window.location.href = paymentRes.authorizationUrl;
-        } else {
-           throw new Error('Payment initialization failed');
-        }
+        // Attempt Online Payment
+        await processPayment(data.id, data.total);
       }
-
     } catch (error: any) {
-      console.error(error);
-      toast.error(error.message || 'Something went wrong');
+      console.error("Order placement error:", error);
+      toast.error(error.message || "Something went wrong.");
       setIsProcessing(false);
     }
   };
-
-
-
 
   if (!mounted) {
     return (
@@ -218,17 +285,6 @@ const handlePlaceOrder = async () => {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-[#0a0a0a] text-gray-900 dark:text-gray-100 font-sans pb-32 lg:pb-10">
-      
-      {/* Header */}
-      {/* <div className="sticky top-0 z-30 bg-white dark:bg-[#0a0a0a]/80 backdrop-blur-md border-b border-gray-100 dark:border-white/5 px-4 h-16 flex items-center justify-between"> */}
-        {/* <button onClick={() => router.back()} className="p-2 -ml-2 hover:bg-gray-100 rounded-full">
-          <ChevronLeft className="w-6 h-6" />
-        </button>
-        <h1 className="font-bold text-lg">Checkout</h1> */}
-        {/* <div className="w-8" /> */}
-      {/* </div> */}
-
-      {/* Alerts */}
       {!isOnline && (
         <div className="max-w-6xl mx-auto px-4 mt-4">
           <div className="bg-orange-50 border border-orange-200 p-4 rounded-xl flex items-center gap-3 text-orange-800">
@@ -238,19 +294,18 @@ const handlePlaceOrder = async () => {
         </div>
       )}
 
-      {/* Main Content */}
       <main className="max-w-6xl mx-auto px-4 sm:px-6 pt-6 grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-6">
-          <AddressSection 
-            addresses={addresses} 
-            selectedAddress={selectedAddress} 
+          <AddressSection
+            addresses={addresses}
+            selectedAddress={selectedAddress}
             isLoading={isLoadingAddresses}
             onSelect={setSelectedAddress}
             onAddNew={() => setShowAddAddressModal(true)}
             isProcessing={isProcessing}
           />
 
-          <CartItemsList 
+          <CartItemsList
             items={cartItems}
             isProcessing={isProcessing}
             onAdd={addItem}
@@ -261,22 +316,23 @@ const handlePlaceOrder = async () => {
 
         <div className="lg:col-span-1">
           <div className="sticky top-24">
-            <OrderSummary 
+            <OrderSummary
               cartTotal={cartTotal}
               deliveryFee={estimatedDeliveryFee}
               serviceFee={serviceFee}
               isProcessing={isProcessing}
               isDisabled={isProcessing || !selectedAddress || !isOnline}
               onPlaceOrder={handlePlaceOrder}
-              retryCount={retryCount}
+              retryCount={0}
+              selectedMethod={selectedPaymentMethod}
+              onSelectMethod={setSelectedPaymentMethod}
             />
           </div>
         </div>
       </main>
 
-      {/* Modals */}
-      <AddAddressModal 
-        isOpen={showAddAddressModal} 
+      <AddAddressModal
+        isOpen={showAddAddressModal}
         onClose={() => setShowAddAddressModal(false)}
         onSave={handleSaveAddress}
       />

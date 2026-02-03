@@ -1,13 +1,13 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'react-toastify';
 import Swal from 'sweetalert2';
 import Link from 'next/link';
 import { ShoppingBag, Car, Package, MapPin, User, ChevronRight, Trash2, ShieldCheck } from 'lucide-react';
+import { useSession, signOut } from "next-auth/react";
 
-import { createClient } from '../../../../utils/supabase/client';
 import { ProfileHeader } from '@/app/main/components/profile/ProfileHeader';
 import { ProfileTabs, ProfileTab } from '@/app/main/components/profile/ProfileTabs';
 import { AddressCard } from '@/app/main/components/profile/AddressCard';
@@ -18,14 +18,14 @@ import { RideCard } from '@/app/main/components/profile/ridecard';
 import { DeliveryCard } from '@/app/main/components/profile/deliverycard';
 import BottomNav from '@/app/main/components/layout/BottomNav';
 import { EmptyState } from '@/app/main/components/profile/EmptyState';
-import { ProfileSkeleton,ContentSkeleton } from '@/app/main/components/profile/skeleton';
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001').replace(/\/$/, '');
+import { ProfileSkeleton, ContentSkeleton } from '@/app/main/components/profile/skeleton';
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
 
 export default function ProfilePage() {
   const router = useRouter();
-  const supabase = createClient();
+  const { data: session, status } = useSession();
   
-  // -- State --
   const [isPageLoading, setIsPageLoading] = useState(true);
   const [isTabLoading, setIsTabLoading] = useState(false);
   const [token, setToken] = useState<string | null>(null);
@@ -34,122 +34,315 @@ export default function ProfilePage() {
   const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
 
-  const [profile, setProfile] = useState<any>({});
+  const [profile, setProfile] = useState<any>(null); // Changed from {} to null
   const [orders, setOrders] = useState<any[]>([]);
   const [rides, setRides] = useState<any[]>([]);
   const [deliveries, setDeliveries] = useState<any[]>([]);
   const [addresses, setAddresses] = useState<any[]>([]);
 
-  // -- Memoized Data --
+  // Use ref to track current tab for race condition prevention
+  const activeTabRef = useRef(activeTab);
+  useEffect(() => {
+    activeTabRef.current = activeTab;
+  }, [activeTab]);
+
   const defaultAddr = useMemo(() => 
-    addresses.find((a: any) => a.isDefault) || addresses[0], [addresses]);
+    addresses.find((a: any) => a.isDefault) || addresses[0] || null, 
+    [addresses]
+  );
 
   const getGreeting = () => {
     const hour = new Date().getHours();
     return hour < 12 ? 'Good Morning' : hour < 18 ? 'Good Afternoon' : 'Good Evening';
   };
 
-  // -- API Helpers --
-  const fetchWithAuth = useCallback(async (path: string, accessToken: string) => {
+  // Enhanced fetch with 401 handling
+  const fetchWithAuth = useCallback(async (path: string, accessToken: string, options: RequestInit = {}) => {
     try {
       const res = await fetch(`${API_URL}${path}`, {
-        headers: { Authorization: `Bearer ${accessToken}` },
+        ...options,
+        headers: { 
+          ...options.headers,
+          Authorization: `Bearer ${accessToken}` 
+        },
       });
-      return res.ok ? await res.json() : [];
-    } catch (e) {
+      
+      if (res.status === 401) {
+        await signOut({ callbackUrl: '/sign-in' });
+        throw new Error('Session expired');
+      }
+      
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || `HTTP ${res.status}`);
+      }
+      
+      return await res.json();
+    } catch (e: any) {
       console.error(`Fetch error for ${path}`, e);
-      return [];
+      
+      // Don't show toast for session expiry (already redirecting)
+      if (e.message !== 'Session expired') {
+        const resource = path.split('/').pop();
+        toast.error(e.message || `Failed to load ${resource}`);
+      }
+      
+      throw e;
     }
   }, []);
 
   const fetchTabData = useCallback(async (tab: ProfileTab, accessToken: string) => {
-    const headers = { Authorization: `Bearer ${accessToken}` };
     setIsTabLoading(true);
+    
     try {
-      if (tab === 'orders' && orders.length === 0) {
-        setOrders(await fetchWithAuth('/users/orders', accessToken));
-      } else if (tab === 'rides' && rides.length === 0) {
-        setRides(await fetchWithAuth('/users/rides', accessToken));
-      } else if (tab === 'deliveries' && deliveries.length === 0) {
-        setDeliveries(await fetchWithAuth('/users/deliveries', accessToken));
+      let data;
+      switch(tab) {
+        case 'orders':
+          data = await fetchWithAuth('/users/orders', accessToken);
+          // Only update if still on same tab (race condition check)
+          if (activeTabRef.current === 'orders') setOrders(data || []);
+          break;
+        case 'rides':
+          data = await fetchWithAuth('/users/rides', accessToken);
+          if (activeTabRef.current === 'rides') setRides(data || []);
+          break;
+        case 'deliveries':
+          data = await fetchWithAuth('/users/deliveries', accessToken);
+          if (activeTabRef.current === 'deliveries') setDeliveries(data || []);
+          break;
       }
+    } catch (e) {
+      console.error("Tab load error", e);
     } finally {
-      setIsTabLoading(false);
+      // Only clear loading if still on same tab
+      if (activeTabRef.current === tab) {
+        setIsTabLoading(false);
+      }
     }
-  }, [orders.length, rides.length, deliveries.length, fetchWithAuth]);
+  }, [fetchWithAuth]);
 
-  // -- Initialization --
   useEffect(() => {
+    if (status === 'loading') return;
+
+    if (status === 'unauthenticated') {
+      router.push('/sign-in');
+      return;
+    }
+
+    // ✅ ADDED: Super Admin Redirect Check
+    // If the user is a Super Admin, redirect immediately to the dashboard.
+    // We return early so 'init()' is never called, keeping 'isPageLoading' true
+    // which prevents the profile content from flashing.
+    if (session?.user?.role === 'SUPER_ADMIN') {
+      router.push('/super-admin/dashboard');
+      return;
+    }
+
     const init = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { router.push('/sign-in'); return; }
-      
-      const accessToken = session.access_token;
-      setToken(accessToken);
-      
-      const [prof, addr] = await Promise.all([
-        fetchWithAuth('/users/profile', accessToken),
-        fetchWithAuth('/users/addresses', accessToken)
-      ]);
-      
-      if (prof) setProfile(prof);
-      if (addr) setAddresses(addr);
-      
-      // Default to loading orders
-      await fetchTabData('orders', accessToken);
-      setIsPageLoading(false);
+      try {
+        const accessToken = session?.accessToken;
+        
+        if (!accessToken) {
+          console.error("Session exists but no Access Token found. Forcing logout.");
+          await signOut({ callbackUrl: '/sign-in' }); 
+          return;
+        }
+        
+        setToken(accessToken);
+
+        const [prof, addr] = await Promise.all([
+          fetchWithAuth('/users/profile', accessToken),
+          fetchWithAuth('/users/addresses', accessToken)
+        ]);
+
+        // Handle profile data properly
+        if (prof) {
+          if (Array.isArray(prof)) {
+            console.warn("Profile returned as array, expected object");
+            setProfile(prof.length > 0 ? prof[0] : null);
+          } else {
+            setProfile(prof);
+          }
+        }
+
+        if (addr && Array.isArray(addr)) {
+          setAddresses(addr);
+        }
+        
+        await fetchTabData('orders', accessToken);
+        
+      } catch (err) {
+        console.error("Profile init failed", err);
+        // Don't show error if it's session expiry (already handled)
+        if ((err as Error).message !== 'Session expired') {
+          toast.error("Failed to load profile data");
+        }
+      } finally {
+        setIsPageLoading(false);
+      }
     };
-    init();
-  }, [supabase, router, fetchWithAuth, fetchTabData]);
+
+    if (session) {
+      init();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session, status, router]);
 
   useEffect(() => {
-    if (token) fetchTabData(activeTab, token);
+    if (token && activeTab !== 'addresses' && activeTab !== 'settings') {
+      fetchTabData(activeTab, token);
+    }
   }, [activeTab, token, fetchTabData]);
 
-  // -- Action Handlers --
   const handleUpdateProfile = async (data: { name: string; phone: string }) => {
-    if (!token) return;
+    if (!token) {
+      toast.error("Session expired. Please log in again.");
+      return;
+    }
+
     try {
-      const res = await fetch(`${API_URL}/users/profile`, {
+      const updatedProfile = await fetchWithAuth('/users/profile', token, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       });
-      if (!res.ok) throw new Error();
-      setProfile((prev: any) => ({ ...prev, ...data }));
-      toast.success("Profile updated");
-    } catch {
-      toast.error("Update failed");
+      
+      setProfile((prev: any) => ({ ...prev, ...updatedProfile }));
+      toast.success("Profile updated successfully");
+      setIsEditProfileOpen(false);
+    } catch (err: any) {
+      console.error("Profile update error:", err);
+      toast.error(err.message || "Failed to update profile");
     }
   };
 
-  const handleDeleteAddress = async (id: string) => {
-    if (!token) return;
+  const handleAddAddress = async (addressData: any) => {
+    if (!token) {
+      toast.error("Session expired. Please log in again.");
+      return;
+    }
+
+    try {
+      await fetchWithAuth('/users/addresses', token, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(addressData),
+      });
+
+      const updatedAddresses = await fetchWithAuth('/users/addresses', token);
+      setAddresses(updatedAddresses || []);
+      setIsAddressModalOpen(false);
+      toast.success("Address added successfully");
+      
+    } catch (error: any) {
+      console.error("Add address error:", error);
+      toast.error(error.message || "Failed to add address");
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!token) {
+      toast.error("Session expired. Please log in again.");
+      return;
+    }
+    
     const isDark = document.documentElement.classList.contains('dark');
     const result = await Swal.fire({
-      title: 'Delete Address?',
+      title: 'Delete Account?',
+      text: "This action cannot be undone. All your data will be permanently deleted.",
       icon: 'warning',
       showCancelButton: true,
-      confirmButtonColor: '#d33',
+      confirmButtonColor: '#dc2626',
+      cancelButtonColor: '#6b7280',
+      confirmButtonText: 'Yes, delete my account',
+      cancelButtonText: 'Cancel',
       background: isDark ? '#1a1a1a' : '#fff',
       color: isDark ? '#fff' : '#000',
     });
 
     if (result.isConfirmed) {
-      setAddresses(prev => prev.filter(a => a.id !== id));
       try {
-        await fetch(`${API_URL}/users/addresses/${id}`, { 
-          method: 'DELETE', headers: { Authorization: `Bearer ${token}` }
+        await fetchWithAuth('/users/profile', token, {
+          method: 'DELETE',
         });
-      } catch {
-        toast.error('Delete failed');
-        const refreshed = await fetchWithAuth('/users/addresses', token);
-        setAddresses(refreshed);
+
+        await Swal.fire({
+          title: 'Account Deleted',
+          text: 'Your account has been successfully deleted.',
+          icon: 'success',
+          background: isDark ? '#1a1a1a' : '#fff',
+          color: isDark ? '#fff' : '#000',
+        });
+
+        await signOut({ callbackUrl: '/' });
+      } catch (error: any) {
+        console.error(error);
+        toast.error(error.message || 'Failed to delete account');
       }
     }
   };
 
-  if (isPageLoading) return <ProfileSkeleton />;
+  const handleDeleteAddress = async (id: string) => {
+    if (!token) {
+      toast.error("Session expired. Please log in again.");
+      return;
+    }
+    
+    const isDark = document.documentElement.classList.contains('dark');
+    const result = await Swal.fire({
+      title: 'Delete Address?',
+      text: 'This action cannot be undone.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#dc2626',
+      cancelButtonColor: '#6b7280',
+      confirmButtonText: 'Delete',
+      cancelButtonText: 'Cancel',
+      background: isDark ? '#1a1a1a' : '#fff',
+      color: isDark ? '#fff' : '#000',
+    });
+
+    if (result.isConfirmed) {
+      try {
+        await fetchWithAuth(`/users/addresses/${id}`, token, {
+          method: 'DELETE',
+        });
+
+        setAddresses(prev => prev.filter(a => a.id !== id));
+        toast.success('Address deleted successfully');
+      } catch (err: any) {
+        console.error('Delete error:', err);
+        toast.error(err.message || 'Failed to delete address');
+        
+        // Refresh addresses on error
+        try {
+          const refreshed = await fetchWithAuth('/users/addresses', token);
+          setAddresses(refreshed || []);
+        } catch (refreshErr) {
+          console.error('Failed to refresh addresses:', refreshErr);
+        }
+      }
+    }
+  };
+
+  if (status === 'loading' || isPageLoading) return <ProfileSkeleton />;
+
+  // Handle null profile
+  if (!profile) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-[#0a0a0a] flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-gray-500 mb-4">Failed to load profile</p>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="px-6 py-2 bg-yellow-500 text-white rounded-lg font-bold"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-[#0a0a0a] text-gray-900 dark:text-gray-100 pb-24">
@@ -159,7 +352,7 @@ export default function ProfilePage() {
         defaultAddr={defaultAddr} 
         orderCount={orders.length} 
         onEditProfile={() => setIsEditProfileOpen(true)}
-        onLogout={() => supabase.auth.signOut().then(() => router.push('/sign-in'))}
+        onLogout={() => signOut({ callbackUrl: '/sign-in' })}
       />
 
       <ProfileTabs activeTab={activeTab} onTabChange={setActiveTab} />
@@ -168,14 +361,23 @@ export default function ProfilePage() {
         {isTabLoading ? <ContentSkeleton /> : (
            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
              
-             {/* ORDERS TAB */}
              {activeTab === 'orders' && (
                <div className="space-y-4">
                  {orders.length === 0 ? (
-                   <EmptyState icon={ShoppingBag} title="No orders yet" desc="Looks like you haven't ordered anything yet." actionLabel="Start Shopping" actionLink="/" />
+                   <EmptyState 
+                     icon={ShoppingBag} 
+                     title="No orders yet" 
+                     desc="Looks like you haven't ordered anything yet." 
+                     actionLabel="Start Shopping" 
+                     actionLink="/main/store" 
+                   />
                  ) : (
                    orders.map((order) => (
-                     <Link href={`/orders/${order.id}`} key={order.id} className="block hover:scale-[1.01] transition-transform">
+                     <Link 
+                       href={`/main/orders/${order.id}`} 
+                       key={order.id} 
+                       className="block hover:scale-[1.01] transition-transform"
+                     >
                        <OrderCard 
                          id={order.id.slice(0, 8).toUpperCase()} 
                          status={order.status}
@@ -189,44 +391,61 @@ export default function ProfilePage() {
                </div>
              )}
 
-             {/* RIDES TAB */}
              {activeTab === 'rides' && (
                <div className="space-y-4">
                  {rides.length === 0 ? (
-                   <EmptyState icon={Car} title="No rides yet" desc="Need a ride? Book one now." actionLabel="Book a Ride" actionLink="/rides" />
+                   <EmptyState 
+                     icon={Car} 
+                     title="No rides yet" 
+                     desc="Need a ride? Book one now." 
+                     actionLabel="Book a Ride" 
+                     actionLink="/main/ride" 
+                   />
                  ) : (
                    rides.map((ride) => <RideCard key={ride.id} {...ride} />)
                  )}
                </div>
              )}
 
-             {/* DELIVERIES TAB */}
              {activeTab === 'deliveries' && (
                <div className="space-y-4">
                  {deliveries.length === 0 ? (
-                   <EmptyState icon={Package} title="No deliveries yet" desc="Send packages securely across the city." actionLabel="Send Package" actionLink="/courier" />
+                   <EmptyState 
+                     icon={Package} 
+                     title="No deliveries yet" 
+                     desc="Send packages securely across the city." 
+                     actionLabel="Send Package" 
+                     actionLink="/main/delivery" 
+                   />
                  ) : (
                    deliveries.map((delivery) => <DeliveryCard key={delivery.id} {...delivery} />)
                  )}
                </div>
              )}
 
-             {/* ADDRESSES TAB */}
              {activeTab === 'addresses' && (
                <div className="space-y-6">
-                 <button onClick={() => setIsAddressModalOpen(true)} className="w-full py-6 border-2 border-dashed border-gray-200 dark:border-white/10 rounded-3xl flex flex-col items-center justify-center gap-2 text-gray-400 font-bold hover:border-yellow-500 hover:text-yellow-500 hover:bg-yellow-50 transition-all">
+                 <button 
+                   onClick={() => setIsAddressModalOpen(true)} 
+                   className="w-full py-6 border-2 border-dashed border-gray-200 dark:border-white/10 rounded-3xl flex flex-col items-center justify-center gap-2 text-gray-400 font-bold hover:border-yellow-500 hover:text-yellow-500 hover:bg-yellow-50 dark:hover:bg-yellow-500/10 transition-all"
+                 >
                    <MapPin className="w-6 h-6" />
                    <span>Add New Address</span>
                  </button>
-                 <div className="grid sm:grid-cols-2 gap-4">
-                   {addresses.map((addr) => (
-                     <AddressCard key={addr.id} {...addr} onDelete={handleDeleteAddress} />
-                   ))}
-                 </div>
+                 {addresses.length === 0 ? (
+                   <div className="text-center py-12 text-gray-500">
+                     No addresses saved yet
+                   </div>
+                 ) : (
+                   <div className="grid sm:grid-cols-2 gap-4">
+                     {addresses.map((addr) => (
+                       <AddressCard key={addr.id} {...addr} onDelete={handleDeleteAddress} />
+                     ))}
+                   </div>
+                 )}
                </div>
              )}
 
-             {/* SETTINGS TAB */}
              {activeTab === 'settings' && (
                <div className="max-w-xl mx-auto space-y-6">
                  <div className="bg-white dark:bg-[#151515] rounded-3xl border border-gray-100 dark:border-white/5 overflow-hidden">
@@ -234,35 +453,56 @@ export default function ProfilePage() {
                      <User className="w-4 h-4"/> Personal Info
                    </div>
                    <div className="p-2">
-                      <button onClick={() => setIsEditProfileOpen(true)} className="w-full flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-white/5 rounded-2xl transition-colors text-left font-medium text-sm">
+                      <button 
+                        onClick={() => setIsEditProfileOpen(true)} 
+                        className="w-full flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-white/5 rounded-2xl transition-colors text-left font-medium text-sm"
+                      >
                         <span>Edit Profile Details</span>
                         <ChevronRight className="w-4 h-4 text-gray-400" />
                       </button>
                    </div>
                  </div>
+                 
                  <div className="bg-white dark:bg-[#151515] rounded-3xl border border-gray-100 dark:border-white/5 overflow-hidden">
                    <div className="p-4 border-b border-gray-100 dark:border-white/5 bg-gray-50/50 dark:bg-white/5 font-bold flex items-center gap-2">
                      <ShieldCheck className="w-4 h-4"/> Security
                    </div>
                    <div className="p-6 flex items-start gap-4">
-                     <div className="p-3 bg-red-100 dark:bg-red-900/20 text-red-600 rounded-full"><Trash2 className="w-6 h-6" /></div>
+                     <div className="p-3 bg-red-100 dark:bg-red-900/20 text-red-600 rounded-full">
+                       <Trash2 className="w-6 h-6" />
+                     </div>
                      <div>
                        <h4 className="font-bold text-red-600">Delete Account</h4>
-                       <p className="text-sm text-gray-500 mt-1 mb-4">Irreversible action.</p>
-                       <button className="px-4 py-2 bg-red-50 text-red-600 font-bold text-sm rounded-lg hover:bg-red-100">Request Deletion</button>
+                       <p className="text-sm text-gray-500 mt-1 mb-4">This action is irreversible. All data will be permanently deleted.</p>
+                       <button 
+                         onClick={handleDeleteAccount}
+                         className="px-4 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 font-bold text-sm rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
+                       >
+                         Request Deletion
+                       </button>
                      </div>
                    </div>
                  </div>
                </div>
              )}
-
            </div>
         )}
       </main>
 
       <BottomNav />
-      <AddAddressModal isOpen={isAddressModalOpen} onClose={() => setIsAddressModalOpen(false)} onSave={(data) => { /* call fetchAddresses after */ }} />
-      <EditProfileModal isOpen={isEditProfileOpen} initialData={{ name: profile.name, phone: profile.phone }} onClose={() => setIsEditProfileOpen(false)} onSave={handleUpdateProfile} />
+      
+      <AddAddressModal 
+        isOpen={isAddressModalOpen} 
+        onClose={() => setIsAddressModalOpen(false)} 
+        onSave={handleAddAddress}  
+      />
+      
+      <EditProfileModal 
+        isOpen={isEditProfileOpen} 
+        initialData={{ name: profile?.name || '', phone: profile?.phone || '' }} 
+        onClose={() => setIsEditProfileOpen(false)} 
+        onSave={handleUpdateProfile} 
+      />
     </div>
   );
 }

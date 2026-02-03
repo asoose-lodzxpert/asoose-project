@@ -1,232 +1,86 @@
 /**
  * Event Type Definitions
  *
- * All events in the matching system are strongly typed.
- * Events are emitted by API/workers and consumed by other services.
+ * All matching-related events are job-based.
+ * Drivers only participate in jobType: 'ride'.
+ * Delivery jobs exist but never enter driver state transitions.
  */
 
 // ========================================
-// RIDE EVENTS
+// JOB EVENTS (CORE MATCHING CONTRACT)
 // ========================================
 
-export const RIDE_EVENTS = {
-  REQUESTED: 'ride.requested',
-  ASSIGNMENT_REQUESTED: 'ride.assignment.requested',
-  ASSIGNED: 'ride.assigned',
-  ACCEPTED: 'ride.accepted',
-  DECLINED: 'ride.declined',
-  TIMEOUT: 'ride.timeout',
-  STARTED: 'ride.started',
-  COMPLETED: 'ride.completed',
-  CANCELLED: 'ride.cancelled',
-  NO_DRIVER_FOUND: 'ride.no_driver_found',
+export const JOB_EVENTS = {
+  ASSIGNED: 'job.assigned',
+  UPDATED: 'job.updated',
+  CANCELLED: 'job.cancelled',
 } as const;
 
-export interface RideRequestedEvent {
-  rideId: string;
-  customerId: string;
-  pickupLat: number;
-  pickupLng: number;
-  dropoffLat: number;
-  dropoffLng: number;
-  distanceKm: number;
-  totalFare: number;
+export type JobType = 'ride' | 'delivery';
+
+export type JobStatus =
+  | 'requested'
+  | 'assignment_requested'
+  | 'assigned'
+  | 'accepted'
+  | 'declined'
+  | 'timeout'
+  | 'started'
+  | 'completed'
+  | 'no_driver_found';
+
+/**
+ * Base job event shared by all job messages
+ */
+export interface BaseJobEvent {
+  jobId: string;
+  jobType: JobType;
   timestamp: number;
 }
 
-export interface RideAssignmentRequestedEvent {
-  rideId: string;
+/**
+ * Emitted exactly once when a job is assigned to a driver
+ */
+export interface JobAssignedEvent extends BaseJobEvent {
+  jobType: 'ride'; // enforced at compile-time for drivers
   driverId: string;
   customerId: string;
-  pickupLat: number;
-  pickupLng: number;
-  dropoffLat: number;
-  dropoffLng: number;
-  totalFare: number;
-  distanceKm: number;
-  estimatedDurationMin: number;
-  expiresAt: number; // Unix timestamp (90s from now)
-  timestamp: number;
+  expiresAt?: number; // assignment TTL
 }
 
-export interface RideAssignedEvent {
-  rideId: string;
-  driverId: string;
-  customerId: string;
-  assignedAt: number;
-}
-
-export interface RideAcceptedEvent {
-  rideId: string;
-  driverId: string;
-  customerId: string;
-  acceptedAt: number;
-}
-
-export interface RideDeclinedEvent {
-  rideId: string;
-  driverId: string;
-  reason?: string;
-  declinedAt: number;
-}
-
-export interface RideTimeoutEvent {
-  rideId: string;
-  driverId: string;
-  timeoutAt: number;
-}
-
-export interface RideStartedEvent {
-  rideId: string;
-  driverId: string;
-  customerId: string;
-  startOtp: string;
-  startedAt: number;
-}
-
-export interface RideCompletedEvent {
-  rideId: string;
-  driverId: string;
-  customerId: string;
-  totalFare: number;
-  distanceKm: number;
-  durationMin: number;
-  completedAt: number;
-}
-
-export interface RideCancelledEvent {
-  rideId: string;
-  customerId: string;
+/**
+ * Emitted for ALL job state transitions except assignment & cancellation
+ */
+export interface JobUpdatedEvent extends BaseJobEvent {
+  status: JobStatus;
   driverId?: string;
+  customerId?: string;
+
+  /**
+   * Optional state-specific payload
+   * (OTP, metrics, decline reason, etc.)
+   */
+  metadata?: {
+    reason?: string;
+    otp?: string;
+    distanceKm?: number;
+    durationMin?: number;
+    earnings?: number;
+    attempts?: number;
+  };
+}
+
+/**
+ * Terminal event — job will never transition again
+ */
+export interface JobCancelledEvent extends BaseJobEvent {
   cancelledBy: 'customer' | 'driver' | 'system';
-  reason?: string;
-  cancelledAt: number;
-}
-
-export interface RideNoDriverFoundEvent {
-  rideId: string;
-  customerId: string;
-  pickupLat: number;
-  pickupLng: number;
-  attempts: number;
-  timestamp: number;
-}
-
-// ========================================
-// DELIVERY EVENTS
-// ========================================
-
-export const DELIVERY_EVENTS = {
-  REQUESTED: 'delivery.requested',
-  ASSIGNMENT_REQUESTED: 'delivery.assignment.requested',
-  ASSIGNED: 'delivery.assigned',
-  ACCEPTED: 'delivery.accepted',
-  DECLINED: 'delivery.declined',
-  TIMEOUT: 'delivery.timeout',
-  PICKED_UP: 'delivery.picked_up',
-  DELIVERED: 'delivery.delivered',
-  CANCELLED: 'delivery.cancelled',
-  NO_DRIVER_FOUND: 'delivery.no_driver_found',
-} as const;
-
-export interface DeliveryRequestedEvent {
-  deliveryId: string;
-  customerId: string;
-  orderId?: string;
-  pickupLat: number;
-  pickupLng: number;
-  dropoffLat: number;
-  dropoffLng: number;
-  distanceKm: number;
-  deliveryFee: number;
-  packageDetails?: string;
-  recipientName: string;
-  recipientPhone: string;
-  timestamp: number;
-}
-
-export interface DeliveryAssignmentRequestedEvent {
-  deliveryId: string;
-  driverId: string;
-  customerId: string;
-  orderId?: string;
-  pickupLat: number;
-  pickupLng: number;
-  dropoffLat: number;
-  dropoffLng: number;
-  deliveryFee: number;
-  distanceKm: number;
-  packageDetails?: string;
-  recipientName: string;
-  recipientPhone: string;
-  expiresAt: number;
-  timestamp: number;
-}
-
-export interface DeliveryAssignedEvent {
-  deliveryId: string;
-  driverId: string;
-  customerId: string;
-  assignedAt: number;
-}
-
-export interface DeliveryAcceptedEvent {
-  deliveryId: string;
-  driverId: string;
-  customerId: string;
-  acceptedAt: number;
-}
-
-export interface DeliveryDeclinedEvent {
-  deliveryId: string;
-  driverId: string;
-  reason?: string;
-  declinedAt: number;
-}
-
-export interface DeliveryTimeoutEvent {
-  deliveryId: string;
-  driverId: string;
-  timeoutAt: number;
-}
-
-export interface DeliveryPickedUpEvent {
-  deliveryId: string;
-  driverId: string;
-  pickupOtp: string;
-  pickedUpAt: number;
-}
-
-export interface DeliveryDeliveredEvent {
-  deliveryId: string;
-  driverId: string;
-  customerId: string;
-  deliveryOtp: string;
-  deliveryFee: number;
-  deliveredAt: number;
-}
-
-export interface DeliveryCancelledEvent {
-  deliveryId: string;
-  customerId: string;
   driverId?: string;
-  cancelledBy: 'customer' | 'driver' | 'system';
   reason?: string;
-  cancelledAt: number;
-}
-
-export interface DeliveryNoDriverFoundEvent {
-  deliveryId: string;
-  customerId: string;
-  orderId?: string;
-  pickupLat: number;
-  pickupLng: number;
-  attempts: number;
-  timestamp: number;
 }
 
 // ========================================
-// DRIVER EVENTS
+// DRIVER EVENTS (UNCHANGED, JOB-AWARE)
 // ========================================
 
 export const DRIVER_EVENTS = {
@@ -267,7 +121,7 @@ export interface DriverAvailableEvent {
   hexId: string;
   lat: number;
   lng: number;
-  reason: 'trip_completed' | 'trip_cancelled' | 'decline_timeout';
+  reason: 'job_completed' | 'job_cancelled' | 'decline_timeout';
   timestamp: number;
 }
 
@@ -284,7 +138,7 @@ export interface DriverMarkedInactiveEvent {
 }
 
 // ========================================
-// NOTIFICATION EVENTS
+// NOTIFICATION EVENTS (UNCHANGED)
 // ========================================
 
 export const NOTIFICATION_EVENTS = {
@@ -313,29 +167,7 @@ export interface SendSMSNotificationEvent {
 // TYPE UNIONS FOR EVENT HANDLERS
 // ========================================
 
-export type RideEvent =
-  | RideRequestedEvent
-  | RideAssignmentRequestedEvent
-  | RideAssignedEvent
-  | RideAcceptedEvent
-  | RideDeclinedEvent
-  | RideTimeoutEvent
-  | RideStartedEvent
-  | RideCompletedEvent
-  | RideCancelledEvent
-  | RideNoDriverFoundEvent;
-
-export type DeliveryEvent =
-  | DeliveryRequestedEvent
-  | DeliveryAssignmentRequestedEvent
-  | DeliveryAssignedEvent
-  | DeliveryAcceptedEvent
-  | DeliveryDeclinedEvent
-  | DeliveryTimeoutEvent
-  | DeliveryPickedUpEvent
-  | DeliveryDeliveredEvent
-  | DeliveryCancelledEvent
-  | DeliveryNoDriverFoundEvent;
+export type JobEvent = JobAssignedEvent | JobUpdatedEvent | JobCancelledEvent;
 
 export type DriverEvent =
   | DriverOnlineEvent
@@ -349,8 +181,4 @@ export type NotificationEvent =
   | SendPushNotificationEvent
   | SendSMSNotificationEvent;
 
-export type MatchingEvent =
-  | RideEvent
-  | DeliveryEvent
-  | DriverEvent
-  | NotificationEvent;
+export type MatchingEvent = JobEvent | DriverEvent | NotificationEvent;

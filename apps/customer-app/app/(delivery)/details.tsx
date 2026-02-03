@@ -1,13 +1,19 @@
 import React, { useEffect, useState } from "react";
-import { View, StyleSheet, Pressable, ScrollView } from "react-native";
+import {
+  View,
+  StyleSheet,
+  Pressable,
+  ScrollView,
+  RefreshControl,
+} from "react-native";
 import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { useRouter, useLocalSearchParams } from "expo-router";
-import deliveries from "@/mock/delivery-history-data.json";
+import { fetchDeliveryDetails } from "@/services/delivery-details.service";
 
-type Delivery = (typeof deliveries)[number];
+type Delivery = any;
 
 export default function DeliveryDetailsScreen() {
   const router = useRouter();
@@ -19,24 +25,39 @@ export default function DeliveryDetailsScreen() {
   const muted = useThemeColor({}, "textMuted");
 
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [delivery, setDelivery] = useState<Delivery | null>(null);
 
-  useEffect(() => {
-    const t = setTimeout(() => {
+  const fetchData = async () => {
+    setLoading(true);
+    try {
       const deliveryId = Array.isArray(id) ? id[0] : id;
-      // @ts-ignore
-      setDelivery(deliveries.find((d) => d.id === deliveryId) ?? null);
+      const data = await fetchDeliveryDetails(deliveryId as string);
+      setDelivery(data);
+    } catch (e) {
+      setDelivery(null);
+    } finally {
       setLoading(false);
-    }, 600);
-    return () => clearTimeout(t);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchData();
+    setRefreshing(false);
+  };
 
   return (
     <ThemedView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} style={styles.backBtn}>
-          <IconSymbol name="arrow-left" size={22} color={primary} />
+          <IconSymbol name="chevron.left" size={22} color={primary} />
         </Pressable>
         <ThemedText type="title" style={styles.headerTitle}>
           Delivery Details
@@ -46,14 +67,22 @@ export default function DeliveryDetailsScreen() {
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
       >
-        {loading && <SkeletonCard />}
-
-        {!loading && !delivery && (
-          <ThemedText style={styles.centerText}>Delivery not found</ThemedText>
-        )}
-
-        {!loading && delivery && (
+        {loading ? (
+          <SkeletonCard />
+        ) : !delivery ? (
+          <View style={{ alignItems: "center", marginTop: 32 }}>
+            <ThemedText style={styles.centerText}>
+              Delivery not found
+            </ThemedText>
+            <ThemedText style={styles.pullToRefresh}>
+              Pull down to refresh
+            </ThemedText>
+          </View>
+        ) : (
           <>
             {/* ROUTE */}
             <View
@@ -68,20 +97,17 @@ export default function DeliveryDetailsScreen() {
                   Live Route
                 </ThemedText>
               </View>
-
               <RouteItem
                 icon="map-pin"
                 label="Pickup"
-                value={delivery.from.address}
+                value={delivery.pickupAddress?.address || "Unknown Address"}
                 color={primary}
               />
-
               <View style={styles.routeDivider} />
-
               <RouteItem
                 icon="flag"
                 label="Drop-off"
-                value={delivery.to.address}
+                value={delivery.dropoffAddress?.address || "Unknown Address"}
                 color={primary}
               />
             </View>
@@ -95,44 +121,42 @@ export default function DeliveryDetailsScreen() {
             >
               <SummaryItem
                 icon="wallet"
-                label="Price"
-                value={`₦${delivery.price.toLocaleString()}`}
+                label="Delivery Fee"
+                value={`₦${delivery.deliveryFee?.toLocaleString?.() ?? delivery.deliveryFee}`}
                 highlight
               />
               <SummaryItem
-                icon="credit-card"
-                label="Payment"
-                value={delivery.paymentMethod}
-              />
-              <SummaryItem
                 icon="box"
-                label="Package"
-                value={delivery.details.packageSize}
-              />
-            </View>
-
-            {/* PEOPLE & NOTES */}
-            <View
-              style={[
-                styles.card,
-                { backgroundColor: surface, borderColor: border },
-              ]}
-            >
-              <SummaryItem
-                icon="user"
-                label="Sender"
-                value={`${delivery.details.sender} (${delivery.details.senderPhone})`}
+                label="Package Details"
+                value={delivery.packageDetails || "-"}
               />
               <SummaryItem
                 icon="user-check"
-                label="Receiver"
-                value={`${delivery.details.receiver} (${delivery.details.receiverPhone})`}
+                label="Recipient"
+                value={`${delivery.recipientName} (${delivery.recipientPhone})`}
               />
               <SummaryItem
-                icon="file-text"
-                label="Instructions"
-                value={delivery.details.instructions || "None"}
+                icon="user"
+                label="Rider"
+                value={
+                  delivery.riderName
+                    ? `${delivery.riderName} (${delivery.riderPhone || "-"})`
+                    : "Not assigned"
+                }
               />
+              <SummaryItem icon="flag" label="Status" value={delivery.status} />
+              <SummaryItem
+                icon="clock"
+                label="Created At"
+                value={new Date(delivery.createdAt).toLocaleString()}
+              />
+              {delivery.deliveredAt && (
+                <SummaryItem
+                  icon="check-circle"
+                  label="Delivered At"
+                  value={new Date(delivery.deliveredAt).toLocaleString()}
+                />
+              )}
             </View>
           </>
         )}
@@ -215,6 +239,11 @@ function SkeletonCard() {
 /* ---------------- Styles ---------------- */
 
 const styles = StyleSheet.create({
+  pullToRefresh: {
+    color: "#888",
+    fontSize: 13,
+    marginTop: 8,
+  },
   container: {
     flex: 1,
   },
@@ -228,6 +257,8 @@ const styles = StyleSheet.create({
   backBtn: {
     marginRight: 12,
     padding: 4,
+    flexDirection: "row",
+    alignItems: "center",
   },
   headerTitle: {
     fontSize: 20,

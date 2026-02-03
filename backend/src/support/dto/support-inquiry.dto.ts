@@ -1,15 +1,19 @@
 import { IsEmail, IsNotEmpty, IsString, MinLength } from 'class-validator';
 
 export class SupportInquiryDto {
-  @IsString() @IsNotEmpty()
+  @IsString()
+  @IsNotEmpty()
   name: string;
 
   @IsEmail()
   email: string;
 
-  @IsString() @IsNotEmpty()
+  @IsString()
+  @IsNotEmpty()
   subject: string;
 
-  @IsString() @IsNotEmpty() @MinLength(10)
+  @IsString()
+  @IsNotEmpty()
+  @MinLength(10)
   message: string;
 }

@@ -1,8 +1,12 @@
-import React, { useRef, useEffect } from "react";
-import { View, StyleSheet, Pressable, Animated } from "react-native";
+import React from "react";
+import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
+
 import { ThemedText } from "@/components/themed-text";
-import { useThemeColor } from "@/hooks/use-theme-color";
 import { useAuth } from "@/context/AuthContext";
+import { useThemeColor } from "@/hooks/use-theme-color";
+
+import * as Haptics from "expo-haptics";
+import { IconSymbol } from "../ui/icon-symbol";
 
 interface Props {
   storeName: string;
@@ -15,60 +19,29 @@ export const StoreHeader: React.FC<Props> = ({
   storeName,
   isOnline,
   onToggleOnline,
-  loading,
+  loading = false,
 }) => {
   const { user } = useAuth();
-  const yellow = useThemeColor({}, "brandPrimary");
+
   const green = useThemeColor({}, "statusSuccess");
   const orange = useThemeColor({}, "statusPending");
   const red = useThemeColor({}, "statusError");
   const borderColor = useThemeColor({}, "borderDefault");
-  const textSecondary = useThemeColor({}, "textSecondary");
   const surfaceCard = useThemeColor({}, "surfaceCard");
 
-  // Animation values
-  const translateX = useRef(new Animated.Value(isOnline ? 1 : 0)).current;
-  const backgroundColor = useRef(new Animated.Value(isOnline ? 1 : 0)).current;
-
-  useEffect(() => {
-    Animated.parallel([
-      Animated.spring(translateX, {
-        toValue: isOnline ? 1 : 0,
-        useNativeDriver: true,
-        tension: 50,
-        friction: 7,
-      }),
-      Animated.timing(backgroundColor, {
-        toValue: isOnline ? 1 : 0,
-        duration: 200,
-        useNativeDriver: false,
-      }),
-    ]).start();
-  }, [isOnline]);
-
-  const thumbTranslateX = translateX.interpolate({
-    inputRange: [0, 1],
-    outputRange: [2, 34],
-  });
-
-  const switchBackgroundColor = backgroundColor.interpolate({
-    inputRange: [0, 1],
-    outputRange: [borderColor, yellow],
-  });
-
-  // Get status color and text
+  // Status badge info
   const getStatusInfo = () => {
     switch (user?.status) {
       case "ACTIVE":
-        return { color: green, text: "Verified", icon: "✓" };
+        return { color: green, text: "Verified" };
       case "PENDING":
-        return { color: orange, text: "Pending", icon: "⏳" };
+        return { color: orange, text: "Pending" };
       case "SUSPENDED":
-        return { color: red, text: "Suspended", icon: "⏸" };
+        return { color: red, text: "Suspended" };
       case "BANNED":
-        return { color: red, text: "Banned", icon: "✕" };
+        return { color: red, text: "Banned" };
       default:
-        return { color: borderColor, text: "Unknown", icon: "?" };
+        return { color: borderColor, text: "Unknown" };
     }
   };
 
@@ -77,112 +50,67 @@ export const StoreHeader: React.FC<Props> = ({
   if (loading) {
     return (
       <View style={styles.container}>
-        <View style={styles.left}>
-          <View>
-            <View
-              style={{
-                width: 120,
-                height: 20,
-                backgroundColor: borderColor,
-                borderRadius: 4,
-                opacity: 0.3,
-                marginBottom: 4,
-              }}
-            />
-            <View
-              style={{
-                width: 80,
-                height: 16,
-                backgroundColor: borderColor,
-                borderRadius: 4,
-                opacity: 0.3,
-              }}
-            />
-          </View>
+        <View style={{ flex: 1 }}>
+          <View style={styles.skeletonLineLarge} />
+          <View style={styles.skeletonLineSmall} />
         </View>
-        <View
-          style={{
-            width: 60,
-            height: 28,
-            backgroundColor: borderColor,
-            borderRadius: 14,
-            opacity: 0.3,
-          }}
-        />
+        <View style={styles.skeletonToggle} />
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
+      {/* Left: Store Info */}
       <View style={styles.left}>
-        <View>
-          <ThemedText type="defaultSemiBold" style={{ fontSize: 18 }}>
-            {storeName}
+        <ThemedText type="defaultSemiBold" style={styles.storeName}>
+          {storeName}
+        </ThemedText>
+
+        <View
+          style={[
+            styles.statusBadge,
+            { backgroundColor: statusInfo.color + "20" },
+          ]}
+        >
+          <ThemedText
+            style={{ color: statusInfo.color, fontSize: 12, fontWeight: "600" }}
+          >
+            {statusInfo.text}
           </ThemedText>
-          <View style={styles.statusRow}>
-            <View
-              style={[
-                styles.statusBadge,
-                { backgroundColor: statusInfo.color + "20" },
-              ]}
-            >
-              <ThemedText style={{ fontSize: 10, marginRight: 2 }}>
-                {statusInfo.icon}
-              </ThemedText>
-              <ThemedText
-                style={{
-                  color: statusInfo.color,
-                  fontSize: 12,
-                  fontWeight: "600",
-                }}
-              >
-                {statusInfo.text}
-              </ThemedText>
-            </View>
-          </View>
         </View>
       </View>
 
-      {/* Animated Switch */}
-      <Pressable onPress={onToggleOnline} style={styles.switchPressable}>
-        <Animated.View
+      {/* Right: Circular Toggle Button */}
+      <Pressable
+        disabled={loading}
+        onPress={() => {
+          if (!loading) {
+            if (!isOnline) {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            } else {
+              Haptics.selectionAsync();
+            }
+            onToggleOnline();
+          }
+        }}
+        style={styles.togglePressable}
+      >
+        <View
           style={[
-            styles.switchTrack,
+            styles.toggleCircle,
             {
-              backgroundColor: switchBackgroundColor,
+              backgroundColor: isOnline ? green : red,
+              opacity: loading ? 0.7 : 1,
             },
           ]}
         >
-          <Animated.View
-            style={[
-              styles.switchThumb,
-              {
-                backgroundColor: surfaceCard,
-                transform: [{ translateX: thumbTranslateX }],
-              },
-            ]}
-          >
-            {isOnline && (
-              <View style={styles.checkIcon}>
-                <ThemedText style={{ color: yellow, fontSize: 12 }}>
-                  ✓
-                </ThemedText>
-              </View>
-            )}
-          </Animated.View>
-          <ThemedText
-            style={[
-              styles.switchLabel,
-              {
-                color: isOnline ? surfaceCard : textSecondary,
-                opacity: isOnline ? 1 : 0.7,
-              },
-            ]}
-          >
-            {isOnline ? "OPEN" : "CLOSED"}
-          </ThemedText>
-        </Animated.View>
+          {loading ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <IconSymbol name="power-on" size={20} color="#fff" />
+          )}
+        </View>
       </Pressable>
     </View>
   );
@@ -191,71 +119,68 @@ export const StoreHeader: React.FC<Props> = ({
 const styles = StyleSheet.create({
   container: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
+    justifyContent: "space-between",
     padding: 16,
   },
+
   left: {
     flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
   },
-  statusRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 4,
-    gap: 6,
+
+  storeName: {
+    fontSize: 18,
+    marginBottom: 4,
   },
+
   statusBadge: {
-    flexDirection: "row",
-    alignItems: "center",
+    alignSelf: "flex-start",
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 8,
   },
-  switchPressable: {
-    marginLeft: 8,
+
+  togglePressable: {
+    marginLeft: 12,
   },
-  switchTrack: {
-    width: 70,
-    height: 32,
-    borderRadius: 16,
+
+  toggleCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     justifyContent: "center",
-    paddingHorizontal: 4,
+    alignItems: "center",
     shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
     shadowRadius: 2,
     elevation: 2,
   },
-  switchThumb: {
-    position: "absolute",
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    justifyContent: "center",
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
+
+  /* ===== Skeleton ===== */
+
+  skeletonLineLarge: {
+    width: 140,
+    height: 18,
+    borderRadius: 4,
+    backgroundColor: "#ccc",
+    opacity: 0.3,
+    marginBottom: 6,
   },
-  checkIcon: {
-    justifyContent: "center",
-    alignItems: "center",
+
+  skeletonLineSmall: {
+    width: 80,
+    height: 14,
+    borderRadius: 4,
+    backgroundColor: "#ccc",
+    opacity: 0.3,
   },
-  switchLabel: {
-    fontSize: 9,
-    fontWeight: "700",
-    letterSpacing: 0.5,
-    textAlign: "center",
+
+  skeletonToggle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#ccc",
+    opacity: 0.3,
   },
 });

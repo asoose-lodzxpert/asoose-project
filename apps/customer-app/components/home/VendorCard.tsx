@@ -1,10 +1,10 @@
 import { View, StyleSheet, Pressable, Image } from "react-native";
-import { useRouter } from "expo-router";
 
 import { ThemedText } from "@/components/themed-text";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { Vendor } from "@/types/home";
+import { RelativePathString, useRouter } from "expo-router";
 
 /* ---------------------------------- */
 /* Assets (placeholders) */
@@ -17,13 +17,27 @@ type Props = {
 };
 
 export function VendorCard({ item }: Props) {
-  const router = useRouter();
   const primary = useThemeColor({}, "brandPrimary");
   const textMuted = useThemeColor({}, "textMuted");
   const card = useThemeColor({}, "surfaceCard");
 
+  const rating = typeof item.rating === "number" ? item.rating : 0;
+  const deliveryText = item.deliveryTime || item.eta || "30-45 mins";
+  const tags = item.tags?.length
+    ? item.tags
+    : item.type
+      ? [item.type.toString().toLowerCase()]
+      : [];
+
+  const coverUri = item.cover || item.image || null;
+  const logoUri = item.logo || item.image || null;
+
+  const router = useRouter();
   function handlePress() {
-    // router.push("/(store)");
+    router.push({
+      pathname: "/(store)/store-screen" as RelativePathString,
+      params: { slug: item.slug },
+    });
   }
 
   return (
@@ -34,7 +48,7 @@ export function VendorCard({ item }: Props) {
       {/* ---------------- Top Section ---------------- */}
       <View style={styles.top}>
         <Image
-          source={item.cover ? { uri: item.cover } : COVER_PLACEHOLDER}
+          source={coverUri ? { uri: coverUri } : COVER_PLACEHOLDER}
           style={styles.cover}
           resizeMode="cover"
         />
@@ -51,7 +65,7 @@ export function VendorCard({ item }: Props) {
       {/* Store Avatar */}
       <View style={styles.avatarWrap}>
         <Image
-          source={item.logo ? { uri: item.logo } : LOGO_PLACEHOLDER}
+          source={logoUri ? { uri: logoUri } : LOGO_PLACEHOLDER}
           style={styles.avatar}
           resizeMode="cover"
         />
@@ -63,11 +77,13 @@ export function VendorCard({ item }: Props) {
 
         <View style={styles.meta}>
           <IconSymbol name="star.fill" size={14} color={primary} />
-          <ThemedText>{item.rating.toFixed(1)}</ThemedText>
-          <ThemedText style={{ color: textMuted }}>• {item.eta}</ThemedText>
+          <ThemedText>{rating.toFixed(1)}</ThemedText>
+          <ThemedText style={{ color: textMuted }}>• {deliveryText}</ThemedText>
         </View>
 
-        <ThemedText style={styles.tags}>{item.tags.join(" • ")}</ThemedText>
+        {tags.length ? (
+          <ThemedText style={styles.tags}>{tags.join(" • ")}</ThemedText>
+        ) : null}
       </View>
     </Pressable>
   );

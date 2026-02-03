@@ -17,7 +17,8 @@ import { ActivityLogService } from 'src/common/services/activity-log.services';
     OrdersService,
     ReviewsService,
     DocumentsService,
-    ActivityLogService, 
+    ActivityLogService,
   ],
+  exports: [StoresService],
 })
 export class VendorModule {}

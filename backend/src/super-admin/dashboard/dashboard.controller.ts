@@ -53,4 +53,3 @@ export class DashboardController {
     return { message: 'Dashboard cache cleared successfully' };
   }
 }
-

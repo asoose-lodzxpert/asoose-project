@@ -1,9 +1,9 @@
-import React from "react";
-import { View, StyleSheet } from "react-native";
-import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
+import { ThemedView } from "@/components/themed-view";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
+import React from "react";
+import { StyleSheet, View } from "react-native";
 
 export function SignupSuccess() {
   const success = useThemeColor({}, "statusSuccess");
@@ -21,7 +21,7 @@ export function SignupSuccess() {
 
         <ThemedText type="title">Application Submitted!</ThemedText>
         <ThemedText style={styles.subTitle}>
-          We're reviewing your documents
+          We&apos;re reviewing your documents
         </ThemedText>
       </View>
 
@@ -68,12 +68,12 @@ export function SignupSuccess() {
 
       {/* What's Next */}
       <View style={[styles.card, { backgroundColor: cardBg }]}>
-        <ThemedText type="defaultSemiBold">What's next?</ThemedText>
+        <ThemedText type="defaultSemiBold">What&apos;s next?</ThemedText>
 
         <View style={styles.nextItem}>
           <IconSymbol name="1.circle.fill" size={20} color={warning} />
           <ThemedText style={styles.nextText}>
-            We'll verify your documents within 24-48 hours.
+            We&apos;ll verify your documents within 24-48 hours.
           </ThemedText>
         </View>
 

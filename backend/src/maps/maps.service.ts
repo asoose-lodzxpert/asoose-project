@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { AppLogger } from '../libs/logger/app-logger.service';
 import axios from 'axios';
 import * as polyline from '@mapbox/polyline';
 
@@ -6,7 +7,7 @@ import * as polyline from '@mapbox/polyline';
 export class MapsService {
   private readonly apiKey: string;
 
-  constructor() {
+  constructor(private readonly appLogger: AppLogger) {
     this.apiKey = process.env.GOOGLE_MAPS_API_KEY!;
   }
 
@@ -34,7 +35,7 @@ export class MapsService {
         })) ?? []
       );
     } catch (error) {
-      console.error('Error searching address:', error);
+      this.appLogger.error('Error searching address', error?.stack, { error });
       return [];
     }
   }
@@ -57,7 +58,9 @@ export class MapsService {
         })) ?? []
       );
     } catch (error) {
-      console.error('Error in places autocomplete:', error);
+      this.appLogger.error('Error in places autocomplete', error?.stack, {
+        error,
+      });
       return [];
     }
   }
@@ -111,7 +114,9 @@ export class MapsService {
         duration: route.legs[0].duration,
       };
     } catch (error) {
-      console.error('Error fetching directions:', error);
+      this.appLogger.error('Error fetching directions', error?.stack, {
+        error,
+      });
       return {
         error: 'Failed to fetch directions',
         coordinates: [],

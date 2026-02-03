@@ -77,7 +77,8 @@ export type IconSymbolName =
   | "pause.circle.fill"
   | "clock.fill"
   | "list.clipboard.fill"
-  | "hand.raised.fill";
+  | "hand.raised.fill"
+  | "power-on";
 
 export const MAPPING: Record<
   IconSymbolName,
@@ -164,6 +165,7 @@ export const MAPPING: Record<
   "clock.fill": "schedule",
   "list.clipboard.fill": "assignment",
   "hand.raised.fill": "front-hand",
+  "power-on": "power-settings-new",
 };
 
 interface IconSymbolProps {
@@ -176,7 +178,7 @@ interface IconSymbolProps {
 export function IconSymbol({ name, size = 24, color, style }: IconSymbolProps) {
   return (
     <MaterialIcons
-      name={MAPPING[name] as keyof typeof MaterialIcons.glyphMap} // <- type cast here
+      name={MAPPING[name] as keyof typeof MaterialIcons.glyphMap}
       size={size}
       color={color}
       style={style}

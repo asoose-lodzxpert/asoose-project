@@ -23,7 +23,6 @@ import {
   saveBankAccount,
   deleteBankAccount,
   getBanks,
-  verifyAccountNumber,
 } from "@/services/bank-account.service";
 
 interface BankAccountData {
@@ -48,15 +47,12 @@ export default function Step4BankAccountScreen() {
   const mutedText = useThemeColor({}, "textDisabled");
   const textPrimary = useThemeColor({}, "textPrimary");
   const errorColor = useThemeColor({}, "statusError");
-  const successColor = useThemeColor({}, "statusSuccess");
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [verifying, setVerifying] = useState(false);
   const [hasExisting, setHasExisting] = useState(false);
   const [banks, setBanks] = useState<Bank[]>([]);
-  const [accountNameVerified, setAccountNameVerified] = useState(false);
 
   const [formData, setFormData] = useState<BankAccountData>({
     bankName: "",
@@ -73,12 +69,16 @@ export default function Step4BankAccountScreen() {
 
   const loadData = async () => {
     setLoading(true);
+
     try {
-      // Load banks list
       const banksData = await getBanks();
       setBanks(Array.isArray(banksData) ? banksData : []);
+    } catch (e) {
+      console.error("Failed to load banks", e);
+      setBanks([]);
+    }
 
-      // Load existing bank account
+    try {
       const account = await getBankAccount();
       if (account) {
         setFormData({
@@ -88,10 +88,9 @@ export default function Step4BankAccountScreen() {
           accountName: account.accountName || "",
         });
         setHasExisting(true);
-        setAccountNameVerified(true); // Already saved account is verified
       }
-    } catch (error: any) {
-      setBanks([]); // Ensure banks is always an array
+    } catch (e) {
+      console.error("Failed to load account", e);
     } finally {
       setLoading(false);
     }
@@ -103,9 +102,8 @@ export default function Step4BankAccountScreen() {
       ...formData,
       bankCode,
       bankName: selectedBank?.name || "",
-      accountName: "", // Reset account name when bank changes
+      accountName: "",
     });
-    setAccountNameVerified(false);
     if (errors.bankCode) {
       setErrors({ ...errors, bankCode: undefined });
     }
@@ -115,49 +113,8 @@ export default function Step4BankAccountScreen() {
     // Only allow digits
     const cleaned = text.replace(/\D/g, "");
     setFormData({ ...formData, accountNumber: cleaned, accountName: "" });
-    setAccountNameVerified(false);
     if (errors.accountNumber) {
       setErrors({ ...errors, accountNumber: undefined });
-    }
-  };
-
-  const handleVerifyAccount = async () => {
-    if (!formData.bankCode) {
-      Toast.show({
-        type: "error",
-        text1: "Please select a bank first",
-      });
-      return;
-    }
-
-    if (!formData.accountNumber || formData.accountNumber.length !== 10) {
-      Toast.show({
-        type: "error",
-        text1: "Please enter a valid 10-digit account number",
-      });
-      return;
-    }
-
-    setVerifying(true);
-    try {
-      const result = await verifyAccountNumber(
-        formData.bankCode,
-        formData.accountNumber
-      );
-      setFormData({ ...formData, accountName: result.accountName });
-      setAccountNameVerified(true);
-      Toast.show({
-        type: "success",
-        text1: "Account verified successfully",
-      });
-    } catch (error: any) {
-      Toast.show({
-        type: "error",
-        text1: error.message || "Failed to verify account number",
-      });
-      setAccountNameVerified(false);
-    } finally {
-      setVerifying(false);
     }
   };
 
@@ -174,9 +131,7 @@ export default function Step4BankAccountScreen() {
       newErrors.accountNumber = "Account number must be 10 digits";
     }
 
-    if (!accountNameVerified || !formData.accountName) {
-      newErrors.accountName = "Please verify account number first";
-    }
+    // We no longer require remote verification. Optionally allow account name input.
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -459,13 +414,7 @@ export default function Step4BankAccountScreen() {
                 }))}
                 value={formData.bankCode}
                 onChange={(value) => handleBankChange(value as string)}
-                modal={true}
               />
-              {errors.bankCode && (
-                <ThemedText style={[styles.errorText, { color: errorColor }]}>
-                  {errors.bankCode}
-                </ThemedText>
-              )}
             </View>
 
             {/* Account Number */}
@@ -490,38 +439,9 @@ export default function Step4BankAccountScreen() {
                   maxLength={10}
                   value={formData.accountNumber}
                   onChangeText={handleAccountNumberChange}
-                  editable={!verifying}
+                  editable={!saving}
                 />
-                <Pressable
-                  onPress={handleVerifyAccount}
-                  disabled={
-                    verifying ||
-                    !formData.bankCode ||
-                    formData.accountNumber.length !== 10
-                  }
-                  style={[
-                    styles.verifyButton,
-                    {
-                      backgroundColor:
-                        verifying ||
-                        !formData.bankCode ||
-                        formData.accountNumber.length !== 10
-                          ? mutedText
-                          : primary,
-                    },
-                  ]}
-                >
-                  {verifying ? (
-                    <ActivityIndicator color="#fff" size="small" />
-                  ) : (
-                    <ThemedText
-                      type="defaultSemiBold"
-                      style={{ color: "#fff", fontSize: 14 }}
-                    >
-                      Verify
-                    </ThemedText>
-                  )}
-                </Pressable>
+                {/* No verify button: users submit directly. */}
               </View>
               {errors.accountNumber && (
                 <ThemedText style={[styles.errorText, { color: errorColor }]}>
@@ -532,53 +452,44 @@ export default function Step4BankAccountScreen() {
 
             {/* Account Name (Auto-filled after verification) */}
             <View style={styles.inputGroup}>
-              <ThemedText style={styles.label}>Account Name</ThemedText>
-              <View
+              <ThemedText style={styles.label}>
+                Account Name (optional)
+              </ThemedText>
+              <TextInput
                 style={[
                   styles.input,
                   {
-                    backgroundColor: accountNameVerified
-                      ? successColor + "10"
-                      : surfaceCard,
-                    borderColor: errors.accountName
-                      ? errorColor
-                      : accountNameVerified
-                        ? successColor
-                        : borderColor,
-                    flexDirection: "row",
-                    alignItems: "center",
-                    justifyContent: "space-between",
+                    backgroundColor: surfaceCard,
+                    borderColor: errors.accountName ? errorColor : borderColor,
+                    color: textPrimary,
                   },
                 ]}
+                placeholder="Account name (optional)"
+                placeholderTextColor={mutedText}
+                value={formData.accountName}
+                onChangeText={(t) => {
+                  setFormData({ ...formData, accountName: t });
+                  if (errors.accountName)
+                    setErrors({ ...errors, accountName: undefined });
+                }}
+              />
+
+              <ThemedText
+                style={{ fontSize: 12, color: mutedText, marginTop: 8 }}
               >
-                <ThemedText
-                  style={{
-                    color: formData.accountName ? textPrimary : mutedText,
-                    flex: 1,
-                  }}
-                >
-                  {formData.accountName || "Verify account to see name"}
-                </ThemedText>
-                {accountNameVerified && (
-                  <IconSymbol name="check" size={20} color={successColor} />
-                )}
-              </View>
-              {errors.accountName && (
-                <ThemedText style={[styles.errorText, { color: errorColor }]}>
-                  {errors.accountName}
-                </ThemedText>
-              )}
+                We won't automatically verify the account number. Please make
+                sure the bank details are correct before submitting.
+              </ThemedText>
             </View>
 
             {/* Save Button */}
             <Pressable
               onPress={handleSave}
-              disabled={saving || !accountNameVerified}
+              disabled={saving}
               style={[
                 styles.saveButton,
                 {
-                  backgroundColor:
-                    saving || !accountNameVerified ? mutedText : primary,
+                  backgroundColor: saving ? mutedText : primary,
                 },
               ]}
             >

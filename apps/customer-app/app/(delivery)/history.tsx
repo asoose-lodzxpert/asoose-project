@@ -38,7 +38,7 @@ export default function DeliveryHistoryScreen() {
         const result = await fetchDeliveryHistory(
           currentTab,
           currentPage,
-          PAGE_SIZE
+          PAGE_SIZE,
         );
         setData((prev) => (refresh ? result : [...prev, ...result]));
         setPage(currentPage);
@@ -48,16 +48,15 @@ export default function DeliveryHistoryScreen() {
         setRefreshing(false);
       }
     },
-    [tab, page, loading]
+    [tab, page, loading],
   );
 
   useEffect(() => {
     setData([]);
     setPage(1);
     setHasMore(true);
-    // Wait for state to update, then load data for new tab
+
     loadData(true, tab, 1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab]);
 
   const onRefresh = useCallback(() => {
@@ -94,7 +93,6 @@ export default function DeliveryHistoryScreen() {
     </ThemedView>
   );
 }
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,

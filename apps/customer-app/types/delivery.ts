@@ -17,7 +17,7 @@ export type LocationPoint = {
   contactPhone?: string;
 };
 
-export type PackageSize = "small" | "medium" | "large";
+export type PackageSize = "small" | "medium" | "large" | "extra_large";
 
 export type DeliveryQuote = {
   distanceKm: number;

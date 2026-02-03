@@ -25,7 +25,7 @@ export  function CustomersPageSkeleton() {
   {[1, 2, 3].map((i) => (
     <div key={i} className="bg-[#1E293B] border border-gray-800 rounded-lg p-3 w-full">
       <SkeletonText width="w-12" height="h-3" />
-      <SkeletonText width="w-8" height="h-6" className="mt-1" />
+      <SkeletonText width="w-8" height="h-6"  />
     </div>
   ))}
 </div>

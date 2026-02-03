@@ -1,10 +1,7 @@
 import axios from "axios";
 import { useEffect, useRef, useState } from "react";
 
-// IMPORTANT: Ensure the protocol (http/https) matches your backend server.
-// For local development, use http://localhost:3000
-// If deploying to production with SSL, set EXPO_PUBLIC_API_URL to https://yourdomain.com
-const API_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000";
+const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
 export function usePlacesAutocomplete(query: string, location?: string) {
   const [results, setResults] = useState<any[]>([]);

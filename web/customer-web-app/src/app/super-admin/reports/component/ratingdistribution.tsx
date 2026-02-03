@@ -22,7 +22,7 @@ export default function RatingsDistribution({ ratings, avgRating }: RatingsProps
               ></div>
             </div>
             <span className="text-xs text-gray-400 w-8 text-right">
-              {item.percentage}%
+         {Math.round(item.percentage)}%
             </span>
           </div>
         ))}

@@ -6,166 +6,280 @@ import React, {
   useEffect,
   useCallback,
   useRef,
+  useMemo,
 } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Crosshair, AlertTriangle } from "lucide-react";
-import { useJsApiLoader, Libraries } from "@react-google-maps/api";
-
+import { useSession } from "next-auth/react";
+import { useGoogleMaps } from "@/providers/GoogleMapsProvider";
 import GoogleMapView from "./components/map";
-import RideSelector from "./components/RideSelector";
+import RideSelector, { RideRequestPayload, PriceEstimate, AVAILABLE_RIDE_TYPES } from "./components/RideSelector";
 import DriverStatusUI from "./components/DriverStatus";
 import TripProgressUI from "./components/TripProgressUI";
 import TripCompleteUI from "./components/TripCompleteUi";
+import FindingDriverUI from "./components/findingDriverui";
 import { DriverStatusSkeleton } from "./components/Skeleton";
 import {
   RideService,
-  RideEstimate,
   VehicleType,
   Driver,
   Ride,
-  CreateRideRequest,
+  RideStatus,
 } from "@/services/ride.service";
 import { useRideSocket } from "@/hooks/useRideSocket";
 import { paymentService } from "@/services/payment.service";
-import { createClient } from "../../../../utils/supabase/client";
+import { z } from "zod";
 import { PAYMENT_METHODS } from "./constants/config";
+import { useDebounce } from "@/hooks/useDebounce";
 
-const GOOGLE_LIBS: Libraries = ["places"];
+// --- Types ---
+// TASK 5 FIX: Added "PROCESSING_PAYMENT" to separate payment wait from driver search
+type PageView = "IDLE" | "PROCESSING_PAYMENT" | "FINDING_DRIVER" | "ON_WAY" | "ARRIVED" | "IN_PROGRESS" | "COMPLETED";
 
-type PageView =
-  | "IDLE"
-  | "FINDING_DRIVER"
-  | "ON_WAY"
-  | "ARRIVED"
-  | "IN_PROGRESS"
-  | "COMPLETED";
+interface SessionWithToken {
+  accessToken?: string;
+  user?: { accessToken?: string; email?: string };
+}
 
+// --- Validation Schemas (TASK 5 FIX) ---
+
+// Strict Vehicle Schema (Replaces z.any())
+const VehicleSchema = z.object({
+  brand: z.string(),
+  model: z.string(),
+  plateNumber: z.string(),
+  color: z.string(),
+});
+
+const DriverFoundSchema = z.object({
+  type: z.literal("DRIVER_FOUND"),
+  metadata: z.object({
+    rideId: z.string(),
+    driver: z.object({
+      id: z.string(),
+      name: z.string(),
+      phone: z.string(),
+      vehicle: VehicleSchema, // STRICT validation
+      rating: z.number().optional(),
+    }),
+  }),
+});
+
+const LocationUpdateSchema = z.object({
+  type: z.literal("DRIVER_LOCATION_UPDATE"),
+  metadata: z.object({
+    lat: z.number(),
+    lng: z.number(),
+    heading: z.number().optional().default(0), // TASK 4 FIX: Added heading
+  }),
+});
+
+// --- Custom Hooks ---
+
+function useToken(session: any) {
+  return useMemo(() => {
+    const typedSession = session as SessionWithToken;
+    return typedSession?.accessToken || typedSession?.user?.accessToken || null;
+  }, [session]);
+}
+
+function usePriceEstimator(
+  locations: { userLocation: google.maps.LatLngLiteral | null; destLocation: google.maps.LatLngLiteral | null },
+  vehicleType: VehicleType,
+  token: string | null
+) {
+  const [priceEstimates, setPriceEstimates] = useState<PriceEstimate | null>(null);
+  const [isCalculating, setIsCalculating] = useState(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  const debouncedLocations = useDebounce(locations, 500);
+
+  useEffect(() => {
+    if (!debouncedLocations.userLocation || !debouncedLocations.destLocation || !token) {
+      setPriceEstimates(null);
+      return;
+    }
+
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+    setIsCalculating(true);
+
+    RideService.getEstimate(
+      {
+        pickupLat: debouncedLocations.userLocation.lat,
+        pickupLng: debouncedLocations.userLocation.lng,
+        dropoffLat: debouncedLocations.destLocation.lat,
+        dropoffLng: debouncedLocations.destLocation.lng,
+        vehicleType,
+      },
+      token
+    )
+      // FIX: Explicitly cast 'data' to 'PriceEstimate'
+      .then((data) => setPriceEstimates(data as PriceEstimate))
+      .catch((err: any) => {
+        if (err.name !== "AbortError") console.error("Estimate failed", err);
+      })
+      .finally(() => setIsCalculating(false));
+
+    return () => {
+      controller.abort();
+      abortControllerRef.current = null;
+    };
+  }, [debouncedLocations, vehicleType, token]);
+
+  return { priceEstimates, isCalculating };
+}
+
+function useRideState() {
+  const [rideStage, setRideStage] = useState<PageView>("IDLE");
+  const [activeRideId, setActiveRideId] = useState<string | null>(null);
+  const [errorState, setErrorState] = useState<{ title: string; message: string } | null>(null);
+
+  const resetApp = useCallback(() => {
+    setRideStage("IDLE");
+    setActiveRideId(null);
+    setErrorState(null);
+  }, []);
+
+  return { rideStage, setRideStage, activeRideId, setActiveRideId, errorState, setErrorState, resetApp };
+}
+
+// --- Main Component ---
 export default function Page() {
   return (
-    <Suspense
-      fallback={
-        <div className="h-screen flex items-center justify-center">
-          <Loader2 className="animate-spin" />
-        </div>
-      }
-    >
+    <Suspense fallback={<Loader2 className="animate-spin" />}>
       <HomeContent />
     </Suspense>
   );
 }
 
 function HomeContent() {
-  const supabase = createClient();
   const router = useRouter();
+  const { data: session } = useSession();
+  const { isLoaded: isGoogleLoaded } = useGoogleMaps();
+  const token = useToken(session);
 
-  const { isLoaded: isGoogleLoaded } = useJsApiLoader({
-    id: "google-map-script",
-    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY || "",
-    libraries: GOOGLE_LIBS,
-  });
+  // Custom hooks
+  const {
+    rideStage,
+    setRideStage,
+    activeRideId,
+    setActiveRideId,
+    errorState,
+    setErrorState,
+    resetApp,
+  } = useRideState();
 
-  // --- State ---
-  const [rideStage, setRideStage] = useState<PageView>("IDLE");
-  const [activeRideId, setActiveRideId] = useState<string | null>(null);
-  const [errorState, setErrorState] = useState<{
-    title: string;
-    message: string;
-  } | null>(null);
-  const [selectedVehicleType, setSelectedVehicleType] =
-    useState<VehicleType>("CAR");
-  const [selectedPaymentMethodId, setSelectedPaymentMethodId] =
-    useState<string>("cash");
-
-  const [userLocation, setUserLocation] =
-    useState<google.maps.LatLngLiteral | null>(null);
-  const [destLocation, setDestLocation] =
-    useState<google.maps.LatLngLiteral | null>(null);
+  const [selectedVehicleType, setSelectedVehicleType] = useState<VehicleType>("CAR");
+  const [userLocation, setUserLocation] = useState<google.maps.LatLngLiteral | null>(null);
+  const [destLocation, setDestLocation] = useState<google.maps.LatLngLiteral | null>(null);
   const [pickupAddress, setPickupAddress] = useState("");
   const [destinationAddress, setDestinationAddress] = useState("");
-
-  const [priceEstimates, setPriceEstimates] = useState<RideEstimate | null>(
-    null,
-  );
   const [driverInfo, setDriverInfo] = useState<Driver | null>(null);
-  const [driverLocation, setDriverLocation] = useState<
-    google.maps.LatLngLiteral | undefined
-  >(undefined);
-  const [isCalculating, setIsCalculating] = useState(false);
+  const [driverLocation, setDriverLocation] = useState<google.maps.LatLngLiteral & { heading?: number } | undefined>(undefined);
 
-  // Request Cancellation Ref
-  const estimateAbortController = useRef<AbortController | null>(null);
+  // Price estimation hook
+  // FIX: Wrapped in useMemo to prevent infinite render loops in usePriceEstimator
+  const locations = useMemo(() => ({ 
+    userLocation, 
+    destLocation 
+  }), [userLocation, destLocation]);
 
-  // --- Initialization ---
+  const { priceEstimates, isCalculating } = usePriceEstimator(locations, selectedVehicleType, token);
+
+  // TASK 5 FIX: Status Mapping
+  // Explicitly map PENDING to PROCESSING_PAYMENT so the user knows why they are waiting
+  const mapBackendStatusToFrontend = (status: RideStatus): PageView => {
+    const mapping: Record<RideStatus, PageView> = {
+      PENDING: "PROCESSING_PAYMENT",
+      REQUESTED: "FINDING_DRIVER",
+      ACCEPTED: "ON_WAY",
+      ARRIVED: "ARRIVED",
+      IN_PROGRESS: "IN_PROGRESS",
+      COMPLETED: "COMPLETED",
+      CANCELLED: "IDLE",
+    };
+    return mapping[status] || "IDLE";
+  };
+
+  // Restore active ride (stable deps)
   useEffect(() => {
-    // Sync Active Ride (if user refreshes page)
-    RideService.getCurrentRide()
+    if (!token) return;
+
+    RideService.getCurrentRide(token)
       .then((ride: Ride | null) => {
         if (ride) {
           setActiveRideId(ride.id);
-          setRideStage(ride.status as PageView);
-          // Note: Real app would need to fetch driver details here too
+          setRideStage(mapBackendStatusToFrontend(ride.status));
+          if (ride.pickupAddress?.address) setPickupAddress(ride.pickupAddress.address);
+          if (ride.dropoffAddress?.address) setDestinationAddress(ride.dropoffAddress.address);
+          if (ride.driver) setDriverInfo(ride.driver);
         }
       })
-      .catch(() => {}); // Ignore 404
-  }, []);
+      .catch((err) => console.error("Failed to fetch current ride:", err));
+  }, [token]);
 
-  // --- Socket Logic ---
-  const handleSocketEvent = useCallback((event: any) => {
-    console.log("Socket Event:", event.type, event);
-    switch (event.type) {
-      case "DRIVER_FOUND":
+  // Secure socket handler with validation
+  const handleSocketEvent = useCallback((event: unknown) => {
+    try {
+      // Validate critical events
+      if ((event as any)?.type === "DRIVER_FOUND") {
+        const parsed = DriverFoundSchema.parse(event);
         setRideStage("ON_WAY");
-        setDriverInfo(event.metadata.driver);
-        setActiveRideId(event.metadata.rideId);
-        break;
-      case "DRIVER_LOCATION_UPDATE":
-        if (event.metadata?.lat && event.metadata?.lng) {
-          setDriverLocation({
-            lat: event.metadata.lat,
-            lng: event.metadata.lng,
-          });
+        setDriverInfo(parsed.metadata.driver);
+        setActiveRideId(parsed.metadata.rideId);
+      } else if ((event as any)?.type === "DRIVER_LOCATION_UPDATE") {
+        const parsed = LocationUpdateSchema.parse(event);
+        // TASK 4 FIX: Pass heading to map view
+        setDriverLocation({
+          lat: parsed.metadata.lat,
+          lng: parsed.metadata.lng,
+          heading: parsed.metadata.heading
+        });
+      } else {
+        // Handle other known events safely
+        const { type } = event as any;
+        switch (type) {
+          case "DRIVER_ARRIVED":
+            setRideStage("ARRIVED");
+            break;
+          case "TRIP_STARTED":
+            setRideStage("IN_PROGRESS");
+            break;
+          case "TRIP_COMPLETED":
+            setRideStage("COMPLETED");
+            break;
+          // TASK 2 FIX: Handle NO_DRIVERS_FOUND event
+          case "NO_DRIVERS_FOUND":
+            setRideStage("IDLE");
+            setErrorState({ title: "Busy Area", message: "No drivers available. Please try again later." });
+            break;
+          case "RIDE_CANCELLED":
+            resetApp();
+            setErrorState({ title: "Ride Cancelled", message: "The ride was cancelled." });
+            break;
         }
-        break;
-      case "DRIVER_ARRIVED":
-        setRideStage("ARRIVED");
-        break;
-      case "TRIP_STARTED":
-        setRideStage("IN_PROGRESS");
-        break;
-      case "TRIP_COMPLETED":
-        setRideStage("COMPLETED");
-        break;
-      case "NO_DRIVERS_FOUND":
-        setRideStage("IDLE");
-        setErrorState({
-          title: "Busy Area",
-          message:
-            "All drivers are currently busy. Please try again in a few moments.",
-        });
-        break;
-      case "RIDE_CANCELLED":
-        resetApp();
-        setErrorState({
-          title: "Ride Cancelled",
-          message: "The ride was cancelled.",
-        });
-        break;
+      }
+    } catch (error) {
+      console.error("Invalid socket event:", error);
     }
-  }, []);
+  }, [resetApp]);
 
   const handleReconnected = useCallback(() => {
-    // Re-sync state on socket reconnection
-    RideService.getCurrentRide().then((ride: Ride | null) => {
-      if (!ride && rideStage !== "IDLE" && rideStage !== "COMPLETED") {
-        // If backend says no ride, but frontend thinks there is one -> Reset
+    if (!token) return;
+    RideService.getCurrentRide(token).then((ride: Ride | null) => {
+      if (ride) {
+        setRideStage(mapBackendStatusToFrontend(ride.status));
+        if (ride.driver) setDriverInfo(ride.driver);
+      } else if (rideStage !== "IDLE" && rideStage !== "COMPLETED") {
         resetApp();
       }
     });
-  }, [rideStage]);
+  }, [token, rideStage, resetApp]);
 
-  useRideSocket(handleSocketEvent, handleReconnected);
+  useRideSocket(token, handleSocketEvent, handleReconnected);
 
-  // --- Location & Estimates ---
+  // Geolocation
   const handleLocateMe = useCallback(() => {
     if (!navigator.geolocation || !isGoogleLoaded) return;
     navigator.geolocation.getCurrentPosition(
@@ -174,137 +288,101 @@ function HomeContent() {
         setUserLocation(coords);
         if (!pickupAddress) {
           const geocoder = new google.maps.Geocoder();
-          const res = await geocoder.geocode({ location: coords });
-          if (res.results[0])
-            setPickupAddress(res.results[0].formatted_address);
+          try {
+            const res = await geocoder.geocode({ location: coords });
+            if (res.results[0]) setPickupAddress(res.results[0].formatted_address || "");
+          } catch (e) {
+            console.error("Geocoding failed:", e);
+          }
         }
       },
-      (err) => console.error(err),
+      (err) => {
+        setErrorState({ title: "Location Error", message: "Please enable location access." });
+        console.error(err);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
     );
   }, [isGoogleLoaded, pickupAddress]);
 
-  // Initial Location
   useEffect(() => {
     if (isGoogleLoaded && !userLocation) handleLocateMe();
   }, [isGoogleLoaded, userLocation, handleLocateMe]);
 
-  // Calculate Estimates with Debounce & Abort
-  useEffect(() => {
-    if (userLocation && destLocation) {
-      // Cancel previous request
-      if (estimateAbortController.current) {
-        estimateAbortController.current.abort();
-      }
-
-      // Create new controller
-      estimateAbortController.current = new AbortController();
-      setIsCalculating(true);
-
-      RideService.getEstimate({
-        pickupLat: userLocation.lat,
-        pickupLng: userLocation.lng,
-        dropoffLat: destLocation.lat,
-        dropoffLng: destLocation.lng,
-        vehicleType: selectedVehicleType,
-      })
-        .then((data: RideEstimate) => setPriceEstimates(data))
-        .catch((err: any) => {
-          if (err.name !== "CanceledError") {
-            console.error("Estimate failed", err);
-            // Only show error if it wasn't a manual cancel
-          }
-        })
-        .finally(() => setIsCalculating(false));
+  // TASK 1 FIX: "Zombie Ride" Deadlock Prevention
+  // Ensures we clean up if payment fails or throws
+  const handleRequestRide = async (data: RideRequestPayload) => {
+    if (!token || !userLocation || !destLocation) {
+      setErrorState({ title: "Error", message: "Missing required information." });
+      return;
     }
-  }, [userLocation, destLocation, selectedVehicleType]);
 
-  // --- Actions ---
-  const handleRequestRide = async (notes?: string) => {
-    if (!userLocation || !destLocation) return;
     setRideStage("FINDING_DRIVER");
 
     try {
-      // 1. Request Ride (Creates Pending Ride)
-      const res = await RideService.createRide({
-        pickupLocation: {
-          latitude: userLocation.lat,
-          longitude: userLocation.lng,
-          address: pickupAddress,
+      const stateParam = crypto.randomUUID(); // CSRF protection
+      const res = await RideService.createRide(
+        {
+          pickupLocation: { latitude: data.pickup.lat, longitude: data.pickup.lng, address: data.pickup.address },
+          dropoffLocation: { latitude: data.dropoff.lat, longitude: data.dropoff.lng, address: data.dropoff.address },
+          vehicleType: data.rideType as VehicleType,
         },
-        dropoffLocation: {
-          latitude: destLocation.lat,
-          longitude: destLocation.lng,
-          address: destinationAddress,
-        },
-        vehicleType: selectedVehicleType,
-        notes: notes,
-      });
-
-      const selectedMethod = PAYMENT_METHODS.find(
-        (m) => m.id === selectedPaymentMethodId,
+        token
       );
 
-      // 2. Process Payment if Online
-      if (
-        selectedMethod &&
-        selectedMethod.type !== "CASH" &&
-        selectedMethod.gateway
-      ) {
-        // Get user email
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
+      const selectedMethod = PAYMENT_METHODS.find((m) => m.id === data.paymentMethodId);
 
+      // FIX 1: Explicitly check if selectedMethod exists to satisfy "possibly undefined" error
+      if (!selectedMethod) {
+        throw new Error("Invalid payment method selected.");
+      }
+
+      if (selectedMethod.type !== "CASH" && selectedMethod.gateway) {
         localStorage.setItem("pending_ride", "true");
+        localStorage.setItem("payment_state", stateParam);
 
-        const paymentRes = await paymentService.initiatePayment({
-          amount: res.payment.amount,
-          email: session?.user.email || "",
-          gateway: selectedMethod.gateway as any,
-          method: "CARD",
-          type: "RIDE",
-          rideId: res.ride.id,
-        });
+        const paymentRes = await paymentService.initiatePayment(
+          {
+            amount: res.payment.amount,
+            email: session?.user?.email || "",
+            // FIX 2: Type assertion to satisfy the strict Union Type requirement
+            gateway: selectedMethod.gateway as "PAYSTACK" | "FLUTTERWAVE" | "MONNIFY",
+            method: "CARD",
+            type: "RIDE",
+            rideId: res.ride.id,
+            state: stateParam,
+          },
+          token
+        );
 
         if (paymentRes.authorizationUrl) {
-          window.location.href = paymentRes.authorizationUrl;
-          return; // Stop execution, browser handles redirect
+          window.open(paymentRes.authorizationUrl, "_blank", "noopener,noreferrer");
+          return;
         }
       }
 
-      // If Cash or Payment Init Success (but no redirect needed?), set ID
+      await RideService.confirmRide(res.ride.id, "CASH", token);
       setActiveRideId(res.ride.id);
     } catch (error: any) {
       console.error(error);
       setRideStage("IDLE");
-      const msg =
-        error.response?.data?.message || "Unable to connect to server.";
+      const msg = error.message || error.response?.data?.message || "Unable to request ride.";
       setErrorState({ title: "Request Failed", message: msg });
     }
   };
 
   const handleCancel = async () => {
-    if (activeRideId) {
+    if (activeRideId && token) {
       try {
-        await RideService.cancelRide(activeRideId, "User cancelled");
+        await RideService.cancelRide(activeRideId, "User cancelled", token);
       } catch (e) {
         console.error(e);
       }
     }
     resetApp();
+    localStorage.removeItem("pending_ride");
+    localStorage.removeItem("payment_state");
   };
 
-  const resetApp = () => {
-    setRideStage("IDLE");
-    setActiveRideId(null);
-    setDestLocation(null);
-    setDestinationAddress("");
-    setDriverInfo(null);
-    setDriverLocation(undefined);
-    setPriceEstimates(null);
-  };
-
-  // --- Render Helpers ---
   const renderSidebar = () => {
     switch (rideStage) {
       case "IDLE":
@@ -323,13 +401,22 @@ function HomeContent() {
             priceEstimates={priceEstimates}
             isCalculatingPrice={isCalculating}
             onRequestRide={handleRequestRide}
-            isRequesting={false}
+            isRequesting={false} // <--- FIX: Simply false, because loading state shows a different UI
             isGoogleLoaded={isGoogleLoaded}
-            availableRideTypes={[]} // Can be populated from backend or config
+            availableRideTypes={AVAILABLE_RIDE_TYPES}
           />
         );
+      case "PROCESSING_PAYMENT":
+        return (
+          <div className="flex flex-col items-center justify-center h-full p-8">
+            <Loader2 className="w-12 h-12 animate-spin text-gray-900 mb-4" />
+            <h3 className="text-xl font-bold">Processing Payment</h3>
+            <p className="text-gray-500 text-center mt-2">Please wait while we secure your payment...</p>
+          </div>
+        );
       case "FINDING_DRIVER":
-        return <DriverStatusSkeleton />;
+        return <FindingDriverUI onCancel={handleCancel} pickupAddress={pickupAddress} dropoffAddress={destinationAddress} />;
+      // ... rest of the cases remain the same
       case "ON_WAY":
       case "ARRIVED":
         return driverInfo ? (
@@ -347,7 +434,7 @@ function HomeContent() {
           <TripProgressUI
             destination={destinationAddress}
             driverName={driverInfo?.name || "Driver"}
-            etaMinutes={10}
+            etaMinutes={driverInfo?.etaMinutes || 10}
           />
         );
       case "COMPLETED":
@@ -355,7 +442,7 @@ function HomeContent() {
           <TripCompleteUI
             pickup={pickupAddress}
             dropoff={destinationAddress}
-            price={0}
+            price={priceEstimates?.CAR?.total || 0}
             driverName={driverInfo?.name || "Driver"}
             onClose={resetApp}
           />
@@ -381,7 +468,7 @@ function HomeContent() {
           isLoaded={isGoogleLoaded}
           userPos={userLocation}
           destPos={destLocation}
-          rideStage={rideStage}
+          rideStage={rideStage === "PROCESSING_PAYMENT" ? "FINDING_DRIVER" : rideStage}
           driverPos={driverLocation}
         />
       </div>
@@ -395,9 +482,7 @@ function HomeContent() {
                   <AlertTriangle size={24} />
                 </div>
                 <h3 className="text-lg font-bold mb-2">{errorState.title}</h3>
-                <p className="text-gray-500 mb-6 text-sm">
-                  {errorState.message}
-                </p>
+                <p className="text-gray-500 mb-6 text-sm">{errorState.message}</p>
                 <button
                   onClick={() => setErrorState(null)}
                   className="w-full py-3 bg-gray-900 text-white rounded-xl font-bold"
@@ -407,7 +492,6 @@ function HomeContent() {
               </div>
             </div>
           )}
-
           {renderSidebar()}
         </div>
       </div>

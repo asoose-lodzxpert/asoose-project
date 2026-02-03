@@ -1,19 +1,20 @@
 import React, { useState, useMemo } from 'react';
-import { ShoppingBag, Ban, Search, X, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import { ShoppingBag, Ban, Search, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Currency } from '@/app/main/components/Currency';
 
-interface Product {
+// ✅ Fix: Match the interface from the parent page (VendorDetailPage)
+export interface Product {
   id: string;
   name: string;
   price: number;
-  image: string;
+  image?: string; // ✅ Made Optional to match parent
   category: string;
-  status: 'ACTIVE' | 'BANNED' | 'OUT_OF_STOCK' | 'DISABLED';
+  status: string; // ✅ Generalized to string to accept API values
 }
 
 interface ProductsTabProps {
   products: Product[];
-  isLoading?: boolean; // ✅ Added optional prop
+  isLoading?: boolean; 
   onToggleBan: (id: string, status: string) => void;
 }
 
@@ -79,7 +80,7 @@ export default function ProductsTabContent({ products, onToggleBan, isLoading = 
 
       {/* Content Area */}
       {isLoading ? (
-        // ✅ Loading Skeleton
+        // Loading Skeleton
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {[...Array(6)].map((_, i) => (
             <div key={i} className="bg-[#0F172A] border border-gray-800 rounded-lg p-4 flex gap-4 animate-pulse">
@@ -94,13 +95,18 @@ export default function ProductsTabContent({ products, onToggleBan, isLoading = 
         </div>
       ) : currentProducts.length > 0 ? (
         <>
-          {/* ✅ Product Grid */}
+          {/* Product Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 min-h-[300px] content-start">
             {currentProducts.map(product => (
               <div key={product.id} className={`bg-[#0F172A] border rounded-lg p-4 flex gap-4 transition-all hover:border-gray-600 ${product.status === 'DISABLED' ? 'border-red-500/30 opacity-75' : 'border-gray-800'}`}>
                 
-                {/* Image */}
-                <div className="w-16 h-16 bg-gray-800 rounded-lg flex-shrink-0 bg-cover bg-center border border-gray-700" style={{ backgroundImage: `url(${product.image})` }} />
+                {/* Image Handling with Fallback */}
+                <div 
+                  className="w-16 h-16 bg-gray-800 rounded-lg flex-shrink-0 bg-cover bg-center border border-gray-700 relative overflow-hidden" 
+                  style={{ backgroundImage: `url(${product.image || '/placeholder-product.png'})` }} // ✅ Handle undefined image
+                >
+                   {!product.image && <ShoppingBag className="w-6 h-6 text-gray-600 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"/>}
+                </div>
                 
                 {/* Content */}
                 <div className="flex-1 min-w-0">
@@ -127,7 +133,7 @@ export default function ProductsTabContent({ products, onToggleBan, isLoading = 
             ))}
           </div>
 
-          {/* ✅ Pagination Controls */}
+          {/* Pagination Controls */}
           {totalPages > 1 && (
             <div className="flex justify-between items-center mt-6 pt-4 border-t border-gray-800">
                <span className="text-xs text-gray-500">

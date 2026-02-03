@@ -17,7 +17,11 @@ import { BannersService } from './banners.service';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { RolesGuard } from 'src/auth/roles.guards';
 import { Roles } from 'src/auth/roles.decorator';
-import { CreateBannerDto, UpdateBannerDto, ReorderBannersDto } from './dto/create-banner.dto';
+import {
+  CreateBannerDto,
+  UpdateBannerDto,
+  ReorderBannersDto,
+} from './dto/create-banner.dto';
 import { UserRole } from 'src/common/enums/user-role.enum';
 
 @Controller('super-admin/banners')

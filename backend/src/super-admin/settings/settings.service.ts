@@ -15,7 +15,7 @@ export class SettingsService {
   constructor(
     private prisma: PrismaService,
     // ✅ Inject the ActivityLogService
-    private logService: ActivityLogService, 
+    private logService: ActivityLogService,
     @Inject('REDIS_CLIENT') private readonly redisClient: RedisClientType,
   ) {}
 
@@ -50,8 +50,8 @@ export class SettingsService {
       // 2. Execute all updates atomically
       const results = await this.prisma.$transaction(operations);
 
-      // 3. CACHE INVALIDATION: 
-      // If maintenance_mode was changed, we MUST clear Redis so the 
+      // 3. CACHE INVALIDATION:
+      // If maintenance_mode was changed, we MUST clear Redis so the
       // AppController and Middleware see the update immediately.
       if (settings.some((s) => s.key === 'maintenance_mode')) {
         await this.redisClient.del(this.MAINTENANCE_CACHE_KEY);

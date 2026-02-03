@@ -1,7 +1,6 @@
 import { fetchWithAuth } from "./auth-fetch";
 
-const API_URL =
-  process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api/v1";
+const EXPO_PUBLIC_API_URL = process.env.EXPO_PUBLIC_API_URL;
 
 export interface RiderProfile {
   id: string;
@@ -27,12 +26,12 @@ export interface RiderProfile {
     color: string;
     year: number;
   } | null;
-  documents?: Array<{
+  documents?: {
     id: string;
     type: string;
     url: string;
     status: string;
-  }>;
+  }[];
   bankAccount?: {
     id: string;
     bankName: string;
@@ -50,7 +49,7 @@ export interface ProfileStats {
 
 export async function getRiderProfile(): Promise<RiderProfile> {
   try {
-    const data = await fetchWithAuth(`${API_URL}/riders/me`);
+    const data = await fetchWithAuth(`${EXPO_PUBLIC_API_URL}/riders/me`);
     return data;
   } catch (error) {
     console.error("Error fetching rider profile:", error);
@@ -60,12 +59,8 @@ export async function getRiderProfile(): Promise<RiderProfile> {
 
 export async function getProfileStats(): Promise<ProfileStats> {
   try {
-    // Get current week's deliveries
-    const now = new Date();
-    const weekStart = new Date(now.setDate(now.getDate() - 7));
-
     const earningsData = await fetchWithAuth(
-      `${API_URL}/riders/earnings?timeframe=week`
+      `${EXPO_PUBLIC_API_URL}/riders/earnings?timeframe={week}`,
     );
 
     return {
@@ -81,10 +76,10 @@ export async function getProfileStats(): Promise<ProfileStats> {
 }
 
 export async function updateRiderProfile(
-  updates: Partial<RiderProfile>
+  updates: Partial<RiderProfile>,
 ): Promise<RiderProfile> {
   try {
-    const data = await fetchWithAuth(`${API_URL}/riders/me`, {
+    const data = await fetchWithAuth(`${EXPO_PUBLIC_API_URL}/riders/me`, {
       method: "PATCH",
       body: JSON.stringify(updates),
     });

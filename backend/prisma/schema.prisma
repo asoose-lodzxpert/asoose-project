@@ -1,4 +1,3 @@
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -73,6 +72,7 @@ enum RideStatus {
   PENDING      // Payment not yet confirmed
   REQUESTED    // Payment confirmed, searching for driver
   ACCEPTED     // Driver accepted
+  ARRIVED
   IN_PROGRESS  // Trip started
   COMPLETED    // Trip completed
   CANCELLED    // Trip cancelled
@@ -167,7 +167,6 @@ model SystemSetting {
   updatedAt   DateTime @updatedAt
 }
 
-
 model User {
   id        String     @id @default(uuid())
   email     String     @unique
@@ -191,13 +190,18 @@ model User {
   activityLogs ActivityLog[]
   disputesOpened    Dispute[]        @relation("DisputeOpener")
   disputesTargeted  Dispute[]        @relation("DisputeTarget")
-  documents UserDocument[]
   disputeMessages   DisputeMessage[]
   payments     Payment[]
 
   // Trip Relations
-  ridesAsCustomer      Ride[]     @relation("RideCustomer")
-  deliveriesAsCustomer Delivery[] @relation("DeliveryCustomer")
+  rides      Ride[]     @relation("RideCustomer")
+  deliveries Delivery[] @relation("DeliveryCustomer")
+
+  // Emergency Contacts
+  emergencyContacts    EmergencyContact[]
+
+  // Notification Preferences
+  notificationsPreferences Json? // Stores notification preferences
 
   @@index([email])
   @@index([googleId])
@@ -205,27 +209,6 @@ model User {
   @@index([createdAt])
   @@index([status, createdAt(sort: Desc)])
 }
-
-
-model UserDocument {
-  id        String   @id @default(uuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  type      String   // e.g., "DRIVER_LICENSE", "VEHICLE_INSURANCE", "CAC_CERT"
-  url       String   // Storage URL (Railway S3 or S3-compatible)
-  
-  status    VerificationStatus @default(PENDING)
-  rejectionReason String?      // Required if status is REJECTED
-  
-  expiresAt DateTime? // For tracking license expiry
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-
-  @@index([userId])
-  @@map("user_documents")
-}
-
 
 model Notification {
   id        String   @id @default(uuid())
@@ -253,7 +236,15 @@ model Notification {
 
 model Address {
   id        String  @id @default(uuid())
-  userId    String
+
+  // 1. Make User Optional (Customers)
+  userId    String?
+  user      User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // 2. Add Vendor Relation (Store Locations)
+  vendorId  String?
+  vendor    Vendor? @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  phone     String?
   label     String
   street    String
   city      String
@@ -262,15 +253,47 @@ model Address {
   lng       Float
   isDefault Boolean @default(false)
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
+  // Reverse Relations
   ridesAsPickup       Ride[]     @relation("RidePickup")
   ridesAsDropoff      Ride[]     @relation("RideDropoff")
   deliveriesAsPickup  Delivery[] @relation("DeliveryPickup")
   deliveriesAsDropoff Delivery[] @relation("DeliveryDropoff")
 
+  // Indexes for performance
   @@index([userId])
   @@index([userId, isDefault])
+  @@index([vendorId])            // Fixed: Added index for vendor lookups
+  @@index([vendorId, isDefault]) // Fixed: Added compound index for vendor defaults
+}
+
+//// =====================
+//// EMERGENCY CONTACT
+//// =====================
+
+model EmergencyContact {
+  id          String   @id @default(uuid())
+  userId      String?
+  riderId     String?
+  vendorId    String?
+  name        String
+  phone       String
+  relationship String? // e.g., "Spouse", "Parent", "Colleague"
+  isPrimary   Boolean  @default(false)
+
+  user        User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rider       Rider?   @relation(fields: [riderId], references: [id], onDelete: Cascade)
+  vendor      Vendor?  @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, phone])
+  @@unique([riderId, phone])
+  @@unique([vendorId, phone])
+  @@index([userId])
+  @@index([riderId])
+  @@index([vendorId])
+  @@index([isPrimary])
 }
 
 //// =====================
@@ -308,6 +331,7 @@ model Rider {
   bankAccount              BankAccount?
   vehicle                  Vehicle?
   documents                RiderDocument[]
+  emergencyContacts        EmergencyContact[]
   notificationSettings     RiderNotificationSettings? @relation("RiderNotificationSettings")
   rides                    Ride[]         @relation("RideRider")
   deliveries               Delivery[]     @relation("DeliveryRider")
@@ -418,40 +442,43 @@ model VehicleDocument {
 //// =====================
 
 model Vendor {
-  id             String     @id @default(uuid())
-  name           String
-  email          String     @unique
-  countryCode    String
-  phone          String
-  businessType   String
-  employees      String
-  password       String
-  image          String?
-  status         UserStatus @default(PENDING)
-  expoPushToken  String?    // Expo push notification token
-  fcmToken       String?    // Firebase Cloud Messaging token
-  
-  // Account Deletion Fields
-  deletionStatus         String?   // PENDING, APPROVED, REJECTED, null (not requested)
-  deletionRequestedAt    DateTime?
-  deletionReasons        String[]  @default([])
-  deletionAdditionalInfo String?
-  deletionApprovedBy     String?   // Admin user ID who approved
-  deletionApprovedAt     DateTime?
-  
-  createdAt      DateTime   @default(now())
-  updatedAt      DateTime   @updatedAt
+  id                     String     @id @default(uuid())
+  name                   String
+  email                  String     @unique
+  countryCode            String
+  phone                  String
+  businessType           String
+  employees              String
+  password               String
+  image                  String?
+  status                 UserStatus @default(PENDING)
+  expoPushToken          String?    // Expo push notification token
+  fcmToken               String?    // Firebase Cloud Messaging token
 
+  // Account Deletion Fields
+  deletionStatus         String?    // PENDING, APPROVED, REJECTED, null (not requested)
+  deletionRequestedAt    DateTime?
+  deletionReasons        String[]   @default([])
+  deletionAdditionalInfo String?
+  deletionApprovedBy     String?    // Admin user ID who approved
+  deletionApprovedAt     DateTime?
+
+  createdAt              DateTime   @default(now())
+  updatedAt              DateTime   @updatedAt
+
+  // Relations
   store                    Store?
   documents                VendorDocument[]
+  emergencyContacts        EmergencyContact[]
   notifications            Notification[]
-  notificationsPreferences Json? // Stores notification preferences for the vendor
+  notificationsPreferences Json?      // Stores notification preferences for the vendor
+  addresses                Address[]  // Fixed: Added relation to Address
 }
 
 model Store {
   id           String             @id @default(uuid())
   name         String
-description String @default("No description provided")
+  description  String             @default("No description provided")
   slug         String             @unique
   type         StoreType
   address      String?
@@ -461,10 +488,10 @@ description String @default("No description provided")
   banner       String?
   openHours    Json?
   rating       Float              @default(0)
-  ratingCount  Int   @default(0)
+  ratingCount  Int                @default(0)
   status       StoreStatus        @default(PENDING)
   verification VerificationStatus @default(PENDING)
-    vendorId     String   @unique
+  vendorId     String             @unique
   createdAt    DateTime           @default(now())
   updatedAt    DateTime           @updatedAt
 
@@ -669,13 +696,14 @@ model Order {
   paymentStatus String?  @default("PENDING") // PENDING, PAID, FAILED
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
-  disputes Dispute[]
-
+  disputes  Dispute[]
+  transactions Transaction[]
   deliveredAt DateTime?
   cancelledAt DateTime?
 
   user     User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   store    Store       @relation(fields: [storeId], references: [id], onDelete: Restrict)
+
   items    OrderItem[]
   delivery Delivery?   @relation("OrderDelivery")
   payment  Payment?    @relation("OrderPayment")
@@ -763,7 +791,8 @@ model Ride {
   status           RideStatus @default(REQUESTED)
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
-  disputes Dispute[]
+  disputes         Dispute[]
+  transactions Transaction[]
   // Security
   startOtp           String?
   cancellationReason String?
@@ -810,7 +839,8 @@ model Delivery {
   status           DeliveryStatus @default(REQUESTED)
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
-  disputes Dispute[]
+  disputes         Dispute[]
+  transactions   Transaction[]
   // Security & Proof
   deliveryOtp   String?
   pickupProof   String?
@@ -886,6 +916,11 @@ model Transaction {
   vendorPayout  VendorPayout? @relation(fields: [vendorPayoutId], references: [id], onDelete: Restrict)
   riderPayout   RiderPayout?  @relation(fields: [riderPayoutId], references: [id], onDelete: Restrict)
   
+  // 👇 ADD THESE LINES
+  delivery      Delivery?     @relation(fields: [deliveryId], references: [id])
+  order         Order?        @relation(fields: [orderId], references: [id])
+  ride          Ride?         @relation(fields: [rideId], references: [id])
+  
   @@index([entityType, entityId, createdAt])
   @@index([type, status, createdAt])
   @@index([paymentId])
@@ -932,8 +967,8 @@ model ActivityLog {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-@@index([action, createdAt], map: "ActivityLog_action_createdAt_idx")      
-@@index([action, createdAt(sort: Desc)], map: "ActivityLog_action_createdAt_desc_idx")
+  @@index([action, createdAt], map: "ActivityLog_action_createdAt_idx")      
+  @@index([action, createdAt(sort: Desc)], map: "ActivityLog_action_createdAt_desc_idx")
 }
 
 model Dispute {

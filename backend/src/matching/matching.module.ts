@@ -17,6 +17,8 @@ import { QueueService } from './queue/queue.service';
 
 // Driver State
 import { DriverStateService } from './driver-state/driver-state.service';
+// Rider State
+import { RiderStateService } from './rider-state/rider-state.service'; // <--- ADD IMPORT
 
 // Workers
 import { RideMatchingProcessor } from './workers/ride-matching.processor';
@@ -29,22 +31,6 @@ import { PrismaModule } from '../prisma/prisma.module';
 
 /**
  * Matching System Module
- *
- * This module encapsulates the entire ride-hailing and delivery matching system.
- *
- * Architecture:
- * - Redis: Real-time state store (driver location, status, assignments)
- * - H3: Hexagonal geospatial indexing for efficient proximity search
- * - BullMQ: Queue-based matching workers (horizontal scaling)
- * - Event-driven: All state changes emit events for decoupled services
- * - Atomic operations: Lua scripts prevent race conditions
- *
- * Key Design Decisions:
- * ✅ NO driver state in database - only Redis
- * ✅ All matching happens in queue workers - not in API handlers
- * ✅ Hex-based spatial indexing for O(1) proximity lookup
- * ✅ Atomic Lua scripts for thread-safe state transitions
- * ✅ Event-driven notifications and analytics
  */
 @Module({
   imports: [
@@ -62,6 +48,7 @@ import { PrismaModule } from '../prisma/prisma.module';
     GeoService,
     EventBusService,
     DriverStateService,
+    RiderStateService, // <--- ADD PROVIDER
 
     // Workers (automatically registered by @Processor decorator)
     RideMatchingProcessor,
@@ -81,6 +68,7 @@ import { PrismaModule } from '../prisma/prisma.module';
     GeoService,
     EventBusService,
     DriverStateService,
+    RiderStateService, // <--- ADD EXPORT
   ],
 })
 export class MatchingModule {}

@@ -3,7 +3,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { X, Minus, Plus } from 'lucide-react';
 import { useCartStore } from '@/store/useCartStore';
-import Swal from 'sweetalert2';
+import { toast } from 'react-toastify'; 
 
 // --- Types must match what is passed from the page ---
 export interface Modifier { id: string; name: string; price: number; }
@@ -16,7 +16,7 @@ export interface Product {
   price: number;
   image?: string;
   category: { name: string };
-  modifierGroups: ModifierGroup[]; // Now included
+  modifierGroups: ModifierGroup[];
 }
 
 interface ProductModalProps {
@@ -76,10 +76,11 @@ export const ProductModal = ({ product, storeId, onClose }: ProductModalProps) =
     });
   }, [product, selectedModifiers]);
 
-  const handleAddToOrder = () => {
+  const handleAddToOrder = async () => {
     if (!product || !isValid) return;
 
-    addItem({
+    // ✅ FIX: Await result to check if item was actually added (vs cancelled)
+    const success = await addItem({
       id: product.id,
       name: product.name,
       price: totalPrice / quantity, // Unit price (base + mods)
@@ -88,17 +89,11 @@ export const ProductModal = ({ product, storeId, onClose }: ProductModalProps) =
       image: product.image
     });
 
-    onClose();
-    Swal.fire({
-      icon: 'success',
-      title: 'Added to basket',
-      toast: true,
-      position: 'bottom-end',
-      showConfirmButton: false,
-      timer: 1500,
-      background: '#1a1a1a',
-      color: '#fff'
-    });
+    // Only close and show toast if confirmed
+    if (success) {
+        onClose();
+        toast.success('Added to basket'); 
+    }
   };
 
   if (!product) return null;

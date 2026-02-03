@@ -2,12 +2,24 @@
 
 import React from 'react';
 
-const SkeletonBox = ({ className = "" }) => (
+// FIX 1: Add interface for props to satisfy TypeScript
+interface SkeletonProps {
+  className?: string;
+}
+
+interface SkeletonTextProps {
+  width?: string;
+  height?: string;
+  className?: string; // FIX 2: Added className here so it can be passed down
+}
+
+const SkeletonBox = ({ className = "" }: SkeletonProps) => (
   <div className={`bg-gray-700/30 rounded animate-pulse ${className}`} />
 );
 
-const SkeletonText = ({ width = "w-full", height = "h-4" }) => (
-  <div className={`${width} ${height} bg-gray-700/30 rounded animate-pulse`} />
+// FIX 3: Destructure className and apply it to the div
+const SkeletonText = ({ width = "w-full", height = "h-4", className = "" }: SkeletonTextProps) => (
+  <div className={`${width} ${height} bg-gray-700/30 rounded animate-pulse ${className}`} />
 );
 
 export default function DisputeDetailSkeleton() {

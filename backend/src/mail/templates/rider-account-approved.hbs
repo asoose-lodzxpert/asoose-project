@@ -1,0 +1,195 @@
+<html>
+  <head>
+    <meta charset='utf-8' />
+    <style>
+      body {
+        font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+        background-color: #f6f6f6;
+        margin: 0;
+        padding: 0;
+      }
+      .container {
+        max-width: 600px;
+        margin: 20px auto;
+        background-color: #ffffff;
+        border-radius: 8px;
+        border-left: 6px solid #10b981;
+        overflow: hidden;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+      .header {
+        background-color: #ecfdf5;
+        padding: 20px 30px;
+        border-bottom: 1px solid #d1fae5;
+        text-align: center;
+      }
+      .content {
+        padding: 30px;
+      }
+      .success-box {
+        background-color: #ecfdf5;
+        border: 2px solid #10b981;
+        padding: 20px;
+        border-radius: 8px;
+        margin: 20px 0;
+        text-align: center;
+      }
+      .footer {
+        padding: 20px 30px;
+        background-color: #f9fafb;
+        text-align: center;
+        font-size: 12px;
+        color: #6b7280;
+      }
+      .btn {
+        background-color: #10b981;
+        color: #ffffff;
+        padding: 14px 28px;
+        text-decoration: none;
+        border-radius: 6px;
+        font-weight: bold;
+        display: inline-block;
+        margin-top: 20px;
+        font-size: 16px;
+      }
+      .btn:hover {
+        background-color: #059669;
+      }
+      .step-box {
+        background-color: #f9fafb;
+        padding: 15px;
+        margin: 15px 0;
+        border-left: 4px solid #10b981;
+        border-radius: 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class='container'>
+      <div class='header'>
+        <h1 style='margin: 0; color: #059669; font-size: 32px;'>🎉 Account
+          Approved!</h1>
+      </div>
+      <div class='content'>
+        <div class='success-box'>
+          <h2 style='color: #065f46; margin: 0 0 10px 0;'>Congratulations
+            {{name}}!</h2>
+          <p style='color: #047857; margin: 0; font-size: 16px;'>
+            Your rider account has been approved and you're ready to start
+            earning!
+          </p>
+        </div>
+
+        <p style='color: #374151; line-height: 1.6;'>
+          Great news! Our verification team has reviewed and approved your
+          documents. You can now go online and start accepting ride requests.
+        </p>
+
+        <h3 style='color: #1f2937; margin-top: 30px;'>🚀 Ready to Get Started?</h3>
+
+        <div class='step-box'>
+          <strong style='color: #1f2937; font-size: 16px;'>1. Download the Rider
+            App</strong>
+          <p style='color: #6b7280; margin: 10px 0 0 0; font-size: 14px;'>
+            If you haven't already, download the Asoose Rider app from your app
+            store.
+          </p>
+        </div>
+
+        <div class='step-box'>
+          <strong style='color: #1f2937; font-size: 16px;'>2. Go Online</strong>
+          <p style='color: #6b7280; margin: 10px 0 0 0; font-size: 14px;'>
+            Open the app, toggle your status to "Online" and start receiving
+            ride requests.
+          </p>
+        </div>
+
+        <div class='step-box'>
+          <strong style='color: #1f2937; font-size: 16px;'>3. Start Earning</strong>
+          <p style='color: #6b7280; margin: 10px 0 0 0; font-size: 14px;'>
+            Accept requests, complete rides, and watch your earnings grow!
+          </p>
+        </div>
+
+        <div style='text-align: center; margin: 30px 0;'>
+          <a href='{{appUrl}}' class='btn'>
+            Open Rider App
+          </a>
+        </div>
+
+        <h3 style='color: #1f2937; margin-top: 30px;'>💡 Tips for Success:</h3>
+        <ul style='color: #6b7280; line-height: 1.8;'>
+          <li><strong>Maintain High Ratings:</strong>
+            Provide excellent service to keep your rating above 4.5</li>
+          <li><strong>Be Responsive:</strong>
+            Accept requests quickly to increase your acceptance rate</li>
+          <li><strong>Stay Professional:</strong>
+            Be courteous and maintain a clean vehicle</li>
+          <li><strong>Know Your Area:</strong>
+            Familiarize yourself with popular routes and destinations</li>
+          <li><strong>Work Peak Hours:</strong>
+            Earn more during busy times (mornings, evenings, weekends)</li>
+        </ul>
+
+        <div
+          style='background-color: #dbeafe; border-left: 4px solid #3b82f6; padding: 15px; border-radius: 4px; margin: 20px 0; color: #1e3a8a;'
+        >
+          <strong>💰 Earnings & Payouts:</strong><br />
+          You'll earn
+          {{commissionRate}}% of each fare. Payouts are processed weekly every
+          Monday directly to your registered bank account.
+        </div>
+
+        <h3 style='color: #1f2937; margin-top: 30px;'>📱 Need Help?</h3>
+        <p style='color: #6b7280;'>
+          Our rider support team is available 24/7 to assist you:
+        </p>
+        <ul style='color: #6b7280;'>
+          <li>Email: rider-support@asoose.com</li>
+          <li>Phone: +234 (0) 800 ASOOSE</li>
+          <li>In-App Chat: Available in the rider app</li>
+        </ul>
+
+        <div
+          style='text-align: center; margin-top: 40px; padding-top: 20px; border-top: 2px solid #e5e7eb;'
+        >
+          <p style='color: #6b7280; font-size: 14px; margin-bottom: 5px;'>
+            Welcome to the Asoose family!
+          </p>
+          <p
+            style='color: #10b981; font-weight: bold; font-size: 18px; margin: 0;'
+          >
+            Happy Riding! 🏍️
+          </p>
+        </div>
+      </div>
+
+      <div class='footer'>
+        <p style='margin: 5px 0;'>
+          ©
+          {{year}}
+          Asoose. All rights reserved.
+        </p>
+        <p style='margin: 5px 0; color: #9ca3af;'>
+          Asoose Rider Platform - Account Approval Notification
+        </p>
+        <p style='margin: 5px 0;'>
+          <a
+            href='#'
+            style='color: #3b82f6; text-decoration: none; margin: 0 10px;'
+          >Rider Portal</a>
+          |
+          <a
+            href='#'
+            style='color: #3b82f6; text-decoration: none; margin: 0 10px;'
+          >Help Center</a>
+          |
+          <a
+            href='#'
+            style='color: #3b82f6; text-decoration: none; margin: 0 10px;'
+          >Contact Support</a>
+        </p>
+      </div>
+    </div>
+  </body>
+</html>

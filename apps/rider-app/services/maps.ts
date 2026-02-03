@@ -1,51 +1,65 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { fetchWithAuth } from "@/services/auth-fetch";
+const EXPO_PUBLIC_API_URL = process.env.EXPO_PUBLIC_API_URL;
 
-const API_URL =
-  process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api/v1";
-
-interface DirectionsResponse {
-  coordinates: Array<{ latitude: number; longitude: number }>;
+export interface DirectionsResponse {
+  coordinates: { latitude: number; longitude: number }[];
   distance: { text: string; value: number };
   duration: { text: string; value: number };
   error?: string;
 }
 
-export async function getDirections(
-  origin: { latitude: number; longitude: number },
-  destination: { latitude: number; longitude: number }
-): Promise<DirectionsResponse> {
-  try {
-    // Get auth token
-    const token = await AsyncStorage.getItem("access_token");
+export interface DirectionsQuery {
+  originLat: number;
+  originLng: number;
+  destLat: number;
+  destLng: number;
+}
 
-    const url = `${API_URL}/maps/directions?originLat=${origin.latitude}&originLng=${origin.longitude}&destLat=${destination.latitude}&destLng=${destination.longitude}`;
+export interface DistanceQuery {
+  originLat: number;
+  originLng: number;
+  destLat: number;
+  destLng: number;
+}
 
-    const response = await fetch(url, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-    });
+export async function getDirections({
+  originLat,
+  originLng,
+  destLat,
+  destLng,
+}: DirectionsQuery): Promise<DirectionsResponse> {
+  const params = new URLSearchParams({
+    originLat: originLat.toString(),
+    originLng: originLng.toString(),
+    destLat: destLat.toString(),
+    destLng: destLng.toString(),
+  }).toString();
+  const url = `${EXPO_PUBLIC_API_URL}/maps/directions?${params}`;
+  return await fetchWithAuth(url, { method: "GET" });
+}
 
-    if (!response.ok) {
-      throw new Error("Failed to fetch directions");
-    }
+/**
+ * Gets the distance in meters between two lat/lng points by calling the backend API.
+ *
+ * Backend route required: GET /maps/distance?originLat=...&originLng=...&destLat=...&destLng=...
+ * Should return: { distance: number }
+ */
+export interface DistanceResponse {
+  distance: number;
+}
 
-    const data = await response.json();
-
-    if (data.error) {
-      throw new Error(data.error);
-    }
-
-    return data;
-  } catch (error) {
-    console.error("Error fetching directions:", error);
-    return {
-      coordinates: [],
-      distance: { text: "", value: 0 },
-      duration: { text: "", value: 0 },
-      error: error instanceof Error ? error.message : "Unknown error",
-    };
-  }
+export async function getDistanceMeters({
+  originLat,
+  originLng,
+  destLat,
+  destLng,
+}: DistanceQuery): Promise<DistanceResponse> {
+  const params = new URLSearchParams({
+    originLat: originLat.toString(),
+    originLng: originLng.toString(),
+    destLat: destLat.toString(),
+    destLng: destLng.toString(),
+  }).toString();
+  const url = `${EXPO_PUBLIC_API_URL}/maps/distance?${params}`;
+  return await fetchWithAuth(url, { method: "GET" });
 }

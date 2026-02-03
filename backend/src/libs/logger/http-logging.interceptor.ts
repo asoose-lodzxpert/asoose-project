@@ -4,19 +4,22 @@ import {
   Injectable,
   NestInterceptor,
 } from '@nestjs/common';
-import { tap } from 'rxjs';
+
+import { AppLogger } from './app-logger.service';
+import { Inject } from '@nestjs/common';
+import { tap } from 'rxjs/operators';
 
 @Injectable()
 export class HttpLoggingInterceptor implements NestInterceptor {
+  constructor(@Inject(AppLogger) private readonly logger: AppLogger) {}
+
   intercept(ctx: ExecutionContext, next: CallHandler) {
     const req = ctx.switchToHttp().getRequest();
-
     const start = Date.now();
-
     return next.handle().pipe(
       tap(() => {
         const ms = Date.now() - start;
-        console.log({
+        this.logger.log('HTTP Request', {
           method: req.method,
           url: req.url,
           statusCode: ctx.switchToHttp().getResponse().statusCode,

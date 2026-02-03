@@ -1,44 +1,48 @@
 "use client";
 
-import React, { useState } from "react";
-import { Loader2, ArrowLeft, Mail } from "lucide-react";
-import Link from "next/link";
-import { ApiService } from "../../services/api.service";
-import { useRouter } from "next/navigation";
+import React, { useState } from 'react';
+import { Loader2, ArrowLeft, Mail } from 'lucide-react';
+import Link from 'next/link';
 
 const ForgotPasswordPage = () => {
   const [isLoading, setIsLoading] = useState(false);
-  const [email, setEmail] = useState("");
-  const [error, setError] = useState("");
+  const [email, setEmail] = useState('');
+  const [error, setError] = useState('');
   const [emailSent, setEmailSent] = useState(false);
-  const router = useRouter();
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-
+    
     if (!email) {
       setError("Input field cannot be empty");
       return;
     }
-
+    
     setIsLoading(true);
-    setError("");
+    setError('');
 
     try {
-      await ApiService.post("/auth/user/forgot-password", { email });
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
+      
+      const res = await fetch(`${API_URL}/auth/user/forgot-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email }),
+      });
 
-      // Show success state and redirect to reset password page with email
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.message || 'Failed to send reset email');
+      }
+      
+      // Show success state
       setEmailSent(true);
-
-      // Store email in sessionStorage for reset password page
-      sessionStorage.setItem("resetEmail", email);
-
-      // Redirect to reset password page after 3 seconds
-      setTimeout(() => {
-        router.push("/reset-password");
-      }, 3000);
+      
     } catch (err: any) {
-      setError(err.message || "An error occurred");
+      setError(err.message || 'An error occurred. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -52,23 +56,15 @@ const ForgotPasswordPage = () => {
             <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 dark:bg-green-900/20 rounded-full mb-4 transition-colors">
               <Mail className="w-8 h-8 text-green-600 dark:text-green-400" />
             </div>
-            <h1 className="text-3xl font-black tracking-tight text-gray-900 dark:text-white mb-2">
-              Check your email
-            </h1>
+            <h1 className="text-3xl font-black tracking-tight text-gray-900 dark:text-white mb-2">Check your email</h1>
             <p className="text-sm text-gray-600 dark:text-gray-400">
-              We've sent a 6-digit OTP code to{" "}
-              <span className="font-bold text-gray-900 dark:text-white">
-                {email}
-              </span>
-              . You'll be redirected to the reset password page.
+              We've sent a password reset link to <span className="font-bold text-gray-900 dark:text-white">{email}</span>
             </p>
           </div>
 
           <div className="space-y-4">
             <div className="p-4 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl transition-colors">
-              <p className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
-                Didn't receive the email?
-              </p>
+              <p className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Didn't receive the email?</p>
               <ul className="text-xs text-gray-500 dark:text-gray-400 space-y-1 list-disc list-inside">
                 <li>Check your spam or junk folder</li>
                 <li>Make sure the email address is correct</li>
@@ -79,8 +75,8 @@ const ForgotPasswordPage = () => {
             <button
               onClick={() => {
                 setEmailSent(false);
-                setEmail("");
-                setError("");
+                setEmail('');
+                setError('');
               }}
               className="w-full bg-yellow-500 text-black py-3 rounded-xl hover:bg-yellow-400 transition-all text-sm font-bold shadow-lg shadow-yellow-500/20 active:scale-[0.98]"
             >
@@ -112,9 +108,7 @@ const ForgotPasswordPage = () => {
         </Link>
 
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-black tracking-tight text-gray-900 dark:text-white mb-2">
-            Forgot password?
-          </h1>
+          <h1 className="text-3xl font-black tracking-tight text-gray-900 dark:text-white mb-2">Forgot password?</h1>
           <p className="text-sm text-gray-600 dark:text-gray-400">
             No worries, we'll send you reset instructions
           </p>
@@ -149,13 +143,13 @@ const ForgotPasswordPage = () => {
                 Sending...
               </span>
             ) : (
-              "Reset password"
+              'Reset password'
             )}
           </button>
         </form>
       </div>
     </div>
   );
-};
+}
 
 export default ForgotPasswordPage;

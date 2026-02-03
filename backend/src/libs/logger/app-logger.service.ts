@@ -1,12 +1,43 @@
 import { Injectable, LoggerService } from '@nestjs/common';
-import { Logger } from 'winston';
+import * as winston from 'winston';
 
 @Injectable()
 export class AppLogger implements LoggerService {
-  constructor(private readonly logger: Logger) {}
+  private readonly logger: winston.Logger;
+  private readonly isProd: boolean;
+
+  constructor() {
+    this.isProd = process.env.NODE_ENV === 'production';
+    this.logger = winston.createLogger({
+      level: this.isProd ? 'error' : 'debug',
+      format: this.isProd
+        ? winston.format.combine(
+            winston.format.timestamp(),
+            winston.format.errors({ stack: true }),
+            winston.format.json(),
+          )
+        : winston.format.combine(
+            winston.format.colorize(),
+            winston.format.timestamp(),
+            winston.format.printf(({ timestamp, level, message, ...meta }) => {
+              let metaStr = Object.keys(meta).length
+                ? ` ${JSON.stringify(meta, null, 2)}`
+                : '';
+              return `[${timestamp}] [${level}]: ${message}${metaStr}`;
+            }),
+          ),
+      transports: [
+        new winston.transports.Console({
+          silent: process.env.NODE_ENV === 'test',
+        }),
+      ],
+    });
+  }
 
   log(message: string, meta?: Record<string, any>) {
-    this.logger.info(message, meta);
+    if (!this.isProd) {
+      this.logger.info(message, meta);
+    }
   }
 
   error(message: string, trace?: string, meta?: Record<string, any>) {
@@ -14,10 +45,14 @@ export class AppLogger implements LoggerService {
   }
 
   warn(message: string, meta?: Record<string, any>) {
-    this.logger.warn(message, meta);
+    if (!this.isProd) {
+      this.logger.warn(message, meta);
+    }
   }
 
   debug(message: string, meta?: Record<string, any>) {
-    this.logger.debug(message, meta);
+    if (!this.isProd) {
+      this.logger.debug(message, meta);
+    }
   }
 }

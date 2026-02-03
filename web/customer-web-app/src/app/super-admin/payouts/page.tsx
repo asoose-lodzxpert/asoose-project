@@ -6,12 +6,10 @@ import { fetcher } from '../hooks/useSuperAdminFetch';
 import { Check, X, Banknote, Clock } from 'lucide-react';
 import PayoutsSkeleton from './skeleton';
 
-// 1. Define the specific structures returned by the backend
 interface PayoutResponse {
   vendorPayouts: Array<{
     id: string;
     amount: number;
-    storeId: string;
     store: {
       name: string;
       bankAccount?: any;
@@ -20,47 +18,59 @@ interface PayoutResponse {
   riderPayouts: Array<{
     id: string;
     amount: number;
-    riderProfileId: string;
-    riderProfile: {
-      user: {
-        name: string;
-      };
+    rider: { 
+      name: string;
       bankAccount?: any;
     };
   }>;
 }
 
 export default function PayoutsManagement() {
-  // 2. Pass the interface to useSWR to fix the "type {}" errors
   const { data, mutate, isLoading } = useSWR<PayoutResponse>(
     '/super-admin/payouts/pending', 
     fetcher
   );
+
+  // FIX: Moved useMemo ABOVE the conditional return to follow the Rules of Hooks
+  const allPayouts = React.useMemo(() => {
+    if (!data) return [];
+    try {
+      return [
+        ...(data.vendorPayouts?.map((p) => ({
+          ...p,
+          type: 'VENDOR' as const,
+          name: p.store?.name || 'Unknown Store'
+        })) || []),
+        ...(data.riderPayouts?.map((p) => ({
+          ...p,
+          type: 'RIDER' as const,
+          name: p.rider?.name || 'Unknown Rider'
+        })) || []),
+      ];
+    } catch (e) {
+      console.error("Malformed payout data encountered", e);
+      return [];
+    }
+  }, [data]);
 
   const handleAction = async (id: string, type: 'VENDOR' | 'RIDER', action: 'approve' | 'reject') => {
     const reason = action === 'reject' ? prompt('Reason for rejection:') : null;
     if (action === 'reject' && !reason) return;
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
-      const res = await fetch(`${apiUrl}/super-admin/payouts/${type}/${id}/${action}`, {
+      // Uses centralized fetcher to ensure Authorization headers are attached
+      await fetcher(`/super-admin/payouts/${type}/${id}/${action}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ reason }),
       });
-      if (res.ok) mutate();
-    } catch (err) {
-      alert('Action failed');
+      mutate(); 
+    } catch (err: any) {
+      alert(err.message || 'Action failed');
     }
   };
 
-  if (isLoading) return <PayoutsSkeleton/>;
-
-  // Now 'data' is typed, so these property accesses are valid
-  const allPayouts = [
-    ...(data?.vendorPayouts?.map((p) => ({ ...p, type: 'VENDOR' as const, name: p.store.name })) || []),
-    ...(data?.riderPayouts?.map((p) => ({ ...p, type: 'RIDER' as const, name: p.riderProfile.user.name })) || []),
-  ];
+  // Conditionals must come after all hook declarations
+  if (isLoading) return <PayoutsSkeleton />;
 
   return (
     <div className="p-6 bg-[#0F172A] min-h-screen text-white">
@@ -88,10 +98,16 @@ export default function PayoutsManagement() {
               </div>
 
               <div className="flex gap-2">
-                <button onClick={() => handleAction(payout.id, payout.type, 'reject')} className="p-2 bg-red-500/10 text-red-500 rounded-lg">
+                <button 
+                  onClick={() => handleAction(payout.id, payout.type, 'reject')} 
+                  className="p-2 bg-red-500/10 text-red-500 rounded-lg transition-colors hover:bg-red-500/20"
+                >
                   <X size={20} />
                 </button>
-                <button onClick={() => handleAction(payout.id, payout.type, 'approve')} className="px-4 py-2 bg-green-600 text-white font-bold rounded-lg">
+                <button 
+                  onClick={() => handleAction(payout.id, payout.type, 'approve')} 
+                  className="px-4 py-2 bg-green-600 text-white font-bold rounded-lg transition-colors hover:bg-green-700"
+                >
                   <Check size={18} /> Approve
                 </button>
               </div>

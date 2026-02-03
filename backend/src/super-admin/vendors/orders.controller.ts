@@ -28,4 +28,3 @@ export class OrdersController {
     return this.ordersService.getVendorOrders(storeId, page, limit);
   }
 }
-

@@ -12,21 +12,23 @@ import { useSendPackage } from "@/context/SendPackageContext";
 import { calculatePrice, formatCurrency } from "@/services/sendPackage.api";
 import {
   initiatePayment,
-  type PaymentMethod,
   createBankTransfer,
   checkBankTransferStatus,
   openInAppCheckout,
   checkInAppPaymentStatus,
 } from "@/services/payment.service";
+import { useUserProfile } from "@/hooks/useUserProfile";
 import * as WebBrowser from "expo-web-browser";
 import * as Clipboard from "expo-clipboard";
 import { useRouter } from "expo-router";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
+import { PaymentMethod } from "@/types/payment";
 
 export default function PaymentScreen() {
   const { returnData } = useSendPackage();
   const router = useRouter();
+  const { user, loading: userLoading, error: userError } = useUserProfile();
 
   const primary = useThemeColor({}, "brandPrimary");
   const surface = useThemeColor({}, "surfaceBackground");
@@ -45,43 +47,48 @@ export default function PaymentScreen() {
   const [checkoutTx, setCheckoutTx] = useState<any | null>(null);
   const pollRef = useRef<number | null>(null);
 
-  const computed = useMemo(() => {
-    const distanceKm = data.quote?.distanceKm ?? 0;
+  const price = useMemo(() => {
     const packageSize = data.packageSize ?? ("small" as any);
-    const weightKg = data.packageOptions?.weightKg ?? 0;
-    return calculatePrice(distanceKm, packageSize, weightKg);
+    return calculatePrice(packageSize);
   }, [data]);
 
   async function confirmPayment() {
+    if (!user) {
+      alert("User not loaded. Please wait.");
+      return;
+    }
     setProcessing(true);
     try {
-      // register/initiate payment record (mock)
-      const init = await initiatePayment(method, data);
-      console.log("initiatePayment ->", init);
-
       if (method === "transfer") {
-        // create a one-time bank account for user to pay into
-        const acct = await createBankTransfer(computed.price, {
-          ...data,
-          init,
-        });
+        const acct = await createBankTransfer(price, data, user);
         setBankAccount(acct);
-        // start polling
         startBankPolling(acct.reference);
       } else {
-        // open in-app checkout and poll status
-        const { transactionId, checkoutUrl } = await openInAppCheckout(
+        // Compose callback URL to return to the app (deep link or expo scheme)
+        // Use your app's actual scheme (e.g., asoose-app://payment-callback)
+
+        const callbackUrl = "asoose-app://payment-callback";
+        const paymentInit = await initiatePayment(
           method,
-          computed.price,
-          { ...data, init }
+          { ...data, callbackUrl, amount: price },
+          user,
         );
+        const checkoutUrl =
+          paymentInit.authorizationUrl || paymentInit.checkoutUrl;
+        const transactionId =
+          paymentInit.reference || paymentInit.transactionId;
         setCheckoutTx({ transactionId, checkoutUrl });
-        // open in-app browser
-        WebBrowser.openBrowserAsync(checkoutUrl);
+        if (checkoutUrl) {
+          WebBrowser.openBrowserAsync(checkoutUrl);
+        }
         startInAppPolling(transactionId);
       }
     } catch (err) {
-      // show error
+      const msg =
+        err && typeof err === "object" && "message" in err
+          ? (err as any).message
+          : String(err);
+      alert("Payment failed: " + msg);
       console.error("payment confirm error", err);
     } finally {
       setProcessing(false);
@@ -98,7 +105,7 @@ export default function PaymentScreen() {
         router.push({
           pathname: "/delivery/success",
           params: {
-            price: computed.price,
+            price: price,
             distanceKm: data.quote?.distanceKm ?? 0,
             etaMinutes: data.quote?.etaMinutes ?? 0,
             method: "transfer",
@@ -107,16 +114,6 @@ export default function PaymentScreen() {
       }
     } finally {
       setProcessing(false);
-    }
-  }
-
-  async function copyAccount() {
-    if (!bankAccount) return;
-    const txt = `${bankAccount.bankName} - ${bankAccount.accountNumber} (${bankAccount.accountName})\nRef: ${bankAccount.reference}\nAmount: ${formatCurrency(bankAccount.amount)}`;
-    try {
-      await Clipboard.setStringAsync(txt);
-    } catch (e) {
-      console.warn("Clipboard unavailable", e);
     }
   }
 
@@ -155,11 +152,10 @@ export default function PaymentScreen() {
       const res = await checkBankTransferStatus(reference);
       if (res.status === "paid") {
         clearPolling();
-        // navigate to success
         router.push({
           pathname: "/delivery/success",
           params: {
-            price: computed.price,
+            price: price,
             distanceKm: data.quote?.distanceKm ?? 0,
             etaMinutes: data.quote?.etaMinutes ?? 0,
             method: "transfer",
@@ -184,7 +180,7 @@ export default function PaymentScreen() {
         router.push({
           pathname: "/delivery/success",
           params: {
-            price: computed.price,
+            price: price,
             distanceKm: data.quote?.distanceKm ?? 0,
             etaMinutes: data.quote?.etaMinutes ?? 0,
             method: method,
@@ -210,7 +206,6 @@ export default function PaymentScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
-        {/* Combined locations card: pickup and delivery in one card with icons */}
         <View
           style={[
             styles.locationCard,
@@ -274,10 +269,10 @@ export default function PaymentScreen() {
               Estimated
             </ThemedText>
             <ThemedText type="value" style={styles.priceText}>
-              {formatCurrency(computed.price)}
+              {formatCurrency(price)}
             </ThemedText>
             <ThemedText type="caption" style={styles.mutedText}>
-              {computed.distanceKm} km
+              {data.quote?.distanceKm ?? 0} km
             </ThemedText>
           </View>
         </View>
@@ -484,7 +479,7 @@ export default function PaymentScreen() {
                   type="defaultSemiBold"
                   style={{ color: textOnPrimary }}
                 >
-                  Pay {formatCurrency(computed.price)}
+                  Pay {formatCurrency(price)}
                 </ThemedText>
               )}
             </Pressable>
@@ -596,6 +591,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   detailLabelWrap: { flex: 1 },
+
   detailValue: { marginTop: 4, fontSize: 15 },
   copyButton: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
   checkButton: { padding: 12, borderRadius: 10, alignItems: "center" },

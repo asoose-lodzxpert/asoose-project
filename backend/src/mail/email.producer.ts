@@ -220,4 +220,71 @@ export class EmailProducer {
       { attempts: 3, removeOnComplete: true },
     );
   }
+
+  // ========== RIDER EMAIL TEMPLATES ==========
+
+  async sendRiderWelcomeEmail(email: string, name: string) {
+    await this.emailQueue.add(
+      'rider-welcome',
+      {
+        email,
+        name,
+        year: new Date().getFullYear(),
+      },
+      { attempts: 3, removeOnComplete: true },
+    );
+  }
+
+  async sendRiderPasswordResetOtp(email: string, name: string, otp: string) {
+    await this.emailQueue.add(
+      'rider-password-reset',
+      {
+        email,
+        name,
+        otp,
+        year: new Date().getFullYear(),
+      },
+      { attempts: 3, removeOnComplete: true },
+    );
+  }
+
+  async sendRiderPasswordChanged(
+    email: string,
+    name: string,
+    ipAddress: string,
+  ) {
+    await this.emailQueue.add(
+      'rider-password-changed',
+      {
+        email,
+        name,
+        timestamp: new Date().toLocaleString('en-US', {
+          dateStyle: 'long',
+          timeStyle: 'short',
+        }),
+        ipAddress,
+        securityUrl: `${process.env.RIDER_APP_URL || 'https://rider.asoose.com'}/security`,
+        year: new Date().getFullYear(),
+      },
+      { attempts: 3, removeOnComplete: true },
+    );
+  }
+
+  async sendRiderAccountApproved(
+    email: string,
+    name: string,
+    commissionRate: number = 85,
+  ) {
+    await this.emailQueue.add(
+      'rider-account-approved',
+      {
+        email,
+        name,
+        commissionRate,
+        appUrl: process.env.RIDER_APP_URL || 'https://rider.asoose.com',
+        year: new Date().getFullYear(),
+      },
+      { attempts: 3, removeOnComplete: true },
+    );
+  }
 }

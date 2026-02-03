@@ -1,20 +1,56 @@
 export type CartItem = {
-  id: string; // product id
+  id: string;
   name: string;
-  image: string;
+  image?: string | null;
   price: number;
   qty: number;
   options?: string;
-  restaurantId: string;
+  vendorId: string;
+  description?: string | null;
+  available?: boolean;
 };
 
 export type Restaurant = {
   id: string;
   name: string;
   deliveryTime: string;
+  image?: string | null;
+  currency?: string;
 };
 
-export type CartResponse = {
-  restaurants: Restaurant[];
-  items: CartItem[];
+export type CartSelection = {
+  id: string;
+  name: string;
+  image?: string | null;
+  price: number;
+  qty: number;
+  vendorId: string;
+  options?: string;
+};
+
+export type CartSummaryItem = {
+  id: string;
+  name: string;
+  image?: string | null;
+  description?: string | null;
+  price: number;
+  quantity: number;
+  total: number;
+  available: boolean;
+};
+
+export type CartSummaryRestaurant = {
+  id: string;
+  name: string;
+  image?: string | null;
+  time: string;
+  currency?: string;
+};
+
+export type CartSummaryResponse = {
+  restaurant: CartSummaryRestaurant | null;
+  items: CartSummaryItem[];
+  subtotal: number;
+  deliveryFee: number;
+  total: number;
 };

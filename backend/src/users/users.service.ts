@@ -8,6 +8,10 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateAddressDto, CreateOrderDto } from './dto/users.dto';
 import { OrdersService } from './orders.service';
 import { AddressesService } from './addresses.service';
+import {
+  CreateEmergencyContactDto,
+  UpdateEmergencyContactDto,
+} from './dto/emergency-contact.dto';
 
 @Injectable()
 export class UsersService {
@@ -32,8 +36,11 @@ export class UsersService {
     return this.ordersService.createOrder(userId, data, idempotencyKey);
   }
 
-  async getUserOrders(userId: string) {
-    return this.ordersService.getUserOrders(userId);
+  async getUserOrders(
+    userId: string,
+    opts?: { page?: number; pageSize?: number; status?: string },
+  ) {
+    return this.ordersService.getUserOrders(userId, opts);
   }
 
   async getOrderDetails(userId: string, orderId: string) {
@@ -58,13 +65,47 @@ export class UsersService {
   /**
    * Retrieves all deliveries for a user
    */
-  async getUserDeliveries(userId: string) {
+  async getUserDeliveries(
+    userId: string,
+    opts?: { status?: string; page?: number; pageSize?: number },
+  ) {
     try {
+      // Determine status filter
+      let statusFilter: any = undefined;
+      if (opts?.status === 'active') {
+        // All statuses that are considered 'active'
+        statusFilter = {
+          in: [
+            'PENDING',
+            'REQUESTED',
+            'ASSIGNED',
+            'ACCEPTED',
+            'PICKED_UP',
+            'IN_TRANSIT',
+          ],
+        };
+      } else if (opts?.status === 'completed') {
+        // All statuses that are considered 'completed'
+        statusFilter = {
+          in: ['DELIVERED', 'CANCELLED'],
+        };
+      } else if (opts?.status) {
+        // If a specific status is provided
+        statusFilter = opts.status;
+      }
+
+      const page = opts?.page ?? 1;
+      const pageSize = opts?.pageSize ?? 50;
+
       const deliveries = await this.prisma.delivery.findMany({
-        where: { customerId: userId },
+        where: {
+          customerId: userId,
+          ...(statusFilter ? { status: statusFilter } : {}),
+        },
         orderBy: { createdAt: 'desc' },
         include: { dropoffAddress: true },
-        take: 50,
+        skip: (page - 1) * pageSize,
+        take: pageSize,
       });
 
       return deliveries.map((d) => ({
@@ -105,10 +146,39 @@ export class UsersService {
         throw new NotFoundException('Delivery not found');
       }
 
+      // Resolve addresses into single strings
+      const pickupAddressResolved = delivery.pickupAddress
+        ? [
+            delivery.pickupAddress.street,
+            delivery.pickupAddress.city,
+            delivery.pickupAddress.state,
+          ]
+            .filter(Boolean)
+            .join(', ')
+        : '';
+
+      const dropoffAddressResolved = delivery.dropoffAddress
+        ? [
+            delivery.dropoffAddress.street,
+            delivery.dropoffAddress.city,
+            delivery.dropoffAddress.state,
+          ]
+            .filter(Boolean)
+            .join(', ')
+        : '';
+
       return {
         ...delivery,
         riderName: delivery.rider?.name,
         riderPhone: delivery.rider?.phone,
+        pickupAddress: {
+          ...delivery.pickupAddress,
+          address: pickupAddressResolved,
+        },
+        dropoffAddress: {
+          ...delivery.dropoffAddress,
+          address: dropoffAddressResolved,
+        },
       };
     } catch (error) {
       if (error instanceof NotFoundException) throw error;
@@ -195,5 +265,164 @@ export class UsersService {
 
   async getOrderQuote(userId: string, data: CreateOrderDto) {
     return this.ordersService.calculateQuote(userId, data);
+  }
+
+  // ==================================================================
+  // PROFILE LOGIC (Missing!)
+  // ==================================================================
+  async getUserProfile(userId: string) {
+    try {
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          phone: true,
+          image: true,
+          createdAt: true,
+          role: true,
+        },
+      });
+
+      if (!user) throw new NotFoundException('User not found');
+
+      return {
+        ...user,
+        // The frontend expects 'avatarUrl', so we map the database 'image' field to it
+        avatarUrl: user.image,
+      };
+    } catch (error) {
+      if (error instanceof NotFoundException) throw error;
+      this.logger.error(`Failed to fetch profile for ${userId}`, error);
+      throw new BadRequestException('Failed to fetch profile');
+    }
+  }
+  async updateUserProfile(
+    userId: string,
+    data: { name: string; phone: string },
+  ) {
+    try {
+      // 1. Update the user in the database
+      const updatedUser = await this.prisma.user.update({
+        where: { id: userId },
+        data: {
+          name: data.name,
+          phone: data.phone,
+        },
+      });
+
+      return updatedUser;
+    } catch (error) {
+      this.logger.error(`Failed to update profile for ${userId}`, error);
+      throw new BadRequestException('Failed to update profile');
+    }
+  }
+  async softDeleteUser(userId: string) {
+    try {
+      // Soft delete: Set deletedAt to now and change status to SUSPENDED
+      return await this.prisma.user.update({
+        where: { id: userId },
+        data: {
+          deletedAt: new Date(),
+          status: 'SUSPENDED', // Optional: Prevents login immediately
+        },
+      });
+    } catch (error) {
+      this.logger.error(`Failed to soft delete user ${userId}`, error);
+      throw new BadRequestException('Failed to delete account');
+    }
+  }
+
+  async deleteUserAddress(userId: string, addressId: string) {
+    return this.addressesService.deleteUserAddress(userId, addressId);
+  }
+
+  // ==================================================================
+  // EMERGENCY CONTACT SERVICE METHODS
+  // ==================================================================
+
+  async getEmergencyContacts(userId: string) {
+    return this.prisma.emergencyContact.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async addEmergencyContact(userId: string, data: CreateEmergencyContactDto) {
+    return this.prisma.emergencyContact.create({
+      data: {
+        ...data,
+        user: { connect: { id: userId } },
+      },
+    });
+  }
+
+  async updateEmergencyContact(
+    userId: string,
+    id: string,
+    data: UpdateEmergencyContactDto,
+  ) {
+    // Ensure the contact belongs to the user
+    const contact = await this.prisma.emergencyContact.findFirst({
+      where: { id, userId },
+    });
+    if (!contact) throw new NotFoundException('Contact not found');
+    return this.prisma.emergencyContact.update({
+      where: { id },
+      data,
+    });
+  }
+
+  async deleteEmergencyContact(userId: string, id: string) {
+    // Ensure the contact belongs to the user
+    const contact = await this.prisma.emergencyContact.findFirst({
+      where: { id, userId },
+    });
+    if (!contact) throw new NotFoundException('Contact not found');
+    return this.prisma.emergencyContact.delete({
+      where: { id },
+    });
+  }
+
+  // ==================================================================
+  // NOTIFICATION CONFIG SERVICE METHODS
+  // ==================================================================
+
+  async getNotificationConfig(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { notificationsPreferences: true },
+    });
+    let prefs: any = {};
+    if (user?.notificationsPreferences) {
+      try {
+        prefs =
+          typeof user.notificationsPreferences === 'string'
+            ? JSON.parse(user.notificationsPreferences)
+            : user.notificationsPreferences;
+      } catch {
+        prefs = {};
+      }
+    }
+    return {
+      push: prefs.push ?? true,
+      sms: prefs.sms ?? false,
+      email: prefs.email ?? true,
+      emergencyAlerts: prefs.emergencyAlerts ?? true,
+      tripUpdates: prefs.tripUpdates ?? true,
+    };
+  }
+
+  async updateNotificationConfig(userId: string, config: any) {
+    const allowed = ['push', 'sms', 'email', 'emergencyAlerts', 'tripUpdates'];
+    const filtered = Object.fromEntries(
+      Object.entries(config).filter(([k]) => allowed.includes(k)),
+    );
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { notificationsPreferences: JSON.stringify(filtered) },
+    });
+    return { success: true };
   }
 }

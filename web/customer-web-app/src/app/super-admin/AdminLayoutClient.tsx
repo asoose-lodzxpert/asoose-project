@@ -7,34 +7,51 @@ import {
   LayoutDashboard, Users, ShoppingCart, Car, Truck, 
   CreditCard, AlertTriangle, FileText, Settings, LogOut, 
   Menu, Bell, ChevronDown, ChevronRight, 
-  User, Banknote, ShieldCheck 
+  User, Banknote, ShieldCheck, Image, Activity
 } from 'lucide-react';
-import { createClient } from '../../../utils/supabase/client';
+import { signOut } from "next-auth/react";
+import useSWR from 'swr';
+import { fetcher } from './hooks/useSuperAdminFetch';
+import { NotificationResponse } from './notifications/types';
 
-// Define the structure for permissions
 type AdminRole = 'SUPER_ADMIN' | 'ADMIN_MANAGER' | 'ADMIN_SUPPORT' | 'ADMIN_FINANCE';
 
 interface AdminLayoutClientProps {
   children: React.ReactNode;
-  userRole: string; // Passed from server layout
+  userRole: string; 
 }
 
 export default function AdminLayoutClient({ children, userRole }: AdminLayoutClientProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const supabase = createClient();
   
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isUsersOpen, setIsUsersOpen] = useState(true);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const role = userRole as AdminRole;
 
-  // --- PERMISSION LOGIC ---
+  // 1. Fetch notifications
+  const { data: notificationsData } = useSWR<NotificationResponse>(
+    '/notifications', 
+    fetcher,
+    { 
+      refreshInterval: 30000, 
+      revalidateOnFocus: true 
+    }
+  );
+
+  const hasUnread = notificationsData?.data?.some(n => !n.isRead) ?? false;
   const hasAccess = (allowedRoles: AdminRole[]) => allowedRoles.includes(role);
 
-  // Define Menu Items with Permissions
   const menuItems = [
+    { 
+      name: 'Activity Logs', 
+      icon: Activity, 
+      href: '/super-admin/activity-logs',
+      allowed: ['SUPER_ADMIN'] 
+    },
     { 
       name: 'Orders', 
       icon: ShoppingCart, 
@@ -54,24 +71,22 @@ export default function AdminLayoutClient({ children, userRole }: AdminLayoutCli
       allowed: ['SUPER_ADMIN', 'ADMIN_MANAGER', 'ADMIN_SUPPORT']
     },
     { 
+      name: 'Verification', 
+      icon: ShieldCheck, 
+      href: '/super-admin/verification',
+      allowed: ['SUPER_ADMIN', 'ADMIN_MANAGER', 'ADMIN_SUPPORT']
+    },
+    { 
       name: 'Transactions', 
       icon: CreditCard, 
       href: '/super-admin/transactions',
       allowed: ['SUPER_ADMIN', 'ADMIN_FINANCE']
     },
-    // 👇 NEW: Payouts Link
     { 
       name: 'Payouts', 
       icon: Banknote, 
       href: '/super-admin/payouts',
       allowed: ['SUPER_ADMIN', 'ADMIN_FINANCE']
-    },
-    // 👇 NEW: Verification Link
-    { 
-      name: 'Verification', 
-      icon: ShieldCheck, 
-      href: '/super-admin/verification',
-      allowed: ['SUPER_ADMIN', 'ADMIN_MANAGER', 'ADMIN_SUPPORT']
     },
     { 
       name: 'Disputes', 
@@ -80,29 +95,26 @@ export default function AdminLayoutClient({ children, userRole }: AdminLayoutCli
       allowed: ['SUPER_ADMIN', 'ADMIN_SUPPORT']
     },
     { 
+      name: 'Banners', 
+      icon: Image, 
+      href: '/super-admin/banners',
+      allowed: ['SUPER_ADMIN', 'ADMIN_MANAGER']
+    },
+    { 
       name: 'Reports', 
       icon: FileText, 
       href: '/super-admin/reports',
       allowed: ['SUPER_ADMIN', 'ADMIN_FINANCE', 'ADMIN_MANAGER']
     },
-    { 
-      name: 'Settings', 
-      icon: Settings, 
-      href: '/super-admin/settings',
-      allowed: ['SUPER_ADMIN']
-    },
   ];
 
-  // User Management Permission (Grouped)
   const canViewUsers = hasAccess(['SUPER_ADMIN', 'ADMIN_MANAGER', 'ADMIN_SUPPORT']);
+  const canViewSettings = hasAccess(['SUPER_ADMIN']);
 
   const handleLogout = async () => {
     try {
       setIsLoggingOut(true);
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
-      router.push('/sign-in');
-      router.refresh();
+      await signOut({ callbackUrl: '/sign-in' });
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
@@ -118,10 +130,11 @@ export default function AdminLayoutClient({ children, userRole }: AdminLayoutCli
       
       {/* Sidebar */}
       <aside className={`
-        fixed inset-y-0 left-0 z-50 w-64 bg-[#1E293B] border-r border-gray-800 transition-transform duration-200 ease-in-out
+        fixed inset-y-0 left-0 z-50 w-64 bg-[#1E293B] border-r border-gray-800 transition-transform duration-200 ease-in-out flex flex-col
         ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0
       `}>
-        <div className="p-6 border-b border-gray-800 flex items-center gap-3">
+        {/* Sidebar Header */}
+        <div className="p-6 border-b border-gray-800 flex items-center gap-3 shrink-0">
           <div className="w-8 h-8 bg-yellow-500 rounded-lg flex items-center justify-center text-black font-black">
             {role === 'SUPER_ADMIN' ? 'SA' : role === 'ADMIN_FINANCE' ? 'FN' : role === 'ADMIN_SUPPORT' ? 'SP' : 'MG'}
           </div>
@@ -131,8 +144,8 @@ export default function AdminLayoutClient({ children, userRole }: AdminLayoutCli
           </div>
         </div>
 
-        <nav className="p-4 space-y-1 overflow-y-auto max-h-[calc(100vh-140px)] scrollbar-hide">
-          {/* Dashboard - Accessible to All Admins */}
+        {/* Navigation - kept pb-24 for spacing */}
+        <nav className="flex-1 p-4 space-y-1 overflow-y-auto scrollbar-hide pb-24">
           <Link 
             href="/super-admin/dashboard"
             className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all mb-1 ${
@@ -145,7 +158,6 @@ export default function AdminLayoutClient({ children, userRole }: AdminLayoutCli
             Dashboard
           </Link>
 
-          {/* User Management Section */}
           {canViewUsers && (
             <div className="mb-1">
               <button 
@@ -177,7 +189,6 @@ export default function AdminLayoutClient({ children, userRole }: AdminLayoutCli
             </div>
           )}
 
-          {/* Dynamic Menu Items based on Role */}
           {menuItems.map((item) => {
              if (!hasAccess(item.allowed as AdminRole[])) return null;
 
@@ -196,9 +207,38 @@ export default function AdminLayoutClient({ children, userRole }: AdminLayoutCli
                </Link>
              );
           })}
+
+          {canViewSettings && (
+            <div className="mb-1">
+              <button 
+                onClick={() => setIsSettingsOpen(!isSettingsOpen)}
+                className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-colors ${
+                   isChildActive('/super-admin/settings') ? 'text-white bg-white/5' : 'text-gray-400 hover:bg-white/5 hover:text-white'
+                }`}
+              >
+                  <div className="flex items-center gap-3">
+                    <Settings className="w-5 h-5" />
+                    <span className={isChildActive('/super-admin/settings') ? 'font-bold' : ''}>Settings</span>
+                  </div>
+                  {isSettingsOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+              </button>
+              
+              {isSettingsOpen && (
+                <div className="ml-4 mt-1 space-y-1 border-l border-gray-700 pl-3">
+                   <Link href="/super-admin/settings" className={`block px-4 py-2 text-sm rounded-lg transition-colors ${pathname === '/super-admin/settings' ? 'text-yellow-500 font-bold bg-yellow-500/10' : 'text-gray-400 hover:text-white'}`}>
+                     General
+                   </Link>
+                   <Link href="/super-admin/settings/zones" className={`block px-4 py-2 text-sm rounded-lg transition-colors ${isActive('/super-admin/settings/zones') ? 'text-yellow-500 font-bold bg-yellow-500/10' : 'text-gray-400 hover:text-white'}`}>
+                     Service Zones
+                   </Link>
+                </div>
+              )}
+            </div>
+          )}
         </nav>
 
-        <div className="absolute bottom-0 w-full p-4 border-t border-gray-800 bg-[#1E293B]">
+        {/* Logout Button */}
+        <div className="absolute bottom-0 w-full p-4 border-t border-gray-800 bg-[#1E293B] z-10">
            <button 
              onClick={handleLogout}
              disabled={isLoggingOut}
@@ -214,22 +254,14 @@ export default function AdminLayoutClient({ children, userRole }: AdminLayoutCli
         </div>
       </aside>
 
-      {/* Main Content Area */}
       <main className="flex-1 md:ml-64 relative bg-[#0F172A] min-h-screen">
         <header className="h-16 border-b border-gray-800 flex items-center justify-between px-6 bg-[#0F172A]/80 backdrop-blur-md sticky top-0 z-40">
            <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="md:hidden text-gray-400">
              <Menu />
            </button>
 
-           <div className="flex-1 max-w-xl mx-4 hidden md:block">
-             <input 
-               type="text" 
-               placeholder="Search..." 
-               className="w-full bg-[#1E293B] border border-gray-700 rounded-lg px-4 py-2 text-sm text-gray-300 focus:outline-none focus:border-yellow-500 transition-colors"
-             />
-           </div>
-
-           <div className="flex items-center gap-4">
+           {/* Layout Fix: ml-auto pushes these icons to the right since the middle search div is gone */}
+           <div className="flex items-center gap-4 ml-auto">
               <Link 
                 href={"/super-admin/notifications"} 
                 className={`relative p-2 transition-colors ${
@@ -237,7 +269,9 @@ export default function AdminLayoutClient({ children, userRole }: AdminLayoutCli
                 }`}
               >
                  <Bell className="w-5 h-5" />
-                 <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full" />
+                 {hasUnread && (
+                   <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full" />
+                 )}
               </Link>
               
               <div className="flex items-center gap-3 pl-4 border-l border-gray-700">
@@ -260,7 +294,6 @@ export default function AdminLayoutClient({ children, userRole }: AdminLayoutCli
         </div>
       </main>
 
-      {/* Mobile Overlay */}
       {isMobileMenuOpen && (
         <div className="fixed inset-0 bg-black/50 z-40 md:hidden backdrop-blur-sm" onClick={() => setIsMobileMenuOpen(false)} />
       )}

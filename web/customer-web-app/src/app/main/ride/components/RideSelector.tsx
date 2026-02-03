@@ -2,12 +2,35 @@
 
 import React, { useState, useEffect } from 'react';
 import { 
-  CreditCard, Banknote, ChevronLeft, Check, Loader2, ChevronDown, AlertCircle
+  CreditCard, Banknote, ChevronLeft, Check, Loader2, ChevronDown
 } from 'lucide-react';
-import { PriceEstimate, RideRequestPayload, RideType } from '@/services/ride.service';
 import FareBreakdown from './fareBreakdown';
 import LocationAutocomplete from './LocationAutocomplete';
-import { PAYMENT_METHODS } from '../constants/config'; // Ensure this exists or define inline if preferred
+import { PAYMENT_METHODS } from '../constants/config'; 
+
+export interface RideType {
+  id: string;
+  displayName: string;
+  icon?: string;
+}
+
+export interface RideRequestPayload {
+  pickup: { lat: number; lng: number; address: string };
+  dropoff: { lat: number; lng: number; address: string };
+  rideType: string;
+  paymentMethodId: string;
+  price: number;
+}
+
+export interface PriceEstimate {
+  [key: string]: {
+    estimatedFare: number;
+    distance: number;
+    duration: number; 
+    total: number;
+    breakdown: any;
+  }; 
+}
 
 interface RideSelectorProps {
   pickupAddress: string;
@@ -19,8 +42,15 @@ interface RideSelectorProps {
   onRequestRide: (data: RideRequestPayload) => void;
   isRequesting: boolean;
   isGoogleLoaded: boolean;
-  availableRideTypes: RideType[]; // NEW: Dynamic types from backend
+  availableRideTypes: RideType[]; 
 }
+
+export const AVAILABLE_RIDE_TYPES: RideType[] = [
+  { id: 'BIKE', displayName: 'Bike' },
+  { id: 'CAR', displayName: 'Car' },
+  { id: 'VAN', displayName: 'Van' },
+];
+
 
 export default function RideSelector({ 
   pickupAddress,
@@ -35,28 +65,32 @@ export default function RideSelector({
   availableRideTypes
 }: RideSelectorProps) {
   
-  // Initialize with the first available type ID or empty string
   const [selectedRideId, setSelectedRideId] = useState<string>('');
   const [selectedPayment, setSelectedPayment] = useState(PAYMENT_METHODS[0]);
   const [isSelectingPayment, setIsSelectingPayment] = useState(false);
   const [showBreakdown, setShowBreakdown] = useState(false);
 
-  // Auto-select the first ride type when data loads
   useEffect(() => {
     if (availableRideTypes.length > 0 && !selectedRideId) {
       setSelectedRideId(availableRideTypes[0].id);
     }
   }, [availableRideTypes, selectedRideId]);
 
-const handleConfirm = () => {
+  const handleConfirm = () => {
     if (!priceEstimates || !selectedRideId) return;
-    const tier = (priceEstimates as any)[selectedRideId];
+
+    // ✅ FIX: Safety check to prevent crash if ID doesn't exist in estimates
+    const tier = priceEstimates[selectedRideId];
+    if (!tier) {
+        console.error(`Missing estimate for type: ${selectedRideId}`);
+        return; 
+    }
     
     onRequestRide({
       pickup: { lat: 0, lng: 0, address: pickupAddress },
       dropoff: { lat: 0, lng: 0, address: destinationAddress },
       rideType: selectedRideId, 
-      paymentMethodId: selectedPayment.id, // This is passed to parent
+      paymentMethodId: selectedPayment.id, 
       price: tier.total
     });
   };
@@ -65,13 +99,11 @@ const handleConfirm = () => {
     return type === 'CARD' ? <CreditCard size={18} /> : <Banknote size={18} />;
   };
 
-  // Helper to get emoji/icon based on backend ID (fallback logic)
   const getRideIcon = (type: RideType) => {
     if (type.icon) return <img src={type.icon} alt={type.displayName} className="w-8 h-8" />;
-    // Fallback based on ID naming convention
     const id = type.id.toLowerCase();
-    if (id.includes('premium')) return '🚐';
-    if (id.includes('xl')) return '🚙';
+    if (id.includes('van') || id.includes('xl')) return '🚙';
+    if (id.includes('bike')) return '🏍️';
     return '🚗';
   };
 
@@ -81,10 +113,8 @@ const handleConfirm = () => {
       {/* --- INPUT HEADER --- */}
       <div className="p-4 border-b border-gray-100 dark:border-zinc-800 shadow-sm z-20">
           <div className="bg-gray-50 dark:bg-zinc-900/50 rounded-2xl p-2 space-y-2 relative border border-gray-100 dark:border-zinc-800">
-              {/* Connector Line */}
               <div className="absolute left-[27px] top-8 bottom-8 w-0.5 bg-gray-200 dark:bg-zinc-700 pointer-events-none" />
               
-              {/* Pickup Input */}
               <div className="flex items-center gap-3 relative z-10 bg-white dark:bg-black/20 rounded-xl px-2">
                   <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0 ml-1.5 ring-4 ring-white dark:ring-zinc-900" />
                   <div className="flex-1 min-w-0">
@@ -97,7 +127,6 @@ const handleConfirm = () => {
                   </div>
               </div>
 
-              {/* Destination Input */}
               <div className="flex items-center gap-3 relative z-10 bg-white dark:bg-black/20 rounded-xl px-2">
                   <div className="w-2.5 h-2.5 rounded-full bg-red-500 shrink-0 ml-1.5 ring-4 ring-white dark:ring-zinc-900" />
                   <div className="flex-1 min-w-0">
@@ -148,14 +177,15 @@ const handleConfirm = () => {
             ) : (
                 <div className="space-y-3">
                   {availableRideTypes.map((type) => {
-                    // Safe access to estimates
-                    const estimate = priceEstimates ? (priceEstimates[type.id] as any) : null;
+                    // ✅ FIX: Access specific estimate using type.id
+                    const estimate = priceEstimates ? priceEstimates[type.id] : null;
                     
                     return (
                         <button
                           key={type.id}
                           onClick={() => { setSelectedRideId(type.id); setShowBreakdown(false); }}
-                          disabled={!priceEstimates}
+                          // Disable if this specific vehicle type has no estimate
+                          disabled={!estimate}
                           className={`w-full flex items-center justify-between p-4 rounded-xl border-2 transition-all disabled:opacity-50 disabled:cursor-wait
                             ${selectedRideId === type.id 
                               ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20' 
@@ -168,8 +198,9 @@ const handleConfirm = () => {
                             </div>
                             <div className="text-left">
                               <h3 className="font-bold text-gray-900 dark:text-white">{type.displayName}</h3>
+                              {/* ✅ FIX: Correctly display duration from specific estimate */}
                               <p className="text-xs text-gray-500 dark:text-zinc-400">
-                                {priceEstimates ? `${priceEstimates.durationMin} min` : '...'}
+                                {estimate ? `${estimate.duration} min` : '...'}
                               </p>
                             </div>
                           </div>
@@ -177,22 +208,22 @@ const handleConfirm = () => {
                             <span className="block font-bold text-lg dark:text-white">
                               {isCalculatingPrice ? <Loader2 className="w-4 h-4 animate-spin inline" /> : (estimate ? `₦${estimate.total.toLocaleString()}` : '---')}
                             </span>
-                            {priceEstimates?.isSurgeActive && <span className="text-[10px] bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-400 px-1.5 py-0.5 rounded font-bold uppercase">Surge</span>}
-                          </div>
+                            {/* Assuming surge info might be added to individual estimate in future */}
+                           </div>
                         </button>
                     );
                   })}
                 </div>
             )}
 
-            {priceEstimates && selectedRideId && (
+            {priceEstimates && selectedRideId && priceEstimates[selectedRideId] && (
               <div className="mt-4">
                   <button onClick={() => setShowBreakdown(!showBreakdown)} className="flex items-center gap-1 text-xs font-bold text-gray-400 dark:text-zinc-500 hover:text-gray-600 dark:hover:text-zinc-300 transition-colors">
                       {showBreakdown ? 'Hide Details' : 'Show fare breakdown'} <ChevronDown size={14} className={showBreakdown ? 'rotate-180' : ''} />
                   </button>
                   {showBreakdown && (
                       <FareBreakdown 
-                        breakdown={priceEstimates[selectedRideId] as any} 
+                        breakdown={priceEstimates[selectedRideId].breakdown} 
                         rideType={availableRideTypes.find(t => t.id === selectedRideId)?.displayName || selectedRideId} 
                       />
                   )}
@@ -210,7 +241,8 @@ const handleConfirm = () => {
         </div>
         <button 
           onClick={handleConfirm}
-          disabled={isRequesting || !priceEstimates || isCalculatingPrice || !selectedRideId}
+          // ✅ FIX: Strict disable check
+          disabled={isRequesting || !priceEstimates || isCalculatingPrice || !selectedRideId || !priceEstimates[selectedRideId]}
           className="w-full py-4 rounded-xl font-bold text-white dark:text-black bg-gray-900 dark:bg-white hover:bg-black dark:hover:bg-zinc-200 transition-all disabled:opacity-50"
         >
           {isRequesting ? <Loader2 className="animate-spin mx-auto" /> : `Confirm ${availableRideTypes.find(t => t.id === selectedRideId)?.displayName || 'Ride'}`}

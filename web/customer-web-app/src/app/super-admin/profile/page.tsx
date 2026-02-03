@@ -6,14 +6,12 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { 
-  User, Mail, Phone, Shield, Calendar, 
-  Lock, Save, Loader2, Key, CheckCircle 
+  User, Lock, Save, Loader2, Key 
 } from 'lucide-react';
 import { toast } from 'react-toastify';
+import { getSession } from 'next-auth/react'; 
 
 import { fetcher } from '../hooks/useSuperAdminFetch';
-import { createClient } from '../../../../utils/supabase/client';
-import ImageUpload from '@/app/main/components/ImageUpload';
 import AdminProfileSkeleton from './skeleton';
 
 interface AdminProfile {
@@ -33,7 +31,7 @@ const profileSchema = z.object({
     .regex(/^[\+]?[(]?[0-9]{1,4}[)]?[-\s\.]?[(]?[0-9]{1,4}[)]?[-\s\.]?[0-9]{1,9}$/, "Invalid phone format")
     .optional()
     .or(z.literal('')),
-  avatar_url: z.string().optional(),
+  // Removed avatar_url from validation requirements for update
 });
 
 const passwordSchema = z.object({
@@ -53,18 +51,18 @@ type ProfileValues = z.infer<typeof profileSchema>;
 type PasswordValues = z.infer<typeof passwordSchema>;
 
 export default function AdminProfilePage() {
-  const supabase = createClient();
   const [isUpdating, setIsUpdating] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
-  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
-  // Fetch Profile with explicit AdminProfile type
+  // Fetch Profile
   const { data: profile, mutate, isLoading, error } = useSWR<AdminProfile>('/users/profile', fetcher);
 
   // Forms Initialization
   const profileForm = useForm<ProfileValues>({
     resolver: zodResolver(profileSchema),
-    defaultValues: { name: '', phone: '', avatar_url: '' }
+    defaultValues: { name: '', phone: '' }
   });
 
   const passwordForm = useForm<PasswordValues>({
@@ -72,34 +70,32 @@ export default function AdminProfilePage() {
     defaultValues: { newPassword: '', confirmPassword: '' }
   });
 
-  // Sync data when loaded - FIXED: Remove profileForm from dependencies
+  // Sync data when loaded
   useEffect(() => {
     if (profile) {
       profileForm.reset({
         name: profile.name || '',
         phone: profile.phone || '',
-        avatar_url: profile.avatar_url || ''
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile]); // Only depend on profile data
+  }, [profile]);
 
   const onUpdateProfile = async (values: ProfileValues) => {
     setIsUpdating(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const session = await getSession();
+      const token = (session as any)?.accessToken;
       
-      if (!session) {
+      if (!token) {
         throw new Error('No active session. Please login again.');
       }
-
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
       const res = await fetch(`${API_URL}/users/profile`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`
+          'Authorization': `Bearer ${token}` 
         },
         body: JSON.stringify(values)
       });
@@ -122,11 +118,29 @@ export default function AdminProfilePage() {
   const onUpdatePassword = async (values: PasswordValues) => {
     setIsChangingPassword(true);
     try {
-      const { error } = await supabase.auth.updateUser({ 
-        password: values.newPassword 
+      const session = await getSession();
+      const token = (session as any)?.accessToken;
+      
+      if (!token) {
+        throw new Error('No active session. Please login again.');
+      }
+
+      const res = await fetch(`${API_URL}/users/change-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ 
+          password: values.newPassword,
+          confirmPassword: values.confirmPassword
+        })
       });
 
-      if (error) throw error;
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to update password');
+      }
 
       toast.success('Password changed successfully');
       passwordForm.reset();
@@ -138,42 +152,8 @@ export default function AdminProfilePage() {
     }
   };
 
-  const handleImageUpload = async (url: string) => {
-    setIsUploadingImage(true);
-    try {
-      profileForm.setValue('avatar_url', url, { shouldDirty: true });
-      
-      // Auto-save avatar immediately
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error('No active session');
-
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-      const res = await fetch(`${API_URL}/users/profile`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`
-        },
-        body: JSON.stringify({ avatar_url: url })
-      });
-
-      if (!res.ok) throw new Error('Failed to save avatar');
-      
-      await mutate();
-      toast.success('Profile picture updated');
-    } catch (error: any) {
-      console.error('Avatar upload error:', error);
-      toast.error(error.message || 'Failed to upload avatar');
-      profileForm.setValue('avatar_url', profile?.avatar_url || '');
-    } finally {
-      setIsUploadingImage(false);
-    }
-  };
-
   if (isLoading) {
-    return (
-        <AdminProfileSkeleton/>
-    );
+    return <AdminProfileSkeleton/>;
   }
 
   if (error) {
@@ -212,18 +192,11 @@ export default function AdminProfilePage() {
           <div className="bg-[#1E293B] border border-gray-800 rounded-3xl p-8 text-center relative overflow-hidden shadow-2xl">
             <div className="absolute top-0 left-0 w-full h-1 bg-yellow-500" />
             
-            <div className="mb-6 relative">
-              {isUploadingImage && (
-                <div className="absolute inset-0 bg-black/50 flex items-center justify-center rounded-full z-10">
-                  <Loader2 className="w-8 h-8 animate-spin text-yellow-500" />
+            {/* Replaced Upload with Static Icon */}
+            <div className="flex justify-center mb-6">
+                <div className="w-24 h-24 bg-[#0F172A] rounded-full flex items-center justify-center border-4 border-[#1E293B] shadow-xl">
+                    <User className="w-12 h-12 text-yellow-500" />
                 </div>
-              )}
-              <ImageUpload 
-                label="Profile Picture"
-                bucket="avatars"
-                value={profileForm.watch('avatar_url')}
-                onUpload={handleImageUpload}
-              />
             </div>
 
             <h2 className="text-xl font-black text-white">{profile.name}</h2>

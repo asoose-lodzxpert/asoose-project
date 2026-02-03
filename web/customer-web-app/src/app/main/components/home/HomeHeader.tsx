@@ -4,9 +4,9 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
-import { Search, MapPin, ChevronDown, Moon, Sun, Car, Package, Utensils, User, Bell, ShoppingBag } from 'lucide-react';
+import { Search, MapPin, ChevronDown, Moon, Sun, Car, Package, Store, User, Bell, ShoppingBag } from 'lucide-react';
 import { useTheme } from 'next-themes';
-import { createClient } from '../../../../../utils/supabase/client';
+import { useSession } from "next-auth/react"; 
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -18,6 +18,7 @@ const sanitizeInput = (input: string): string => {
 };
 
 export const HomeHeader = () => {
+  const { data: session } = useSession(); 
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -27,7 +28,6 @@ export const HomeHeader = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const pathname = usePathname();
-  const supabase = createClient();
 
   // Logic for Search visibility (Only on main store page)
   const isStorePage = pathname === '/main/store';
@@ -35,14 +35,14 @@ export const HomeHeader = () => {
   // Logic for Address visibility (Store page AND Store detail pages)
   const isStoreSection = pathname.startsWith('/main/store');
 
-  // NEW: Logic for Branding visibility (Ride, Delivery, Cart, Order, Checkout, Notifications)
+  // Logic for Branding visibility
   const showBranding = [
     '/main/ride', 
     '/main/delivery', 
     '/main/cart', 
     '/main/orders', 
     '/main/checkout',
-    '/main/notifications' // Added this route
+    '/main/notifications'
   ].some(path => pathname.startsWith(path));
 
   const isActive = (path: string) => pathname.startsWith(path);
@@ -59,19 +59,19 @@ export const HomeHeader = () => {
 
     const fetchAddressAndNotifications = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        const token = (session as any)?.accessToken || (session as any)?.user?.accessToken;
         
-        if (!session) {
+        if (!session || !token) {
           setDeliveryAddress({ label: 'Guest', details: 'Login to set address' });
           return;
         }
 
         const [addressRes, notifRes] = await Promise.all([
           fetch(`${API_URL}/users/addresses`, {
-            headers: { Authorization: `Bearer ${session.access_token}` }
+            headers: { Authorization: `Bearer ${token}` } 
           }),
           fetch(`${API_URL}/notifications`, {
-            headers: { Authorization: `Bearer ${session.access_token}` }
+            headers: { Authorization: `Bearer ${token}` } 
           })
         ]);
 
@@ -89,8 +89,10 @@ export const HomeHeader = () => {
         }
 
         if (notifRes.ok) {
-          const notifications = await notifRes.json();
-          const unread = notifications.filter((n: any) => !n.isRead).length;
+          const response = await notifRes.json();
+          const notificationsList = Array.isArray(response) ? response : (response.data || []);
+          
+          const unread = notificationsList.filter((n: any) => !n.isRead).length;
           setUnreadCount(unread);
         }
       } catch (error) {
@@ -99,7 +101,7 @@ export const HomeHeader = () => {
     };
 
     fetchAddressAndNotifications();
-  }, [searchParams, supabase.auth]);
+  }, [searchParams, session]); 
 
   const toggleTheme = () => {
     setTheme(theme === 'dark' ? 'light' : 'dark');
@@ -126,7 +128,7 @@ export const HomeHeader = () => {
         {/* LEFT: Branding OR Address */}
         <div className="flex items-center gap-6">
           
-          {/* 1. Branding (Visible on Ride, Delivery, Cart, Order, Checkout, Notifications) */}
+          {/* 1. Branding */}
           {showBranding && (
             <Link href="/" className="flex items-center gap-3 group">
               <div className="w-9 h-9 relative transition-transform group-hover:scale-105">
@@ -148,23 +150,32 @@ export const HomeHeader = () => {
           {/* 2. Address (Visible only in Store Section) */}
           {isStoreSection && (
             <Link href="/main/profile" 
-              className="flex items-center gap-3 group min-w-fit hover:bg-gray-50 dark:hover:bg-white/5 p-2 rounded-xl transition-colors focus:outline-none focus:ring-2 focus:ring-yellow-500"
+              className="flex items-center gap-2 sm:gap-3 group min-w-fit hover:bg-gray-50 dark:hover:bg-white/5 p-1.5 sm:p-2 rounded-xl transition-colors focus:outline-none focus:ring-2 focus:ring-yellow-500"
               aria-label="Change delivery address"
             >
-              <div className={`p-2 rounded-full transition-colors ${isActive('/main/profile') ? 'bg-yellow-500 shadow-lg shadow-yellow-500/20' : 'bg-yellow-500/10 group-hover:bg-yellow-500/20'}`}>
-                <MapPin className={`w-5 h-5 ${isActive('/main/profile') ? 'text-white' : 'text-yellow-500'}`} aria-hidden="true" />
+              {/* Icon - Smaller padding on mobile */}
+              <div className={`p-1.5 sm:p-2 rounded-full transition-colors ${isActive('/main/profile') ? 'bg-yellow-500 shadow-lg shadow-yellow-500/20' : 'bg-yellow-500/10 group-hover:bg-yellow-500/20'}`}>
+                <MapPin className={`w-4 h-4 sm:w-5 sm:h-5 ${isActive('/main/profile') ? 'text-white' : 'text-yellow-500'}`} aria-hidden="true" />
               </div>
-              <div className="hidden sm:block text-left">
-                <div className="text-[10px] text-gray-500 font-black uppercase tracking-widest leading-none mb-1">
+
+              {/* Text Container - NOW VISIBLE ON MOBILE */}
+              <div className="text-left">
+                
+                {/* Label: Hidden on mobile to save space */}
+                <div className="hidden sm:block text-[10px] text-gray-500 font-black uppercase tracking-widest leading-none mb-1">
                   Deliver to
                 </div>
-                <div className="flex items-center gap-1 font-bold text-sm leading-none whitespace-nowrap max-w-[150px] sm:max-w-[200px] truncate dark:text-white">
-                  {deliveryAddress ? (
-                     <>{deliveryAddress.label} - {deliveryAddress.details}</>
-                  ) : (
-                     <span>Set Location</span>
-                  )}
-                  <ChevronDown className="w-4 h-4 text-gray-400 shrink-0" aria-hidden="true" />
+
+                {/* Address Text: Visible but truncated on mobile */}
+                <div className="flex items-center gap-1 font-bold text-sm leading-none dark:text-white">
+                  <span className="max-w-[100px] sm:max-w-[200px] truncate block">
+                    {deliveryAddress ? (
+                       <>{deliveryAddress.label === 'Guest' ? 'Set Location' : deliveryAddress.details}</>
+                    ) : (
+                       <span>Set Location</span>
+                    )}
+                  </span>
+                  <ChevronDown className="w-3 h-3 sm:w-4 sm:h-4 text-gray-400 shrink-0" aria-hidden="true" />
                 </div>
               </div>
             </Link>
@@ -196,13 +207,13 @@ export const HomeHeader = () => {
         <div className="flex items-center gap-4">
           <nav className="hidden lg:flex items-center gap-1 bg-gray-100 dark:bg-white/5 p-1 rounded-xl mr-2">
             <Link href="/main/store" className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-yellow-500 ${isActive('/main/store') ? 'bg-white dark:bg-zinc-800 text-yellow-500 shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}>
-              <Utensils className="w-3.5 h-3.5" /> Food
+              <Store className="w-3.5 h-3.5" /> make order
             </Link>
             <Link href="/main/ride" className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-yellow-500 ${isActive('/main/ride') ? 'bg-white dark:bg-zinc-800 text-yellow-500 shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}>
-              <Car className="w-3.5 h-3.5" /> Ride
+              <Car className="w-3.5 h-3.5" /> Book a ride 
             </Link>
             <Link href="/main/delivery" className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-yellow-500 ${isActive('/main/delivery') ? 'bg-white dark:bg-zinc-800 text-yellow-500 shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}>
-              <Package className="w-3.5 h-3.5" /> Send
+              <Package className="w-3.5 h-3.5" /> Send a package
             </Link>
             
             <Link href="/main/checkout" className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-yellow-500 ${isActive('/main/checkout') ? 'bg-white dark:bg-zinc-800 text-yellow-500 shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}>

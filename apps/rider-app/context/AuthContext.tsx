@@ -91,24 +91,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   async function signIn(identifier: string, password: string) {
+    let prevBiometric: { identifier: string; password: string } | null = null;
+    try {
+      prevBiometric = await getBiometricCredentials();
+    } catch {}
     const { user } = await login(identifier, password);
+    if (
+      prevBiometric &&
+      prevBiometric.identifier &&
+      prevBiometric.identifier !== identifier
+    ) {
+      await disableBiometricAuth();
+    }
     setUser(user);
   }
 
   async function signInWithBiometric() {
-    // First authenticate with biometric
     const authenticated = await authenticateWithBiometric();
     if (!authenticated) {
       throw new Error("Biometric authentication failed");
     }
 
-    // Get stored credentials
     const credentials = await getBiometricCredentials();
     if (!credentials) {
       throw new Error("No biometric credentials found");
     }
 
-    // Login with stored credentials
     const { user } = await login(credentials.identifier, credentials.password);
     setUser(user);
   }
@@ -126,6 +134,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   async function signOut() {
     setUser(null);
     await logout();
+    // Always clear biometric credentials on logout
+    await disableBiometricAuth();
   }
 
   return (

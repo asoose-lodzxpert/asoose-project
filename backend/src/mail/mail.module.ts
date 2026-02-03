@@ -40,6 +40,6 @@ import { join } from 'path';
     }),
   ],
   providers: [EmailProcessor, EmailProducer],
-  exports: [EmailProducer],
+  exports: [EmailProducer, BullModule],
 })
 export class MailModule {}

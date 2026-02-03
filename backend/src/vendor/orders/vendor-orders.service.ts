@@ -57,11 +57,24 @@ export class VendorOrdersService {
 
     const whereClause: any = { storeId: store.id };
 
+    whereClause.paymentStatus = 'PAID';
+
     if (status) {
-      const statuses = status.split(',').map((s) => s.trim());
+      const statusMap = Object.values(OrderStatus).reduce(
+        (acc, os) => {
+          acc[os.toLowerCase()] = os;
+          return acc;
+        },
+        {} as Record<string, OrderStatus>,
+      );
+      const statuses = status
+        .split(',')
+        .map((s) => s.trim().toLowerCase())
+        .map((s) => statusMap[s])
+        .filter((s): s is OrderStatus => !!s);
       if (statuses.length === 1) {
         whereClause.status = statuses[0];
-      } else {
+      } else if (statuses.length > 1) {
         whereClause.status = { in: statuses };
       }
     }
@@ -74,7 +87,7 @@ export class VendorOrdersService {
         skip,
         include: {
           items: true,
-          user: { select: { name: true, phone: true } },
+          user: { select: { name: true, phone: true, image: true } },
           delivery: { select: { status: true, riderId: true } },
         },
       }),
@@ -89,6 +102,10 @@ export class VendorOrdersService {
 
   async acceptOrder(userId: string, orderId: string) {
     const order = await this.validateOrderAccess(userId, orderId);
+
+    if (order.paymentStatus !== 'PAID') {
+      throw new BadRequestException(`Order has not been paid yet!`);
+    }
 
     if (order.status !== 'PENDING') {
       throw new BadRequestException(
@@ -105,9 +122,23 @@ export class VendorOrdersService {
     this.notificationsGateway.sendOrderUpdate(updated.id, {
       status: 'CONFIRMED',
       timeline: [
-        { status: 'PLACED', time: updated.createdAt.toISOString(), icon: 'default' },
-        { status: 'CONFIRMED', label: 'Order Confirmed', time: new Date().toISOString(), icon: 'kitchen' }
-      ]
+        {
+          status: 'PLACED',
+          time: updated.createdAt.toISOString(),
+          icon: 'default',
+        },
+        {
+          status: 'CONFIRMED',
+          label: 'Order Confirmed',
+          time: new Date().toISOString(),
+          icon: 'store',
+        },
+        {
+          status: 'PREPARING',
+          label: 'Store is packaging your order',
+          time: new Date().toISOString(),
+        },
+      ],
     });
 
     return updated;
@@ -143,9 +174,14 @@ export class VendorOrdersService {
       this.notificationsGateway.sendOrderUpdate(updated.id, {
         status: 'REJECTED',
         timeline: [
-           { status: 'PLACED', time: updated.createdAt.toISOString() },
-           { status: 'CANCELLED', label: 'Order Declined', description: reason, time: new Date().toISOString() }
-        ]
+          { status: 'PLACED', time: updated.createdAt.toISOString() },
+          {
+            status: 'CANCELLED',
+            label: 'Order Declined',
+            description: reason,
+            time: new Date().toISOString(),
+          },
+        ],
       });
 
       return updated;
@@ -171,10 +207,8 @@ export class VendorOrdersService {
       storeId: updated.storeId,
     });
 
-    // Real-time update
     this.notificationsGateway.sendOrderUpdate(updated.id, {
       status: 'READY',
-      // In a full implementation, you would reconstruct the whole timeline here
     });
 
     return updated;
@@ -192,7 +226,6 @@ export class VendorOrdersService {
       data: { status: OrderStatus.PREPARING },
     });
 
-    // Real-time update
     this.notificationsGateway.sendOrderUpdate(updated.id, {
       status: 'PREPARING',
     });

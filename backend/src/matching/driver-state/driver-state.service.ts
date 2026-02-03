@@ -1,11 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter'; // <--- Added for Task 4
 import { RedisService } from '../redis/redis.service';
 import { GeoService } from '../geo/geo.service';
 import { EventBusService } from '../events/event-bus.service';
+import { DRIVER_EVENTS, DriverLocationUpdatedEvent } from '../events/event-types'; // <--- Added
 import {
   DriverStatus,
   REDIS_TTL,
-  TripType,
+  JobType,
 } from '../redis/redis-keys.constants';
 import {
   ATOMIC_UPDATE_LOCATION,
@@ -16,12 +18,11 @@ import {
   ATOMIC_DECLINE_TRIP,
 } from '../redis/lua-scripts';
 
-/**
- * Driver State Management Service
- *
- * Manages all driver state transitions in Redis.
- * ALL driver status, location, and active trip data lives here - NOT in the database.
- */
+type RideJob = {
+  jobId: string;
+  jobType: 'ride';
+};
+
 @Injectable()
 export class DriverStateService {
   private readonly logger = new Logger(DriverStateService.name);
@@ -30,83 +31,52 @@ export class DriverStateService {
     private readonly redis: RedisService,
     private readonly geo: GeoService,
     private readonly eventBus: EventBusService,
+    private readonly eventEmitter: EventEmitter2, // <--- Injected for Real-Time Updates
   ) {}
 
-  // ========================================
-  // DRIVER STATUS TRANSITIONS
-  // ========================================
+  /* ============================================================
+     INTERNAL GUARD
+  ============================================================ */
+  private assertRideJob(job: RideJob) {
+    if (job.jobType !== 'ride') {
+      throw new Error('Driver state only supports ride jobs');
+    }
+  }
 
-  /**
-   * Set driver online
-   *
-   * Atomically sets driver to ONLINE and adds to hex index.
-   */
+  /* ============================================================
+     DRIVER STATUS
+  ============================================================ */
   async setOnline(driverId: string, lat: number, lng: number): Promise<void> {
-    // Validate coordinates
-    if (!this.geo.validateCoordinates(lat, lng)) {
+    if (!this.geo.validateCoordinates(lat, lng))
       throw new Error('Invalid coordinates');
-    }
-
-    // Check service area
-    if (!this.geo.isWithinServiceArea(lat, lng)) {
-      throw new Error('Location outside service area');
-    }
+    if (!this.geo.isWithinServiceArea(lat, lng))
+      throw new Error('Outside service area');
 
     const hexId = this.geo.latLngToHex(lat, lng);
     const timestamp = Date.now();
 
-    // Execute atomic script
     const result = await this.redis
       .getClient()
       .eval(ATOMIC_SET_ONLINE, 0, driverId, hexId);
+    if (result !== 1) return;
 
-    if (result === 1) {
-      // Update location and last seen
-      await Promise.all([
-        this.redis
-          .getClient()
-          .set(`driver:${driverId}:location`, JSON.stringify({ lat, lng })),
-        this.redis.updateLastSeen(driverId),
-      ]);
+    await this.redis
+      .getClient()
+      .set(`driver:${driverId}:location`, JSON.stringify({ lat, lng }));
+    await this.redis.updateLastSeen(driverId);
+    await this.redis.addDriverToGeoIndex(driverId, lat, lng);
 
-      // Add to geo index (fallback)
-      await this.redis.addDriverToGeoIndex(driverId, lat, lng);
-
-      this.logger.log(`✅ Driver ${driverId} is now ONLINE at hex ${hexId}`);
-
-      // Emit event
-      this.eventBus.emitDriverOnline({
-        driverId,
-        lat,
-        lng,
-        hexId,
-        timestamp,
-      });
-    }
+    this.eventBus.emitDriverOnline({ driverId, lat, lng, hexId, timestamp });
   }
 
-  /**
-   * Set driver offline
-   *
-   * Atomically sets driver to OFFLINE and removes from all indexes.
-   * Fails if driver has active trip.
-   */
   async setOffline(driverId: string, reason?: string): Promise<void> {
-    // Execute atomic script
     const result = await this.redis
       .getClient()
       .eval(ATOMIC_SET_OFFLINE, 0, driverId);
+    if (result === 0) throw new Error('Active job prevents offline');
 
-    if (result === 0) {
-      throw new Error('Cannot go offline: driver has active trip');
-    }
-
-    // Remove from geo index
     await this.redis.removeDriverFromGeoIndex(driverId);
 
-    this.logger.log(`✅ Driver ${driverId} is now OFFLINE`);
-
-    // Emit event
     this.eventBus.emitDriverOffline({
       driverId,
       reason,
@@ -114,10 +84,13 @@ export class DriverStateService {
     });
   }
 
-  // ========================================
-  // LOCATION UPDATES
-  // ========================================
+  /* ============================================================
+     LOCATION UPDATES
+  ============================================================ */
+  async updateLocation(driverId: string, lat: number, lng: number) {
+    if (!this.geo.validateCoordinates(lat, lng)) return;
 
+    const hexId = this.geo.latLngToHex(lat, lng);
   /**
    * Update driver location (heartbeat)
    *
@@ -128,6 +101,7 @@ export class DriverStateService {
     driverId: string,
     lat: number,
     lng: number,
+    heading: number = 0, // <--- Added heading parameter
   ): Promise<void> {
     // Validate coordinates
     if (!this.geo.validateCoordinates(lat, lng)) {
@@ -137,7 +111,6 @@ export class DriverStateService {
     const newHexId = this.geo.latLngToHex(lat, lng);
     const timestamp = Date.now();
 
-    // Execute atomic script
     const result = await this.redis
       .getClient()
       .eval(
@@ -146,98 +119,61 @@ export class DriverStateService {
         driverId,
         lat.toString(),
         lng.toString(),
-        newHexId,
+        hexId,
         timestamp.toString(),
       );
 
-    if (result === -1) {
-      // Driver not online - ignore silently or throw error
-      this.logger.warn(
-        `Driver ${driverId} location update rejected: not online`,
-      );
-      return;
-    }
+    if (result === -1) return;
 
-    // Update geo index
     await this.redis.addDriverToGeoIndex(driverId, lat, lng);
 
-    const hexChanged = result === 1;
-    const oldHexId = hexChanged ? undefined : newHexId;
-
-    this.logger.debug(
-      `📍 Driver ${driverId} location updated (hex: ${newHexId}, changed: ${hexChanged})`,
-    );
-
-    // Emit event
     this.eventBus.emitDriverLocationUpdated({
       driverId,
       lat,
       lng,
-      hexId: newHexId,
-      oldHexId,
-      hexChanged,
+      hexId,
+      hexChanged: result === 1,
       timestamp,
+    };
+
+    // 1. Emit to System Event Bus (existing logic)
+    this.eventBus.emitDriverLocationUpdated(eventPayload);
+
+    // 2. Emit to Real-Time Socket Listener (FIX for Task 4)
+    // This bridges the gap to the DriverLocationListener
+    this.eventEmitter.emitAsync(DRIVER_EVENTS.LOCATION_UPDATED, eventPayload);
+  }
+
+  /* ============================================================
+     JOB ASSIGNMENT (RIDE ONLY)
+  ============================================================ */
+  async acceptJob(driverId: string, job: RideJob) {
+    this.assertRideJob(job);
+
+    const result = await this.redis
+      .getClient()
+      .eval(ATOMIC_ACCEPT_TRIP, 0, driverId, JobType.RIDE, job.jobId);
+
+    if (result === 0) throw new Error('No pending ride job');
+
+    this.eventBus.emitJobUpdated({
+      jobId: job.jobId,
+      jobType: 'ride',
+      status: 'accepted',
+      driverId,
+      timestamp: Date.now(),
     });
   }
 
-  // ========================================
-  // TRIP ASSIGNMENT
-  // ========================================
-
-  /**
-   * Accept trip assignment
-   *
-   * Atomically transitions driver from pending assignment to ACTIVE.
-   */
-  async acceptTrip(
+  async declineJob(
     driverId: string,
-    tripType: TripType,
-    tripId: string,
-  ): Promise<void> {
-    const result = await this.redis
-      .getClient()
-      .eval(ATOMIC_ACCEPT_TRIP, 0, driverId, tripType, tripId);
-
-    if (result === 0) {
-      throw new Error('No pending assignment or trip mismatch');
-    }
-
-    this.logger.log(`✅ Driver ${driverId} accepted ${tripType} ${tripId}`);
-
-    // Emit event
-    if (tripType === TripType.RIDE) {
-      this.eventBus.emitRideAccepted({
-        rideId: tripId,
-        driverId,
-        customerId: '', // Will be filled by caller
-        acceptedAt: Date.now(),
-      });
-    } else {
-      this.eventBus.emitDeliveryAccepted({
-        deliveryId: tripId,
-        driverId,
-        customerId: '',
-        acceptedAt: Date.now(),
-      });
-    }
-  }
-
-  /**
-   * Decline trip assignment
-   *
-   * Atomically reverts driver to ONLINE and re-adds to hex index.
-   * Adds driver to declined list for this trip.
-   */
-  async declineTrip(
-    driverId: string,
-    tripType: TripType,
-    tripId: string,
+    job: RideJob,
     reason?: string,
   ): Promise<void> {
+    this.assertRideJob(job);
+
     const state = await this.redis.getDriverState(driverId);
-    if (!state || !state.hexId) {
-      throw new Error('Driver state not found');
-    }
+    if (!state?.hexId) throw new Error('Driver state missing');
 
     const result = await this.redis
       .getClient()
@@ -245,53 +181,29 @@ export class DriverStateService {
         ATOMIC_DECLINE_TRIP,
         0,
         driverId,
-        tripType,
-        tripId,
+        JobType.RIDE,
+        job.jobId,
         state.hexId,
         REDIS_TTL.DECLINED_DRIVERS.toString(),
       );
 
-    if (result === 0) {
-      throw new Error('No pending assignment or trip mismatch');
-    }
+    if (result === 0) throw new Error('No pending ride job');
 
-    this.logger.log(`❌ Driver ${driverId} declined ${tripType} ${tripId}`);
-
-    // Emit event
-    if (tripType === TripType.RIDE) {
-      this.eventBus.emitRideDeclined({
-        rideId: tripId,
-        driverId,
-        reason,
-        declinedAt: Date.now(),
-      });
-    } else {
-      this.eventBus.emitDeliveryDeclined({
-        deliveryId: tripId,
-        driverId,
-        reason,
-        declinedAt: Date.now(),
-      });
-    }
+    this.eventBus.emitJobCancelled({
+      jobId: job.jobId,
+      jobType: 'ride',
+      driverId,
+      reason,
+      cancelledBy: 'driver',
+      timestamp: Date.now(),
+    });
   }
 
-  /**
-   * Handle assignment timeout
-   *
-   * Same as decline, but triggered by timeout job.
-   */
-  async handleAssignmentTimeout(
-    driverId: string,
-    tripType: TripType,
-    tripId: string,
-  ): Promise<void> {
+  async handleAssignmentTimeout(driverId: string, job: RideJob) {
+    this.assertRideJob(job);
+
     const state = await this.redis.getDriverState(driverId);
-    if (!state || !state.hexId) {
-      this.logger.warn(
-        `Cannot timeout ${tripType} ${tripId}: driver ${driverId} state not found`,
-      );
-      return;
-    }
+    if (!state?.hexId) return;
 
     const result = await this.redis
       .getClient()
@@ -299,140 +211,78 @@ export class DriverStateService {
         ATOMIC_DECLINE_TRIP,
         0,
         driverId,
-        tripType,
-        tripId,
+        JobType.RIDE,
+        job.jobId,
         state.hexId,
         REDIS_TTL.DECLINED_DRIVERS.toString(),
       );
 
-    if (result === 0) {
-      // Assignment already handled (accepted or declined)
-      this.logger.debug(
-        `Timeout ignored: ${tripType} ${tripId} already handled`,
-      );
-      return;
-    }
+    if (result === 0) return;
 
-    this.logger.warn(
-      `⏱️  Driver ${driverId} assignment timeout for ${tripType} ${tripId}`,
-    );
-
-    // Emit timeout event
-    if (tripType === TripType.RIDE) {
-      this.eventBus.emitRideTimeout({
-        rideId: tripId,
-        driverId,
-        timeoutAt: Date.now(),
-      });
-    } else {
-      this.eventBus.emitDeliveryTimeout({
-        deliveryId: tripId,
-        driverId,
-        timeoutAt: Date.now(),
-      });
-    }
+    this.eventBus.emitJobUpdated({
+      jobId: job.jobId,
+      jobType: 'ride',
+      status: 'timeout',
+      driverId,
+      timestamp: Date.now(),
+    });
   }
 
-  // ========================================
-  // TRIP COMPLETION
-  // ========================================
+  /* ============================================================
+     JOB COMPLETION
+  ============================================================ */
+  async completeJob(driverId: string, job: RideJob): Promise<void> {
+    this.assertRideJob(job);
 
-  /**
-   * Complete trip
-   *
-   * Atomically sets driver back to ONLINE and re-adds to hex index.
-   */
-  async completeTrip(
-    driverId: string,
-    tripType: TripType,
-    tripId: string,
-  ): Promise<void> {
     const state = await this.redis.getDriverState(driverId);
-    if (!state || !state.hexId) {
-      throw new Error('Driver state not found');
-    }
+    if (!state?.hexId) throw new Error('Driver state missing');
 
     const result = await this.redis
       .getClient()
-      .eval(ATOMIC_COMPLETE_TRIP, 0, driverId, tripType, tripId, state.hexId);
+      .eval(
+        ATOMIC_COMPLETE_TRIP,
+        0,
+        driverId,
+        JobType.RIDE,
+        job.jobId,
+        state.hexId,
+      );
 
-    if (result === 0) {
-      throw new Error('No active trip or trip mismatch');
-    }
+    if (result === 0) throw new Error('No active ride job');
 
-    this.logger.log(`✅ Driver ${driverId} completed ${tripType} ${tripId}`);
+    const timestamp = Date.now();
+
+    // Emit job completion event
+    this.eventBus.emitJobUpdated({
+      jobId: job.jobId,
+      jobType: 'ride',
+      status: 'completed',
+      driverId,
+      timestamp,
+    });
 
     // Emit driver available event
     this.eventBus.emitDriverAvailable({
       driverId,
       hexId: state.hexId,
-      lat: state.location?.lat || 0,
-      lng: state.location?.lng || 0,
-      reason: 'trip_completed',
-      timestamp: Date.now(),
+      lat: state.location?.lat ?? 0,
+      lng: state.location?.lng ?? 0,
+      reason: 'job_completed',
+      timestamp,
     });
   }
 
-  /**
-   * Cancel trip (make driver available again)
-   */
-  async cancelTrip(
-    driverId: string,
-    tripType: TripType,
-    tripId: string,
-  ): Promise<void> {
-    // Same as complete trip for driver state
-    await this.completeTrip(driverId, tripType, tripId);
-  }
-
-  // ========================================
-  // STATE QUERIES
-  // ========================================
-
-  /**
-   * Get driver current state
-   */
-  async getDriverState(driverId: string) {
-    return this.redis.getDriverState(driverId);
-  }
-
-  /**
-   * Get driver status
-   */
-  async getDriverStatus(driverId: string): Promise<DriverStatus | null> {
-    return this.redis.getDriverStatus(driverId);
-  }
-
-  /**
-   * Check if driver is available for matching
-   *
-   * Driver is available if:
-   * - Status is ONLINE
-   * - No pending assignments
-   * - No active trips
-   */
+  /* ============================================================
+     QUERIES
+  ============================================================ */
   async isDriverAvailable(driverId: string): Promise<boolean> {
     const state = await this.redis.getDriverState(driverId);
-
     if (!state) return false;
-    if (state.status !== DriverStatus.ONLINE) return false;
-    if (state.pendingRide || state.pendingDelivery) return false;
-    if (state.currentRide || state.currentDelivery) return false;
 
-    return true;
-  }
-
-  /**
-   * Get all drivers in a hex
-   */
-  async getDriversInHex(hexId: string): Promise<string[]> {
-    return this.redis.getDriversInHex(hexId);
-  }
-
-  /**
-   * Get driver count in hex
-   */
-  async getHexDriverCount(hexId: string): Promise<number> {
-    return this.redis.getHexDriverCount(hexId);
+    return (
+      state.status === DriverStatus.ONLINE &&
+      !state.pendingJobId &&
+      !state.currentJobId
+    );
   }
 }

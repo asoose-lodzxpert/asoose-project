@@ -9,7 +9,11 @@ import { ThemedText } from "@/components/themed-text";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { toastConfig } from "@/components/ThemedToast";
 import Toast from "react-native-toast-message";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import {
+  checkStartupPermissions,
+  requestStartupPermissions,
+} from "@/utils/permissions";
 
 function LoadingScreen() {
   const dot1 = useRef(new Animated.Value(0)).current;
@@ -32,7 +36,7 @@ function LoadingScreen() {
               duration: 400,
               useNativeDriver: true,
             }),
-          ])
+          ]),
         ),
       ]);
     };
@@ -76,19 +80,33 @@ function RootNavigator() {
     return <LoadingScreen />;
   }
 
-  return (
-    <GestureHandlerRootView>
-      <Stack screenOptions={{ headerShown: false }}>
-        {!user ? (
+  if (!user) {
+    return (
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="(auth)" />
-        ) : user.status === "PENDING" ? (
+        </Stack>
+      </GestureHandlerRootView>
+    );
+  }
+
+  const status = user.status?.trim().toUpperCase() ?? "";
+
+  return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <Stack screenOptions={{ headerShown: false }}>
+        {status === "PENDING" ? (
           <Stack.Screen name="(status)/pending" />
-        ) : user.status === "SUSPENDED" ? (
+        ) : status === "SUSPENDED" ? (
           <Stack.Screen name="(status)/suspended" />
-        ) : user.status === "BANNED" ? (
+        ) : status === "CLOSED_PERMANENTLY" ? (
+          <Stack.Screen name="(status)/closed-permanently" />
+        ) : status === "BANNED" ? (
           <Stack.Screen name="(status)/banned" />
-        ) : (
+        ) : status === "ACTIVE" ? (
           <Stack.Screen name="(main)" />
+        ) : (
+          <Stack.Screen name="(auth)" />
         )}
       </Stack>
     </GestureHandlerRootView>
@@ -96,6 +114,32 @@ function RootNavigator() {
 }
 
 export default function RootLayout() {
+  const [permissionsReady, setPermissionsReady] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const initPermissions = async () => {
+      try {
+        await requestStartupPermissions();
+        await checkStartupPermissions();
+      } catch (e) {
+        console.warn("Startup permission check failed:", e);
+      } finally {
+        if (mounted) setPermissionsReady(true);
+      }
+    };
+
+    initPermissions();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  if (!permissionsReady) {
+    return <LoadingScreen />;
+  }
   return (
     <ErrorBoundary>
       <AuthProvider>

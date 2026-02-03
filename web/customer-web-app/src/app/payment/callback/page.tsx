@@ -1,66 +1,102 @@
 'use client';
 
-import { useEffect, Suspense } from 'react';
+import { useEffect, useRef, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'react-toastify';
+import { useSession } from 'next-auth/react';
 import { useCartStore } from '@/store/useCartStore';
-import { useDeliveryStore } from '@/app/main/store/useDeliveryStore';
+import { useDeliveryStore } from '@/store/useDeliveryStore';
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
 function CallbackContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { clearCart } = useCartStore();
-  const { resetDelivery } = useDeliveryStore();
+  const { resetDelivery } = useDeliveryStore(); // We still need this for 'reset' logic elsewhere, but not for success
+  
+  const { data: session } = useSession();
+  const processedRef = useRef(false);
 
   useEffect(() => {
-    const status = searchParams.get('status');
-    const reference = searchParams.get('reference');
-    // Note: Backend might not pass order_id/ride_id in query params, 
-    // so we rely on the status and last known state or redirect to a dashboard.
+    if (processedRef.current) return;
     
-    const handleCompletion = async () => {
-      if (status === 'SUCCESS' || status === 'successful') {
-        toast.success('Payment Successful!');
-        
-        // Cleanup stores based on context (local storage checks can be added here)
-        // For now, we clear the cart as a safety measure if coming from checkout
-        if (localStorage.getItem('pending_checkout')) {
-            clearCart();
-            localStorage.removeItem('pending_checkout');
-            const orderId = localStorage.getItem('last_order_id');
-            router.push(orderId ? `/main/orders/${orderId}` : '/main/orders');
-            return;
+    if (!session) return; 
+
+    const reference = searchParams.get('reference');
+
+    if (!reference) {
+       toast.error('Invalid Payment Reference');
+       router.replace('/main/checkout');
+       return;
+    }
+
+    const verifyAndComplete = async () => {
+      processedRef.current = true; 
+
+      try {
+        await useCartStore.persist.rehydrate();
+        await useDeliveryStore.persist.rehydrate();
+
+        const res = await fetch(`${API_URL}/payment/verify?reference=${reference}&gateway=PAYSTACK`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${session.accessToken || (session.user as any).accessToken}`
+            }
+        });
+
+        if (!res.ok) {
+            const errData = await res.json();
+            throw new Error(errData.message || 'Verification failed');
         }
 
-        if (localStorage.getItem('pending_ride')) {
-            localStorage.removeItem('pending_ride');
-            router.push('/main/ride');
-            return;
+        const data = await res.json();
+
+        if (data.status === 'SUCCESS' || data.data?.status === 'SUCCESS' || data.status === 'COMPLETED') {
+            toast.success('Payment Verified & Completed');
+
+            const isCheckout = localStorage.getItem('pending_checkout');
+            const isRide = localStorage.getItem('pending_ride');
+            const isDelivery = localStorage.getItem('pending_delivery');
+
+            if (isCheckout) {
+                clearCart();
+                localStorage.removeItem('pending_checkout');
+                const orderId = localStorage.getItem('last_order_id');
+                router.replace(orderId ? `/main/orders/confirmed?id=${orderId}` : '/main/orders');
+            } else if (isRide) {
+                localStorage.removeItem('pending_ride');
+                router.replace('/main/ride');
+            } else if (isDelivery) {
+                // 🛑 CRITICAL FIX: Removed resetDelivery() 
+                // We MUST keep the store state so the main page can track the delivery
+                localStorage.removeItem('pending_delivery');
+                router.replace('/main/delivery');
+            } else {
+                router.replace('/dashboard');
+            }
+
+        } else {
+            throw new Error('Payment not successful');
         }
 
-        if (localStorage.getItem('pending_delivery')) {
-            resetDelivery();
-            localStorage.removeItem('pending_delivery');
-            router.push('/main/delivery');
-            return;
-        }
-
-        router.push('/dashboard');
-      } else {
-        toast.error('Payment Failed or Cancelled');
-        router.back();
+      } catch (error) {
+        console.error('Payment verification error:', error);
+        toast.error('Payment verification failed.');
+        router.replace('/main/checkout');
       }
     };
 
-    handleCompletion();
-  }, [searchParams, router, clearCart, resetDelivery]);
+    verifyAndComplete();
+  }, [searchParams, router, clearCart, resetDelivery, session]);
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-[#0a0a0a]">
       <Loader2 className="w-10 h-10 animate-spin text-yellow-500 mb-4" />
-      <h2 className="text-xl font-bold text-gray-900 dark:text-white">Verifying Transaction...</h2>
-      <p className="text-gray-500">Please do not close this window.</p>
+      <h2 className="text-xl font-bold text-gray-900 dark:text-white">Securely Verifying Payment...</h2>
+      <p className="text-gray-500">Do not close this window.</p>
     </div>
   );
 }

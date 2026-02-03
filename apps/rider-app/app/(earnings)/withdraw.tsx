@@ -49,7 +49,7 @@ const SkeletonBox = ({
           duration: 800,
           useNativeDriver: true,
         }),
-      ])
+      ]),
     );
     animation.start();
     return () => animation.stop();
@@ -84,21 +84,27 @@ export default function WithdrawEarningsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [withdrawing, setWithdrawing] = useState(false);
-  const [accountModalLoading, setAccountModalLoading] = useState(false);
 
   const [amountDisplay, setAmountDisplay] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const [withdrawalInfo, setWithdrawalInfo] = useState<WithdrawalInfo | null>(
-    null
+    null,
   );
   const [account, setAccount] = useState<BankAccountInfo | null>(null);
   const [accountModal, setAccountModal] = useState(false);
   const [successModal, setSuccessModal] = useState(false);
 
   // Load withdrawal info
+
   useEffect(() => {
-    loadWithdrawalInfo();
+    (async () => {
+      try {
+        await loadWithdrawalInfo();
+      } catch (err) {
+        console.error("Error in initial withdrawal info load:", err);
+      }
+    })();
   }, []);
 
   const loadWithdrawalInfo = async () => {
@@ -111,6 +117,7 @@ export default function WithdrawEarningsScreen() {
       }
     } catch (err) {
       console.error("Error loading withdrawal info:", err);
+      setError("Failed to load withdrawal info. Please try again later.");
     } finally {
       setLoading(false);
     }
@@ -139,7 +146,7 @@ export default function WithdrawEarningsScreen() {
       setError(null);
     } else if (numericAmount < withdrawalInfo.minWithdrawal) {
       setError(
-        `Minimum withdrawal is ₦${withdrawalInfo.minWithdrawal.toLocaleString()}`
+        `Minimum withdrawal is ₦${withdrawalInfo.minWithdrawal.toLocaleString()}`,
       );
     } else if (numericAmount > withdrawalInfo.balance) {
       setError("Amount exceeds available balance");
@@ -174,7 +181,8 @@ export default function WithdrawEarningsScreen() {
       setSuccessModal(true);
       setAmountDisplay("");
     } catch (err: any) {
-      setError(err.message || "Failed to process withdrawal");
+      console.error("Error processing withdrawal:", err);
+      setError(err?.message || "Failed to process withdrawal");
     } finally {
       setWithdrawing(false);
     }
@@ -189,14 +197,17 @@ export default function WithdrawEarningsScreen() {
   if (loading) {
     return (
       <ThemedView style={{ flex: 1, backgroundColor: surface }}>
+        {/* Header and Back Button always visible */}
+        <View style={[styles.headerRow, { marginBottom: 24 }]}>
+          <Pressable style={styles.headerBackBtn} onPress={() => router.back()}>
+            <IconSymbol name="chevron.left" size={18} color={primary} />
+            <ThemedText type="link">Back</ThemedText>
+          </Pressable>
+          <ThemedText type="subtitle" style={styles.headerTitle}>
+            Withdraw Earnings
+          </ThemedText>
+        </View>
         <ScrollView contentContainerStyle={styles.scrollContent}>
-          {/* Header Skeleton */}
-          <View style={styles.backRow}>
-            <SkeletonBox width={80} height={20} />
-          </View>
-
-          <SkeletonBox width={200} height={32} style={{ marginBottom: 24 }} />
-
           {/* Balance Card Skeleton */}
           <View style={[styles.balanceCard, { backgroundColor: cardBg }]}>
             <SkeletonBox
@@ -275,6 +286,7 @@ export default function WithdrawEarningsScreen() {
         <ThemedText style={{ color: muted, marginTop: 8 }}>
           Please add a bank account to withdraw
         </ThemedText>
+        {error && <ThemedText style={styles.error}>{error}</ThemedText>}
       </ThemedView>
     );
   }
@@ -291,15 +303,16 @@ export default function WithdrawEarningsScreen() {
           />
         }
       >
-        {/* Header */}
-        <Pressable style={styles.backRow} onPress={() => router.back()}>
-          <IconSymbol name="chevron.left" size={18} color={primary} />
-          <ThemedText type="link">Back</ThemedText>
-        </Pressable>
-
-        <ThemedText type="title" style={styles.pageTitle}>
-          Withdraw Earnings
-        </ThemedText>
+        {/* Header and Back Button in Same Row */}
+        <View style={[styles.headerRow, { marginBottom: 24 }]}>
+          <Pressable style={styles.headerBackBtn} onPress={() => router.back()}>
+            <IconSymbol name="chevron.left" size={18} color={primary} />
+            <ThemedText type="link">Back</ThemedText>
+          </Pressable>
+          <ThemedText type="subtitle" style={styles.headerTitle}>
+            Withdraw Earnings
+          </ThemedText>
+        </View>
 
         {/* Balance Card - Centered */}
         <View style={[styles.balanceCard, { backgroundColor: cardBg }]}>
@@ -310,7 +323,9 @@ export default function WithdrawEarningsScreen() {
             ₦{withdrawalInfo.balance.toLocaleString()}
           </ThemedText>
           <ThemedText style={{ color: primary, textAlign: "center" }}>
-            Ready to withdraw
+            {withdrawalInfo.balance >= withdrawalInfo.minWithdrawal
+              ? "Ready to withdraw"
+              : `Minimum withdrawal is ₦${withdrawalInfo.minWithdrawal.toLocaleString()}`}
           </ThemedText>
         </View>
 
@@ -478,6 +493,30 @@ function QuickButton({
 /* ---------------------------------- */
 
 const styles = StyleSheet.create({
+  headerRow: {
+    position: "relative",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    width: "100%",
+    minHeight: 40,
+  },
+  headerBackBtn: {
+    position: "absolute",
+    left: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    height: 40,
+    paddingRight: 12,
+    zIndex: 2,
+  },
+  headerTitle: {
+    flex: 1,
+    textAlign: "center",
+    marginTop: 8,
+    marginBottom: 20,
+  },
   scrollContent: {
     flexGrow: 1,
     padding: 20,

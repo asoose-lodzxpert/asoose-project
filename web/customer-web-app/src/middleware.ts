@@ -1,92 +1,69 @@
-import { NextResponse, type NextRequest } from "next/server";
-import { auth } from "@/auth";
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
+import { getToken } from 'next-auth/jwt'; 
 
-// Authorized administrative roles for bypass
-const ADMIN_ROLES = [
-  "SUPER_ADMIN",
-  "ADMIN_MANAGER",
-  "ADMIN_SUPPORT",
-  "ADMIN_FINANCE",
-];
+const ADMIN_ROLES = ['SUPER_ADMIN', 'ADMIN_MANAGER', 'ADMIN_SUPPORT', 'ADMIN_FINANCE'];
 
-// Public routes that don't require authentication
-const PUBLIC_ROUTES = ["/sign-in", "/sign-up", "/forgot-password", "/"];
+export async function middleware(req: NextRequest) {
+  const url = req.nextUrl;
 
-export async function middleware(request: NextRequest) {
-  const url = request.nextUrl.clone();
-
-  // 1. PERFORMANCE: Skip static assets and internal Next.js files immediately
+  // 1. Skip Static Files & API
   if (
-    url.pathname.startsWith("/_next") ||
-    url.pathname.includes(".") ||
-    url.pathname.startsWith("/api")
+    url.pathname.startsWith('/_next') || 
+    url.pathname.includes('.') || 
+    url.pathname.startsWith('/api')
   ) {
     return NextResponse.next();
   }
 
-  // 2. Allow public routes
-  if (PUBLIC_ROUTES.some((route) => url.pathname.startsWith(route))) {
-    return NextResponse.next();
-  }
+  // 2. Get User Session (NextAuth v4)
+  // Utilizes the NextAuth secret to retrieve the JWT token containing user data like role
+  const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
+  const isLoggedIn = !!token;
+  const userRole = token?.role as string | undefined;
 
-  // 3. Check authentication
-  const session = await auth();
-
-  if (!session) {
-    const signInUrl = new URL("/sign-in", request.url);
-    signInUrl.searchParams.set("callbackUrl", url.pathname);
-    return NextResponse.redirect(signInUrl);
-  }
-
-  // 4. Check maintenance mode via backend API
-  const API_URL =
-    process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1";
+  // 3. Check Maintenance Mode (Fetch from NestJS Backend)
   let isMaintenanceActive = false;
-
+  
   try {
-    const response = await fetch(
-      `${API_URL}/system/settings/maintenance_mode`,
-      {
-        headers: {
-          Authorization: `Bearer ${session.accessToken}`,
-        },
-      },
-    );
-
-    if (response.ok) {
-      const data = await response.json();
-      isMaintenanceActive = data.value === "true";
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/settings/maintenance-mode`, {
+      next: { revalidate: 60 }, 
+    });
+    
+    if (res.ok) {
+      const data = await res.json();
+      isMaintenanceActive = data.isEnabled === true; 
     }
   } catch (error) {
-    console.error("Failed to fetch maintenance mode:", error);
+    console.error("Middleware fetch error:", error);
   }
 
-  // 5. Check if user is admin
-  const isAdmin = session.user.role && ADMIN_ROLES.includes(session.user.role);
-  const isMaintenancePage = url.pathname === "/maintenance";
+  // Checks if the logged-in user possesses an authorized admin role
+  const isAdmin = isLoggedIn && userRole && ADMIN_ROLES.includes(userRole);
 
-  // --- TERMINAL LOGGING (View this in your VS Code terminal) ---
-  console.log(
-    `🛡️ Middleware Running: ${url.pathname} | Maint Active: ${isMaintenanceActive} | Is Admin: ${isAdmin}`,
-  );
-
-  // 6. MAINTENANCE REDIRECTION LOGIC
-  if (isMaintenanceActive && !isAdmin && !isMaintenancePage) {
-    console.log("🚀 REDIRECTING GUEST TO MAINTENANCE PAGE");
-    return NextResponse.redirect(new URL("/maintenance", request.url));
+  // 4. Redirect Logic
+  
+  // Maintenance Redirect
+  if (isMaintenanceActive && !isAdmin && url.pathname !== '/maintenance') {
+    return NextResponse.redirect(new URL('/maintenance', req.url));
   }
 
-  // 7. PROTECT ADMIN ROUTES
-  if (url.pathname.startsWith("/super-admin")) {
-    if (!isAdmin) {
-      return NextResponse.redirect(new URL("/store", request.url));
-    }
+  // Admin Route Protection
+  if (url.pathname.startsWith('/super-admin')) {
+    if (!isLoggedIn) return NextResponse.redirect(new URL('/sign-in', req.url));
+    if (!isAdmin) return NextResponse.redirect(new URL('/main/store', req.url));
+  }
+
+  // Auth Page Redirect
+  if (isLoggedIn && (url.pathname === '/sign-in' || url.pathname === '/sign-up')) {
+    // FIX: Dynamically redirect based on the user's role instead of hardcoding /main/store
+    const target = isAdmin ? '/super-admin' : '/main/store';
+    return NextResponse.redirect(new URL(target, req.url));
   }
 
   return NextResponse.next();
 }
 
 export const config = {
-  // Matches all routes except APIs and static files
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
+  matcher: ['/((?!api|_next/static|_next/image|favicon.ico).*)'],
 };

@@ -42,7 +42,6 @@ export class QueueService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
-    // Setup recurring jobs
     await this.setupRecurringJobs();
     this.logger.log('✅ Queue service initialized');
   }
@@ -51,18 +50,15 @@ export class QueueService implements OnModuleInit {
   // RIDE MATCHING QUEUE
   // ========================================
 
-  /**
-   * Enqueue a ride matching job
-   */
   async enqueueRideMatching(data: MatchRideJobData) {
     const job = await this.rideMatchingQueue.add(JOB_TYPES.MATCH_RIDE, data, {
       ...QUEUE_OPTIONS.rideMatching,
-      jobId: `ride-${data.rideId}-attempt-${data.attempt}`,
+      jobId: `ride-${data.job.id}-attempt-${data.attempt}`,
       priority: this.calculatePriority(data.attempt),
     });
 
     this.logger.log(
-      `Enqueued ride matching: ${data.rideId} (attempt ${data.attempt})`,
+      `Enqueued ride matching: ${data.job.id} (attempt ${data.attempt})`,
     );
     return job;
   }
@@ -71,22 +67,19 @@ export class QueueService implements OnModuleInit {
   // DELIVERY MATCHING QUEUE
   // ========================================
 
-  /**
-   * Enqueue a delivery matching job
-   */
   async enqueueDeliveryMatching(data: MatchDeliveryJobData) {
     const job = await this.deliveryMatchingQueue.add(
       JOB_TYPES.MATCH_DELIVERY,
       data,
       {
         ...QUEUE_OPTIONS.deliveryMatching,
-        jobId: `delivery-${data.deliveryId}-attempt-${data.attempt}`,
+        jobId: `delivery-${data.job.id}-attempt-${data.attempt}`,
         priority: this.calculatePriority(data.attempt),
       },
     );
 
     this.logger.log(
-      `Enqueued delivery matching: ${data.deliveryId} (attempt ${data.attempt})`,
+      `Enqueued delivery matching: ${data.job.id} (attempt ${data.attempt})`,
     );
     return job;
   }
@@ -95,9 +88,6 @@ export class QueueService implements OnModuleInit {
   // NOTIFICATION QUEUE
   // ========================================
 
-  /**
-   * Enqueue push notification
-   */
   async enqueuePushNotification(data: SendPushNotificationJobData) {
     const job = await this.notificationQueue.add(
       JOB_TYPES.SEND_PUSH_NOTIFICATION,
@@ -112,9 +102,6 @@ export class QueueService implements OnModuleInit {
     return job;
   }
 
-  /**
-   * Enqueue SMS notification
-   */
   async enqueueSMS(data: SendSMSJobData) {
     const job = await this.notificationQueue.add(
       JOB_TYPES.SEND_SMS,
@@ -130,9 +117,6 @@ export class QueueService implements OnModuleInit {
   // ASSIGNMENT TIMEOUT QUEUE
   // ========================================
 
-  /**
-   * Schedule assignment timeout handler (delayed job)
-   */
   async scheduleAssignmentTimeout(
     data: HandleAssignmentTimeoutJobData,
     delayMs: number,
@@ -143,30 +127,23 @@ export class QueueService implements OnModuleInit {
       {
         ...QUEUE_OPTIONS.assignmentTimeout,
         delay: delayMs,
-        jobId: `timeout-${data.tripType}-${data.tripId}-${data.driverId}`,
+        jobId: `timeout-${data.job.jobType}-${data.job.id}-${data.job.id}`,
       },
     );
 
     this.logger.debug(
-      `Scheduled timeout for ${data.tripType} ${data.tripId} in ${delayMs}ms`,
+      `Scheduled timeout for ${data.job.jobType} ${data.job.id} in ${delayMs}ms`,
     );
     return job;
   }
 
-  /**
-   * Cancel scheduled assignment timeout
-   */
-  async cancelAssignmentTimeout(
-    tripType: 'ride' | 'delivery',
-    tripId: string,
-    driverId: string,
-  ) {
-    const jobId = `timeout-${tripType}-${tripId}-${driverId}`;
-    const job = await this.assignmentTimeoutQueue.getJob(jobId);
+  async cancelAssignmentTimeout(jobType: 'ride' | 'delivery', jobId: string) {
+    const jobKey = `timeout-${jobType}-${jobId}-${jobId}`;
+    const job = await this.assignmentTimeoutQueue.getJob(jobKey);
 
     if (job) {
       await job.remove();
-      this.logger.debug(`Cancelled timeout for ${tripType} ${tripId}`);
+      this.logger.debug(`Cancelled timeout for ${jobType} ${jobId}`);
       return true;
     }
 
@@ -178,15 +155,12 @@ export class QueueService implements OnModuleInit {
   // ========================================
 
   private async setupRecurringJobs() {
-    // Setup inactivity check recurring job
     await this.driverInactivityQueue.add(
       JOB_TYPES.CHECK_INACTIVITY,
       { scheduledAt: Date.now() } as CheckInactivityJobData,
       {
         ...QUEUE_OPTIONS.inactivityCheck,
-        repeat: {
-          pattern: REPEAT_SCHEDULES.INACTIVITY_CHECK.pattern,
-        },
+        repeat: { pattern: REPEAT_SCHEDULES.INACTIVITY_CHECK.pattern },
         jobId: REPEAT_SCHEDULES.INACTIVITY_CHECK.jobId,
       },
     );
@@ -198,31 +172,8 @@ export class QueueService implements OnModuleInit {
   // QUEUE MANAGEMENT
   // ========================================
 
-  /**
-   * Get queue statistics
-   */
   async getQueueStats(queueName: string) {
-    let queue: Queue;
-
-    switch (queueName) {
-      case QUEUE_NAMES.RIDE_MATCHING:
-        queue = this.rideMatchingQueue;
-        break;
-      case QUEUE_NAMES.DELIVERY_MATCHING:
-        queue = this.deliveryMatchingQueue;
-        break;
-      case QUEUE_NAMES.DRIVER_INACTIVITY:
-        queue = this.driverInactivityQueue;
-        break;
-      case QUEUE_NAMES.NOTIFICATION:
-        queue = this.notificationQueue;
-        break;
-      case QUEUE_NAMES.ASSIGNMENT_TIMEOUT:
-        queue = this.assignmentTimeoutQueue;
-        break;
-      default:
-        throw new Error(`Unknown queue: ${queueName}`);
-    }
+    const queue = this.getQueue(queueName);
 
     const [waiting, active, completed, failed, delayed] = await Promise.all([
       queue.getWaitingCount(),
@@ -243,48 +194,34 @@ export class QueueService implements OnModuleInit {
     };
   }
 
-  /**
-   * Get all queues stats
-   */
   async getAllQueueStats() {
-    const stats = await Promise.all([
+    return Promise.all([
       this.getQueueStats(QUEUE_NAMES.RIDE_MATCHING),
       this.getQueueStats(QUEUE_NAMES.DELIVERY_MATCHING),
       this.getQueueStats(QUEUE_NAMES.DRIVER_INACTIVITY),
       this.getQueueStats(QUEUE_NAMES.NOTIFICATION),
       this.getQueueStats(QUEUE_NAMES.ASSIGNMENT_TIMEOUT),
     ]);
-
-    return stats;
   }
 
-  /**
-   * Pause a queue
-   */
   async pauseQueue(queueName: string) {
     const queue = this.getQueue(queueName);
     await queue.pause();
-    this.logger.warn(`⏸️  Queue paused: ${queueName}`);
+    this.logger.warn(`⏸️ Queue paused: ${queueName}`);
   }
 
-  /**
-   * Resume a queue
-   */
   async resumeQueue(queueName: string) {
     const queue = this.getQueue(queueName);
     await queue.resume();
-    this.logger.log(`▶️  Queue resumed: ${queueName}`);
+    this.logger.log(`▶️ Queue resumed: ${queueName}`);
   }
 
-  /**
-   * Clean old jobs from queue
-   */
   async cleanQueue(queueName: string, grace: number = 24 * 3600 * 1000) {
     const queue = this.getQueue(queueName);
 
     const [completedCleaned, failedCleaned] = await Promise.all([
       queue.clean(grace, 1000, 'completed'),
-      queue.clean(grace * 7, 1000, 'failed'), // Keep failed jobs longer
+      queue.clean(grace * 7, 1000, 'failed'),
     ]);
 
     this.logger.log(
@@ -319,7 +256,6 @@ export class QueueService implements OnModuleInit {
   }
 
   private calculatePriority(attempt: number): number {
-    // Higher priority for retries
-    return Math.max(1, 10 - attempt);
+    return Math.max(1, 10 - attempt); // higher priority for retries
   }
 }

@@ -1,16 +1,19 @@
-import React from "react";
-import { StyleSheet, View, Pressable, Dimensions, Switch } from "react-native";
-import { useThemeColor } from "@/hooks/use-theme-color";
 import { ThemedText } from "@/components/themed-text";
 import { IconSymbol } from "@/components/ui/icon-symbol";
-import { useDelivery } from "@/context/DeliveryContext";
+import { useJobs } from "@/context/JobContext";
+import { useThemeColor } from "@/hooks/use-theme-color";
+import React from "react";
+import { Dimensions, Pressable, StyleSheet, Switch, View } from "react-native";
+
+import { useConfirm } from "@/hooks/use-confirm";
 import { useRouter } from "expo-router";
 
 const { width } = Dimensions.get("window");
 
 export default function FloatingHeader() {
   const router = useRouter();
-  const { status, goOnline, goOffline } = useDelivery();
+  const { status, goOnline, goOffline } = useJobs();
+  const { confirm, ConfirmModal } = useConfirm();
 
   const card = useThemeColor({}, "surfaceCard");
   const border = useThemeColor({}, "borderDefault");
@@ -18,12 +21,31 @@ export default function FloatingHeader() {
   const isOnline = status !== "offline";
   const statusColor = useThemeColor(
     {},
-    isOnline ? "statusSuccess" : "statusError"
+    isOnline ? "statusSuccess" : "statusError",
   );
 
-  const handleToggle = (value: boolean) => {
-    if (value) goOnline();
-    else goOffline();
+  const handleToggle = async (value: boolean) => {
+    if (value) {
+      const ok = await confirm({
+        title: "Go Online?",
+        message:
+          "Are you sure you want to go online and start receiving orders?",
+        confirmText: "Go Online",
+        cancelText: "Cancel",
+        type: "info",
+      });
+      if (ok) goOnline();
+    } else {
+      const ok = await confirm({
+        title: "Go Offline?",
+        message:
+          "Are you sure you want to go offline and stop receiving orders?",
+        confirmText: "Go Offline",
+        cancelText: "Cancel",
+        type: "warning",
+      });
+      if (ok) goOffline();
+    }
   };
 
   const handleProfilePress = () => {
@@ -31,29 +53,32 @@ export default function FloatingHeader() {
   };
 
   return (
-    <View style={styles.wrapper} pointerEvents="box-none">
-      <View
-        style={[styles.card, { backgroundColor: card, borderColor: border }]}
-      >
-        <Pressable onPress={handleProfilePress} hitSlop={10}>
-          <IconSymbol name="person.circle" size={28} color={primary} />
-        </Pressable>
+    <>
+      <View style={styles.wrapper} pointerEvents="box-none">
+        <View
+          style={[styles.card, { backgroundColor: card, borderColor: border }]}
+        >
+          <Pressable onPress={handleProfilePress} hitSlop={10}>
+            <IconSymbol name="person.circle" size={28} color={primary} />
+          </Pressable>
 
-        {/* Centered status text */}
-        <View style={styles.statusContainer}>
-          <ThemedText style={[styles.statusText, { color: statusColor }]}>
-            {status.replace("-", " ")}
-          </ThemedText>
+          {/* Centered status text */}
+          <View style={styles.statusContainer}>
+            <ThemedText style={[styles.statusText, { color: statusColor }]}>
+              {status.replace("-", " ")}
+            </ThemedText>
+          </View>
+
+          <Switch
+            value={isOnline}
+            onValueChange={handleToggle}
+            trackColor={{ false: statusColor, true: primary }}
+            thumbColor="#fff"
+          />
         </View>
-
-        <Switch
-          value={isOnline}
-          onValueChange={handleToggle}
-          trackColor={{ false: statusColor, true: primary }}
-          thumbColor="#fff"
-        />
       </View>
-    </View>
+      <ConfirmModal />
+    </>
   );
 }
 

@@ -3,7 +3,6 @@ import {
   latLngToCell,
   cellToBoundary,
   gridDisk,
-  getResolution,
   greatCircleDistance,
 } from 'h3-js';
 

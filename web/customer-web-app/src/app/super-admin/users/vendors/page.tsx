@@ -7,15 +7,15 @@ import {
   Download, Plus, Search, Eye, Trash2, Copy, UserCheck, X, CheckCircle, AlertCircle, Filter, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { DataTable } from '@/app/super-admin/component/datatable';
-import { createColumnHelper, ColumnDef } from '@tanstack/react-table';
+import { createColumnHelper, ColumnDef, PaginationState } from '@tanstack/react-table';
 import Swal from 'sweetalert2';
 import useSWR from 'swr'; 
+import { getSession } from 'next-auth/react'; 
 import { fetcher } from '../../hooks/useSuperAdminFetch';
 import VendorManagementPageSkeleton from './component/skeleton';
 import AddVendorModal from './component/addvendorModal';
 import { FilterSelect } from './component/filterSelect';
 import { StatCard } from './component/statcard';
-import { createClient } from '../../../../../utils/supabase/client';
 
 interface Vendor {
   id: string;
@@ -60,8 +60,10 @@ export default function VendorManagementPage() {
   const [isProcessingBulk, setIsProcessingBulk] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize] = useState(20);
+  const [pagination, setPagination] = useState<PaginationState>({
+    pageIndex: 0,
+    pageSize: 20,
+  });
   
   const [searchQuery, setSearchQuery] = useState('');
   const debouncedSearch = useDebounce(searchQuery, 500);
@@ -70,22 +72,22 @@ export default function VendorManagementPage() {
   const [verificationFilter, setVerificationFilter] = useState('All');
 
   useEffect(() => {
-    setCurrentPage(1);
+    setPagination(prev => ({ ...prev, pageIndex: 0 }));
   }, [debouncedSearch, statusFilter, categoryFilter, verificationFilter]);
 
   const getAuthHeader = async () => {
-    const supabase = createClient();
-    const { data: { session } } = await supabase.auth.getSession();
+    const session = await getSession();
+    const token = (session as any)?.accessToken;
     return {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${session?.access_token || ''}`
+      'Authorization': `Bearer ${token || ''}`
     };
   };
 
   const queryString = useMemo(() => {
     const params = new URLSearchParams({
-      page: currentPage.toString(),
-      limit: pageSize.toString()
+      page: (pagination.pageIndex + 1).toString(),
+      limit: pagination.pageSize.toString()
     });
     
     if (debouncedSearch) params.set('search', debouncedSearch);
@@ -94,7 +96,7 @@ export default function VendorManagementPage() {
     if (verificationFilter !== 'All') params.set('verification', verificationFilter);
     
     return params.toString();
-  }, [currentPage, pageSize, debouncedSearch, statusFilter, categoryFilter, verificationFilter]);
+  }, [pagination, debouncedSearch, statusFilter, categoryFilter, verificationFilter]);
 
   const { 
     data: apiResponse, 
@@ -107,7 +109,16 @@ export default function VendorManagementPage() {
     { revalidateOnFocus: false }
   );
 
-  const vendors = apiResponse?.data || [];
+  // ✅ FIX: Filter out 'SUSPENDED' vendors (used for soft delete in backend)
+  const vendors = useMemo(() => {
+    const rawData = apiResponse?.data || [];
+    return rawData.filter(v => {
+      // Backend sets status to SUSPENDED and appends -deleted- to slug on delete
+      // We filter based on status 'SUSPENDED' or explicit slug check if available
+      return v.status !== 'SUSPENDED' && !v.slug?.includes('-deleted-');
+    });
+  }, [apiResponse?.data]);
+
   const meta = apiResponse?.meta || { total: 0, page: 1, limit: 20, totalPages: 0 };
 
   const { 
@@ -118,8 +129,11 @@ export default function VendorManagementPage() {
     { revalidateOnFocus: false }
   );
 
+  // ✅ FIX: Filter 'SUSPENDED' from stats to ensure counts are accurate
   const stats = useMemo(() => {
-    const allVendors = statsResponse?.data || [];
+    const rawVendors = statsResponse?.data || [];
+    const allVendors = rawVendors.filter(v => v.status !== 'SUSPENDED' && !v.slug?.includes('-deleted-'));
+    
     return {
       total: allVendors.length,
       pending: allVendors.filter(v => v.verification === 'PENDING').length,
@@ -133,7 +147,7 @@ export default function VendorManagementPage() {
     setStatusFilter('All Status');
     setCategoryFilter('All');
     setVerificationFilter('All');
-    setCurrentPage(1);
+    setPagination(prev => ({ ...prev, pageIndex: 0 }));
   };
 
   const handleQuickFilter = (type: 'ALL' | 'PENDING' | 'ACTIVE' | 'REJECTED') => {
@@ -150,7 +164,7 @@ export default function VendorManagementPage() {
   const handleDelete = async (id: string) => {
     const result = await Swal.fire({
       title: 'Delete Vendor?',
-      text: "This acts as a soft-delete.",
+      text: "This acts as a soft-delete (Vendor will be hidden).",
       icon: 'warning',
       showCancelButton: true,
       confirmButtonColor: '#ef4444',
@@ -295,13 +309,6 @@ export default function VendorManagementPage() {
     }
   };
 
-  const handlePageChange = (newPage: number) => {
-    if (newPage >= 1 && newPage <= meta.totalPages) {
-      setCurrentPage(newPage);
-      setRowSelection({});
-    }
-  };
-
   const selectedCount = Object.keys(rowSelection).length;
 
   const columns = useMemo<ColumnDef<Vendor, any>[]>(() => [
@@ -398,12 +405,6 @@ export default function VendorManagementPage() {
       header: 'Actions',
       cell: ({ row }) => (
         <div className="flex items-center gap-1">
-          <button 
-            className="p-2 hover:bg-purple-500/10 rounded-lg text-gray-400 hover:text-purple-400 transition-colors" 
-            title="Impersonate"
-          >
-            <UserCheck className="w-4 h-4" />
-          </button>
           <Link href={`/super-admin/users/vendors/${row.original.slug || row.original.id}`}>
             <button 
               className="p-2 hover:bg-blue-500/10 rounded-lg text-gray-400 hover:text-blue-500 transition-colors" 
@@ -533,112 +534,60 @@ export default function VendorManagementPage() {
         <div className="flex-1 min-h-0">
           <div className="bg-[#1E293B] border border-gray-800 rounded-xl overflow-hidden min-h-[400px]">
             {vendors.length > 0 ? (
-              <>
-                <DataTable
-                  data={vendors}
-                  columns={columns}
-                  rowSelection={rowSelection}
-                  onRowSelectionChange={setRowSelection}
-                  pageSize={pageSize}
-                  disablePagination={true}
-                  renderMobileCard={(v) => (
-                    <div className="bg-[#1E293B] border border-gray-800 rounded-lg p-4 hover:border-gray-700 transition-colors mb-3">
-                      <div className="flex justify-between items-start mb-3">
-                        <Link 
-                          href={`/super-admin/users/vendors/${v.slug || v.id}`} 
-                          className="text-yellow-500 hover:text-yellow-400 font-mono font-bold text-sm transition-colors"
-                        >
-                          {v.name}
-                        </Link>
-                        <span className={`px-2 py-1 rounded text-xs font-bold uppercase border ${v.status === 'ACTIVE' ? 'bg-green-500/20 text-green-500 border-green-500/20' : 'bg-yellow-500/20 text-yellow-500 border-yellow-500/20'}`}>
-                          {v.status}
+              <DataTable
+                data={vendors}
+                columns={columns}
+                rowSelection={rowSelection}
+                onRowSelectionChange={setRowSelection}
+                
+                pageCount={meta.totalPages} 
+                pagination={pagination}
+                onPaginationChange={setPagination}
+                
+                renderMobileCard={(v) => (
+                  <div className="bg-[#1E293B] border border-gray-800 rounded-lg p-4 hover:border-gray-700 transition-colors mb-3">
+                    <div className="flex justify-between items-start mb-3">
+                      <Link 
+                        href={`/super-admin/users/vendors/${v.slug || v.id}`} 
+                        className="text-yellow-500 hover:text-yellow-400 font-mono font-bold text-sm transition-colors"
+                      >
+                        {v.name}
+                      </Link>
+                      <span className={`px-2 py-1 rounded text-xs font-bold uppercase border ${v.status === 'ACTIVE' ? 'bg-green-500/20 text-green-500 border-green-500/20' : 'bg-yellow-500/20 text-yellow-500 border-yellow-500/20'}`}>
+                        {v.status}
+                      </span>
+                    </div>
+                    <div className="space-y-2 mb-3 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">Verification:</span>
+                        <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${v.verification === 'VERIFIED' ? 'text-blue-400 bg-blue-500/10' : 'text-yellow-500 bg-yellow-500/10'}`}>
+                          {v.verification}
                         </span>
                       </div>
-                      <div className="space-y-2 mb-3 text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-gray-500">Verification:</span>
-                          <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${v.verification === 'VERIFIED' ? 'text-blue-400 bg-blue-500/10' : 'text-yellow-500 bg-yellow-500/10'}`}>
-                            {v.verification}
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-500">Orders:</span>
-                          <span className="text-white font-mono">{v.totalOrders.toLocaleString()}</span>
-                        </div>
-                      </div>
-                      <div className="flex gap-2 pt-3 border-t border-gray-800">
-                        <Link 
-                          href={`/super-admin/users/vendors/${v.slug || v.id}`} 
-                          className="flex-1 flex items-center justify-center gap-2 py-2 bg-gray-700/50 rounded-lg hover:bg-white/10 text-gray-300 hover:text-white"
-                        >
-                          <Eye className="w-4 h-4" />
-                          <span className="text-sm">View</span>
-                        </Link>
-                        <button 
-                          onClick={() => handleDelete(v.id)} 
-                          className="flex-1 flex items-center justify-center gap-2 py-2 bg-red-500/10 border border-red-500/20 rounded-lg hover:bg-red-500 hover:text-white text-red-500"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                          <span className="text-sm">Delete</span>
-                        </button>
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">Orders:</span>
+                        <span className="text-white font-mono">{v.totalOrders.toLocaleString()}</span>
                       </div>
                     </div>
-                  )}
-                />
-                
-                <div className="border-t border-gray-800 px-4 py-3 flex items-center justify-between">
-                  <div className="text-sm text-gray-400">
-                    Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, meta.total)} of {meta.total} vendors
-                  </div>
-                  
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => handlePageChange(currentPage - 1)}
-                      disabled={currentPage === 1}
-                      className="p-2 border border-gray-700 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    >
-                      <ChevronLeft className="w-4 h-4" />
-                    </button>
-                    
-                    <div className="flex items-center gap-1">
-                      {Array.from({ length: Math.min(5, meta.totalPages) }, (_, i) => {
-                        let pageNum;
-                        if (meta.totalPages <= 5) {
-                          pageNum = i + 1;
-                        } else if (currentPage <= 3) {
-                          pageNum = i + 1;
-                        } else if (currentPage >= meta.totalPages - 2) {
-                          pageNum = meta.totalPages - 4 + i;
-                        } else {
-                          pageNum = currentPage - 2 + i;
-                        }
-                        
-                        return (
-                          <button
-                            key={pageNum}
-                            onClick={() => handlePageChange(pageNum)}
-                            className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
-                              currentPage === pageNum
-                                ? 'bg-yellow-500 text-black'
-                                : 'text-gray-400 hover:text-white hover:bg-gray-800'
-                            }`}
-                          >
-                            {pageNum}
-                          </button>
-                        );
-                      })}
+                    <div className="flex gap-2 pt-3 border-t border-gray-800">
+                      <Link 
+                        href={`/super-admin/users/vendors/${v.slug || v.id}`} 
+                        className="flex-1 flex items-center justify-center gap-2 py-2 bg-gray-700/50 rounded-lg hover:bg-white/10 text-gray-300 hover:text-white"
+                      >
+                        <Eye className="w-4 h-4" />
+                        <span className="text-sm">View</span>
+                      </Link>
+                      <button 
+                        onClick={() => handleDelete(v.id)} 
+                        className="flex-1 flex items-center justify-center gap-2 py-2 bg-red-500/10 border border-red-500/20 rounded-lg hover:bg-red-500 hover:text-white text-red-500"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        <span className="text-sm">Delete</span>
+                      </button>
                     </div>
-                    
-                    <button
-                      onClick={() => handlePageChange(currentPage + 1)}
-                      disabled={currentPage === meta.totalPages}
-                      className="p-2 border border-gray-700 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    >
-                      <ChevronRight className="w-4 h-4" />
-                    </button>
                   </div>
-                </div>
-              </>
+                )}
+              />
             ) : (
               <div className="flex flex-col items-center justify-center h-64 text-gray-500">
                 <Search className="w-12 h-12 mb-4 opacity-20" />

@@ -1,26 +1,25 @@
-import React, { useEffect, useState } from "react";
-import { View, StyleSheet, Pressable, Text } from "react-native";
 import { ThemedText } from "@/components/themed-text";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { useJobs } from "@/context/JobContext";
 import { useThemeColor } from "@/hooks/use-theme-color";
-import { useDelivery } from "@/context/DeliveryContext";
+import { getDirections, getDistanceMeters } from "@/services/maps";
 import * as Location from "expo-location";
-import { Keys } from "@/config/keys";
-import axios from "axios";
+import React, { useEffect, useState } from "react";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
 export default function EnRouteToDropoff({
   onAnimateToDropoff,
 }: {
   onAnimateToDropoff?: () => void;
 }) {
-  const { activeDelivery, arriveAtDropoff } = useDelivery();
+  const { activeJob, arriveAtDropoff } = useJobs();
 
   const primary = useThemeColor({}, "brandPrimary");
   const surface = useThemeColor({}, "surfaceBackground");
   const cardBg = useThemeColor({}, "surfaceSubtle");
 
   const [distanceToCustomer, setDistanceToCustomer] = useState<number | null>(
-    null
+    null,
   );
   const [eta, setEta] = useState("");
   const [currentStep, setCurrentStep] = useState<{
@@ -30,11 +29,9 @@ export default function EnRouteToDropoff({
 
   useEffect(() => {
     let subscription: Location.LocationSubscription;
-
     (async () => {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== "granted") return;
-
       subscription = await Location.watchPositionAsync(
         {
           accuracy: Location.Accuracy.High,
@@ -42,63 +39,78 @@ export default function EnRouteToDropoff({
           timeInterval: 3000,
         },
         async (loc) => {
-          if (!activeDelivery) return;
-
-          const d = getDistanceMeters(
-            loc.coords.latitude,
-            loc.coords.longitude,
-            Keys.CUSTOMER_COORD.latitude,
-            Keys.CUSTOMER_COORD.longitude
-          );
-          setDistanceToCustomer(d);
-
-          try {
-            const res = await axios.get(
-              `https://maps.googleapis.com/maps/api/directions/json?origin=${loc.coords.latitude},${loc.coords.longitude}&destination=${Keys.CUSTOMER_COORD.latitude},${Keys.CUSTOMER_COORD.longitude}&mode=driving&key=${Keys.GOOGLE_MAPS_API_KEY}`
-            );
-
-            if (res.data.status === "OK") {
-              const leg = res.data.routes[0].legs[0];
-              setEta(leg.duration.text);
-
-              let closestStep = null;
-              let minDistance = Infinity;
-
-              for (const step of leg.steps) {
-                const dist = getDistanceMeters(
-                  loc.coords.latitude,
-                  loc.coords.longitude,
-                  step.end_location.lat,
-                  step.end_location.lng
-                );
-
-                if (dist < minDistance) {
-                  minDistance = dist;
-                  closestStep = step;
+          if (!activeJob) return;
+          const dropoffLat =
+            activeJob.dropoffAddress?.latitude ?? activeJob.dropoffAddress?.lat;
+          const dropoffLng =
+            activeJob.dropoffAddress?.longitude ??
+            activeJob.dropoffAddress?.lng;
+          if (
+            typeof dropoffLat === "number" &&
+            typeof dropoffLng === "number"
+          ) {
+            try {
+              const distData = await getDistanceMeters({
+                originLat: loc.coords.latitude,
+                originLng: loc.coords.longitude,
+                destLat: dropoffLat,
+                destLng: dropoffLng,
+              });
+              if (typeof distData.distance === "number") {
+                setDistanceToCustomer(distData.distance);
+              }
+            } catch {
+              setDistanceToCustomer(null);
+            }
+            try {
+              const data = await getDirections({
+                originLat: loc.coords.latitude,
+                originLng: loc.coords.longitude,
+                destLat: dropoffLat,
+                destLng: dropoffLng,
+              });
+              if (!data.error && data.duration && data.coordinates) {
+                setEta(data.duration.text);
+                let closestStep = null;
+                let minDistance = Infinity;
+                for (const coord of data.coordinates) {
+                  const stepDistData = await getDistanceMeters({
+                    originLat: loc.coords.latitude,
+                    originLng: loc.coords.longitude,
+                    destLat: coord.latitude,
+                    destLng: coord.longitude,
+                  });
+                  const dist =
+                    typeof stepDistData.distance === "number"
+                      ? stepDistData.distance
+                      : Infinity;
+                  if (dist < minDistance) {
+                    minDistance = dist;
+                    closestStep = coord;
+                  }
+                }
+                if (closestStep) {
+                  setCurrentStep({
+                    text: `Continue to drop-off`,
+                    maneuver: undefined,
+                  });
                 }
               }
-
-              if (closestStep) {
-                setCurrentStep({
-                  text: closestStep.html_instructions.replace(/<[^>]+>/g, ""),
-                  maneuver: closestStep.maneuver,
-                });
-              }
+            } catch (err) {
+              console.log("Directions API error:", err);
             }
-          } catch (err) {
-            console.log("Directions API error:", err);
           }
-        }
+        },
       );
     })();
-
     return () => subscription?.remove();
-  }, [activeDelivery]);
+  }, [activeJob]);
 
-  if (!activeDelivery) return null;
+  if (!activeJob) return null;
 
-  const canArrive = true; // 50ft
-  // const canArrive = distanceToCustomer !== null && distanceToCustomer <= 15.24; // 50ft
+  const isRide = activeJob.jobType === "ride";
+
+  const canArrive = distanceToCustomer !== null && distanceToCustomer <= 15.24;
 
   const getManeuverIcon = (maneuver?: string) => {
     switch (maneuver) {
@@ -117,32 +129,36 @@ export default function EnRouteToDropoff({
   return (
     <View style={styles.container}>
       <View style={[styles.bottomContainer, { backgroundColor: surface }]}>
-        {/* Customer card */}
         <View style={[styles.vendorCard, { backgroundColor: cardBg }]}>
           <View style={styles.vendorInfo}>
-            <IconSymbol name="person.circle" size={36} color={primary} />
+            <IconSymbol
+              name={isRide ? "car" : "person.circle"}
+              size={36}
+              color={primary}
+            />
             <View style={{ flex: 1 }}>
               <ThemedText type="defaultSemiBold">
-                {activeDelivery.customerName}
+                {activeJob.customerName}
               </ThemedText>
               <ThemedText style={{ color: "#666", fontSize: 14 }}>
-                {activeDelivery.customerAddress}
+                {activeJob.dropoffAddress?.address ||
+                  activeJob.dropoffAddress ||
+                  ""}
               </ThemedText>
             </View>
           </View>
         </View>
 
-        {/* Distance + ETA */}
         <View style={styles.row}>
           {distanceToCustomer !== null && (
             <Text style={[styles.infoText, { marginRight: 16 }]}>
-              {(distanceToCustomer / 1000).toFixed(2)} km
+              {" "}
+              {(distanceToCustomer / 1000).toFixed(2)} km{" "}
             </Text>
           )}
           {eta && <Text style={styles.infoText}>{eta}</Text>}
         </View>
 
-        {/* Direction (KEY UI) */}
         {currentStep && (
           <View style={styles.currentStepContainer}>
             <IconSymbol
@@ -165,30 +181,13 @@ export default function EnRouteToDropoff({
             }}
           >
             <ThemedText style={styles.arrivedText}>
-              ARRIVED AT DROP-OFF
+              {isRide ? "ARRIVED AT DROP-OFF" : "ARRIVED AT DROP-OFF"}
             </ThemedText>
           </Pressable>
         )}
       </View>
     </View>
   );
-}
-
-/* ---------- Utils ---------- */
-function getDistanceMeters(
-  lat1: number,
-  lon1: number,
-  lat2: number,
-  lon2: number
-) {
-  const toRad = (x: number) => (x * Math.PI) / 180;
-  const R = 6371000;
-  const dLat = toRad(lat2 - lat1);
-  const dLon = toRad(lon2 - lon1);
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
-  return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
 }
 
 /* ---------- Styles ---------- */

@@ -11,15 +11,10 @@ async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
   app.setGlobalPrefix(process.env.API_PREFIX || 'api/v1');
-
-  // Serve static files from uploads directory
   app.useStaticAssets(join(__dirname, '..', 'uploads'), {
     prefix: '/uploads',
   });
-
-  app.useLogger(appLogger);
   app.useGlobalFilters(new HttpExceptionFilter());
-
   app.useGlobalPipes(
     new ValidationPipe({
       transform: true,
@@ -27,18 +22,60 @@ async function bootstrap() {
       forbidNonWhitelisted: true,
     }),
   );
+  const isDevelopment = process.env.NODE_ENV !== 'production';
+  if (isDevelopment) {
+    app.enableCors({
+      origin: true,
+      credentials: true,
+      methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+      allowedHeaders: [
+        'Content-Type',
+        'Authorization',
+        'X-Requested-With',
+        'Accept',
+        'Origin',
+        'Idempotency-Key',
+      ],
+    });
+  } else {
+    if (!process.env.CORS_ORIGIN) {
+      throw new Error(
+        'CORS_ORIGIN environment variable must be set in production',
+      );
+    }
+    const allowedOrigins = process.env.CORS_ORIGIN.split(',')
+      .map((origin) => origin.trim())
+      .filter((origin) => origin.length > 0);
+    app.enableCors({
+      origin: (origin, callback) => {
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.includes(origin)) {
+          callback(null, true);
+        } else {
+          callback(new Error('Not allowed by CORS'));
+        }
+      },
+      methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+      credentials: true,
+      allowedHeaders: [
+        'Content-Type',
+        'Authorization',
+        'X-Requested-With',
+        'Accept',
+        'Origin',
+        'Idempotency-Key',
+      ],
+      exposedHeaders: ['X-Total-Count', 'X-Page-Number'],
+      maxAge: 86400,
+    });
+  }
+  const port = process.env.PORT ?? 3000;
 
-  app.enableCors({
-    origin: process.env.CORS_ORIGIN 
-      ? process.env.CORS_ORIGIN.split(',') 
-      : 'http://localhost:3000',
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-    credentials: true,
+  await app.listen(port, '0.0.0.0');
+
+  appLogger.log(`Backend started on port ${port}`, {
+    context: 'Main',
   });
-
-  await app.listen(process.env.PORT ?? 3000, '0.0.0.0');
-  appLogger.log(
-    `Backend is running on: ${await app.getUrl()}/${process.env.API_PREFIX || 'api/v1'}`,
-  );
 }
+
 bootstrap();

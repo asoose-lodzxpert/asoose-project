@@ -1,8 +1,8 @@
-export function getCategories() {
-  return [
-    { key: "all", label: "All" },
-    { key: "restaurants", label: "Restaurants", icon: "restaurant" },
-    { key: "groceries", label: "Groceries", icon: "bag" },
-    { key: "pharmacy", label: "Pharmacy", icon: "plus" },
-  ];
+import { request } from "@/lib/authFetch";
+
+export type Category = { id: string; name: string };
+
+export async function fetchCategories(): Promise<Category[]> {
+  const { parsed } = await request("categories", { method: "GET" });
+  return parsed;
 }

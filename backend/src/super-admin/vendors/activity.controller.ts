@@ -28,4 +28,3 @@ export class ActivityController {
     return this.activityService.getVendorActivityLogs(storeId, page, limit);
   }
 }
-

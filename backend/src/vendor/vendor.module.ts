@@ -30,7 +30,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
 // 👇 1. Services IMPORTS
 import { ActivityLogService } from 'src/common/services/activity-log.services';
 // Ensure this path points to where your StoresService actually is
-// import { StoresService } from './stores/stores.service'; 
+// import { StoresService } from './stores/stores.service';
 import { StoresService } from 'src/super-admin/vendors/vendors.service';
 @Module({
   imports: [
@@ -56,10 +56,10 @@ import { StoresService } from 'src/super-admin/vendors/vendors.service';
     VendorService,
     VendorAuthService,
     NubanService,
-    
+
     // 👇 2. VITAL: Add BOTH Services here
     ActivityLogService, // Fixes the "?" at index [2]
-    StoresService,      // The service itself
+    StoresService, // The service itself
   ],
   exports: [VendorSecurityNotificationsService, VendorOrdersStreamService],
 })

@@ -111,6 +111,7 @@ export class StoresService {
               phone: true,
               name: true,
               status: true,
+              image: true,
             },
           },
           orders: {
@@ -344,7 +345,9 @@ export class StoresService {
       status: store.status,
       verification: store.verification,
       rating: store.rating,
-
+      image: store.logo || store.vendor?.image || null,
+      createdAt: store.createdAt,
+      updatedAt: store.updatedAt,
       totalRevenue,
       unpaidBalance: Math.max(0, totalRevenue - paidOut),
       totalOrders: store.orders.length,
@@ -430,5 +433,15 @@ export class StoresService {
     );
 
     return { success: true, message: 'Email queued successfully' };
+  }
+  async getVendorPayouts(storeId: string) {
+    return this.prisma.vendorPayout.findMany({
+      where: {
+        storeId: storeId,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
   }
 }

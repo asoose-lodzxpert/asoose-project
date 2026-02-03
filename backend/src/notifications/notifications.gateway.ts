@@ -15,8 +15,8 @@ import { JwtService } from '@nestjs/jwt';
 // Explicit CORS configuration for Socket.IO
 @WebSocketGateway({
   cors: {
-    origin: process.env.CORS_ORIGIN 
-      ? process.env.CORS_ORIGIN.split(',') 
+    origin: process.env.CORS_ORIGIN
+      ? process.env.CORS_ORIGIN.split(',')
       : ['http://localhost:3001', 'http://localhost:3000'],
     methods: ['GET', 'POST'],
     credentials: true,
@@ -40,7 +40,7 @@ export class NotificationsGateway
   async handleConnection(client: Socket) {
     try {
       const token = this.extractToken(client);
-      
+
       if (!token) {
         this.logger.warn(`Connection attempt without token: ${client.id}`);
         client.disconnect();
@@ -48,9 +48,10 @@ export class NotificationsGateway
       }
 
       const payload = this.jwtService.verify(token, {
-        secret: process.env.JWT_SECRET || 'your-secret-key-change-in-production',
+        secret:
+          process.env.JWT_SECRET || 'your-secret-key-change-in-production',
       });
-      
+
       const userId = payload.sub || payload.userId;
 
       client.data.userId = userId;
@@ -118,7 +119,7 @@ export class NotificationsGateway
   sendOrderUpdate(orderId: string, payload: any) {
     // 1. Emit to the specific event listener expected by frontend hooks
     this.server.emit(`order_update_${orderId}`, payload);
-    
+
     // 2. Also emit to the standard room for scalability
     this.server.to(`order_${orderId}`).emit('order_update', payload);
   }

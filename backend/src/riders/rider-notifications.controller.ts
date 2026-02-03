@@ -17,7 +17,7 @@ import { UserRole } from '../common/enums/user-role.enum';
 
 @Controller('rider/notifications')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(UserRole.RIDER)
+@Roles(UserRole.RIDER, UserRole.DRIVER)
 export class RiderNotificationsController {
   constructor(
     private readonly notificationsService: RiderNotificationsService,

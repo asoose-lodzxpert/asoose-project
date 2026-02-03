@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ShoppingBag, Car, Package, Settings, User } from 'lucide-react';
+import { ShoppingBag, Car, Package, User } from 'lucide-react';
 
 const NavItem = ({ 
   icon: Icon, 
@@ -41,8 +41,17 @@ export default function BottomNav() {
     { icon: User, label: 'Profile', href: '/main/profile' }
   ];
 
+  // Helper function to check if current route matches or is a sub-route
+  const isActiveRoute = (href: string) => {
+    if (pathname === href) return true;
+    
+    // Check if current path starts with the nav item's href (sub-route detection)
+    // But ensure we're not just matching partial strings (e.g., /main/store-settings shouldn't match /main/store)
+    return pathname.startsWith(href + '/');
+  };
+
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-[#0a0a0a] border-t border-gray-100 dark:border-white/5 py-2 px-6 z-50">
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-[#0a0a0a] border-t border-gray-100 dark:border-white/5 py-2 px-6 z-50 safe-area-bottom">
       <div className="flex justify-between items-end max-w-md mx-auto">
         {navItems.map((item) => (
           <NavItem
@@ -50,7 +59,7 @@ export default function BottomNav() {
             icon={item.icon}
             label={item.label}
             href={item.href}
-            active={pathname === item.href}
+            active={isActiveRoute(item.href)}
           />
         ))}
       </div>

@@ -1,4 +1,5 @@
 import { Global, Module, OnApplicationShutdown } from '@nestjs/common';
+import { AppLogger } from '../libs/logger/app-logger.service';
 import { createClient, RedisClientType } from 'redis';
 import * as dotenv from 'dotenv';
 
@@ -24,11 +25,12 @@ let redisClient: RedisClientType | null = null;
               }),
             },
           });
+          const appLogger = new AppLogger();
           redisClient.on('error', (err) =>
-            console.error('Redis Client Error', err),
+            appLogger.error('Redis Client Error', err?.stack, { error: err }),
           );
           await redisClient.connect();
-          console.log('✅ Redis connected!');
+          appLogger.log('✅ Redis connected!');
         }
         return redisClient;
       },
@@ -40,7 +42,8 @@ export class RedisModule implements OnApplicationShutdown {
   async onApplicationShutdown(signal?: string) {
     if (redisClient) {
       await redisClient.disconnect();
-      console.log('Redis disconnected on shutdown');
+      const appLogger = new AppLogger();
+      appLogger.log('Redis disconnected on shutdown');
     }
   }
 }

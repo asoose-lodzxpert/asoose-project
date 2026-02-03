@@ -9,10 +9,11 @@ import useSWRMutation from 'swr/mutation';
 import { toast } from 'react-toastify';
 import { Loader2, Trash2, ExternalLink, Edit2, X } from 'lucide-react';
 import Image from 'next/image';
+import { getSession } from 'next-auth/react';
+import Swal from 'sweetalert2'; // ✅ Import SweetAlert2
 
 import ImageUpload from '@/app/main/components/ImageUpload';
 import { fetcher } from '../hooks/useSuperAdminFetch';
-import { createClient } from '../../../../utils/supabase/client';
 
 // 1. Define strict interfaces for type safety
 type BannerType = 'PROMO' | 'AD';
@@ -31,7 +32,7 @@ interface Banner {
 
 const BUCKET_NAME = process.env.NEXT_PUBLIC_STORAGE_BUCKET || 'marketplace_assets';
 
-// 2. Fixed: Removed .default(true) to resolve type conflicts
+// 2. Form Schema
 const bannerSchema = z.object({
   title: z.string().min(1, "Title is required"),
   subtitle: z.string().min(1, "Subtitle is required"),
@@ -46,18 +47,18 @@ const bannerSchema = z.object({
 type BannerFormValues = z.infer<typeof bannerSchema>;
 
 /**
- * Helper to handle mutations (POST/PATCH/DELETE) with session logic
+ * Helper to handle mutations (POST/PATCH/DELETE) with NextAuth session logic
  */
 async function mutationFetcher(url: string, { arg }: { arg: { method: string, body?: any } }) {
-  const supabase = createClient();
-  const { data: { session } } = await supabase.auth.getSession();
+  const session = await getSession();
+  const token = (session as any)?.accessToken;
   
-  if (!session) throw new Error('Authentication required');
+  if (!token) throw new Error('Authentication required');
 
   const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}${url}`, {
     method: arg.method,
     headers: {
-      'Authorization': `Bearer ${session.access_token}`,
+      'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json',
     },
     body: arg.body ? JSON.stringify(arg.body) : undefined,
@@ -74,7 +75,7 @@ async function mutationFetcher(url: string, { arg }: { arg: { method: string, bo
 export default function BannerManagement() {
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  // 3. Explicitly typed useSWR as Banner[]
+  // 3. Explicitly typed useSWR
   const { data: banners, mutate: refreshBanners, isLoading: loadingList } = useSWR<Banner[]>(
     '/super-admin/banners',
     fetcher
@@ -96,7 +97,6 @@ export default function BannerManagement() {
     mutationFetcher
   );
 
-  // 4. SubmitHandler for strict typing
   const onSubmit: SubmitHandler<BannerFormValues> = async (data) => {
     try {
       if (editingId) {
@@ -145,19 +145,45 @@ export default function BannerManagement() {
     });
   };
 
+  // ✅ Updated Delete Confirmation with SweetAlert2
   const handleDelete = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this banner?')) return;
-    try {
-      const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/super-admin/banners/${id}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${session?.access_token}` },
-      });
-      toast.success('Banner deleted');
-      refreshBanners();
-    } catch (err: any) {
-      toast.error(err.message || 'Delete failed');
+    const result = await Swal.fire({
+      title: 'Are you sure?',
+      text: "This banner will be permanently removed.",
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#EAB308', // yellow-500
+      cancelButtonColor: '#1E293B',  // Slate-800
+      confirmButtonText: 'Yes, delete it!',
+      background: '#0F172A',         // App dark background
+      color: '#fff',
+      customClass: {
+        popup: 'rounded-xl border border-gray-800',
+      }
+    });
+
+    if (result.isConfirmed) {
+      try {
+        const session = await getSession();
+        const token = (session as any)?.accessToken;
+
+        if (!token) throw new Error('Authentication required');
+
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/super-admin/banners/${id}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+
+        if (!res.ok) {
+          const error = await res.json();
+          throw new Error(error.message || 'Delete failed');
+        }
+
+        toast.success('Banner deleted');
+        refreshBanners();
+      } catch (err: any) {
+        toast.error(err.message || 'Delete failed');
+      }
     }
   };
 
@@ -236,7 +262,20 @@ export default function BannerManagement() {
             banners?.map((banner) => (
               <div key={banner.id} className={`bg-[#1E293B] border ${editingId === banner.id ? 'border-yellow-500' : 'border-gray-800'} rounded-xl overflow-hidden flex gap-4 p-3 group transition-all`}>
                 <div className="relative w-24 h-24 rounded-lg overflow-hidden flex-shrink-0 bg-[#0F172A]">
-                  <Image src={banner.image} alt={banner.title} fill className="object-cover" />
+                  {/* rendering guard from previous fix */}
+                  {banner.image ? (
+                    <Image 
+                      src={banner.image} 
+                      alt={banner.title} 
+                      fill 
+                      className="object-cover"
+                      unoptimized 
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-gray-600 text-[10px] font-bold uppercase">
+                      No Image
+                    </div>
+                  )}
                   {!banner.isActive && <div className="absolute inset-0 bg-black/60 flex items-center justify-center"><span className="text-[10px] font-bold text-white uppercase tracking-wider">Inactive</span></div>}
                 </div>
                 <div className="flex-1 flex flex-col justify-center">

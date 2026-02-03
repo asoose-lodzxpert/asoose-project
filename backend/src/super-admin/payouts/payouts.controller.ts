@@ -1,4 +1,12 @@
-import { Controller, Get, Post, Body, Param, UseGuards, Request } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  UseGuards,
+  Request,
+} from '@nestjs/common';
 import { PayoutsService } from './payouts.service';
 import { UserRole } from '@prisma/client';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
@@ -17,12 +25,20 @@ export class PayoutsController {
   }
 
   @Post(':type/:id/approve')
-  approve(@Param('id') id: string, @Param('type') type: 'VENDOR' | 'RIDER', @Request() req) {
+  approve(
+    @Param('id') id: string,
+    @Param('type') type: 'VENDOR' | 'RIDER',
+    @Request() req,
+  ) {
     return this.payoutsService.approvePayout(id, type, req.user.id);
   }
 
   @Post(':type/:id/reject')
-  reject(@Param('id') id: string, @Param('type') type: 'VENDOR' | 'RIDER', @Body('reason') reason: string) {
+  reject(
+    @Param('id') id: string,
+    @Param('type') type: 'VENDOR' | 'RIDER',
+    @Body('reason') reason: string,
+  ) {
     return this.payoutsService.rejectPayout(id, type, reason);
   }
 }

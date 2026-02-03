@@ -7,7 +7,7 @@ import { RecentOrdersFeed } from "@/components/store/RecentOrdersFeed";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useRouter } from "expo-router";
 import { ConfirmationModal } from "@/components/ui/ConfirmationModal";
-import { ScrollView, RefreshControl } from "react-native";
+import { View } from "react-native";
 
 import { StoreMetrics, StoreOrder } from "@/types/store";
 import { useThemeColor } from "@/hooks/use-theme-color";
@@ -31,7 +31,7 @@ export default function StoreDashboardPage() {
   const [loadingStore, setLoadingStore] = useState(true);
   const [toggleLoading, setToggleLoading] = useState(false);
   const [confirmVisible, setConfirmVisible] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
+  // remove top-level pull-to-refresh to avoid nesting VirtualizedList inside ScrollView
   const router = useRouter();
   const linkColor = useThemeColor({}, "brandPrimary");
 
@@ -103,20 +103,8 @@ export default function StoreDashboardPage() {
     fetchStore();
   }, [fetchOnline, fetchMetrics, fetchOrders, fetchStore]);
 
-  /** Handle pull to refresh */
-  const handleRefresh = useCallback(async () => {
-    setRefreshing(true);
-    try {
-      await Promise.all([
-        fetchOnline(),
-        fetchMetrics(),
-        fetchOrders(),
-        fetchStore(),
-      ]);
-    } finally {
-      setRefreshing(false);
-    }
-  }, [fetchOnline, fetchMetrics, fetchOrders, fetchStore]);
+  // If you need a global refresh that refreshes metrics/orders/store,
+  // consider adding a refresh button that calls fetchOnline/fetchMetrics/fetchOrders/fetchStore.
 
   /** Open confirmation modal */
   const openConfirmation = () => setConfirmVisible(true);
@@ -162,17 +150,7 @@ export default function StoreDashboardPage() {
 
   return (
     <ThemedView style={{ flex: 1 }}>
-      <ScrollView
-        contentContainerStyle={{ flexGrow: 1 }}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={handleRefresh}
-            tintColor={linkColor}
-          />
-        }
-      >
+      <View style={{ flex: 1 }}>
         <StoreHeader
           storeName={storeName}
           isOnline={!!isOnline}
@@ -205,7 +183,7 @@ export default function StoreDashboardPage() {
           onRefresh={fetchOrders}
           loading={loadingOrders}
         />
-      </ScrollView>
+      </View>
 
       <ConfirmationModal
         visible={confirmVisible}

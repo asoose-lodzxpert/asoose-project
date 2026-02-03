@@ -1,111 +1,188 @@
-export type PaymentMethod = "transfer" | "paystack" | "monnify" | "flutterwave";
+import { request } from "@/lib/authFetch";
+import type { PaymentMethod, BankAccount, InAppTx } from "@/types/payment";
 
-export async function initiatePayment(method: PaymentMethod, payload: any) {
-  // Placeholder: integrate with payment providers here.
-  // For now, simulate network call and return a success object.
-  await new Promise((res) => setTimeout(res, 1000));
-
-  return {
-    success: true,
-    method,
-    transactionId: `txn_${Date.now()}`,
-    payload,
-  };
-}
-
-// ------------------------------
-// Mock bank-transfer & in-app checkout services
-// ------------------------------
-
-type BankAccount = {
-  accountNumber: string;
-  bankName: string;
-  accountName: string;
-  reference: string;
-  amount: number;
-  expiresAt: number;
-  status: "pending" | "paid" | "failed";
+// Map frontend payment method to backend enums
+const gatewayMap: Record<PaymentMethod, string> = {
+  transfer: "MONNIFY",
+  paystack: "PAYSTACK",
+  monnify: "MONNIFY",
+  flutterwave: "FLUTTERWAVE",
 };
 
-type InAppTx = {
-  transactionId: string;
-  checkoutUrl: string;
-  amount: number;
-  method: PaymentMethod;
-  status: "pending" | "paid" | "failed";
+const methodMap: Record<PaymentMethod, string> = {
+  transfer: "BANK_TRANSFER",
+  paystack: "CARD",
+  monnify: "BANK_TRANSFER",
+  flutterwave: "CARD",
 };
 
-const bankStore = new Map<string, BankAccount>();
-const inAppStore = new Map<string, InAppTx>();
+// All payment functions now require a user object for identity fields
+type UserIdentity = { email: string; name: string; phone?: string };
 
-function randomAccountNumber() {
-  return Math.floor(1000000000 + Math.random() * 8999999999).toString();
-}
+export async function initiatePayment(
+  method: PaymentMethod,
+  payload: any,
+  user: UserIdentity,
+) {
+  const gateway = gatewayMap[method];
+  const mappedMethod = methodMap[method];
+  const email = user.email;
+  const customerName = user.name;
+  const phoneNumber = user.phone;
+  const amount =
+    payload.amount ||
+    payload.price ||
+    payload.estimatedPrice ||
+    payload.quote?.amount ||
+    payload.quote?.price ||
+    payload.price ||
+    0;
+  const type = payload.type || "ORDER";
+  const orderId = payload.orderId;
+  const rideId = payload.rideId;
+  const callbackUrl = payload.callbackUrl;
+  const metadata = { ...payload };
 
-export async function createBankTransfer(amount: number, payload: any) {
-  const reference = `BTX-${Date.now()}`;
-  const acct: BankAccount = {
-    accountNumber: randomAccountNumber(),
-    bankName: "Mock Bank",
-    accountName: "Asoose Payments",
-    reference,
+  const body = {
     amount,
-    expiresAt: Date.now() + 1000 * 60 * 60, // 1 hour
-    status: "pending",
+    email,
+    customerName,
+    phoneNumber,
+    gateway,
+    method: mappedMethod,
+    type,
+    orderId,
+    rideId,
+    callbackUrl,
+    metadata,
   };
-  bankStore.set(reference, acct);
+  const { parsed } = await request("payment/initialize", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+  return parsed;
+}
 
-  // Simulate the user paying after a short delay (for demo only)
-  setTimeout(() => {
-    const existing = bankStore.get(reference);
-    if (existing) {
-      existing.status = "paid";
-      bankStore.set(reference, existing);
-    }
-  }, 8_000);
+export async function checkPaymentStatus(reference: string) {
+  const { parsed } = await request(
+    `payment/verify?reference=${encodeURIComponent(reference)}`,
+    { method: "GET" },
+  );
+  return parsed;
+}
 
-  return acct;
+// Bank transfer support (real backend)
+export async function createBankTransfer(
+  amount: number,
+  payload: any,
+  user: UserIdentity,
+): Promise<BankAccount> {
+  // Always use MONNIFY for bank transfer
+  const gateway = "MONNIFY";
+  const method = "BANK_TRANSFER";
+  const email = user.email;
+  const customerName = user.name;
+  const phoneNumber = user.phone;
+  const type = payload.type || "ORDER";
+  const orderId = payload.orderId;
+  const rideId = payload.rideId;
+  const callbackUrl = payload.callbackUrl;
+  const metadata = { ...payload };
+
+  const body = {
+    amount,
+    email,
+    customerName,
+    phoneNumber,
+    gateway,
+    method,
+    type,
+    orderId,
+    rideId,
+    callbackUrl,
+    metadata,
+  };
+  const { parsed } = await request("payment/initialize", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+  return parsed;
 }
 
 export async function checkBankTransferStatus(reference: string) {
-  // simulate network latency
-  await new Promise((r) => setTimeout(r, 300));
-  const entry = bankStore.get(reference);
-  if (!entry) return { status: "failed" as const };
-  return { status: entry.status };
+  return checkPaymentStatus(reference);
 }
 
+// In-app checkout (Paystack, Flutterwave, Monnify)
 export async function openInAppCheckout(
   method: PaymentMethod,
   amount: number,
-  payload: any
-) {
-  const transactionId = `ia_${Date.now()}`;
-  const checkoutUrl = `https://mock-payments.example.com/checkout/${transactionId}`;
-  const tx: InAppTx = {
-    transactionId,
-    checkoutUrl,
+  payload: any,
+  user: UserIdentity,
+): Promise<InAppTx> {
+  const gateway = gatewayMap[method];
+  const mappedMethod = methodMap[method];
+  const email = user.email;
+  const customerName = user.name;
+  const phoneNumber = user.phone;
+  const type = payload.type || "ORDER";
+  const orderId = payload.orderId;
+  const rideId = payload.rideId;
+  const callbackUrl = payload.callbackUrl;
+  const metadata = { ...payload };
+
+  const body = {
     amount,
+    email,
+    customerName,
+    phoneNumber,
+    gateway,
+    method: mappedMethod,
+    type,
+    orderId,
+    rideId,
+    callbackUrl,
+    metadata,
+  };
+  const { parsed } = await request("payment/initialize", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+  // The backend should return authorizationUrl or checkoutUrl and reference/transactionId
+  return {
+    transactionId: parsed.reference || parsed.transactionId,
+    checkoutUrl: parsed.authorizationUrl || parsed.checkoutUrl,
+    amount: parsed.amount,
     method,
     status: "pending",
   };
-  inAppStore.set(transactionId, tx);
-
-  // Simulate provider completing payment after a short delay
-  setTimeout(() => {
-    const existing = inAppStore.get(transactionId);
-    if (existing) {
-      existing.status = "paid";
-      inAppStore.set(transactionId, existing);
-    }
-  }, 6_000);
-
-  return { transactionId, checkoutUrl };
 }
 
+// Checks the payment status for a given transactionId using the backend
 export async function checkInAppPaymentStatus(transactionId: string) {
-  await new Promise((r) => setTimeout(r, 300));
-  const entry = inAppStore.get(transactionId);
-  if (!entry) return { status: "failed" as const };
-  return { status: entry.status };
+  // Try all gateways if needed, but default to Paystack for now
+  // You may want to pass the gateway if you support multiple
+  const gateways = ["PAYSTACK", "FLUTTERWAVE", "MONNIFY"];
+  for (const gateway of gateways) {
+    try {
+      const res = await request(
+        "payment/verify?reference=" +
+          encodeURIComponent(transactionId) +
+          "&gateway=" +
+          gateway,
+      );
+      if (
+        res &&
+        (res.status === "SUCCESS" || res.status === "PAID" || res.success)
+      ) {
+        return { status: "paid", ...res };
+      }
+      if (res && (res.status === "PENDING" || res.status === "pending")) {
+        return { status: "pending", ...res };
+      }
+    } catch (e) {
+      // Try next gateway
+    }
+  }
+  return { status: "pending" };
 }

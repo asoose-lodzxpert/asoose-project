@@ -11,8 +11,11 @@ interface EditProfileModalProps {
 
 export const EditProfileModal = ({ isOpen, initialData, onClose, onSave }: EditProfileModalProps) => {
   const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState(initialData);
-
+// Ensure fields are empty strings, not null/undefined
+  const [formData, setFormData] = useState({
+    name: initialData.name || '',
+    phone: initialData.phone || ''
+  });
   if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -44,7 +47,7 @@ export const EditProfileModal = ({ isOpen, initialData, onClose, onSave }: EditP
             <label className="text-xs font-bold text-gray-500 uppercase">Phone</label>
             <input 
               type="tel" 
-              value={formData.phone}
+              value={formData.phone || ''}  // <--- Add "|| ''"
               onChange={e => setFormData({...formData, phone: e.target.value})}
               className="w-full mt-1 p-3 bg-gray-50 dark:bg-white/5 rounded-xl outline-none focus:ring-2 ring-yellow-500"
             />

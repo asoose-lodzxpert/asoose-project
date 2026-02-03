@@ -1,31 +1,32 @@
-import React, { useState, useEffect, useRef } from "react";
 import {
-  fetchVendorProfile,
-  fetchStorePublicDetails,
   fetchStoreBalance,
+  fetchStorePublicDetails,
+  fetchVendorProfile,
   updateVendorProfileImage,
 } from "@/services/profile.service";
-import {
-  View,
-  StyleSheet,
-  Pressable,
-  Image,
-  ScrollView,
-  Text,
-  RefreshControl,
-  ActivityIndicator,
-} from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { RelativePathString, useRouter } from "expo-router";
+import React, { useEffect, useRef, useState } from "react";
+import {
+  Image,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import Toast from "react-native-toast-message";
 
 import { ThemedText } from "@/components/themed-text";
-import { IconSymbol } from "@/components/ui/icon-symbol";
-import { useThemeColor } from "@/hooks/use-theme-color";
 import { ThemedView } from "@/components/themed-view";
-import { ProfileData, VendorStatus } from "@/types/profile";
-import { useAuth } from "@/context/AuthContext";
 import { ConfirmationModal } from "@/components/ui/ConfirmationModal";
+import { IconSymbol } from "@/components/ui/icon-symbol";
+import { useAuth } from "@/context/AuthContext";
+import { useThemeColor } from "@/hooks/use-theme-color";
+import { ProfileData, VendorStatus } from "@/types/profile";
+
+/* -------------------------------------------------------------------------- */
 
 type AllowedRoute =
   | "/(profile)/edit-business"
@@ -36,12 +37,7 @@ type AllowedRoute =
   | "/(profile)/privacy"
   | "/(profile)/delete-account";
 
-interface SettingItem {
-  label: string;
-  route: AllowedRoute;
-}
-
-const SETTINGS: SettingItem[] = [
+const SETTINGS = [
   { label: "Edit business profile", route: "/(profile)/edit-business" },
   { label: "Change password", route: "/(profile)/resetpassword" },
   { label: "Notification preferences", route: "/(profile)/notifications" },
@@ -52,10 +48,11 @@ const SETTINGS: SettingItem[] = [
 ];
 
 const INITIAL_PROFILE: ProfileData & { balance: number } = {
+  storeBanner: "",
   profilePicture: "",
   businessName: "",
   shopName: "",
-  status: "pending",
+  status: "PENDING",
   balance: 0,
 };
 
@@ -79,7 +76,6 @@ export default function ProfileScreen() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const balanceInterval = useRef<number | null>(null);
 
-  // Fetch profile and store info
   const loadProfile = async (isRefresh = false) => {
     if (!isRefresh) setLoading(true);
     try {
@@ -88,15 +84,15 @@ export default function ProfileScreen() {
         fetchStorePublicDetails(),
         fetchStoreBalance(),
       ]);
+
       setProfile({
         profilePicture: vendor.image || "",
         businessName: vendor.name || "",
         shopName: store?.name || "",
-        status: vendor.status || "pending",
+        storeBanner: store?.banner || "",
+        status: vendor.status || "PENDING",
         balance: balance?.amount ?? 0,
       });
-    } catch (e) {
-      // Optionally show error toast
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -104,38 +100,49 @@ export default function ProfileScreen() {
   };
 
   useEffect(() => {
-    let mounted = true;
-    if (mounted) {
-      loadProfile();
-    }
+    loadProfile();
 
-    // Set up periodic balance refresh
     balanceInterval.current = setInterval(async () => {
-      try {
-        const balance = await fetchStoreBalance();
-        setProfile((prev) => ({ ...prev, balance: balance?.amount ?? 0 }));
-      } catch {}
-    }, 180000); // 3 minutes
+      const balance = await fetchStoreBalance();
+      setProfile((p) => ({ ...p, balance: balance?.amount ?? 0 }));
+    }, 180000);
 
     return () => {
-      mounted = false;
-      if (balanceInterval.current) {
-        clearInterval(balanceInterval.current);
-      }
+      if (balanceInterval.current) clearInterval(balanceInterval.current);
     };
   }, []);
 
-  /** Handle pull to refresh */
   const handleRefresh = async () => {
     setRefreshing(true);
     await loadProfile(true);
   };
 
-  /** Pick profile image */
   const pickImage = async () => {
-    const permissionResult =
-      await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permissionResult.granted) {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (!permission.granted) {
+      Toast.show({ type: "error", text1: "Permission required" });
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+
+    if (!result.canceled) {
+      setSelectedImage(result.assets[0].uri);
+      setShowImageConfirm(true);
+    }
+  };
+
+  /* -------------------- BANNER HANDLER (OUTSIDE COMPONENT) -------------------- */
+  async function pickAndUploadBanner(onSuccess: () => Promise<void>) {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (!permission.granted) {
       Toast.show({
         type: "error",
         text1: "Permission required to access photos",
@@ -147,281 +154,115 @@ export default function ProfileScreen() {
       mediaTypes: ["images"],
       quality: 0.8,
       allowsEditing: true,
-      aspect: [1, 1],
+      aspect: [16, 9],
     });
 
     if (!result.canceled && result.assets.length > 0) {
-      setSelectedImage(result.assets[0].uri);
-      setShowImageConfirm(true);
+      try {
+        await updateVendorProfileImage(result.assets[0].uri, "banner");
+        Toast.show({
+          type: "success",
+          text1: "Store banner updated successfully",
+        });
+        await onSuccess();
+      } catch (error: any) {
+        Toast.show({
+          type: "error",
+          text1: error.message || "Failed to update store banner",
+        });
+      }
     }
-  };
+  }
 
-  /** Confirm and upload image */
   const handleConfirmImageChange = async () => {
     if (!selectedImage) return;
-
     setUploadingImage(true);
     setShowImageConfirm(false);
 
     try {
       await updateVendorProfileImage(selectedImage);
-
-      Toast.show({
-        type: "success",
-        text1: "Profile image updated successfully",
-      });
-
-      // Refresh profile to get updated image URL
       await loadProfile(true);
-    } catch (error: any) {
-      Toast.show({
-        type: "error",
-        text1: error.message || "Failed to update profile image",
-      });
+      Toast.show({ type: "success", text1: "Profile image updated" });
     } finally {
       setUploadingImage(false);
       setSelectedImage(null);
     }
   };
 
-  /** Cancel image change */
-  const handleCancelImageChange = () => {
-    setShowImageConfirm(false);
-    setSelectedImage(null);
-  };
-
-  /** Get badge color */
   const getStatusColor = (status: VendorStatus) => {
     switch (status) {
-      case "pending":
+      case "PENDING":
         return statusPending;
-      case "approved":
+      case "APPROVED":
         return statusSuccess;
-      case "suspended":
+      case "SUSPENDED":
         return statusError;
     }
   };
 
-  if (loading) {
-    return (
-      <ThemedView style={{ flex: 1 }}>
-        <ScrollView
-          style={{ flex: 1 }}
-          contentContainerStyle={{ padding: 14, gap: 16 }}
-        >
-          {/* Profile Card Skeleton */}
-          <View style={[styles.card, { backgroundColor: surfaceCard }]}>
-            <View style={styles.profileRow}>
-              <View style={styles.profileInfo}>
-                <View
-                  style={[
-                    styles.skeleton,
-                    { width: "80%", height: 20, backgroundColor: borderColor },
-                  ]}
-                />
-                <View
-                  style={[
-                    styles.skeleton,
-                    {
-                      width: "60%",
-                      height: 16,
-                      marginTop: 8,
-                      backgroundColor: borderColor,
-                    },
-                  ]}
-                />
-                <View
-                  style={[
-                    styles.skeleton,
-                    {
-                      width: 120,
-                      height: 28,
-                      marginTop: 8,
-                      borderRadius: 12,
-                      backgroundColor: borderColor,
-                    },
-                  ]}
-                />
-              </View>
-
-              {/* Right: Avatar Skeleton */}
-              <View
-                style={[
-                  styles.skeleton,
-                  {
-                    width: 96,
-                    height: 96,
-                    borderRadius: 48,
-                    backgroundColor: borderColor,
-                  },
-                ]}
-              />
-            </View>
-
-            {/* Balance Card Skeleton */}
-            <View
-              style={[
-                styles.balanceCard,
-                { backgroundColor: surfaceCard, marginTop: 12 },
-              ]}
-            >
-              <View style={{ gap: 4 }}>
-                <View
-                  style={[
-                    styles.skeleton,
-                    { width: 60, height: 16, backgroundColor: borderColor },
-                  ]}
-                />
-                <View
-                  style={[
-                    styles.skeleton,
-                    { width: 100, height: 18, backgroundColor: borderColor },
-                  ]}
-                />
-              </View>
-              <View
-                style={[
-                  styles.skeleton,
-                  {
-                    width: 90,
-                    height: 36,
-                    borderRadius: 8,
-                    backgroundColor: borderColor,
-                  },
-                ]}
-              />
-            </View>
-          </View>
-
-          {/* Account Settings Title Skeleton */}
-          <View
-            style={[
-              styles.skeleton,
-              { width: 150, height: 20, backgroundColor: borderColor },
-            ]}
-          />
-
-          {/* Settings Card Skeleton */}
-          <View style={[styles.card, { backgroundColor: surfaceCard }]}>
-            {[1, 2, 3, 4, 5, 6].map((item) => (
-              <View
-                key={item}
-                style={[
-                  styles.settingRow,
-                  { borderColor: borderColor },
-                  item === 6 && { borderBottomWidth: 0 },
-                ]}
-              >
-                <View
-                  style={[
-                    styles.skeleton,
-                    { width: "60%", height: 16, backgroundColor: borderColor },
-                  ]}
-                />
-                <View
-                  style={[
-                    styles.skeleton,
-                    {
-                      width: 18,
-                      height: 18,
-                      borderRadius: 9,
-                      backgroundColor: borderColor,
-                    },
-                  ]}
-                />
-              </View>
-            ))}
-          </View>
-
-          {/* Logout Button Skeleton */}
-          <View
-            style={[
-              styles.skeleton,
-              {
-                height: 48,
-                borderRadius: 12,
-                backgroundColor: borderColor,
-              },
-            ]}
-          />
-        </ScrollView>
-      </ThemedView>
-    );
-  }
-
   return (
     <ThemedView style={{ flex: 1 }}>
       <ScrollView
-        style={{ flex: 1 }}
         contentContainerStyle={{ padding: 14, gap: 16 }}
-        showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={handleRefresh}
-            tintColor={primary}
-          />
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
         }
       >
-        {/* Profile Card */}
+        {/* ---------------- PROFILE CARD WITH BANNER BACKGROUND ---------------- */}
         <View style={[styles.card, { backgroundColor: surfaceCard }]}>
-          <View style={styles.profileRow}>
-            {/* Left: Info */}
-            <View style={styles.profileInfo}>
-              <ThemedText type="defaultSemiBold" style={{ fontSize: 18 }}>
-                {profile.businessName}
-              </ThemedText>
-              <ThemedText style={{ fontSize: 14, color: mutedText }}>
-                {profile.shopName}
-              </ThemedText>
-              <View
-                style={[
-                  styles.statusBadge,
-                  { backgroundColor: getStatusColor(profile.status) },
-                ]}
-              >
-                <ThemedText
-                  type="defaultSemiBold"
-                  style={{ color: textOnPrimary, fontSize: 12 }}
-                >
-                  {profile.status === "approved"
-                    ? "Approved Vendor"
-                    : profile.status.charAt(0).toUpperCase() +
-                      profile.status.slice(1)}
+          {profile.storeBanner && (
+            <Image
+              source={{ uri: profile.storeBanner }}
+              style={styles.cardBanner}
+            />
+          )}
+
+          <Pressable
+            style={styles.bannerEditOverlay}
+            onPress={() => pickAndUploadBanner(() => loadProfile(true))}
+          >
+            <IconSymbol name="camera.fill" size={20} color="#fff" />
+          </Pressable>
+
+          <View style={styles.cardContent}>
+            <View style={styles.profileRow}>
+              <View style={{ flex: 1 }}>
+                <ThemedText type="title">{profile.businessName}</ThemedText>
+                <ThemedText style={{ color: mutedText }}>
+                  {profile.shopName}
                 </ThemedText>
+
+                <View
+                  style={[
+                    styles.statusBadge,
+                    { backgroundColor: getStatusColor(profile.status) },
+                  ]}
+                >
+                  <ThemedText style={{ color: textOnPrimary, fontSize: 12 }}>
+                    {profile.status}
+                  </ThemedText>
+                </View>
+              </View>
+
+              <View>
+                <Image
+                  source={
+                    profile.profilePicture
+                      ? { uri: profile.profilePicture }
+                      : require("@/assets/default-avatar.png")
+                  }
+                  style={styles.avatar}
+                />
+                <Pressable style={styles.editOverlay} onPress={pickImage}>
+                  <IconSymbol name="camera.fill" size={18} color="#fff" />
+                </Pressable>
               </View>
             </View>
 
-            {/* Right: Avatar */}
-            <View style={{ position: "relative" }}>
-              <Image
-                source={
-                  profile.profilePicture
-                    ? { uri: profile.profilePicture }
-                    : require("@/assets/default-avatar.png")
-                }
-                style={styles.avatar}
-              />
-              {uploadingImage ? (
-                <View style={styles.uploadingOverlay}>
-                  <ActivityIndicator size="large" color="#fff" />
-                </View>
-              ) : (
-                <Pressable style={styles.editOverlay} onPress={pickImage}>
-                  <IconSymbol name="camera.fill" size={20} color="#fff" />
-                </Pressable>
-              )}
-            </View>
-          </View>
-
-          {/* Balance + Withdraw */}
-          {profile.balance !== undefined && (
-            <View
-              style={[styles.balanceCard, { backgroundColor: surfaceCard }]}
-            >
+            <View style={styles.balanceCard}>
               <View>
                 <ThemedText type="defaultSemiBold">Balance</ThemedText>
-                <ThemedText style={{ color: mutedText, fontSize: 14 }}>
+                <ThemedText style={{ color: mutedText }}>
                   ₦{profile.balance.toLocaleString()}
                 </ThemedText>
               </View>
@@ -431,24 +272,21 @@ export default function ProfileScreen() {
                   router.push("/(profile)/withdrawal" as RelativePathString)
                 }
               >
-                <ThemedText style={{ color: "#fff", fontWeight: "600" }}>
-                  Withdraw
-                </ThemedText>
+                <ThemedText style={{ color: "#fff" }}>Withdraw</ThemedText>
               </Pressable>
             </View>
-          )}
+          </View>
         </View>
 
-        {/* Account Settings */}
+        {/* ---------------- SETTINGS ---------------- */}
         <ThemedText type="subtitle">Account Settings</ThemedText>
         <View style={[styles.card, { backgroundColor: surfaceCard }]}>
-          {SETTINGS.map((s, idx) => (
+          {SETTINGS.map((s, i) => (
             <Pressable
               key={s.label}
               style={[
                 styles.settingRow,
-                { borderColor: borderColor },
-                idx === SETTINGS.length - 1 && { borderBottomWidth: 0 },
+                i === SETTINGS.length - 1 && { borderBottomWidth: 0 },
               ]}
               onPress={() => router.push(s.route as RelativePathString)}
             >
@@ -458,10 +296,9 @@ export default function ProfileScreen() {
           ))}
         </View>
 
-        {/* Logout */}
         <Pressable
           style={[styles.logoutButton, { borderColor: statusError }]}
-          onPress={() => signOut()}
+          onPress={signOut}
         >
           <ThemedText style={{ color: statusError }}>Logout</ThemedText>
         </Pressable>
@@ -471,42 +308,52 @@ export default function ProfileScreen() {
         </Text>
       </ScrollView>
 
-      {/* Image Change Confirmation Modal */}
       <ConfirmationModal
         visible={showImageConfirm}
-        message="Do you want to change your profile image?"
+        message="Change profile image?"
         onConfirm={handleConfirmImageChange}
-        onCancel={handleCancelImageChange}
+        onCancel={() => setShowImageConfirm(false)}
         loading={uploadingImage}
       />
-
-      <Toast />
     </ThemedView>
   );
 }
 
+/* -------------------------------- STYLES -------------------------------- */
+
 const styles = StyleSheet.create({
   card: {
-    borderRadius: 12,
+    borderRadius: 14,
+    overflow: "hidden",
+  },
+  cardBanner: {
+    ...StyleSheet.absoluteFillObject,
+    height: 140,
+  },
+  cardContent: {
     padding: 16,
+    paddingTop: 100,
     gap: 12,
+  },
+  bannerEditOverlay: {
+    position: "absolute",
+    right: 12,
+    top: 12,
+    backgroundColor: "#0008",
+    borderRadius: 16,
+    padding: 6,
+    zIndex: 2,
   },
   profileRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
-    gap: 12,
-  },
-  profileInfo: {
-    flex: 1,
-    gap: 4,
   },
   statusBadge: {
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    marginTop: 4,
+    marginTop: 6,
     alignSelf: "flex-start",
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
   },
   avatar: {
     width: 96,
@@ -519,42 +366,26 @@ const styles = StyleSheet.create({
     right: 0,
     backgroundColor: "#000",
     padding: 6,
-    borderRadius: 16,
-  },
-  uploadingOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: "rgba(0, 0, 0, 0.6)",
-    borderRadius: 48,
-    justifyContent: "center",
-    alignItems: "center",
+    borderRadius: 14,
   },
   balanceCard: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
     marginTop: 12,
   },
   withdrawButton: {
     backgroundColor: "#E5A503",
-    paddingVertical: 8,
     paddingHorizontal: 16,
+    paddingVertical: 8,
     borderRadius: 8,
   },
   settingRow: {
+    paddingVertical: 14,
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 12,
     borderBottomWidth: 1,
+    borderColor: "#E5E7EB",
   },
   logoutButton: {
     borderWidth: 1,
@@ -564,11 +395,7 @@ const styles = StyleSheet.create({
   },
   copyright: {
     textAlign: "center",
-    marginTop: 16,
     color: "#9CA3AF",
-  },
-  skeleton: {
-    borderRadius: 6,
-    opacity: 0.3,
+    marginTop: 16,
   },
 });

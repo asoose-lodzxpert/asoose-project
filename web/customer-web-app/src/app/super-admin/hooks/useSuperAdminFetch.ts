@@ -1,6 +1,6 @@
-import { createClient } from "../../../../utils/supabase/client";
-// Validate environment variables at module load
+import { getSession } from "next-auth/react";
 
+// Validate environment variables at module load
 const BACKEND_URL = (() => {
   const url = process.env.NEXT_PUBLIC_API_URL;
   if (!url) {
@@ -10,11 +10,11 @@ const BACKEND_URL = (() => {
   return url.replace(/\/$/, ''); 
 })();
 
-interface FetcherOptions {
+// 1. FIX: Extend RequestInit to include standard fetch options (method, body, etc.)
+interface FetcherOptions extends RequestInit {
   retries?: number;
   retryDelay?: number;
   timeout?: number;
-  signal?: AbortSignal;
 }
 
 interface FetcherError extends Error {
@@ -23,9 +23,9 @@ interface FetcherError extends Error {
 }
 
 /**
- * Production-ready fetcher for SWR with Supabase authentication
+ * Production-ready fetcher for SWR with NextAuth authentication
  * @param url - API endpoint path (will be appended to BACKEND_URL)
- * @param options - Configuration options for retry logic and timeout
+ * @param options - Configuration options for retry logic, timeout, AND standard fetch options
  * @returns Promise with the JSON response
  */
 export const fetcher = async <T = any>(
@@ -37,18 +37,12 @@ export const fetcher = async <T = any>(
     retryDelay = 1000,
     timeout = 30000,
     signal,
+    headers, // 2. FIX: Extract headers to merge them later
+    ...fetchOptions // 3. FIX: Capture remaining standard options (method, body)
   } = options;
 
-  const supabase = createClient();
-
-  // Get and validate session
-  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-
-  if (sessionError) {
-    const error: FetcherError = new Error('Session error: ' + sessionError.message);
-    error.status = 401;
-    throw error;
-  }
+  // 1. Get and validate session using NextAuth
+  const session = await getSession();
 
   if (!session) {
     const error: FetcherError = new Error('Authentication required');
@@ -56,20 +50,13 @@ export const fetcher = async <T = any>(
     throw error;
   }
 
-  // Check token expiration and refresh if needed (within 60 seconds of expiry)
-  let activeSession = session;
-  const expiresAt = session.expires_at;
-  const now = Math.floor(Date.now() / 1000);
+  // 2. Extract Token 
+  const token = (session as any).accessToken || (session.user as any)?.accessToken;
 
-  if (expiresAt && expiresAt - now < 60) {
-    const { data: { session: refreshedSession }, error: refreshError } = 
-      await supabase.auth.refreshSession();
-
-    if (refreshError) {
-      console.warn('Failed to refresh session:', refreshError.message);
-    } else if (refreshedSession) {
-      activeSession = refreshedSession;
-    }
+  if (!token) {
+    const error: FetcherError = new Error('No access token found in session');
+    error.status = 401;
+    throw error;
   }
 
   const fullUrl = `${BACKEND_URL}${url}`;
@@ -87,9 +74,11 @@ export const fetcher = async <T = any>(
 
     try {
       const res = await fetch(fullUrl, {
+        ...fetchOptions, // 4. FIX: Spread the method, body, etc. here
         headers: {
-          'Authorization': `Bearer ${activeSession.access_token}`,
+          'Authorization': `Bearer ${token}`, // Use NextAuth Token
           'Content-Type': 'application/json',
+          ...headers as any, // 5. FIX: Merge in any custom headers passed in options
         },
         signal: combinedSignal,
       });
@@ -98,6 +87,10 @@ export const fetcher = async <T = any>(
 
       // Success case
       if (res.ok) {
+        // Handle empty responses (like 204 No Content) to avoid JSON parse errors
+        if (res.status === 204) {
+          return {} as T;
+        }
         const data = await res.json();
         return data as T;
       }
@@ -242,4 +235,3 @@ export const createFetcher = (defaultOptions: FetcherOptions = {}) => {
     return fetcher<T>(url, { ...defaultOptions, ...options });
   };
 };
-

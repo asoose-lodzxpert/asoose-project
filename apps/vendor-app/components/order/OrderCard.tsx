@@ -17,9 +17,11 @@ interface Props {
   onAccept?: () => void;
   onDecline?: () => void;
   onPrepare?: () => void;
+  onMarkReady?: () => void;
   accepting?: boolean;
   declining?: boolean;
   preparing?: boolean;
+  markingReady?: boolean;
 }
 
 export const OrderCard: React.FC<Props> = ({
@@ -28,9 +30,11 @@ export const OrderCard: React.FC<Props> = ({
   onAccept,
   onDecline,
   onPrepare,
+  onMarkReady,
   accepting = false,
   declining = false,
   preparing = false,
+  markingReady = false,
 }) => {
   const background = useThemeColor({}, "surfaceCard");
   const primary = useThemeColor({}, "brandPrimary");
@@ -74,11 +78,8 @@ export const OrderCard: React.FC<Props> = ({
       {/* Top row */}
       <View style={styles.topRow}>
         <View style={{ flexDirection: "row", alignItems: "center" }}>
-          {order.customerProfile ? (
-            <Image
-              source={{ uri: order.customerProfile }}
-              style={styles.profile}
-            />
+          {order.user?.image ? (
+            <Image source={{ uri: order.user.image }} style={styles.profile} />
           ) : (
             <View style={[styles.profile, { backgroundColor: borderColor }]}>
               <IconSymbol
@@ -89,10 +90,12 @@ export const OrderCard: React.FC<Props> = ({
             </View>
           )}
           <View style={{ marginLeft: 8 }}>
-            <ThemedText type="defaultSemiBold">{order.customerName}</ThemedText>
-            {order.customerPhone && (
+            <ThemedText type="defaultSemiBold">
+              {order.user?.name || ""}
+            </ThemedText>
+            {order.user?.phone && (
               <ThemedText style={{ color: grey, fontSize: 12 }}>
-                {order.customerPhone}
+                {order.user.phone}
               </ThemedText>
             )}
           </View>
@@ -109,7 +112,10 @@ export const OrderCard: React.FC<Props> = ({
               {item.quantity}x {item.nameSnap}
             </ThemedText>
             <ThemedText style={{ color: grey }}>
-              ₦{(item.priceSnap * item.quantity).toLocaleString()}
+              ₦
+              {(
+                (Number(item.price) || 0) * (Number(item.quantity) || 0)
+              ).toLocaleString()}
             </ThemedText>
           </View>
         ))}
@@ -141,10 +147,30 @@ export const OrderCard: React.FC<Props> = ({
       {/* Total */}
       <View style={styles.totalRow}>
         <ThemedText type="defaultSemiBold">Total</ThemedText>
-        <ThemedText type="defaultSemiBold" style={{ fontSize: 18 }}>
-          ₦{order.total.toLocaleString()}
-        </ThemedText>
+        <View style={{ alignItems: "flex-end" }}>
+          <ThemedText type="defaultSemiBold" style={{ fontSize: 18 }}>
+            ₦{(Number(order.total) || 0).toLocaleString()}
+          </ThemedText>
+        </View>
       </View>
+
+      {/* Mark as Ready (when preparing) */}
+      {order.status === "PREPARING" && (
+        <Pressable
+          style={[
+            styles.fullButton,
+            { backgroundColor: primary, opacity: markingReady ? 0.5 : 1 },
+          ]}
+          onPress={onMarkReady}
+          disabled={markingReady}
+        >
+          {markingReady ? (
+            <ActivityIndicator color="#fff" size="small" />
+          ) : (
+            <ThemedText style={{ color: "#fff" }}>Mark as Ready</ThemedText>
+          )}
+        </Pressable>
+      )}
 
       {/* Actions */}
       {tab === "pending" && order.status === "PENDING" && (

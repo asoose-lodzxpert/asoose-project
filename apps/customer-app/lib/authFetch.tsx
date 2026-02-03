@@ -1,62 +1,85 @@
-import { useCallback } from "react";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import {
+  authConfig,
+  getAccessToken,
+  refreshAccessToken,
+} from "@/services/auth.service";
 
-const DEFAULT_BACKEND = "https://asoose.com/api/v1/";
-const BACKEND_URL =
-  (process.env.BACKEND_URL || DEFAULT_BACKEND).replace(/\/+$/, "") + "/";
+const BACKEND_URL = `${authConfig.apiBase}/`;
 
 type FetchOpts = RequestInit & { absolute?: boolean };
-
-const ACCESS_TOKEN_KEY = "@auth/access_token";
 
 /**
  * Hook that returns helpers for making requests with the access token from AsyncStorage
  * included as a Bearer token in the Authorization header.
  */
-export function useAuthFetch() {
-  const request = useCallback(async (path: string, opts: FetchOpts = {}) => {
-    const { absolute = false, headers: incomingHeaders, ...rest } = opts;
-    const url = absolute ? path : BACKEND_URL + path.replace(/^\/+/, "");
 
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-      ...(typeof incomingHeaders === "object"
-        ? (incomingHeaders as Record<string, string>)
-        : {}),
-    };
+export async function request(path: string, opts: FetchOpts = {}) {
+  const { absolute = false, headers: incomingHeaders, ...rest } = opts;
+  const url = absolute ? path : BACKEND_URL + path.replace(/^\/+/, "");
 
-    // Get token from AsyncStorage
-    const token = await AsyncStorage.getItem(ACCESS_TOKEN_KEY);
-    if (token) headers["Authorization"] = `Bearer ${token}`;
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...(typeof incomingHeaders === "object"
+      ? (incomingHeaders as Record<string, string>)
+      : {}),
+  };
 
-    const res = await fetch(url, { headers, ...rest });
-    const text = await res.text();
-    let body: any = null;
+  let token = await getAccessToken();
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  async function execute() {
+    const response = await fetch(url, { headers, ...rest });
+    const parsed = await parseBody(response);
+    return { response, parsed };
+  }
+
+  let { response, parsed } = await execute();
+
+  if (response.status === 401 && token) {
     try {
-      body = text ? JSON.parse(text) : null;
-    } catch {
-      body = text;
+      const newToken = await refreshAccessToken();
+      token = newToken;
+      headers["Authorization"] = `Bearer ${newToken}`;
+      ({ response, parsed } = await execute());
+    } catch (error) {
+      throw error instanceof Error ? error : new Error("Session expired");
     }
+  }
 
-    if (!res.ok) throw body || new Error(`HTTP ${res.status}`);
-    return body;
-  }, []);
-
-  const get = useCallback(
-    (path: string, opts: FetchOpts = {}) =>
-      request(path, { method: "GET", ...opts }),
-    [request]
-  );
-
-  const post = useCallback(
-    (path: string, body?: any, opts: FetchOpts = {}) => {
-      const payload = body === undefined ? undefined : JSON.stringify(body);
-      return request(path, { method: "POST", body: payload, ...opts });
-    },
-    [request]
-  );
-
-  return { request, get, post, backendUrl: BACKEND_URL };
+  if (!response.ok) throw toError(parsed, response.statusText);
+  return parsed;
 }
 
-export default useAuthFetch;
+export function get(path: string, opts: FetchOpts = {}) {
+  return request(path, { method: "GET", ...opts });
+}
+
+export function post(path: string, body?: any, opts: FetchOpts = {}) {
+  const payload = body === undefined ? undefined : JSON.stringify(body);
+  return request(path, { method: "POST", body: payload, ...opts });
+}
+
+export function patch(path: string, body?: any, opts: FetchOpts = {}) {
+  const payload = body === undefined ? undefined : JSON.stringify(body);
+  return request(path, { method: "PATCH", body: payload, ...opts });
+}
+
+export { BACKEND_URL as backendUrl };
+
+async function parseBody(res: Response) {
+  const text = await res.text();
+  if (!text) return null;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
+}
+
+function toError(body: any, fallback: string) {
+  if (!body) return new Error(fallback || "Request failed");
+  if (typeof body === "string") return new Error(body);
+  if (typeof body.message === "string") return new Error(body.message);
+  if (typeof body.error === "string") return new Error(body.error);
+  return new Error(fallback || "Request failed");
+}

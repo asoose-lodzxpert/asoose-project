@@ -84,7 +84,6 @@ export class VendorOrdersController {
     @Body('reason') reason: string,
   ) {
     const vendorId = req.user.id;
-    this.logger.log(`Vendor ${vendorId} declining order ${id}`);
     return this.ordersService.declineOrder(
       vendorId,
       id,
@@ -101,7 +100,6 @@ export class VendorOrdersController {
   @Patch(':id/ready')
   async markReady(@Request() req, @Param('id') id: string) {
     const vendorId = req.user.id;
-    this.logger.log(`Vendor ${vendorId} marked order ${id} as READY`);
     return this.ordersService.markReady(vendorId, id);
   }
 }

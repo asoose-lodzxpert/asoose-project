@@ -42,6 +42,7 @@ export class RiderAuthService {
         email: dto.email,
         countryCode: dto.countryCode,
         phone: dto.phone,
+        role: dto.role,
         password: hashedPassword,
         image: dto.image,
         currentLat: dto.location?.lat,
@@ -110,7 +111,7 @@ export class RiderAuthService {
     });
 
     // Send welcome email
-    await this.emailProducer.sendWelcomeEmail(rider.email, rider.name);
+    await this.emailProducer.sendRiderWelcomeEmail(rider.email, rider.name);
 
     return {
       rider: {
@@ -209,7 +210,7 @@ export class RiderAuthService {
     }
 
     const otp = await this.otpService.generateOtp(email);
-    await this.emailProducer.sendPasswordResetOtp(email, rider.name, otp);
+    await this.emailProducer.sendRiderPasswordResetOtp(email, rider.name, otp);
 
     return { message: 'OTP sent to your email' };
   }
@@ -280,7 +281,7 @@ export class RiderAuthService {
     try {
       const payload = this.jwtService.verify(refreshToken);
       const rider = await this.prisma.rider.findUnique({
-        where: { id: payload.sub || payload.id }, // Support both for backward compatibility
+        where: { id: payload.sub || payload.id },
       });
 
       if (!rider) {
@@ -337,6 +338,17 @@ export class RiderAuthService {
     });
 
     return { message: 'Push token saved' };
+  }
+
+  // ============== DELETE PUSH TOKEN ==============
+  async deletePushToken(riderId: string) {
+    await this.prisma.rider.update({
+      where: { id: riderId },
+      data: {
+        expoPushToken: null,
+      },
+    });
+    return { message: 'Push token deleted' };
   }
 
   // ============== RIDER DETAILS (Vehicle, Documents, Bank) ==============
