@@ -1,5 +1,5 @@
 import React from "react";
-import { ScrollView, View, StyleSheet } from "react-native";
+import { ScrollView, View, StyleSheet, TouchableOpacity } from "react-native";
 import { ThemedText } from "@/components/themed-text";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import type { StoreData, Review } from "@/types/store-types";
@@ -9,9 +9,15 @@ interface StoreInfoProps {
   store: StoreData;
   reviews: Review[];
   loading?: boolean;
+  onWriteReview?: () => void;
 }
 
-export function StoreInfo({ store, reviews, loading = false }: StoreInfoProps) {
+export function StoreInfo({
+  store,
+  reviews,
+  loading = false,
+  onWriteReview,
+}: StoreInfoProps) {
   const isRestaurant = store.type === "RESTAURANT";
   const cardBg = useThemeColor({}, "surfaceCard");
   const border = useThemeColor({}, "borderDefault");
@@ -20,6 +26,7 @@ export function StoreInfo({ store, reviews, loading = false }: StoreInfoProps) {
   const avatarBg = useThemeColor({}, "surfaceSubtle");
   const skeletonColor = useThemeColor({}, "surfaceSubtle");
   const starColor = useThemeColor({}, "statusSuccess");
+  const primary = useThemeColor({}, "brandPrimary");
 
   const renderReview = (review: Review, idx: number) => (
     <View
@@ -121,6 +128,17 @@ export function StoreInfo({ store, reviews, loading = false }: StoreInfoProps) {
       <ThemedText style={[styles.infoTitle, { color: text }]}>
         Reviews
       </ThemedText>
+      {onWriteReview && (
+        <TouchableOpacity
+          style={[styles.writeReviewButton, { backgroundColor: primary }]}
+          onPress={onWriteReview}
+        >
+          <IconSymbol name="pencil" size={18} color="#fff" />
+          <ThemedText style={styles.writeReviewText}>
+            Write a Review
+          </ThemedText>
+        </TouchableOpacity>
+      )}
       {loading ? (
         Array.from({ length: 3 }).map(renderSkeleton)
       ) : reviews.length === 0 ? (
@@ -187,6 +205,20 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: "#333",
     marginTop: 2,
+  },
+  writeReviewButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 12,
+    borderRadius: 10,
+    marginBottom: 16,
+    gap: 8,
+  },
+  writeReviewText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
   },
   noReviewsText: {
     fontSize: 14,

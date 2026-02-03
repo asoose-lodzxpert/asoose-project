@@ -13,6 +13,7 @@ import { SendPackageProvider } from "@/context/SendPackageContext";
 import ThemedToastProvider from "@/components/ui/ThemedToast";
 import { HomeProvider } from "@/context/HomeContext";
 import { ToastProvider } from "@/components/ui/toast";
+import { RideProvider } from "@/context/RideContext";
 
 /* ---------------------------------- */
 /* Root Navigator */
@@ -105,12 +106,14 @@ export default function RootLayout() {
         <ConfirmProvider>
           <CartProvider>
             <HomeProvider>
+              <RideProvider>
               <SendPackageProvider>
                 <ToastProvider>
                   <RootNavigator />
                   <ThemedToastProvider />
                 </ToastProvider>
               </SendPackageProvider>
+              </RideProvider>
             </HomeProvider>
           </CartProvider>
         </ConfirmProvider>

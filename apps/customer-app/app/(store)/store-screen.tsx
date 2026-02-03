@@ -19,6 +19,7 @@ import { ActionTabs } from "@/components/store/ActionTabs";
 import { CategoryFilter } from "@/components/store/CategoryFilter";
 import { ProductList } from "@/components/store/ProductList";
 import { StoreInfo } from "@/components/store/StoreInfo";
+import { ReviewModal } from "@/components/store/ReviewModal";
 import type { StoreData, Product } from "@/types/store-types";
 
 import { useCart } from "@/context/CartContext";
@@ -34,6 +35,7 @@ export default function StoreScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [reviewModalVisible, setReviewModalVisible] = useState(false);
 
   const [currentTab, setCurrentTab] = useState<TabType>("all");
   const [activeCategory, setActiveCategory] = useState("Popular");
@@ -120,7 +122,11 @@ export default function StoreScreen() {
         <>
           <PromoBanner promoText="20% off orders over ₦5000 🎉" />
           <ActionTabs currentTab={currentTab} onTabChange={setCurrentTab} />
-          <StoreInfo store={storeData} reviews={storeData.reviews} />
+          <StoreInfo
+            store={storeData}
+            reviews={storeData.reviews}
+            onWriteReview={() => setReviewModalVisible(true)}
+          />
         </>
       );
     }
@@ -196,6 +202,18 @@ export default function StoreScreen() {
       </ScrollView>
 
       <FloatingCart />
+
+      {storeData && (
+        <ReviewModal
+          visible={reviewModalVisible}
+          onClose={() => setReviewModalVisible(false)}
+          storeId={storeData.id}
+          storeName={storeData.name}
+          onSuccess={() => {
+            loadStore();
+          }}
+        />
+      )}
     </ThemedView>
   );
 }

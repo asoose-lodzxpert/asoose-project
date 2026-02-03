@@ -1,0 +1,171 @@
+import { request, get, post, patch } from "@/lib/authFetch";
+import {
+  Ride,
+  FareEstimate,
+  CreateRidePayload,
+  RideEstimatePayload,
+  ConfirmRidePayload,
+  CancelRidePayload,
+  DriverLocation,
+} from "@/types/ride";
+
+export class RideService {
+  /**
+   * Get fare estimate for a ride
+   * Uses /fare/ride endpoint as specified
+   */
+  static async estimateRide(
+    payload: RideEstimatePayload
+  ): Promise<FareEstimate> {
+    return post("fare/ride", payload);
+  }
+
+  /**
+   * Request a new ride (creates ride in PENDING status)
+   */
+  static async requestRide(payload: CreateRidePayload): Promise<{
+    ride: Ride;
+    fareBreakdown: any;
+    payment: any;
+    message: string;
+  }> {
+    return post("trips/rides/request", payload);
+  }
+
+  /**
+   * Confirm ride payment (transitions to REQUESTED and triggers driver matching)
+   */
+  static async confirmRide(
+    rideId: string,
+    paymentMethod: "CASH" | "CARD"
+  ): Promise<{ status: string; rideId: string }> {
+    return post(`trips/rides/${rideId}/confirm`, { paymentMethod });
+  }
+
+  /**
+   * Get current active ride for the user
+   */
+  static async getCurrentRide(): Promise<Ride | null> {
+    try {
+      const ride = await get("trips/rides/current");
+      return ride || null;
+    } catch (error: any) {
+      if (error?.message?.includes("not found") || error?.message?.includes("404")) {
+        return null;
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Get specific ride by ID
+   */
+  static async getRideById(rideId: string): Promise<Ride> {
+    return get(`trips/rides/${rideId}`);
+  }
+
+  /**
+   * Cancel an active ride
+   */
+  static async cancelRide(
+    rideId: string,
+    payload: CancelRidePayload
+  ): Promise<{ message: string }> {
+    return patch(`trips/rides/${rideId}/cancel`, payload);
+  }
+
+  /**
+   * Get driver's current location
+   */
+  static async getDriverLocation(rideId: string): Promise<DriverLocation> {
+    return get(`trips/rides/${rideId}/driver-location`);
+  }
+
+  /**
+   * Get user's ride history
+   */
+  static async getUserRides(params?: {
+    status?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<Ride[]> {
+    const queryParams = new URLSearchParams();
+    if (params?.status) queryParams.set("status", params.status);
+    if (params?.page) queryParams.set("page", String(params.page));
+    if (params?.limit) queryParams.set("limit", String(params.limit));
+
+    const query = queryParams.toString();
+    return get(`trips/rides${query ? `?${query}` : ""}`);
+  }
+
+  /**
+   * Format currency for display
+   */
+  static formatCurrency(amount: number): string {
+    return new Intl.NumberFormat("en-NG", {
+      style: "currency",
+      currency: "NGN",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount);
+  }
+
+  /**
+   * Format duration in minutes to readable string
+   */
+  static formatDuration(minutes: number): string {
+    if (minutes < 60) {
+      return `${Math.round(minutes)} min`;
+    }
+    const hours = Math.floor(minutes / 60);
+    const mins = Math.round(minutes % 60);
+    if (mins === 0) {
+      return `${hours} hr`;
+    }
+    return `${hours} hr ${mins} min`;
+  }
+
+  /**
+   * Format distance in km to readable string
+   */
+  static formatDistance(km: number): string {
+    if (km < 1) {
+      return `${Math.round(km * 1000)} m`;
+    }
+    return `${km.toFixed(1)} km`;
+  }
+
+  /**
+   * Get vehicle type display name
+   */
+  static getVehicleTypeName(type: string): string {
+    const names: Record<string, string> = {
+      BIKE: "Bike",
+      CAR: "Car",
+      VAN: "Van",
+    };
+    return names[type] || type;
+  }
+
+  /**
+   * Get vehicle type description
+   */
+  static getVehicleTypeDescription(type: string): string {
+    const descriptions: Record<string, string> = {
+      BIKE: "Quick and affordable",
+      CAR: "Comfortable ride",
+      VAN: "Extra space for groups",
+    };
+    return descriptions[type] || "";
+  }
+
+  /**
+   * Mask phone number for privacy
+   */
+  static maskPhoneNumber(phone: string): string {
+    if (!phone || phone.length < 4) return phone;
+    const last4 = phone.slice(-4);
+    const masked = "*".repeat(Math.max(0, phone.length - 4));
+    return masked + last4;
+  }
+}
