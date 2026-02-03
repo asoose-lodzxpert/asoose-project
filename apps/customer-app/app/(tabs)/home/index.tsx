@@ -23,6 +23,7 @@ import { ThemedText } from "@/components/themed-text";
 import { useHomeContext } from "@/context/HomeContext";
 import type { StoreFilterSlug, Banner } from "@/types/home";
 import type { IconSymbolName } from "@/components/ui/icon-symbol";
+import { SkeletonStoreCard } from "@/components/ui/Skeleton";
 
 export type CategoryOption = {
   key: StoreFilterSlug | string;
@@ -206,7 +207,11 @@ export default function HomeScreen() {
         }
         ListFooterComponent={
           <View style={{ paddingVertical: 24, alignItems: "center" }}>
-            {storeLoading && stores.length > 0 ? <ActivityIndicator /> : null}
+            {storeLoading && stores.length > 0 ? (
+              <View style={{ paddingHorizontal: 16, paddingBottom: 16 }}>
+                <SkeletonStoreCard />
+              </View>
+            ) : null}
             {!hasMore && stores.length > 0 ? (
               <ThemedText style={{ color: "#6B7280", marginTop: 8 }}>
                 {"You've reached the end."}

@@ -11,15 +11,13 @@ import {
   StyleSheet,
   Pressable,
   FlatList,
-  ActivityIndicator,
-  Dimensions,
 } from "react-native";
+import { SkeletonCard } from "@/components/ui/Skeleton";
 import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { RelativePathString, useRouter } from "expo-router";
-import { CustomDropdown } from "@/components/CustomDropdown";
 import { fetchOrderHistory } from "@/services/order-history.service";
 import { OrderStatus, Order } from "@/types/order-types";
 
@@ -305,7 +303,7 @@ export default function OrderHistoryScreen() {
             ListEmptyComponent={renderEmpty}
             ListFooterComponent={
               loading && orders.length > 0 ? (
-                <ActivityIndicator style={{ marginVertical: 16 }} />
+                <SkeletonCard style={{ marginHorizontal: 16 }} />
               ) : null
             }
             contentContainerStyle={

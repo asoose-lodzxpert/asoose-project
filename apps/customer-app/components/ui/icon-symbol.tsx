@@ -23,9 +23,6 @@ export type IconSymbolName =
   | "chevron.left"
   | "chevron.down"
   | "chevron.up"
-  | "chevron.left"
-  | "chevron.down"
-  | "chevron.up"
   | "info.circle"
   | "cloud.upload"
   | "camera.fill"
@@ -112,11 +109,6 @@ export type IconSymbolName =
   | "person.text.rectangle"
   | "doc.text"
   | "creditcard"
-  | "location"
-  | "shopping-bag"
-  | "truck"
-  | "moon"
-  | "log-out"
   | "car"
   | "box.truck"
   | "calendar"
@@ -136,7 +128,21 @@ export type IconSymbolName =
   | "x"
   | "cart"
   | "star"
-  | "heart";
+  | "heart"
+  | "banknote"
+  | "checkmark.circle"
+  | "exclamationmark"
+  | "exclamationmark.triangle"
+  | "magnifyingglass"
+  | "mappin"
+  | "message.fill"
+  | "number"
+  | "phone.fill"
+  | "slider.horizontal.3"
+  | "xmark.circle"
+  | "building.columns"
+  | "xmark.circle.fill"
+  | "doc.on.doc";
 
 export const MAPPING: Record<
   IconSymbolName,
@@ -268,6 +274,20 @@ export const MAPPING: Record<
   cart: "shopping-cart",
   star: "star",
   heart: "monitor-heart",
+  banknote: "payments",
+  "checkmark.circle": "check-circle-outline",
+  exclamationmark: "priority-high",
+  "exclamationmark.triangle": "warning",
+  magnifyingglass: "search",
+  mappin: "place",
+  "message.fill": "message",
+  number: "tag",
+  "phone.fill": "phone",
+  "slider.horizontal.3": "tune",
+  "xmark.circle": "cancel",
+  "building.columns": "account-balance",
+  "xmark.circle.fill": "cancel",
+  "doc.on.doc": "content-copy",
 };
 
 interface IconSymbolProps {

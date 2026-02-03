@@ -17,6 +17,7 @@ import { useThemeColor } from "@/hooks/use-theme-color";
 import { useRouter } from "expo-router";
 import { ThemedInput } from "@/components/ThemedInput";
 import { useToast } from "@/components/ui/toast";
+import { SkeletonAddressCard } from "@/components/ui/Skeleton";
 
 import { Address } from "@/types/address";
 import {
@@ -51,7 +52,7 @@ export default function Addresses() {
   const [saving, setSaving] = useState(false);
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const mapRef = useRef<MapView>(null);
-  const debounceRef = useRef<number | null>(null);
+  const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
   // ---------------- Load Addresses ----------------
   useEffect(() => {
@@ -322,8 +323,10 @@ export default function Addresses() {
     return (
       <ThemedView style={styles.container}>
         <Header title="Saved Addresses" onBack={() => router.back()} />
-        <View style={{ marginTop: 32 }}>
-          <ActivityIndicator size="large" color={primary} />
+        <View style={{ paddingHorizontal: 16, paddingTop: 16 }}>
+          {Array.from({ length: 5 }).map((_, i) => (
+            <SkeletonAddressCard key={i} />
+          ))}
         </View>
       </ThemedView>
     );

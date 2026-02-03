@@ -6,9 +6,12 @@ import {
   ActivityIndicator,
   Alert,
   RefreshControl,
+  Dimensions,
 } from "react-native";
-import { useState } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "expo-router";
+import * as Location from "expo-location";
+import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from "react-native-maps";
 import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
 import { IconSymbol } from "@/components/ui/icon-symbol";
@@ -20,6 +23,10 @@ import { DriverInfoCard } from "@/components/ride/DriverInfoCard";
 import { TripProgressTracker } from "@/components/ride/TripProgressTracker";
 import { OTPDisplay } from "@/components/ride/OTPDisplay";
 import { RideService } from "@/services/ride.service";
+import { get } from "@/lib/authFetch";
+
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
+const MAP_HEIGHT = SCREEN_HEIGHT * 0.5;
 
 export default function RideTrackingScreen() {
   const router = useRouter();
@@ -43,6 +50,138 @@ export default function RideTrackingScreen() {
 
   const [refreshing, setRefreshing] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const [userLocation, setUserLocation] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
+  const [routeCoordinates, setRouteCoordinates] = useState<
+    Array<{ latitude: number; longitude: number }>
+  >([]);
+  const mapRef = useRef<MapView>(null);
+
+  // Get user's current location
+  useEffect(() => {
+    let locationSubscription: Location.LocationSubscription | null = null;
+
+    const startLocationTracking = async () => {
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== "granted") return;
+
+        // Get initial location
+        const location = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.High,
+        });
+        setUserLocation({
+          latitude: location.coords.latitude,
+          longitude: location.coords.longitude,
+        });
+
+        // Watch location updates
+        locationSubscription = await Location.watchPositionAsync(
+          {
+            accuracy: Location.Accuracy.High,
+            timeInterval: 3000,
+            distanceInterval: 10,
+          },
+          (location) => {
+            setUserLocation({
+              latitude: location.coords.latitude,
+              longitude: location.coords.longitude,
+            });
+          }
+        );
+      } catch (error) {
+        console.error("Error getting location:", error);
+      }
+    };
+
+    startLocationTracking();
+
+    return () => {
+      if (locationSubscription) {
+        locationSubscription.remove();
+      }
+    };
+  }, []);
+
+  // Fetch route directions
+  const fetchRoute = useCallback(async () => {
+    if (!currentRide?.pickupAddress || !currentRide?.dropoffAddress) return;
+
+    try {
+      const pickup = currentRide.pickupAddress;
+      const dropoff = currentRide.dropoffAddress;
+
+      const response = await get(
+        `maps/directions?originLat=${pickup.lat}&originLng=${pickup.lng}&destLat=${dropoff.lat}&destLng=${dropoff.lng}`
+      );
+
+      if (response.coordinates && response.coordinates.length > 0) {
+        setRouteCoordinates(response.coordinates);
+      }
+    } catch (error) {
+      console.error("Error fetching route:", error);
+    }
+  }, [currentRide?.pickupAddress, currentRide?.dropoffAddress]);
+
+  // Fit map to show all markers
+  const fitMapToMarkers = useCallback(() => {
+    if (!mapRef.current) return;
+
+    const coordinates: Array<{ latitude: number; longitude: number }> = [];
+
+    // Add pickup
+    if (currentRide?.pickupAddress) {
+      coordinates.push({
+        latitude: currentRide.pickupAddress.lat,
+        longitude: currentRide.pickupAddress.lng,
+      });
+    }
+
+    // Add dropoff
+    if (currentRide?.dropoffAddress) {
+      coordinates.push({
+        latitude: currentRide.dropoffAddress.lat,
+        longitude: currentRide.dropoffAddress.lng,
+      });
+    }
+
+    // Add driver location
+    if (driverLocation) {
+      coordinates.push({
+        latitude: driverLocation.latitude,
+        longitude: driverLocation.longitude,
+      });
+    }
+
+    // Add user location if in progress
+    if (userLocation && currentRide?.status === RideStatus.IN_PROGRESS) {
+      coordinates.push(userLocation);
+    }
+
+    if (coordinates.length > 0) {
+      mapRef.current.fitToCoordinates(coordinates, {
+        edgePadding: { top: 100, right: 50, bottom: 300, left: 50 },
+        animated: true,
+      });
+    }
+  }, [currentRide, driverLocation, userLocation]);
+
+  // Initial route fetch and map fit
+  useEffect(() => {
+    if (currentRide) {
+      fetchRoute();
+      setTimeout(() => fitMapToMarkers(), 500);
+    }
+  }, [currentRide?.id, fetchRoute]);
+
+  // Update map when driver or user location changes
+  useEffect(() => {
+    if (driverLocation || userLocation) {
+      fitMapToMarkers();
+    }
+  }, [driverLocation, userLocation]);
 
   if (!currentRide) {
     return (
@@ -104,27 +243,113 @@ export default function RideTrackingScreen() {
 
   return (
     <ThemedView style={[styles.container, { backgroundColor: surface }]}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backButton}>
-          <IconSymbol name="chevron.left" size={24} color={primary} />
-        </Pressable>
-        <View style={styles.headerContent}>
-          <ThemedText type="subtitle">Your Ride</ThemedText>
-          <View style={styles.statusBadge}>
-            <View
-              style={[
-                styles.statusDot,
-                {
-                  backgroundColor: socketConnected ? success : danger,
-                },
-              ]}
+      {/* Live Interactive Map */}
+      <View style={styles.mapContainer}>
+        <MapView
+          ref={mapRef}
+          provider={PROVIDER_GOOGLE}
+          style={styles.map}
+          initialRegion={{
+            latitude: currentRide?.pickupAddress?.lat || 0,
+            longitude: currentRide?.pickupAddress?.lng || 0,
+            latitudeDelta: 0.05,
+            longitudeDelta: 0.05,
+          }}
+          showsUserLocation={currentRide.status === RideStatus.IN_PROGRESS}
+          showsMyLocationButton={false}
+          showsCompass={true}
+          rotateEnabled={false}
+        >
+          {/* Pickup Marker */}
+          {currentRide.pickupAddress && (
+            <Marker
+              coordinate={{
+                latitude: currentRide.pickupAddress.lat,
+                longitude: currentRide.pickupAddress.lng,
+              }}
+              title="Pickup Location"
+              pinColor="#10b981"
             />
-            <ThemedText type="caption" style={{ color: textSecondary }}>
-              {socketConnected ? "Live" : "Offline"}
-            </ThemedText>
+          )}
+
+          {/* Dropoff Marker */}
+          {currentRide.dropoffAddress && (
+            <Marker
+              coordinate={{
+                latitude: currentRide.dropoffAddress.lat,
+                longitude: currentRide.dropoffAddress.lng,
+              }}
+              title="Dropoff Location"
+              pinColor="#ef4444"
+            />
+          )}
+
+          {/* Driver Marker */}
+          {driverLocation && (
+            <Marker
+              coordinate={driverLocation}
+              title="Driver"
+              description={currentRide.rider?.name || "Your driver"}
+            >
+              <View
+                style={{
+                  backgroundColor: primary,
+                  borderRadius: 20,
+                  padding: 8,
+                  borderWidth: 3,
+                  borderColor: "#fff",
+                }}
+              >
+                <IconSymbol name="car.fill" size={24} color="#fff" />
+              </View>
+            </Marker>
+          )}
+
+          {/* Route Polyline */}
+          {routeCoordinates.length > 0 && (
+            <Polyline
+              coordinates={routeCoordinates}
+              strokeColor={primary}
+              strokeWidth={4}
+              lineDashPattern={[0]}
+            />
+          )}
+        </MapView>
+
+        {/* Overlay Header */}
+        <View style={[styles.overlayHeader, { backgroundColor: `${surface}F5` }]}>
+          <Pressable onPress={() => router.back()} style={styles.backButton}>
+            <IconSymbol name="chevron.left" size={24} color={primary} />
+          </Pressable>
+          <View style={styles.headerContent}>
+            <ThemedText type="subtitle">Your Ride</ThemedText>
+            <View style={styles.statusBadge}>
+              <View
+                style={[
+                  styles.statusDot,
+                  {
+                    backgroundColor: socketConnected ? success : danger,
+                  },
+                ]}
+              />
+              <ThemedText type="caption" style={{ color: textSecondary }}>
+                {socketConnected ? "Live" : "Offline"}
+              </ThemedText>
+            </View>
           </View>
         </View>
+
+        {/* Refresh Button */}
+        <Pressable
+          onPress={() => {
+            handleRefresh();
+            fetchRoute();
+            fitMapToMarkers();
+          }}
+          style={[styles.refreshButton, { backgroundColor: surface }]}
+        >
+          <IconSymbol name="arrow.clockwise" size={20} color={primary} />
+        </Pressable>
       </View>
 
       <ScrollView
@@ -288,6 +513,42 @@ export default function RideTrackingScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  mapContainer: {
+    width: "100%",
+    height: MAP_HEIGHT,
+    position: "relative",
+  },
+  map: {
+    width: "100%",
+    height: "100%",
+  },
+  overlayHeader: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingTop: 60,
+    paddingBottom: 12,
+    gap: 12,
+  },
+  refreshButton: {
+    position: "absolute",
+    bottom: 16,
+    right: 16,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
   header: {
     flexDirection: "row",

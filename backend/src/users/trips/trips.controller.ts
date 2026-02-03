@@ -78,11 +78,18 @@ export class TripsController {
 
   /**
    * Get all user's rides
-   * GET /trips/rides?status=REQUESTED
+   * GET /trips/rides?status=REQUESTED&page=1&limit=10
    */
   @Get('rides')
-  async getUserRides(@Request() req, @Query('status') status?: string) {
-    return this.tripsService.getUserRides(req.user.id, status);
+  async getUserRides(
+    @Request() req,
+    @Query('status') status?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const pageNum = page ? parseInt(page, 10) : 1;
+    const limitNum = limit ? parseInt(limit, 10) : 20;
+    return this.tripsService.getUserRides(req.user.id, status, pageNum, limitNum);
   }
 
   /**

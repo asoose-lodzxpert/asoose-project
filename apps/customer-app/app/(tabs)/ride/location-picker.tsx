@@ -5,15 +5,23 @@ import {
   TextInput,
   ScrollView,
   ActivityIndicator,
+  Dimensions,
 } from "react-native";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter, useLocalSearchParams } from "expo-router";
+import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
+import * as Location from "expo-location";
 import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { useRide } from "@/context/RideContext";
 import { useLocation } from "@/context/LocationContext";
+import axios from "axios";
+
+const API_URL = process.env.EXPO_PUBLIC_API_URL;
+const SCREEN_HEIGHT = Dimensions.get("window").height;
+const MAP_HEIGHT = SCREEN_HEIGHT * 0.35;
 
 export default function LocationPickerScreen() {
   const router = useRouter();
@@ -32,9 +40,148 @@ export default function LocationPickerScreen() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [searching, setSearching] = useState(false);
+  const [autocompleteResults, setAutocompleteResults] = useState<
+    Array<{ id: string; title: string; subtitle: string }>
+  >([]);
+  const [selectedMarker, setSelectedMarker] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
+  const [mapRegion, setMapRegion] = useState({
+    latitude: currentLocation?.coords?.latitude || 6.5244,
+    longitude: currentLocation?.coords?.longitude || 3.3792,
+    latitudeDelta: 0.05,
+    longitudeDelta: 0.05,
+  });
+  const [reverseGeocodedAddress, setReverseGeocodedAddress] = useState("");
+  const [gettingPlaceDetails, setGettingPlaceDetails] = useState(false);
+  const mapRef = useRef<MapView>(null);
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Debounced autocomplete search
+  const searchPlaces = useCallback(async (query: string) => {
+    if (!query || query.length < 3) {
+      setAutocompleteResults([]);
+      return;
+    }
+
+    setSearching(true);
+    try {
+      const location = currentLocation?.coords
+        ? `${currentLocation.coords.latitude},${currentLocation.coords.longitude}`
+        : undefined;
+      
+      const params: any = { query };
+      if (location) params.location = location;
+      
+      const response = await axios.get(`${API_URL}/maps/places-autocomplete`, {
+        params,
+      });
+      setAutocompleteResults(response.data || []);
+    } catch (error) {
+      console.error("Autocomplete error:", error);
+      setAutocompleteResults([]);
+    } finally {
+      setSearching(false);
+    }
+  }, [currentLocation]);
+
+  // Debounce search input
+  useEffect(() => {
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    searchTimeoutRef.current = setTimeout(() => {
+      searchPlaces(searchQuery);
+    }, 300);
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [searchQuery, searchPlaces]);
+
+  // Reverse geocode when marker is moved
+  const reverseGeocode = useCallback(async (lat: number, lng: number) => {
+    try {
+      const results = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lng });
+      if (results && results.length > 0) {
+        const result = results[0];
+        const address = [
+          result.name,
+          result.street,
+          result.city,
+          result.region,
+        ]
+          .filter(Boolean)
+          .join(", ");
+        setReverseGeocodedAddress(address || "Selected Location");
+      }
+    } catch (error) {
+      console.error("Reverse geocode error:", error);
+      setReverseGeocodedAddress("Selected Location");
+    }
+  }, []);
+
+  // Handle map marker drag or tap
+  const handleMapPress = useCallback(
+    (event: any) => {
+      const { latitude, longitude } = event.nativeEvent.coordinate;
+      setSelectedMarker({ latitude, longitude });
+      reverseGeocode(latitude, longitude);
+    },
+    [reverseGeocode]
+  );
+
+  // Get place details from place_id
+  const getPlaceDetails = useCallback(async (placeId: string, title: string, subtitle: string) => {
+    setGettingPlaceDetails(true);
+    try {
+      // Use geocoding to get coordinates from place ID
+      const response = await axios.get(`${API_URL}/maps/geocode`, {
+        params: { placeId },
+      });
+      
+      if (response.data && response.data.lat && response.data.lng) {
+        const location = {
+          latitude: response.data.lat,
+          longitude: response.data.lng,
+          address: subtitle ? `${title}, ${subtitle}` : title,
+        };
+
+        if (type === "pickup") {
+          setPickupLocation(location);
+        } else {
+          setDropoffLocation(location);
+        }
+
+        router.back();
+      }
+    } catch (error) {
+      console.error("Place details error:", error);
+      // Fallback: just use the address without coordinates
+      const location = {
+        latitude: 0,
+        longitude: 0,
+        address: subtitle ? `${title}, ${subtitle}` : title,
+      };
+
+      if (type === "pickup") {
+        setPickupLocation(location);
+      } else {
+        setDropoffLocation(location);
+      }
+
+      router.back();
+    } finally {
+      setGettingPlaceDetails(false);
+    }
+  }, [type, setPickupLocation, setDropoffLocation, router]);
 
   const handleUseCurrentLocation = () => {
-    if (currentLocation) {
+    if (currentLocation?.coords) {
       const location = {
         latitude: currentLocation.coords.latitude,
         longitude: currentLocation.coords.longitude,
@@ -65,6 +212,24 @@ export default function LocationPickerScreen() {
     }
 
     router.back();
+  };
+
+  const handleConfirmMapSelection = () => {
+    if (selectedMarker) {
+      const location = {
+        latitude: selectedMarker.latitude,
+        longitude: selectedMarker.longitude,
+        address: reverseGeocodedAddress || "Selected Location",
+      };
+
+      if (type === "pickup") {
+        setPickupLocation(location);
+      } else {
+        setDropoffLocation(location);
+      }
+
+      router.back();
+    }
   };
 
   // Sample locations (in production, integrate with Google Places API)
@@ -102,9 +267,54 @@ export default function LocationPickerScreen() {
         {searching && <ActivityIndicator size="small" color={primary} />}
       </View>
 
+      {/* Interactive Map */}
+      <View style={[styles.mapContainer, { borderColor: border }]}>
+        <MapView
+          ref={mapRef}
+          provider={PROVIDER_GOOGLE}
+          style={styles.map}
+          initialRegion={mapRegion}
+          onPress={handleMapPress}
+          showsUserLocation={true}
+          showsMyLocationButton={false}
+        >
+          {selectedMarker && (
+            <Marker
+              coordinate={selectedMarker}
+              draggable
+              onDragEnd={handleMapPress}
+              pinColor={primary}
+            />
+          )}
+        </MapView>
+        
+        {selectedMarker && (
+          <View style={[styles.mapOverlay, { backgroundColor: card }]}>
+            <View style={styles.mapOverlayContent}>
+              <IconSymbol name="mappin" size={20} color={primary} />
+              <ThemedText type="caption" style={{ flex: 1, color: textSecondary }}>
+                {reverseGeocodedAddress || "Getting address..."}
+              </ThemedText>
+            </View>
+            <Pressable
+              onPress={handleConfirmMapSelection}
+              style={[styles.confirmButton, { backgroundColor: primary }]}
+            >
+              <ThemedText type="defaultSemiBold" style={{ color: "#fff" }}>
+                Confirm
+              </ThemedText>
+            </Pressable>
+          </View>
+        )}
+
+        <ThemedText type="caption" style={[styles.mapHint, { color: textSecondary }]}>
+          Tap on map to select location
+        </ThemedText>
+      </View>
+
       <ScrollView style={styles.scrollView}>
         {/* Current Location */}
-        {currentLocation && (
+        {currentLocation && !searchQuery && (
           <Pressable
             onPress={handleUseCurrentLocation}
             style={[styles.locationItem, { backgroundColor: card, borderColor: border }]}
@@ -122,33 +332,90 @@ export default function LocationPickerScreen() {
           </Pressable>
         )}
 
-        {/* Sample Locations */}
-        <ThemedText type="caption" style={[styles.sectionTitle, { color: textSecondary }]}>
-          Popular Locations
-        </ThemedText>
+        {/* Loading State */}
+        {searching && (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="small" color={primary} />
+            <ThemedText type="caption" style={{ color: textSecondary, marginLeft: 8 }}>
+              Searching...
+            </ThemedText>
+          </View>
+        )}
 
-        {sampleLocations
-          .filter((loc) =>
-            loc.name.toLowerCase().includes(searchQuery.toLowerCase())
-          )
-          .map((loc, index) => (
-            <Pressable
-              key={index}
-              onPress={() => handleSelectLocation(loc.name, loc.lat, loc.lng)}
-              style={[styles.locationItem, { backgroundColor: card, borderColor: border }]}
-            >
-              <View style={[styles.iconContainer, { backgroundColor: `${primary}15` }]}>
-                <IconSymbol name="mappin" size={20} color={primary} />
-              </View>
-              <View style={styles.locationInfo}>
-                <ThemedText type="defaultSemiBold">{loc.name}</ThemedText>
-                <ThemedText type="caption" style={{ color: textSecondary }}>
-                  Lagos, Nigeria
-                </ThemedText>
-              </View>
-              <IconSymbol name="chevron.right" size={20} color={textSecondary} />
-            </Pressable>
-          ))}
+        {/* Place Details Loading */}
+        {gettingPlaceDetails && (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="small" color={primary} />
+            <ThemedText type="caption" style={{ color: textSecondary, marginLeft: 8 }}>
+              Getting location details...
+            </ThemedText>
+          </View>
+        )}
+
+        {/* Autocomplete Results */}
+        {!searching && autocompleteResults.length > 0 && (
+          <>
+            <ThemedText type="caption" style={[styles.sectionTitle, { color: textSecondary }]}>
+              Search Results
+            </ThemedText>
+            {autocompleteResults.map((place) => (
+              <Pressable
+                key={place.id}
+                onPress={() => getPlaceDetails(place.id, place.title, place.subtitle)}
+                style={[styles.locationItem, { backgroundColor: card, borderColor: border }]}
+              >
+                <View style={[styles.iconContainer, { backgroundColor: `${primary}15` }]}>
+                  <IconSymbol name="mappin" size={20} color={primary} />
+                </View>
+                <View style={styles.locationInfo}>
+                  <ThemedText type="defaultSemiBold">{place.title}</ThemedText>
+                  <ThemedText type="caption" style={{ color: textSecondary }}>
+                    {place.subtitle}
+                  </ThemedText>
+                </View>
+                <IconSymbol name="chevron.right" size={20} color={textSecondary} />
+              </Pressable>
+            ))}
+          </>
+        )}
+
+        {/* No Results */}
+        {!searching && searchQuery.length >= 3 && autocompleteResults.length === 0 && (
+          <View style={styles.emptyState}>
+            <IconSymbol name="magnifyingglass" size={48} color={textSecondary} />
+            <ThemedText type="caption" style={{ color: textSecondary, marginTop: 8 }}>
+              No locations found
+            </ThemedText>
+          </View>
+        )}
+
+        {/* Sample Locations - shown when no search */}
+        {!searchQuery && !searching && autocompleteResults.length === 0 && (
+          <>
+            <ThemedText type="caption" style={[styles.sectionTitle, { color: textSecondary }]}>
+              Popular Locations
+            </ThemedText>
+
+            {sampleLocations.map((loc, index) => (
+              <Pressable
+                key={index}
+                onPress={() => handleSelectLocation(loc.name, loc.lat, loc.lng)}
+                style={[styles.locationItem, { backgroundColor: card, borderColor: border }]}
+              >
+                <View style={[styles.iconContainer, { backgroundColor: `${primary}15` }]}>
+                  <IconSymbol name="mappin" size={20} color={primary} />
+                </View>
+                <View style={styles.locationInfo}>
+                  <ThemedText type="defaultSemiBold">{loc.name}</ThemedText>
+                  <ThemedText type="caption" style={{ color: textSecondary }}>
+                    Lagos, Nigeria
+                  </ThemedText>
+                </View>
+                <IconSymbol name="chevron.right" size={20} color={textSecondary} />
+              </Pressable>
+            ))}
+          </>
+        )}
       </ScrollView>
     </ThemedView>
   );
@@ -212,5 +479,61 @@ const styles = StyleSheet.create({
   },
   locationInfo: {
     flex: 1,
+  },
+  mapContainer: {
+    height: MAP_HEIGHT,
+    marginHorizontal: 16,
+    marginBottom: 16,
+    borderRadius: 12,
+    overflow: "hidden",
+    borderWidth: 1,
+    position: "relative",
+  },
+  map: {
+    width: "100%",
+    height: "100%",
+  },
+  mapHint: {
+    position: "absolute",
+    top: 12,
+    alignSelf: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    borderRadius: 16,
+    color: "#fff",
+    fontSize: 12,
+  },
+  mapOverlay: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  mapOverlayContent: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  confirmButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  loadingContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 16,
+  },
+  emptyState: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 40,
   },
 });

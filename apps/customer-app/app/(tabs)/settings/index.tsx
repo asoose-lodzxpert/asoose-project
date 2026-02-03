@@ -202,7 +202,7 @@ export default function SettingsScreen() {
 
           <Pressable
             style={[styles.row, { borderBottomColor: border }]}
-            onPress={() => router.push("/payment-methods" as any)}
+            onPress={() => router.push("/(settings)/payment-methods")}
           >
             <View
               style={[styles.iconBox, { backgroundColor: accentRed + "22" }]}
@@ -261,7 +261,7 @@ export default function SettingsScreen() {
 
           <Pressable
             style={[styles.row, { borderBottomColor: border }]}
-            onPress={() => router.push("/rides" as any)}
+            onPress={() => router.push("/(settings)/rides")}
           >
             <View
               style={[styles.iconBox, { backgroundColor: accentGreen + "22" }]}

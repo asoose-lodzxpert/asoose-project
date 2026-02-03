@@ -15,6 +15,7 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { useRouter } from "expo-router";
 import { get, patch } from "@/lib/authFetch";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -68,6 +69,34 @@ export default function ProfileScreen() {
     }
   };
 
+  if (loading) {
+    return (
+      <ThemedView style={styles.container}>
+        <View style={styles.header}>
+          <Pressable onPress={() => router.back()} style={styles.backBtn}>
+            <IconSymbol name="chevron.left" size={22} color={primary} />
+          </Pressable>
+          <ThemedText type="title" style={styles.headerTitle}>
+            Edit Profile
+          </ThemedText>
+        </View>
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          <View style={{ padding: 16, gap: 16 }}>
+            <View>
+              <Skeleton width="20%" height={14} style={{ marginBottom: 8 }} />
+              <Skeleton width="100%" height={48} />
+            </View>
+            <View>
+              <Skeleton width="30%" height={14} style={{ marginBottom: 8 }} />
+              <Skeleton width="100%" height={48} />
+            </View>
+            <Skeleton width="100%" height={48} style={{ marginTop: 16 }} />
+          </View>
+        </ScrollView>
+      </ThemedView>
+    );
+  }
+
   return (
     <ThemedView style={styles.container}>
       <View style={styles.header}>
@@ -89,7 +118,7 @@ export default function ProfileScreen() {
             onChangeText={(text) =>
               setProfile((p) => (p ? { ...p, name: text } : p))
             }
-            editable={!loading && !saving}
+            editable={!saving}
             placeholder="Enter your name"
             placeholderTextColor={border}
           />
@@ -101,7 +130,7 @@ export default function ProfileScreen() {
             onChangeText={(text) =>
               setProfile((p) => (p ? { ...p, phone: text } : p))
             }
-            editable={!loading && !saving}
+            editable={!saving}
             placeholder="Enter your phone number"
             keyboardType="phone-pad"
             placeholderTextColor={border}
@@ -117,18 +146,19 @@ export default function ProfileScreen() {
               Saved!
             </ThemedText>
           )}
-          {(loading || saving) && (
-            <ActivityIndicator style={{ marginTop: 16 }} color={primary} />
-          )}
 
           <Pressable
             style={[styles.saveBtn, { backgroundColor: primary }]}
             onPress={handleSave}
-            disabled={loading || saving}
+            disabled={saving}
           >
-            <ThemedText style={[styles.saveText, { color: "#fff" }]}>
-              Save Changes
-            </ThemedText>
+            {saving ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <ThemedText style={[styles.saveText, { color: "#fff" }]}>
+                Save Changes
+              </ThemedText>
+            )}
           </Pressable>
         </View>
       </ScrollView>

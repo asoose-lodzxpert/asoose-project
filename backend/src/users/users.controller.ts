@@ -168,4 +168,23 @@ export class UsersController {
   async updateNotificationConfig(@Request() req, @Body() body: any) {
     return this.usersService.updateNotificationConfig(req.user.id, body);
   }
+
+  // ==================================================================
+  // WALLET & PAYMENT METHODS ENDPOINTS
+  // ==================================================================
+
+  @Get('wallet')
+  async getWalletBalance(@Request() req) {
+    return this.usersService.getWalletBalance(req.user.id);
+  }
+
+  @Get('payment/cards')
+  async getSavedCards(@Request() req) {
+    return this.usersService.getSavedCards(req.user.id);
+  }
+
+  @Delete('payment/cards/:id')
+  async deleteSavedCard(@Request() req, @Param('id') cardId: string) {
+    return this.usersService.deleteSavedCard(req.user.id, cardId);
+  }
 }

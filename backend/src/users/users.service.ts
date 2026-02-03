@@ -425,4 +425,37 @@ export class UsersService {
     });
     return { success: true };
   }
+
+  // ==================================================================
+  // WALLET & PAYMENT METHODS SERVICE
+  // ==================================================================
+
+  async getWalletBalance(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { walletBalance: true },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    return {
+      balance: Number(user.walletBalance) || 0,
+      currency: '₦',
+    };
+  }
+
+  async getSavedCards(userId: string) {
+    // Note: Payment cards are typically stored in the payment service
+    // This is a placeholder implementation
+    // In production, this would query a payment cards table or external service
+    return [];
+  }
+
+  async deleteSavedCard(userId: string, cardId: string) {
+    // Note: This would delete from payment cards table or external service
+    // Placeholder implementation
+    return { success: true, message: 'Card deleted successfully' };
+  }
 }

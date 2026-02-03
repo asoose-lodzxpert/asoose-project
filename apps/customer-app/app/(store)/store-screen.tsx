@@ -24,6 +24,7 @@ import type { StoreData, Product } from "@/types/store-types";
 
 import { useCart } from "@/context/CartContext";
 import { useToast } from "@/components/ui/ThemedToast";
+import { Skeleton, SkeletonText } from "@/components/ui/Skeleton";
 
 type TabType = "all" | "favorites" | "info";
 
@@ -154,8 +155,26 @@ export default function StoreScreen() {
 
   if (loading) {
     return (
-      <ThemedView style={[styles.container, styles.center]}>
-        <ActivityIndicator size="large" color={primary} />
+      <ThemedView style={styles.container}>
+        <ScrollView>
+          <Skeleton width="100%" height={200} borderRadius={0} />
+          <View style={{ padding: 16 }}>
+            <Skeleton width="60%" height={24} style={{ marginBottom: 8 }} />
+            <Skeleton width="40%" height={16} style={{ marginBottom: 16 }} />
+            <SkeletonText lines={3} />
+            <View style={{ marginTop: 24 }}>
+              {Array.from({ length: 4 }).map((_, i) => (
+                <Skeleton
+                  key={i}
+                  width="100%"
+                  height={100}
+                  borderRadius={12}
+                  style={{ marginBottom: 12 }}
+                />
+              ))}
+            </View>
+          </View>
+        </ScrollView>
       </ThemedView>
     );
   }
