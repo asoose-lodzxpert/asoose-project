@@ -48,7 +48,7 @@ export default function AsooseLanding() {
       cta: 'Make order',
       link: '/main/store',
       badge: 'Track your order live',
-      image: '/shopping.png', 
+      image: '/marketplace.jpg', 
     },
     ride: {
       title: 'Where to?',
@@ -56,7 +56,7 @@ export default function AsooseLanding() {
       cta: 'Book a ride',
       link: '/main/ride',
       badge: 'Quick driver matching',
-      image: '/ride.png', 
+      image: '/ride.jpg', 
     },
     package: {
       title: 'Send a package',
@@ -64,7 +64,7 @@ export default function AsooseLanding() {
       cta: 'Send a package',
       link: '/main/delivery',
       badge: 'Upfront pricing & secure',
-      image: '/package.png', 
+      image: '/delivery.jpg', 
     },
   };
 
@@ -247,7 +247,7 @@ export default function AsooseLanding() {
             </a>
           </div>
           <div className="order-1 md:order-2 relative h-[300px] sm:h-[400px] md:h-[450px] rounded-3xl overflow-hidden">
-            <Image src="/store.svg" alt="Become a merchant" fill className="object-cover" />
+            <Image src="/vendor.jpg" alt="Become a merchant" fill className="object-cover" />
           </div>
         </section>
 
@@ -255,7 +255,7 @@ export default function AsooseLanding() {
         <section className={`py-16 sm:py-20 md:py-24 px-4 sm:px-6 border-t ${darkMode ? 'bg-[#0a0a0a] border-white/5' : 'bg-white border-black/5'}`}>
           <div className="max-w-7xl mx-auto grid md:grid-cols-2 gap-10 sm:gap-12 md:gap-16 items-center">
             <div className="relative h-[300px] sm:h-[400px] md:h-[450px] rounded-3xl overflow-hidden">
-              <Image src="/rider.png" alt="Become a rider" fill className="object-cover" />
+              <Image src="/driver.jpg" alt="Become a rider" fill className="object-cover" />
             </div>
             <div className="space-y-6 sm:space-y-8">
               <h3 className="text-3xl sm:text-4xl font-black tracking-tight">Be the boss.<br/>Drive with Asoose.</h3>

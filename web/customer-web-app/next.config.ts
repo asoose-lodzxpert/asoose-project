@@ -4,6 +4,12 @@ const nextConfig = {
     remotePatterns: [
       {
         protocol: 'https',
+        hostname: 'asoose-storage.s3.eu-north-1.amazonaws.com',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
         hostname: 'ffyfvbgcbvbgnmopmmhi.supabase.co',
         port: '',
         pathname: '/storage/v1/object/public/**',
@@ -43,19 +49,6 @@ const nextConfig = {
         port: '',
         pathname: '/**',
       },
-     
-      {
-        protocol: 'https',
-        hostname: 'storage.railway.app',
-        port: '',
-        pathname: '/**',
-      },
-      {
-        protocol: 'https',
-        hostname: 'asoose-storage.s3.eu-north-1.amazonaws.com',
-        port: '',
-        pathname: '/**',
-      },
     ],
   },
 
@@ -65,6 +58,7 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  
 };
 
 module.exports = nextConfig;

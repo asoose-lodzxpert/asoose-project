@@ -222,7 +222,7 @@ export class PaymentService {
     signature: string,
   ): Promise<void> {
     let isValid = false;
-
+    console.log("payload:",payload)
     switch (gateway) {
       case PaymentGateway.PAYSTACK:
         isValid = this.paystackService.verifyWebhookSignature(

@@ -13,6 +13,7 @@ import { CreateDisputeDto } from './dto/create-dispute.dto';
 import { UserRole } from '@prisma/client';
 import { AddMessageDto } from './dto/add-message.dto';
 import { PaymentService } from 'src/payment/payment.service';
+import { DisputePriority } from '@prisma/client';
 import {
   ResolveDisputeDto,
   ResolutionAction,
@@ -30,98 +31,94 @@ export class DisputesService {
   ) {}
 
 // ==================== CREATE DISPUTE ====================
-  async create(dto: CreateDisputeDto, userId: string) {
-    // 1. Validate Business Rules (Time limits, ownership, status)
-    await this.validateDisputeEligibility(dto, userId);
-
-    // 2. Check for Duplicates
-    const existingDispute = await this.checkExistingDispute(dto);
-    if (existingDispute) {
-      throw new BadRequestException(
-        'An open dispute already exists for this transaction',
-      );
+  async create(userId: string, dto: CreateDisputeDto) {
+    // 1. Validation: Ensure at least one reference ID exists
+    if (!dto.orderId && !dto.rideId && !dto.deliveryId) {
+      throw new BadRequestException('A dispute must be linked to an Order, Ride, or Delivery.');
     }
 
-    let paymentId: string | undefined;
+    let targetUserEmail: string | undefined;
+    let priority: DisputePriority = DisputePriority.MEDIUM; // Default priority
 
-    // 3. Resolve Payment ID & Data Integrity Checks
+    // 2. Resolve Target User (Who is being reported?) & Verify Ownership
     if (dto.orderId) {
       const order = await this.prisma.order.findUnique({
         where: { id: dto.orderId },
-        include: { payment: true },
+        include: { store: { include: { vendor: true } } },
       });
 
-      //  INVARIANT CHECK: Order is processed but has no payment record
-      if (order && !order.payment && order.paymentStatus !== 'PENDING') {
-        throw new BadRequestException(
-          'System Error: This order is confirmed but has no payment record. Please contact support.',
-        );
-      }
+      if (!order) throw new NotFoundException('Order not found');
+      if (order.userId !== userId) throw new BadRequestException('You can only report disputes for your own orders.');
 
-      paymentId = order?.payment?.id;
-    } else if (dto.rideId) {
+      // Target: The Vendor of the store
+      targetUserEmail = order.store?.vendor?.email;
+    } 
+    else if (dto.rideId) {
       const ride = await this.prisma.ride.findUnique({
         where: { id: dto.rideId },
-        include: { payment: true },
+        include: { rider: true },
       });
-      paymentId = ride?.payment?.id;
+
+      if (!ride) throw new NotFoundException('Ride not found');
+      if (ride.customerId !== userId) throw new BadRequestException('You can only report disputes for your own rides.');
+
+      // Target: The Rider
+      targetUserEmail = ride.rider?.email;
+    } 
+    else if (dto.deliveryId) {
+      const delivery = await this.prisma.delivery.findUnique({
+        where: { id: dto.deliveryId },
+        include: { rider: true },
+      });
+
+      if (!delivery) throw new NotFoundException('Delivery not found');
+      if (delivery.customerId !== userId) throw new BadRequestException('You can only report disputes for your own deliveries.');
+
+      // Target: The Rider
+      targetUserEmail = delivery.rider?.email;
     }
 
-    // 4. Atomic Creation (Dispute + Log)
-    return this.prisma.$transaction(async (tx) => {
-      // A. Create the Dispute
-      const dispute = await tx.dispute.create({
-        data: {
-          reason: dto.reason,
-          description: dto.description,
-          priority: dto.priority || 'MEDIUM',
-          evidenceImages: dto.evidenceImages || [],
-          openedByUser: { connect: { id: userId } },
-          // Connect optional relations
-          ...(dto.targetUserId && {
-            targetUser: { connect: { id: dto.targetUserId } },
-          }),
-          ...(paymentId && { payment: { connect: { id: paymentId } } }),
-          ...(dto.orderId && { order: { connect: { id: dto.orderId } } }),
-          ...(dto.rideId && { ride: { connect: { id: dto.rideId } } }),
-          ...(dto.deliveryId && {
-            delivery: { connect: { id: dto.deliveryId } },
-          }),
-          // Initial Message
-          messages: {
-            create: {
-              senderId: userId,
-              message: `Dispute opened: ${dto.reason}\n\n${dto.description || ''}`,
-              isInternal: false,
-            },
-          },
-        },
-        include: {
-          openedByUser: { select: { id: true, name: true, email: true } },
-          order: { select: { id: true, total: true, status: true } },
-          ride: { select: { id: true, totalFare: true, status: true } },
-          delivery: { select: { id: true, deliveryFee: true, status: true } },
-        },
+    // 3. Look up the Target User ID via Email
+    // (This bridges the gap between Vendor/Rider tables and the main User table used for disputes)
+    let targetUserId: string | null = null;
+    if (targetUserEmail) {
+      const targetUser = await this.prisma.user.findUnique({
+        where: { email: targetUserEmail },
+        select: { id: true },
       });
+      targetUserId = targetUser?.id || null;
+    }
 
-      // B. Create Activity Log
-      await tx.activityLog.create({
-        data: {
-          userId: userId,
-          action: 'DISPUTE_OPENED',
-          target: `Dispute #${dispute.id.substring(0, 8)}`,
-          status: 'SUCCESS',
-          details: `Opened dispute for reason: ${dto.reason}`,
-          metadata: {
-            disputeId: dispute.id,
-            priority: dispute.priority,
-            category: dto.orderId ? 'ORDER' : dto.rideId ? 'RIDE' : 'DELIVERY',
-          },
-        },
-      });
+    // 4. Dynamic Priority Assignment
+    // Auto-escalate based on sensitive keywords in reason or description
+    const sensitiveKeywords = [
+      'safety', 'accident', 'harassment', 'assault', 'threat', 'emergency', 
+      'injury', 'police', 'danger', 'reckless'
+    ];
+    const highKeywords = ['stolen', 'fraud', 'missing', 'aggressive', 'stealing'];
 
-      this.logger.log(`Dispute ${dispute.id} created by user ${userId}`);
-      return dispute;
+    const combinedText = `${dto.reason} ${dto.description}`.toLowerCase();
+
+    if (sensitiveKeywords.some((word) => combinedText.includes(word))) {
+      priority = DisputePriority.URGENT;
+    } else if (highKeywords.some((word) => combinedText.includes(word))) {
+      priority = DisputePriority.HIGH;
+    }
+
+    // 5. Create the Dispute
+    return this.prisma.dispute.create({
+      data: {
+        reason: dto.reason,
+        description: dto.description, // Now required from DTO
+        evidenceImages: dto.evidenceImages || [],
+        priority, // Auto-calculated
+        status: 'OPEN',
+        openedByUserId: userId,
+        targetUserId, // Derived from relations
+        orderId: dto.orderId,
+        rideId: dto.rideId,
+        deliveryId: dto.deliveryId,
+      },
     });
   }
 

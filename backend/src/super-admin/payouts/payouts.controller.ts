@@ -38,7 +38,9 @@ export class PayoutsController {
     @Param('id') id: string,
     @Param('type') type: 'VENDOR' | 'RIDER',
     @Body('reason') reason: string,
+    @Request() req,
   ) {
-    return this.payoutsService.rejectPayout(id, type, reason);
+    // ✅ Updated: Pass req.user.id as the 4th argument
+    return this.payoutsService.rejectPayout(id, type, reason, req.user.id);
   }
 }
