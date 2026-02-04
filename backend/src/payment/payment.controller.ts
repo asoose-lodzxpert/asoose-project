@@ -29,7 +29,10 @@ import { PaymentGateway } from './interfaces/payment.interface';
 import { UserRole } from '../common/enums/user-role.enum';
 import type { Request, Response } from 'express';
 
-@Controller('payment')
+@Controller({
+  path: 'payment',
+  version: '1',
+})
 export class PaymentController {
   private readonly logger = new Logger(PaymentController.name);
 

@@ -31,7 +31,10 @@ import {
 
 @ApiTags('Disputes')
 @ApiBearerAuth()
-@Controller('super-admin/disputes')
+@Controller({
+  path: 'super-admin/disputes',
+  version: '1',
+})
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class DisputesController {
   constructor(private readonly disputesService: DisputesService) {}

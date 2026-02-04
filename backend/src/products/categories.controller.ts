@@ -3,7 +3,10 @@ import { CacheInterceptor, CacheTTL } from '@nestjs/cache-manager';
 import { VendorProductsService } from 'src/vendor/products/products.service';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 
-@Controller('categories')
+@Controller({
+  path: 'categories',
+  version: '1',
+})
 @UseGuards(JwtAuthGuard)
 export class CategoriesController {
   constructor(private readonly productsService: VendorProductsService) {}

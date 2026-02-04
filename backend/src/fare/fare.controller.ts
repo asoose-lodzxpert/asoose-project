@@ -3,7 +3,10 @@ import { DeliveryFareDto } from './dto/delivery-fare-dto';
 import { RideFareDto } from './dto/ride-fare-dto';
 import { FareService } from './fare.service';
 
-@Controller('fare')
+@Controller({
+  path: 'fare',
+  version: '1',
+})
 export class FareConntroller {
   constructor(private readonly fareService: FareService) {}
   @Post('ride')

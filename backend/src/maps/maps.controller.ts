@@ -1,7 +1,10 @@
 import { Controller, Get, Query } from '@nestjs/common';
 import { MapsService } from './maps.service';
 
-@Controller('maps')
+@Controller({
+  path: 'maps',
+  version: '1',
+})
 export class MapsController {
   constructor(private readonly mapsService: MapsService) {}
 
@@ -50,12 +53,6 @@ export class MapsController {
     @Query('zoom') zoom?: string,
     @Query('size') size?: string,
   ) {
-    return this.mapsService.getStaticMapUrl(
-      markers,
-      path,
-      center,
-      zoom,
-      size,
-    );
+    return this.mapsService.getStaticMapUrl(markers, path, center, zoom, size);
   }
 }

@@ -2,7 +2,10 @@ import { Controller, Post, Body } from '@nestjs/common';
 import { EmailProducer } from '../mail/email.producer';
 import { SupportInquiryDto } from './dto/support-inquiry.dto';
 
-@Controller('support')
+@Controller({
+  path: 'support',
+  version: '1',
+})
 export class SupportController {
   constructor(private readonly emailProducer: EmailProducer) {}
 

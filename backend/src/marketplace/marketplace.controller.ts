@@ -20,7 +20,10 @@ export interface SearchResponseDto {
   products: any[];
 }
 
-@Controller('marketplace')
+@Controller({
+  path: 'marketplace',
+  version: '1',
+})
 export class MarketplaceController {
   constructor(private readonly marketplaceService: MarketplaceService) {}
 

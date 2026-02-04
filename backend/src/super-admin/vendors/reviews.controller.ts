@@ -13,7 +13,10 @@ import { RolesGuard } from '../../auth/roles.guards';
 import { Roles } from '../../auth/roles.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
 
-@Controller('super-admin/vendors')
+@Controller({
+  path: 'super-admin/vendors',
+  version: '1',
+})
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
 export class ReviewsController {

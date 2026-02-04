@@ -14,7 +14,10 @@ import { RolesGuard } from '../../auth/roles.guards';
 import { Roles } from '../../auth/roles.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
 
-@Controller('super-admin/dashboard')
+@Controller({
+  path: 'super-admin/dashboard',
+  version: '1',
+})
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class DashboardController {
   constructor(private readonly dashboardService: DashboardService) {}

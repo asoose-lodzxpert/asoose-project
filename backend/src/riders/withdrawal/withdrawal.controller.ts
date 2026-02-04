@@ -6,7 +6,10 @@ import { UserRole } from '../../common/enums/user-role.enum';
 import { WithdrawalService } from './withdrawal.service';
 import { CreateWithdrawalDto } from '../dto/create-withdrawal.dto';
 
-@Controller('riders/withdrawal')
+@Controller({
+  path: 'riders/withdrawal',
+  version: '1',
+})
 export class WithdrawalController {
   constructor(private readonly withdrawalService: WithdrawalService) {}
 

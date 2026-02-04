@@ -433,7 +433,7 @@ export class UsersService {
   async getWalletBalance(userId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { walletBalance: true },
+      select: { name: true },
     });
 
     if (!user) {
@@ -441,7 +441,7 @@ export class UsersService {
     }
 
     return {
-      balance: Number(user.walletBalance) || 0,
+      balance: 0,
       currency: '₦',
     };
   }

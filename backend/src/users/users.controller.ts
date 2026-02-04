@@ -19,7 +19,10 @@ import {
   UpdateEmergencyContactDto,
 } from './dto/emergency-contact.dto';
 
-@Controller('users')
+@Controller({
+  path: 'users',
+  version: '1',
+})
 @UseGuards(JwtAuthGuard)
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}

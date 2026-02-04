@@ -20,7 +20,10 @@ import { Roles } from '../../auth/roles.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { CreateProductDto, UpdateProductDto } from '../dto/product.dto';
 
-@Controller('vendor/products')
+@Controller({
+  path: 'vendor/products',
+  version: '1',
+})
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.VENDOR)
 export class VendorProductsController {

@@ -7,7 +7,10 @@ import { RolesGuard } from '../auth/roles.guards';
 import { Roles } from '../auth/roles.decorator';
 import { UserRole } from '../common/enums/user-role.enum';
 
-@Controller('riders/jobs')
+@Controller({
+  path: 'riders/jobs',
+  version: '1',
+})
 export class JobsController {
   constructor(private readonly jobsService: JobsService) {}
 

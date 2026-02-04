@@ -24,7 +24,10 @@ import {
 } from './dto/create-banner.dto';
 import { UserRole } from 'src/common/enums/user-role.enum';
 
-@Controller('super-admin/banners')
+@Controller({
+  path: 'super-admin/banners',
+  version: '1',
+})
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.SUPER_ADMIN)
 export class BannersController {

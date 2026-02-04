@@ -13,7 +13,10 @@ import { RolesGuard } from '../../auth/roles.guards';
 import { Roles } from '../../auth/roles.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
 
-@Controller('super-admin/deliveries')
+@Controller({
+  path: 'super-admin/deliveries',
+  version: '1',
+})
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class DeliveriesController {
   constructor(private readonly deliveriesService: DeliveriesService) {}

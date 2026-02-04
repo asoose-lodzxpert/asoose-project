@@ -15,7 +15,10 @@ import { RolesGuard } from '../auth/roles.guards';
 import { Roles } from '../auth/roles.decorator';
 import { UserRole } from '../common/enums/user-role.enum';
 
-@Controller('rider/notifications')
+@Controller({
+  path: 'rider/notifications',
+  version: '1',
+})
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.RIDER, UserRole.DRIVER)
 export class RiderNotificationsController {

@@ -15,7 +15,10 @@ import { RolesGuard } from '../../auth/roles.guards';
 import { Roles } from '../../auth/roles.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
 
-@Controller('vendor/notifications')
+@Controller({
+  path: 'vendor/notifications',
+  version: '1',
+})
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.VENDOR)
 export class VendorNotificationsController {

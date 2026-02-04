@@ -18,7 +18,10 @@ import {
   RideEstimateDto,
 } from './dto/trip.dto';
 
-@Controller('trips')
+@Controller({
+  path: 'trips',
+  version: '1',
+})
 @UseGuards(JwtAuthGuard)
 export class TripsController {
   constructor(private readonly tripsService: TripsService) {}
@@ -89,7 +92,12 @@ export class TripsController {
   ) {
     const pageNum = page ? parseInt(page, 10) : 1;
     const limitNum = limit ? parseInt(limit, 10) : 20;
-    return this.tripsService.getUserRides(req.user.id, status, pageNum, limitNum);
+    return this.tripsService.getUserRides(
+      req.user.id,
+      status,
+      pageNum,
+      limitNum,
+    );
   }
 
   /**

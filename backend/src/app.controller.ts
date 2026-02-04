@@ -3,7 +3,11 @@ import { AppService } from './app.service';
 import { PrismaService } from './prisma/prisma.service';
 import type { RedisClientType } from 'redis';
 import { Public } from './auth/decorators/public.decorator';
-@Controller()
+
+@Controller({
+  path: '',
+  version: '1',
+})
 export class AppController {
   constructor(
     private readonly appService: AppService,

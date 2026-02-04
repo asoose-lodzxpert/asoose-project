@@ -47,37 +47,48 @@ export function ProductList({
     setSelectedProduct(null);
   };
 
-  const renderProduct = ({ item }: { item: Product }) => (
-    <TouchableOpacity
-      activeOpacity={0.85}
-      onPress={() => handleOpenModal(item)}
-      style={[styles.menuCard, { backgroundColor: cardBg }]}
-    >
-      <Image source={{ uri: item.images[0] }} style={styles.menuImage} />
-      <ThemedText style={[styles.menuTitle, { color: text }]}>
-        {item.name}
-      </ThemedText>
-      <ThemedText style={[styles.menuDescription, { color: muted }]}>
-        {item.description} • {item.category.name}
-      </ThemedText>
-      <View style={styles.menuFooter}>
-        <ThemedText style={[styles.menuPrice, { color: price }]}>
-          ₦{item.price.toFixed(2)}
+  const renderProduct = ({ item }: { item: Product }) => {
+    // Safely get the first image or use a placeholder
+    const imageUri =
+      item.images && item.images.length > 0
+        ? item.images[0]
+        : "https://via.placeholder.com/150";
+
+    // Safely get category name
+    const categoryName = item.category?.name || "Uncategorized";
+
+    return (
+      <TouchableOpacity
+        activeOpacity={0.85}
+        onPress={() => handleOpenModal(item)}
+        style={[styles.menuCard, { backgroundColor: cardBg }]}
+      >
+        <Image source={{ uri: imageUri }} style={styles.menuImage} />
+        <ThemedText style={[styles.menuTitle, { color: text }]}>
+          {item.name}
         </ThemedText>
-        <TouchableOpacity
-          style={[styles.addButton, { backgroundColor: primary }]}
-          onPress={(e) => {
-            e.stopPropagation();
-            onAddToCart?.(item.id);
-          }}
-        >
-          <ThemedText style={[styles.addButtonText, { color: text }]}>
-            +
+        <ThemedText style={[styles.menuDescription, { color: muted }]}>
+          {item.description} • {categoryName}
+        </ThemedText>
+        <View style={styles.menuFooter}>
+          <ThemedText style={[styles.menuPrice, { color: price }]}>
+            ₦{item.price?.toFixed(2) || "0.00"}
           </ThemedText>
-        </TouchableOpacity>
-      </View>
-    </TouchableOpacity>
-  );
+          <TouchableOpacity
+            style={[styles.addButton, { backgroundColor: primary }]}
+            onPress={(e) => {
+              e.stopPropagation();
+              onAddToCart?.(item.id);
+            }}
+          >
+            <ThemedText style={[styles.addButtonText, { color: text }]}>
+              +
+            </ThemedText>
+          </TouchableOpacity>
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   const renderSkeleton = (_: any, idx: number) => (
     <View

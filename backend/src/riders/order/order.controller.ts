@@ -5,7 +5,10 @@ import { Roles } from '../../auth/roles.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { OrderService } from './order.service';
 
-@Controller('riders/order')
+@Controller({
+  path: 'riders/order',
+  version: '1',
+})
 export class OrderController {
   constructor(private readonly orderService: OrderService) {}
 

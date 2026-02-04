@@ -15,7 +15,10 @@ import { RolesGuard } from '../../auth/roles.guards';
 import { Roles } from '../../auth/roles.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { AdjustWalletDto } from './dto/adjust-wallet.dto';
-@Controller('super-admin/transactions')
+@Controller({
+  path: 'super-admin/transactions',
+  version: '1',
+})
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN_FINANCE)
 export class TransactionsController {

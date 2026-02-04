@@ -30,23 +30,20 @@ import { StorageModule } from './storage/storage.module';
 import { PaymentModule } from './payment/payment.module';
 import { MatchingModule } from './matching/matching.module';
 import { ProductsModule } from './products/products.module';
+import { FareModule } from './fare/fare.module';
 
 @Module({
   imports: [
-    // ---------- Global Config ----------
     ConfigModule.forRoot({ isGlobal: true }),
 
-    // ---------- Caching ----------
     CacheModule.register({
       isGlobal: true,
-      ttl: 60, // Default TTL in seconds (1 minute)
-      max: 100, // Maximum number of items in cache
+      ttl: 60,
+      max: 100,
     }),
 
-    // ---------- Rate Limiting ----------
     ThrottlerModule.forRoot(),
 
-    // ----------     yarn add @bull-board/expressMQ / Redis ----------
     BullModule.forRoot({
       connection: {
         host: process.env.REDIS_HOST || 'localhost',
@@ -62,11 +59,9 @@ import { ProductsModule } from './products/products.module';
       },
     }),
 
-    // ---------- Scheduling & Events ----------
     ScheduleModule.forRoot(),
     EventEmitterModule.forRoot({ global: true }),
 
-    // ---------- App Modules ----------
     AuthModule,
     PrismaModule,
     RedisModule,
@@ -75,6 +70,7 @@ import { ProductsModule } from './products/products.module';
     RidersModule,
     MarketplaceModule,
     CartModule,
+    FareModule,
     UsersModule,
     NotificationsModule,
     QueueModule,

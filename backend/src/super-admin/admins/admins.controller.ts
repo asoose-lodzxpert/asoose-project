@@ -15,7 +15,10 @@ import { RolesGuard } from 'src/auth/roles.guards';
 import { Roles } from 'src/auth/roles.decorator';
 import { UserRole } from 'src/common/enums/user-role.enum';
 
-@Controller('super-admin/admins')
+@Controller({
+  path: 'super-admin/admins',
+  version: '1',
+})
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class AdminsController {
   constructor(private readonly adminsService: AdminsService) {}

@@ -13,7 +13,10 @@ import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { RolesGuard } from 'src/auth/roles.guards';
 import { Roles } from 'src/auth/roles.decorator';
 
-@Controller('super-admin/payouts')
+@Controller({
+  path: 'super-admin/payouts',
+  version: '1',
+})
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN_FINANCE)
 export class PayoutsController {
