@@ -1,6 +1,6 @@
-import { Suspense } from 'react';
-import CheckoutForm from './checkoutform'; // Ensure this matches your filename exactly
-import { Loader2 } from 'lucide-react';
+import { Suspense } from "react";
+import CheckoutForm from "./checkoutform"; // Ensure this matches your filename exactly
+import { Loader2 } from "lucide-react";
 
 // This component acts as the Server Component wrapper
 export default function CheckoutPage() {

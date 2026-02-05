@@ -74,7 +74,7 @@ export default function EditBusinessInfoScreen() {
   /** Generic change handler */
   const onChange = <K extends keyof SignupStep1Data>(
     key: K,
-    value: SignupStep1Data[K]
+    value: SignupStep1Data[K],
   ) => {
     setData((prev) => (prev ? { ...prev, [key]: value } : prev));
   };

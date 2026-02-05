@@ -54,10 +54,24 @@ export default function Addresses() {
   const mapRef = useRef<MapView>(null);
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Helper to format full address string from API fields
+  const formatFullAddress = (addr: any) => {
+    return [addr.street, addr.city, addr.state].filter(Boolean).join(", ");
+  };
+
   // ---------------- Load Addresses ----------------
   useEffect(() => {
     fetchAddresses().then((data) => {
-      setAddresses(data);
+      const mappedData = data.map((item: any) => ({
+        ...item,
+        address: item.address || formatFullAddress(item),
+        coordinates: {
+          lat: item.lat?.toString(),
+          lng: item.lng?.toString(),
+        },
+      }));
+
+      setAddresses(mappedData);
       setLoading(false);
     });
   }, []);
@@ -77,13 +91,12 @@ export default function Addresses() {
 
   const handleSelectSuggestion = async (placeId: string) => {
     try {
-      // Use Google Maps Places API to resolve full address
       const addr = await selectPlaceHelper(placeId);
       if (!addr || !selectedAddress) return;
 
       setSelectedAddress({
         ...selectedAddress,
-        address: addr.address, // full address
+        address: addr.address,
         coordinates: addr.coordinates,
       });
 
@@ -95,7 +108,7 @@ export default function Addresses() {
             latitudeDelta: 0.01,
             longitudeDelta: 0.01,
           },
-          500
+          500,
         );
       }
 
@@ -124,17 +137,31 @@ export default function Addresses() {
         message: "Please enter label and address",
         variant: "warning",
       });
-      console.log("scrrrrrr");
-
       return;
     }
+
     setSaving(true);
     try {
-      await saveAddressService(selectedAddress);
-      setAddresses((prev) => [
-        ...prev.filter((a) => a.id !== selectedAddress.id),
-        selectedAddress,
-      ]);
+      // Prepare payload to match your API backend structure
+      const payload = {
+        ...selectedAddress,
+        street: selectedAddress.address, // mapping UI 'address' to API 'street'
+        lat: parseFloat(selectedAddress.coordinates.lat),
+        lng: parseFloat(selectedAddress.coordinates.lng),
+      };
+
+      await saveAddressService(payload);
+
+      // Refresh list
+      const updatedData = await fetchAddresses();
+      setAddresses(
+        updatedData.map((item: any) => ({
+          ...item,
+          address: item.address || formatFullAddress(item),
+          coordinates: { lat: item.lat?.toString(), lng: item.lng?.toString() },
+        })),
+      );
+
       toast({
         title: "Success",
         message: "Address saved!",
@@ -159,7 +186,7 @@ export default function Addresses() {
 
     if (addr.label === "Home" || addr.label === "Work") {
       toast({
-        title: "Cannot delete default address",
+        title: "Default Address",
         message: "Home and Work cannot be deleted",
         variant: "warning",
       });
@@ -171,74 +198,7 @@ export default function Addresses() {
     toast({ title: "Deleted", message: "Address deleted", variant: "success" });
   };
 
-  // ---------------- Current Location ----------------
-  const useCurrentLocation = async () => {
-    setLocating(true);
-    try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== "granted") {
-        toast({
-          title: "Permission denied",
-          message: "Location permission denied",
-          variant: "error",
-        });
-        setLocating(false);
-        return;
-      }
-      const loc = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Highest,
-      });
-      if (!selectedAddress) {
-        setLocating(false);
-        return;
-      }
-
-      const coords = {
-        lat: loc.coords.latitude.toString(),
-        lng: loc.coords.longitude.toString(),
-      };
-      let resolved = null;
-      try {
-        resolved = await resolveAddressFromCoords({
-          lat: loc.coords.latitude,
-          lng: loc.coords.longitude,
-        });
-      } catch {}
-      setSelectedAddress((prev) =>
-        prev
-          ? {
-              ...prev,
-              coordinates: coords,
-              address: resolved?.address || prev.address || "",
-            }
-          : prev
-      );
-
-      if (mapRef.current) {
-        mapRef.current.animateToRegion(
-          {
-            latitude: loc.coords.latitude,
-            longitude: loc.coords.longitude,
-            latitudeDelta: 0.01,
-            longitudeDelta: 0.01,
-          },
-          500
-        );
-      }
-
-      // Automatically go to label if address is empty
-      setStep("label");
-    } catch {
-      toast({
-        title: "Location Error",
-        message: "Could not get current location",
-        variant: "error",
-      });
-    } finally {
-      setLocating(false);
-    }
-  };
-
+  // ---------------- Location Helpers ----------------
   const moveMapToCurrentLocation = async () => {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
@@ -252,6 +212,7 @@ export default function Addresses() {
         lat: loc.coords.latitude.toString(),
         lng: loc.coords.longitude.toString(),
       };
+
       let resolved = null;
       try {
         resolved = await resolveAddressFromCoords({
@@ -259,6 +220,7 @@ export default function Addresses() {
           lng: loc.coords.longitude,
         });
       } catch {}
+
       setSelectedAddress((prev) =>
         prev
           ? {
@@ -266,7 +228,7 @@ export default function Addresses() {
               coordinates: coords,
               address: resolved?.address || prev.address || "",
             }
-          : prev
+          : prev,
       );
 
       if (mapRef.current) {
@@ -277,7 +239,7 @@ export default function Addresses() {
             latitudeDelta: 0.01,
             longitudeDelta: 0.01,
           },
-          500
+          500,
         );
       }
     } catch (e) {
@@ -285,7 +247,14 @@ export default function Addresses() {
     }
   };
 
-  // ---------------- Animation ----------------
+  const useCurrentLocation = async () => {
+    setLocating(true);
+    await moveMapToCurrentLocation();
+    setStep("label");
+    setLocating(false);
+  };
+
+  // ---------------- Animation & Lifecycle ----------------
   useEffect(() => {
     if (locating) {
       Animated.loop(
@@ -300,7 +269,7 @@ export default function Addresses() {
             duration: 400,
             useNativeDriver: true,
           }),
-        ])
+        ]),
       ).start();
     } else {
       scaleAnim.setValue(1);
@@ -309,7 +278,6 @@ export default function Addresses() {
 
   useEffect(() => {
     if (step === "map" && selectedAddress) {
-      // If no coordinates yet → jump to current location
       if (
         !selectedAddress.coordinates.lat ||
         !selectedAddress.coordinates.lng
@@ -356,7 +324,6 @@ export default function Addresses() {
           });
           setStep("address");
           setAddressInput("");
-          setSuggestions([]);
         }}
         onAddWork={() => {
           setSelectedAddress({
@@ -368,7 +335,6 @@ export default function Addresses() {
           });
           setStep("address");
           setAddressInput("");
-          setSuggestions([]);
         }}
         onAddOther={() => {
           setSelectedAddress({
@@ -380,26 +346,22 @@ export default function Addresses() {
           });
           setStep("address");
           setAddressInput("");
-          setSuggestions([]);
         }}
       />
 
-      {/* Address Modal Flow */}
       <Modal visible={step !== null} animationType="slide">
-        <View style={{ flex: 1, padding: 16 }}>
+        <ThemedView style={{ flex: 1, padding: 16 }}>
           {locating && <GettingLocationOverlay scaleAnim={scaleAnim} />}
           {saving && (
-            <View style={styles.savingOverlay} pointerEvents="auto">
-              <Animated.View style={styles.savingContent}>
-                <ActivityIndicator size="large" color={primary} />
-                <ThemedText style={styles.savingText}>
-                  Saving address...
-                </ThemedText>
-              </Animated.View>
+            <View style={styles.savingOverlay}>
+              <ActivityIndicator size="large" color={primary} />
+              <ThemedText style={styles.savingText}>
+                Saving address...
+              </ThemedText>
             </View>
           )}
 
-          {/* ---------------- Address Step ---------------- */}
+          {/* Address Step */}
           {step === "address" && selectedAddress && (
             <>
               <View style={styles.modalHeaderRow}>
@@ -430,87 +392,64 @@ export default function Addresses() {
                   style={{ marginTop: 8 }}
                 />
               )}
-              {suggestions.length > 0 && (
-                <View style={{ maxHeight: 200, marginTop: 8 }}>
-                  {suggestions.map((s) => (
-                    <Pressable
-                      key={s.place_id}
-                      style={styles.suggestionRow}
-                      onPress={() => handleSelectSuggestion(s.place_id)}
-                    >
-                      <ThemedText>{s.description}</ThemedText>
-                    </Pressable>
-                  ))}
-                </View>
-              )}
+              <View style={{ maxHeight: 300, marginTop: 8 }}>
+                {suggestions.map((s) => (
+                  <Pressable
+                    key={s.place_id}
+                    style={styles.suggestionRow}
+                    onPress={() => handleSelectSuggestion(s.place_id)}
+                  >
+                    <ThemedText>{s.description}</ThemedText>
+                  </Pressable>
+                ))}
+              </View>
             </>
           )}
 
-          {/* ---------------- Map Step ---------------- */}
+          {/* Map Step */}
           {step === "map" && selectedAddress && (
-            <>
+            <ThemedView style={{ flex: 1 }}>
               <MapView
                 ref={mapRef}
-                style={{ flex: 1, minHeight: 300 }}
+                style={{ flex: 1, minHeight: 300, borderRadius: 12 }}
                 initialRegion={{
                   latitude: selectedAddress.coordinates.lat
                     ? parseFloat(selectedAddress.coordinates.lat)
-                    : 37.78825,
+                    : 11.83,
                   longitude: selectedAddress.coordinates.lng
                     ? parseFloat(selectedAddress.coordinates.lng)
-                    : -122.4324,
+                    : 13.15,
                   latitudeDelta: 0.01,
                   longitudeDelta: 0.01,
                 }}
                 onPress={async (e) => {
                   const coords = e.nativeEvent.coordinate;
-                  try {
-                    // Use Google Maps Places API to resolve full address from coordinates
-                    const resolved = await resolveAddressFromCoords({
-                      lat: coords.latitude,
-                      lng: coords.longitude,
-                    });
-                    setSelectedAddress((prev) =>
-                      prev
-                        ? {
-                            ...prev,
-                            coordinates: {
-                              lat: coords.latitude.toString(),
-                              lng: coords.longitude.toString(),
-                            },
-                            address: resolved?.address || prev.address || "",
-                          }
-                        : null
-                    );
-                  } catch {
-                    setSelectedAddress((prev) =>
-                      prev
-                        ? {
-                            ...prev,
-                            coordinates: {
-                              lat: coords.latitude.toString(),
-                              lng: coords.longitude.toString(),
-                            },
-                          }
-                        : null
-                    );
-                    toast({
-                      title: "Error",
-                      message: "Could not resolve address from map",
-                      variant: "error",
-                    });
-                  }
+                  const resolved = await resolveAddressFromCoords({
+                    lat: coords.latitude,
+                    lng: coords.longitude,
+                  });
+                  setSelectedAddress((prev) =>
+                    prev
+                      ? {
+                          ...prev,
+                          coordinates: {
+                            lat: coords.latitude.toString(),
+                            lng: coords.longitude.toString(),
+                          },
+                          address: resolved?.address || prev.address || "",
+                        }
+                      : null,
+                  );
                 }}
               >
-                {selectedAddress.coordinates.lat &&
-                  selectedAddress.coordinates.lng && (
-                    <Marker
-                      coordinate={{
-                        latitude: parseFloat(selectedAddress.coordinates.lat),
-                        longitude: parseFloat(selectedAddress.coordinates.lng),
-                      }}
-                    />
-                  )}
+                {selectedAddress.coordinates.lat && (
+                  <Marker
+                    coordinate={{
+                      latitude: parseFloat(selectedAddress.coordinates.lat),
+                      longitude: parseFloat(selectedAddress.coordinates.lng),
+                    }}
+                  />
+                )}
               </MapView>
               <MapCurrentLocationBtn
                 onPress={useCurrentLocation}
@@ -518,27 +457,15 @@ export default function Addresses() {
               />
               <View style={{ flexDirection: "row", marginTop: 16, gap: 8 }}>
                 <Pressable
-                  style={[
-                    styles.useAddressBtn,
-                    styles.cancelBtn,
-                    {
-                      borderColor: border,
-                      flex: 1,
-                      backgroundColor: "transparent",
-                      margin: 0,
-                    },
-                  ]}
-                  onPress={() => {
-                    setSelectedAddress(null);
-                    setStep(null);
-                  }}
+                  style={[styles.cancelBtn, { borderColor: border }]}
+                  onPress={() => setStep(null)}
                 >
                   <ThemedText>Cancel</ThemedText>
                 </Pressable>
                 <Pressable
                   style={[
                     styles.useAddressBtn,
-                    { backgroundColor: primary, flex: 1, margin: 0 },
+                    { backgroundColor: primary, flex: 1 },
                   ]}
                   onPress={() => setStep("label")}
                 >
@@ -547,68 +474,54 @@ export default function Addresses() {
                   </ThemedText>
                 </Pressable>
               </View>
-            </>
+            </ThemedView>
           )}
 
-          {/* ---------------- Label Step ---------------- */}
+          {/* Label Step */}
           {step === "label" && selectedAddress && (
             <>
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  marginBottom: 8,
-                }}
-              >
-                <Pressable
-                  onPress={() => setStep("address")}
-                  style={{ marginRight: 8 }}
-                >
+              <View style={styles.labelHeader}>
+                <Pressable onPress={() => setStep("address")}>
                   <IconSymbol name="chevron.left" size={22} color={primary} />
                 </Pressable>
-                <ThemedText style={{ fontWeight: "600" }}>Label</ThemedText>
+                <ThemedText style={{ fontWeight: "600", marginLeft: 8 }}>
+                  Label Address
+                </ThemedText>
               </View>
               <ThemedInput
                 value={selectedAddress.label}
-                placeholder="Home / Work / Other"
+                placeholder="e.g. Home, Office, Gym"
                 onChangeText={(val) =>
                   setSelectedAddress((prev) =>
-                    prev ? { ...prev, label: val } : prev
+                    prev ? { ...prev, label: val } : prev,
                   )
                 }
                 autoFocus
               />
-              <View style={{ flexDirection: "row", marginTop: 16 }}>
+              <View style={{ flexDirection: "row", marginTop: 16, gap: 8 }}>
                 <Pressable
-                  style={[
-                    styles.cancelBtn,
-                    { borderColor: border, flex: 1, marginRight: 8 },
-                  ]}
-                  onPress={() => {
-                    setSelectedAddress(null);
-                    setStep(null);
-                  }}
+                  style={[styles.cancelBtn, { borderColor: border }]}
+                  onPress={() => setStep(null)}
                 >
                   <ThemedText>Cancel</ThemedText>
                 </Pressable>
                 <Pressable
-                  style={[
-                    styles.saveBtn,
-                    { backgroundColor: primary, flex: 1 },
-                  ]}
+                  style={[styles.saveBtn, { backgroundColor: primary }]}
                   onPress={saveAddress}
                   disabled={saving}
                 >
                   {saving ? (
-                    <ActivityIndicator size="small" color="#fff" />
+                    <ActivityIndicator color="#fff" />
                   ) : (
-                    <ThemedText style={{ color: "#fff" }}>Save</ThemedText>
+                    <ThemedText style={{ color: "#fff" }}>
+                      Save Address
+                    </ThemedText>
                   )}
                 </Pressable>
               </View>
             </>
           )}
-        </View>
+        </ThemedView>
       </Modal>
     </ThemedView>
   );
@@ -633,50 +546,39 @@ const styles = StyleSheet.create({
   header: { flexDirection: "row", alignItems: "center", padding: 16 },
   backBtn: { marginRight: 12, padding: 4 },
   headerTitle: { fontSize: 20, fontWeight: "700" },
-  suggestionRow: { padding: 12, borderBottomWidth: 1, borderColor: "#eee" },
+  suggestionRow: { padding: 15, borderBottomWidth: 1, borderColor: "#f0f0f0" },
   modalHeaderRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 8,
+    marginBottom: 16,
   },
+  labelHeader: { flexDirection: "row", alignItems: "center", marginBottom: 12 },
   saveBtn: {
     flex: 1,
     borderRadius: 10,
-    paddingVertical: 12,
+    paddingVertical: 14,
     alignItems: "center",
+    justifyContent: "center",
   },
   cancelBtn: {
     flex: 1,
     borderWidth: 1,
     borderRadius: 10,
-    paddingVertical: 12,
-    marginTop: 8,
-    alignItems: "center",
-  },
-  useAddressBtn: {
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-    borderRadius: 10,
+    paddingVertical: 14,
     alignItems: "center",
     justifyContent: "center",
   },
-
+  useAddressBtn: {
+    paddingVertical: 14,
+    borderRadius: 10,
+    alignItems: "center",
+  },
   savingOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(255,255,255,0.85)",
+    backgroundColor: "rgba(255,255,255,0.9)",
     alignItems: "center",
     justifyContent: "center",
     zIndex: 2000,
   },
-  savingContent: {
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  savingText: {
-    marginTop: 18,
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#1a73e8",
-  },
+  savingText: { marginTop: 18, fontSize: 16, fontWeight: "600", color: "#333" },
 });

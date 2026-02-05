@@ -188,11 +188,7 @@ export class MapsService {
         const [label, coords] = marker.split(':');
         if (coords) {
           const color =
-            label === 'pickup'
-              ? 'green'
-              : label === 'dropoff'
-                ? 'red'
-                : 'blue';
+            label === 'pickup' ? 'green' : label === 'dropoff' ? 'red' : 'blue';
           params.append(
             'markers',
             `color:${color}|label:${label.charAt(0).toUpperCase()}|${coords}`,

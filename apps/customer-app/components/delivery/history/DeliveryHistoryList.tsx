@@ -9,7 +9,7 @@ import {
 import { ThemedText } from "@/components/themed-text";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
-import { useRouter } from "expo-router";
+import { RelativePathString, useRouter } from "expo-router";
 
 export type DeliveryHistoryItem = {
   id: string;
@@ -63,7 +63,11 @@ export const DeliveryHistoryList: React.FC<Props> = ({
           styles.card,
           { backgroundColor: surfaceCard, borderColor: border },
         ]}
-        onPress={() => router.push(`/(delivery)/details?id=${item.id}`)}
+        onPress={() =>
+          router.push(
+            `/(settings)/delivery-history/${item.id}` as RelativePathString,
+          )
+        }
       >
         <View style={styles.cardRow}>
           <IconSymbol

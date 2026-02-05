@@ -1,5 +1,5 @@
 import React from "react";
-import { FlatList, TouchableOpacity, StyleSheet, View } from "react-native";
+import { ScrollView, TouchableOpacity, StyleSheet, View } from "react-native";
 import { ThemedText } from "@/components/themed-text";
 import { useThemeColor } from "@/hooks/use-theme-color";
 
@@ -56,21 +56,27 @@ export function CategoryFilter({
 
   return (
     <View style={styles.categoryFilter}>
-      <View style={styles.categoryContainer}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.categoryContainer}
+      >
         {loading
           ? Array.from({ length: 4 }).map(renderSkeleton)
           : categories.map(renderChip)}
-      </View>
+      </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   categoryFilter: {
-    maxHeight: 40,
+    paddingVertical: 8,
   },
   categoryContainer: {
     paddingHorizontal: 16,
+    flexDirection: "row",
+    alignItems: "center",
   },
   categoryChip: {
     paddingHorizontal: 16,
@@ -81,5 +87,6 @@ const styles = StyleSheet.create({
   },
   categoryChipText: {
     fontSize: 14,
+    fontWeight: "500",
   },
 });

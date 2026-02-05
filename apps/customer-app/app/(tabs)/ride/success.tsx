@@ -1,10 +1,4 @@
-import {
-  View,
-  StyleSheet,
-  ScrollView,
-  Pressable,
-  Alert,
-} from "react-native";
+import { View, StyleSheet, ScrollView, Pressable } from "react-native";
 import { useState } from "react";
 import { useRouter } from "expo-router";
 import { ThemedView } from "@/components/themed-view";
@@ -13,9 +7,11 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { useRide } from "@/context/RideContext";
 import { RideService } from "@/services/ride.service";
+import { useToast } from "@/components/ui/ThemedToast";
 
 export default function RideSuccessScreen() {
   const router = useRouter();
+  const showToast = useToast();
   const { currentRide, resetBooking } = useRide();
 
   const primary = useThemeColor({}, "brandPrimary");
@@ -38,14 +34,19 @@ export default function RideSuccessScreen() {
 
   const handleSubmitRating = () => {
     if (rating === 0) {
-      Alert.alert("Rate Your Driver", "Please select a rating before submitting");
+      showToast({
+        message: "Please select a rating before submitting",
+        variant: "error",
+      });
       return;
     }
 
     // TODO: Submit rating to backend
-    Alert.alert("Thank You!", "Your rating has been submitted", [
-      { text: "OK", onPress: handleGoHome },
-    ]);
+    showToast({
+      message: "Your rating has been submitted. Thank you!",
+      variant: "success",
+    });
+    setTimeout(handleGoHome, 1500);
   };
 
   if (!currentRide) {
@@ -69,19 +70,33 @@ export default function RideSuccessScreen() {
       >
         {/* Success Icon */}
         <View style={styles.successIconContainer}>
-          <View style={[styles.successIcon, { backgroundColor: `${success}20` }]}>
-            <IconSymbol name="checkmark.circle.fill" size={64} color={success} />
+          <View
+            style={[styles.successIcon, { backgroundColor: `${success}20` }]}
+          >
+            <IconSymbol
+              name="checkmark.circle.fill"
+              size={64}
+              color={success}
+            />
           </View>
           <ThemedText type="title" style={styles.successTitle}>
             Trip Completed!
           </ThemedText>
-          <ThemedText type="caption" style={[styles.successSubtitle, { color: textSecondary }]}>
+          <ThemedText
+            type="caption"
+            style={[styles.successSubtitle, { color: textSecondary }]}
+          >
             We hope you enjoyed your ride
           </ThemedText>
         </View>
 
         {/* Trip Summary */}
-        <View style={[styles.summaryCard, { backgroundColor: card, borderColor: border }]}>
+        <View
+          style={[
+            styles.summaryCard,
+            { backgroundColor: card, borderColor: border },
+          ]}
+        >
           <ThemedText type="subtitle" style={styles.cardTitle}>
             Trip Summary
           </ThemedText>
@@ -118,13 +133,20 @@ export default function RideSuccessScreen() {
               Date
             </ThemedText>
             <ThemedText type="default">
-              {new Date(currentRide.completedAt || currentRide.createdAt).toLocaleString()}
+              {new Date(
+                currentRide.completedAt || currentRide.createdAt,
+              ).toLocaleString()}
             </ThemedText>
           </View>
         </View>
 
         {/* Fare Breakdown */}
-        <View style={[styles.fareCard, { backgroundColor: card, borderColor: border }]}>
+        <View
+          style={[
+            styles.fareCard,
+            { backgroundColor: card, borderColor: border },
+          ]}
+        >
           <ThemedText type="subtitle" style={styles.cardTitle}>
             Fare Breakdown
           </ThemedText>
@@ -181,7 +203,11 @@ export default function RideSuccessScreen() {
 
           <View style={styles.paymentMethod}>
             <IconSymbol
-              name={currentRide.payment?.method === "CASH" ? "banknote" : "creditcard"}
+              name={
+                currentRide.payment?.method === "CASH"
+                  ? "banknote"
+                  : "creditcard"
+              }
               size={16}
               color={textSecondary}
             />
@@ -193,7 +219,12 @@ export default function RideSuccessScreen() {
 
         {/* Driver Rating */}
         {currentRide.rider && (
-          <View style={[styles.ratingCard, { backgroundColor: card, borderColor: border }]}>
+          <View
+            style={[
+              styles.ratingCard,
+              { backgroundColor: card, borderColor: border },
+            ]}
+          >
             <ThemedText type="subtitle" style={styles.cardTitle}>
               Rate Your Driver
             </ThemedText>

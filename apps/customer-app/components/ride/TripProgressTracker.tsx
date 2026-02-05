@@ -11,11 +11,23 @@ type StatusStep = {
 };
 
 const STATUS_STEPS: StatusStep[] = [
-  { status: RideStatus.REQUESTED, label: "Requested", icon: "checkmark.circle" },
+  {
+    status: RideStatus.REQUESTED,
+    label: "Requested",
+    icon: "checkmark.circle",
+  },
   { status: RideStatus.ACCEPTED, label: "Driver Found", icon: "person.fill" },
-  { status: RideStatus.ARRIVED, label: "Driver Arrived", icon: "location.fill" },
+  {
+    status: RideStatus.ARRIVED,
+    label: "Driver Arrived",
+    icon: "location.fill",
+  },
   { status: RideStatus.IN_PROGRESS, label: "In Progress", icon: "car.fill" },
-  { status: RideStatus.COMPLETED, label: "Completed", icon: "checkmark.circle.fill" },
+  {
+    status: RideStatus.COMPLETED,
+    label: "Completed",
+    icon: "checkmark.circle.fill",
+  },
 ];
 
 type Props = {

@@ -69,6 +69,15 @@ export class MarketplaceController {
     return this.marketplaceService.getPaginatedStores(page, limit, type);
   }
 
+  @Get('products/:id')
+  async getProduct(@Param('id') id: string) {
+    const product = await this.marketplaceService.getProductById(id);
+    if (!product) {
+      throw new NotFoundException(`Product not found: ${id}`);
+    }
+    return product;
+  }
+
   @UseGuards(JwtAuthGuard)
   @Post('reviews')
   async upsertReview(@Request() req, @Body() createReviewDto: CreateReviewDto) {

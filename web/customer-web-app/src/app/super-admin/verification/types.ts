@@ -1,15 +1,15 @@
 export enum VerificationEntityType {
-  VENDOR = 'vendor',
-  RIDER = 'rider'
+  VENDOR = "vendor",
+  RIDER = "rider",
 }
 
-export type VerificationAction = 'APPROVE' | 'REJECT' | 'REQUEST_INFO';
+export type VerificationAction = "APPROVE" | "REJECT" | "REQUEST_INFO";
 
 export interface VerificationDocument {
   id: string;
   type: string;
   url: string;
-  status: 'PENDING' | 'VERIFIED' | 'REJECTED';
+  status: "PENDING" | "VERIFIED" | "REJECTED";
   createdAt: string;
 }
 
@@ -18,7 +18,7 @@ export interface VerificationRow {
   name: string;
   email: string;
   type: VerificationEntityType;
-  status: 'PENDING' | 'REJECTED' | 'REQUESTED';
+  status: "PENDING" | "REJECTED" | "REQUESTED";
   submittedAt: string;
   documents: VerificationDocument[];
 }

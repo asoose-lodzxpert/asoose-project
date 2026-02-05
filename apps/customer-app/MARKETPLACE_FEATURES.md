@@ -5,20 +5,25 @@ This document describes the newly implemented marketplace features that integrat
 ## 📦 Files Created
 
 ### Types
+
 - `types/marketplace.ts` - Search, category, and review type definitions
 
 ### Services
+
 - `services/search.service.ts` - Search and category browsing with backend integration
 - `services/review.service.ts` - Review submission and validation
 
 ### Components
+
 - `components/store/ReviewModal.tsx` - Review submission modal with rating stars
 
 ### Screens
+
 - `app/category/[id].tsx` - Category detail page with sorting options
 - `app/discover.tsx` - All stores browsing page with category filters
 
 ### Updated Files
+
 - `app/search.tsx` - Connected to backend search API (replaced mock data)
 - `app/(store)/store-screen.tsx` - Added review modal integration
 - `components/store/StoreInfo.tsx` - Added "Write a Review" button
@@ -28,9 +33,11 @@ This document describes the newly implemented marketplace features that integrat
 ## ✅ Features Implemented
 
 ### 1. **Backend-Integrated Search**
+
 **File:** `app/search.tsx`
 
 **What Changed:**
+
 - Replaced hardcoded `MOCK_PRODUCTS` array with backend API integration
 - Added debounced search (500ms delay)
 - Real-time search results from `GET /marketplace/search?q=query`
@@ -39,6 +46,7 @@ This document describes the newly implemented marketplace features that integrat
 - Theme-aware styling
 
 **How to Use:**
+
 1. Navigate to search screen from home header
 2. Type at least 2 characters to trigger search
 3. Filter by category using pill filters
@@ -48,9 +56,11 @@ This document describes the newly implemented marketplace features that integrat
 ---
 
 ### 2. **Category Detail Pages**
+
 **File:** `app/category/[id].tsx`
 
 **What Changed:**
+
 - Created new dynamic route for category browsing
 - Fetches from `GET /marketplace/categories/:id?sort=...`
 - Sort options: All, Top Rated, Fastest Delivery, Nearest, Most Popular
@@ -58,6 +68,7 @@ This document describes the newly implemented marketplace features that integrat
 - Empty state when no stores found
 
 **How to Use:**
+
 1. From home screen, tap "View all" on any category section
 2. Navigate to `/category/{categoryId}`
 3. Tap sort dropdown to change ordering
@@ -69,9 +80,11 @@ This document describes the newly implemented marketplace features that integrat
 ---
 
 ### 3. **Review System**
+
 **Files:** `services/review.service.ts`, `components/store/ReviewModal.tsx`
 
 **What Changed:**
+
 - Created review submission service with validation
 - 5-star rating picker with visual feedback
 - Comment input (10-500 characters)
@@ -79,6 +92,7 @@ This document describes the newly implemented marketplace features that integrat
 - Auto-refreshes store data after submission
 
 **How to Use:**
+
 1. Navigate to any store detail page
 2. Switch to "Info" tab
 3. Tap "Write a Review" button
@@ -87,6 +101,7 @@ This document describes the newly implemented marketplace features that integrat
 6. Tap "Submit Review"
 
 **Validation:**
+
 - Store ID required
 - Rating: 1-5
 - Comment: 10-500 characters
@@ -97,9 +112,11 @@ This document describes the newly implemented marketplace features that integrat
 ---
 
 ### 4. **Discover Page**
+
 **File:** `app/discover.tsx`
 
 **What Changed:**
+
 - Created dedicated store browsing page
 - Uses existing `HomeContext` for store data
 - Category filtering via pill filters
@@ -107,6 +124,7 @@ This document describes the newly implemented marketplace features that integrat
 - Pull-to-refresh support
 
 **How to Use:**
+
 1. From home screen, navigate to `/discover`
 2. Filter by category (All, Restaurant, Grocery, etc.)
 3. Scroll to load more stores
@@ -119,35 +137,40 @@ This document describes the newly implemented marketplace features that integrat
 
 ## 🔧 Backend Endpoints Used
 
-| Endpoint | Usage | Status |
-|----------|-------|--------|
-| `GET /marketplace/search?q=query` | Search stores and products | ✅ Implemented |
-| `GET /marketplace/categories/:id?sort=...` | Category detail page | ✅ Implemented |
-| `POST /marketplace/reviews` | Submit/update review | ✅ Implemented |
-| `DELETE /marketplace/reviews/:storeId` | Delete review | ⚠️ Service ready (UI not added) |
-| `GET /marketplace/stores` | Discover page | ✅ Existing (reused) |
+| Endpoint                                   | Usage                      | Status                          |
+| ------------------------------------------ | -------------------------- | ------------------------------- |
+| `GET /marketplace/search?q=query`          | Search stores and products | ✅ Implemented                  |
+| `GET /marketplace/categories/:id?sort=...` | Category detail page       | ✅ Implemented                  |
+| `POST /marketplace/reviews`                | Submit/update review       | ✅ Implemented                  |
+| `DELETE /marketplace/reviews/:storeId`     | Delete review              | ⚠️ Service ready (UI not added) |
+| `GET /marketplace/stores`                  | Discover page              | ✅ Existing (reused)            |
 
 ---
 
 ## 🎨 UI/UX Features
 
 ### Theme Support
+
 All new components are theme-aware:
+
 - `useThemeColor` hook for consistent styling
 - Works in both light and dark mode
 - Uses `ThemedView` and `ThemedText` components
 
 ### Loading States
+
 - Skeleton screens for search and category pages
 - Activity indicators for async operations
 - Proper empty states with helpful messages
 
 ### Error Handling
+
 - Network error messages
 - Validation errors in review modal
 - Retry buttons for failed requests
 
 ### User Feedback
+
 - Debounced search (prevents excessive API calls)
 - Pull-to-refresh on all list screens
 - Character counter in review modal
@@ -176,6 +199,7 @@ Home Screen
 ## 🚀 Testing Checklist
 
 ### Search Functionality
+
 - [ ] Search returns results from backend
 - [ ] Debouncing works (no spam requests)
 - [ ] Category filter works
@@ -184,6 +208,7 @@ Home Screen
 - [ ] Loading skeleton appears during search
 
 ### Category Pages
+
 - [ ] Navigate from home "View all" links
 - [ ] Category vendors load from backend
 - [ ] Sort options change results
@@ -191,6 +216,7 @@ Home Screen
 - [ ] Empty state for categories with no stores
 
 ### Review System
+
 - [ ] "Write Review" button appears in store info tab
 - [ ] Review modal opens
 - [ ] Star rating selection works
@@ -199,6 +225,7 @@ Home Screen
 - [ ] Error messages display correctly
 
 ### Discover Page
+
 - [ ] "/discover" route loads
 - [ ] Category filters work
 - [ ] Infinite scroll loads more stores
@@ -210,9 +237,11 @@ Home Screen
 ## 🔄 Migration Notes
 
 ### Breaking Changes
+
 None. All changes are additive.
 
 ### Data Requirements
+
 - Users must be authenticated to submit reviews
 - Backend must support `GET /marketplace/search?q=...`
 - Backend must support `GET /marketplace/categories/:id?sort=...`
@@ -233,6 +262,7 @@ None. All changes are additive.
 ## 📚 Code Examples
 
 ### Using Search Service
+
 ```typescript
 import { searchMarketplace } from "@/services/search.service";
 
@@ -240,21 +270,22 @@ const results = await searchMarketplace("pizza", {
   category: "food",
   minPrice: 500,
   maxPrice: 2000,
-  sortBy: "rating"
+  sortBy: "rating",
 });
 
-console.log(results.stores);   // Vendor[]
+console.log(results.stores); // Vendor[]
 console.log(results.products); // Product[]
 ```
 
 ### Submitting a Review
+
 ```typescript
 import { submitReview, validateReview } from "@/services/review.service";
 
 const reviewData = {
   storeId: "store-123",
   rating: 5,
-  comment: "Great food and fast delivery!"
+  comment: "Great food and fast delivery!",
 };
 
 const validation = validateReview(reviewData);
@@ -267,11 +298,12 @@ const review = await submitReview(reviewData);
 ```
 
 ### Fetching Category Data
+
 ```typescript
 import { fetchCategoryDetail } from "@/services/search.service";
 
 const data = await fetchCategoryDetail("restaurant", "rating");
-console.log(data.vertical.title);   // "Top Restaurants"
+console.log(data.vertical.title); // "Top Restaurants"
 console.log(data.vertical.vendors); // Vendor[]
 ```
 
@@ -292,6 +324,7 @@ console.log(data.vertical.vendors); // Vendor[]
 ## 📞 Support
 
 For issues or questions about these features:
+
 1. Check error messages in console
 2. Verify backend endpoints are accessible
 3. Ensure user is authenticated (for review submission)

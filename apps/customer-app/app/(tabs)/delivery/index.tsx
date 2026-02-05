@@ -2,9 +2,7 @@ import { LocationCard } from "@/components/delivery/LocationCard";
 import { PackageDetailsSection } from "@/components/delivery/PackageDetailsSection";
 import { PackageSizeSelector } from "@/components/delivery/PackageSizeSelector";
 import { QuoteBottomSheet } from "@/components/delivery/QuoteBottomSheet";
-import { SendPackageHeader } from "@/components/delivery/SendPackageHeader";
 import { ThemedView } from "@/components/themed-view";
-import { useSendPackage } from "@/context/SendPackageContext";
 import {
   ScrollView,
   KeyboardAvoidingView,

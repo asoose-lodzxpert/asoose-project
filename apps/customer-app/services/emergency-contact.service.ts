@@ -13,15 +13,27 @@ export async function saveEmergencyContacts(
 ): Promise<void> {
   await Promise.all(
     contacts.map(async (contact) => {
-      if (contact.id) {
+      // If contact has a UUID-like ID, update it. Otherwise, create new
+      const isExisting = contact.id && contact.id.length > 20; // UUID check
+
+      if (isExisting) {
         await request(`users/emergency-contacts/${contact.id}`, {
           method: "PATCH",
-          body: JSON.stringify(contact),
+          body: JSON.stringify({
+            name: contact.name,
+            phone: contact.phone,
+            relationship: contact.relationship,
+          }),
         });
       } else {
-        await request("users/emergency-contacts", {
+        // Create new contact
+        await request(`users/emergency-contacts`, {
           method: "POST",
-          body: JSON.stringify(contact),
+          body: JSON.stringify({
+            name: contact.name,
+            phone: contact.phone,
+            relationship: contact.relationship,
+          }),
         });
       }
     }),

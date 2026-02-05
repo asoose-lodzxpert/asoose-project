@@ -27,3 +27,37 @@ export async function fetchPaginatedStores(
   const suffix = params.toString();
   return request(`marketplace/stores${suffix ? `?${suffix}` : ""}`);
 }
+
+export interface ProductDetails {
+  id: string;
+  name: string;
+  description: string | null;
+  price: number;
+  images: string[];
+  available: boolean;
+  category: {
+    id: string;
+    name: string;
+  } | null;
+  store: {
+    id: string;
+    name: string;
+    slug: string;
+  };
+  modifierGroups: Array<{
+    id: string;
+    name: string;
+    required: boolean;
+    minSelection: number;
+    maxSelection: number;
+    modifiers: Array<{
+      id: string;
+      name: string;
+      price: number;
+    }>;
+  }>;
+}
+
+export async function fetchProductById(id: string): Promise<ProductDetails> {
+  return request(`marketplace/products/${id}`);
+}

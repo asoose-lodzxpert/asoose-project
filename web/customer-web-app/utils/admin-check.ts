@@ -1,6 +1,11 @@
 import { getServerSession } from "next-auth"; // <--- v4 Import
 import { authOptions } from "./authOptions";
-const ADMIN_ROLES = ["SUPER_ADMIN", "ADMIN_MANAGER", "ADMIN_SUPPORT", "ADMIN_FINANCE"];
+const ADMIN_ROLES = [
+  "SUPER_ADMIN",
+  "ADMIN_MANAGER",
+  "ADMIN_SUPPORT",
+  "ADMIN_FINANCE",
+];
 
 export async function requireAdmin() {
   const session = await getServerSession(authOptions); // <--- v4 Usage
@@ -13,7 +18,9 @@ export async function requireAdmin() {
   const userRole = session.user.role;
 
   if (!ADMIN_ROLES.includes(userRole)) {
-    console.error(`❌ Admin Check Failed: Role '${userRole}' is not an admin role.`);
+    console.error(
+      `❌ Admin Check Failed: Role '${userRole}' is not an admin role.`,
+    );
     return null;
   }
 

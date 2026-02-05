@@ -1,22 +1,33 @@
 // 04-payouts.ts
 import { prisma } from './seed-utils';
-import { PayoutStatus, TransactionType, WalletEntityType, TransactionStatus } from '@prisma/client';
+import {
+  PayoutStatus,
+  TransactionType,
+  WalletEntityType,
+  TransactionStatus,
+} from '@prisma/client';
 
 export async function seedPayouts() {
   console.log('🌱 Seeding Payout Requests...');
 
   // --- Vendor Payouts ---
   // Fetch stores with balance > 0
-  const stores = await prisma.store.findMany({ 
+  const stores = await prisma.store.findMany({
     where: { walletBalance: { gt: 0 } },
     include: { bankAccount: true },
-    take: 5 
+    take: 5,
   });
 
-  const statuses = [PayoutStatus.PENDING, PayoutStatus.APPROVED, PayoutStatus.COMPLETED, PayoutStatus.REJECTED, PayoutStatus.FAILED];
+  const statuses = [
+    PayoutStatus.PENDING,
+    PayoutStatus.APPROVED,
+    PayoutStatus.COMPLETED,
+    PayoutStatus.REJECTED,
+    PayoutStatus.FAILED,
+  ];
 
   for (const [index, store] of stores.entries()) {
-    const amount = 1000.00; // Fixed withdrawal amount
+    const amount = 1000.0; // Fixed withdrawal amount
     const status = statuses[index % statuses.length];
 
     // 1. Create Payout Record
@@ -29,17 +40,17 @@ export async function seedPayouts() {
         method: 'BANK_TRANSFER',
         reference: `PAY_REF_${Date.now()}_${index}`,
         processedAt: status === PayoutStatus.COMPLETED ? new Date() : null,
-      }
+      },
     });
 
     // 2. Handle Ledger & Balance Logic
     // If Pending/Approved/Completed, money leaves the wallet (or is locked)
     // If Rejected/Failed, money should theoretically return, but for the seed we assume
     // the deduction happened at request time.
-    
+
     if (status !== PayoutStatus.REJECTED) {
       const currentBalance = store.walletBalance; // Should reflect the update from step 3
-      
+
       // Create Transaction for the Payout Request
       await prisma.transaction.create({
         data: {
@@ -52,25 +63,25 @@ export async function seedPayouts() {
           balanceAfter: currentBalance - amount,
           description: `Payout Request ${status}`,
           status: TransactionStatus.COMPLETED, // The request transaction is complete
-        }
+        },
       });
 
       // Deduct from Wallet
       await prisma.store.update({
         where: { id: store.id },
-        data: { walletBalance: { decrement: amount } }
+        data: { walletBalance: { decrement: amount } },
       });
     }
   }
 
   // --- Rider Payouts ---
-  const riders = await prisma.rider.findMany({ 
+  const riders = await prisma.rider.findMany({
     where: { walletBalance: { gt: 0 } },
-    take: 5 
+    take: 5,
   });
 
   for (const [index, rider] of riders.entries()) {
-    const amount = 500.00;
+    const amount = 500.0;
     const status = statuses[index % statuses.length];
 
     const payout = await prisma.riderPayout.create({
@@ -80,7 +91,7 @@ export async function seedPayouts() {
         status: status,
         method: 'BANK_TRANSFER',
         reference: `RIDER_PAY_${Date.now()}_${index}`,
-      }
+      },
     });
 
     if (status !== PayoutStatus.REJECTED) {
@@ -95,12 +106,12 @@ export async function seedPayouts() {
           balanceAfter: rider.walletBalance - amount,
           description: `Rider Payout ${status}`,
           status: TransactionStatus.COMPLETED,
-        }
+        },
       });
 
       await prisma.rider.update({
         where: { id: rider.id },
-        data: { walletBalance: { decrement: amount } }
+        data: { walletBalance: { decrement: amount } },
       });
     }
   }

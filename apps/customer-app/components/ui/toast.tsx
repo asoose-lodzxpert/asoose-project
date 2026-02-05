@@ -70,7 +70,7 @@ export function toast(options: ToastOptions) {
   // In your app, use the useToast() hook or context for best results.
   // You can implement a global event emitter or singleton pattern if needed.
   console.warn(
-    "[Toast] Direct usage is not implemented. Use <ToastProvider> and useToast()."
+    "[Toast] Direct usage is not implemented. Use <ToastProvider> and useToast().",
   );
 }
 

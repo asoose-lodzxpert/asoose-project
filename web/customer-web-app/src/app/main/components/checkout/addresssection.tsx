@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import React from 'react';
-import { MapPin, ChevronRight, Loader2, Plus } from 'lucide-react';
-import { Address } from '@/app/main/checkout/types';
+import React from "react";
+import { MapPin, ChevronRight, Loader2, Plus } from "lucide-react";
+import { Address } from "@/app/main/checkout/types";
 interface AddressSectionProps {
   addresses: Address[];
   selectedAddress: Address | null;
@@ -59,13 +59,13 @@ export const AddressSection = ({
                   onClick={() => !isProcessing && onSelect(addr)}
                   className={`p-4 rounded-2xl border flex items-center justify-between cursor-pointer transition-all ${
                     selectedAddress?.id === addr.id
-                      ? 'border-yellow-500 bg-yellow-50 dark:bg-yellow-500/10'
-                      : 'border-gray-100 dark:border-white/5 hover:border-yellow-500/50'
+                      ? "border-yellow-500 bg-yellow-50 dark:bg-yellow-500/10"
+                      : "border-gray-100 dark:border-white/5 hover:border-yellow-500/50"
                   }`}
                 >
                   <div>
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="font-bold">{addr.label || 'Home'}</span>
+                      <span className="font-bold">{addr.label || "Home"}</span>
                       {addr.isDefault && (
                         <span className="text-[10px] bg-gray-200 dark:bg-white/10 px-2 py-0.5 rounded-md">
                           Default

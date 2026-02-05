@@ -3,7 +3,7 @@ import polyline from "@mapbox/polyline";
 export async function getRouteCoordinates(
   origin: { latitude: number; longitude: number },
   destination: { latitude: number; longitude: number },
-  apiKey: string
+  apiKey: string,
 ) {
   const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${origin.latitude},${origin.longitude}&destination=${destination.latitude},${destination.longitude}&key=${apiKey}`;
 

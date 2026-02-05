@@ -64,7 +64,7 @@ export default function RidesHistoryScreen() {
         setRefreshing(false);
       }
     },
-    [page, hasMore, loading]
+    [page, hasMore, loading],
   );
 
   useEffect(() => {
@@ -129,10 +129,15 @@ export default function RidesHistoryScreen() {
 
     return (
       <Pressable
-        style={[styles.rideCard, { backgroundColor: cardBg, borderColor: border }]}
+        style={[
+          styles.rideCard,
+          { backgroundColor: cardBg, borderColor: border },
+        ]}
         onPress={() => {
           // Navigate to ride details (to be implemented)
-          router.push(`/(tabs)/ride-history/${ride.id}` as RelativePathString);
+          router.push(
+            `/(settings)/ride-history/${ride.id}` as RelativePathString,
+          );
         }}
       >
         <View style={styles.rideHeader}>
@@ -142,7 +147,12 @@ export default function RidesHistoryScreen() {
               Ride #{ride.id.slice(-6).toUpperCase()}
             </ThemedText>
           </View>
-          <View style={[styles.statusBadge, { backgroundColor: statusColor + "22" }]}>
+          <View
+            style={[
+              styles.statusBadge,
+              { backgroundColor: statusColor + "22" },
+            ]}
+          >
             <ThemedText
               type="caption"
               style={[styles.statusText, { color: statusColor }]}
@@ -181,7 +191,8 @@ export default function RidesHistoryScreen() {
             </ThemedText>
             {ride.rider.vehicle && (
               <ThemedText type="caption" style={{ color: textSecondary }}>
-                {ride.rider.vehicle.make} {ride.rider.vehicle.model} • {ride.rider.vehicle.plateNumber}
+                {ride.rider.vehicle.make} {ride.rider.vehicle.model} •{" "}
+                {ride.rider.vehicle.plateNumber}
               </ThemedText>
             )}
           </View>

@@ -5,7 +5,7 @@ import { PrismaClient } from '@prisma/client';
 export const prisma = new PrismaClient();
 export const MAIDUGURI_COORDS = { lat: 11.8311, lng: 13.151 };
 export const PASSWORD_HASH =
-  '$2b$10$EpRnTzVlqHNP0.fKbX9neeCFr.nwcV7sO/tCq.pE/JH.Z8k/M.mC'; // "password123"
+  '$2b$10$2AwGc1ssUeYGnseXxmurROycyDVXJlTM8ORgDh7s6kH9kyDJyOu3e'; // "Calculus@123"
 
 export async function cleanDatabase() {
   // Wipe all major tables in dependency order

@@ -68,8 +68,8 @@ export class RidesService {
 
     for (const type of types) {
       let multiplier = 1;
-      if (type === VehicleType.VAN) multiplier = 1.5;
-      if (type === VehicleType.BIKE) multiplier = 0.7;
+      if (type === VehicleType.BUSINESS) multiplier = 1.5;
+      if (type === VehicleType.ECONOMY) multiplier = 1.0;
 
       const fareDetails = this.geo.calculateFare(distanceKm, durationMin);
 
@@ -93,7 +93,10 @@ export class RidesService {
   }
 
   async requestRide(userId: string, dto: RequestRideDto) {
-    // 1. Strict Input Validation
+    this.logger.log(
+      `Request Ride - User: ${userId}, DTO: ${JSON.stringify(dto, null, 2)}`,
+    );
+
     this.validateCoordinates(
       dto.pickupLocation.latitude,
       dto.pickupLocation.longitude,
@@ -107,8 +110,6 @@ export class RidesService {
       throw new BadRequestException('Invalid vehicle type');
     }
 
-    // 2. Idempotency Check (FIXED): Only block if ride is TRULY active
-    // We removed 'PENDING' from this check to prevent deadlocks.
     const activeRide = await this.prisma.ride.findFirst({
       where: {
         customerId: userId,
@@ -127,9 +128,6 @@ export class RidesService {
       throw new ConflictException('You already have an active ride request');
     }
 
-    // 3. Cleanup Zombie PENDING rides (FIXED)
-    // If a previous attempt failed at payment or was abandoned, we auto-cancel it here.
-    // This ensures the user can always try again without getting a 409 Conflict.
     await this.prisma.ride.updateMany({
       where: {
         customerId: userId,
@@ -170,7 +168,6 @@ export class RidesService {
           },
         });
 
-        // 5. Calculate Fare
         const distanceKm = this.geo.calculateDistance(
           pickupAddress.lat,
           pickupAddress.lng,
@@ -179,7 +176,6 @@ export class RidesService {
         );
 
         const durationMin = Math.ceil(distanceKm * 3);
-        const fareDetails = this.geo.calculateFare(distanceKm, durationMin);
 
         // 6. Security: Hash OTP
         const rawOtp = this.geo.generateOTP(TRIPS_CONFIG.OTP_LENGTH);
@@ -194,12 +190,7 @@ export class RidesService {
             status: RideStatus.PENDING,
             distanceKm,
             durationMin,
-            baseFare: this.common.round(fareDetails.baseFare),
-            distanceFare: this.common.round(fareDetails.distanceFare),
-            timeFare: this.common.round(fareDetails.timeFare),
-            platformFee: this.common.round(fareDetails.platformFee || 0),
-            driverFee: this.common.round(fareDetails.driverFee),
-            totalFare: this.common.round(fareDetails.totalFare),
+            totalFare: this.common.round(dto.fare),
             startOtp: hashedOtp,
             surgeMultiplier: 1.0,
           },
@@ -223,7 +214,7 @@ export class RidesService {
 
         return {
           ride: { ...ride, startOtp: undefined },
-          fareBreakdown: fareDetails,
+          fare: dto.fare,
           payment,
           message: 'Ride created. Please confirm to find a driver.',
         };
@@ -310,7 +301,7 @@ export class RidesService {
 
     const job = rideToJobSummary(ride);
     const eventPayload = { job, attempt: 1 };
-    this.eventBus.emitRideRequested(eventPayload);
+    this.eventBus.emitRideRequested({ rideId: job.id, ...eventPayload });
     await this.queue.enqueueRideMatching(eventPayload);
   }
 
@@ -509,8 +500,6 @@ export class RidesService {
       throw new BadRequestException(`Invalid coordinates: ${lat}, ${lng}`);
     }
   }
-
-  // ... (Other existing methods: cancelRide, getUserRides, etc. - assume standard implementation)
 
   async startRideMatching(rideId: string) {
     // Internal method for manual triggering if needed

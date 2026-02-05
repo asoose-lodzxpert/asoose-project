@@ -5,13 +5,7 @@ import {
   Animated,
   Easing,
   Platform,
-} from "react-native";
-import {
-  View,
-  StyleSheet,
-  Pressable,
-  FlatList,
-} from "react-native";
+ View, StyleSheet, Pressable, FlatList } from "react-native";
 import { SkeletonCard } from "@/components/ui/Skeleton";
 import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
@@ -36,9 +30,11 @@ export default function OrderHistoryScreen() {
   const [hasMore, setHasMore] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const pageSize = 10;
+
   const brandPrimary = useThemeColor({}, "brandPrimary");
   const textColor = useThemeColor({}, "textPrimary");
   const textSecondary = useThemeColor({}, "textSecondary");
+  const surfaceBg = useThemeColor({}, "surfaceBackground");
   const cardBg = useThemeColor({}, "surfaceCard");
   const border = useThemeColor({}, "borderDefault");
   const skeletonColor = useThemeColor({}, "surfaceSubtle");
@@ -95,51 +91,50 @@ export default function OrderHistoryScreen() {
     <>
       <Pressable
         key={order.id}
-        style={[styles.orderCard, { backgroundColor: cardBg }]}
+        style={[
+          styles.orderCard,
+          { backgroundColor: cardBg, borderColor: border },
+        ]}
         onPress={() =>
           router.push(("/order-history/" + order.id) as RelativePathString)
         }
       >
-        <View style={styles.cardRow}>
-          <View style={styles.cardIconWrap}>
-            <IconSymbol name="shopping-bag" size={28} color={brandPrimary} />
-          </View>
-          <View style={{ flex: 1 }}>
+        <View style={styles.cardHeader}>
+          <View style={styles.orderIdContainer}>
+            <IconSymbol name="shopping-bag" size={18} color={brandPrimary} />
             <ThemedText style={[styles.orderId, { color: textColor }]}>
               Order #{order.id.slice(-6)}
             </ThemedText>
-            <ThemedText style={[styles.status, { color: brandPrimary }]}>
+          </View>
+
+          <View
+            style={[
+              styles.statusBadge,
+              { backgroundColor: brandPrimary + "22" },
+            ]}
+          >
+            <ThemedText style={[styles.statusText, { color: brandPrimary }]}>
               {order.status}
             </ThemedText>
-            <View style={styles.cardDetailsRow}>
-              <ThemedText
-                style={[styles.detailLabel, { color: textSecondary }]}
-              >
-                Total:
-              </ThemedText>
-              <ThemedText style={[styles.detailValue, { color: textColor }]}>
-                ₦{order.total.toFixed(2)}
-              </ThemedText>
-            </View>
-            <View style={styles.cardDetailsRow}>
-              <ThemedText
-                style={[styles.detailLabel, { color: textSecondary }]}
-              >
-                Date:
-              </ThemedText>
-              <ThemedText
-                style={[styles.detailValue, { color: textSecondary }]}
-              >
-                {new Date(order.createdAt).toLocaleString()}
-              </ThemedText>
-            </View>
           </View>
-          <IconSymbol
-            name="chevron.right"
-            size={20}
-            color={border}
-            style={{ marginLeft: 8 }}
-          />
+        </View>
+
+        <View style={styles.cardDetailsRowSmall}>
+          <ThemedText style={[styles.detailLabel, { color: textSecondary }]}>
+            Total:
+          </ThemedText>
+          <ThemedText style={[styles.detailValue, { color: textColor }]}>
+            ₦{order.total.toFixed(2)}
+          </ThemedText>
+        </View>
+
+        <View style={styles.cardDetailsRowSmall}>
+          <ThemedText style={[styles.detailLabel, { color: textSecondary }]}>
+            Date:
+          </ThemedText>
+          <ThemedText style={[styles.detailValue, { color: textSecondary }]}>
+            {new Date(order.createdAt).toLocaleString()}
+          </ThemedText>
         </View>
       </Pressable>
       <View style={[styles.separator, { backgroundColor: border }]} />
@@ -151,7 +146,10 @@ export default function OrderHistoryScreen() {
     return skeletons.map((_, i) => (
       <View
         key={i}
-        style={[styles.orderCard, { backgroundColor: cardBg, opacity: 0.5 }]}
+        style={[
+          styles.orderCard,
+          { backgroundColor: cardBg, opacity: 0.5, borderColor: border },
+        ]}
       >
         <View
           style={[styles.skeletonLine, { backgroundColor: skeletonColor }]}
@@ -246,7 +244,11 @@ export default function OrderHistoryScreen() {
         <Animated.View
           style={[
             styles.modalSheet,
-            { transform: [{ translateY: modalTranslateY }] },
+            {
+              transform: [{ translateY: modalTranslateY }],
+              backgroundColor: surfaceBg,
+              borderColor: border,
+            },
           ]}
         >
           <View style={styles.modalHandle} />
@@ -269,7 +271,7 @@ export default function OrderHistoryScreen() {
                 key={opt.value}
                 style={[
                   styles.modalOption,
-                  status === opt.value && styles.modalOptionActive,
+                  { borderColor: status === opt.value ? brandPrimary : border },
                 ]}
                 onPress={() => {
                   setStatus(opt.value as OrderStatus);
@@ -327,7 +329,6 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     paddingHorizontal: 16,
     borderBottomWidth: 1,
-    borderBottomColor: "#F0F1F3",
     zIndex: 2,
   },
   backBtn: {
@@ -337,13 +338,11 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: "600",
-    color: "#222",
   },
   filterBtn: {
     marginLeft: "auto",
     padding: 8,
     borderRadius: 20,
-    backgroundColor: "#F4F6F8",
   },
   // Modal styles
   modalBackdrop: {
@@ -352,7 +351,6 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: "rgba(0,0,0,0.18)",
     zIndex: 1,
   },
   modalSheet: {
@@ -360,13 +358,11 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: "#fff",
     borderTopLeftRadius: 18,
     borderTopRightRadius: 18,
     padding: 24,
     paddingBottom: 32,
     zIndex: 2,
-    shadowColor: "#000",
     shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.08,
     shadowRadius: 12,
@@ -376,7 +372,6 @@ const styles = StyleSheet.create({
     width: 40,
     height: 5,
     borderRadius: 3,
-    backgroundColor: "#E0E2E6",
     alignSelf: "center",
     marginBottom: 16,
   },
@@ -385,7 +380,6 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     marginBottom: 18,
     textAlign: "center",
-    color: "#222",
   },
   modalOptions: {
     marginBottom: 16,
@@ -395,25 +389,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     borderRadius: 8,
     marginBottom: 6,
-    backgroundColor: "#F6F7F9",
   },
-  modalOptionActive: {
-    backgroundColor: "#E6F0FF",
-  },
+  modalOptionActive: {},
   modalOptionText: {
     fontSize: 16,
-    color: "#222",
     fontWeight: "500",
   },
   modalCancelBtn: {
     marginTop: 8,
     paddingVertical: 12,
     borderRadius: 8,
-    backgroundColor: "#F4F6F8",
   },
   modalCancelText: {
     textAlign: "center",
-    color: "#888",
     fontSize: 16,
     fontWeight: "500",
   },
@@ -423,30 +411,22 @@ const styles = StyleSheet.create({
     paddingTop: 8,
   },
   orderCard: {
-    backgroundColor: "#fff",
-    borderRadius: 14,
-    padding: 18,
-    marginBottom: 0,
-    elevation: 2,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 16,
+    marginTop: 12,
     marginHorizontal: 16,
-    marginTop: 8,
   },
-  cardRow: {
+  cardHeader: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 8,
   },
-  cardIconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: "#F0F1F3",
+  orderIdContainer: {
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    marginRight: 14,
+    gap: 8,
   },
   status: {
     fontWeight: "600",
@@ -455,6 +435,20 @@ const styles = StyleSheet.create({
     marginTop: 2,
     letterSpacing: 0.2,
     textTransform: "capitalize",
+  },
+  statusBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  cardDetailsRowSmall: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 4,
   },
   cardDetailsRow: {
     flexDirection: "row",
@@ -479,7 +473,6 @@ const styles = StyleSheet.create({
     height: 1,
     marginVertical: 10,
     marginHorizontal: 24,
-    backgroundColor: "#F0F1F3",
   },
   skeletonLine: {
     height: 16,

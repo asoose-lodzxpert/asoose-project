@@ -1,9 +1,16 @@
-'use client';
+"use client";
 
-import { create } from 'zustand';
-import { RideService } from '@/services/ride.service';
+import { create } from "zustand";
+import { RideService } from "@/services/ride.service";
 
-export type RideStage = 'IDLE' | 'FINDING_DRIVER' | 'ON_WAY' | 'ARRIVED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+export type RideStage =
+  | "IDLE"
+  | "FINDING_DRIVER"
+  | "ON_WAY"
+  | "ARRIVED"
+  | "IN_PROGRESS"
+  | "COMPLETED"
+  | "CANCELLED";
 
 interface RideState {
   rideStage: RideStage;
@@ -25,7 +32,7 @@ interface RideState {
 }
 
 export const useRideStore = create<RideState>((set) => ({
-  rideStage: 'IDLE',
+  rideStage: "IDLE",
   activeRideId: null,
   userLocation: null,
   destination: null,
@@ -35,21 +42,23 @@ export const useRideStore = create<RideState>((set) => ({
   isCalculating: false,
 
   setRideStage: (stage) => set({ rideStage: stage }),
-  
-  setLocations: (pickup, dropoff) => set({ userLocation: pickup, destination: dropoff }),
-  
+
+  setLocations: (pickup, dropoff) =>
+    set({ userLocation: pickup, destination: dropoff }),
+
   setDriverInfo: (info) => set({ driverInfo: info }),
-  
+
   updateDriverLocation: (loc) => set({ driverLocation: loc }),
-  
+
   setPriceEstimates: (est) => set({ priceEstimates: est }),
 
-  resetRide: () => set({
-    rideStage: 'IDLE',
-    activeRideId: null,
-    destination: null,
-    driverInfo: null,
-    driverLocation: undefined,
-    priceEstimates: null
-  }),
+  resetRide: () =>
+    set({
+      rideStage: "IDLE",
+      activeRideId: null,
+      destination: null,
+      driverInfo: null,
+      driverLocation: undefined,
+      priceEstimates: null,
+    }),
 }));

@@ -57,7 +57,7 @@ export async function initiatePayment(
     callbackUrl,
     metadata,
   };
-  const { parsed } = await request("payment/initialize", {
+  const parsed = await request("payment/initialize", {
     method: "POST",
     body: JSON.stringify(body),
   });
@@ -65,7 +65,7 @@ export async function initiatePayment(
 }
 
 export async function checkPaymentStatus(reference: string) {
-  const { parsed } = await request(
+  const parsed = await request(
     `payment/verify?reference=${encodeURIComponent(reference)}`,
     { method: "GET" },
   );

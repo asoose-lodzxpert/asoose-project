@@ -1,18 +1,18 @@
-import React from 'react';
-import Link from 'next/link';
-import { Car, ExternalLink, MapPin } from 'lucide-react';
-import { SectionCard } from './SectionCard';
-import { TransactionDetail } from '../types';
-import { Currency } from '@/app/main/components/Currency'; // ✅ Added
+import React from "react";
+import Link from "next/link";
+import { Car, ExternalLink, MapPin } from "lucide-react";
+import { SectionCard } from "./SectionCard";
+import { TransactionDetail } from "../types";
+import { Currency } from "@/app/main/components/Currency"; // ✅ Added
 
 interface RideDetailsProps {
-  details: NonNullable<TransactionDetail['rideDetails']>;
-  pricing: NonNullable<TransactionDetail['ridePricing']>;
+  details: NonNullable<TransactionDetail["rideDetails"]>;
+  pricing: NonNullable<TransactionDetail["ridePricing"]>;
 }
 
 export const RideDetailsCard = ({ details, pricing }: RideDetailsProps) => {
   const action = (
-    <Link 
+    <Link
       href={`/super-admin/rides/${details.rideId}`}
       className="text-yellow-500 hover:text-yellow-400 text-sm font-medium flex items-center gap-2"
     >
@@ -21,15 +21,15 @@ export const RideDetailsCard = ({ details, pricing }: RideDetailsProps) => {
   );
 
   return (
-    <SectionCard 
-      title="Ride Details" 
-      icon={Car} 
+    <SectionCard
+      title="Ride Details"
+      icon={Car}
       iconColorClass="bg-purple-500/20 text-purple-500"
       action={action}
     >
       <div className="space-y-6">
         {/* ... Header Stats remains same ... */}
-        
+
         {/* ... Route Info and Trip Statistics remain same ... */}
 
         {/* Fare Breakdown */}
@@ -40,20 +40,26 @@ export const RideDetailsCard = ({ details, pricing }: RideDetailsProps) => {
               <div>
                 <p className="text-gray-400 text-xs mb-1">Base Fare</p>
                 {/* ✅ Fixed: Formatted base fare */}
-                <p className="text-white"><Currency amount={pricing.baseFare} /></p>
+                <p className="text-white">
+                  <Currency amount={pricing.baseFare} />
+                </p>
               </div>
               <div>
                 <p className="text-gray-400 text-xs mb-1">Distance Fare</p>
                 {/* ✅ Fixed: Formatted distance fare */}
-                <p className="text-white"><Currency amount={pricing.distanceFare} /></p>
+                <p className="text-white">
+                  <Currency amount={pricing.distanceFare} />
+                </p>
               </div>
             </div>
-            
+
             <div className="pt-4 border-t border-gray-700">
               <div className="flex justify-between mb-2">
                 <span className="text-gray-400">Platform Fee</span>
                 {/* ✅ Fixed: Formatted platform fee */}
-                <span className="text-orange-500"><Currency amount={pricing.platformFee} /></span>
+                <span className="text-orange-500">
+                  <Currency amount={pricing.platformFee} />
+                </span>
               </div>
               <div className="flex justify-between pt-3 border-t border-gray-700">
                 <span className="text-white font-medium">Driver Receives</span>

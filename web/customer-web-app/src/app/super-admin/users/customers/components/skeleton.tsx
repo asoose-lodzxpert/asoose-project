@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 
 const SkeletonBox = ({ className = "" }) => (
   <div className={`bg-gray-700/30 rounded animate-pulse ${className}`} />
@@ -8,27 +8,29 @@ const SkeletonText = ({ width = "w-full", height = "h-4" }) => (
   <div className={`${width} ${height} bg-gray-700/30 rounded animate-pulse`} />
 );
 
-export  function CustomersPageSkeleton() {
+export function CustomersPageSkeleton() {
   return (
     <div className="mins-h-screen bg-[#0F172A] p-4 md:p-6">
       <div className="max-w-7xl mx-auto space-y-6">
-        
         {/* Header Section Skeleton */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div className="space-y-2">
             <SkeletonText width="w-48" height="h-8" />
             <SkeletonText width="w-40" height="h-4" />
           </div>
-          
+
           {/* Summary Stats Skeleton */}
           <div className="grid grid-cols-1 w-full gap-3 sm:grid-cols-3 md:flex md:gap-4">
-  {[1, 2, 3].map((i) => (
-    <div key={i} className="bg-[#1E293B] border border-gray-800 rounded-lg p-3 w-full">
-      <SkeletonText width="w-12" height="h-3" />
-      <SkeletonText width="w-8" height="h-6"  />
-    </div>
-  ))}
-</div>
+            {[1, 2, 3].map((i) => (
+              <div
+                key={i}
+                className="bg-[#1E293B] border border-gray-800 rounded-lg p-3 w-full"
+              >
+                <SkeletonText width="w-12" height="h-3" />
+                <SkeletonText width="w-8" height="h-6" />
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* Search Bar Skeleton */}
@@ -54,25 +56,25 @@ export  function CustomersPageSkeleton() {
                 <div className="grid grid-cols-7 gap-4 items-center">
                   {/* Customer ID */}
                   <SkeletonText width="w-20" height="h-4" />
-                  
+
                   {/* Customer Name/Email */}
                   <div className="space-y-2">
                     <SkeletonText width="w-32" height="h-4" />
                     <SkeletonText width="w-40" height="h-3" />
                   </div>
-                  
+
                   {/* Joined Date */}
                   <SkeletonText width="w-24" height="h-4" />
-                  
+
                   {/* Orders */}
                   <SkeletonText width="w-12" height="h-4" />
-                  
+
                   {/* Total Spent */}
                   <SkeletonText width="w-20" height="h-4" />
-                  
+
                   {/* Status */}
                   <SkeletonBox className="w-20 h-6 rounded" />
-                  
+
                   {/* Actions */}
                   <div className="flex items-center gap-2">
                     <SkeletonBox className="w-8 h-8 rounded-lg" />
@@ -100,7 +102,10 @@ export  function CustomersPageSkeleton() {
         {/* Mobile Cards Skeleton */}
         <div className="md:hidden space-y-3">
           {[1, 2, 3, 4, 5].map((card) => (
-            <div key={card} className="bg-[#1E293B] border border-gray-800 rounded-lg p-4">
+            <div
+              key={card}
+              className="bg-[#1E293B] border border-gray-800 rounded-lg p-4"
+            >
               {/* Header: ID + Status */}
               <div className="flex justify-between items-start mb-3">
                 <SkeletonText width="w-24" height="h-5" />
@@ -124,7 +129,7 @@ export  function CustomersPageSkeleton() {
                     </div>
                   </div>
                 ))}
-                
+
                 <div className="col-span-2 flex items-center gap-2">
                   <SkeletonBox className="w-8 h-8 rounded" />
                   <div className="space-y-1 flex-1">
@@ -143,7 +148,6 @@ export  function CustomersPageSkeleton() {
             </div>
           ))}
         </div>
-
       </div>
     </div>
   );

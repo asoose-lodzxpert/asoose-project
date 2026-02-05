@@ -2,7 +2,11 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { appLogger } from './libs/logger/logger';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
-import { ValidationPipe, VersioningType } from '@nestjs/common';
+import {
+  ValidationPipe,
+  VersioningType,
+  BadRequestException,
+} from '@nestjs/common';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'path';
 import 'dotenv/config';
@@ -24,6 +28,16 @@ async function bootstrap() {
       transform: true,
       whitelist: true,
       forbidNonWhitelisted: true,
+      exceptionFactory: (errors) => {
+        const messages = errors.map(
+          (error) =>
+            `${error.property}: ${Object.values(error.constraints || {}).join(', ')}`,
+        );
+        return new BadRequestException({
+          message: 'Validation failed: ' + messages.join('; '),
+          errors: messages,
+        });
+      },
     }),
   );
   const isDevelopment = process.env.NODE_ENV !== 'production';

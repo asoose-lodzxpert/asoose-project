@@ -81,7 +81,7 @@ export default function NotificationsScreen() {
       setPage(1);
       setHasMore(true);
       loadNotifications(1);
-    }, [activeTab])
+    }, [activeTab]),
   );
 
   // Auto-refresh every 60 seconds
@@ -129,7 +129,7 @@ export default function NotificationsScreen() {
   const handleNotificationRead = async (notificationId: string) => {
     // Optimistically update UI
     setNotifications((prev) =>
-      prev.map((n) => (n.id === notificationId ? { ...n, isRead: true } : n))
+      prev.map((n) => (n.id === notificationId ? { ...n, isRead: true } : n)),
     );
 
     // Refresh global unread count

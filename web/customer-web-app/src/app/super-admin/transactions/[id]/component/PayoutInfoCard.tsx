@@ -1,11 +1,19 @@
-import React from 'react';
-import { FileText } from 'lucide-react';
-import { CopyButton } from './CopyButton';
-import { SectionCard } from './SectionCard';
-import { TransactionDetail } from '../types';
-export const PayoutInfoCard = ({ info }: { info: NonNullable<TransactionDetail['payoutInfo']> }) => {
+import React from "react";
+import { FileText } from "lucide-react";
+import { CopyButton } from "./CopyButton";
+import { SectionCard } from "./SectionCard";
+import { TransactionDetail } from "../types";
+export const PayoutInfoCard = ({
+  info,
+}: {
+  info: NonNullable<TransactionDetail["payoutInfo"]>;
+}) => {
   return (
-    <SectionCard title="Payout Information" icon={FileText} iconColorClass="bg-yellow-500/20 text-yellow-500">
+    <SectionCard
+      title="Payout Information"
+      icon={FileText}
+      iconColorClass="bg-yellow-500/20 text-yellow-500"
+    >
       <div className="space-y-4">
         {info.reference && (
           <div>
@@ -22,15 +30,21 @@ export const PayoutInfoCard = ({ info }: { info: NonNullable<TransactionDetail['
         </div>
         <div>
           <p className="text-gray-400 text-xs mb-2">Requested</p>
-          <p className="text-white text-sm">{new Date(info.requestedAt).toLocaleDateString()}</p>
+          <p className="text-white text-sm">
+            {new Date(info.requestedAt).toLocaleDateString()}
+          </p>
         </div>
         <div>
           <p className="text-gray-400 text-xs mb-2">Status</p>
-          <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-            info.status === 'PAID' ? 'bg-green-500/20 text-green-500' :
-            info.status === 'FAILED' ? 'bg-red-500/20 text-red-500' :
-            'bg-yellow-500/20 text-yellow-500'
-          }`}>
+          <span
+            className={`px-3 py-1 rounded-full text-xs font-medium ${
+              info.status === "PAID"
+                ? "bg-green-500/20 text-green-500"
+                : info.status === "FAILED"
+                  ? "bg-red-500/20 text-red-500"
+                  : "bg-yellow-500/20 text-yellow-500"
+            }`}
+          >
             {info.status}
           </span>
         </div>

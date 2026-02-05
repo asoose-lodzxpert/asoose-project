@@ -8,7 +8,7 @@ export interface UploadProgress {
 
 export async function uploadFile(
   file: { uri: string; name: string; type: string },
-  onProgress?: (progress: UploadProgress) => void
+  onProgress?: (progress: UploadProgress) => void,
 ): Promise<string> {
   const formData = new FormData();
 
@@ -94,7 +94,7 @@ export async function deleteFile(url: string): Promise<void> {
         ...(token && { Authorization: `Bearer ${token}` }),
       },
       body: JSON.stringify({ url }),
-    }
+    },
   );
 
   if (!response.ok) {
@@ -111,7 +111,7 @@ export interface BulkUploadResult {
 
 export async function uploadBulk(
   files: { uri: string; name: string; type: string }[],
-  onProgress?: (progress: UploadProgress) => void
+  onProgress?: (progress: UploadProgress) => void,
 ): Promise<string[]> {
   const formData = new FormData();
 

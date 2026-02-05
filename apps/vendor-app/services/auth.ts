@@ -20,7 +20,7 @@ export async function login(identifier: string, password: string) {
           "ngrok-skip-browser-warning": "true",
         },
         body: JSON.stringify({ email: identifier, password }),
-      }
+      },
     );
 
     if (!res.ok) {
@@ -73,7 +73,7 @@ export async function refreshAccessToken() {
         "ngrok-skip-browser-warning": "true",
       },
       body: JSON.stringify({ refreshToken }),
-    }
+    },
   );
 
   if (!res.ok) {

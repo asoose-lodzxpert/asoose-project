@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import React, { Dispatch, SetStateAction, useState } from 'react';
+import React, { Dispatch, SetStateAction, useState } from "react";
 import {
   useReactTable,
   getCoreRowModel,
@@ -11,7 +11,7 @@ import {
   RowSelectionState,
   PaginationState,
   SortingState, // ✅ Import SortingState
-  OnChangeFn,   // ✅ Import OnChangeFn
+  OnChangeFn, // ✅ Import OnChangeFn
 } from "@tanstack/react-table";
 
 // 1. Updated Interface to support Pagination AND Sorting
@@ -22,7 +22,7 @@ interface DataTableProps<T> {
   onRowSelectionChange?: (updater: any) => void;
   pageSize?: number;
   renderMobileCard?: (item: T) => React.ReactNode;
-  
+
   // Manual Pagination
   pageCount?: number;
   pagination?: PaginationState;
@@ -43,10 +43,9 @@ export function DataTable<T>({
   pageCount,
   pagination,
   onPaginationChange,
-  sorting,          // ✅ Destructure sorting
-  onSortingChange,  // ✅ Destructure onSortingChange
+  sorting, // ✅ Destructure sorting
+  onSortingChange, // ✅ Destructure onSortingChange
 }: DataTableProps<T>) {
-  
   // 2. Logic to detect if we are in manual mode (server-side fetching)
   const isManual = pagination !== undefined && onPaginationChange !== undefined;
 
@@ -56,23 +55,23 @@ export function DataTable<T>({
   const table = useReactTable({
     data,
     columns,
-    state: { 
+    state: {
       rowSelection,
       // ✅ Use provided sorting state OR fall back to local state
       sorting: sorting ?? localSorting,
       // Use the external pagination state only if provided
       ...(isManual ? { pagination } : {}),
     },
-    
+
     // Pagination Config
     manualPagination: isManual,
-    pageCount: pageCount ?? -1, 
-    
+    pageCount: pageCount ?? -1,
+
     // Selection Config
     enableRowSelection: !!onRowSelectionChange,
     onRowSelectionChange,
     onPaginationChange,
-    
+
     // ✅ Sorting Config
     onSortingChange: onSortingChange ?? setLocalSorting,
     getSortedRowModel: getSortedRowModel(),
@@ -81,13 +80,13 @@ export function DataTable<T>({
     getCoreRowModel: getCoreRowModel(),
     // Only use local pagination logic if NOT in manual mode
     getPaginationRowModel: isManual ? undefined : getPaginationRowModel(),
-    
+
     initialState: {
       pagination: { pageSize },
     },
   });
 
-  const currentPageData = table.getRowModel().rows.map(row => row.original);
+  const currentPageData = table.getRowModel().rows.map((row) => row.original);
 
   return (
     <div className="h-full flex flex-col">
@@ -96,9 +95,9 @@ export function DataTable<T>({
         <div className="flex-1 overflow-y-auto scrollbar-hide">
           <table className="w-full text-sm">
             <thead className="border-b border-gray-700 text-xs uppercase text-gray-500 sticky top-0 bg-[#0F172A] z-10">
-              {table.getHeaderGroups().map(headerGroup => (
+              {table.getHeaderGroups().map((headerGroup) => (
                 <tr key={headerGroup.id}>
-                  {headerGroup.headers.map(header => (
+                  {headerGroup.headers.map((header) => (
                     <th
                       key={header.id}
                       className="px-4 py-3 text-left cursor-pointer hover:text-white transition-colors select-none"
@@ -107,12 +106,12 @@ export function DataTable<T>({
                       <div className="flex items-center gap-2 truncate">
                         {flexRender(
                           header.column.columnDef.header,
-                          header.getContext()
+                          header.getContext(),
                         )}
                         {/* ✅ Optional: Add Sorting Indicators */}
                         {{
-                          asc: ' 🔼',
-                          desc: ' 🔽',
+                          asc: " 🔼",
+                          desc: " 🔽",
                         }[header.column.getIsSorted() as string] ?? null}
                       </div>
                     </th>
@@ -122,12 +121,18 @@ export function DataTable<T>({
             </thead>
 
             <tbody className="divide-y divide-gray-800">
-              {table.getRowModel().rows.map(row => (
-                <tr key={row.id} className="hover:bg-[#1E293B] transition-colors group">
-                  {row.getVisibleCells().map(cell => (
+              {table.getRowModel().rows.map((row) => (
+                <tr
+                  key={row.id}
+                  className="hover:bg-[#1E293B] transition-colors group"
+                >
+                  {row.getVisibleCells().map((cell) => (
                     <td key={cell.id} className="px-4 py-4">
                       <div className="truncate max-w-[200px]">
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        {flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext(),
+                        )}
                       </div>
                     </td>
                   ))}
@@ -140,7 +145,8 @@ export function DataTable<T>({
         {/* Desktop Pagination */}
         <div className="border-t border-gray-800 px-4 py-3 text-sm flex justify-between items-center bg-[#0F172A] rounded-b-lg flex-shrink-0">
           <span className="text-gray-400 font-medium">
-            Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}
+            Page {table.getState().pagination.pageIndex + 1} of{" "}
+            {table.getPageCount()}
           </span>
           <div className="flex gap-2">
             <button
@@ -166,7 +172,10 @@ export function DataTable<T>({
         <div className="flex-1 overflow-y-auto px-4 py-2 space-y-3 scrollbar-hide">
           {renderMobileCard ? (
             currentPageData.map((item, index) => (
-              <div key={index} className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+              <div
+                key={index}
+                className="animate-in fade-in slide-in-from-bottom-2 duration-300"
+              >
                 {renderMobileCard(item)}
               </div>
             ))

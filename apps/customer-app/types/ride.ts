@@ -9,9 +9,8 @@ export enum RideStatus {
 }
 
 export enum VehicleType {
-  BIKE = "BIKE",
-  CAR = "CAR",
-  VAN = "VAN",
+  ECONOMY = "ECONOMY",
+  BUSINESS = "BUSINESS",
 }
 
 export type Location = {
@@ -32,6 +31,7 @@ export type Driver = {
     plateNumber: string;
     year?: number;
   };
+  totalRides?: number;
   currentLat?: number;
   currentLng?: number;
 };
@@ -106,6 +106,7 @@ export type CreateRidePayload = {
   pickupLocation: Location;
   dropoffLocation: Location;
   vehicleType: VehicleType;
+  fare: number;
   notes?: string;
 };
 
@@ -114,7 +115,6 @@ export type RideEstimatePayload = {
   pickupLng: number;
   dropoffLat: number;
   dropoffLng: number;
-  vehicleType?: VehicleType;
 };
 
 export type ConfirmRidePayload = {

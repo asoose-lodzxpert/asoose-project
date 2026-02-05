@@ -7,7 +7,9 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Image,
+  Pressable,
 } from "react-native";
+import { RelativePathString, useRouter } from "expo-router";
 import { ThemedInput } from "@/components/ThemedInput";
 import { ThemedText } from "@/components/themed-text";
 import { IconSymbol } from "@/components/ui/icon-symbol";
@@ -21,6 +23,7 @@ import type { Product } from "@/types/store-types";
 import type { Vendor } from "@/types/home";
 
 export default function SearchScreen() {
+  const router = useRouter();
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [loading, setLoading] = useState(false);
@@ -130,7 +133,10 @@ export default function SearchScreen() {
 
   // Product card
   const renderProduct = ({ item }: { item: Product }) => (
-    <View style={[styles.resultCard, { backgroundColor: cardBg }]}>
+    <Pressable
+      style={[styles.resultCard, { backgroundColor: cardBg }]}
+      onPress={() => router.push(`/product/${item.id}` as RelativePathString)}
+    >
       <View style={{ flexDirection: "row", alignItems: "center" }}>
         <View>
           <View style={styles.resultImageWrap}>
@@ -168,7 +174,7 @@ export default function SearchScreen() {
           </ThemedText>
         </View>
       </View>
-    </View>
+    </Pressable>
   );
 
   const renderStore = ({ item }: { item: Vendor }) => (
@@ -190,7 +196,11 @@ export default function SearchScreen() {
         containerStyle={{ marginBottom: 10 }}
         iconRight={
           <TouchableOpacity onPress={() => setFilterVisible(true)}>
-            <IconSymbol name="slider.horizontal.3" size={22} color={mutedColor} />
+            <IconSymbol
+              name="slider.horizontal.3"
+              size={22}
+              color={mutedColor}
+            />
           </TouchableOpacity>
         }
       />
@@ -226,7 +236,10 @@ export default function SearchScreen() {
         <FlatList
           data={[
             ...searchResults.stores.map((s) => ({ type: "store", data: s })),
-            ...searchResults.products.map((p) => ({ type: "product", data: p })),
+            ...searchResults.products.map((p) => ({
+              type: "product",
+              data: p,
+            })),
           ]}
           renderItem={({ item }) =>
             item.type === "store"
@@ -300,7 +313,13 @@ export default function SearchScreen() {
               style={[styles.closeBtn, { backgroundColor: primary }]}
               onPress={() => setFilterVisible(false)}
             >
-              <ThemedText style={{ color: "#fff", textAlign: "center", fontWeight: "600" }}>
+              <ThemedText
+                style={{
+                  color: "#fff",
+                  textAlign: "center",
+                  fontWeight: "600",
+                }}
+              >
                 Apply Filters
               </ThemedText>
             </TouchableOpacity>

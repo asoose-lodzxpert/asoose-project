@@ -4,12 +4,10 @@ import {
   ScrollView,
   Pressable,
   ActivityIndicator,
-  Alert,
   Modal,
 } from "react-native";
 import { useState } from "react";
 import { useRouter } from "expo-router";
-import * as WebBrowser from "expo-web-browser";
 import * as Clipboard from "expo-clipboard";
 import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
@@ -17,18 +15,22 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { useRide } from "@/context/RideContext";
 import { RideService } from "@/services/ride.service";
-import { initiatePayment, checkBankTransferStatus, checkInAppPaymentStatus } from "@/services/payment.service";
+import {
+  initiatePayment,
+  checkBankTransferStatus,
+} from "@/services/payment.service";
+import { PaymentWebView } from "@/components/checkout/PaymentWebView";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import type { PaymentMethod, BankAccount, InAppTx } from "@/types/payment";
+import { useToast } from "@/components/ui/ThemedToast";
+import { useConfirm } from "@/components/ui/ConfirmDialogProvider";
 
 export default function RidePaymentScreen() {
   const router = useRouter();
-  const {
-    currentRide,
-    loading,
-    confirmPayment,
-  } = useRide();
+  const { currentRide, loading, confirmPayment } = useRide();
   const { user } = useUserProfile();
+  const showToast = useToast();
+  const showConfirm = useConfirm();
 
   const primary = useThemeColor({}, "brandPrimary");
   const textOnPrimary = useThemeColor({}, "textOnPrimary");
@@ -40,19 +42,24 @@ export default function RidePaymentScreen() {
   const danger = useThemeColor({}, "statusError");
   const muted = useThemeColor({}, "textMuted");
 
-  const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>("paystack");
+  const [selectedMethod, setSelectedMethod] =
+    useState<PaymentMethod>("paystack");
   const [processing, setProcessing] = useState(false);
   const [bankAccount, setBankAccount] = useState<BankAccount | null>(null);
   const [checkoutTx, setCheckoutTx] = useState<InAppTx | null>(null);
   const [showBankModal, setShowBankModal] = useState(false);
   const [pollingStatus, setPollingStatus] = useState<string>("");
+  const [showPaymentWebView, setShowPaymentWebView] = useState(false);
 
   if (!currentRide) {
     return (
       <ThemedView style={[styles.container, { backgroundColor: surface }]}>
         <View style={styles.emptyState}>
           <ThemedText>No ride found</ThemedText>
-          <Pressable onPress={() => router.replace("/ride")} style={styles.backLink}>
+          <Pressable
+            onPress={() => router.replace("/ride")}
+            style={styles.backLink}
+          >
             <ThemedText type="link">Go back</ThemedText>
           </Pressable>
         </View>
@@ -62,7 +69,10 @@ export default function RidePaymentScreen() {
 
   const handleConfirmPayment = async () => {
     if (!user || !currentRide) {
-      Alert.alert("Error", "User or ride information missing");
+      showToast({
+        message: "User or ride information missing",
+        variant: "error",
+      });
       return;
     }
 
@@ -80,7 +90,7 @@ export default function RidePaymentScreen() {
         const response = await initiatePayment(
           selectedMethod,
           paymentPayload,
-          user
+          user,
         );
 
         if (response.accountNumber) {
@@ -97,7 +107,10 @@ export default function RidePaymentScreen() {
         }
       }
       // For card payments (Paystack/Flutterwave)
-      else if (selectedMethod === "paystack" || selectedMethod === "flutterwave") {
+      else if (
+        selectedMethod === "paystack" ||
+        selectedMethod === "flutterwave"
+      ) {
         const callbackUrl = "asoose-app://payment-callback";
         const paymentPayload = {
           amount: currentRide.totalFare,
@@ -109,7 +122,7 @@ export default function RidePaymentScreen() {
         const response = await initiatePayment(
           selectedMethod,
           paymentPayload,
-          user
+          user,
         );
 
         const checkoutUrl = response.authorizationUrl || response.checkoutUrl;
@@ -123,55 +136,32 @@ export default function RidePaymentScreen() {
             method: selectedMethod,
             status: "pending",
           });
-
-          // Open browser for payment
-          await WebBrowser.openBrowserAsync(checkoutUrl);
-
-          // Poll for payment status
-          await pollInAppPaymentStatus(transactionId);
+          setShowPaymentWebView(true);
         }
       }
     } catch (err: any) {
       console.error("Payment error:", err);
-      Alert.alert("Payment Error", err.message || "Failed to initiate payment");
+      showToast({
+        message: err.message || "Failed to initiate payment",
+        variant: "error",
+      });
     } finally {
       setProcessing(false);
     }
   };
 
-  const pollInAppPaymentStatus = async (transactionId: string) => {
-    setPollingStatus("Checking payment status...");
-    let attempts = 0;
-    const maxAttempts = 20;
+  // Remove pollInAppPaymentStatus, handled by PaymentWebView
+  // PaymentWebView handlers
+  const handlePaymentSuccess = async () => {
+    setShowPaymentWebView(false);
+    showToast({ message: "Payment confirmed!", variant: "success" });
+    confirmPayment(currentRide.id, "CARD");
+    router.replace("/ride/tracking");
+  };
 
-    const poll = setInterval(async () => {
-      attempts++;
-      try {
-        const status = await checkInAppPaymentStatus(transactionId);
-        if (status.paid) {
-          clearInterval(poll);
-          setPollingStatus("");
-          Alert.alert("Success", "Payment confirmed!", [
-            {
-              text: "OK",
-              onPress: () => router.replace("/ride/tracking"),
-            },
-          ]);
-        } else if (attempts >= maxAttempts) {
-          clearInterval(poll);
-          setPollingStatus("");
-          Alert.alert(
-            "Payment Pending",
-            "Payment verification is taking longer than expected. Please check your ride status."
-          );
-        }
-      } catch (err) {
-        if (attempts >= maxAttempts) {
-          clearInterval(poll);
-          setPollingStatus("");
-        }
-      }
-    }, 3000);
+  const handlePaymentCancel = () => {
+    setShowPaymentWebView(false);
+    showToast({ message: "Payment cancelled", variant: "info" });
   };
 
   const checkBankNow = async () => {
@@ -183,23 +173,21 @@ export default function RidePaymentScreen() {
     try {
       const status = await checkBankTransferStatus(bankAccount.reference);
       if (status.paid) {
-        Alert.alert("Success", "Payment confirmed!", [
-          {
-            text: "OK",
-            onPress: () => {
-              setShowBankModal(false);
-              router.replace("/ride/tracking");
-            },
-          },
-        ]);
+        showToast({ message: "Payment confirmed!", variant: "success" });
+        setShowBankModal(false);
+        router.replace("/ride/tracking");
       } else {
-        Alert.alert(
-          "Payment Pending",
-          "We haven't received your payment yet. Please make the transfer and try again."
-        );
+        showToast({
+          message:
+            "We haven't received your payment yet. Please make the transfer and try again.",
+          variant: "info",
+        });
       }
     } catch (err: any) {
-      Alert.alert("Error", err.message || "Failed to check payment status");
+      showToast({
+        message: err.message || "Failed to check payment status",
+        variant: "error",
+      });
     } finally {
       setProcessing(false);
       setPollingStatus("");
@@ -208,7 +196,7 @@ export default function RidePaymentScreen() {
 
   const copyToClipboard = (text: string) => {
     Clipboard.setStringAsync(text);
-    Alert.alert("Copied", "Account number copied to clipboard");
+    showToast({ message: "Account number copied", variant: "success" });
   };
 
   return (
@@ -221,9 +209,17 @@ export default function RidePaymentScreen() {
         <ThemedText type="subtitle">Confirm Payment</ThemedText>
       </View>
 
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.content}
+      >
         {/* Trip Summary */}
-        <View style={[styles.summaryCard, { backgroundColor: card, borderColor: border }]}>
+        <View
+          style={[
+            styles.summaryCard,
+            { backgroundColor: card, borderColor: border },
+          ]}
+        >
           <ThemedText type="subtitle" style={styles.cardTitle}>
             Trip Summary
           </ThemedText>
@@ -276,7 +272,12 @@ export default function RidePaymentScreen() {
         </View>
 
         {/* Fare Breakdown */}
-        <View style={[styles.fareCard, { backgroundColor: card, borderColor: border }]}>
+        <View
+          style={[
+            styles.fareCard,
+            { backgroundColor: card, borderColor: border },
+          ]}
+        >
           <ThemedText type="subtitle" style={styles.cardTitle}>
             Fare Breakdown
           </ThemedText>
@@ -333,7 +334,12 @@ export default function RidePaymentScreen() {
         </View>
 
         {/* Payment Method */}
-        <View style={[styles.paymentCard, { backgroundColor: card, borderColor: border }]}>
+        <View
+          style={[
+            styles.paymentCard,
+            { backgroundColor: card, borderColor: border },
+          ]}
+        >
           <ThemedText type="subtitle" style={styles.cardTitle}>
             Payment Method
           </ThemedText>
@@ -369,7 +375,8 @@ export default function RidePaymentScreen() {
               styles.methodOption,
               {
                 borderColor: selectedMethod === "paystack" ? primary : border,
-                backgroundColor: selectedMethod === "paystack" ? `${primary}10` : card,
+                backgroundColor:
+                  selectedMethod === "paystack" ? `${primary}10` : card,
               },
             ]}
           >
@@ -383,7 +390,11 @@ export default function RidePaymentScreen() {
               </View>
             </View>
             {selectedMethod === "paystack" && (
-              <IconSymbol name="checkmark.circle.fill" size={24} color={primary} />
+              <IconSymbol
+                name="checkmark.circle.fill"
+                size={24}
+                color={primary}
+              />
             )}
           </Pressable>
 
@@ -393,8 +404,10 @@ export default function RidePaymentScreen() {
             style={[
               styles.methodOption,
               {
-                borderColor: selectedMethod === "flutterwave" ? primary : border,
-                backgroundColor: selectedMethod === "flutterwave" ? `${primary}10` : card,
+                borderColor:
+                  selectedMethod === "flutterwave" ? primary : border,
+                backgroundColor:
+                  selectedMethod === "flutterwave" ? `${primary}10` : card,
               },
             ]}
           >
@@ -408,7 +421,11 @@ export default function RidePaymentScreen() {
               </View>
             </View>
             {selectedMethod === "flutterwave" && (
-              <IconSymbol name="checkmark.circle.fill" size={24} color={primary} />
+              <IconSymbol
+                name="checkmark.circle.fill"
+                size={24}
+                color={primary}
+              />
             )}
           </Pressable>
 
@@ -419,7 +436,8 @@ export default function RidePaymentScreen() {
               styles.methodOption,
               {
                 borderColor: selectedMethod === "transfer" ? primary : border,
-                backgroundColor: selectedMethod === "transfer" ? `${primary}10` : card,
+                backgroundColor:
+                  selectedMethod === "transfer" ? `${primary}10` : card,
               },
             ]}
           >
@@ -433,7 +451,11 @@ export default function RidePaymentScreen() {
               </View>
             </View>
             {selectedMethod === "transfer" && (
-              <IconSymbol name="checkmark.circle.fill" size={24} color={primary} />
+              <IconSymbol
+                name="checkmark.circle.fill"
+                size={24}
+                color={primary}
+              />
             )}
           </Pressable>
         </View>
@@ -446,7 +468,10 @@ export default function RidePaymentScreen() {
         {pollingStatus ? (
           <View style={styles.pollingContainer}>
             <ActivityIndicator size="small" color={primary} />
-            <ThemedText type="caption" style={{ color: textSecondary, marginTop: 8 }}>
+            <ThemedText
+              type="caption"
+              style={{ color: textSecondary, marginTop: 8 }}
+            >
               {pollingStatus}
             </ThemedText>
           </View>
@@ -474,12 +499,27 @@ export default function RidePaymentScreen() {
                     ? "Generate Account Number"
                     : "Proceed to Payment"}
                 </ThemedText>
-                <IconSymbol name="arrow.right" size={20} color={textOnPrimary} />
+                <IconSymbol
+                  name="arrow.right"
+                  size={20}
+                  color={textOnPrimary}
+                />
               </>
             )}
           </Pressable>
         )}
       </View>
+
+      {/* Payment WebView Modal for Card Payments */}
+      {checkoutTx && showPaymentWebView && (
+        <PaymentWebView
+          visible={showPaymentWebView}
+          url={checkoutTx.checkoutUrl}
+          reference={checkoutTx.transactionId}
+          onSuccess={handlePaymentSuccess}
+          onCancel={handlePaymentCancel}
+        />
+      )}
 
       {/* Bank Transfer Modal */}
       <Modal
@@ -488,7 +528,9 @@ export default function RidePaymentScreen() {
         transparent={false}
         onRequestClose={() => setShowBankModal(false)}
       >
-        <ThemedView style={[styles.modalContainer, { backgroundColor: surface }]}>
+        <ThemedView
+          style={[styles.modalContainer, { backgroundColor: surface }]}
+        >
           <View style={styles.modalHeader}>
             <ThemedText type="title">Bank Transfer</ThemedText>
             <Pressable onPress={() => setShowBankModal(false)}>
@@ -498,7 +540,12 @@ export default function RidePaymentScreen() {
 
           <ScrollView style={styles.modalContent}>
             {bankAccount && (
-              <View style={[styles.bankCard, { backgroundColor: card, borderColor: border }]}>
+              <View
+                style={[
+                  styles.bankCard,
+                  { backgroundColor: card, borderColor: border },
+                ]}
+              >
                 <ThemedText type="subtitle" style={{ marginBottom: 16 }}>
                   Transfer to this account
                 </ThemedText>
@@ -507,7 +554,9 @@ export default function RidePaymentScreen() {
                   <ThemedText type="caption" style={{ color: textSecondary }}>
                     Bank Name
                   </ThemedText>
-                  <ThemedText type="defaultSemiBold">{bankAccount.bankName}</ThemedText>
+                  <ThemedText type="defaultSemiBold">
+                    {bankAccount.bankName}
+                  </ThemedText>
                 </View>
 
                 <View style={styles.bankInfoRow}>
@@ -518,7 +567,9 @@ export default function RidePaymentScreen() {
                     <ThemedText type="defaultSemiBold">
                       {bankAccount.accountNumber}
                     </ThemedText>
-                    <Pressable onPress={() => copyToClipboard(bankAccount.accountNumber)}>
+                    <Pressable
+                      onPress={() => copyToClipboard(bankAccount.accountNumber)}
+                    >
                       <IconSymbol name="doc.text" size={20} color={primary} />
                     </Pressable>
                   </View>
@@ -528,10 +579,17 @@ export default function RidePaymentScreen() {
                   <ThemedText type="caption" style={{ color: textSecondary }}>
                     Account Name
                   </ThemedText>
-                  <ThemedText type="defaultSemiBold">{bankAccount.accountName}</ThemedText>
+                  <ThemedText type="defaultSemiBold">
+                    {bankAccount.accountName}
+                  </ThemedText>
                 </View>
 
-                <View style={[styles.divider, { backgroundColor: border, marginVertical: 16 }]} />
+                <View
+                  style={[
+                    styles.divider,
+                    { backgroundColor: border, marginVertical: 16 },
+                  ]}
+                />
 
                 <View style={styles.bankInfoRow}>
                   <ThemedText type="caption" style={{ color: textSecondary }}>
@@ -544,8 +602,12 @@ export default function RidePaymentScreen() {
 
                 <View style={styles.instructionsBox}>
                   <IconSymbol name="info.circle" size={20} color={primary} />
-                  <ThemedText type="caption" style={{ color: textSecondary, flex: 1 }}>
-                    Transfer the exact amount to complete your payment. Click "Check Payment" after transfer.
+                  <ThemedText
+                    type="caption"
+                    style={{ color: textSecondary, flex: 1 }}
+                  >
+                    Transfer the exact amount to complete your payment. Click
+                    "Check Payment" after transfer.
                   </ThemedText>
                 </View>
 
@@ -564,7 +626,10 @@ export default function RidePaymentScreen() {
                   {processing ? (
                     <ActivityIndicator color={textOnPrimary} />
                   ) : (
-                    <ThemedText type="defaultSemiBold" style={{ color: textOnPrimary }}>
+                    <ThemedText
+                      type="defaultSemiBold"
+                      style={{ color: textOnPrimary }}
+                    >
                       Check Payment Status
                     </ThemedText>
                   )}
@@ -586,8 +651,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 16,
-    paddingTop: 60,
-    paddingBottom: 16,
+    paddingTop: 20,
     gap: 12,
   },
   backButton: {

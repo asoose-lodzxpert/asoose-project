@@ -32,7 +32,7 @@ export interface NotificationsResponse {
 export async function fetchNotifications(
   page: number = 1,
   type?: "ORDER" | "PAYOUT" | "SYSTEM",
-  isRead?: boolean
+  isRead?: boolean,
 ): Promise<NotificationsResponse> {
   const params = new URLSearchParams({
     page: page.toString(),
@@ -68,7 +68,7 @@ export async function markAllAsRead(): Promise<void> {
 
 // Helper to determine notification category for filtering
 export function getNotificationType(
-  type: "ORDER" | "PAYOUT" | "SYSTEM"
+  type: "ORDER" | "PAYOUT" | "SYSTEM",
 ): "orders" | "payouts" | "system" {
   if (type === "ORDER") return "orders";
   if (type === "PAYOUT") return "payouts";
@@ -77,7 +77,7 @@ export function getNotificationType(
 
 // Map tab to API type filter
 export function getApiTypeFromTab(
-  tab: "orders" | "payouts" | "system"
+  tab: "orders" | "payouts" | "system",
 ): "ORDER" | "PAYOUT" | "SYSTEM" | undefined {
   const mapping = {
     orders: "ORDER" as const,
@@ -89,7 +89,7 @@ export function getApiTypeFromTab(
 
 export async function getNotificationPreferences() {
   const res = await fetchWithAuth(
-    `${API}/auth/vendor/notifications-preferences`
+    `${API}/auth/vendor/notifications-preferences`,
   );
   return res;
 }
@@ -101,7 +101,7 @@ export async function updateNotificationPreferences(preferences: any) {
       method: "PUT",
       body: JSON.stringify(preferences),
       headers: { "Content-Type": "application/json" },
-    }
+    },
   );
   return res;
 }

@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import React from 'react';
+import React from "react";
 
 const SkeletonBox = ({ className = "" }) => (
   <div className={`bg-gray-700/30 rounded animate-pulse ${className}`} />
@@ -56,7 +56,10 @@ export default function SettingsPageSkeleton() {
         </div>
         <div className="space-y-4">
           {[1, 2].map((toggle) => (
-            <div key={toggle} className="flex items-center justify-between p-3 bg-[#0F172A] rounded-lg border border-gray-700">
+            <div
+              key={toggle}
+              className="flex items-center justify-between p-3 bg-[#0F172A] rounded-lg border border-gray-700"
+            >
               <div className="space-y-2">
                 <SkeletonText width="w-40" height="h-4" />
                 <SkeletonText width="w-56" height="h-3" />

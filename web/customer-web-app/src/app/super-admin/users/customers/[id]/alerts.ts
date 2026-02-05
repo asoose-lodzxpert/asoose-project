@@ -1,16 +1,16 @@
-import Swal from 'sweetalert2';
+import Swal from "sweetalert2";
 
 const themeColors = {
-  background: '#1E293B', // Slate-800
-  color: '#F8FAFC',      // Slate-50
-  confirmButton: '#EAB308', // Yellow-500
-  cancelButton: '#EF4444',  // Red-500
+  background: "#1E293B", // Slate-800
+  color: "#F8FAFC", // Slate-50
+  confirmButton: "#EAB308", // Yellow-500
+  cancelButton: "#EF4444", // Red-500
 };
 
 export const AppAlert = {
-  error: (title: string, text: string) => 
+  error: (title: string, text: string) =>
     Swal.fire({
-      icon: 'error',
+      icon: "error",
       title,
       text,
       background: themeColors.background,
@@ -18,26 +18,31 @@ export const AppAlert = {
       confirmButtonColor: themeColors.confirmButton,
     }),
 
-  success: (title: string) => 
+  success: (title: string) =>
     Swal.fire({
-      icon: 'success',
+      icon: "success",
       title,
       toast: true,
-      position: 'top-end',
+      position: "top-end",
       showConfirmButton: false,
       timer: 1500,
       background: themeColors.background,
       color: themeColors.color,
     }),
 
-  confirm: async (title: string, text: string, confirmText: string, isDestructive = false) => {
+  confirm: async (
+    title: string,
+    text: string,
+    confirmText: string,
+    isDestructive = false,
+  ) => {
     return Swal.fire({
       title,
       text,
-      icon: 'warning',
+      icon: "warning",
       showCancelButton: true,
-      confirmButtonColor: isDestructive ? themeColors.cancelButton : '#10B981',
-      cancelButtonColor: '#64748B',
+      confirmButtonColor: isDestructive ? themeColors.cancelButton : "#10B981",
+      cancelButtonColor: "#64748B",
       confirmButtonText: confirmText,
       background: themeColors.background,
       color: themeColors.color,
@@ -47,14 +52,16 @@ export const AppAlert = {
   input: async (title: string, placeholder: string) => {
     return Swal.fire({
       title,
-      input: 'textarea',
+      input: "textarea",
       inputPlaceholder: placeholder,
       showCancelButton: true,
-      confirmButtonText: 'Send',
+      confirmButtonText: "Send",
       confirmButtonColor: themeColors.confirmButton,
       background: themeColors.background,
       color: themeColors.color,
-      customClass: { input: 'bg-gray-700 text-white border-gray-600 focus:ring-yellow-500' }
+      customClass: {
+        input: "bg-gray-700 text-white border-gray-600 focus:ring-yellow-500",
+      },
     });
-  }
+  },
 };

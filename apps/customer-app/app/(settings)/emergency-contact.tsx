@@ -1,5 +1,11 @@
 import React, { useEffect, useState } from "react";
-import { View, StyleSheet, Pressable, ScrollView } from "react-native";
+import {
+  View,
+  StyleSheet,
+  Pressable,
+  ScrollView,
+  ActivityIndicator,
+} from "react-native";
 import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
 import { IconSymbol } from "@/components/ui/icon-symbol";
@@ -29,10 +35,10 @@ export default function EmergencyContactsScreen() {
   const primary = useThemeColor({}, "brandPrimary");
   const card = useThemeColor({}, "surfaceCard");
   const border = useThemeColor({}, "borderDefault");
-  const muted = useThemeColor({}, "textMuted");
   const danger = useThemeColor({}, "statusError");
 
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState(false);
 
   const [contacts, setContacts] = useState<EmergencyContact[]>([]);
@@ -40,12 +46,21 @@ export default function EmergencyContactsScreen() {
 
   /* ------------------ Load ------------------ */
   useEffect(() => {
-    fetchEmergencyContacts().then((data) => {
-      const normalized = data.length === 0 ? [emptyContact()] : data;
-      setContacts(normalized);
-      setDrafts(normalized);
-      setLoading(false);
-    });
+    fetchEmergencyContacts()
+      .then((data) => {
+        const normalized = data && data.length > 0 ? data : [emptyContact()];
+
+        setContacts(normalized);
+        setDrafts(normalized);
+        setLoading(false);
+      })
+      .catch((error) => {
+        console.error("Failed to fetch emergency contacts:", error);
+        const fallback = [emptyContact()];
+        setContacts(fallback);
+        setDrafts(fallback);
+        setLoading(false);
+      });
   }, []);
 
   /* ------------------ Actions ------------------ */
@@ -57,9 +72,16 @@ export default function EmergencyContactsScreen() {
   };
 
   const saveEdit = async () => {
-    await saveEmergencyContacts(drafts);
-    setContacts(drafts);
-    setEditing(false);
+    setSaving(true);
+    try {
+      await saveEmergencyContacts(drafts);
+      setContacts(drafts);
+      setEditing(false);
+    } catch (error) {
+      console.error("Failed to save emergency contacts:", error);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const addSecondContact = () => {
@@ -76,10 +98,10 @@ export default function EmergencyContactsScreen() {
   const updateDraft = (
     index: number,
     field: keyof EmergencyContact,
-    value: string
+    value: string,
   ) => {
     setDrafts((prev) =>
-      prev.map((c, i) => (i === index ? { ...c, [field]: value } : c))
+      prev.map((c, i) => (i === index ? { ...c, [field]: value } : c)),
     );
   };
 
@@ -196,8 +218,13 @@ export default function EmergencyContactsScreen() {
               <Pressable
                 style={[styles.actionBtn, { backgroundColor: primary }]}
                 onPress={saveEdit}
+                disabled={saving}
               >
-                <ThemedText style={styles.saveText}>Save</ThemedText>
+                {saving ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <ThemedText style={styles.saveText}>Save</ThemedText>
+                )}
               </Pressable>
             </View>
           )}

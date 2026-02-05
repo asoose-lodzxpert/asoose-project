@@ -32,12 +32,12 @@ export default function EnableLocationScreen() {
 
     if (status !== Location.PermissionStatus.GRANTED) {
       setError(
-        "Location permission is required to continue. You can enable it later in settings."
+        "Location permission is required to continue. You can enable it later in settings.",
       );
       return;
     }
 
-  router.replace({ pathname: "/" } as any); // continue to app
+    router.replace({ pathname: "/" } as any); // continue to app
   };
 
   return (

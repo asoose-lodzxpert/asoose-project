@@ -1,23 +1,38 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback } from "react";
 import { RideService, Ride, Driver, RideStatus } from "@/services/ride.service";
 import { toast } from "react-toastify"; // Assuming toast is available or use console
 
-export type PageView = "IDLE" | "FINDING_DRIVER" | "ON_WAY" | "ARRIVED" | "IN_PROGRESS" | "COMPLETED";
+export type PageView =
+  | "IDLE"
+  | "FINDING_DRIVER"
+  | "ON_WAY"
+  | "ARRIVED"
+  | "IN_PROGRESS"
+  | "COMPLETED";
 
 export const useRideFlow = (token: string | null) => {
   const [stage, setStage] = useState<PageView>("IDLE");
   const [activeRideId, setActiveRideId] = useState<string | null>(null);
   const [driverInfo, setDriverInfo] = useState<Driver | null>(null);
-  const [error, setError] = useState<{ title: string; message: string } | null>(null);
+  const [error, setError] = useState<{ title: string; message: string } | null>(
+    null,
+  );
 
   const mapBackendStatus = (status: RideStatus): PageView => {
     switch (status) {
-      case "PENDING": case "REQUESTED": return "FINDING_DRIVER";
-      case "ACCEPTED": return "ON_WAY";
-      case "ARRIVED": return "ARRIVED";
-      case "IN_PROGRESS": return "IN_PROGRESS";
-      case "COMPLETED": return "COMPLETED";
-      default: return "IDLE";
+      case "PENDING":
+      case "REQUESTED":
+        return "FINDING_DRIVER";
+      case "ACCEPTED":
+        return "ON_WAY";
+      case "ARRIVED":
+        return "ARRIVED";
+      case "IN_PROGRESS":
+        return "IN_PROGRESS";
+      case "COMPLETED":
+        return "COMPLETED";
+      default:
+        return "IDLE";
     }
   };
 
@@ -67,6 +82,6 @@ export const useRideFlow = (token: string | null) => {
     setError,
     syncRideState,
     resetFlow,
-    cancelRide
+    cancelRide,
   };
 };

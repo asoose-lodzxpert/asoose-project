@@ -53,6 +53,7 @@ export default function CategoryDetailScreen() {
       setError(null);
       const data = await fetchCategoryDetail(id, sortBy);
       setCategoryData(data);
+      console.log("Catrgory data:", JSON.stringify(data, null, 2));
     } catch (err: any) {
       setError(err.message || "Failed to load category");
       setCategoryData(null);
@@ -84,10 +85,7 @@ export default function CategoryDetailScreen() {
   );
 
   const renderSkeleton = (_: any, idx: number) => (
-    <View
-      key={idx}
-      style={[styles.skeletonCard, { backgroundColor: cardBg }]}
-    >
+    <View key={idx} style={[styles.skeletonCard, { backgroundColor: cardBg }]}>
       <View style={[styles.skeletonImage, { backgroundColor: "#e0e0e0" }]} />
       <View style={styles.skeletonContent}>
         <View
@@ -113,7 +111,7 @@ export default function CategoryDetailScreen() {
     <ThemedView style={styles.container}>
       <Stack.Screen
         options={{
-          title: categoryData?.vertical.title || "Category",
+          title: categoryData?.title || "Category",
           headerShown: true,
           headerBackTitle: "Back",
         }}
@@ -121,9 +119,9 @@ export default function CategoryDetailScreen() {
 
       {/* Header with Sort */}
       <View style={styles.header}>
-        {categoryData?.vertical.description && (
+        {categoryData?.description && (
           <ThemedText style={[styles.description, { color: mutedColor }]}>
-            {categoryData.vertical.description}
+            {categoryData.description}
           </ThemedText>
         )}
 
@@ -192,7 +190,7 @@ export default function CategoryDetailScreen() {
         </View>
       ) : (
         <FlatList
-          data={categoryData?.vertical.vendors || []}
+          data={categoryData?.vendors || []}
           renderItem={renderVendor}
           keyExtractor={(item) => item.id}
           contentContainerStyle={{ padding: 16 }}
@@ -209,9 +207,7 @@ export default function CategoryDetailScreen() {
           }
           ListFooterComponent={
             categoryData?.meta && categoryData.meta.total > 0 ? (
-              <ThemedText
-                style={[styles.footerText, { color: mutedColor }]}
-              >
+              <ThemedText style={[styles.footerText, { color: mutedColor }]}>
                 {categoryData.meta.total} store
                 {categoryData.meta.total !== 1 ? "s" : ""} found
               </ThemedText>

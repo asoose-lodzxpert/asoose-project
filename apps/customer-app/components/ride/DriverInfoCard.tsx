@@ -1,10 +1,9 @@
-import { View, StyleSheet, Image, Pressable } from "react-native";
+import { View, StyleSheet, Image, Pressable , Linking } from "react-native";
 import { ThemedText } from "@/components/themed-text";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { Driver } from "@/types/ride";
 import { RideService } from "@/services/ride.service";
-import { Linking } from "react-native";
 
 type Props = {
   driver: Driver;

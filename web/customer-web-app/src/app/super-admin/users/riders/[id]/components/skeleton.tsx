@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 
 const SkeletonBox = ({ className = "" }) => (
   <div className={`bg-gray-700/30 rounded animate-pulse ${className}`} />
@@ -16,7 +16,6 @@ export default function RiderDetailPageSkeleton() {
   return (
     <div className="min-h-screen bg-[#0F172A] p-4 md:p-6">
       <div className="max-w-7xl mx-auto space-y-6">
-        
         {/* Header Section Skeleton */}
         <div className="bg-[#1E293B] border border-gray-800 rounded-xl p-4 md:p-6">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -38,10 +37,8 @@ export default function RiderDetailPageSkeleton() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          
           {/* Left Column: Profile Card */}
           <div className="lg:col-span-1 space-y-6">
-            
             {/* Profile Card */}
             <div className="bg-[#1E293B] border border-gray-800 rounded-xl p-6">
               {/* Avatar & Basic Info */}
@@ -103,7 +100,10 @@ export default function RiderDetailPageSkeleton() {
                 <SkeletonText width="w-28" height="h-5" />
                 <div className="mt-3 space-y-2">
                   {[1, 2, 3].map((i) => (
-                    <div key={i} className="flex items-center justify-between p-3 bg-[#0F172A] rounded-lg border border-gray-800">
+                    <div
+                      key={i}
+                      className="flex items-center justify-between p-3 bg-[#0F172A] rounded-lg border border-gray-800"
+                    >
                       <div className="flex items-center gap-2">
                         <SkeletonBox className="w-8 h-8 rounded" />
                         <SkeletonText width="w-32" height="h-4" />
@@ -114,16 +114,17 @@ export default function RiderDetailPageSkeleton() {
                 </div>
               </div>
             </div>
-
           </div>
 
           {/* Right Column: Stats & Tabs */}
           <div className="lg:col-span-2 space-y-6">
-            
             {/* Stats Overview */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {[1, 2, 3, 4].map((i) => (
-                <div key={i} className="bg-[#1E293B] p-4 rounded-xl border border-gray-800">
+                <div
+                  key={i}
+                  className="bg-[#1E293B] p-4 rounded-xl border border-gray-800"
+                >
                   <div className="flex items-center justify-between mb-2">
                     <SkeletonText width="w-20" height="h-3" />
                     <SkeletonBox className="w-8 h-8 rounded-lg" />
@@ -139,7 +140,10 @@ export default function RiderDetailPageSkeleton() {
               {/* Tab Headers */}
               <div className="flex border-b border-gray-800">
                 {[1, 2, 3].map((i) => (
-                  <div key={i} className="flex-1 p-4 border-r border-gray-800 last:border-r-0">
+                  <div
+                    key={i}
+                    className="flex-1 p-4 border-r border-gray-800 last:border-r-0"
+                  >
                     <SkeletonText width="w-24" height="h-5" />
                   </div>
                 ))}
@@ -166,7 +170,10 @@ export default function RiderDetailPageSkeleton() {
                   {/* Table Rows */}
                   <div className="divide-y divide-gray-800">
                     {[1, 2, 3, 4, 5].map((row) => (
-                      <div key={row} className="grid grid-cols-6 gap-4 p-3 items-center">
+                      <div
+                        key={row}
+                        className="grid grid-cols-6 gap-4 p-3 items-center"
+                      >
                         <SkeletonText width="w-24" height="h-4" />
                         <div className="space-y-1">
                           <SkeletonText width="w-28" height="h-4" />
@@ -187,7 +194,10 @@ export default function RiderDetailPageSkeleton() {
                 {/* Mobile Cards */}
                 <div className="md:hidden space-y-3">
                   {[1, 2, 3].map((card) => (
-                    <div key={card} className="bg-[#0F172A] border border-gray-800 rounded-lg p-4">
+                    <div
+                      key={card}
+                      className="bg-[#0F172A] border border-gray-800 rounded-lg p-4"
+                    >
                       <div className="flex justify-between items-start mb-3">
                         <SkeletonText width="w-28" height="h-5" />
                         <SkeletonBox className="w-20 h-6 rounded" />
@@ -224,9 +234,7 @@ export default function RiderDetailPageSkeleton() {
                 </div>
               </div>
             </div>
-
           </div>
-
         </div>
       </div>
     </div>

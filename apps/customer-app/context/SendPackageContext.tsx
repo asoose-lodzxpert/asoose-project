@@ -11,6 +11,8 @@ import {
   fetchDeliveryQuote,
 } from "../services/sendPackage.api";
 
+import { useUserProfile } from "@/hooks/useUserProfile";
+
 import type {
   Address,
   DeliveryDetails,
@@ -87,6 +89,8 @@ export function SendPackageProvider({
 }: {
   children: React.ReactNode;
 }) {
+  const { user } = useUserProfile();
+
   const [pickup, setPickup] = useState<LocationPoint>({ address: null });
   const [dropoff, setDropoff] = useState<LocationPoint>({ address: null });
 
@@ -170,7 +174,6 @@ export function SendPackageProvider({
             p.longitude,
             d.latitude,
             d.longitude,
-            packageSize,
           );
           if (!mounted) return;
           setQuote(q);
@@ -187,7 +190,7 @@ export function SendPackageProvider({
       mounted = false;
       if (timer) clearTimeout(timer);
     };
-  }, [pickup, dropoff, packageSize]);
+  }, [pickup, dropoff]);
 
   /* ---------------------------------- */
   /* Helpers to prevent invalid selections */
@@ -291,6 +294,18 @@ export function SendPackageProvider({
     returnData,
     resetDelivery,
   };
+
+  useEffect(() => {
+    if (user) {
+      setPickupDetails({
+        name: user.name || "",
+        phone: user.phone || "",
+        instructions: "",
+      });
+    }
+    // Only set on mount or when user changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   return (
     <SendPackageContext.Provider value={value}>

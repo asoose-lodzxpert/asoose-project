@@ -46,57 +46,17 @@ export function FareEstimateCard({
 
       <View style={[styles.divider, { backgroundColor: border }]} />
 
-      <View style={styles.fareRow}>
-        <ThemedText type="caption" style={{ color: textSecondary }}>
-          Base Fare
-        </ThemedText>
-        <ThemedText type="caption" style={{ color: textSecondary }}>
-          {RideService.formatCurrency(fareBreakdown.baseFare)}
-        </ThemedText>
-      </View>
-
-      <View style={styles.fareRow}>
-        <ThemedText type="caption" style={{ color: textSecondary }}>
-          Distance Fare
-        </ThemedText>
-        <ThemedText type="caption" style={{ color: textSecondary }}>
-          {RideService.formatCurrency(fareBreakdown.distanceFare)}
-        </ThemedText>
-      </View>
-
-      <View style={styles.fareRow}>
-        <ThemedText type="caption" style={{ color: textSecondary }}>
-          Time Fare
-        </ThemedText>
-        <ThemedText type="caption" style={{ color: textSecondary }}>
-          {RideService.formatCurrency(fareBreakdown.timeFare)}
-        </ThemedText>
-      </View>
-
-      {fareBreakdown.platformFee > 0 && (
-        <View style={styles.fareRow}>
-          <ThemedText type="caption" style={{ color: textSecondary }}>
-            Platform Fee
-          </ThemedText>
-          <ThemedText type="caption" style={{ color: textSecondary }}>
-            {RideService.formatCurrency(fareBreakdown.platformFee)}
-          </ThemedText>
-        </View>
-      )}
-
-      <View style={[styles.divider, { backgroundColor: border }]} />
-
       <View style={styles.totalRow}>
         <ThemedText type="defaultSemiBold">Total Fare</ThemedText>
         <ThemedText
           type="defaultSemiBold"
           style={[styles.totalAmount, { color: primary }]}
         >
-          {RideService.formatCurrency(fareBreakdown.totalFare)}
+          {RideService.formatCurrency(fareBreakdown?.totalFare || 0)}
         </ThemedText>
       </View>
 
-      {fareBreakdown.surgeMultiplier && fareBreakdown.surgeMultiplier > 1 && (
+      {fareBreakdown?.surgeMultiplier && fareBreakdown.surgeMultiplier > 1 && (
         <View style={styles.surgeNotice}>
           <ThemedText type="caption" style={{ color: textSecondary }}>
             {fareBreakdown.surgeMultiplier}x surge pricing applied

@@ -1,9 +1,16 @@
-'use client';
+"use client";
 
-import React, { useMemo } from 'react';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
+import React, { useMemo } from "react";
+import {
+  PieChart,
+  Pie,
+  Cell,
+  ResponsiveContainer,
+  Tooltip,
+  Legend,
+} from "recharts";
 
-const COLORS = ['#10B981', '#EAB308', '#3B82F6', '#A855F7', '#EC4899'];
+const COLORS = ["#10B981", "#EAB308", "#3B82F6", "#A855F7", "#EC4899"];
 
 interface RevenueItem {
   category: string;
@@ -14,18 +21,26 @@ interface RevenueItem {
 
 export default function RevenueBreakdown({ data }: { data: RevenueItem[] }) {
   // 1. Reusable Naira Formatters
-  const nairaFormatter = useMemo(() => new Intl.NumberFormat('en-NG', {
-    style: 'currency',
-    currency: 'NGN',
-    maximumFractionDigits: 0,
-  }), []);
+  const nairaFormatter = useMemo(
+    () =>
+      new Intl.NumberFormat("en-NG", {
+        style: "currency",
+        currency: "NGN",
+        maximumFractionDigits: 0,
+      }),
+    [],
+  );
 
-  const compactNairaFormatter = useMemo(() => new Intl.NumberFormat('en-NG', {
-    style: 'currency',
-    currency: 'NGN',
-    notation: 'compact',
-    maximumFractionDigits: 1,
-  }), []);
+  const compactNairaFormatter = useMemo(
+    () =>
+      new Intl.NumberFormat("en-NG", {
+        style: "currency",
+        currency: "NGN",
+        notation: "compact",
+        maximumFractionDigits: 1,
+      }),
+    [],
+  );
 
   // 2. Safe empty state check
   if (!data || data.length === 0) {
@@ -40,7 +55,7 @@ export default function RevenueBreakdown({ data }: { data: RevenueItem[] }) {
   const chartData = data.map((item) => ({
     name: item.category,
     value: item.amount,
-    percentage: item.percentage
+    percentage: item.percentage,
   }));
 
   const totalRevenue = data.reduce((sum, item) => sum + item.amount, 0);
@@ -63,25 +78,29 @@ export default function RevenueBreakdown({ data }: { data: RevenueItem[] }) {
               dataKey="value"
             >
               {chartData.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} stroke="rgba(0,0,0,0)" />
+                <Cell
+                  key={`cell-${index}`}
+                  fill={COLORS[index % COLORS.length]}
+                  stroke="rgba(0,0,0,0)"
+                />
               ))}
             </Pie>
 
-<Tooltip 
-  contentStyle={{ 
-    backgroundColor: '#0F172A', 
-    borderColor: '#334155', 
-    borderRadius: '8px' 
-  }}
-  itemStyle={{ color: '#fff', fontSize: '12px' }}
-  // FIX: Explicitly handle number | undefined to satisfy Recharts types
-  formatter={(value: number | undefined) => [
-    nairaFormatter.format(value ?? 0), 
-    'Revenue'
-  ]}
-/>
-            <Legend 
-              verticalAlign="bottom" 
+            <Tooltip
+              contentStyle={{
+                backgroundColor: "#0F172A",
+                borderColor: "#334155",
+                borderRadius: "8px",
+              }}
+              itemStyle={{ color: "#fff", fontSize: "12px" }}
+              // FIX: Explicitly handle number | undefined to satisfy Recharts types
+              formatter={(value: number | undefined) => [
+                nairaFormatter.format(value ?? 0),
+                "Revenue",
+              ]}
+            />
+            <Legend
+              verticalAlign="bottom"
               height={36}
               iconType="circle"
               formatter={(value, entry: any) => (
@@ -92,10 +111,12 @@ export default function RevenueBreakdown({ data }: { data: RevenueItem[] }) {
             />
           </PieChart>
         </ResponsiveContainer>
-        
+
         {/* Center Label: Fixed formatting and currency */}
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-[60%] text-center pointer-events-none">
-          <p className="text-gray-400 text-[10px] uppercase font-bold tracking-wider">Total</p>
+          <p className="text-gray-400 text-[10px] uppercase font-bold tracking-wider">
+            Total
+          </p>
           <p className="text-white font-bold text-sm">
             {compactNairaFormatter.format(totalRevenue)}
           </p>

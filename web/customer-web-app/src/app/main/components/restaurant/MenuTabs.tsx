@@ -14,8 +14,8 @@ export const MenuTabs = ({ categories, activeTab, onSelect }: TabProps) => {
             onClick={() => onSelect(cat)}
             className={`px-6 py-2.5 rounded-full text-sm font-bold whitespace-nowrap transition-all ${
               activeTab === cat
-                ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/20'
-                : 'bg-white dark:bg-white/5 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-white/5'
+                ? "bg-yellow-500 text-black shadow-lg shadow-yellow-500/20"
+                : "bg-white dark:bg-white/5 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-white/5"
             }`}
           >
             {cat}

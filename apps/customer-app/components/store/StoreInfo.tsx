@@ -22,10 +22,11 @@ export function StoreInfo({
   const cardBg = useThemeColor({}, "surfaceCard");
   const border = useThemeColor({}, "borderDefault");
   const text = useThemeColor({}, "textPrimary");
+  const textSecondary = useThemeColor({}, "textSecondary");
   const muted = useThemeColor({}, "textMuted");
   const avatarBg = useThemeColor({}, "surfaceSubtle");
   const skeletonColor = useThemeColor({}, "surfaceSubtle");
-  const starColor = useThemeColor({}, "statusSuccess");
+  const starColor = "#F59E0B";
   const primary = useThemeColor({}, "brandPrimary");
 
   const renderReview = (review: Review, idx: number) => (
@@ -37,22 +38,45 @@ export function StoreInfo({
       ]}
     >
       <View style={styles.reviewHeader}>
-        <View style={[styles.avatar, { backgroundColor: avatarBg }]} />
+        <View style={[styles.avatar, { backgroundColor: avatarBg }]}>
+          <IconSymbol name="person.fill" size={16} color={muted} />
+        </View>
         <View style={{ flex: 1 }}>
-          <View style={{ flexDirection: "row", alignItems: "center" }}>
-            <IconSymbol name="star" size={16} color={starColor} />
-            <ThemedText style={[styles.reviewRating, { color: text }]}>
-              {review.rating}
+          <ThemedText style={[styles.reviewerName, { color: text }]}>
+            {review.userName ?? `Customer ${idx + 1}`}
+          </ThemedText>
+          <View
+            style={{ flexDirection: "row", alignItems: "center", marginTop: 2 }}
+          >
+            {Array.from({ length: 5 }).map((_, i) => (
+              <IconSymbol
+                key={i}
+                name={i < review.rating ? "star.fill" : "star"}
+                size={12}
+                color={i < review.rating ? starColor : border}
+              />
+            ))}
+            <ThemedText
+              style={[
+                styles.reviewRating,
+                { color: textSecondary, marginLeft: 6 },
+              ]}
+            >
+              {review.rating}.0
             </ThemedText>
           </View>
-          <ThemedText style={[styles.reviewerName, { color: muted }]}>
-            User {idx + 1}
-          </ThemedText>
         </View>
+        {review.createdAt && (
+          <ThemedText style={[styles.reviewDate, { color: muted }]}>
+            {new Date(review.createdAt).toLocaleDateString()}
+          </ThemedText>
+        )}
       </View>
-      <ThemedText style={[styles.reviewComment, { color: text }]}>
-        {review.comment}
-      </ThemedText>
+      {review.comment && (
+        <ThemedText style={[styles.reviewComment, { color: text }]}>
+          {review.comment}
+        </ThemedText>
+      )}
     </View>
   );
 
@@ -61,32 +85,24 @@ export function StoreInfo({
       key={idx}
       style={[
         styles.reviewCard,
-        { backgroundColor: cardBg, borderColor: border, opacity: 0.5 },
+        { backgroundColor: cardBg, borderColor: border },
       ]}
     >
       <View style={styles.reviewHeader}>
         <View style={[styles.avatar, { backgroundColor: skeletonColor }]} />
-        <View style={{ flex: 1 }}>
+        <View style={{ flex: 1, gap: 6 }}>
           <View
             style={{
-              flexDirection: "row",
-              alignItems: "center",
-              marginBottom: 4,
+              width: 100,
+              height: 14,
+              backgroundColor: skeletonColor,
+              borderRadius: 4,
             }}
-          >
-            <View
-              style={{
-                width: 40,
-                height: 12,
-                backgroundColor: skeletonColor,
-                borderRadius: 4,
-              }}
-            />
-          </View>
+          />
           <View
             style={{
-              width: 60,
-              height: 10,
+              width: 80,
+              height: 12,
               backgroundColor: skeletonColor,
               borderRadius: 4,
             }}
@@ -107,47 +123,108 @@ export function StoreInfo({
 
   return (
     <ScrollView style={styles.infoContainer}>
-      <ThemedText style={styles.infoTitle}>
-        {isRestaurant ? "About the Restaurant" : "About the Store"}
-      </ThemedText>
-      {loading ? (
-        <View
-          style={{
-            width: "80%",
-            height: 16,
-            backgroundColor: skeletonColor,
-            borderRadius: 4,
-            marginBottom: 16,
-          }}
-        />
-      ) : (
-        <ThemedText style={[styles.infoText, { color: text }]}>
-          {store.address}
-        </ThemedText>
-      )}
-      <ThemedText style={[styles.infoTitle, { color: text }]}>
-        Reviews
-      </ThemedText>
-      {onWriteReview && (
-        <TouchableOpacity
-          style={[styles.writeReviewButton, { backgroundColor: primary }]}
-          onPress={onWriteReview}
-        >
-          <IconSymbol name="pencil" size={18} color="#fff" />
-          <ThemedText style={styles.writeReviewText}>
-            Write a Review
+      {/* About Section */}
+      <View
+        style={[
+          styles.section,
+          { backgroundColor: cardBg, borderColor: border },
+        ]}
+      >
+        <View style={styles.sectionHeader}>
+          <IconSymbol
+            name={isRestaurant ? "fork.knife" : "basket.fill"}
+            size={20}
+            color={primary}
+          />
+          <ThemedText style={[styles.sectionTitle, { color: text }]}>
+            {isRestaurant ? "About Restaurant" : "About Store"}
           </ThemedText>
-        </TouchableOpacity>
-      )}
-      {loading ? (
-        Array.from({ length: 3 }).map(renderSkeleton)
-      ) : reviews.length === 0 ? (
-        <ThemedText style={[styles.noReviewsText, { color: muted }]}>
-          No reviews yet. Be the first to review!
-        </ThemedText>
-      ) : (
-        reviews.map(renderReview)
-      )}
+        </View>
+
+        {loading ? (
+          <View style={{ gap: 8 }}>
+            <View style={[styles.skeletonLine, { width: "100%" }]} />
+            <View style={[styles.skeletonLine, { width: "80%" }]} />
+          </View>
+        ) : (
+          <>
+            <View style={styles.infoRow}>
+              <IconSymbol
+                name="location.fill"
+                size={16}
+                color={textSecondary}
+              />
+              <ThemedText style={[styles.infoText, { color: text }]}>
+                {store.address || "Address not available"}
+              </ThemedText>
+            </View>
+
+            <View style={styles.infoRow}>
+              <IconSymbol name="clock.fill" size={16} color={textSecondary} />
+              <ThemedText style={[styles.infoText, { color: text }]}>
+                Delivery: {store.deliveryTime || "30-45 mins"}
+              </ThemedText>
+            </View>
+
+            <View style={styles.infoRow}>
+              <IconSymbol name="tag.fill" size={16} color={textSecondary} />
+              <ThemedText style={[styles.infoText, { color: text }]}>
+                Type: {isRestaurant ? "Restaurant" : "Store"}
+              </ThemedText>
+            </View>
+          </>
+        )}
+      </View>
+
+      {/* Reviews Section */}
+      <View style={styles.reviewsSection}>
+        <View style={styles.reviewsHeader}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <IconSymbol name="star.fill" size={20} color={starColor} />
+            <ThemedText style={[styles.sectionTitle, { color: text }]}>
+              Reviews
+            </ThemedText>
+            {!loading && reviews.length > 0 && (
+              <View style={[styles.badge, { backgroundColor: primary }]}>
+                <ThemedText style={styles.badgeText}>
+                  {reviews.length}
+                </ThemedText>
+              </View>
+            )}
+          </View>
+
+          {onWriteReview && !loading && (
+            <TouchableOpacity
+              style={[styles.writeReviewButton, { backgroundColor: primary }]}
+              onPress={onWriteReview}
+            >
+              <IconSymbol name="pencil" size={16} color="#fff" />
+              <ThemedText style={styles.writeReviewText}>Write</ThemedText>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {loading ? (
+          Array.from({ length: 3 }).map(renderSkeleton)
+        ) : reviews.length === 0 ? (
+          <View
+            style={[
+              styles.emptyReviews,
+              { backgroundColor: cardBg, borderColor: border },
+            ]}
+          >
+            <IconSymbol name="message" size={48} color={muted} />
+            <ThemedText style={[styles.emptyReviewsTitle, { color: text }]}>
+              No reviews yet
+            </ThemedText>
+            <ThemedText style={[styles.emptyReviewsText, { color: muted }]}>
+              Be the first to share your experience!
+            </ThemedText>
+          </View>
+        ) : (
+          reviews.map(renderReview)
+        )}
+      </View>
     </ScrollView>
   );
 }
@@ -157,73 +234,125 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 16,
   },
-  infoTitle: {
+  section: {
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 16,
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 16,
+  },
+  sectionTitle: {
     fontSize: 18,
-    fontWeight: "600",
-    marginBottom: 8,
-    marginTop: 16,
+    fontWeight: "700",
+    letterSpacing: 0.3,
+  },
+  infoRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    marginBottom: 12,
   },
   infoText: {
     fontSize: 14,
-    color: "#666",
-    marginBottom: 16,
+    flex: 1,
+    lineHeight: 20,
   },
-  reviewCard: {
-    backgroundColor: "#F9FAFB",
-    padding: 14,
-    borderRadius: 10,
-    marginBottom: 12,
-    shadowColor: "#000",
-    shadowOpacity: 0.04,
-    shadowRadius: 2,
-    elevation: 1,
+  reviewsSection: {
+    marginBottom: 24,
   },
-  reviewHeader: {
+  reviewsHeader: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 6,
+    justifyContent: "space-between",
+    marginBottom: 16,
   },
-  avatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: "#f3f3f3",
-    marginRight: 10,
+  badge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
   },
-  reviewerName: {
-    fontSize: 13,
-    color: "#888",
-    marginTop: 2,
-  },
-  reviewRating: {
-    fontSize: 15,
-    fontWeight: "bold",
-    marginLeft: 4,
-    color: "#222",
-  },
-  reviewComment: {
-    fontSize: 15,
-    color: "#333",
-    marginTop: 2,
+  badgeText: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "700",
   },
   writeReviewButton: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    padding: 12,
-    borderRadius: 10,
-    marginBottom: 16,
-    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    gap: 6,
   },
   writeReviewText: {
     color: "#fff",
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: "600",
   },
-  noReviewsText: {
+  reviewCard: {
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    shadowColor: "#000",
+    shadowOpacity: 0.03,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  reviewHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    marginBottom: 8,
+  },
+  avatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: 12,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  reviewerName: {
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  reviewRating: {
+    fontSize: 12,
+    fontWeight: "500",
+  },
+  reviewDate: {
+    fontSize: 12,
+  },
+  reviewComment: {
     fontSize: 14,
-    color: "#666",
+    lineHeight: 20,
+    marginTop: 4,
+  },
+  emptyReviews: {
+    padding: 32,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  emptyReviewsTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  emptyReviewsText: {
+    fontSize: 14,
     textAlign: "center",
-    paddingVertical: 20,
+  },
+  skeletonLine: {
+    height: 14,
+    backgroundColor: "#E5E7EB",
+    borderRadius: 4,
   },
 });

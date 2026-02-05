@@ -30,10 +30,10 @@ export function ToggleRow({
 /* Styles */
 /* ---------------------------------- */
 const styles = StyleSheet.create({
-     toggleRow: {
+  toggleRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     paddingVertical: 12,
     alignItems: "center",
   },
-})
+});

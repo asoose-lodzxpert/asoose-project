@@ -22,7 +22,10 @@ export function RideLocationCard({ type, title, location, onPress }: Props) {
   const iconColor = isPickup ? success : danger;
 
   return (
-    <Pressable onPress={onPress} style={[styles.card, { backgroundColor: card }]}>
+    <Pressable
+      onPress={onPress}
+      style={[styles.card, { backgroundColor: card }]}
+    >
       <View style={styles.titleRow}>
         <IconSymbol name="location.fill" size={18} color={iconColor} />
         <ThemedText type="subtitle">{title}</ThemedText>

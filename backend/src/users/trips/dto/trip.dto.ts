@@ -12,9 +12,8 @@ import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export enum VehicleType {
-  BIKE = 'BIKE',
-  CAR = 'CAR',
-  VAN = 'VAN',
+  ECONOMY = 'ECONOMY',
+  BUSINESS = 'BUSINESS',
 }
 
 export class LocationDto {
@@ -45,6 +44,10 @@ export class RequestRideDto {
   @ApiProperty({ enum: VehicleType })
   @IsEnum(VehicleType)
   vehicleType: VehicleType;
+
+  @ApiProperty()
+  @IsNumber()
+  fare: number;
 
   @ApiPropertyOptional()
   @IsOptional()

@@ -14,7 +14,7 @@ export default function TermsScreen() {
   const linkColor = useThemeColor({}, "brandPrimary");
 
   const [openSection, setOpenSection] = useState<string | null>(
-    termsData.sections[0]?.id || ""
+    termsData.sections[0]?.id || "",
   );
 
   const handlePress = (id: string) => {

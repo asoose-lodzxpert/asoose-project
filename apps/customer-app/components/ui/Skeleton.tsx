@@ -32,7 +32,7 @@ export function Skeleton({
           duration: 1000,
           useNativeDriver: true,
         }),
-      ])
+      ]),
     ).start();
   }, [shimmerAnim]);
 
@@ -42,7 +42,13 @@ export function Skeleton({
   });
 
   return (
-    <View style={[styles.container, { width: width as any, height, borderRadius }, style]}>
+    <View
+      style={[
+        styles.container,
+        { width: width as any, height, borderRadius },
+        style,
+      ]}
+    >
       <Animated.View
         style={[
           styles.shimmer,

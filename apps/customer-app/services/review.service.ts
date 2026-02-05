@@ -11,7 +11,7 @@ import type { Review, CreateReviewDto } from "@/types/marketplace";
  * @param reviewData - Review data with storeId, rating, and comment
  */
 export async function submitReview(
-  reviewData: CreateReviewDto
+  reviewData: CreateReviewDto,
 ): Promise<Review> {
   return request("marketplace/reviews", {
     method: "POST",

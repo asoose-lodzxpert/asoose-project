@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import React from 'react';
+import React from "react";
 
 export function TransactionsListSkeleton() {
   return (
@@ -20,7 +20,10 @@ export function TransactionsListSkeleton() {
       {/* Stats Cards Skeleton */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         {[1, 2, 3].map((item) => (
-          <div key={item} className="bg-[#1E293B] border border-gray-700 rounded-xl p-4 animate-pulse">
+          <div
+            key={item}
+            className="bg-[#1E293B] border border-gray-700 rounded-xl p-4 animate-pulse"
+          >
             <div className="flex items-center justify-between">
               <div className="h-4 w-20 bg-[#0F172A] rounded"></div>
               <div className="h-5 w-5 bg-[#0F172A] rounded"></div>
@@ -47,44 +50,50 @@ export function TransactionsListSkeleton() {
           {/* Table Header Skeleton */}
           <div className="grid grid-cols-7 gap-4 mb-4 px-4">
             {[1, 2, 3, 4, 5, 6, 7].map((item) => (
-              <div key={item} className="h-6 bg-[#0F172A] rounded animate-pulse"></div>
+              <div
+                key={item}
+                className="h-6 bg-[#0F172A] rounded animate-pulse"
+              ></div>
             ))}
           </div>
 
           {/* Table Rows Skeleton */}
           <div className="space-y-3">
             {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((row) => (
-              <div key={row} className="grid grid-cols-7 gap-4 p-4 border-t border-gray-700">
+              <div
+                key={row}
+                className="grid grid-cols-7 gap-4 p-4 border-t border-gray-700"
+              >
                 {/* ID */}
                 <div className="space-y-2">
                   <div className="h-4 w-24 bg-[#0F172A] rounded animate-pulse"></div>
                 </div>
-                
+
                 {/* Description */}
                 <div className="space-y-2">
                   <div className="h-4 w-48 bg-[#0F172A] rounded animate-pulse"></div>
                 </div>
-                
+
                 {/* User */}
                 <div className="space-y-2">
                   <div className="h-4 w-32 bg-[#0F172A] rounded animate-pulse"></div>
                 </div>
-                
+
                 {/* Amount */}
                 <div className="space-y-2">
                   <div className="h-4 w-24 bg-[#0F172A] rounded animate-pulse"></div>
                 </div>
-                
+
                 {/* Status */}
                 <div className="space-y-2">
                   <div className="h-6 w-16 bg-[#0F172A] rounded-full animate-pulse"></div>
                 </div>
-                
+
                 {/* Date */}
                 <div className="space-y-2">
                   <div className="h-4 w-24 bg-[#0F172A] rounded animate-pulse"></div>
                 </div>
-                
+
                 {/* Actions */}
                 <div className="space-y-2">
                   <div className="h-4 w-4 bg-[#0F172A] rounded animate-pulse ml-auto"></div>
@@ -109,7 +118,10 @@ export function TransactionsListSkeleton() {
         {/* Mobile Cards Skeleton */}
         <div className="md:hidden space-y-3">
           {[1, 2, 3, 4, 5].map((item) => (
-            <div key={item} className="bg-[#0F172A] border border-gray-700 rounded-lg p-4 space-y-3">
+            <div
+              key={item}
+              className="bg-[#0F172A] border border-gray-700 rounded-lg p-4 space-y-3"
+            >
               <div className="flex items-start justify-between">
                 <div className="h-4 w-32 bg-[#1E293B] rounded animate-pulse"></div>
                 <div className="h-6 w-16 bg-[#1E293B] rounded-full animate-pulse"></div>

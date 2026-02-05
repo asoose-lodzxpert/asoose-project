@@ -8,8 +8,20 @@ export interface DisputeDetail {
   evidenceImages: string[];
   openedByUser: { id: string; name: string; email: string; role: string };
   targetUser?: { id: string; name: string; role: string };
-  order?: { id: string; total: number; status: string; store?: { name: string }; items?: any[] };
-  ride?: { id: string; totalFare: number; status: string; rider?: { user?: { name: string }}; distanceKm?: number };
+  order?: {
+    id: string;
+    total: number;
+    status: string;
+    store?: { name: string };
+    items?: any[];
+  };
+  ride?: {
+    id: string;
+    totalFare: number;
+    status: string;
+    rider?: { user?: { name: string } };
+    distanceKm?: number;
+  };
   delivery?: { id: string; deliveryFee: number; status: string };
   messages: Array<{
     id: string;
@@ -28,4 +40,9 @@ export interface DisputeDetail {
   breachedSLA: boolean;
 }
 
-export type ModalType = 'REFUND_PARTIAL' | 'REFUND_FULL' | 'REJECT' | 'RESOLVE_NO_REFUND' | null;
+export type ModalType =
+  | "REFUND_PARTIAL"
+  | "REFUND_FULL"
+  | "REJECT"
+  | "RESOLVE_NO_REFUND"
+  | null;

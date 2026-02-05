@@ -51,7 +51,6 @@ export class InitiatePaymentDto {
   @IsString()
   rideId?: string;
 
-  // FIX: Added validation for Delivery ID
   @ValidateIf((o) => o.type === PaymentType.DELIVERY)
   @IsString()
   deliveryId?: string;
@@ -70,7 +69,8 @@ export class VerifyPaymentDto {
   reference: string;
 
   @IsEnum(PaymentGateway)
-  gateway: PaymentGateway;
+  @IsOptional()
+  gateway?: PaymentGateway;
 }
 
 export class DisbursePaymentDto {

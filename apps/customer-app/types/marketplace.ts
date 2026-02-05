@@ -20,19 +20,24 @@ export type SearchFilters = {
 /* ---------------------------------- */
 /* Category Types */
 /* ---------------------------------- */
+export type CategoryDetailResponse = {
+  id: string;
+  title: string;
+  description?: string;
+  vendors: Vendor[];
+  meta?: {
+    total: number;
+    page?: number;
+    limit?: number;
+  };
+};
+
 export type CategoryVertical = {
   id: string;
   type: string;
   title: string;
   description?: string;
   vendors: Vendor[];
-};
-
-export type CategoryDetailResponse = {
-  vertical: CategoryVertical;
-  meta?: {
-    total: number;
-  };
 };
 
 export type CategorySortOption =

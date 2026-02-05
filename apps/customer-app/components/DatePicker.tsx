@@ -158,7 +158,7 @@ function WheelDateModal({
 
   const daysInMonth = useMemo(
     () => new Date(year, month + 1, 0).getDate(),
-    [year, month]
+    [year, month],
   );
 
   const years = useMemo(() => {
@@ -275,7 +275,7 @@ type WheelProps<T extends string | number> = {
 const Wheel = React.forwardRef<FlatList<any>, WheelProps<any>>(
   (
     { data, index, onChange, activeTextColor, inactiveTextColor, ready },
-    ref
+    ref,
   ) => {
     return (
       <FlatList
@@ -310,7 +310,7 @@ const Wheel = React.forwardRef<FlatList<any>, WheelProps<any>>(
         }}
       />
     );
-  }
+  },
 );
 
 /* ------------------------------------------------------------------ */

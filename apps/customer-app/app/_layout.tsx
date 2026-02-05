@@ -85,7 +85,7 @@ function RootNavigator() {
 
         {/* Global modal routes */}
         <Stack.Screen
-          name="location-picker"
+          name="(delivery)/location-picker"
           options={{
             presentation: "modal",
             animation: "slide_from_bottom",
@@ -107,12 +107,12 @@ export default function RootLayout() {
           <CartProvider>
             <HomeProvider>
               <RideProvider>
-              <SendPackageProvider>
-                <ToastProvider>
-                  <RootNavigator />
-                  <ThemedToastProvider />
-                </ToastProvider>
-              </SendPackageProvider>
+                <SendPackageProvider>
+                  <ToastProvider>
+                    <RootNavigator />
+                    <ThemedToastProvider />
+                  </ToastProvider>
+                </SendPackageProvider>
               </RideProvider>
             </HomeProvider>
           </CartProvider>

@@ -1,4 +1,8 @@
-import { useCallback } from "react";
+import React, { useCallback } from "react";
+import { View, Text, StyleSheet, Animated } from "react-native";
+
+import Toast, { BaseToastProps } from "react-native-toast-message";
+import { useThemeColor } from "@/hooks/use-theme-color";
 
 export const useToast = () =>
   useCallback(
@@ -18,11 +22,6 @@ export const useToast = () =>
     },
     [],
   );
-import React from "react";
-import { View, Text, StyleSheet, Animated } from "react-native";
-
-import Toast, { BaseToastProps } from "react-native-toast-message";
-import { useThemeColor } from "@/hooks/use-theme-color";
 
 type CustomToastProps = BaseToastProps & {
   toastType: "success" | "error" | "info";

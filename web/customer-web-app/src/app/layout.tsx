@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { NotificationListener } from "@/app/main/components/NotificationListener";
-import { Providers } from "./providers"; 
+import { Providers } from "./providers";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -11,16 +11,25 @@ export const metadata: Metadata = {
     default: "Asoose | Rides, Food & Logistics",
     template: "%s | Asoose",
   },
-  description: "Ride, eat, and send packages with one app. Experience fast, safe, and affordable services with transparent pricing and real-time tracking.",
-  keywords: ["ride hailing", "food delivery", "logistics", "package delivery", "Asoose", "transportation app"],
+  description:
+    "Ride, eat, and send packages with one app. Experience fast, safe, and affordable services with transparent pricing and real-time tracking.",
+  keywords: [
+    "ride hailing",
+    "food delivery",
+    "logistics",
+    "package delivery",
+    "Asoose",
+    "transportation app",
+  ],
   openGraph: {
     title: "Asoose | Your City in Your Pocket",
-    description: "One app for rides, food, and deliveries. Get matched quickly with verified drivers and vendors.",
-    url: "https://asoose.com", 
+    description:
+      "One app for rides, food, and deliveries. Get matched quickly with verified drivers and vendors.",
+    url: "https://asoose.com",
     siteName: "Asoose",
     images: [
       {
-        url: "/og-image.png", 
+        url: "/og-image.png",
         width: 1200,
         height: 630,
         alt: "Asoose App Preview",
@@ -32,13 +41,14 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "Asoose | Rides, Food & Logistics",
-    description: "Ride, eat, and send packages with one app. Fast, safe, and affordable.",
-    images: ["/og-image.png"], 
+    description:
+      "Ride, eat, and send packages with one app. Fast, safe, and affordable.",
+    images: ["/og-image.png"],
   },
   icons: {
-    icon: "/logo.png", 
+    icon: "/logo.png",
     shortcut: "/logo.png",
-    apple: "/logo.png", 
+    apple: "/logo.png",
   },
 };
 

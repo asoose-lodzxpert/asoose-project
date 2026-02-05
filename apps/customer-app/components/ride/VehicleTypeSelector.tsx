@@ -14,25 +14,18 @@ type VehicleOption = {
 
 const VEHICLE_OPTIONS: VehicleOption[] = [
   {
-    type: "BIKE",
-    name: "Bike",
+    type: VehicleType.ECONOMY,
+    name: "Economy",
     description: "Quick & affordable",
     icon: "bicycle",
-    capacity: "1 person",
+    capacity: "Up to 3",
   },
   {
-    type: "CAR",
-    name: "Car",
+    type: VehicleType.BUSINESS,
+    name: "Business",
     description: "Comfortable ride",
     icon: "car.fill",
     capacity: "Up to 4",
-  },
-  {
-    type: "VAN",
-    name: "Van",
-    description: "Extra space",
-    icon: "car.2.fill",
-    capacity: "Up to 6",
   },
 ];
 

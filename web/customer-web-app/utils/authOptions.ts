@@ -22,17 +22,20 @@ export const authOptions: NextAuthOptions = {
       name: "Credentials",
       credentials: {
         email: { label: "Email", type: "email" },
-        password: { label: "Password", type: "password" }
+        password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null;
 
         try {
-          const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/user/login`, {
-            method: 'POST',
-            body: JSON.stringify(credentials),
-            headers: { "Content-Type": "application/json" }
-          });
+          const res = await fetch(
+            `${process.env.NEXT_PUBLIC_API_URL}/auth/user/login`,
+            {
+              method: "POST",
+              body: JSON.stringify(credentials),
+              headers: { "Content-Type": "application/json" },
+            },
+          );
 
           const data = await res.json();
 
@@ -51,7 +54,7 @@ export const authOptions: NextAuthOptions = {
           console.error("Login Error:", error);
           return null;
         }
-      }
+      },
     }),
   ],
   session: {
@@ -64,17 +67,23 @@ export const authOptions: NextAuthOptions = {
       if (account?.provider === "google") {
         try {
           const googleProfile = profile as any;
-          const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/user/oauth/google`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              email: user.email,
-              googleId: account.providerAccountId,
-              firstName: googleProfile?.given_name || user.name?.split(" ")[0],
-              lastName: googleProfile?.family_name || user.name?.split(" ").slice(1).join(" "),
-              profilePicture: user.image,
-            }),
-          });
+          const res = await fetch(
+            `${process.env.NEXT_PUBLIC_API_URL}/auth/user/oauth/google`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                email: user.email,
+                googleId: account.providerAccountId,
+                firstName:
+                  googleProfile?.given_name || user.name?.split(" ")[0],
+                lastName:
+                  googleProfile?.family_name ||
+                  user.name?.split(" ").slice(1).join(" "),
+                profilePicture: user.image,
+              }),
+            },
+          );
 
           const data = await res.json();
 
@@ -99,7 +108,7 @@ export const authOptions: NextAuthOptions = {
         const u = user as CustomUser;
         token.role = u.role;
         token.id = u.id;
-        token.accessToken = u.accessToken; 
+        token.accessToken = u.accessToken;
       }
       return token;
     },
@@ -111,11 +120,11 @@ export const authOptions: NextAuthOptions = {
       }
       session.accessToken = token.accessToken as string;
       return session;
-    }
+    },
   },
   pages: {
-    signIn: '/sign-in',
-    error: '/sign-in', 
+    signIn: "/sign-in",
+    error: "/sign-in",
   },
   secret: process.env.NEXTAUTH_SECRET,
 };

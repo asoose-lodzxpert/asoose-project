@@ -4,7 +4,6 @@ import {
   ScrollView,
   Pressable,
   ActivityIndicator,
-  Alert,
   RefreshControl,
   Dimensions,
 } from "react-native";
@@ -18,6 +17,7 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { useRide } from "@/context/RideContext";
 import { RideStatus } from "@/types/ride";
+import { useConfirm } from "@/components/ui/ConfirmDialogProvider";
 import { FindingDriverView } from "@/components/ride/FindingDriverView";
 import { DriverInfoCard } from "@/components/ride/DriverInfoCard";
 import { TripProgressTracker } from "@/components/ride/TripProgressTracker";
@@ -30,10 +30,9 @@ const MAP_HEIGHT = SCREEN_HEIGHT * 0.5;
 
 export default function RideTrackingScreen() {
   const router = useRouter();
+  const showConfirm = useConfirm();
   const {
     currentRide,
-    pageView,
-    loading,
     driverLocation,
     cancelRide,
     refreshCurrentRide,
@@ -55,7 +54,7 @@ export default function RideTrackingScreen() {
     longitude: number;
   } | null>(null);
   const [routeCoordinates, setRouteCoordinates] = useState<
-    Array<{ latitude: number; longitude: number }>
+    { latitude: number; longitude: number }[]
   >([]);
   const mapRef = useRef<MapView>(null);
 
@@ -89,7 +88,7 @@ export default function RideTrackingScreen() {
               latitude: location.coords.latitude,
               longitude: location.coords.longitude,
             });
-          }
+          },
         );
       } catch (error) {
         console.error("Error getting location:", error);
@@ -114,7 +113,7 @@ export default function RideTrackingScreen() {
       const dropoff = currentRide.dropoffAddress;
 
       const response = await get(
-        `maps/directions?originLat=${pickup.lat}&originLng=${pickup.lng}&destLat=${dropoff.lat}&destLng=${dropoff.lng}`
+        `maps/directions?originLat=${pickup.lat}&originLng=${pickup.lng}&destLat=${dropoff.lat}&destLng=${dropoff.lng}`,
       );
 
       if (response.coordinates && response.coordinates.length > 0) {
@@ -129,7 +128,7 @@ export default function RideTrackingScreen() {
   const fitMapToMarkers = useCallback(() => {
     if (!mapRef.current) return;
 
-    const coordinates: Array<{ latitude: number; longitude: number }> = [];
+    const coordinates: { latitude: number; longitude: number }[] = [];
 
     // Add pickup
     if (currentRide?.pickupAddress) {
@@ -188,7 +187,10 @@ export default function RideTrackingScreen() {
       <ThemedView style={[styles.container, { backgroundColor: surface }]}>
         <View style={styles.emptyState}>
           <ThemedText>No active ride</ThemedText>
-          <Pressable onPress={() => router.replace("/ride")} style={styles.backLink}>
+          <Pressable
+            onPress={() => router.replace("/ride")}
+            style={styles.backLink}
+          >
             <ThemedText type="link">Book a Ride</ThemedText>
           </Pressable>
         </View>
@@ -202,29 +204,25 @@ export default function RideTrackingScreen() {
     setRefreshing(false);
   };
 
-  const handleCancelRide = () => {
-    Alert.alert(
-      "Cancel Ride",
-      "Are you sure you want to cancel this ride?",
-      [
-        { text: "No", style: "cancel" },
-        {
-          text: "Yes, Cancel",
-          style: "destructive",
-          onPress: async () => {
-            setCancelling(true);
-            try {
-              await cancelRide("Cancelled by user");
-              router.replace("/ride");
-            } catch (err) {
-              console.error("Cancel error:", err);
-            } finally {
-              setCancelling(false);
-            }
-          },
-        },
-      ]
-    );
+  const handleCancelRide = async () => {
+    const confirmed = await showConfirm({
+      title: "Cancel Ride",
+      message: "Are you sure you want to cancel this ride?",
+      confirmLabel: "Yes, Cancel",
+      cancelLabel: "No",
+    });
+
+    if (confirmed) {
+      setCancelling(true);
+      try {
+        await cancelRide("Cancelled by user");
+        router.replace("/ride");
+      } catch (err) {
+        console.error("Cancel error:", err);
+      } finally {
+        setCancelling(false);
+      }
+    }
   };
 
   const canCancel =
@@ -317,7 +315,9 @@ export default function RideTrackingScreen() {
         </MapView>
 
         {/* Overlay Header */}
-        <View style={[styles.overlayHeader, { backgroundColor: `${surface}F5` }]}>
+        <View
+          style={[styles.overlayHeader, { backgroundColor: `${surface}F5` }]}
+        >
           <Pressable onPress={() => router.back()} style={styles.backButton}>
             <IconSymbol name="chevron.left" size={24} color={primary} />
           </Pressable>
@@ -363,7 +363,9 @@ export default function RideTrackingScreen() {
         {currentRide.status !== RideStatus.PENDING &&
           currentRide.status !== RideStatus.CANCELLED && (
             <View style={[styles.progressCard, { backgroundColor: card }]}>
-              <TripProgressTracker currentStatus={currentRide.status as RideStatus} />
+              <TripProgressTracker
+                currentStatus={currentRide.status as RideStatus}
+              />
             </View>
           )}
 
@@ -377,7 +379,12 @@ export default function RideTrackingScreen() {
         {showOTP && <OTPDisplay otp={currentRide.startOtp!} />}
 
         {/* Trip Details */}
-        <View style={[styles.detailsCard, { backgroundColor: card, borderColor: border }]}>
+        <View
+          style={[
+            styles.detailsCard,
+            { backgroundColor: card, borderColor: border },
+          ]}
+        >
           <ThemedText type="subtitle" style={styles.cardTitle}>
             Trip Details
           </ThemedText>
@@ -431,7 +438,12 @@ export default function RideTrackingScreen() {
 
         {/* Driver Location Info */}
         {driverLocation && (
-          <View style={[styles.locationCard, { backgroundColor: card, borderColor: border }]}>
+          <View
+            style={[
+              styles.locationCard,
+              { backgroundColor: card, borderColor: border },
+            ]}
+          >
             <View style={styles.locationHeader}>
               <IconSymbol name="location.fill" size={20} color={primary} />
               <ThemedText type="defaultSemiBold">Driver Location</ThemedText>
@@ -447,7 +459,9 @@ export default function RideTrackingScreen() {
 
         {/* Status Messages */}
         {currentRide.status === RideStatus.ACCEPTED && (
-          <View style={[styles.messageCard, { backgroundColor: `${primary}15` }]}>
+          <View
+            style={[styles.messageCard, { backgroundColor: `${primary}15` }]}
+          >
             <IconSymbol name="car.fill" size={20} color={primary} />
             <ThemedText type="caption" style={{ color: primary }}>
               Your driver is on the way to pick you up
@@ -456,7 +470,9 @@ export default function RideTrackingScreen() {
         )}
 
         {currentRide.status === RideStatus.ARRIVED && (
-          <View style={[styles.messageCard, { backgroundColor: `${success}15` }]}>
+          <View
+            style={[styles.messageCard, { backgroundColor: `${success}15` }]}
+          >
             <IconSymbol name="checkmark.circle" size={20} color={success} />
             <ThemedText type="caption" style={{ color: success }}>
               Your driver has arrived at the pickup location
@@ -465,7 +481,9 @@ export default function RideTrackingScreen() {
         )}
 
         {currentRide.status === RideStatus.IN_PROGRESS && (
-          <View style={[styles.messageCard, { backgroundColor: `${primary}15` }]}>
+          <View
+            style={[styles.messageCard, { backgroundColor: `${primary}15` }]}
+          >
             <IconSymbol name="arrow.right.circle" size={20} color={primary} />
             <ThemedText type="caption" style={{ color: primary }}>
               Trip in progress. Enjoy your ride!
@@ -554,7 +572,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 16,
-    paddingTop: 60,
+    paddingTop: 24,
     paddingBottom: 16,
     gap: 12,
   },

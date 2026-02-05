@@ -1,25 +1,25 @@
-'use client';
+"use client";
 
-import React, { useState, useMemo, useEffect } from 'react';
-import useSWR from 'swr';
-import { ColumnDef } from '@tanstack/react-table';
-import { 
-  Eye, 
-  Search, 
-  Calendar, 
+import React, { useState, useMemo, useEffect } from "react";
+import useSWR from "swr";
+import { ColumnDef } from "@tanstack/react-table";
+import {
+  Eye,
+  Search,
+  Calendar,
   ChevronRight,
   Copy,
   RotateCcw,
-  Download
-} from 'lucide-react';
-import Link from 'next/link';
-import { format } from 'date-fns';
-import { toast } from 'react-toastify';
+  Download,
+} from "lucide-react";
+import Link from "next/link";
+import { format } from "date-fns";
+import { toast } from "react-toastify";
 
-import { DataTable } from '../component/datatable';
-import { fetcher } from '../hooks/useSuperAdminFetch';
-import { Currency } from '@/app/main/components/Currency';
-import { OrderListSkeleton } from './components/skeleton';
+import { DataTable } from "../component/datatable";
+import { fetcher } from "../hooks/useSuperAdminFetch";
+import { Currency } from "@/app/main/components/Currency";
+import { OrderListSkeleton } from "./components/skeleton";
 // --- Types ---
 interface OrderListItem {
   id: string;
@@ -45,10 +45,10 @@ interface OrdersResponse {
 
 export default function OrdersPage() {
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
-  const [search, setSearch] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('All');
-  const [typeFilter, setTypeFilter] = useState('All');
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("All");
+  const [typeFilter, setTypeFilter] = useState("All");
 
   // --- 1. Debounce Logic Hook ---
   useEffect(() => {
@@ -61,100 +61,116 @@ export default function OrdersPage() {
     page: (pagination.pageIndex + 1).toString(),
     limit: pagination.pageSize.toString(),
     ...(debouncedSearch && { search: debouncedSearch }),
-    ...(statusFilter !== 'All' && { status: statusFilter }),
-    ...(typeFilter !== 'All' && { type: typeFilter }),
+    ...(statusFilter !== "All" && { status: statusFilter }),
+    ...(typeFilter !== "All" && { type: typeFilter }),
   });
 
   const { data, isLoading, mutate } = useSWR<OrdersResponse>(
     `/super-admin/orders?${queryParams.toString()}`,
     fetcher,
-    { keepPreviousData: true }
+    { keepPreviousData: true },
   );
 
   // --- 3. Columns Definition Hook (MOVED ABOVE THE EARLY RETURN) ---
-  const columns = useMemo<ColumnDef<OrderListItem>[]>(() => [
-    {
-      accessorKey: 'id',
-      header: 'Order ID',
-      cell: ({ row }) => (
-        <div className="flex items-center gap-2 group">
-          <span className="font-mono text-xs text-gray-400">
-            #{row.original.id.substring(0, 8).toUpperCase()}
-          </span>
-          <button 
-            onClick={() => {
-              navigator.clipboard.writeText(row.original.id);
-              toast.success('ID Copied');
-            }}
-            className="opacity-0 group-hover:opacity-100 p-1 hover:bg-white/10 rounded transition-all"
-          >
-            <Copy size={12} className="text-gray-500" />
-          </button>
-        </div>
-      ),
-    },
-    {
-      accessorKey: 'status',
-      header: 'Status',
-      cell: ({ row }) => {
-        const status = row.original.status;
-        const colors: Record<string, string> = {
-          PENDING: 'text-amber-500 bg-amber-500/10 border-amber-500/20',
-          CONFIRMED: 'text-blue-500 bg-blue-500/10 border-blue-500/20',
-          PREPARING: 'text-indigo-500 bg-indigo-500/10 border-indigo-500/20',
-          DELIVERED: 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20',
-          CANCELLED: 'text-rose-500 bg-rose-500/10 border-rose-500/20',
-        };
-        return (
-          <span className={`px-2 py-1 rounded-full text-[10px] font-bold border uppercase ${colors[status] || 'text-gray-500 bg-gray-500/10 border-gray-500/20'}`}>
-            {status}
-          </span>
-        );
+  const columns = useMemo<ColumnDef<OrderListItem>[]>(
+    () => [
+      {
+        accessorKey: "id",
+        header: "Order ID",
+        cell: ({ row }) => (
+          <div className="flex items-center gap-2 group">
+            <span className="font-mono text-xs text-gray-400">
+              #{row.original.id.substring(0, 8).toUpperCase()}
+            </span>
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(row.original.id);
+                toast.success("ID Copied");
+              }}
+              className="opacity-0 group-hover:opacity-100 p-1 hover:bg-white/10 rounded transition-all"
+            >
+              <Copy size={12} className="text-gray-500" />
+            </button>
+          </div>
+        ),
       },
-    },
-    {
-      accessorKey: 'customer',
-      header: 'Customer',
-      cell: ({ row }) => <span className="font-medium text-white text-sm">{row.original.customer}</span>,
-    },
-    {
-      accessorKey: 'vendor',
-      header: 'Vendor',
-      cell: ({ row }) => <span className="text-gray-400 text-sm">{row.original.vendor}</span>,
-    },
-    {
-      accessorKey: 'amount',
-      header: 'Total',
-      cell: ({ row }) => (
-        <span className="font-bold text-white text-sm">
-          <Currency amount={row.original.amount} />
-        </span>
-      ),
-    },
-    {
-      accessorKey: 'placedAt',
-      header: 'Date',
-      cell: ({ row }) => (
-        <div className="flex flex-col">
-          <span className="text-white text-xs">{format(new Date(row.original.placedAt), 'MMM dd, yyyy')}</span>
-          <span className="text-gray-500 text-[10px] font-mono">{format(new Date(row.original.placedAt), 'HH:mm')}</span>
-        </div>
-      ),
-    },
-    {
-      id: 'actions',
-      header: '',
-      cell: ({ row }) => (
-        <Link 
-          href={`/super-admin/orders/${row.original.id}`}
-          className="p-2 hover:bg-yellow-500/10 rounded-lg text-yellow-500 transition-colors inline-block"
-          title="View Details"
-        >
-          <Eye size={16} />
-        </Link>
-      ),
-    },
-  ], []);
+      {
+        accessorKey: "status",
+        header: "Status",
+        cell: ({ row }) => {
+          const status = row.original.status;
+          const colors: Record<string, string> = {
+            PENDING: "text-amber-500 bg-amber-500/10 border-amber-500/20",
+            CONFIRMED: "text-blue-500 bg-blue-500/10 border-blue-500/20",
+            PREPARING: "text-indigo-500 bg-indigo-500/10 border-indigo-500/20",
+            DELIVERED:
+              "text-emerald-500 bg-emerald-500/10 border-emerald-500/20",
+            CANCELLED: "text-rose-500 bg-rose-500/10 border-rose-500/20",
+          };
+          return (
+            <span
+              className={`px-2 py-1 rounded-full text-[10px] font-bold border uppercase ${colors[status] || "text-gray-500 bg-gray-500/10 border-gray-500/20"}`}
+            >
+              {status}
+            </span>
+          );
+        },
+      },
+      {
+        accessorKey: "customer",
+        header: "Customer",
+        cell: ({ row }) => (
+          <span className="font-medium text-white text-sm">
+            {row.original.customer}
+          </span>
+        ),
+      },
+      {
+        accessorKey: "vendor",
+        header: "Vendor",
+        cell: ({ row }) => (
+          <span className="text-gray-400 text-sm">{row.original.vendor}</span>
+        ),
+      },
+      {
+        accessorKey: "amount",
+        header: "Total",
+        cell: ({ row }) => (
+          <span className="font-bold text-white text-sm">
+            <Currency amount={row.original.amount} />
+          </span>
+        ),
+      },
+      {
+        accessorKey: "placedAt",
+        header: "Date",
+        cell: ({ row }) => (
+          <div className="flex flex-col">
+            <span className="text-white text-xs">
+              {format(new Date(row.original.placedAt), "MMM dd, yyyy")}
+            </span>
+            <span className="text-gray-500 text-[10px] font-mono">
+              {format(new Date(row.original.placedAt), "HH:mm")}
+            </span>
+          </div>
+        ),
+      },
+      {
+        id: "actions",
+        header: "",
+        cell: ({ row }) => (
+          <Link
+            href={`/super-admin/orders/${row.original.id}`}
+            className="p-2 hover:bg-yellow-500/10 rounded-lg text-yellow-500 transition-colors inline-block"
+            title="View Details"
+          >
+            <Eye size={16} />
+          </Link>
+        ),
+      },
+    ],
+    [],
+  );
 
   // --- 4. Handle Early Loading State AFTER all hooks are defined ---
   if (isLoading && !data) {
@@ -162,9 +178,9 @@ export default function OrdersPage() {
   }
 
   const resetFilters = () => {
-    setSearch('');
-    setStatusFilter('All');
-    setTypeFilter('All');
+    setSearch("");
+    setStatusFilter("All");
+    setTypeFilter("All");
   };
 
   return (
@@ -187,7 +203,7 @@ export default function OrdersPage() {
         <div className="flex flex-wrap items-center gap-4">
           <div className="relative flex-1 min-w-[240px]">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-500" />
-            <input 
+            <input
               type="text"
               placeholder="Search ID, Customer, Store..."
               className="w-full bg-[#0F172A] border border-gray-700 rounded-lg pl-10 pr-4 py-2 text-sm text-white focus:outline-none focus:border-yellow-500"
@@ -197,7 +213,7 @@ export default function OrdersPage() {
           </div>
 
           <div className="flex items-center gap-3">
-            <select 
+            <select
               className="bg-[#0F172A] border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-yellow-500"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
@@ -209,7 +225,7 @@ export default function OrdersPage() {
               <option value="CANCELLED">Cancelled</option>
             </select>
 
-            <select 
+            <select
               className="bg-[#0F172A] border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-yellow-500"
               value={typeFilter}
               onChange={(e) => setTypeFilter(e.target.value)}
@@ -220,7 +236,7 @@ export default function OrdersPage() {
               <option value="Pharmacy">Pharmacy</option>
             </select>
 
-            <button 
+            <button
               onClick={resetFilters}
               className="p-2 text-gray-500 hover:text-white transition-colors"
               title="Reset Filters"
@@ -233,33 +249,44 @@ export default function OrdersPage() {
 
       {/* Data Table */}
       <div className="bg-[#1E293B] rounded-xl border border-gray-800 overflow-hidden shadow-xl min-h-[500px]">
-          <DataTable 
-            data={data?.data || []}
-            columns={columns}
-            pagination={pagination}
-            onPaginationChange={setPagination}
-            pageCount={data?.meta?.pages || 0}
-            renderMobileCard={(order) => (
-              <Link href={`/super-admin/orders/${order.id}`} className="block bg-[#1E293B] border border-gray-800 rounded-xl p-4 active:scale-[0.98] transition-all">
-                <div className="flex justify-between items-start mb-3">
-                  <span className="font-mono text-xs text-gray-500 font-bold uppercase">#{order.id.substring(0,8)}</span>
-                  <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold border uppercase ${order.status === 'PENDING' ? 'text-amber-500 border-amber-500/20' : 'text-emerald-500 border-emerald-500/20'}`}>
-                    {order.status}
-                  </span>
+        <DataTable
+          data={data?.data || []}
+          columns={columns}
+          pagination={pagination}
+          onPaginationChange={setPagination}
+          pageCount={data?.meta?.pages || 0}
+          renderMobileCard={(order) => (
+            <Link
+              href={`/super-admin/orders/${order.id}`}
+              className="block bg-[#1E293B] border border-gray-800 rounded-xl p-4 active:scale-[0.98] transition-all"
+            >
+              <div className="flex justify-between items-start mb-3">
+                <span className="font-mono text-xs text-gray-500 font-bold uppercase">
+                  #{order.id.substring(0, 8)}
+                </span>
+                <span
+                  className={`px-2 py-0.5 rounded-full text-[9px] font-bold border uppercase ${order.status === "PENDING" ? "text-amber-500 border-amber-500/20" : "text-emerald-500 border-emerald-500/20"}`}
+                >
+                  {order.status}
+                </span>
+              </div>
+              <div className="flex justify-between items-end">
+                <div>
+                  <p className="text-white font-bold text-sm">
+                    {order.customer}
+                  </p>
+                  <p className="text-gray-500 text-xs">{order.vendor}</p>
                 </div>
-                <div className="flex justify-between items-end">
-                   <div>
-                     <p className="text-white font-bold text-sm">{order.customer}</p>
-                     <p className="text-gray-500 text-xs">{order.vendor}</p>
-                   </div>
-                   <div className="text-right">
-                     <p className="text-yellow-500 font-bold mb-1"><Currency amount={order.amount} /></p>
-                     <ChevronRight size={16} className="text-gray-700 ml-auto" />
-                   </div>
+                <div className="text-right">
+                  <p className="text-yellow-500 font-bold mb-1">
+                    <Currency amount={order.amount} />
+                  </p>
+                  <ChevronRight size={16} className="text-gray-700 ml-auto" />
                 </div>
-              </Link>
-            )}
-          />
+              </div>
+            </Link>
+          )}
+        />
       </div>
     </div>
   );

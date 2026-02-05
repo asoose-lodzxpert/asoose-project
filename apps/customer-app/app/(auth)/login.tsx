@@ -64,16 +64,10 @@ export default function LoginScreen() {
       >
         {/* Header */}
         <View style={styles.header}>
-          <Image
-            source={require("@/assets/images/icon.png")}
-            style={styles.logo}
-            resizeMode="contain"
-          />
-
           <ThemedText type="title" style={styles.title}>
             Welcome Back
           </ThemedText>
-          <ThemedText style={{ color: textMuted }}>
+          <ThemedText style={{ color: textMuted, textAlign: "center" }}>
             Sign in to continue
           </ThemedText>
         </View>
@@ -214,6 +208,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: "700",
+    textAlign: "center",
   },
   card: {
     gap: 14,

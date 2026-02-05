@@ -8,6 +8,8 @@ export type Review = {
   id: string;
   rating: number;
   comment: string;
+  userName?: string;
+  createdAt?: string;
 };
 
 export type Product = {
@@ -25,7 +27,8 @@ export type StoreData = {
   slug: string;
   name: string;
   type: StoreType;
-  image: string;
+  image: string | null;
+  banner?: string | null;
   address: string;
   rating: number;
   deliveryTime: string;

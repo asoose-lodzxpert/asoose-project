@@ -149,7 +149,7 @@ export class UsersController {
     @Param('id') id: string,
     @Body() body: UpdateEmergencyContactDto,
   ) {
-    return this.usersService.updateEmergencyContact(req.user.id, id, body);
+    return this.usersService.upsertEmergencyContact(req.user.id, id, body);
   }
 
   @Delete('emergency-contacts/:id')

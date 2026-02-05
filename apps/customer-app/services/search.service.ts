@@ -17,7 +17,7 @@ import type {
  */
 export async function searchMarketplace(
   query: string,
-  filters?: SearchFilters
+  filters?: SearchFilters,
 ): Promise<SearchResult> {
   if (!query.trim()) {
     return { stores: [], products: [] };
@@ -30,9 +30,9 @@ export async function searchMarketplace(
   // Filters are applied client-side for now
   // Future: Backend should support these query params
 
-  const result = await request(
-    `marketplace/search?${params.toString()}`
-  ) as SearchResult;
+  const result = (await request(
+    `marketplace/search?${params.toString()}`,
+  )) as SearchResult;
 
   return applyClientSideFilters(result, filters);
 }
@@ -42,7 +42,7 @@ export async function searchMarketplace(
  */
 function applyClientSideFilters(
   result: SearchResult,
-  filters?: SearchFilters
+  filters?: SearchFilters,
 ): SearchResult {
   if (!filters) return result;
 
@@ -54,13 +54,13 @@ function applyClientSideFilters(
       (store) =>
         store.type?.toLowerCase() === filters.category?.toLowerCase() ||
         store.tags?.some(
-          (tag) => tag.toLowerCase() === filters.category?.toLowerCase()
-        )
+          (tag) => tag.toLowerCase() === filters.category?.toLowerCase(),
+        ),
     );
     products = products.filter(
       (product) =>
         product.category?.name?.toLowerCase() ===
-        filters.category?.toLowerCase()
+        filters.category?.toLowerCase(),
     );
   }
 
@@ -75,7 +75,7 @@ function applyClientSideFilters(
   // Filter by rating
   if (filters.minRating !== undefined) {
     stores = stores.filter(
-      (store) => (store.rating ?? 0) >= filters.minRating!
+      (store) => (store.rating ?? 0) >= filters.minRating!,
     );
   }
 
@@ -89,9 +89,7 @@ function applyClientSideFilters(
         products = [...products].sort((a, b) => b.price - a.price);
         break;
       case "rating":
-        stores = [...stores].sort(
-          (a, b) => (b.rating ?? 0) - (a.rating ?? 0)
-        );
+        stores = [...stores].sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
         break;
       case "relevance":
       default:
@@ -114,7 +112,7 @@ function applyClientSideFilters(
  */
 export async function fetchCategoryDetail(
   categoryId: string,
-  sort: CategorySortOption = "all"
+  sort: CategorySortOption = "all",
 ): Promise<CategoryDetailResponse> {
   const params = new URLSearchParams();
   if (sort && sort !== "all") {
@@ -123,7 +121,7 @@ export async function fetchCategoryDetail(
 
   const suffix = params.toString();
   return request(
-    `marketplace/categories/${categoryId}${suffix ? `?${suffix}` : ""}`
+    `marketplace/categories/${categoryId}${suffix ? `?${suffix}` : ""}`,
   ) as Promise<CategoryDetailResponse>;
 }
 

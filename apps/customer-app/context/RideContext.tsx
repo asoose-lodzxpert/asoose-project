@@ -61,40 +61,78 @@ export function RideProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [fareEstimate, setFareEstimate] = useState<FareEstimate | null>(null);
   const [driverLocation, setDriverLocation] = useState<DriverLocation | null>(
-    null
+    null,
   );
   const [socketConnected, setSocketConnected] = useState(false);
 
   // Booking state
   const [pickupLocation, setPickupLocation] = useState<Location | null>(null);
   const [dropoffLocation, setDropoffLocation] = useState<Location | null>(null);
-  const [selectedVehicleType, setSelectedVehicleType] =
-    useState<VehicleType>("CAR");
+  const [selectedVehicleType, setSelectedVehicleType] = useState<VehicleType>(
+    VehicleType.ECONOMY,
+  );
 
   const socketRef = useRef<Socket | null>(null);
-  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const pollingIntervalRef = useRef<number | null>(null);
 
   // Map backend status to page view
-  const mapStatusToPageView = useCallback((status: RideStatus): RidePageView => {
-    switch (status) {
-      case RideStatus.PENDING:
-        return "PAYMENT";
-      case RideStatus.REQUESTED:
-        return "FINDING_DRIVER";
-      case RideStatus.ACCEPTED:
-        return "DRIVER_ASSIGNED";
-      case RideStatus.ARRIVED:
-        return "DRIVER_ARRIVED";
-      case RideStatus.IN_PROGRESS:
-        return "IN_PROGRESS";
-      case RideStatus.COMPLETED:
-        return "COMPLETED";
-      case RideStatus.CANCELLED:
-        return "IDLE";
-      default:
-        return "IDLE";
+  const mapStatusToPageView = useCallback(
+    (status: RideStatus): RidePageView => {
+      switch (status) {
+        case RideStatus.PENDING:
+          return "PAYMENT";
+        case RideStatus.REQUESTED:
+          return "FINDING_DRIVER";
+        case RideStatus.ACCEPTED:
+          return "DRIVER_ASSIGNED";
+        case RideStatus.ARRIVED:
+          return "DRIVER_ARRIVED";
+        case RideStatus.IN_PROGRESS:
+          return "IN_PROGRESS";
+        case RideStatus.COMPLETED:
+          return "COMPLETED";
+        case RideStatus.CANCELLED:
+          return "IDLE";
+        default:
+          return "IDLE";
+      }
+    },
+    [],
+  );
+
+  // Refresh current ride
+  const refreshCurrentRide = useCallback(async () => {
+    if (!user) return;
+
+    try {
+      const ride = await RideService.getCurrentRide();
+      setCurrentRide(ride);
+
+      if (ride) {
+        setPageView(mapStatusToPageView(ride.status as RideStatus));
+
+        // Fetch driver location if ride is active
+        if (
+          ride.riderId &&
+          (ride.status === RideStatus.ACCEPTED ||
+            ride.status === RideStatus.ARRIVED ||
+            ride.status === RideStatus.IN_PROGRESS)
+        ) {
+          try {
+            const location = await RideService.getDriverLocation(ride.id);
+            setDriverLocation(location);
+          } catch (err) {
+            console.warn("Failed to fetch driver location:", err);
+          }
+        }
+      } else {
+        setPageView("IDLE");
+        setDriverLocation(null);
+      }
+    } catch (err: any) {
+      console.error("Failed to refresh ride:", err);
     }
-  }, []);
+  }, [user, mapStatusToPageView]);
 
   // Initialize WebSocket connection
   const initializeSocket = useCallback(() => {
@@ -207,40 +245,6 @@ export function RideProvider({ children }: { children: ReactNode }) {
     }
   }, [user?.id, initializeSocket]);
 
-  // Refresh current ride
-  const refreshCurrentRide = useCallback(async () => {
-    if (!user) return;
-
-    try {
-      const ride = await RideService.getCurrentRide();
-      setCurrentRide(ride);
-
-      if (ride) {
-        setPageView(mapStatusToPageView(ride.status as RideStatus));
-
-        // Fetch driver location if ride is active
-        if (
-          ride.riderId &&
-          (ride.status === RideStatus.ACCEPTED ||
-            ride.status === RideStatus.ARRIVED ||
-            ride.status === RideStatus.IN_PROGRESS)
-        ) {
-          try {
-            const location = await RideService.getDriverLocation(ride.id);
-            setDriverLocation(location);
-          } catch (err) {
-            console.warn("Failed to fetch driver location:", err);
-          }
-        }
-      } else {
-        setPageView("IDLE");
-        setDriverLocation(null);
-      }
-    } catch (err: any) {
-      console.error("Failed to refresh ride:", err);
-    }
-  }, [user, mapStatusToPageView]);
-
   // Check for active ride on mount
   useEffect(() => {
     refreshCurrentRide();
@@ -284,13 +288,28 @@ export function RideProvider({ children }: { children: ReactNode }) {
     setError(null);
 
     try {
-      const estimate = await RideService.estimateRide({
+      const response = await RideService.estimateRide({
         pickupLat: pickupLocation.latitude,
         pickupLng: pickupLocation.longitude,
         dropoffLat: dropoffLocation.latitude,
         dropoffLng: dropoffLocation.longitude,
-        vehicleType: selectedVehicleType,
       });
+
+      // Map backend response to FareEstimate type
+      const estimate: FareEstimate = {
+        distanceKm: response.distance.meters / 1000,
+        durationMin: response.eta.seconds / 60,
+        fareBreakdown: {
+          baseFare: 0,
+          distanceFare: 0,
+          timeFare: 0,
+          platformFee: 0,
+          driverFee: 0,
+          totalFare: Number(response.price),
+        },
+      };
+
+      console.log("Estimate:", estimate);
 
       setFareEstimate(estimate);
     } catch (err: any) {
@@ -309,6 +328,11 @@ export function RideProvider({ children }: { children: ReactNode }) {
         return null;
       }
 
+      if (!fareEstimate) {
+        setError("Please get fare estimate first");
+        return null;
+      }
+
       setLoading(true);
       setError(null);
 
@@ -317,6 +341,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
           pickupLocation,
           dropoffLocation,
           vehicleType: selectedVehicleType,
+          fare: fareEstimate.fareBreakdown.totalFare,
           notes,
         });
 
@@ -336,7 +361,13 @@ export function RideProvider({ children }: { children: ReactNode }) {
         setLoading(false);
       }
     },
-    [pickupLocation, dropoffLocation, selectedVehicleType, refreshCurrentRide]
+    [
+      pickupLocation,
+      dropoffLocation,
+      selectedVehicleType,
+      fareEstimate,
+      refreshCurrentRide,
+    ],
   );
 
   // Confirm payment
@@ -356,7 +387,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
         setLoading(false);
       }
     },
-    [refreshCurrentRide]
+    [refreshCurrentRide],
   );
 
   // Cancel ride
@@ -380,14 +411,14 @@ export function RideProvider({ children }: { children: ReactNode }) {
         setLoading(false);
       }
     },
-    [currentRide]
+    [currentRide],
   );
 
   // Reset booking state
   const resetBooking = useCallback(() => {
     setPickupLocation(null);
     setDropoffLocation(null);
-    setSelectedVehicleType("CAR");
+    setSelectedVehicleType(VehicleType.ECONOMY);
     setFareEstimate(null);
     setError(null);
   }, []);

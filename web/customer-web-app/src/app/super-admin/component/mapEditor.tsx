@@ -1,16 +1,22 @@
-'use client';
+"use client";
 
-import React, { useState, useEffect } from 'react';
-import { MapContainer, TileLayer, Polygon, Marker, useMapEvents } from 'react-leaflet';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
+import React, { useState, useEffect } from "react";
+import {
+  MapContainer,
+  TileLayer,
+  Polygon,
+  Marker,
+  useMapEvents,
+} from "react-leaflet";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
 
 // Fix for default Leaflet icons in React
 const icon = L.icon({
-  iconUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png',
+  iconUrl: "https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png",
+  shadowUrl: "https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png",
   iconSize: [25, 41],
-  iconAnchor: [12, 41]
+  iconAnchor: [12, 41],
 });
 
 interface Coordinate {
@@ -25,7 +31,13 @@ interface MapEditorProps {
   resetDrawing?: boolean;
 }
 
-function ClickHandler({ isDrawing, onAddPoint }: { isDrawing: boolean, onAddPoint: (e: any) => void }) {
+function ClickHandler({
+  isDrawing,
+  onAddPoint,
+}: {
+  isDrawing: boolean;
+  onAddPoint: (e: any) => void;
+}) {
   useMapEvents({
     click(e) {
       if (isDrawing) onAddPoint(e.latlng);
@@ -34,7 +46,12 @@ function ClickHandler({ isDrawing, onAddPoint }: { isDrawing: boolean, onAddPoin
   return null;
 }
 
-const MapEditor = ({ existingZones, isDrawing, onPolygonChange, resetDrawing }: MapEditorProps) => {
+const MapEditor = ({
+  existingZones,
+  isDrawing,
+  onPolygonChange,
+  resetDrawing,
+}: MapEditorProps) => {
   const [currentPolygon, setCurrentPolygon] = useState<Coordinate[]>([]);
 
   useEffect(() => {
@@ -48,13 +65,18 @@ const MapEditor = ({ existingZones, isDrawing, onPolygonChange, resetDrawing }: 
   };
 
   return (
-    <MapContainer 
+    <MapContainer
       center={[9.0765, 7.3986]} // Default to Abuja (Update if needed)
-      zoom={12} 
-      style={{ height: '100%', width: '100%', borderRadius: '0.75rem', zIndex: 0 }}
+      zoom={12}
+      style={{
+        height: "100%",
+        width: "100%",
+        borderRadius: "0.75rem",
+        zIndex: 0,
+      }}
     >
       <TileLayer
-        attribution='&copy; OpenStreetMap contributors'
+        attribution="&copy; OpenStreetMap contributors"
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
 
@@ -62,17 +84,24 @@ const MapEditor = ({ existingZones, isDrawing, onPolygonChange, resetDrawing }: 
 
       {/* Render Existing Zones */}
       {existingZones.map((zone) => (
-        <Polygon 
-          key={zone.id} 
-          positions={zone.coordinates} 
-          pathOptions={{ color: zone.isActive ? 'green' : 'gray', fillColor: zone.isActive ? 'green' : 'gray', fillOpacity: 0.2 }} 
+        <Polygon
+          key={zone.id}
+          positions={zone.coordinates}
+          pathOptions={{
+            color: zone.isActive ? "green" : "gray",
+            fillColor: zone.isActive ? "green" : "gray",
+            fillOpacity: 0.2,
+          }}
         />
       ))}
 
       {/* Render Current Drawing */}
       {currentPolygon.length > 0 && (
         <>
-          <Polygon positions={currentPolygon} pathOptions={{ color: 'blue', dashArray: '5, 10' }} />
+          <Polygon
+            positions={currentPolygon}
+            pathOptions={{ color: "blue", dashArray: "5, 10" }}
+          />
           {currentPolygon.map((pos, idx) => (
             <Marker key={idx} position={pos} icon={icon} />
           ))}

@@ -5,7 +5,6 @@ import {
   Pressable,
   ScrollView,
   RefreshControl,
-  Alert,
 } from "react-native";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { ThemedView } from "@/components/themed-view";
@@ -15,6 +14,7 @@ import { useThemeColor } from "@/hooks/use-theme-color";
 import { useRouter } from "expo-router";
 import { get, request } from "@/lib/authFetch";
 import { useConfirm } from "@/components/ui/ConfirmDialogProvider";
+import { useToast } from "@/components/ui/ThemedToast";
 
 type SavedCard = {
   id: string;
@@ -32,6 +32,7 @@ type WalletBalance = {
 
 export default function PaymentMethodsScreen() {
   const router = useRouter();
+  const showToast = useToast();
   const primary = useThemeColor({}, "brandPrimary");
   const border = useThemeColor({}, "borderDefault");
   const card = useThemeColor({}, "surfaceCard");
@@ -110,10 +111,10 @@ export default function PaymentMethodsScreen() {
       }
       setCards((prev) => prev.filter((c) => c.id !== cardId));
     } catch (err) {
-      Alert.alert(
-        "Error",
-        err instanceof Error ? err.message : "Failed to remove card"
-      );
+      showToast({
+        message: err instanceof Error ? err.message : "Failed to remove card",
+        variant: "error",
+      });
     }
   };
 
@@ -152,11 +153,21 @@ export default function PaymentMethodsScreen() {
       >
         {loading && !refreshing ? (
           <View style={styles.scrollContent}>
-            <View style={[styles.section, { backgroundColor: card, borderColor: border }]}>
+            <View
+              style={[
+                styles.section,
+                { backgroundColor: card, borderColor: border },
+              ]}
+            >
               <Skeleton width="40%" height={18} style={{ marginBottom: 16 }} />
               <Skeleton width="100%" height={80} borderRadius={12} />
             </View>
-            <View style={[styles.section, { backgroundColor: card, borderColor: border }]}>
+            <View
+              style={[
+                styles.section,
+                { backgroundColor: card, borderColor: border },
+              ]}
+            >
               <Skeleton width="40%" height={18} style={{ marginBottom: 16 }} />
               {Array.from({ length: 3 }).map((_, i) => (
                 <View key={i} style={{ marginBottom: 12 }}>
@@ -199,7 +210,10 @@ export default function PaymentMethodsScreen() {
                   <View style={styles.walletInfo}>
                     <IconSymbol name="wallet" size={24} color={accentGreen} />
                     <View style={styles.walletDetails}>
-                      <ThemedText type="caption" style={{ color: textSecondary }}>
+                      <ThemedText
+                        type="caption"
+                        style={{ color: textSecondary }}
+                      >
                         Available Balance
                       </ThemedText>
                       <ThemedText type="subtitle" style={styles.walletAmount}>
@@ -210,8 +224,10 @@ export default function PaymentMethodsScreen() {
                   <Pressable
                     style={[styles.topUpBtn, { backgroundColor: primary }]}
                     onPress={() => {
-                      // Navigate to top-up screen (to be implemented)
-                      Alert.alert("Top Up", "Top up feature coming soon!");
+                      showToast({
+                        message: "Top up feature coming soon!",
+                        variant: "info",
+                      });
                     }}
                   >
                     <ThemedText style={styles.topUpText}>Top Up</ThemedText>
@@ -258,14 +274,11 @@ export default function PaymentMethodsScreen() {
                     ]}
                   >
                     <View style={styles.cardInfo}>
-                      <IconSymbol
-                        name="creditcard"
-                        size={24}
-                        color={primary}
-                      />
+                      <IconSymbol name="creditcard" size={24} color={primary} />
                       <View style={styles.cardDetails}>
                         <ThemedText style={styles.cardBrand}>
-                          {formatCardBrand(cardItem.brand)} •••• {cardItem.last4}
+                          {formatCardBrand(cardItem.brand)} ••••{" "}
+                          {cardItem.last4}
                         </ThemedText>
                         <ThemedText
                           type="caption"
@@ -305,8 +318,10 @@ export default function PaymentMethodsScreen() {
               <Pressable
                 style={[styles.addCardBtn, { borderColor: border }]}
                 onPress={() => {
-                  // Navigate to add card screen (to be implemented)
-                  Alert.alert("Add Card", "Add card feature coming soon!");
+                  showToast({
+                    message: "Add card feature coming soon!",
+                    variant: "info",
+                  });
                 }}
               >
                 <IconSymbol name="plus" size={18} color={primary} />

@@ -60,7 +60,13 @@ export default function DiscoverScreen() {
   }, [refreshStores]);
 
   const categories = React.useMemo(() => {
-    const base = [{ key: "all" as StoreFilterSlug, label: "All", icon: "storefront" as IconSymbolName }];
+    const base = [
+      {
+        key: "all" as StoreFilterSlug,
+        label: "All",
+        icon: "storefront" as IconSymbolName,
+      },
+    ];
     const dynamic = verticals.map((section) => ({
       key: section.id as StoreFilterSlug,
       label: section.title,

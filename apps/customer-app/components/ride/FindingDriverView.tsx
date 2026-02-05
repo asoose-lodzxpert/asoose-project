@@ -15,19 +15,26 @@ export function FindingDriverView({ message }: Props) {
     <View style={[styles.container, { backgroundColor: card }]}>
       <View style={styles.content}>
         <ActivityIndicator size="large" color={primary} />
-        
+
         <ThemedText type="subtitle" style={styles.title}>
           {message || "Finding a driver..."}
         </ThemedText>
-        
-        <ThemedText type="caption" style={[styles.subtitle, { color: textSecondary }]}>
+
+        <ThemedText
+          type="caption"
+          style={[styles.subtitle, { color: textSecondary }]}
+        >
           We're matching you with the nearest available driver
         </ThemedText>
 
         <View style={styles.dotsContainer}>
           <View style={[styles.dot, { backgroundColor: primary }]} />
-          <View style={[styles.dot, { backgroundColor: primary, opacity: 0.6 }]} />
-          <View style={[styles.dot, { backgroundColor: primary, opacity: 0.3 }]} />
+          <View
+            style={[styles.dot, { backgroundColor: primary, opacity: 0.6 }]}
+          />
+          <View
+            style={[styles.dot, { backgroundColor: primary, opacity: 0.3 }]}
+          />
         </View>
       </View>
     </View>

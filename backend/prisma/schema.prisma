@@ -749,6 +749,7 @@ model Payment {
   id            String        @id @default(uuid())
   orderId       String?       @unique
   rideId        String?       @unique
+  deliveryId    String?       @unique
   userId        String
   amount        Float
   method        PaymentMethod
@@ -777,6 +778,7 @@ model Payment {
   disputes      Dispute[]
   order         Order?        @relation("OrderPayment", fields: [orderId], references: [id], onDelete: Cascade)
   ride          Ride?         @relation("RidePayment", fields: [rideId], references: [id], onDelete: Cascade)
+  delivery      Delivery?     @relation("DeliveryPayment", fields: [deliveryId], references: [id], onDelete: Cascade)
   user          User          @relation(fields: [userId], references: [id], onDelete: Restrict)
   transactions  Transaction[] // Link to transaction ledger
 
@@ -785,6 +787,7 @@ model Payment {
   @@index([transactionId])
   @@index([orderId])
   @@index([rideId])
+  @@index([deliveryId])
   @@index([reference])
   @@index([gateway, status])
   @@index([status, createdAt(sort: Desc), amount])
@@ -879,6 +882,7 @@ model Delivery {
   rider          Rider?   @relation("DeliveryRider", fields: [riderId], references: [id], onDelete: SetNull)
   pickupAddress  Address  @relation("DeliveryPickup", fields: [pickupAddressId], references: [id], onDelete: Restrict)
   dropoffAddress Address  @relation("DeliveryDropoff", fields: [dropoffAddressId], references: [id], onDelete: Restrict)
+  payment        Payment? @relation("DeliveryPayment")
 
   @@index([orderId])
   @@index([customerId, status])

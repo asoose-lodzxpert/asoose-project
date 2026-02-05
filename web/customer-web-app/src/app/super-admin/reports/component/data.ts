@@ -1,10 +1,10 @@
-import { DollarSign, ShoppingBag, Users, UserPlus } from 'lucide-react';
+import { DollarSign, ShoppingBag, Users, UserPlus } from "lucide-react";
 
 export interface OverviewMetric {
   label: string;
   value: string;
   change: string;
-  iconName: 'DollarSign' | 'ShoppingBag' | 'Users' | 'UserPlus';
+  iconName: "DollarSign" | "ShoppingBag" | "Users" | "UserPlus";
   color: string;
   bg: string;
 }
@@ -29,4 +29,3 @@ export interface ReportData {
   avgRating: number;
   topVendors: VendorMetric[];
 }
-

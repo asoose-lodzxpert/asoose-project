@@ -61,45 +61,75 @@ export class PaymentService {
       );
     }
 
-    // 1. Validate Delivery Specifics
-    // Check if type is DELIVERY (using 'as any' to avoid TS error if Enum isn't updated yet)
+    const reference = this.generateReference();
+    const customerName = dto.customerName ?? undefined;
+
+    // Extract rideId and deliveryId from dto or metadata
+    const rideId = dto.rideId || dto.metadata?.rideId;
+    const deliveryId = dto.metadata?.deliveryId;
+
+    // Validate based on payment type
     if ((dto.type as any) === 'DELIVERY' || dto.type === PaymentType.DELIVERY) {
-      if (!dto.metadata?.deliveryId) {
+      if (!deliveryId) {
         throw new BadRequestException(
           'Delivery ID is required in metadata for delivery payments',
         );
       }
     }
 
-    const reference = this.generateReference();
-    const customerName = dto.customerName ?? undefined;
-
-    // 2. Prepare Metadata
-    // Crucial: Persist 'type' and 'deliveryId' so we know what this payment is for later
     const metadata = {
       ...(dto.metadata || {}),
       ...(dto.callbackUrl ? { callbackUrl: dto.callbackUrl } : {}),
-      type: dto.type, // Save the payment type (RIDE/DELIVERY/ORDER)
-      deliveryId: dto.metadata?.deliveryId, // Ensure deliveryId is saved
+      type: dto.type,
     };
 
-    // 3. Create Payment Record
-    // Note: We store delivery info in metadata because Payment schema lacks deliveryId field
-    await this.prisma.payment.create({
-      data: {
-        reference,
-        amount: dto.amount,
-        gateway: dto.gateway,
-        method: dto.method as any,
-        status: 'PENDING',
-        userId,
-        orderId: dto.orderId,
-        rideId: dto.rideId,
-        customerEmail: dto.email,
-        customerName: customerName,
-        metadata: metadata as Prisma.InputJsonValue,
-      },
-    });
+    // Check if payment already exists (for rides or deliveries)
+    let existingPayment: any = null;
+    if (rideId) {
+      existingPayment = await this.prisma.payment.findFirst({
+        where: { rideId: rideId },
+      });
+    } else if (deliveryId) {
+      // Check by deliveryId field directly
+      existingPayment = await this.prisma.payment.findFirst({
+        where: { deliveryId: deliveryId } as any,
+      });
+    }
+
+    if (existingPayment) {
+      // Update existing payment
+      await this.prisma.payment.update({
+        where: { id: existingPayment.id },
+        data: {
+          reference,
+          amount: dto.amount,
+          gateway: dto.gateway,
+          method: dto.method as any,
+          status: 'PENDING',
+          customerEmail: dto.email,
+          customerName: customerName,
+          metadata: metadata as Prisma.InputJsonValue,
+        },
+      });
+    } else {
+      // Create new payment
+      await this.prisma.payment.create({
+        data: {
+          reference,
+          amount: dto.amount,
+          gateway: dto.gateway,
+          method: dto.method as any,
+          status: 'PENDING',
+          userId,
+          orderId: dto.orderId,
+          rideId: rideId,
+          deliveryId: deliveryId,
+          customerEmail: dto.email,
+          customerName: customerName,
+          metadata: metadata as Prisma.InputJsonValue,
+        } as any,
+      });
+    }
 
     let response: PaymentInitResponse;
 
@@ -170,30 +200,57 @@ export class PaymentService {
 
   async verifyPayment(
     reference: string,
-    gateway: PaymentGateway,
+    gateway?: PaymentGateway,
   ): Promise<VerifyPaymentResponse & { meta?: { callbackUrl?: string } }> {
-    let verification: VerifyPaymentResponse;
+    let verification: VerifyPaymentResponse | undefined;
 
-    try {
-      switch (gateway) {
-        case PaymentGateway.PAYSTACK:
-          verification = await this.paystackService.verifyPayment(reference);
-          break;
-        case PaymentGateway.FLUTTERWAVE:
-          verification = await this.flutterwaveService.verifyPayment(reference);
-          break;
-        case PaymentGateway.MONNIFY:
-          verification = await this.monnifyService.verifyPayment(reference);
-          break;
-        default:
-          throw new BadRequestException('Invalid payment gateway');
+    // If gateway not specified, try to find payment in database first
+    if (!gateway) {
+      const payment = await this.prisma.payment.findUnique({
+        where: { reference },
+        select: { gateway: true },
+      });
+
+      if (payment?.gateway) {
+        gateway = payment.gateway as PaymentGateway;
+      } else {
+        // Try all gateways if payment not found in DB
+        const gateways = [
+          PaymentGateway.PAYSTACK,
+          PaymentGateway.FLUTTERWAVE,
+          PaymentGateway.MONNIFY,
+        ];
+
+        for (const gw of gateways) {
+          try {
+            verification = await this.verifyWithGateway(reference, gw);
+            if (verification.success) {
+              gateway = gw;
+              break;
+            }
+          } catch (error) {
+            // Try next gateway
+            continue;
+          }
+        }
+
+        if (!gateway) {
+          throw new BadRequestException('Payment not found in any gateway');
+        }
       }
-    } catch (err) {
-      this.logger.error(
-        `Verification failed at gateway level for ${reference}`,
-        err,
-      );
-      throw err;
+    }
+
+    // Verify with the determined gateway
+    if (!verification) {
+      try {
+        verification = await this.verifyWithGateway(reference, gateway);
+      } catch (err) {
+        this.logger.error(
+          `Verification failed at gateway level for ${reference}`,
+          err,
+        );
+        throw err;
+      }
     }
 
     await this.updatePaymentStatus(verification);
@@ -214,6 +271,22 @@ export class PaymentService {
     }
 
     return { ...verification, meta: { callbackUrl } };
+  }
+
+  private async verifyWithGateway(
+    reference: string,
+    gateway: PaymentGateway,
+  ): Promise<VerifyPaymentResponse> {
+    switch (gateway) {
+      case PaymentGateway.PAYSTACK:
+        return await this.paystackService.verifyPayment(reference);
+      case PaymentGateway.FLUTTERWAVE:
+        return await this.flutterwaveService.verifyPayment(reference);
+      case PaymentGateway.MONNIFY:
+        return await this.monnifyService.verifyPayment(reference);
+      default:
+        throw new BadRequestException('Invalid payment gateway');
+    }
   }
 
   async handleWebhook(
@@ -460,6 +533,8 @@ export class PaymentService {
         });
       }
 
+      this.logger.log('Payment processed successfully:', result);
+
       // =========================================================
       // 👇 MATCHING LOGIC FIXED HERE
       // =========================================================
@@ -469,9 +544,9 @@ export class PaymentService {
       } else if (payment.metadata && (payment.metadata as any).deliveryId) {
         // Case B: Direct Delivery Request (This fixes the stuck "Finding Courier" screen)
         await this.startDeliveryMatching((payment.metadata as any).deliveryId);
-      } else if (result.rideId) {
+      } else if (payment.metadata && (payment.metadata as any).rideId) {
         // Case C: Ride Request
-        await this.startRideMatching(result.rideId);
+        await this.startRideMatching((payment.metadata as any).rideId);
       }
 
       await this.sendPaymentNotifications(result);

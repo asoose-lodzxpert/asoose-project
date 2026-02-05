@@ -45,7 +45,7 @@ export default function DeleteAccountScreen() {
 
   const toggleReason = (id: string) => {
     setSelectedReasons((prev) =>
-      prev.includes(id) ? prev.filter((r) => r !== id) : [...prev, id]
+      prev.includes(id) ? prev.filter((r) => r !== id) : [...prev, id],
     );
   };
 
@@ -78,7 +78,7 @@ export default function DeleteAccountScreen() {
 
     try {
       const reasonLabels = DELETION_REASONS.filter((r) =>
-        selectedReasons.includes(r.id)
+        selectedReasons.includes(r.id),
       ).map((r) => r.label);
 
       await requestAccountDeletion({
@@ -294,7 +294,7 @@ export default function DeleteAccountScreen() {
               />
               <ThemedText>{reason.label}</ThemedText>
             </View>
-          )
+          ),
         )}
 
         {additionalInfo.trim() && (

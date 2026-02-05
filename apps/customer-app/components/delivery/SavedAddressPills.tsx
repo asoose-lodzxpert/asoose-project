@@ -1,6 +1,8 @@
-import { View, Pressable, StyleSheet } from "react-native";
+import { ScrollView, Pressable, StyleSheet } from "react-native";
 import { ThemedText } from "@/components/themed-text";
 import { useSendPackage } from "@/context/SendPackageContext";
+import { IconSymbol } from "@/components/ui/icon-symbol";
+import { useThemeColor } from "@/hooks/use-theme-color";
 
 type Props = {
   type: "pickup" | "delivery";
@@ -8,6 +10,8 @@ type Props = {
 
 export function SavedAddressPills({ type }: Props) {
   const { savedAddresses, setPickup, setDropoff } = useSendPackage();
+  const backgroundColor = useThemeColor({}, "surfaceCard");
+  const textMuted = useThemeColor({}, "textMuted");
 
   if (!savedAddresses.length) return null;
 
@@ -22,38 +26,66 @@ export function SavedAddressPills({ type }: Props) {
   }
 
   return (
-    <View style={styles.container}>
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.container}
+      style={styles.scrollView}
+    >
       {savedAddresses.map((addr) => (
         <Pressable
           key={addr.id}
-          style={styles.pill}
+          style={({ pressed }) => [
+            styles.pill,
+            {
+              borderColor: textMuted,
+              backgroundColor: backgroundColor,
+              shadowColor: textMuted,
+            },
+            pressed && styles.pillPressed,
+          ]}
           onPress={() => selectAddress(addr)}
         >
-          <ThemedText type="caption" style={styles.label}>
+          <IconSymbol name="location.fill" size={16} color={textMuted} />
+          <ThemedText
+            type="caption"
+            style={[styles.label, { color: textMuted }]}
+          >
             {addr.label}
           </ThemedText>
         </Pressable>
       ))}
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
+  scrollView: {
+    marginVertical: 12,
+  },
   container: {
-    flexDirection: "row",
-    gap: 8,
-    marginVertical: 8,
-    flexWrap: "wrap",
+    gap: 10,
+    paddingHorizontal: 16,
   },
   pill: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 999,
-    backgroundColor: "#FEF3C7",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  pillPressed: {
+    opacity: 0.7,
+    transform: [{ scale: 0.98 }],
   },
   label: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: "600",
-    color: "#000",
   },
 });

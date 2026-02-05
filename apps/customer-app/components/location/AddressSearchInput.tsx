@@ -23,9 +23,12 @@ export function AddressSearchInput({
       onChangeText={onChange}
       placeholder="Search address"
       style={{ flex: 1, paddingVertical: 12 }}
+      containerStyle={{
+        marginTop: 8,
+      }}
       iconRight={
         loading ? (
-          <ActivityIndicator size="small" />
+          <ActivityIndicator size="small" color={primary} />
         ) : (
           <Pressable onPress={onMapPress}>
             <IconSymbol name="map" size={20} color={primary} />

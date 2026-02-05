@@ -17,11 +17,17 @@ export function OTPDisplay({ otp }: Props) {
 
   return (
     <View style={[styles.card, { backgroundColor: card, borderColor: border }]}>
-      <ThemedText type="caption" style={[styles.label, { color: textSecondary }]}>
+      <ThemedText
+        type="caption"
+        style={[styles.label, { color: textSecondary }]}
+      >
         Start OTP
       </ThemedText>
-      
-      <ThemedText type="subtitle" style={[styles.instructions, { color: textSecondary }]}>
+
+      <ThemedText
+        type="subtitle"
+        style={[styles.instructions, { color: textSecondary }]}
+      >
         Share this code with your driver to start the trip
       </ThemedText>
 
@@ -41,7 +47,10 @@ export function OTPDisplay({ otp }: Props) {
         ))}
       </View>
 
-      <ThemedText type="caption" style={[styles.note, { color: textSecondary }]}>
+      <ThemedText
+        type="caption"
+        style={[styles.note, { color: textSecondary }]}
+      >
         The driver will enter this code to begin your trip
       </ThemedText>
     </View>

@@ -108,6 +108,8 @@ export class DeliveriesService {
   }
 
   async requestDelivery(userId: string, dto: RequestDeliveryDto) {
+    this.logger.debug(`Request delivery DTO: ${JSON.stringify(dto, null, 2)}`);
+
     if (
       dto.weightKg &&
       (dto.weightKg < TRIPS_CONFIG.MIN_DELIVERY_WEIGHT_KG ||
@@ -142,6 +144,7 @@ export class DeliveriesService {
           throw new BadRequestException('Invalid dropoff address');
         }
       }
+
       // Otherwise, create new addresses from location data
       else if (dto.pickupLocation && dto.dropoffLocation) {
         if (

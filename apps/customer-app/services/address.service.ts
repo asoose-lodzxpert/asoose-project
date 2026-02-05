@@ -2,7 +2,7 @@ import { request } from "@/lib/authFetch";
 import { Address } from "@/types/address";
 
 export const fetchAddresses = async (): Promise<Address[]> => {
-  const { parsed } = await request("users/addresses", { method: "GET" });
+  const parsed = await request("users/addresses", { method: "GET" });
   if (!Array.isArray(parsed)) return [];
 
   return parsed.map((a: any) => ({

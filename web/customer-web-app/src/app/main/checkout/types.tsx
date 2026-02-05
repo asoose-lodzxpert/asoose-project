@@ -1,4 +1,3 @@
-
 export interface Address {
   id: string;
   label?: string;
@@ -15,7 +14,7 @@ export interface CartItem {
   name: string;
   price: number;
   quantity: number;
-  image?: string | null; 
+  image?: string | null;
   restaurantId: string;
 }
 

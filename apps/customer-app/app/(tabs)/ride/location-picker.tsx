@@ -41,7 +41,7 @@ export default function LocationPickerScreen() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searching, setSearching] = useState(false);
   const [autocompleteResults, setAutocompleteResults] = useState<
-    Array<{ id: string; title: string; subtitle: string }>
+    { id: string; title: string; subtitle: string }[]
   >([]);
   const [selectedMarker, setSelectedMarker] = useState<{
     latitude: number;
@@ -59,32 +59,38 @@ export default function LocationPickerScreen() {
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Debounced autocomplete search
-  const searchPlaces = useCallback(async (query: string) => {
-    if (!query || query.length < 3) {
-      setAutocompleteResults([]);
-      return;
-    }
+  const searchPlaces = useCallback(
+    async (query: string) => {
+      if (!query || query.length < 3) {
+        setAutocompleteResults([]);
+        return;
+      }
 
-    setSearching(true);
-    try {
-      const location = currentLocation?.coords
-        ? `${currentLocation.coords.latitude},${currentLocation.coords.longitude}`
-        : undefined;
-      
-      const params: any = { query };
-      if (location) params.location = location;
-      
-      const response = await axios.get(`${API_URL}/maps/places-autocomplete`, {
-        params,
-      });
-      setAutocompleteResults(response.data || []);
-    } catch (error) {
-      console.error("Autocomplete error:", error);
-      setAutocompleteResults([]);
-    } finally {
-      setSearching(false);
-    }
-  }, [currentLocation]);
+      setSearching(true);
+      try {
+        const location = currentLocation?.coords
+          ? `${currentLocation.coords.latitude},${currentLocation.coords.longitude}`
+          : undefined;
+
+        const params: any = { query };
+        if (location) params.location = location;
+
+        const response = await axios.get(
+          `${API_URL}/maps/places-autocomplete`,
+          {
+            params,
+          },
+        );
+        setAutocompleteResults(response.data || []);
+      } catch (error) {
+        console.error("Autocomplete error:", error);
+        setAutocompleteResults([]);
+      } finally {
+        setSearching(false);
+      }
+    },
+    [currentLocation],
+  );
 
   // Debounce search input
   useEffect(() => {
@@ -106,15 +112,13 @@ export default function LocationPickerScreen() {
   // Reverse geocode when marker is moved
   const reverseGeocode = useCallback(async (lat: number, lng: number) => {
     try {
-      const results = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lng });
+      const results = await Location.reverseGeocodeAsync({
+        latitude: lat,
+        longitude: lng,
+      });
       if (results && results.length > 0) {
         const result = results[0];
-        const address = [
-          result.name,
-          result.street,
-          result.city,
-          result.region,
-        ]
+        const address = [result.name, result.street, result.city, result.region]
           .filter(Boolean)
           .join(", ");
         setReverseGeocodedAddress(address || "Selected Location");
@@ -132,22 +136,40 @@ export default function LocationPickerScreen() {
       setSelectedMarker({ latitude, longitude });
       reverseGeocode(latitude, longitude);
     },
-    [reverseGeocode]
+    [reverseGeocode],
   );
 
   // Get place details from place_id
-  const getPlaceDetails = useCallback(async (placeId: string, title: string, subtitle: string) => {
-    setGettingPlaceDetails(true);
-    try {
-      // Use geocoding to get coordinates from place ID
-      const response = await axios.get(`${API_URL}/maps/geocode`, {
-        params: { placeId },
-      });
-      
-      if (response.data && response.data.lat && response.data.lng) {
+  const getPlaceDetails = useCallback(
+    async (placeId: string, title: string, subtitle: string) => {
+      setGettingPlaceDetails(true);
+      try {
+        // Use geocoding to get coordinates from place ID
+        const response = await axios.get(`${API_URL}/maps/geocode`, {
+          params: { placeId },
+        });
+
+        if (response.data && response.data.lat && response.data.lng) {
+          const location = {
+            latitude: response.data.lat,
+            longitude: response.data.lng,
+            address: subtitle ? `${title}, ${subtitle}` : title,
+          };
+
+          if (type === "pickup") {
+            setPickupLocation(location);
+          } else {
+            setDropoffLocation(location);
+          }
+
+          router.back();
+        }
+      } catch (error) {
+        console.error("Place details error:", error);
+        // Fallback: just use the address without coordinates
         const location = {
-          latitude: response.data.lat,
-          longitude: response.data.lng,
+          latitude: 0,
+          longitude: 0,
           address: subtitle ? `${title}, ${subtitle}` : title,
         };
 
@@ -158,27 +180,12 @@ export default function LocationPickerScreen() {
         }
 
         router.back();
+      } finally {
+        setGettingPlaceDetails(false);
       }
-    } catch (error) {
-      console.error("Place details error:", error);
-      // Fallback: just use the address without coordinates
-      const location = {
-        latitude: 0,
-        longitude: 0,
-        address: subtitle ? `${title}, ${subtitle}` : title,
-      };
-
-      if (type === "pickup") {
-        setPickupLocation(location);
-      } else {
-        setDropoffLocation(location);
-      }
-
-      router.back();
-    } finally {
-      setGettingPlaceDetails(false);
-    }
-  }, [type, setPickupLocation, setDropoffLocation, router]);
+    },
+    [type, setPickupLocation, setDropoffLocation, router],
+  );
 
   const handleUseCurrentLocation = () => {
     if (currentLocation?.coords) {
@@ -287,12 +294,15 @@ export default function LocationPickerScreen() {
             />
           )}
         </MapView>
-        
+
         {selectedMarker && (
           <View style={[styles.mapOverlay, { backgroundColor: card }]}>
             <View style={styles.mapOverlayContent}>
               <IconSymbol name="mappin" size={20} color={primary} />
-              <ThemedText type="caption" style={{ flex: 1, color: textSecondary }}>
+              <ThemedText
+                type="caption"
+                style={{ flex: 1, color: textSecondary }}
+              >
                 {reverseGeocodedAddress || "Getting address..."}
               </ThemedText>
             </View>
@@ -307,7 +317,10 @@ export default function LocationPickerScreen() {
           </View>
         )}
 
-        <ThemedText type="caption" style={[styles.mapHint, { color: textSecondary }]}>
+        <ThemedText
+          type="caption"
+          style={[styles.mapHint, { color: textSecondary }]}
+        >
           Tap on map to select location
         </ThemedText>
       </View>
@@ -317,9 +330,17 @@ export default function LocationPickerScreen() {
         {currentLocation && !searchQuery && (
           <Pressable
             onPress={handleUseCurrentLocation}
-            style={[styles.locationItem, { backgroundColor: card, borderColor: border }]}
+            style={[
+              styles.locationItem,
+              { backgroundColor: card, borderColor: border },
+            ]}
           >
-            <View style={[styles.iconContainer, { backgroundColor: `${success}20` }]}>
+            <View
+              style={[
+                styles.iconContainer,
+                { backgroundColor: `${success}20` },
+              ]}
+            >
               <IconSymbol name="location.fill" size={20} color={success} />
             </View>
             <View style={styles.locationInfo}>
@@ -336,7 +357,10 @@ export default function LocationPickerScreen() {
         {searching && (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="small" color={primary} />
-            <ThemedText type="caption" style={{ color: textSecondary, marginLeft: 8 }}>
+            <ThemedText
+              type="caption"
+              style={{ color: textSecondary, marginLeft: 8 }}
+            >
               Searching...
             </ThemedText>
           </View>
@@ -346,7 +370,10 @@ export default function LocationPickerScreen() {
         {gettingPlaceDetails && (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="small" color={primary} />
-            <ThemedText type="caption" style={{ color: textSecondary, marginLeft: 8 }}>
+            <ThemedText
+              type="caption"
+              style={{ color: textSecondary, marginLeft: 8 }}
+            >
               Getting location details...
             </ThemedText>
           </View>
@@ -355,16 +382,29 @@ export default function LocationPickerScreen() {
         {/* Autocomplete Results */}
         {!searching && autocompleteResults.length > 0 && (
           <>
-            <ThemedText type="caption" style={[styles.sectionTitle, { color: textSecondary }]}>
+            <ThemedText
+              type="caption"
+              style={[styles.sectionTitle, { color: textSecondary }]}
+            >
               Search Results
             </ThemedText>
             {autocompleteResults.map((place) => (
               <Pressable
                 key={place.id}
-                onPress={() => getPlaceDetails(place.id, place.title, place.subtitle)}
-                style={[styles.locationItem, { backgroundColor: card, borderColor: border }]}
+                onPress={() =>
+                  getPlaceDetails(place.id, place.title, place.subtitle)
+                }
+                style={[
+                  styles.locationItem,
+                  { backgroundColor: card, borderColor: border },
+                ]}
               >
-                <View style={[styles.iconContainer, { backgroundColor: `${primary}15` }]}>
+                <View
+                  style={[
+                    styles.iconContainer,
+                    { backgroundColor: `${primary}15` },
+                  ]}
+                >
                   <IconSymbol name="mappin" size={20} color={primary} />
                 </View>
                 <View style={styles.locationInfo}>
@@ -373,26 +413,42 @@ export default function LocationPickerScreen() {
                     {place.subtitle}
                   </ThemedText>
                 </View>
-                <IconSymbol name="chevron.right" size={20} color={textSecondary} />
+                <IconSymbol
+                  name="chevron.right"
+                  size={20}
+                  color={textSecondary}
+                />
               </Pressable>
             ))}
           </>
         )}
 
         {/* No Results */}
-        {!searching && searchQuery.length >= 3 && autocompleteResults.length === 0 && (
-          <View style={styles.emptyState}>
-            <IconSymbol name="magnifyingglass" size={48} color={textSecondary} />
-            <ThemedText type="caption" style={{ color: textSecondary, marginTop: 8 }}>
-              No locations found
-            </ThemedText>
-          </View>
-        )}
+        {!searching &&
+          searchQuery.length >= 3 &&
+          autocompleteResults.length === 0 && (
+            <View style={styles.emptyState}>
+              <IconSymbol
+                name="magnifyingglass"
+                size={48}
+                color={textSecondary}
+              />
+              <ThemedText
+                type="caption"
+                style={{ color: textSecondary, marginTop: 8 }}
+              >
+                No locations found
+              </ThemedText>
+            </View>
+          )}
 
         {/* Sample Locations - shown when no search */}
         {!searchQuery && !searching && autocompleteResults.length === 0 && (
           <>
-            <ThemedText type="caption" style={[styles.sectionTitle, { color: textSecondary }]}>
+            <ThemedText
+              type="caption"
+              style={[styles.sectionTitle, { color: textSecondary }]}
+            >
               Popular Locations
             </ThemedText>
 
@@ -400,9 +456,17 @@ export default function LocationPickerScreen() {
               <Pressable
                 key={index}
                 onPress={() => handleSelectLocation(loc.name, loc.lat, loc.lng)}
-                style={[styles.locationItem, { backgroundColor: card, borderColor: border }]}
+                style={[
+                  styles.locationItem,
+                  { backgroundColor: card, borderColor: border },
+                ]}
               >
-                <View style={[styles.iconContainer, { backgroundColor: `${primary}15` }]}>
+                <View
+                  style={[
+                    styles.iconContainer,
+                    { backgroundColor: `${primary}15` },
+                  ]}
+                >
                   <IconSymbol name="mappin" size={20} color={primary} />
                 </View>
                 <View style={styles.locationInfo}>
@@ -411,7 +475,11 @@ export default function LocationPickerScreen() {
                     Lagos, Nigeria
                   </ThemedText>
                 </View>
-                <IconSymbol name="chevron.right" size={20} color={textSecondary} />
+                <IconSymbol
+                  name="chevron.right"
+                  size={20}
+                  color={textSecondary}
+                />
               </Pressable>
             ))}
           </>

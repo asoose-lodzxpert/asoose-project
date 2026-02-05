@@ -24,6 +24,7 @@ import { useHomeContext } from "@/context/HomeContext";
 import type { StoreFilterSlug, Banner } from "@/types/home";
 import type { IconSymbolName } from "@/components/ui/icon-symbol";
 import { SkeletonStoreCard } from "@/components/ui/Skeleton";
+import { useThemeColor } from "@/hooks/use-theme-color";
 
 export type CategoryOption = {
   key: StoreFilterSlug | string;
@@ -98,6 +99,8 @@ export default function HomeScreen() {
       setRefreshing(false);
     }
   }, [refreshBanners, refreshVerticals, refreshStores]);
+
+  const primary = useThemeColor({}, "brandPrimary");
 
   const promotions = useMemo<Promotion[]>(
     () => (banners?.length ? banners.map(transformBannerToPromotion) : []),
@@ -209,7 +212,7 @@ export default function HomeScreen() {
           <View style={{ paddingVertical: 24, alignItems: "center" }}>
             {storeLoading && stores.length > 0 ? (
               <View style={{ paddingHorizontal: 16, paddingBottom: 16 }}>
-                <SkeletonStoreCard />
+                <ActivityIndicator size="small" color={primary} />
               </View>
             ) : null}
             {!hasMore && stores.length > 0 ? (

@@ -5,7 +5,7 @@ import { useRouter } from "expo-router";
 import { ThemedText } from "@/components/themed-text";
 import { useSendPackage } from "@/context/SendPackageContext";
 import { useThemeColor } from "@/hooks/use-theme-color";
-import { calculatePrice, formatCurrency } from "@/services/sendPackage.api";
+import { formatCurrency } from "@/services/sendPackage.api";
 
 export function QuoteBottomSheet() {
   const router = useRouter();
@@ -18,7 +18,7 @@ export function QuoteBottomSheet() {
 
   const pricing = useMemo(() => {
     if (!quote) return null;
-    return quote.price;
+    return typeof quote.price === "number" ? quote.price : null;
   }, [quote]);
 
   return (

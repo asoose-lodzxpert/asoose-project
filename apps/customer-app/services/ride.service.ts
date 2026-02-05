@@ -14,10 +14,19 @@ export class RideService {
    * Get fare estimate for a ride
    * Uses /fare/ride endpoint as specified
    */
-  static async estimateRide(
-    payload: RideEstimatePayload
-  ): Promise<FareEstimate> {
-    return post("fare/ride", payload);
+  static async estimateRide(payload: RideEstimatePayload): Promise<{
+    price: any;
+    distance: { meters: number; text: string };
+    eta: { seconds: number; text: string };
+  }> {
+    // Transform to backend DTO format
+    const dto = {
+      pickuplat: String(payload.pickupLat),
+      pickuplong: String(payload.pickupLng),
+      dropofflat: String(payload.dropoffLat),
+      dropofflong: String(payload.dropoffLng),
+    };
+    return post("fare/ride", dto);
   }
 
   /**
@@ -25,11 +34,27 @@ export class RideService {
    */
   static async requestRide(payload: CreateRidePayload): Promise<{
     ride: Ride;
-    fareBreakdown: any;
+    fare: number;
     payment: any;
     message: string;
   }> {
-    return post("trips/rides/request", payload);
+    const dto = {
+      pickupLocation: {
+        latitude: Number(payload.pickupLocation.latitude),
+        longitude: Number(payload.pickupLocation.longitude),
+        address: payload.pickupLocation.address,
+      },
+      dropoffLocation: {
+        latitude: Number(payload.dropoffLocation.latitude),
+        longitude: Number(payload.dropoffLocation.longitude),
+        address: payload.dropoffLocation.address,
+      },
+      vehicleType: payload.vehicleType as string,
+      fare: payload.fare,
+      notes: payload.notes,
+    };
+
+    return post("trips/rides/request", dto);
   }
 
   /**
@@ -37,7 +62,7 @@ export class RideService {
    */
   static async confirmRide(
     rideId: string,
-    paymentMethod: "CASH" | "CARD"
+    paymentMethod: "CASH" | "CARD",
   ): Promise<{ status: string; rideId: string }> {
     return post(`trips/rides/${rideId}/confirm`, { paymentMethod });
   }
@@ -50,7 +75,10 @@ export class RideService {
       const ride = await get("trips/rides/current");
       return ride || null;
     } catch (error: any) {
-      if (error?.message?.includes("not found") || error?.message?.includes("404")) {
+      if (
+        error?.message?.includes("not found") ||
+        error?.message?.includes("404")
+      ) {
         return null;
       }
       throw error;
@@ -69,7 +97,7 @@ export class RideService {
    */
   static async cancelRide(
     rideId: string,
-    payload: CancelRidePayload
+    payload: CancelRidePayload,
   ): Promise<{ message: string }> {
     return patch(`trips/rides/${rideId}/cancel`, payload);
   }
@@ -140,9 +168,8 @@ export class RideService {
    */
   static getVehicleTypeName(type: string): string {
     const names: Record<string, string> = {
-      BIKE: "Bike",
-      CAR: "Car",
-      VAN: "Van",
+      ECONOMY: "Economy",
+      BUSINESS: "Business",
     };
     return names[type] || type;
   }
@@ -152,9 +179,8 @@ export class RideService {
    */
   static getVehicleTypeDescription(type: string): string {
     const descriptions: Record<string, string> = {
-      BIKE: "Quick and affordable",
-      CAR: "Comfortable ride",
-      VAN: "Extra space for groups",
+      ECONOMY: "Affordable and comfortable",
+      BUSINESS: "Premium experience",
     };
     return descriptions[type] || "";
   }

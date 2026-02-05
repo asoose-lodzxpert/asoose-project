@@ -1,5 +1,5 @@
-import React from 'react';
-import { Star, User, PenLine, Trash2 } from 'lucide-react';
+import React from "react";
+import { Star, User, PenLine, Trash2 } from "lucide-react";
 
 interface Review {
   id: string;
@@ -23,11 +23,11 @@ interface StoreReviewsProps {
 const formatReviewDate = (dateString: string): string => {
   const date = new Date(dateString);
   return isNaN(date.getTime())
-    ? 'Invalid date'
+    ? "Invalid date"
     : date.toLocaleDateString(undefined, {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
+        year: "numeric",
+        month: "short",
+        day: "numeric",
       });
 };
 
@@ -36,11 +36,11 @@ const getRelativeTime = (dateString: string): string => {
   if (isNaN(date.getTime())) return formatReviewDate(dateString);
 
   const diffDays = Math.floor(
-    (Date.now() - date.getTime()) / (1000 * 60 * 60 * 24)
+    (Date.now() - date.getTime()) / (1000 * 60 * 60 * 24),
   );
 
-  if (diffDays <= 0) return 'Today';
-  if (diffDays === 1) return 'Yesterday';
+  if (diffDays <= 0) return "Today";
+  if (diffDays === 1) return "Yesterday";
   if (diffDays < 7) return `${diffDays} days ago`;
   if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
   if (diffDays < 365) return `${Math.floor(diffDays / 30)} months ago`;

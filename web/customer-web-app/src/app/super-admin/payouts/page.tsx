@@ -1,10 +1,10 @@
-'use client';
+"use client";
 
-import React from 'react';
-import useSWR from 'swr';
-import { fetcher } from '../hooks/useSuperAdminFetch';
-import { Check, X, Banknote, Clock } from 'lucide-react';
-import PayoutsSkeleton from './skeleton';
+import React from "react";
+import useSWR from "swr";
+import { fetcher } from "../hooks/useSuperAdminFetch";
+import { Check, X, Banknote, Clock } from "lucide-react";
+import PayoutsSkeleton from "./skeleton";
 
 interface PayoutResponse {
   vendorPayouts: Array<{
@@ -18,7 +18,7 @@ interface PayoutResponse {
   riderPayouts: Array<{
     id: string;
     amount: number;
-    rider: { 
+    rider: {
       name: string;
       bankAccount?: any;
     };
@@ -27,8 +27,8 @@ interface PayoutResponse {
 
 export default function PayoutsManagement() {
   const { data, mutate, isLoading } = useSWR<PayoutResponse>(
-    '/super-admin/payouts/pending', 
-    fetcher
+    "/super-admin/payouts/pending",
+    fetcher,
   );
 
   // FIX: Moved useMemo ABOVE the conditional return to follow the Rules of Hooks
@@ -38,13 +38,13 @@ export default function PayoutsManagement() {
       return [
         ...(data.vendorPayouts?.map((p) => ({
           ...p,
-          type: 'VENDOR' as const,
-          name: p.store?.name || 'Unknown Store'
+          type: "VENDOR" as const,
+          name: p.store?.name || "Unknown Store",
         })) || []),
         ...(data.riderPayouts?.map((p) => ({
           ...p,
-          type: 'RIDER' as const,
-          name: p.rider?.name || 'Unknown Rider'
+          type: "RIDER" as const,
+          name: p.rider?.name || "Unknown Rider",
         })) || []),
       ];
     } catch (e) {
@@ -53,19 +53,23 @@ export default function PayoutsManagement() {
     }
   }, [data]);
 
-  const handleAction = async (id: string, type: 'VENDOR' | 'RIDER', action: 'approve' | 'reject') => {
-    const reason = action === 'reject' ? prompt('Reason for rejection:') : null;
-    if (action === 'reject' && !reason) return;
+  const handleAction = async (
+    id: string,
+    type: "VENDOR" | "RIDER",
+    action: "approve" | "reject",
+  ) => {
+    const reason = action === "reject" ? prompt("Reason for rejection:") : null;
+    if (action === "reject" && !reason) return;
 
     try {
       // Uses centralized fetcher to ensure Authorization headers are attached
       await fetcher(`/super-admin/payouts/${type}/${id}/${action}`, {
-        method: 'POST',
+        method: "POST",
         body: JSON.stringify({ reason }),
       });
-      mutate(); 
+      mutate();
     } catch (err: any) {
-      alert(err.message || 'Action failed');
+      alert(err.message || "Action failed");
     }
   };
 
@@ -86,26 +90,35 @@ export default function PayoutsManagement() {
           </div>
         ) : (
           allPayouts.map((payout) => (
-            <div key={payout.id} className="bg-[#1E293B] p-5 rounded-xl border border-gray-800 flex justify-between items-center">
+            <div
+              key={payout.id}
+              className="bg-[#1E293B] p-5 rounded-xl border border-gray-800 flex justify-between items-center"
+            >
               <div>
                 <div className="flex items-center gap-2 mb-1">
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${payout.type === 'VENDOR' ? 'bg-blue-500/10 text-blue-400' : 'bg-purple-500/10 text-purple-400'}`}>
+                  <span
+                    className={`text-[10px] font-bold px-2 py-0.5 rounded ${payout.type === "VENDOR" ? "bg-blue-500/10 text-blue-400" : "bg-purple-500/10 text-purple-400"}`}
+                  >
                     {payout.type}
                   </span>
                   <h3 className="font-bold">{payout.name}</h3>
                 </div>
-                <p className="text-2xl font-black text-white">₦{payout.amount.toLocaleString()}</p>
+                <p className="text-2xl font-black text-white">
+                  ₦{payout.amount.toLocaleString()}
+                </p>
               </div>
 
               <div className="flex gap-2">
-                <button 
-                  onClick={() => handleAction(payout.id, payout.type, 'reject')} 
+                <button
+                  onClick={() => handleAction(payout.id, payout.type, "reject")}
                   className="p-2 bg-red-500/10 text-red-500 rounded-lg transition-colors hover:bg-red-500/20"
                 >
                   <X size={20} />
                 </button>
-                <button 
-                  onClick={() => handleAction(payout.id, payout.type, 'approve')} 
+                <button
+                  onClick={() =>
+                    handleAction(payout.id, payout.type, "approve")
+                  }
                   className="px-4 py-2 bg-green-600 text-white font-bold rounded-lg transition-colors hover:bg-green-700"
                 >
                   <Check size={18} /> Approve

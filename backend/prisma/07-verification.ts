@@ -7,20 +7,20 @@ export async function seedVerificationQueue() {
 
   // --- 1. Pending Vendor (For Admin Approval) ---
   const pendingVendorEmail = 'vendor.pending@example.com';
-  
+
   const pendingVendor = await prisma.vendor.upsert({
     where: { email: pendingVendorEmail },
     update: {},
     create: {
       email: pendingVendorEmail,
       password: PASSWORD_HASH,
-      name: "Pending Pharmacy Ltd",
-      phone: "+2348099999001",
+      name: 'Pending Pharmacy Ltd',
+      phone: '+2348099999001',
       status: UserStatus.PENDING, // Not active yet
       countryCode: 'NG',
       businessType: 'PHARMACY',
       employees: '10+',
-    }
+    },
   });
 
   // Upload Pending Documents
@@ -28,18 +28,18 @@ export async function seedVerificationQueue() {
     data: [
       {
         vendorId: pendingVendor.id,
-        name: "CAC Registration",
-        fileName: "cac_cert.pdf",
-        url: "https://placehold.co/600x800/png?text=CAC+Cert",
-        status: VerificationStatus.PENDING
+        name: 'CAC Registration',
+        fileName: 'cac_cert.pdf',
+        url: 'https://placehold.co/600x800/png?text=CAC+Cert',
+        status: VerificationStatus.PENDING,
       },
       {
         vendorId: pendingVendor.id,
-        name: "Pharmacy License",
-        fileName: "license.pdf",
-        url: "https://placehold.co/600x800/png?text=License",
-        status: VerificationStatus.PENDING
-      }
+        name: 'Pharmacy License',
+        fileName: 'license.pdf',
+        url: 'https://placehold.co/600x800/png?text=License',
+        status: VerificationStatus.PENDING,
+      },
     ],
     skipDuplicates: true,
   });
@@ -52,15 +52,15 @@ export async function seedVerificationQueue() {
     update: {},
     create: {
       email: rejectedRiderEmail,
-      name: "Rider Rejected",
-      phone: "+2348099999002",
+      name: 'Rider Rejected',
+      phone: '+2348099999002',
       password: PASSWORD_HASH,
       role: UserRole.RIDER,
       status: UserStatus.PENDING, // Stuck in pending due to rejection
       countryCode: 'NG',
       currentLat: MAIDUGURI_COORDS.lat,
       currentLng: MAIDUGURI_COORDS.lng,
-    }
+    },
   });
 
   // Upload Rejected Documents
@@ -69,27 +69,29 @@ export async function seedVerificationQueue() {
     data: [
       {
         riderId: rejectedRider.id,
-        type: "DRIVER_LICENSE",
-        url: "https://placehold.co/600x400/png?text=Blurry+License",
+        type: 'DRIVER_LICENSE',
+        url: 'https://placehold.co/600x400/png?text=Blurry+License',
         status: VerificationStatus.REJECTED,
-        // The schema might not have 'rejectionReason' on RiderDocument, 
-        // checking schema... it is on UserDocument. 
+        // The schema might not have 'rejectionReason' on RiderDocument,
+        // checking schema... it is on UserDocument.
         // For RiderDocument, status is the main indicator.
       },
       {
         riderId: rejectedRider.id,
-        type: "VEHICLE_INSURANCE",
-        url: "https://placehold.co/600x400/png?text=Valid+Insurance",
-        status: VerificationStatus.VERIFIED // One valid, one invalid
-      }
+        type: 'VEHICLE_INSURANCE',
+        url: 'https://placehold.co/600x400/png?text=Valid+Insurance',
+        status: VerificationStatus.VERIFIED, // One valid, one invalid
+      },
     ],
     skipDuplicates: true,
   });
 
   // --- 3. Expiring Documents (Optional: For Expiry Job Testing) ---
   // Attaching to an existing active rider
-  const activeRider = await prisma.rider.findFirst({ where: { status: UserStatus.ACTIVE } });
-  
+  const activeRider = await prisma.rider.findFirst({
+    where: { status: UserStatus.ACTIVE },
+  });
+
   if (activeRider) {
     // Determine a date in the past for expiry
     const lastMonth = new Date();
@@ -98,26 +100,28 @@ export async function seedVerificationQueue() {
     await prisma.riderDocument.create({
       data: {
         riderId: activeRider.id,
-        type: "ROAD_WORTHINESS",
-        url: "https://placehold.co/600x400/png?text=Expired+Doc",
+        type: 'ROAD_WORTHINESS',
+        url: 'https://placehold.co/600x400/png?text=Expired+Doc',
         status: VerificationStatus.VERIFIED,
         // Ideally we would set expiresAt here if the schema supports it for RiderDocument.
         // Looking at schema: UserDocument has expiresAt. VehicleDocument has expiresAt.
         // RiderDocument does NOT have expiresAt in the provided schema.
         // We will add it to a VehicleDocument instead.
-      }
+      },
     });
-    
+
     // Check for vehicle
-    const vehicle = await prisma.vehicle.findUnique({ where: { riderId: activeRider.id } });
+    const vehicle = await prisma.vehicle.findUnique({
+      where: { riderId: activeRider.id },
+    });
     if (vehicle) {
       await prisma.vehicleDocument.create({
         data: {
           vehicleId: vehicle.id,
-          type: "MOT_TEST",
-          url: "https://placehold.co/600x400",
+          type: 'MOT_TEST',
+          url: 'https://placehold.co/600x400',
           expiresAt: lastMonth, // EXPIRED
-        }
+        },
       });
     }
   }

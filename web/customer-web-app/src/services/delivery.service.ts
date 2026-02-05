@@ -117,7 +117,7 @@ export class DeliveryService {
    * Required before creating a delivery.
    */
   static async saveAddress(
-    data: CreateAddressPayload
+    data: CreateAddressPayload,
   ): Promise<AddressResponse> {
     return ApiService.post<AddressResponse>("/users/addresses", data);
   }
@@ -128,11 +128,11 @@ export class DeliveryService {
    * Uses /trips/deliveries/request
    */
   static async createDelivery(
-    data: CreateDeliveryRequest
+    data: CreateDeliveryRequest,
   ): Promise<DeliveryRequestResponse> {
     return ApiService.post<DeliveryRequestResponse>(
       "/trips/deliveries/request",
-      data
+      data,
     );
   }
 
@@ -174,11 +174,11 @@ export class DeliveryService {
    */
   static async cancelDelivery(
     deliveryId: string,
-    reason?: string
+    reason?: string,
   ): Promise<{ message: string }> {
     return ApiService.patch<{ message: string }>(
       `/trips/deliveries/${deliveryId}/cancel`,
-      { reason }
+      { reason },
     );
   }
 
@@ -189,7 +189,7 @@ export class DeliveryService {
     deliveryId: string,
     targetStatus: DeliveryStatus = "REQUESTED",
     maxAttempts: number = 20,
-    intervalMs: number = 3000
+    intervalMs: number = 3000,
   ): Promise<boolean> {
     let attempts = 0;
     while (attempts < maxAttempts) {
@@ -223,11 +223,11 @@ export class DeliveryService {
    */
   static async verifyPickupOtp(
     deliveryId: string,
-    otp: string
+    otp: string,
   ): Promise<{ message: string; delivery: Delivery }> {
     return ApiService.post<{ message: string; delivery: Delivery }>(
       `/users/deliveries/${deliveryId}/verify-pickup`, // Note: Check if backend moved this to Trips
-      { otp }
+      { otp },
     );
   }
 
@@ -236,11 +236,11 @@ export class DeliveryService {
    */
   static async verifyDeliveryOtp(
     deliveryId: string,
-    otp: string
+    otp: string,
   ): Promise<{ message: string; delivery: Delivery }> {
     return ApiService.post<{ message: string; delivery: Delivery }>(
       `/users/deliveries/${deliveryId}/verify-delivery`, // Note: Check if backend moved this to Trips
-      { otp }
+      { otp },
     );
   }
 
@@ -250,14 +250,14 @@ export class DeliveryService {
   static async rateDelivery(
     deliveryId: string,
     rating: number,
-    comment?: string
+    comment?: string,
   ): Promise<{ message: string }> {
     return ApiService.post<{ message: string }>(
       `/users/deliveries/${deliveryId}/rate`,
       {
         rating,
         comment,
-      }
+      },
     );
   }
 

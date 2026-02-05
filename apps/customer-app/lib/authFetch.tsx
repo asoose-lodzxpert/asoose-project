@@ -79,6 +79,14 @@ async function parseBody(res: Response) {
 function toError(body: any, fallback: string) {
   if (!body) return new Error(fallback || "Request failed");
   if (typeof body === "string") return new Error(body);
+
+  // Handle validation errors with detailed messages
+  if (body.errors && Array.isArray(body.errors)) {
+    const errorMessage = body.message || "Validation failed";
+    const details = body.errors.join("; ");
+    return new Error(`${errorMessage}: ${details}`);
+  }
+
   if (typeof body.message === "string") return new Error(body.message);
   if (typeof body.error === "string") return new Error(body.error);
   return new Error(fallback || "Request failed");

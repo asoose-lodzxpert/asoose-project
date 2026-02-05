@@ -16,7 +16,7 @@ export function ThemedView({
 }: ThemedViewProps) {
   const backgroundColor = useThemeColor(
     { light: lightColor, dark: darkColor },
-    "surfaceBackground"
+    "surfaceBackground",
   );
 
   return <SafeAreaView style={[{ backgroundColor }, style]} {...otherProps} />;

@@ -1,39 +1,58 @@
 import { Address } from "@/types/address";
-
-const GOOGLE_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_KEY || "";
+import { request } from "@/lib/authFetch";
 
 export const fetchSuggestions = async (input: string): Promise<any[]> => {
   if (!input) return [];
-  const res = await fetch(
-    `https://maps.googleapis.com/maps/api/place/autocomplete/json?key=${GOOGLE_API_KEY}&input=${encodeURIComponent(
-      input
-    )}`
-  );
-  const json = await res.json();
-  return json.predictions || [];
+  try {
+    // Backend expects 'query' parameter, returns array of { id, title, subtitle }
+    const response = await request(
+      `maps/places-autocomplete?query=${encodeURIComponent(input)}`,
+      { method: "GET" },
+    );
+    // Transform backend response to match expected format
+    return response.map((item: any) => ({
+      place_id: item.id,
+      description: `${item.title}, ${item.subtitle}`,
+      structured_formatting: {
+        main_text: item.title,
+        secondary_text: item.subtitle,
+      },
+    }));
+  } catch (error) {
+    console.error("Error fetching suggestions:", error);
+    return [];
+  }
 };
 
 export const selectPlace = async (placeId: string): Promise<Address | null> => {
-  const res = await fetch(
-    `https://maps.googleapis.com/maps/api/place/details/json?key=${GOOGLE_API_KEY}&place_id=${placeId}`
-  );
-  const json = await res.json();
-  const place = json.result;
-  if (!place || !place.geometry?.location) return null;
-  return {
-    id: Date.now().toString(),
-    label: "Other",
-    address: place.formatted_address,
-    coordinates: {
-      lat: place.geometry.location.lat.toString(),
-      lng: place.geometry.location.lng.toString(),
-    },
-    isDefault: false,
-  };
+  try {
+    // Backend geocode endpoint returns { lat, lng, address }
+    const response = await request(
+      `maps/geocode?placeId=${encodeURIComponent(placeId)}`,
+      { method: "GET" },
+    );
+
+    if (!response || !response.lat || !response.lng) return null;
+
+    return {
+      id: Date.now().toString(),
+      label: "Other",
+      address: response.address,
+      coordinates: {
+        lat: response.lat.toString(),
+        lng: response.lng.toString(),
+      },
+      isDefault: false,
+    };
+  } catch (error) {
+    console.error("Error selecting place:", error);
+    return null;
+  }
 };
 
 /**
- * Resolves a full address from latitude and longitude using Google Maps Geocoding API.
+ * Resolves a full address from latitude and longitude using backend Maps API.
+ * Uses the geocode endpoint with coordinates.
  * @param coords Object with lat and lng (number or string)
  * @returns {Promise<{ address: string } | null>}
  */
@@ -45,12 +64,21 @@ export const resolveAddressFromCoords = async (coords: {
     typeof coords.lat === "string" ? coords.lat : coords.lat.toString();
   const lng =
     typeof coords.lng === "string" ? coords.lng : coords.lng.toString();
-  const res = await fetch(
-    `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${GOOGLE_API_KEY}`
-  );
-  const json = await res.json();
-  if (json.status === "OK" && json.results && json.results.length > 0) {
-    return { address: json.results[0].formatted_address };
+
+  try {
+    // Use address-search endpoint which accepts latitude and longitude
+    const response = await request(
+      `maps/address-search?query=${lat},${lng}&latitude=${lat}&longitude=${lng}`,
+      { method: "GET" },
+    );
+
+    // If we get results, use the first one
+    if (response && response.length > 0) {
+      return { address: `${response[0].title}, ${response[0].subtitle}` };
+    }
+    return null;
+  } catch (error) {
+    console.error("Error resolving address:", error);
+    return null;
   }
-  return null;
 };

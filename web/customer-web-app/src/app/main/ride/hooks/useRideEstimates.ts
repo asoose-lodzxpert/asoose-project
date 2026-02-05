@@ -1,11 +1,11 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from "react";
 import { RideService, VehicleType } from "@/services/ride.service";
 
 export const useRideEstimates = (
   pickup: google.maps.LatLngLiteral | null,
   dropoff: google.maps.LatLngLiteral | null,
   vehicleType: VehicleType,
-  token: string | null
+  token: string | null,
 ) => {
   const [estimates, setEstimates] = useState<any | null>(null); // Replace 'any' with PriceEstimate type
   const [loading, setLoading] = useState(false);
@@ -21,16 +21,19 @@ export const useRideEstimates = (
     const fetchEstimates = async () => {
       setLoading(true);
       try {
-        const data = await RideService.getEstimate({
-          pickupLat: pickup.lat,
-          pickupLng: pickup.lng,
-          dropoffLat: dropoff.lat,
-          dropoffLng: dropoff.lng,
-          vehicleType,
-        }, token);
+        const data = await RideService.getEstimate(
+          {
+            pickupLat: pickup.lat,
+            pickupLng: pickup.lng,
+            dropoffLat: dropoff.lat,
+            dropoffLng: dropoff.lng,
+            vehicleType,
+          },
+          token,
+        );
         setEstimates(data);
       } catch (error: any) {
-        if (error.name !== 'CanceledError') {
+        if (error.name !== "CanceledError") {
           console.error("Estimate error:", error);
         }
       } finally {

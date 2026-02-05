@@ -25,7 +25,6 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [pickerVisible, setPickerVisible] = useState(false);
 
- 
   async function useCurrentLocation() {
     const { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== "granted") return;

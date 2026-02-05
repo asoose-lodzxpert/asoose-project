@@ -58,7 +58,7 @@ export const MenuFilters = memo(
         </ScrollView>
       </View>
     );
-  }
+  },
 );
 
 MenuFilters.displayName = "MenuFilters";

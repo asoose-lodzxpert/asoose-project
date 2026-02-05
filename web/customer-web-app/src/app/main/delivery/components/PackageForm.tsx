@@ -1,9 +1,15 @@
-'use client';
+"use client";
 
-import React from 'react';
-import { Package, Info, ChevronRight, Box, FileText, Truck } from 'lucide-react';
-import { useDeliveryStore } from '@/store/useDeliveryStore';
-
+import React from "react";
+import {
+  Package,
+  Info,
+  ChevronRight,
+  Box,
+  FileText,
+  Truck,
+} from "lucide-react";
+import { useDeliveryStore } from "@/store/useDeliveryStore";
 
 interface PackageFormProps {
   onContinue: () => void;
@@ -13,12 +19,12 @@ export default function PackageForm({ onContinue }: PackageFormProps) {
   const { packageInfo, setPackageInfo } = useDeliveryStore();
 
   const packageTypes = [
-    { id: 'Document', icon: FileText, label: 'Documents' },
-    { id: 'Small Box', icon: Box, label: 'Small Box' },
-    { id: 'Large Item', icon: Truck, label: 'Large Item' },
+    { id: "Document", icon: FileText, label: "Documents" },
+    { id: "Small Box", icon: Box, label: "Small Box" },
+    { id: "Large Item", icon: Truck, label: "Large Item" },
   ];
 
-  const weights = ['< 5kg', '5-20kg', '20-50kg', '50kg+'];
+  const weights = ["< 5kg", "5-20kg", "20-50kg", "50kg+"];
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -34,12 +40,21 @@ export default function PackageForm({ onContinue }: PackageFormProps) {
               onClick={() => setPackageInfo({ type: type.id })}
               className={`flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all ${
                 packageInfo.type === type.id
-                  ? 'border-yellow-500 bg-yellow-50 dark:bg-yellow-900/10'
-                  : 'border-gray-100 dark:border-zinc-800 bg-white dark:bg-zinc-900'
+                  ? "border-yellow-500 bg-yellow-50 dark:bg-yellow-900/10"
+                  : "border-gray-100 dark:border-zinc-800 bg-white dark:bg-zinc-900"
               }`}
             >
-              <type.icon size={20} className={packageInfo.type === type.id ? 'text-yellow-600' : 'text-gray-400'} />
-              <span className={`text-[10px] font-bold ${packageInfo.type === type.id ? 'text-yellow-700 dark:text-yellow-500' : 'text-gray-500'}`}>
+              <type.icon
+                size={20}
+                className={
+                  packageInfo.type === type.id
+                    ? "text-yellow-600"
+                    : "text-gray-400"
+                }
+              />
+              <span
+                className={`text-[10px] font-bold ${packageInfo.type === type.id ? "text-yellow-700 dark:text-yellow-500" : "text-gray-500"}`}
+              >
                 {type.label}
               </span>
             </button>
@@ -59,8 +74,8 @@ export default function PackageForm({ onContinue }: PackageFormProps) {
               onClick={() => setPackageInfo({ weight: w })}
               className={`px-4 py-2 rounded-full text-xs font-bold border transition-all ${
                 packageInfo.weight === w
-                  ? 'bg-gray-900 dark:bg-white text-white dark:text-black border-transparent'
-                  : 'bg-white dark:bg-zinc-900 text-gray-500 border-gray-100 dark:border-zinc-800'
+                  ? "bg-gray-900 dark:bg-white text-white dark:text-black border-transparent"
+                  : "bg-white dark:bg-zinc-900 text-gray-500 border-gray-100 dark:border-zinc-800"
               }`}
             >
               {w}

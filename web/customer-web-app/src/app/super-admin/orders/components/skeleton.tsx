@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import React from 'react';
+import React from "react";
 
 export function OrderListSkeleton() {
   return (
@@ -30,11 +30,14 @@ export function OrderListSkeleton() {
       <div className="bg-[#1E293B] rounded-xl border border-gray-800 overflow-hidden">
         {/* Table Header Placeholder */}
         <div className="h-12 bg-slate-800/30 border-b border-gray-800" />
-        
+
         {/* Table Rows */}
         <div className="p-4 space-y-4">
           {[...Array(8)].map((_, i) => (
-            <div key={i} className="flex items-center justify-between py-3 border-b border-gray-800 last:border-0">
+            <div
+              key={i}
+              className="flex items-center justify-between py-3 border-b border-gray-800 last:border-0"
+            >
               <div className="flex gap-4 items-center">
                 <div className="h-4 w-20 bg-slate-800 rounded" />
                 <div className="h-6 w-24 bg-slate-800/50 rounded-full" />

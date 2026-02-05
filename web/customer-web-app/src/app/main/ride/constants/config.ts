@@ -16,7 +16,7 @@ export const PAYMENT_METHODS = [
     icon: Smartphone,
   },
   // FIX: Uncommented Cash to enable the logic in page.tsx
-  { id: 'cash', label: 'Cash', type: 'CASH', gateway: null, icon: Banknote },
+  { id: "cash", label: "Cash", type: "CASH", gateway: null, icon: Banknote },
 ];
 
 export const RIDE_OPTIONS = ["Standard", "Premium", "XL"] as const;

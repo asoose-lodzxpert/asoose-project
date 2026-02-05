@@ -1,31 +1,23 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import {
   View,
   StyleSheet,
   Pressable,
   ScrollView,
-  Dimensions,
   RefreshControl,
-  DimensionValue,
   Share,
-  Alert,
+  Animated,
+  StyleProp,
+  ViewStyle,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withRepeat,
-  withTiming,
-  Easing,
-} from "react-native-reanimated";
 
 import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
 import { fetchOrderById } from "@/services/order-history.service";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
-
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
+import { useToast } from "@/components/ui/ThemedToast";
 
 function formatCurrency(value: string | number | undefined | null) {
   const num = typeof value === "string" ? parseFloat(value) : Number(value);
@@ -40,6 +32,7 @@ function formatCurrency(value: string | number | undefined | null) {
 export default function OrderDetailsScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
   const router = useRouter();
+  const showToast = useToast();
 
   /* -------- Theme Colors -------- */
   const brandPrimary = useThemeColor({}, "brandPrimary");
@@ -104,75 +97,67 @@ export default function OrderDetailsScreen() {
     try {
       await Share.share({ message });
     } catch (error: any) {
-      Alert.alert("Share failed", error.message);
+      showToast({ message: error.message || "Share failed", variant: "error" });
     }
-  }, [order]);
+  }, [order, showToast]);
 
   /* ---------------- Skeleton Components ---------------- */
 
-  const SkeletonLine = ({
+  const SkeletonBlock = ({
+    height,
     width = "100%",
-    height = 14,
-    radius = 8,
+    style,
   }: {
-    width?: DimensionValue;
-    height?: number;
-    radius?: number;
+    height: number;
+    width?: number | string;
+    style?: StyleProp<ViewStyle>;
   }) => {
-    const progress = useSharedValue(-SCREEN_WIDTH);
-
-    const animatedStyle = useAnimatedStyle(() => ({
-      transform: [{ translateX: progress.value }],
-    }));
+    const pulse = useRef(new Animated.Value(0.3)).current;
 
     useEffect(() => {
-      progress.value = withRepeat(
-        withTiming(SCREEN_WIDTH, { duration: 1400, easing: Easing.linear }),
-        -1,
-        false,
-      );
-    }, []);
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulse, {
+            toValue: 0.7,
+            duration: 800,
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulse, {
+            toValue: 0.3,
+            duration: 800,
+            useNativeDriver: true,
+          }),
+        ]),
+      ).start();
+    }, [pulse]);
+
+    const animatedStyle = {
+      height,
+      borderRadius: 8,
+      backgroundColor: surfaceSubtle,
+      opacity: pulse,
+      ...(typeof width === "number" && { width }),
+    };
 
     return (
-      <View
-        style={{
-          width,
-          height,
-          borderRadius: radius,
-          backgroundColor: surfaceSubtle,
-          overflow: "hidden",
-        }}
-      >
-        <Animated.View
-          style={[
-            {
-              width: "40%",
-              height: "100%",
-              backgroundColor: borderSubtle,
-              opacity: 0.4,
-            },
-            animatedStyle,
-          ]}
-        />
-      </View>
+      <Animated.View
+        style={[
+          animatedStyle,
+          typeof width === "string" && { width: width as any },
+          style,
+        ]}
+      />
     );
   };
 
   const SkeletonInfo = () => (
     <View style={styles.skeletonSection}>
-      <View style={{ alignItems: "center", gap: 6 }}>
-        <SkeletonLine width={160} height={18} />
-        <SkeletonLine width={100} height={12} />
-        <SkeletonLine width={80} height={12} radius={6} />
-      </View>
-
-      <View style={[styles.infoDivider, { backgroundColor: surfaceSubtle }]} />
-
-      <View style={{ gap: 10 }}>
+      <SkeletonBlock height={18} width={140} style={{ marginBottom: 16 }} />
+      <View style={{ gap: 12 }}>
         {[1, 2, 3, 4].map((i) => (
           <View key={i} style={styles.infoRow}>
-            <SkeletonLine width={80} height={12} />
-            <SkeletonLine width={140} height={12} />
+            <SkeletonBlock width={80} height={14} />
+            <SkeletonBlock width={120} height={14} />
           </View>
         ))}
       </View>
@@ -181,41 +166,70 @@ export default function OrderDetailsScreen() {
 
   const SkeletonTimeline = () => (
     <View style={styles.skeletonSection}>
-      <SkeletonLine width={140} height={14} />
+      <SkeletonBlock height={18} width={140} style={{ marginBottom: 16 }} />
 
-      <View style={{ marginTop: 12, gap: 14 }}>
-        {[1, 2, 3].map((i) => (
-          <View key={i} style={styles.timelineItem}>
-            <SkeletonLine width={32} height={32} radius={16} />
-            <View style={{ flex: 1, gap: 6 }}>
-              <SkeletonLine width="60%" height={14} />
-              <SkeletonLine width="90%" height={12} />
-              <SkeletonLine width="40%" height={10} />
-            </View>
-          </View>
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 8,
+          marginBottom: 20,
+        }}
+      >
+        {[1, 2, 3, 4].map((i) => (
+          <React.Fragment key={i}>
+            <SkeletonBlock
+              width={36}
+              height={36}
+              style={{ borderRadius: 18 }}
+            />
+            {i < 4 && <SkeletonBlock width={40} height={3} />}
+          </React.Fragment>
         ))}
+      </View>
+
+      <View style={{ alignItems: "center", gap: 8 }}>
+        <SkeletonBlock width="60%" height={16} />
+        <SkeletonBlock width="80%" height={14} />
+        <SkeletonBlock width="50%" height={12} />
       </View>
     </View>
   );
 
   const SkeletonItems = () => (
     <View style={styles.skeletonSection}>
-      <SkeletonLine width={100} height={14} />
+      <SkeletonBlock height={18} width={120} style={{ marginBottom: 16 }} />
 
-      <View style={{ marginTop: 12, gap: 12 }}>
+      <View style={{ gap: 16 }}>
         {[1, 2, 3].map((i) => (
           <View key={i} style={styles.itemRow}>
             <View style={{ flex: 1, gap: 6 }}>
-              <SkeletonLine width="70%" height={14} />
-              <SkeletonLine width="30%" height={12} />
+              <SkeletonBlock width="70%" height={14} />
+              <SkeletonBlock width="30%" height={12} />
             </View>
-            <SkeletonLine width={60} height={14} />
+            <SkeletonBlock width={70} height={14} />
           </View>
         ))}
 
-        <View style={styles.totalRow}>
-          <SkeletonLine width={80} height={14} />
-          <SkeletonLine width={90} height={18} />
+        <View
+          style={[styles.totalRow, { borderTopColor: border, marginTop: 8 }]}
+        >
+          <SkeletonBlock width={100} height={16} />
+          <SkeletonBlock width={80} height={18} />
+        </View>
+      </View>
+    </View>
+  );
+
+  const SkeletonPayment = () => (
+    <View style={styles.skeletonSection}>
+      <SkeletonBlock height={18} width={140} style={{ marginBottom: 16 }} />
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+        <SkeletonBlock width={40} height={40} style={{ borderRadius: 20 }} />
+        <View style={{ flex: 1, gap: 6 }}>
+          <SkeletonBlock width="50%" height={14} />
+          <SkeletonBlock width="30%" height={12} />
         </View>
       </View>
     </View>
@@ -226,46 +240,82 @@ export default function OrderDetailsScreen() {
   const renderTimeline = () => {
     if (!order?.timeline?.length) return null;
 
+    // Find the current active step by matching order status
+    const currentStepIndex = order.timeline.findIndex(
+      (step: any) => step.status === order.status,
+    );
+    const activeIndex =
+      currentStepIndex >= 0
+        ? currentStepIndex
+        : order.timeline.findIndex((step: any) => step.time);
+    const currentStep = order.timeline[activeIndex >= 0 ? activeIndex : 0];
+
+    // Map timeline icons to available IconSymbol names
+    const iconMap: Record<string, any> = {
+      default: "checkmark.circle",
+      kitchen: "fork.knife",
+      package: "shippingbox.fill",
+      rider: "car.fill",
+      delivered: "checkmark.circle.fill",
+    };
+
     return (
       <View style={styles.timelineSection}>
         <ThemedText style={[styles.sectionTitle, { color: textColor }]}>
-          Order Timeline
+          Order Status
         </ThemedText>
         <View style={[styles.timelineDivider, { backgroundColor: border }]} />
 
-        <View style={styles.timelineContainer}>
-          {order.timeline.map((step: any, idx: number) => (
-            <View key={idx} style={styles.timelineItem}>
-              <View
-                style={[styles.timelineDot, { backgroundColor: brandPrimary }]}
-              >
-                <IconSymbol
-                  name={step.icon || "clock"}
-                  size={14}
-                  color="#FFF"
-                />
-              </View>
-              <View style={styles.timelineContent}>
-                <ThemedText
-                  style={[styles.timelineLabel, { color: textColor }]}
-                >
-                  {step.label}
-                </ThemedText>
-                <ThemedText
-                  style={[styles.timelineDesc, { color: textSecondary }]}
-                >
-                  {step.description}
-                </ThemedText>
-                {step.time && (
-                  <ThemedText
-                    style={[styles.timelineTime, { color: textSecondary }]}
+        {/* Horizontal Icon Timeline */}
+        <View style={styles.horizontalTimeline}>
+          {order.timeline.map((step: any, idx: number) => {
+            const isPassed = idx <= activeIndex;
+            const iconColor = isPassed ? brandPrimary : "#D1D5DB";
+            const lineColor = isPassed ? brandPrimary : "#E5E7EB";
+            const iconName = iconMap[step.icon] || step.icon || "clock";
+
+            return (
+              <React.Fragment key={idx}>
+                <View style={styles.timelineIconWrapper}>
+                  <View
+                    style={[
+                      styles.timelineIconCircle,
+                      { backgroundColor: iconColor },
+                    ]}
                   >
-                    {new Date(step.time).toLocaleString()}
-                  </ThemedText>
+                    <IconSymbol name={iconName} size={16} color="#FFF" />
+                  </View>
+                </View>
+                {idx < order.timeline.length - 1 && (
+                  <View
+                    style={[
+                      styles.timelineConnector,
+                      { backgroundColor: lineColor },
+                    ]}
+                  />
                 )}
-              </View>
-            </View>
-          ))}
+              </React.Fragment>
+            );
+          })}
+        </View>
+
+        {/* Current Status Description */}
+        <View style={styles.currentStatusContainer}>
+          <ThemedText style={[styles.currentStatusLabel, { color: textColor }]}>
+            {currentStep.label}
+          </ThemedText>
+          <ThemedText
+            style={[styles.currentStatusDesc, { color: textSecondary }]}
+          >
+            {currentStep.description}
+          </ThemedText>
+          {currentStep.time && (
+            <ThemedText
+              style={[styles.currentStatusTime, { color: textSecondary }]}
+            >
+              {new Date(currentStep.time).toLocaleString()}
+            </ThemedText>
+          )}
         </View>
       </View>
     );
@@ -277,7 +327,7 @@ export default function OrderDetailsScreen() {
     return (
       <View style={styles.itemsSection}>
         <ThemedText style={[styles.sectionTitle, { color: textColor }]}>
-          Items
+          Order Items
         </ThemedText>
         <View style={[styles.itemsDivider, { backgroundColor: border }]} />
         <View style={styles.itemsList}>
@@ -291,7 +341,7 @@ export default function OrderDetailsScreen() {
                   {item.name}
                 </ThemedText>
                 <ThemedText style={[styles.itemQty, { color: textSecondary }]}>
-                  x{item.quantity}
+                  Qty: {item.quantity}
                 </ThemedText>
               </View>
               <ThemedText style={[styles.itemPrice, { color: textColor }]}>
@@ -301,7 +351,7 @@ export default function OrderDetailsScreen() {
           ))}
           <View style={[styles.totalRow, { borderTopColor: border }]}>
             <ThemedText style={[styles.totalLabel, { color: textColor }]}>
-              Total
+              Total Amount
             </ThemedText>
             <ThemedText style={[styles.totalPrice, { color: brandPrimary }]}>
               ₦{formatCurrency(order.total)}
@@ -312,50 +362,75 @@ export default function OrderDetailsScreen() {
     );
   };
 
-  const renderInfo = () =>
-    order && (
-      <View style={styles.infoSection}>
-        <View style={styles.receiptSubHeader}>
-          <ThemedText style={[styles.receiptTitle, { color: textColor }]}>
-            Order:{" "}
-            <ThemedText style={{ fontSize: 11, color: textSecondary }}>
-              #{order.id}
-            </ThemedText>
-          </ThemedText>
-          <ThemedText style={[styles.receiptDate, { color: textSecondary }]}>
-            {new Date(order.createdAt).toLocaleDateString()}
-          </ThemedText>
-          <ThemedText style={[styles.receiptStatus, { color: brandPrimary }]}>
-            {order.status.toUpperCase()}
-          </ThemedText>
+  const renderPayment = () => {
+    if (!order?.paymentMethod) return null;
+
+    const paymentMethod = order.paymentMethod;
+    const paymentIcon =
+      paymentMethod === "Cash" ? "dollarsign.circle.fill" : "creditcard.fill";
+
+    return (
+      <View style={styles.paymentSection}>
+        <ThemedText style={[styles.sectionTitle, { color: textColor }]}>
+          Payment Method
+        </ThemedText>
+        <View style={[styles.paymentDivider, { backgroundColor: border }]} />
+        <View style={styles.paymentContent}>
+          <View style={styles.paymentRow}>
+            <View style={styles.paymentIconWrapper}>
+              <IconSymbol name={paymentIcon} size={20} color={brandPrimary} />
+            </View>
+            <View style={styles.paymentInfo}>
+              <ThemedText style={[styles.paymentMethod, { color: textColor }]}>
+                {paymentMethod}
+              </ThemedText>
+              {order.paymentStatus && (
+                <ThemedText
+                  style={[styles.paymentStatus, { color: textSecondary }]}
+                >
+                  {order.paymentStatus}
+                </ThemedText>
+              )}
+            </View>
+          </View>
         </View>
+      </View>
+    );
+  };
 
-        {order.deliveredAt && (
-          <ThemedText
-            style={[styles.receiptDelivered, { color: textSecondary }]}
-          >
-            Delivered: {new Date(order.deliveredAt).toLocaleDateString()}
-          </ThemedText>
-        )}
+  const renderInfo = () => {
+    if (!order) return null;
 
-        <View style={[styles.infoDivider, { backgroundColor: borderSubtle }]} />
-
+    return (
+      <View style={styles.infoSection}>
+        <ThemedText style={[styles.sectionTitle, { color: textColor }]}>
+          Order Information
+        </ThemedText>
+        <View style={[styles.infoDivider, { backgroundColor: border }]} />
         <View style={styles.infoGrid}>
-          <InfoRow label="Order ID" value={order.id} />
-          <InfoRow label="Status" value={order.status} />
           <InfoRow
-            label="Created"
-            value={new Date(order.createdAt).toLocaleString()}
+            label="Order ID"
+            value={`#${order.id.slice(-8).toUpperCase()}`}
           />
-          {order.deliveredAt && (
-            <InfoRow
-              label="Delivered"
-              value={new Date(order.deliveredAt).toLocaleString()}
-            />
+          <InfoRow
+            label="Placed On"
+            value={new Date(order.createdAt).toLocaleDateString()}
+          />
+          <InfoRow
+            label="Time"
+            value={new Date(order.createdAt).toLocaleTimeString()}
+          />
+          {order.eta && <InfoRow label="ETA" value={order.eta} />}
+          {order.store?.name && (
+            <InfoRow label="Store" value={order.store.name} />
+          )}
+          {order.distance && (
+            <InfoRow label="Distance" value={`${order.distance} km`} />
           )}
         </View>
       </View>
     );
+  };
 
   /* ---------------- UI ---------------- */
 
@@ -401,9 +476,10 @@ export default function OrderDetailsScreen() {
       }
     >
       <View style={styles.receiptContainer}>
-        {renderInfo()}
         {renderTimeline()}
+        {renderInfo()}
         {renderItems()}
+        {renderPayment()}
       </View>
       <View style={styles.footerSpacer} />
     </ScrollView>
@@ -445,9 +521,10 @@ export default function OrderDetailsScreen() {
           contentContainerStyle={styles.scrollContent}
         >
           <View style={styles.receiptContainer}>
-            <SkeletonInfo />
             <SkeletonTimeline />
+            <SkeletonInfo />
             <SkeletonItems />
+            <SkeletonPayment />
           </View>
           <View style={styles.footerSpacer} />
         </ScrollView>
@@ -506,31 +583,6 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
 
-  receiptSubHeader: {
-    alignItems: "center",
-    paddingHorizontal: 24,
-    paddingBottom: 8,
-    gap: 2,
-  },
-
-  receiptTitle: { fontSize: 18, fontWeight: "700" },
-  receiptDate: { fontSize: 14 },
-  receiptStatus: {
-    fontSize: 12,
-    fontWeight: "600",
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderWidth: 1,
-    borderRadius: 4,
-  },
-  receiptDelivered: {
-    textAlign: "center",
-    paddingHorizontal: 24,
-    paddingVertical: 4,
-    fontSize: 12,
-    fontStyle: "italic",
-  },
-
   sectionTitle: {
     fontSize: 16,
     fontWeight: "700",
@@ -541,13 +593,15 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
 
-  infoSection: {},
+  infoSection: {
+    paddingBottom: 8,
+  },
   infoDivider: {
     height: StyleSheet.hairlineWidth,
     marginHorizontal: 24,
     marginBottom: 16,
   },
-  infoGrid: { paddingHorizontal: 24, gap: 8 },
+  infoGrid: { paddingHorizontal: 24, gap: 10, paddingBottom: 8 },
   infoRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -561,34 +615,65 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
 
-  timelineSection: {},
+  timelineSection: {
+    paddingBottom: 12,
+  },
   timelineDivider: {
-    height: StyleSheet.hairlineWidth,
-    marginHorizontal: 24,
-    marginBottom: 12,
-  },
-  timelineContainer: { paddingHorizontal: 24, gap: 12 },
-  timelineItem: { flexDirection: "row", gap: 12, alignItems: "flex-start" },
-  timelineDot: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: "center",
-    alignItems: "center",
-    flexShrink: 0,
-  },
-  timelineContent: { flex: 1, gap: 2 },
-  timelineLabel: { fontSize: 15, fontWeight: "600" },
-  timelineDesc: { fontSize: 13 },
-  timelineTime: { fontSize: 11 },
-
-  itemsSection: {},
-  itemsDivider: {
     height: StyleSheet.hairlineWidth,
     marginHorizontal: 24,
     marginBottom: 16,
   },
-  itemsList: { paddingHorizontal: 24, gap: 8 },
+  horizontalTimeline: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 24,
+    marginBottom: 16,
+  },
+  timelineIconWrapper: {
+    alignItems: "center",
+  },
+  timelineIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  timelineConnector: {
+    flex: 1,
+    height: 3,
+    marginHorizontal: 4,
+    borderRadius: 2,
+  },
+  currentStatusContainer: {
+    paddingHorizontal: 24,
+    paddingBottom: 8,
+    alignItems: "center",
+    gap: 4,
+  },
+  currentStatusLabel: {
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  currentStatusDesc: {
+    fontSize: 14,
+    textAlign: "center",
+  },
+  currentStatusTime: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+
+  itemsSection: {
+    paddingBottom: 8,
+  },
+  itemsDivider: {
+    height: StyleSheet.hairlineWidth,
+    marginHorizontal: 24,
+    marginBottom: 12,
+  },
+  itemsList: { paddingHorizontal: 24, gap: 0 },
   itemRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -610,12 +695,49 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingTop: 8,
+    paddingTop: 12,
+    marginTop: 8,
     borderTopWidth: 1,
-    paddingBottom: 20,
+    paddingBottom: 8,
   },
   totalLabel: { fontSize: 16, fontWeight: "700" },
   totalPrice: { fontSize: 18, fontWeight: "800" },
+
+  paymentSection: {
+    paddingBottom: 12,
+  },
+  paymentDivider: {
+    height: StyleSheet.hairlineWidth,
+    marginHorizontal: 24,
+    marginBottom: 12,
+  },
+  paymentContent: {
+    paddingHorizontal: 24,
+  },
+  paymentRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  paymentIconWrapper: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#F3F4F6",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  paymentInfo: {
+    flex: 1,
+    gap: 2,
+  },
+  paymentMethod: {
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  paymentStatus: {
+    fontSize: 13,
+  },
 
   errorContainer: {
     flexGrow: 1,

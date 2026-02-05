@@ -5,28 +5,12 @@ export function formatCurrency(amount: number): string {
   return `₦${amount.toLocaleString("en-NG", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 }
 
-export function calculatePrice(packageSize: string): number {
-  switch (packageSize) {
-    case "small":
-      return 500;
-    case "medium":
-      return 1000;
-    case "large":
-      return 2500;
-    case "extra_large":
-      return 5000;
-    default:
-      return 0;
-  }
-}
-
 // Call backend to get a delivery fare based on coordinates.
 export async function fetchDeliveryQuote(
   pickuplat: number,
   pickuplong: number,
   dropofflat: number,
   dropofflong: number,
-  packageSize: string,
 ) {
   // Build DTO expected by backend
   const body = {
@@ -60,7 +44,7 @@ export async function fetchDeliveryQuote(
 }
 
 export async function fetchSavedAddresses(): Promise<Address[]> {
-  const { parsed } = await request("users/addresses", { method: "GET" });
+  const parsed = await request("users/addresses", { method: "GET" });
 
   return parsed.map((a: any) => ({
     id: a.id,
@@ -74,13 +58,13 @@ export async function fetchSavedAddresses(): Promise<Address[]> {
 export async function createDelivery(deliveryData: any) {
   const body = {
     pickupLocation: {
-      latitude: deliveryData.pickup.address.coords.latitude,
-      longitude: deliveryData.pickup.address.coords.longitude,
+      latitude: Number(deliveryData.pickup.address.coords.latitude),
+      longitude: Number(deliveryData.pickup.address.coords.longitude),
       address: deliveryData.pickup.address.fullAddress,
     },
     dropoffLocation: {
-      latitude: deliveryData.dropoff.address.coords.latitude,
-      longitude: deliveryData.dropoff.address.coords.longitude,
+      latitude: Number(deliveryData.dropoff.address.coords.latitude),
+      longitude: Number(deliveryData.dropoff.address.coords.longitude),
       address: deliveryData.dropoff.address.fullAddress,
     },
     recipientName: deliveryData.deliveryDetails.name,
@@ -90,7 +74,9 @@ export async function createDelivery(deliveryData: any) {
     senderPhone: deliveryData.pickupDetails.phone,
     senderInstructions: deliveryData.pickupDetails.instructions,
     packageSize: deliveryData.packageSize,
-    weightKg: deliveryData.packageOptions.weightKg,
+    weightKg: deliveryData.packageOptions.weightKg
+      ? Number(deliveryData.packageOptions.weightKg)
+      : undefined,
     declaredValue: deliveryData.packageOptions.declaredValue,
     fragile: deliveryData.packageOptions.fragile,
     perishable: deliveryData.packageOptions.perishable,
@@ -98,7 +84,7 @@ export async function createDelivery(deliveryData: any) {
     packageDetails: `${deliveryData.packageSize} package${deliveryData.packageOptions.fragile ? ", Fragile" : ""}${deliveryData.packageOptions.perishable ? ", Perishable" : ""}${deliveryData.packageOptions.containsLiquid ? ", Contains Liquid" : ""}`,
   };
 
-  const { parsed } = await request("trips/deliveries/request", {
+  const parsed = await request("trips/deliveries/request", {
     method: "POST",
     body: JSON.stringify(body),
   });

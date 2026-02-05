@@ -49,10 +49,14 @@ export class DeliveryMatchingProcessor extends WorkerHost {
     this.logger.log(`🔍 Matching delivery ${deliveryId} (attempt ${attempt})`);
 
     try {
-      // Verify delivery status
       const delivery = await this.prisma.delivery.findUnique({
         where: { id: deliveryId },
-        select: { status: true, riderId: true },
+        select: {
+          status: true,
+          riderId: true,
+          customerId: true,
+          orderId: true,
+        },
       });
 
       if (!delivery) {
@@ -99,11 +103,7 @@ export class DeliveryMatchingProcessor extends WorkerHost {
       } else {
         await this.handleNoDriverFound(
           deliveryId,
-          pickupLat,
-          pickupLng,
-          dropoffLat,
-          dropoffLng,
-          attempt,
+          delivery.orderId ?? undefined,
         );
       }
     } catch (error) {
@@ -252,11 +252,7 @@ export class DeliveryMatchingProcessor extends WorkerHost {
 
   private async handleNoDriverFound(
     deliveryId: string,
-    customerId: string,
     orderId: string | undefined,
-    pickupLat: number,
-    pickupLng: number,
-    attempt: number,
   ): Promise<void> {
     const attempts = await this.redis.incrementMatchingAttempts(deliveryId);
 
@@ -273,7 +269,7 @@ export class DeliveryMatchingProcessor extends WorkerHost {
     // If linked to order, update order status
     if (orderId) {
       await this.prisma.order.update({
-        where: { id: orderId },
+        where: { id: String(orderId) },
         data: { status: 'CANCELLED' },
       });
     }

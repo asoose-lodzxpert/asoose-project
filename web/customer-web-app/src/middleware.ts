@@ -1,17 +1,22 @@
-import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
-import { getToken } from 'next-auth/jwt'; 
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { getToken } from "next-auth/jwt";
 
-const ADMIN_ROLES = ['SUPER_ADMIN', 'ADMIN_MANAGER', 'ADMIN_SUPPORT', 'ADMIN_FINANCE'];
+const ADMIN_ROLES = [
+  "SUPER_ADMIN",
+  "ADMIN_MANAGER",
+  "ADMIN_SUPPORT",
+  "ADMIN_FINANCE",
+];
 
 export async function middleware(req: NextRequest) {
   const url = req.nextUrl;
 
   // 1. Skip Static Files & API
   if (
-    url.pathname.startsWith('/_next') || 
-    url.pathname.includes('.') || 
-    url.pathname.startsWith('/api')
+    url.pathname.startsWith("/_next") ||
+    url.pathname.includes(".") ||
+    url.pathname.startsWith("/api")
   ) {
     return NextResponse.next();
   }
@@ -24,15 +29,18 @@ export async function middleware(req: NextRequest) {
 
   // 3. Check Maintenance Mode (Fetch from NestJS Backend)
   let isMaintenanceActive = false;
-  
+
   try {
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/settings/maintenance-mode`, {
-      next: { revalidate: 60 }, 
-    });
-    
+    const res = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/settings/maintenance-mode`,
+      {
+        next: { revalidate: 60 },
+      },
+    );
+
     if (res.ok) {
       const data = await res.json();
-      isMaintenanceActive = data.isEnabled === true; 
+      isMaintenanceActive = data.isEnabled === true;
     }
   } catch (error) {
     console.error("Middleware fetch error:", error);
@@ -42,22 +50,25 @@ export async function middleware(req: NextRequest) {
   const isAdmin = isLoggedIn && userRole && ADMIN_ROLES.includes(userRole);
 
   // 4. Redirect Logic
-  
+
   // Maintenance Redirect
-  if (isMaintenanceActive && !isAdmin && url.pathname !== '/maintenance') {
-    return NextResponse.redirect(new URL('/maintenance', req.url));
+  if (isMaintenanceActive && !isAdmin && url.pathname !== "/maintenance") {
+    return NextResponse.redirect(new URL("/maintenance", req.url));
   }
 
   // Admin Route Protection
-  if (url.pathname.startsWith('/super-admin')) {
-    if (!isLoggedIn) return NextResponse.redirect(new URL('/sign-in', req.url));
-    if (!isAdmin) return NextResponse.redirect(new URL('/main/store', req.url));
+  if (url.pathname.startsWith("/super-admin")) {
+    if (!isLoggedIn) return NextResponse.redirect(new URL("/sign-in", req.url));
+    if (!isAdmin) return NextResponse.redirect(new URL("/main/store", req.url));
   }
 
   // Auth Page Redirect
-  if (isLoggedIn && (url.pathname === '/sign-in' || url.pathname === '/sign-up')) {
+  if (
+    isLoggedIn &&
+    (url.pathname === "/sign-in" || url.pathname === "/sign-up")
+  ) {
     // FIX: Dynamically redirect based on the user's role instead of hardcoding /main/store
-    const target = isAdmin ? '/super-admin' : '/main/store';
+    const target = isAdmin ? "/super-admin" : "/main/store";
     return NextResponse.redirect(new URL(target, req.url));
   }
 
@@ -65,5 +76,5 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!api|_next/static|_next/image|favicon.ico).*)'],
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
 };

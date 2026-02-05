@@ -1,22 +1,22 @@
-'use client';
+"use client";
 
-import React, { useState, useEffect } from 'react';
-import { toast } from 'react-toastify';
-import useSWR from 'swr';
-import { getSession } from 'next-auth/react';
-import { fetcher } from '../../hooks/useSuperAdminFetch';
-import DisputeDetailSkeleton from './component/skeleton';
-import { DisputeDetail, ModalType } from './types';
+import React, { useState, useEffect } from "react";
+import { toast } from "react-toastify";
+import useSWR from "swr";
+import { getSession } from "next-auth/react";
+import { fetcher } from "../../hooks/useSuperAdminFetch";
+import DisputeDetailSkeleton from "./component/skeleton";
+import { DisputeDetail, ModalType } from "./types";
 
 // Sub-components
-import DisputeHeader from './component/DisputeHeader';
-import DisputeOverview from './component/DisputeOverview';
-import DisputeChat from './component/DisputeChat';
-import RelatedEntityCard from './component/RelatedEntityCard';
-import DisputeActions from './component/DisputeActions';
-import DisputeTimeline from './component/DisputeTimeline';
-import ResolutionModal from './component/ResolutionModal';
-import ImageLightbox from './component/ImageLightbox';
+import DisputeHeader from "./component/DisputeHeader";
+import DisputeOverview from "./component/DisputeOverview";
+import DisputeChat from "./component/DisputeChat";
+import RelatedEntityCard from "./component/RelatedEntityCard";
+import DisputeActions from "./component/DisputeActions";
+import DisputeTimeline from "./component/DisputeTimeline";
+import ResolutionModal from "./component/ResolutionModal";
+import ImageLightbox from "./component/ImageLightbox";
 
 interface DisputeDetailPageProps {
   params: Promise<{ id: string }>;
@@ -40,18 +40,18 @@ export default function DisputeDetailPage({ params }: DisputeDetailPageProps) {
   //  ✅ SWR DATA FETCHING
   // ===========================================================================
 
-  const { 
-    data: dispute, 
-    error, 
-    isLoading, 
-    mutate 
+  const {
+    data: dispute,
+    error,
+    isLoading,
+    mutate,
   } = useSWR<DisputeDetail>(
     disputeId ? `/super-admin/disputes/${disputeId}` : null,
     fetcher,
     {
       refreshInterval: 15000,
-      revalidateOnFocus: true
-    }
+      revalidateOnFocus: true,
+    },
   );
 
   // --- Helpers ---
@@ -68,42 +68,48 @@ export default function DisputeDetailPage({ params }: DisputeDetailPageProps) {
 
   const handleSendMessage = async (message: string, isInternal: boolean) => {
     if (!disputeId) return;
-    
+
     // Optimistic UI Update
     if (dispute) {
-       const optimisticMsg = {
-         id: 'temp-' + Date.now(),
-         message,
-         isInternal,
-         sender: { id: 'self', name: 'You', role: 'ADMIN' },
-         createdAt: new Date().toISOString(),
-         isAdmin: true
-       };
-       mutate({ ...dispute, messages: [...dispute.messages, optimisticMsg as any] }, false);
+      const optimisticMsg = {
+        id: "temp-" + Date.now(),
+        message,
+        isInternal,
+        sender: { id: "self", name: "You", role: "ADMIN" },
+        createdAt: new Date().toISOString(),
+        isAdmin: true,
+      };
+      mutate(
+        { ...dispute, messages: [...dispute.messages, optimisticMsg as any] },
+        false,
+      );
     }
 
     try {
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+      const API_URL =
+        process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
       const session = await getSession();
       const authToken = (session as any)?.accessToken;
 
-      const res = await fetch(`${API_URL}/super-admin/disputes/${disputeId}/messages`, {
-        method: 'POST',
-        headers: { 
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${authToken}`
+      const res = await fetch(
+        `${API_URL}/super-admin/disputes/${disputeId}/messages`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${authToken}`,
+          },
+          body: JSON.stringify({ message, isInternal }),
         },
-        body: JSON.stringify({ message, isInternal })
-      });
+      );
 
-      if (!res.ok) throw new Error('Failed');
-      
-      toast.success(isInternal ? 'Internal note added' : 'Message sent');
-      mutate(); 
+      if (!res.ok) throw new Error("Failed");
 
+      toast.success(isInternal ? "Internal note added" : "Message sent");
+      mutate();
     } catch (e) {
-      toast.error('Failed to send message');
-      mutate(); 
+      toast.error("Failed to send message");
+      mutate();
     }
   };
 
@@ -112,90 +118,98 @@ export default function DisputeDetailPage({ params }: DisputeDetailPageProps) {
     try {
       const session = await getSession();
       const authToken = (session as any)?.accessToken;
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+      const API_URL =
+        process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
       await fetch(`${API_URL}/super-admin/disputes/${disputeId}/priority`, {
-        method: 'PATCH',
-        headers: { 
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${authToken}`
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${authToken}`,
         },
-        body: JSON.stringify({ priority })
+        body: JSON.stringify({ priority }),
       });
 
-      toast.success('Priority updated');
-      mutate(); 
+      toast.success("Priority updated");
+      mutate();
     } catch (e) {
-      toast.error('Failed to update priority');
+      toast.error("Failed to update priority");
     }
   };
 
   // ✅ FIX: Updated signature to accept (notes, refundSource, amountInput)
   // This matches the updated ResolutionModal logic
-  const handleResolution = async (notes: string, refundSource: string, amountInput?: string) => {
+  const handleResolution = async (
+    notes: string,
+    refundSource: string,
+    amountInput?: string,
+  ) => {
     if (!dispute || !disputeId) return;
     setProcessing(true);
     try {
       const session = await getSession();
       const authToken = (session as any)?.accessToken;
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+      const API_URL =
+        process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
       let endpoint = `${API_URL}/super-admin/disputes/${disputeId}/resolve`;
       let body: any = {};
 
-      if (modalType === 'REJECT') {
+      if (modalType === "REJECT") {
         endpoint = `${API_URL}/super-admin/disputes/${disputeId}/reject`;
         body = { reason: notes }; // For reject, the first arg is the reason
       } else {
-        let action = 'NO_REFUND';
+        let action = "NO_REFUND";
         let refundAmount = 0;
 
-        if (modalType === 'REFUND_FULL') {
-          action = 'REFUND_FULL';
+        if (modalType === "REFUND_FULL") {
+          action = "REFUND_FULL";
           refundAmount = getMaxRefundAmount() || 0;
-        } else if (modalType === 'REFUND_PARTIAL') {
-          action = 'REFUND_PARTIAL';
+        } else if (modalType === "REFUND_PARTIAL") {
+          action = "REFUND_PARTIAL";
           // ✅ FIX: Use the 3rd argument (amountInput) for partial amount
-          refundAmount = parseFloat(amountInput || '0'); 
+          refundAmount = parseFloat(amountInput || "0");
         }
 
         // ✅ FIX: Formatted string with Naira (₦) symbol
-        const resolutionNotes = modalType === 'REFUND_PARTIAL' 
-          ? `Partial Refund of ₦${amountInput} | ${notes}` 
-          : notes;
+        const resolutionNotes =
+          modalType === "REFUND_PARTIAL"
+            ? `Partial Refund of ₦${amountInput} | ${notes}`
+            : notes;
 
         body = {
           action,
           resolutionNotes: resolutionNotes,
-          ...(refundAmount > 0 && { 
-             refundAmount, 
-             refundSource: refundSource 
-          })
+          ...(refundAmount > 0 && {
+            refundAmount,
+            refundSource: refundSource,
+          }),
         };
       }
 
-      console.log('Sending Payload:', body); // Debug check
+      console.log("Sending Payload:", body); // Debug check
 
       const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${authToken}`
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${authToken}`,
         },
-        body: JSON.stringify(body)
+        body: JSON.stringify(body),
       });
 
       if (!res.ok) {
         const err = await res.json();
-        throw new Error(err.message || 'Action failed');
+        throw new Error(err.message || "Action failed");
       }
-      
-      toast.success('Dispute resolved. Action has been recorded in audit logs.');
-      setModalType(null);
-      mutate(); 
 
+      toast.success(
+        "Dispute resolved. Action has been recorded in audit logs.",
+      );
+      setModalType(null);
+      mutate();
     } catch (e: any) {
-      toast.error(e.message || 'Failed to process request');
+      toast.error(e.message || "Failed to process request");
     } finally {
       setProcessing(false);
     }
@@ -206,45 +220,45 @@ export default function DisputeDetailPage({ params }: DisputeDetailPageProps) {
   // ===========================================================================
 
   if (isLoading) return <DisputeDetailSkeleton />;
-  if (error || !dispute) return (
-    <div className="min-h-screen bg-[#0F172A] flex items-center justify-center text-white">
+  if (error || !dispute)
+    return (
+      <div className="min-h-screen bg-[#0F172A] flex items-center justify-center text-white">
         Dispute not found or access denied.
-    </div>
-  );
+      </div>
+    );
 
   return (
     <div className="min-h-screen bg-[#0F172A] p-4 md:p-6 font-sans">
       <div className="max-w-7xl mx-auto space-y-6">
-        
-        <DisputeHeader 
-          id={dispute.id} 
-          status={dispute.status} 
-          breachedSLA={dispute.breachedSLA} 
-          hoursOpen={dispute.hoursOpen} 
+        <DisputeHeader
+          id={dispute.id}
+          status={dispute.status}
+          breachedSLA={dispute.breachedSLA}
+          hoursOpen={dispute.hoursOpen}
         />
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
-            <DisputeOverview 
-              dispute={dispute} 
-              onImageClick={setSelectedImage} 
+            <DisputeOverview
+              dispute={dispute}
+              onImageClick={setSelectedImage}
             />
-            
-            <DisputeChat 
-              messages={dispute.messages} 
-              canAddMessage={dispute.canAddMessage} 
-              onSendMessage={handleSendMessage} 
+
+            <DisputeChat
+              messages={dispute.messages}
+              canAddMessage={dispute.canAddMessage}
+              onSendMessage={handleSendMessage}
             />
           </div>
 
           <div className="lg:col-span-1 space-y-6">
             <div className="sticky top-6 space-y-6">
-              <RelatedEntityCard 
-                order={dispute.order} 
-                ride={dispute.ride} 
-                delivery={dispute.delivery} 
+              <RelatedEntityCard
+                order={dispute.order}
+                ride={dispute.ride}
+                delivery={dispute.delivery}
               />
-              <DisputeActions 
+              <DisputeActions
                 priority={dispute.priority}
                 canResolve={dispute.canResolve}
                 status={dispute.status}
@@ -258,7 +272,7 @@ export default function DisputeDetailPage({ params }: DisputeDetailPageProps) {
         </div>
       </div>
 
-      <ResolutionModal 
+      <ResolutionModal
         isOpen={!!modalType}
         type={modalType}
         maxRefundAmount={getMaxRefundAmount() || 0}
@@ -267,9 +281,9 @@ export default function DisputeDetailPage({ params }: DisputeDetailPageProps) {
         onConfirm={handleResolution} // Logic matches updated signature
       />
 
-      <ImageLightbox 
-        imageUrl={selectedImage} 
-        onClose={() => setSelectedImage(null)} 
+      <ImageLightbox
+        imageUrl={selectedImage}
+        onClose={() => setSelectedImage(null)}
       />
     </div>
   );

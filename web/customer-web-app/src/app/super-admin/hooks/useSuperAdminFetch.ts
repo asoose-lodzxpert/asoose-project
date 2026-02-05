@@ -4,10 +4,10 @@ import { getSession } from "next-auth/react";
 const BACKEND_URL = (() => {
   const url = process.env.NEXT_PUBLIC_API_URL;
   if (!url) {
-    console.warn('NEXT_PUBLIC_API_URL is not defined, using fallback');
-    return 'http://localhost:3000/api/v1';
+    console.warn("NEXT_PUBLIC_API_URL is not defined, using fallback");
+    return "http://localhost:3000/api/v1";
   }
-  return url.replace(/\/$/, ''); 
+  return url.replace(/\/$/, "");
 })();
 
 // 1. FIX: Extend RequestInit to include standard fetch options (method, body, etc.)
@@ -30,7 +30,7 @@ interface FetcherError extends Error {
  */
 export const fetcher = async <T = any>(
   url: string,
-  options: FetcherOptions = {}
+  options: FetcherOptions = {},
 ): Promise<T> => {
   const {
     retries = 2,
@@ -45,16 +45,17 @@ export const fetcher = async <T = any>(
   const session = await getSession();
 
   if (!session) {
-    const error: FetcherError = new Error('Authentication required');
+    const error: FetcherError = new Error("Authentication required");
     error.status = 401;
     throw error;
   }
 
-  // 2. Extract Token 
-  const token = (session as any).accessToken || (session.user as any)?.accessToken;
+  // 2. Extract Token
+  const token =
+    (session as any).accessToken || (session.user as any)?.accessToken;
 
   if (!token) {
-    const error: FetcherError = new Error('No access token found in session');
+    const error: FetcherError = new Error("No access token found in session");
     error.status = 401;
     throw error;
   }
@@ -76,9 +77,9 @@ export const fetcher = async <T = any>(
       const res = await fetch(fullUrl, {
         ...fetchOptions, // 4. FIX: Spread the method, body, etc. here
         headers: {
-          'Authorization': `Bearer ${token}`, // Use NextAuth Token
-          'Content-Type': 'application/json',
-          ...headers as any, // 5. FIX: Merge in any custom headers passed in options
+          Authorization: `Bearer ${token}`, // Use NextAuth Token
+          "Content-Type": "application/json",
+          ...(headers as any), // 5. FIX: Merge in any custom headers passed in options
         },
         signal: combinedSignal,
       });
@@ -99,11 +100,11 @@ export const fetcher = async <T = any>(
       if (res.status >= 400 && res.status < 500) {
         // Retry on rate limiting
         if (res.status === 429 && attempt < retries) {
-          const retryAfter = res.headers.get('Retry-After');
-          const delay = retryAfter 
-            ? parseInt(retryAfter, 10) * 1000 
+          const retryAfter = res.headers.get("Retry-After");
+          const delay = retryAfter
+            ? parseInt(retryAfter, 10) * 1000
             : retryDelay * Math.pow(2, attempt);
-          
+
           await sleep(delay);
           continue;
         }
@@ -113,7 +114,7 @@ export const fetcher = async <T = any>(
         error.status = res.status;
 
         // Include detailed error info only in development
-        if (process.env.NODE_ENV === 'development') {
+        if (process.env.NODE_ENV === "development") {
           try {
             error.info = await res.json();
           } catch {
@@ -138,25 +139,28 @@ export const fetcher = async <T = any>(
       }
 
       // Unexpected status code
-      const error: FetcherError = new Error(`Unexpected response: ${res.status}`);
+      const error: FetcherError = new Error(
+        `Unexpected response: ${res.status}`,
+      );
       error.status = res.status;
       throw error;
-
     } catch (err) {
       clearTimeout(timeoutId);
 
       // Handle AbortError (timeout or external cancellation)
-      if (err instanceof Error && err.name === 'AbortError') {
+      if (err instanceof Error && err.name === "AbortError") {
         const error: FetcherError = new Error(
-          signal?.aborted ? 'Request cancelled' : 'Request timeout'
+          signal?.aborted ? "Request cancelled" : "Request timeout",
         );
         error.status = 408;
         throw error;
       }
 
       // Handle network errors
-      if (err instanceof TypeError && err.message === 'Failed to fetch') {
-        lastError = new Error('Network error - please check your connection') as FetcherError;
+      if (err instanceof TypeError && err.message === "Failed to fetch") {
+        lastError = new Error(
+          "Network error - please check your connection",
+        ) as FetcherError;
         lastError.status = 0;
 
         if (attempt < retries) {
@@ -173,8 +177,8 @@ export const fetcher = async <T = any>(
       }
 
       // Wrap unknown errors
-      lastError = new Error('An unexpected error occurred') as FetcherError;
-      if (process.env.NODE_ENV === 'development' && err instanceof Error) {
+      lastError = new Error("An unexpected error occurred") as FetcherError;
+      if (process.env.NODE_ENV === "development" && err instanceof Error) {
         lastError.info = { originalError: err.message };
       }
 
@@ -186,35 +190,38 @@ export const fetcher = async <T = any>(
     }
   }
 
-  throw lastError || new Error('Request failed after all retries');
+  throw lastError || new Error("Request failed after all retries");
 };
 
 // Helper functions
 
 function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function getErrorMessage(status: number): string {
   switch (status) {
     case 401:
-      return 'Unauthorized - please sign in again';
+      return "Unauthorized - please sign in again";
     case 403:
-      return 'Forbidden - you do not have permission';
+      return "Forbidden - you do not have permission";
     case 404:
-      return 'Resource not found';
+      return "Resource not found";
     case 422:
-      return 'Validation error';
+      return "Validation error";
     default:
-      return 'Request failed';
+      return "Request failed";
   }
 }
 
 function isFetcherError(error: unknown): error is FetcherError {
-  return error instanceof Error && 'status' in error;
+  return error instanceof Error && "status" in error;
 }
 
-function combineAbortSignals(signal1: AbortSignal, signal2: AbortSignal): AbortSignal {
+function combineAbortSignals(
+  signal1: AbortSignal,
+  signal2: AbortSignal,
+): AbortSignal {
   const controller = new AbortController();
 
   const abort = () => controller.abort();
@@ -222,8 +229,8 @@ function combineAbortSignals(signal1: AbortSignal, signal2: AbortSignal): AbortS
   if (signal1.aborted || signal2.aborted) {
     abort();
   } else {
-    signal1.addEventListener('abort', abort);
-    signal2.addEventListener('abort', abort);
+    signal1.addEventListener("abort", abort);
+    signal2.addEventListener("abort", abort);
   }
 
   return controller.signal;

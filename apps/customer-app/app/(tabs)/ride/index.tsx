@@ -4,7 +4,6 @@ import {
   ScrollView,
   Pressable,
   ActivityIndicator,
-  Alert,
 } from "react-native";
 import { useState, useEffect } from "react";
 import { useRouter } from "expo-router";
@@ -13,6 +12,7 @@ import { ThemedText } from "@/components/themed-text";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { useRide } from "@/context/RideContext";
+import { useToast } from "@/components/ui/ThemedToast";
 import { RideLocationCard } from "@/components/ride/RideLocationCard";
 import { VehicleTypeSelector } from "@/components/ride/VehicleTypeSelector";
 import { FareEstimateCard } from "@/components/ride/FareEstimateCard";
@@ -20,6 +20,7 @@ import { VehicleType } from "@/types/ride";
 
 export default function RideBookingScreen() {
   const router = useRouter();
+  const showToast = useToast();
   const {
     currentRide,
     pageView,
@@ -29,8 +30,6 @@ export default function RideBookingScreen() {
     fareEstimate,
     loading,
     error,
-    setPickupLocation,
-    setDropoffLocation,
     setSelectedVehicleType,
     estimateFare,
     createRide,
@@ -59,7 +58,12 @@ export default function RideBookingScreen() {
 
   // Auto-estimate when locations and vehicle are selected
   useEffect(() => {
-    if (pickupLocation && dropoffLocation && selectedVehicleType && !fareEstimate) {
+    if (
+      pickupLocation &&
+      dropoffLocation &&
+      selectedVehicleType &&
+      !fareEstimate
+    ) {
       handleEstimate();
     }
   }, [pickupLocation, dropoffLocation, selectedVehicleType]);
@@ -72,12 +76,15 @@ export default function RideBookingScreen() {
 
   const handleBookRide = async () => {
     if (!pickupLocation || !dropoffLocation) {
-      Alert.alert("Error", "Please select both pickup and dropoff locations");
+      showToast({
+        message: "Please select both pickup and dropoff locations",
+        variant: "error",
+      });
       return;
     }
 
     if (!fareEstimate) {
-      Alert.alert("Error", "Please wait for fare estimate");
+      showToast({ message: "Please wait for fare estimate", variant: "error" });
       return;
     }
 
@@ -88,7 +95,11 @@ export default function RideBookingScreen() {
   };
 
   const canBook =
-    pickupLocation && dropoffLocation && fareEstimate && !loading && !estimating;
+    pickupLocation &&
+    dropoffLocation &&
+    fareEstimate &&
+    !loading &&
+    !estimating;
 
   return (
     <ThemedView style={[styles.container, { backgroundColor: surface }]}>
@@ -108,8 +119,15 @@ export default function RideBookingScreen() {
         {/* Error Message */}
         {error && (
           <View style={[styles.errorCard, { backgroundColor: `${danger}15` }]}>
-            <IconSymbol name="exclamationmark.triangle" size={20} color={danger} />
-            <ThemedText type="caption" style={[styles.errorText, { color: danger }]}>
+            <IconSymbol
+              name="exclamationmark.triangle"
+              size={20}
+              color={danger}
+            />
+            <ThemedText
+              type="caption"
+              style={[styles.errorText, { color: danger }]}
+            >
               {error}
             </ThemedText>
           </View>
@@ -199,7 +217,7 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingHorizontal: 16,
-    paddingTop: 60,
+    paddingTop: 20,
     paddingBottom: 16,
   },
   scrollView: {

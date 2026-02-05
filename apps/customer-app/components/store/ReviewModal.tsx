@@ -193,7 +193,9 @@ export function ReviewModal({
               onPress={handleClose}
               disabled={loading}
             >
-              <ThemedText style={[styles.cancelButtonText, { color: mutedColor }]}>
+              <ThemedText
+                style={[styles.cancelButtonText, { color: mutedColor }]}
+              >
                 Cancel
               </ThemedText>
             </TouchableOpacity>
