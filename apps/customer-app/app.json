@@ -33,7 +33,10 @@
         "NSUserNotificationUsageDescription": "Notifications are used to keep you updated about your account and activity."
       }
     },
-    "platforms": ["ios", "android"],
+    "platforms": [
+      "ios",
+      "android"
+    ],
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
@@ -51,7 +54,8 @@
         "POST_NOTIFICATIONS"
       ],
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.iamwyteshadow.asoosecustomerapp"
     },
     "plugins": [
       "expo-router",
@@ -72,6 +76,12 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "efdbbc55-7bbe-4db6-9a9d-d7116d8d3d8d"
+      }
     }
   }
 }
