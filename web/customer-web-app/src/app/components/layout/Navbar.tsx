@@ -21,11 +21,11 @@ export default function Navbar() {
   const darkMode = resolvedTheme === "dark";
 
   const navLinks = [
-    { name: "About", href: "/about" },
-    { name: "Contact", href: "/contact" },
-    { name: "Book a Ride", href: "/main/ride" },
-    { name: "Make orders", href: "/main/store" },
-    { name: "Make Deliveries", href: "/main/store" },
+    { name: 'About', href: '/about' },
+    { name: 'Contact', href: '/contact' },
+    { name: 'Book a Ride', href: '/main/ride' },
+    { name: 'Make orders', href: '/main/store' },
+    { name: 'Make Deliveries', href: '/main/delivery' },
   ];
 
   return (
@@ -57,7 +57,7 @@ export default function Navbar() {
           </span>
         </Link>
 
-        {/* Desktop Links */}
+        {/* Desktop Links & Actions */}
         <div className="hidden md:flex items-center gap-8">
           <div className="flex gap-6 text-xs font-bold uppercase tracking-widest">
             {navLinks.map((link) => {
@@ -92,31 +92,38 @@ export default function Navbar() {
             >
               {darkMode ? <Sun size={18} /> : <Moon size={18} />}
             </button>
-
-            <Link
-              href="/sign-up"
-              className="bg-yellow-400 text-black px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-yellow-300 transition-all active:scale-95 "
+            
+            <Link 
+              href="/sign-up" 
+              className="bg-yellow-400 text-black px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-yellow-300 transition-all active:scale-95"
             >
               Sign up
             </Link>
           </div>
         </div>
 
-        {/* Mobile menu button */}
-        <button
-          className="md:hidden p-2"
-          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          aria-label="Toggle mobile menu"
-        >
-          {isMobileMenuOpen ? (
-            <X size={24} className={darkMode ? "text-white" : "text-black"} />
-          ) : (
-            <Menu
-              size={24}
-              className={darkMode ? "text-white" : "text-black"}
-            />
-          )}
-        </button>
+        {/* Mobile Actions (Visible on small screens) */}
+        <div className="flex items-center gap-3 md:hidden">
+          {/* Mobile Sign Up Button - Now visible outside menu */}
+          <Link 
+            href="/sign-up" 
+            className="bg-yellow-400 text-black px-4 py-2 rounded-lg text-xs font-bold hover:bg-yellow-300 transition-all active:scale-95"
+          >
+            Sign up
+          </Link>
+
+          {/* Mobile menu toggle */}
+          <button 
+            className="p-2" 
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            aria-label="Toggle mobile menu"
+          >
+            {isMobileMenuOpen ? 
+              <X size={24} className={darkMode ? 'text-white' : 'text-black'}/> : 
+              <Menu size={24} className={darkMode ? 'text-white' : 'text-black'}/>
+            }
+          </button>
+        </div>
       </div>
 
       {/* Mobile Menu Overlay */}
@@ -155,14 +162,6 @@ export default function Navbar() {
                 <span className="text-xs">{darkMode ? "Light" : "Dark"}</span>
               </button>
             </div>
-
-            <Link
-              href="/sign-up"
-              onClick={() => setIsMobileMenuOpen(false)}
-              className="bg-yellow-400 text-black w-full py-3 rounded-xl text-sm font-bold hover:bg-yellow-300 transition-all text-center"
-            >
-              Sign up
-            </Link>
           </div>
         </div>
       )}

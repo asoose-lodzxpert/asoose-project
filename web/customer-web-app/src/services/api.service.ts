@@ -1,4 +1,5 @@
 import { getSession } from "next-auth/react";
+import { getCookie } from "cookies-next"; // ✅ Import to access cookies
 
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1";
@@ -12,11 +13,19 @@ export class ApiService {
       };
     }
 
+    // 1. Try getting session from NextAuth
     const session = await getSession();
+    
+    // 2. Fallback: Try getting token directly from cookies
+    // (This handles cases where NextAuth session isn't synced but the cookie exists)
+    const cookieToken = getCookie("accessToken");
+
+    const accessToken = session?.accessToken || cookieToken;
+
     return {
       "Content-Type": "application/json",
-      ...(session?.accessToken && {
-        Authorization: `Bearer ${session.accessToken}`,
+      ...(accessToken && {
+        Authorization: `Bearer ${accessToken}`,
       }),
     };
   }
@@ -36,16 +45,28 @@ export class ApiService {
       },
     });
 
+    // ✅ FIX: Handle Unauthorized (401) explicitly
+    if (response.status === 401) {
+      console.error("ApiService: Unauthorized (401). Session may be expired.");
+      
+      // Force redirect to login if happening client-side
+      if (typeof window !== "undefined" && !window.location.pathname.includes('/sign-in')) {
+        window.location.href = "/sign-in?reason=session_expired";
+      }
+      
+      throw new Error("Session expired. Please log in again.");
+    }
+
     if (!response.ok) {
+      // Attempt to parse error message from backend
       const error = await response
         .json()
         .catch(() => ({ message: "Request failed" }));
-      throw new Error(
-        error.message || `HTTP ${response.status} - Request failed`,
-      );
+      
+      // Throw error with status for easier debugging
+      throw new Error(error.message || `HTTP ${response.status} - Request failed`);
     }
 
-    // ✅ FIX: Handle empty responses safely
     if (response.status === 204) {
       return {} as T;
     }
@@ -54,7 +75,6 @@ export class ApiService {
     try {
       return text ? JSON.parse(text) : ({} as T);
     } catch {
-      // If parsing fails (e.g. server sent plain text instead of JSON), return empty or handle gracefully
       return {} as T;
     }
   }

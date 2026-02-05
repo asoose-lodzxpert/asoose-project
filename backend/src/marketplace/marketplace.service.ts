@@ -87,6 +87,18 @@ export class MarketplaceService {
     return { verticals, banners };
   }
 
+private async resolveImage(key: string | null): Promise<string | null> {
+    if (!key) return null;
+    if (key.startsWith('http')) return key; // Handle legacy or external URLs
+    try {
+      // FIX: Use the existing public method from StorageService
+      // Note: getPublicUrl is synchronous, so 'await' is technically not needed but harmless if kept in an async function
+      return this.storage.getPublicUrl(key);
+    } catch (error) {
+      this.logger.warn(`Failed to resolve image for key: ${key}`);
+      return null;
+    }
+  }
   async getPaginatedStores(page: number, limit: number, type?: string) {
     const skip = (page - 1) * limit;
 

@@ -48,28 +48,28 @@ export default function AsooseLanding() {
 
   const SERVICE_DATA = {
     food: {
-      title: "Local Marketplace",
-      desc: "Explore thousands of items from nearby stores. Groceries, meals, pharmacy, and retail delivered fast",
-      cta: "Make order",
-      link: "/main/store",
-      badge: "Track your order live",
-      image: "/shopping.png",
+      title: 'Local Marketplace',
+      desc: 'Explore thousands of items from nearby stores. Groceries, meals, pharmacy, and retail delivered fast',
+      cta: 'Make order',
+      link: '/main/store',
+      badge: 'Track your order live',
+      image: '/marketplace.jpg', 
     },
     ride: {
-      title: "Where to?",
-      desc: "Get to your destination quickly and safely. Reliable rides with verified drivers and upfront pricing.",
-      cta: "Book a ride",
-      link: "/main/ride",
-      badge: "Quick driver matching",
-      image: "/ride.png",
+      title: 'Where to?',
+      desc: 'Get to your destination quickly and safely. Reliable rides with verified drivers and upfront pricing.',
+      cta: 'Book a ride',
+      link: '/main/ride',
+      badge: 'Quick driver matching',
+      image: '/ride.jpg', 
     },
     package: {
-      title: "Send a package",
-      desc: "Secure delivery for your parcels. From documents to bulk items, we ensure it gets there safely.",
-      cta: "Send a package",
-      link: "/main/delivery",
-      badge: "Upfront pricing & secure",
-      image: "/package.png",
+      title: 'Send a package',
+      desc: 'Secure delivery for your parcels. From documents to bulk items, we ensure it gets there safely.',
+      cta: 'Send a package',
+      link: '/main/delivery',
+      badge: 'Upfront pricing & secure',
+      image: '/delivery.jpg', 
     },
   };
 
@@ -295,12 +295,7 @@ export default function AsooseLanding() {
             </a>
           </div>
           <div className="order-1 md:order-2 relative h-[300px] sm:h-[400px] md:h-[450px] rounded-3xl overflow-hidden">
-            <Image
-              src="/store.svg"
-              alt="Become a merchant"
-              fill
-              className="object-cover"
-            />
+            <Image src="/vendor.jpg" alt="Become a merchant" fill className="object-cover" />
           </div>
         </section>
 
@@ -310,12 +305,7 @@ export default function AsooseLanding() {
         >
           <div className="max-w-7xl mx-auto grid md:grid-cols-2 gap-10 sm:gap-12 md:gap-16 items-center">
             <div className="relative h-[300px] sm:h-[400px] md:h-[450px] rounded-3xl overflow-hidden">
-              <Image
-                src="/rider.png"
-                alt="Become a rider"
-                fill
-                className="object-cover"
-              />
+              <Image src="/driver.jpg" alt="Become a rider" fill className="object-cover" />
             </div>
             <div className="space-y-6 sm:space-y-8">
               <h3 className="text-3xl sm:text-4xl font-black tracking-tight">

@@ -31,15 +31,11 @@ import {
 
 @ApiTags('Disputes')
 @ApiBearerAuth()
-@Controller({
-  path: 'super-admin/disputes',
-  version: '1',
-})
+@Controller('disputes') 
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class DisputesController {
   constructor(private readonly disputesService: DisputesService) {}
 
-  // Open to regular users to file complaints
   @Post()
   @Roles(
     UserRole.SUPER_ADMIN,
@@ -49,14 +45,16 @@ export class DisputesController {
     UserRole.RIDER,
   )
   @ApiOperation({ summary: 'Create a new dispute' })
+  @HttpCode(HttpStatus.CREATED)
   create(@Body() dto: CreateDisputeDto, @Request() req) {
-    return this.disputesService.create(dto, req.user.id);
+    // ✅ FIX: Passed userId first to match the updated Service signature
+    return this.disputesService.create(req.user.id, dto);
   }
 
-  // 🔓 Support Agents + Managers + Super Admin
+  // 🔒 ADMIN ONLY: Support Agents + Managers + Super Admin
   @Get()
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN_MANAGER, UserRole.ADMIN_SUPPORT)
-  @ApiOperation({ summary: 'Get all disputes' })
+  @ApiOperation({ summary: 'Get all disputes (Admin)' })
   findAll(@Query() query: FilterDisputesDto, @Request() req) {
     return this.disputesService.findAll({
       ...query,
@@ -65,6 +63,7 @@ export class DisputesController {
     });
   }
 
+  // 🔒 ADMIN ONLY
   @Get('stats')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN_MANAGER, UserRole.ADMIN_SUPPORT)
   @ApiOperation({ summary: 'Get dispute statistics' })
@@ -72,6 +71,7 @@ export class DisputesController {
     return this.disputesService.getStats();
   }
 
+  // ✅ SHARED: Accessible by Admins AND the specific parties involved
   @Get(':id')
   @Roles(
     UserRole.SUPER_ADMIN,
@@ -86,7 +86,16 @@ export class DisputesController {
     return this.disputesService.findOne(id, req.user.id, req.user.role);
   }
 
+  // ✅ SHARED: Add message to dispute
   @Post(':id/messages')
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN_MANAGER,
+    UserRole.ADMIN_SUPPORT,
+    UserRole.CUSTOMER,
+    UserRole.VENDOR,
+    UserRole.RIDER,
+  )
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Add message to dispute' })
   addMessage(
@@ -97,7 +106,7 @@ export class DisputesController {
     return this.disputesService.addMessage(id, dto, req.user.id, req.user.role);
   }
 
-  // 🔒 Support Agents act here
+  // 🔒 ADMIN ONLY: Internal Notes
   @Post(':id/admin-notes')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN_MANAGER, UserRole.ADMIN_SUPPORT)
   @HttpCode(HttpStatus.CREATED)
@@ -110,6 +119,7 @@ export class DisputesController {
     return this.disputesService.addAdminNote(id, note, req.user.id);
   }
 
+  // 🔒 ADMIN ONLY: Update Priority
   @Patch(':id/priority')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN_MANAGER, UserRole.ADMIN_SUPPORT)
   @HttpCode(HttpStatus.OK)
@@ -124,6 +134,7 @@ export class DisputesController {
     });
   }
 
+  // 🔒 ADMIN ONLY: Resolve
   @Post(':id/resolve')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN_MANAGER, UserRole.ADMIN_SUPPORT)
   @HttpCode(HttpStatus.OK)
@@ -137,6 +148,7 @@ export class DisputesController {
     return this.disputesService.resolve(id, dto, req.user.id);
   }
 
+  // 🔒 ADMIN ONLY: Reject
   @Post(':id/reject')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN_MANAGER, UserRole.ADMIN_SUPPORT)
   @HttpCode(HttpStatus.OK)

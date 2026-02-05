@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
+import { ActivityLogService } from 'src/common/services/activity-log.services';
 import {
   VerificationStatus,
   UserStatus,
@@ -15,7 +16,11 @@ export enum VerificationEntityType {
 @Injectable()
 export class VerificationService {
   private readonly logger = new Logger(VerificationService.name);
-  constructor(private prisma: PrismaService) {}
+
+  constructor(
+    private prisma: PrismaService,
+    private activityLogService: ActivityLogService,
+  ) {}
 
   /**
    * 1.3 Server-Side Search & Pagination
@@ -82,6 +87,7 @@ export class VerificationService {
   /**
    * 1.2 Multi-Step Decision Flow
    * FIX: Captures updated store object to avoid the null-reference error on findUnique
+   * UPDATE: Added Activity Logging for auditing verification actions
    */
   async handleDecision(
     id: string,
@@ -104,15 +110,16 @@ export class VerificationService {
           ? UserStatus.SUSPENDED
           : UserStatus.PENDING;
 
-    return await this.prisma.$transaction(async (tx) => {
+    // 1. Perform the database update transaction
+    const result = await this.prisma.$transaction(async (tx) => {
       if (isVendor) {
-        // 1. Update Vendor Account
+        // Update Vendor Account
         const vendor = await tx.vendor.update({
           where: { id },
           data: { status: uStatus },
         });
 
-        // 2. Update Store Entity and Verification status - CAPTURE THE RESULT
+        // Update Store Entity and Verification status
         const store = await tx.store.update({
           where: { vendorId: id },
           data: {
@@ -122,7 +129,7 @@ export class VerificationService {
           },
         });
 
-        // 3. Use the captured 'store.id' for the log entry
+        // Keep existing StoreLog for vendor-specific logic
         await tx.storeLog.create({
           data: {
             storeId: store.id,
@@ -134,13 +141,13 @@ export class VerificationService {
 
         return vendor;
       } else {
-        // 1. Update Rider Account
+        // Update Rider Account
         const rider = await tx.rider.update({
           where: { id },
           data: { status: uStatus },
         });
 
-        // 2. Update all Rider documents to match decision
+        // Update all Rider documents to match decision
         await tx.riderDocument.updateMany({
           where: { riderId: id },
           data: { status: vStatus },
@@ -149,6 +156,30 @@ export class VerificationService {
         return rider;
       }
     });
+
+    // 2. Record in Global Activity Log (Non-blocking / outside transaction to ensure it reflects committed state)
+    try {
+      await this.activityLogService.record({
+        userId: adminId,
+        action: `VERIFICATION_${action}`,
+        target: id, // The ID of the Vendor or Rider being verified
+        status: 'SUCCESS',
+        details: note || `Admin ${action}ed ${type} verification request`,
+        metadata: {
+          entityType: type,
+          verificationStatus: vStatus,
+          userStatus: uStatus,
+        },
+      });
+    } catch (logError) {
+      this.logger.error(
+        `Failed to record activity log for verification ${id}`,
+        logError,
+      );
+      // We do not throw here to prevent rolling back the successful verification logic
+    }
+
+    return result;
   }
 
   async getVerificationById(id: string) {

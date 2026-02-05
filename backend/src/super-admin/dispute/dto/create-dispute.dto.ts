@@ -2,27 +2,21 @@ import {
   IsString,
   IsOptional,
   IsUUID,
-  IsEnum,
   IsArray,
   IsUrl,
+  IsNotEmpty
 } from 'class-validator';
-import { DisputePriority } from '@prisma/client';
 
 export class CreateDisputeDto {
   @IsString()
+  @IsNotEmpty()
   reason: string;
 
-  @IsOptional()
+  // Updated: Made required to ensure actionable context is provided
   @IsString()
-  description?: string;
+  @IsNotEmpty()
+  description: string;
 
-  @IsOptional()
-  @IsEnum(DisputePriority)
-  priority?: DisputePriority;
-
-  @IsOptional()
-  @IsUUID()
-  targetUserId?: string;
 
   @IsOptional()
   @IsUUID()

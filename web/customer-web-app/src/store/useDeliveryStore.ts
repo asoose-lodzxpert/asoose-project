@@ -1,19 +1,20 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 
-// 1. Update the Stage type to include ALL steps used in the page
-export type DeliveryStage =
-  | "IDLE"
-  | "CONFIGURING"
-  | "Processing_Address" // Added
-  | "Calculating_Fee" // Added
-  | "SELECTING_VEHICLE"
-  | "Payment_Pending" // Added
-  | "FINDING_COURIER"
-  | "COURIER_ASSIGNED"
-  | "PICKED_UP"
-  | "COMPLETED"
-  | "CANCELLED";
+// 1. Update the Stage type to include REVIEW_PAYMENT
+export type DeliveryStage = 
+  | 'IDLE' 
+  | 'CONFIGURING' 
+  | 'Processing_Address' 
+  | 'Calculating_Fee' 
+  | 'REVIEW_PAYMENT'      // ✅ ADDED THIS
+  | 'SELECTING_VEHICLE'   // Kept for backward compatibility if needed, or you can remove it
+  | 'Payment_Pending' 
+  | 'FINDING_COURIER' 
+  | 'COURIER_ASSIGNED' 
+  | 'PICKED_UP' 
+  | 'COMPLETED' 
+  | 'CANCELLED';
 
 type Position = { lat: number; lng: number };
 
@@ -32,15 +33,13 @@ interface DeliveryState {
   activeDeliveryId: string | null;
   pickupPos: Position | null;
   dropoffPos: Position | null;
-
-  // Added address IDs for backend linkage
+  
   pickupAddressId: string | null;
   dropoffAddressId: string | null;
 
   courierPos: Position | undefined;
   packageInfo: PackageInfo;
-
-  // Changed from generic 'priceEstimates' to specific fee
+  
   calculatedFee: number | null;
 
   courierInfo: any | null;
@@ -49,9 +48,9 @@ interface DeliveryState {
   // Actions
   setStage: (stage: DeliveryStage) => void;
   setLocations: (pickup?: Position, dropoff?: Position) => void;
-  setAddressIds: (pickupId?: string, dropoffId?: string) => void; // Added
+  setAddressIds: (pickupId?: string, dropoffId?: string) => void; 
   setPackageInfo: (info: Partial<PackageInfo>) => void;
-  setCalculatedFee: (fee: number) => void; // Added
+  setCalculatedFee: (fee: number) => void; 
   resetDelivery: () => void;
 }
 

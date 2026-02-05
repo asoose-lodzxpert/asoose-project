@@ -8,6 +8,7 @@ import {
   Query,
   UseGuards,
   Request,
+  Headers, // FIX: Added Headers import
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { TripsService } from './trips.service';
@@ -113,11 +114,20 @@ export class TripsController {
     return this.tripsService.cancelRide(req.user.id, rideId, dto);
   }
 
-  // DELIVERY ENDPOINTS (Unchanged)
+  // DELIVERY ENDPOINTS
 
+  // FIX: Updated to capture idempotency-key header
   @Post('deliveries/request')
-  async requestDelivery(@Request() req, @Body() dto: RequestDeliveryDto) {
-    return this.tripsService.requestDelivery(req.user.id, dto);
+  async requestDelivery(
+    @Request() req,
+    @Body() dto: RequestDeliveryDto,
+    @Headers('idempotency-key') idempotencyKey?: string,
+  ) {
+    return this.tripsService.requestDelivery(
+      req.user.id,
+      dto,
+      idempotencyKey,
+    );
   }
 
   @Get('deliveries')
@@ -138,6 +148,7 @@ export class TripsController {
   ) {
     return this.tripsService.cancelDelivery(req.user.id, deliveryId, dto);
   }
+
   @Patch('rides/:id/arrived')
   async driverArrived(@Request() req, @Param('id') rideId: string) {
     return this.tripsService.driverArrived(rideId, req.user.id);
