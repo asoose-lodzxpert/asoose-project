@@ -117,8 +117,8 @@ export class DeliveryService {
 
   static async verifyPayment(reference: string, token?: string): Promise<boolean> {
     try {
-      const res = await api.get(`/payments/verify/${reference}`, getAuthHeader(token));
-      return res.data.status === 'success';
+      const res = await api.get(`/payment/verify?reference=${reference}`, getAuthHeader(token));
+      return res.data.status === 'success' || res.data.success === true;
     } catch (error) {
       console.error("Manual verification failed", error);
       return false;

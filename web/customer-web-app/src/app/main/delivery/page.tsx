@@ -4,7 +4,8 @@ import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
   Package, ChevronRight, Box, Layers, Truck, 
-  Loader2, User, Phone, AlertCircle, RefreshCw, CreditCard, CheckCircle2
+  Loader2, User, Phone, AlertCircle, RefreshCw, CreditCard, CheckCircle2,
+  FileText
 } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { useSession } from 'next-auth/react';
@@ -17,11 +18,9 @@ import { ReviewModal } from '@/store/ReviewModal';
 import { paymentService } from '@/services/payment.service';
 import { DeliveryService } from '@/services/delivery.service';
 import { socketService } from '@/services/socket.service';
+import { PACKAGE_TYPES } from '@/constants/packageTypes'; 
 
-
-// ===========================
 // CONSTANTS & TYPES
-// ===========================
 
 const DeliveryStage = {
   IDLE: 'IDLE',
@@ -38,7 +37,7 @@ const DeliveryStage = {
 } as const;
 
 const PHONE_REGEX = /^(\+234|0)[789][01]\d{8}$/;
-const PENDING_DELIVERY_KEY = 'pending_delivery_data'; // Stores JSON: { id, reference }
+const PENDING_DELIVERY_KEY = 'pending_delivery_data'; 
 
 interface DetailInputProps {
   label: string;
@@ -57,9 +56,7 @@ interface SessionWithToken {
   };
 }
 
-// ===========================
 // UTILITIES
-// ===========================
 
 const getAuthToken = (session: any): string | null => {
   const typedSession = session as SessionWithToken;
@@ -89,9 +86,7 @@ const sanitizeInput = (input: string, maxLength: number = 255): string => {
   return input.trim().slice(0, maxLength);
 };
 
-// ===========================
 // MAIN COMPONENT
-// ===========================
 
 export default function DeliveryPage() {
   const router = useRouter();
@@ -120,9 +115,7 @@ export default function DeliveryPage() {
     }
   }, [stage, activeDeliveryId, router]);
 
-  // ===========================
-  // RECOVERY LOGIC (THE FIX)
-  // ===========================
+  // RECOVERY LOGIC 
   const handlePaymentSuccess = useCallback((id?: string) => {
     localStorage.removeItem(PENDING_DELIVERY_KEY);
     setStage(DeliveryStage.FINDING_COURIER);
@@ -135,7 +128,6 @@ export default function DeliveryPage() {
 
   useEffect(() => {
     const recoverState = async () => {
-      // Wait for session to be ready
       if (status === 'loading') return;
 
       const storedData = localStorage.getItem(PENDING_DELIVERY_KEY);
@@ -145,11 +137,8 @@ export default function DeliveryPage() {
         try {
           const { id, reference } = JSON.parse(storedData);
           
-          // Only attempt recovery if we are in a pending/review state and have an ID
           if (id && reference && (stage === DeliveryStage.PAYMENT_PENDING || stage === DeliveryStage.REVIEW_PAYMENT)) {
-             
              // 1. Force Active Verification First
-             // Pass token explicitly
              const isVerified = await DeliveryService.verifyPayment(reference, token || undefined);
              
              if (isVerified) {
@@ -158,12 +147,9 @@ export default function DeliveryPage() {
              }
 
              // 2. If verification failed (network/timing), fall back to Polling
-             // We restore the ID to the store to ensure the UI Context is correct
              useDeliveryStore.setState({ activeDeliveryId: id });
              setStage(DeliveryStage.PAYMENT_PENDING); 
              
-             // Start polling as fallback
-             // Pass token explicitly
              const success = await DeliveryService.pollDeliveryStatus(id, undefined, undefined, undefined, token || undefined);
              if (success) {
                handlePaymentSuccess(id);
@@ -178,11 +164,9 @@ export default function DeliveryPage() {
 
     recoverState();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session, status]); // Added session dependencies
+  }, [session, status]); 
 
-  // ===========================
   // EVENT HANDLERS
-  // ===========================
 
   const handleSocketUpdate = useCallback((data: any) => {
     if (data.status === 'ASSIGNED') {
@@ -195,7 +179,6 @@ export default function DeliveryPage() {
     }
   }, [setStage]);
 
-  // Connect Socket
   useEffect(() => {
     const token = getAuthToken(session);
     if (token && activeDeliveryId) {
@@ -221,27 +204,35 @@ export default function DeliveryPage() {
     );
   }, [pickupPos, dropoffPos, packageInfo, phoneError]);
 
-  const packageSizes = [
-    { id: 'Small', label: 'Small', icon: Package, type: 'Document', radius: 'rounded-lg', weightLabel: '< 5 kg', weightValue: 2.5 },
-    { id: 'Medium', label: 'Medium', icon: Box, type: 'Parcel', radius: 'rounded-xl', weightLabel: '5-20 kg', weightValue: 12.5 },
-    { id: 'Large', label: 'Large', icon: Layers, type: 'Bulk', radius: 'rounded-2xl', weightLabel: '20-50 kg', weightValue: 35 },
-    { id: 'XL', label: 'Extra Large', icon: Truck, type: 'Heavy', radius: 'rounded-3xl', weightLabel: '50+ kg', weightValue: 60 },
-  ];
+  // Helper to get icons for PACKAGE_TYPES
+  const getPackageIcon = (id: string) => {
+    switch (id) {
+      case 'Document': return FileText;
+      case 'Parcel': return Box;
+      case 'Bulk': return Layers;
+      case 'Heavy': return Truck;
+      default: return Package;
+    }
+  };
+
+  // ✅ Helper to get style radius based on index/type (mimicking original UI feel)
+  const getRadiusStyle = (index: number) => {
+    const radii = ['rounded-lg', 'rounded-xl', 'rounded-2xl', 'rounded-3xl'];
+    return radii[index] || 'rounded-lg';
+  };
 
   const getSelectedWeight = (): number => {
-    const selected = packageSizes.find(p => p.type === packageInfo.type);
+    //  Use Shared Constants for weight lookup
+    const selected = PACKAGE_TYPES.find(p => p.id === packageInfo.type);
     return selected ? selected.weightValue : 2.5;
   };
 
   const handleInitializeDelivery = async () => {
     if (!pickupPos || !dropoffPos) return;
 
-    // ✅ FIX: Retrieve token from session
     const token = getAuthToken(session);
     if (!token) {
       toast.error("Please log in to continue");
-      // Optional: redirect to login
-      // router.push('/sign-in'); 
       return;
     }
 
@@ -251,7 +242,6 @@ export default function DeliveryPage() {
       setStage(DeliveryStage.PROCESSING_ADDRESS);
       const cityFallback = "Lagos";
 
-      // ✅ FIX: Pass token to saveAddress
       const pickupRes = await DeliveryService.saveAddress({
         street: sanitizeInput(packageInfo.pickupAddress),
         city: cityFallback,
@@ -259,7 +249,6 @@ export default function DeliveryPage() {
         lng: pickupPos.lng
       }, token);
 
-      // ✅ FIX: Pass token to saveAddress
       const dropoffRes = await DeliveryService.saveAddress({
         street: sanitizeInput(packageInfo.destinationAddress),
         city: cityFallback,
@@ -270,20 +259,19 @@ export default function DeliveryPage() {
       setAddressIds(pickupRes.id, dropoffRes.id);
       setStage(DeliveryStage.CALCULATING_FEE);
       
-      // ✅ FIX: Pass token to createDelivery
       const deliveryRes = await DeliveryService.createDelivery({
         pickupAddressId: pickupRes.id,
         dropoffAddressId: dropoffRes.id,
         recipientName: sanitizeInput(packageInfo.recipientName),
         recipientPhone: normalizePhoneNumber(packageInfo.recipientPhone),
         packageDetails: sanitizeInput(`${packageInfo.type} - ${packageInfo.instructions || ''}`),
-        weightKg: getSelectedWeight()
+        weightKg: getSelectedWeight() // ✅ Uses consistent weight logic
       }, token);
 
       if (deliveryRes?.delivery?.id) {
         useDeliveryStore.setState({ activeDeliveryId: deliveryRes.delivery.id });
         setCalculatedFee(deliveryRes.deliveryFee);
-        setStage(DeliveryStage.REVIEW_PAYMENT); // Skip vehicle selection
+        setStage(DeliveryStage.REVIEW_PAYMENT); 
       } else {
         throw new Error("Invalid server response");
       }
@@ -317,7 +305,6 @@ export default function DeliveryPage() {
       }, token);
 
       if (paymentRes.authorizationUrl && paymentRes.reference) {
-        // ✅ FIX: Store Reference + ID
         localStorage.setItem(PENDING_DELIVERY_KEY, JSON.stringify({
           id: activeDeliveryId,
           reference: paymentRes.reference
@@ -335,9 +322,7 @@ export default function DeliveryPage() {
 
   const handleManualPaymentCheck = useCallback(async () => {
     if (activeDeliveryId) {
-       // Attempt a manual poll when user clicks "I have paid"
        const token = getAuthToken(session);
-       // Pass token
        const success = await DeliveryService.pollDeliveryStatus(
          activeDeliveryId, 
          undefined, 
@@ -354,7 +339,6 @@ export default function DeliveryPage() {
     if (!activeDeliveryId) return;
     const token = getAuthToken(session);
     try {
-      // Pass token
       await DeliveryService.rateDelivery(
         activeDeliveryId, 
         rating, 
@@ -375,9 +359,7 @@ export default function DeliveryPage() {
     setStage(DeliveryStage.IDLE);
   }, [resetDelivery, setStage]);
 
-  // ===========================
   // RENDER CONTENT
-  // ===========================
   const renderStageContent = () => {
     if (apiError && stage === DeliveryStage.CONFIGURING) {
       return (
@@ -403,7 +385,7 @@ export default function DeliveryPage() {
         );
 
       case DeliveryStage.REVIEW_PAYMENT:
-      case DeliveryStage.SELECTING_VEHICLE: // Handle legacy state if stuck
+      case DeliveryStage.SELECTING_VEHICLE: 
         return (
           <div className="max-w-xl mx-auto p-6 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl animate-in fade-in slide-in-from-bottom-4 shadow-xl">
              <div className="text-center mb-8">
@@ -511,23 +493,30 @@ export default function DeliveryPage() {
               <section>
                 <h3 className="text-lg font-semibold mb-4 dark:text-white">Package Size</h3>
                 <div className="grid grid-cols-2 gap-4">
-                  {packageSizes.map((size) => (
-                    <button 
-                      key={size.id} 
-                      onClick={() => setPackageInfo({ type: size.type, weight: size.weightLabel })} 
-                      className={`p-6 border transition-all duration-300 text-left flex flex-col gap-4 ${size.radius} ${
-                        packageInfo.type === size.type 
-                          ? 'border-yellow-500 bg-yellow-500/5 shadow-md' 
-                          : 'border-zinc-200 dark:border-white/10 hover:border-yellow-500/50'
-                      }`}
-                    >
-                      <size.icon className={`w-6 h-6 ${packageInfo.type === size.type ? 'text-yellow-500' : 'text-zinc-400'}`} />
-                      <div>
-                        <p className="text-base font-medium dark:text-white">{size.label}</p>
-                        <p className="text-xs text-gray-500 mt-1">{size.weightLabel}</p>
-                      </div>
-                    </button>
-                  ))}
+                  {/* ✅ Replaced hardcoded array with PACKAGE_TYPES */}
+                  {PACKAGE_TYPES.map((type, index) => {
+                    const Icon = getPackageIcon(type.id);
+                    const radiusClass = getRadiusStyle(index);
+                    const isSelected = packageInfo.type === type.id;
+                    
+                    return (
+                      <button 
+                        key={type.id} 
+                        onClick={() => setPackageInfo({ type: type.id, weight: type.weightLabel })} 
+                        className={`p-6 border transition-all duration-300 text-left flex flex-col gap-4 ${radiusClass} ${
+                          isSelected 
+                            ? 'border-yellow-500 bg-yellow-500/5 shadow-md' 
+                            : 'border-zinc-200 dark:border-white/10 hover:border-yellow-500/50'
+                        }`}
+                      >
+                        <Icon className={`w-6 h-6 ${isSelected ? 'text-yellow-500' : 'text-zinc-400'}`} />
+                        <div>
+                          <p className="text-base font-medium dark:text-white">{type.label}</p>
+                          <p className="text-xs text-gray-500 mt-1">{type.weightLabel}</p>
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
               </section>
 
