@@ -41,13 +41,13 @@ export class RidersController {
   }
 
   @Patch(':id/status')
-  // Ensure Roles guard is present if not global
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN_MANAGER)
   async updateStatus(
-    @Param('id') id: string, 
+    @Param('id') id: string,
     @Body('status') status: UserStatus,
-    @Req() req: any 
+    @Req() req: any,
   ) {
-    const adminId = req.user?.id || req.user?.sub; // Get Admin ID from JWT
+    const adminId = req.user?.id || req.user?.userId;
     return this.ridersService.updateStatus(id, status, adminId);
   }
 
@@ -57,8 +57,10 @@ export class RidersController {
     @Param('id') riderId: string,
     @Param('docId') docId: string,
     @Body('status') status: VerificationStatus,
+    @Req() req: any,
   ) {
-    return this.ridersService.verifyDocument(riderId, docId, status);
+    const adminId = req.user?.id || req.user?.userId;
+    return this.ridersService.verifyDocument(riderId, docId, status, adminId);
   }
 
   @Get(':id/rides')
@@ -122,19 +124,25 @@ export class RidersController {
       body.reference,
     );
   }
+
   @Delete(':id')
   @Roles(UserRole.SUPER_ADMIN) // Restrict deletion to Super Admin only
-  async remove(@Param('id') id: string) {
-    return this.ridersService.remove(id); // Ensure remove() exists in RidersService
+  async remove(@Param('id') id: string, @Req() req: any) {
+    const adminId = req.user?.id || req.user?.userId;
+    return this.ridersService.remove(id, adminId);
   }
+
   @Post(':id/message')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN_MANAGER)
   async messageRider(
     @Param('id') id: string,
     @Body('message') message: string,
+    @Req() req: any,
   ) {
-    return this.ridersService.sendMessageToRider(id, message);
+    const adminId = req.user?.id || req.user?.userId;
+    return this.ridersService.sendMessageToRider(id, message, adminId);
   }
+
   @Patch(':id/vehicle')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN_MANAGER)
   async updateVehicle(
@@ -147,27 +155,32 @@ export class RidersController {
       color?: string;
       plateNumber?: string;
     },
+    @Req() req: any,
   ) {
-    return this.ridersService.updateVehicle(id, body);
+    const adminId = req.user?.id || req.user?.userId;
+    return this.ridersService.updateVehicle(id, body, adminId);
   }
-  @Get(':id/payouts')
-@Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN) // Ensure proper authorization
-async getRiderPayouts(@Param('id') id: string) {
-  // This calls the service to fetch payouts linked to this specific rider
-  return this.ridersService.getRiderPayouts(id);
-}
 
-@Post(':id/kill-switch')
-  @Roles(UserRole.SUPER_ADMIN) 
+  @Get(':id/payouts')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN) // Ensure proper authorization
+  async getRiderPayouts(@Param('id') id: string) {
+    // This calls the service to fetch payouts linked to this specific rider
+    return this.ridersService.getRiderPayouts(id);
+  }
+
+  @Post(':id/kill-switch')
+  @Roles(UserRole.SUPER_ADMIN)
   async killSwitch(
     @Param('id') id: string,
     @Body() body: { action: 'SUSPEND' | 'BAN'; reason: string },
-    @Req() req: any // Inject Request to get Admin ID
+    @Req() req: any, // Inject Request to get Admin ID
   ) {
-    // Note: Assuming you have a custom decorator or extracting from req.user
-    const adminId = req.user?.id || 'SYSTEM'; 
-    return this.ridersService.executeKillSwitch(id, body.action, body.reason, adminId);
+    const adminId = req.user?.id || req.user?.userId;
+    return this.ridersService.executeKillSwitch(
+      id,
+      body.action,
+      body.reason,
+      adminId,
+    );
   }
-
-
 }

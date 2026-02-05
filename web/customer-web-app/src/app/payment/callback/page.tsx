@@ -14,7 +14,7 @@ function CallbackContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { clearCart } = useCartStore();
-  const { resetDelivery } = useDeliveryStore(); // We still need this for 'reset' logic elsewhere, but not for success
+  const { resetDelivery } = useDeliveryStore(); 
   
   const { data: session } = useSession();
   const processedRef = useRef(false);
@@ -59,7 +59,9 @@ function CallbackContent() {
 
             const isCheckout = localStorage.getItem('pending_checkout');
             const isRide = localStorage.getItem('pending_ride');
-            const isDelivery = localStorage.getItem('pending_delivery');
+            
+            // ✅ FIX: Match the key used in DeliveryPage ('pending_delivery_data')
+            const pendingDeliveryData = localStorage.getItem('pending_delivery_data');
 
             if (isCheckout) {
                 clearCart();
@@ -69,13 +71,25 @@ function CallbackContent() {
             } else if (isRide) {
                 localStorage.removeItem('pending_ride');
                 router.replace('/main/ride');
-            } else if (isDelivery) {
-                // 🛑 CRITICAL FIX: Removed resetDelivery() 
-                // We MUST keep the store state so the main page can track the delivery
-                localStorage.removeItem('pending_delivery');
-                router.replace('/main/delivery');
+            } else if (pendingDeliveryData) {
+                // ✅ FIX: Extract ID and redirect directly to tracking page
+                try {
+                    const { id } = JSON.parse(pendingDeliveryData);
+                    localStorage.removeItem('pending_delivery_data');
+                    
+                    if (id) {
+                        router.replace(`/main/delivery/${id}`);
+                    } else {
+                        // Fallback if ID parsing fails
+                        router.replace('/main/delivery');
+                    }
+                } catch (e) {
+                    console.error("Failed to parse delivery data", e);
+                    localStorage.removeItem('pending_delivery_data');
+                    router.replace('/main/delivery');
+                }
             } else {
-                router.replace('/dashboard');
+                router.replace('/main/store');
             }
 
         } else {

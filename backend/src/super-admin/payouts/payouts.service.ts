@@ -4,6 +4,7 @@ import { PayoutStatus } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { PaymentService } from 'src/payment/payment.service';
 import { RecipientType, PaymentGateway } from 'src/payment/dto/payment.dto';
+import { ActivityLogService } from 'src/common/services/activity-log.services'; // ✅ Import Added
 
 @Injectable()
 export class PayoutsService {
@@ -13,6 +14,7 @@ export class PayoutsService {
     private prisma: PrismaService,
     private ledger: TransactionLedgerService,
     private paymentService: PaymentService,
+    private logService: ActivityLogService, // ✅ Inject Service
   ) {}
 
   async getPendingPayouts() {
@@ -37,8 +39,8 @@ export class PayoutsService {
   }
 
   async approvePayout(id: string, type: 'VENDOR' | 'RIDER', adminId: string) {
-    // 1. Critical: Wrap the entire check-and-lock in a transaction to prevent race conditions
-    return this.prisma.$transaction(async (tx) => {
+    // 1. Perform Transaction
+    const result = await this.prisma.$transaction(async (tx) => {
       const payout =
         type === 'VENDOR'
           ? await tx.vendorPayout.findUnique({
@@ -127,16 +129,32 @@ export class PayoutsService {
         throw new BadRequestException(`Bank Transfer Failed: ${error.message}`);
       }
     });
+
+    // 2. ✅ Log Activity (Outside Transaction)
+    await this.logService.record({
+      userId: adminId,
+      action: 'PAYOUT_APPROVED',
+      target: id,
+      details: `Approved ${type} payout of ${result.amount}`,
+      metadata: { payoutId: id, type, amount: result.amount },
+    });
+
+    return result;
   }
 
-  async rejectPayout(id: string, type: 'VENDOR' | 'RIDER', reason: string) {
-    // Corrected: Use PayoutStatus.REJECTED instead of FAILED to align with schema
+  async rejectPayout(
+    id: string,
+    type: 'VENDOR' | 'RIDER',
+    reason: string,
+    adminId: string,
+  ) {
     const updateData = {
       status: PayoutStatus.REJECTED,
       rejectionReason: reason,
     };
 
-    return this.prisma.$transaction(async (tx) => {
+    // 1. Perform Transaction
+    const result = await this.prisma.$transaction(async (tx) => {
       if (type === 'VENDOR') {
         const payout = await tx.vendorPayout.update({
           where: { id },
@@ -163,5 +181,16 @@ export class PayoutsService {
         return payout;
       }
     });
+
+    // 2. ✅ Log Activity (Outside Transaction)
+    await this.logService.record({
+      userId: adminId,
+      action: 'PAYOUT_REJECTED',
+      target: id,
+      details: `Rejected ${type} payout. Reason: ${reason}`,
+      metadata: { payoutId: id, type, reason },
+    });
+
+    return result;
   }
 }

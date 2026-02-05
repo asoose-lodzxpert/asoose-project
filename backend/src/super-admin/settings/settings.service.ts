@@ -34,7 +34,6 @@ export class SettingsService {
    */
   async updateBulk(settings: { key: string; value: any }[], adminId: string) {
     try {
-      // 1. Create a list of upsert operations
       const operations = settings.map((s) =>
         this.prisma.systemSetting.upsert({
           where: { key: s.key },
@@ -47,12 +46,19 @@ export class SettingsService {
         }),
       );
 
-      // 2. Execute all updates atomically
       const results = await this.prisma.$transaction(operations);
 
-      // 3. CACHE INVALIDATION:
-      // If maintenance_mode was changed, we MUST clear Redis so the
-      // AppController and Middleware see the update immediately.
+      // 1. Audit Log
+      await this.logService.record({
+        userId: adminId,
+        action: 'SETTINGS_UPDATE',
+        target: 'System Settings',
+        details: `Updated ${settings.length} system configuration(s)`,
+        metadata: {
+          updatedKeys: settings.map((s) => s.key),
+        },
+      });
+
       if (settings.some((s) => s.key === 'maintenance_mode')) {
         await this.redisClient.del(this.MAINTENANCE_CACHE_KEY);
         this.logger.log('Maintenance mode changed: Redis cache invalidated.');

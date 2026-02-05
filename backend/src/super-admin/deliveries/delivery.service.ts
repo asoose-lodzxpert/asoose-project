@@ -21,8 +21,8 @@ export class DeliveriesService {
 
     const where: any = {};
 
-    if (status) where.status = status;
-    if (riderId) where.riderId = riderId; // Ensure riderId is added to your DTO
+    if (status && status !== 'All') where.status = status;
+    if (riderId) where.riderId = riderId;
 
     if (from && to) {
       where.createdAt = {
@@ -41,10 +41,10 @@ export class DeliveriesService {
             select: {
               id: true,
               status: true,
-              store: { select: { name: true } },
+              store: { select: { name: true } }, // Fetch Store Name for Sender
             },
           },
-          // Select direct fields from Rider
+          // ✅ FIX: Select name/phone directly from Rider (no user relation)
           rider: {
             select: {
               id: true,
@@ -53,14 +53,20 @@ export class DeliveriesService {
             },
           },
           customer: { select: { name: true, phone: true } },
+          // ✅ FIX: Include Addresses so route info displays
+          pickupAddress: true,
+          dropoffAddress: true,
         },
         orderBy: { createdAt: 'desc' },
       }),
       this.prisma.delivery.count({ where }),
     ]);
 
+    // Transform data before returning
+    const transformedData = data.map((d) => this.transformForList(d));
+
     return {
-      data,
+      data: transformedData,
       meta: {
         total,
         page,
@@ -86,6 +92,7 @@ export class DeliveriesService {
             },
           },
         },
+        // ✅ FIX: Include vehicle for Rider details
         rider: {
           include: {
             vehicle: true,
@@ -134,7 +141,6 @@ export class DeliveriesService {
       });
 
       // 2. Record delivery earnings in ledger
-      // Note: Delivery fee comes from the delivery record
       const deliveryFee = delivery.deliveryFee || 0;
 
       if (deliveryFee > 0 && delivery.rider) {
@@ -155,7 +161,6 @@ export class DeliveriesService {
           },
         });
 
-        // Record order payment and commission if payment exists
         if (
           delivery.order.payment &&
           delivery.order.payment.status === 'COMPLETED'
@@ -169,7 +174,6 @@ export class DeliveriesService {
             status: delivery.order.payment.status,
           });
 
-          // Record order commission (if order has store)
           const order = await tx.order.findUnique({
             where: { id: delivery.orderId },
             include: { store: { select: { id: true, commissionRate: true } } },
@@ -204,7 +208,6 @@ export class DeliveriesService {
     });
   }
 
-  // 🚫 4. Cancel/Delete Delivery
   async remove(id: string, adminUserId?: string, reason?: string) {
     const delivery = await this.prisma.delivery.findUnique({
       where: { id },
@@ -225,13 +228,11 @@ export class DeliveriesService {
     }
 
     return this.prisma.$transaction(async (tx) => {
-      // 1. Cancel the delivery
       await tx.delivery.update({
         where: { id },
         data: { status: 'CANCELLED' },
       });
 
-      // 2. If this delivery has an associated order, cancel it too
       if (delivery.orderId && delivery.order) {
         await tx.order.update({
           where: { id: delivery.orderId },
@@ -241,7 +242,6 @@ export class DeliveriesService {
           },
         });
 
-        // Process refund if payment was completed
         if (
           delivery.order.payment &&
           delivery.order.payment.status === 'COMPLETED'
@@ -260,7 +260,6 @@ export class DeliveriesService {
         }
       }
 
-      // 3. Log activity
       await tx.activityLog.create({
         data: {
           userId: adminUserId || 'SUPER_ADMIN',
@@ -276,7 +275,6 @@ export class DeliveriesService {
     });
   }
 
-  // 💰 5. Process Delivery Refund (for standalone deliveries)
   async refundDelivery(id: string, refundAmount?: number, reason?: string) {
     const delivery = await this.prisma.delivery.findUnique({
       where: { id },
@@ -292,14 +290,12 @@ export class DeliveriesService {
 
     if (!delivery) throw new NotFoundException('Delivery not found');
 
-    // Check if order exists
     if (!delivery.order) {
       throw new BadRequestException(
         'No associated order found for this delivery',
       );
     }
 
-    // Check if payment exists
     if (!delivery.order.payment) {
       throw new BadRequestException('No payment found for this delivery');
     }
@@ -315,10 +311,8 @@ export class DeliveriesService {
     }
 
     return this.prisma.$transaction(async (tx) => {
-      // Safe to use non-null assertion here because we checked above
       const payment = delivery.order!.payment!;
 
-      // Update payment status
       await tx.payment.update({
         where: { id: payment.id },
         data: {
@@ -329,7 +323,6 @@ export class DeliveriesService {
         },
       });
 
-      // Record refund in ledger
       await this.ledgerService.recordRefund({
         id: payment.id,
         amount: amountToRefund,
@@ -337,7 +330,6 @@ export class DeliveriesService {
         ...(delivery.orderId && { orderId: delivery.orderId }),
       });
 
-      // Log activity
       await tx.activityLog.create({
         data: {
           userId: 'ADMIN',
@@ -362,13 +354,14 @@ export class DeliveriesService {
     return 'Parcel';
   }
 
+  // ✅ FIX: Access rider fields directly (no user relation)
   private transformForList = (d: any) => {
     return {
       id: d.id,
       type: this.inferType(d.weightKg || 0, d.isFragile),
-      sender: d.order?.store?.name || d.customer.name,
-      recipient: d.recipientName,
-      driver: d.rider?.user?.name || '-',
+      sender: d.order?.store?.name || d.customer?.name || 'Unknown',
+      recipient: d.recipientName || 'Unknown',
+      driver: d.rider?.name || '-', // Direct access
       status:
         d.status === 'PICKED_UP'
           ? 'In Transit'
@@ -377,8 +370,8 @@ export class DeliveriesService {
             : d.status === 'REQUESTED'
               ? 'Pending Pickup'
               : d.status.charAt(0) + d.status.slice(1).toLowerCase(),
-      pickup: d.pickupAddress.city || d.pickupAddress.street,
-      dropoff: d.dropoffAddress.city || d.dropoffAddress.street,
+      pickup: d.pickupAddress?.city || d.pickupAddress?.street || 'N/A',
+      dropoff: d.dropoffAddress?.city || d.dropoffAddress?.street || 'N/A',
       eta: d.deliveredAt ? 'Delivered' : 'Est. 2 hrs',
     };
   };
@@ -407,29 +400,32 @@ export class DeliveriesService {
         ? {
             name: d.order.store.name,
             address: d.order.store.address || 'N/A',
-            phone: d.order.store.owner?.phone || 'N/A',
+            phone: d.order.store.vendor?.phone || 'N/A',
           }
         : {
             name: d.customer.name,
-            address: d.pickupAddress.street,
+            address: d.pickupAddress?.street || 'N/A',
             phone: d.customer.phone,
           },
 
       recipient: {
         name: d.recipientName,
-        address: `${d.dropoffAddress.street}, ${d.dropoffAddress.city}`,
+        address: d.dropoffAddress
+          ? `${d.dropoffAddress.street}, ${d.dropoffAddress.city}`
+          : 'N/A',
         phone: d.recipientPhone,
         instructions: 'N/A',
       },
 
+      // ✅ FIX: Access rider fields directly
       courier: d.rider
         ? {
-            name: d.rider.user.name,
+            name: d.rider.name, 
             id: d.rider.id,
             vehicle: d.rider.vehicle
               ? `${d.rider.vehicle.color} ${d.rider.vehicle.model}`
               : 'Unknown',
-            phone: d.rider.user.phone,
+            phone: d.rider.phone,
           }
         : null,
 
@@ -448,13 +444,13 @@ export class DeliveriesService {
         },
         {
           status: 'Picked Up',
-          loc: d.pickupAddress.street,
+          loc: d.pickupAddress?.street || 'Pickup',
           time: d.pickedUpAt,
           done: !!d.pickedUpAt,
         },
         {
           status: 'Delivered',
-          loc: d.dropoffAddress.street,
+          loc: d.dropoffAddress?.street || 'Dropoff',
           time: d.deliveredAt,
           done: !!d.deliveredAt,
         },
