@@ -20,7 +20,7 @@ import {
 } from "@/types/ride";
 import { useAuth } from "./AuthContext";
 import { io, Socket } from "socket.io-client";
-import { authConfig } from "@/services/auth.service";
+import { authConfig, getAccessToken } from "@/services/auth.service";
 
 type RideContextType = {
   // State
@@ -143,6 +143,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
       reconnection: true,
       reconnectionDelay: 1000,
       reconnectionAttempts: 5,
+      auth: { token: getAccessToken() },
     });
 
     socket.on("connect", () => {

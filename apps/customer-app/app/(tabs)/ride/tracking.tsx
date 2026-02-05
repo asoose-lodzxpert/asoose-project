@@ -4,8 +4,9 @@ import {
   ScrollView,
   Pressable,
   ActivityIndicator,
-  RefreshControl,
   Dimensions,
+  Platform,
+  SafeAreaView,
 } from "react-native";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "expo-router";
@@ -26,7 +27,96 @@ import { RideService } from "@/services/ride.service";
 import { get } from "@/lib/authFetch";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
-const MAP_HEIGHT = SCREEN_HEIGHT * 0.5;
+
+// 1. Uber-like Clean Silver Map Style
+const MODERN_MAP_STYLE = [
+  {
+    elementType: "geometry",
+    stylers: [{ color: "#f5f5f5" }],
+  },
+  {
+    elementType: "labels.icon",
+    stylers: [{ visibility: "off" }],
+  },
+  {
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#616161" }],
+  },
+  {
+    elementType: "labels.text.stroke",
+    stylers: [{ color: "#f5f5f5" }],
+  },
+  {
+    featureType: "administrative.land_parcel",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#bdbdbd" }],
+  },
+  {
+    featureType: "poi",
+    elementType: "geometry",
+    stylers: [{ color: "#eeeeee" }],
+  },
+  {
+    featureType: "poi",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#757575" }],
+  },
+  {
+    featureType: "poi.park",
+    elementType: "geometry",
+    stylers: [{ color: "#e5e5e5" }],
+  },
+  {
+    featureType: "poi.park",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#9e9e9e" }],
+  },
+  {
+    featureType: "road",
+    elementType: "geometry",
+    stylers: [{ color: "#ffffff" }],
+  },
+  {
+    featureType: "road.arterial",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#757575" }],
+  },
+  {
+    featureType: "road.highway",
+    elementType: "geometry",
+    stylers: [{ color: "#dadada" }],
+  },
+  {
+    featureType: "road.highway",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#616161" }],
+  },
+  {
+    featureType: "road.local",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#9e9e9e" }],
+  },
+  {
+    featureType: "transit.line",
+    elementType: "geometry",
+    stylers: [{ color: "#e5e5e5" }],
+  },
+  {
+    featureType: "transit.station",
+    elementType: "geometry",
+    stylers: [{ color: "#eeeeee" }],
+  },
+  {
+    featureType: "water",
+    elementType: "geometry",
+    stylers: [{ color: "#c9c9c9" }],
+  },
+  {
+    featureType: "water",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#9e9e9e" }],
+  },
+];
 
 export default function RideTrackingScreen() {
   const router = useRouter();
@@ -39,9 +129,10 @@ export default function RideTrackingScreen() {
     socketConnected,
   } = useRide();
 
+  // Colors
   const primary = useThemeColor({}, "brandPrimary");
   const surface = useThemeColor({}, "surfaceBackground");
-  const card = useThemeColor({}, "surfaceCard");
+  const cardColor = useThemeColor({}, "surfaceCard");
   const border = useThemeColor({}, "borderDefault");
   const textSecondary = useThemeColor({}, "textSecondary");
   const success = useThemeColor({}, "statusSuccess");
@@ -56,118 +147,96 @@ export default function RideTrackingScreen() {
   const [routeCoordinates, setRouteCoordinates] = useState<
     { latitude: number; longitude: number }[]
   >([]);
+
   const mapRef = useRef<MapView>(null);
 
-  // Get user's current location
+  // --- Location & Route Logic (Kept mostly same, adjusted padding) ---
   useEffect(() => {
     let locationSubscription: Location.LocationSubscription | null = null;
-
     const startLocationTracking = async () => {
       try {
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== "granted") return;
-
-        // Get initial location
         const location = await Location.getCurrentPositionAsync({
           accuracy: Location.Accuracy.High,
         });
-        setUserLocation({
-          latitude: location.coords.latitude,
-          longitude: location.coords.longitude,
-        });
-
-        // Watch location updates
+        setUserLocation(location.coords);
         locationSubscription = await Location.watchPositionAsync(
           {
             accuracy: Location.Accuracy.High,
             timeInterval: 3000,
             distanceInterval: 10,
           },
-          (location) => {
-            setUserLocation({
-              latitude: location.coords.latitude,
-              longitude: location.coords.longitude,
-            });
-          },
+          (loc) => setUserLocation(loc.coords),
         );
       } catch (error) {
         console.error("Error getting location:", error);
       }
     };
-
     startLocationTracking();
-
     return () => {
-      if (locationSubscription) {
-        locationSubscription.remove();
-      }
+      if (locationSubscription) locationSubscription.remove();
     };
   }, []);
 
-  // Fetch route directions
+  // Always fetch directions from backend API
   const fetchRoute = useCallback(async () => {
     if (!currentRide?.pickupAddress || !currentRide?.dropoffAddress) return;
-
     try {
       const pickup = currentRide.pickupAddress;
       const dropoff = currentRide.dropoffAddress;
-
+      // Fetch directions from backend API
       const response = await get(
         `maps/directions?originLat=${pickup.lat}&originLng=${pickup.lng}&destLat=${dropoff.lat}&destLng=${dropoff.lng}`,
       );
-
-      if (response.coordinates && response.coordinates.length > 0) {
+      // Only use backend response for route coordinates
+      if (
+        response &&
+        Array.isArray(response.coordinates) &&
+        response.coordinates.length > 0
+      ) {
         setRouteCoordinates(response.coordinates);
+      } else {
+        setRouteCoordinates([]);
       }
+      // No client-side direction logic or fallback here
     } catch (error) {
-      console.error("Error fetching route:", error);
+      console.error("Error fetching route from backend:", error);
+      setRouteCoordinates([]);
     }
   }, [currentRide?.pickupAddress, currentRide?.dropoffAddress]);
 
-  // Fit map to show all markers
   const fitMapToMarkers = useCallback(() => {
     if (!mapRef.current) return;
-
     const coordinates: { latitude: number; longitude: number }[] = [];
-
-    // Add pickup
-    if (currentRide?.pickupAddress) {
+    if (currentRide?.pickupAddress)
       coordinates.push({
         latitude: currentRide.pickupAddress.lat,
         longitude: currentRide.pickupAddress.lng,
       });
-    }
-
-    // Add dropoff
-    if (currentRide?.dropoffAddress) {
+    if (currentRide?.dropoffAddress)
       coordinates.push({
         latitude: currentRide.dropoffAddress.lat,
         longitude: currentRide.dropoffAddress.lng,
       });
-    }
-
-    // Add driver location
-    if (driverLocation) {
-      coordinates.push({
-        latitude: driverLocation.latitude,
-        longitude: driverLocation.longitude,
-      });
-    }
-
-    // Add user location if in progress
-    if (userLocation && currentRide?.status === RideStatus.IN_PROGRESS) {
+    if (driverLocation) coordinates.push(driverLocation);
+    if (userLocation && currentRide?.status === RideStatus.IN_PROGRESS)
       coordinates.push(userLocation);
-    }
 
     if (coordinates.length > 0) {
       mapRef.current.fitToCoordinates(coordinates, {
-        edgePadding: { top: 100, right: 50, bottom: 300, left: 50 },
+        // 4. Critical: Add bottom padding so the route isn't hidden by the bottom card
+        edgePadding: {
+          top: 120,
+          right: 40,
+          bottom: SCREEN_HEIGHT * 0.45,
+          left: 40,
+        },
         animated: true,
       });
     }
   }, [currentRide, driverLocation, userLocation]);
 
-  // Initial route fetch and map fit
   useEffect(() => {
     if (currentRide) {
       fetchRoute();
@@ -175,29 +244,11 @@ export default function RideTrackingScreen() {
     }
   }, [currentRide?.id, fetchRoute]);
 
-  // Update map when driver or user location changes
   useEffect(() => {
-    if (driverLocation || userLocation) {
-      fitMapToMarkers();
-    }
+    if (driverLocation || userLocation) fitMapToMarkers();
   }, [driverLocation, userLocation]);
 
-  if (!currentRide) {
-    return (
-      <ThemedView style={[styles.container, { backgroundColor: surface }]}>
-        <View style={styles.emptyState}>
-          <ThemedText>No active ride</ThemedText>
-          <Pressable
-            onPress={() => router.replace("/ride")}
-            style={styles.backLink}
-          >
-            <ThemedText type="link">Book a Ride</ThemedText>
-          </Pressable>
-        </View>
-      </ThemedView>
-    );
-  }
-
+  // --- Handlers ---
   const handleRefresh = async () => {
     setRefreshing(true);
     await refreshCurrentRide();
@@ -211,7 +262,6 @@ export default function RideTrackingScreen() {
       confirmLabel: "Yes, Cancel",
       cancelLabel: "No",
     });
-
     if (confirmed) {
       setCancelling(true);
       try {
@@ -225,476 +275,381 @@ export default function RideTrackingScreen() {
     }
   };
 
-  const canCancel =
-    currentRide.status === RideStatus.PENDING ||
-    currentRide.status === RideStatus.REQUESTED ||
-    currentRide.status === RideStatus.ACCEPTED;
+  if (!currentRide) return null; // Handle empty state elsewhere or simple loader
 
+  const canCancel = [
+    RideStatus.PENDING,
+    RideStatus.REQUESTED,
+    RideStatus.ACCEPTED,
+  ].includes(currentRide.status as RideStatus);
   const showDriverInfo =
     currentRide.rider &&
-    (currentRide.status === RideStatus.ACCEPTED ||
-      currentRide.status === RideStatus.ARRIVED ||
-      currentRide.status === RideStatus.IN_PROGRESS);
-
+    [RideStatus.ACCEPTED, RideStatus.ARRIVED, RideStatus.IN_PROGRESS].includes(
+      currentRide.status as RideStatus,
+    );
   const showOTP =
     currentRide.status === RideStatus.ARRIVED && currentRide.startOtp;
 
   return (
-    <ThemedView style={[styles.container, { backgroundColor: surface }]}>
-      {/* Live Interactive Map */}
-      <View style={styles.mapContainer}>
-        <MapView
-          ref={mapRef}
-          provider={PROVIDER_GOOGLE}
-          style={styles.map}
-          initialRegion={{
-            latitude: currentRide?.pickupAddress?.lat || 0,
-            longitude: currentRide?.pickupAddress?.lng || 0,
-            latitudeDelta: 0.05,
-            longitudeDelta: 0.05,
-          }}
-          showsUserLocation={currentRide.status === RideStatus.IN_PROGRESS}
-          showsMyLocationButton={false}
-          showsCompass={true}
-          rotateEnabled={false}
-        >
-          {/* Pickup Marker */}
-          {currentRide.pickupAddress && (
-            <Marker
-              coordinate={{
-                latitude: currentRide.pickupAddress.lat,
-                longitude: currentRide.pickupAddress.lng,
-              }}
-              title="Pickup Location"
-              pinColor="#10b981"
+    <View style={styles.container}>
+      {/* 1. Full Screen Map */}
+      <MapView
+        ref={mapRef}
+        provider={PROVIDER_GOOGLE}
+        style={StyleSheet.absoluteFillObject} // Fills the screen behind everything
+        customMapStyle={MODERN_MAP_STYLE} // The modern look
+        // Padding forces map center to be in the top visible area
+        mapPadding={{ top: 20, right: 0, bottom: SCREEN_HEIGHT * 0.4, left: 0 }}
+        initialRegion={{
+          latitude: currentRide?.pickupAddress?.lat || 0,
+          longitude: currentRide?.pickupAddress?.lng || 0,
+          latitudeDelta: 0.05,
+          longitudeDelta: 0.05,
+        }}
+        showsUserLocation={currentRide.status === RideStatus.IN_PROGRESS}
+        showsMyLocationButton={false}
+        showsCompass={false}
+        rotateEnabled={false}
+      >
+        {/* Simplified Markers (Modern) */}
+        {currentRide.pickupAddress && (
+          <Marker
+            coordinate={{
+              latitude: currentRide.pickupAddress.lat,
+              longitude: currentRide.pickupAddress.lng,
+            }}
+            title="Pickup"
+          >
+            {/* Custom simple dot marker often looks better than default pin */}
+            <View
+              style={[
+                styles.dotMarker,
+                { backgroundColor: success, borderColor: "white" },
+              ]}
             />
-          )}
+          </Marker>
+        )}
 
-          {/* Dropoff Marker */}
-          {currentRide.dropoffAddress && (
-            <Marker
-              coordinate={{
-                latitude: currentRide.dropoffAddress.lat,
-                longitude: currentRide.dropoffAddress.lng,
-              }}
-              title="Dropoff Location"
-              pinColor="#ef4444"
+        {currentRide.dropoffAddress && (
+          <Marker
+            coordinate={{
+              latitude: currentRide.dropoffAddress.lat,
+              longitude: currentRide.dropoffAddress.lng,
+            }}
+            title="Dropoff"
+          >
+            <View
+              style={[
+                styles.dotMarker,
+                { backgroundColor: danger, borderColor: "white" },
+              ]}
             />
-          )}
+          </Marker>
+        )}
 
-          {/* Driver Marker */}
-          {driverLocation && (
-            <Marker
-              coordinate={driverLocation}
-              title="Driver"
-              description={currentRide.rider?.name || "Your driver"}
-            >
-              <View
-                style={{
-                  backgroundColor: primary,
-                  borderRadius: 20,
-                  padding: 8,
-                  borderWidth: 3,
-                  borderColor: "#fff",
-                }}
-              >
-                <IconSymbol name="car.fill" size={24} color="#fff" />
-              </View>
-            </Marker>
-          )}
-
-          {/* Route Polyline */}
-          {routeCoordinates.length > 0 && (
-            <Polyline
-              coordinates={routeCoordinates}
-              strokeColor={primary}
-              strokeWidth={4}
-              lineDashPattern={[0]}
-            />
-          )}
-        </MapView>
-
-        {/* Overlay Header */}
-        <View
-          style={[styles.overlayHeader, { backgroundColor: `${surface}F5` }]}
-        >
-          <Pressable onPress={() => router.back()} style={styles.backButton}>
-            <IconSymbol name="chevron.left" size={24} color={primary} />
-          </Pressable>
-          <View style={styles.headerContent}>
-            <ThemedText type="subtitle">Your Ride</ThemedText>
-            <View style={styles.statusBadge}>
-              <View
-                style={[
-                  styles.statusDot,
-                  {
-                    backgroundColor: socketConnected ? success : danger,
-                  },
-                ]}
-              />
-              <ThemedText type="caption" style={{ color: textSecondary }}>
-                {socketConnected ? "Live" : "Offline"}
-              </ThemedText>
+        {driverLocation && (
+          <Marker
+            coordinate={driverLocation}
+            title="Driver"
+            flat
+            anchor={{ x: 0.5, y: 0.5 }}
+          >
+            <View style={[styles.driverMarker, { backgroundColor: primary }]}>
+              <IconSymbol name="car.fill" size={20} color="#fff" />
             </View>
+          </Marker>
+        )}
+
+        {routeCoordinates.length > 0 && (
+          <Polyline
+            coordinates={routeCoordinates}
+            strokeColor="black" // Modern maps often use black or dark grey for route
+            strokeWidth={4}
+          />
+        )}
+      </MapView>
+
+      {/* 2. Floating Top Header (Glassmorphism) */}
+      <SafeAreaView style={styles.topContainer} pointerEvents="box-none">
+        <View style={styles.headerRow}>
+          {/* Back Button */}
+          <Pressable
+            onPress={() => router.back()}
+            style={[styles.floatingButton, { backgroundColor: surface }]}
+          >
+            <IconSymbol name="arrow.left" size={24} color={primary} />
+          </Pressable>
+
+          {/* Status Pill */}
+          <View style={[styles.statusPill, { backgroundColor: surface }]}>
+            <View
+              style={[
+                styles.statusDot,
+                { backgroundColor: socketConnected ? success : danger },
+              ]}
+            />
+            <ThemedText type="caption" style={{ fontWeight: "600" }}>
+              {socketConnected ? "LIVE" : "CONNECTING..."}
+            </ThemedText>
           </View>
+
+          {/* Refresh Button */}
+          <Pressable
+            onPress={handleRefresh}
+            style={[styles.floatingButton, { backgroundColor: surface }]}
+          >
+            {refreshing ? (
+              <ActivityIndicator size="small" color={primary} />
+            ) : (
+              <IconSymbol name="arrow.clockwise" size={20} color={primary} />
+            )}
+          </Pressable>
+        </View>
+      </SafeAreaView>
+
+      {/* 3. Modern Bottom Sheet Card */}
+      <View style={[styles.bottomSheet, { backgroundColor: surface }]}>
+        {/* Drag Handle */}
+        <View style={styles.dragHandleContainer}>
+          <View style={styles.dragHandle} />
         </View>
 
-        {/* Refresh Button */}
-        <Pressable
-          onPress={() => {
-            handleRefresh();
-            fetchRoute();
-            fitMapToMarkers();
-          }}
-          style={[styles.refreshButton, { backgroundColor: surface }]}
+        <ScrollView
+          style={styles.sheetContent}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 40 }}
         >
-          <IconSymbol name="arrow.clockwise" size={20} color={primary} />
-        </Pressable>
-      </View>
+          {/* Header Status (Driver on the way, etc) */}
+          <View style={styles.sheetHeader}>
+            <ThemedText type="subtitle" style={{ fontSize: 18 }}>
+              {currentRide.status === RideStatus.REQUESTED
+                ? "Finding your driver..."
+                : currentRide.status === RideStatus.IN_PROGRESS
+                  ? "Heading to destination"
+                  : currentRide.status === RideStatus.ARRIVED
+                    ? "Driver has arrived"
+                    : "Driver is on the way"}
+            </ThemedText>
+            {/* Optional ETA text could go here */}
+          </View>
 
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.content}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-        }
-      >
-        {/* Progress Tracker */}
-        {currentRide.status !== RideStatus.PENDING &&
-          currentRide.status !== RideStatus.CANCELLED && (
-            <View style={[styles.progressCard, { backgroundColor: card }]}>
+          {/* Progress Bar */}
+          {currentRide.status !== RideStatus.PENDING && (
+            <View style={{ marginVertical: 16 }}>
               <TripProgressTracker
                 currentStatus={currentRide.status as RideStatus}
               />
             </View>
           )}
 
-        {/* Finding Driver State */}
-        {currentRide.status === RideStatus.REQUESTED && <FindingDriverView />}
+          {/* Dynamic Content based on status */}
+          {currentRide.status === RideStatus.REQUESTED && <FindingDriverView />}
 
-        {/* Driver Info */}
-        {showDriverInfo && <DriverInfoCard driver={currentRide.rider!} />}
-
-        {/* OTP Display */}
-        {showOTP && <OTPDisplay otp={currentRide.startOtp!} />}
-
-        {/* Trip Details */}
-        <View
-          style={[
-            styles.detailsCard,
-            { backgroundColor: card, borderColor: border },
-          ]}
-        >
-          <ThemedText type="subtitle" style={styles.cardTitle}>
-            Trip Details
-          </ThemedText>
-
-          <View style={styles.locationRow}>
-            <View style={[styles.locationDot, { backgroundColor: success }]} />
-            <View style={styles.locationText}>
-              <ThemedText type="caption" style={{ color: textSecondary }}>
-                Pickup
-              </ThemedText>
-              <ThemedText type="default">
-                {currentRide.pickupAddress?.street || "Pickup location"}
-              </ThemedText>
+          {showDriverInfo && (
+            <View style={[styles.cardSection, { backgroundColor: cardColor }]}>
+              <DriverInfoCard driver={currentRide.rider!} />
             </View>
-          </View>
+          )}
 
-          <View style={[styles.locationLine, { backgroundColor: border }]} />
-
-          <View style={styles.locationRow}>
-            <View style={[styles.locationDot, { backgroundColor: danger }]} />
-            <View style={styles.locationText}>
-              <ThemedText type="caption" style={{ color: textSecondary }}>
-                Dropoff
-              </ThemedText>
-              <ThemedText type="default">
-                {currentRide.dropoffAddress?.street || "Dropoff location"}
-              </ThemedText>
+          {showOTP && (
+            <View style={{ marginTop: 12 }}>
+              <OTPDisplay otp={currentRide.startOtp!} />
             </View>
-          </View>
+          )}
 
-          <View style={[styles.divider, { backgroundColor: border }]} />
-
-          <View style={styles.infoRow}>
-            <ThemedText type="caption" style={{ color: textSecondary }}>
-              Distance
-            </ThemedText>
-            <ThemedText type="default">
-              {RideService.formatDistance(currentRide.distanceKm || 0)}
-            </ThemedText>
-          </View>
-
-          <View style={styles.infoRow}>
-            <ThemedText type="caption" style={{ color: textSecondary }}>
-              Estimated Fare
-            </ThemedText>
-            <ThemedText type="defaultSemiBold" style={{ color: primary }}>
-              {RideService.formatCurrency(currentRide.totalFare || 0)}
-            </ThemedText>
-          </View>
-        </View>
-
-        {/* Driver Location Info */}
-        {driverLocation && (
+          {/* Trip Details (Simplified) */}
           <View
             style={[
-              styles.locationCard,
-              { backgroundColor: card, borderColor: border },
+              styles.cardSection,
+              { backgroundColor: cardColor, marginTop: 16 },
             ]}
           >
-            <View style={styles.locationHeader}>
-              <IconSymbol name="location.fill" size={20} color={primary} />
-              <ThemedText type="defaultSemiBold">Driver Location</ThemedText>
+            <View style={styles.addressRow}>
+              <IconSymbol name="mappin.circle.fill" size={20} color={success} />
+              <View style={{ flex: 1 }}>
+                <ThemedText type="caption" style={{ color: textSecondary }}>
+                  Pickup
+                </ThemedText>
+                <ThemedText numberOfLines={1} type="defaultSemiBold">
+                  {currentRide.pickupAddress?.street}
+                </ThemedText>
+              </View>
             </View>
-            <ThemedText type="caption" style={{ color: textSecondary }}>
-              Lat: {driverLocation.latitude.toFixed(6)}
-            </ThemedText>
-            <ThemedText type="caption" style={{ color: textSecondary }}>
-              Lng: {driverLocation.longitude.toFixed(6)}
-            </ThemedText>
+            <View style={styles.divider} />
+            <View style={styles.addressRow}>
+              <IconSymbol name="mappin.circle.fill" size={20} color={danger} />
+              <View style={{ flex: 1 }}>
+                <ThemedText type="caption" style={{ color: textSecondary }}>
+                  Dropoff
+                </ThemedText>
+                <ThemedText numberOfLines={1} type="defaultSemiBold">
+                  {currentRide.dropoffAddress?.street}
+                </ThemedText>
+              </View>
+            </View>
+
+            <View style={[styles.divider, { marginVertical: 12 }]} />
+
+            <View
+              style={{ flexDirection: "row", justifyContent: "space-between" }}
+            >
+              <ThemedText>Total Fare</ThemedText>
+              <ThemedText type="subtitle">
+                {RideService.formatCurrency(currentRide.totalFare || 0)}
+              </ThemedText>
+            </View>
           </View>
-        )}
 
-        {/* Status Messages */}
-        {currentRide.status === RideStatus.ACCEPTED && (
-          <View
-            style={[styles.messageCard, { backgroundColor: `${primary}15` }]}
-          >
-            <IconSymbol name="car.fill" size={20} color={primary} />
-            <ThemedText type="caption" style={{ color: primary }}>
-              Your driver is on the way to pick you up
-            </ThemedText>
-          </View>
-        )}
-
-        {currentRide.status === RideStatus.ARRIVED && (
-          <View
-            style={[styles.messageCard, { backgroundColor: `${success}15` }]}
-          >
-            <IconSymbol name="checkmark.circle" size={20} color={success} />
-            <ThemedText type="caption" style={{ color: success }}>
-              Your driver has arrived at the pickup location
-            </ThemedText>
-          </View>
-        )}
-
-        {currentRide.status === RideStatus.IN_PROGRESS && (
-          <View
-            style={[styles.messageCard, { backgroundColor: `${primary}15` }]}
-          >
-            <IconSymbol name="arrow.right.circle" size={20} color={primary} />
-            <ThemedText type="caption" style={{ color: primary }}>
-              Trip in progress. Enjoy your ride!
-            </ThemedText>
-          </View>
-        )}
-
-        <View style={{ height: 100 }} />
-      </ScrollView>
-
-      {/* Cancel Button */}
-      {canCancel && (
-        <View style={[styles.footer, { backgroundColor: surface }]}>
-          <Pressable
-            onPress={handleCancelRide}
-            disabled={cancelling}
-            style={[
-              styles.cancelButton,
-              {
-                backgroundColor: danger,
-                opacity: cancelling ? 0.6 : 1,
-              },
-            ]}
-          >
-            {cancelling ? (
-              <ActivityIndicator size="small" color="white" />
-            ) : (
-              <>
-                <IconSymbol name="xmark.circle" size={20} color="white" />
-                <ThemedText
-                  type="defaultSemiBold"
-                  style={styles.cancelButtonText}
-                >
+          {/* Cancel Button */}
+          {canCancel && (
+            <Pressable
+              onPress={handleCancelRide}
+              disabled={cancelling}
+              style={[
+                styles.cancelButton,
+                { backgroundColor: `${danger}15`, marginTop: 24 },
+              ]}
+            >
+              {cancelling ? (
+                <ActivityIndicator color={danger} />
+              ) : (
+                <ThemedText style={{ color: danger, fontWeight: "600" }}>
                   Cancel Ride
                 </ThemedText>
-              </>
-            )}
-          </Pressable>
-        </View>
-      )}
-    </ThemedView>
+              )}
+            </Pressable>
+          )}
+        </ScrollView>
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: "#fff",
   },
-  mapContainer: {
-    width: "100%",
-    height: MAP_HEIGHT,
-    position: "relative",
-  },
-  map: {
-    width: "100%",
-    height: "100%",
-  },
-  overlayHeader: {
+  // Floating Top UI
+  topContainer: {
     position: "absolute",
     top: 0,
     left: 0,
     right: 0,
+    zIndex: 10,
+  },
+  headerRow: {
     flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 16,
-    paddingTop: 60,
-    paddingBottom: 12,
-    gap: 12,
+    paddingTop: Platform.OS === "android" ? 40 : 10,
   },
-  refreshButton: {
-    position: "absolute",
-    bottom: 16,
-    right: 16,
+  floatingButton: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    justifyContent: "center",
     alignItems: "center",
+    justifyContent: "center",
+    // Shadow for elevation
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
     elevation: 5,
   },
-  header: {
+  statusPill: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 16,
-    paddingTop: 24,
-    paddingBottom: 16,
-    gap: 12,
-  },
-  backButton: {
-    padding: 4,
-  },
-  headerContent: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  statusBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
+    height: 36,
+    borderRadius: 18,
+    gap: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 5,
   },
   statusDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
   },
-  scrollView: {
-    flex: 1,
-  },
-  content: {
-    padding: 16,
-  },
-  emptyState: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 16,
-  },
-  backLink: {
-    padding: 8,
-  },
-  progressCard: {
-    borderRadius: 12,
-    marginBottom: 16,
-    overflow: "hidden",
-  },
-  detailsCard: {
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    marginBottom: 16,
-  },
-  locationCard: {
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    marginBottom: 16,
-  },
-  messageCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 16,
-  },
-  cardTitle: {
-    marginBottom: 16,
-  },
-  locationRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 12,
-    paddingVertical: 4,
-  },
-  locationDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    marginTop: 6,
-  },
-  locationLine: {
-    width: 2,
+
+  // Map Markers
+  dotMarker: {
+    width: 20,
     height: 20,
-    marginLeft: 5,
-    marginVertical: 4,
+    borderRadius: 10,
+    borderWidth: 3,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
   },
-  locationText: {
-    flex: 1,
+  driverMarker: {
+    padding: 8,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: "white",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
   },
-  divider: {
-    height: 1,
-    marginVertical: 12,
-  },
-  infoRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 6,
-  },
-  locationHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginBottom: 8,
-  },
-  footer: {
+
+  // Bottom Sheet
+  bottomSheet: {
     position: "absolute",
     bottom: 0,
     left: 0,
     right: 0,
-    padding: 16,
-    paddingBottom: 32,
-    borderTopWidth: 1,
-    borderTopColor: "rgba(0,0,0,0.05)",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: SCREEN_HEIGHT * 0.5, // Ensures map is always visible
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -5 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 20,
+    paddingBottom: 20,
   },
-  cancelButton: {
+  dragHandleContainer: {
+    alignItems: "center",
+    paddingVertical: 12,
+  },
+  dragHandle: {
+    width: 40,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: "#e0e0e0",
+  },
+  sheetContent: {
+    paddingHorizontal: 20,
+  },
+  sheetHeader: {
+    marginBottom: 16,
+  },
+  cardSection: {
+    padding: 16,
+    borderRadius: 16,
+  },
+  addressRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
+    gap: 12,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: "#f0f0f0",
+    marginLeft: 32, // align with text
+    marginVertical: 12,
+  },
+  cancelButton: {
     paddingVertical: 16,
     borderRadius: 12,
-  },
-  cancelButtonText: {
-    fontSize: 16,
-    color: "white",
+    alignItems: "center",
+    justifyContent: "center",
   },
 });

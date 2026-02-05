@@ -4,21 +4,52 @@
     "slug": "asoose-customer-app",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/asoose icon.png",
     "scheme": "asoose-app",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "icon": "./assets/images/ios-light.png",
+      "iconDark": "./assets/images/ios-dark.png",
+      "iconTinted": "./assets/images/ios-tinted.png",
+      "splash": {
+        "image": "./assets/images/splash-icon-light.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#ffffff",
+        "dark": {
+          "image": "./assets/images/splash-icon-dark.png",
+          "backgroundColor": "#000000"
+        }
+      },
+      "infoPlist": {
+        "NSFaceIDUsageDescription": "This app uses Face ID to securely authenticate you.",
+        "NSBiometricUsageDescription": "Biometric authentication is used for secure login.",
+        "NSUserAuthenticationUsageDescription": "Authentication is required to access your account.",
+        "NSCameraUsageDescription": "This app requires camera access to take photos and scan documents.",
+        "NSPhotoLibraryUsageDescription": "This app requires access to your photo library to select images.",
+        "NSLocationWhenInUseUsageDescription": "Location is used to provide location-based services.",
+        "NSLocationAlwaysUsageDescription": "Location is used to provide location-based services even when the app is in the background.",
+        "NSUserNotificationUsageDescription": "Notifications are used to keep you updated about your account and activity."
+      }
     },
     "platforms": ["ios", "android"],
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "foregroundImage": "./assets/images/adaptive-icon.png"
       },
+      "permissions": [
+        "USE_BIOMETRIC",
+        "USE_FINGERPRINT",
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "FOREGROUND_SERVICE",
+        "POST_NOTIFICATIONS"
+      ],
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },
@@ -27,11 +58,12 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
+          "image": "./assets/images/splash-icon-light.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff",
           "dark": {
+            "image": "./assets/images/splash-icon-dark.png",
             "backgroundColor": "#000000"
           }
         }

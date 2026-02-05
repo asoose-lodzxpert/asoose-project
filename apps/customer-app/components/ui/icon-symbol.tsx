@@ -38,6 +38,7 @@ export type IconSymbolName =
   | "map.fill"
   | "lock.fill"
   | "pencil"
+  | "mappin.circle.fill"
   | "trash"
   | "plus"
   | "fullscreen"
@@ -197,6 +198,7 @@ export const MAPPING: Record<
   "map.marker": "place",
   "location.fill": "location-on",
   "map.fill": "map",
+  "mappin.circle.fill": "place",
   "arrow.up.left.and.arrow.down.right": "fullscreen",
   fullscreen: "fullscreen",
   xmark: "close",

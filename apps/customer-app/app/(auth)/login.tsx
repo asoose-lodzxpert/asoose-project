@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   StyleSheet,
@@ -16,6 +16,8 @@ import { ThemedInput } from "@/components/ThemedInput";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { useAuth } from "@/context/AuthContext";
+import { useToast } from "@/components/ui/ThemedToast";
+import { useConfirm } from "@/components/ui/ConfirmDialogProvider";
 
 /* ---------------------------------- */
 /* Screen */
@@ -26,19 +28,43 @@ export default function LoginScreen() {
   const textMuted = useThemeColor({}, "textMuted");
   const border = useThemeColor({}, "borderDefault");
 
-  const { login } = useAuth();
+  const {
+    login,
+    biometricLogin,
+    biometricAvailable,
+    biometricEnrolled,
+    enableBiometrics,
+    isBiometricEnabled,
+  } = useAuth();
   const router = useRouter();
+  const showToast = useToast();
+  const showConfirm = useConfirm();
 
+  // Form state
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [secure, setSecure] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const biometricEnabled = true;
+  // Biometric state
+  const [biometricEnabled, setBiometricEnabled] = useState(false);
+  const [biometricLoading, setBiometricLoading] = useState(false);
+
+  // Check if biometric is enabled for this user
+  useEffect(() => {
+    (async () => {
+      try {
+        const enabled = await isBiometricEnabled();
+        setBiometricEnabled(enabled);
+      } catch (err) {
+        console.error("[LoginScreen] Failed to check biometric status:", err);
+      }
+    })();
+  }, [isBiometricEnabled]);
 
   /* ---------------------------------- */
-  /* Simulated Login */
+  /* Email/Password Login */
   /* ---------------------------------- */
   const handleLogin = async () => {
     if (!identifier || !password) {
@@ -49,11 +75,76 @@ export default function LoginScreen() {
     setError(null);
     try {
       await login({ email: identifier, password });
+      showToast({ message: "Login successful!", variant: "success" });
+
+      // Ask user if they want to enable biometric login
+      if (biometricAvailable && biometricEnrolled && !biometricEnabled) {
+        showConfirm({
+          title: "Enable Biometric Login?",
+          message:
+            "Save your credentials to login with your fingerprint next time",
+          confirmLabel: "Enable",
+          cancelLabel: "Skip",
+        }).then(async (confirmed) => {
+          if (confirmed) {
+            try {
+              await enableBiometrics(identifier, password);
+              setBiometricEnabled(true);
+              showToast({
+                message: "Biometric login enabled",
+                variant: "success",
+              });
+            } catch (err: any) {
+              console.error("[LoginScreen] Failed to enable biometric:", err);
+              showToast({
+                message: "Failed to enable biometric",
+                variant: "error",
+              });
+            }
+          }
+        });
+      }
+
       router.replace({ pathname: "/(tabs)/home" });
     } catch (err: any) {
       setError(err.message || "Login failed");
+      showToast({ message: err.message || "Login failed", variant: "error" });
     }
     setLoading(false);
+  };
+
+  /* ---------------------------------- */
+  /* Biometric Login */
+  /* ---------------------------------- */
+  const handleBiometricLogin = async () => {
+    if (!biometricAvailable || !biometricEnrolled) {
+      showToast({
+        message: "Biometric authentication not available",
+        variant: "info",
+      });
+      return;
+    }
+
+    if (!biometricEnabled) {
+      showToast({
+        message: "Please login first to enable biometric",
+        variant: "info",
+      });
+      return;
+    }
+
+    setBiometricLoading(true);
+    try {
+      // CRITICAL: biometricLogin blocks until verification completes
+      await biometricLogin();
+      showToast({ message: "Login successful!", variant: "success" });
+      router.replace({ pathname: "/(tabs)/home" });
+    } catch (err: any) {
+      const errorMsg = err.message || "Biometric login failed";
+      console.error("[LoginScreen] Biometric login error:", err);
+      showToast({ message: errorMsg, variant: "error" });
+    }
+    setBiometricLoading(false);
   };
 
   return (
