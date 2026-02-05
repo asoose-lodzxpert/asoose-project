@@ -371,4 +371,65 @@ private async resolveImage(key: string | null): Promise<string | null> {
       where: { userId_storeId: { userId: userId, storeId: storeId } },
     });
   }
+
+  async getProductById(id: string) {
+    const product = await this.prisma.product.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        description: true,
+        price: true,
+        images: true,
+        status: true,
+        stock: true,
+        inventory: true,
+        salesCount: true,
+        createdAt: true,
+        updatedAt: true,
+        category: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        store: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            type: true,
+          },
+        },
+        modifierGroups: {
+          select: {
+            id: true,
+            name: true,
+            minSelect: true,
+            maxSelect: true,
+            modifiers: {
+              select: {
+                id: true,
+                name: true,
+                price: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!product) {
+      return null;
+    }
+
+    return {
+      ...product,
+      images:
+        product.images.length > 0
+          ? product.images
+          : ['https://via.placeholder.com/400'],
+    };
+  }
 }

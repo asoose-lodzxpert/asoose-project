@@ -7,7 +7,7 @@ import { MonnifyService } from './monnify.service';
 import { PrismaModule } from '../prisma/prisma.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { TripsModule } from '../users/trips/trips.module';
-import { TransactionsModule } from '../super-admin/transactions/transaction.module'; 
+import { TransactionsModule } from '../super-admin/transactions/transaction.module';
 
 @Module({
   imports: [
@@ -15,7 +15,7 @@ import { TransactionsModule } from '../super-admin/transactions/transaction.modu
     NotificationsModule,
     forwardRef(() => TripsModule), // Existing forwardRef
     // FIX: Wrap TransactionsModule with forwardRef
-    forwardRef(() => TransactionsModule), 
+    forwardRef(() => TransactionsModule),
   ],
   controllers: [PaymentController],
   providers: [

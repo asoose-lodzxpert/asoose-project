@@ -1,6 +1,13 @@
-import React, { useState, useMemo } from 'react';
-import { ShoppingBag, Ban, Search, X, ChevronLeft, ChevronRight } from 'lucide-react';
-import { Currency } from '@/app/main/components/Currency';
+import React, { useState, useMemo } from "react";
+import {
+  ShoppingBag,
+  Ban,
+  Search,
+  X,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
+import { Currency } from "@/app/main/components/Currency";
 
 // ✅ Fix: Match the interface from the parent page (VendorDetailPage)
 export interface Product {
@@ -14,13 +21,17 @@ export interface Product {
 
 interface ProductsTabProps {
   products: Product[];
-  isLoading?: boolean; 
+  isLoading?: boolean;
   onToggleBan: (id: string, status: string) => void;
 }
 
-export default function ProductsTabContent({ products, onToggleBan, isLoading = false }: ProductsTabProps) {
+export default function ProductsTabContent({
+  products,
+  onToggleBan,
+  isLoading = false,
+}: ProductsTabProps) {
   const [search, setSearch] = useState("");
-  
+
   // --- Pagination State ---
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 6;
@@ -30,9 +41,10 @@ export default function ProductsTabContent({ products, onToggleBan, isLoading = 
     if (!products) return [];
     if (!search) return products;
     const lowerSearch = search.toLowerCase();
-    return products.filter(p => 
-      p.name.toLowerCase().includes(lowerSearch) || 
-      p.category.toLowerCase().includes(lowerSearch)
+    return products.filter(
+      (p) =>
+        p.name.toLowerCase().includes(lowerSearch) ||
+        p.category.toLowerCase().includes(lowerSearch),
     );
   }, [products, search]);
 
@@ -53,13 +65,14 @@ export default function ProductsTabContent({ products, onToggleBan, isLoading = 
       {/* Header & Search Bar */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
         <h3 className="text-lg font-bold text-white flex items-center gap-2">
-          <ShoppingBag className="w-5 h-5 text-blue-500" /> Catalog ({products?.length || 0})
+          <ShoppingBag className="w-5 h-5 text-blue-500" /> Catalog (
+          {products?.length || 0})
         </h3>
 
         {/* Search Input */}
         <div className="relative w-full md:w-64">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-          <input 
+          <input
             type="text"
             placeholder="Search products..."
             value={search}
@@ -68,7 +81,7 @@ export default function ProductsTabContent({ products, onToggleBan, isLoading = 
             className="w-full bg-[#0F172A] border border-gray-800 rounded-lg pl-10 pr-8 py-2 text-sm text-gray-200 focus:outline-none focus:border-blue-500/50 transition-colors disabled:opacity-50"
           />
           {search && (
-            <button 
+            <button
               onClick={() => setSearch("")}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white"
             >
@@ -83,7 +96,10 @@ export default function ProductsTabContent({ products, onToggleBan, isLoading = 
         // Loading Skeleton
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {[...Array(6)].map((_, i) => (
-            <div key={i} className="bg-[#0F172A] border border-gray-800 rounded-lg p-4 flex gap-4 animate-pulse">
+            <div
+              key={i}
+              className="bg-[#0F172A] border border-gray-800 rounded-lg p-4 flex gap-4 animate-pulse"
+            >
               <div className="w-16 h-16 bg-gray-800 rounded-lg flex-shrink-0" />
               <div className="flex-1 space-y-2 py-1">
                 <div className="h-4 bg-gray-800 rounded w-3/4" />
@@ -97,35 +113,49 @@ export default function ProductsTabContent({ products, onToggleBan, isLoading = 
         <>
           {/* Product Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 min-h-[300px] content-start">
-            {currentProducts.map(product => (
-              <div key={product.id} className={`bg-[#0F172A] border rounded-lg p-4 flex gap-4 transition-all hover:border-gray-600 ${product.status === 'DISABLED' ? 'border-red-500/30 opacity-75' : 'border-gray-800'}`}>
-                
+            {currentProducts.map((product) => (
+              <div
+                key={product.id}
+                className={`bg-[#0F172A] border rounded-lg p-4 flex gap-4 transition-all hover:border-gray-600 ${product.status === "DISABLED" ? "border-red-500/30 opacity-75" : "border-gray-800"}`}
+              >
                 {/* Image Handling with Fallback */}
-                <div 
-                  className="w-16 h-16 bg-gray-800 rounded-lg flex-shrink-0 bg-cover bg-center border border-gray-700 relative overflow-hidden" 
-                  style={{ backgroundImage: `url(${product.image || '/placeholder-product.png'})` }} // ✅ Handle undefined image
+                <div
+                  className="w-16 h-16 bg-gray-800 rounded-lg flex-shrink-0 bg-cover bg-center border border-gray-700 relative overflow-hidden"
+                  style={{
+                    backgroundImage: `url(${product.image || "/placeholder-product.png"})`,
+                  }} // ✅ Handle undefined image
                 >
-                   {!product.image && <ShoppingBag className="w-6 h-6 text-gray-600 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"/>}
+                  {!product.image && (
+                    <ShoppingBag className="w-6 h-6 text-gray-600 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+                  )}
                 </div>
-                
+
                 {/* Content */}
                 <div className="flex-1 min-w-0">
                   <div className="flex justify-between items-start">
-                    <h4 className="font-bold text-white truncate pr-2 text-sm">{product.name}</h4>
-                    {product.status === 'DISABLED' && <Ban className="w-4 h-4 text-red-500 flex-shrink-0" />}
+                    <h4 className="font-bold text-white truncate pr-2 text-sm">
+                      {product.name}
+                    </h4>
+                    {product.status === "DISABLED" && (
+                      <Ban className="w-4 h-4 text-red-500 flex-shrink-0" />
+                    )}
                   </div>
-                  <p className="text-xs text-gray-400 mt-0.5"><Currency amount={product.price}/> • {product.category}</p>
-                  
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    <Currency amount={product.price} /> • {product.category}
+                  </p>
+
                   <div className="mt-3">
-                    <button 
+                    <button
                       onClick={() => onToggleBan(product.id, product.status)}
                       className={`text-[10px] font-bold px-3 py-1.5 rounded transition-colors uppercase tracking-wide ${
-                        product.status === 'DISABLED' 
-                          ? 'bg-green-500/10 text-green-500 hover:bg-green-500 hover:text-white border border-green-500/20' 
-                          : 'bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white border border-red-500/20'
+                        product.status === "DISABLED"
+                          ? "bg-green-500/10 text-green-500 hover:bg-green-500 hover:text-white border border-green-500/20"
+                          : "bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white border border-red-500/20"
                       }`}
                     >
-                      {product.status === 'DISABLED' ? 'Unban Item' : 'Ban Item'}
+                      {product.status === "DISABLED"
+                        ? "Unban Item"
+                        : "Ban Item"}
                     </button>
                   </div>
                 </div>
@@ -136,25 +166,27 @@ export default function ProductsTabContent({ products, onToggleBan, isLoading = 
           {/* Pagination Controls */}
           {totalPages > 1 && (
             <div className="flex justify-between items-center mt-6 pt-4 border-t border-gray-800">
-               <span className="text-xs text-gray-500">
-                 Page {currentPage} of {totalPages}
-               </span>
-               <div className="flex gap-2">
-                 <button 
-                   onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                   disabled={currentPage === 1}
-                   className="p-2 bg-gray-800 rounded-lg text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                 >
-                   <ChevronLeft className="w-4 h-4" />
-                 </button>
-                 <button 
-                   onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                   disabled={currentPage === totalPages}
-                   className="p-2 bg-gray-800 rounded-lg text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                 >
-                   <ChevronRight className="w-4 h-4" />
-                 </button>
-               </div>
+              <span className="text-xs text-gray-500">
+                Page {currentPage} of {totalPages}
+              </span>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="p-2 bg-gray-800 rounded-lg text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() =>
+                    setCurrentPage((p) => Math.min(totalPages, p + 1))
+                  }
+                  disabled={currentPage === totalPages}
+                  className="p-2 bg-gray-800 rounded-lg text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
             </div>
           )}
         </>
@@ -164,10 +196,15 @@ export default function ProductsTabContent({ products, onToggleBan, isLoading = 
           <ShoppingBag className="w-12 h-12 text-gray-700 mb-3" />
           <p className="text-gray-400 font-bold">No products found</p>
           <p className="text-gray-600 text-sm mt-1">
-            {search ? `No results matching "${search}"` : "This vendor hasn't added any products yet."}
+            {search
+              ? `No results matching "${search}"`
+              : "This vendor hasn't added any products yet."}
           </p>
           {search && (
-            <button onClick={() => setSearch("")} className="mt-4 text-xs text-blue-400 hover:text-blue-300 underline">
+            <button
+              onClick={() => setSearch("")}
+              className="mt-4 text-xs text-blue-400 hover:text-blue-300 underline"
+            >
               Clear Search
             </button>
           )}

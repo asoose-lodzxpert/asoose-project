@@ -2,7 +2,10 @@ import { Body, Controller, Post, HttpCode, HttpStatus } from '@nestjs/common';
 import { CartService } from './cart.service';
 import { GetCartSummaryDto } from './dto/cart-summary.dto';
 
-@Controller('cart')
+@Controller({
+  path: 'cart',
+  version: '1',
+})
 export class CartController {
   constructor(private readonly cartService: CartService) {}
 

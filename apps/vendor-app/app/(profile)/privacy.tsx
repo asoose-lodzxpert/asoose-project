@@ -28,7 +28,7 @@ export default function PrivacyScreen() {
 
   const handlePress = (id: string) => {
     setOpenSections((prev) =>
-      prev.includes(id) ? prev.filter((secId) => secId !== id) : [...prev, id]
+      prev.includes(id) ? prev.filter((secId) => secId !== id) : [...prev, id],
     );
   };
 

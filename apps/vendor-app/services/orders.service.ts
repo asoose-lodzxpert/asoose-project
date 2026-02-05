@@ -1,11 +1,33 @@
 import { fetchWithAuth } from "./auth-fetch";
 
+/* ---------- Types ---------- */
+
+export interface OrderItemModifier {
+  id?: string;
+  name: string;
+  price: number;
+}
+
+export interface OrderItemModifierGroup {
+  id?: string;
+  name: string;
+  modifiers: OrderItemModifier[];
+}
+
 export interface OrderItem {
   id: string;
   productId: string;
   nameSnap: string;
   quantity: number;
+
+  /** Base product price (without modifiers) */
   price: number;
+
+  /** Selected modifiers (snapshotted) */
+  modifierGroups?: OrderItemModifierGroup[];
+
+  /** Optional precomputed item total from backend */
+  total?: number;
 }
 
 export interface Order {
@@ -41,6 +63,27 @@ export interface OrdersResponse {
   };
 }
 
+/* ---------- Helpers ---------- */
+
+function computeItemTotal(item: OrderItem): number {
+  const base = Number(item.price) || 0;
+
+  const modifiersTotal =
+    item.modifierGroups?.reduce((groupSum, group) => {
+      return (
+        groupSum +
+        group.modifiers.reduce(
+          (modSum, mod) => modSum + (Number(mod.price) || 0),
+          0,
+        )
+      );
+    }, 0) ?? 0;
+
+  return (base + modifiersTotal) * (Number(item.quantity) || 0);
+}
+
+/* ---------- API ---------- */
+
 export async function fetchOrders(
   status: "pending" | "active" | "history",
   page: number = 1,
@@ -56,25 +99,34 @@ export async function fetchOrders(
   );
 
   try {
-
     if (resp && Array.isArray(resp.data)) {
       resp.data = resp.data.map((order: any) => {
-        const items = Array.isArray(order.items)
+        const items: OrderItem[] = Array.isArray(order.items)
           ? order.items.map((it: any) => {
               const price = Number(it.price);
               const quantity = Number(it.quantity);
 
-              return {
+              const normalizedItem: OrderItem = {
                 ...it,
                 price: Number.isFinite(price) ? price : 0,
                 quantity: Number.isFinite(quantity) ? quantity : 0,
+                modifierGroups: Array.isArray(it.modifierGroups)
+                  ? it.modifierGroups
+                  : [],
+              };
+
+              return {
+                ...normalizedItem,
+                total:
+                  typeof it.total === "number"
+                    ? it.total
+                    : computeItemTotal(normalizedItem),
               };
             })
           : [];
 
         const computedTotal = items.reduce(
-          (s: number, i: any) =>
-            s + (Number(i.price) || 0) * (Number(i.quantity) || 0),
+          (sum, item) => sum + (item.total || 0),
           0,
         );
 
@@ -86,23 +138,23 @@ export async function fetchOrders(
       });
     }
   } catch (e) {
-    // If normalization fails, return original response and let UI handle it.
+    // Fallback to backend response if normalization fails
   }
 
   return resp;
 }
 
+/* ---------- Actions ---------- */
+
 export async function acceptOrder(orderId: string) {
-  return await fetchWithAuth(
+  return fetchWithAuth(
     `${process.env.EXPO_PUBLIC_API_URL}/vendor/orders/${orderId}/accept`,
-    {
-      method: "PATCH",
-    },
+    { method: "PATCH" },
   );
 }
 
 export async function declineOrder(orderId: string, reason: string) {
-  return await fetchWithAuth(
+  return fetchWithAuth(
     `${process.env.EXPO_PUBLIC_API_URL}/vendor/orders/${orderId}/decline`,
     {
       method: "PATCH",
@@ -112,19 +164,15 @@ export async function declineOrder(orderId: string, reason: string) {
 }
 
 export async function markAsPreparing(orderId: string) {
-  return await fetchWithAuth(
+  return fetchWithAuth(
     `${process.env.EXPO_PUBLIC_API_URL}/vendor/orders/${orderId}/preparing`,
-    {
-      method: "PATCH",
-    },
+    { method: "PATCH" },
   );
 }
 
 export async function markAsReady(orderId: string) {
-  return await fetchWithAuth(
+  return fetchWithAuth(
     `${process.env.EXPO_PUBLIC_API_URL}/vendor/orders/${orderId}/ready`,
-    {
-      method: "PATCH",
-    },
+    { method: "PATCH" },
   );
 }

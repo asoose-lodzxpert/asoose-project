@@ -12,7 +12,10 @@ import { UpdateProfileDto } from './dto/update-profile.dto';
 import { GoogleOAuthDto } from './dto/google-oauth.dto';
 import { UserRole } from '../common/enums/user-role.enum';
 
-@Controller('auth')
+@Controller({
+  path: 'auth',
+  version: '1',
+})
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
@@ -33,7 +36,10 @@ export class AuthController {
 }
 
 // User Auth
-@Controller('auth/user')
+@Controller({
+  path: 'auth/user',
+  version: '1',
+})
 export class UserAuthController {
   constructor(private readonly authService: AuthService) {}
 

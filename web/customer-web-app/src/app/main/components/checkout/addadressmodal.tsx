@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import React, { useState } from 'react';
-import { X, MapPin, Loader2, Phone } from 'lucide-react'; // Added Phone icon
-import { toast } from 'react-toastify';
+import React, { useState } from "react";
+import { X, MapPin, Loader2, Phone } from "lucide-react"; // Added Phone icon
+import { toast } from "react-toastify";
 
 interface AddAddressModalProps {
   isOpen: boolean;
@@ -10,14 +10,18 @@ interface AddAddressModalProps {
   onSave: (data: any) => Promise<void>;
 }
 
-export const AddAddressModal = ({ isOpen, onClose, onSave }: AddAddressModalProps) => {
+export const AddAddressModal = ({
+  isOpen,
+  onClose,
+  onSave,
+}: AddAddressModalProps) => {
   // ✅ ADDED: 'phone' to state
-  const [formData, setFormData] = useState({ 
-    street: '', 
-    city: '', 
-    phone: '', 
-    label: 'Home', 
-    state: 'Maiduguri' 
+  const [formData, setFormData] = useState({
+    street: "",
+    city: "",
+    phone: "",
+    label: "Home",
+    state: "Maiduguri",
   });
   const [isLocating, setIsLocating] = useState(false);
 
@@ -27,7 +31,7 @@ export const AddAddressModal = ({ isOpen, onClose, onSave }: AddAddressModalProp
     e.preventDefault();
     // ✅ ADDED: Validation for phone
     if (!formData.street || !formData.city || !formData.phone) {
-      toast.error('Please fill in street, city, and phone number');
+      toast.error("Please fill in street, city, and phone number");
       return;
     }
 
@@ -37,10 +41,10 @@ export const AddAddressModal = ({ isOpen, onClose, onSave }: AddAddressModalProp
       // Mock Coordinates (Aligning with Profile Page Logic)
       const MAIDUGURI_COORDS = {
         lat: 11.8311,
-        lng: 13.1510
+        lng: 13.151,
       };
 
-      await new Promise(resolve => setTimeout(resolve, 800));
+      await new Promise((resolve) => setTimeout(resolve, 800));
 
       await onSave({
         ...formData,
@@ -49,11 +53,17 @@ export const AddAddressModal = ({ isOpen, onClose, onSave }: AddAddressModalProp
       });
 
       // Reset form
-      setFormData({ street: '', city: '', phone: '', label: 'Home', state: 'Maiduguri' });
+      setFormData({
+        street: "",
+        city: "",
+        phone: "",
+        label: "Home",
+        state: "Maiduguri",
+      });
       onClose();
     } catch (error: any) {
       console.error("Address save error:", error);
-      toast.error('Failed to save address. Please try again.');
+      toast.error("Failed to save address. Please try again.");
     } finally {
       setIsLocating(false);
     }
@@ -64,7 +74,10 @@ export const AddAddressModal = ({ isOpen, onClose, onSave }: AddAddressModalProp
       <div className="bg-white dark:bg-[#1a1a1a] w-full max-w-md rounded-3xl p-6 shadow-2xl border border-gray-100 dark:border-white/10">
         <div className="flex justify-between items-center mb-6">
           <h3 className="text-xl font-bold">Add New Address</h3>
-          <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-white/5 rounded-full">
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-gray-100 dark:hover:bg-white/5 rounded-full"
+          >
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -73,15 +86,15 @@ export const AddAddressModal = ({ isOpen, onClose, onSave }: AddAddressModalProp
           <div>
             <label className="block text-sm font-medium mb-1">Label</label>
             <div className="flex gap-2">
-              {['Home', 'Work', 'Other'].map((l) => (
+              {["Home", "Work", "Other"].map((l) => (
                 <button
                   type="button"
                   key={l}
                   onClick={() => setFormData({ ...formData, label: l })}
                   className={`px-4 py-2 rounded-xl text-sm font-bold border transition-colors ${
                     formData.label === l
-                      ? 'bg-yellow-500 border-yellow-500 text-black'
-                      : 'border-gray-200 dark:border-white/10 hover:border-yellow-500'
+                      ? "bg-yellow-500 border-yellow-500 text-black"
+                      : "border-gray-200 dark:border-white/10 hover:border-yellow-500"
                   }`}
                 >
                   {l}
@@ -91,20 +104,26 @@ export const AddAddressModal = ({ isOpen, onClose, onSave }: AddAddressModalProp
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1">Street Address</label>
+            <label className="block text-sm font-medium mb-1">
+              Street Address
+            </label>
             <input
               type="text"
               required
               className="w-full p-3 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 focus:border-yellow-500 outline-none transition-colors"
               placeholder="e.g. 123 Lagos Street"
               value={formData.street}
-              onChange={(e) => setFormData({ ...formData, street: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, street: e.target.value })
+              }
             />
           </div>
 
           {/* ✅ ADDED: Phone Input Field */}
           <div>
-            <label className="block text-sm font-medium mb-1">Contact Phone</label>
+            <label className="block text-sm font-medium mb-1">
+              Contact Phone
+            </label>
             <div className="relative">
               <input
                 type="tel"
@@ -112,7 +131,9 @@ export const AddAddressModal = ({ isOpen, onClose, onSave }: AddAddressModalProp
                 className="w-full p-3 pl-10 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 focus:border-yellow-500 outline-none transition-colors"
                 placeholder="e.g. 08012345678"
                 value={formData.phone}
-                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, phone: e.target.value })
+                }
               />
               <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             </div>
@@ -126,7 +147,9 @@ export const AddAddressModal = ({ isOpen, onClose, onSave }: AddAddressModalProp
                 required
                 className="w-full p-3 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 focus:border-yellow-500 outline-none"
                 value={formData.city}
-                onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, city: e.target.value })
+                }
               />
             </div>
             <div>

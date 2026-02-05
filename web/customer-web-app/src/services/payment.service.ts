@@ -1,11 +1,11 @@
-import { api } from './api';
+import { api } from "./api";
 
 export interface InitiatePaymentPayload {
   amount: number;
   email: string;
-  gateway: 'PAYSTACK' | 'FLUTTERWAVE' | 'MONNIFY';
-  method: 'CARD' | 'BANK_TRANSFER' | 'CASH';
-  type: 'ORDER' | 'RIDE' | 'DELIVERY';
+  gateway: "PAYSTACK" | "FLUTTERWAVE" | "MONNIFY";
+  method: "CARD" | "BANK_TRANSFER" | "CASH";
+  type: "ORDER" | "RIDE" | "DELIVERY";
   orderId?: string;
   rideId?: string;
   deliveryId?: string;
@@ -27,14 +27,14 @@ export const paymentService = {
    * @param token Optional auth token to ensure authenticated request
    */
   initiatePayment: async (payload: InitiatePaymentPayload, token?: string) => {
-    const config = token 
-      ? { headers: { Authorization: `Bearer ${token}` } } 
+    const config = token
+      ? { headers: { Authorization: `Bearer ${token}` } }
       : {};
 
     const { data } = await api.post<PaymentInitResponse>(
-      '/payment/initialize', 
+      "/payment/initialize",
       payload,
-      config
+      config,
     );
     return data;
   },
@@ -43,7 +43,9 @@ export const paymentService = {
    * Verify a transaction
    */
   verifyPayment: async (reference: string, gateway: string) => {
-    const { data } = await api.get(`/payment/verify?reference=${reference}&gateway=${gateway}`);
+    const { data } = await api.get(
+      `/payment/verify?reference=${reference}&gateway=${gateway}`,
+    );
     return data;
-  }
+  },
 };

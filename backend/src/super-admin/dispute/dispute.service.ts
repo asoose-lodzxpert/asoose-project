@@ -478,7 +478,7 @@ export class DisputesService {
     });
   }
 
-// ==================== ADD ADMIN NOTE  ====================
+  // ==================== ADD ADMIN NOTE  ====================
   async addAdminNote(id: string, note: string, adminId: string) {
     const dispute = await this.prisma.dispute.findUnique({ where: { id } });
     if (!dispute) throw new NotFoundException('Dispute not found');
@@ -515,18 +515,21 @@ export class DisputesService {
       return updatedDispute;
     });
   }
- //  RESOLVE DISPUTE 
+  //  RESOLVE DISPUTE
   // ==================== RESOLVE DISPUTE ====================
   async resolve(id: string, dto: ResolveDisputeDto, adminId: string) {
     this.logger.log(`Admin ${adminId} resolving dispute ${id}`);
 
     const dispute = await this.findOne(id, adminId, UserRole.SUPER_ADMIN);
     if (!dispute) throw new NotFoundException('Dispute not found');
-    if (dispute.status !== 'OPEN') throw new BadRequestException('Dispute is already closed');
+    if (dispute.status !== 'OPEN')
+      throw new BadRequestException('Dispute is already closed');
 
     // Validation: Vendor Wallet logic
     if (dto.refundSource === RefundSource.VENDOR_WALLET && !dispute.orderId) {
-      throw new BadRequestException('Vendor wallet refunds are only allowed for order disputes');
+      throw new BadRequestException(
+        'Vendor wallet refunds are only allowed for order disputes',
+      );
     }
 
     return this.prisma.$transaction(async (tx) => {
@@ -544,10 +547,14 @@ export class DisputesService {
 
         if (dto.action === ResolutionAction.REFUND_PARTIAL) {
           if (!dto.refundAmount || dto.refundAmount <= 0) {
-            throw new BadRequestException('Refund amount must be greater than 0');
+            throw new BadRequestException(
+              'Refund amount must be greater than 0',
+            );
           }
           if (dto.refundAmount > maxRefund) {
-            throw new BadRequestException(`Refund amount cannot exceed ₦${maxRefund}`);
+            throw new BadRequestException(
+              `Refund amount cannot exceed ₦${maxRefund}`,
+            );
           }
           refundAmount = dto.refundAmount;
         } else {
@@ -559,17 +566,25 @@ export class DisputesService {
           const paymentRef = dispute.payment?.reference;
 
           if (!paymentRef) {
-            this.logger.warn(`Dispute ${id} has no payment reference. Recording as internal refund.`);
+            this.logger.warn(
+              `Dispute ${id} has no payment reference. Recording as internal refund.`,
+            );
             resolutionText += ` (Manual Refund - No Gateway Reference)`;
           } else {
-            const isTestTransaction = paymentRef.startsWith('PAY-REF-') || paymentRef.startsWith('REF-');
+            const isTestTransaction =
+              paymentRef.startsWith('PAY-REF-') ||
+              paymentRef.startsWith('REF-');
 
             if (isTestTransaction) {
-              this.logger.warn(`Skipping Gateway Refund for Test Transaction: ${paymentRef}`);
+              this.logger.warn(
+                `Skipping Gateway Refund for Test Transaction: ${paymentRef}`,
+              );
             } else {
               try {
-                this.logger.log(`Initiating Gateway Refund: ${paymentRef} | Amount: ₦${refundAmount}`);
-                
+                this.logger.log(
+                  `Initiating Gateway Refund: ${paymentRef} | Amount: ₦${refundAmount}`,
+                );
+
                 await this.paymentService.processRefund(
                   {
                     paymentReference: paymentRef,
@@ -580,8 +595,13 @@ export class DisputesService {
                   adminId,
                 );
               } catch (error) {
-                this.logger.error(`Gateway Refund Failed: ${error.message}`, error.stack);
-                throw new BadRequestException(`Payment Gateway Failed: ${error.message}`);
+                this.logger.error(
+                  `Gateway Refund Failed: ${error.message}`,
+                  error.stack,
+                );
+                throw new BadRequestException(
+                  `Payment Gateway Failed: ${error.message}`,
+                );
               }
             }
           }
@@ -597,14 +617,14 @@ export class DisputesService {
             status: 'COMPLETED',
             description: `Refund for Dispute #${id.substring(0, 8)}`,
             entityType: 'PLATFORM',
-            balanceBefore: 0, 
+            balanceBefore: 0,
             balanceAfter: 0,
             ...(dispute.paymentId && { paymentId: dispute.paymentId }),
             ...(dispute.orderId && { orderId: dispute.orderId }),
             ...(dispute.rideId && { rideId: dispute.rideId }),
             ...(dispute.deliveryId && { deliveryId: dispute.deliveryId }),
-            
-            processedBy: adminId, 
+
+            processedBy: adminId,
 
             metadata: {
               disputeId: id,
@@ -616,7 +636,10 @@ export class DisputesService {
         });
 
         if (dispute.paymentId) {
-          const newStatus = dto.action === ResolutionAction.REFUND_FULL ? 'REFUNDED' : 'PARTIALLY_REFUNDED';
+          const newStatus =
+            dto.action === ResolutionAction.REFUND_FULL
+              ? 'REFUNDED'
+              : 'PARTIALLY_REFUNDED';
           await tx.payment.update({
             where: { id: dispute.paymentId },
             data: { status: newStatus },
@@ -624,14 +647,19 @@ export class DisputesService {
         }
 
         // --- 4. VENDOR WALLET ADJUSTMENT ---
-        if (dto.refundSource === RefundSource.VENDOR_WALLET && dispute.order?.storeId) {
+        if (
+          dto.refundSource === RefundSource.VENDOR_WALLET &&
+          dispute.order?.storeId
+        ) {
           const store = await tx.store.findUnique({
             where: { id: dispute.order.storeId },
             select: { walletBalance: true },
           });
 
           if ((store?.walletBalance || 0) < refundAmount) {
-            throw new BadRequestException('Vendor wallet has insufficient balance for refund');
+            throw new BadRequestException(
+              'Vendor wallet has insufficient balance for refund',
+            );
           }
 
           const currentBalance = store?.walletBalance || 0;
@@ -713,7 +741,7 @@ ${dto.resolutionNotes}
       return updatedDispute;
     });
   }
-  //  REJECT DISPUTE 
+  //  REJECT DISPUTE
   async reject(id: string, reason: string, adminId: string) {
     this.logger.log(`Admin ${adminId} rejecting dispute ${id}`);
 
@@ -791,15 +819,17 @@ ${reason}
           target: `Dispute #${id.substring(0, 8)}`,
           status: 'SUCCESS',
           details: `Priority changed from ${oldDispute.priority} to ${priority}`,
-          metadata: { 
-            disputeId: id, 
-            oldPriority: oldDispute.priority, 
-            newPriority: priority 
+          metadata: {
+            disputeId: id,
+            oldPriority: oldDispute.priority,
+            newPriority: priority,
           },
         },
       });
 
-      this.logger.log(`Priority for Dispute ${id} updated to ${priority} by ${adminId}`);
+      this.logger.log(
+        `Priority for Dispute ${id} updated to ${priority} by ${adminId}`,
+      );
       return updatedDispute;
     });
   }

@@ -34,13 +34,14 @@ describe('Super Admin RBAC', () => {
     disputesController = module.get<DisputesController>(DisputesController);
   });
 
-  const mockContext = (role: UserRole) => ({
-    switchToHttp: () => ({
-      getRequest: () => ({ user: { id: 'test-user', role } }),
-    }),
-    getHandler: () => {},
-    getClass: () => PayoutsController, // or DisputesController
-  } as unknown as ExecutionContext);
+  const mockContext = (role: UserRole) =>
+    ({
+      switchToHttp: () => ({
+        getRequest: () => ({ user: { id: 'test-user', role } }),
+      }),
+      getHandler: () => {},
+      getClass: () => PayoutsController, // or DisputesController
+    }) as unknown as ExecutionContext;
 
   describe('PayoutsController', () => {
     it('should allow SUPER_ADMIN to approve payouts', () => {
@@ -48,7 +49,9 @@ describe('Super Admin RBAC', () => {
       const roles = [UserRole.SUPER_ADMIN, UserRole.ADMIN_FINANCE];
       jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(roles);
 
-      const canActivate = rolesGuard.canActivate(mockContext(UserRole.SUPER_ADMIN));
+      const canActivate = rolesGuard.canActivate(
+        mockContext(UserRole.SUPER_ADMIN),
+      );
       expect(canActivate).toBe(true);
     });
 
@@ -56,7 +59,9 @@ describe('Super Admin RBAC', () => {
       const roles = [UserRole.SUPER_ADMIN, UserRole.ADMIN_FINANCE];
       jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(roles);
 
-      const canActivate = rolesGuard.canActivate(mockContext(UserRole.ADMIN_SUPPORT));
+      const canActivate = rolesGuard.canActivate(
+        mockContext(UserRole.ADMIN_SUPPORT),
+      );
       expect(canActivate).toBe(false);
     });
   });
@@ -66,7 +71,9 @@ describe('Super Admin RBAC', () => {
       const roles = [UserRole.SUPER_ADMIN, UserRole.ADMIN_SUPPORT];
       jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(roles);
 
-      const canActivate = rolesGuard.canActivate(mockContext(UserRole.ADMIN_SUPPORT));
+      const canActivate = rolesGuard.canActivate(
+        mockContext(UserRole.ADMIN_SUPPORT),
+      );
       expect(canActivate).toBe(true);
     });
   });

@@ -65,6 +65,35 @@ export class MapsService {
     }
   }
 
+  async geocodePlace(
+    placeId: string,
+  ): Promise<{ lat: number; lng: number; address: string }> {
+    if (!placeId) {
+      throw new Error('Place ID is required');
+    }
+
+    const url = `https://maps.googleapis.com/maps/api/geocode/json?place_id=${placeId}&key=${this.apiKey}`;
+
+    try {
+      const res = await axios.get(url);
+      if (res.data.results && res.data.results.length > 0) {
+        const result = res.data.results[0];
+        return {
+          lat: result.geometry.location.lat,
+          lng: result.geometry.location.lng,
+          address: result.formatted_address,
+        };
+      }
+      throw new Error('No results found for place ID');
+    } catch (error) {
+      this.appLogger.error('Error geocoding place', error?.stack, {
+        error,
+        placeId,
+      });
+      throw new Error('Failed to geocode place');
+    }
+  }
+
   async getDirections(
     originLat: string,
     originLng: string,
@@ -124,5 +153,55 @@ export class MapsService {
         duration: { text: '', value: 0 },
       };
     }
+  }
+
+  /**
+   * Generate a Google Static Maps URL with markers and optional path
+   * Format: markers=color:label|lat,lng&markers=...&path=...
+   */
+  getStaticMapUrl(
+    markers: string,
+    path?: string,
+    center?: string,
+    zoom: string = '14',
+    size: string = '600x400',
+  ): { url: string } {
+    const baseUrl = 'https://maps.googleapis.com/maps/api/staticmap';
+    const params = new URLSearchParams();
+
+    params.append('size', size);
+    params.append('key', this.apiKey);
+
+    if (center) {
+      params.append('center', center);
+    }
+
+    if (zoom) {
+      params.append('zoom', zoom);
+    }
+
+    // Parse and add markers
+    // Format: pickup:6.5244,3.3792|dropoff:6.4698,3.5852|driver:6.5100,3.4000
+    if (markers) {
+      const markerList = markers.split('|');
+      markerList.forEach((marker) => {
+        const [label, coords] = marker.split(':');
+        if (coords) {
+          const color =
+            label === 'pickup' ? 'green' : label === 'dropoff' ? 'red' : 'blue';
+          params.append(
+            'markers',
+            `color:${color}|label:${label.charAt(0).toUpperCase()}|${coords}`,
+          );
+        }
+      });
+    }
+
+    // Add path if provided (encoded polyline or lat,lng pairs)
+    if (path) {
+      params.append('path', `color:0x0000ff|weight:3|${path}`);
+    }
+
+    return { url: `${baseUrl}?${params.toString()}` };
   }
 }

@@ -23,7 +23,7 @@ export function useUserProfile(): {
       setLoading(true);
       setError(null);
       try {
-        const data = await request("auth/user/me", { method: "GET" });
+        const data = await request("users/profile", { method: "GET" });
         if (mounted)
           setUser({
             id: data.id || data._id,

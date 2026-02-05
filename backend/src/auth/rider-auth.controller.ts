@@ -19,7 +19,10 @@ import { CreateRiderDto } from '../auth/dto/create-rider.dto';
 import { ResetPasswordDto } from '../auth/dto/reset-password.dto';
 import { UpdateProfileDto } from '../auth/dto/update-profile.dto';
 
-@Controller('auth/rider')
+@Controller({
+  path: 'auth/rider',
+  version: '1',
+})
 export class RiderAuthController {
   constructor(private readonly riderAuthService: RiderAuthService) {}
 

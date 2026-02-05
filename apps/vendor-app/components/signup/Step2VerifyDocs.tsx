@@ -103,7 +103,7 @@ export const Step2VerifyDocs: React.FC<Step2Props> = ({ data, onChange }) => {
             ...prev,
             [key]: { uploading: true, progress: progress.percentage },
           }));
-        }
+        },
       );
 
       onChange(key, url);

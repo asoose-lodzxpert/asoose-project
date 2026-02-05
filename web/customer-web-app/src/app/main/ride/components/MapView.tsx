@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import React from 'react';
-import Map from './map'; 
+import React from "react";
+import Map from "./map";
 
 // ✅ FIX: Change [number, number] to { lat: number; lng: number }
 interface MapViewProps {
@@ -11,11 +11,11 @@ interface MapViewProps {
   tripStatus?: string;
   onRouteData?: (distance: number, duration: number) => void;
   // Add any other props that 'Map' accepts if needed
-  driverPos?: { lat: number; lng: number }; 
+  driverPos?: { lat: number; lng: number };
   rideStage?: string;
 }
 
 export default function MapView(props: MapViewProps) {
-   // Now the types match what <Map /> expects
-   return <Map {...props} />;
+  // Now the types match what <Map /> expects
+  return <Map {...props} />;
 }

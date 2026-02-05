@@ -20,7 +20,6 @@ export default function TabLayout() {
         tabBarStyle: { backgroundColor: themeColors.surfaceBackground },
       }}
     >
-      i
       <Tabs.Screen
         name="home"
         options={{

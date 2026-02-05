@@ -107,7 +107,6 @@ export function DeliveriesPageSkeleton() {
     <div className="flex flex-col h-screen bg-[#0F172A] overflow-hidden">
       <div className="flex-1 overflow-y-auto">
         <div className="p-4 md:p-6 space-y-6">
-          
           {/* Header Skeleton */}
           <div className="flex justify-between items-center">
             <div>
@@ -162,7 +161,6 @@ export function DeliveriesPageSkeleton() {
               ))}
             </div>
           </div>
-
         </div>
       </div>
     </div>

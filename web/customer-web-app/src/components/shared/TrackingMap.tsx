@@ -21,7 +21,7 @@ export interface TrackingMapProps {
 }
 
 const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
-// REQUIRED: Advanced Markers only work with a Map ID. 
+// REQUIRED: Advanced Markers only work with a Map ID.
 // Use "DEMO_MAP_ID" for dev, but create a real one in Google Cloud Console for prod.
 const MAP_ID = process.env.NEXT_PUBLIC_GOOGLE_MAP_ID || "DEMO_MAP_ID";
 
@@ -37,7 +37,7 @@ export const TrackingMap: React.FC<TrackingMapProps> = ({
 }) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<google.maps.Map | null>(null);
-  
+
   // Store marker references. Note the type change to AdvancedMarkerElement
   const [markers, setMarkers] = useState<{
     user?: google.maps.marker.AdvancedMarkerElement;
@@ -46,9 +46,11 @@ export const TrackingMap: React.FC<TrackingMapProps> = ({
     destination?: google.maps.marker.AdvancedMarkerElement;
   }>({});
 
-  const [routePolyline, setRoutePolyline] = useState<google.maps.Polyline | null>(null);
-  const [directionsService, setDirectionsService] = useState<google.maps.DirectionsService | null>(null);
-  
+  const [routePolyline, setRoutePolyline] =
+    useState<google.maps.Polyline | null>(null);
+  const [directionsService, setDirectionsService] =
+    useState<google.maps.DirectionsService | null>(null);
+
   // We need to keep a reference to the driver's content element to rotate it efficiently
   const driverContentRef = useRef<HTMLDivElement | null>(null);
 
@@ -62,18 +64,23 @@ export const TrackingMap: React.FC<TrackingMapProps> = ({
       libraries: ["marker", "maps", "routes"], // Explicitly request 'marker' library
     });
 
-  const initMap = async () => {
+    const initMap = async () => {
       // 1. Load the script (bypass TS check if needed)
       await (loader as any).load();
 
       // 2. Import libraries using the global google object
-      const { Map } = await google.maps.importLibrary("maps") as google.maps.MapsLibrary;
-      const { AdvancedMarkerElement, PinElement } = await google.maps.importLibrary("marker") as google.maps.MarkerLibrary;
+      const { Map } = (await google.maps.importLibrary(
+        "maps",
+      )) as google.maps.MapsLibrary;
+      const { AdvancedMarkerElement, PinElement } =
+        (await google.maps.importLibrary(
+          "marker",
+        )) as google.maps.MarkerLibrary;
 
       const newMap = new Map(mapRef.current!, {
         center: { lat: userLocation.latitude, lng: userLocation.longitude },
         zoom,
-        mapId: MAP_ID, 
+        mapId: MAP_ID,
         disableDefaultUI: false,
         zoomControl: true,
         mapTypeControl: false,
@@ -82,8 +89,10 @@ export const TrackingMap: React.FC<TrackingMapProps> = ({
       });
 
       setMap(newMap);
-      
-      const { DirectionsService } = await google.maps.importLibrary("routes") as google.maps.RoutesLibrary;
+
+      const { DirectionsService } = (await google.maps.importLibrary(
+        "routes",
+      )) as google.maps.RoutesLibrary;
       setDirectionsService(new DirectionsService());
     };
 
@@ -95,10 +104,16 @@ export const TrackingMap: React.FC<TrackingMapProps> = ({
     if (!map) return;
 
     const updateUserMarker = async () => {
-      const { AdvancedMarkerElement, PinElement } = await google.maps.importLibrary("marker") as google.maps.MarkerLibrary;
+      const { AdvancedMarkerElement, PinElement } =
+        (await google.maps.importLibrary(
+          "marker",
+        )) as google.maps.MarkerLibrary;
 
       if (markers.user) {
-        markers.user.position = { lat: userLocation.latitude, lng: userLocation.longitude };
+        markers.user.position = {
+          lat: userLocation.latitude,
+          lng: userLocation.longitude,
+        };
       } else {
         // Create a blue circle using PinElement
         const pin = new PinElement({
@@ -127,16 +142,20 @@ export const TrackingMap: React.FC<TrackingMapProps> = ({
     if (!map || !driverLocation) return;
 
     const updateDriverMarker = async () => {
-      const { AdvancedMarkerElement } = await google.maps.importLibrary("marker") as google.maps.MarkerLibrary;
+      const { AdvancedMarkerElement } = (await google.maps.importLibrary(
+        "marker",
+      )) as google.maps.MarkerLibrary;
 
       if (markers.driver) {
-        markers.driver.position = { lat: driverLocation.latitude, lng: driverLocation.longitude };
-        
+        markers.driver.position = {
+          lat: driverLocation.latitude,
+          lng: driverLocation.longitude,
+        };
+
         // Rotate the existing DOM element
         if (driverContentRef.current && driverLocation.heading !== undefined) {
-           driverContentRef.current.style.transform = `rotate(${driverLocation.heading}deg)`;
+          driverContentRef.current.style.transform = `rotate(${driverLocation.heading}deg)`;
         }
-
       } else {
         // Create a custom arrow SVG for the driver
         const iconDiv = document.createElement("div");
@@ -146,7 +165,7 @@ export const TrackingMap: React.FC<TrackingMapProps> = ({
         iconDiv.style.alignItems = "center";
         iconDiv.style.justifyContent = "center";
         iconDiv.style.transition = "transform 0.3s ease"; // Smooth rotation
-        
+
         // SVG Arrow (Green with white border)
         iconDiv.innerHTML = `
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -155,14 +174,17 @@ export const TrackingMap: React.FC<TrackingMapProps> = ({
         `;
 
         if (driverLocation.heading) {
-            iconDiv.style.transform = `rotate(${driverLocation.heading}deg)`;
+          iconDiv.style.transform = `rotate(${driverLocation.heading}deg)`;
         }
-        
+
         driverContentRef.current = iconDiv;
 
         const driverMarker = new AdvancedMarkerElement({
           map,
-          position: { lat: driverLocation.latitude, lng: driverLocation.longitude },
+          position: {
+            lat: driverLocation.latitude,
+            lng: driverLocation.longitude,
+          },
           title: "Driver",
           content: iconDiv,
         });
@@ -172,7 +194,10 @@ export const TrackingMap: React.FC<TrackingMapProps> = ({
 
       // Auto-center on driver
       if (autoCenterOnDriver) {
-        map.panTo({ lat: driverLocation.latitude, lng: driverLocation.longitude });
+        map.panTo({
+          lat: driverLocation.latitude,
+          lng: driverLocation.longitude,
+        });
       }
     };
 
@@ -190,21 +215,30 @@ export const TrackingMap: React.FC<TrackingMapProps> = ({
     }
 
     const updatePickup = async () => {
-      const { AdvancedMarkerElement, PinElement } = await google.maps.importLibrary("marker") as google.maps.MarkerLibrary;
+      const { AdvancedMarkerElement, PinElement } =
+        (await google.maps.importLibrary(
+          "marker",
+        )) as google.maps.MarkerLibrary;
 
       if (markers.pickup) {
-        markers.pickup.position = { lat: pickupLocation.latitude, lng: pickupLocation.longitude };
+        markers.pickup.position = {
+          lat: pickupLocation.latitude,
+          lng: pickupLocation.longitude,
+        };
       } else {
         const pin = new PinElement({
-            scale: 1,
-            glyphColor: 'white',
-            background: '#EA4335', // Red
-            borderColor: '#B31412',
+          scale: 1,
+          glyphColor: "white",
+          background: "#EA4335", // Red
+          borderColor: "#B31412",
         });
 
         const pickupMarker = new AdvancedMarkerElement({
           map,
-          position: { lat: pickupLocation.latitude, lng: pickupLocation.longitude },
+          position: {
+            lat: pickupLocation.latitude,
+            lng: pickupLocation.longitude,
+          },
           title: "Pickup Location",
           content: pin.element,
         });
@@ -226,21 +260,30 @@ export const TrackingMap: React.FC<TrackingMapProps> = ({
     }
 
     const updateDestination = async () => {
-      const { AdvancedMarkerElement, PinElement } = await google.maps.importLibrary("marker") as google.maps.MarkerLibrary;
+      const { AdvancedMarkerElement, PinElement } =
+        (await google.maps.importLibrary(
+          "marker",
+        )) as google.maps.MarkerLibrary;
 
       if (markers.destination) {
-        markers.destination.position = { lat: destinationLocation.latitude, lng: destinationLocation.longitude };
+        markers.destination.position = {
+          lat: destinationLocation.latitude,
+          lng: destinationLocation.longitude,
+        };
       } else {
-         const pin = new PinElement({
-            scale: 1,
-            glyphColor: 'white',
-            background: '#FBBC04', // Yellow/Orange
-            borderColor: '#EA8600',
+        const pin = new PinElement({
+          scale: 1,
+          glyphColor: "white",
+          background: "#FBBC04", // Yellow/Orange
+          borderColor: "#EA8600",
         });
 
         const destinationMarker = new AdvancedMarkerElement({
           map,
-          position: { lat: destinationLocation.latitude, lng: destinationLocation.longitude },
+          position: {
+            lat: destinationLocation.latitude,
+            lng: destinationLocation.longitude,
+          },
           title: "Destination",
           content: pin.element,
         });
@@ -283,7 +326,14 @@ export const TrackingMap: React.FC<TrackingMapProps> = ({
         setRoutePolyline(newPolyline);
       }
     });
-  }, [map, directionsService, showRoute, driverLocation, pickupLocation, destinationLocation]);
+  }, [
+    map,
+    directionsService,
+    showRoute,
+    driverLocation,
+    pickupLocation,
+    destinationLocation,
+  ]);
 
   // Fit bounds
   useEffect(() => {
@@ -293,19 +343,35 @@ export const TrackingMap: React.FC<TrackingMapProps> = ({
     bounds.extend({ lat: userLocation.latitude, lng: userLocation.longitude });
 
     if (driverLocation && !autoCenterOnDriver) {
-      bounds.extend({ lat: driverLocation.latitude, lng: driverLocation.longitude });
+      bounds.extend({
+        lat: driverLocation.latitude,
+        lng: driverLocation.longitude,
+      });
     }
     if (pickupLocation) {
-      bounds.extend({ lat: pickupLocation.latitude, lng: pickupLocation.longitude });
+      bounds.extend({
+        lat: pickupLocation.latitude,
+        lng: pickupLocation.longitude,
+      });
     }
     if (destinationLocation) {
-      bounds.extend({ lat: destinationLocation.latitude, lng: destinationLocation.longitude });
+      bounds.extend({
+        lat: destinationLocation.latitude,
+        lng: destinationLocation.longitude,
+      });
     }
 
     if (!autoCenterOnDriver) {
       map.fitBounds(bounds);
     }
-  }, [map, userLocation, driverLocation, pickupLocation, destinationLocation, autoCenterOnDriver]);
+  }, [
+    map,
+    userLocation,
+    driverLocation,
+    pickupLocation,
+    destinationLocation,
+    autoCenterOnDriver,
+  ]);
 
   return (
     <div

@@ -1,39 +1,43 @@
-import React from 'react';
-import { notFound } from 'next/navigation';
-import { ArrowLeft, AlertCircle } from 'lucide-react';
-import CategoryClient, { CategoryData } from './CategoryClient';
-import { StoreSkeleton } from '@/app/main/store/skeleton';
+import React from "react";
+import { notFound } from "next/navigation";
+import { ArrowLeft, AlertCircle } from "lucide-react";
+import CategoryClient, { CategoryData } from "./CategoryClient";
+import { StoreSkeleton } from "@/app/main/store/skeleton";
 
 // --- CONFIG ---
-const RAW_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
-const API_URL = RAW_API_URL.replace(/\/$/, ''); 
+const RAW_API_URL =
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1";
+const API_URL = RAW_API_URL.replace(/\/$/, "");
 
 const UI_FILTERS = {
-  'All': 'all',
-  'Top Rated': 'top-rated',
-  'Fastest Delivery': 'fastest',
-  'Low Delivery Fee': 'cheapest'
+  All: "all",
+  "Top Rated": "top-rated",
+  "Fastest Delivery": "fastest",
+  "Low Delivery Fee": "cheapest",
 };
 
 const API_FILTER_MAP: Record<string, string> = {
-  'top-rated': 'RATING_DESC',
-  'fastest': 'TIME_ASC',
-  'cheapest': 'FEE_ASC',
+  "top-rated": "RATING_DESC",
+  fastest: "TIME_ASC",
+  cheapest: "FEE_ASC",
 };
 
 // --- DATA FETCHING ---
-async function getCategoryData(id: string, filterSlug: string = 'all'): Promise<CategoryData | null> {
+async function getCategoryData(
+  id: string,
+  filterSlug: string = "all",
+): Promise<CategoryData | null> {
   try {
     const apiSortParam = API_FILTER_MAP[filterSlug];
     let url = `${API_URL}/marketplace/categories/${id}`;
-    
+
     if (apiSortParam) {
       url += `?sort=${apiSortParam}`;
     }
 
     const res = await fetch(url, {
       next: { revalidate: 60 },
-      headers: { 'Content-Type': 'application/json' },
+      headers: { "Content-Type": "application/json" },
     });
 
     if (!res.ok) {
@@ -43,7 +47,7 @@ async function getCategoryData(id: string, filterSlug: string = 'all'): Promise<
 
     return await res.json();
   } catch (error) {
-    console.error('Fetch error:', error);
+    console.error("Fetch error:", error);
     throw error;
   }
 }
@@ -55,12 +59,15 @@ interface PageProps {
   searchParams: Promise<{ filter?: string }>;
 }
 
-export default async function CategoryPage({ params, searchParams }: PageProps) {
+export default async function CategoryPage({
+  params,
+  searchParams,
+}: PageProps) {
   // 2. Await the params and searchParams
   const resolvedParams = await params;
   const resolvedSearchParams = await searchParams;
 
-  const filter = resolvedSearchParams.filter || 'all';
+  const filter = resolvedSearchParams.filter || "all";
   const categoryId = resolvedParams.id;
 
   let categoryData: CategoryData | null = null;
@@ -69,7 +76,7 @@ export default async function CategoryPage({ params, searchParams }: PageProps) 
   try {
     categoryData = await getCategoryData(categoryId, filter);
   } catch (err) {
-    error = err instanceof Error ? err.message : 'An unexpected error occurred';
+    error = err instanceof Error ? err.message : "An unexpected error occurred";
   }
 
   if (error) {
@@ -80,7 +87,7 @@ export default async function CategoryPage({ params, searchParams }: PageProps) 
         </div>
         <h2 className="text-xl font-bold mb-2">Unable to load category</h2>
         <p className="text-gray-500 mb-6">{error}</p>
-        <a 
+        <a
           href="/main/store"
           className="flex items-center gap-2 px-6 py-3 bg-gray-900 dark:bg-white text-white dark:text-black rounded-xl font-bold hover:opacity-90 transition-opacity"
         >
@@ -95,8 +102,8 @@ export default async function CategoryPage({ params, searchParams }: PageProps) 
   }
 
   return (
-    <CategoryClient 
-      data={categoryData} 
+    <CategoryClient
+      data={categoryData}
       categoryId={categoryId}
       activeFilter={filter}
       filters={UI_FILTERS}

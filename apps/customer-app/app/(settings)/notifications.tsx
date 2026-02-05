@@ -20,7 +20,7 @@ export default function NotificationsScreen() {
 
   const [loading, setLoading] = useState(true);
   const [savingKey, setSavingKey] = useState<keyof NotificationConfig | null>(
-    null
+    null,
   );
 
   const [config, setConfig] = useState<NotificationConfig | null>(null);

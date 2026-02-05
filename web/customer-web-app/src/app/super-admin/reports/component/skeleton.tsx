@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import React from 'react';
+import React from "react";
 
 // Interfaces for TypeScript type safety
 interface SkeletonProps {
@@ -22,8 +22,14 @@ const SkeletonBox = ({ className = "" }: SkeletonProps) => (
 );
 
 // FIX: Added className to the destructuring and applied it to the div
-const SkeletonText = ({ width = "w-full", height = "h-4", className = "" }: SkeletonTextProps) => (
-  <div className={`${width} ${height} bg-gray-700/30 rounded animate-pulse ${className}`} />
+const SkeletonText = ({
+  width = "w-full",
+  height = "h-4",
+  className = "",
+}: SkeletonTextProps) => (
+  <div
+    className={`${width} ${height} bg-gray-700/30 rounded animate-pulse ${className}`}
+  />
 );
 
 const SkeletonCircle = ({ size = "w-12 h-12" }: SkeletonCircleProps) => (
@@ -33,7 +39,6 @@ const SkeletonCircle = ({ size = "w-12 h-12" }: SkeletonCircleProps) => (
 export default function ReportsPageSkeleton() {
   return (
     <div className="space-y-6">
-      
       {/* Header Skeleton */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
@@ -48,7 +53,10 @@ export default function ReportsPageSkeleton() {
       {/* Overview Cards Skeleton */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {[1, 2, 3, 4].map((card) => (
-          <div key={card} className="bg-[#1E293B] p-6 rounded-xl border border-gray-800 flex flex-col justify-between">
+          <div
+            key={card}
+            className="bg-[#1E293B] p-6 rounded-xl border border-gray-800 flex flex-col justify-between"
+          >
             <div className="flex justify-between items-start mb-4">
               <SkeletonCircle size="w-12 h-12" />
               <SkeletonBox className="w-16 h-6 rounded-full" />
@@ -65,7 +73,6 @@ export default function ReportsPageSkeleton() {
 
       {/* Performance Charts Skeleton */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        
         {/* Chart 1: Order Volume Skeleton */}
         <div className="bg-[#1E293B] p-6 rounded-xl border border-gray-800">
           <SkeletonText width="w-56" height="h-6" className="mb-6" />
@@ -82,7 +89,11 @@ export default function ReportsPageSkeleton() {
             </div>
             <div className="absolute bottom-8 left-8 right-8 flex items-end justify-between gap-2">
               {[1, 2, 3, 4, 5, 6, 7].map((bar) => (
-                <div key={bar} className="flex flex-col items-center gap-2" style={{ height: '100%' }}>
+                <div
+                  key={bar}
+                  className="flex flex-col items-center gap-2"
+                  style={{ height: "100%" }}
+                >
                   <div className="flex items-end gap-1 h-full">
                     <SkeletonBox className="w-6 h-3/4 rounded-t" />
                     <SkeletonBox className="w-6 h-1/2 rounded-t" />
@@ -108,7 +119,7 @@ export default function ReportsPageSkeleton() {
           <SkeletonText width="w-56" height="h-6" className="mb-6" />
           <div className="h-[300px] relative">
             <div className="absolute bottom-0 left-0 right-0 flex justify-between px-8">
-              {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'].map((month) => (
+              {["Jan", "Feb", "Mar", "Apr", "May", "Jun"].map((month) => (
                 <SkeletonText key={month} width="w-8" height="h-3" />
               ))}
             </div>
@@ -120,7 +131,10 @@ export default function ReportsPageSkeleton() {
             <div className="absolute top-8 bottom-8 left-8 right-8">
               <div className="h-full flex flex-col justify-between">
                 {[1, 2, 3, 4].map((line) => (
-                  <div key={line} className="border-b border-gray-700/50 w-full"></div>
+                  <div
+                    key={line}
+                    className="border-b border-gray-700/50 w-full"
+                  ></div>
                 ))}
               </div>
               <div className="absolute top-0 left-0 right-0 h-1 bg-gray-700/50 rounded-full mt-16"></div>
@@ -172,7 +186,7 @@ export default function ReportsPageSkeleton() {
           <div className="mt-8 text-center">
             <SkeletonText width="w-16" height="h-10" className="mx-auto mb-2" />
             <div className="flex justify-center gap-1 my-2">
-              {[1, 2, 3, 4, 5].map(star => (
+              {[1, 2, 3, 4, 5].map((star) => (
                 <SkeletonBox key={star} className="w-4 h-4 rounded-sm" />
               ))}
             </div>
@@ -184,7 +198,10 @@ export default function ReportsPageSkeleton() {
           <SkeletonText width="w-56" height="h-6" className="mb-6" />
           <div className="space-y-4">
             {[1, 2, 3, 4, 5].map((vendor) => (
-              <div key={vendor} className="flex items-center justify-between p-3 rounded-lg">
+              <div
+                key={vendor}
+                className="flex items-center justify-between p-3 rounded-lg"
+              >
                 <div className="flex items-center gap-3">
                   <SkeletonCircle size="w-8 h-8" />
                   <div>

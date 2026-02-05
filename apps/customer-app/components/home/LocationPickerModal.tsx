@@ -46,7 +46,7 @@ export function LocationPickerModal() {
           latitudeDelta: 0.01,
           longitudeDelta: 0.01,
         },
-        500
+        500,
       );
     })();
   }, [pickerVisible]);

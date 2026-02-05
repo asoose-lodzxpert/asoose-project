@@ -3,9 +3,16 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useJobs } from "@/context/JobContext";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import React, { useEffect, useState } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
+import {
+  ActivityIndicator,
+  Pressable,
+  StyleSheet,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
 const AUTO_DECLINE_TIMEOUT = 90;
+const EXTENSION_TIME = 15;
 
 export default function IncomingJobSheet() {
   const { incomingJob, acceptJob, declineJob } = useJobs();
@@ -13,8 +20,11 @@ export default function IncomingJobSheet() {
   const primary = useThemeColor({}, "brandPrimary");
   const surface = useThemeColor({}, "surfaceBackground");
   const danger = useThemeColor({}, "statusError");
+  const warning = useThemeColor({}, "statusPending");
 
   const [timer, setTimer] = useState(AUTO_DECLINE_TIMEOUT);
+  const [isPaused, setIsPaused] = useState(false);
+  const [canExtend, setCanExtend] = useState(true);
   const [loadingAccept, setLoadingAccept] = useState(false);
 
   const isRide = incomingJob && incomingJob.jobType === "ride";
@@ -24,22 +34,26 @@ export default function IncomingJobSheet() {
     if (!incomingJob) return;
 
     setTimer(AUTO_DECLINE_TIMEOUT);
+    setIsPaused(false);
+    setCanExtend(true);
 
     const interval = setInterval(() => {
-      setTimer((prev) => {
-        if (prev <= 1) {
-          clearInterval(interval);
-          if (incomingJob) {
-            declineJob(incomingJob.id, incomingJob.jobType);
+      if (!isPaused) {
+        setTimer((prev) => {
+          if (prev <= 1) {
+            clearInterval(interval);
+            if (incomingJob) {
+              declineJob(incomingJob.id, incomingJob.jobType);
+            }
+            return 0;
           }
-          return 0;
-        }
-        return prev - 1;
-      });
+          return prev - 1;
+        });
+      }
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [incomingJob, declineJob]);
+  }, [incomingJob, declineJob, isPaused]);
 
   if (!incomingJob) return null;
 
@@ -56,6 +70,13 @@ export default function IncomingJobSheet() {
     await declineJob(incomingJob.id, incomingJob.jobType);
   };
 
+  const handleExtend = () => {
+    if (canExtend) {
+      setTimer((prev) => prev + EXTENSION_TIME);
+      setCanExtend(false);
+    }
+  };
+
   const minutes = Math.floor(timer / 60);
   const seconds = timer % 60;
 
@@ -69,10 +90,24 @@ export default function IncomingJobSheet() {
           <ThemedText style={{ color: primary, fontWeight: "600" }}>
             {isRide ? "NEW RIDE" : "NEW DELIVERY"}
           </ThemedText>
-          <View style={styles.timerBadge}>
-            <ThemedText style={{ color: "#fff", fontWeight: "600" }}>
-              {minutes}:{seconds < 10 ? `0${seconds}` : seconds}
-            </ThemedText>
+          <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
+            {canExtend && timer <= 30 && (
+              <TouchableOpacity
+                onPress={handleExtend}
+                style={[styles.extendButton, { backgroundColor: warning }]}
+              >
+                <ThemedText
+                  style={{ color: "#fff", fontSize: 12, fontWeight: "600" }}
+                >
+                  +15s
+                </ThemedText>
+              </TouchableOpacity>
+            )}
+            <View style={styles.timerBadge}>
+              <ThemedText style={{ color: "#fff", fontWeight: "600" }}>
+                {minutes}:{seconds < 10 ? `0${seconds}` : seconds}
+              </ThemedText>
+            </View>
           </View>
         </View>
         <View style={styles.vendorRow}>
@@ -177,6 +212,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 30,
+  },
+  extendButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
   },
   vendorRow: { flexDirection: "row", alignItems: "center", gap: 12 },
   addressRow: { flexDirection: "row", alignItems: "center", gap: 12 },

@@ -2,6 +2,9 @@ import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { OpaqueColorValue, type StyleProp, type TextStyle } from "react-native";
 
 export type IconSymbolName =
+  | "mappin.and.ellipse"
+  | "building.columns.fill"
+  // ...existing code...
   | "radio"
   | "map-pin"
   | "flag"
@@ -23,9 +26,6 @@ export type IconSymbolName =
   | "chevron.left"
   | "chevron.down"
   | "chevron.up"
-  | "chevron.left"
-  | "chevron.down"
-  | "chevron.up"
   | "info.circle"
   | "cloud.upload"
   | "camera.fill"
@@ -38,6 +38,7 @@ export type IconSymbolName =
   | "map.fill"
   | "lock.fill"
   | "pencil"
+  | "mappin.circle.fill"
   | "trash"
   | "plus"
   | "fullscreen"
@@ -82,6 +83,7 @@ export type IconSymbolName =
   | "moon"
   | "log-out"
   | "alert-circle"
+  | "person.2.fill"
   | "calender"
   | "clock.fill"
   | "touchid"
@@ -111,12 +113,8 @@ export type IconSymbolName =
   | "star.fill"
   | "person.text.rectangle"
   | "doc.text"
+  | "doc.text.fill"
   | "creditcard"
-  | "location"
-  | "shopping-bag"
-  | "truck"
-  | "moon"
-  | "log-out"
   | "car"
   | "box.truck"
   | "calendar"
@@ -135,13 +133,44 @@ export type IconSymbolName =
   | "mail"
   | "x"
   | "cart"
+  | "cart.fill"
   | "star"
-  | "heart";
+  | "heart"
+  | "banknote"
+  | "checkmark.circle"
+  | "exclamationmark"
+  | "exclamationmark.triangle"
+  | "magnifyingglass"
+  | "mappin"
+  | "message.fill"
+  | "number"
+  | "phone.fill"
+  | "slider.horizontal.3"
+  | "xmark.circle"
+  | "building.columns"
+  | "xmark.circle.fill"
+  | "doc.on.doc"
+  | "dollarsign.circle.fill"
+  | "creditcard.fill"
+  | "basket.fill"
+  | "tag.fill"
+  | "message"
+  | "banknote.fill"
+  | "minus"
+  | "plus.circle.fill"
+  | "exclamationmark.triangle.fill"
+  | "arrow.up.circle.fill"
+  | "arrow.down.circle.fill"
+  | "scalemass.fill"
+  | "wallet-giftcard"
+  | "bicycle";
 
 export const MAPPING: Record<
   IconSymbolName,
   keyof typeof MaterialIcons.glyphMap
 > = {
+  "mappin.and.ellipse": "my-location", // or another suitable MaterialIcon
+  "building.columns.fill": "account-balance",
   location: "location-on",
   "shopping-bag": "shopping-bag",
   truck: "local-shipping",
@@ -169,6 +198,7 @@ export const MAPPING: Record<
   "map.marker": "place",
   "location.fill": "location-on",
   "map.fill": "map",
+  "mappin.circle.fill": "place",
   "arrow.up.left.and.arrow.down.right": "fullscreen",
   fullscreen: "fullscreen",
   xmark: "close",
@@ -210,6 +240,7 @@ export const MAPPING: Record<
   "file-text": "description",
   "credit-card": "credit-card",
   "alert-circle": "error-outline",
+  "person.2.fill": "group",
   calender: "calendar-today",
   "clock.fill": "access-time",
   touchid: "fingerprint",
@@ -240,6 +271,7 @@ export const MAPPING: Record<
   "star.fill": "star",
   "person.text.rectangle": "badge",
   "doc.text": "article",
+  "doc.text.fill": "article",
   creditcard: "credit-card",
   car: "directions-car",
   "box.truck": "local-shipping",
@@ -266,8 +298,37 @@ export const MAPPING: Record<
   "alert-triangle": "warning",
   x: "close",
   cart: "shopping-cart",
+  "cart.fill": "shopping-cart",
   star: "star",
   heart: "monitor-heart",
+  banknote: "payments",
+  "checkmark.circle": "check-circle-outline",
+  exclamationmark: "priority-high",
+  "exclamationmark.triangle": "warning",
+  magnifyingglass: "search",
+  mappin: "place",
+  "message.fill": "message",
+  number: "tag",
+  "phone.fill": "phone",
+  "slider.horizontal.3": "tune",
+  "xmark.circle": "cancel",
+  "building.columns": "account-balance",
+  "xmark.circle.fill": "cancel",
+  "doc.on.doc": "content-copy",
+  "dollarsign.circle.fill": "payments",
+  "creditcard.fill": "credit-card",
+  "basket.fill": "shopping-basket",
+  "tag.fill": "local-offer",
+  "banknote.fill": "payments",
+  message: "message",
+  minus: "remove",
+  "plus.circle.fill": "add-circle",
+  "exclamationmark.triangle.fill": "warning",
+  "arrow.up.circle.fill": "arrow-circle-up",
+  "arrow.down.circle.fill": "arrow-circle-down",
+  "scalemass.fill": "scale",
+  "wallet-giftcard": "card-giftcard",
+  bicycle: "directions-bike",
 };
 
 interface IconSymbolProps {

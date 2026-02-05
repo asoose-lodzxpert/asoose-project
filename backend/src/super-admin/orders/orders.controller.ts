@@ -16,7 +16,10 @@ import { RolesGuard } from '../../auth/roles.guards';
 import { Roles } from '../../auth/roles.decorator';
 import { UserRole } from '@prisma/client';
 
-@Controller('super-admin/orders')
+@Controller({
+  path: 'super-admin/orders',
+  version: '1',
+})
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
 export class OrdersController {

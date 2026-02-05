@@ -25,8 +25,8 @@ export {
   REDIS_KEYS,
   REDIS_TTL,
   DriverStatus,
-  TripType,
 } from './redis/redis-keys.constants';
+
 export {
   QUEUE_NAMES,
   JOB_TYPES,

@@ -1,24 +1,38 @@
-'use client';
+"use client";
 
-import Link from 'next/link';
+import Link from "next/link";
 
 export default function AppFooter() {
   const footerSections = [
     {
       title: "Company",
-      links: [{ n: "About Us", h: "/about" }, { n: "Contact Us", h: "/contact" }, { n: "Careers", h: "#" }]
+      links: [
+        { n: "About Us", h: "/about" },
+        { n: "Contact Us", h: "/contact" },
+        { n: "Careers", h: "#" },
+      ],
     },
     {
       title: "our services",
-      links: [{ n: "Book a ride", h: "/main/ride" }, { n: "Food, groceries and essentials", h: "/main/store" }, { n: "Logistics", h: "/main/delivery" }]
+      links: [
+        { n: "Book a ride", h: "/main/ride" },
+        { n: "Food, groceries and essentials", h: "/main/store" },
+        { n: "Logistics", h: "/main/delivery" },
+      ],
     },
     {
       title: "Partner",
       links: [
-        { n: "Drive with Asoose", h: "https://play.google.com/store/apps/details?id=com.asoose.rider" },
-        { n: "Vendor Solutions", h: "https://play.google.com/store/apps/details?id=com.asoose.vendor" }
-      ]
-    }
+        {
+          n: "Drive with Asoose",
+          h: "https://play.google.com/store/apps/details?id=com.asoose.rider",
+        },
+        {
+          n: "Vendor Solutions",
+          h: "https://play.google.com/store/apps/details?id=com.asoose.vendor",
+        },
+      ],
+    },
   ];
 
   return (
@@ -40,7 +54,11 @@ export default function AppFooter() {
             </div>
             <div className="flex flex-col gap-3">
               {section.links.map((link, j) => (
-                <Link key={j} href={link.h} className="text-sm font-bold hover:text-yellow-500 transition-colors">
+                <Link
+                  key={j}
+                  href={link.h}
+                  className="text-sm font-bold hover:text-yellow-500 transition-colors"
+                >
                   {link.n}
                 </Link>
               ))}
@@ -48,12 +66,16 @@ export default function AppFooter() {
           </div>
         ))}
       </div>
-      
+
       <div className="max-w-7xl mx-auto pt-8 border-t border-zinc-100 dark:border-white/5 flex justify-between items-center text-[10px] font-black uppercase tracking-[0.2em] opacity-30">
         <span>© 2026 Asoose Technologies Inc.</span>
         <div className="flex gap-6">
-          <Link href="/privacy" className="hover:text-yellow-500">Privacy</Link>
-          <Link href="/terms" className="hover:text-yellow-500">Terms</Link>
+          <Link href="/privacy" className="hover:text-yellow-500">
+            Privacy
+          </Link>
+          <Link href="/terms" className="hover:text-yellow-500">
+            Terms
+          </Link>
         </div>
       </div>
     </footer>

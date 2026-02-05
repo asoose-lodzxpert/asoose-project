@@ -19,7 +19,7 @@ export interface CustomerProfile {
   email: string;
   phone?: string;
   image?: string;
-  status: 'ACTIVE' | 'BANNED' | 'SUSPENDED' | 'PENDING';
+  status: "ACTIVE" | "BANNED" | "SUSPENDED" | "PENDING";
   joinedAt: string;
   updatedAt: string;
   stats: CustomerStats;

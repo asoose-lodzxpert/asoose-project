@@ -17,7 +17,10 @@ import { RolesGuard } from '../../auth/roles.guards';
 import { Roles } from '../../auth/roles.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
 
-@Controller('/super-admin/reports')
+@Controller({
+  path: '/super-admin/reports',
+  version: '1',
+})
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN_MANAGER)
 export class AnalyticsController {

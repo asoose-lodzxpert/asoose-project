@@ -18,7 +18,10 @@ import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { RolesGuard } from '../../auth/roles.guards';
 import { Roles } from '../../auth/roles.decorator';
 
-@Controller('super-admin/riders')
+@Controller({
+  path: 'super-admin/riders',
+  version: '1',
+})
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class RidersController {
   constructor(private readonly ridersService: RidersService) {}

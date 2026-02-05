@@ -1,10 +1,9 @@
-import React from "react";
+import React, { useRef, useEffect } from "react";
 import { StyleSheet, View } from "react-native";
 import { ThemedInput } from "@/components/ThemedInput";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
 
-import { useRef, useEffect } from "react";
 
 interface StoreSearchBarProps {
   value: string;
@@ -23,16 +22,23 @@ const StoreSearchBar: React.FC<StoreSearchBarProps> = ({
 }) => {
   const iconColor = useThemeColor({}, "iconDefault");
   const skeleton = useThemeColor({}, "surfaceSubtle");
-  const debounceRef = useRef<number | null>(null);
+  const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (!onDebouncedChange) return;
-    if (debounceRef.current) clearTimeout(debounceRef.current);
+
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+    }
+
     debounceRef.current = setTimeout(() => {
       onDebouncedChange(value);
     }, 400);
+
     return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+      }
     };
   }, [value, onDebouncedChange]);
 
@@ -50,23 +56,25 @@ const StoreSearchBar: React.FC<StoreSearchBarProps> = ({
       </View>
     );
   }
+
   return (
-    <ThemedInput
-      value={value}
-      onChangeText={onChangeText}
-      placeholder={placeholder}
-      autoCorrect={false}
-      autoCapitalize="none"
-      clearButtonMode="while-editing"
-      containerStyle={styles.container}
-      iconRight={<IconSymbol name="search" size={22} color={iconColor} />}
-    />
+    <View style={styles.container}>
+      <ThemedInput
+        value={value}
+        onChangeText={onChangeText}
+        placeholder={placeholder}
+        autoCorrect={false}
+        autoCapitalize="none"
+        clearButtonMode="while-editing"
+        iconRight={<IconSymbol name="search" size={22} color={iconColor} />}
+      />
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     paddingVertical: 8,
   },
 });

@@ -16,7 +16,10 @@ import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { StorageService } from './storage.service';
 
-@Controller('storage')
+@Controller({
+  path: 'storage',
+  version: '1',
+})
 export class StorageController {
   constructor(private readonly storageService: StorageService) {}
 

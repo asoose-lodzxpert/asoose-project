@@ -19,7 +19,10 @@ import { StorageService } from '../../storage/storage.service';
 import { UpdatePersonalInfoDto } from '../dto/update-personal-info.dto';
 import { FileInterceptor } from '@nestjs/platform-express';
 
-@Controller('riders/profile')
+@Controller({
+  path: 'riders/profile',
+  version: '1',
+})
 export class ProfileController {
   constructor(
     private readonly profileService: ProfileService,

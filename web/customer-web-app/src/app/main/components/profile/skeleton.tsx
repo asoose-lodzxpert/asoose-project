@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 
 export const ProfileSkeleton = () => (
   <div className="min-h-screen bg-gray-50 dark:bg-[#0a0a0a] pb-24 animate-pulse">
@@ -24,7 +24,10 @@ export const ProfileSkeleton = () => (
     <div className="sticky top-0 bg-gray-50/95 dark:bg-[#0a0a0a]/95 border-b border-gray-200 dark:border-white/5 px-4 py-4">
       <div className="max-w-4xl mx-auto flex gap-3 overflow-hidden">
         {[1, 2, 3, 4, 5].map((i) => (
-          <div key={i} className="h-10 w-28 bg-gray-200 dark:bg-white/10 rounded-full shrink-0" />
+          <div
+            key={i}
+            className="h-10 w-28 bg-gray-200 dark:bg-white/10 rounded-full shrink-0"
+          />
         ))}
       </div>
     </div>
@@ -39,9 +42,9 @@ export const ProfileSkeleton = () => (
 export const ContentSkeleton = () => (
   <div className="space-y-4 animate-pulse">
     {[1, 2, 3].map((i) => (
-      <div 
-        key={i} 
-        className="h-32 bg-white dark:bg-[#151515] rounded-3xl border border-gray-100 dark:border-white/5" 
+      <div
+        key={i}
+        className="h-32 bg-white dark:bg-[#151515] rounded-3xl border border-gray-100 dark:border-white/5"
       />
     ))}
   </div>

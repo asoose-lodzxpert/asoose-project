@@ -13,6 +13,7 @@ import { SendPackageProvider } from "@/context/SendPackageContext";
 import ThemedToastProvider from "@/components/ui/ThemedToast";
 import { HomeProvider } from "@/context/HomeContext";
 import { ToastProvider } from "@/components/ui/toast";
+import { RideProvider } from "@/context/RideContext";
 
 /* ---------------------------------- */
 /* Root Navigator */
@@ -67,24 +68,27 @@ function RootNavigator() {
   }
 
   /* ---------- Navigation ---------- */
+  // Always render all screens, use initialRouteName and navigation guards
+  let initialRouteName = "onboarding";
+  if (hasLaunched) {
+    if (!user) initialRouteName = "(auth)";
+    else if (!locationGranted) initialRouteName = "enable-location";
+    else initialRouteName = "(tabs)";
+  }
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <Stack screenOptions={{ headerShown: false }}>
-        {!hasLaunched && <Stack.Screen name="onboarding" />}
-
-        {hasLaunched && !user && <Stack.Screen name="(auth)" />}
-
-        {hasLaunched && user && !locationGranted && (
-          <Stack.Screen name="enable-location" />
-        )}
-
-        {hasLaunched && user && locationGranted && (
-          <Stack.Screen name="(tabs)" />
-        )}
-
+      <Stack
+        screenOptions={{ headerShown: false }}
+        initialRouteName={initialRouteName}
+      >
+        <Stack.Screen name="onboarding" />
+        <Stack.Screen name="(auth)" />
+        <Stack.Screen name="enable-location" />
+        <Stack.Screen name="(tabs)" />
         {/* Global modal routes */}
         <Stack.Screen
-          name="location-picker"
+          name="(delivery)/location-picker"
           options={{
             presentation: "modal",
             animation: "slide_from_bottom",
@@ -105,12 +109,14 @@ export default function RootLayout() {
         <ConfirmProvider>
           <CartProvider>
             <HomeProvider>
-              <SendPackageProvider>
-                <ToastProvider>
-                  <RootNavigator />
-                  <ThemedToastProvider />
-                </ToastProvider>
-              </SendPackageProvider>
+              <RideProvider>
+                <SendPackageProvider>
+                  <ToastProvider>
+                    <RootNavigator />
+                    <ThemedToastProvider />
+                  </ToastProvider>
+                </SendPackageProvider>
+              </RideProvider>
             </HomeProvider>
           </CartProvider>
         </ConfirmProvider>

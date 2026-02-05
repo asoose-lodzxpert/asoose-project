@@ -24,7 +24,10 @@ describe('TransactionLedgerService', () => {
   });
 
   it('should correctly calculate commission deduction upon payout completion', async () => {
-    mockPrisma.store.findUnique.mockResolvedValue({ walletBalance: 10000, commissionRate: 10 });
+    mockPrisma.store.findUnique.mockResolvedValue({
+      walletBalance: 10000,
+      commissionRate: 10,
+    });
 
     const payoutData = {
       id: 'payout-1',

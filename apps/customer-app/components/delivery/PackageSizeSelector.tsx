@@ -8,16 +8,14 @@ const SIZES: {
   key: PackageSize;
   label: string;
   desc: string;
-  price: number;
 }[] = [
-  { key: "small", label: "Small", desc: "Documents / Envelope", price: 500 },
-  { key: "medium", label: "Medium", desc: "Shoebox size", price: 1000 },
-  { key: "large", label: "Large", desc: "Bulk items", price: 2500 },
+  { key: "small", label: "Small", desc: "Documents / Envelope" },
+  { key: "medium", label: "Medium", desc: "Shoebox size" },
+  { key: "large", label: "Large", desc: "Bulk items" },
   {
     key: "extra_large",
     label: "Extra Large",
     desc: "Very large or heavy items",
-    price: 5000,
   },
 ];
 
@@ -53,12 +51,6 @@ export function PackageSizeSelector() {
               >
                 <ThemedText style={{ fontWeight: "700" }}>{s.label}</ThemedText>
                 <ThemedText type="caption">{s.desc}</ThemedText>
-                <ThemedText
-                  type="caption"
-                  style={{ marginTop: 4, color: primary }}
-                >
-                  ₦{s.price.toLocaleString()}
-                </ThemedText>
               </Pressable>
             );
           })}

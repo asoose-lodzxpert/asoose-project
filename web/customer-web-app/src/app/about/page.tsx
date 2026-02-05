@@ -1,18 +1,18 @@
-'use client';
+"use client";
 
-import { useTheme } from 'next-themes';
-import { 
-  ShieldCheck, 
-  Zap, 
-  Users, 
-  Truck, 
-  Car, 
+import { useTheme } from "next-themes";
+import {
+  ShieldCheck,
+  Zap,
+  Users,
+  Truck,
+  Car,
   ShoppingBag,
-  ArrowRight
-} from 'lucide-react';
-import { useEffect, useState } from 'react';
-import Footer from '../components/layout/Footer';
-import Navbar from '../components/layout/Navbar';
+  ArrowRight,
+} from "lucide-react";
+import { useEffect, useState } from "react";
+import Footer from "../components/layout/Footer";
+import Navbar from "../components/layout/Navbar";
 
 export default function AboutPage() {
   const { resolvedTheme } = useTheme();
@@ -20,33 +20,45 @@ export default function AboutPage() {
   useEffect(() => setMounted(true), []);
 
   if (!mounted) return null;
-  const darkMode = resolvedTheme === 'dark';
+  const darkMode = resolvedTheme === "dark";
 
   return (
     <div className="flex flex-col min-h-screen">
       <Navbar />
-      
-      <main className={`flex-grow pt-20 ${darkMode ? 'bg-[#0a0a0a] text-white' : 'bg-white text-black'}`}>
-        
+
+      <main
+        className={`flex-grow pt-20 ${darkMode ? "bg-[#0a0a0a] text-white" : "bg-white text-black"}`}
+      >
         {/* HERO */}
         <section className="py-24 px-6 max-w-3xl mx-auto text-center">
           <h1 className="text-5xl font-bold mb-4">
             About <span className="text-yellow-500">Asoose Lodzxpert</span>
           </h1>
           <p className="text-lg opacity-60">
-            Asoose Lodzxpert is a logistics, mobility, and e-commerce company founded in 2023 with the mission to make last-mile delivery and shared transportation reliable, safe, and accessible.
+            Asoose Lodzxpert is a logistics, mobility, and e-commerce company
+            founded in 2023 with the mission to make last-mile delivery and
+            shared transportation reliable, safe, and accessible.
           </p>
         </section>
 
         {/* DESCRIPTION */}
-        <section className={`py-16 px-6 border-y ${darkMode ? 'border-white/10' : 'border-black/10'}`}>
+        <section
+          className={`py-16 px-6 border-y ${darkMode ? "border-white/10" : "border-black/10"}`}
+        >
           <div className="max-w-3xl mx-auto">
             <h2 className="text-2xl font-bold mb-4">Our Story</h2>
             <p className="opacity-60 leading-relaxed mb-4">
-              Our platform seamlessly connects people, vendors, drivers, and riders, addressing the real needs of our communities.
+              Our platform seamlessly connects people, vendors, drivers, and
+              riders, addressing the real needs of our communities.
             </p>
             <p className="opacity-60 leading-relaxed">
-              Our services include last-mile delivery, local e-commerce support, and car-sharing solutions, providing affordable and flexible mobility options that empower livelihoods and help local businesses grow. By leveraging technology and a deep understanding of local needs, we enable communities to move goods and people more efficiently, saving time, reducing barriers, and creating opportunities.
+              Our services include last-mile delivery, local e-commerce support,
+              and car-sharing solutions, providing affordable and flexible
+              mobility options that empower livelihoods and help local
+              businesses grow. By leveraging technology and a deep understanding
+              of local needs, we enable communities to move goods and people
+              more efficiently, saving time, reducing barriers, and creating
+              opportunities.
             </p>
           </div>
         </section>
@@ -54,24 +66,24 @@ export default function AboutPage() {
         {/* SERVICES */}
         <section className="py-16 px-6 max-w-3xl mx-auto">
           <h2 className="text-2xl font-bold mb-8">What We Do</h2>
-          
+
           <div className="space-y-6">
             {[
-              { 
-                icon: <Truck className="text-yellow-500" size={20} />, 
-                title: "Last-Mile Delivery", 
-                desc: "Reliable logistics support to ensure goods reach their destination safely and on time." 
+              {
+                icon: <Truck className="text-yellow-500" size={20} />,
+                title: "Last-Mile Delivery",
+                desc: "Reliable logistics support to ensure goods reach their destination safely and on time.",
               },
-              { 
-                icon: <ShoppingBag className="text-yellow-500" size={20} />, 
-                title: "E-Commerce Support", 
-                desc: "Connecting local vendors to a wider audience with seamless delivery solutions." 
+              {
+                icon: <ShoppingBag className="text-yellow-500" size={20} />,
+                title: "E-Commerce Support",
+                desc: "Connecting local vendors to a wider audience with seamless delivery solutions.",
               },
-              { 
-                icon: <Car className="text-yellow-500" size={20} />, 
-                title: "Car-Sharing", 
-                desc: "Affordable and flexible mobility options designed to create new opportunities." 
-              }
+              {
+                icon: <Car className="text-yellow-500" size={20} />,
+                title: "Car-Sharing",
+                desc: "Affordable and flexible mobility options designed to create new opportunities.",
+              },
             ].map((service, i) => (
               <div key={i} className="flex gap-4">
                 <div className="mt-1">{service.icon}</div>
@@ -85,13 +97,16 @@ export default function AboutPage() {
         </section>
 
         {/* IMPACT */}
-        <section className={`py-16 px-6 ${darkMode ? 'bg-white/5' : 'bg-gray-50'}`}>
+        <section
+          className={`py-16 px-6 ${darkMode ? "bg-white/5" : "bg-gray-50"}`}
+        >
           <div className="max-w-2xl mx-auto text-center">
-            <h2 className="text-3xl font-bold mb-4">
-              Our Impact
-            </h2>
+            <h2 className="text-3xl font-bold mb-4">Our Impact</h2>
             <p className="opacity-60 leading-relaxed">
-              We're committed to saving time, reducing barriers, and creating opportunities. By understanding the heartbeat of the community, we enable more efficient movement, helping local businesses grow and individuals thrive.
+              We're committed to saving time, reducing barriers, and creating
+              opportunities. By understanding the heartbeat of the community, we
+              enable more efficient movement, helping local businesses grow and
+              individuals thrive.
             </p>
           </div>
         </section>
@@ -101,10 +116,22 @@ export default function AboutPage() {
           <h2 className="text-2xl font-bold mb-8 text-center">Our Values</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
             {[
-              { icon: <ShieldCheck className="text-yellow-500" size={20} />, text: "Reliable" },
-              { icon: <Zap className="text-yellow-500" size={20} />, text: "Efficient" },
-              { icon: <Users className="text-yellow-500" size={20} />, text: "Community-Driven" },
-              { icon: <ArrowRight className="text-yellow-500" size={20} />, text: "Accessible" }
+              {
+                icon: <ShieldCheck className="text-yellow-500" size={20} />,
+                text: "Reliable",
+              },
+              {
+                icon: <Zap className="text-yellow-500" size={20} />,
+                text: "Efficient",
+              },
+              {
+                icon: <Users className="text-yellow-500" size={20} />,
+                text: "Community-Driven",
+              },
+              {
+                icon: <ArrowRight className="text-yellow-500" size={20} />,
+                text: "Accessible",
+              },
             ].map((val, i) => (
               <div key={i} className="text-center space-y-2">
                 <div className="flex justify-center">{val.icon}</div>
@@ -113,9 +140,8 @@ export default function AboutPage() {
             ))}
           </div>
         </section>
-
       </main>
-      
+
       <Footer />
     </div>
   );

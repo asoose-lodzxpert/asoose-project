@@ -4,7 +4,10 @@ import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { RolesGuard } from '../../auth/roles.guards';
 import { Roles } from '../../auth/roles.decorator';
 import { UserRole } from '@prisma/client';
-@Controller('super-admin/settings')
+@Controller({
+  path: 'super-admin/settings',
+  version: '1',
+})
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class SettingsController {
   constructor(private readonly service: SettingsService) {}

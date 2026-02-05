@@ -6,7 +6,10 @@ import { UserRole } from '../../common/enums/user-role.enum';
 import { BankService } from './bank.service';
 import { UpdateBankAccountDto } from '../dto/update-bank-account.dto';
 
-@Controller('riders/bank')
+@Controller({
+  path: 'riders/bank',
+  version: '1',
+})
 export class BankController {
   constructor(private readonly bankService: BankService) {}
 

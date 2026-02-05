@@ -41,7 +41,7 @@ export class OrderService {
     });
     let totalRides = 0;
     let rideFees = 0;
-    let bonuses = 0;
+    const bonuses = 0;
     let serviceFees = 0;
     let avgPerRide = 0;
     let hoursOnline = 0;

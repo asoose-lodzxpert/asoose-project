@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import React, { useState } from 'react';
 import { X, Loader2 } from 'lucide-react';
@@ -31,7 +31,7 @@ export default function ReportDisputeModal({
   const { data: session } = useSession();
 
   const handleImageUpload = (url: string) => {
-    if (url) setEvidenceImages(prev => [...prev, url]);
+    if (url) setEvidenceImages((prev) => [...prev, url]);
   };
 
   const getReasonOptions = () => {
@@ -81,7 +81,9 @@ export default function ReportDisputeModal({
         return;
       }
 
-      const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001').replace(/\/$/, '');
+      const API_URL = (
+        process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
+      ).replace(/\/$/, "");
 
       const payload: any = {
         reason,

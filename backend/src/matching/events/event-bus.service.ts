@@ -20,9 +20,49 @@ import {
  */
 @Injectable()
 export class EventBusService {
+  // ========================================
+  // SUPPORT ALERT EVENTS
+  // ========================================
+
+  emitSupportAlert(event: {
+    type: string;
+    driverId?: string;
+    riderId?: string;
+    currentJobId?: string;
+    timestamp: number;
+    details?: any;
+  }) {
+    this.logger.warn(
+      `[SUPPORT] Alert: ${event.type} ${event.driverId || event.riderId || ''}`,
+    );
+    this.eventEmitter.emit('support.alert', event);
+  }
+
+  // ========================================
+  // RIDER EVENTS
+  // ========================================
+
+  emitRiderMarkedInactive(event: {
+    riderId: string;
+    lastSeen: number;
+    markedAt: number;
+  }) {
+    this.logger.warn(`[RIDER] Marked inactive: ${event.riderId}`);
+    this.eventEmitter.emit('rider.marked.inactive', event);
+  }
   private readonly logger = new Logger(EventBusService.name);
 
   constructor(private readonly eventEmitter: EventEmitter2) {}
+
+  emitDeliveryRequested(event: any) {
+    this.logger.log(`[DELIVERY] Requested: ${event.deliveryId}`);
+    this.eventEmitter.emit('delivery.requested', event);
+  }
+
+  emitRideRequested(event: any) {
+    this.logger.log(`[RIDE] Requested: ${event.rideId}`);
+    this.eventEmitter.emit('ride.requested', event);
+  }
 
   // ========================================
   // JOB EVENTS

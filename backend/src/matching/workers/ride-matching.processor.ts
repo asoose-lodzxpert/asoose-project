@@ -14,7 +14,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { ATOMIC_LOCK_DRIVER } from '../redis/lua-scripts';
 import {
   REDIS_TTL,
-  TripType,
+  JobType,
   DriverStatus,
 } from '../redis/redis-keys.constants';
 
@@ -60,29 +60,11 @@ export class RideMatchingProcessor extends WorkerHost {
   }
 
   async process(job: Job<MatchRideJobData>): Promise<void> {
-    const {
-      rideId,
-      customerId,
-      pickupLat,
-      pickupLng,
-      dropoffLat,
-      dropoffLng,
-      distanceKm,
-      totalFare,
-      attempt,
-      excludeDriverIds = [],
-    } = job.data;
-
-    this.logger.log(`🔍 Matching ride ${rideId} (attempt ${attempt})`);
+    const { job: jobSummary, attempt, excludeDriverIds = [] } = job.data;
+    const rideId = jobSummary.id;
+    this.logger.log(`Matching ride ${rideId} (attempt ${attempt})`);
 
     try {
-      // Acquire global trip lock to prevent concurrent matching
-      const locked = await this.redis.setTripLock(TripType.RIDE, rideId);
-      if (!locked) {
-        this.logger.warn(`Ride ${rideId} is already being matched`);
-        return;
-      }
-
       // Verify ride is still in REQUESTED status
       const ride = await this.prisma.ride.findUnique({
         where: { id: rideId },
@@ -91,7 +73,6 @@ export class RideMatchingProcessor extends WorkerHost {
 
       if (!ride) {
         this.logger.error(`Ride ${rideId} not found`);
-        await this.redis.releaseTripLock(TripType.RIDE, rideId);
         return;
       }
 
@@ -99,53 +80,42 @@ export class RideMatchingProcessor extends WorkerHost {
         this.logger.log(
           `Ride ${rideId} no longer REQUESTED (status: ${ride.status})`,
         );
-        await this.redis.releaseTripLock(TripType.RIDE, rideId);
         return;
       }
 
       // Get declined drivers from Redis
-      const declinedDrivers = await this.redis.getDeclinedDrivers(
-        TripType.RIDE,
-        rideId,
-      );
+      const declinedDrivers = await this.redis.getDeclinedDrivers(rideId);
       const allExcludedDrivers = [...excludeDriverIds, ...declinedDrivers];
 
       // Get pickup hex
+      const pickupLat = jobSummary.pickupAddress?.lat;
+      const pickupLng = jobSummary.pickupAddress?.lng;
+      const dropoffLat = jobSummary.dropoffAddress?.lat;
+      const dropoffLng = jobSummary.dropoffAddress?.lng;
       const pickupHex = this.geo.latLngToHex(pickupLat, pickupLng);
       this.logger.debug(`Pickup hex: ${pickupHex}`);
 
       // Expand in rings and search for driver
       const driverFound = await this.searchInRings(
         rideId,
-        customerId,
         pickupHex,
         pickupLat,
         pickupLng,
         dropoffLat,
         dropoffLng,
-        distanceKm,
-        totalFare,
+        jobSummary.distanceKm ?? 0,
+        jobSummary.earnings,
         allExcludedDrivers,
       );
 
       if (driverFound) {
-        this.logger.log(`✅ Driver found for ride ${rideId}`);
+        this.logger.log(`Driver found for ride ${rideId}`);
       } else {
         // No driver found after all rings
-        await this.handleNoDriverFound(
-          rideId,
-          customerId,
-          pickupLat,
-          pickupLng,
-          attempt,
-        );
+        await this.handleNoDriverFound(rideId, pickupLat, pickupLng, attempt);
       }
-
-      // Release trip lock
-      await this.redis.releaseTripLock(TripType.RIDE, rideId);
     } catch (error) {
       this.logger.error(`Error matching ride ${rideId}:`, error);
-      await this.redis.releaseTripLock(TripType.RIDE, rideId);
       throw error;
     }
   }
@@ -155,7 +125,6 @@ export class RideMatchingProcessor extends WorkerHost {
    */
   private async searchInRings(
     rideId: string,
-    customerId: string,
     centerHex: string,
     pickupLat: number,
     pickupLng: number,
@@ -172,22 +141,16 @@ export class RideMatchingProcessor extends WorkerHost {
 
     for (let ringIndex = 0; ringIndex < rings.length; ringIndex++) {
       const ring = rings[ringIndex];
-
       this.logger.debug(`Searching ring ${ringIndex} (${ring.length} hexes)`);
-
       for (const hexId of ring) {
         // Get drivers in this hex
         const driverIds = await this.redis.getDriversInHex(hexId);
-
         if (driverIds.length === 0) continue;
-
         // Filter out excluded drivers
         const candidateIds = driverIds.filter(
           (id) => !excludeDriverIds.includes(id),
         );
-
         if (candidateIds.length === 0) continue;
-
         // Get driver locations and sort by distance
         const candidates = await this.getDriverLocations(candidateIds);
         const sorted = this.geo.sortByDistance(
@@ -195,21 +158,17 @@ export class RideMatchingProcessor extends WorkerHost {
           pickupLng,
           candidates,
         );
-
         // Try to assign to closest available driver
         for (const driver of sorted) {
           totalAttempts++;
-
           if (totalAttempts > this.MAX_ATTEMPTS) {
             this.logger.warn(
               `Reached max attempts (${this.MAX_ATTEMPTS}) for ride ${rideId}`,
             );
             return false;
           }
-
           const assigned = await this.attemptAssignment(
             rideId,
-            customerId,
             driver.id,
             hexId,
             pickupLat,
@@ -218,14 +177,10 @@ export class RideMatchingProcessor extends WorkerHost {
             dropoffLng,
             distanceKm,
             totalFare,
-            driver.distanceKm,
           );
-
           if (assigned) {
             return true;
           }
-
-          // If not assigned, try next driver
         }
       }
     }
@@ -238,7 +193,6 @@ export class RideMatchingProcessor extends WorkerHost {
    */
   private async attemptAssignment(
     rideId: string,
-    customerId: string,
     driverId: string,
     hexId: string,
     pickupLat: number,
@@ -247,7 +201,6 @@ export class RideMatchingProcessor extends WorkerHost {
     dropoffLng: number,
     distanceKm: number,
     totalFare: number,
-    driverDistanceKm: number,
   ): Promise<boolean> {
     // Execute atomic lock script
     const result = await this.redis
@@ -256,7 +209,7 @@ export class RideMatchingProcessor extends WorkerHost {
         ATOMIC_LOCK_DRIVER,
         0,
         driverId,
-        TripType.RIDE,
+        JobType.RIDE,
         rideId,
         hexId,
         REDIS_TTL.PENDING_ASSIGNMENT.toString(),
@@ -264,39 +217,26 @@ export class RideMatchingProcessor extends WorkerHost {
 
     if (result === 1) {
       // Successfully locked driver
-      this.logger.log(
-        `🔒 Locked driver ${driverId} for ride ${rideId} (${driverDistanceKm.toFixed(2)} km away)`,
-      );
+      this.logger.log(`Locked driver ${driverId} for ride ${rideId}`);
 
-      // Schedule assignment timeout
+      // Schedule assignment timeout using job-centric payload
       await this.queue.scheduleAssignmentTimeout(
         {
-          tripType: TripType.RIDE,
-          tripId: rideId,
-          driverId,
-          scheduledFor: Date.now() + this.TIMEOUT_MS,
+          job: {
+            id: rideId,
+            jobType: 'ride',
+            pickupAddress: { lat: pickupLat, lng: pickupLng },
+            dropoffAddress: { lat: dropoffLat, lng: dropoffLng },
+            customerName: '',
+            earnings: totalFare,
+            distanceKm,
+            status: 'assigned',
+          },
         },
         this.TIMEOUT_MS,
       );
 
-      // Emit assignment requested event (notification service will handle push)
-      const estimatedDurationMin = this.geo.estimateDuration(distanceKm);
-
-      this.eventBus.emitRideAssignmentRequested({
-        rideId,
-        driverId,
-        customerId,
-        pickupLat,
-        pickupLng,
-        dropoffLat,
-        dropoffLng,
-        totalFare,
-        distanceKm,
-        estimatedDurationMin,
-        expiresAt: Date.now() + this.TIMEOUT_MS,
-        timestamp: Date.now(),
-      });
-
+      // Optionally emit a generic event or log here if needed
       return true;
     } else if (result === -1) {
       // Driver already declined
@@ -336,18 +276,14 @@ export class RideMatchingProcessor extends WorkerHost {
    */
   private async handleNoDriverFound(
     rideId: string,
-    customerId: string,
     pickupLat: number,
     pickupLng: number,
     attempt: number,
   ): Promise<void> {
-    const attempts = await this.redis.incrementMatchingAttempts(
-      TripType.RIDE,
-      rideId,
-    );
+    const attempts = await this.redis.incrementMatchingAttempts(rideId);
 
     this.logger.warn(
-      `❌ No driver found for ride ${rideId} (attempt ${attempts})`,
+      `No driver found for ride ${rideId} (attempt ${attempts})`,
     );
 
     // Update ride status to CANCELLED
@@ -361,13 +297,12 @@ export class RideMatchingProcessor extends WorkerHost {
       },
     });
 
-    // Emit no driver found event
-    this.eventBus.emitRideNoDriverFound({
-      rideId,
-      customerId,
-      pickupLat,
-      pickupLng,
-      attempts,
+    // Emit job cancelled event
+    this.eventBus.emitJobCancelled({
+      jobId: rideId,
+      jobType: 'ride',
+      reason: 'No driver available',
+      cancelledBy: 'system',
       timestamp: Date.now(),
     });
   }

@@ -130,7 +130,7 @@ export default function EditBusinessDocumentsScreen() {
             ...prev,
             [key]: { uploading: true, progress: progress.percentage },
           }));
-        }
+        },
       );
 
       setData((prev) => (prev ? { ...prev, [key]: url } : prev));
@@ -180,7 +180,7 @@ export default function EditBusinessDocumentsScreen() {
   const renderDocCard = (
     key: keyof SignupStep2Data,
     label: string,
-    optional?: boolean
+    optional?: boolean,
   ) => {
     const value = data?.[key];
     const uploaded = Boolean(value);

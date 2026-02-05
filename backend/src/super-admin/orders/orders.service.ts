@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { OrderFilterDto } from './dto/order-filter.dto';
-import { Prisma, StoreType, OrderStatus } from '@prisma/client'; // Added OrderStatus
+import { Prisma, StoreType, OrderStatus } from '@prisma/client';
 import { TransactionLedgerService } from '../transactions/transaction-ledger.service';
 
 // Helper to map friendly frontend names to DB Enums
@@ -101,11 +101,15 @@ export class OrdersService {
         user: true,
         store: {
           include: {
-            // Line 98
             vendor: { select: { name: true, phone: true, email: true } },
           },
         },
-        items: { include: { product: true } },
+        items: {
+          include: {
+            product: true,
+            modifiers: true, // ✅ include the modifiers relation
+          },
+        },
         payment: true,
         delivery: {
           include: {
@@ -150,18 +154,12 @@ export class OrdersService {
       throw new BadRequestException('Order already completed');
     }
 
-    // Use transaction to ensure atomicity
     return this.prisma.$transaction(async (tx) => {
-      // 1. Update order status
       const updatedOrder = await tx.order.update({
         where: { id },
-        data: {
-          status: 'DELIVERED',
-          deliveredAt: new Date(),
-        },
+        data: { status: 'DELIVERED', deliveredAt: new Date() },
       });
 
-      // 2. Record payment in ledger (if payment exists and is completed)
       if (order.payment && order.payment.status === 'COMPLETED') {
         await this.ledgerService.recordPayment({
           id: order.payment.id,
@@ -172,16 +170,14 @@ export class OrdersService {
           status: order.payment.status,
         });
 
-        // 3. Record commission and vendor earnings
         await this.ledgerService.recordOrderCommission({
           id: order.id,
           storeId: order.store.id,
           total: order.total,
-          commissionRate: order.store.commissionRate || 20, // Default 20%
+          commissionRate: order.store.commissionRate || 20,
         });
       }
 
-      // 4. Log activity
       await tx.activityLog.create({
         data: {
           userId: 'SYSTEM',
@@ -198,18 +194,14 @@ export class OrdersService {
     });
   }
 
-  // ❌ 4. Cancel Order (With Refund Handling)
+  // ❌ 4. Cancel Order
   async remove(id: string, adminUserId?: string) {
     const order = await this.prisma.order.findUnique({
       where: { id },
-      include: {
-        payment: true,
-        user: { select: { id: true } },
-      },
+      include: { payment: true, user: { select: { id: true } } },
     });
 
     if (!order) throw new NotFoundException('Order not found');
-
     if (['DELIVERED', 'CANCELLED', 'REJECTED'].includes(order.status)) {
       throw new BadRequestException(
         `Cannot cancel order that is ${order.status}`,
@@ -217,24 +209,17 @@ export class OrdersService {
     }
 
     return this.prisma.$transaction(async (tx) => {
-      // 1. Cancel the order
       await tx.order.update({
         where: { id },
-        data: {
-          status: 'CANCELLED',
-          cancelledAt: new Date(),
-        },
+        data: { status: 'CANCELLED', cancelledAt: new Date() },
       });
 
-      // 2. Process refund if payment was completed
       if (order.payment && order.payment.status === 'COMPLETED') {
-        // Update payment status to refunded
         await tx.payment.update({
           where: { id: order.payment.id },
           data: { status: 'REFUNDED' },
         });
 
-        // Record refund in ledger
         await this.ledgerService.recordRefund({
           id: order.payment.id,
           amount: order.payment.amount,
@@ -243,7 +228,6 @@ export class OrdersService {
         });
       }
 
-      // 3. Log activity
       await tx.activityLog.create({
         data: {
           userId: adminUserId || 'SUPER_ADMIN',
@@ -258,32 +242,27 @@ export class OrdersService {
     });
   }
 
-  // 💰 5. Process Order Refund (Partial or Full)
+  // 💰 5. Refund Order
   async refundOrder(id: string, refundAmount?: number, reason?: string) {
     const order = await this.prisma.order.findUnique({
       where: { id },
-      include: {
-        payment: true,
-        user: { select: { id: true } },
-      },
+      include: { payment: true, user: { select: { id: true } } },
     });
 
     if (!order) throw new NotFoundException('Order not found');
-    if (!order.payment)
+    const payment = order.payment;
+    if (!payment)
       throw new BadRequestException('No payment found for this order');
-    if (order.payment.status !== 'COMPLETED') {
+    if (payment.status !== 'COMPLETED') {
       throw new BadRequestException('Can only refund completed payments');
     }
 
-    const payment = order.payment;
     const amountToRefund = refundAmount || payment.amount;
-
     if (amountToRefund > payment.amount) {
       throw new BadRequestException('Refund amount exceeds payment amount');
     }
 
     return this.prisma.$transaction(async (tx) => {
-      // Update payment status
       await tx.payment.update({
         where: { id: payment.id },
         data: {
@@ -294,7 +273,6 @@ export class OrdersService {
         },
       });
 
-      // Record refund in ledger
       await this.ledgerService.recordRefund({
         id: payment.id,
         amount: amountToRefund,
@@ -302,7 +280,6 @@ export class OrdersService {
         orderId: order.id,
       });
 
-      // Log activity
       await tx.activityLog.create({
         data: {
           userId: 'ADMIN',
@@ -318,8 +295,7 @@ export class OrdersService {
     });
   }
 
-  // ⚠️ 6. Force Status Override ("God Mode")
-  // Allows moving an order to ANY status without standard validation.
+  // ⚠️ 6. Force Status Override
   async forceStatusChange(
     orderId: string,
     newStatus: OrderStatus,
@@ -329,18 +305,14 @@ export class OrdersService {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
     });
-
     if (!order) throw new NotFoundException('Order not found');
 
-    // Perform the Override
     const updatedOrder = await this.prisma.order.update({
       where: { id: orderId },
       data: {
         status: newStatus,
-        // Manage timestamps based on status
         cancelledAt: newStatus === 'CANCELLED' ? new Date() : undefined,
         deliveredAt: newStatus === 'DELIVERED' ? new Date() : undefined,
-        // If resetting to PENDING/PREPARING, we might want to clear deliveredAt
         ...(['PENDING', 'PREPARING', 'CONFIRMED'].includes(newStatus) && {
           deliveredAt: null,
           cancelledAt: null,
@@ -348,18 +320,13 @@ export class OrdersService {
       },
     });
 
-    // Log the System Override
     await this.prisma.activityLog.create({
       data: {
         userId: adminId,
         action: 'ORDER_FORCE_UPDATE',
         details: `Force status change from ${order.status} to ${newStatus}. Reason: ${reason}`,
         target: orderId,
-        metadata: {
-          oldStatus: order.status,
-          newStatus: newStatus,
-          reason: reason,
-        },
+        metadata: { oldStatus: order.status, newStatus, reason },
       },
     });
 
@@ -367,7 +334,6 @@ export class OrdersService {
   }
 
   // --- Transformers ---
-
   private mapStoreTypeToService(type: string) {
     const entry = Object.entries(SERVICE_TYPE_MAP).find(([k, v]) => v === type);
     return entry ? entry[0] : type;
@@ -378,7 +344,7 @@ export class OrdersService {
       id: order.id,
       serviceType: this.mapStoreTypeToService(order.store.type),
       status: order.status,
-      dispute: dispute,
+      dispute,
       amount: order.total,
       updatedAt: order.updatedAt,
       isLate:
@@ -412,6 +378,11 @@ export class OrdersService {
         quantity: item.quantity,
         price: item.price,
         options: item.selectedOptions,
+        modifiers: item.modifiers.map((m: any) => ({
+          name: m.name,
+          price: m.price,
+        })), // ✅ include modifiers
+        product: item.product,
       })),
 
       payment: order.payment
@@ -426,7 +397,6 @@ export class OrdersService {
         date: log.createdAt,
         user: log.user?.name || 'System',
         action: log.action,
-        // Include detail/metadata in response so Admin sees reason for override
         details:
           log.details || (log.metadata ? JSON.stringify(log.metadata) : ''),
       })),

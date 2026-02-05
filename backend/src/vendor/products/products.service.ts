@@ -111,7 +111,7 @@ export class VendorProductsService {
       slug = `${slug}-${Date.now()}`;
     }
 
-    // 3. Create
+    // 3. Create Product + Modifier Groups
     const product = await this.prisma.product.create({
       data: {
         name: dto.name,
@@ -123,12 +123,37 @@ export class VendorProductsService {
         status: ProductStatus.ACTIVE,
         storeId: dto.storeId,
         categoryId: dto.categoryId,
+
+        /** 🔹 Nested modifier groups */
+        modifierGroups: dto.modifierGroups
+          ? {
+              create: dto.modifierGroups.map((group) => ({
+                name: group.name,
+                minSelect: group.minSelect ?? 0,
+                maxSelect: group.maxSelect ?? 1,
+                modifiers: group.modifiers
+                  ? {
+                      create: group.modifiers.map((modifier) => ({
+                        name: modifier.name,
+                        price: modifier.price ?? 0,
+                      })),
+                    }
+                  : undefined,
+              })),
+            }
+          : undefined,
+      },
+      include: {
+        modifierGroups: {
+          include: { modifiers: true },
+        },
       },
     });
 
     this.logger.log(
       `Product created: "${product.name}" (ID: ${product.id}) for Store: ${store.name}`,
     );
+
     return product;
   }
 
@@ -136,8 +161,8 @@ export class VendorProductsService {
     // 1. Verify Product Ownership
     const product = await this.validateProductOwnership(userId, productId);
 
-    // 2. Handle Slug Update if name changes
-    let newSlug: string | undefined = undefined;
+    // 2. Handle Slug Update
+    let newSlug: string | undefined;
 
     if (dto.name && dto.name !== product.name) {
       newSlug = this.generateSlug(dto.name);
@@ -147,13 +172,12 @@ export class VendorProductsService {
       if (existing) newSlug = `${newSlug}-${Date.now()}`;
     }
 
-    // Handle image deletion: delete old images that are not in the new images array
-    if (dto.images && product.images && product.images.length > 0) {
+    // 3. Image cleanup (unchanged)
+    if (dto.images && product.images?.length) {
       const imagesToDelete = product.images.filter(
         (oldImage) => !dto.images!.includes(oldImage),
       );
 
-      // Delete removed images from storage
       for (const imageUrl of imagesToDelete) {
         try {
           await this.storageService.deleteFile(imageUrl);
@@ -163,19 +187,61 @@ export class VendorProductsService {
       }
     }
 
-    // 3. Update
-    const updated = await this.prisma.product.update({
-      where: { id: productId },
-      data: {
-        name: dto.name,
-        slug: newSlug,
-        description: dto.description,
-        price: dto.price,
-        images: dto.images,
-        stock: dto.stock,
-        categoryId: dto.categoryId,
-        status: dto.status,
-      },
+    // 4. Transaction: update product + modifiers
+    const updated = await this.prisma.$transaction(async (tx) => {
+      // 🔹 Replace modifier groups if provided
+      if (dto.modifierGroups) {
+        await tx.modifierGroup.deleteMany({
+          where: { productId },
+        });
+
+        await tx.modifierGroup.createMany({
+          data: dto.modifierGroups.map((group) => ({
+            productId,
+            name: group.name,
+            minSelect: group.minSelect ?? 0,
+            maxSelect: group.maxSelect ?? 1,
+          })),
+        });
+
+        // Fetch created groups to attach modifiers
+        const createdGroups = await tx.modifierGroup.findMany({
+          where: { productId },
+        });
+
+        for (const group of dto.modifierGroups) {
+          const dbGroup = createdGroups.find((g) => g.name === group.name);
+
+          if (dbGroup && group.modifiers?.length) {
+            await tx.modifier.createMany({
+              data: group.modifiers.map((modifier) => ({
+                modifierGroupId: dbGroup.id,
+                name: modifier.name,
+                price: modifier.price ?? 0,
+              })),
+            });
+          }
+        }
+      }
+
+      return tx.product.update({
+        where: { id: productId },
+        data: {
+          name: dto.name,
+          slug: newSlug,
+          description: dto.description,
+          price: dto.price,
+          images: dto.images,
+          stock: dto.stock,
+          categoryId: dto.categoryId,
+          status: dto.status,
+        },
+        include: {
+          modifierGroups: {
+            include: { modifiers: true },
+          },
+        },
+      });
     });
 
     this.logger.log(`Product updated: ${productId} by User ${userId}`);

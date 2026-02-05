@@ -15,7 +15,10 @@ export const StoreSkeleton = () => {
         <div className="px-4">
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-4">
             {[1, 2, 3, 4, 5, 6].map((i) => (
-              <div key={i} className="flex flex-col items-center p-5 rounded-3xl bg-white dark:bg-[#151515] border border-gray-100 dark:border-white/5">
+              <div
+                key={i}
+                className="flex flex-col items-center p-5 rounded-3xl bg-white dark:bg-[#151515] border border-gray-100 dark:border-white/5"
+              >
                 <div className="w-14 h-14 rounded-2xl bg-gray-200 dark:bg-white/5" />
                 <div className="mt-4 w-16 h-3 rounded bg-gray-200 dark:bg-white/5" />
               </div>
@@ -36,10 +39,13 @@ export const StoreSkeleton = () => {
 
             <div className="px-4 flex gap-5 overflow-hidden">
               {[1, 2, 3].map((card) => (
-                <div key={card} className="min-w-[300px] h-64 rounded-[2rem] bg-white dark:bg-[#151515] p-4 border border-gray-100 dark:border-white/5">
-                   <div className="w-full h-40 rounded-2xl bg-gray-200 dark:bg-white/5 mb-4" />
-                   <div className="w-3/4 h-5 rounded bg-gray-200 dark:bg-white/5 mb-2" />
-                   <div className="w-1/2 h-3 rounded bg-gray-200 dark:bg-white/5" />
+                <div
+                  key={card}
+                  className="min-w-[300px] h-64 rounded-[2rem] bg-white dark:bg-[#151515] p-4 border border-gray-100 dark:border-white/5"
+                >
+                  <div className="w-full h-40 rounded-2xl bg-gray-200 dark:bg-white/5 mb-4" />
+                  <div className="w-3/4 h-5 rounded bg-gray-200 dark:bg-white/5 mb-2" />
+                  <div className="w-1/2 h-3 rounded bg-gray-200 dark:bg-white/5" />
                 </div>
               ))}
             </div>

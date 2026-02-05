@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 
 export default function PayoutsSkeleton() {
   return (
@@ -12,8 +12,8 @@ export default function PayoutsSkeleton() {
       <div className="grid gap-4">
         {/* Render 5 skeleton items */}
         {[1, 2, 3, 4, 5].map((i) => (
-          <div 
-            key={i} 
+          <div
+            key={i}
             className="bg-[#1E293B] p-5 rounded-xl border border-gray-800 flex justify-between items-center"
           >
             {/* Left Side: Info */}

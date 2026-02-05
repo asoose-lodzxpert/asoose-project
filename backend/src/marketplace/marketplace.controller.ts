@@ -1,4 +1,16 @@
-import { Controller, Get, Param, NotFoundException, Body, Request, UseGuards, Post, Delete, Query, ParseIntPipe } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Param,
+  NotFoundException,
+  Body,
+  Request,
+  UseGuards,
+  Post,
+  Delete,
+  Query,
+  ParseIntPipe,
+} from '@nestjs/common';
 import { MarketplaceService } from './marketplace.service';
 import { CreateReviewDto } from './dto/create-review.dto';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
@@ -8,7 +20,10 @@ export interface SearchResponseDto {
   products: any[];
 }
 
-@Controller('marketplace')
+@Controller({
+  path: 'marketplace',
+  version: '1',
+})
 export class MarketplaceController {
   constructor(private readonly marketplaceService: MarketplaceService) {}
 
@@ -24,12 +39,12 @@ export class MarketplaceController {
   }
 
   @Get('categories/:id')
-  async getCategory(
-    @Param('id') id: string,
-    @Query('sort') sort?: string 
-  ) {
-    const categoryData = await this.marketplaceService.getCategoryData(id, sort || 'all');
-    
+  async getCategory(@Param('id') id: string, @Query('sort') sort?: string) {
+    const categoryData = await this.marketplaceService.getCategoryData(
+      id,
+      sort || 'all',
+    );
+
     if (!categoryData) {
       throw new NotFoundException(`Category vertical not found: ${id}`);
     }
@@ -52,6 +67,15 @@ export class MarketplaceController {
     @Query('type') type?: string,
   ) {
     return this.marketplaceService.getPaginatedStores(page, limit, type);
+  }
+
+  @Get('products/:id')
+  async getProduct(@Param('id') id: string) {
+    const product = await this.marketplaceService.getProductById(id);
+    if (!product) {
+      throw new NotFoundException(`Product not found: ${id}`);
+    }
+    return product;
   }
 
   @UseGuards(JwtAuthGuard)

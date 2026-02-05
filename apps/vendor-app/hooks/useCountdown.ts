@@ -18,7 +18,7 @@ export function useCountdown(deadline?: number) {
       setTimeLeft(
         `${minutes.toString().padStart(2, "0")}:${seconds
           .toString()
-          .padStart(2, "0")} left`
+          .padStart(2, "0")} left`,
       );
     };
 

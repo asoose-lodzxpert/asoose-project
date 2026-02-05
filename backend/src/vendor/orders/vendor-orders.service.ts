@@ -55,9 +55,7 @@ export class VendorOrdersService {
 
     const skip = (page - 1) * limit;
 
-    const whereClause: any = { storeId: store.id };
-
-    whereClause.paymentStatus = 'PAID';
+    const whereClause: any = { storeId: store.id, paymentStatus: 'PAID' };
 
     if (status) {
       const statusMap = Object.values(OrderStatus).reduce(
@@ -86,7 +84,15 @@ export class VendorOrdersService {
         take: limit,
         skip,
         include: {
-          items: true,
+          items: {
+            include: {
+              modifiers: {
+                include: {
+                  modifier: true,
+                },
+              },
+            },
+          },
           user: { select: { name: true, phone: true, image: true } },
           delivery: { select: { status: true, riderId: true } },
         },
@@ -94,8 +100,33 @@ export class VendorOrdersService {
       this.prisma.order.count({ where: whereClause }),
     ]);
 
+    // Transform the data to match the expected frontend format
+    const transformedData = data.map((order) => ({
+      ...order,
+      items: order.items.map((item) => ({
+        ...item,
+        // Transform modifiers into modifierGroups format expected by frontend
+        modifierGroups:
+          item.modifiers && item.modifiers.length > 0
+            ? [
+                {
+                  id: 'default-group',
+                  name: 'Selected Options',
+                  modifiers: item.modifiers.map((mod) => ({
+                    id: mod.modifier.id,
+                    name: mod.modifier.name,
+                    price: mod.modifier.price,
+                  })),
+                },
+              ]
+            : [],
+        // Remove the raw modifiers field to avoid confusion
+        modifiers: undefined,
+      })),
+    }));
+
     return {
-      data,
+      data: transformedData,
       meta: { total, page, limit, pages: Math.ceil(total / limit) },
     };
   }
@@ -118,7 +149,6 @@ export class VendorOrdersService {
       data: { status: OrderStatus.CONFIRMED },
     });
 
-    // Real-time update
     this.notificationsGateway.sendOrderUpdate(updated.id, {
       status: 'CONFIRMED',
       timeline: [
@@ -154,10 +184,7 @@ export class VendorOrdersService {
     return this.prisma.$transaction(async (tx) => {
       const updated = await tx.order.update({
         where: { id: orderId },
-        data: {
-          status: OrderStatus.REJECTED,
-          cancelledAt: new Date(),
-        },
+        data: { status: OrderStatus.REJECTED, cancelledAt: new Date() },
       });
 
       await tx.activityLog.create({
@@ -170,7 +197,6 @@ export class VendorOrdersService {
         },
       });
 
-      // Real-time update
       this.notificationsGateway.sendOrderUpdate(updated.id, {
         status: 'REJECTED',
         timeline: [
@@ -191,7 +217,11 @@ export class VendorOrdersService {
   async markReady(userId: string, orderId: string) {
     const order = await this.validateOrderAccess(userId, orderId);
 
-    if (order.status !== 'PREPARING' && order.status !== 'CONFIRMED') {
+    if (
+      ![OrderStatus.PREPARING, OrderStatus.CONFIRMED]
+        .map(String)
+        .includes(order.status)
+    ) {
       throw new BadRequestException(
         'Order must be Confirmed or Preparing to mark as Ready',
       );
@@ -206,10 +236,7 @@ export class VendorOrdersService {
       orderId: updated.id,
       storeId: updated.storeId,
     });
-
-    this.notificationsGateway.sendOrderUpdate(updated.id, {
-      status: 'READY',
-    });
+    this.notificationsGateway.sendOrderUpdate(updated.id, { status: 'READY' });
 
     return updated;
   }

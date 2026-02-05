@@ -45,7 +45,7 @@ export async function enableBiometric(identifier: string, password: string) {
     JSON.stringify({ identifier, password }),
     {
       keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY,
-    }
+    },
   );
 }
 
@@ -81,7 +81,7 @@ export async function login(identifier: string, password: string) {
           "ngrok-skip-browser-warning": "true",
         },
         body: JSON.stringify({ email: identifier, password }),
-      }
+      },
     );
 
     if (!res.ok) {
@@ -131,7 +131,7 @@ export async function refreshAccessToken() {
         "ngrok-skip-browser-warning": "true",
       },
       body: JSON.stringify({ refreshToken }),
-    }
+    },
   );
 
   if (!res.ok) {

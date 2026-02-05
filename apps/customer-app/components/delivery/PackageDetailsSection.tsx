@@ -11,7 +11,7 @@ export function PackageDetailsSection() {
 
   const update = <K extends keyof typeof packageOptions>(
     key: K,
-    value: (typeof packageOptions)[K]
+    value: (typeof packageOptions)[K],
   ) => {
     setPackageOptions({
       ...packageOptions,
@@ -20,7 +20,7 @@ export function PackageDetailsSection() {
   };
 
   return (
-    <Section title="Package Details">
+    <Section title="Package Details (optional)">
       <ToggleRow
         label="Fragile item"
         value={packageOptions.fragile}

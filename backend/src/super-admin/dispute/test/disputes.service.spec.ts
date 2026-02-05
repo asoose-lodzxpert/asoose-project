@@ -45,7 +45,7 @@ describe('DisputesService', () => {
   describe('resolve', () => {
     const adminId = 'admin-123';
     const disputeId = 'dispute-001';
-    
+
     const mockOpenDispute = {
       id: disputeId,
       status: 'OPEN',
@@ -60,7 +60,10 @@ describe('DisputesService', () => {
     it('should successfully fully refund a buyer via Payment Gateway', async () => {
       mockPrisma.dispute.findUnique.mockResolvedValue(mockOpenDispute);
       mockPaymentService.processRefund.mockResolvedValue({ status: 'success' });
-      mockPrisma.dispute.update.mockResolvedValue({ ...mockOpenDispute, status: 'RESOLVED' });
+      mockPrisma.dispute.update.mockResolvedValue({
+        ...mockOpenDispute,
+        status: 'RESOLVED',
+      });
 
       const dto = {
         action: 'REFUND_FULL',
@@ -76,7 +79,7 @@ describe('DisputesService', () => {
           data: expect.objectContaining({
             type: 'REFUND_ISSUED',
             amount: 1000,
-            entityType: 'PLATFORM', 
+            entityType: 'PLATFORM',
           }),
         }),
       );
@@ -108,54 +111,63 @@ describe('DisputesService', () => {
     });
 
     it('should fail if attempting to refund more than the transaction amount', async () => {
-        mockPrisma.dispute.findUnique.mockResolvedValue(mockOpenDispute);
-  
-        const dto = {
-          action: 'REFUND_PARTIAL',
-          refundAmount: 5000, // Exceeds 1000
-          resolutionNotes: 'Too much',
-          refundSource: 'PAYMENT_GATEWAY',
-        };
-  
-        await expect(service.resolve(disputeId, dto as any, adminId)).rejects.toThrow(
-          BadRequestException,
-        );
-      });
-  
-      it('should prevent resolving an already closed dispute', async () => {
-        mockPrisma.dispute.findUnique.mockResolvedValue({ ...mockOpenDispute, status: 'RESOLVED' });
-  
-        await expect(
-          service.resolve(disputeId, { action: 'NO_ACTION', resolutionNotes: 'test' } as any, adminId),
-        ).rejects.toThrow(BadRequestException);
+      mockPrisma.dispute.findUnique.mockResolvedValue(mockOpenDispute);
+
+      const dto = {
+        action: 'REFUND_PARTIAL',
+        refundAmount: 5000, // Exceeds 1000
+        resolutionNotes: 'Too much',
+        refundSource: 'PAYMENT_GATEWAY',
+      };
+
+      await expect(
+        service.resolve(disputeId, dto as any, adminId),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should prevent resolving an already closed dispute', async () => {
+      mockPrisma.dispute.findUnique.mockResolvedValue({
+        ...mockOpenDispute,
+        status: 'RESOLVED',
       });
 
+      await expect(
+        service.resolve(
+          disputeId,
+          { action: 'NO_ACTION', resolutionNotes: 'test' } as any,
+          adminId,
+        ),
+      ).rejects.toThrow(BadRequestException);
+    });
+
     it('should fail if vendor has insufficient funds for wallet refund', async () => {
-        mockPrisma.dispute.findUnique.mockResolvedValue(mockOpenDispute);
-        mockPrisma.store.findUnique.mockResolvedValue({ walletBalance: 500 }); // Insufficient
-  
-        const dto = {
-          action: 'REFUND_FULL',
-          refundAmount: 1000,
-          refundSource: 'VENDOR_WALLET',
-          resolutionNotes: 'Vendor fault',
-        };
-  
-        await expect(service.resolve(disputeId, dto as any, adminId)).rejects.toThrow(
-          BadRequestException,
-        );
-      });
+      mockPrisma.dispute.findUnique.mockResolvedValue(mockOpenDispute);
+      mockPrisma.store.findUnique.mockResolvedValue({ walletBalance: 500 }); // Insufficient
+
+      const dto = {
+        action: 'REFUND_FULL',
+        refundAmount: 1000,
+        refundSource: 'VENDOR_WALLET',
+        resolutionNotes: 'Vendor fault',
+      };
+
+      await expect(
+        service.resolve(disputeId, dto as any, adminId),
+      ).rejects.toThrow(BadRequestException);
+    });
   });
 
   describe('SLA Breach Calculation', () => {
     it('should flag URGENT disputes older than 4 hours', async () => {
       const fiveHoursAgo = new Date(Date.now() - 5 * 60 * 60 * 1000);
-      mockPrisma.dispute.findMany.mockResolvedValue([{ 
-        id: 'd1', 
-        priority: 'URGENT', 
-        createdAt: fiveHoursAgo, 
-        _count: { messages: 0 } 
-      }]);
+      mockPrisma.dispute.findMany.mockResolvedValue([
+        {
+          id: 'd1',
+          priority: 'URGENT',
+          createdAt: fiveHoursAgo,
+          _count: { messages: 0 },
+        },
+      ]);
       mockPrisma.dispute.count.mockResolvedValue(1);
 
       const result = await service.findAll({ role: UserRole.SUPER_ADMIN });

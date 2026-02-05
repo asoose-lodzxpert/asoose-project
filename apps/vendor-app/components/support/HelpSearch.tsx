@@ -21,14 +21,14 @@ export const HelpSearch: React.FC<Props> = ({ sections }) => {
 
   const articles = useMemo(
     () => sections.flatMap((s) => s.articles),
-    [sections]
+    [sections],
   );
 
   const results = useMemo(() => {
     if (!query.trim()) return [];
 
     return articles.filter(
-      (a) => fuzzyMatch(query, a.title) || fuzzyMatch(query, a.content)
+      (a) => fuzzyMatch(query, a.title) || fuzzyMatch(query, a.content),
     );
   }, [query, articles]);
 

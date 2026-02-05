@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 
 const SkeletonBox = ({ className = "" }) => (
   <div className={`bg-gray-700/30 rounded animate-pulse ${className}`} />
@@ -12,7 +12,6 @@ export default function RidersPageSkeleton() {
   return (
     <div className="min-h-screen bg-[#0F172A] p-4 md:p-6">
       <div className="max-w-7xl mx-auto space-y-6">
-        
         {/* Header Skeleton */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div className="space-y-2">
@@ -25,7 +24,10 @@ export default function RidersPageSkeleton() {
         {/* Stats Cards Skeleton */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="bg-[#1E293B] p-4 rounded-xl border border-gray-800">
+            <div
+              key={i}
+              className="bg-[#1E293B] p-4 rounded-xl border border-gray-800"
+            >
               <div className="flex items-center justify-between mb-2">
                 <SkeletonText width="w-20" height="h-3" />
                 <SkeletonBox className="w-8 h-8 rounded-lg" />
@@ -40,7 +42,7 @@ export default function RidersPageSkeleton() {
         <div className="bg-[#1E293B] p-3 md:p-4 rounded-xl border border-gray-800">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
             <SkeletonText width="w-40" height="h-6" />
-            
+
             <div className="flex items-center gap-2 w-full md:w-auto">
               <SkeletonBox className="flex-1 md:flex-none md:w-64 h-10 rounded-lg" />
               <SkeletonBox className="w-24 md:w-28 h-10 rounded-lg" />
@@ -66,13 +68,13 @@ export default function RidersPageSkeleton() {
                 <div className="grid grid-cols-8 gap-4 items-center">
                   {/* Rider ID */}
                   <SkeletonText width="w-20" height="h-4" />
-                  
+
                   {/* Name / Phone */}
                   <div className="space-y-2">
                     <SkeletonText width="w-32" height="h-4" />
                     <SkeletonText width="w-28" height="h-3" />
                   </div>
-                  
+
                   {/* Vehicle Details */}
                   <div className="flex items-center gap-2">
                     <SkeletonBox className="w-8 h-8 rounded-lg" />
@@ -81,19 +83,19 @@ export default function RidersPageSkeleton() {
                       <SkeletonText width="w-16" height="h-3" />
                     </div>
                   </div>
-                  
+
                   {/* Status */}
                   <SkeletonBox className="w-20 h-6 rounded" />
-                  
+
                   {/* Verification */}
                   <SkeletonBox className="w-24 h-6 rounded" />
-                  
+
                   {/* Rating */}
                   <SkeletonText width="w-12" height="h-4" />
-                  
+
                   {/* Total Rides */}
                   <SkeletonText width="w-12" height="h-4" />
-                  
+
                   {/* Actions */}
                   <div className="flex items-center gap-2">
                     <SkeletonBox className="w-8 h-8 rounded-lg" />
@@ -120,7 +122,10 @@ export default function RidersPageSkeleton() {
         {/* Mobile Cards Skeleton */}
         <div className="md:hidden space-y-3">
           {[1, 2, 3, 4, 5].map((card) => (
-            <div key={card} className="bg-[#1E293B] border border-gray-800 rounded-lg p-4">
+            <div
+              key={card}
+              className="bg-[#1E293B] border border-gray-800 rounded-lg p-4"
+            >
               {/* Header: ID + Status */}
               <div className="flex justify-between items-start mb-3">
                 <SkeletonText width="w-24" height="h-5" />
@@ -145,7 +150,7 @@ export default function RidersPageSkeleton() {
                     </div>
                   </div>
                 ))}
-                
+
                 <div className="col-span-2">
                   <div className="flex justify-between items-center">
                     <div className="space-y-1">
@@ -169,7 +174,6 @@ export default function RidersPageSkeleton() {
             </div>
           ))}
         </div>
-
       </div>
     </div>
   );

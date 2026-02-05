@@ -1,22 +1,21 @@
-import { getSession } from 'next-auth/react'; // ✅ Import NextAuth
-import { NotificationResponse } from '../types';
+import { getSession } from "next-auth/react"; // ✅ Import NextAuth
+import { NotificationResponse } from "../types";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
 export const NotificationService = {
-
   async getAll(page: number = 1): Promise<NotificationResponse> {
     // ✅ Get NextAuth Session
     const session = await getSession();
     const token = (session as any)?.accessToken;
-    
-    if (!token) throw new Error('No session found');
+
+    if (!token) throw new Error("No session found");
 
     const res = await fetch(`${API_URL}/notifications?page=${page}`, {
-      headers: { Authorization: `Bearer ${token}` }
+      headers: { Authorization: `Bearer ${token}` },
     });
-    
-    if (!res.ok) throw new Error('Failed to fetch notifications');
+
+    if (!res.ok) throw new Error("Failed to fetch notifications");
     return res.json();
   },
 
@@ -24,14 +23,14 @@ export const NotificationService = {
     const session = await getSession();
     const token = (session as any)?.accessToken;
 
-    if (!token) throw new Error('No session found');
+    if (!token) throw new Error("No session found");
 
     const res = await fetch(`${API_URL}/notifications/${id}/read`, {
-      method: 'PATCH',
-      headers: { Authorization: `Bearer ${token}` }
+      method: "PATCH",
+      headers: { Authorization: `Bearer ${token}` },
     });
 
-    if (!res.ok) throw new Error('Failed to mark as read');
+    if (!res.ok) throw new Error("Failed to mark as read");
     return res.json();
   },
 
@@ -39,14 +38,14 @@ export const NotificationService = {
     const session = await getSession();
     const token = (session as any)?.accessToken;
 
-    if (!token) throw new Error('No session found');
+    if (!token) throw new Error("No session found");
 
     const res = await fetch(`${API_URL}/notifications/read-all`, {
-      method: 'PATCH',
-      headers: { Authorization: `Bearer ${token}` }
+      method: "PATCH",
+      headers: { Authorization: `Bearer ${token}` },
     });
 
-    if (!res.ok) throw new Error('Failed to mark all as read');
+    if (!res.ok) throw new Error("Failed to mark all as read");
     return res.json();
-  }
+  },
 };

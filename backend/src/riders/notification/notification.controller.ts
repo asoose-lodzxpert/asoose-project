@@ -6,7 +6,10 @@ import { UserRole } from '../../common/enums/user-role.enum';
 import { NotificationService } from './notification.service';
 import { UpdateNotificationSettingsDto } from '../dto/update-notification-settings.dto';
 
-@Controller('riders/notification')
+@Controller({
+  path: 'riders/notification',
+  version: '1',
+})
 export class NotificationController {
   constructor(private readonly notificationService: NotificationService) {}
 

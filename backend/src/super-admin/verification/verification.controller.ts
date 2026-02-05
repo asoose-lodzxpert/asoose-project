@@ -15,7 +15,10 @@ import { RolesGuard } from '../../auth/roles.guards';
 import { Roles } from '../../auth/roles.decorator';
 import { VerifyDocumentDto } from './dto/verify-document.dto';
 
-@Controller('super-admin/verification')
+@Controller({
+  path: 'super-admin/verification',
+  version: '1',
+})
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles('SUPER_ADMIN', 'ADMIN_MANAGER', 'ADMIN_SUPPORT')
 export class VerificationController {

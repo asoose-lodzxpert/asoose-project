@@ -1,21 +1,24 @@
-'use client';
+"use client";
 
-import React, { useState, useMemo } from 'react';
-import { Filter, RefreshCw } from 'lucide-react';
-import useSWR from 'swr'; 
-import { DataTable } from '@/app/super-admin/component/datatable';
-import DisputesPageSkeleton from './component/skeleton';
-import { fetcher } from '../hooks/useSuperAdminFetch';
+import React, { useState, useMemo } from "react";
+import { Filter, RefreshCw } from "lucide-react";
+import useSWR from "swr";
+import { DataTable } from "@/app/super-admin/component/datatable";
+import DisputesPageSkeleton from "./component/skeleton";
+import { fetcher } from "../hooks/useSuperAdminFetch";
 // Imported Components
-import DisputeHeader from './component/DisputeHeader';
-import DisputeStatsCard from './component/DisputeStatsCard';
-import DisputeFilters from './component/DisputeFilters';
-import { disputeColumns, renderMobileDisputeCard } from './component/table-config';
-import { Dispute, DisputeStats } from './types';
+import DisputeHeader from "./component/DisputeHeader";
+import DisputeStatsCard from "./component/DisputeStatsCard";
+import DisputeFilters from "./component/DisputeFilters";
+import {
+  disputeColumns,
+  renderMobileDisputeCard,
+} from "./component/table-config";
+import { Dispute, DisputeStats } from "./types";
 
 // API Response Interface
 interface DisputesApiResponse {
-  data: any[]; 
+  data: any[];
   total: number;
 }
 
@@ -23,11 +26,11 @@ export default function DisputesPage() {
   // ===========================================================================
   //  UI STATE
   // ===========================================================================
-  const [searchTerm, setSearchTerm] = useState('');
-  const [activeTab, setActiveTab] = useState('All'); 
-  const [statusFilter, setStatusFilter] = useState('All');
-  const [priorityFilter, setPriorityFilter] = useState('All');
-  const [categoryFilter, setCategoryFilter] = useState('All');
+  const [searchTerm, setSearchTerm] = useState("");
+  const [activeTab, setActiveTab] = useState("All");
+  const [statusFilter, setStatusFilter] = useState("All");
+  const [priorityFilter, setPriorityFilter] = useState("All");
+  const [categoryFilter, setCategoryFilter] = useState("All");
   const [rowSelection, setRowSelection] = useState({});
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
 
@@ -36,10 +39,10 @@ export default function DisputesPage() {
   // ===========================================================================
 
   // 1. Fetch Stats
-  const { 
-    data: stats, 
-    isLoading: statsLoading 
-  } = useSWR<DisputeStats>('/super-admin/disputes/stats', fetcher);
+  const { data: stats, isLoading: statsLoading } = useSWR<DisputeStats>(
+    "/super-admin/disputes/stats",
+    fetcher,
+  );
 
   // 2. Build Query String for Disputes
   const queryString = useMemo(() => {
@@ -48,22 +51,22 @@ export default function DisputesPage() {
       take: pagination.pageSize.toString(),
     });
 
-    if (statusFilter !== 'All') params.append('status', statusFilter);
-    if (priorityFilter !== 'All') params.append('priority', priorityFilter);
-    if (searchTerm) params.append('search', searchTerm);
+    if (statusFilter !== "All") params.append("status", statusFilter);
+    if (priorityFilter !== "All") params.append("priority", priorityFilter);
+    if (searchTerm) params.append("search", searchTerm);
 
     return params.toString();
   }, [pagination, statusFilter, priorityFilter, searchTerm]);
 
   // 3. Fetch Disputes List
-  const { 
-    data: disputesData, 
+  const {
+    data: disputesData,
     isLoading: disputesLoading,
-    mutate 
+    mutate,
   } = useSWR<DisputesApiResponse>(
-    `/super-admin/disputes?${queryString}`, 
+    `/super-admin/disputes?${queryString}`,
     fetcher,
-    { keepPreviousData: true }
+    { keepPreviousData: true },
   );
 
   // ===========================================================================
@@ -74,31 +77,39 @@ export default function DisputesPage() {
     if (!disputesData?.data) return [];
 
     return disputesData.data.map((d: any) => ({
-        id: d.id,
-        status: d.status,
-        priority: d.priority,
-        category: d.order ? 'Order' : d.ride ? 'Ride' : d.delivery ? 'Delivery' : 'General',
-        relatedType: d.order ? 'Order' : d.ride ? 'Ride' : 'N/A',
-        // ✅ FIX: Replaced $ with ₦
-        relatedAmount: d.order 
-          ? `₦${d.order.total.toFixed(2)}` 
-          : d.ride 
-            ? `₦${d.ride.totalFare?.toFixed(2) || '0.00'}` 
-            : '₦0.00',
-        parties: d.targetUser 
-          ? `${d.openedByUser?.name} vs ${d.targetUser.name}` 
-          : `${d.openedByUser?.name} vs Platform`,
-        reportedBy: d.openedByUser?.name || 'Unknown',
-        reportedAt: d.createdAt,
-        messageCount: d.messageCount || 0,
-        isUrgent: d.priority === 'URGENT' || d.priority === 'HIGH',
-        hoursOpen: d.hoursOpen || 0,
-        breachedSLA: d.breachedSLA || false
+      id: d.id,
+      status: d.status,
+      priority: d.priority,
+      category: d.order
+        ? "Order"
+        : d.ride
+          ? "Ride"
+          : d.delivery
+            ? "Delivery"
+            : "General",
+      relatedType: d.order ? "Order" : d.ride ? "Ride" : "N/A",
+      // ✅ FIX: Replaced $ with ₦
+      relatedAmount: d.order
+        ? `₦${d.order.total.toFixed(2)}`
+        : d.ride
+          ? `₦${d.ride.totalFare?.toFixed(2) || "0.00"}`
+          : "₦0.00",
+      parties: d.targetUser
+        ? `${d.openedByUser?.name} vs ${d.targetUser.name}`
+        : `${d.openedByUser?.name} vs Platform`,
+      reportedBy: d.openedByUser?.name || "Unknown",
+      reportedAt: d.createdAt,
+      messageCount: d.messageCount || 0,
+      isUrgent: d.priority === "URGENT" || d.priority === "HIGH",
+      hoursOpen: d.hoursOpen || 0,
+      breachedSLA: d.breachedSLA || false,
     }));
   }, [disputesData]);
 
   const filteredDisputes = useMemo(() => {
-    return mappedDisputes.filter(d => categoryFilter === 'All' || d.category === categoryFilter);
+    return mappedDisputes.filter(
+      (d) => categoryFilter === "All" || d.category === categoryFilter,
+    );
   }, [categoryFilter, mappedDisputes]);
 
   const total = disputesData?.total || 0;
@@ -110,47 +121,66 @@ export default function DisputesPage() {
 
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
-    setPagination(prev => ({ ...prev, pageIndex: 0 })); 
+    setPagination((prev) => ({ ...prev, pageIndex: 0 }));
 
     switch (tab) {
-      case 'All':
-        setStatusFilter('All');
-        setPriorityFilter('All');
+      case "All":
+        setStatusFilter("All");
+        setPriorityFilter("All");
         break;
-      case 'Needs Attention':
-        setStatusFilter('OPEN');
-        setPriorityFilter('All');
+      case "Needs Attention":
+        setStatusFilter("OPEN");
+        setPriorityFilter("All");
         break;
-      case 'Urgent':
-        setStatusFilter('OPEN');
-        setPriorityFilter('URGENT');
+      case "Urgent":
+        setStatusFilter("OPEN");
+        setPriorityFilter("URGENT");
         break;
-      case 'Resolved':
-        setStatusFilter('RESOLVED');
-        setPriorityFilter('All');
+      case "Resolved":
+        setStatusFilter("RESOLVED");
+        setPriorityFilter("All");
         break;
     }
   };
 
   const clearFilters = () => {
-    handleTabChange('All');
-    setCategoryFilter('All');
-    setSearchTerm('');
+    handleTabChange("All");
+    setCategoryFilter("All");
+    setSearchTerm("");
   };
 
   const handleExport = () => {
     const csvRows = [];
-    csvRows.push(['ID', 'Status', 'Priority', 'Category', 'Reported By', 'Date']);
-    
-    mappedDisputes.forEach(d => {
-      csvRows.push([d.id, d.status, d.priority, d.category, d.reportedBy, d.reportedAt]);
+    csvRows.push([
+      "ID",
+      "Status",
+      "Priority",
+      "Category",
+      "Reported By",
+      "Date",
+    ]);
+
+    mappedDisputes.forEach((d) => {
+      csvRows.push([
+        d.id,
+        d.status,
+        d.priority,
+        d.category,
+        d.reportedBy,
+        d.reportedAt,
+      ]);
     });
 
-    const csvContent = "data:text/csv;charset=utf-8," + csvRows.map(e => e.join(",")).join("\n");
+    const csvContent =
+      "data:text/csv;charset=utf-8," +
+      csvRows.map((e) => e.join(",")).join("\n");
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `disputes_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute(
+      "download",
+      `disputes_${new Date().toISOString().split("T")[0]}.csv`,
+    );
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -165,20 +195,19 @@ export default function DisputesPage() {
   return (
     <div className="min-h-screen bg-[#0F172A] p-4 md:p-6 font-sans">
       <div className="max-w-7xl mx-auto space-y-6">
-        
         <DisputeHeader total={total} onExport={handleExport} />
-        
+
         {/* Pass null if stats is undefined to avoid type mismatch */}
         <DisputeStatsCard stats={stats ?? null} />
-        
-       <DisputeFilters 
-          activeTab={activeTab} 
+
+        <DisputeFilters
+          activeTab={activeTab}
           onTabChange={handleTabChange}
           searchTerm={searchTerm}
           onSearchChange={setSearchTerm}
           categoryFilter={categoryFilter}
           onCategoryChange={setCategoryFilter}
-          stats={stats ?? null} 
+          stats={stats ?? null}
         />
         <div className="bg-[#1E293B] border border-gray-800 rounded-xl overflow-hidden min-h-[400px]">
           {filteredDisputes.length === 0 && !isLoading ? (
@@ -186,11 +215,13 @@ export default function DisputesPage() {
               <div className="bg-gray-800 p-4 rounded-full mb-4">
                 <Filter className="w-8 h-8 text-gray-500" />
               </div>
-              <h3 className="text-white font-bold text-lg">No disputes found</h3>
+              <h3 className="text-white font-bold text-lg">
+                No disputes found
+              </h3>
               <p className="text-gray-500 text-sm max-w-xs mt-2">
                 We couldn't find any disputes matching your current filters.
               </p>
-              <button 
+              <button
                 onClick={clearFilters}
                 className="mt-6 text-yellow-500 hover:text-yellow-400 text-sm font-bold hover:underline"
               >
@@ -199,13 +230,16 @@ export default function DisputesPage() {
             </div>
           ) : (
             <>
-                <div className="w-full flex justify-end p-2 md:hidden">
-                    <button onClick={() => mutate()} className="text-gray-500 text-xs flex items-center gap-1">
-                        <RefreshCw className="w-3 h-3" /> Refresh
-                    </button>
-                </div>
+              <div className="w-full flex justify-end p-2 md:hidden">
+                <button
+                  onClick={() => mutate()}
+                  className="text-gray-500 text-xs flex items-center gap-1"
+                >
+                  <RefreshCw className="w-3 h-3" /> Refresh
+                </button>
+              </div>
 
-                <DataTable
+              <DataTable
                 data={filteredDisputes}
                 columns={disputeColumns}
                 rowSelection={rowSelection}
@@ -214,11 +248,10 @@ export default function DisputesPage() {
                 onPaginationChange={setPagination}
                 pageCount={Math.ceil(total / pagination.pageSize)}
                 renderMobileCard={renderMobileDisputeCard}
-                />
+              />
             </>
           )}
         </div>
-
       </div>
     </div>
   );

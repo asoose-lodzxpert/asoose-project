@@ -5,11 +5,11 @@ import { useRouter } from "expo-router";
 import { ThemedText } from "@/components/themed-text";
 import { useSendPackage } from "@/context/SendPackageContext";
 import { useThemeColor } from "@/hooks/use-theme-color";
-import { calculatePrice, formatCurrency } from "@/services/sendPackage.api";
+import { formatCurrency } from "@/services/sendPackage.api";
 
 export function QuoteBottomSheet() {
   const router = useRouter();
-  const { quote, loadingQuote, returnData } = useSendPackage();
+  const { quote, loadingQuote } = useSendPackage();
 
   const surface = useThemeColor({}, "surfaceBackground");
   const primary = useThemeColor({}, "brandPrimary");
@@ -18,10 +18,8 @@ export function QuoteBottomSheet() {
 
   const pricing = useMemo(() => {
     if (!quote) return null;
-
-    const data = returnData();
-    return calculatePrice(data.packageSize ?? "small");
-  }, [quote, returnData]);
+    return typeof quote.price === "number" ? quote.price : null;
+  }, [quote]);
 
   return (
     <View style={[styles.container, { backgroundColor: surface }]}>

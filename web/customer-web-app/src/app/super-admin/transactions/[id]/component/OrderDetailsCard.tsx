@@ -1,18 +1,21 @@
-import React from 'react';
-import Link from 'next/link';
-import { Package, ExternalLink } from 'lucide-react';
-import { SectionCard } from './SectionCard';
-import { TransactionDetail } from '../types';
-import { Currency } from '@/app/main/components/Currency'; // ✅ Added
+import React from "react";
+import Link from "next/link";
+import { Package, ExternalLink } from "lucide-react";
+import { SectionCard } from "./SectionCard";
+import { TransactionDetail } from "../types";
+import { Currency } from "@/app/main/components/Currency"; // ✅ Added
 
 interface OrderDetailsProps {
-  details: NonNullable<TransactionDetail['orderDetails']>;
-  financialBreakdown?: TransactionDetail['financialBreakdown'];
+  details: NonNullable<TransactionDetail["orderDetails"]>;
+  financialBreakdown?: TransactionDetail["financialBreakdown"];
 }
 
-export const OrderDetailsCard = ({ details, financialBreakdown }: OrderDetailsProps) => {
+export const OrderDetailsCard = ({
+  details,
+  financialBreakdown,
+}: OrderDetailsProps) => {
   const action = (
-    <Link 
+    <Link
       href={`/super-admin/orders/${details.orderId}`}
       className="text-yellow-500 hover:text-yellow-400 text-sm font-medium flex items-center gap-2"
     >
@@ -21,9 +24,9 @@ export const OrderDetailsCard = ({ details, financialBreakdown }: OrderDetailsPr
   );
 
   return (
-    <SectionCard 
-      title="Order Details" 
-      icon={Package} 
+    <SectionCard
+      title="Order Details"
+      icon={Package}
       iconColorClass="bg-blue-500/20 text-blue-500"
       action={action}
     >
@@ -40,7 +43,9 @@ export const OrderDetailsCard = ({ details, financialBreakdown }: OrderDetailsPr
           </div>
           <div className="space-y-2">
             <p className="text-gray-400 text-xs">Commission Rate</p>
-            <p className="text-orange-500 font-medium">{details.commissionRate}%</p>
+            <p className="text-orange-500 font-medium">
+              {details.commissionRate}%
+            </p>
           </div>
         </div>
 
@@ -49,11 +54,14 @@ export const OrderDetailsCard = ({ details, financialBreakdown }: OrderDetailsPr
           <h4 className="text-white font-medium mb-4">Items Ordered</h4>
           <div className="space-y-3">
             {details.items.map((item, idx) => (
-              <div key={idx} className="flex items-center justify-between p-3 bg-[#0F172A] rounded-lg">
+              <div
+                key={idx}
+                className="flex items-center justify-between p-3 bg-[#0F172A] rounded-lg"
+              >
                 <div className="flex items-center gap-3">
                   {item.image && (
-                    <img 
-                      src={item.image} 
+                    <img
+                      src={item.image}
                       alt={item.name}
                       className="w-12 h-12 rounded-lg object-cover"
                     />
@@ -61,11 +69,15 @@ export const OrderDetailsCard = ({ details, financialBreakdown }: OrderDetailsPr
                   <div>
                     <p className="text-white font-medium">{item.name}</p>
                     {/* ✅ Fixed: Formatted item price */}
-                    <p className="text-gray-400 text-sm">Qty: {item.qty} × <Currency amount={item.price} /></p>
+                    <p className="text-gray-400 text-sm">
+                      Qty: {item.qty} × <Currency amount={item.price} />
+                    </p>
                   </div>
                 </div>
                 {/* ✅ Fixed: Formatted item total */}
-                <span className="text-white font-bold"><Currency amount={item.total} /></span>
+                <span className="text-white font-bold">
+                  <Currency amount={item.total} />
+                </span>
               </div>
             ))}
           </div>
@@ -79,15 +91,23 @@ export const OrderDetailsCard = ({ details, financialBreakdown }: OrderDetailsPr
               <div className="flex justify-between">
                 <span className="text-gray-400">Subtotal</span>
                 {/* ✅ Fixed: Formatted subtotal */}
-                <span className="text-white"><Currency amount={details.subtotal} /></span>
+                <span className="text-white">
+                  <Currency amount={details.subtotal} />
+                </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-400">Platform Commission ({details.commissionRate}%)</span>
+                <span className="text-gray-400">
+                  Platform Commission ({details.commissionRate}%)
+                </span>
                 {/* ✅ Fixed: Formatted commission */}
-                <span className="text-orange-500">-<Currency amount={financialBreakdown.platformCommission} /></span>
+                <span className="text-orange-500">
+                  -<Currency amount={financialBreakdown.platformCommission} />
+                </span>
               </div>
               <div className="flex justify-between pt-3 border-t border-gray-700">
-                <span className="text-gray-300 font-medium">Vendor Receives</span>
+                <span className="text-gray-300 font-medium">
+                  Vendor Receives
+                </span>
                 <span className="text-green-500 font-bold text-lg">
                   {/* ✅ Fixed: Formatted vendor amount */}
                   <Currency amount={financialBreakdown.vendorReceives} />

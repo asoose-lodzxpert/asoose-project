@@ -59,7 +59,9 @@ export class CartService {
           price: itemPrice,
           quantity: itemDto.quantity,
           total: lineTotal,
-          available: product.status === 'ACTIVE',
+          available:
+            product.status === 'ACTIVE' &&
+            (typeof product.stock === 'number' ? product.stock > 0 : true),
         };
       }),
     );

@@ -35,7 +35,9 @@ export function LocationCard({ type, title }: Props) {
     return {
       location,
       iconColor: isPickup ? success : danger,
-      detailsLabel: isPickup ? "Add pickup details" : "Add recipient details",
+      detailsLabel: isPickup
+        ? "Add pickup details *"
+        : "Add recipient details *",
       emptyLabel: "Select location",
     };
   }, [isPickup, pickup, dropoff, success, danger]);
@@ -70,21 +72,23 @@ export function LocationCard({ type, title }: Props) {
       <SavedAddressPills type={type} />
 
       {/* ---------- Details Toggle ---------- */}
-      <Pressable onPress={toggleDetails} style={styles.detailsRow}>
-        <View style={styles.detailsLeft}>
-          <ThemedText type="link">{config.detailsLabel}</ThemedText>
-          <IconSymbol name="chevron.right" size={14} color={primary} />
-        </View>
+      {!isPickup && (
+        <Pressable onPress={toggleDetails} style={styles.detailsRow}>
+          <View style={styles.detailsLeft}>
+            <ThemedText type="link">{config.detailsLabel}</ThemedText>
+            <IconSymbol name="chevron.right" size={14} color={primary} />
+          </View>
 
-        <IconSymbol
-          name={isDetailsOpen ? "chevron.up" : "chevron.down"}
-          size={16}
-          color={primary}
-        />
-      </Pressable>
+          <IconSymbol
+            name={isDetailsOpen ? "chevron.up" : "chevron.down"}
+            size={16}
+            color={primary}
+          />
+        </Pressable>
+      )}
 
       {/* ---------- Conditional Details ---------- */}
-      {isDetailsOpen && <LocationDetailsForm type={type} />}
+      {isDetailsOpen && !isPickup && <LocationDetailsForm type={type} />}
     </View>
   );
 }

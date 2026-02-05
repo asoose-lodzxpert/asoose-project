@@ -1,19 +1,19 @@
-import { Stack } from "expo-router";
-import { AuthProvider, useAuth } from "@/context/AuthContext";
-import { View, Image, StyleSheet, Animated } from "react-native";
-import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { NotificationPreferencesProvider } from "@/context/NotificationPreferencesContext";
-import { NotificationProvider } from "@/context/NotificationContext";
-import { ThemedView } from "@/components/themed-view";
-import { ThemedText } from "@/components/themed-text";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { ThemedText } from "@/components/themed-text";
+import { ThemedView } from "@/components/themed-view";
 import { toastConfig } from "@/components/ThemedToast";
-import Toast from "react-native-toast-message";
-import { useEffect, useRef, useState } from "react";
+import { AuthProvider, useAuth } from "@/context/AuthContext";
+import { NotificationProvider } from "@/context/NotificationContext";
+import { NotificationPreferencesProvider } from "@/context/NotificationPreferencesContext";
 import {
   checkStartupPermissions,
   requestStartupPermissions,
 } from "@/utils/permissions";
+import { Stack } from "expo-router";
+import { useEffect, useRef, useState } from "react";
+import { Animated, Image, StyleSheet, View } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
+import Toast from "react-native-toast-message";
 
 function LoadingScreen() {
   const dot1 = useRef(new Animated.Value(0)).current;
@@ -91,6 +91,8 @@ function RootNavigator() {
   }
 
   const status = user.status?.trim().toUpperCase() ?? "";
+
+  console.log("User status:", status);
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>

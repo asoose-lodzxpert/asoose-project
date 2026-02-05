@@ -1,12 +1,16 @@
-'use client';
+"use client";
 
-import React, { useEffect, useRef, useState } from 'react';
-import { X, Star, Loader2 } from 'lucide-react';
+import React, { useEffect, useRef, useState } from "react";
+import { X, Star, Loader2 } from "lucide-react";
 
 interface ReviewModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (rating: number, comment: string, orderId?: string) => Promise<void>;
+  onSubmit: (
+    rating: number,
+    comment: string,
+    orderId?: string,
+  ) => Promise<void>;
   orderId?: string; // Optional for general store reviews, required for verified order reviews
   initialData?: {
     rating: number;
@@ -28,7 +32,7 @@ export const ReviewModal = ({
 
   const [rating, setRating] = useState(0);
   const [hoverRating, setHoverRating] = useState(0);
-  const [comment, setComment] = useState('');
+  const [comment, setComment] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [mounted, setMounted] = useState(false);
 
@@ -45,7 +49,7 @@ export const ReviewModal = ({
     if (!isOpen) return;
 
     setRating(initialData?.rating ?? 0);
-    setComment(initialData?.comment ?? '');
+    setComment(initialData?.comment ?? "");
     setHoverRating(0);
     setErrors({});
     setIsSubmitting(false);
@@ -61,20 +65,20 @@ export const ReviewModal = ({
     if (!isOpen) return;
 
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !isSubmitting) {
+      if (e.key === "Escape" && !isSubmitting) {
         onClose();
       }
     };
 
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
   }, [isOpen, isSubmitting, onClose]);
 
   const validate = () => {
     const nextErrors: typeof errors = {};
 
     if (rating === 0) {
-      nextErrors.rating = 'Rating is required';
+      nextErrors.rating = "Rating is required";
     }
 
     const trimmed = comment.trim();
@@ -97,8 +101,7 @@ export const ReviewModal = ({
       onClose();
     } catch (err) {
       setErrors({
-        submit:
-          err instanceof Error ? err.message : 'Submission failed',
+        submit: err instanceof Error ? err.message : "Submission failed",
       });
     } finally {
       setIsSubmitting(false);
@@ -111,7 +114,7 @@ export const ReviewModal = ({
     <div
       className={`fixed inset-0 z-50 flex items-center justify-center p-4
         bg-black/60 backdrop-blur-sm transition-opacity duration-200
-        ${mounted ? 'opacity-100' : 'opacity-0'}`}
+        ${mounted ? "opacity-100" : "opacity-0"}`}
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <div
@@ -123,13 +126,13 @@ export const ReviewModal = ({
         className={`w-full max-w-md rounded-3xl p-6 outline-none
           bg-white dark:bg-[#1a1a1a]
           transform transition-all duration-200 ease-out
-          ${mounted ? 'scale-100 opacity-100' : 'scale-95 opacity-0'}`}
+          ${mounted ? "scale-100 opacity-100" : "scale-95 opacity-0"}`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex justify-between items-center mb-6">
           <h3 id="review-title" className="text-xl font-black italic">
-            {isEditMode ? 'Edit Review' : 'Write a Review'}
+            {isEditMode ? "Edit Review" : "Write a Review"}
           </h3>
           <button
             onClick={onClose}
@@ -157,8 +160,8 @@ export const ReviewModal = ({
               <Star
                 className={`w-10 h-10 transition-colors ${
                   s <= (hoverRating || rating)
-                    ? 'fill-yellow-500 text-yellow-500'
-                    : 'text-gray-300 dark:text-gray-600'
+                    ? "fill-yellow-500 text-yellow-500"
+                    : "text-gray-300 dark:text-gray-600"
                 }`}
               />
             </button>
@@ -188,7 +191,7 @@ export const ReviewModal = ({
           <span>
             {comment.trim() && comment.trim().length < MIN_COMMENT_LENGTH
               ? `Min ${MIN_COMMENT_LENGTH} chars`
-              : 'Optional'}
+              : "Optional"}
           </span>
           <span>{MAX_COMMENT_LENGTH - comment.length} characters left</span>
         </div>
@@ -219,9 +222,9 @@ export const ReviewModal = ({
               Submitting…
             </>
           ) : isEditMode ? (
-            'Update Review'
+            "Update Review"
           ) : (
-            'Submit Review'
+            "Submit Review"
           )}
         </button>
       </div>

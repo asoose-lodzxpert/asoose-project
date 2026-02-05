@@ -1,41 +1,40 @@
-"use client"
-import React, { useState } from 'react';
-import { Loader2, ArrowLeft, Mail } from 'lucide-react';
-import Link from 'next/link';
-import { createClient } from '../../../utils/supabase/client';
+"use client";
+import React, { useState } from "react";
+import { Loader2, ArrowLeft, Mail } from "lucide-react";
+import Link from "next/link";
+import { createClient } from "../../../utils/supabase/client";
 
 const ForgotPasswordPage = () => {
   const [isLoading, setIsLoading] = useState(false);
-  const [email, setEmail] = useState('');
-  const [error, setError] = useState('');
+  const [email, setEmail] = useState("");
+  const [error, setError] = useState("");
   const [emailSent, setEmailSent] = useState(false);
   const supabase = createClient();
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!email) {
       setError("Input field cannot be empty");
       return;
     }
-    
+
     setIsLoading(true);
-    setError('');
+    setError("");
 
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/reset-password`,
       });
-      
+
       if (error) {
         throw error;
       }
-      
+
       // Show success state
       setEmailSent(true);
-      
     } catch (err: any) {
-      setError(err.message || 'An error occurred');
+      setError(err.message || "An error occurred");
     } finally {
       setIsLoading(false);
     }
@@ -49,15 +48,20 @@ const ForgotPasswordPage = () => {
             <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mb-4">
               <Mail className="w-8 h-8 text-green-600" />
             </div>
-            <h1 className="text-3xl font-semibold text-gray-900 mb-2">Check your email</h1>
+            <h1 className="text-3xl font-semibold text-gray-900 mb-2">
+              Check your email
+            </h1>
             <p className="text-sm text-gray-600">
-              We've sent a password reset link to <span className="font-medium text-gray-900">{email}</span>
+              We've sent a password reset link to{" "}
+              <span className="font-medium text-gray-900">{email}</span>
             </p>
           </div>
 
           <div className="space-y-4">
             <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
-              <p className="text-sm text-gray-600 mb-2">Didn't receive the email?</p>
+              <p className="text-sm text-gray-600 mb-2">
+                Didn't receive the email?
+              </p>
               <ul className="text-xs text-gray-500 space-y-1 list-disc list-inside">
                 <li>Check your spam or junk folder</li>
                 <li>Make sure the email address is correct</li>
@@ -68,8 +72,8 @@ const ForgotPasswordPage = () => {
             <button
               onClick={() => {
                 setEmailSent(false);
-                setEmail('');
-                setError('');
+                setEmail("");
+                setError("");
               }}
               className="w-full bg-black text-white py-2.5 rounded-lg hover:bg-gray-800 transition-colors text-sm font-medium"
             >
@@ -101,7 +105,9 @@ const ForgotPasswordPage = () => {
         </Link>
 
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-semibold text-gray-900 mb-2">Forgot password?</h1>
+          <h1 className="text-3xl font-semibold text-gray-900 mb-2">
+            Forgot password?
+          </h1>
           <p className="text-sm text-gray-600">
             No worries, we'll send you reset instructions
           </p>
@@ -136,13 +142,13 @@ const ForgotPasswordPage = () => {
                 Sending...
               </span>
             ) : (
-              'Reset password'
+              "Reset password"
             )}
           </button>
         </form>
       </div>
     </div>
   );
-}
+};
 
 export default ForgotPasswordPage;

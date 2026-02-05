@@ -28,82 +28,118 @@ export default function EnRouteToDropoff({
   } | null>(null);
 
   useEffect(() => {
-    let subscription: Location.LocationSubscription;
-    (async () => {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== "granted") return;
-      subscription = await Location.watchPositionAsync(
-        {
-          accuracy: Location.Accuracy.High,
-          distanceInterval: 1,
-          timeInterval: 3000,
-        },
-        async (loc) => {
-          if (!activeJob) return;
-          const dropoffLat =
-            activeJob.dropoffAddress?.latitude ?? activeJob.dropoffAddress?.lat;
-          const dropoffLng =
-            activeJob.dropoffAddress?.longitude ??
-            activeJob.dropoffAddress?.lng;
-          if (
-            typeof dropoffLat === "number" &&
-            typeof dropoffLng === "number"
-          ) {
-            try {
-              const distData = await getDistanceMeters({
-                originLat: loc.coords.latitude,
-                originLng: loc.coords.longitude,
-                destLat: dropoffLat,
-                destLng: dropoffLng,
-              });
-              if (typeof distData.distance === "number") {
-                setDistanceToCustomer(distData.distance);
-              }
-            } catch {
-              setDistanceToCustomer(null);
+    let subscription: Location.LocationSubscription | null = null;
+    let isMounted = true;
+
+    const startTracking = async () => {
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== "granted") {
+          console.error("Location permission denied");
+          return;
+        }
+
+        if (!isMounted) return;
+
+        subscription = await Location.watchPositionAsync(
+          {
+            accuracy: Location.Accuracy.High,
+            distanceInterval: 1,
+            timeInterval: 1000, // Improved: 1 second for real-time updates
+          },
+          async (loc) => {
+            if (!isMounted || !activeJob) return;
+
+            // Validate GPS accuracy
+            if (loc.coords.accuracy && loc.coords.accuracy > 50) {
+              console.warn("Poor GPS accuracy:", loc.coords.accuracy);
             }
-            try {
-              const data = await getDirections({
-                originLat: loc.coords.latitude,
-                originLng: loc.coords.longitude,
-                destLat: dropoffLat,
-                destLng: dropoffLng,
-              });
-              if (!data.error && data.duration && data.coordinates) {
-                setEta(data.duration.text);
-                let closestStep = null;
-                let minDistance = Infinity;
-                for (const coord of data.coordinates) {
-                  const stepDistData = await getDistanceMeters({
-                    originLat: loc.coords.latitude,
-                    originLng: loc.coords.longitude,
-                    destLat: coord.latitude,
-                    destLng: coord.longitude,
-                  });
-                  const dist =
-                    typeof stepDistData.distance === "number"
-                      ? stepDistData.distance
-                      : Infinity;
-                  if (dist < minDistance) {
-                    minDistance = dist;
-                    closestStep = coord;
+
+            const dropoffLat =
+              activeJob.dropoffAddress?.latitude ??
+              activeJob.dropoffAddress?.lat;
+            const dropoffLng =
+              activeJob.dropoffAddress?.longitude ??
+              activeJob.dropoffAddress?.lng;
+
+            if (
+              typeof dropoffLat === "number" &&
+              typeof dropoffLng === "number"
+            ) {
+              try {
+                const distData = await getDistanceMeters({
+                  originLat: loc.coords.latitude,
+                  originLng: loc.coords.longitude,
+                  destLat: dropoffLat,
+                  destLng: dropoffLng,
+                });
+                if (typeof distData.distance === "number" && isMounted) {
+                  setDistanceToCustomer(distData.distance);
+                }
+              } catch (error) {
+                console.error("Distance calculation error:", error);
+                if (isMounted) setDistanceToCustomer(null);
+              }
+
+              try {
+                const data = await getDirections({
+                  originLat: loc.coords.latitude,
+                  originLng: loc.coords.longitude,
+                  destLat: dropoffLat,
+                  destLng: dropoffLng,
+                });
+                if (
+                  !data.error &&
+                  data.duration &&
+                  data.coordinates &&
+                  isMounted
+                ) {
+                  setEta(data.duration.text);
+                  let closestStep = null;
+                  let minDistance = Infinity;
+                  for (const coord of data.coordinates) {
+                    const stepDistData = await getDistanceMeters({
+                      originLat: loc.coords.latitude,
+                      originLng: loc.coords.longitude,
+                      destLat: coord.latitude,
+                      destLng: coord.longitude,
+                    });
+                    const dist =
+                      typeof stepDistData.distance === "number"
+                        ? stepDistData.distance
+                        : Infinity;
+                    if (dist < minDistance) {
+                      minDistance = dist;
+                      closestStep = coord;
+                    }
+                  }
+                  if (closestStep && isMounted) {
+                    setCurrentStep({
+                      text: `Continue to drop-off`,
+                      maneuver: undefined,
+                    });
                   }
                 }
-                if (closestStep) {
-                  setCurrentStep({
-                    text: `Continue to drop-off`,
-                    maneuver: undefined,
-                  });
-                }
+              } catch (err) {
+                console.error("Directions API error:", err);
               }
-            } catch (err) {
-              console.log("Directions API error:", err);
             }
-          }
-        },
-      );
-    })();
-    return () => subscription?.remove();
+          },
+        );
+      } catch (error) {
+        console.error("Failed to start location tracking:", error);
+      }
+    };
+
+    startTracking();
+
+    return () => {
+      isMounted = false;
+      if (subscription) {
+        subscription.remove();
+        subscription = null;
+      }
+    };
   }, [activeJob]);
 
   if (!activeJob) return null;

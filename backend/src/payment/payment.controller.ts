@@ -29,7 +29,10 @@ import { PaymentGateway } from './interfaces/payment.interface';
 import { UserRole } from '../common/enums/user-role.enum';
 import type { Request, Response } from 'express';
 
-@Controller('payment')
+@Controller({
+  path: 'payment',
+  version: '1',
+})
 export class PaymentController {
   private readonly logger = new Logger(PaymentController.name);
 
@@ -68,7 +71,10 @@ export class PaymentController {
   @Get('verify')
   @UseGuards(JwtAuthGuard)
   async verifyPayment(@Query() query: VerifyPaymentDto) {
-    return this.paymentService.verifyPayment(query.reference, query.gateway);
+    return this.paymentService.verifyPayment(
+      query.reference,
+      query.gateway as PaymentGateway | undefined,
+    );
   }
 
   // WEBHOOK HANDLERS (Server-to-Server)
@@ -80,6 +86,11 @@ export class PaymentController {
     @Headers('x-paystack-signature') signature: string,
   ) {
     const payload = req.body;
+
+    this.logger.debug(
+      `Received Paystack webhook: ${JSON.stringify(payload, null, 2)}`,
+    );
+
     await this.paymentService.handleWebhook(
       PaymentGateway.PAYSTACK,
       payload,
@@ -156,6 +167,15 @@ export class PaymentController {
         verification.status === 'SUCCESS' ? 'success' : 'failed';
 
       let callbackUrl = verification.meta?.callbackUrl || frontendUrl;
+
+      // Support native app URLs (e.g., asoose-app://)
+      if (callbackUrl.startsWith('asoose-app://')) {
+        return res.redirect(
+          `${callbackUrl}?reference=${reference}&status=${statusParam}`,
+        );
+      }
+
+      // Web app URLs
       if (callbackUrl.includes('localhost:3000')) callbackUrl = frontendUrl;
 
       return res.redirect(
@@ -192,6 +212,14 @@ export class PaymentController {
       }
 
       const status = verification.success ? 'success' : 'failed';
+
+      // Support native app URLs
+      if (callbackUrl.startsWith('asoose-app://')) {
+        return res.redirect(
+          `${callbackUrl}?reference=${verification.reference}&status=${status}`,
+        );
+      }
+
       const redirectUrl = `${callbackUrl}/payment/callback?reference=${verification.reference}&status=${status}`;
       return res.redirect(redirectUrl);
     } catch (error) {
@@ -223,6 +251,14 @@ export class PaymentController {
       }
 
       const status = verification.success ? 'success' : 'failed';
+
+      // Support native app URLs
+      if (callbackUrl.startsWith('asoose-app://')) {
+        return res.redirect(
+          `${callbackUrl}?reference=${reference}&status=${status}`,
+        );
+      }
+
       const redirectUrl = `${callbackUrl}/payment/callback?reference=${reference}&status=${status}`;
       return res.redirect(redirectUrl);
     } catch (error) {

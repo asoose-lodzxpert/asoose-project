@@ -34,8 +34,8 @@ export async function seedUsersAndRiders() {
     isOnline: true,
     countryCode: 'NG',
     password: PASSWORD_HASH,
-    currentLat: MAIDUGURI_COORDS.lat + (Math.random() * 0.01), // Slight jitter
-    currentLng: MAIDUGURI_COORDS.lng + (Math.random() * 0.01),
+    currentLat: MAIDUGURI_COORDS.lat + Math.random() * 0.01, // Slight jitter
+    currentLng: MAIDUGURI_COORDS.lng + Math.random() * 0.01,
     commissionRate: 20.0, // Platform takes 20%
     walletBalance: 0, // Will be updated in the Wallet Seed
   }));
@@ -50,8 +50,18 @@ export async function seedUsersAndRiders() {
     // Seed Verified Rider Documents (Required for Payouts/Active status)
     await prisma.riderDocument.createMany({
       data: [
-        { riderId: rider.id, type: 'DRIVER_LICENSE', url: 'https://placehold.co/600x400', status: VerificationStatus.VERIFIED },
-        { riderId: rider.id, type: 'VEHICLE_INSURANCE', url: 'https://placehold.co/600x400', status: VerificationStatus.VERIFIED },
+        {
+          riderId: rider.id,
+          type: 'DRIVER_LICENSE',
+          url: 'https://placehold.co/600x400',
+          status: VerificationStatus.VERIFIED,
+        },
+        {
+          riderId: rider.id,
+          type: 'VEHICLE_INSURANCE',
+          url: 'https://placehold.co/600x400',
+          status: VerificationStatus.VERIFIED,
+        },
       ],
       skipDuplicates: true, // rudimentary idempotency for sub-records
     });

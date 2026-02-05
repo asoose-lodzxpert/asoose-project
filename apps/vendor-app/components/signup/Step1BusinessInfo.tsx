@@ -26,7 +26,7 @@ interface Step1Props {
   data: SignupStep1Data;
   onChange: <K extends keyof SignupStep1Data>(
     key: K,
-    value: SignupStep1Data[K]
+    value: SignupStep1Data[K],
   ) => void;
 }
 
@@ -184,11 +184,11 @@ export const Step1BusinessInfo: React.FC<Step1Props> = ({ data, onChange }) => {
               {renderValidation("At least 8 characters", validations.length)}
               {renderValidation(
                 "At least 1 uppercase letter",
-                validations.uppercase
+                validations.uppercase,
               )}
               {renderValidation(
                 "At least 1 lowercase letter",
-                validations.lowercase
+                validations.lowercase,
               )}
               {renderValidation("At least 1 number", validations.number)}
               {renderValidation("At least 1 symbol", validations.symbol)}

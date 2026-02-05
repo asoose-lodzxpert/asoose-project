@@ -28,26 +28,42 @@ export default function EnRouteToPickup({
   } | null>(null);
 
   useEffect(() => {
-    let subscription: Location.LocationSubscription;
-    (async () => {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== "granted") return;
-      await Location.getCurrentPositionAsync({});
-      // setRiderLocation(loc); // removed unused state
-      subscription = await Location.watchPositionAsync(
-        {
-          accuracy: Location.Accuracy.High,
-          distanceInterval: 1,
-          timeInterval: 3000,
-        },
-        async (newLoc) => {
-          // setRiderLocation(newLoc); // removed unused state
-          if (activeJob) {
+    let subscription: Location.LocationSubscription | null = null;
+    let isMounted = true;
+
+    const startTracking = async () => {
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== "granted") {
+          console.error("Location permission denied");
+          return;
+        }
+
+        if (!isMounted) return;
+
+        await Location.getCurrentPositionAsync({});
+
+        subscription = await Location.watchPositionAsync(
+          {
+            accuracy: Location.Accuracy.High,
+            distanceInterval: 1,
+            timeInterval: 1000, // Improved: 1 second for real-time updates
+          },
+          async (newLoc) => {
+            if (!isMounted || !activeJob) return;
+
+            // Validate GPS accuracy
+            if (newLoc.coords.accuracy && newLoc.coords.accuracy > 50) {
+              console.warn("Poor GPS accuracy:", newLoc.coords.accuracy);
+              // Still update but with warning
+            }
+
             const pickupLat =
               activeJob.pickupAddress?.latitude ?? activeJob.pickupAddress?.lat;
             const pickupLng =
               activeJob.pickupAddress?.longitude ??
               activeJob.pickupAddress?.lng;
+
             if (
               typeof pickupLat === "number" &&
               typeof pickupLng === "number"
@@ -59,12 +75,14 @@ export default function EnRouteToPickup({
                   destLat: pickupLat,
                   destLng: pickupLng,
                 });
-                if (typeof distData.distance === "number") {
+                if (typeof distData.distance === "number" && isMounted) {
                   setDistanceToPickup(distData.distance);
                 }
-              } catch {
-                setDistanceToPickup(null);
+              } catch (error) {
+                console.error("Distance calculation error:", error);
+                if (isMounted) setDistanceToPickup(null);
               }
+
               try {
                 const data = await getDirections({
                   originLat: newLoc.coords.latitude,
@@ -72,7 +90,12 @@ export default function EnRouteToPickup({
                   destLat: pickupLat,
                   destLng: pickupLng,
                 });
-                if (!data.error && data.duration && data.coordinates) {
+                if (
+                  !data.error &&
+                  data.duration &&
+                  data.coordinates &&
+                  isMounted
+                ) {
                   setEta(data.duration.text);
                   let closestStep = null;
                   let minDistance = Infinity;
@@ -92,7 +115,7 @@ export default function EnRouteToPickup({
                       closestStep = coord;
                     }
                   }
-                  if (closestStep) {
+                  if (closestStep && isMounted) {
                     setCurrentStep({
                       text: `Continue to pickup`,
                       maneuver: undefined,
@@ -100,14 +123,25 @@ export default function EnRouteToPickup({
                   }
                 }
               } catch (err) {
-                console.log("Directions API error:", err);
+                console.error("Directions API error:", err);
               }
             }
-          }
-        },
-      );
-    })();
-    return () => subscription?.remove();
+          },
+        );
+      } catch (error) {
+        console.error("Failed to start location tracking:", error);
+      }
+    };
+
+    startTracking();
+
+    return () => {
+      isMounted = false;
+      if (subscription) {
+        subscription.remove();
+        subscription = null;
+      }
+    };
   }, [activeJob]);
 
   if (!activeJob) return null;

@@ -16,12 +16,11 @@ export function LocationDetailsForm({ type }: Props) {
   } = useSendPackage();
 
   const details = type === "pickup" ? pickupDetails : deliveryDetails;
-  const setDetails =
-    type === "pickup" ? setPickupDetails : setDeliveryDetails;
+  const setDetails = type === "pickup" ? setPickupDetails : setDeliveryDetails;
 
   function update<K extends keyof typeof details>(
     key: K,
-    value: (typeof details)[K]
+    value: (typeof details)[K],
   ) {
     setDetails({ ...details, [key]: value });
   }

@@ -17,7 +17,10 @@ import { Roles } from 'src/auth/roles.decorator';
 import { RolesGuard } from 'src/auth/roles.guards';
 import { UserRole } from 'src/common/enums/user-role.enum';
 
-@Controller('super-admin/zones')
+@Controller({
+  path: 'super-admin/zones',
+  version: '1',
+})
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN_MANAGER)
 export class ZonesController {

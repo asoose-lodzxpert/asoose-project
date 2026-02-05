@@ -1,6 +1,6 @@
-import { X, Bike, ExternalLink } from 'lucide-react';
-import Link from 'next/link';
-import Image from 'next/image'; // 1. Import Image component
+import { X, Bike, ExternalLink } from "lucide-react";
+import Link from "next/link";
+import Image from "next/image"; // 1. Import Image component
 
 interface BannerData {
   id: string;
@@ -9,7 +9,7 @@ interface BannerData {
   buttonText: string;
   link: string;
   image: string;
-  type: 'PROMO' | 'AD';
+  type: "PROMO" | "AD";
   priority: number;
   isActive: boolean;
 }
@@ -26,11 +26,12 @@ export const PromoBanner = ({ banner, onClose }: PromoBannerProps) => {
 
   return (
     <section className="px-4 pt-6 animate-in fade-in slide-in-from-top-4 duration-500">
-      <div 
+      <div
         className={`w-full h-40 sm:h-48 rounded-3xl relative overflow-hidden flex items-center px-6 shadow-lg group
-          ${banner.type === 'AD' 
-            ? 'bg-indigo-600' 
-            : 'bg-gradient-to-r from-yellow-500 to-orange-500'
+          ${
+            banner.type === "AD"
+              ? "bg-indigo-600"
+              : "bg-gradient-to-r from-yellow-500 to-orange-500"
           }`}
         // 2. Removed inline style for background image
       >
@@ -47,12 +48,10 @@ export const PromoBanner = ({ banner, onClose }: PromoBannerProps) => {
         )}
 
         {/* Overlay for better text readability */}
-        {banner.image && (
-          <div className="absolute inset-0 bg-black/40 z-0" />
-        )}
-        
-        <button 
-          onClick={onClose} 
+        {banner.image && <div className="absolute inset-0 bg-black/40 z-0" />}
+
+        <button
+          onClick={onClose}
           className="absolute top-4 right-4 z-20 p-2 bg-black/10 hover:bg-black/20 text-white rounded-full transition-colors backdrop-blur-sm"
           aria-label="Close banner"
         >
@@ -66,7 +65,7 @@ export const PromoBanner = ({ banner, onClose }: PromoBannerProps) => {
           <p className="font-medium opacity-90 mb-4 drop-shadow-sm text-sm sm:text-base">
             {banner.subtitle}
           </p>
-          <Link 
+          <Link
             href={banner.link}
             className="bg-white text-orange-600 px-5 py-2.5 rounded-xl font-bold text-sm shadow-md inline-block hover:scale-105 transition-transform"
           >
@@ -75,13 +74,12 @@ export const PromoBanner = ({ banner, onClose }: PromoBannerProps) => {
         </div>
 
         {/* Dynamic Icon fallback (only show if no image) */}
-        {!banner.image && (
-          banner.type === 'AD' ? (
+        {!banner.image &&
+          (banner.type === "AD" ? (
             <ExternalLink className="absolute right-8 bottom-8 w-24 h-24 text-white/10 -rotate-12" />
           ) : (
             <Bike className="absolute right-8 bottom-8 w-24 h-24 text-white/20 -rotate-12" />
-          )
-        )}
+          ))}
       </div>
     </section>
   );

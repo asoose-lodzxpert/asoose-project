@@ -61,6 +61,6 @@ export async function fetchWithAuth(url: string, options: RequestInit = {}) {
 
 export async function fetchCurrentUser() {
   return await fetchWithAuth(
-    `${process.env.EXPO_PUBLIC_API_URL}/vendor/dashboard/me`
+    `${process.env.EXPO_PUBLIC_API_URL}/vendor/dashboard/me`,
   );
 }

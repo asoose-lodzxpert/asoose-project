@@ -19,7 +19,10 @@ import {
   UpdateEmergencyContactDto,
 } from './dto/emergency-contact.dto';
 
-@Controller('users')
+@Controller({
+  path: 'users',
+  version: '1',
+})
 @UseGuards(JwtAuthGuard)
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
@@ -146,7 +149,7 @@ export class UsersController {
     @Param('id') id: string,
     @Body() body: UpdateEmergencyContactDto,
   ) {
-    return this.usersService.updateEmergencyContact(req.user.id, id, body);
+    return this.usersService.upsertEmergencyContact(req.user.id, id, body);
   }
 
   @Delete('emergency-contacts/:id')
@@ -167,5 +170,24 @@ export class UsersController {
   @Patch('notification-config')
   async updateNotificationConfig(@Request() req, @Body() body: any) {
     return this.usersService.updateNotificationConfig(req.user.id, body);
+  }
+
+  // ==================================================================
+  // WALLET & PAYMENT METHODS ENDPOINTS
+  // ==================================================================
+
+  @Get('wallet')
+  async getWalletBalance(@Request() req) {
+    return this.usersService.getWalletBalance(req.user.id);
+  }
+
+  @Get('payment/cards')
+  async getSavedCards(@Request() req) {
+    return this.usersService.getSavedCards(req.user.id);
+  }
+
+  @Delete('payment/cards/:id')
+  async deleteSavedCard(@Request() req, @Param('id') cardId: string) {
+    return this.usersService.deleteSavedCard(req.user.id, cardId);
   }
 }

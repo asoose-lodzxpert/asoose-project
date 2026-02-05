@@ -15,9 +15,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
         enableSystem
         disableTransitionOnChange
       >
-        <GoogleMapsProvider>
-           {children}
-        </GoogleMapsProvider>
+        <GoogleMapsProvider>{children}</GoogleMapsProvider>
         <ToastContainer
           position="top-right"
           autoClose={3000}

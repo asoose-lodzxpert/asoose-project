@@ -1,11 +1,9 @@
-import { WinstonModule } from 'nest-winston';
-import * as winston from 'winston';
+import { Module, Global } from '@nestjs/common';
+import { AppLogger } from './app-logger.service';
 
-export const logger = WinstonModule.createLogger({
-  level: 'info',
-  format: winston.format.combine(
-    winston.format.timestamp(),
-    winston.format.json(),
-  ),
-  transports: [new winston.transports.Console()],
-});
+@Global()
+@Module({
+  providers: [AppLogger],
+  exports: [AppLogger],
+})
+export class LoggerModule {}

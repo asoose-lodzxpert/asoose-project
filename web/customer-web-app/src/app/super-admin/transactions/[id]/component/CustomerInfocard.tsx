@@ -1,17 +1,20 @@
-import React from 'react';
-import { User } from 'lucide-react';
-import { SectionCard } from './SectionCard';
-import { TransactionDetail } from '../types';
+import React from "react";
+import { User } from "lucide-react";
+import { SectionCard } from "./SectionCard";
+import { TransactionDetail } from "../types";
 interface CustomerProps {
-  customer: NonNullable<TransactionDetail['customer']>;
+  customer: NonNullable<TransactionDetail["customer"]>;
   isBankRecipient?: boolean;
 }
 
-export const CustomerInfoCard = ({ customer, isBankRecipient }: CustomerProps) => {
+export const CustomerInfoCard = ({
+  customer,
+  isBankRecipient,
+}: CustomerProps) => {
   return (
-    <SectionCard 
-      title={isBankRecipient ? 'Recipient' : 'Customer'} 
-      icon={User} 
+    <SectionCard
+      title={isBankRecipient ? "Recipient" : "Customer"}
+      icon={User}
       iconColorClass="bg-blue-500/20 text-blue-500"
     >
       <div className="space-y-4">

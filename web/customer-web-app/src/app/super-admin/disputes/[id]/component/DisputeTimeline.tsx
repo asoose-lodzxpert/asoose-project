@@ -1,7 +1,7 @@
-'use client';
-import React from 'react';
-import { Calendar } from 'lucide-react';
-import { DisputeDetail } from '../types';
+"use client";
+import React from "react";
+import { Calendar } from "lucide-react";
+import { DisputeDetail } from "../types";
 interface Props {
   dispute: DisputeDetail;
 }
@@ -13,7 +13,6 @@ export default function DisputeTimeline({ dispute }: Props) {
         <Calendar className="w-5 h-5" /> Timeline
       </h2>
       <div className="space-y-4 relative border-l border-gray-700 ml-2 pl-6">
-        
         {/* Created Event */}
         <div className="relative">
           <div className="absolute -left-[29px] top-1 w-3 h-3 rounded-full border-2 border-[#1E293B] bg-blue-500"></div>
@@ -26,11 +25,13 @@ export default function DisputeTimeline({ dispute }: Props) {
         {/* Resolved Event */}
         {dispute.resolvedAt && (
           <div className="relative">
-            <div className={`absolute -left-[29px] top-1 w-3 h-3 rounded-full border-2 border-[#1E293B] ${
-              dispute.status === 'RESOLVED' ? 'bg-green-500' : 'bg-red-500'
-            }`}></div>
+            <div
+              className={`absolute -left-[29px] top-1 w-3 h-3 rounded-full border-2 border-[#1E293B] ${
+                dispute.status === "RESOLVED" ? "bg-green-500" : "bg-red-500"
+              }`}
+            ></div>
             <p className="text-xs font-bold text-gray-300">
-              {dispute.status === 'RESOLVED' ? 'Resolved' : 'Rejected'}
+              {dispute.status === "RESOLVED" ? "Resolved" : "Rejected"}
             </p>
             <p className="text-[10px] text-gray-500 font-mono">
               {new Date(dispute.resolvedAt).toLocaleString()}
@@ -41,9 +42,9 @@ export default function DisputeTimeline({ dispute }: Props) {
               </span>
             )}
             {dispute.resolution && (
-               <p className="text-[10px] text-gray-400 mt-1 italic line-clamp-2">
-                 "{dispute.resolution}"
-               </p>
+              <p className="text-[10px] text-gray-400 mt-1 italic line-clamp-2">
+                "{dispute.resolution}"
+              </p>
             )}
           </div>
         )}

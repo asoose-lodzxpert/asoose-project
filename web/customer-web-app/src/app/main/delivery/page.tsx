@@ -65,10 +65,10 @@ const getAuthToken = (session: any): string | null => {
 
 const normalizePhoneNumber = (phone: string): string => {
   let cleaned = phone.trim();
-  if (cleaned.startsWith('+234')) {
-    cleaned = '0' + cleaned.slice(4);
-  } else if (cleaned.startsWith('234')) {
-    cleaned = '0' + cleaned.slice(3);
+  if (cleaned.startsWith("+234")) {
+    cleaned = "0" + cleaned.slice(4);
+  } else if (cleaned.startsWith("234")) {
+    cleaned = "0" + cleaned.slice(3);
   }
   return cleaned;
 };
@@ -237,7 +237,7 @@ export default function DeliveryPage() {
     }
 
     setApiError(false);
-    
+
     try {
       setStage(DeliveryStage.PROCESSING_ADDRESS);
       const cityFallback = "Lagos";
@@ -258,7 +258,7 @@ export default function DeliveryPage() {
 
       setAddressIds(pickupRes.id, dropoffRes.id);
       setStage(DeliveryStage.CALCULATING_FEE);
-      
+
       const deliveryRes = await DeliveryService.createDelivery({
         pickupAddressId: pickupRes.id,
         dropoffAddressId: dropoffRes.id,
@@ -269,7 +269,9 @@ export default function DeliveryPage() {
       }, token);
 
       if (deliveryRes?.delivery?.id) {
-        useDeliveryStore.setState({ activeDeliveryId: deliveryRes.delivery.id });
+        useDeliveryStore.setState({
+          activeDeliveryId: deliveryRes.delivery.id,
+        });
         setCalculatedFee(deliveryRes.deliveryFee);
         setStage(DeliveryStage.REVIEW_PAYMENT); 
       } else {
@@ -418,7 +420,7 @@ export default function DeliveryPage() {
              </div>
           </div>
         );
-        
+
       case DeliveryStage.PAYMENT_PENDING:
         return (
           <div className="text-center py-20">
@@ -450,7 +452,10 @@ export default function DeliveryPage() {
                       placeholder="Current package location"
                       initialValue={packageInfo.pickupAddress}
                       onSelect={(data) => {
-                        setLocations({ lat: data.lat, lng: data.lng }, undefined);
+                        setLocations(
+                          { lat: data.lat, lng: data.lng },
+                          undefined,
+                        );
                         setPackageInfo({ pickupAddress: data.address });
                       }}
                     />
@@ -462,7 +467,10 @@ export default function DeliveryPage() {
                       initialValue={packageInfo.destinationAddress}
                       showPinpoint={false}
                       onSelect={(data) => {
-                        setLocations(undefined, { lat: data.lat, lng: data.lng });
+                        setLocations(undefined, {
+                          lat: data.lat,
+                          lng: data.lng,
+                        });
                         setPackageInfo({ destinationAddress: data.address });
                       }}
                     />

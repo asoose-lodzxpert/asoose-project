@@ -33,7 +33,7 @@ export class ApiService {
   static async request<T>(
     endpoint: string,
     options: RequestInit = {},
-    token?: string
+    token?: string,
   ): Promise<T> {
     const headers = await this.getHeaders(token);
 
@@ -83,36 +83,48 @@ export class ApiService {
     return this.request<T>(endpoint, { method: "GET" }, token);
   }
 
-  static async post<T>(endpoint: string, data?: any, token?: string): Promise<T> {
+  static async post<T>(
+    endpoint: string,
+    data?: any,
+    token?: string,
+  ): Promise<T> {
     return this.request<T>(
       endpoint,
       {
         method: "POST",
         body: data ? JSON.stringify(data) : undefined,
       },
-      token
+      token,
     );
   }
 
-  static async put<T>(endpoint: string, data?: any, token?: string): Promise<T> {
+  static async put<T>(
+    endpoint: string,
+    data?: any,
+    token?: string,
+  ): Promise<T> {
     return this.request<T>(
       endpoint,
       {
         method: "PUT",
         body: data ? JSON.stringify(data) : undefined,
       },
-      token
+      token,
     );
   }
 
-  static async patch<T>(endpoint: string, data?: any, token?: string): Promise<T> {
+  static async patch<T>(
+    endpoint: string,
+    data?: any,
+    token?: string,
+  ): Promise<T> {
     return this.request<T>(
       endpoint,
       {
         method: "PATCH",
         body: data ? JSON.stringify(data) : undefined,
       },
-      token
+      token,
     );
   }
 

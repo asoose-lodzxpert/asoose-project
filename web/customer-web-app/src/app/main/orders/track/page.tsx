@@ -1,16 +1,23 @@
-'use client';
+"use client";
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import useSWR from 'swr';
-import { io, Socket } from 'socket.io-client';
-import { 
-  ChevronLeft, Phone, User, CreditCard, 
-  Loader2, AlertCircle, RefreshCw, WifiOff, Package 
-} from 'lucide-react';
-import { getSession } from 'next-auth/react'; // ✅ Import NextAuth
-import { toast } from 'react-toastify';
-import SmartTimeline, { TimelineStep } from './component/smartTimeline';
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import { useParams, useRouter } from "next/navigation";
+import useSWR from "swr";
+import { io, Socket } from "socket.io-client";
+import {
+  ChevronLeft,
+  Phone,
+  User,
+  CreditCard,
+  Loader2,
+  AlertCircle,
+  RefreshCw,
+  WifiOff,
+  Package,
+} from "lucide-react";
+import { getSession } from "next-auth/react"; // ✅ Import NextAuth
+import { toast } from "react-toastify";
+import SmartTimeline, { TimelineStep } from "./component/smartTimeline";
 
 // --- Configuration ---
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
@@ -22,11 +29,11 @@ interface OrderData {
   id: string;
   status: string;
   total: number;
-  
+
   // ✅ Backend provided metrics
-  eta: string | null;       
-  distance: string | null;  
-  
+  eta: string | null;
+  distance: string | null;
+
   timeline: TimelineStep[];
   items: { id: string; name: string; qty: number; price: number }[];
   rider?: {
@@ -42,19 +49,19 @@ interface ApiError {
 
 // --- Fetcher ---
 const fetcher = async (url: string): Promise<OrderData> => {
-  if (!API_URL) throw new Error('API URL not configured');
-  
+  if (!API_URL) throw new Error("API URL not configured");
+
   // ✅ Use NextAuth getSession
   const session = await getSession();
   const token = (session as any)?.accessToken;
 
-  if (!token) throw new Error('Authentication required');
-  
+  if (!token) throw new Error("Authentication required");
+
   const res = await fetch(`${API_URL}${url}`, {
-    headers: { 'Authorization': `Bearer ${token}` } // ✅ Use NextAuth Token
+    headers: { Authorization: `Bearer ${token}` }, // ✅ Use NextAuth Token
   });
-  
-  if (!res.ok) throw new Error('Failed to fetch order');
+
+  if (!res.ok) throw new Error("Failed to fetch order");
   return res.json();
 };
 
@@ -62,28 +69,28 @@ export default function TrackOrderPage() {
   const params = useParams();
   const router = useRouter();
   const orderId = params.id as string;
-  
+
   // State
   const [socket, setSocket] = useState<Socket | null>(null);
   const [socketConnected, setSocketConnected] = useState(false);
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [reconnectAttempts, setReconnectAttempts] = useState(0);
-  
+
   const socketRef = useRef<Socket | null>(null);
 
   // --- Data Fetching ---
-  const { 
-    data: order, 
-    error: fetchError, 
+  const {
+    data: order,
+    error: fetchError,
     isLoading,
-    mutate: updateOrder 
+    mutate: updateOrder,
   } = useSWR<OrderData, ApiError>(
-    orderId ? `/api/orders/${orderId}` : null, 
+    orderId ? `/api/orders/${orderId}` : null,
     fetcher,
-    { 
+    {
       revalidateOnFocus: false,
       shouldRetryOnError: true,
-    }
+    },
   );
 
   // --- Socket Connection ---
@@ -97,56 +104,63 @@ export default function TrackOrderPage() {
       const token = (session as any)?.accessToken;
 
       if (!token) {
-        setConnectionError('Authentication failed');
+        setConnectionError("Authentication failed");
         return;
       }
 
       const newSocket = io(API_URL, {
         auth: { token }, // ✅ Pass NextAuth Token to Socket
         reconnectionAttempts: MAX_RECONNECT_ATTEMPTS,
-        timeout: 10000
+        timeout: 10000,
       });
 
-      newSocket.on('connect', () => {
+      newSocket.on("connect", () => {
         setSocketConnected(true);
         setConnectionError(null);
         setReconnectAttempts(0);
-        newSocket.emit('joinOrderRoom', { orderId });
+        newSocket.emit("joinOrderRoom", { orderId });
       });
 
-      newSocket.on('disconnect', () => setSocketConnected(false));
-      
-      newSocket.on('connect_error', () => {
-        setConnectionError('Connection lost. Retrying...');
-        setReconnectAttempts(prev => prev + 1);
+      newSocket.on("disconnect", () => setSocketConnected(false));
+
+      newSocket.on("connect_error", () => {
+        setConnectionError("Connection lost. Retrying...");
+        setReconnectAttempts((prev) => prev + 1);
       });
 
       // ✅ Listen for Smart Updates from Backend
       newSocket.on(`order_update_${orderId}`, (data: Partial<OrderData>) => {
-        if (data.status) toast.info(`Status: ${data.status.replace(/_/g, ' ')}`);
-        
+        if (data.status)
+          toast.info(`Status: ${data.status.replace(/_/g, " ")}`);
+
         updateOrder((prev) => {
           if (!prev) return prev;
-          return { 
-            ...prev, 
+          return {
+            ...prev,
             ...data,
             // Merge timeline intelligently if needed, or just replace
-            timeline: data.timeline || prev.timeline 
+            timeline: data.timeline || prev.timeline,
           };
         }, false);
       });
 
       // ✅ Listen for specific Trip Updates (ETA/Distance)
-      newSocket.on(`trip_update_${orderId}`, (data: { eta: string; distance: string }) => {
-         updateOrder((prev) => prev ? { ...prev, eta: data.eta, distance: data.distance } : prev, false);
-      });
+      newSocket.on(
+        `trip_update_${orderId}`,
+        (data: { eta: string; distance: string }) => {
+          updateOrder(
+            (prev) =>
+              prev ? { ...prev, eta: data.eta, distance: data.distance } : prev,
+            false,
+          );
+        },
+      );
 
       socketRef.current = newSocket;
       setSocket(newSocket);
-
     } catch (error) {
-      console.error('Socket error:', error);
-      setConnectionError('Failed to connect');
+      console.error("Socket error:", error);
+      setConnectionError("Failed to connect");
     }
   }, [orderId, updateOrder]);
 
@@ -175,7 +189,12 @@ export default function TrackOrderPage() {
         <div className="bg-white rounded-2xl p-8 shadow-lg max-w-md w-full text-center">
           <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
           <h2 className="text-xl font-bold mb-2">Unable to Load Order</h2>
-          <button onClick={() => router.back()} className="text-blue-600 underline">Back</button>
+          <button
+            onClick={() => router.back()}
+            className="text-blue-600 underline"
+          >
+            Back
+          </button>
         </div>
       </div>
     );
@@ -183,16 +202,20 @@ export default function TrackOrderPage() {
 
   return (
     <div className="min-h-screen bg-gray-100 pb-20">
-      
       {/* Header */}
       <header className="bg-white shadow-sm sticky top-0 z-20 px-4 py-4 flex items-center gap-4">
-        <button onClick={() => router.back()} className="p-2 hover:bg-gray-100 rounded-full">
+        <button
+          onClick={() => router.back()}
+          className="p-2 hover:bg-gray-100 rounded-full"
+        >
           <ChevronLeft className="w-5 h-5 text-gray-600" />
         </button>
         <div className="flex-1">
           <h1 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-            Track Order 
-            {socketConnected && <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />}
+            Track Order
+            {socketConnected && (
+              <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+            )}
           </h1>
           <p className="text-xs text-gray-500">#{order.id.slice(0, 8)}</p>
         </div>
@@ -205,16 +228,18 @@ export default function TrackOrderPage() {
             <WifiOff className="w-4 h-4" />
             <span>{connectionError}</span>
           </div>
-          <button onClick={() => connectSocket()} className="flex items-center gap-1 text-yellow-700 text-sm font-medium">
+          <button
+            onClick={() => connectSocket()}
+            className="flex items-center gap-1 text-yellow-700 text-sm font-medium"
+          >
             <RefreshCw className="w-4 h-4" /> Retry
           </button>
         </div>
       )}
 
       <main className="max-w-3xl mx-auto p-4 space-y-6">
-
         {/* ✅ Smart Timeline Implementation */}
-        <SmartTimeline 
+        <SmartTimeline
           status={order.status}
           eta={order.eta}
           distance={order.distance}
@@ -234,7 +259,10 @@ export default function TrackOrderPage() {
                 <p className="text-xs text-gray-500">{order.rider.vehicle}</p>
               </div>
             </div>
-            <a href={`tel:${order.rider.phone}`} className="p-3 bg-green-50 text-green-600 rounded-full hover:bg-green-100">
+            <a
+              href={`tel:${order.rider.phone}`}
+              className="p-3 bg-green-50 text-green-600 rounded-full hover:bg-green-100"
+            >
               <Phone className="w-5 h-5" />
             </a>
           </section>
@@ -250,9 +278,12 @@ export default function TrackOrderPage() {
             {order.items.map((item) => (
               <div key={item.id} className="flex justify-between text-sm">
                 <span className="text-gray-600">
-                  <span className="font-bold text-gray-900">x{item.qty}</span> {item.name}
+                  <span className="font-bold text-gray-900">x{item.qty}</span>{" "}
+                  {item.name}
                 </span>
-                <span className="font-medium text-gray-900">₦{item.price.toLocaleString()}</span>
+                <span className="font-medium text-gray-900">
+                  ₦{item.price.toLocaleString()}
+                </span>
               </div>
             ))}
           </div>
@@ -261,10 +292,11 @@ export default function TrackOrderPage() {
               <CreditCard className="w-4 h-4" />
               <span>Paid via Card</span>
             </div>
-            <p className="text-xl font-bold text-gray-900">₦{order.total.toLocaleString()}</p>
+            <p className="text-xl font-bold text-gray-900">
+              ₦{order.total.toLocaleString()}
+            </p>
           </div>
         </section>
-
       </main>
     </div>
   );

@@ -3,7 +3,10 @@ import { TripsService } from '../users/trips/trips.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { UserStatus } from '@prisma/client'; // Import Enum for type safety
 
-@Controller('test')
+@Controller({
+  path: 'test',
+  version: '1',
+})
 export class TestController {
   constructor(
     private readonly tripsService: TripsService,

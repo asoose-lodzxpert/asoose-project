@@ -5,8 +5,17 @@ import {
   ActivityIndicator,
   RefreshControl,
   View,
+  Dimensions,
+  DimensionValue,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withRepeat,
+  withTiming,
+  Easing,
+} from "react-native-reanimated";
 
 import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
@@ -19,10 +28,13 @@ import { ActionTabs } from "@/components/store/ActionTabs";
 import { CategoryFilter } from "@/components/store/CategoryFilter";
 import { ProductList } from "@/components/store/ProductList";
 import { StoreInfo } from "@/components/store/StoreInfo";
+import { ReviewModal } from "@/components/store/ReviewModal";
 import type { StoreData, Product } from "@/types/store-types";
 
 import { useCart } from "@/context/CartContext";
 import { useToast } from "@/components/ui/ThemedToast";
+
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 type TabType = "all" | "favorites" | "info";
 
@@ -34,11 +46,14 @@ export default function StoreScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [reviewModalVisible, setReviewModalVisible] = useState(false);
 
   const [currentTab, setCurrentTab] = useState<TabType>("all");
   const [activeCategory, setActiveCategory] = useState("Popular");
+  const [searchValue, setSearchValue] = useState("");
 
-  const primary = useThemeColor({}, "brandPrimary");
+  const border = useThemeColor({}, "borderDefault");
+  const surfaceSubtle = useThemeColor({}, "surfaceSubtle");
 
   const loadStore = useCallback(async () => {
     if (!slug || typeof slug !== "string") {
@@ -95,21 +110,119 @@ export default function StoreScreen() {
         await addItem({
           id: product.id,
           name: product.name,
-          image: product.images[0],
+          image:
+            Array.isArray(product.images) && product.images.length > 0
+              ? product.images[0]
+              : null,
           price: product.price,
           qty: 1,
           vendorId: storeData.id,
-          description: product.description,
+          description:
+            typeof product.description === "string" ? product.description : "",
           available: true,
         });
       } catch (e) {
         showToast({
           variant: "error",
-          message: "Could not add to cart. Please try again.",
+          message:
+            "Could not add to cart. Please try again." +
+            (e instanceof Error ? e.message : ""),
         });
       }
     },
     [addItem, storeData, showToast],
+  );
+
+  /* ---------------- Skeleton Components ---------------- */
+  const SkeletonLine = ({
+    width = "100%",
+    height = 14,
+    radius = 8,
+  }: {
+    width?: DimensionValue;
+    height?: number;
+    radius?: number;
+  }) => {
+    const progress = useSharedValue(-SCREEN_WIDTH);
+
+    const animatedStyle = useAnimatedStyle(() => ({
+      transform: [{ translateX: progress.value }],
+    }));
+
+    useEffect(() => {
+      progress.value = withRepeat(
+        withTiming(SCREEN_WIDTH, { duration: 1400, easing: Easing.linear }),
+        -1,
+        false,
+      );
+    }, []);
+
+    return (
+      <View
+        style={{
+          width,
+          height,
+          borderRadius: radius,
+          backgroundColor: surfaceSubtle,
+          overflow: "hidden",
+        }}
+      >
+        <Animated.View
+          style={[
+            {
+              width: "40%",
+              height: "100%",
+              backgroundColor: border,
+              opacity: 0.4,
+            },
+            animatedStyle,
+          ]}
+        />
+      </View>
+    );
+  };
+
+  const SkeletonHero = () => (
+    <View style={styles.skeletonHero}>
+      <SkeletonLine width="100%" height={240} radius={0} />
+    </View>
+  );
+
+  const SkeletonBanner = () => (
+    <View style={styles.skeletonBanner}>
+      <SkeletonLine width="80%" height={16} />
+    </View>
+  );
+
+  const SkeletonTabs = () => (
+    <View style={styles.skeletonTabs}>
+      {[1, 2, 3].map((i) => (
+        <SkeletonLine key={i} width={80} height={36} radius={18} />
+      ))}
+    </View>
+  );
+
+  const SkeletonCategories = () => (
+    <View style={styles.skeletonCategories}>
+      {[1, 2, 3, 4].map((i) => (
+        <SkeletonLine key={i} width={100} height={32} radius={16} />
+      ))}
+    </View>
+  );
+
+  const SkeletonProducts = () => (
+    <View style={styles.skeletonProducts}>
+      {[1, 2, 3, 4].map((i) => (
+        <View key={i} style={styles.skeletonProduct}>
+          <SkeletonLine width={120} height={120} radius={12} />
+          <View style={{ flex: 1, gap: 8 }}>
+            <SkeletonLine width="80%" height={16} />
+            <SkeletonLine width="60%" height={14} />
+            <SkeletonLine width="40%" height={18} />
+          </View>
+        </View>
+      ))}
+    </View>
   );
 
   const renderContent = () => {
@@ -119,8 +232,17 @@ export default function StoreScreen() {
       return (
         <>
           <PromoBanner promoText="20% off orders over ₦5000 🎉" />
-          <ActionTabs currentTab={currentTab} onTabChange={setCurrentTab} />
-          <StoreInfo store={storeData} reviews={storeData.reviews} />
+          <ActionTabs
+            currentTab={currentTab}
+            onTabChange={setCurrentTab}
+            searchValue={searchValue}
+            onSearchChange={setSearchValue}
+          />
+          <StoreInfo
+            store={storeData}
+            reviews={storeData.reviews}
+            onWriteReview={() => setReviewModalVisible(true)}
+          />
         </>
       );
     }
@@ -128,7 +250,12 @@ export default function StoreScreen() {
     return (
       <>
         <PromoBanner promoText="20% off orders over ₦5000 🎉" />
-        <ActionTabs currentTab={currentTab} onTabChange={setCurrentTab} />
+        <ActionTabs
+          currentTab={currentTab}
+          onTabChange={setCurrentTab}
+          searchValue={searchValue}
+          onSearchChange={setSearchValue}
+        />
         <CategoryFilter
           categories={categories}
           activeCategory={activeCategory}
@@ -148,8 +275,14 @@ export default function StoreScreen() {
 
   if (loading) {
     return (
-      <ThemedView style={[styles.container, styles.center]}>
-        <ActivityIndicator size="large" color={primary} />
+      <ThemedView style={styles.container}>
+        <ScrollView showsVerticalScrollIndicator={false}>
+          <SkeletonHero />
+          <SkeletonBanner />
+          <SkeletonTabs />
+          <SkeletonCategories />
+          <SkeletonProducts />
+        </ScrollView>
       </ThemedView>
     );
   }
@@ -179,11 +312,7 @@ export default function StoreScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <StoreHero
-        store={storeData}
-        onBack={() => router.back()}
-        onShare={() => console.log("Share")}
-      />
+      <StoreHero store={storeData} onBack={() => router.back()} />
 
       <ScrollView
         style={styles.contentContainer}
@@ -196,6 +325,18 @@ export default function StoreScreen() {
       </ScrollView>
 
       <FloatingCart />
+
+      {storeData && (
+        <ReviewModal
+          visible={reviewModalVisible}
+          onClose={() => setReviewModalVisible(false)}
+          storeId={storeData.id}
+          storeName={storeData.name}
+          onSuccess={() => {
+            loadStore();
+          }}
+        />
+      )}
     </ThemedView>
   );
 }
@@ -222,5 +363,39 @@ const styles = StyleSheet.create({
     fontSize: 14,
     opacity: 0.7,
     textAlign: "center",
+  },
+  skeletonHero: {
+    width: "100%",
+    height: 240,
+    marginBottom: 0,
+  },
+  skeletonBanner: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    alignItems: "center",
+    backgroundColor: "transparent",
+  },
+  skeletonTabs: {
+    flexDirection: "row",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 12,
+  },
+  skeletonCategories: {
+    flexDirection: "row",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 8,
+  },
+  skeletonProducts: {
+    padding: 16,
+    gap: 16,
+  },
+  skeletonProduct: {
+    flexDirection: "row",
+    gap: 12,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: "transparent",
   },
 });

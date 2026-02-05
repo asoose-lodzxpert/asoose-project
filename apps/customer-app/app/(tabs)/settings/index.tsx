@@ -36,7 +36,7 @@ export default function SettingsScreen() {
   const accentRed = useThemeColor({}, "statusError");
   const accentBlue = useThemeColor({}, "brandPrimary");
   const accentGreen = useThemeColor({}, "statusSuccess");
-  const textOnPrimary = useThemeColor({}, "textOnPrimary");
+  const textPrimary = useThemeColor({}, "textPrimary");
 
   const { user, logout } = useAuth();
   const router = useRouter();
@@ -76,17 +76,9 @@ export default function SettingsScreen() {
     setRefreshing(false);
   }, [loadProfile]);
 
-  const displayName = profile?.name ?? user?.name;
-  const displayPhone = profile?.phone ?? user?.phone;
-  const displayEmail = profile?.email ?? user?.email;
+  const displayName = profile?.name ?? user?.name ?? "User";
+  const displaySubtitle = profile?.email ?? profile?.phone ?? user?.email ?? "";
   const displayAvatar = profile?.avatarUrl ?? user?.avatarUrl;
-  const joinedDate = profile?.createdAt
-    ? new Date(profile.createdAt).toLocaleDateString(undefined, {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      })
-    : null;
 
   const handleLogout = async () => {
     const ok = await showConfirm({
@@ -117,77 +109,73 @@ export default function SettingsScreen() {
           />
         }
       >
-        {/* Profile */}
+        {/* --- REDESIGNED PROFILE CARD --- */}
+        <View style={styles.headerContainer}>
+          <ThemedText type="title" style={{ fontSize: 32, marginBottom: 16 }}>
+            Settings
+          </ThemedText>
+        </View>
+
         <Pressable
-          style={[styles.heroCard, { backgroundColor: primary }]}
+          style={[
+            styles.profileCard,
+            { backgroundColor: card, borderColor: border },
+          ]}
           onPress={() => router.push("/(settings)/profile")}
         >
-          <View style={styles.heroContent}>
-            <View
-              style={[
-                styles.avatarWrap,
-                { borderColor: textOnPrimary, backgroundColor: textOnPrimary },
-              ]}
-            >
+          <View style={styles.profileRow}>
+            {/* Avatar */}
+            <View style={[styles.avatarContainer, { borderColor: border }]}>
               <Image
                 source={
                   displayAvatar
                     ? { uri: displayAvatar }
                     : require("@/assets/default-avatar.png")
                 }
-                style={styles.avatar}
+                style={styles.avatarImage}
               />
             </View>
 
-            <ThemedText
-              type="title"
-              style={[styles.heroName, { color: textOnPrimary }]}
-            >
-              {displayName ? `Hey, ${displayName}!` : "Hey there!"}
-            </ThemedText>
-
-            {displayPhone && (
-              <ThemedText type="caption" style={{ color: textOnPrimary }}>
-                {displayPhone}
-              </ThemedText>
-            )}
-
-            {displayEmail && (
-              <ThemedText type="caption" style={{ color: textOnPrimary }}>
-                {displayEmail}
-              </ThemedText>
-            )}
-
-            {joinedDate && (
-              <ThemedText type="caption" style={{ color: textOnPrimary }}>
-                Member since {joinedDate}
-              </ThemedText>
-            )}
-
-            {profileLoading && (
-              <ActivityIndicator
-                color={textOnPrimary}
-                style={{ marginTop: 12 }}
-              />
-            )}
-
-            {profileError && !profileLoading && (
-              <ThemedText
-                type="caption"
-                style={[styles.heroError, { color: textOnPrimary }]}
+            {/* Info */}
+            <View style={styles.profileInfo}>
+              <View
+                style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
               >
-                {profileError}
-              </ThemedText>
-            )}
+                <ThemedText style={styles.profileName} numberOfLines={1}>
+                  {displayName}
+                </ThemedText>
+                {profileLoading && (
+                  <ActivityIndicator size="small" color={primary} />
+                )}
+              </View>
 
-            <IconSymbol
-              name="chevron.right"
-              size={18}
-              color={textOnPrimary}
-              style={styles.heroChevron}
-            />
+              {profileError ? (
+                <ThemedText style={{ color: accentRed, fontSize: 13 }}>
+                  {profileError}
+                </ThemedText>
+              ) : (
+                <ThemedText
+                  style={{ color: muted, fontSize: 14 }}
+                  numberOfLines={1}
+                >
+                  {displaySubtitle}
+                </ThemedText>
+              )}
+
+              <View style={styles.editBadge}>
+                <ThemedText
+                  style={{ color: primary, fontSize: 12, fontWeight: "600" }}
+                >
+                  Edit Profile
+                </ThemedText>
+              </View>
+            </View>
+
+            {/* Arrow */}
+            <IconSymbol name="chevron.right" size={20} color={muted} />
           </View>
         </Pressable>
+        {/* ------------------------------- */}
 
         {/* Your Account */}
         <ThemedView
@@ -202,12 +190,12 @@ export default function SettingsScreen() {
 
           <Pressable
             style={[styles.row, { borderBottomColor: border }]}
-            onPress={() => router.push("/payment-methods" as any)}
+            onPress={() => router.push("/(settings)/payment-methods")}
           >
             <View
-              style={[styles.iconBox, { backgroundColor: accentRed + "22" }]}
+              style={[styles.iconBox, { backgroundColor: accentRed + "15" }]}
             >
-              <IconSymbol name="credit-card" size={18} color={primary} />
+              <IconSymbol name="credit-card" size={18} color={accentRed} />
             </View>
             <View style={styles.rowTextWrap}>
               <ThemedText style={styles.rowLabel}>Payment Methods</ThemedText>
@@ -221,9 +209,9 @@ export default function SettingsScreen() {
             onPress={() => router.push("/(settings)/addresses")}
           >
             <View
-              style={[styles.iconBox, { backgroundColor: accentBlue + "22" }]}
+              style={[styles.iconBox, { backgroundColor: accentBlue + "15" }]}
             >
-              <IconSymbol name="location" size={18} color={primary} />
+              <IconSymbol name="location" size={18} color={accentBlue} />
             </View>
             <View style={styles.rowTextWrap}>
               <ThemedText style={styles.rowLabel}>Addresses</ThemedText>
@@ -233,6 +221,7 @@ export default function SettingsScreen() {
           </Pressable>
         </ThemedView>
 
+        {/* Activity & History */}
         <ThemedView
           style={[
             styles.sectionGroup,
@@ -248,9 +237,9 @@ export default function SettingsScreen() {
             onPress={() => router.push("/(settings)/order-history-screen")}
           >
             <View
-              style={[styles.iconBox, { backgroundColor: accentGreen + "22" }]}
+              style={[styles.iconBox, { backgroundColor: accentGreen + "15" }]}
             >
-              <IconSymbol name="shopping-bag" size={18} color={primary} />
+              <IconSymbol name="shopping-bag" size={18} color={accentGreen} />
             </View>
             <View style={styles.rowTextWrap}>
               <ThemedText style={styles.rowLabel}>Orders</ThemedText>
@@ -261,12 +250,12 @@ export default function SettingsScreen() {
 
           <Pressable
             style={[styles.row, { borderBottomColor: border }]}
-            onPress={() => router.push("/rides" as any)}
+            onPress={() => router.push("/(settings)/rides")}
           >
             <View
-              style={[styles.iconBox, { backgroundColor: accentGreen + "22" }]}
+              style={[styles.iconBox, { backgroundColor: accentGreen + "15" }]}
             >
-              <IconSymbol name="car" size={18} color={primary} />
+              <IconSymbol name="car" size={18} color={accentGreen} />
             </View>
             <View style={styles.rowTextWrap}>
               <ThemedText style={styles.rowLabel}>Rides</ThemedText>
@@ -280,9 +269,9 @@ export default function SettingsScreen() {
             onPress={() => router.push("/(delivery)/history")}
           >
             <View
-              style={[styles.iconBox, { backgroundColor: accentGreen + "22" }]}
+              style={[styles.iconBox, { backgroundColor: accentGreen + "15" }]}
             >
-              <IconSymbol name="truck" size={18} color={primary} />
+              <IconSymbol name="truck" size={18} color={accentGreen} />
             </View>
             <View style={styles.rowTextWrap}>
               <ThemedText style={styles.rowLabel}>Deliveries</ThemedText>
@@ -300,7 +289,7 @@ export default function SettingsScreen() {
           ]}
         >
           <ThemedText type="subtitle" style={styles.sectionTitle}>
-            Account Settings
+            Preferences
           </ThemedText>
 
           <Pressable
@@ -308,14 +297,12 @@ export default function SettingsScreen() {
             onPress={() => router.push("/(settings)/notifications")}
           >
             <View
-              style={[styles.iconBox, { backgroundColor: accentBlue + "22" }]}
+              style={[styles.iconBox, { backgroundColor: accentBlue + "15" }]}
             >
-              <IconSymbol name="bell" size={18} color={primary} />
+              <IconSymbol name="bell" size={18} color={accentBlue} />
             </View>
             <View style={styles.rowTextWrap}>
-              <ThemedText style={styles.rowLabel}>
-                Notification Preferences
-              </ThemedText>
+              <ThemedText style={styles.rowLabel}>Notifications</ThemedText>
               <ThemedText type="caption">Push, email and SMS</ThemedText>
             </View>
             <IconSymbol name="chevron.right" size={18} color={muted} />
@@ -326,9 +313,9 @@ export default function SettingsScreen() {
             onPress={() => router.push("/(settings)/emergency-contact")}
           >
             <View
-              style={[styles.iconBox, { backgroundColor: accentGreen + "22" }]}
+              style={[styles.iconBox, { backgroundColor: accentRed + "15" }]}
             >
-              <IconSymbol name="phone" size={18} color={primary} />
+              <IconSymbol name="phone" size={18} color={accentRed} />
             </View>
             <View style={styles.rowTextWrap}>
               <ThemedText style={styles.rowLabel}>Emergency Contact</ThemedText>
@@ -342,17 +329,15 @@ export default function SettingsScreen() {
             onPress={() => router.push("/(settings)/delete-account")}
           >
             <View
-              style={[styles.iconBox, { backgroundColor: accentRed + "22" }]}
+              style={[styles.iconBox, { backgroundColor: accentRed + "15" }]}
             >
-              <IconSymbol name="delete" size={18} color={accentRed} />
+              <IconSymbol name="trash" size={18} color={accentRed} />
             </View>
             <View style={styles.rowTextWrap}>
               <ThemedText style={[styles.rowLabel, { color: accentRed }]}>
                 Delete Account
               </ThemedText>
-              <ThemedText type="caption">
-                Permanently remove your account
-              </ThemedText>
+              <ThemedText type="caption">Permanently remove account</ThemedText>
             </View>
           </Pressable>
         </ThemedView>
@@ -381,58 +366,64 @@ export default function SettingsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  scrollContent: { paddingBottom: 32 },
+  scrollContent: { paddingBottom: 40 },
+  headerContainer: { paddingHorizontal: 20, paddingTop: 10 },
 
-  heroCard: {
-    marginTop: Platform.OS === "ios" ? 24 : 16,
+  // --- New Profile Card Styles ---
+  profileCard: {
     marginHorizontal: 16,
     borderRadius: 16,
+    borderWidth: 1,
+    padding: 16,
+    marginBottom: 8,
+  },
+  profileRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  avatarContainer: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    borderWidth: 1,
     overflow: "hidden",
   },
-  heroContent: {
-    padding: 16,
-    alignItems: "center",
+  avatarImage: {
+    width: "100%",
+    height: "100%",
   },
-  avatarWrap: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    borderWidth: 3,
-    alignItems: "center",
+  profileInfo: {
+    flex: 1,
+    marginLeft: 16,
     justifyContent: "center",
   },
-  avatar: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-  },
-  heroName: {
-    fontSize: 20,
+  profileName: {
+    fontSize: 18,
     fontWeight: "700",
-    marginTop: 8,
+    marginBottom: 2,
   },
-  heroError: {
-    marginTop: 12,
-    textAlign: "center",
-    fontWeight: "600",
+  editBadge: {
+    marginTop: 4,
+    alignSelf: "flex-start",
   },
-  heroChevron: {
-    position: "absolute",
-    right: 16,
-    top: 16,
-  },
+  // -------------------------------
 
   sectionGroup: {
-    marginTop: 24,
+    marginTop: 20,
     marginHorizontal: 16,
     borderRadius: 14,
     borderWidth: 1,
+    overflow: "hidden",
   },
   sectionTitle: {
     marginLeft: 16,
-    marginTop: 12,
-    fontSize: 14,
-    fontWeight: "600",
+    marginTop: 16,
+    marginBottom: 8,
+    fontSize: 13,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    opacity: 0.6,
+    letterSpacing: 0.5,
   },
 
   row: {
@@ -450,15 +441,16 @@ const styles = StyleSheet.create({
   },
   rowTextWrap: {
     flex: 1,
-    marginLeft: 12,
+    marginLeft: 14,
   },
   rowLabel: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: "500",
+    marginBottom: 2,
   },
   iconBox: {
-    width: 34,
-    height: 34,
+    width: 36,
+    height: 36,
     borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
@@ -467,15 +459,15 @@ const styles = StyleSheet.create({
   logoutButton: {
     marginTop: 32,
     marginHorizontal: 16,
-    paddingVertical: 14,
-    borderRadius: 12,
+    paddingVertical: 16,
+    borderRadius: 14,
     borderWidth: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
   },
   logoutText: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: "600",
   },
 });

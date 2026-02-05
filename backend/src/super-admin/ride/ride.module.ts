@@ -6,10 +6,7 @@ import { TransactionsModule } from '../transactions/transaction.module';
 import { TripsModule } from 'src/users/trips/trips.module'; // ✅ Import TripsModule
 
 @Module({
-  imports: [
-    TransactionsModule,
-    TripsModule, 
-  ],
+  imports: [TransactionsModule, TripsModule],
   controllers: [RidesController],
   providers: [RidesService, PrismaService],
   exports: [RidesService],

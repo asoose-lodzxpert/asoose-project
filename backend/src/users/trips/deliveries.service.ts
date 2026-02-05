@@ -9,10 +9,10 @@ import {
 } from '@nestjs/common';
 import {
   DeliveryStatus,
-  TransactionType,
-  TransactionStatus,
-  WalletEntityType,
   PaymentStatus,
+  TransactionStatus,
+  TransactionType,
+  WalletEntityType,
 } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { GeoService } from '../../matching/geo/geo.service';
@@ -21,6 +21,7 @@ import { QueueService } from '../../matching/queue/queue.service';
 import { NotificationsGateway } from '../../notifications/notifications.gateway';
 import { RequestDeliveryDto, CancelTripDto } from './dto/trip.dto';
 import { TripsCommonService, TRIPS_CONFIG } from './trips.common.service';
+import { deliveryToJobSummary } from '../../jobs/job.dto';
 
 @Injectable()
 export class DeliveriesService {
@@ -35,7 +36,80 @@ export class DeliveriesService {
     private readonly common: TripsCommonService,
   ) {}
 
+  // --- JOBS SERVICE STUBS ---
+  async findActiveDeliveryForRider(riderId: string): Promise<any> {
+    // TODO: Implement actual logic
+    return null;
+  }
+
+  async findIncomingDeliveriesForRider(riderId: string): Promise<any[]> {
+    // TODO: Implement actual logic
+    return [];
+  }
+
+  async updateDeliveryStatus(deliveryId: string, status: string): Promise<any> {
+    // TODO: Implement actual logic
+    return null;
+  }
+
+  async declineDelivery(deliveryId: string, riderId: string): Promise<any> {
+    // TODO: Implement actual logic
+    return { success: false };
+  }
+
+  async arrivePickup(deliveryId: string, riderId: string): Promise<any> {
+    // TODO: Implement actual logic
+    return { success: false };
+  }
+
+  async confirmPickup(deliveryId: string, riderId: string): Promise<any> {
+    // TODO: Implement actual logic
+    return { success: false };
+  }
+
+  async arriveDropoff(deliveryId: string, riderId: string): Promise<any> {
+    // TODO: Implement actual logic
+    return { success: false };
+  }
+
+  /**
+   * Parse address string to extract city and state
+   * Expected format: "Street, City, State" or "Street, City"
+   */
+  private parseAddress(fullAddress: string): {
+    street: string;
+    city: string;
+    state: string;
+  } {
+    const parts = fullAddress.split(',').map((p) => p.trim());
+
+    if (parts.length >= 3) {
+      // Format: "Street, City, State"
+      return {
+        street: parts[0] || fullAddress,
+        city: parts[1] || '',
+        state: parts[2] || '',
+      };
+    } else if (parts.length === 2) {
+      // Format: "Street, City"
+      return {
+        street: parts[0] || fullAddress,
+        city: parts[1] || '',
+        state: '',
+      };
+    } else {
+      // Single string, treat as street
+      return {
+        street: fullAddress,
+        city: '',
+        state: '',
+      };
+    }
+  }
+
   async requestDelivery(userId: string, dto: RequestDeliveryDto) {
+    this.logger.debug(`Request delivery DTO: ${JSON.stringify(dto, null, 2)}`);
+
     if (
       dto.weightKg &&
       (dto.weightKg < TRIPS_CONFIG.MIN_DELIVERY_WEIGHT_KG ||
@@ -53,16 +127,71 @@ export class DeliveriesService {
           throw new ForbiddenException('Invalid order link');
       }
 
-      const [pickupAddress, dropoffAddress] = await Promise.all([
-        tx.address.findUnique({ where: { id: dto.pickupAddressId } }),
-        tx.address.findUnique({ where: { id: dto.dropoffAddressId } }),
-      ]);
+      let pickupAddress: any;
+      let dropoffAddress: any;
 
-      if (!pickupAddress || pickupAddress.userId !== userId) {
-        throw new BadRequestException('Invalid pickup address');
+      // If address IDs are provided, use them
+      if (dto.pickupAddressId && dto.dropoffAddressId) {
+        [pickupAddress, dropoffAddress] = await Promise.all([
+          tx.address.findUnique({ where: { id: dto.pickupAddressId } }),
+          tx.address.findUnique({ where: { id: dto.dropoffAddressId } }),
+        ]);
+
+        if (!pickupAddress || pickupAddress.userId !== userId) {
+          throw new BadRequestException('Invalid pickup address');
+        }
+        if (!dropoffAddress || dropoffAddress.userId !== userId) {
+          throw new BadRequestException('Invalid dropoff address');
+        }
       }
-      if (!dropoffAddress || dropoffAddress.userId !== userId) {
-        throw new BadRequestException('Invalid dropoff address');
+
+      // Otherwise, create new addresses from location data
+      else if (dto.pickupLocation && dto.dropoffLocation) {
+        if (
+          !this.geo.validateCoordinates(
+            dto.pickupLocation.latitude,
+            dto.pickupLocation.longitude,
+          ) ||
+          !this.geo.validateCoordinates(
+            dto.dropoffLocation.latitude,
+            dto.dropoffLocation.longitude,
+          )
+        ) {
+          throw new BadRequestException('Invalid coordinates');
+        }
+
+        // Create addresses for the delivery
+        const pickupParsed = this.parseAddress(dto.pickupLocation.address);
+        const dropoffParsed = this.parseAddress(dto.dropoffLocation.address);
+
+        [pickupAddress, dropoffAddress] = await Promise.all([
+          tx.address.create({
+            data: {
+              userId,
+              street: pickupParsed.street,
+              city: pickupParsed.city,
+              state: pickupParsed.state,
+              lat: dto.pickupLocation.latitude,
+              lng: dto.pickupLocation.longitude,
+              label: 'Pickup Location',
+            },
+          }),
+          tx.address.create({
+            data: {
+              userId,
+              street: dropoffParsed.street,
+              city: dropoffParsed.city,
+              state: dropoffParsed.state,
+              lat: dto.dropoffLocation.latitude,
+              lng: dto.dropoffLocation.longitude,
+              label: 'Dropoff Location',
+            },
+          }),
+        ]);
+      } else {
+        throw new BadRequestException(
+          'Either address IDs or location coordinates must be provided',
+        );
       }
 
       if (
@@ -90,8 +219,8 @@ export class DeliveriesService {
         data: {
           customerId: userId,
           orderId: dto.orderId,
-          pickupAddressId: dto.pickupAddressId,
-          dropoffAddressId: dto.dropoffAddressId,
+          pickupAddressId: pickupAddress.id,
+          dropoffAddressId: dropoffAddress.id,
           status: DeliveryStatus.PENDING,
           deliveryFee: this.common.round(deliveryFee),
           distanceKm: this.common.round(distanceKm),
@@ -105,6 +234,7 @@ export class DeliveriesService {
 
       return {
         delivery,
+        deliveryId: delivery.id,
         deliveryFee: delivery.deliveryFee,
         distance: delivery.distanceKm,
         message: 'Delivery request created',
@@ -175,27 +305,10 @@ export class DeliveriesService {
       }
     }
 
-    const eventPayload = {
-      deliveryId: delivery.id,
-      customerId: delivery.customerId,
-      orderId: delivery.orderId || undefined,
-      pickupLat: delivery.pickupAddress.lat,
-      pickupLng: delivery.pickupAddress.lng,
-      dropoffLat: delivery.dropoffAddress.lat,
-      dropoffLng: delivery.dropoffAddress.lng,
-      distanceKm: delivery.distanceKm || 0,
-      deliveryFee: Number(delivery.deliveryFee),
-      packageDetails: delivery.packageDetails || undefined,
-      recipientName: delivery.recipientName,
-      recipientPhone: delivery.recipientPhone,
-      timestamp: Date.now(),
-    };
-
+    const job = deliveryToJobSummary(delivery);
+    const eventPayload = { job, attempt: 1 };
     this.eventBus.emitDeliveryRequested(eventPayload);
-    await this.queue.enqueueDeliveryMatching({
-      ...eventPayload,
-      attempt: 1,
-    });
+    await this.queue.enqueueDeliveryMatching(eventPayload);
 
     return {
       message: 'Delivery matching started',
@@ -208,33 +321,14 @@ export class DeliveriesService {
 
     const result = await this.prisma.delivery.updateMany({
       where: { id: deliveryId, status: DeliveryStatus.REQUESTED },
-      data: { status: DeliveryStatus.ASSIGNED, riderId, assignedAt: new Date() },
+      data: {
+        status: DeliveryStatus.ASSIGNED,
+        riderId,
+        assignedAt: new Date(),
+      },
     });
 
     if (result.count === 0) throw new ConflictException('Delivery unavailable');
-    return { success: true };
-  }
-
-  async confirmPickup(deliveryId: string, riderId: string, proof: string) {
-    if (!riderId) throw new ForbiddenException();
-    if (!proof || proof.length > 2048)
-      throw new BadRequestException('Invalid proof');
-
-    const result = await this.prisma.delivery.updateMany({
-      where: {
-        id: deliveryId,
-        riderId: riderId,
-        status: DeliveryStatus.ASSIGNED,
-      },
-      data: {
-        status: DeliveryStatus.PICKED_UP,
-        pickedUpAt: new Date(),
-        pickupProof: proof,
-      },
-    });
-
-    if (result.count === 0)
-      throw new BadRequestException('Invalid state for pickup');
     return { success: true };
   }
 
@@ -425,7 +519,8 @@ export class DeliveriesService {
       include: { rider: { include: { vehicle: true } } },
     });
 
-    if (!delivery?.rider) throw new InternalServerErrorException('Rider link failed');
+    if (!delivery?.rider)
+      throw new InternalServerErrorException('Rider link failed');
 
     try {
       this.notificationsGateway.server

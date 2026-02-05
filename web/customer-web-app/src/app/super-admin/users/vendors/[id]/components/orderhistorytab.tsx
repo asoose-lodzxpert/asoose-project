@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import { useState, useMemo } from "react";
 import { createColumnHelper } from "@tanstack/react-table";
@@ -36,7 +36,7 @@ const columnHelper = createColumnHelper<Order>();
 
 export default function OrderHistoryTab({ orders }: { orders: Order[] }) {
   const [rowSelection, setRowSelection] = useState({});
-  
+
   // --- New State for Filtering ---
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
@@ -45,145 +45,172 @@ export default function OrderHistoryTab({ orders }: { orders: Order[] }) {
   const filteredOrders = useMemo(() => {
     return orders.filter((order) => {
       // 1. Search Logic (ID, Customer, or Vendor)
-      const matchesSearch = 
+      const matchesSearch =
         search === "" ||
         order.id.toLowerCase().includes(search.toLowerCase()) ||
         order.customer.toLowerCase().includes(search.toLowerCase()) ||
-        (order.storeName && order.storeName.toLowerCase().includes(search.toLowerCase()));
+        (order.storeName &&
+          order.storeName.toLowerCase().includes(search.toLowerCase()));
 
       // 2. Status Logic
-      const matchesStatus = 
-        statusFilter === "ALL" || 
-        order.status.toUpperCase() === statusFilter;
+      const matchesStatus =
+        statusFilter === "ALL" || order.status.toUpperCase() === statusFilter;
 
       return matchesSearch && matchesStatus;
     });
   }, [orders, search, statusFilter]);
 
   // --- Column Definitions ---
-  const columns = useMemo(() => [
-    {
-      id: "select",
-      header: ({ table }: any) => (
-        <button 
-          className="p-1 hover:bg-gray-700/50 rounded transition-colors"
-          onClick={table.getToggleAllRowsSelectedHandler()}
-        >
-          {table.getIsAllRowsSelected() ? (
-            <CheckSquare className="w-4 h-4 text-yellow-500" />
-          ) : (
-            <Square className="w-4 h-4 text-gray-500" />
-          )}
-        </button>
-      ),
-      cell: ({ row }: any) => (
-        <button 
-          className="p-1 hover:bg-gray-700/50 rounded transition-colors"
-          onClick={row.getToggleSelectedHandler()}
-        >
-          {row.getIsSelected() ? (
-            <CheckSquare className="w-4 h-4 text-yellow-500" />
-          ) : (
-            <Square className="w-4 h-4 text-gray-500" />
-          )}
-        </button>
-      ),
-    },
-    columnHelper.accessor("id", {
-      header: "Order ID",
-      cell: info => (
-        <Link 
-          href={`/super-admin/orders/${info.getValue()}`}
-          className="text-yellow-500 hover:text-yellow-400 font-bold transition-colors font-mono text-xs"
-        >
-          {info.getValue().substring(0, 8)}...
-        </Link>
-      ),
-    }),
-    columnHelper.accessor("date", {
-      header: "Date",
-      cell: info => <span className="text-gray-300 text-sm">{new Date(info.getValue()).toLocaleDateString()}</span>,
-    }),
-    columnHelper.accessor("customer", {
-      header: "Customer",
-      cell: info => <span className="font-bold text-white text-sm">{info.getValue()}</span>,
-    }),
-    // ✅ NEW: Store/Vendor Column
-    columnHelper.accessor("storeName", {
-        header: "Store",
-        cell: info => <span className="text-gray-300 text-sm">{info.getValue() || '-'}</span>,
-    }),
-    columnHelper.accessor("status", {
-      header: "Status",
-      cell: info => {
-        const status = info.getValue();
-        const getStatusColor = (s: string) => {
-          switch (s.toUpperCase()) {
-            case 'DELIVERED': return 'bg-green-500/20 text-green-400 border-green-500/20';
-            case 'PENDING': return 'bg-yellow-500/20 text-yellow-500 border-yellow-500/20';
-            case 'CANCELLED': return 'bg-red-500/20 text-red-400 border-red-500/20';
-            case 'PREPARING': return 'bg-blue-500/20 text-blue-400 border-blue-500/20';
-            default: return 'bg-gray-700 text-gray-300';
-          }
-        };
-        return (
-          <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase border ${getStatusColor(status)}`}>
-            {status}
-          </span>
-        );
-      },
-    }),
-    columnHelper.accessor("itemsCount", {
-      header: "Items",
-      cell: info => <span className="text-gray-400 text-sm">{info.getValue()}</span>,
-    }),
-    columnHelper.accessor("total", {
-      header: "Total",
-      // ✅ Using Reusable Currency Component
-      cell: info => <Currency amount={info.getValue()} className="text-white" />,
-    }),
-    {
-      id: "actions",
-      header: "Actions",
-      cell: ({ row }: any) => (
-        <div className="flex items-center gap-2">
-          <Link
-            href={`/super-admin/orders/${row.original.id}`}
-            className="p-2 bg-gray-700/50 rounded-lg hover:bg-white/10 hover:text-white text-gray-400 transition-colors"
+  const columns = useMemo(
+    () => [
+      {
+        id: "select",
+        header: ({ table }: any) => (
+          <button
+            className="p-1 hover:bg-gray-700/50 rounded transition-colors"
+            onClick={table.getToggleAllRowsSelectedHandler()}
           >
-            <Eye className="w-4 h-4" />
+            {table.getIsAllRowsSelected() ? (
+              <CheckSquare className="w-4 h-4 text-yellow-500" />
+            ) : (
+              <Square className="w-4 h-4 text-gray-500" />
+            )}
+          </button>
+        ),
+        cell: ({ row }: any) => (
+          <button
+            className="p-1 hover:bg-gray-700/50 rounded transition-colors"
+            onClick={row.getToggleSelectedHandler()}
+          >
+            {row.getIsSelected() ? (
+              <CheckSquare className="w-4 h-4 text-yellow-500" />
+            ) : (
+              <Square className="w-4 h-4 text-gray-500" />
+            )}
+          </button>
+        ),
+      },
+      columnHelper.accessor("id", {
+        header: "Order ID",
+        cell: (info) => (
+          <Link
+            href={`/super-admin/orders/${info.getValue()}`}
+            className="text-yellow-500 hover:text-yellow-400 font-bold transition-colors font-mono text-xs"
+          >
+            {info.getValue().substring(0, 8)}...
           </Link>
-        </div>
-      ),
-    },
-  ], []);
+        ),
+      }),
+      columnHelper.accessor("date", {
+        header: "Date",
+        cell: (info) => (
+          <span className="text-gray-300 text-sm">
+            {new Date(info.getValue()).toLocaleDateString()}
+          </span>
+        ),
+      }),
+      columnHelper.accessor("customer", {
+        header: "Customer",
+        cell: (info) => (
+          <span className="font-bold text-white text-sm">
+            {info.getValue()}
+          </span>
+        ),
+      }),
+      // ✅ NEW: Store/Vendor Column
+      columnHelper.accessor("storeName", {
+        header: "Store",
+        cell: (info) => (
+          <span className="text-gray-300 text-sm">
+            {info.getValue() || "-"}
+          </span>
+        ),
+      }),
+      columnHelper.accessor("status", {
+        header: "Status",
+        cell: (info) => {
+          const status = info.getValue();
+          const getStatusColor = (s: string) => {
+            switch (s.toUpperCase()) {
+              case "DELIVERED":
+                return "bg-green-500/20 text-green-400 border-green-500/20";
+              case "PENDING":
+                return "bg-yellow-500/20 text-yellow-500 border-yellow-500/20";
+              case "CANCELLED":
+                return "bg-red-500/20 text-red-400 border-red-500/20";
+              case "PREPARING":
+                return "bg-blue-500/20 text-blue-400 border-blue-500/20";
+              default:
+                return "bg-gray-700 text-gray-300";
+            }
+          };
+          return (
+            <span
+              className={`px-2 py-1 rounded text-[10px] font-bold uppercase border ${getStatusColor(status)}`}
+            >
+              {status}
+            </span>
+          );
+        },
+      }),
+      columnHelper.accessor("itemsCount", {
+        header: "Items",
+        cell: (info) => (
+          <span className="text-gray-400 text-sm">{info.getValue()}</span>
+        ),
+      }),
+      columnHelper.accessor("total", {
+        header: "Total",
+        // ✅ Using Reusable Currency Component
+        cell: (info) => (
+          <Currency amount={info.getValue()} className="text-white" />
+        ),
+      }),
+      {
+        id: "actions",
+        header: "Actions",
+        cell: ({ row }: any) => (
+          <div className="flex items-center gap-2">
+            <Link
+              href={`/super-admin/orders/${row.original.id}`}
+              className="p-2 bg-gray-700/50 rounded-lg hover:bg-white/10 hover:text-white text-gray-400 transition-colors"
+            >
+              <Eye className="w-4 h-4" />
+            </Link>
+          </div>
+        ),
+      },
+    ],
+    [],
+  );
 
   // --- Render ---
   return (
     <div className="h-full flex flex-col">
-      
       {/* 1. Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <div className="bg-[#0F172A] border border-gray-800 rounded-lg p-4">
           <p className="text-gray-500 text-sm">Total Shown</p>
-          <p className="text-2xl font-bold text-white">{filteredOrders.length}</p>
+          <p className="text-2xl font-bold text-white">
+            {filteredOrders.length}
+          </p>
         </div>
         <div className="bg-[#0F172A] border border-gray-800 rounded-lg p-4">
           <p className="text-gray-500 text-sm">Delivered</p>
           <p className="text-2xl font-bold text-green-500">
-            {filteredOrders.filter(o => o.status === 'DELIVERED').length}
+            {filteredOrders.filter((o) => o.status === "DELIVERED").length}
           </p>
         </div>
         <div className="bg-[#0F172A] border border-gray-800 rounded-lg p-4">
           <p className="text-gray-500 text-sm">Pending</p>
           <p className="text-2xl font-bold text-yellow-500">
-            {filteredOrders.filter(o => o.status === 'PENDING').length}
+            {filteredOrders.filter((o) => o.status === "PENDING").length}
           </p>
         </div>
         <div className="bg-[#0F172A] border border-gray-800 rounded-lg p-4">
           <p className="text-gray-500 text-sm">Cancelled</p>
           <p className="text-2xl font-bold text-red-500">
-            {filteredOrders.filter(o => o.status === 'CANCELLED').length}
+            {filteredOrders.filter((o) => o.status === "CANCELLED").length}
           </p>
         </div>
       </div>
@@ -193,7 +220,7 @@ export default function OrderHistoryTab({ orders }: { orders: Order[] }) {
         {/* Search Input */}
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-          <input 
+          <input
             type="text"
             placeholder="Search by ID, Customer, or Store..."
             value={search}
@@ -201,7 +228,7 @@ export default function OrderHistoryTab({ orders }: { orders: Order[] }) {
             className="w-full bg-[#0F172A] border border-gray-800 rounded-lg pl-10 pr-4 py-2 text-sm text-gray-200 focus:outline-none focus:border-yellow-500/50 transition-colors"
           />
           {search && (
-            <button 
+            <button
               onClick={() => setSearch("")}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white"
             >
@@ -236,10 +263,7 @@ export default function OrderHistoryTab({ orders }: { orders: Order[] }) {
           rowSelection={rowSelection}
           onRowSelectionChange={setRowSelection}
           renderMobileCard={(order) => (
-            <OrderCard 
-              order={mapToCardOrder(order)}
-              showActions={true}
-            />
+            <OrderCard order={mapToCardOrder(order)} showActions={true} />
           )}
         />
       </div>

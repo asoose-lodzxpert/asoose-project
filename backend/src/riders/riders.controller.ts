@@ -12,7 +12,10 @@ import { Roles } from '../auth/roles.decorator';
 import { UserRole } from '../common/enums/user-role.enum';
 import { RidersStreamService } from './riders-stream.service';
 
-@Controller('riders')
+@Controller({
+  path: 'riders',
+  version: '1',
+})
 export class RidersController {
   constructor(private readonly streamService: RidersStreamService) {}
 

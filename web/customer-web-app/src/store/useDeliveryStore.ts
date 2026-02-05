@@ -1,5 +1,5 @@
-import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
+import { create } from "zustand";
+import { persist, createJSONStorage } from "zustand/middleware";
 
 // 1. Update the Stage type to include REVIEW_PAYMENT
 export type DeliveryStage = 
@@ -41,7 +41,7 @@ interface DeliveryState {
   packageInfo: PackageInfo;
   
   calculatedFee: number | null;
-  
+
   courierInfo: any | null;
   isCalculating: boolean;
 
@@ -55,19 +55,19 @@ interface DeliveryState {
 }
 
 const initialPackageInfo: PackageInfo = {
-  type: 'Document',
-  weight: '< 5kg',
-  instructions: '',
-  recipientName: '',
-  recipientPhone: '',
-  pickupAddress: '',
-  destinationAddress: '',
+  type: "Document",
+  weight: "< 5kg",
+  instructions: "",
+  recipientName: "",
+  recipientPhone: "",
+  pickupAddress: "",
+  destinationAddress: "",
 };
 
 export const useDeliveryStore = create<DeliveryState>()(
   persist(
     (set) => ({
-      stage: 'IDLE',
+      stage: "IDLE",
       activeDeliveryId: null,
       pickupPos: null,
       dropoffPos: null,
@@ -80,49 +80,53 @@ export const useDeliveryStore = create<DeliveryState>()(
       isCalculating: false,
 
       setStage: (stage) => set({ stage }),
-      
-      setLocations: (pickup, dropoff) => set((state) => ({ 
-        pickupPos: pickup ?? state.pickupPos, 
-        dropoffPos: dropoff ?? state.dropoffPos 
-      })),
 
-      setAddressIds: (pickupId, dropoffId) => set((state) => ({
-        pickupAddressId: pickupId ?? state.pickupAddressId,
-        dropoffAddressId: dropoffId ?? state.dropoffAddressId
-      })),
+      setLocations: (pickup, dropoff) =>
+        set((state) => ({
+          pickupPos: pickup ?? state.pickupPos,
+          dropoffPos: dropoff ?? state.dropoffPos,
+        })),
 
-      setPackageInfo: (info) => set((state) => ({ 
-        packageInfo: { ...state.packageInfo, ...info } 
-      })),
+      setAddressIds: (pickupId, dropoffId) =>
+        set((state) => ({
+          pickupAddressId: pickupId ?? state.pickupAddressId,
+          dropoffAddressId: dropoffId ?? state.dropoffAddressId,
+        })),
+
+      setPackageInfo: (info) =>
+        set((state) => ({
+          packageInfo: { ...state.packageInfo, ...info },
+        })),
 
       setCalculatedFee: (fee) => set({ calculatedFee: fee }),
 
-      resetDelivery: () => set({
-        stage: 'IDLE',
-        activeDeliveryId: null,
-        pickupPos: null,
-        dropoffPos: null,
-        pickupAddressId: null,
-        dropoffAddressId: null,
-        courierPos: undefined,
-        calculatedFee: null,
-        courierInfo: null,
-        packageInfo: initialPackageInfo,
-      }),
+      resetDelivery: () =>
+        set({
+          stage: "IDLE",
+          activeDeliveryId: null,
+          pickupPos: null,
+          dropoffPos: null,
+          pickupAddressId: null,
+          dropoffAddressId: null,
+          courierPos: undefined,
+          calculatedFee: null,
+          courierInfo: null,
+          packageInfo: initialPackageInfo,
+        }),
     }),
     {
-      name: 'asoose-delivery-storage',
+      name: "asoose-delivery-storage",
       storage: createJSONStorage(() => localStorage),
-      partialize: (state) => ({ 
-        stage: state.stage, 
+      partialize: (state) => ({
+        stage: state.stage,
         packageInfo: state.packageInfo,
         activeDeliveryId: state.activeDeliveryId,
         pickupPos: state.pickupPos,
         dropoffPos: state.dropoffPos,
         pickupAddressId: state.pickupAddressId,
         dropoffAddressId: state.dropoffAddressId,
-        calculatedFee: state.calculatedFee
+        calculatedFee: state.calculatedFee,
       }),
-    }
-  )
+    },
+  ),
 );

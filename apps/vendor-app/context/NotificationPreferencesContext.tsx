@@ -28,7 +28,7 @@ export const NotificationPreferencesProvider = ({
   children: ReactNode;
 }) => {
   const [preferences, setPreferences] = useState<Record<string, boolean>>(
-    DEFAULT_NOTIFICATION_SETTINGS
+    DEFAULT_NOTIFICATION_SETTINGS,
   );
   const [loading, setLoading] = useState(true);
 
@@ -79,7 +79,7 @@ export const useNotificationPreferences = () => {
   const ctx = useContext(NotificationPreferencesContext);
   if (!ctx)
     throw new Error(
-      "useNotificationPreferences must be used within NotificationPreferencesProvider"
+      "useNotificationPreferences must be used within NotificationPreferencesProvider",
     );
   return ctx;
 };

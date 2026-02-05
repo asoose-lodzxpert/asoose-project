@@ -1,9 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { EventEmitter2 } from '@nestjs/event-emitter'; // <--- Added for Task 4
 import { RedisService } from '../redis/redis.service';
 import { GeoService } from '../geo/geo.service';
 import { EventBusService } from '../events/event-bus.service';
-import { DRIVER_EVENTS, DriverLocationUpdatedEvent } from '../events/event-types'; // <--- Added
 import {
   DriverStatus,
   REDIS_TTL,
@@ -31,7 +29,6 @@ export class DriverStateService {
     private readonly redis: RedisService,
     private readonly geo: GeoService,
     private readonly eventBus: EventBusService,
-    private readonly eventEmitter: EventEmitter2, // <--- Injected for Real-Time Updates
   ) {}
 
   /* ============================================================
@@ -91,24 +88,6 @@ export class DriverStateService {
     if (!this.geo.validateCoordinates(lat, lng)) return;
 
     const hexId = this.geo.latLngToHex(lat, lng);
-  /**
-   * Update driver location (heartbeat)
-   *
-   * Atomically updates location, hex, and moves between hex indexes if needed.
-   * This is called frequently by the driver app (every 5-10 seconds).
-   */
-  async updateLocation(
-    driverId: string,
-    lat: number,
-    lng: number,
-    heading: number = 0, // <--- Added heading parameter
-  ): Promise<void> {
-    // Validate coordinates
-    if (!this.geo.validateCoordinates(lat, lng)) {
-      throw new Error('Invalid coordinates');
-    }
-
-    const newHexId = this.geo.latLngToHex(lat, lng);
     const timestamp = Date.now();
 
     const result = await this.redis
@@ -134,14 +113,7 @@ export class DriverStateService {
       hexId,
       hexChanged: result === 1,
       timestamp,
-    };
-
-    // 1. Emit to System Event Bus (existing logic)
-    this.eventBus.emitDriverLocationUpdated(eventPayload);
-
-    // 2. Emit to Real-Time Socket Listener (FIX for Task 4)
-    // This bridges the gap to the DriverLocationListener
-    this.eventEmitter.emitAsync(DRIVER_EVENTS.LOCATION_UPDATED, eventPayload);
+    });
   }
 
   /* ============================================================

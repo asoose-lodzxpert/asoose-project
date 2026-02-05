@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Animated,
   Image,
   Keyboard,
   KeyboardAvoidingView,
@@ -11,11 +12,6 @@ import {
   TouchableWithoutFeedback,
   View,
 } from "react-native";
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
-} from "react-native-reanimated";
 
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
@@ -44,17 +40,25 @@ export default function LoginScreen() {
   const textOnPrimary = useThemeColor({}, "textOnPrimary");
   const muted = useThemeColor({}, "textMuted");
 
-  /* ------------------ Reanimated logo shift ------------------ */
+  /* ------------------ Animated logo shift ------------------ */
 
-  const logoTranslateY = useSharedValue(0);
+  const logoTranslateY = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     const showSub = Keyboard.addListener("keyboardWillShow", () => {
-      logoTranslateY.value = withTiming(-60, { duration: 300 });
+      Animated.timing(logoTranslateY, {
+        toValue: -60,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
     });
 
     const hideSub = Keyboard.addListener("keyboardWillHide", () => {
-      logoTranslateY.value = withTiming(0, { duration: 300 });
+      Animated.timing(logoTranslateY, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
     });
 
     return () => {
@@ -63,9 +67,9 @@ export default function LoginScreen() {
     };
   }, []);
 
-  const logoStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: logoTranslateY.value }],
-  }));
+  const logoStyle = {
+    transform: [{ translateY: logoTranslateY }],
+  };
 
   /* ------------------ Logic ------------------ */
 

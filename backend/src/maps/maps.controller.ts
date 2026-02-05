@@ -1,7 +1,10 @@
 import { Controller, Get, Query } from '@nestjs/common';
 import { MapsService } from './maps.service';
 
-@Controller('maps')
+@Controller({
+  path: 'maps',
+  version: '1',
+})
 export class MapsController {
   constructor(private readonly mapsService: MapsService) {}
 
@@ -22,6 +25,11 @@ export class MapsController {
     return this.mapsService.placesAutocomplete(query, location);
   }
 
+  @Get('geocode')
+  async geocode(@Query('placeId') placeId: string) {
+    return this.mapsService.geocodePlace(placeId);
+  }
+
   @Get('directions')
   async getDirections(
     @Query('originLat') originLat: string,
@@ -35,5 +43,16 @@ export class MapsController {
       destLat,
       destLng,
     );
+  }
+
+  @Get('static-map')
+  async getStaticMap(
+    @Query('markers') markers: string,
+    @Query('path') path?: string,
+    @Query('center') center?: string,
+    @Query('zoom') zoom?: string,
+    @Query('size') size?: string,
+  ) {
+    return this.mapsService.getStaticMapUrl(markers, path, center, zoom, size);
   }
 }

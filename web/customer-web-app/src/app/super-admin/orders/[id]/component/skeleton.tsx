@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import React from 'react';
+import React from "react";
 
 export function OrderDetailsSkeleton() {
   return (
@@ -76,7 +76,10 @@ export function OrderDetailsSkeleton() {
         {/* Sidebar Skeleton */}
         <div className="space-y-6">
           {[...Array(3)].map((_, i) => (
-            <div key={i} className="bg-[#1E293B] border border-slate-800 rounded-xl p-6 space-y-4">
+            <div
+              key={i}
+              className="bg-[#1E293B] border border-slate-800 rounded-xl p-6 space-y-4"
+            >
               <div className="h-4 w-32 bg-slate-800 rounded" />
               <div className="h-20 w-full bg-slate-900/50 rounded-lg" />
               <div className="space-y-2">

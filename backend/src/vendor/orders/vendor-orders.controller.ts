@@ -19,7 +19,10 @@ import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { RolesGuard } from 'src/auth/roles.guards';
 import { Roles } from 'src/auth/roles.decorator';
 
-@Controller('vendor/orders')
+@Controller({
+  path: 'vendor/orders',
+  version: '1',
+})
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.VENDOR)
 export class VendorOrdersController {

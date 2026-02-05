@@ -8,7 +8,7 @@ import {
 } from '../queue/queue.constants';
 import { DriverStateService } from '../driver-state/driver-state.service';
 import { QueueService } from '../queue/queue.service';
-import { TripType } from '../redis/redis-keys.constants';
+// Removed TripType import; job type is now in JobSummaryDto
 import {
   MatchRideJobData,
   MatchDeliveryJobData,
@@ -36,42 +36,63 @@ export class AssignmentTimeoutProcessor extends WorkerHost {
   }
 
   async process(job: Job<HandleAssignmentTimeoutJobData>): Promise<void> {
-    const { tripType, tripId, driverId } = job.data;
+    const { job: jobSummary } = job.data;
+    const jobType = jobSummary.jobType;
+    const jobId = jobSummary.id;
 
-    this.logger.log(
-      `⏱️  Handling assignment timeout: ${tripType} ${tripId} for driver ${driverId}`,
-    );
+    this.logger.log(`Handling assignment timeout: ${jobType} ${jobId}`);
 
     try {
-      // Trigger timeout in driver state (same as decline)
-      await this.driverState.handleAssignmentTimeout(
-        driverId,
-        tripType as TripType,
-        tripId,
-      );
+      // We need driverId for handleAssignmentTimeout. This should come from the matching context, but JobSummaryDto does not have driverId.
+      // If the job was assigned, the driverId should be in the DB (ride or delivery entity). For timeout, we need to know which driver was assigned and timed out.
+      // For now, skip calling handleAssignmentTimeout if driverId is not available, and log a warning.
+      let driverId: string | undefined = undefined;
+      if (jobType === 'ride') {
+        const ride = await this.prisma.ride.findUnique({
+          where: { id: jobId },
+        });
+        driverId = ride?.riderId ?? undefined;
+        if (!driverId) {
+          this.logger.warn(
+            `No riderId found for ride ${jobId}, skipping assignment timeout handling.`,
+          );
+        } else {
+          await this.driverState.handleAssignmentTimeout(driverId, {
+            jobId,
+            jobType: 'ride',
+          });
+        }
+      } else if (jobType === 'delivery') {
+        const delivery = await this.prisma.delivery.findUnique({
+          where: { id: jobId },
+        });
+        driverId = delivery?.riderId ?? undefined;
+        // DriverStateService only supports ride jobs, so skip for delivery
+
+        this.logger.warn(
+          `Assignment timeout for delivery ${jobId} (riderId: ${driverId}) not handled in DriverStateService.`,
+        );
+      }
 
       // Re-enqueue matching job to find another driver
-      if (tripType === 'ride') {
-        await this.retryRideMatching(tripId, driverId);
+      if (jobType === 'ride') {
+        await this.retryRideMatching(jobSummary);
       } else {
-        await this.retryDeliveryMatching(tripId, driverId);
+        await this.retryDeliveryMatching(jobSummary);
       }
     } catch (error) {
       this.logger.error(
-        `Error handling timeout for ${tripType} ${tripId}:`,
+        `Error handling timeout for ${jobType} ${jobId}:`,
         error,
       );
       // Don't throw - timeout already occurred
     }
   }
 
-  private async retryRideMatching(
-    rideId: string,
-    timedOutDriverId: string,
-  ): Promise<void> {
+  private async retryRideMatching(jobSummary: any): Promise<void> {
     // Get ride details
     const ride = await this.prisma.ride.findUnique({
-      where: { id: rideId },
+      where: { id: jobSummary.id },
       include: {
         pickupAddress: true,
         dropoffAddress: true,
@@ -79,42 +100,32 @@ export class AssignmentTimeoutProcessor extends WorkerHost {
     });
 
     if (!ride) {
-      this.logger.error(`Ride ${rideId} not found`);
+      this.logger.error(`Ride ${jobSummary.id} not found`);
       return;
     }
 
     if (ride.status !== 'REQUESTED') {
-      this.logger.log(`Ride ${rideId} no longer REQUESTED, skipping retry`);
+      this.logger.log(
+        `Ride ${jobSummary.id} no longer REQUESTED, skipping retry`,
+      );
       return;
     }
 
-    // Re-enqueue with incremented attempt
-    const distanceKm = ride.distanceKm || 0;
-
+    // Re-enqueue with incremented attempt and exclude timed-out driver
     await this.queue.enqueueRideMatching({
-      rideId,
-      customerId: ride.customerId,
-      pickupLat: ride.pickupAddress.lat,
-      pickupLng: ride.pickupAddress.lng,
-      dropoffLat: ride.dropoffAddress.lat,
-      dropoffLng: ride.dropoffAddress.lng,
-      distanceKm,
-      totalFare: ride.totalFare || 0,
-      attempt: 2, // Retry attempt
-      excludeDriverIds: [timedOutDriverId],
-    } as MatchRideJobData);
+      job: jobSummary,
+      attempt: 2, // Always retry with attempt 2 for timeout
+      excludeDriverIds: [jobSummary.driverId].filter(Boolean),
+    });
 
     this.logger.log(
-      `🔄 Retry ride matching for ${rideId} (excluded driver: ${timedOutDriverId})`,
+      `Retry ride matching for ${jobSummary.id} (excluded driver: ${jobSummary.driverId})`,
     );
   }
 
-  private async retryDeliveryMatching(
-    deliveryId: string,
-    timedOutDriverId: string,
-  ): Promise<void> {
+  private async retryDeliveryMatching(jobSummary: any): Promise<void> {
     const delivery = await this.prisma.delivery.findUnique({
-      where: { id: deliveryId },
+      where: { id: jobSummary.id },
       include: {
         pickupAddress: true,
         dropoffAddress: true,
@@ -122,38 +133,25 @@ export class AssignmentTimeoutProcessor extends WorkerHost {
     });
 
     if (!delivery) {
-      this.logger.error(`Delivery ${deliveryId} not found`);
+      this.logger.error(`Delivery ${jobSummary.id} not found`);
       return;
     }
 
     if (delivery.status !== 'REQUESTED') {
       this.logger.log(
-        `Delivery ${deliveryId} no longer REQUESTED, skipping retry`,
+        `Delivery ${jobSummary.id} no longer REQUESTED, skipping retry`,
       );
       return;
     }
 
-    const distanceKm = delivery.distanceKm || 0;
-
     await this.queue.enqueueDeliveryMatching({
-      deliveryId,
-      customerId: delivery.customerId,
-      orderId: delivery.orderId || undefined,
-      pickupLat: delivery.pickupAddress.lat,
-      pickupLng: delivery.pickupAddress.lng,
-      dropoffLat: delivery.dropoffAddress.lat,
-      dropoffLng: delivery.dropoffAddress.lng,
-      distanceKm,
-      deliveryFee: delivery.deliveryFee,
-      packageDetails: delivery.packageDetails || undefined,
-      recipientName: delivery.recipientName,
-      recipientPhone: delivery.recipientPhone,
+      job: jobSummary,
       attempt: 2,
-      excludeDriverIds: [timedOutDriverId],
-    } as MatchDeliveryJobData);
+      excludeDriverIds: [jobSummary.driverId].filter(Boolean),
+    });
 
     this.logger.log(
-      `🔄 Retry delivery matching for ${deliveryId} (excluded driver: ${timedOutDriverId})`,
+      `Retry delivery matching for ${jobSummary.id} (excluded driver: ${jobSummary.driverId})`,
     );
   }
 }

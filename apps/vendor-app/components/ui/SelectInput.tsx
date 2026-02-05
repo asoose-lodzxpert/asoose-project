@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
-import { View, Pressable, StyleSheet, FlatList } from 'react-native';
-import { ThemedText } from '@/components/themed-text';
-import { useThemeColor } from '@/hooks/use-theme-color';
+import React, { useState } from "react";
+import { View, Pressable, StyleSheet, FlatList } from "react-native";
+import { ThemedText } from "@/components/themed-text";
+import { useThemeColor } from "@/hooks/use-theme-color";
 
 interface SelectInputProps<T extends string> {
   options: readonly T[];
@@ -14,13 +14,13 @@ interface SelectInputProps<T extends string> {
 export function SelectInput<T extends string>({
   options,
   selected,
-  placeholder = 'Select',
+  placeholder = "Select",
   onSelect,
   style,
 }: SelectInputProps<T>) {
   const [open, setOpen] = useState(false);
-  const borderColor = useThemeColor({}, 'borderDefault');
-  const primary = useThemeColor({}, 'brandPrimary');
+  const borderColor = useThemeColor({}, "borderDefault");
+  const primary = useThemeColor({}, "brandPrimary");
 
   return (
     <View style={[styles.container, style]}>
@@ -28,7 +28,7 @@ export function SelectInput<T extends string>({
         style={[styles.input, { borderColor }]}
         onPress={() => setOpen(!open)}
       >
-        <ThemedText style={{ color: selected ? undefined : '#9CA3AF' }}>
+        <ThemedText style={{ color: selected ? undefined : "#9CA3AF" }}>
           {selected ?? placeholder}
         </ThemedText>
       </Pressable>
@@ -46,7 +46,9 @@ export function SelectInput<T extends string>({
                   setOpen(false);
                 }}
               >
-                <ThemedText style={{ color: item === selected ? primary : undefined }}>
+                <ThemedText
+                  style={{ color: item === selected ? primary : undefined }}
+                >
                   {item}
                 </ThemedText>
               </Pressable>
@@ -59,20 +61,20 @@ export function SelectInput<T extends string>({
 }
 
 const styles = StyleSheet.create({
-  container: { position: 'relative', width: '100%' },
+  container: { position: "relative", width: "100%" },
   input: {
     padding: 12,
     borderWidth: 1,
     borderRadius: 8,
-    justifyContent: 'center',
+    justifyContent: "center",
   },
   dropdown: {
-    position: 'absolute',
+    position: "absolute",
     top: 50,
-    width: '100%',
+    width: "100%",
     borderWidth: 1,
     borderRadius: 8,
-    backgroundColor: '#FFF',
+    backgroundColor: "#FFF",
     zIndex: 10,
     maxHeight: 200,
   },

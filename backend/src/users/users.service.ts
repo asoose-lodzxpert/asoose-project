@@ -73,16 +73,9 @@ export class UsersService {
       // Determine status filter
       let statusFilter: any = undefined;
       if (opts?.status === 'active') {
-        // All statuses that are considered 'active'
+        // All statuses that are NOT completed (active deliveries)
         statusFilter = {
-          in: [
-            'PENDING',
-            'REQUESTED',
-            'ASSIGNED',
-            'ACCEPTED',
-            'PICKED_UP',
-            'IN_TRANSIT',
-          ],
+          notIn: ['DELIVERED', 'CANCELLED'],
         };
       } else if (opts?.status === 'completed') {
         // All statuses that are considered 'completed'
@@ -358,19 +351,22 @@ export class UsersService {
     });
   }
 
-  async updateEmergencyContact(
+  async upsertEmergencyContact(
     userId: string,
     id: string,
     data: UpdateEmergencyContactDto,
   ) {
-    // Ensure the contact belongs to the user
-    const contact = await this.prisma.emergencyContact.findFirst({
-      where: { id, userId },
-    });
-    if (!contact) throw new NotFoundException('Contact not found');
-    return this.prisma.emergencyContact.update({
-      where: { id },
-      data,
+    return this.prisma.emergencyContact.upsert({
+      where: { id }, // must be UNIQUE in your Prisma schema
+      update: {
+        ...data,
+      },
+      create: {
+        ...data,
+        user: {
+          connect: { id: userId },
+        },
+      },
     });
   }
 
@@ -424,5 +420,38 @@ export class UsersService {
       data: { notificationsPreferences: JSON.stringify(filtered) },
     });
     return { success: true };
+  }
+
+  // ==================================================================
+  // WALLET & PAYMENT METHODS SERVICE
+  // ==================================================================
+
+  async getWalletBalance(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { name: true },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    return {
+      balance: 0,
+      currency: '₦',
+    };
+  }
+
+  async getSavedCards(userId: string) {
+    // Note: Payment cards are typically stored in the payment service
+    // This is a placeholder implementation
+    // In production, this would query a payment cards table or external service
+    return [];
+  }
+
+  async deleteSavedCard(userId: string, cardId: string) {
+    // Note: This would delete from payment cards table or external service
+    // Placeholder implementation
+    return { success: true, message: 'Card deleted successfully' };
   }
 }

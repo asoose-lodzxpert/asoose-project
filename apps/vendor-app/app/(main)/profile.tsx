@@ -228,9 +228,7 @@ export default function ProfileScreen() {
             <View style={styles.profileRow}>
               <View style={{ flex: 1 }}>
                 <ThemedText type="title">{profile.businessName}</ThemedText>
-                <ThemedText style={{ color: mutedText }}>
-                  {profile.shopName}
-                </ThemedText>
+                <ThemedText type="subtitle">{profile.shopName}</ThemedText>
 
                 <View
                   style={[

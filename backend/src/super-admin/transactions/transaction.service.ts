@@ -2,7 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
-  Inject,      
+  Inject,
   forwardRef,
 } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
@@ -987,13 +987,13 @@ export class TransactionsService {
     });
   }
 
-async verifyTransactionPayment(id: string, adminId: string) {
+  async verifyTransactionPayment(id: string, adminId: string) {
     // 1. Fetch Transaction with Payment relation
     const transaction = await this.prisma.transaction.findUnique({
       where: { id },
       include: {
         payment: true, // Required to get reference and gateway
-      }
+      },
     });
 
     if (!transaction) throw new NotFoundException('Transaction not found');
@@ -1001,7 +1001,9 @@ async verifyTransactionPayment(id: string, adminId: string) {
     // 2. Validate Links
     // The transaction MUST be linked to a payment to be verified via this flow
     if (!transaction.payment) {
-      throw new BadRequestException('This transaction is not linked to a verifyable payment record.');
+      throw new BadRequestException(
+        'This transaction is not linked to a verifyable payment record.',
+      );
     }
 
     const { reference, gateway } = transaction.payment;
@@ -1011,8 +1013,8 @@ async verifyTransactionPayment(id: string, adminId: string) {
     }
 
     const verificationResult = await this.paymentService.verifyPayment(
-      reference, 
-      gateway as PaymentGateway // Cast string from DB to Enum
+      reference,
+      gateway as PaymentGateway, // Cast string from DB to Enum
     );
 
     // 4. Audit Log
@@ -1025,17 +1027,15 @@ async verifyTransactionPayment(id: string, adminId: string) {
         metadata: {
           transactionId: id,
           reference,
-          gatewayResponse: verificationResult?.status || 'N/A'
-        }
-      }
+          gatewayResponse: verificationResult?.status || 'N/A',
+        },
+      },
     });
 
     return {
       success: true,
       message: 'Verification process completed.',
-      data: verificationResult
+      data: verificationResult,
     };
   }
-
-
 }

@@ -1,14 +1,14 @@
-'use client';
+"use client";
 
-import { useEffect, useRef, Suspense } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
-import { Loader2 } from 'lucide-react';
-import { toast } from 'react-toastify';
-import { useSession } from 'next-auth/react';
-import { useCartStore } from '@/store/useCartStore';
-import { useDeliveryStore } from '@/store/useDeliveryStore';
+import { useEffect, useRef, Suspense } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
+import { Loader2 } from "lucide-react";
+import { toast } from "react-toastify";
+import { useSession } from "next-auth/react";
+import { useCartStore } from "@/store/useCartStore";
+import { useDeliveryStore } from "@/store/useDeliveryStore";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
 function CallbackContent() {
   const searchParams = useSearchParams();
@@ -21,35 +21,38 @@ function CallbackContent() {
 
   useEffect(() => {
     if (processedRef.current) return;
-    
-    if (!session) return; 
 
-    const reference = searchParams.get('reference');
+    if (!session) return;
+
+    const reference = searchParams.get("reference");
 
     if (!reference) {
-       toast.error('Invalid Payment Reference');
-       router.replace('/main/checkout');
-       return;
+      toast.error("Invalid Payment Reference");
+      router.replace("/main/checkout");
+      return;
     }
 
     const verifyAndComplete = async () => {
-      processedRef.current = true; 
+      processedRef.current = true;
 
       try {
         await useCartStore.persist.rehydrate();
         await useDeliveryStore.persist.rehydrate();
 
-        const res = await fetch(`${API_URL}/payment/verify?reference=${reference}&gateway=PAYSTACK`, {
-            method: 'GET',
+        const res = await fetch(
+          `${API_URL}/payment/verify?reference=${reference}&gateway=PAYSTACK`,
+          {
+            method: "GET",
             headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${session.accessToken || (session.user as any).accessToken}`
-            }
-        });
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${session.accessToken || (session.user as any).accessToken}`,
+            },
+          },
+        );
 
         if (!res.ok) {
-            const errData = await res.json();
-            throw new Error(errData.message || 'Verification failed');
+          const errData = await res.json();
+          throw new Error(errData.message || "Verification failed");
         }
 
         const data = await res.json();
@@ -93,13 +96,12 @@ function CallbackContent() {
             }
 
         } else {
-            throw new Error('Payment not successful');
+          throw new Error("Payment not successful");
         }
-
       } catch (error) {
-        console.error('Payment verification error:', error);
-        toast.error('Payment verification failed.');
-        router.replace('/main/checkout');
+        console.error("Payment verification error:", error);
+        toast.error("Payment verification failed.");
+        router.replace("/main/checkout");
       }
     };
 
@@ -109,7 +111,9 @@ function CallbackContent() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-[#0a0a0a]">
       <Loader2 className="w-10 h-10 animate-spin text-yellow-500 mb-4" />
-      <h2 className="text-xl font-bold text-gray-900 dark:text-white">Securely Verifying Payment...</h2>
+      <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+        Securely Verifying Payment...
+      </h2>
       <p className="text-gray-500">Do not close this window.</p>
     </div>
   );

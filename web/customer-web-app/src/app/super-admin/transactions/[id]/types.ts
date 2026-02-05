@@ -12,9 +12,9 @@ export interface TransactionDetail {
   balanceAfter?: number;
   metadata?: any;
   customer?: { name: string; email?: string; phone?: string };
-  bankInfo?: { 
-    bankName: string; 
-    accountNumber: string; 
+  bankInfo?: {
+    bankName: string;
+    accountNumber: string;
     accountName: string;
     currency: string;
   };
@@ -95,5 +95,10 @@ export interface TransactionDetail {
     totalDistance?: string;
     averageEarningPerTrip?: number;
   };
-  timeline: Array<{ status: string; date: string; done: boolean; note?: string }>;
+  timeline: Array<{
+    status: string;
+    date: string;
+    done: boolean;
+    note?: string;
+  }>;
 }

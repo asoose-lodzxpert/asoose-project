@@ -3,12 +3,10 @@ import { Loader2 } from "lucide-react";
 const ProfileSkeleton = () => {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-[#0a0a0a] text-gray-900 dark:text-gray-100 pb-24 font-sans animate-pulse">
-      
       {/* 1. Enhanced Header Skeleton */}
       <div className="bg-white dark:bg-[#151515] border-b border-gray-100 dark:border-white/5 pt-10 pb-8 px-4 sm:px-8">
         <div className="max-w-4xl mx-auto">
           <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 text-center sm:text-left">
-            
             {/* Avatar Skeleton */}
             <div className="relative">
               <div className="w-24 h-24 bg-gray-200 dark:bg-gray-800 rounded-full border-4 border-white dark:border-[#151515] shadow-xl" />
@@ -20,10 +18,10 @@ const ProfileSkeleton = () => {
             <div className="flex-1 w-full">
               {/* Greeting Skeleton */}
               <div className="h-4 w-24 bg-gray-200 dark:bg-gray-800 rounded-full mx-auto sm:mx-0" />
-              
+
               {/* Name Skeleton */}
               <div className="h-8 w-48 bg-gray-200 dark:bg-gray-800 rounded-lg mt-3 mb-2 mx-auto sm:mx-0" />
-              
+
               {/* User Details Block Skeleton */}
               <div className="flex flex-col sm:flex-row items-center sm:items-start gap-y-1 gap-x-4 text-sm">
                 <div className="h-3 w-40 bg-gray-200 dark:bg-gray-800 rounded-full" />
@@ -50,7 +48,7 @@ const ProfileSkeleton = () => {
                 </div>
               </div>
             </div>
-            
+
             {/* Sign Out Button Skeleton */}
             <div className="hidden sm:flex items-center gap-2 px-5 py-2.5 bg-gray-200 dark:bg-gray-800 rounded-xl w-28 h-10" />
           </div>
@@ -74,7 +72,6 @@ const ProfileSkeleton = () => {
 
       {/* 3. Main Content Area Skeleton */}
       <main className="max-w-4xl mx-auto px-4 sm:px-6 py-8 min-h-[400px]">
-        
         {/* Orders Tab Skeleton */}
         <div className="space-y-4">
           {/* Empty State Skeleton */}
@@ -138,7 +135,10 @@ export const ContentSkeleton = () => {
           </div>
           <div className="p-2">
             {[1, 2].map((i) => (
-              <div key={i} className="w-full flex items-center justify-between p-4">
+              <div
+                key={i}
+                className="w-full flex items-center justify-between p-4"
+              >
                 <div className="h-4 w-40 bg-gray-200 dark:bg-gray-800 rounded-full" />
                 <div className="w-4 h-4 bg-gray-200 dark:bg-gray-800 rounded-full" />
               </div>
@@ -208,7 +208,7 @@ export const AddressesSkeleton = () => {
         </div>
         <div className="h-4 w-32 bg-gray-200 dark:bg-gray-800 rounded-full" />
       </div>
-      
+
       <div className="grid sm:grid-cols-2 gap-4">
         {[1, 2].map((i) => (
           <div

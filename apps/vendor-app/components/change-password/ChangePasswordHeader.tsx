@@ -12,14 +12,11 @@ interface Props {
 export const ChangePasswordHeader: React.FC<Props> = () => {
   const router = useRouter();
 
-    const linkColor = useThemeColor({}, "brandPrimary");
+  const linkColor = useThemeColor({}, "brandPrimary");
 
   return (
     <View style={styles.container}>
-      <Pressable
-        style={styles.backButton}
-        onPress={() => router.back()}
-      >
+      <Pressable style={styles.backButton} onPress={() => router.back()}>
         <IconSymbol name="chevron.left" size={24} color={linkColor} />
         <ThemedText type="link">Back</ThemedText>
       </Pressable>

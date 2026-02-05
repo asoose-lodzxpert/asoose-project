@@ -1,37 +1,66 @@
-<!DOCTYPE html>
 <html>
-<head>
-    <meta charset="utf-8">
+  <head>
+    <meta charset='utf-8' />
     <style>
-        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #f6f6f6; }
-        .container { max-width: 600px; margin: 20px auto; background-color: #ffffff; border-radius: 8px; border-left: 6px solid #2563EB; overflow: hidden; }
-        .content { padding: 30px; }
-        .alert-box { background-color: #EFF6FF; border: 1px solid #DBEAFE; color: #1E40AF; padding: 15px; border-radius: 6px; margin-bottom: 20px; }
-        .btn { background-color: #2563EB; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block; }
+      body {
+        font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+        background-color: #f6f6f6;
+      }
+      .container {
+        max-width: 600px;
+        margin: 20px auto;
+        background-color: #ffffff;
+        border-radius: 8px;
+        border-left: 6px solid #2563eb;
+        overflow: hidden;
+      }
+      .content {
+        padding: 30px;
+      }
+      .alert-box {
+        background-color: #eff6ff;
+        border: 1px solid #dbeafe;
+        color: #1e40af;
+        padding: 15px;
+        border-radius: 6px;
+        margin-bottom: 20px;
+      }
+      .btn {
+        background-color: #2563eb;
+        color: #ffffff;
+        padding: 12px 24px;
+        text-decoration: none;
+        border-radius: 6px;
+        font-weight: bold;
+        display: inline-block;
+      }
     </style>
-</head>
-<body>
-    <div class="container">
-        <div class="content">
-            <h2 style="margin-top: 0;">🔔 New Order Received</h2>
-            
-            <div class="alert-box">
-                <strong>Order #{{orderId}}</strong> needs your attention.
-            </div>
+  </head>
+  <body>
+    <div class='container'>
+      <div class='content'>
+        <h2 style='margin-top: 0;'>🔔 New Order Received</h2>
 
-            <p>You have received a new order worth <strong>₦{{total}}</strong>.</p>
-            
-            <p><strong>Items:</strong></p>
-            <ul style="padding-left: 20px; color: #555;">
-                {{#each items}}
-                <li>{{this}}</li>
-                {{/each}}
-            </ul>
-
-            <p>Please accept or decline this order within <strong>15 minutes</strong> to avoid auto-cancellation.</p>
-
-            <a href="{{dashboardUrl}}" class="btn">Go to Dashboard</a>
+        <div class='alert-box'>
+          <strong>Order #{{orderId}}</strong>
+          needs your attention.
         </div>
+
+        <p>You have received a new order worth <strong>₦{{total}}</strong>.</p>
+
+        <p><strong>Items:</strong></p>
+        <ul style='padding-left: 20px; color: #555;'>
+          {{#each items}}
+            <li>{{this}}</li>
+          {{/each}}
+        </ul>
+
+        <p>Please accept or decline this order within
+          <strong>15 minutes</strong>
+          to avoid auto-cancellation.</p>
+
+        <a href='{{dashboardUrl}}' class='btn'>Go to Dashboard</a>
+      </div>
     </div>
-</body>
+  </body>
 </html>

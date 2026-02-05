@@ -20,19 +20,27 @@ describe('Financial Integrity & Critical Paths', () => {
         PaymentService,
         PrismaService,
         TransactionLedgerService,
-        { provide: 'RidersStreamService', useValue: { emitDeliveryUpdate: jest.fn() } },
+        {
+          provide: 'RidersStreamService',
+          useValue: { emitDeliveryUpdate: jest.fn() },
+        },
         { provide: 'NotificationsService', useValue: { create: jest.fn() } },
         { provide: 'PaystackService', useValue: { verifyPayment: jest.fn() } },
         { provide: 'FlutterwaveService', useValue: {} },
         { provide: 'MonnifyService', useValue: {} },
-        { provide: 'TripsService', useValue: { startDeliveryMatching: jest.fn() } },
+        {
+          provide: 'TripsService',
+          useValue: { startDeliveryMatching: jest.fn() },
+        },
       ],
     }).compile();
 
     ridersService = module.get<RidersService>(RidersService);
     paymentService = module.get<PaymentService>(PaymentService);
     prisma = module.get<PrismaService>(PrismaService);
-    ledgerService = module.get<TransactionLedgerService>(TransactionLedgerService);
+    ledgerService = module.get<TransactionLedgerService>(
+      TransactionLedgerService,
+    );
   });
 
   describe('Race Condition: Concurrent Withdrawals', () => {
@@ -174,7 +182,9 @@ describe('Financial Integrity & Critical Paths', () => {
 
       // 2. Execute
       try {
-        await paymentService['updatePaymentStatus'](verificationResponse as any);
+        await paymentService['updatePaymentStatus'](
+          verificationResponse as any,
+        );
       } catch (e) {
         // Expected error from Ledger mock
       }

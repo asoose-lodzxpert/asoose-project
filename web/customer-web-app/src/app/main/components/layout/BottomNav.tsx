@@ -1,31 +1,35 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { ShoppingBag, Car, Package, User } from 'lucide-react';
+import { useState } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { ShoppingBag, Car, Package, User } from "lucide-react";
 
-const NavItem = ({ 
-  icon: Icon, 
-  label, 
+const NavItem = ({
+  icon: Icon,
+  label,
   active = false,
-  href
-}: { 
-  icon: any, 
-  label: string, 
-  active?: boolean,
-  href: string
+  href,
+}: {
+  icon: any;
+  label: string;
+  active?: boolean;
+  href: string;
 }) => (
-  <Link 
+  <Link
     href={href}
     className={`flex flex-col items-center gap-1 w-16 transition-colors active:scale-90 duration-200 ${
-      active 
-        ? 'text-yellow-600 dark:text-yellow-500' 
-        : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-200'
+      active
+        ? "text-yellow-600 dark:text-yellow-500"
+        : "text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
     }`}
   >
-    <div className={`p-1.5 rounded-xl transition-all ${active ? 'bg-yellow-500/10' : ''}`}>
-      <Icon className={`w-6 h-6 ${active ? 'fill-yellow-500/20 stroke-[2.5px]' : 'stroke-2'}`} />
+    <div
+      className={`p-1.5 rounded-xl transition-all ${active ? "bg-yellow-500/10" : ""}`}
+    >
+      <Icon
+        className={`w-6 h-6 ${active ? "fill-yellow-500/20 stroke-[2.5px]" : "stroke-2"}`}
+      />
     </div>
     <span className="text-[10px] font-bold">{label}</span>
   </Link>
@@ -35,19 +39,19 @@ export default function BottomNav() {
   const pathname = usePathname();
 
   const navItems = [
-    { icon: ShoppingBag, label: 'Order', href: '/main/store' },
-    { icon: Car, label: 'Ride', href: '/main/ride' },
-    { icon: Package, label: 'Deliver', href: '/main/delivery' },
-    { icon: User, label: 'Profile', href: '/main/profile' }
+    { icon: ShoppingBag, label: "Order", href: "/main/store" },
+    { icon: Car, label: "Ride", href: "/main/ride" },
+    { icon: Package, label: "Deliver", href: "/main/delivery" },
+    { icon: User, label: "Profile", href: "/main/profile" },
   ];
 
   // Helper function to check if current route matches or is a sub-route
   const isActiveRoute = (href: string) => {
     if (pathname === href) return true;
-    
+
     // Check if current path starts with the nav item's href (sub-route detection)
     // But ensure we're not just matching partial strings (e.g., /main/store-settings shouldn't match /main/store)
-    return pathname.startsWith(href + '/');
+    return pathname.startsWith(href + "/");
   };
 
   return (

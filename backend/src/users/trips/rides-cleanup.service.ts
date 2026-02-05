@@ -4,7 +4,8 @@ import { RideStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { QueueService } from '../../matching/queue/queue.service';
 // Remove TRIPS_CONFIG import if not used elsewhere
-import { TRIPS_CONFIG } from './trips.common.service'; 
+import { TRIPS_CONFIG } from './trips.common.service';
+import { rideToJobSummary } from 'src/jobs/job.dto';
 
 @Injectable()
 export class RidesCleanupService {
@@ -33,32 +34,22 @@ export class RidesCleanupService {
 
     if (stuckRides.length === 0) return;
 
-    this.logger.warn(`Found ${stuckRides.length} stuck rides. Initiating recovery...`);
+    this.logger.warn(
+      `Found ${stuckRides.length} stuck rides. Initiating recovery...`,
+    );
 
     for (const ride of stuckRides) {
       try {
         this.logger.log(`Recovering ride ${ride.id}`);
 
-        // FIX: Strictly adhere to MatchRideJobData interface
-        // Removed 'timestamp' and 'expiresAt' as they are not in the interface
-        await this.queue.enqueueRideMatching({
-          rideId: ride.id,
-          customerId: ride.customerId,
-          pickupLat: ride.pickupAddress.lat,
-          pickupLng: ride.pickupAddress.lng,
-          dropoffLat: ride.dropoffAddress.lat,
-          dropoffLng: ride.dropoffAddress.lng,
-          distanceKm: ride.distanceKm || 0,
-          totalFare: Number(ride.totalFare) || 0,
-          attempt: 1, // Reset attempt count
-        });
+        const job = rideToJobSummary(ride);
+        await this.queue.enqueueRideMatching({ job, attempt: 1 });
 
         // Touch the ride to prevent immediate re-processing
         await this.prisma.ride.update({
           where: { id: ride.id },
           data: { updatedAt: new Date() },
         });
-
       } catch (error) {
         this.logger.error(`Failed to recover ride ${ride.id}`, error);
       }

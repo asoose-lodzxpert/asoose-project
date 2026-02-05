@@ -1,32 +1,60 @@
 import { JobType } from "@/types/job";
+import { retryWithBackoff, isRetryableError } from "@/utils/retry";
 import { fetchWithAuth } from "./auth-fetch";
 
 const EXPO_PUBLIC_API_URL = process.env.EXPO_PUBLIC_API_URL;
 
 export const jobsService = {
   async updateJobStatus(jobId: string, jobType: JobType, status: string) {
-    const response = await fetchWithAuth(
-      `${EXPO_PUBLIC_API_URL}/riders/jobs/${jobId}/status`,
+    return retryWithBackoff(
+      async () => {
+        const response = await fetchWithAuth(
+          `${EXPO_PUBLIC_API_URL}/riders/jobs/${jobId}/status`,
+          {
+            method: "PATCH",
+            body: JSON.stringify({ jobType, status }),
+          },
+        );
+        return response;
+      },
       {
-        method: "PATCH",
-        body: JSON.stringify({ jobType, status }),
+        maxAttempts: 3,
+        onRetry: (attempt, error) => {
+          console.log(
+            `Retrying updateJobStatus (attempt ${attempt}):`,
+            error.message,
+          );
+        },
       },
     );
-    return response;
   },
 
   async acceptJob(jobId: string, jobType: JobType) {
-    const response = await fetchWithAuth(
-      `${EXPO_PUBLIC_API_URL}/riders/jobs/accept`,
+    return retryWithBackoff(
+      async () => {
+        const response = await fetchWithAuth(
+          `${EXPO_PUBLIC_API_URL}/riders/jobs/accept`,
+          {
+            method: "POST",
+            body: JSON.stringify({ jobId, jobType }),
+          },
+        );
+        return response;
+      },
       {
-        method: "POST",
-        body: JSON.stringify({ jobId, jobType }),
+        maxAttempts: 3,
+        onRetry: (attempt, error) => {
+          console.log(
+            `Retrying acceptJob (attempt ${attempt}):`,
+            error.message,
+          );
+        },
       },
     );
-    return response;
   },
 
   async declineJob(jobId: string, jobType: JobType) {
+    // Don't retry decline - if it fails, the job will auto-decline anyway
     const response = await fetchWithAuth(
       `${EXPO_PUBLIC_API_URL}/riders/jobs/decline`,
       {
@@ -38,29 +66,53 @@ export const jobsService = {
   },
 
   async completeJob(jobId: string, jobType: JobType, payload?: any) {
-    const response = await fetchWithAuth(
-      `${EXPO_PUBLIC_API_URL}/riders/jobs/complete`,
+    return retryWithBackoff(
+      async () => {
+        const response = await fetchWithAuth(
+          `${EXPO_PUBLIC_API_URL}/riders/jobs/complete`,
+          {
+            method: "POST",
+            body: JSON.stringify({ jobId, jobType, ...payload }),
+          },
+        );
+        return response;
+      },
       {
-        method: "POST",
-        body: JSON.stringify({ jobId, jobType, ...payload }),
+        maxAttempts: 3,
+        onRetry: (attempt, error) => {
+          console.log(
+            `Retrying completeJob (attempt ${attempt}):`,
+            error.message,
+          );
+        },
       },
     );
-    return response;
   },
 
   async goOnline(coords: { latitude: number; longitude: number }) {
-    const response = await fetchWithAuth(
-      `${EXPO_PUBLIC_API_URL}/riders/online`,
+    return retryWithBackoff(
+      async () => {
+        const response = await fetchWithAuth(
+          `${EXPO_PUBLIC_API_URL}/riders/online`,
+          {
+            method: "POST",
+            body: JSON.stringify(coords),
+            headers: { "Content-Type": "application/json" },
+          },
+        );
+        return response;
+      },
       {
-        method: "POST",
-        body: JSON.stringify(coords),
-        headers: { "Content-Type": "application/json" },
+        maxAttempts: 2,
+        onRetry: (attempt, error) => {
+          console.log(`Retrying goOnline (attempt ${attempt}):`, error.message);
+        },
       },
     );
-    return response;
   },
 
   async goOffline(coords: { latitude: number; longitude: number }) {
+    // Don't retry offline - rider can manually go offline again if needed
     const response = await fetchWithAuth(
       `${EXPO_PUBLIC_API_URL}/riders/offline`,
       {

@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import React from 'react';
+import React from "react";
 
 export default function AdminProfileSkeleton() {
   return (
@@ -16,15 +16,15 @@ export default function AdminProfileSkeleton() {
         <div className="lg:col-span-4 space-y-6">
           <div className="bg-[#1E293B] border border-gray-800 rounded-3xl p-8 text-center space-y-6 relative overflow-hidden">
             <div className="absolute top-0 left-0 w-full h-1 bg-slate-800" />
-            
+
             {/* Avatar Circle */}
             <div className="w-24 h-24 bg-slate-800 rounded-full mx-auto" />
-            
+
             <div className="space-y-3">
               <div className="h-6 w-32 bg-slate-800 mx-auto rounded" />
               <div className="h-3 w-48 bg-slate-800/50 mx-auto rounded" />
             </div>
-            
+
             {/* Info Badges */}
             <div className="space-y-2">
               <div className="h-12 w-full bg-[#0F172A] rounded-2xl border border-gray-800" />
@@ -36,12 +36,15 @@ export default function AdminProfileSkeleton() {
         {/* RIGHT: Form Sections Skeleton */}
         <div className="lg:col-span-8 space-y-6">
           {[1, 2].map((section) => (
-            <div key={section} className="bg-[#1E293B] border border-gray-800 rounded-3xl overflow-hidden shadow-xl">
+            <div
+              key={section}
+              className="bg-[#1E293B] border border-gray-800 rounded-3xl overflow-hidden shadow-xl"
+            >
               {/* Section Header */}
               <div className="p-6 border-b border-gray-800 bg-white/5">
                 <div className="h-5 w-40 bg-slate-800 rounded" />
               </div>
-              
+
               <div className="p-8 space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Field Pulses */}
@@ -52,7 +55,7 @@ export default function AdminProfileSkeleton() {
                     </div>
                   ))}
                 </div>
-                
+
                 {/* Button Pulse */}
                 <div className="flex justify-end pt-4">
                   <div className="h-14 w-44 bg-slate-800 rounded-2xl" />

@@ -16,6 +16,31 @@ import {
 export class RedisService {
   private readonly logger = new Logger(RedisService.name);
 
+  /**
+   * Returns the active ride/job ID for a driver (if any)
+   */
+  async getDriverActiveRide(driverId: string): Promise<string | null> {
+    // Uses the current job key, which is set when a driver is on a ride
+    const rideId = await this.redis.get(
+      REDIS_KEYS.DRIVER_CURRENT_JOB(driverId),
+    );
+    return rideId || null;
+  }
+
+  /**
+   * Returns the customer/user ID for a given ride/job (if any)
+   */
+  async getRideCustomer(rideId: string): Promise<string | null> {
+    // Assumes a key like ride:{rideId}:customer exists
+    if (!REDIS_KEYS.RIDE_CUSTOMER) {
+      throw new Error(
+        'REDIS_KEYS.RIDE_CUSTOMER is not defined. Please add it to redis-keys.constants.ts',
+      );
+    }
+    const customerId = await this.redis.get(REDIS_KEYS.RIDE_CUSTOMER(rideId));
+    return customerId || null;
+  }
+
   constructor(@Inject(MATCHING_REDIS_CLIENT) private readonly redis: Redis) {}
 
   getClient(): Redis {
@@ -154,18 +179,30 @@ export class RedisService {
     const results = await pipeline.exec();
     if (!results) return null;
 
-    const [status, hexId, lastSeen, currentJobId, pendingJobId, location] =
-      results.map((r) => r[1]);
+    const [
+      status,
+      hexId,
+      lastSeen,
+      currentJobId,
+      currentJobType,
+      pendingJobId,
+      pendingJobType,
+      role,
+      location,
+    ] = results.map((r) => r[1]);
 
-    if (!status) return null;
+    if (!status || !role) return null;
 
     return {
       id: riderId,
       status: status as RiderStatus,
+      role: role as DriverRole, // or RiderRole if defined separately
       hexId: hexId as string | null,
       lastSeen: lastSeen ? parseInt(lastSeen as string, 10) : 0,
       currentJobId: currentJobId as string | null,
+      currentJobType: currentJobType as JobType | null,
       pendingJobId: pendingJobId as string | null,
+      pendingJobType: pendingJobType as JobType | null,
       location: location ? JSON.parse(location as string) : null,
     };
   }
@@ -345,18 +382,4 @@ export class RedisService {
       return false;
     }
   }
-
-  // Add this method to RedisService class
-async getDriverActiveRide(driverId: string): Promise<string | null> {
-  // Assuming you store active ride mappings. 
-  // If not, we use the standard key pattern "driver_active_ride:{driverId}"
-  // This key should be set when a ride is ACCEPTED and deleted when COMPLETED.
-  return this.redis.get(`driver_active_ride:${driverId}`);
-}
-
-async getRideCustomer(rideId: string): Promise<string | null> {
-    // Helper to get customerId from a cached ride object or key
-    // For speed, we might store "ride_customer:{rideId}" -> customerId
-    return this.redis.get(`ride_customer:${rideId}`);
-}
 }

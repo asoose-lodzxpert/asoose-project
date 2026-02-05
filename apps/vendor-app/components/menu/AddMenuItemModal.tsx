@@ -138,7 +138,7 @@ export const AddMenuItemModal: React.FC<Props> = ({
             },
             (progress) => {
               setUploadProgress(progress.percentage);
-            }
+            },
           );
 
           // Add uploaded URL to images array

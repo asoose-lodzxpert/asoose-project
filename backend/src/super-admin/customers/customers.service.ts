@@ -158,7 +158,7 @@ export class CustomersService {
     });
   }
 
-async updateStatus(id: string, status: UserStatus, adminId?: string) {
+  async updateStatus(id: string, status: UserStatus, adminId?: string) {
     const customer = await this.prisma.user.findUnique({ where: { id } });
     if (!customer) throw new NotFoundException('Customer not found');
 
@@ -172,15 +172,21 @@ async updateStatus(id: string, status: UserStatus, adminId?: string) {
         await tx.activityLog.create({
           data: {
             userId: adminId,
-            action: status === 'ACTIVE' ? 'CUSTOMER_REACTIVATED' : 'CUSTOMER_STATUS_UPDATE',
+            action:
+              status === 'ACTIVE'
+                ? 'CUSTOMER_REACTIVATED'
+                : 'CUSTOMER_STATUS_UPDATE',
             target: id,
             details: `Customer status changed from ${customer.status} to ${status}`,
             metadata: {
               previousStatus: customer.status,
               newStatus: status,
-              reason: status === 'ACTIVE' ? 'Manual Reactivation (Reverse Kill Switch)' : undefined
-            }
-          }
+              reason:
+                status === 'ACTIVE'
+                  ? 'Manual Reactivation (Reverse Kill Switch)'
+                  : undefined,
+            },
+          },
         });
       }
 
@@ -233,15 +239,18 @@ async updateStatus(id: string, status: UserStatus, adminId?: string) {
   }
 
   async executeKillSwitch(
-    customerId: string, 
-    action: 'SUSPEND' | 'BAN', 
-    reason: string, 
-    adminId: string
+    customerId: string,
+    action: 'SUSPEND' | 'BAN',
+    reason: string,
+    adminId: string,
   ) {
-    const customer = await this.prisma.user.findUnique({ where: { id: customerId } });
+    const customer = await this.prisma.user.findUnique({
+      where: { id: customerId },
+    });
     if (!customer) throw new NotFoundException('Customer not found');
 
-    const targetStatus = action === 'BAN' ? UserStatus.BANNED : UserStatus.SUSPENDED;
+    const targetStatus =
+      action === 'BAN' ? UserStatus.BANNED : UserStatus.SUSPENDED;
 
     await this.prisma.$transaction(async (tx) => {
       await tx.user.update({
@@ -249,7 +258,7 @@ async updateStatus(id: string, status: UserStatus, adminId?: string) {
         data: {
           status: targetStatus,
           fcmToken: null, // Revoke access
-        }
+        },
       });
 
       await tx.activityLog.create({
@@ -261,13 +270,12 @@ async updateStatus(id: string, status: UserStatus, adminId?: string) {
           metadata: {
             previousStatus: customer.status,
             reason,
-            actionType: action
-          }
-        }
+            actionType: action,
+          },
+        },
       });
     });
 
     return { success: true, message: `Customer has been ${action}ED.` };
   }
-
 }

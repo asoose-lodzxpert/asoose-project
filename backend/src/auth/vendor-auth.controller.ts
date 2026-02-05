@@ -20,7 +20,10 @@ import { ResetPasswordDto } from '../auth/dto/reset-password.dto';
 import { UpdateProfileDto } from '../auth/dto/update-profile.dto';
 import { LoginVendorDto } from '../auth/dto/login-vendor.dto';
 
-@Controller('auth/vendor')
+@Controller({
+  path: 'auth/vendor',
+  version: '1',
+})
 export class VendorAuthController {
   constructor(private readonly vendorAuthService: VendorAuthService) {}
 

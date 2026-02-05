@@ -8,7 +8,10 @@ import type { Request, Response } from 'express';
 
 import { QUEUE_NAMES } from '../matching/queue/queue.constants';
 
-@Controller('system/queues')
+@Controller({
+  path: 'system/queues',
+  version: '1',
+})
 export class BullBoardController {
   private static serverAdapter: ExpressAdapter;
 

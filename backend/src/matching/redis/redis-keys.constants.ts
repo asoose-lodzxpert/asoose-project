@@ -10,6 +10,8 @@
 export const REDIS_CLIENT = 'REDIS_CLIENT';
 
 export const REDIS_KEYS = {
+  /** Customer ID for a given ride/job */
+  RIDE_CUSTOMER: (rideId: string) => `ride:${rideId}:customer`,
   // ========================================
   // DRIVER STATE (SOURCE OF TRUTH)
   // ========================================
@@ -42,6 +44,33 @@ export const REDIS_KEYS = {
 
   /** Driver's last known location (GeoJSON) */
   DRIVER_LOCATION: (driverId: string) => `driver:${driverId}:location`,
+
+  // ========================================
+  // RIDER STATE (DELIVERY ONLY)
+  // ========================================
+
+  /** Rider online status: OFFLINE | ONLINE | ACTIVE */
+  RIDER_STATUS: (riderId: string) => `rider:${riderId}:status`,
+
+  /** Current hex ID where rider is located */
+  RIDER_HEX: (riderId: string) => `rider:${riderId}:hex`,
+
+  /** Unix timestamp of last heartbeat / location update */
+  RIDER_LAST_SEEN: (riderId: string) => `rider:${riderId}:lastSeen`,
+
+  /** Current active delivery ID */
+  RIDER_CURRENT_DELIVERY: (riderId: string) =>
+    `rider:${riderId}:currentDelivery`,
+
+  /** Pending delivery assignment (TTL enforced) */
+  RIDER_PENDING_DELIVERY: (riderId: string) =>
+    `rider:${riderId}:pendingDelivery`,
+
+  /** Rider's last known location (GeoJSON) */
+  RIDER_LOCATION: (riderId: string) => `rider:${riderId}:location`,
+
+  /** Global geospatial index for fallback queries for riders */
+  RIDERS_GEO_INDEX: 'riders:geo',
 
   // ========================================
   // HEX GEOSPATIAL INDEX
@@ -167,8 +196,8 @@ export interface DriverState {
 
 export interface RiderState {
   id: string;
-  role: DriverRole;
-  status: DriverStatus;
+  role: DriverRole; // always RIDER
+  status: RiderStatus;
   hexId: string | null;
   lastSeen: number;
 

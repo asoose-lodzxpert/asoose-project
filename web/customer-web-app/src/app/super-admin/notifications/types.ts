@@ -2,9 +2,9 @@ export interface Notification {
   id: string;
   title: string;
   message: string;
-  type: 'ORDER' | 'ALERT' | 'INFO' | 'SUCCESS' | 'RIDE' | 'PAYMENT';
+  type: "ORDER" | "ALERT" | "INFO" | "SUCCESS" | "RIDE" | "PAYMENT";
   isRead: boolean;
-  createdAt: string; 
+  createdAt: string;
   metadata?: Record<string, any>;
 }
 

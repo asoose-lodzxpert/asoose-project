@@ -1,5 +1,5 @@
-import React from 'react';
-import { Search, Filter, Download, Calendar } from 'lucide-react';
+import React from "react";
+import { Search, Filter, Download, Calendar } from "lucide-react";
 
 const SkeletonBox = ({ className = "" }) => (
   <div className={`bg-gray-700/30 animate-pulse rounded ${className}`} />
@@ -85,7 +85,6 @@ export default function RidesPageSkeleton() {
   return (
     <div className="min-h-screen bg-[#0F172A] p-4 md:p-6 pb-20">
       <div className="max-w-7xl mx-auto space-y-6">
-        
         {/* Header Skeleton */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
@@ -105,7 +104,6 @@ export default function RidesPageSkeleton() {
         {/* Filters Panel Skeleton */}
         <div className="bg-[#1E293B] p-4 rounded-xl border border-gray-800 space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-5 gap-4">
-            
             {/* Search Skeleton */}
             <div className="md:col-span-2 relative">
               <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-500" />
@@ -136,7 +134,6 @@ export default function RidesPageSkeleton() {
                 </div>
               </div>
             </div>
-
           </div>
         </div>
 
@@ -190,7 +187,6 @@ export default function RidesPageSkeleton() {
             <SkeletonMobileCard key={i} />
           ))}
         </div>
-
       </div>
     </div>
   );

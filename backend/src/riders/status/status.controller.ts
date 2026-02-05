@@ -6,7 +6,10 @@ import { UserRole } from '../../common/enums/user-role.enum';
 import { StatusService } from './status.service';
 import { UpdateRiderStatusDto } from '../dto/update-status.dto';
 
-@Controller('riders/status')
+@Controller({
+  path: 'riders/status',
+  version: '1',
+})
 export class StatusController {
   constructor(private readonly statusService: StatusService) {}
 

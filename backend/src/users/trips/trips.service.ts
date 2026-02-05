@@ -99,7 +99,7 @@ export class TripsService {
   }
 
   async confirmPickup(deliveryId: string, riderId: string, proof: string) {
-    return this.deliveriesService.confirmPickup(deliveryId, riderId, proof);
+    return this.deliveriesService.confirmPickup(deliveryId, riderId);
   }
 
   async completeDelivery(

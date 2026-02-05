@@ -12,7 +12,7 @@ import { EventBusService } from '../events/event-bus.service';
 import { QueueService } from '../queue/queue.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ATOMIC_LOCK_DRIVER } from '../redis/lua-scripts';
-import { REDIS_TTL, TripType } from '../redis/redis-keys.constants';
+import { REDIS_TTL, JobType } from '../redis/redis-keys.constants';
 
 /**
  * Delivery Matching Worker
@@ -44,45 +44,23 @@ export class DeliveryMatchingProcessor extends WorkerHost {
   }
 
   async process(job: Job<MatchDeliveryJobData>): Promise<void> {
-    const {
-      deliveryId,
-      customerId,
-      orderId,
-      pickupLat,
-      pickupLng,
-      dropoffLat,
-      dropoffLng,
-      distanceKm,
-      deliveryFee,
-      packageDetails,
-      recipientName,
-      recipientPhone,
-      attempt,
-      excludeDriverIds = [],
-    } = job.data;
-
+    const { job: jobSummary, attempt, excludeDriverIds = [] } = job.data;
+    const deliveryId = jobSummary.id;
     this.logger.log(`🔍 Matching delivery ${deliveryId} (attempt ${attempt})`);
 
     try {
-      // Acquire global trip lock
-      const locked = await this.redis.setTripLock(
-        TripType.DELIVERY,
-        deliveryId,
-      );
-      if (!locked) {
-        this.logger.warn(`Delivery ${deliveryId} is already being matched`);
-        return;
-      }
-
-      // Verify delivery status
       const delivery = await this.prisma.delivery.findUnique({
         where: { id: deliveryId },
-        select: { status: true, riderId: true },
+        select: {
+          status: true,
+          riderId: true,
+          customerId: true,
+          orderId: true,
+        },
       });
 
       if (!delivery) {
         this.logger.error(`Delivery ${deliveryId} not found`);
-        await this.redis.releaseTripLock(TripType.DELIVERY, deliveryId);
         return;
       }
 
@@ -90,35 +68,33 @@ export class DeliveryMatchingProcessor extends WorkerHost {
         this.logger.log(
           `Delivery ${deliveryId} no longer REQUESTED (status: ${delivery.status})`,
         );
-        await this.redis.releaseTripLock(TripType.DELIVERY, deliveryId);
         return;
       }
 
       // Get declined drivers
-      const declinedDrivers = await this.redis.getDeclinedDrivers(
-        TripType.DELIVERY,
-        deliveryId,
-      );
+      const declinedDrivers = await this.redis.getDeclinedDrivers(deliveryId);
       const allExcludedDrivers = [...excludeDriverIds, ...declinedDrivers];
 
       // Get pickup hex
+      const pickupLat = jobSummary.pickupAddress?.lat;
+      const pickupLng = jobSummary.pickupAddress?.lng;
+      const dropoffLat = jobSummary.dropoffAddress?.lat;
+      const dropoffLng = jobSummary.dropoffAddress?.lng;
       const pickupHex = this.geo.latLngToHex(pickupLat, pickupLng);
 
       // Search in rings
       const driverFound = await this.searchInRings(
         deliveryId,
-        customerId,
-        orderId,
         pickupHex,
         pickupLat,
         pickupLng,
         dropoffLat,
         dropoffLng,
-        distanceKm,
-        deliveryFee,
-        packageDetails,
-        recipientName,
-        recipientPhone,
+        jobSummary.distanceKm ?? 0,
+        jobSummary.earnings,
+        jobSummary.packageDetails,
+        jobSummary.customerName,
+        jobSummary.customerPhone ?? '',
         allExcludedDrivers,
       );
 
@@ -127,26 +103,17 @@ export class DeliveryMatchingProcessor extends WorkerHost {
       } else {
         await this.handleNoDriverFound(
           deliveryId,
-          customerId,
-          orderId,
-          pickupLat,
-          pickupLng,
-          attempt,
+          delivery.orderId ?? undefined,
         );
       }
-
-      await this.redis.releaseTripLock(TripType.DELIVERY, deliveryId);
     } catch (error) {
       this.logger.error(`Error matching delivery ${deliveryId}:`, error);
-      await this.redis.releaseTripLock(TripType.DELIVERY, deliveryId);
       throw error;
     }
   }
 
   private async searchInRings(
     deliveryId: string,
-    customerId: string,
-    orderId: string | undefined,
     centerHex: string,
     pickupLat: number,
     pickupLng: number,
@@ -164,36 +131,26 @@ export class DeliveryMatchingProcessor extends WorkerHost {
 
     for (let ringIndex = 0; ringIndex < rings.length; ringIndex++) {
       const ring = rings[ringIndex];
-
       for (const hexId of ring) {
         const driverIds = await this.redis.getDriversInHex(hexId);
-
         if (driverIds.length === 0) continue;
-
         const candidateIds = driverIds.filter(
           (id) => !excludeDriverIds.includes(id),
         );
-
         if (candidateIds.length === 0) continue;
-
         const candidates = await this.getDriverLocations(candidateIds);
         const sorted = this.geo.sortByDistance(
           pickupLat,
           pickupLng,
           candidates,
         );
-
         for (const driver of sorted) {
           totalAttempts++;
-
           if (totalAttempts > this.MAX_ATTEMPTS) {
             return false;
           }
-
           const assigned = await this.attemptAssignment(
             deliveryId,
-            customerId,
-            orderId,
             driver.id,
             hexId,
             pickupLat,
@@ -206,7 +163,6 @@ export class DeliveryMatchingProcessor extends WorkerHost {
             recipientName,
             recipientPhone,
           );
-
           if (assigned) {
             return true;
           }
@@ -219,8 +175,6 @@ export class DeliveryMatchingProcessor extends WorkerHost {
 
   private async attemptAssignment(
     deliveryId: string,
-    customerId: string,
-    orderId: string | undefined,
     driverId: string,
     hexId: string,
     pickupLat: number,
@@ -239,7 +193,7 @@ export class DeliveryMatchingProcessor extends WorkerHost {
         ATOMIC_LOCK_DRIVER,
         0,
         driverId,
-        TripType.DELIVERY,
+        JobType.DELIVERY,
         deliveryId,
         hexId,
         REDIS_TTL.PENDING_ASSIGNMENT.toString(),
@@ -250,35 +204,26 @@ export class DeliveryMatchingProcessor extends WorkerHost {
         `🔒 Locked driver ${driverId} for delivery ${deliveryId}`,
       );
 
-      // Schedule timeout
+      // Schedule timeout using job-centric payload
       await this.queue.scheduleAssignmentTimeout(
         {
-          tripType: TripType.DELIVERY,
-          tripId: deliveryId,
-          driverId,
-          scheduledFor: Date.now() + this.TIMEOUT_MS,
+          job: {
+            id: deliveryId,
+            jobType: 'delivery',
+            pickupAddress: { lat: pickupLat, lng: pickupLng },
+            dropoffAddress: { lat: dropoffLat, lng: dropoffLng },
+            customerName: recipientName,
+            customerPhone: recipientPhone,
+            earnings: deliveryFee,
+            distanceKm,
+            packageDetails,
+            status: 'assigned',
+          },
         },
         this.TIMEOUT_MS,
       );
 
-      // Emit event
-      this.eventBus.emitDeliveryAssignmentRequested({
-        deliveryId,
-        driverId,
-        customerId,
-        orderId,
-        pickupLat,
-        pickupLng,
-        dropoffLat,
-        dropoffLng,
-        deliveryFee,
-        distanceKm,
-        packageDetails,
-        recipientName,
-        recipientPhone,
-        expiresAt: Date.now() + this.TIMEOUT_MS,
-        timestamp: Date.now(),
-      });
+      // Optionally emit a generic event or log here if needed
 
       return true;
     }
@@ -307,16 +252,9 @@ export class DeliveryMatchingProcessor extends WorkerHost {
 
   private async handleNoDriverFound(
     deliveryId: string,
-    customerId: string,
     orderId: string | undefined,
-    pickupLat: number,
-    pickupLng: number,
-    attempt: number,
   ): Promise<void> {
-    const attempts = await this.redis.incrementMatchingAttempts(
-      TripType.DELIVERY,
-      deliveryId,
-    );
+    const attempts = await this.redis.incrementMatchingAttempts(deliveryId);
 
     this.logger.warn(
       `❌ No driver found for delivery ${deliveryId} (attempt ${attempts})`,
@@ -331,19 +269,11 @@ export class DeliveryMatchingProcessor extends WorkerHost {
     // If linked to order, update order status
     if (orderId) {
       await this.prisma.order.update({
-        where: { id: orderId },
+        where: { id: String(orderId) },
         data: { status: 'CANCELLED' },
       });
     }
 
-    this.eventBus.emitDeliveryNoDriverFound({
-      deliveryId,
-      customerId,
-      orderId,
-      pickupLat,
-      pickupLng,
-      attempts,
-      timestamp: Date.now(),
-    });
+    // Optionally emit a generic event or log here if needed
   }
 }

@@ -1,23 +1,26 @@
 // seed.ts
 import { prisma, cleanDatabase } from './seed-utils';
-import { seedUsersAndRiders } from './01-users-riders';
-import { seedVendorsAndProducts } from './02-vendors-products';
-import { seedWalletsAndTransactions } from './03-wallets-transactions';
-import { seedPayouts } from './04-payouts';
-import { seedDisputes } from './05-disputes'; // NEW
-import { seedVerificationQueue } from './06-verification'; // NEW
+import { seedAddresses } from './01-address';
+import { seedUsersAndRiders } from './02-users-riders';
+import { seedVendorsAndProducts } from './03-vendors-products';
+import { seedWalletsAndTransactions } from './04-wallets-transactions';
+import { seedPayouts } from './05-payouts';
+import { seedDisputes } from './06-disputes';
+import { seedVerificationQueue } from './07-verification';
+import { seedBanks } from './08-bank';
 
 async function main() {
   // await cleanDatabase(); // Optional
 
+  await seedAddresses();
   await seedUsersAndRiders();
   await seedVendorsAndProducts();
   await seedWalletsAndTransactions();
   await seedPayouts();
 
-  // New modules
   await seedDisputes();
   await seedVerificationQueue();
+  await seedBanks();
 
   console.log('✅ Database seeded successfully!');
 }

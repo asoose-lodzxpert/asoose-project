@@ -1,12 +1,18 @@
-'use client';
+"use client";
 
-import React from 'react';
+import React from "react";
 
 const SkeletonBox = ({ className = "" }: { className?: string }) => (
   <div className={`bg-gray-700/30 rounded animate-pulse ${className}`} />
 );
 
-const SkeletonText = ({ width = "w-full", height = "h-4" }: { width?: string, height?: string }) => (
+const SkeletonText = ({
+  width = "w-full",
+  height = "h-4",
+}: {
+  width?: string;
+  height?: string;
+}) => (
   <div className={`${width} ${height} bg-gray-700/30 rounded animate-pulse`} />
 );
 
@@ -14,14 +20,13 @@ export default function DisputesPageSkeleton() {
   return (
     <div className="min-h-screen bg-[#0F172A] p-4 md:p-6">
       <div className="max-w-7xl mx-auto space-y-6">
-        
         {/* Header Skeleton */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div className="space-y-2">
             <SkeletonText width="w-48" height="h-8" />
             <SkeletonText width="w-64" height="h-4" />
           </div>
-          
+
           <div className="flex gap-2 w-full md:w-auto">
             <SkeletonBox className="md:hidden w-10 h-10 rounded-lg" />
             <SkeletonBox className="flex-1 md:flex-none w-32 h-10 rounded-lg" />
@@ -94,7 +99,10 @@ export default function DisputesPageSkeleton() {
         {/* Mobile Cards Skeleton */}
         <div className="md:hidden space-y-3">
           {[1, 2, 3, 4, 5].map((card) => (
-            <div key={card} className="bg-[#1E293B] border border-gray-800 rounded-lg p-4">
+            <div
+              key={card}
+              className="bg-[#1E293B] border border-gray-800 rounded-lg p-4"
+            >
               <div className="flex justify-between items-start mb-3">
                 <SkeletonText width="w-24" height="h-5" />
                 <SkeletonBox className="w-24 h-6 rounded" />

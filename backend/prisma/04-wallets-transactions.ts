@@ -1,8 +1,13 @@
 // 03-wallets-transactions.ts
 import { prisma } from './seed-utils';
-import { 
-  TransactionType, WalletEntityType, TransactionStatus, 
-  OrderStatus, PaymentStatus, PaymentMethod, UserRole 
+import {
+  TransactionType,
+  WalletEntityType,
+  TransactionStatus,
+  OrderStatus,
+  PaymentStatus,
+  PaymentMethod,
+  UserRole,
 } from '@prisma/client';
 
 export async function seedWalletsAndTransactions() {
@@ -10,17 +15,19 @@ export async function seedWalletsAndTransactions() {
 
   const stores = await prisma.store.findMany({ take: 5 });
   const riders = await prisma.rider.findMany({ take: 5 });
-  const customer = await prisma.user.findFirst({ where: { role: UserRole.CUSTOMER } });
+  const customer = await prisma.user.findFirst({
+    where: { role: UserRole.CUSTOMER },
+  });
 
   if (!customer || stores.length === 0 || riders.length === 0) {
-    throw new Error("❌ Run Users and Vendors seeds first.");
+    throw new Error('❌ Run Users and Vendors seeds first.');
   }
 
   // --- Scenario: Generate Income for Stores and Riders ---
-  
+
   for (const store of stores) {
-    const orderTotal = 5000.00;
-    const platformFee = orderTotal * 0.10; // 10%
+    const orderTotal = 5000.0;
+    const platformFee = orderTotal * 0.1; // 10%
     const vendorEarning = orderTotal - platformFee;
 
     // 1. Create a Completed Order
@@ -34,12 +41,12 @@ export async function seedWalletsAndTransactions() {
         deliveredAt: new Date(),
         items: {
           create: {
-            nameSnap: "Test Product",
+            nameSnap: 'Test Product',
             quantity: 2,
-            price: 2500.00
-          }
-        }
-      }
+            price: 2500.0,
+          },
+        },
+      },
     });
 
     // 2. Create Ledger Entry: Vendor Earning
@@ -54,23 +61,23 @@ export async function seedWalletsAndTransactions() {
         balanceAfter: store.walletBalance + vendorEarning,
         description: `Earnings for Order #${order.id.slice(0, 8)}`,
         status: TransactionStatus.COMPLETED,
-      }
+      },
     });
 
     // 3. Update Store Wallet
     await prisma.store.update({
       where: { id: store.id },
-      data: { 
+      data: {
         walletBalance: { increment: vendorEarning },
         totalRevenue: { increment: orderTotal },
-        totalOrders: { increment: 1 }
-      }
+        totalOrders: { increment: 1 },
+      },
     });
   }
 
   for (const rider of riders) {
-    const rideFare = 2000.00;
-    const riderCommission = rideFare * 0.20; // 20%
+    const rideFare = 2000.0;
+    const riderCommission = rideFare * 0.2; // 20%
     const riderEarning = rideFare - riderCommission;
 
     // 1. Ledger Entry: Rider Earning (Simulating a completed ride)
@@ -84,16 +91,16 @@ export async function seedWalletsAndTransactions() {
         balanceAfter: rider.walletBalance + riderEarning,
         description: 'Ride Earnings',
         status: TransactionStatus.COMPLETED,
-      }
+      },
     });
 
     // 2. Update Rider Wallet
     await prisma.rider.update({
       where: { id: rider.id },
-      data: { 
+      data: {
         walletBalance: { increment: riderEarning },
-        totalRides: { increment: 1 }
-      }
+        totalRides: { increment: 1 },
+      },
     });
   }
 }

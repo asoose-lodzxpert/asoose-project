@@ -115,18 +115,28 @@ export class DriverInactivityProcessor extends WorkerHost {
   }
 
   private async setDriverOfflineForInactivity(driverId: string): Promise<void> {
-    const state = await this.redis.getDriverState(driverId);
+    await this.handleDriverInactivity(driverId);
+  }
 
-    if (!state) {
-      return;
-    }
+  // Handles driver inactivity (same pattern as handleAssignmentTimeout)
+  async handleDriverInactivity(driverId: string): Promise<void> {
+    const state = await this.redis.getDriverState(driverId);
+    if (!state?.hexId) return;
 
     // Check if driver has active trip
-    if (state.currentRide || state.currentDelivery) {
+    if (state.currentJobId) {
       this.logger.warn(
         `Driver ${driverId} has active trip, cannot set offline`,
       );
-      // TODO: Emit alert for support team
+      // Emit alert for support team
+      if (this.eventBus.emitSupportAlert) {
+        this.eventBus.emitSupportAlert({
+          type: 'driver-inactivity-active-trip',
+          driverId,
+          currentJobId: state.currentJobId,
+          timestamp: Date.now(),
+        });
+      }
       return;
     }
 
@@ -135,17 +145,51 @@ export class DriverInactivityProcessor extends WorkerHost {
       .getClient()
       .eval(ATOMIC_SET_OFFLINE, 0, driverId);
 
-    if (result === 1) {
-      // Successfully set offline
-      await this.redis.removeDriverFromGeoIndex(driverId);
+    if (result !== 1) return;
 
+    await this.redis.removeDriverFromGeoIndex(driverId);
+
+    if (this.eventBus.emitDriverMarkedInactive) {
       this.eventBus.emitDriverMarkedInactive({
         driverId,
         lastSeen: state.lastSeen,
         markedAt: Date.now(),
       });
-
-      this.logger.log(`✅ Driver ${driverId} marked OFFLINE due to inactivity`);
     }
+
+    this.logger.log(`✅ Driver ${driverId} marked OFFLINE due to inactivity`);
+  }
+
+  // Handles rider inactivity (requires similar Redis and event bus support)
+  async handleRiderInactivity(riderId: string): Promise<void> {
+    if (!this.redis.getRiderState) {
+      this.logger.warn('getRiderState not implemented in RedisService');
+      return;
+    }
+    const state = await this.redis.getRiderState(riderId);
+    if (!state) return;
+
+    // Execute atomic offline script for rider
+    if (!global.ATOMIC_SET_RIDER_OFFLINE) {
+      this.logger.warn('ATOMIC_SET_RIDER_OFFLINE script not implemented');
+    } else {
+      const result = await this.redis
+        .getClient()
+        .eval(global.ATOMIC_SET_RIDER_OFFLINE, 0, riderId);
+      if (result !== 1) {
+        this.logger.warn(`Failed to mark rider ${riderId} offline in Redis`);
+        return;
+      }
+    }
+
+    if (this.eventBus.emitRiderMarkedInactive) {
+      this.eventBus.emitRiderMarkedInactive({
+        riderId,
+        lastSeen: state.lastSeen,
+        markedAt: Date.now(),
+      });
+    }
+
+    this.logger.log(`✅ Rider ${riderId} marked INACTIVE due to inactivity`);
   }
 }

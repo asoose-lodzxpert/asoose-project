@@ -18,7 +18,9 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
-    "seed": "tsx prisma/seed.ts"
+    "seed": "tsx prisma/seed.ts",
+    "android": "expo run:android",
+    "ios": "expo run:ios"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -76,7 +78,10 @@
     "rxjs": "^7.8.1",
     "socket.io": "^4.8.3",
     "winston": "^3.19.0",
-    "zod": "^4.1.13"
+    "zod": "^4.1.13",
+    "expo": "~54.0.32",
+    "react": "19.1.0",
+    "react-native": "0.81.5"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",

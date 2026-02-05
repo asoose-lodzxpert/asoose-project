@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import React, { useEffect, useState } from 'react';
-import { useCartStore } from '@/store/useCartStore';
-import Link from 'next/link';
+import React, { useEffect, useState } from "react";
+import { useCartStore } from "@/store/useCartStore";
+import Link from "next/link";
 
 interface SidebarCartProps {
   restaurantName: string;
@@ -24,7 +24,9 @@ export const SidebarCart = ({ restaurantName }: SidebarCartProps) => {
     <div className="bg-white dark:bg-[#151515] p-6 rounded-3xl border border-gray-100 dark:border-white/5 shadow-sm">
       <div className="flex items-center justify-between mb-4">
         <h3 className="font-black text-lg">Your Order</h3>
-        <span className="text-xs font-bold text-gray-400 line-clamp-1 max-w-[100px]">{restaurantName}</span>
+        <span className="text-xs font-bold text-gray-400 line-clamp-1 max-w-[100px]">
+          {restaurantName}
+        </span>
       </div>
 
       {items.length === 0 ? (
@@ -34,14 +36,21 @@ export const SidebarCart = ({ restaurantName }: SidebarCartProps) => {
       ) : (
         <div className="space-y-3 mb-6 max-h-60 overflow-y-auto pr-1 custom-scrollbar">
           {items.map((item) => (
-            <div key={item.id} className="flex justify-between items-center text-sm">
+            <div
+              key={item.id}
+              className="flex justify-between items-center text-sm"
+            >
               <div className="flex items-center gap-2">
                 <span className="font-bold bg-yellow-100 dark:bg-yellow-500/20 text-yellow-700 dark:text-yellow-500 px-2 py-0.5 rounded-md text-xs">
                   {item.quantity}x
                 </span>
-                <span className="text-gray-700 dark:text-gray-300">{item.name}</span>
+                <span className="text-gray-700 dark:text-gray-300">
+                  {item.name}
+                </span>
               </div>
-              <span className="font-bold">₦{(item.price * item.quantity).toLocaleString()}</span>
+              <span className="font-bold">
+                ₦{(item.price * item.quantity).toLocaleString()}
+              </span>
             </div>
           ))}
         </div>
@@ -50,8 +59,10 @@ export const SidebarCart = ({ restaurantName }: SidebarCartProps) => {
       {/* Total Section */}
       {items.length > 0 && (
         <div className="flex justify-between items-center mb-4 border-t border-dashed border-gray-200 dark:border-white/10 pt-4">
-            <span className="text-gray-500 font-medium">Total</span>
-            <span className="font-black text-xl">₦{totalPrice.toLocaleString()}</span>
+          <span className="text-gray-500 font-medium">Total</span>
+          <span className="font-black text-xl">
+            ₦{totalPrice.toLocaleString()}
+          </span>
         </div>
       )}
 

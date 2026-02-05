@@ -44,7 +44,7 @@ export async function signupVendor(data: SignupData) {
           location: data.step3.location,
           openHours: data.step3.openHours,
         }),
-      }
+      },
     );
     if (!res.ok) {
       const error = await res.json();
