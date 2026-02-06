@@ -61,11 +61,11 @@ export default function LocationAutocomplete({
 }: Props) {
   const { isLoaded: contextLoaded } = useGoogleMaps();
   const isMapsScriptReady = propLoaded ?? contextLoaded;
-  
+
   const isMounted = useRef(true);
   const containerRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
-  
+
   const isProgrammaticUpdate = useRef(false);
   const isInitializingLibs = useRef(false);
 
@@ -86,7 +86,10 @@ export default function LocationAutocomplete({
   const [geocodingLib, setGeocodingLib] = useState<any>(null);
   const [sessionToken, setSessionToken] = useState<any>(null);
 
-  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [userLocation, setUserLocation] = useState<{
+    lat: number;
+    lng: number;
+  } | null>(null);
 
   const debouncedInputValue = useDebounce(inputValue, 300);
   const prevInitialValueRef = useRef(initialValue);
@@ -104,7 +107,12 @@ export default function LocationAutocomplete({
 
   // Initialize Libraries
   useEffect(() => {
-    if (isMapsScriptReady && !placesLib && isMounted.current && !isInitializingLibs.current) {
+    if (
+      isMapsScriptReady &&
+      !placesLib &&
+      isMounted.current &&
+      !isInitializingLibs.current
+    ) {
       isInitializingLibs.current = true;
       setIsLibraryLoading(true);
 
@@ -114,7 +122,7 @@ export default function LocationAutocomplete({
       ])
         .then(([placesResult, geocodingResult]) => {
           if (!isMounted.current) return;
-          
+
           // Cast to any allows us to use the library without strict type definition checks
           const places = placesResult as any;
           setPlacesLib(places);
@@ -156,7 +164,7 @@ export default function LocationAutocomplete({
           setUserLocation({ lat: 9.082, lng: 8.6753 });
         }
       },
-      { enableHighAccuracy: false, timeout: 5000 }
+      { enableHighAccuracy: false, timeout: 5000 },
     );
   }, []);
 
@@ -174,7 +182,7 @@ export default function LocationAutocomplete({
     const fetchSuggestions = async () => {
       if (isProgrammaticUpdate.current) {
         isProgrammaticUpdate.current = false;
-        return; 
+        return;
       }
 
       if (!debouncedInputValue || debouncedInputValue.length < 2) {
@@ -205,14 +213,17 @@ export default function LocationAutocomplete({
         };
 
         const { suggestions: results } =
-          await placesLib.AutocompleteSuggestion.fetchAutocompleteSuggestions(request);
+          await placesLib.AutocompleteSuggestion.fetchAutocompleteSuggestions(
+            request,
+          );
 
         if (currentController.signal.aborted || !isMounted.current) return;
 
         setSuggestions((results as AutocompleteSuggestion[]) || []);
         setError(null);
       } catch (err: any) {
-        if (err.name === "AbortError" || currentController.signal.aborted) return;
+        if (err.name === "AbortError" || currentController.signal.aborted)
+          return;
         if (isMounted.current) setSuggestions([]);
       }
     };
@@ -234,8 +245,9 @@ export default function LocationAutocomplete({
     setIsSelecting(true);
     setError(null);
 
-    const addressText = prediction.text?.text || prediction.mainText?.text || "Selected Address";
-    
+    const addressText =
+      prediction.text?.text || prediction.mainText?.text || "Selected Address";
+
     isProgrammaticUpdate.current = true;
     setInputValue(addressText);
     setSuggestions([]);
@@ -269,7 +281,6 @@ export default function LocationAutocomplete({
       }
 
       onSelect({ address: formattedAddress, lat, lng });
-
     } catch (error: any) {
       console.error("Place Details Error:", error);
       let userMessage = "Unable to retrieve location details.";
@@ -332,10 +343,10 @@ export default function LocationAutocomplete({
           }
 
           const address = response.results[0].formatted_address;
-          
+
           isProgrammaticUpdate.current = true;
           setInputValue(address);
-          setSuggestions([]); 
+          setSuggestions([]);
           setIsFocused(false);
 
           onSelect({ address, lat, lng });
@@ -352,14 +363,17 @@ export default function LocationAutocomplete({
         setIsLocating(false);
         setError("Unable to get location");
       },
-      { enableHighAccuracy: true, timeout: 10000 }
+      { enableHighAccuracy: true, timeout: 10000 },
     );
   };
 
   // Close dropdown on outside click
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(event.target as Node)
+      ) {
         setIsFocused(false);
       }
     };
@@ -416,7 +430,9 @@ export default function LocationAutocomplete({
       {error && (
         <div className="absolute top-full mt-2 left-0 right-0 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-3 z-50 flex items-center gap-2 animate-in fade-in slide-in-from-top-1">
           <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 shrink-0" />
-          <p className="text-xs text-red-700 dark:text-red-300 font-medium">{error}</p>
+          <p className="text-xs text-red-700 dark:text-red-300 font-medium">
+            {error}
+          </p>
         </div>
       )}
 
@@ -441,7 +457,8 @@ export default function LocationAutocomplete({
 
           {suggestions.map((suggestion, index) => {
             const mainText = suggestion.placePrediction?.mainText?.text;
-            const secondaryText = suggestion.placePrediction?.secondaryText?.text;
+            const secondaryText =
+              suggestion.placePrediction?.secondaryText?.text;
 
             if (!mainText) return null;
 
@@ -461,7 +478,9 @@ export default function LocationAutocomplete({
                   <p className="font-bold text-xs truncate text-zinc-900 dark:text-white">
                     {mainText}
                   </p>
-                  <p className="text-[10px] text-gray-500 truncate">{secondaryText}</p>
+                  <p className="text-[10px] text-gray-500 truncate">
+                    {secondaryText}
+                  </p>
                 </div>
               </li>
             );

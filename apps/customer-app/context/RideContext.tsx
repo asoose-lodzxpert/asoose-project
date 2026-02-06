@@ -135,9 +135,17 @@ export function RideProvider({ children }: { children: ReactNode }) {
   }, [user, mapStatusToPageView]);
 
   // Initialize WebSocket connection
-
   const initializeSocket = useCallback(async () => {
-    if (!user?.id || socketRef.current?.connected) return;
+    if (!user?.id) return;
+
+    // If socket already exists and is connected, do nothing
+    if (socketRef.current && socketRef.current.connected) return;
+
+    // If socket exists but is not connected, disconnect and clean up
+    if (socketRef.current) {
+      socketRef.current.disconnect();
+      socketRef.current = null;
+    }
 
     const token = await getAccessToken();
 
@@ -229,7 +237,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
     socketRef.current = socket;
   }, [user?.id, refreshCurrentRide]);
 
-  // Cleanup socket on unmount
+  // Cleanup socket on unmount or when user changes
   useEffect(() => {
     return () => {
       if (socketRef.current) {
@@ -241,7 +249,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
         pollingIntervalRef.current = null;
       }
     };
-  }, []);
+  }, [user?.id]);
 
   // Initialize socket when user is available
   useEffect(() => {

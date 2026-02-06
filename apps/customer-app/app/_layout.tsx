@@ -1,4 +1,3 @@
-import { Stack, useRouter, useSegments } from "expo-router";
 import { View, ActivityIndicator } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -19,6 +18,10 @@ import { RideProvider } from "@/context/RideContext";
 /* ---------------------------------- */
 /* Helper: App Providers Wrapper      */
 /* ---------------------------------- */
+import { SafeAreaProvider } from "react-native-safe-area-context";
+import { useRouter, useSegments } from "expo-router";
+import { Stack } from "expo-router";
+
 // Combining providers here cleans up the RootLayout significantly
 function AppProviders({ children }: { children: React.ReactNode }) {
   return (
@@ -160,8 +163,10 @@ function RootNavigator() {
 /* ---------------------------------- */
 export default function RootLayout() {
   return (
-    <AppProviders>
-      <RootNavigator />
-    </AppProviders>
+    <SafeAreaProvider>
+      <AppProviders>
+        <RootNavigator />
+      </AppProviders>
+    </SafeAreaProvider>
   );
 }
