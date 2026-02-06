@@ -25,7 +25,7 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
 }
 
 /* -------------------- Loading Screen -------------------- */
-
+// Loading
 function LoadingScreen() {
   const primary = useThemeColor({}, "brandPrimary");
 
