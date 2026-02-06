@@ -4,7 +4,6 @@ import { Animated, StyleSheet, View, Text } from "react-native";
 import { Stack, useRouter, useSegments, ErrorBoundaryProps } from "expo-router";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import Toast from "react-native-toast-message";
 
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
@@ -162,7 +161,6 @@ function RootNavigator() {
         <Stack.Screen name="(auth)" />
       </Stack>
       <ConfirmModal />
-      <Toast />
     </GestureHandlerRootView>
   );
 }

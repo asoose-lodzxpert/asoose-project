@@ -34,8 +34,9 @@ export const JobsProvider = ({ children }: { children: ReactNode }) => {
   const [connectionStatus, setConnectionStatus] =
     useState<ConnectionStatus>("disconnected");
 
-  // Unified job event handlers
+  // Unified job event handlers - Lazy initialization to avoid early imports
   const { reconnect } = useJobEvents({
+    enabled: isOnline,
     onJobAssigned: (job: IncomingJobOffer) => {
       setIncomingJob(job);
       setStatus("incoming-job");
@@ -78,7 +79,6 @@ export const JobsProvider = ({ children }: { children: ReactNode }) => {
         });
       }
     },
-    enabled: isOnline,
   });
 
   const goOnline = async () => {
