@@ -31,12 +31,11 @@
         "NSLocationWhenInUseUsageDescription": "Location is used to provide location-based services.",
         "NSLocationAlwaysUsageDescription": "Location is used to provide location-based services even when the app is in the background.",
         "NSUserNotificationUsageDescription": "Notifications are used to keep you updated about your account and activity."
-      }
+      },
+      "bundleIdentifier": "com.iamwyteshadow.asoosecustomerapp",
+      "usesAppleSignIn": true
     },
-    "platforms": [
-      "ios",
-      "android"
-    ],
+    "platforms": ["ios", "android"],
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
@@ -59,6 +58,7 @@
     },
     "plugins": [
       "expo-router",
+      "expo-apple-authentication",
       [
         "expo-splash-screen",
         {

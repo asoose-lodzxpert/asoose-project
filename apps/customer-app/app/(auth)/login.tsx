@@ -9,6 +9,15 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { RelativePathString, useRouter } from "expo-router";
+import * as WebBrowser from "expo-web-browser";
+import {
+  useGoogleSignIn,
+  authenticateWithGoogle,
+  authenticateWithApple,
+  isAppleSignInAvailable,
+} from "@/services/oauth.service";
+
+WebBrowser.maybeCompleteAuthSession();
 
 import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
@@ -51,6 +60,11 @@ export default function LoginScreen() {
   const [biometricEnabled, setBiometricEnabled] = useState(false);
   const [biometricLoading, setBiometricLoading] = useState(false);
 
+  // OAuth state
+  const { request, response, promptAsync } = useGoogleSignIn();
+  const [appleAvailable, setAppleAvailable] = useState(false);
+  const [oauthLoading, setOauthLoading] = useState(false);
+
   // Check if biometric is enabled for this user
   useEffect(() => {
     (async () => {
@@ -62,6 +76,21 @@ export default function LoginScreen() {
       }
     })();
   }, [isBiometricEnabled]);
+
+  // Check Apple Sign-In availability
+  useEffect(() => {
+    (async () => {
+      const available = await isAppleSignInAvailable();
+      setAppleAvailable(available);
+    })();
+  }, []);
+
+  // Handle Google OAuth response
+  useEffect(() => {
+    if (response?.type === "success" && response.authentication) {
+      handleGoogleSignIn(response.authentication.accessToken);
+    }
+  }, [response]);
 
   /* ---------------------------------- */
   /* Email/Password Login */
@@ -111,6 +140,44 @@ export default function LoginScreen() {
       showToast({ message: err.message || "Login failed", variant: "error" });
     }
     setLoading(false);
+  };
+
+  /* ---------------------------------- */
+  /* Google Sign-In */
+  /* ---------------------------------- */
+  const handleGoogleSignIn = async (accessToken: string) => {
+    setOauthLoading(true);
+    try {
+      const response = await authenticateWithGoogle(accessToken);
+      showToast({ message: "Login successful!", variant: "success" });
+      router.replace({ pathname: "/(tabs)/home" });
+    } catch (err: any) {
+      const errorMsg = err.message || "Google sign-in failed";
+      console.error("[LoginScreen] Google sign-in error:", err);
+      showToast({ message: errorMsg, variant: "error" });
+    } finally {
+      setOauthLoading(false);
+    }
+  };
+
+  /* ---------------------------------- */
+  /* Apple Sign-In */
+  /* ---------------------------------- */
+  const handleAppleSignIn = async () => {
+    setOauthLoading(true);
+    try {
+      const response = await authenticateWithApple();
+      showToast({ message: "Login successful!", variant: "success" });
+      router.replace({ pathname: "/(tabs)/home" });
+    } catch (err: any) {
+      if (err.message !== "Apple Sign-In was cancelled") {
+        const errorMsg = err.message || "Apple sign-in failed";
+        console.error("[LoginScreen] Apple sign-in error:", err);
+        showToast({ message: errorMsg, variant: "error" });
+      }
+    } finally {
+      setOauthLoading(false);
+    }
   };
 
   /* ---------------------------------- */
@@ -245,15 +312,39 @@ export default function LoginScreen() {
           <ThemedText style={{ color: textMuted }}>Or continue with</ThemedText>
 
           <View style={styles.socialRow}>
-            <Pressable style={[styles.socialButton, { borderColor: border }]}>
-              <IconSymbol name="google.logo" size={18} color={primary} />
-              <ThemedText>Google</ThemedText>
+            {/* Google Sign-In */}
+            <Pressable
+              style={[
+                styles.socialButton,
+                { borderColor: border, opacity: oauthLoading ? 0.6 : 1 },
+              ]}
+              onPress={() => promptAsync()}
+              disabled={!request || loading || oauthLoading}
+            >
+              {oauthLoading ? (
+                <ActivityIndicator size="small" color={primary} />
+              ) : (
+                <>
+                  <IconSymbol name="google.logo" size={18} color={primary} />
+                  <ThemedText>Google</ThemedText>
+                </>
+              )}
             </Pressable>
 
-            <Pressable style={[styles.socialButton, { borderColor: border }]}>
-              <IconSymbol name="apple.logo" size={18} color={primary} />
-              <ThemedText>Apple</ThemedText>
-            </Pressable>
+            {/* Apple Sign-In (iOS only) */}
+            {appleAvailable && (
+              <Pressable
+                style={[
+                  styles.socialButton,
+                  { borderColor: border, opacity: oauthLoading ? 0.6 : 1 },
+                ]}
+                onPress={handleAppleSignIn}
+                disabled={loading || oauthLoading}
+              >
+                <IconSymbol name="apple.logo" size={18} color={primary} />
+                <ThemedText>Apple</ThemedText>
+              </Pressable>
+            )}
           </View>
         </View>
 

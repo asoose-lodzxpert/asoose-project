@@ -135,15 +135,18 @@ export function RideProvider({ children }: { children: ReactNode }) {
   }, [user, mapStatusToPageView]);
 
   // Initialize WebSocket connection
-  const initializeSocket = useCallback(() => {
+
+  const initializeSocket = useCallback(async () => {
     if (!user?.id || socketRef.current?.connected) return;
+
+    const token = await getAccessToken();
 
     const socket = io(authConfig.apiBase.replace("/api/v1", ""), {
       transports: ["websocket", "polling"],
       reconnection: true,
       reconnectionDelay: 1000,
       reconnectionAttempts: 5,
-      auth: { token: getAccessToken() },
+      auth: { token },
     });
 
     socket.on("connect", () => {
@@ -235,6 +238,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
       }
       if (pollingIntervalRef.current) {
         clearInterval(pollingIntervalRef.current);
+        pollingIntervalRef.current = null;
       }
     };
   }, []);

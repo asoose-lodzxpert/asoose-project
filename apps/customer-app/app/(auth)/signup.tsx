@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { z } from "zod";
 import {
   View,
@@ -10,6 +10,15 @@ import {
 } from "react-native";
 import { router } from "expo-router";
 import { useToast } from "@/components/ui/toast";
+import * as WebBrowser from "expo-web-browser";
+import {
+  useGoogleSignIn,
+  authenticateWithGoogle,
+  authenticateWithApple,
+  isAppleSignInAvailable,
+} from "@/services/oauth.service";
+
+WebBrowser.maybeCompleteAuthSession();
 
 import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
@@ -53,6 +62,11 @@ export default function Signup() {
   const [accepted, setAccepted] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  // OAuth state
+  const { request, response, promptAsync } = useGoogleSignIn();
+  const [appleAvailable, setAppleAvailable] = useState(false);
+  const [oauthLoading, setOauthLoading] = useState(false);
+
   /* ---------------------------------- */
   /* Password Strength */
   /* ---------------------------------- */
@@ -64,6 +78,59 @@ export default function Signup() {
   }, [password]);
 
   const strengthColors = ["#E5E7EB", "#F87171", "#FBBF24", "#22C55E"];
+
+  // Check Apple Sign-In availability
+  useEffect(() => {
+    (async () => {
+      const available = await isAppleSignInAvailable();
+      setAppleAvailable(available);
+    })();
+  }, []);
+
+  // Handle Google OAuth response
+  useEffect(() => {
+    if (response?.type === "success" && response.authentication) {
+      handleGoogleSignIn(response.authentication.accessToken);
+    }
+  }, [response]);
+
+  /* ---------------------------------- */
+  /* Google Sign-In */
+  /* ---------------------------------- */
+  const handleGoogleSignIn = async (accessToken: string) => {
+    setOauthLoading(true);
+    try {
+      const response = await authenticateWithGoogle(accessToken);
+      showToast({ variant: "success", message: "Account created!" });
+      router.replace("/(tabs)/home");
+    } catch (err: any) {
+      const errorMsg = err.message || "Google sign-in failed";
+      console.error("[SignupScreen] Google sign-in error:", err);
+      showToast({ variant: "error", message: errorMsg });
+    } finally {
+      setOauthLoading(false);
+    }
+  };
+
+  /* ---------------------------------- */
+  /* Apple Sign-In */
+  /* ---------------------------------- */
+  const handleAppleSignIn = async () => {
+    setOauthLoading(true);
+    try {
+      const response = await authenticateWithApple();
+      showToast({ variant: "success", message: "Account created!" });
+      router.replace("/(tabs)/home");
+    } catch (err: any) {
+      if (err.message !== "Apple Sign-In was cancelled") {
+        const errorMsg = err.message || "Apple sign-in failed";
+        console.error("[SignupScreen] Apple sign-in error:", err);
+        showToast({ variant: "error", message: errorMsg });
+      }
+    } finally {
+      setOauthLoading(false);
+    }
+  };
 
   /* ---------------------------------- */
   /* Simulate Signup */
@@ -276,10 +343,49 @@ export default function Signup() {
 
         {/* Social Login */}
         <View style={styles.socialSection}>
-          <Pressable style={[styles.socialButton, { borderColor: border }]}>
-            <IconSymbol name="google.logo" size={18} color={primary} />
-            <ThemedText>Continue with Google</ThemedText>
-          </Pressable>
+          <View style={styles.socialRow}>
+            {/* Google Sign-In */}
+            <Pressable
+              style={[
+                styles.socialButton,
+                {
+                  borderColor: border,
+                  flex: 1,
+                  opacity: oauthLoading ? 0.6 : 1,
+                },
+              ]}
+              onPress={() => promptAsync()}
+              disabled={!request || loading || oauthLoading}
+            >
+              {oauthLoading ? (
+                <ActivityIndicator size="small" color={primary} />
+              ) : (
+                <>
+                  <IconSymbol name="google.logo" size={18} color={primary} />
+                  <ThemedText>Google</ThemedText>
+                </>
+              )}
+            </Pressable>
+
+            {/* Apple Sign-In (iOS only) */}
+            {appleAvailable && (
+              <Pressable
+                style={[
+                  styles.socialButton,
+                  {
+                    borderColor: border,
+                    flex: 1,
+                    opacity: oauthLoading ? 0.6 : 1,
+                  },
+                ]}
+                onPress={handleAppleSignIn}
+                disabled={loading || oauthLoading}
+              >
+                <IconSymbol name="apple.logo" size={18} color={primary} />
+                <ThemedText>Apple</ThemedText>
+              </Pressable>
+            )}
+          </View>
         </View>
 
         {/* Footer */}
@@ -377,6 +483,10 @@ const styles = StyleSheet.create({
   },
   socialSection: {
     marginTop: 28,
+  },
+  socialRow: {
+    flexDirection: "row",
+    gap: 12,
   },
   socialButton: {
     height: 48,

@@ -175,6 +175,7 @@ model User {
   phone     String?
   image     String?
   googleId  String?    @unique @map("google_id")
+  appleId   String?    @unique @map("apple_id")
   notifications Notification[]
   fcmToken  String?  @map("fcm_token")
   role      UserRole   @default(CUSTOMER)
@@ -205,6 +206,7 @@ model User {
 
   @@index([email])
   @@index([googleId])
+  @@index([appleId])
   @@index([role, status])
   @@index([createdAt])
   @@index([status, createdAt(sort: Desc)])
