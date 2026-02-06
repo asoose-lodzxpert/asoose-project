@@ -83,7 +83,7 @@ export class TripsService {
     dto: RequestDeliveryDto,
     idempotencyKey?: string,
   ) {
-    return this.deliveriesService.requestDelivery(userId, dto, idempotencyKey);
+    return this.deliveriesService.requestDelivery(userId, dto);
   }
 
   async startDeliveryMatching(deliveryId: string) {
