@@ -1,6 +1,6 @@
+import * as SecureStore from "expo-secure-store";
 import React, { useEffect, useRef, useState } from "react";
-import { View, Pressable, StyleSheet, ActivityIndicator } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
 import Toast from "react-native-toast-message";
 
 import { ThemedText } from "@/components/themed-text";
@@ -46,8 +46,8 @@ export const ChangePasswordOtp: React.FC<Props> = ({
       setResendCount(nextCount);
 
       const now = Date.now();
-      await AsyncStorage.setItem(LAST_SENT_KEY, now.toString());
-      await AsyncStorage.setItem(RESEND_COUNT_KEY, nextCount.toString());
+      await SecureStore.setItemAsync(LAST_SENT_KEY, now.toString());
+      await SecureStore.setItemAsync(RESEND_COUNT_KEY, nextCount.toString());
 
       const nextCooldown = 30 + (nextCount - 1) * 30;
       setCooldown(nextCooldown);
@@ -70,8 +70,8 @@ export const ChangePasswordOtp: React.FC<Props> = ({
   /** Restore cooldown on mount */
   useEffect(() => {
     const restore = async () => {
-      const lastSent = await AsyncStorage.getItem(LAST_SENT_KEY);
-      const storedCount = await AsyncStorage.getItem(RESEND_COUNT_KEY);
+      const lastSent = await SecureStore.getItemAsync(LAST_SENT_KEY);
+      const storedCount = await SecureStore.getItemAsync(RESEND_COUNT_KEY);
 
       const count = storedCount ? parseInt(storedCount, 10) : 0;
       setResendCount(count);

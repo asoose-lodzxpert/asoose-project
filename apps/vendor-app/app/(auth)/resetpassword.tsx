@@ -1,21 +1,21 @@
-import React, { useState, useEffect, useRef } from "react";
-import { ScrollView, KeyboardAvoidingView, Platform } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as SecureStore from "expo-secure-store";
+import React, { useEffect, useRef, useState } from "react";
+import { KeyboardAvoidingView, Platform, ScrollView } from "react-native";
 
-import Toast from "react-native-toast-message";
-import { useRouter } from "expo-router";
 import {
+  resetVendorPassword,
   sendVendorOtp,
   verifyVendorOtp,
-  resetVendorPassword,
 } from "@/services/reset-password.service";
+import { useRouter } from "expo-router";
+import Toast from "react-native-toast-message";
 
-import { ResetPasswordEmail } from "@/components/reset-password/ResetPasswordEmail";
-import { ResetPasswordOtp } from "@/components/reset-password/ResetPasswordOtp";
 import { ResetPasswordChange } from "@/components/reset-password/ResetPasswordChange";
+import { ResetPasswordEmail } from "@/components/reset-password/ResetPasswordEmail";
+import { ResetPasswordHeader } from "@/components/reset-password/ResetPasswordHeader";
+import { ResetPasswordOtp } from "@/components/reset-password/ResetPasswordOtp";
 import { ResetPasswordSuccess } from "@/components/reset-password/ResetPasswordSuccess";
 import { ThemedView } from "@/components/themed-view";
-import { ResetPasswordHeader } from "@/components/reset-password/ResetPasswordHeader";
 
 export default function ResetPasswordScreen() {
   const router = useRouter();
@@ -42,8 +42,11 @@ export default function ResetPasswordScreen() {
       const newResendCount = resendCount + 1;
       setResendCount(newResendCount);
       const now = Date.now();
-      await AsyncStorage.setItem(LAST_SENT_KEY, now.toString());
-      await AsyncStorage.setItem(RESEND_COUNT_KEY, newResendCount.toString());
+      await SecureStore.setItemAsync(LAST_SENT_KEY, now.toString());
+      await SecureStore.setItemAsync(
+        RESEND_COUNT_KEY,
+        newResendCount.toString(),
+      );
       setCooldown(30 + (newResendCount - 1) * 30);
       Toast.show({
         type: "success",
@@ -62,8 +65,8 @@ export default function ResetPasswordScreen() {
   }, [step]);
 
   const restoreCooldown = async () => {
-    const lastSent = await AsyncStorage.getItem(LAST_SENT_KEY);
-    const storedResendCount = await AsyncStorage.getItem(RESEND_COUNT_KEY);
+    const lastSent = await SecureStore.getItemAsync(LAST_SENT_KEY);
+    const storedResendCount = await SecureStore.getItemAsync(RESEND_COUNT_KEY);
 
     const count = storedResendCount ? parseInt(storedResendCount) : 0;
     setResendCount(count);

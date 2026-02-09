@@ -72,9 +72,11 @@ export async function registerForPushNotificationsAsync(): Promise<
     }
 
     if (finalStatus !== "granted") {
-      console.warn(
-        "[Push Notifications] Permission not granted, cannot register for push notifications",
-      );
+      if (__DEV__) {
+        console.warn(
+          "[Push Notifications] Permission not granted, cannot register for push notifications",
+        );
+      }
       Toast.show({
         type: "warning",
         text1: "Notifications disabled",
@@ -84,12 +86,13 @@ export async function registerForPushNotificationsAsync(): Promise<
     }
 
     try {
-      const projectId = Constants.expoConfig?.extra?.eas?.projectId;
-
-      // Get Expo Push Token (not FCM token)
-      // This prevents Android 12+ BackgroundServiceStartNotAllowedException
-      // by using Expo's notification service instead of starting Firebase services
-
+      const projectId =
+        Constants.easConfig?.projectId ??
+        Constants.expoConfig?.extra?.eas?.projectId ??
+        Constants.expoConfig?.extra?.expoProjectId;
+      if (!projectId) {
+        throw new Error("Expo projectId missing in production build");
+      }
       token = (
         await Notifications.getExpoPushTokenAsync({
           projectId,

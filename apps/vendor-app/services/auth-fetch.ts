@@ -12,7 +12,7 @@ export async function fetchWithAuth(url: string, options: RequestInit = {}) {
     ...(options.headers || {}),
     Authorization: `Bearer ${accessToken}`,
     "Content-Type": "application/json",
-    "ngrok-skip-browser-warning": "true",
+    ...(__DEV__ ? { "ngrok-skip-browser-warning": "true" } : {}),
   };
 
   const res = await fetch(url, { ...options, headers });
@@ -32,7 +32,7 @@ export async function fetchWithAuth(url: string, options: RequestInit = {}) {
         ...(options.headers || {}),
         Authorization: `Bearer ${newAccessToken}`,
         "Content-Type": "application/json",
-        "ngrok-skip-browser-warning": "true",
+        ...(__DEV__ ? { "ngrok-skip-browser-warning": "true" } : {}),
       };
 
       const retryRes = await fetch(url, { ...options, headers: retryHeaders });

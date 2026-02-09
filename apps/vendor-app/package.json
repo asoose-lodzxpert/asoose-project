@@ -11,10 +11,7 @@
     "build:prev": "eas build --profile preview --platform android"
   },
   "dependencies": {
-    "@emotion/react": "^11.14.0",
-    "@emotion/styled": "^11.14.1",
     "@expo/vector-icons": "^15.0.2",
-    "@mui/material": "^7.3.6",
     "@react-native-async-storage/async-storage": "^2.2.0",
     "@react-native-picker/picker": "^2.11.4",
     "@react-navigation/bottom-tabs": "^7.4.0",

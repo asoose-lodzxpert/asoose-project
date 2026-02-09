@@ -156,7 +156,7 @@ export default function MenuScreen() {
     <MenuItemCard
       item={item}
       onToggleStock={() => handleToggleStock(item.id)}
-      onEdit={() => router.push(`/(main)/(menu)/add-item?id=${item.id}`)}
+      onEdit={() => router.push(`/(menu)/add-item?id=${item.id}`)}
       onDelete={() => setDeleteTarget(item)}
     />
   );

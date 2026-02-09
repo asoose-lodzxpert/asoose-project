@@ -20,7 +20,7 @@ import Toast from "react-native-toast-message";
 
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
-import { ConfirmationModal } from "@/components/ui/ConfirmationModal";
+import { useConfirm } from "@/hooks/use-confirm";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useAuth } from "@/context/AuthContext";
 import { useThemeColor } from "@/hooks/use-theme-color";
@@ -72,7 +72,7 @@ export default function ProfileScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
-  const [showImageConfirm, setShowImageConfirm] = useState(false);
+  const { confirm, ConfirmModal } = useConfirm();
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const balanceInterval = useRef<NodeJS.Timeout | null>(null);
 
@@ -134,7 +134,19 @@ export default function ProfileScreen() {
 
     if (!result.canceled) {
       setSelectedImage(result.assets[0].uri);
-      setShowImageConfirm(true);
+      const resultConfirm = await confirm({
+        title: "Change profile image?",
+        message: "Do you want to update your profile image?",
+        confirmText: "Change",
+        cancelText: "Cancel",
+        type: "info",
+        icon: "camera.fill",
+      });
+      if (resultConfirm) {
+        await handleConfirmImageChange();
+      } else {
+        setSelectedImage(null);
+      }
     }
   };
 
@@ -177,7 +189,6 @@ export default function ProfileScreen() {
   const handleConfirmImageChange = async () => {
     if (!selectedImage) return;
     setUploadingImage(true);
-    setShowImageConfirm(false);
 
     try {
       await updateVendorProfileImage(selectedImage);
@@ -192,11 +203,13 @@ export default function ProfileScreen() {
   const getStatusColor = (status: VendorStatus) => {
     switch (status) {
       case "PENDING":
-        return statusPending;
+        return statusPending + "FF";
       case "APPROVED":
-        return statusSuccess;
+        return statusSuccess + "FF";
       case "SUSPENDED":
-        return statusError;
+        return statusError + "FF";
+      default:
+        return borderColor;
     }
   };
 
@@ -341,13 +354,7 @@ export default function ProfileScreen() {
         </View>
       </ScrollView>
 
-      <ConfirmationModal
-        visible={showImageConfirm}
-        message="Change profile image?"
-        onConfirm={handleConfirmImageChange}
-        onCancel={() => setShowImageConfirm(false)}
-        loading={uploadingImage}
-      />
+      <ConfirmModal />
     </ThemedView>
   );
 }

@@ -9,7 +9,7 @@ import {
 } from "@/utils/permissions";
 import { Stack } from "expo-router";
 import { useEffect, useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { StyleSheet } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import Toast from "react-native-toast-message";
 
@@ -64,7 +64,9 @@ export default function RootLayout() {
         await requestStartupPermissions();
         await checkStartupPermissions();
       } catch (e) {
-        console.warn("Startup permission check failed:", e);
+        if (__DEV__) {
+          console.warn("Startup permission check failed:", e);
+        }
       } finally {
         if (mounted) setPermissionsReady(true);
       }

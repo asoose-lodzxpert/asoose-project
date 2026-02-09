@@ -13,7 +13,7 @@ import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
-import { ConfirmationModal } from "@/components/ui/ConfirmationModal";
+import { useConfirm } from "@/hooks/use-confirm";
 import { requestAccountDeletion } from "@/services/account.service";
 import { useAuth } from "@/context/AuthContext";
 
@@ -43,7 +43,7 @@ export default function DeleteAccountScreen() {
 
   const [selectedReasons, setSelectedReasons] = useState<string[]>([]);
   const [additionalInfo, setAdditionalInfo] = useState("");
-  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const { confirm, ConfirmModal } = useConfirm();
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState(1); // 1: Info, 2: Reasons, 3: Confirm
 
@@ -78,7 +78,6 @@ export default function DeleteAccountScreen() {
 
   const handleSubmitDeletion = async () => {
     setLoading(true);
-    setShowConfirmModal(false);
 
     try {
       const reasonLabels = DELETION_REASONS.filter((r) =>
@@ -397,7 +396,20 @@ export default function DeleteAccountScreen() {
         ) : (
           <Pressable
             style={[styles.button, { backgroundColor: statusError }]}
-            onPress={() => setShowConfirmModal(true)}
+            onPress={async () => {
+              const result = await confirm({
+                title: "Request Account Deletion",
+                message:
+                  "Are you absolutely sure you want to request account deletion? This action cannot be undone once approved by admin.",
+                confirmText: "Delete Account",
+                cancelText: "Cancel",
+                type: "danger",
+                icon: "trash.fill",
+              });
+              if (result) {
+                await handleSubmitDeletion();
+              }
+            }}
             disabled={loading}
           >
             {loading ? (
@@ -411,13 +423,7 @@ export default function DeleteAccountScreen() {
         )}
       </View>
 
-      <ConfirmationModal
-        visible={showConfirmModal}
-        message="Are you absolutely sure you want to request account deletion? This action cannot be undone once approved by admin."
-        onConfirm={handleSubmitDeletion}
-        onCancel={() => setShowConfirmModal(false)}
-        loading={loading}
-      />
+      <ConfirmModal />
 
       <Toast />
     </ThemedView>
