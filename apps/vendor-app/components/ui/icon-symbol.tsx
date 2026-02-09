@@ -7,6 +7,7 @@ export type IconSymbolName =
   | "house.fill"
   | "ticket.fill"
   | "fork.knife"
+  | "banknote"
   | "chart.line.uptrend.xyaxis"
   | "person.crop.circle.fill"
   | "eye.fill"
@@ -88,6 +89,7 @@ export const MAPPING: Record<
   IconSymbolName,
   keyof typeof MaterialIcons.glyphMap
 > = {
+  banknote: "account-balance-wallet",
   "doc.fill": "description",
   "minus.circle.fill": "remove-circle",
   "house.fill": "home",

@@ -191,7 +191,7 @@ export default function StoreDashboardPage() {
           loading={loadingOrders}
         />
       </View>
-      <ConfirmModal /> {/* <-- Render the confirm modal */}
+      <ConfirmModal />
     </ThemedView>
   );
 }

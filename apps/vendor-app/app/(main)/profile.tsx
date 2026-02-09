@@ -170,6 +170,15 @@ export default function ProfileScreen() {
     });
 
     if (!result.canceled && result.assets.length > 0) {
+      const confirmResult = await confirm({
+        title: "Change store banner?",
+        message: "Do you want to update your store banner image?",
+        confirmText: "Change",
+        cancelText: "Cancel",
+        type: "info",
+        icon: "camera.fill",
+      });
+      if (!confirmResult) return;
       try {
         await updateVendorProfileImage(result.assets[0].uri, "banner");
         Toast.show({

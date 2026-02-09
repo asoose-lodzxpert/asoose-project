@@ -39,7 +39,12 @@ export default function NotificationsScreen() {
 
   const { setUnreadCount, refreshUnreadCount } = useNotifications();
 
-  const loadNotifications = async (pageNum: number, isRefresh = false) => {
+  // Always use the latest tab value
+  const loadNotifications = async (
+    pageNum: number,
+    tab: NotificationTab,
+    isRefresh = false,
+  ) => {
     try {
       if (pageNum === 1 && !isRefresh) {
         setLoading(true);
@@ -47,8 +52,8 @@ export default function NotificationsScreen() {
         setLoadingMore(true);
       }
 
-      // Get type filter based on active tab
-      const typeFilter = getApiTypeFromTab(activeTab);
+      // Get type filter based on tab
+      const typeFilter = getApiTypeFromTab(tab);
 
       const response = await fetchNotifications(pageNum, typeFilter);
 
@@ -80,29 +85,29 @@ export default function NotificationsScreen() {
     useCallback(() => {
       setPage(1);
       setHasMore(true);
-      loadNotifications(1);
+      loadNotifications(1, activeTab);
     }, [activeTab]),
   );
 
   // Auto-refresh every 60 seconds
   useEffect(() => {
     const interval = setInterval(() => {
-      loadNotifications(1, true);
+      loadNotifications(1, activeTab, true);
     }, 60000); // 60 seconds
 
     return () => clearInterval(interval);
-  }, []);
+  }, [activeTab]);
 
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
     setPage(1);
     setHasMore(true);
-    loadNotifications(1, true);
-  }, []);
+    loadNotifications(1, activeTab, true);
+  }, [activeTab]);
 
   const handleLoadMore = () => {
     if (!loadingMore && hasMore && !loading) {
-      loadNotifications(page + 1);
+      loadNotifications(page + 1, activeTab);
     }
   };
 
