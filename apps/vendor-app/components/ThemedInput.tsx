@@ -8,14 +8,17 @@ import {
   type StyleProp,
 } from "react-native";
 import { useThemeColor } from "@/hooks/use-theme-color";
+import { ThemedText } from "./themed-text";
 
 type ThemedInputProps = TextInputProps & {
+  label?: string;
   iconRight?: React.ReactNode;
   multiline?: boolean;
   containerStyle?: StyleProp<ViewStyle>;
 };
 
 export function ThemedInput({
+  label,
   iconRight,
   style,
   containerStyle,
@@ -28,43 +31,57 @@ export function ThemedInput({
   const placeholderColor = useThemeColor({}, "textDisabled");
 
   return (
-    <View
-      style={[
-        styles.container,
-        {
-          backgroundColor,
-          borderColor,
-          height: multiline ? undefined : 52,
-          alignItems: multiline ? "flex-start" : "center",
-          paddingVertical: multiline ? 10 : 0,
-        },
-        containerStyle,
-      ]}
-    >
-      <TextInput
-        {...props}
-        multiline={multiline}
-        placeholderTextColor={placeholderColor}
+    <View style={[styles.wrapper, containerStyle]}>
+      {label && (
+        <ThemedText type="defaultSemiBold" style={styles.label}>
+          {label}
+        </ThemedText>
+      )}
+      <View
         style={[
-          styles.input,
+          styles.inputContainer,
           {
-            color: textColor,
-            textAlignVertical: multiline ? "top" : "center",
+            backgroundColor,
+            borderColor,
+            height: multiline ? undefined : 52,
+            alignItems: multiline ? "flex-start" : "center",
+            paddingVertical: multiline ? 10 : 0,
           },
-          style,
         ]}
-      />
-      {iconRight && <View style={styles.icon}>{iconRight}</View>}
+      >
+        <TextInput
+          {...props}
+          multiline={multiline}
+          placeholderTextColor={placeholderColor}
+          style={[
+            styles.input,
+            {
+              color: textColor,
+              textAlignVertical: multiline ? "top" : "center",
+            },
+            style,
+          ]}
+        />
+        {iconRight && <View style={styles.icon}>{iconRight}</View>}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  wrapper: {
+    gap: 8,
+    // Note: We don't hardcode width here so containerStyle can control it
+  },
+  label: {
+    fontSize: 14,
+  },
+  inputContainer: {
     borderWidth: 1,
     borderRadius: 12,
     paddingHorizontal: 14,
     flexDirection: "row",
+    width: "100%", // Ensures input fills the wrapper width
   },
   input: {
     flex: 1,

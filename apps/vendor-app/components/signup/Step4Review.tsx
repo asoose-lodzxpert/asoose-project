@@ -15,19 +15,47 @@ export const Step4Review: React.FC<Step4Props> = ({ data }) => {
   const errorColor = useThemeColor({}, "statusError");
   const textSecondary = useThemeColor({}, "textSecondary");
   const surfaceCard = useThemeColor({}, "surfaceCard");
+  const border = useThemeColor({}, "borderDefault");
+  const shadowColor = useThemeColor({}, "surfaceSubtle");
 
   const renderDocument = (doc: string | undefined, type: string) => {
     const uploaded = !!doc;
     return (
-      <View key={type} style={styles.documentRow}>
-        <IconSymbol
-          name={uploaded ? "check" : "xmark"}
-          size={20}
-          color={uploaded ? successColor : errorColor}
-        />
-        <View style={{ marginLeft: 8, flex: 1 }}>
-          <ThemedText>{uploaded ? doc : "Not uploaded"}</ThemedText>
-          <ThemedText type="caption">{type}</ThemedText>
+      <View
+        key={type}
+        style={[
+          styles.documentCard,
+          { backgroundColor: surfaceCard, borderColor: border },
+        ]}
+      >
+        {uploaded ? (
+          <View style={styles.documentImageContainer}>
+            <Image
+              source={{ uri: doc }}
+              style={styles.documentImage}
+              resizeMode="cover"
+            />
+            <View
+              style={[styles.statusBadge, { backgroundColor: successColor }]}
+            >
+              <IconSymbol name="checkmark" size={14} color="#fff" />
+            </View>
+          </View>
+        ) : (
+          <View style={[styles.documentPlaceholder, { borderColor: border }]}>
+            <IconSymbol name="doc.fill" size={40} color={textSecondary} />
+          </View>
+        )}
+        <View style={styles.documentInfo}>
+          <ThemedText type="defaultSemiBold" style={styles.documentTitle}>
+            {type}
+          </ThemedText>
+          <ThemedText
+            type="caption"
+            style={{ color: uploaded ? successColor : errorColor }}
+          >
+            {uploaded ? "✓ Uploaded" : "Not uploaded"}
+          </ThemedText>
         </View>
       </View>
     );
@@ -42,7 +70,9 @@ export const Step4Review: React.FC<Step4Props> = ({ data }) => {
       <ThemedText type="subtitle">Make sure everything is correct.</ThemedText>
 
       {/* Business Information */}
-      <View style={[styles.card, { backgroundColor: surfaceCard }]}>
+      <View
+        style={[styles.card, { backgroundColor: surfaceCard, shadowColor }]}
+      >
         <ThemedText type="subtitle">Business Information</ThemedText>
 
         <View style={styles.infoRow}>
@@ -74,15 +104,21 @@ export const Step4Review: React.FC<Step4Props> = ({ data }) => {
       </View>
 
       {/* Verification Documents */}
-      <View style={[styles.card, { backgroundColor: surfaceCard }]}>
+      <View
+        style={[styles.card, { backgroundColor: surfaceCard, shadowColor }]}
+      >
         <ThemedText type="subtitle">Verification Documents</ThemedText>
-        {renderDocument(step2.businessRegCert, "Business Registration")}
-        {renderDocument(step2.taxIdDoc, "Tax ID")}
-        {renderDocument(step2.proofOfAddress, "Proof of Address")}
+        <View style={styles.documentsGrid}>
+          {renderDocument(step2.businessRegCert, "Business Registration")}
+          {renderDocument(step2.taxIdDoc, "Tax ID")}
+          {renderDocument(step2.proofOfAddress, "Proof of Address")}
+        </View>
       </View>
 
       {/* Store Setup */}
-      <View style={[styles.card, { backgroundColor: surfaceCard }]}>
+      <View
+        style={[styles.card, { backgroundColor: surfaceCard, shadowColor }]}
+      >
         <ThemedText type="subtitle">Store Setup</ThemedText>
 
         <View style={styles.infoRow}>
@@ -142,7 +178,6 @@ const styles = StyleSheet.create({
   card: {
     borderRadius: 12,
     padding: 16,
-    shadowColor: "#000",
     shadowOpacity: 0.02,
     shadowRadius: 5,
     shadowOffset: { width: 0, height: 2 },
@@ -152,10 +187,50 @@ const styles = StyleSheet.create({
   infoRow: {
     marginBottom: 8,
   },
-  documentRow: {
-    flexDirection: "row",
+  documentsGrid: {
+    gap: 12,
+  },
+  documentCard: {
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    gap: 12,
+  },
+  documentImageContainer: {
+    width: "100%",
+    height: 160,
+    borderRadius: 8,
+    overflow: "hidden",
+    position: "relative",
+  },
+  documentImage: {
+    width: "100%",
+    height: "100%",
+  },
+  documentPlaceholder: {
+    width: "100%",
+    height: 160,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderStyle: "dashed",
+    justifyContent: "center",
     alignItems: "center",
-    marginBottom: 8,
+  },
+  statusBadge: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  documentInfo: {
+    gap: 4,
+  },
+  documentTitle: {
+    fontSize: 15,
   },
   logo: { width: 80, height: 80, borderRadius: 40, marginTop: 4 },
   banner: { width: "100%", height: 150, borderRadius: 12, marginTop: 4 },

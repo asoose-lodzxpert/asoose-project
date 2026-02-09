@@ -178,6 +178,7 @@ model User {
   appleId   String?    @unique @map("apple_id")
   notifications Notification[]
   fcmToken  String?  @map("fcm_token")
+  expoPushToken String? @map("expo_push_token")
   role      UserRole   @default(CUSTOMER)
   status    UserStatus @default(ACTIVE)
   verificationStatus String? @default("UNVERIFIED")

@@ -9,7 +9,7 @@ import { useState, useMemo, useEffect, useRef } from "react";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { useSendPackage } from "@/context/SendPackageContext";
-import { formatCurrency , createDelivery } from "@/services/sendPackage.api";
+import { formatCurrency, createDelivery } from "@/services/sendPackage.api";
 import {
   initiatePayment,
   createBankTransfer,
@@ -224,7 +224,6 @@ export default function PaymentScreen() {
 
   useEffect(() => {
     return () => clearPolling();
-     
   }, []);
 
   return (
@@ -335,46 +334,6 @@ export default function PaymentScreen() {
                 size={20}
                 color={success}
               />
-            </View>
-            <View style={styles.contactInfo}>
-              <ThemedText type="caption" style={{ color: muted }}>
-                Sender
-              </ThemedText>
-              <ThemedText type="defaultSemiBold" style={{ marginTop: 4 }}>
-                {data.pickupDetails?.name || "Not provided"}
-              </ThemedText>
-              {data.pickupDetails?.phone && (
-                <ThemedText type="caption" style={{ marginTop: 2 }}>
-                  {data.pickupDetails.phone}
-                </ThemedText>
-              )}
-            </View>
-          </View>
-
-          <View style={[styles.divider, { backgroundColor: border }]} />
-
-          <View style={styles.contactSection}>
-            <View
-              style={[styles.contactIconWrap, { backgroundColor: surface }]}
-            >
-              <IconSymbol
-                name="arrow.down.circle.fill"
-                size={20}
-                color={primary}
-              />
-            </View>
-            <View style={styles.contactInfo}>
-              <ThemedText type="caption" style={{ color: muted }}>
-                Recipient
-              </ThemedText>
-              <ThemedText type="defaultSemiBold" style={{ marginTop: 4 }}>
-                {data.deliveryDetails?.name || "Not provided"}
-              </ThemedText>
-              {data.deliveryDetails?.phone && (
-                <ThemedText type="caption" style={{ marginTop: 2 }}>
-                  {data.deliveryDetails.phone}
-                </ThemedText>
-              )}
             </View>
           </View>
         </View>
@@ -701,6 +660,7 @@ export default function PaymentScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: { flexDirection: "row", alignItems: "center", padding: 16 },
+  iconContainer: { marginTop: 4 },
   backButton: { padding: 8, marginRight: 8, borderRadius: 8 },
   headerTitle: { marginLeft: 4, fontSize: 18 },
   content: { padding: 16, paddingBottom: 40 },

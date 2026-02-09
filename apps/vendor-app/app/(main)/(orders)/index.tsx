@@ -600,6 +600,7 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingHorizontal: 16,
+    paddingTop: 12,
     paddingBottom: 24,
     flexGrow: 1,
   },

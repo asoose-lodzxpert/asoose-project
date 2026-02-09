@@ -2,6 +2,8 @@ import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { OpaqueColorValue, type StyleProp, type TextStyle } from "react-native";
 
 export type IconSymbolName =
+  | "doc.fill"
+  | "minus.circle.fill"
   | "house.fill"
   | "ticket.fill"
   | "fork.knife"
@@ -30,6 +32,8 @@ export type IconSymbolName =
   | "lock.fill"
   | "pencil"
   | "trash"
+  | "trash.fill"
+  | "info.circle.fill"
   | "plus"
   | "fullscreen"
   | "exclamationmark.triangle"
@@ -84,6 +88,8 @@ export const MAPPING: Record<
   IconSymbolName,
   keyof typeof MaterialIcons.glyphMap
 > = {
+  "doc.fill": "description",
+  "minus.circle.fill": "remove-circle",
   "house.fill": "home",
   "ticket.fill": "confirmation-number",
   "fork.knife": "restaurant",
@@ -124,6 +130,7 @@ export const MAPPING: Record<
 
   pencil: "edit",
   trash: "delete",
+  "trash.fill": "delete-forever",
   plus: "add",
   "exclamationmark.triangle": "warning",
   "exclamationmark.triangle.fill": "warning",
@@ -166,6 +173,7 @@ export const MAPPING: Record<
   "list.clipboard.fill": "assignment",
   "hand.raised.fill": "front-hand",
   "power-on": "power-settings-new",
+  "info.circle.fill": "info-outline",
 };
 
 interface IconSymbolProps {

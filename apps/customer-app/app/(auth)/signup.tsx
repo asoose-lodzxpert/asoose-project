@@ -7,6 +7,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  Image,
 } from "react-native";
 import { router } from "expo-router";
 import { useToast } from "@/components/ui/toast";
@@ -361,7 +362,10 @@ export default function Signup() {
                 <ActivityIndicator size="small" color={primary} />
               ) : (
                 <>
-                  <IconSymbol name="google.logo" size={18} color={primary} />
+                  <Image
+                    source={require("@/assets/images/icons8-google-48.png")}
+                    style={{ width: 20, height: 20 }}
+                  />
                   <ThemedText>Google</ThemedText>
                 </>
               )}

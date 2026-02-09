@@ -295,7 +295,7 @@ export class PaymentService {
     signature: string,
   ): Promise<void> {
     let isValid = false;
-    console.log("payload:",payload)
+    console.log('payload:', payload);
     switch (gateway) {
       case PaymentGateway.PAYSTACK:
         isValid = this.paystackService.verifyWebhookSignature(
@@ -400,7 +400,7 @@ export class PaymentService {
     }
 
     // Cast to any to compare Prisma Enum (generated) vs App Enum (interface)
-    if ((payment.status as any) === PaymentStatus.SUCCESS) {
+    if ((payment.status as any).toUpperCase() === PaymentStatus.SUCCESS) {
       this.logger.log(`Payment ${verification.reference} already processed.`);
       return;
     }
@@ -538,18 +538,151 @@ export class PaymentService {
       // =========================================================
       // 👇 MATCHING LOGIC FIXED HERE
       // =========================================================
-      if (result.order?.delivery) {
-        // Case A: Delivery linked to an E-commerce Order
-        await this.startDeliveryMatching(result.order.delivery.id);
-      } else if (payment.metadata && (payment.metadata as any).deliveryId) {
-        // Case B: Direct Delivery Request (This fixes the stuck "Finding Courier" screen)
-        await this.startDeliveryMatching((payment.metadata as any).deliveryId);
-      } else if (payment.metadata && (payment.metadata as any).rideId) {
-        // Case C: Ride Request
-        await this.startRideMatching((payment.metadata as any).rideId);
+      // New logic: use metadata.type for routing
+      const meta = payment.metadata as any;
+      if (meta && meta.type) {
+        if (meta.type === 'ride') {
+          // Ride request
+          if (meta.rideId) {
+            await this.startRideMatching(meta.rideId);
+            // Notify rider and customer
+            await this.sendMatchingNotifications({
+              type: 'ride',
+              rideId: meta.rideId,
+              customerId: result.ride?.customer?.id,
+              riderId: result.ride?.riderId ?? undefined,
+            });
+          }
+        } else if (meta.type === 'order') {
+          // E-commerce order delivery
+          if (result.order?.delivery?.id) {
+            await this.startDeliveryMatching(result.order.delivery.id);
+            // Notify customer and vendor
+            await this.sendMatchingNotifications({
+              type: 'order',
+              orderId: result.order.id,
+              deliveryId: result.order.delivery.id,
+              customerId: result.order.userId,
+              vendorId: result.order.store?.vendorId,
+            });
+          }
+        } else if (meta.type === 'delivery') {
+          // Direct delivery request: notify admin for manual assignment
+          await this.sendAdminAssignmentNotification(
+            meta.deliveryId,
+            payment.userId,
+          );
+          // Notify customer
+          await this.sendMatchingNotifications({
+            type: 'delivery',
+            deliveryId: meta.deliveryId,
+            customerId: payment.userId,
+          });
+          // DO NOT start delivery matching for direct delivery
+        }
       }
 
       await this.sendPaymentNotifications(result);
+    }
+  }
+
+  // Send notifications to involved parties after matching
+  private async sendMatchingNotifications(params: {
+    type: 'ride' | 'order' | 'delivery';
+    rideId?: string;
+    orderId?: string;
+    deliveryId?: string;
+    customerId?: string;
+    riderId?: string;
+    vendorId?: string;
+  }): Promise<void> {
+    try {
+      if (params.type === 'ride') {
+        if (params.customerId) {
+          await this.notificationsService.create({
+            userId: params.customerId,
+            title: 'Ride Matching Started',
+            message: 'We are finding a rider for your trip.',
+            type: 'RIDE_MATCHING',
+            metadata: { rideId: params.rideId },
+          });
+        }
+        if (params.riderId) {
+          await this.notificationsService.create({
+            userId: params.riderId,
+            title: 'New Ride Request',
+            message: 'A new ride request is available for you.',
+            type: 'RIDE_REQUEST',
+            metadata: { rideId: params.rideId },
+          });
+        }
+      } else if (params.type === 'order') {
+        if (params.customerId) {
+          await this.notificationsService.create({
+            userId: params.customerId,
+            title: 'Order Delivery Matching Started',
+            message: 'We are finding a courier for your order.',
+            type: 'ORDER_DELIVERY_MATCHING',
+            metadata: {
+              orderId: params.orderId,
+              deliveryId: params.deliveryId,
+            },
+          });
+        }
+        if (params.vendorId) {
+          await this.notificationsService.createForVendor({
+            vendorId: params.vendorId,
+            title: 'Order Delivery Matching Started',
+            message: 'A courier is being assigned for your order.',
+            type: 'ORDER_DELIVERY_MATCHING',
+            metadata: {
+              orderId: params.orderId,
+              deliveryId: params.deliveryId,
+            },
+          });
+        }
+      } else if (params.type === 'delivery') {
+        if (params.customerId) {
+          await this.notificationsService.create({
+            userId: params.customerId,
+            title: 'Delivery Request Received',
+            message:
+              'Your delivery request is being processed. An admin will assign a rider soon.',
+            type: 'DELIVERY_REQUEST',
+            metadata: { deliveryId: params.deliveryId },
+          });
+        }
+      }
+    } catch (error) {
+      this.logger.error('Failed to send matching notifications:', error);
+    }
+  }
+
+  // Notify admin for manual delivery assignment
+  private async sendAdminAssignmentNotification(
+    deliveryId: string,
+    customerId: string,
+  ): Promise<void> {
+    try {
+      // Find admin users (example: all users with role 'ADMIN')
+      const admins = await this.prisma.user.findMany({
+        where: { role: 'ADMIN' },
+        select: { id: true },
+      });
+      for (const admin of admins) {
+        await this.notificationsService.create({
+          userId: admin.id,
+          title: 'Manual Delivery Assignment Needed',
+          message: `A new delivery request (${deliveryId}) requires manual rider assignment.`,
+          type: 'DELIVERY_MANUAL_ASSIGN',
+          metadata: { deliveryId, customerId },
+        });
+      }
+    } catch (error) {
+      this.logger.error(
+        'Failed to notify admin for manual delivery assignment:',
+        error,
+      );
     }
   }
 
@@ -590,6 +723,7 @@ export class PaymentService {
         customerId = payment.userId;
       }
 
+      // Only send one notification per user
       if (
         customerId &&
         typeof customerId === 'string' &&
@@ -613,6 +747,7 @@ export class PaymentService {
         );
       }
 
+      // Only send one notification per vendor
       const vendorId = payment.order?.store?.vendorId;
       if (vendorId && typeof vendorId === 'string') {
         await this.notificationsService.createForVendor({

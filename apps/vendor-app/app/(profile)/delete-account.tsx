@@ -6,7 +6,6 @@ import {
   ScrollView,
   TextInput,
   ActivityIndicator,
-  Alert,
 } from "react-native";
 import { router } from "expo-router";
 import Toast from "react-native-toast-message";
@@ -33,8 +32,13 @@ export default function DeleteAccountScreen() {
   const border = useThemeColor({}, "borderDefault");
   const linkColor = useThemeColor({}, "brandPrimary");
   const surfaceCard = useThemeColor({}, "surfaceCard");
+  const surfaceSubtle = useThemeColor({}, "surfaceSubtle");
   const textMuted = useThemeColor({}, "textMuted");
+  const textOnPrimary = useThemeColor({}, "textOnPrimary");
   const statusError = useThemeColor({}, "statusError");
+  const statusSuccess = useThemeColor({}, "statusSuccess");
+  const statusPending = useThemeColor({}, "statusPending");
+
   const { signOut } = useAuth();
 
   const [selectedReasons, setSelectedReasons] = useState<string[]>([]);
@@ -93,7 +97,6 @@ export default function DeleteAccountScreen() {
         visibilityTime: 5000,
       });
 
-      // Delay to show toast before signing out
       setTimeout(() => {
         signOut();
         router.replace("/(auth)/login");
@@ -128,7 +131,9 @@ export default function DeleteAccountScreen() {
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
     >
-      <View style={[styles.warningCard, { backgroundColor: "#FEF2F2" }]}>
+      <View
+        style={[styles.warningCard, { backgroundColor: statusError + "15" }]}
+      >
         <IconSymbol
           name="exclamationmark.triangle.fill"
           size={48}
@@ -170,12 +175,12 @@ export default function DeleteAccountScreen() {
         <InfoItem
           icon="clock"
           text="Your request will be reviewed by our admin team"
-          color="#F59E0B"
+          color={statusPending}
         />
         <InfoItem
           icon="shield.checkmark"
           text="Pending payments will be processed before deletion"
-          color="#10B981"
+          color={statusSuccess}
         />
       </View>
 
@@ -216,7 +221,7 @@ export default function DeleteAccountScreen() {
               { borderColor: border },
               selectedReasons.includes(reason.id) && {
                 borderColor: linkColor,
-                backgroundColor: linkColor + "10",
+                backgroundColor: linkColor + "15",
               },
             ]}
             onPress={() => toggleReason(reason.id)}
@@ -232,7 +237,7 @@ export default function DeleteAccountScreen() {
               ]}
             >
               {selectedReasons.includes(reason.id) && (
-                <IconSymbol name="checkmark" size={14} color="#fff" />
+                <IconSymbol name="checkmark" size={14} color={textOnPrimary} />
               )}
             </View>
             <ThemedText>{reason.label}</ThemedText>
@@ -266,7 +271,9 @@ export default function DeleteAccountScreen() {
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
     >
-      <View style={[styles.warningCard, { backgroundColor: "#FEF2F2" }]}>
+      <View
+        style={[styles.warningCard, { backgroundColor: statusError + "15" }]}
+      >
         <IconSymbol
           name="exclamationmark.triangle.fill"
           size={48}
@@ -316,7 +323,7 @@ export default function DeleteAccountScreen() {
         style={[
           styles.card,
           {
-            backgroundColor: "#FEF2F2",
+            backgroundColor: surfaceSubtle,
             borderWidth: 1,
             borderColor: statusError,
           },
@@ -364,7 +371,12 @@ export default function DeleteAccountScreen() {
       {step === 3 && renderConfirmStep()}
 
       {/* Action Button */}
-      <View style={[styles.footer, { borderTopColor: border }]}>
+      <View
+        style={[
+          styles.footer,
+          { borderTopColor: border, backgroundColor: surfaceCard },
+        ]}
+      >
         {step < 3 ? (
           <Pressable
             style={[
@@ -378,7 +390,7 @@ export default function DeleteAccountScreen() {
             onPress={handleNext}
             disabled={step === 2 && selectedReasons.length === 0}
           >
-            <ThemedText style={{ color: "#fff", fontWeight: "600" }}>
+            <ThemedText style={{ color: textOnPrimary, fontWeight: "600" }}>
               Continue
             </ThemedText>
           </Pressable>
@@ -389,9 +401,9 @@ export default function DeleteAccountScreen() {
             disabled={loading}
           >
             {loading ? (
-              <ActivityIndicator color="#fff" />
+              <ActivityIndicator color={textOnPrimary} />
             ) : (
-              <ThemedText style={{ color: "#fff", fontWeight: "600" }}>
+              <ThemedText style={{ color: textOnPrimary, fontWeight: "600" }}>
                 Request Account Deletion
               </ThemedText>
             )}
@@ -460,7 +472,7 @@ const styles = StyleSheet.create({
   content: {
     padding: 16,
     gap: 16,
-    paddingBottom: 100,
+    paddingBottom: 120,
   },
   warningCard: {
     alignItems: "center",
@@ -515,7 +527,6 @@ const styles = StyleSheet.create({
     right: 0,
     padding: 16,
     borderTopWidth: 1,
-    backgroundColor: "#fff",
   },
   button: {
     paddingVertical: 14,

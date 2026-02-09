@@ -340,7 +340,7 @@ export default function MenuScreen() {
       {/* Floating Action Button */}
       <FloatingActionButton
         icon="plus"
-        onPress={() => router.push("/(main)/(menu)/add-item")}
+        onPress={() => router.push("/(menu)/add-item")}
       />
 
       {/* Delete Confirmation */}

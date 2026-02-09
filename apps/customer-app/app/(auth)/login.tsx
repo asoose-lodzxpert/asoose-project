@@ -39,6 +39,7 @@ export default function LoginScreen() {
 
   const {
     login,
+
     biometricLogin,
     biometricAvailable,
     biometricEnrolled,
@@ -325,7 +326,10 @@ export default function LoginScreen() {
                 <ActivityIndicator size="small" color={primary} />
               ) : (
                 <>
-                  <IconSymbol name="google.logo" size={18} color={primary} />
+                  <Image
+                    source={require("@/assets/images/icons8-google-48.png")}
+                    style={{ width: 20, height: 20 }}
+                  />
                   <ThemedText>Google</ThemedText>
                 </>
               )}

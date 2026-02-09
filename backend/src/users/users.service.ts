@@ -55,6 +55,36 @@ export class UsersService {
     return this.addressesService.addUserAddress(userId, data);
   }
 
+  async updateExpoPushToken(userId: string, expoPushToken: string) {
+    try {
+      return await this.prisma.user.update({
+        where: { id: userId },
+        data: { expoPushToken },
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to update expoPushToken for user ${userId}`,
+        error,
+      );
+      throw new BadRequestException('Failed to update expo push token');
+    }
+  }
+
+  async deleteExpoPushToken(userId: string) {
+    try {
+      return await this.prisma.user.update({
+        where: { id: userId },
+        data: { expoPushToken: null },
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to delete expoPushToken for user ${userId}`,
+        error,
+      );
+      throw new BadRequestException('Failed to delete expo push token');
+    }
+  }
+
   // ==================================================================
   // REMAINING LOGIC (Rides & Deliveries)
   // ==================================================================

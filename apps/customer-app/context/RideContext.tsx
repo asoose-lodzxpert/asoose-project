@@ -258,38 +258,6 @@ export function RideProvider({ children }: { children: ReactNode }) {
     }
   }, [user?.id, initializeSocket]);
 
-  // Check for active ride on mount
-  useEffect(() => {
-    refreshCurrentRide();
-  }, [refreshCurrentRide]);
-
-  // Poll for driver location updates (fallback if socket fails)
-  useEffect(() => {
-    if (
-      currentRide?.riderId &&
-      (currentRide.status === RideStatus.ACCEPTED ||
-        currentRide.status === RideStatus.ARRIVED ||
-        currentRide.status === RideStatus.IN_PROGRESS)
-    ) {
-      // Poll every 5 seconds
-      pollingIntervalRef.current = setInterval(async () => {
-        try {
-          const location = await RideService.getDriverLocation(currentRide.id);
-          setDriverLocation(location);
-        } catch (err) {
-          console.warn("Failed to poll driver location:", err);
-        }
-      }, 5000);
-    }
-
-    return () => {
-      if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current);
-        pollingIntervalRef.current = null;
-      }
-    };
-  }, [currentRide]);
-
   // Estimate fare
   const estimateFare = useCallback(async () => {
     if (!pickupLocation || !dropoffLocation) {

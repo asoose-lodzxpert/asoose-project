@@ -1,5 +1,6 @@
 import { IncomingJobOffer } from "@/types/job";
 import { getAccessToken } from "./auth";
+import { io, Socket } from "socket.io-client";
 
 export type ConnectionStatus =
   | "connected"
@@ -16,7 +17,7 @@ export type JobEventCallbacks = {
 };
 
 export class JobEventsService {
-  private eventSource: any = null;
+  private socket: Socket | null = null;
   private reconnectTimeout: any;
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 10;
@@ -35,12 +36,7 @@ export class JobEventsService {
 
   async connect(callbacks: JobEventCallbacks): Promise<void> {
     this.callbacks = callbacks;
-    this.setConnectionStatus("connected"); // Temporarily set as connected
 
-    // TODO: SSE temporarily disabled due to property is not writable error
-    // Uncomment when moving to old architecture or fixing SSE compatibility
-
-    /*
     try {
       const token = await getAccessToken();
       if (!token) {
@@ -48,20 +44,17 @@ export class JobEventsService {
       }
 
       // Close existing connection
-      if (this.eventSource) {
-        this.eventSource.close();
+      if (this.socket) {
+        this.socket.disconnect();
       }
 
-      const url = `${process.env.EXPO_PUBLIC_API_URL}/riders/jobs/stream`;
-
-      // Dynamic import to avoid early initialization
-      const RNEventSource = (await import("react-native-sse")).default;
-
-      this.eventSource = new RNEventSource(url, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        pollingInterval: 5000, // Fallback polling
+      const apiUrl = process.env.EXPO_PUBLIC_API_URL || "";
+      this.socket = io(apiUrl, {
+        auth: { token },
+        transports: ["websocket"],
+        reconnection: true,
+        reconnectionDelay: 1000,
+        reconnectionAttempts: this.maxReconnectAttempts,
       });
 
       this.setupEventListeners();
@@ -71,21 +64,45 @@ export class JobEventsService {
       this.callbacks.onError?.(error as Error);
       throw error;
     }
-    */
   }
 
   private setupEventListeners(): void {
-    // TODO: SSE temporarily disabled
-    return;
+    if (!this.socket) return;
 
-    /*
-    if (!this.eventSource) return;
+    this.socket.on("connect", () => {
+      console.log("Job events socket connected");
+      this.setConnectionStatus("connected");
+      this.reconnectAttempts = 0;
+    });
 
-    this.eventSource.addEventListener("job.assigned", (event: any) => {
+    this.socket.on("disconnect", () => {
+      console.log("Job events socket disconnected");
+      this.setConnectionStatus("disconnected");
+    });
+
+    this.socket.on("connect_error", (error) => {
+      console.error("Job events socket connection error:", error);
+      this.setConnectionStatus("reconnecting");
+      this.callbacks.onError?.(new Error("Connection error"));
+    });
+
+    // Listen for job.assigned event
+    this.socket.on("job.assigned", (data: any) => {
       try {
-        const data =
-          typeof event.data === "string" ? JSON.parse(event.data) : event.data;
-        this.callbacks.onJobAssigned?.(data);
+        console.log("Received job.assigned event:", data);
+
+        // Map backend event to IncomingJobOffer format
+        const job: IncomingJobOffer = {
+          id: data.id,
+          jobType: data.jobType,
+          customerName: data.customerName || "Customer",
+          pickupAddress: data.pickupAddress || "",
+          dropoffAddress: data.dropoffAddress || "",
+          earnings: data.estimatedEarnings || data.earnings || 0,
+          distanceKm: data.distance || data.distanceKm,
+        };
+
+        this.callbacks.onJobAssigned?.(job);
         this.reconnectAttempts = 0;
       } catch (error) {
         console.error("Error handling job.assigned event:", error);
@@ -93,10 +110,10 @@ export class JobEventsService {
       }
     });
 
-    this.eventSource.addEventListener("job.updated", (event: any) => {
+    // Listen for job.updated event
+    this.socket.on("job.updated", (data: any) => {
       try {
-        const data =
-          typeof event.data === "string" ? JSON.parse(event.data) : event.data;
+        console.log("Received job.updated event:", data);
         this.callbacks.onJobUpdated?.(data.id, data.status);
       } catch (error) {
         console.error("Error handling job.updated event:", error);
@@ -104,10 +121,10 @@ export class JobEventsService {
       }
     });
 
-    this.eventSource.addEventListener("job.cancelled", (event: any) => {
+    // Listen for job.cancelled event
+    this.socket.on("job.cancelled", (data: any) => {
       try {
-        const data =
-          typeof event.data === "string" ? JSON.parse(event.data) : event.data;
+        console.log("Received job.cancelled event:", data);
         this.callbacks.onJobCancelled?.(data.id);
       } catch (error) {
         console.error("Error handling job.cancelled event:", error);
@@ -116,19 +133,9 @@ export class JobEventsService {
         );
       }
     });
-
-    this.eventSource.onerror = (error: any) => {
-      console.error("SSE connection error:", error);
-      this.setConnectionStatus("reconnecting");
-      this.callbacks.onError?.(new Error("SSE connection error"));
-      this.handleReconnect();
-    };
-    */
   }
 
   private handleReconnect(): void {
-    // TODO: SSE temporarily disabled
-    /*
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
       console.error("Max reconnect attempts reached");
       this.setConnectionStatus("failed");
@@ -147,22 +154,18 @@ export class JobEventsService {
       this.reconnectAttempts++;
       this.connect(this.callbacks);
     }, delay);
-    */
   }
 
   disconnect(): void {
-    // TODO: SSE temporarily disabled
-    /*
     if (this.reconnectTimeout) {
       clearTimeout(this.reconnectTimeout);
       this.reconnectTimeout = undefined;
     }
-    if (this.eventSource) {
-      this.eventSource.close();
-      this.eventSource = null;
+    if (this.socket) {
+      this.socket.disconnect();
+      this.socket = null;
     }
     this.reconnectAttempts = 0;
-    */
     this.setConnectionStatus("disconnected");
   }
 

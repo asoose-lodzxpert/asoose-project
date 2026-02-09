@@ -12,6 +12,11 @@ import {
   logout as logoutService,
 } from "../services/auth.service";
 import { useBiometric } from "../hooks/useBiometric";
+import {
+  deleteExpoPushTokenFromBackend,
+  getExpoPushToken,
+  sendExpoPushTokenToBackend,
+} from "../services/expo-push-token.service";
 
 type User = {
   id: string;
@@ -86,26 +91,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     async ({ email, password }: { email: string; password: string }) => {
       setLoading(true);
       try {
-        console.log("[AuthContext] login called", { email });
         const resp = await loginService(email, password);
-        console.log("[AuthContext] loginService response", resp);
-        // resp expected: { user, accessToken, refreshToken }
         await saveSession(
           resp.user,
           resp.accessToken || null,
           resp.refreshToken || null,
         );
-        console.log("[AuthContext] saveSession complete", {
-          user: resp.user,
-          accessToken: resp.accessToken,
-          refreshToken: resp.refreshToken,
-        });
+        // Send expo push token to backend
+        try {
+          const token = await getExpoPushToken();
+          if (token) await sendExpoPushTokenToBackend(token);
+        } catch {}
       } catch (err) {
-        console.error("[AuthContext] login error", err);
         throw err;
       } finally {
         setLoading(false);
-        console.log("[AuthContext] login finished, loading:", false);
       }
     },
     [],
@@ -113,9 +113,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(async () => {
     setLoading(true);
+    setUser(null);
     try {
       try {
         await logoutService();
+      } catch {}
+      try {
+        await deleteExpoPushTokenFromBackend();
       } catch {}
       await clearSession();
     } finally {

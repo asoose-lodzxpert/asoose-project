@@ -223,7 +223,15 @@ export class DeliveryMatchingProcessor extends WorkerHost {
         this.TIMEOUT_MS,
       );
 
-      // Optionally emit a generic event or log here if needed
+      // Emit job.assigned event for socket notification
+      this.eventBus.emitJobAssigned({
+        jobId: deliveryId,
+        jobType: 'delivery',
+        driverId,
+        customerId: recipientName,
+        timestamp: Date.now(),
+        expiresAt: Date.now() + this.TIMEOUT_MS,
+      });
 
       return true;
     }

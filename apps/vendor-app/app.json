@@ -27,14 +27,15 @@
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.asoose.vendor.app",
-
+      "notification": {
+        "icon": "./assets/images/icon.png"
+      },
       "permissions": [
         "INTERNET",
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
         "POST_NOTIFICATIONS"
       ],
-
       "blockedPermissions": [
         "CAMERA",
         "RECORD_AUDIO",
