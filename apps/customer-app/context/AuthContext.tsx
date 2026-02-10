@@ -1,17 +1,17 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as SecureStore from "expo-secure-store";
 import React, {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useState,
-  useCallback,
 } from "react";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useBiometric } from "../hooks/useBiometric";
 import {
   login as loginService,
-  refreshToken as refreshTokenService,
   logout as logoutService,
 } from "../services/auth.service";
-import { useBiometric } from "../hooks/useBiometric";
 import {
   deleteExpoPushTokenFromBackend,
   getExpoPushToken,
@@ -72,24 +72,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   ) => {
     setUser(u);
     await AsyncStorage.setItem(USER_KEY, JSON.stringify(u));
-    if (accessToken) await AsyncStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
+    if (accessToken)
+      await SecureStore.setItemAsync(ACCESS_TOKEN_KEY, accessToken);
     if (refreshToken)
-      await AsyncStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+      await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, refreshToken);
   };
 
   const clearSession = async () => {
     setUser(null);
-    await AsyncStorage.multiRemove([
-      USER_KEY,
-      ACCESS_TOKEN_KEY,
-      REFRESH_TOKEN_KEY,
-    ]);
+    await AsyncStorage.removeItem(USER_KEY);
+    await SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY);
+    await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY);
     await biometric.clearCredentials();
   };
 
   const login = useCallback(
     async ({ email, password }: { email: string; password: string }) => {
-      setLoading(true);
+      // setLoading(true);
       try {
         const resp = await loginService(email, password);
         await saveSession(
@@ -105,7 +104,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } catch (err) {
         throw err;
       } finally {
-        setLoading(false);
+        // setLoading(false);
       }
     },
     [],

@@ -1,12 +1,25 @@
-import * as Google from "expo-auth-session/providers/google";
 import * as AppleAuthentication from "expo-apple-authentication";
+import * as Google from "expo-auth-session/providers/google";
+import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 
-const DEFAULT_API_URL = "https://asoose.com/api/v1";
-const API_BASE = (process.env.EXPO_PUBLIC_API_URL || DEFAULT_API_URL)
-  .replace(/\/+$/, "")
-  .replace(/\/$/, "");
+const API_BASE = (() => {
+  const url = process.env.EXPO_PUBLIC_API_URL;
+  if (!url) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error(
+        "EXPO_PUBLIC_API_URL is required in production. Please set it via EAS secrets or environment variables.",
+      );
+    }
+    // In development, you may fallback or warn
+    console.warn(
+      "EXPO_PUBLIC_API_URL is not set. Using default development URL.",
+    );
+    return "https://asoose.com/api/v1";
+  }
+  return url.replace(/\/+$/, "").replace(/\/$/, "");
+})();
+
 const AUTH_BASE = `${API_BASE}/auth/user`;
 
 const ACCESS_TOKEN_KEY = "@auth/access_token";
@@ -105,12 +118,12 @@ export async function authenticateWithGoogle(
     });
 
     // Store tokens
-    await AsyncStorage.setItem(ACCESS_TOKEN_KEY, response.access_token);
-    await AsyncStorage.setItem(REFRESH_TOKEN_KEY, response.refresh_token);
+    await SecureStore.setItemAsync(ACCESS_TOKEN_KEY, response.access_token);
+    await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, response.refresh_token);
 
     return response;
   } catch (error) {
-    console.error("Google OAuth error:", error);
+    if (__DEV__) console.error("Google OAuth error:", error);
     throw error;
   }
 }
@@ -152,15 +165,15 @@ export async function authenticateWithApple(): Promise<OAuthResponse> {
     });
 
     // Store tokens
-    await AsyncStorage.setItem(ACCESS_TOKEN_KEY, response.access_token);
-    await AsyncStorage.setItem(REFRESH_TOKEN_KEY, response.refresh_token);
+    await SecureStore.setItemAsync(ACCESS_TOKEN_KEY, response.access_token);
+    await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, response.refresh_token);
 
     return response;
   } catch (error: any) {
     if (error.code === "ERR_CANCELED") {
       throw new Error("Apple Sign-In was cancelled");
     }
-    console.error("Apple OAuth error:", error);
+    if (__DEV__) console.error("Apple OAuth error:", error);
     throw new Error("Apple Sign-In failed");
   }
 }

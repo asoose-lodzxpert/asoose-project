@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect, useRef } from "react";
 import { z } from "zod";
 import {
   View,
@@ -8,9 +8,10 @@ import {
   Platform,
   ActivityIndicator,
   Image,
+  ScrollView,
 } from "react-native";
 import { router } from "expo-router";
-import { useToast } from "@/components/ui/toast";
+import { useToast } from "@/components/ui/ThemedToast";
 import * as WebBrowser from "expo-web-browser";
 import {
   useGoogleSignIn,
@@ -28,17 +29,11 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { CustomDropdown } from "@/components/CustomDropdown";
 import { signup } from "@/services/auth.service";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-/* ---------------------------------- */
-/* Static Data */
-/* ---------------------------------- */
 const COUNTRY_CODES = [{ label: "+234", value: "+234" }];
 
-/* ---------------------------------- */
-/* Screen */
-/* ---------------------------------- */
 export default function Signup() {
-  // Validation schema
   const schema = z.object({
     fullName: z.string().min(2, "Full name is required"),
     email: z.string().email("Enter a valid email address"),
@@ -49,10 +44,15 @@ export default function Signup() {
 
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const showToast = useToast();
+
+  // Theme Colors
   const primary = useThemeColor({}, "brandPrimary");
   const surface = useThemeColor({}, "surfaceBackground");
-  const textMuted = useThemeColor({}, "textMuted");
+  const textPrimary = useThemeColor({}, "textPrimary");
+  const textSecondary = useThemeColor({}, "textSecondary");
+  const textOnPrimary = useThemeColor({}, "textOnPrimary");
   const border = useThemeColor({}, "borderDefault");
+  const surfaceSubtle = useThemeColor({}, "surfaceSubtle");
 
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -68,9 +68,6 @@ export default function Signup() {
   const [appleAvailable, setAppleAvailable] = useState(false);
   const [oauthLoading, setOauthLoading] = useState(false);
 
-  /* ---------------------------------- */
-  /* Password Strength */
-  /* ---------------------------------- */
   const strength = useMemo(() => {
     if (password.length === 0) return 0;
     if (password.length < 6) return 1;
@@ -78,9 +75,8 @@ export default function Signup() {
     return 3;
   }, [password]);
 
-  const strengthColors = ["#E5E7EB", "#F87171", "#FBBF24", "#22C55E"];
+  const strengthColors = ["#E5E7EB", "#F87171", "#FBBF24", "#10B981"];
 
-  // Check Apple Sign-In availability
   useEffect(() => {
     (async () => {
       const available = await isAppleSignInAvailable();
@@ -88,54 +84,46 @@ export default function Signup() {
     })();
   }, []);
 
-  // Handle Google OAuth response
   useEffect(() => {
     if (response?.type === "success" && response.authentication) {
       handleGoogleSignIn(response.authentication.accessToken);
     }
   }, [response]);
 
-  /* ---------------------------------- */
-  /* Google Sign-In */
-  /* ---------------------------------- */
   const handleGoogleSignIn = async (accessToken: string) => {
     setOauthLoading(true);
     try {
-      const response = await authenticateWithGoogle(accessToken);
+      await authenticateWithGoogle(accessToken);
       showToast({ variant: "success", message: "Account created!" });
       router.replace("/(tabs)/home");
     } catch (err: any) {
-      const errorMsg = err.message || "Google sign-in failed";
-      console.error("[SignupScreen] Google sign-in error:", err);
-      showToast({ variant: "error", message: errorMsg });
+      showToast({
+        variant: "error",
+        message: err.message || "Google sign-in failed",
+      });
     } finally {
       setOauthLoading(false);
     }
   };
 
-  /* ---------------------------------- */
-  /* Apple Sign-In */
-  /* ---------------------------------- */
   const handleAppleSignIn = async () => {
     setOauthLoading(true);
     try {
-      const response = await authenticateWithApple();
+      await authenticateWithApple();
       showToast({ variant: "success", message: "Account created!" });
       router.replace("/(tabs)/home");
     } catch (err: any) {
       if (err.message !== "Apple Sign-In was cancelled") {
-        const errorMsg = err.message || "Apple sign-in failed";
-        console.error("[SignupScreen] Apple sign-in error:", err);
-        showToast({ variant: "error", message: errorMsg });
+        showToast({
+          variant: "error",
+          message: err.message || "Apple sign-in failed",
+        });
       }
     } finally {
       setOauthLoading(false);
     }
   };
 
-  /* ---------------------------------- */
-  /* Simulate Signup */
-  /* ---------------------------------- */
   const handleSignup = async () => {
     setErrors({});
     const result = schema.safeParse({
@@ -145,15 +133,16 @@ export default function Signup() {
       password,
       accepted,
     });
+
     if (!result.success) {
       const fieldErrors: { [key: string]: string } = {};
-      for (const issue of result.error.issues) {
-        if (issue.path[0]) fieldErrors[String(issue.path[0])] = issue.message;
-      }
+      result.error.issues.forEach((issue) => {
+        fieldErrors[String(issue.path[0])] = issue.message;
+      });
       setErrors(fieldErrors);
-      showToast({ variant: "error", message: Object.values(fieldErrors)[0] });
       return;
     }
+
     setLoading(true);
     try {
       const phone = `${phoneCode}${phoneNumber}`;
@@ -165,13 +154,11 @@ export default function Signup() {
       });
       showToast({ variant: "success", message: "Account created!" });
       router.replace("/login");
-    } catch (err: unknown) {
-      console.error("signup error", err);
-      const message =
-        err instanceof Error
-          ? err.message
-          : "Could not create account. Please try again.";
-      showToast({ variant: "error", message });
+    } catch (err: any) {
+      showToast({
+        variant: "error",
+        message: err.message || "Could not create account",
+      });
     } finally {
       setLoading(false);
     }
@@ -179,330 +166,292 @@ export default function Signup() {
 
   return (
     <ThemedView style={[styles.container, { backgroundColor: surface }]}>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-      >
-        {/* Header */}
-        <View style={styles.header}>
-          <ThemedText type="title" style={[styles.title, { color: primary }]}>
-            Create Account
-          </ThemedText>
-          <ThemedText type="caption">
-            Join thousands of happy customers
-          </ThemedText>
-        </View>
-
-        {/* Form */}
-        <View style={styles.form}>
-          <ThemedInput
-            placeholder="Full name"
-            value={fullName}
-            onChangeText={setFullName}
-          />
-          {errors.fullName && (
-            <ThemedText style={{ color: "#F87171", fontSize: 13 }}>
-              {errors.fullName}
-            </ThemedText>
-          )}
-
-          <ThemedInput
-            placeholder="Email address"
-            value={email}
-            onChangeText={setEmail}
-            autoCapitalize="none"
-            keyboardType="email-address"
-          />
-          {errors.email && (
-            <ThemedText style={{ color: "#F87171", fontSize: 13 }}>
-              {errors.email}
-            </ThemedText>
-          )}
-
-          {/* Phone */}
-          <View style={styles.row}>
-            <CustomDropdown
-              data={COUNTRY_CODES}
-              value={phoneCode}
-              onChange={(v) => setPhoneCode(v as string)}
-              placeholder="+234"
-              containerStyle={{ flex: 2 }}
-            />
-
-            <ThemedInput
-              placeholder="Phone number"
-              value={phoneNumber}
-              onChangeText={setPhoneNumber}
-              keyboardType="phone-pad"
-              containerStyle={{ flex: 4 }}
-            />
-            {errors.phoneNumber && (
-              <ThemedText style={{ color: "#F87171", fontSize: 13 }}>
-                {errors.phoneNumber}
-              </ThemedText>
-            )}
-          </View>
-
-          {/* Password */}
-          <ThemedInput
-            placeholder="Password (minimum 8 characters)"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry={secure}
-            iconRight={
-              <Pressable onPress={() => setSecure((s) => !s)}>
-                <IconSymbol
-                  name={secure ? "eye.slash.fill" : "eye.fill"}
-                  size={18}
-                  color={textMuted}
-                />
-              </Pressable>
-            }
-          />
-          {errors.password && (
-            <ThemedText style={{ color: "#F87171", fontSize: 13 }}>
-              {errors.password}
-            </ThemedText>
-          )}
-
-          {/* Strength Indicator */}
-          <View style={styles.strengthRow}>
-            {[0, 1, 2].map((i) => (
-              <View
-                key={i}
-                style={[
-                  styles.strengthBar,
-                  {
-                    backgroundColor:
-                      strength > i ? strengthColors[strength] : "#E5E7EB",
-                  },
-                ]}
-              />
-            ))}
-          </View>
-
-          {/* Terms */}
-          <Pressable
-            style={styles.termsRow}
-            onPress={() => setAccepted((v) => !v)}
+      <SafeAreaView style={{ flex: 1 }}>
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+        >
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.scrollContent}
           >
-            <View
-              style={[
-                styles.checkbox,
-                {
-                  borderColor: accepted ? primary : border,
-                  backgroundColor: accepted ? primary : "transparent",
-                },
-              ]}
-            >
-              {accepted && <IconSymbol name="check" size={14} color="#000" />}
-            </View>
-            <ThemedText style={styles.termsText}>
-              I agree to the{" "}
-              <ThemedText style={{ color: primary }}>
-                Terms of Service
-              </ThemedText>{" "}
-              and{" "}
-              <ThemedText style={{ color: primary }}>Privacy Policy</ThemedText>
-            </ThemedText>
-          </Pressable>
-          {errors.accepted && (
-            <ThemedText style={{ color: "#F87171", fontSize: 13 }}>
-              {errors.accepted}
-            </ThemedText>
-          )}
-
-          {/* Security Banner */}
-          <View style={styles.securityBanner}>
-            <IconSymbol name="shield" size={18} color="#16A34A" />
-            <ThemedText style={styles.securityText}>
-              Your information is encrypted and secure
-            </ThemedText>
-          </View>
-
-          {/* Create Account */}
-          <Pressable
-            onPress={handleSignup}
-            disabled={!accepted || loading}
-            style={[
-              styles.primaryButton,
-              {
-                backgroundColor: primary,
-                opacity: !accepted || loading ? 0.6 : 1,
-              },
-            ]}
-          >
-            {loading ? (
-              <ActivityIndicator />
-            ) : (
-              <ThemedText style={styles.primaryButtonText}>
+            {/* Header */}
+            <View style={styles.header}>
+              <ThemedText
+                type="title"
+                style={[styles.title, { color: textPrimary }]}
+              >
                 Create Account
               </ThemedText>
-            )}
-          </Pressable>
-        </View>
+              <ThemedText style={{ color: textSecondary }}>
+                Join Asoose today and experience more.
+              </ThemedText>
+            </View>
 
-        {/* Social Login */}
-        <View style={styles.socialSection}>
-          <View style={styles.socialRow}>
-            {/* Google Sign-In */}
-            <Pressable
-              style={[
-                styles.socialButton,
-                {
-                  borderColor: border,
-                  flex: 1,
-                  opacity: oauthLoading ? 0.6 : 1,
-                },
-              ]}
-              onPress={() => promptAsync()}
-              disabled={!request || loading || oauthLoading}
-            >
-              {oauthLoading ? (
-                <ActivityIndicator size="small" color={primary} />
-              ) : (
-                <>
-                  <Image
-                    source={require("@/assets/images/icons8-google-48.png")}
-                    style={{ width: 20, height: 20 }}
-                  />
-                  <ThemedText>Google</ThemedText>
-                </>
-              )}
-            </Pressable>
+            {/* Form Fields */}
+            <View style={styles.form}>
+              <ThemedInput
+                placeholder="Full name"
+                value={fullName}
+                onChangeText={setFullName}
+                error={errors.fullName}
+              />
 
-            {/* Apple Sign-In (iOS only) */}
-            {appleAvailable && (
+              <ThemedInput
+                placeholder="Email address"
+                value={email}
+                onChangeText={setEmail}
+                autoCapitalize="none"
+                keyboardType="email-address"
+                error={errors.email}
+              />
+
+              <View style={styles.phoneRow}>
+                <CustomDropdown
+                  data={COUNTRY_CODES}
+                  value={phoneCode}
+                  onChange={(v) => setPhoneCode(v as string)}
+                  containerStyle={styles.dropdown}
+                />
+                <ThemedInput
+                  placeholder="Phone number"
+                  value={phoneNumber}
+                  onChangeText={setPhoneNumber}
+                  keyboardType="phone-pad"
+                  containerStyle={{ flex: 1 }}
+                  error={errors.phoneNumber}
+                />
+              </View>
+
+              <View>
+                <ThemedInput
+                  placeholder="Password"
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry={secure}
+                  error={errors.password}
+                  iconRight={
+                    <Pressable onPress={() => setSecure(!secure)}>
+                      <IconSymbol
+                        name={secure ? "eye.slash.fill" : "eye.fill"}
+                        size={20}
+                        color={textSecondary}
+                      />
+                    </Pressable>
+                  }
+                />
+                {/* Strength Indicator */}
+                {password.length > 0 && (
+                  <View style={styles.strengthRow}>
+                    {[0, 1, 2].map((i) => (
+                      <View
+                        key={i}
+                        style={[
+                          styles.strengthBar,
+                          {
+                            backgroundColor:
+                              strength > i ? strengthColors[strength] : border,
+                          },
+                        ]}
+                      />
+                    ))}
+                  </View>
+                )}
+              </View>
+
+              {/* Terms Checkbox */}
               <Pressable
-                style={[
-                  styles.socialButton,
-                  {
-                    borderColor: border,
-                    flex: 1,
-                    opacity: oauthLoading ? 0.6 : 1,
-                  },
-                ]}
-                onPress={handleAppleSignIn}
-                disabled={loading || oauthLoading}
+                style={styles.termsRow}
+                onPress={() => setAccepted(!accepted)}
               >
-                <IconSymbol name="apple.logo" size={18} color={primary} />
-                <ThemedText>Apple</ThemedText>
+                <View
+                  style={[
+                    styles.checkbox,
+                    {
+                      borderColor: accepted ? primary : border,
+                      backgroundColor: accepted ? primary : "transparent",
+                    },
+                  ]}
+                >
+                  {accepted && (
+                    <IconSymbol name="check" size={12} color={textOnPrimary} />
+                  )}
+                </View>
+                <ThemedText style={styles.termsText}>
+                  I agree to the{" "}
+                  <ThemedText style={{ color: primary, fontWeight: "600" }}>
+                    Terms
+                  </ThemedText>{" "}
+                  and{" "}
+                  <ThemedText style={{ color: primary, fontWeight: "600" }}>
+                    Privacy Policy
+                  </ThemedText>
+                </ThemedText>
               </Pressable>
-            )}
-          </View>
-        </View>
+              {errors.accepted && (
+                <ThemedText style={styles.errorText}>
+                  {errors.accepted}
+                </ThemedText>
+              )}
 
-        {/* Footer */}
-        <Pressable
-          onPress={() => router.replace("/login")}
-          style={styles.footer}
-        >
-          <ThemedText>
-            Already have an account?{" "}
-            <ThemedText style={{ color: primary, fontWeight: "600" }}>
-              Sign in
-            </ThemedText>
-          </ThemedText>
-        </Pressable>
-      </KeyboardAvoidingView>
+              {/* Action Button */}
+              <Pressable
+                onPress={handleSignup}
+                disabled={loading}
+                style={[
+                  styles.primaryButton,
+                  { backgroundColor: primary, opacity: loading ? 0.7 : 1 },
+                ]}
+              >
+                {loading ? (
+                  <ActivityIndicator color={textOnPrimary} />
+                ) : (
+                  <ThemedText
+                    style={[styles.primaryButtonText, { color: textOnPrimary }]}
+                  >
+                    Create Account
+                  </ThemedText>
+                )}
+              </Pressable>
+            </View>
+
+            {/* OAuth Section */}
+            <View style={styles.socialSection}>
+              <View style={styles.dividerRow}>
+                <View style={[styles.line, { backgroundColor: border }]} />
+                <ThemedText style={[styles.orText, { color: textSecondary }]}>
+                  or join with
+                </ThemedText>
+                <View style={[styles.line, { backgroundColor: border }]} />
+              </View>
+
+              <View style={styles.socialRow}>
+                <Pressable
+                  style={[
+                    styles.socialButton,
+                    { backgroundColor: surfaceSubtle },
+                  ]}
+                  onPress={() => promptAsync()}
+                  disabled={oauthLoading}
+                >
+                  {oauthLoading ? (
+                    <ActivityIndicator size="small" color={primary} />
+                  ) : (
+                    <>
+                      <Image
+                        source={require("@/assets/images/icons8-google-48.png")}
+                        style={styles.socialIcon}
+                      />
+                      <ThemedText style={styles.socialText}>Google</ThemedText>
+                    </>
+                  )}
+                </Pressable>
+
+                {appleAvailable && (
+                  <Pressable
+                    style={[
+                      styles.socialButton,
+                      { backgroundColor: surfaceSubtle },
+                    ]}
+                    onPress={handleAppleSignIn}
+                  >
+                    <IconSymbol
+                      name="apple.logo"
+                      size={20}
+                      color={textPrimary}
+                    />
+                    <ThemedText style={styles.socialText}>Apple</ThemedText>
+                  </Pressable>
+                )}
+              </View>
+            </View>
+
+            {/* Login Link */}
+            <Pressable
+              onPress={() => router.replace("/login")}
+              style={styles.footer}
+            >
+              <ThemedText style={{ color: textSecondary }}>
+                Already have an account?{" "}
+                <ThemedText style={{ color: primary, fontWeight: "700" }}>
+                  Sign in
+                </ThemedText>
+              </ThemedText>
+            </Pressable>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
     </ThemedView>
   );
 }
 
-/* ---------------------------------- */
-/* Styles */
-/* ---------------------------------- */
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    paddingHorizontal: 20,
+  container: { flex: 1 },
+  scrollContent: {
+    paddingHorizontal: 24,
+    paddingBottom: 40,
+    flexGrow: 1,
   },
   header: {
-    marginTop: 80,
+    marginTop: 20,
     marginBottom: 32,
-    gap: 6,
+    gap: 8,
   },
-  title: {
-    fontSize: 28,
-    fontWeight: "700",
-  },
-  form: {
-    gap: 16,
-  },
-  row: {
-    flexDirection: "row",
-    gap: 12,
-  },
+  title: { fontSize: 32, fontWeight: "800", letterSpacing: -0.5 },
+  form: { gap: 20 },
+  phoneRow: { flexDirection: "row", gap: 12, alignItems: "flex-start" },
+  dropdown: { width: 100 },
   strengthRow: {
     flexDirection: "row",
-    gap: 6,
-    marginTop: -6,
+    gap: 4,
+    marginTop: 8,
+    paddingHorizontal: 2,
   },
-  strengthBar: {
-    flex: 1,
-    height: 4,
-    borderRadius: 2,
-  },
+  strengthBar: { flex: 1, height: 4, borderRadius: 2 },
   termsRow: {
     flexDirection: "row",
-    gap: 10,
-    alignItems: "flex-start",
+    gap: 12,
+    alignItems: "center",
+    marginTop: 4,
   },
   checkbox: {
-    width: 18,
-    height: 18,
-    borderRadius: 4,
-    borderWidth: 1.5,
+    width: 22,
+    height: 22,
+    borderRadius: 8,
+    borderWidth: 2,
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 2,
   },
-  termsText: {
-    fontSize: 13,
-    flex: 1,
-  },
-  securityBanner: {
-    flexDirection: "row",
-    gap: 8,
-    padding: 12,
-    borderRadius: 12,
-    backgroundColor: "#ECFDF5",
-    alignItems: "center",
-  },
-  securityText: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#166534",
-  },
+  termsText: { fontSize: 14, flex: 1 },
+  errorText: { color: "#F87171", fontSize: 12, marginTop: -12, marginLeft: 34 },
   primaryButton: {
-    height: 52,
-    borderRadius: 14,
+    height: 58,
+    borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 12,
+    marginTop: 10,
   },
-  primaryButtonText: {
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  socialSection: {
-    marginTop: 28,
-  },
-  socialRow: {
+  primaryButtonText: { fontSize: 17, fontWeight: "700" },
+  socialSection: { marginTop: 32 },
+  dividerRow: {
     flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 24,
+  },
+  line: { flex: 1, height: 1 },
+  orText: { fontSize: 14, fontWeight: "500" },
+  socialRow: { flexDirection: "row", gap: 12 },
+  socialButton: {
+    flex: 1,
+    height: 56,
+    borderRadius: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     gap: 12,
   },
-  socialButton: {
-    height: 48,
-    borderRadius: 14,
-    borderWidth: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 10,
-  },
-  footer: {
-    marginTop: 24,
-    alignItems: "center",
-  },
+  socialIcon: { width: 22, height: 22 },
+  socialText: { fontWeight: "600", fontSize: 15 },
+  footer: { marginTop: 32, alignItems: "center" },
 });

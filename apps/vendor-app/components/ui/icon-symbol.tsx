@@ -1,7 +1,15 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { OpaqueColorValue, type StyleProp, type TextStyle } from "react-native";
 
+/**
+ * An icon symbol component that uses MaterialIcons on Android/web
+ * while maintaining an SF Symbols-style naming convention.
+ */
 export type IconSymbolName =
+  | "square.grid.2x2.fill"
+  | "bus.fill"
+  | "box.truck.fill"
+  | "person.fill"
   | "doc.fill"
   | "minus.circle.fill"
   | "house.fill"
@@ -63,18 +71,12 @@ export type IconSymbolName =
   | "headphones"
   | "play"
   | "activity"
-  | "arrow.left"
   | "lightbulb"
-  | "list"
-  | "dollar-sign"
-  | "menu"
   | "shield"
-  | "info"
   | "close"
   | "edit"
   | "delete"
   | "add"
-  | "send"
   | "share"
   | "file-text"
   | "credit-card"
@@ -83,12 +85,19 @@ export type IconSymbolName =
   | "clock.fill"
   | "list.clipboard.fill"
   | "hand.raised.fill"
+  | "touchid"
+  | "shield.fill"
+  | "apple.logo"
   | "power-on";
 
-export const MAPPING: Record<
-  IconSymbolName,
-  keyof typeof MaterialIcons.glyphMap
-> = {
+const MAPPING: Record<IconSymbolName, keyof typeof MaterialIcons.glyphMap> = {
+  // Onboarding & Services
+  "square.grid.2x2.fill": "apps",
+  "bus.fill": "directions-bus",
+  "box.truck.fill": "local-shipping",
+  "person.fill": "person",
+  "apple.logo": "apple",
+  touchid: "fingerprint",
   banknote: "account-balance-wallet",
   "doc.fill": "description",
   "minus.circle.fill": "remove-circle",
@@ -98,38 +107,40 @@ export const MAPPING: Record<
   "chart.line.uptrend.xyaxis": "show-chart",
   "person.crop.circle.fill": "account-circle",
 
+  // Auth & UI
   "eye.fill": "remove-red-eye",
   "eye.slash.fill": "visibility-off",
-
   "paperplane.fill": "send",
   send: "send",
+  "lock.fill": "lock",
+  "shield.fill": "security",
+  shield: "security",
 
+  // Navigation
   "chevron.left.forwardslash.chevron.right": "code",
   "chevron.right": "chevron-right",
   "chevron.left": "chevron-left",
   "chevron.down": "keyboard-arrow-down",
   "chevron.up": "keyboard-arrow-up",
+  "arrow.right": "arrow-right",
+  "arrow.left": "arrow-left",
+  "arrow.up": "arrow-upward",
 
+  // Common UI
   "info.circle": "info",
+  "info.circle.fill": "info",
   "cloud.upload": "cloud-upload",
   "camera.fill": "photo-camera",
-
   check: "check",
   checkmark: "check",
   "circle.fill": "circle",
-
   "map.marker": "place",
   "location.fill": "location-on",
   "map.fill": "map",
-
   "arrow.up.left.and.arrow.down.right": "fullscreen",
   fullscreen: "fullscreen",
-
   xmark: "close",
   "xmark.circle": "cancel",
-
-  "lock.fill": "lock",
-
   pencil: "edit",
   trash: "delete",
   "trash.fill": "delete-forever",
@@ -137,9 +148,11 @@ export const MAPPING: Record<
   "exclamationmark.triangle": "warning",
   "exclamationmark.triangle.fill": "warning",
   clock: "schedule",
+  "clock.fill": "schedule",
   "shield.checkmark": "verified-user",
   "checkmark.circle.fill": "check-circle",
 
+  // Misc
   home: "home",
   restaurant: "restaurant",
   notifications: "notifications",
@@ -149,9 +162,6 @@ export const MAPPING: Record<
   menu: "menu",
   users: "people",
   power: "power",
-  "arrow.right": "arrow-right",
-  "arrow.left": "arrow-left",
-  "arrow.up": "arrow-upward",
   settings: "settings",
   bell: "notifications",
   list: "list",
@@ -164,18 +174,15 @@ export const MAPPING: Record<
   edit: "edit",
   delete: "delete",
   add: "add",
-  shield: "security",
   lightbulb: "lightbulb",
   share: "share",
   "file-text": "text-snippet",
   "credit-card": "credit-card",
-  "alert-circle": "incomplete-circle",
+  "alert-circle": "error-outline",
   "pause.circle.fill": "pause-circle-filled",
-  "clock.fill": "schedule",
   "list.clipboard.fill": "assignment",
   "hand.raised.fill": "front-hand",
   "power-on": "power-settings-new",
-  "info.circle.fill": "info-outline",
 };
 
 interface IconSymbolProps {
@@ -188,7 +195,7 @@ interface IconSymbolProps {
 export function IconSymbol({ name, size = 24, color, style }: IconSymbolProps) {
   return (
     <MaterialIcons
-      name={MAPPING[name] as keyof typeof MaterialIcons.glyphMap}
+      name={MAPPING[name]}
       size={size}
       color={color}
       style={style}

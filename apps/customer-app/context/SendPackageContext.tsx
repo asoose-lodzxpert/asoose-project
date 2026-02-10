@@ -1,14 +1,14 @@
 import React, {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useState,
-  useCallback,
 } from "react";
 
 import {
-  fetchSavedAddresses,
   fetchDeliveryQuote,
+  fetchSavedAddresses,
 } from "../services/sendPackage.api";
 
 import { useUserProfile } from "@/hooks/useUserProfile";
@@ -178,7 +178,7 @@ export function SendPackageProvider({
           if (!mounted) return;
           setQuote(q);
         } catch (e) {
-          console.error("Failed to fetch delivery quote", e);
+          if (__DEV__) console.error("Failed to fetch delivery quote", e);
           if (mounted) setQuote(null);
         } finally {
           if (mounted) setLoadingQuote(false);

@@ -1,26 +1,26 @@
-import React, {
-  createContext,
-  useContext,
-  useState,
-  useEffect,
-  useCallback,
-  useRef,
-  ReactNode,
-} from "react";
+import { authConfig, getAccessToken } from "@/services/auth.service";
 import { RideService } from "@/services/ride.service";
 import {
-  Ride,
-  RideStatus,
-  RidePageView,
-  FareEstimate,
   DriverLocation,
+  FareEstimate,
   Location,
-  VehicleType,
+  Ride,
+  RidePageView,
   RideSocketEvent,
+  RideStatus,
+  VehicleType,
 } from "@/types/ride";
-import { useAuth } from "./AuthContext";
+import React, {
+  createContext,
+  ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { io, Socket } from "socket.io-client";
-import { authConfig, getAccessToken } from "@/services/auth.service";
+import { useAuth } from "./AuthContext";
 
 type RideContextType = {
   // State
@@ -122,7 +122,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
             const location = await RideService.getDriverLocation(ride.id);
             setDriverLocation(location);
           } catch (err) {
-            console.warn("Failed to fetch driver location:", err);
+            if (__DEV__) console.warn("Failed to fetch driver location:", err);
           }
         }
       } else {
@@ -130,7 +130,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
         setDriverLocation(null);
       }
     } catch (err: any) {
-      console.error("Failed to refresh ride:", err);
+      if (__DEV__) console.error("Failed to refresh ride:", err);
     }
   }, [user, mapStatusToPageView]);
 
@@ -158,27 +158,27 @@ export function RideProvider({ children }: { children: ReactNode }) {
     });
 
     socket.on("connect", () => {
-      console.log("[RideContext] Socket connected");
+      if (__DEV__) console.log("[RideContext] Socket connected");
       setSocketConnected(true);
       // Join user's room
       socket.emit("join", `user_${user.id}`);
     });
 
     socket.on("disconnect", () => {
-      console.log("[RideContext] Socket disconnected");
+      if (__DEV__) console.log("[RideContext] Socket disconnected");
       setSocketConnected(false);
     });
 
     // Handle ride updates
     socket.on("ride_update", (event: RideSocketEvent) => {
-      console.log("[RideContext] Ride update:", event);
+      if (__DEV__) console.log("[RideContext] Ride update:", event);
       if (event.type === "ride_update") {
         refreshCurrentRide();
       }
     });
 
     socket.on("DRIVER_FOUND", (event: RideSocketEvent) => {
-      console.log("[RideContext] Driver found:", event);
+      if (__DEV__) console.log("[RideContext] Driver found:", event);
       if (event.type === "DRIVER_FOUND") {
         refreshCurrentRide();
         setPageView("DRIVER_ASSIGNED");
@@ -186,7 +186,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
     });
 
     socket.on("DRIVER_ARRIVED", (event: RideSocketEvent) => {
-      console.log("[RideContext] Driver arrived:", event);
+      if (__DEV__) console.log("[RideContext] Driver arrived:", event);
       if (event.type === "DRIVER_ARRIVED") {
         refreshCurrentRide();
         setPageView("DRIVER_ARRIVED");
@@ -204,7 +204,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
     });
 
     socket.on("TRIP_STARTED", (event: RideSocketEvent) => {
-      console.log("[RideContext] Trip started:", event);
+      if (__DEV__) console.log("[RideContext] Trip started:", event);
       if (event.type === "TRIP_STARTED") {
         refreshCurrentRide();
         setPageView("IN_PROGRESS");
@@ -212,7 +212,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
     });
 
     socket.on("TRIP_COMPLETED", (event: RideSocketEvent) => {
-      console.log("[RideContext] Trip completed:", event);
+      if (__DEV__) console.log("[RideContext] Trip completed:", event);
       if (event.type === "TRIP_COMPLETED") {
         refreshCurrentRide();
         setPageView("COMPLETED");
@@ -220,7 +220,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
     });
 
     socket.on("RIDE_CANCELLED", (event: RideSocketEvent) => {
-      console.log("[RideContext] Ride cancelled:", event);
+      if (__DEV__) console.log("[RideContext] Ride cancelled:", event);
       if (event.type === "RIDE_CANCELLED") {
         setCurrentRide(null);
         setPageView("IDLE");
@@ -228,7 +228,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
     });
 
     socket.on("NO_DRIVERS_FOUND", (event: RideSocketEvent) => {
-      console.log("[RideContext] No drivers found:", event);
+      if (__DEV__) console.log("[RideContext] No drivers found:", event);
       if (event.type === "NO_DRIVERS_FOUND") {
         setError("No drivers available at the moment. Please try again.");
       }
@@ -290,12 +290,12 @@ export function RideProvider({ children }: { children: ReactNode }) {
         },
       };
 
-      console.log("Estimate:", estimate);
+      if (__DEV__) console.log("Estimate:", estimate);
 
       setFareEstimate(estimate);
     } catch (err: any) {
       setError(err?.message || "Failed to estimate fare");
-      console.error("Fare estimation error:", err);
+      if (__DEV__) console.error("Fare estimation error:", err);
     } finally {
       setLoading(false);
     }
@@ -336,7 +336,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
         } else {
           setError(err?.message || "Failed to create ride");
         }
-        console.error("Create ride error:", err);
+        if (__DEV__) console.error("Create ride error:", err);
         return null;
       } finally {
         setLoading(false);
@@ -363,7 +363,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
         setPageView("FINDING_DRIVER");
       } catch (err: any) {
         setError(err?.message || "Failed to confirm payment");
-        console.error("Confirm payment error:", err);
+        if (__DEV__) console.error("Confirm payment error:", err);
       } finally {
         setLoading(false);
       }
@@ -387,7 +387,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
         resetBooking();
       } catch (err: any) {
         setError(err?.message || "Failed to cancel ride");
-        console.error("Cancel ride error:", err);
+        if (__DEV__) console.error("Cancel ride error:", err);
       } finally {
         setLoading(false);
       }
