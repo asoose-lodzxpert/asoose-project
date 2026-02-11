@@ -101,11 +101,11 @@ export const ProductModal = ({
     });
   }, [product, selectedModifiers]);
 
-  const handleAddToOrder = async () => {
+  const handleAddToOrder = () => {
     if (!product || !isValid) return;
 
-    // ✅ FIX: Await result to check if item was actually added (vs cancelled)
-    const success = await addItem({
+    // FIX: Removed await and success check since addItem is synchronous/void
+    addItem({
       id: product.id,
       name: product.name,
       price: totalPrice / quantity, // Unit price (base + mods)
@@ -114,11 +114,9 @@ export const ProductModal = ({
       image: product.image,
     });
 
-    // Only close and show toast if confirmed
-    if (success) {
-      onClose();
-      toast.success("Added to basket");
-    }
+    // Valid feedback flow
+    onClose();
+    toast.success("Added to basket");
   };
 
   if (!product) return null;

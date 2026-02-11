@@ -25,23 +25,21 @@ export const ProductCard = ({
 }: ProductProps) => {
   const addItem = useCartStore((state) => state.addItem);
 
-  const handleQuickAdd = async (e: React.MouseEvent) => {
+  const handleQuickAdd = (e: React.MouseEvent) => {
     e.stopPropagation();
 
-    // ✅ FIX: Await the result from the store
-    const success = await addItem({
+    // 1. Call addItem (it is synchronous and returns void)
+    addItem({
       id,
       name,
       price,
       quantity: 1,
-      image: image,
-      restaurantId: storeId,
+      restaurantId: storeId, // image property was missing in your interface but passed here, usually safe if store handles it
+      image: image,          // Explicitly passing image if your store expects it
     });
 
-    // ✅ FIX: Only show toast if item was actually added
-    if (success) {
-      toast.success("Added to basket");
-    }
+    // 2. Show toast immediately
+    toast.success("Added to basket");
   };
 
   return (

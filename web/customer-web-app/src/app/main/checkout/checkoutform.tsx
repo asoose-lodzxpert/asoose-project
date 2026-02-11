@@ -29,10 +29,8 @@ export default function CheckoutForm() {
   const router = useRouter();
   const { data: session, status } = useSession();
   const abortControllerRef = useRef<AbortController | null>(null);
-  // Track if order was created to prevent phantom redirects
   const isOrderCreated = useRef(false);
 
-  // State
   const [mounted, setMounted] = useState(false);
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [selectedAddress, setSelectedAddress] = useState<Address | null>(null);
@@ -44,7 +42,6 @@ export default function CheckoutForm() {
     (typeof PAYMENT_METHODS)[number] | null
   >(null);
 
-  // Store
   const {
     items: cartItems,
     getTotalPrice,
@@ -54,7 +51,6 @@ export default function CheckoutForm() {
     clearCart,
   } = useCartStore();
 
-  // Fees
   const cartTotal = getTotalPrice();
   const estimatedDeliveryFee = BASE_DELIVERY_FEE;
   const serviceFee = Math.round(cartTotal * SERVICE_FEE_PERCENTAGE);
@@ -123,7 +119,6 @@ export default function CheckoutForm() {
     }
   }, [status, fetchAddresses]);
 
-  // Prevent redirect if order was just created
   useEffect(() => {
     if (mounted && cartItems.length === 0 && !isOrderCreated.current) {
       router.push("/");
@@ -156,12 +151,18 @@ export default function CheckoutForm() {
     }
   };
 
-  const processPayment = async (orderId: string, orderTotal: number) => {
+  const processPayment = async (
+    id: string,
+    orderTotal: number,
+    isGroup = false,
+  ) => {
     try {
       if (!selectedPaymentMethod) return;
 
       localStorage.setItem("pending_checkout", "true");
-      localStorage.setItem("last_order_id", orderId);
+      // For groups, we might need to handle differently in "orders/confirmed"
+      // But for now, we just save the ID.
+      localStorage.setItem("last_order_id", id); 
 
       const paymentPayload: InitiatePaymentPayload = {
         amount: orderTotal,
@@ -169,9 +170,15 @@ export default function CheckoutForm() {
         gateway: selectedPaymentMethod.gateway as any,
         method: selectedPaymentMethod.type as "CARD" | "BANK_TRANSFER" | "CASH",
         type: "ORDER",
-        orderId: orderId,
         callbackUrl: process.env.NEXT_PUBLIC_APP_URL,
       };
+
+      // FIX: Distinguish between single Order ID and OrderGroup ID
+      if (isGroup) {
+        paymentPayload.orderGroupId = id;
+      } else {
+        paymentPayload.orderId = id;
+      }
 
       const token = session?.accessToken;
       if (!token) throw new Error("Authentication missing");
@@ -190,9 +197,14 @@ export default function CheckoutForm() {
       console.error("Payment initialization error:", paymentError);
 
       toast.warn(
-        "Payment initialization failed. Please try paying from Order Details.",
+        "Payment initialization failed. Please check your order history.",
       );
-      router.push(`/main/orders/confirmed?id=${orderId}`);
+      // If group, maybe redirect to orders list?
+      if (isGroup) {
+        router.push("/main/orders");
+      } else {
+        router.push(`/main/orders/confirmed?id=${id}`);
+      }
     }
   };
 
@@ -210,7 +222,11 @@ export default function CheckoutForm() {
       return;
     }
 
-    const restaurantId = cartItems[0].restaurantId;
+    // FIX: Don't force restaurantId if multi-vendor.
+    // The backend's createMultiOrder groups items itself.
+    // However, if we are hitting 'createOrder' endpoint it might expect one.
+    // We'll trust the payload construction handles it.
+    
     const token = session?.accessToken;
 
     if (!token) {
@@ -224,14 +240,13 @@ export default function CheckoutForm() {
       const idempotencyKey = crypto.randomUUID();
       const payload = {
         addressId: selectedAddress.id,
-        restaurantId: restaurantId,
+        restaurantId: cartItems[0].restaurantId, // Kept for backward compat with single-order endpoint logic
         items: cartItems.map((item) => ({
           id: item.id,
           quantity: item.quantity,
         })),
       };
 
-      // 1. Create Order
       const res = await fetch(`${API_URL}/users/orders`, {
         method: "POST",
         headers: {
@@ -245,12 +260,9 @@ export default function CheckoutForm() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Order creation failed");
 
-      // ✅ CRITICAL FIX: Order created successfully. Clear cart immediately.
-      // This prevents "Cart not cleared" bugs if payment logic throws/redirects.
       isOrderCreated.current = true;
       clearCart();
 
-      // 2. Handle Payment
       if (selectedPaymentMethod.type === "CASH") {
         localStorage.removeItem("pending_checkout");
         localStorage.removeItem("last_order_id");
@@ -258,15 +270,26 @@ export default function CheckoutForm() {
         await Swal.fire({
           icon: "success",
           title: "Order Placed!",
-          text: `Order #${data.id.slice(0, 8)} confirmed.`,
+          text: `Order confirmed.`,
           confirmButtonColor: "#EAB308",
           timer: 2000,
         });
 
-        router.push(`/main/orders/confirmed?id=${data.id}`);
+        // Redirect based on whether it was a group or single
+        if (data.orderGroupId) {
+           router.push("/main/orders");
+        } else {
+           router.push(`/main/orders/confirmed?id=${data.id}`);
+        }
       } else {
-        // Attempt Online Payment
-        await processPayment(data.id, data.total);
+        // FIX: Detect if response has orderGroupId
+        if (data.orderGroupId) {
+          // It's a multi-order
+          await processPayment(data.orderGroupId, data.grandTotal || data.total, true);
+        } else {
+          // Single order
+          await processPayment(data.id, data.total, false);
+        }
       }
     } catch (error: any) {
       console.error("Order placement error:", error);

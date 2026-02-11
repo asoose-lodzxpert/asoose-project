@@ -200,11 +200,11 @@ export class FlutterwaveService {
   private mapStatus(status: string): PaymentStatus {
     switch (status) {
       case 'successful':
-        return PaymentStatus.SUCCESS;
+        return PaymentStatus.COMPLETED; // ✅ FIXED
       case 'failed':
         return PaymentStatus.FAILED;
       case 'cancelled':
-        return PaymentStatus.CANCELLED;
+        return PaymentStatus.FAILED; // ✅ FIXED: Mapped to FAILED
       default:
         return PaymentStatus.PENDING;
     }

@@ -19,20 +19,17 @@ interface Props {
   isLoaded?: boolean;
 }
 
-// FIX 1: Helper to safely handle Google's inconsistent coordinate types
-// This resolves "This expression is not callable" and "not assignable to number"
-const getCoordinate = (value: any): number => {
-  if (typeof value === "function") {
-    return value(); // Call it if it's a function
-  }
-  if (typeof value === "number") {
-    return value; // Return it if it's already a number
-  }
-  return 0; // Fallback
+// Helper to safely extract coordinates from API response
+// Handles both function-based (.lat()) and property-based (.lat) versions
+const getCoordinate = (value: number | (() => number) | undefined): number => {
+  if (value === undefined) return 0;
+  if (typeof value === "function") return value();
+  return value;
 };
 
+// Minimal type definitions to avoid dependency on specific @types versions
 interface PlacePrediction {
-  toPlace: () => any;
+  toPlace: () => any; // Returns a Place object
   text: { text: string };
   mainText: { text: string };
   secondaryText: { text: string };
@@ -43,6 +40,7 @@ interface AutocompleteSuggestion {
   placePrediction: PlacePrediction;
 }
 
+// Helper to debounce API calls
 function useDebounce<T>(value: T, delay: number): T {
   const [debouncedValue, setDebouncedValue] = useState(value);
   useEffect(() => {
@@ -54,129 +52,67 @@ function useDebounce<T>(value: T, delay: number): T {
 
 export default function LocationAutocomplete({
   onSelect,
-  placeholder = "Search for a location",
+  placeholder,
   showPinpoint = true,
   initialValue = "",
   isLoaded: propLoaded,
 }: Props) {
   const { isLoaded: contextLoaded } = useGoogleMaps();
   const isMapsScriptReady = propLoaded ?? contextLoaded;
-  
   const isMounted = useRef(true);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const abortControllerRef = useRef<AbortController | null>(null);
-  
-  const isProgrammaticUpdate = useRef(false);
-  const isInitializingLibs = useRef(false);
 
   // State
   const [inputValue, setInputValue] = useState(initialValue);
   const [suggestions, setSuggestions] = useState<AutocompleteSuggestion[]>([]);
 
   // Loading States
-  const [isLibraryLoading, setIsLibraryLoading] = useState(true);
   const [isLocating, setIsLocating] = useState(false);
   const [isSelecting, setIsSelecting] = useState(false);
 
   const [error, setError] = useState<string | null>(null);
   const [isFocused, setIsFocused] = useState(false);
 
-  // FIX 2: Use 'any' to bypass "Namespace has no exported member" errors
+  // Google Maps Objects (Typed as 'any' to fix namespace errors)
   const [placesLib, setPlacesLib] = useState<any>(null);
   const [geocodingLib, setGeocodingLib] = useState<any>(null);
   const [sessionToken, setSessionToken] = useState<any>(null);
 
-  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
-
   const debouncedInputValue = useDebounce(inputValue, 300);
   const prevInitialValueRef = useRef(initialValue);
 
-  // Cleanup
+  // 0. Cleanup on unmount
   useEffect(() => {
-    isMounted.current = true;
     return () => {
       isMounted.current = false;
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
     };
   }, []);
 
-  // Initialize Libraries
+  // 1. Initialize Libraries
   useEffect(() => {
-    if (isMapsScriptReady && !placesLib && isMounted.current && !isInitializingLibs.current) {
-      isInitializingLibs.current = true;
-      setIsLibraryLoading(true);
-
-      Promise.all([
-        google.maps.importLibrary("places"),
-        google.maps.importLibrary("geocoding"),
-      ])
-        .then(([placesResult, geocodingResult]) => {
-          if (!isMounted.current) return;
-          
-          // Cast to any allows us to use the library without strict type definition checks
-          const places = placesResult as any;
-          setPlacesLib(places);
-          setSessionToken(new places.AutocompleteSessionToken());
-          setGeocodingLib(geocodingResult);
-          setIsLibraryLoading(false);
-        })
-        .catch((err) => {
-          console.error("Failed to load Google Maps libraries:", err);
-          if (isMounted.current) {
-            setError("Failed to load maps. Please refresh.");
-            setIsLibraryLoading(false);
-          }
-        })
-        .finally(() => {
-          isInitializingLibs.current = false;
-        });
+    if (isMapsScriptReady && !placesLib && isMounted.current) {
+      google.maps.importLibrary("places").then((lib) => {
+        if (!isMounted.current) return;
+        setPlacesLib(lib);
+        setSessionToken(new (lib as any).AutocompleteSessionToken());
+      });
+      google.maps.importLibrary("geocoding").then((lib) => {
+        if (!isMounted.current) return;
+        setGeocodingLib(lib);
+      });
     }
   }, [isMapsScriptReady, placesLib]);
 
-  // Geolocation
-  useEffect(() => {
-    if (!navigator.geolocation) {
-      setUserLocation({ lat: 9.082, lng: 8.6753 });
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        if (isMounted.current) {
-          setUserLocation({
-            lat: pos.coords.latitude,
-            lng: pos.coords.longitude,
-          });
-        }
-      },
-      () => {
-        if (isMounted.current) {
-          setUserLocation({ lat: 9.082, lng: 8.6753 });
-        }
-      },
-      { enableHighAccuracy: false, timeout: 5000 }
-    );
-  }, []);
-
-  // Sync Initial Value
+  // 2. Sync Initial Value
   useEffect(() => {
     if (initialValue !== prevInitialValueRef.current) {
-      isProgrammaticUpdate.current = true;
       setInputValue(initialValue);
       prevInitialValueRef.current = initialValue;
     }
   }, [initialValue]);
 
-  // Fetch Suggestions
+  // 3. Fetch Suggestions
   useEffect(() => {
     const fetchSuggestions = async () => {
-      if (isProgrammaticUpdate.current) {
-        isProgrammaticUpdate.current = false;
-        return; 
-      }
-
       if (!debouncedInputValue || debouncedInputValue.length < 2) {
         if (isMounted.current) setSuggestions([]);
         return;
@@ -184,120 +120,82 @@ export default function LocationAutocomplete({
 
       if (!placesLib || !sessionToken) return;
 
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-
-      abortControllerRef.current = new AbortController();
-      const currentController = abortControllerRef.current;
-
       try {
         const request = {
           input: debouncedInputValue,
           sessionToken: sessionToken,
-          includedRegionCodes: ["ng"],
-          ...(userLocation && {
-            locationBias: {
-              center: userLocation,
-              radius: 50000,
-            },
-          }),
+          includedRegionCodes: ["ng"], // Restrict to Nigeria
         };
 
+        // Use 'any' cast to bypass strict library type check
         const { suggestions: results } =
-          await placesLib.AutocompleteSuggestion.fetchAutocompleteSuggestions(request);
+          await placesLib.AutocompleteSuggestion.fetchAutocompleteSuggestions(
+            request,
+          );
 
-        if (currentController.signal.aborted || !isMounted.current) return;
-
-        setSuggestions((results as AutocompleteSuggestion[]) || []);
-        setError(null);
-      } catch (err: any) {
-        if (err.name === "AbortError" || currentController.signal.aborted) return;
-        if (isMounted.current) setSuggestions([]);
+        if (isMounted.current) {
+          setSuggestions((results as AutocompleteSuggestion[]) || []);
+          setError(null);
+        }
+      } catch (err) {
+        console.error("Autocomplete Error:", err);
       }
     };
 
     fetchSuggestions();
+  }, [debouncedInputValue, placesLib, sessionToken]);
 
-    return () => {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-    };
-  }, [debouncedInputValue, placesLib, sessionToken, userLocation]);
-
-  // Handle Selection
+  // 4. Handle Selection
   const handleSelect = async (suggestion: AutocompleteSuggestion) => {
     const prediction = suggestion.placePrediction;
-    if (!prediction || isSelecting) return;
+    if (!prediction) return;
 
-    setIsSelecting(true);
-    setError(null);
+    if (isSelecting) return;
 
-    const addressText = prediction.text?.text || prediction.mainText?.text || "Selected Address";
-    
-    isProgrammaticUpdate.current = true;
+    const addressText =
+      prediction.text?.text || prediction.mainText?.text || "Selected Address";
     setInputValue(addressText);
     setSuggestions([]);
+    setIsFocused(false);
+    setError(null);
+    setIsSelecting(true);
 
     try {
       const place = prediction.toPlace();
 
-      await place.fetchFields({
-        fields: ["location", "formattedAddress", "addressComponents", "name"],
-      });
+      await place.fetchFields({ fields: ["location", "formattedAddress"] });
 
       if (!isMounted.current) return;
 
       const location = place.location;
       if (!location) throw new Error("Location coordinates missing");
 
-      // FIX 3: Use the helper here
+      // FIX: Use helper to extract strictly typed numbers
       const lat = getCoordinate(location.lat);
       const lng = getCoordinate(location.lng);
-
-      let formattedAddress = place.formattedAddress;
-
-      if (!formattedAddress && place.addressComponents) {
-        formattedAddress = place.addressComponents
-          .map((component: any) => component.longText)
-          .join(", ");
-      }
-
-      if (!formattedAddress) {
-        formattedAddress = addressText;
-      }
+      
+      const formattedAddress = place.formattedAddress || addressText;
 
       onSelect({ address: formattedAddress, lat, lng });
 
-    } catch (error: any) {
-      console.error("Place Details Error:", error);
-      let userMessage = "Unable to retrieve location details.";
-
-      if (error && error.message && error.message.includes("ZERO_RESULTS")) {
-        userMessage = "Location not found.";
+      if (placesLib) {
+        setSessionToken(new placesLib.AutocompleteSessionToken());
       }
-
+    } catch (error) {
+      console.error("Place Details Error:", error);
       if (isMounted.current) {
-        setError(userMessage);
+        setError("Unable to retrieve details. Please try again.");
       }
     } finally {
-      if (isMounted.current) {
-        setIsSelecting(false);
-        if (placesLib) {
-          setSessionToken(new placesLib.AutocompleteSessionToken());
-        }
-      }
+      if (isMounted.current) setIsSelecting(false);
     }
   };
 
   const handleClear = () => {
-    isProgrammaticUpdate.current = false;
     setInputValue("");
     setSuggestions([]);
     setError(null);
     setIsFocused(true);
-
     if (placesLib) {
       setSessionToken(new placesLib.AutocompleteSessionToken());
     }
@@ -305,11 +203,11 @@ export default function LocationAutocomplete({
 
   const handleCurrentLocation = () => {
     if (!navigator.geolocation) {
-      setError("Geolocation is not supported");
+      setError("Geolocation is not supported by your browser");
       return;
     }
     if (!isMapsScriptReady || !geocodingLib) {
-      setError("Maps service loading...");
+      setError("Maps service is still loading...");
       return;
     }
 
@@ -332,40 +230,26 @@ export default function LocationAutocomplete({
           }
 
           const address = response.results[0].formatted_address;
-          
-          isProgrammaticUpdate.current = true;
           setInputValue(address);
-          setSuggestions([]); 
           setIsFocused(false);
-
           onSelect({ address, lat, lng });
         } catch (err) {
-          if (isMounted.current) {
-            setError("Unable to get address");
-          }
+          console.error("Reverse Geocoding Error:", err);
+          if (isMounted.current)
+            setError("Unable to get address for your location");
         } finally {
           if (isMounted.current) setIsLocating(false);
         }
       },
       (error) => {
-        if (!isMounted.current) return;
-        setIsLocating(false);
-        setError("Unable to get location");
+        if (isMounted.current) {
+          setIsLocating(false);
+          setError("Unable to get your location. Please check permissions.");
+        }
       },
-      { enableHighAccuracy: true, timeout: 10000 }
+      { enableHighAccuracy: false, timeout: 15000, maximumAge: 10000 },
     );
   };
-
-  // Close dropdown on outside click
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setIsFocused(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
 
   const showDropdown =
     isFocused &&
@@ -375,20 +259,22 @@ export default function LocationAutocomplete({
   const isLoading = isLocating || isSelecting;
 
   return (
-    <div ref={containerRef} className="w-full relative group">
+    <div className="w-full relative group">
       <div className="relative z-10">
         <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5 group-focus-within:text-yellow-500 transition-colors" />
 
         <input
           value={inputValue}
-          onChange={(e) => {
-            isProgrammaticUpdate.current = false;
-            setInputValue(e.target.value);
-          }}
+          onChange={(e) => setInputValue(e.target.value)}
           onFocus={() => setIsFocused(true)}
-          disabled={!isMapsScriptReady || isLoading || isLibraryLoading}
+          onBlur={() => {
+            setTimeout(() => {
+              if (isMounted.current) setIsFocused(false);
+            }, 200);
+          }}
+          disabled={!isMapsScriptReady || isLoading}
           placeholder={
-            !isMapsScriptReady || isLibraryLoading
+            !isMapsScriptReady
               ? "Loading maps..."
               : isLoading
                 ? "Retrieving location..."
@@ -416,7 +302,9 @@ export default function LocationAutocomplete({
       {error && (
         <div className="absolute top-full mt-2 left-0 right-0 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-3 z-50 flex items-center gap-2 animate-in fade-in slide-in-from-top-1">
           <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 shrink-0" />
-          <p className="text-xs text-red-700 dark:text-red-300 font-medium">{error}</p>
+          <p className="text-xs text-red-700 dark:text-red-300 font-medium">
+            {error}
+          </p>
         </div>
       )}
 
@@ -441,7 +329,8 @@ export default function LocationAutocomplete({
 
           {suggestions.map((suggestion, index) => {
             const mainText = suggestion.placePrediction?.mainText?.text;
-            const secondaryText = suggestion.placePrediction?.secondaryText?.text;
+            const secondaryText =
+              suggestion.placePrediction?.secondaryText?.text;
 
             if (!mainText) return null;
 
@@ -461,7 +350,9 @@ export default function LocationAutocomplete({
                   <p className="font-bold text-xs truncate text-zinc-900 dark:text-white">
                     {mainText}
                   </p>
-                  <p className="text-[10px] text-gray-500 truncate">{secondaryText}</p>
+                  <p className="text-[10px] text-gray-500 truncate">
+                    {secondaryText}
+                  </p>
                 </div>
               </li>
             );

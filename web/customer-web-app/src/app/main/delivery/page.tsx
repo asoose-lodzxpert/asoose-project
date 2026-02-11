@@ -12,7 +12,6 @@ import { useSession } from 'next-auth/react';
 import BottomNav from '../components/layout/BottomNav';
 import { useDeliveryStore } from '@/store/useDeliveryStore';
 import LocationAutocomplete from '../ride/components/LocationAutocomplete';
-import DeliverySelector from './components/DeliverySelector';
 import DeliveryProgressUI from './components/DeliveryProgressUi';
 import { ReviewModal } from '@/store/ReviewModal';
 import { paymentService } from '@/services/payment.service';
@@ -28,7 +27,7 @@ const DeliveryStage = {
   PROCESSING_ADDRESS: 'Processing_Address',
   CALCULATING_FEE: 'Calculating_Fee',
   REVIEW_PAYMENT: 'REVIEW_PAYMENT',
-  SELECTING_VEHICLE: 'SELECTING_VEHICLE', // Kept for legacy support
+  SELECTING_VEHICLE: 'SELECTING_VEHICLE',
   PAYMENT_PENDING: 'Payment_Pending',
   FINDING_COURIER: 'FINDING_COURIER',
   COURIER_ASSIGNED: 'COURIER_ASSIGNED',
@@ -58,13 +57,9 @@ interface SessionWithToken {
 
 // UTILITIES
 
-const getAuthToken = (session: any): string | null => {
-  const typedSession = session as SessionWithToken;
-  return typedSession?.accessToken || typedSession?.user?.accessToken || null;
-};
-
 const normalizePhoneNumber = (phone: string): string => {
-  let cleaned = phone.trim();
+  // FIX: Remove spaces and dashes to prevent validation errors
+  let cleaned = phone.replace(/[\s-]/g, '');
   if (cleaned.startsWith("+234")) {
     cleaned = "0" + cleaned.slice(4);
   } else if (cleaned.startsWith("234")) {
@@ -80,6 +75,11 @@ const validatePhoneNumber = (phone: string): { valid: boolean; error: string | n
     return { valid: false, error: "Enter valid Nigerian number (e.g. 08012345678)" };
   }
   return { valid: true, error: null };
+};
+
+const getAuthToken = (session: any): string | null => {
+  const typedSession = session as SessionWithToken;
+  return typedSession?.accessToken || typedSession?.user?.accessToken || null;
 };
 
 const sanitizeInput = (input: string, maxLength: number = 255): string => {
@@ -163,8 +163,7 @@ export default function DeliveryPage() {
     };
 
     recoverState();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session, status]); 
+  }, [session, status, handlePaymentSuccess, stage]); 
 
   // EVENT HANDLERS
 
@@ -204,7 +203,6 @@ export default function DeliveryPage() {
     );
   }, [pickupPos, dropoffPos, packageInfo, phoneError]);
 
-  // Helper to get icons for PACKAGE_TYPES
   const getPackageIcon = (id: string) => {
     switch (id) {
       case 'Document': return FileText;
@@ -215,20 +213,34 @@ export default function DeliveryPage() {
     }
   };
 
-  // ✅ Helper to get style radius based on index/type (mimicking original UI feel)
   const getRadiusStyle = (index: number) => {
     const radii = ['rounded-lg', 'rounded-xl', 'rounded-2xl', 'rounded-3xl'];
     return radii[index] || 'rounded-lg';
   };
 
   const getSelectedWeight = (): number => {
-    //  Use Shared Constants for weight lookup
     const selected = PACKAGE_TYPES.find(p => p.id === packageInfo.type);
     return selected ? selected.weightValue : 2.5;
   };
 
   const handleInitializeDelivery = async () => {
-    if (!pickupPos || !dropoffPos) return;
+    // FIX: Provide specific feedback instead of a disabled button
+    if (!pickupPos) {
+      toast.error("Please select a valid Pickup Location from the suggestions.");
+      return;
+    }
+    if (!dropoffPos) {
+      toast.error("Please select a valid Delivery Address from the suggestions.");
+      return;
+    }
+    if (!packageInfo.recipientName) {
+      toast.error("Please enter the recipient's name.");
+      return;
+    }
+    if (!packageInfo.recipientPhone || phoneError) {
+      toast.error("Please enter a valid Nigerian phone number.");
+      return;
+    }
 
     const token = getAuthToken(session);
     if (!token) {
@@ -265,7 +277,7 @@ export default function DeliveryPage() {
         recipientName: sanitizeInput(packageInfo.recipientName),
         recipientPhone: normalizePhoneNumber(packageInfo.recipientPhone),
         packageDetails: sanitizeInput(`${packageInfo.type} - ${packageInfo.instructions || ''}`),
-        weightKg: getSelectedWeight() // ✅ Uses consistent weight logic
+        weightKg: getSelectedWeight() 
       }, token);
 
       if (deliveryRes?.delivery?.id) {
@@ -355,13 +367,6 @@ export default function DeliveryPage() {
     }
   };
 
-  const handleResetDelivery = useCallback(() => {
-    localStorage.removeItem(PENDING_DELIVERY_KEY);
-    resetDelivery();
-    setStage(DeliveryStage.IDLE);
-  }, [resetDelivery, setStage]);
-
-  // RENDER CONTENT
   const renderStageContent = () => {
     if (apiError && stage === DeliveryStage.CONFIGURING) {
       return (
@@ -501,7 +506,6 @@ export default function DeliveryPage() {
               <section>
                 <h3 className="text-lg font-semibold mb-4 dark:text-white">Package Size</h3>
                 <div className="grid grid-cols-2 gap-4">
-                  {/* ✅ Replaced hardcoded array with PACKAGE_TYPES */}
                   {PACKAGE_TYPES.map((type, index) => {
                     const Icon = getPackageIcon(type.id);
                     const radiusClass = getRadiusStyle(index);
@@ -529,12 +533,12 @@ export default function DeliveryPage() {
               </section>
 
               <div className="pt-8 border-t border-zinc-200 dark:border-zinc-800">
+                {/* FIX: Removed disabled logic to show Toast errors on click instead */}
                 <button 
                   onClick={handleInitializeDelivery} 
-                  disabled={!isFormValid} 
-                  className="w-full group bg-zinc-900 dark:bg-white hover:bg-yellow-500 text-white dark:text-black py-4 px-6 flex items-center justify-between transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl shadow-xl"
+                  className="w-full group bg-zinc-900 dark:bg-white hover:bg-yellow-500 text-white dark:text-black py-4 px-6 flex items-center justify-between transition-all duration-300 rounded-xl shadow-xl"
                 >
-                  <span className="font-medium">{isFormValid ? "Calculate Price & Proceed" : "Complete All Fields"}</span>
+                  <span className="font-medium">Calculate Price & Proceed</span>
                   <ChevronRight size={20} className="transition-transform group-hover:translate-x-2" />
                 </button>
               </div>

@@ -25,14 +25,11 @@ import {
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guards';
 import { Roles } from '../auth/roles.decorator';
-import { PaymentGateway } from './interfaces/payment.interface';
+import { PaymentGateway, PaymentStatus } from './interfaces/payment.interface'; // ✅ Added PaymentStatus import
 import { UserRole } from '../common/enums/user-role.enum';
 import type { Request, Response } from 'express';
 
-@Controller({
-  path: 'payment',
-  version: '1',
-})
+@Controller('payment')
 export class PaymentController {
   private readonly logger = new Logger(PaymentController.name);
 
@@ -52,7 +49,6 @@ export class PaymentController {
     try {
       return await this.paymentService.initiatePayment(dto, userId);
     } catch (error) {
-      // FIX: Mask internal gateway errors (like 504 Gateway Timeout)
       if (
         error.message &&
         (error.message.includes('Gateway Timeout') ||
@@ -71,13 +67,10 @@ export class PaymentController {
   @Get('verify')
   @UseGuards(JwtAuthGuard)
   async verifyPayment(@Query() query: VerifyPaymentDto) {
-    return this.paymentService.verifyPayment(
-      query.reference,
-      query.gateway as PaymentGateway | undefined,
-    );
+    return this.paymentService.verifyPayment(query.reference, query.gateway);
   }
 
-  // WEBHOOK HANDLERS (Server-to-Server)
+  // WEBHOOK HANDLERS
 
   @Post('webhook/paystack')
   @HttpCode(HttpStatus.OK)
@@ -86,11 +79,6 @@ export class PaymentController {
     @Headers('x-paystack-signature') signature: string,
   ) {
     const payload = req.body;
-
-    this.logger.debug(
-      `Received Paystack webhook: ${JSON.stringify(payload, null, 2)}`,
-    );
-
     await this.paymentService.handleWebhook(
       PaymentGateway.PAYSTACK,
       payload,
@@ -140,7 +128,7 @@ export class PaymentController {
     return { status: 'success' };
   }
 
-  // USER CALLBACK HANDLERS (Browser Redirects)
+  // USER CALLBACK HANDLERS
 
   @Get('callback/paystack')
   async paystackCallback(
@@ -156,26 +144,16 @@ export class PaymentController {
     }
 
     try {
-      // Backend performs the heavy lifting
       const verification = await this.paymentService.verifyPayment(
         reference,
         PaymentGateway.PAYSTACK,
       );
 
-      // Normalize status for URL param (Frontend will still verify independently)
+      // ✅ FIX: Comparison now matches Enum type
       const statusParam =
-        verification.status === 'SUCCESS' ? 'success' : 'failed';
+        verification.status === PaymentStatus.COMPLETED ? 'success' : 'failed';
 
       let callbackUrl = verification.meta?.callbackUrl || frontendUrl;
-
-      // Support native app URLs (e.g., asoose-app://)
-      if (callbackUrl.startsWith('asoose-app://')) {
-        return res.redirect(
-          `${callbackUrl}?reference=${reference}&status=${statusParam}`,
-        );
-      }
-
-      // Web app URLs
       if (callbackUrl.includes('localhost:3000')) callbackUrl = frontendUrl;
 
       return res.redirect(
@@ -206,20 +184,11 @@ export class PaymentController {
 
       let callbackUrl = verification.meta?.callbackUrl;
 
-      // FIX: Force Frontend URL if missing or incorrect
       if (!callbackUrl || callbackUrl.includes('localhost:3000')) {
         callbackUrl = frontendUrl;
       }
 
       const status = verification.success ? 'success' : 'failed';
-
-      // Support native app URLs
-      if (callbackUrl.startsWith('asoose-app://')) {
-        return res.redirect(
-          `${callbackUrl}?reference=${verification.reference}&status=${status}`,
-        );
-      }
-
       const redirectUrl = `${callbackUrl}/payment/callback?reference=${verification.reference}&status=${status}`;
       return res.redirect(redirectUrl);
     } catch (error) {
@@ -245,20 +214,11 @@ export class PaymentController {
 
       let callbackUrl = verification.meta?.callbackUrl;
 
-      // FIX: Force Frontend URL if missing or incorrect
       if (!callbackUrl || callbackUrl.includes('localhost:3000')) {
         callbackUrl = frontendUrl;
       }
 
       const status = verification.success ? 'success' : 'failed';
-
-      // Support native app URLs
-      if (callbackUrl.startsWith('asoose-app://')) {
-        return res.redirect(
-          `${callbackUrl}?reference=${reference}&status=${status}`,
-        );
-      }
-
       const redirectUrl = `${callbackUrl}/payment/callback?reference=${reference}&status=${status}`;
       return res.redirect(redirectUrl);
     } catch (error) {
