@@ -18,6 +18,7 @@ import {
   RefreshCw,
   X,
   Calendar,
+  Layers, // Added for Group visualization
 } from "lucide-react";
 import { DataTable } from "@/app/super-admin/component/datatable";
 import { ColumnDef } from "@tanstack/react-table";
@@ -165,6 +166,23 @@ export default function TransactionsPage() {
         header: "Description",
         cell: (info) => {
           const row = info.row.original;
+          
+          // ✅ FIX: Handle OrderGroup specifically
+          if (row.refType === 'OrderGroup') {
+             return (
+              <div className="flex flex-col">
+                <span className="text-white font-medium text-sm">{info.getValue<string>()}</span>
+                <div className="flex items-center gap-1 mt-0.5">
+                  <Layers size={10} className="text-purple-400"/>
+                  <span className="text-[10px] text-purple-400 font-mono">
+                     Group #{row.refId?.substring(0, 8)}
+                  </span>
+                </div>
+              </div>
+            );
+          }
+
+          // Legacy / Standard Link handling
           if (row.refId && row.refType) {
             return (
               <Link
@@ -263,7 +281,7 @@ export default function TransactionsPage() {
     [],
   );
 
-  // --- ✅ FIXED: MOBILE CARD CURRENCY DISPLAY ---
+  // --- ✅ FIXED: MOBILE CARD CURRENCY DISPLAY & GROUP HANDLING ---
   const TransactionCard = ({ transaction }: { transaction: Transaction }) => (
     <div className="bg-[#1E293B] border border-gray-700 rounded-lg p-4 space-y-3 hover:border-gray-600 transition-colors">
       <div className="flex items-start justify-between gap-2">
@@ -285,7 +303,14 @@ export default function TransactionsPage() {
         </span>
       </div>
       <div>
-        {transaction.refId && transaction.refType ? (
+        {transaction.refType === 'OrderGroup' ? (
+           <div className="flex flex-col">
+                <span className="text-white font-medium text-base">{transaction.desc}</span>
+                <span className="text-xs text-purple-400 font-mono flex items-center gap-1 mt-1">
+                   <Layers size={10} /> Group #{transaction.refId?.substring(0, 8)}
+                </span>
+           </div>
+        ) : transaction.refId && transaction.refType ? (
           <Link
             href={`/super-admin/${transaction.refType.toLowerCase()}s/${transaction.refId}`}
             className="text-yellow-500 hover:underline font-medium text-base flex items-center gap-1"

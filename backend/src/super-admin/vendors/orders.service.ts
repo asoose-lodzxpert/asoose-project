@@ -6,24 +6,32 @@ export class OrdersService {
   constructor(private prisma: PrismaService) {}
 
   async getVendorOrders(storeId: string, page = 1, limit = 10) {
-    // Optimized single query with relation filtering
     const orders = await this.prisma.order.findMany({
-      where: { storeId: storeId }, // Direct filter if storeId is passed
+      where: { storeId: storeId },
       orderBy: { createdAt: 'desc' },
       take: limit,
       skip: (page - 1) * limit,
       include: {
-        user: { select: { name: true, email: true } }, // Get customer details
-        items: true, // Get items for the UI
+        user: { select: { name: true, email: true } },
+        items: true,
+        // FIX: Include Payment context
+        payment: { select: { status: true } },
+        orderGroup: { include: { payment: { select: { status: true } } } }
       },
     });
 
-    const total = await this.prisma.order.count({
-      where: { storeId: storeId },
+    const total = await this.prisma.order.count({ where: { storeId: storeId } });
+
+    const transformed = orders.map(order => {
+       const effectivePayment = order.payment || order.orderGroup?.payment;
+       return {
+         ...order,
+         paymentStatus: effectivePayment?.status || 'UNPAID',
+       };
     });
 
     return {
-      data: orders,
+      data: transformed,
       meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
     };
   }

@@ -2,6 +2,7 @@
 import React from "react";
 import { Calendar } from "lucide-react";
 import { DisputeDetail } from "../types";
+
 interface Props {
   dispute: DisputeDetail;
 }
@@ -38,7 +39,7 @@ export default function DisputeTimeline({ dispute }: Props) {
             </p>
             {dispute.refundAmount && dispute.refundAmount > 0 && (
               <span className="inline-block mt-1 text-[10px] bg-green-900 text-green-300 px-1.5 py-0.5 rounded border border-green-800">
-                Refunded ${dispute.refundAmount}
+                Refunded ₦{dispute.refundAmount.toLocaleString()}
               </span>
             )}
             {dispute.resolution && (

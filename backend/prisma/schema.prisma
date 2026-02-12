@@ -104,6 +104,13 @@ enum DisputeStatus {
   REJECTED
 }
 
+enum DisputeRefundStatus {
+  IDLE
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
 enum DisputePriority {
   LOW
   MEDIUM
@@ -361,7 +368,7 @@ model RiderPayout {
   reference String?       // Transaction ID from bank/payment gateway
   processedAt DateTime?
   createdAt   DateTime    @default(now())
-
+  bankAccountId String?
   rider        Rider         @relation(fields: [riderId], references: [id], onDelete: Cascade)
   transactions Transaction[] // Link to transaction ledger
 
@@ -498,7 +505,7 @@ model Store {
   vendorId     String             @unique
   createdAt    DateTime           @default(now())
   updatedAt    DateTime           @updatedAt
-
+  walletBalance Float @default(0)
   // Operational Settings
   prepTime       Int     @default(20)
   isOpen         Boolean @default(true)
@@ -507,7 +514,7 @@ model Store {
   // Analytics
   totalRevenue  Float @default(0)
   totalOrders   Int   @default(0)
-  walletBalance Float @default(0)
+  
 
   // Relations
   vendor           Vendor?           @relation(fields: [vendorId], references: [id], onDelete: Restrict)
@@ -519,7 +526,7 @@ model Store {
   bankAccount      BankAccount?
   storeLogs        StoreLog[]
 
-  balance          Float @default(0)
+  
 
   @@index([vendorId])
   @@index([status, verification])
@@ -1032,7 +1039,9 @@ model Dispute {
   priority    DisputePriority @default(MEDIUM)
   reason      String         // e.g., "Item missing", "Driver rude"
   description String?        @db.Text
-  
+  refundStatus       DisputeRefundStatus @default(IDLE)
+  refundIdempotencyKey String?           @unique
+  gatewayRefundId    String?
   openedByUserId String
   openedByUser   User   @relation("DisputeOpener", fields: [openedByUserId], references: [id], onDelete: Cascade)
 

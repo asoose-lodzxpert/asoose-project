@@ -9,10 +9,10 @@ import {
 } from '@nestjs/common';
 import {
   DeliveryStatus,
-  PaymentStatus,
-  TransactionStatus,
   TransactionType,
+  TransactionStatus,
   WalletEntityType,
+  PaymentStatus,
 } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { GeoService } from '../../matching/geo/geo.service';
@@ -22,7 +22,6 @@ import { NotificationsGateway } from '../../notifications/notifications.gateway'
 import { RequestDeliveryDto, CancelTripDto } from './dto/trip.dto';
 import { TripsCommonService, TRIPS_CONFIG } from './trips.common.service';
 import { deliveryToJobSummary } from '../../jobs/job.dto';
-
 @Injectable()
 export class DeliveriesService {
   private readonly logger = new Logger(DeliveriesService.name);
@@ -36,80 +35,16 @@ export class DeliveriesService {
     private readonly common: TripsCommonService,
   ) {}
 
-  // --- JOBS SERVICE STUBS ---
-  async findActiveDeliveryForRider(riderId: string): Promise<any> {
-    // TODO: Implement actual logic
-    return null;
-  }
+// src/users/trips/deliveries.service.ts
 
-  async findIncomingDeliveriesForRider(riderId: string): Promise<any[]> {
-    // TODO: Implement actual logic
-    return [];
-  }
+// ... imports
 
-  async updateDeliveryStatus(deliveryId: string, status: string): Promise<any> {
-    // TODO: Implement actual logic
-    return null;
-  }
-
-  async declineDelivery(deliveryId: string, riderId: string): Promise<any> {
-    // TODO: Implement actual logic
-    return { success: false };
-  }
-
-  async arrivePickup(deliveryId: string, riderId: string): Promise<any> {
-    // TODO: Implement actual logic
-    return { success: false };
-  }
-
-  async confirmPickup(deliveryId: string, riderId: string): Promise<any> {
-    // TODO: Implement actual logic
-    return { success: false };
-  }
-
-  async arriveDropoff(deliveryId: string, riderId: string): Promise<any> {
-    // TODO: Implement actual logic
-    return { success: false };
-  }
-
-  /**
-   * Parse address string to extract city and state
-   * Expected format: "Street, City, State" or "Street, City"
-   */
-  private parseAddress(fullAddress: string): {
-    street: string;
-    city: string;
-    state: string;
-  } {
-    const parts = fullAddress.split(',').map((p) => p.trim());
-
-    if (parts.length >= 3) {
-      // Format: "Street, City, State"
-      return {
-        street: parts[0] || fullAddress,
-        city: parts[1] || '',
-        state: parts[2] || '',
-      };
-    } else if (parts.length === 2) {
-      // Format: "Street, City"
-      return {
-        street: parts[0] || fullAddress,
-        city: parts[1] || '',
-        state: '',
-      };
-    } else {
-      // Single string, treat as street
-      return {
-        street: fullAddress,
-        city: '',
-        state: '',
-      };
-    }
-  }
-
-  async requestDelivery(userId: string, dto: RequestDeliveryDto) {
-    this.logger.debug(`Request delivery DTO: ${JSON.stringify(dto, null, 2)}`);
-
+  async requestDelivery(
+    userId: string,
+    dto: RequestDeliveryDto,
+    idempotencyKey?: string,
+  ) {
+    // 1. Validate Weight
     if (
       dto.weightKg &&
       (dto.weightKg < TRIPS_CONFIG.MIN_DELIVERY_WEIGHT_KG ||
@@ -119,6 +54,7 @@ export class DeliveriesService {
     }
 
     return this.prisma.$transaction(async (tx) => {
+      // 2. Validate Order Link (if applicable)
       if (dto.orderId) {
         const order = await tx.order.findUnique({
           where: { id: dto.orderId },
@@ -127,80 +63,62 @@ export class DeliveriesService {
           throw new ForbiddenException('Invalid order link');
       }
 
-      let pickupAddress: any;
-      let dropoffAddress: any;
-
-      // If address IDs are provided, use them
-      if (dto.pickupAddressId && dto.dropoffAddressId) {
-        [pickupAddress, dropoffAddress] = await Promise.all([
-          tx.address.findUnique({ where: { id: dto.pickupAddressId } }),
-          tx.address.findUnique({ where: { id: dto.dropoffAddressId } }),
-        ]);
-
-        if (!pickupAddress || pickupAddress.userId !== userId) {
-          throw new BadRequestException('Invalid pickup address');
-        }
-        if (!dropoffAddress || dropoffAddress.userId !== userId) {
-          throw new BadRequestException('Invalid dropoff address');
-        }
-      }
-
-      // Otherwise, create new addresses from location data
-      else if (dto.pickupLocation && dto.dropoffLocation) {
-        if (
-          !this.geo.validateCoordinates(
-            dto.pickupLocation.latitude,
-            dto.pickupLocation.longitude,
-          ) ||
-          !this.geo.validateCoordinates(
-            dto.dropoffLocation.latitude,
-            dto.dropoffLocation.longitude,
-          )
-        ) {
-          throw new BadRequestException('Invalid coordinates');
+      // 3. Helper to Resolve Address (Find or Create)
+      const resolveAddress = async (
+        addressId?: string,
+        location?: { latitude: number; longitude: number; address: string },
+        type: 'pickup' | 'dropoff' = 'pickup',
+      ) => {
+        // Case A: ID provided - Fetch existing
+        if (addressId) {
+          const address = await tx.address.findUnique({
+            where: { id: addressId },
+          });
+          if (!address || address.userId !== userId) {
+            throw new BadRequestException(`Invalid ${type} address ID`);
+          }
+          return address;
         }
 
-        // Create addresses for the delivery
-        const pickupParsed = this.parseAddress(dto.pickupLocation.address);
-        const dropoffParsed = this.parseAddress(dto.dropoffLocation.address);
-
-        [pickupAddress, dropoffAddress] = await Promise.all([
-          tx.address.create({
+        // Case B: Location provided - Create new address
+        if (location) {
+          // Note: Since LocationDto might lack city/state, we use defaults or parse address
+          return await tx.address.create({
             data: {
               userId,
-              street: pickupParsed.street,
-              city: pickupParsed.city,
-              state: pickupParsed.state,
-              lat: dto.pickupLocation.latitude,
-              lng: dto.pickupLocation.longitude,
-              label: 'Pickup Location',
+              label: `Delivery ${type} - ${new Date().toLocaleDateString()}`,
+              street: location.address,
+              city: 'Unknown', // You might want to use Geocoding service here to get city
+              state: 'Unknown',
+              lat: location.latitude,
+              lng: location.longitude,
+              isDefault: false,
             },
-          }),
-          tx.address.create({
-            data: {
-              userId,
-              street: dropoffParsed.street,
-              city: dropoffParsed.city,
-              state: dropoffParsed.state,
-              lat: dto.dropoffLocation.latitude,
-              lng: dto.dropoffLocation.longitude,
-              label: 'Dropoff Location',
-            },
-          }),
-        ]);
-      } else {
+          });
+        }
+
+        // Case C: Neither provided
         throw new BadRequestException(
-          'Either address IDs or location coordinates must be provided',
+          `Please provide a ${type} address ID or location coordinates`,
         );
-      }
+      };
 
+      // 4. Resolve Both Addresses
+      // This ensures we have valid Address objects (and thus valid IDs) before creating the delivery
+      const [pickupAddress, dropoffAddress] = await Promise.all([
+        resolveAddress(dto.pickupAddressId, dto.pickupLocation, 'pickup'),
+        resolveAddress(dto.dropoffAddressId, dto.dropoffLocation, 'dropoff'),
+      ]);
+
+      // 5. Validate Coordinates (Double check)
       if (
         !this.geo.validateCoordinates(pickupAddress.lat, pickupAddress.lng) ||
         !this.geo.validateCoordinates(dropoffAddress.lat, dropoffAddress.lng)
       ) {
-        throw new BadRequestException('Invalid coordinates');
+        throw new BadRequestException('Invalid coordinates detected');
       }
 
+      // 6. Calculate Fee
       const distanceKm = this.geo.calculateDistance(
         pickupAddress.lat,
         pickupAddress.lng,
@@ -215,12 +133,14 @@ export class DeliveriesService {
 
       const deliveryOtp = this.geo.generateOTP(TRIPS_CONFIG.OTP_LENGTH);
 
+      // 7. Create Delivery
+      // ✅ FIX: We use pickupAddress.id (guaranteed string) instead of dto.pickupAddressId
       const delivery = await tx.delivery.create({
         data: {
           customerId: userId,
           orderId: dto.orderId,
-          pickupAddressId: pickupAddress.id,
-          dropoffAddressId: dropoffAddress.id,
+          pickupAddressId: pickupAddress.id,   // ✅ Type safe: string
+          dropoffAddressId: dropoffAddress.id, // ✅ Type safe: string
           status: DeliveryStatus.PENDING,
           deliveryFee: this.common.round(deliveryFee),
           distanceKm: this.common.round(distanceKm),
@@ -234,46 +154,38 @@ export class DeliveriesService {
 
       return {
         delivery,
-        deliveryId: delivery.id,
-        deliveryFee: delivery.deliveryFee,
-        distance: delivery.distanceKm,
+        deliveryFee: Number(delivery.deliveryFee),
+        distance: Number(delivery.distanceKm),
         message: 'Delivery request created',
       };
     });
   }
 
-  async startDeliveryMatching(deliveryId: string) {
+async startDeliveryMatching(deliveryId: string) {
     const deliveryCheck = await this.prisma.delivery.findUnique({
       where: { id: deliveryId },
     });
 
     if (!deliveryCheck) throw new NotFoundException('Delivery not found');
 
-    // Prevent matching for direct delivery requests (no orderId)
-    if (!deliveryCheck.orderId) {
-      this.logger.warn(
-        `Direct delivery request ${deliveryId} - matching skipped.`,
-      );
-      return {
-        message: 'Direct delivery request - matching not started',
-        status: deliveryCheck.status,
-      };
+    // 1. Check Payment Status
+    if (deliveryCheck.orderId) {
+      const payment = await this.prisma.payment.findUnique({
+        where: { orderId: deliveryCheck.orderId },
+      });
+
+      if (
+        payment &&
+        payment.status !== PaymentStatus.COMPLETED &&
+        payment.status !== PaymentStatus.PENDING
+      ) {
+        this.logger.warn(
+          `Payment not ready for delivery ${deliveryId} (Order ${deliveryCheck.orderId})`,
+        );
+      }
     }
 
-    const payment = await this.prisma.payment.findUnique({
-      where: { orderId: deliveryCheck.orderId },
-    });
-
-    if (
-      payment &&
-      payment.status !== PaymentStatus.COMPLETED &&
-      payment.status !== PaymentStatus.PENDING
-    ) {
-      this.logger.warn(
-        `Payment not ready for delivery ${deliveryId} (Order ${deliveryCheck.orderId})`,
-      );
-    }
-
+    // 2. Update Status to REQUESTED (Idempotency check)
     const result = await this.prisma.delivery.updateMany({
       where: {
         id: deliveryId,
@@ -289,11 +201,13 @@ export class DeliveriesService {
       return;
     }
 
+    // 3. Fetch Full Details (Include Customer for the DTO)
     const delivery = await this.prisma.delivery.findUnique({
       where: { id: deliveryId },
       include: {
         pickupAddress: true,
         dropoffAddress: true,
+        customer: true, // ✅ ADDED: Required for JobSummaryDto.customerName
       },
     });
 
@@ -301,21 +215,31 @@ export class DeliveriesService {
       throw new NotFoundException('Delivery not found after status update');
     }
 
-    try {
-      if (typeof delivery.orderId === 'string') {
+    // 4. Send Order Update Notification (if linked to order)
+    if (delivery.orderId) {
+      try {
         this.notificationsGateway.sendOrderUpdate(delivery.orderId, {
           status: 'DRIVER_SEARCHING',
           label: 'Finding a Rider',
           description: 'Searching for nearby riders...',
           eta: 'Calculating...',
         });
+      } catch (e) {
+        this.logger.error(`Notification failed for delivery ${deliveryId}`, e);
       }
-    } catch (e) {
-      this.logger.error(`Notification failed for delivery ${deliveryId}`, e);
     }
 
+    // 5. ✅ FIX: Use the Mapper to create the correct DTO
+    // This converts the Prisma object into the JobSummaryDto structure
     const job = deliveryToJobSummary(delivery);
-    const eventPayload = { job, attempt: 1 };
+
+    // 6. Create the structured payload expected by the Queue
+    const eventPayload = { 
+      job,          // Contains the JobSummaryDto
+      attempt: 1 
+    };
+
+    // 7. Emit events with the correct structure
     this.eventBus.emitDeliveryRequested(eventPayload);
     await this.queue.enqueueDeliveryMatching(eventPayload);
 
@@ -330,14 +254,33 @@ export class DeliveriesService {
 
     const result = await this.prisma.delivery.updateMany({
       where: { id: deliveryId, status: DeliveryStatus.REQUESTED },
-      data: {
-        status: DeliveryStatus.ASSIGNED,
-        riderId,
-        assignedAt: new Date(),
-      },
+      data: { status: DeliveryStatus.ASSIGNED, riderId, assignedAt: new Date() },
     });
 
     if (result.count === 0) throw new ConflictException('Delivery unavailable');
+    return { success: true };
+  }
+
+  async confirmPickup(deliveryId: string, riderId: string, proof: string) {
+    if (!riderId) throw new ForbiddenException();
+    if (!proof || proof.length > 2048)
+      throw new BadRequestException('Invalid proof');
+
+    const result = await this.prisma.delivery.updateMany({
+      where: {
+        id: deliveryId,
+        riderId: riderId,
+        status: DeliveryStatus.ASSIGNED,
+      },
+      data: {
+        status: DeliveryStatus.PICKED_UP,
+        pickedUpAt: new Date(),
+        pickupProof: proof,
+      },
+    });
+
+    if (result.count === 0)
+      throw new BadRequestException('Invalid state for pickup');
     return { success: true };
   }
 
@@ -528,8 +471,7 @@ export class DeliveriesService {
       include: { rider: { include: { vehicle: true } } },
     });
 
-    if (!delivery?.rider)
-      throw new InternalServerErrorException('Rider link failed');
+    if (!delivery?.rider) throw new InternalServerErrorException('Rider link failed');
 
     try {
       this.notificationsGateway.server
