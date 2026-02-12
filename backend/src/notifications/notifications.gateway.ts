@@ -51,9 +51,14 @@ export class NotificationsGateway
         return;
       }
 
+      if (!process.env.JWT_SECRET) {
+        this.logger.error('JWT_SECRET not configured');
+        client.disconnect();
+        return;
+      }
+
       const payload = this.jwtService.verify(token, {
-        secret:
-          process.env.JWT_SECRET || 'your-secret-key-change-in-production',
+        secret: process.env.JWT_SECRET,
       });
 
       const userId = payload.sub || payload.userId;
@@ -197,6 +202,47 @@ export class NotificationsGateway
   }
 
   /**
+   * Emit job assignment event to a specific rider
+   */
+  emitJobAssigned(riderId: string, jobData: any) {
+    this.logger.log(`Emitting job.assigned to rider ${riderId}`);
+    this.server.to(`user_${riderId}`).emit('job.assigned', jobData);
+  }
+
+  /**
+   * Emit job update event to a specific rider
+   */
+  emitJobUpdated(riderId: string, jobData: any) {
+    this.logger.log(`Emitting job.updated to rider ${riderId}`);
+    this.server.to(`user_${riderId}`).emit('job.updated', jobData);
+  }
+
+  /**
+   * Emit job cancellation event to a specific rider
+   */
+  emitJobCancelled(riderId: string, jobData: any) {
+    this.logger.log(`Emitting job.cancelled to rider ${riderId}`);
+    this.server.to(`user_${riderId}`).emit('job.cancelled', jobData);
+  }
+
+  /**
+   * Join a rider to an order/ride room for real-time updates
+   */
+  joinJobRoom(riderId: string, jobId: string) {
+    // Find all sockets for this rider and join them to the room
+    const userSockets = this.activeUsers.get(riderId);
+    if (userSockets) {
+      userSockets.forEach((socketId) => {
+        const socket = this.server.sockets.sockets.get(socketId);
+        if (socket) {
+          socket.join(`order_${jobId}`);
+          this.logger.log(`Rider ${riderId} joined room: order_${jobId}`);
+        }
+      });
+    }
+  }
+
+  /**
    * Emit real-time order updates to anyone tracking this order
    */
   sendOrderUpdate(orderId: string, payload: any) {
@@ -208,16 +254,18 @@ export class NotificationsGateway
   }
 
   private extractToken(client: Socket): string | null {
-    // 1. Check Handshake Auth (Standard Socket.IO v4)
+    // 1. Check Handshake Auth (Standard Socket.IO v4) - PRIORITIZE THIS FOR RIDER APP
     if (client.handshake.auth?.token) {
       return client.handshake.auth.token;
     }
 
+    // 2. Fallback to Authorization header
     const authHeader = client.handshake.headers.authorization;
     if (authHeader) {
       return authHeader.replace('Bearer ', '');
     }
 
+    // 3. Fallback to query parameter
     if (client.handshake.query?.token) {
       return client.handshake.query.token as string;
     }

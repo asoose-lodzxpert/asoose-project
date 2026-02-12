@@ -1,9 +1,10 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { JobsService } from './jobs.service';
 import { JobsController } from './jobs.controller';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
-  imports: [],
+  imports: [NotificationsModule],
   controllers: [JobsController],
   providers: [JobsService],
   exports: [JobsService],

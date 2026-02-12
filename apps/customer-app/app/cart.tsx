@@ -376,20 +376,6 @@ export default function CartScreen() {
           </View>
         </View>
 
-        {!canCheckout ? (
-          <View
-            style={[
-              styles.warningBanner,
-              { backgroundColor: surfaceSubtle, borderColor: statusError },
-            ]}
-          >
-            <IconSymbol name="alert-circle" size={18} color={statusError} />
-            <ThemedText style={[styles.warningText, { color: statusError }]}>
-              Keep only one store in cart
-            </ThemedText>
-          </View>
-        ) : null}
-
         <Pressable
           disabled={!canCheckout}
           onPress={() => router.push("/checkout")}

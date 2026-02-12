@@ -2,7 +2,7 @@ import {
   AUTH_ACCESS_TOKEN_KEY,
   AUTH_REFRESH_TOKEN_KEY,
   AUTH_USER_KEY,
-} from "@/constants/authStorageKeys";
+} from "@/constants/static-config";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, {
   createContext,

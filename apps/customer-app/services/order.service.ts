@@ -3,7 +3,7 @@ import { request } from "@/lib/authFetch";
 // Align with backend CreateOrderDto
 export type CreateOrderPayload = {
   addressId: string;
-  restaurantId: string;
+  restaurantId?: string; // Optional - backend will auto-detect multi-vendor
   items: {
     id: string; // product id
     quantity: number;
@@ -27,7 +27,20 @@ export type Order = {
   }[];
 };
 
-export async function createOrder(payload: CreateOrderPayload): Promise<Order> {
+export type OrderGroup = {
+  id: string;
+  orderGroupId?: string; // For multi-vendor orders
+  orders?: Order[]; // Array of orders for multi-vendor
+  userId: string;
+  totalAmount: number;
+  grandTotal: number;
+  paymentStatus: string;
+  createdAt: string;
+};
+
+export async function createOrder(
+  payload: CreateOrderPayload,
+): Promise<Order | OrderGroup> {
   return request("/users/orders", {
     method: "POST",
     body: JSON.stringify(payload),

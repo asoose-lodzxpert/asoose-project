@@ -1,38 +1,38 @@
-import React, { useEffect, useState, useRef } from "react";
+import { ThemedText } from "@/components/themed-text";
+import { ThemedView } from "@/components/themed-view";
+import { ThemedInput } from "@/components/ThemedInput";
+import { IconSymbol } from "@/components/ui/icon-symbol";
+import { SkeletonAddressCard } from "@/components/ui/Skeleton";
+import { useToast } from "@/components/ui/toast";
+import { useThemeColor } from "@/hooks/use-theme-color";
+import * as Location from "expo-location";
+import { useRouter } from "expo-router";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-  View,
-  StyleSheet,
-  Pressable,
-  Modal,
   ActivityIndicator,
-  Keyboard,
   Animated,
+  Keyboard,
+  Modal,
+  Pressable,
+  StyleSheet,
+  View,
 } from "react-native";
 import MapView, { Marker } from "react-native-maps";
-import * as Location from "expo-location";
-import { ThemedView } from "@/components/themed-view";
-import { ThemedText } from "@/components/themed-text";
-import { IconSymbol } from "@/components/ui/icon-symbol";
-import { useThemeColor } from "@/hooks/use-theme-color";
-import { useRouter } from "expo-router";
-import { ThemedInput } from "@/components/ThemedInput";
-import { useToast } from "@/components/ui/toast";
-import { SkeletonAddressCard } from "@/components/ui/Skeleton";
 
-import { Address } from "@/types/address";
-import {
-  fetchAddresses,
-  saveAddress as saveAddressService,
-  deleteAddress as deleteAddressService,
-} from "@/services/address.service";
-import {
-  fetchSuggestions as fetchSuggestionsHelper,
-  selectPlace as selectPlaceHelper,
-  resolveAddressFromCoords,
-} from "@/services/helpers/places-helper";
 import { AddressList } from "@/components/addresses/AddressList";
 import { GettingLocationOverlay } from "@/components/addresses/GettingLocationOverlay";
 import { MapCurrentLocationBtn } from "@/components/addresses/MapCurrentLocationBtn";
+import {
+  deleteAddress as deleteAddressService,
+  fetchAddresses,
+  saveAddress as saveAddressService,
+} from "@/services/address.service";
+import {
+  fetchSuggestions as fetchSuggestionsHelper,
+  resolveAddressFromCoords,
+  selectPlace as selectPlaceHelper,
+} from "@/services/helpers/places-helper";
+import { Address } from "@/types/address";
 
 export default function Addresses() {
   const router = useRouter();
@@ -42,6 +42,8 @@ export default function Addresses() {
 
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [loading, setLoading] = useState(true);
+  const [retryCount, setRetryCount] = useState(0);
+  const retryTimeoutRef = React.useRef<number | null>(null);
 
   const [addressInput, setAddressInput] = useState("");
   const [suggestions, setSuggestions] = useState<any[]>([]);
@@ -52,28 +54,66 @@ export default function Addresses() {
   const [saving, setSaving] = useState(false);
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const mapRef = useRef<MapView>(null);
-  const debounceRef = useRef<NodeJS.Timeout | null>(null);
+  const debounceRef = useRef<number | null>(null);
 
   // Helper to format full address string from API fields
   const formatFullAddress = (addr: any) => {
     return [addr.street, addr.city, addr.state].filter(Boolean).join(", ");
   };
 
-  // ---------------- Load Addresses ----------------
-  useEffect(() => {
-    fetchAddresses().then((data) => {
-      const mappedData = data.map((item: any) => ({
-        ...item,
-        address: item.address || formatFullAddress(item),
-        coordinates: {
-          lat: item.lat?.toString(),
-          lng: item.lng?.toString(),
-        },
-      }));
+  // ---------------- Load Addresses with Auto-Retry ----------------
+  const loadAddresses = useCallback(
+    async (attempt = 0) => {
+      try {
+        const data = await fetchAddresses();
+        const mappedData = data.map((item: any) => ({
+          ...item,
+          address: item.address || formatFullAddress(item),
+          coordinates: {
+            lat: item.lat?.toString(),
+            lng: item.lng?.toString(),
+          },
+        }));
 
-      setAddresses(mappedData);
-      setLoading(false);
-    });
+        setAddresses(mappedData);
+        setLoading(false);
+        setRetryCount(0);
+      } catch (error) {
+        const errorMessage = (error as Error)?.message || "Failed to load";
+        const isNetworkError =
+          errorMessage.toLowerCase().includes("network") ||
+          errorMessage.toLowerCase().includes("fetch") ||
+          errorMessage.toLowerCase().includes("connection");
+
+        const maxRetries = isNetworkError ? 3 : 1;
+
+        if (attempt < maxRetries) {
+          const delay = Math.min(1000 * Math.pow(2, attempt), 5000);
+          setRetryCount(attempt + 1);
+
+          retryTimeoutRef.current = setTimeout(() => {
+            loadAddresses(attempt + 1);
+          }, delay);
+        } else {
+          // Only stop loading after all retries fail
+          setLoading(false);
+          setRetryCount(0);
+        }
+      }
+    },
+    [formatFullAddress],
+  );
+
+  useEffect(() => {
+    loadAddresses();
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current);
+      }
+    };
   }, []);
 
   // ---------------- Suggestions ----------------

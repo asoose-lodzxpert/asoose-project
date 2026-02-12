@@ -1,38 +1,37 @@
-import React, { useEffect, useState, useCallback } from "react";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import React, { useCallback, useEffect, useState } from "react";
 import {
-  ScrollView,
-  StyleSheet,
-  ActivityIndicator,
-  RefreshControl,
-  View,
   Dimensions,
   DimensionValue,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  View,
 } from "react-native";
-import { useLocalSearchParams, useRouter } from "expo-router";
 import Animated, {
-  useSharedValue,
+  Easing,
   useAnimatedStyle,
+  useSharedValue,
   withRepeat,
   withTiming,
-  Easing,
 } from "react-native-reanimated";
 
-import { ThemedView } from "@/components/themed-view";
-import { ThemedText } from "@/components/themed-text";
-import { fetchStoreBySlug } from "@/services/store.service";
-import { useThemeColor } from "@/hooks/use-theme-color";
 import { FloatingCart } from "@/components/home/FloatingCart";
-import { StoreHero } from "@/components/store/StoreHero";
-import { PromoBanner } from "@/components/store/PromoBanner";
 import { ActionTabs } from "@/components/store/ActionTabs";
 import { CategoryFilter } from "@/components/store/CategoryFilter";
 import { ProductList } from "@/components/store/ProductList";
-import { StoreInfo } from "@/components/store/StoreInfo";
+import { PromoBanner } from "@/components/store/PromoBanner";
 import { ReviewModal } from "@/components/store/ReviewModal";
-import type { StoreData, Product } from "@/types/store-types";
+import { StoreHero } from "@/components/store/StoreHero";
+import { StoreInfo } from "@/components/store/StoreInfo";
+import { ThemedText } from "@/components/themed-text";
+import { ThemedView } from "@/components/themed-view";
+import { useThemeColor } from "@/hooks/use-theme-color";
+import { fetchStoreBySlug } from "@/services/store.service";
+import type { StoreData } from "@/types/store-types";
 
-import { useCart } from "@/context/CartContext";
 import { useToast } from "@/components/ui/ThemedToast";
+import { useCart } from "@/context/CartContext";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -47,6 +46,8 @@ export default function StoreScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reviewModalVisible, setReviewModalVisible] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+  const retryTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
 
   const [currentTab, setCurrentTab] = useState<TabType>("all");
   const [activeCategory, setActiveCategory] = useState("Popular");
@@ -55,26 +56,59 @@ export default function StoreScreen() {
   const border = useThemeColor({}, "borderDefault");
   const surfaceSubtle = useThemeColor({}, "surfaceSubtle");
 
-  const loadStore = useCallback(async () => {
-    if (!slug || typeof slug !== "string") {
-      setError("Missing store slug");
-      setStoreData(null);
-      setLoading(false);
-      return;
-    }
+  const loadStore = useCallback(
+    async (attempt = 0) => {
+      if (!slug || typeof slug !== "string") {
+        setError("Missing store slug");
+        setStoreData(null);
+        setLoading(false);
+        return;
+      }
 
-    try {
-      setError(null);
-      const data = await fetchStoreBySlug(slug);
-      setStoreData(data);
-    } catch (e) {
-      setError("Failed to load store");
-      setStoreData(null);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [slug]);
+      if (attempt === 0) {
+        setError(null);
+        setRetryCount(0);
+      }
+
+      try {
+        const data = await fetchStoreBySlug(slug);
+        setStoreData(data);
+        setError(null);
+        setRetryCount(0);
+        setLoading(false);
+        setRefreshing(false);
+      } catch (e) {
+        const errorMessage = "Failed to load store";
+        const isNetworkError = true; // Assume network error for stores
+
+        const maxRetries = isNetworkError ? 3 : 1;
+
+        if (attempt < maxRetries) {
+          const delay = Math.min(1000 * Math.pow(2, attempt), 5000);
+          setRetryCount(attempt + 1);
+
+          retryTimeoutRef.current = setTimeout(() => {
+            loadStore(attempt + 1);
+          }, delay);
+        } else {
+          setError(errorMessage);
+          setStoreData(null);
+          setLoading(false);
+          setRefreshing(false);
+          setRetryCount(0);
+        }
+      }
+    },
+    [slug],
+  );
+
+  useEffect(() => {
+    return () => {
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     setLoading(true);
@@ -83,7 +117,7 @@ export default function StoreScreen() {
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    loadStore();
+    loadStore(0);
   }, [loadStore]);
 
   const isRestaurant = storeData?.type === "RESTAURANT";

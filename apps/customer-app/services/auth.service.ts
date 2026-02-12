@@ -1,7 +1,7 @@
 import {
   AUTH_ACCESS_TOKEN_KEY,
   AUTH_REFRESH_TOKEN_KEY,
-} from "@/constants/authStorageKeys";
+} from "@/constants/static-config";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const API_BASE = (() => {

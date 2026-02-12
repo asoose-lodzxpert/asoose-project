@@ -43,14 +43,25 @@ export type CartSummaryRestaurant = {
   id: string;
   name: string;
   image?: string | null;
-  time: string;
+  time?: string;
   currency?: string;
 };
 
-export type CartSummaryResponse = {
-  restaurant: CartSummaryRestaurant | null;
+export type CartGroup = {
+  restaurant: CartSummaryRestaurant;
   items: CartSummaryItem[];
   subtotal: number;
   deliveryFee: number;
   total: number;
+};
+
+export type CartSummaryResponse = {
+  groups: CartGroup[];
+  grandTotal: number;
+  // Legacy single-vendor fields for backwards compatibility
+  restaurant?: CartSummaryRestaurant | null;
+  items?: CartSummaryItem[];
+  subtotal?: number;
+  deliveryFee?: number;
+  total?: number;
 };

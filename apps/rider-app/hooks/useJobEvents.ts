@@ -67,5 +67,12 @@ export function useJobEvents(options: UseJobEventsOptions) {
     };
   }, [enabled, connect, disconnect]);
 
-  return { disconnect, reconnect: connect };
+  // Expose joinOrderRoom for consumers
+  const joinOrderRoom = (orderId: string) => {
+    if (serviceRef.current) {
+      serviceRef.current.joinOrderRoom(orderId);
+    }
+  };
+
+  return { disconnect, reconnect: connect, joinOrderRoom };
 }
