@@ -1,17 +1,22 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as SecureStore from "expo-secure-store";
 import React, {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useState,
-  useCallback,
 } from "react";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useBiometric } from "../hooks/useBiometric";
 import {
   login as loginService,
-  refreshToken as refreshTokenService,
   logout as logoutService,
 } from "../services/auth.service";
-import { useBiometric } from "../hooks/useBiometric";
+import {
+  deleteExpoPushTokenFromBackend,
+  getExpoPushToken,
+  sendExpoPushTokenToBackend,
+} from "../services/expo-push-token.service";
 
 type User = {
   id: string;
@@ -67,45 +72,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   ) => {
     setUser(u);
     await AsyncStorage.setItem(USER_KEY, JSON.stringify(u));
-    if (accessToken) await AsyncStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
+    if (accessToken)
+      await SecureStore.setItemAsync(ACCESS_TOKEN_KEY, accessToken);
     if (refreshToken)
-      await AsyncStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+      await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, refreshToken);
   };
 
   const clearSession = async () => {
     setUser(null);
-    await AsyncStorage.multiRemove([
-      USER_KEY,
-      ACCESS_TOKEN_KEY,
-      REFRESH_TOKEN_KEY,
-    ]);
+    await AsyncStorage.removeItem(USER_KEY);
+    await SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY);
+    await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY);
     await biometric.clearCredentials();
   };
 
   const login = useCallback(
     async ({ email, password }: { email: string; password: string }) => {
-      setLoading(true);
+      // setLoading(true);
       try {
-        console.log("[AuthContext] login called", { email });
         const resp = await loginService(email, password);
-        console.log("[AuthContext] loginService response", resp);
-        // resp expected: { user, accessToken, refreshToken }
         await saveSession(
           resp.user,
           resp.accessToken || null,
           resp.refreshToken || null,
         );
-        console.log("[AuthContext] saveSession complete", {
-          user: resp.user,
-          accessToken: resp.accessToken,
-          refreshToken: resp.refreshToken,
-        });
+        // Send expo push token to backend
+        try {
+          const token = await getExpoPushToken();
+          if (token) await sendExpoPushTokenToBackend(token);
+        } catch {}
       } catch (err) {
-        console.error("[AuthContext] login error", err);
         throw err;
       } finally {
-        setLoading(false);
-        console.log("[AuthContext] login finished, loading:", false);
+        // setLoading(false);
       }
     },
     [],
@@ -113,9 +112,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(async () => {
     setLoading(true);
+    setUser(null);
     try {
       try {
         await logoutService();
+      } catch {}
+      try {
+        await deleteExpoPushTokenFromBackend();
       } catch {}
       await clearSession();
     } finally {

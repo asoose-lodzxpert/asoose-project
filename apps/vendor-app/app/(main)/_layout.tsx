@@ -6,10 +6,14 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useAuth } from "@/context/AuthContext";
+import { useNotifications } from "@/context/NotificationContext";
+import { View, StyleSheet } from "react-native";
+import { ThemedText } from "@/components/themed-text";
 
 export default function TabLayout() {
   const colorScheme = useColorScheme() ?? "light";
   const { user, loading } = useAuth();
+  const { unreadCount } = useNotifications();
 
   if (loading) {
     return null;
@@ -66,7 +70,23 @@ export default function TabLayout() {
         options={{
           title: "Notifications",
           tabBarIcon: ({ color }) => (
-            <IconSymbol size={28} name="bell" color={color} />
+            <View
+              style={{
+                width: 32,
+                height: 32,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <IconSymbol size={28} name="bell" color={color} />
+              {unreadCount > 0 && (
+                <View style={styles.badgeContainer}>
+                  <ThemedText style={styles.badgeText} numberOfLines={1}>
+                    {unreadCount > 99 ? "99+" : unreadCount}
+                  </ThemedText>
+                </View>
+              )}
+            </View>
           ),
         }}
       />
@@ -87,3 +107,26 @@ export default function TabLayout() {
     </Tabs>
   );
 }
+
+const styles = StyleSheet.create({
+  badgeContainer: {
+    position: "absolute",
+    top: -2,
+    right: -6,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: "#E53935",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 4,
+    zIndex: 10,
+  },
+  badgeText: {
+    color: "#fff",
+    fontSize: 11,
+    fontWeight: "bold",
+    textAlign: "center",
+    includeFontPadding: false,
+  },
+});

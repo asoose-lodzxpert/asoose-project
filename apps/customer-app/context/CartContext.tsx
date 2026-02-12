@@ -1,15 +1,15 @@
+import { fetchCartSummary } from "@/services/cart.service";
+import { CartItem, Restaurant } from "@/types/cart";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, {
   createContext,
-  useContext,
-  useMemo,
-  useState,
-  useEffect,
   useCallback,
+  useContext,
+  useEffect,
+  useMemo,
   useRef,
+  useState,
 } from "react";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { CartItem, Restaurant } from "@/types/cart";
-import { fetchCartSummary } from "@/services/cart.service";
 
 type CartContextType = {
   items: CartItem[];
@@ -141,7 +141,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({
           }
         }
       } catch (err) {
-        console.warn("Unable to hydrate cart", err);
+        if (__DEV__) console.warn("Unable to hydrate cart", err);
       } finally {
         setHydrating(false);
       }

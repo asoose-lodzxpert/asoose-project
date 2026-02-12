@@ -31,8 +31,14 @@ export default function LoginScreen() {
   const [biometricLoading, setBiometricLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const { signIn, signInWithBiometric, biometric, enableBiometricAuth } =
-    useAuth();
+  const {
+    login,
+    biometricAvailable,
+    biometricEnrolled,
+    biometricLogin,
+    enableBiometrics,
+    isBiometricEnabled,
+  } = useAuth();
   const { confirm, ConfirmModal } = useConfirm();
   const router = useRouter();
 
@@ -88,13 +94,11 @@ export default function LoginScreen() {
   async function handleLogin() {
     setError("");
     if (!validateForm()) return;
-
     setLoading(true);
-
     try {
-      await signIn(identifier, password);
-
-      if (biometric.isSupported && !biometric.isEnabled) {
+      await login({ email: identifier, password });
+      const enabled = await isBiometricEnabled();
+      if (biometricAvailable && !enabled) {
         const wantsBiometric = await confirm({
           title: "Enable Biometric Login?",
           message:
@@ -104,11 +108,10 @@ export default function LoginScreen() {
           type: "info",
           icon: "touchid",
         });
-
         if (wantsBiometric) {
           try {
             setBiometricLoading(true);
-            await enableBiometricAuth(identifier, password);
+            await enableBiometrics(identifier, password);
             Toast.show({
               type: "success",
               text1: "Biometric Enabled",
@@ -138,7 +141,7 @@ export default function LoginScreen() {
   }
 
   async function handleBiometricLogin() {
-    if (!biometric.isSupported) {
+    if (!biometricAvailable) {
       Toast.show({
         type: "error",
         text1: "Not Supported",
@@ -146,8 +149,7 @@ export default function LoginScreen() {
       });
       return;
     }
-
-    if (!biometric.isEnrolled) {
+    if (!biometricEnrolled) {
       Toast.show({
         type: "error",
         text1: "Not Enrolled",
@@ -156,8 +158,8 @@ export default function LoginScreen() {
       });
       return;
     }
-
-    if (!biometric.isEnabled) {
+    const enabled = await isBiometricEnabled();
+    if (!enabled) {
       Toast.show({
         type: "info",
         text1: "Biometric Login Disabled",
@@ -166,12 +168,10 @@ export default function LoginScreen() {
       });
       return;
     }
-
     setBiometricLoading(true);
     setError("");
-
     try {
-      await signInWithBiometric();
+      await biometricLogin();
       router.replace("/(tabs)");
     } catch (e: any) {
       setError(e.message || "Biometric authentication failed.");
@@ -273,12 +273,12 @@ export default function LoginScreen() {
                     style={[
                       styles.fingerprintButton,
                       { borderColor: primary },
-                      (!biometric.isEnabled || biometricLoading) && {
+                      biometricLoading && {
                         opacity: 0.5,
                       },
                     ]}
                     onPress={handleBiometricLogin}
-                    disabled={biometricLoading || !biometric.isEnabled}
+                    disabled={biometricLoading}
                   >
                     {biometricLoading ? (
                       <ActivityIndicator color={primary} />

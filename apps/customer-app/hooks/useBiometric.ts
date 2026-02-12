@@ -2,7 +2,7 @@ import { useState, useCallback } from "react";
 import * as LocalAuthentication from "expo-local-authentication";
 import * as SecureStore from "expo-secure-store";
 
-const BIOMETRIC_CREDENTIALS_KEY = "@auth/biometric_credentials";
+const BIOMETRIC_CREDENTIALS_KEY = "biometric_credentials";
 
 export type BiometricStatus = "idle" | "verifying" | "success" | "error";
 

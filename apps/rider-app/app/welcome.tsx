@@ -23,7 +23,7 @@ export default function OnboardingScreen() {
         />
 
         <ThemedText type="title" style={styles.appName}>
-          Asoose Partner App
+          Asoose Rider
         </ThemedText>
 
         <ThemedText style={[styles.tagline, { color: muted }]}>

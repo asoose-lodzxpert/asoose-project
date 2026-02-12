@@ -11,6 +11,7 @@ import {
 import { Server, Socket } from 'socket.io';
 import { Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { RiderStateService } from '../matching/rider-state/rider-state.service';
 
 // Explicit CORS configuration for Socket.IO
 @WebSocketGateway({
@@ -31,7 +32,10 @@ export class NotificationsGateway
   // Map to track active sockets per user: userId -> Set<socketId>
   private activeUsers = new Map<string, Set<string>>();
 
-  constructor(private jwtService: JwtService) {}
+  constructor(
+    private jwtService: JwtService,
+    private riderStateService: RiderStateService,
+  ) {}
 
   afterInit() {
     this.logger.log('WebSocket Gateway Initialized');
@@ -98,6 +102,85 @@ export class NotificationsGateway
       client.join(roomName);
       this.logger.log(`User ${client.data.userId} joined room: ${roomName}`);
       return { event: 'joinedRoom', room: roomName };
+    }
+  }
+
+  /**
+   * Handle rider location updates via socket
+   */
+  @SubscribeMessage('rider_location_update')
+  async handleRiderLocationUpdate(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { lat: number; lng: number },
+  ) {
+    const riderId = client.data.userId;
+    if (!riderId) {
+      this.logger.warn(`Location update from unauthenticated socket`);
+      return { success: false, error: 'Not authenticated' };
+    }
+
+    if (!data || typeof data.lat !== 'number' || typeof data.lng !== 'number') {
+      this.logger.warn(`Invalid location data from ${riderId}`);
+      return { success: false, error: 'Invalid location data' };
+    }
+
+    try {
+      await this.riderStateService.updateLocation(riderId, data.lat, data.lng);
+      this.logger.debug(
+        `Location updated for rider ${riderId}: [${data.lat}, ${data.lng}]`,
+      );
+      return { success: true };
+    } catch (error) {
+      this.logger.error(`Error updating location for rider ${riderId}`, error);
+      return { success: false, error: 'Failed to update location' };
+    }
+  }
+
+  /**
+   * Handle batch location updates (for offline queue flush)
+   */
+  @SubscribeMessage('rider_location_batch')
+  async handleRiderLocationBatch(
+    @ConnectedSocket() client: Socket,
+    @MessageBody()
+    data: { locations: Array<{ lat: number; lng: number; timestamp: number }> },
+  ) {
+    const riderId = client.data.userId;
+    if (!riderId) {
+      return { success: false, error: 'Not authenticated' };
+    }
+
+    if (!data || !Array.isArray(data.locations)) {
+      return { success: false, error: 'Invalid batch data' };
+    }
+
+    try {
+      // Process only the most recent location from the batch
+      const sorted = data.locations.sort((a, b) => b.timestamp - a.timestamp);
+      const latest = sorted[0];
+
+      if (
+        latest &&
+        typeof latest.lat === 'number' &&
+        typeof latest.lng === 'number'
+      ) {
+        await this.riderStateService.updateLocation(
+          riderId,
+          latest.lat,
+          latest.lng,
+        );
+        this.logger.log(
+          `Batch location updated for rider ${riderId} (${data.locations.length} entries)`,
+        );
+      }
+
+      return { success: true, processed: data.locations.length };
+    } catch (error) {
+      this.logger.error(
+        `Error processing location batch for rider ${riderId}`,
+        error,
+      );
+      return { success: false, error: 'Failed to process batch' };
     }
   }
 

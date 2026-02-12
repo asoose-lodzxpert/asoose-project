@@ -1,5 +1,5 @@
-import * as Location from "expo-location";
 import * as ImagePicker from "expo-image-picker";
+import * as Location from "expo-location";
 import * as Notifications from "expo-notifications";
 
 export type StartupPermissionStatus = {
@@ -48,6 +48,8 @@ export async function requestStartupPermissions() {
   try {
     await Notifications.requestPermissionsAsync();
   } catch (e) {
-    console.warn("Notification permission error:", e);
+    if (__DEV__) {
+      console.warn("Notification permission error:", e);
+    }
   }
 }

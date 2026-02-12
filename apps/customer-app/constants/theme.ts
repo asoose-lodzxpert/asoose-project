@@ -44,10 +44,10 @@ export const Colors = {
 
   dark: {
     // Core surfaces
-    surfaceBackground: "#0F172A",
-    surfaceCard: "#111827",
-    surfaceSubtle: "#1F2937",
-    borderDefault: "#273244",
+    surfaceBackground: "#0A0A0A",
+    surfaceCard: "#1A1A1A",
+    surfaceSubtle: "#242424",
+    borderDefault: "#2A2A2A",
     tint: brandPrimary,
 
     // Text
@@ -55,7 +55,7 @@ export const Colors = {
     textSecondary: "#9CA3AF",
     textDisabled: "#6B7280",
     textMuted: "#6B7280",
-    textOnPrimary: "#111827",
+    textOnPrimary: "#0A0A0A",
 
     // Brand & actions
     brandPrimary,

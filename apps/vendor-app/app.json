@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "ASOOSE VENDOR APP",
+    "name": "ASOOSE VENDOR",
     "slug": "asoose-vendor-app",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -27,14 +27,16 @@
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.asoose.vendor.app",
-
+      "versionCode": 1,
+      "notification": {
+        "icon": "./assets/images/icon.png"
+      },
       "permissions": [
         "INTERNET",
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
         "POST_NOTIFICATIONS"
       ],
-
       "blockedPermissions": [
         "CAMERA",
         "RECORD_AUDIO",
@@ -52,6 +54,11 @@
         "expo-splash-screen",
         {
           "image": "./assets/images/splash-icon.png",
+          "dark": {
+            "image": "./assets/images/splash-icon-dark.png",
+            "backgroundColor": "#0A0A0A"
+          },
+          "backgroundColor": "#F9FAFB",
           "imageWidth": 200,
           "resizeMode": "contain"
         }

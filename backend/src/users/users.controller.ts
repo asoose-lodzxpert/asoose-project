@@ -103,6 +103,22 @@ export class UsersController {
     return order;
   }
 
+  @Patch('expo-push-token')
+  async updateExpoPushToken(
+    @Request() req,
+    @Body() body: { expoPushToken: string },
+  ) {
+    return this.usersService.updateExpoPushToken(
+      req.user.id,
+      body.expoPushToken,
+    );
+  }
+
+  @Delete('expo-push-token')
+  async deleteExpoPushToken(@Request() req) {
+    return this.usersService.deleteExpoPushToken(req.user.id);
+  }
+
   // ==================================================================
   // ADDRESS ENDPOINTS
   // ==================================================================

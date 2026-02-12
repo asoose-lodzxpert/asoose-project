@@ -7,90 +7,86 @@ import {
   Dimensions,
   Pressable,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
+
 import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
 import { IconSymbol, IconSymbolName } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
-import { useRouter } from "expo-router";
 
 const { width } = Dimensions.get("window");
 
 type Step = {
   key: string;
-  title?: string;
-  description?: string;
   content: React.ReactNode;
 };
 
-export default function OnboardingScreen() {
+export default function OnboardingScreen({ onDone }: { onDone?: () => void }) {
   const router = useRouter();
-  const primary = useThemeColor({}, "brandPrimary");
-
   const [index, setIndex] = useState(0);
   const ref = useRef<FlatList>(null);
 
-  const next = () => {
-    if (index === steps.length - 1) {
-      router.replace("/(auth)/login");
-    } else {
-      ref.current?.scrollToIndex({ index: index + 1 });
-    }
-  };
+  // Theme Colors
+  const primary = useThemeColor({}, "brandPrimary");
+  const textPrimary = useThemeColor({}, "textPrimary");
+  const textSecondary = useThemeColor({}, "textSecondary");
+  const textOnPrimary = useThemeColor({}, "textOnPrimary");
+  const surfaceSubtle = useThemeColor({}, "surfaceSubtle");
+  const dotInactive = useThemeColor({}, "borderDefault");
 
   const steps: Step[] = [
     {
       key: "branding",
       content: (
-        <View style={styles.center}>
+        <View style={styles.slide}>
           <Image
             source={require("@/assets/images/icon.png")}
             style={styles.logo}
           />
-          <ThemedText style={styles.appName}>ASOOSE</ThemedText>
-          <ThemedText style={styles.slogan}>Order. Ride. Deliver.</ThemedText>
+          <ThemedText style={[styles.appName, { color: textPrimary }]}>
+            ASOOSE
+          </ThemedText>
+          <ThemedText style={[styles.slogan, { color: textSecondary }]}>
+            Order. Ride. Deliver.
+          </ThemedText>
         </View>
       ),
     },
-
     {
       key: "services",
       content: (
-        <View style={styles.center}>
-          <ThemedText style={styles.stepTitle}>
-            Everything you need, one app
+        <View style={styles.slide}>
+          <ThemedText style={[styles.stepTitle, { color: textPrimary }]}>
+            Everything you need,{"\n"}one single app
           </ThemedText>
-
           <View style={styles.iconRow}>
-            <ServiceBubble icon="person" color="#FACC15" label="Order" />
-            <ServiceBubble icon="bus.fill" color="#93C5FD" label="Ride" />
-            <ServiceBubble
-              icon="square.grid.2x2.fill"
-              color="#FDBA74"
-              label="Deliver"
-            />
+            <ServiceBubble icon="person.fill" label="Order" />
+            <ServiceBubble icon="car.fill" label="Ride" />
+            <ServiceBubble icon="shippingbox.fill" label="Deliver" />
           </View>
         </View>
       ),
     },
-
     {
       key: "categories",
       content: (
-        <View style={styles.center}>
-          <ThemedText style={styles.stepTitle}>Choose your service</ThemedText>
-
+        <View style={styles.slide}>
+          <ThemedText
+            style={[styles.stepTitle, { color: textPrimary, marginBottom: 32 }]}
+          >
+            Choose your service
+          </ThemedText>
           <CategoryCard
             icon="fork.knife"
             title="Order Food & More"
-            description="Restaurants, groceries, and essentials delivered fast"
+            description="Restaurants and essentials delivered fast"
           />
-
           <CategoryCard
             icon="car.fill"
             title="Book Rides"
-            description="Safe, reliable transportation whenever you need it"
+            description="Safe transportation whenever you need it"
           />
-
           <CategoryCard
             icon="shippingbox.fill"
             title="Send Packages"
@@ -101,62 +97,100 @@ export default function OnboardingScreen() {
     },
   ];
 
-  return (
-    <ThemedView style={{ flex: 1 }}>
-      <FlatList
-        ref={ref}
-        data={steps}
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        keyExtractor={(i) => i.key}
-        onMomentumScrollEnd={(e) =>
-          setIndex(Math.round(e.nativeEvent.contentOffset.x / width))
-        }
-        renderItem={({ item }) => <View style={{ width }}>{item.content}</View>}
-      />
+  const isLastStep = index === steps.length - 1;
 
-      {/* Footer */}
-      <View style={styles.footer}>
-        <View style={styles.dots}>
-          {steps.map((_, i) => (
-            <View
-              key={i}
-              style={[styles.dot, i === index && { backgroundColor: primary }]}
-            />
-          ))}
+  const handleFinish = () => {
+    if (onDone) onDone();
+    else router.replace("/(auth)/login");
+  };
+
+  const next = () => {
+    if (isLastStep) {
+      handleFinish();
+    } else {
+      ref.current?.scrollToIndex({ index: index + 1, animated: true });
+    }
+  };
+
+  return (
+    <ThemedView style={styles.container}>
+      <SafeAreaView style={{ flex: 1 }}>
+        {/* Header - Skip */}
+        <View style={styles.header}>
+          {!isLastStep && (
+            <Pressable onPress={handleFinish} style={styles.skipBtn}>
+              <ThemedText style={[styles.skipText, { color: textSecondary }]}>
+                Skip
+              </ThemedText>
+            </Pressable>
+          )}
         </View>
 
-        <Pressable
-          style={[styles.button, { backgroundColor: primary }]}
-          onPress={next}
-        >
-          <ThemedText style={styles.buttonText}>
-            {index === steps.length - 1 ? "Get Started" : "Next"}
-          </ThemedText>
-        </Pressable>
-      </View>
+        <FlatList
+          ref={ref}
+          data={steps}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          onMomentumScrollEnd={(e) =>
+            setIndex(Math.round(e.nativeEvent.contentOffset.x / width))
+          }
+          keyExtractor={(i) => i.key}
+          renderItem={({ item }) => (
+            <View style={{ width }}>{item.content}</View>
+          )}
+        />
+
+        {/* Footer Actions */}
+        <View style={styles.footer}>
+          <View style={styles.pagination}>
+            {steps.map((_, i) => (
+              <View
+                key={i}
+                style={[
+                  styles.dot,
+                  i === index
+                    ? [styles.activeDot, { backgroundColor: primary }]
+                    : { backgroundColor: dotInactive },
+                ]}
+              />
+            ))}
+          </View>
+
+          <Pressable
+            style={[styles.button, { backgroundColor: primary }]}
+            onPress={next}
+          >
+            <ThemedText style={[styles.buttonText, { color: textOnPrimary }]}>
+              {isLastStep ? "Get Started" : "Continue"}
+            </ThemedText>
+          </Pressable>
+        </View>
+      </SafeAreaView>
     </ThemedView>
   );
 }
 
-/* ───────── Components ───────── */
+/* ───────── Sub-Components ───────── */
 
 function ServiceBubble({
   icon,
-  color,
   label,
 }: {
   icon: IconSymbolName;
-  color: string;
   label: string;
 }) {
+  const primary = useThemeColor({}, "brandPrimary");
+  const textSecondary = useThemeColor({}, "textSecondary");
+
   return (
-    <View style={{ alignItems: "center", gap: 8 }}>
-      <View style={[styles.bubble, { backgroundColor: color }]}>
-        <IconSymbol name={icon} size={28} color="#111827" />
+    <View style={styles.bubbleContainer}>
+      <View style={[styles.bubble, { backgroundColor: `${primary}15` }]}>
+        <IconSymbol name={icon} size={28} color={primary} />
       </View>
-      <ThemedText>{label}</ThemedText>
+      <ThemedText style={[styles.bubbleLabel, { color: textSecondary }]}>
+        {label}
+      </ThemedText>
     </View>
   );
 }
@@ -171,13 +205,22 @@ function CategoryCard({
   description: string;
 }) {
   const primary = useThemeColor({}, "brandPrimary");
-  const border = useThemeColor({}, "borderDefault");
+  const surface = useThemeColor({}, "surfaceSubtle");
+  const textPrimary = useThemeColor({}, "textPrimary");
+  const textSecondary = useThemeColor({}, "textSecondary");
+
   return (
-    <View style={[styles.card, { borderColor: border }]}>
-      <IconSymbol name={icon} size={28} color={primary} />
+    <View style={[styles.card, { backgroundColor: surface }]}>
+      <View style={styles.cardIcon}>
+        <IconSymbol name={icon} size={24} color={primary} />
+      </View>
       <View style={{ flex: 1 }}>
-        <ThemedText style={styles.cardTitle}>{title}</ThemedText>
-        <ThemedText style={styles.cardDesc}>{description}</ThemedText>
+        <ThemedText style={[styles.cardTitle, { color: textPrimary }]}>
+          {title}
+        </ThemedText>
+        <ThemedText style={[styles.cardDesc, { color: textSecondary }]}>
+          {description}
+        </ThemedText>
       </View>
     </View>
   );
@@ -186,100 +229,101 @@ function CategoryCard({
 /* ───────── Styles ───────── */
 
 const styles = StyleSheet.create({
-  center: {
+  container: { flex: 1 },
+  header: {
+    height: 50,
+    justifyContent: "center",
+    alignItems: "flex-end",
+    paddingHorizontal: 24,
+  },
+  skipBtn: { padding: 8 },
+  skipText: { fontSize: 16, fontWeight: "600" },
+  slide: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    padding: 24,
-    gap: 20,
+    paddingHorizontal: 32,
   },
-
   logo: {
-    width: 96,
-    height: 96,
-    resizeMode: "contain",
+    width: 100,
+    height: 100,
+    marginBottom: 24,
   },
-
   appName: {
+    fontSize: 32,
+    fontWeight: "900",
+    letterSpacing: 2,
+    marginBottom: 8,
+  },
+  slogan: {
+    fontSize: 18,
+    fontWeight: "500",
+  },
+  stepTitle: {
     fontSize: 28,
     fontWeight: "800",
-    letterSpacing: 1,
-  },
-
-  slogan: {
-    fontSize: 16,
-    color: "#4B5563",
-  },
-
-  stepTitle: {
-    fontSize: 22,
-    fontWeight: "800",
     textAlign: "center",
-    marginBottom: 12,
+    lineHeight: 36,
   },
-
   iconRow: {
     flexDirection: "row",
-    gap: 28,
+    gap: 24,
+    marginTop: 40,
   },
-
+  bubbleContainer: { alignItems: "center", gap: 12 },
   bubble: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 72,
+    height: 72,
+    borderRadius: 24,
     alignItems: "center",
     justifyContent: "center",
   },
-
+  bubbleLabel: { fontSize: 14, fontWeight: "600" },
   card: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 14,
-    padding: 16,
-    borderRadius: 18,
-    width: "100%",
-    marginTop: 12,
-    // elevation: 2,
-    borderWidth: 1,
-  },
-
-  cardTitle: {
-    fontWeight: "700",
-    fontSize: 16,
-  },
-
-  cardDesc: {
-    fontSize: 13,
-    color: "#6B7280",
-  },
-
-  footer: {
-    padding: 20,
     gap: 16,
+    padding: 20,
+    borderRadius: 24,
+    width: "100%",
+    marginBottom: 12,
   },
-
-  dots: {
+  cardIcon: { width: 32, alignItems: "center" },
+  cardTitle: { fontWeight: "700", fontSize: 17, marginBottom: 2 },
+  cardDesc: { fontSize: 14, lineHeight: 20 },
+  footer: {
+    paddingHorizontal: 24,
+    paddingBottom: 24,
+  },
+  pagination: {
     flexDirection: "row",
     justifyContent: "center",
-    gap: 8,
-  },
-
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: "#D1D5DB",
-  },
-
-  button: {
-    paddingVertical: 14,
-    borderRadius: 999,
     alignItems: "center",
+    gap: 8,
+    marginBottom: 32,
   },
-
+  dot: {
+    height: 6,
+    width: 6,
+    borderRadius: 3,
+  },
+  activeDot: {
+    width: 20,
+  },
+  button: {
+    height: 60,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    // Subtle shadow
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 2,
+  },
   buttonText: {
     fontWeight: "700",
-    fontSize: 16,
-    color: "#fff",
+    fontSize: 18,
   },
 });

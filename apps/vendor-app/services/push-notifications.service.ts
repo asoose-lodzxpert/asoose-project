@@ -18,7 +18,7 @@ export function initializeNotificationHandler() {
 
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
-      shouldShowAlert: true,
+      // shouldShowAlert is deprecated; use shouldShowBanner and shouldShowList
       shouldPlaySound: true,
       shouldSetBadge: true,
       shouldShowBanner: true,
@@ -36,19 +36,9 @@ export function initializeNotificationHandler() {
 export async function registerForPushNotificationsAsync(): Promise<
   string | undefined
 > {
-  console.log("[Push Notifications] Starting registration...");
-  console.log(
-    "[Push Notifications] Device type:",
-    Device.isDevice ? "Physical Device" : "Simulator/Emulator",
-  );
-  console.log("[Push Notifications] Platform:", Platform.OS);
-
   let token;
 
   if (Platform.OS === "android") {
-    console.log(
-      "[Push Notifications] Setting up Android notification channels...",
-    );
     // Create notification channels for Android 8.0+
     // These channels only affect foreground notifications
     await Notifications.setNotificationChannelAsync("default", {
@@ -68,33 +58,25 @@ export async function registerForPushNotificationsAsync(): Promise<
       sound: "default",
       enableVibrate: true,
     });
-    console.log("[Push Notifications] Android channels created successfully");
   }
 
   if (Device.isDevice) {
-    console.log("[Push Notifications] Checking notification permissions...");
     const { status: existingStatus } =
       await Notifications.getPermissionsAsync();
-    console.log(
-      "[Push Notifications] Current permission status:",
-      existingStatus,
-    );
 
     let finalStatus = existingStatus;
 
     if (existingStatus !== "granted") {
-      console.log(
-        "[Push Notifications] Requesting notification permissions...",
-      );
       const { status } = await Notifications.requestPermissionsAsync();
       finalStatus = status;
-      console.log("[Push Notifications] Permission request result:", status);
     }
 
     if (finalStatus !== "granted") {
-      console.warn(
-        "[Push Notifications] Permission not granted, cannot register for push notifications",
-      );
+      if (__DEV__) {
+        console.warn(
+          "[Push Notifications] Permission not granted, cannot register for push notifications",
+        );
+      }
       Toast.show({
         type: "warning",
         text1: "Notifications disabled",
@@ -104,31 +86,21 @@ export async function registerForPushNotificationsAsync(): Promise<
     }
 
     try {
-      const projectId = Constants.expoConfig?.extra?.eas?.projectId;
-      console.log("[Push Notifications] EAS Project ID:", projectId);
-
-      // Get Expo Push Token (not FCM token)
-      // This prevents Android 12+ BackgroundServiceStartNotAllowedException
-      // by using Expo's notification service instead of starting Firebase services
-      console.log("[Push Notifications] Requesting Expo push token...");
+      const projectId =
+        Constants.easConfig?.projectId ??
+        Constants.expoConfig?.extra?.eas?.projectId ??
+        Constants.expoConfig?.extra?.expoProjectId;
+      if (!projectId) {
+        throw new Error("Expo projectId missing in production build");
+      }
       token = (
         await Notifications.getExpoPushTokenAsync({
           projectId,
         })
       ).data;
-      console.log("[Push Notifications] Token received successfully:", token);
     } catch (e: any) {
       // Silently fail if push notifications cannot be registered
       // This prevents app crashes on Android 12+ when background services are restricted
-      console.error(
-        "[Push Notifications] Push notification registration failed:",
-        e,
-      );
-      console.error("[Push Notifications] Error details:", {
-        message: e.message,
-        code: e.code,
-        stack: e.stack,
-      });
 
       Toast.show({
         type: "warning",
@@ -138,9 +110,6 @@ export async function registerForPushNotificationsAsync(): Promise<
       return undefined;
     }
   } else {
-    console.warn(
-      "[Push Notifications] Not running on a physical device, skipping token registration",
-    );
     return undefined;
   }
 
@@ -149,13 +118,6 @@ export async function registerForPushNotificationsAsync(): Promise<
 
 // Save push token to backend
 export async function savePushToken(token: string): Promise<void> {
-  console.log(
-    "[Push Notifications] Attempting to save push token to backend...",
-  );
-  console.log("[Push Notifications] Token:", token);
-  console.log("[Push Notifications] API URL:", EXPO_PUBLIC_API_URL);
-  console.log("[Push Notifications] Platform:", Platform.OS);
-
   try {
     const response = await fetchWithAuth(
       `${EXPO_PUBLIC_API_URL}/auth/vendor/push-token`,
@@ -164,15 +126,8 @@ export async function savePushToken(token: string): Promise<void> {
         body: JSON.stringify({ token, platform: Platform.OS }),
       },
     );
-
-    console.log("[Push Notifications] Token saved successfully:", response);
   } catch (error: any) {
     // Surface error for debugging
-    console.error("[Push Notifications] Failed to send push token:", error);
-    console.error("[Push Notifications] Error details:", {
-      message: error.message,
-      stack: error.stack,
-    });
 
     Toast.show({
       type: "error",

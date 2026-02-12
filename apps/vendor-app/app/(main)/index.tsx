@@ -6,8 +6,8 @@ import { QuickActions } from "@/components/store/QuickActions";
 import { RecentOrdersFeed } from "@/components/store/RecentOrdersFeed";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useRouter } from "expo-router";
-import { ConfirmationModal } from "@/components/ui/ConfirmationModal";
 import { View } from "react-native";
+import { useConfirm } from "@/hooks/use-confirm"; // <-- import useConfirm
 
 import { StoreMetrics, StoreOrder } from "@/types/store";
 import { useThemeColor } from "@/hooks/use-theme-color";
@@ -30,10 +30,11 @@ export default function StoreDashboardPage() {
   const [loadingOrders, setLoadingOrders] = useState(true);
   const [loadingStore, setLoadingStore] = useState(true);
   const [toggleLoading, setToggleLoading] = useState(false);
-  const [confirmVisible, setConfirmVisible] = useState(false);
-  // remove top-level pull-to-refresh to avoid nesting VirtualizedList inside ScrollView
+
   const router = useRouter();
   const linkColor = useThemeColor({}, "brandPrimary");
+
+  const { confirm, ConfirmModal } = useConfirm(); // <-- useConfirm hook
 
   // Fetch store public details
   const fetchStore = useCallback(async () => {
@@ -85,6 +86,7 @@ export default function StoreDashboardPage() {
     setLoadingOrders(true);
     try {
       const res = await fetchStoreOrders();
+
       setOrders(res);
     } catch (e: any) {
       Toast.show({
@@ -103,11 +105,20 @@ export default function StoreDashboardPage() {
     fetchStore();
   }, [fetchOnline, fetchMetrics, fetchOrders, fetchStore]);
 
-  // If you need a global refresh that refreshes metrics/orders/store,
-  // consider adding a refresh button that calls fetchOnline/fetchMetrics/fetchOrders/fetchStore.
-
-  /** Open confirmation modal */
-  const openConfirmation = () => setConfirmVisible(true);
+  /** Open confirmation modal using useConfirm */
+  const openConfirmation = async () => {
+    const result = await confirm({
+      title: isOnline ? "Go Offline" : "Go Online",
+      message: `Are you sure you want to ${isOnline ? "go offline" : "go online"}?`,
+      confirmText: isOnline ? "Go Offline" : "Go Online",
+      cancelText: "Cancel",
+      type: isOnline ? "warning" : "info",
+      icon: "power",
+    });
+    if (result) {
+      handleConfirmToggle();
+    }
+  };
 
   /** Confirm toggle */
   const handleConfirmToggle = async () => {
@@ -126,12 +137,8 @@ export default function StoreDashboardPage() {
       });
     } finally {
       setToggleLoading(false);
-      setConfirmVisible(false);
     }
   };
-
-  /** Cancel modal */
-  const handleCancel = () => setConfirmVisible(false);
 
   /** QuickActions data */
   const actions = [
@@ -184,14 +191,7 @@ export default function StoreDashboardPage() {
           loading={loadingOrders}
         />
       </View>
-
-      <ConfirmationModal
-        visible={confirmVisible}
-        message={`Are you sure you want to ${isOnline ? "go offline" : "go online"}?`}
-        onConfirm={handleConfirmToggle}
-        onCancel={handleCancel}
-        loading={toggleLoading}
-      />
+      <ConfirmModal />
     </ThemedView>
   );
 }

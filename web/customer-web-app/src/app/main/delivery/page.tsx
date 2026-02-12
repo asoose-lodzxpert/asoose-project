@@ -36,7 +36,7 @@ const DeliveryStage = {
 } as const;
 
 const PHONE_REGEX = /^(\+234|0)[789][01]\d{8}$/;
-const PENDING_DELIVERY_KEY = 'pending_delivery_data'; 
+const PENDING_DELIVERY_KEY = "pending_delivery_data";
 
 interface DetailInputProps {
   label: string;
@@ -68,11 +68,16 @@ const normalizePhoneNumber = (phone: string): string => {
   return cleaned;
 };
 
-const validatePhoneNumber = (phone: string): { valid: boolean; error: string | null } => {
+const validatePhoneNumber = (
+  phone: string,
+): { valid: boolean; error: string | null } => {
   if (!phone) return { valid: false, error: null };
   const normalized = normalizePhoneNumber(phone);
   if (!PHONE_REGEX.test(normalized)) {
-    return { valid: false, error: "Enter valid Nigerian number (e.g. 08012345678)" };
+    return {
+      valid: false,
+      error: "Enter valid Nigerian number (e.g. 08012345678)",
+    };
   }
   return { valid: true, error: null };
 };
@@ -90,11 +95,20 @@ const sanitizeInput = (input: string, maxLength: number = 255): string => {
 
 export default function DeliveryPage() {
   const router = useRouter();
-  const { 
-    packageInfo, setPackageInfo, setLocations, 
-    pickupPos, dropoffPos, setStage, stage, 
-    courierInfo, activeDeliveryId, resetDelivery,
-    setAddressIds, setCalculatedFee, calculatedFee
+  const {
+    packageInfo,
+    setPackageInfo,
+    setLocations,
+    pickupPos,
+    dropoffPos,
+    setStage,
+    stage,
+    courierInfo,
+    activeDeliveryId,
+    resetDelivery,
+    setAddressIds,
+    setCalculatedFee,
+    calculatedFee,
   } = useDeliveryStore();
 
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
@@ -105,55 +119,72 @@ export default function DeliveryPage() {
   // Redirect if we are in a tracking state
   useEffect(() => {
     const trackingStages = [
-      DeliveryStage.FINDING_COURIER, 
-      DeliveryStage.COURIER_ASSIGNED, 
-      DeliveryStage.PICKED_UP, 
-      DeliveryStage.COMPLETED
+      DeliveryStage.FINDING_COURIER,
+      DeliveryStage.COURIER_ASSIGNED,
+      DeliveryStage.PICKED_UP,
+      DeliveryStage.COMPLETED,
     ];
     if (activeDeliveryId && trackingStages.includes(stage as any)) {
       router.push(`/main/delivery/${activeDeliveryId}`);
     }
   }, [stage, activeDeliveryId, router]);
 
-  // RECOVERY LOGIC 
-  const handlePaymentSuccess = useCallback((id?: string) => {
-    localStorage.removeItem(PENDING_DELIVERY_KEY);
-    setStage(DeliveryStage.FINDING_COURIER);
-    toast.success("Payment confirmed!");
-    const targetId = id || activeDeliveryId;
-    if (targetId) {
-      router.push(`/main/delivery/${targetId}`);
-    }
-  }, [activeDeliveryId, router, setStage]);
+  // RECOVERY LOGIC
+  const handlePaymentSuccess = useCallback(
+    (id?: string) => {
+      localStorage.removeItem(PENDING_DELIVERY_KEY);
+      setStage(DeliveryStage.FINDING_COURIER);
+      toast.success("Payment confirmed!");
+      const targetId = id || activeDeliveryId;
+      if (targetId) {
+        router.push(`/main/delivery/${targetId}`);
+      }
+    },
+    [activeDeliveryId, router, setStage],
+  );
 
   useEffect(() => {
     const recoverState = async () => {
-      if (status === 'loading') return;
+      if (status === "loading") return;
 
       const storedData = localStorage.getItem(PENDING_DELIVERY_KEY);
       const token = getAuthToken(session);
-      
+
       if (storedData) {
         try {
           const { id, reference } = JSON.parse(storedData);
-          
-          if (id && reference && (stage === DeliveryStage.PAYMENT_PENDING || stage === DeliveryStage.REVIEW_PAYMENT)) {
-             // 1. Force Active Verification First
-             const isVerified = await DeliveryService.verifyPayment(reference, token || undefined);
-             
-             if (isVerified) {
-               handlePaymentSuccess(id);
-               return;
-             }
 
-             // 2. If verification failed (network/timing), fall back to Polling
-             useDeliveryStore.setState({ activeDeliveryId: id });
-             setStage(DeliveryStage.PAYMENT_PENDING); 
-             
-             const success = await DeliveryService.pollDeliveryStatus(id, undefined, undefined, undefined, token || undefined);
-             if (success) {
-               handlePaymentSuccess(id);
-             }
+          if (
+            id &&
+            reference &&
+            (stage === DeliveryStage.PAYMENT_PENDING ||
+              stage === DeliveryStage.REVIEW_PAYMENT)
+          ) {
+            // 1. Force Active Verification First
+            const isVerified = await DeliveryService.verifyPayment(
+              reference,
+              token || undefined,
+            );
+
+            if (isVerified) {
+              handlePaymentSuccess(id);
+              return;
+            }
+
+            // 2. If verification failed (network/timing), fall back to Polling
+            useDeliveryStore.setState({ activeDeliveryId: id });
+            setStage(DeliveryStage.PAYMENT_PENDING);
+
+            const success = await DeliveryService.pollDeliveryStatus(
+              id,
+              undefined,
+              undefined,
+              undefined,
+              token || undefined,
+            );
+            if (success) {
+              handlePaymentSuccess(id);
+            }
           }
         } catch (e) {
           console.error("Failed to parse pending delivery data", e);
@@ -167,55 +198,74 @@ export default function DeliveryPage() {
 
   // EVENT HANDLERS
 
-  const handleSocketUpdate = useCallback((data: any) => {
-    if (data.status === 'ASSIGNED') {
-      useDeliveryStore.setState({ courierInfo: data.rider, stage: DeliveryStage.COURIER_ASSIGNED });
-      toast.info("Courier found! They are on their way.");
-    } else if (data.status === 'PICKED_UP') {
-      setStage(DeliveryStage.PICKED_UP);
-    } else if (data.status === 'DELIVERED' || data.status === 'COMPLETED') {
-      setStage(DeliveryStage.COMPLETED);
-    }
-  }, [setStage]);
+  const handleSocketUpdate = useCallback(
+    (data: any) => {
+      if (data.status === "ASSIGNED") {
+        useDeliveryStore.setState({
+          courierInfo: data.rider,
+          stage: DeliveryStage.COURIER_ASSIGNED,
+        });
+        toast.info("Courier found! They are on their way.");
+      } else if (data.status === "PICKED_UP") {
+        setStage(DeliveryStage.PICKED_UP);
+      } else if (data.status === "DELIVERED" || data.status === "COMPLETED") {
+        setStage(DeliveryStage.COMPLETED);
+      }
+    },
+    [setStage],
+  );
 
   useEffect(() => {
     const token = getAuthToken(session);
     if (token && activeDeliveryId) {
       socketService.connect(token);
-      socketService.on('delivery_update', (data) => {
+      socketService.on("delivery_update", (data) => {
         if (data.deliveryId === activeDeliveryId) handleSocketUpdate(data);
       });
-      return () => { socketService.off('delivery_update', handleSocketUpdate); };
+      return () => {
+        socketService.off("delivery_update", handleSocketUpdate);
+      };
     }
   }, [activeDeliveryId, session, handleSocketUpdate]);
 
-  const handlePhoneChange = useCallback((value: string) => {
-    setPackageInfo({ recipientPhone: value });
-    const validation = validatePhoneNumber(value);
-    setPhoneError(validation.error);
-  }, [setPackageInfo]);
+  const handlePhoneChange = useCallback(
+    (value: string) => {
+      setPackageInfo({ recipientPhone: value });
+      const validation = validatePhoneNumber(value);
+      setPhoneError(validation.error);
+    },
+    [setPackageInfo],
+  );
 
   const isFormValid = useMemo(() => {
     return Boolean(
-      pickupPos && dropoffPos && packageInfo.recipientName && 
-      packageInfo.recipientPhone && !phoneError &&
-      validatePhoneNumber(packageInfo.recipientPhone).valid
+      pickupPos &&
+      dropoffPos &&
+      packageInfo.recipientName &&
+      packageInfo.recipientPhone &&
+      !phoneError &&
+      validatePhoneNumber(packageInfo.recipientPhone).valid,
     );
   }, [pickupPos, dropoffPos, packageInfo, phoneError]);
 
   const getPackageIcon = (id: string) => {
     switch (id) {
-      case 'Document': return FileText;
-      case 'Parcel': return Box;
-      case 'Bulk': return Layers;
-      case 'Heavy': return Truck;
-      default: return Package;
+      case "Document":
+        return FileText;
+      case "Parcel":
+        return Box;
+      case "Bulk":
+        return Layers;
+      case "Heavy":
+        return Truck;
+      default:
+        return Package;
     }
   };
 
   const getRadiusStyle = (index: number) => {
-    const radii = ['rounded-lg', 'rounded-xl', 'rounded-2xl', 'rounded-3xl'];
-    return radii[index] || 'rounded-lg';
+    const radii = ["rounded-lg", "rounded-xl", "rounded-2xl", "rounded-3xl"];
+    return radii[index] || "rounded-lg";
   };
 
   const getSelectedWeight = (): number => {
@@ -254,19 +304,25 @@ export default function DeliveryPage() {
       setStage(DeliveryStage.PROCESSING_ADDRESS);
       const cityFallback = "Lagos";
 
-      const pickupRes = await DeliveryService.saveAddress({
-        street: sanitizeInput(packageInfo.pickupAddress),
-        city: cityFallback,
-        lat: pickupPos.lat,
-        lng: pickupPos.lng
-      }, token);
+      const pickupRes = await DeliveryService.saveAddress(
+        {
+          street: sanitizeInput(packageInfo.pickupAddress),
+          city: cityFallback,
+          lat: pickupPos.lat,
+          lng: pickupPos.lng,
+        },
+        token,
+      );
 
-      const dropoffRes = await DeliveryService.saveAddress({
-        street: sanitizeInput(packageInfo.destinationAddress),
-        city: cityFallback,
-        lat: dropoffPos.lat,
-        lng: dropoffPos.lng
-      }, token);
+      const dropoffRes = await DeliveryService.saveAddress(
+        {
+          street: sanitizeInput(packageInfo.destinationAddress),
+          city: cityFallback,
+          lat: dropoffPos.lat,
+          lng: dropoffPos.lng,
+        },
+        token,
+      );
 
       setAddressIds(pickupRes.id, dropoffRes.id);
       setStage(DeliveryStage.CALCULATING_FEE);
@@ -285,7 +341,7 @@ export default function DeliveryPage() {
           activeDeliveryId: deliveryRes.delivery.id,
         });
         setCalculatedFee(deliveryRes.deliveryFee);
-        setStage(DeliveryStage.REVIEW_PAYMENT); 
+        setStage(DeliveryStage.REVIEW_PAYMENT);
       } else {
         throw new Error("Invalid server response");
       }
@@ -307,22 +363,32 @@ export default function DeliveryPage() {
 
     try {
       setStage(DeliveryStage.PAYMENT_PENDING);
-      const userEmail = session?.user?.email || `guest-${Date.now()}@asoose.com`;
+      const userEmail =
+        session?.user?.email || `guest-${Date.now()}@asoose.com`;
 
-      const paymentRes = await paymentService.initiatePayment({
-        amount: calculatedFee, 
-        email: userEmail,
-        gateway: 'PAYSTACK', 
-        method: 'CARD', 
-        type: 'DELIVERY', 
-        metadata: { deliveryId: activeDeliveryId, purpose: 'DELIVERY_REQUEST' }
-      }, token);
+      const paymentRes = await paymentService.initiatePayment(
+        {
+          amount: calculatedFee,
+          email: userEmail,
+          gateway: "PAYSTACK",
+          method: "CARD",
+          type: "DELIVERY",
+          metadata: {
+            deliveryId: activeDeliveryId,
+            purpose: "DELIVERY_REQUEST",
+          },
+        },
+        token,
+      );
 
       if (paymentRes.authorizationUrl && paymentRes.reference) {
-        localStorage.setItem(PENDING_DELIVERY_KEY, JSON.stringify({
-          id: activeDeliveryId,
-          reference: paymentRes.reference
-        }));
+        localStorage.setItem(
+          PENDING_DELIVERY_KEY,
+          JSON.stringify({
+            id: activeDeliveryId,
+            reference: paymentRes.reference,
+          }),
+        );
         window.location.href = paymentRes.authorizationUrl;
       } else {
         throw new Error("Invalid payment response");
@@ -336,16 +402,16 @@ export default function DeliveryPage() {
 
   const handleManualPaymentCheck = useCallback(async () => {
     if (activeDeliveryId) {
-       const token = getAuthToken(session);
-       const success = await DeliveryService.pollDeliveryStatus(
-         activeDeliveryId, 
-         undefined, 
-         undefined, 
-         undefined, 
-         token || undefined
-       );
-       if (success) handlePaymentSuccess();
-       else toast.info("Payment not yet confirmed. We are still checking...");
+      const token = getAuthToken(session);
+      const success = await DeliveryService.pollDeliveryStatus(
+        activeDeliveryId,
+        undefined,
+        undefined,
+        undefined,
+        token || undefined,
+      );
+      if (success) handlePaymentSuccess();
+      else toast.info("Payment not yet confirmed. We are still checking...");
     }
   }, [activeDeliveryId, handlePaymentSuccess, session]);
 
@@ -354,10 +420,10 @@ export default function DeliveryPage() {
     const token = getAuthToken(session);
     try {
       await DeliveryService.rateDelivery(
-        activeDeliveryId, 
-        rating, 
-        sanitizeInput(comment, 1000), 
-        token || undefined
+        activeDeliveryId,
+        rating,
+        sanitizeInput(comment, 1000),
+        token || undefined,
       );
       toast.success("Review submitted successfully");
       setIsReviewModalOpen(false);
@@ -372,11 +438,21 @@ export default function DeliveryPage() {
       return (
         <div className="flex flex-col items-center justify-center py-12 px-6 bg-red-50 dark:bg-red-900/10 rounded-2xl border border-red-200 dark:border-red-800">
           <AlertCircle className="h-12 w-12 text-red-500 mb-4" />
-          <h3 className="text-lg font-bold text-red-900 dark:text-red-100">Connection Failed</h3>
-          <button onClick={handleInitializeDelivery} className="flex items-center gap-2 px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-medium mt-4">
+          <h3 className="text-lg font-bold text-red-900 dark:text-red-100">
+            Connection Failed
+          </h3>
+          <button
+            onClick={handleInitializeDelivery}
+            className="flex items-center gap-2 px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-medium mt-4"
+          >
             <RefreshCw size={18} /> Retry
           </button>
-          <button onClick={() => setApiError(false)} className="mt-4 text-sm text-gray-500 underline">Edit Details</button>
+          <button
+            onClick={() => setApiError(false)}
+            className="mt-4 text-sm text-gray-500 underline"
+          >
+            Edit Details
+          </button>
         </div>
       );
     }
@@ -392,47 +468,70 @@ export default function DeliveryPage() {
         );
 
       case DeliveryStage.REVIEW_PAYMENT:
-      case DeliveryStage.SELECTING_VEHICLE: 
+      case DeliveryStage.SELECTING_VEHICLE:
         return (
           <div className="max-w-xl mx-auto p-6 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl animate-in fade-in slide-in-from-bottom-4 shadow-xl">
-             <div className="text-center mb-8">
-               <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4 text-yellow-600">
-                 <CreditCard size={32} />
-               </div>
-               <h2 className="text-2xl font-black mb-2 dark:text-white">Review & Pay</h2>
-               <p className="text-zinc-500">Total Delivery Fee</p>
-             </div>
+            <div className="text-center mb-8">
+              <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4 text-yellow-600">
+                <CreditCard size={32} />
+              </div>
+              <h2 className="text-2xl font-black mb-2 dark:text-white">
+                Review & Pay
+              </h2>
+              <p className="text-zinc-500">Total Delivery Fee</p>
+            </div>
 
-             <div className="bg-zinc-50 dark:bg-zinc-800/50 p-6 rounded-2xl mb-6 flex justify-between items-center border border-zinc-100 dark:border-zinc-700">
-                <span className="font-medium text-zinc-600 dark:text-zinc-400">Amount to Pay</span>
-                <span className="text-3xl font-black dark:text-white">₦{calculatedFee?.toLocaleString()}</span>
-             </div>
+            <div className="bg-zinc-50 dark:bg-zinc-800/50 p-6 rounded-2xl mb-6 flex justify-between items-center border border-zinc-100 dark:border-zinc-700">
+              <span className="font-medium text-zinc-600 dark:text-zinc-400">
+                Amount to Pay
+              </span>
+              <span className="text-3xl font-black dark:text-white">
+                ₦{calculatedFee?.toLocaleString()}
+              </span>
+            </div>
 
-             <div className="flex items-start gap-3 bg-blue-50 dark:bg-blue-900/10 p-4 rounded-xl mb-8">
-               <CheckCircle2 className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
-               <p className="text-sm text-blue-700 dark:text-blue-300">
-                 Vehicle assigned automatically based on package weight ({packageInfo.weight}).
-               </p>
-             </div>
+            <div className="flex items-start gap-3 bg-blue-50 dark:bg-blue-900/10 p-4 rounded-xl mb-8">
+              <CheckCircle2 className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
+              <p className="text-sm text-blue-700 dark:text-blue-300">
+                Vehicle assigned automatically based on package weight (
+                {packageInfo.weight}).
+              </p>
+            </div>
 
-             <div className="space-y-3">
-               <button onClick={handlePayment} className="w-full py-4 bg-yellow-500 hover:bg-yellow-600 text-white font-black rounded-xl shadow-lg transition-all active:scale-[0.98] flex items-center justify-center gap-2">
-                 Pay Securely <ChevronRight size={18} />
-               </button>
-               <button onClick={() => setStage(DeliveryStage.CONFIGURING)} className="w-full py-3 text-zinc-500 font-medium hover:text-zinc-800 transition-colors">
-                 Cancel & Edit
-               </button>
-             </div>
+            <div className="space-y-3">
+              <button
+                onClick={handlePayment}
+                className="w-full py-4 bg-yellow-500 hover:bg-yellow-600 text-white font-black rounded-xl shadow-lg transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+              >
+                Pay Securely <ChevronRight size={18} />
+              </button>
+              <button
+                onClick={() => setStage(DeliveryStage.CONFIGURING)}
+                className="w-full py-3 text-zinc-500 font-medium hover:text-zinc-800 transition-colors"
+              >
+                Cancel & Edit
+              </button>
+            </div>
           </div>
         );
 
       case DeliveryStage.PAYMENT_PENDING:
         return (
           <div className="text-center py-20">
-            <Loader2 size={48} className="animate-spin text-blue-500 mx-auto mb-4" />
-            <h3 className="text-xl font-bold dark:text-white">Processing Payment</h3>
-            <p className="text-sm text-gray-500 mt-2">Completing your secure transaction...</p>
-            <button onClick={handleManualPaymentCheck} className="mt-6 text-sm font-medium text-blue-500 hover:underline">
+            <Loader2
+              size={48}
+              className="animate-spin text-blue-500 mx-auto mb-4"
+            />
+            <h3 className="text-xl font-bold dark:text-white">
+              Processing Payment
+            </h3>
+            <p className="text-sm text-gray-500 mt-2">
+              Completing your secure transaction...
+            </p>
+            <button
+              onClick={handleManualPaymentCheck}
+              className="mt-6 text-sm font-medium text-blue-500 hover:underline"
+            >
               I have completed payment
             </button>
           </div>
@@ -452,8 +551,10 @@ export default function DeliveryPage() {
               <section>
                 <div className="relative space-y-8 mt-10">
                   <div className="border-b border-zinc-200 dark:border-zinc-800 pb-2">
-                    <label className="text-sm font-medium mb-2 block text-zinc-500">Pickup Location</label>
-                    <LocationAutocomplete 
+                    <label className="text-sm font-medium mb-2 block text-zinc-500">
+                      Pickup Location
+                    </label>
+                    <LocationAutocomplete
                       placeholder="Current package location"
                       initialValue={packageInfo.pickupAddress}
                       onSelect={(data) => {
@@ -466,8 +567,10 @@ export default function DeliveryPage() {
                     />
                   </div>
                   <div className="border-b border-zinc-200 dark:border-zinc-800 pb-2">
-                    <label className="text-sm font-medium mb-2 block text-zinc-500">Delivery Address</label>
-                    <LocationAutocomplete 
+                    <label className="text-sm font-medium mb-2 block text-zinc-500">
+                      Delivery Address
+                    </label>
+                    <LocationAutocomplete
                       placeholder="Enter full delivery address"
                       initialValue={packageInfo.destinationAddress}
                       showPinpoint={false}
@@ -484,15 +587,21 @@ export default function DeliveryPage() {
               </section>
 
               <section>
-                <h3 className="text-lg font-semibold mb-4 dark:text-white">Recipient Information</h3>
+                <h3 className="text-lg font-semibold mb-4 dark:text-white">
+                  Recipient Information
+                </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <DetailInput 
-                    label="Recipient Name" icon={User} placeholder="Full name" 
+                  <DetailInput
+                    label="Recipient Name"
+                    icon={User}
+                    placeholder="Full name"
                     value={packageInfo.recipientName}
                     onChange={(v) => setPackageInfo({ recipientName: v })}
                   />
-                  <DetailInput 
-                    label="Contact Number" icon={Phone} placeholder="08012345678" 
+                  <DetailInput
+                    label="Contact Number"
+                    icon={Phone}
+                    placeholder="08012345678"
                     value={packageInfo.recipientPhone}
                     onChange={handlePhoneChange}
                     error={phoneError}
@@ -504,27 +613,40 @@ export default function DeliveryPage() {
             {/* Right Column: Package Size */}
             <div className="lg:col-span-5 space-y-12">
               <section>
-                <h3 className="text-lg font-semibold mb-4 dark:text-white">Package Size</h3>
+                <h3 className="text-lg font-semibold mb-4 dark:text-white">
+                  Package Size
+                </h3>
                 <div className="grid grid-cols-2 gap-4">
                   {PACKAGE_TYPES.map((type, index) => {
                     const Icon = getPackageIcon(type.id);
                     const radiusClass = getRadiusStyle(index);
                     const isSelected = packageInfo.type === type.id;
-                    
+
                     return (
-                      <button 
-                        key={type.id} 
-                        onClick={() => setPackageInfo({ type: type.id, weight: type.weightLabel })} 
+                      <button
+                        key={type.id}
+                        onClick={() =>
+                          setPackageInfo({
+                            type: type.id,
+                            weight: type.weightLabel,
+                          })
+                        }
                         className={`p-6 border transition-all duration-300 text-left flex flex-col gap-4 ${radiusClass} ${
-                          isSelected 
-                            ? 'border-yellow-500 bg-yellow-500/5 shadow-md' 
-                            : 'border-zinc-200 dark:border-white/10 hover:border-yellow-500/50'
+                          isSelected
+                            ? "border-yellow-500 bg-yellow-500/5 shadow-md"
+                            : "border-zinc-200 dark:border-white/10 hover:border-yellow-500/50"
                         }`}
                       >
-                        <Icon className={`w-6 h-6 ${isSelected ? 'text-yellow-500' : 'text-zinc-400'}`} />
+                        <Icon
+                          className={`w-6 h-6 ${isSelected ? "text-yellow-500" : "text-zinc-400"}`}
+                        />
                         <div>
-                          <p className="text-base font-medium dark:text-white">{type.label}</p>
-                          <p className="text-xs text-gray-500 mt-1">{type.weightLabel}</p>
+                          <p className="text-base font-medium dark:text-white">
+                            {type.label}
+                          </p>
+                          <p className="text-xs text-gray-500 mt-1">
+                            {type.weightLabel}
+                          </p>
                         </div>
                       </button>
                     );
@@ -561,22 +683,39 @@ export default function DeliveryPage() {
         {renderStageContent()}
       </main>
       <BottomNav />
-      <ReviewModal 
-        isOpen={isReviewModalOpen} 
-        onClose={() => setIsReviewModalOpen(false)} 
-        onSubmit={handleReviewSubmit} 
+      <ReviewModal
+        isOpen={isReviewModalOpen}
+        onClose={() => setIsReviewModalOpen(false)}
+        onSubmit={handleReviewSubmit}
       />
     </div>
   );
 }
 
-const DetailInput: React.FC<DetailInputProps> = ({ label, icon: Icon, placeholder, value, onChange, error }) => (
-  <div className={`border-b pb-2 transition-colors ${error ? 'border-red-500' : 'border-zinc-200 dark:border-white/10 focus-within:border-yellow-500'}`}>
-    <label className={`flex items-center gap-2 text-sm font-medium mb-2 ${error ? 'text-red-500' : 'text-zinc-600 dark:text-zinc-400'}`}>
-      <Icon size={16} className={error ? 'text-red-500' : 'text-yellow-500/50'} /> {label}
+const DetailInput: React.FC<DetailInputProps> = ({
+  label,
+  icon: Icon,
+  placeholder,
+  value,
+  onChange,
+  error,
+}) => (
+  <div
+    className={`border-b pb-2 transition-colors ${error ? "border-red-500" : "border-zinc-200 dark:border-white/10 focus-within:border-yellow-500"}`}
+  >
+    <label
+      className={`flex items-center gap-2 text-sm font-medium mb-2 ${error ? "text-red-500" : "text-zinc-600 dark:text-zinc-400"}`}
+    >
+      <Icon
+        size={16}
+        className={error ? "text-red-500" : "text-yellow-500/50"}
+      />{" "}
+      {label}
     </label>
-    <input 
-      type="text" placeholder={placeholder} value={value || ''}
+    <input
+      type="text"
+      placeholder={placeholder}
+      value={value || ""}
       onChange={(e) => onChange(e.target.value)}
       className="w-full bg-transparent text-base font-normal outline-none text-zinc-900 dark:text-white placeholder:text-zinc-400"
     />

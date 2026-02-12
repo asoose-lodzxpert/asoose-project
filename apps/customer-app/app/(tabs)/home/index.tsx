@@ -147,15 +147,41 @@ export default function HomeScreen() {
             <PromotionsCarousel data={promotions} />
 
             {bannersError && banners.length === 0 ? (
-              <ThemedText style={{ marginVertical: 12 }}>
-                {bannersError}
-              </ThemedText>
+              <View
+                style={{
+                  marginVertical: 12,
+                  padding: 16,
+                  borderRadius: 8,
+                  backgroundColor: "#F3F4F6",
+                  alignItems: "center",
+                }}
+              >
+                <ThemedText style={{ marginBottom: 8, fontWeight: "bold" }}>
+                  Unable to load promotions.
+                </ThemedText>
+                <ThemedText style={{ marginBottom: 8 }}>
+                  Please pull down to refresh.
+                </ThemedText>
+              </View>
             ) : null}
 
             {verticalsError && verticals.length === 0 ? (
-              <ThemedText style={{ marginVertical: 12 }}>
-                {verticalsError}
-              </ThemedText>
+              <View
+                style={{
+                  marginVertical: 12,
+                  padding: 16,
+                  borderRadius: 8,
+                  backgroundColor: "#F3F4F6",
+                  alignItems: "center",
+                }}
+              >
+                <ThemedText style={{ marginBottom: 8, fontWeight: "bold" }}>
+                  Unable to load categories.
+                </ThemedText>
+                <ThemedText style={{ marginBottom: 8 }}>
+                  Please pull down to refresh.
+                </ThemedText>
+              </View>
             ) : null}
 
             {verticalsLoading && verticals.length === 0 ? (

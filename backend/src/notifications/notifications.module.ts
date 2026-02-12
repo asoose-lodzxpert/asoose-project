@@ -8,15 +8,18 @@ import { ExpoModule } from '../libs/expo/expo.module';
 import { FcmModule } from '../libs/fcm/fcm.module';
 import { MatchingEventsListener } from './listeners/matching-events.listener';
 import { DriverLocationListener } from './listeners/driver-location.listener';
+import { RiderJobEventsListener } from './listeners/rider-job-events.listener';
+import { MatchingModule } from '../matching/matching.module';
 @Global()
 @Module({
-  imports: [PrismaModule, AuthModule, ExpoModule, FcmModule],
+  imports: [PrismaModule, AuthModule, ExpoModule, FcmModule, MatchingModule],
   controllers: [NotificationsController],
   providers: [
     NotificationsGateway,
     NotificationsService,
     MatchingEventsListener,
     DriverLocationListener,
+    RiderJobEventsListener,
   ],
   exports: [NotificationsService, NotificationsGateway],
 })

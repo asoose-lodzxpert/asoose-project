@@ -90,21 +90,7 @@ export default function LoginScreen() {
     <ThemedView style={styles.container}>
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <View style={{ flex: 1 }}>
-          <Animated.View
-            style={[
-              styles.logoContainer,
-              { transform: [{ translateY: logoAnim }] },
-            ]}
-          >
-            <Image
-              source={require("@/assets/images/icon.png")}
-              style={styles.logoImage}
-              resizeMode="contain"
-            />
-            <ThemedText type="title" style={styles.logoText}>
-              ASOOSE
-            </ThemedText>
-          </Animated.View>
+          {/* Logo removed for cleaner, centered layout */}
 
           <KeyboardAvoidingView
             style={{ flex: 1 }}
@@ -112,89 +98,92 @@ export default function LoginScreen() {
             keyboardVerticalOffset={Platform.OS === "ios" ? 40 : 0}
           >
             <ScrollView
-              contentContainerStyle={{ flexGrow: 1 }}
+              contentContainerStyle={{ flexGrow: 1, justifyContent: "center" }}
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
             >
-              {/* Form */}
-              <View style={styles.form}>
-                <ThemedText type="title">Welcome back</ThemedText>
-
-                <View style={styles.field}>
-                  <ThemedInput
-                    placeholder="Email address"
-                    autoCapitalize="none"
-                    keyboardType="email-address"
-                    value={identifier}
-                    onChangeText={(text) => {
-                      setIdentifier(text);
-                      if (error) setError("");
-                    }}
-                  />
-                </View>
-
-                <View style={styles.field}>
-                  <ThemedInput
-                    placeholder="Password"
-                    secureTextEntry={secure}
-                    value={password}
-                    onChangeText={(text) => {
-                      setPassword(text);
-                      if (error) setError("");
-                    }}
-                    iconRight={
-                      <Pressable onPress={() => setSecure(!secure)}>
-                        <IconSymbol
-                          size={24}
-                          name={secure ? "eye.fill" : "eye.slash.fill"}
-                          color={primary}
-                        />
-                      </Pressable>
-                    }
-                  />
-                </View>
-
-                {error ? (
-                  <ThemedText style={styles.inputError}>{error}</ThemedText>
-                ) : null}
-
-                <Pressable
-                  style={styles.forgot}
-                  onPress={() => router.push("/(auth)/resetpassword")}
-                >
-                  <ThemedText type="link">Forgot password?</ThemedText>
-                </Pressable>
-
-                <Pressable
-                  style={[styles.button, { backgroundColor: primary }]}
-                  onPress={handleLogin}
-                  disabled={loading}
-                >
-                  {loading ? (
-                    <ActivityIndicator color={textOnPrimary} />
-                  ) : (
-                    <ThemedText
-                      style={{ color: textOnPrimary }}
-                      type="defaultSemiBold"
-                    >
-                      Login
-                    </ThemedText>
-                  )}
-                </Pressable>
-              </View>
-
-              {/* Footer */}
-              {/* Footer */}
-              <View style={styles.footer}>
-                <ThemedText>
-                  Don’t have an account?{" "}
-                  <ThemedText
-                    type="link"
-                    onPress={() => router.push("/(auth)/signup")}
-                  >
-                    Sign up
+              <View style={styles.centeredWrapper}>
+                {/* Form */}
+                <View style={styles.form}>
+                  <ThemedText type="title" style={styles.centeredTitle}>
+                    Welcome back
                   </ThemedText>
-                </ThemedText>
+
+                  <View style={styles.field}>
+                    <ThemedInput
+                      placeholder="Email address"
+                      autoCapitalize="none"
+                      keyboardType="email-address"
+                      value={identifier}
+                      onChangeText={(text) => {
+                        setIdentifier(text);
+                        if (error) setError("");
+                      }}
+                    />
+                  </View>
+
+                  <View style={styles.field}>
+                    <ThemedInput
+                      placeholder="Password"
+                      secureTextEntry={secure}
+                      value={password}
+                      onChangeText={(text) => {
+                        setPassword(text);
+                        if (error) setError("");
+                      }}
+                      iconRight={
+                        <Pressable onPress={() => setSecure(!secure)}>
+                          <IconSymbol
+                            size={24}
+                            name={secure ? "eye.fill" : "eye.slash.fill"}
+                            color={primary}
+                          />
+                        </Pressable>
+                      }
+                    />
+                  </View>
+
+                  {error ? (
+                    <ThemedText style={styles.inputError}>{error}</ThemedText>
+                  ) : null}
+
+                  <Pressable
+                    style={styles.forgot}
+                    onPress={() => router.push("/(auth)/resetpassword")}
+                  >
+                    <ThemedText type="link">Forgot password?</ThemedText>
+                  </Pressable>
+
+                  <Pressable
+                    style={[styles.button, { backgroundColor: primary }]}
+                    onPress={handleLogin}
+                    disabled={loading}
+                  >
+                    {loading ? (
+                      <ActivityIndicator color={textOnPrimary} />
+                    ) : (
+                      <ThemedText
+                        style={{ color: textOnPrimary }}
+                        type="defaultSemiBold"
+                      >
+                        Login
+                      </ThemedText>
+                    )}
+                  </Pressable>
+                </View>
+
+                {/* Footer */}
+                <View style={styles.footer}>
+                  <ThemedText>
+                    Don't have an account?{" "}
+                    <ThemedText
+                      type="link"
+                      onPress={() => router.push("/(auth)/signup")}
+                    >
+                      Sign up
+                    </ThemedText>
+                  </ThemedText>
+                </View>
               </View>
             </ScrollView>
           </KeyboardAvoidingView>
@@ -209,25 +198,24 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 24,
   },
-  logoContainer: {
-    flexDirection: "row",
-    alignItems: "center",
+  // Logo styles removed
+  centeredWrapper: {
+    flex: 1,
     justifyContent: "center",
-    marginTop: 64,
-    gap: 12,
+    alignItems: "center",
+    minHeight: 400,
+    paddingVertical: 32,
   },
-  logoImage: {
-    width: 48,
-    height: 48,
-  },
-  logoText: {
-    fontSize: 32,
-    fontWeight: "bold",
+  centeredTitle: {
+    textAlign: "center",
+    marginBottom: 8,
   },
   form: {
     flex: 1,
     justifyContent: "center",
     gap: 16,
+    width: "100%",
+    maxWidth: 400,
   },
   field: {
     marginTop: 12,

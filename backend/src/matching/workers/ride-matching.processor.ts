@@ -236,7 +236,16 @@ export class RideMatchingProcessor extends WorkerHost {
         this.TIMEOUT_MS,
       );
 
-      // Optionally emit a generic event or log here if needed
+      // Emit job.assigned event for socket notification
+      this.eventBus.emitJobAssigned({
+        jobId: rideId,
+        jobType: 'ride',
+        driverId,
+        customerId: '', // Will be populated if available from job context
+        timestamp: Date.now(),
+        expiresAt: Date.now() + this.TIMEOUT_MS,
+      });
+
       return true;
     } else if (result === -1) {
       // Driver already declined

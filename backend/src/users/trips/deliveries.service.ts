@@ -249,20 +249,29 @@ export class DeliveriesService {
 
     if (!deliveryCheck) throw new NotFoundException('Delivery not found');
 
-    if (deliveryCheck.orderId) {
-      const payment = await this.prisma.payment.findUnique({
-        where: { orderId: deliveryCheck.orderId },
-      });
+    // Prevent matching for direct delivery requests (no orderId)
+    if (!deliveryCheck.orderId) {
+      this.logger.warn(
+        `Direct delivery request ${deliveryId} - matching skipped.`,
+      );
+      return {
+        message: 'Direct delivery request - matching not started',
+        status: deliveryCheck.status,
+      };
+    }
 
-      if (
-        payment &&
-        payment.status !== PaymentStatus.COMPLETED &&
-        payment.status !== PaymentStatus.PENDING
-      ) {
-        this.logger.warn(
-          `Payment not ready for delivery ${deliveryId} (Order ${deliveryCheck.orderId})`,
-        );
-      }
+    const payment = await this.prisma.payment.findUnique({
+      where: { orderId: deliveryCheck.orderId },
+    });
+
+    if (
+      payment &&
+      payment.status !== PaymentStatus.COMPLETED &&
+      payment.status !== PaymentStatus.PENDING
+    ) {
+      this.logger.warn(
+        `Payment not ready for delivery ${deliveryId} (Order ${deliveryCheck.orderId})`,
+      );
     }
 
     const result = await this.prisma.delivery.updateMany({
@@ -292,17 +301,17 @@ export class DeliveriesService {
       throw new NotFoundException('Delivery not found after status update');
     }
 
-    if (delivery.orderId) {
-      try {
+    try {
+      if (typeof delivery.orderId === 'string') {
         this.notificationsGateway.sendOrderUpdate(delivery.orderId, {
           status: 'DRIVER_SEARCHING',
           label: 'Finding a Rider',
           description: 'Searching for nearby riders...',
           eta: 'Calculating...',
         });
-      } catch (e) {
-        this.logger.error(`Notification failed for delivery ${deliveryId}`, e);
       }
+    } catch (e) {
+      this.logger.error(`Notification failed for delivery ${deliveryId}`, e);
     }
 
     const job = deliveryToJobSummary(delivery);

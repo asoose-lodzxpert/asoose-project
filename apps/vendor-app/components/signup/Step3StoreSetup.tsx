@@ -1,11 +1,13 @@
 import { ThemedText } from "@/components/themed-text";
 import { ThemedInput } from "@/components/ThemedInput";
+import { useConfirm } from "@/hooks/use-confirm";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { OpenHour } from "@/types/signup";
 import * as Location from "expo-location";
 import React, { useEffect, useRef, useState } from "react";
-import { Alert, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import MapView from "react-native-maps";
+import Toast from "react-native-toast-message";
 
 import { ImageUpload } from "./step3/ImageUpload";
 import { OpenHoursBlock } from "./step3/OpenHoursBlock";
@@ -13,6 +15,7 @@ import { StoreInfo } from "./step3/StoreInfo";
 import { Step3Props } from "./step3/types";
 
 export const Step3StoreSetup: React.FC<Step3Props> = ({ data, onChange }) => {
+  const { confirm, ConfirmModal } = useConfirm();
   const mapRef = useRef<MapView | null>(null);
   const isMountedRef = useRef(true);
 
@@ -38,37 +41,44 @@ export const Step3StoreSetup: React.FC<Step3Props> = ({ data, onChange }) => {
   const useCurrentLocation = async () => {
     if (isLocating) return;
 
+    const confirmed = await confirm({
+      title: "Why We Need Your Location",
+      message:
+        "ASOOSE Vendor App needs access to your location to help you set your store address. Location is only used when you tap 'Use Current Location' and is not tracked in the background.",
+      confirmText: "Continue",
+      cancelText: "Cancel",
+      type: "info",
+    });
+    if (!confirmed) return;
     try {
       setIsLocating(true);
-
       const servicesEnabled = await Location.hasServicesEnabledAsync();
       if (!servicesEnabled) {
-        Alert.alert("Location disabled", "Please enable location services.");
+        Toast.show({
+          type: "error",
+          text1: "Location disabled",
+          text2: "Please enable location services.",
+        });
         return;
       }
-
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== "granted") {
-        Alert.alert(
-          "Permission required",
-          "Location access is needed to set your store location.",
-        );
+        Toast.show({
+          type: "error",
+          text1: "Permission required",
+          text2: "Location access is needed to set your store location.",
+        });
         return;
       }
-
       const pos = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.Balanced,
       });
-
       const coords = {
         lat: pos.coords.latitude,
         lng: pos.coords.longitude,
       };
-
       if (!isMountedRef.current) return;
-
       onChange("location", coords);
-
       if (mapReady && mapRef.current) {
         requestAnimationFrame(() => {
           mapRef.current?.animateToRegion({
@@ -80,8 +90,14 @@ export const Step3StoreSetup: React.FC<Step3Props> = ({ data, onChange }) => {
         });
       }
     } catch (err) {
-      console.warn("Location error:", err);
-      Alert.alert("Location error", "Unable to get your current location.");
+      if (__DEV__) {
+        console.warn("Location error:", err);
+      }
+      Toast.show({
+        type: "error",
+        text1: "Location error",
+        text2: "Unable to get your current location.",
+      });
     } finally {
       if (isMountedRef.current) setIsLocating(false);
     }
@@ -179,19 +195,12 @@ export const Step3StoreSetup: React.FC<Step3Props> = ({ data, onChange }) => {
       </View>
 
       <OpenHoursBlock value={openHours} onChange={updateOpenHours} />
+
+      <ConfirmModal />
     </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  input: {
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    borderRadius: 8,
-    padding: 10,
-    fontSize: 16,
-    backgroundColor: "#FAFAFA",
-  },
-  // input: removed, now using ThemedInput
 });
