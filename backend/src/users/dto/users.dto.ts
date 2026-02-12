@@ -73,12 +73,13 @@ export class CreateOrderDto {
   @IsNotEmpty()
   addressId: string;
 
+  // Make optional so multi-vendor orders don't fail validation
   @IsString()
-  @IsNotEmpty()
-  restaurantId: string;
+  @IsOptional()
+  restaurantId?: string; 
 
   @IsArray()
-  @ArrayMinSize(1, { message: 'Order must contain at least one item' })
+  @ArrayMinSize(1)
   @ValidateNested({ each: true })
   @Type(() => OrderItemDto)
   items: OrderItemDto[];

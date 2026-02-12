@@ -27,10 +27,9 @@ export class PaystackService {
     email: string,
     reference: string,
     metadata?: any,
-    callbackUrl?: string, // FIX: Added optional callbackUrl
+    callbackUrl?: string,
   ): Promise<PaymentInitResponse> {
     try {
-      // Prioritize the passed callbackUrl, fallback to env or defaults if needed
       const finalCallbackUrl =
         callbackUrl || `${process.env.BACKEND_URL}/payment/callback/paystack`;
 
@@ -82,7 +81,7 @@ export class PaystackService {
       return {
         success: data.status === 'success',
         reference: data.reference,
-        amount: data.amount / 100, // Convert from kobo
+        amount: data.amount / 100,
         status: this.mapStatus(data.status),
         gateway: PaymentGateway.PAYSTACK,
         metadata: data.metadata,
@@ -117,7 +116,7 @@ export class PaystackService {
         `${this.baseUrl}/transfer`,
         {
           source: 'balance',
-          amount: amount * 100, // Convert to kobo
+          amount: amount * 100,
           recipient: recipientCode,
           reference,
           reason: reason || 'Payment disbursement',
@@ -190,7 +189,7 @@ export class PaystackService {
         `${this.baseUrl}/refund`,
         {
           transaction: reference,
-          ...(amount && { amount: amount * 100 }), // Partial refund if amount specified
+          ...(amount && { amount: amount * 100 }),
         },
         {
           headers: {
@@ -222,11 +221,11 @@ export class PaystackService {
   private mapStatus(status: string): PaymentStatus {
     switch (status) {
       case 'success':
-        return PaymentStatus.SUCCESS;
+        return PaymentStatus.COMPLETED; // ✅ FIXED
       case 'failed':
         return PaymentStatus.FAILED;
       case 'abandoned':
-        return PaymentStatus.CANCELLED;
+        return PaymentStatus.FAILED; // ✅ FIXED: Mapped to FAILED
       default:
         return PaymentStatus.PENDING;
     }

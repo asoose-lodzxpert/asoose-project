@@ -1,17 +1,16 @@
+import { PaymentStatus as PrismaPaymentStatus } from '@prisma/client';
+
+// Re-export Prisma's enum as the source of truth
+export { PrismaPaymentStatus as PaymentStatus };
+
+// Gateway enum remains standalone as it's not in DB
 export enum PaymentGateway {
   PAYSTACK = 'PAYSTACK',
   FLUTTERWAVE = 'FLUTTERWAVE',
   MONNIFY = 'MONNIFY',
 }
-export enum PaymentStatus {
-  PENDING = 'PENDING',
-  SUCCESS = 'SUCCESS',
-  FAILED = 'FAILED',
-  CANCELLED = 'CANCELLED',
-  REFUNDED = 'REFUNDED',
-  PARTIAL_REFUND = 'PARTIAL_REFUND',
-}
 
+// Ensure these match your DB or map strictly
 export enum PaymentMethod {
   CARD = 'CARD',
   BANK_TRANSFER = 'BANK_TRANSFER',

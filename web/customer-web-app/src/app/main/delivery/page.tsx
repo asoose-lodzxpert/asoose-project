@@ -1,48 +1,38 @@
-"use client";
+'use client';
 
-import { useEffect, useState, useMemo, useCallback } from "react";
-import { useRouter } from "next/navigation";
-import {
-  Package,
-  ChevronRight,
-  Box,
-  Layers,
-  Truck,
-  Loader2,
-  User,
-  Phone,
-  AlertCircle,
-  RefreshCw,
-  CreditCard,
-  CheckCircle2,
-  FileText,
-} from "lucide-react";
-import { toast } from "react-toastify";
-import { useSession } from "next-auth/react";
-import BottomNav from "../components/layout/BottomNav";
-import { useDeliveryStore } from "@/store/useDeliveryStore";
-import LocationAutocomplete from "../ride/components/LocationAutocomplete";
-import DeliveryProgressUI from "./components/DeliveryProgressUi";
-import { ReviewModal } from "@/store/ReviewModal";
-import { paymentService } from "@/services/payment.service";
-import { DeliveryService } from "@/services/delivery.service";
-import { socketService } from "@/services/socket.service";
-import { PACKAGE_TYPES } from "@/constants/packageTypes";
+import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
+import { 
+  Package, ChevronRight, Box, Layers, Truck, 
+  Loader2, User, Phone, AlertCircle, RefreshCw, CreditCard, CheckCircle2,
+  FileText
+} from 'lucide-react';
+import { toast } from 'react-toastify';
+import { useSession } from 'next-auth/react';
+import BottomNav from '../components/layout/BottomNav';
+import { useDeliveryStore } from '@/store/useDeliveryStore';
+import LocationAutocomplete from '../ride/components/LocationAutocomplete';
+import DeliveryProgressUI from './components/DeliveryProgressUi';
+import { ReviewModal } from '@/store/ReviewModal';
+import { paymentService } from '@/services/payment.service';
+import { DeliveryService } from '@/services/delivery.service';
+import { socketService } from '@/services/socket.service';
+import { PACKAGE_TYPES } from '@/constants/packageTypes'; 
 
 // CONSTANTS & TYPES
 
 const DeliveryStage = {
-  IDLE: "IDLE",
-  CONFIGURING: "CONFIGURING",
-  PROCESSING_ADDRESS: "Processing_Address",
-  CALCULATING_FEE: "Calculating_Fee",
-  REVIEW_PAYMENT: "REVIEW_PAYMENT",
-  SELECTING_VEHICLE: "SELECTING_VEHICLE",
-  PAYMENT_PENDING: "Payment_Pending",
-  FINDING_COURIER: "FINDING_COURIER",
-  COURIER_ASSIGNED: "COURIER_ASSIGNED",
-  PICKED_UP: "PICKED_UP",
-  COMPLETED: "COMPLETED",
+  IDLE: 'IDLE',
+  CONFIGURING: 'CONFIGURING',
+  PROCESSING_ADDRESS: 'Processing_Address',
+  CALCULATING_FEE: 'Calculating_Fee',
+  REVIEW_PAYMENT: 'REVIEW_PAYMENT',
+  SELECTING_VEHICLE: 'SELECTING_VEHICLE',
+  PAYMENT_PENDING: 'Payment_Pending',
+  FINDING_COURIER: 'FINDING_COURIER',
+  COURIER_ASSIGNED: 'COURIER_ASSIGNED',
+  PICKED_UP: 'PICKED_UP',
+  COMPLETED: 'COMPLETED'
 } as const;
 
 const PHONE_REGEX = /^(\+234|0)[789][01]\d{8}$/;
@@ -69,7 +59,7 @@ interface SessionWithToken {
 
 const normalizePhoneNumber = (phone: string): string => {
   // FIX: Remove spaces and dashes to prevent validation errors
-  let cleaned = phone.replace(/[\s-]/g, "");
+  let cleaned = phone.replace(/[\s-]/g, '');
   if (cleaned.startsWith("+234")) {
     cleaned = "0" + cleaned.slice(4);
   } else if (cleaned.startsWith("234")) {
@@ -204,7 +194,7 @@ export default function DeliveryPage() {
     };
 
     recoverState();
-  }, [session, status, handlePaymentSuccess, stage]);
+  }, [session, status, handlePaymentSuccess, stage]); 
 
   // EVENT HANDLERS
 
@@ -279,22 +269,18 @@ export default function DeliveryPage() {
   };
 
   const getSelectedWeight = (): number => {
-    const selected = PACKAGE_TYPES.find((p) => p.id === packageInfo.type);
+    const selected = PACKAGE_TYPES.find(p => p.id === packageInfo.type);
     return selected ? selected.weightValue : 2.5;
   };
 
   const handleInitializeDelivery = async () => {
     // FIX: Provide specific feedback instead of a disabled button
     if (!pickupPos) {
-      toast.error(
-        "Please select a valid Pickup Location from the suggestions.",
-      );
+      toast.error("Please select a valid Pickup Location from the suggestions.");
       return;
     }
     if (!dropoffPos) {
-      toast.error(
-        "Please select a valid Delivery Address from the suggestions.",
-      );
+      toast.error("Please select a valid Delivery Address from the suggestions.");
       return;
     }
     if (!packageInfo.recipientName) {
@@ -341,19 +327,14 @@ export default function DeliveryPage() {
       setAddressIds(pickupRes.id, dropoffRes.id);
       setStage(DeliveryStage.CALCULATING_FEE);
 
-      const deliveryRes = await DeliveryService.createDelivery(
-        {
-          pickupAddressId: pickupRes.id,
-          dropoffAddressId: dropoffRes.id,
-          recipientName: sanitizeInput(packageInfo.recipientName),
-          recipientPhone: normalizePhoneNumber(packageInfo.recipientPhone),
-          packageDetails: sanitizeInput(
-            `${packageInfo.type} - ${packageInfo.instructions || ""}`,
-          ),
-          weightKg: getSelectedWeight(),
-        },
-        token,
-      );
+      const deliveryRes = await DeliveryService.createDelivery({
+        pickupAddressId: pickupRes.id,
+        dropoffAddressId: dropoffRes.id,
+        recipientName: sanitizeInput(packageInfo.recipientName),
+        recipientPhone: normalizePhoneNumber(packageInfo.recipientPhone),
+        packageDetails: sanitizeInput(`${packageInfo.type} - ${packageInfo.instructions || ''}`),
+        weightKg: getSelectedWeight() 
+      }, token);
 
       if (deliveryRes?.delivery?.id) {
         useDeliveryStore.setState({
@@ -675,15 +656,12 @@ export default function DeliveryPage() {
 
               <div className="pt-8 border-t border-zinc-200 dark:border-zinc-800">
                 {/* FIX: Removed disabled logic to show Toast errors on click instead */}
-                <button
-                  onClick={handleInitializeDelivery}
+                <button 
+                  onClick={handleInitializeDelivery} 
                   className="w-full group bg-zinc-900 dark:bg-white hover:bg-yellow-500 text-white dark:text-black py-4 px-6 flex items-center justify-between transition-all duration-300 rounded-xl shadow-xl"
                 >
                   <span className="font-medium">Calculate Price & Proceed</span>
-                  <ChevronRight
-                    size={20}
-                    className="transition-transform group-hover:translate-x-2"
-                  />
+                  <ChevronRight size={20} className="transition-transform group-hover:translate-x-2" />
                 </button>
               </div>
             </div>

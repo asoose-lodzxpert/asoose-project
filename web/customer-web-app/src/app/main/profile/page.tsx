@@ -127,11 +127,12 @@ export default function ProfilePage() {
       try {
         let data;
         switch (tab) {
-          case "orders":
-            data = await fetchWithAuth("/users/orders", accessToken);
-            // Only update if still on same tab (race condition check)
-            if (activeTabRef.current === "orders") setOrders(data || []);
-            break;
+        case "orders":
+  data = await fetchWithAuth("/users/orders", accessToken);
+  if (activeTabRef.current === "orders") {
+    setOrders(data?.data || []); 
+  }
+  break;
           case "rides":
             data = await fetchWithAuth("/users/rides", accessToken);
             if (activeTabRef.current === "rides") setRides(data || []);

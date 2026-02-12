@@ -26,6 +26,7 @@ export class TransactionLedgerService {
 
   /**
    * Record a payment from customer (order or ride)
+   * FIXED: Added orderGroupId and description to the type definition
    */
   async recordPayment(
     payment: {
@@ -34,17 +35,28 @@ export class TransactionLedgerService {
       userId: string;
       orderId?: string;
       rideId?: string;
+      orderGroupId?: string; // <--- NEW FIELD
       method: string;
       status: string;
+      description?: string;  // <--- NEW FIELD
     },
     tx?: Prisma.TransactionClient,
   ) {
     return this.withTransaction(async (client) => {
-      const description = payment.orderId
-        ? 'Payment for order'
-        : payment.rideId
-          ? 'Payment for ride'
-          : 'Wallet top-up';
+      // Logic to determine description if not provided
+      let description = payment.description;
+
+      if (!description) {
+        if (payment.orderGroupId) {
+          description = `Payment for Order Group #${payment.orderGroupId}`;
+        } else if (payment.orderId) {
+          description = 'Payment for order';
+        } else if (payment.rideId) {
+          description = 'Payment for ride';
+        } else {
+          description = 'Wallet top-up';
+        }
+      }
 
       return client.transaction.create({
         data: {
@@ -53,6 +65,7 @@ export class TransactionLedgerService {
           paymentId: payment.id,
           orderId: payment.orderId,
           rideId: payment.rideId,
+          orderGroupId: payment.orderGroupId, // <--- MAP TO DB
           description,
           status: payment.status === 'COMPLETED' ? 'COMPLETED' : 'PENDING',
           balanceBefore: 0, // Platform balance (if tracking)
@@ -60,12 +73,15 @@ export class TransactionLedgerService {
           metadata: {
             method: payment.method,
             userId: payment.userId,
+            ...(payment.orderGroupId && { orderGroupId: payment.orderGroupId }),
           },
         },
       });
     }, tx);
   }
 
+  // ... (Keep the rest of the existing methods: recordOrderCommission, recordRideEarnings, etc.)
+  
   /**
    * Record vendor earning from an order
    * Note: Commission is deducted later during withdrawal, not here
@@ -126,7 +142,6 @@ export class TransactionLedgerService {
 
   /**
    * Record ride earnings
-   * Note: Commission is deducted later during withdrawal, not here
    */
   async recordRideEarnings(
     ride: {
@@ -148,7 +163,6 @@ export class TransactionLedgerService {
 
       const currentBalance = rider?.walletBalance || 0;
 
-      // Record rider earning (full amount)
       await client.transaction.create({
         data: {
           type: 'RIDER_EARNING',
@@ -169,7 +183,6 @@ export class TransactionLedgerService {
         },
       });
 
-      // Update rider wallet balance (full amount)
       await client.rider.update({
         where: { id: ride.riderId },
         data: {
@@ -181,10 +194,8 @@ export class TransactionLedgerService {
     }, tx);
   }
 
-  /**
-   * Record delivery earnings
-   * Note: Commission is deducted later during withdrawal, not here
-   */
+  // ... (Include recordDeliveryEarnings, recordVendorPayout, recordRiderPayout, recordRefund, recordAdjustment methods here as they were)
+  
   async recordDeliveryEarnings(
     delivery: {
       id: string;
@@ -203,7 +214,6 @@ export class TransactionLedgerService {
 
       const currentBalance = rider?.walletBalance || 0;
 
-      // Record rider earning (full amount)
       await client.transaction.create({
         data: {
           type: 'RIDER_EARNING',
@@ -224,7 +234,6 @@ export class TransactionLedgerService {
         },
       });
 
-      // Update rider wallet balance (full amount)
       await client.rider.update({
         where: { id: delivery.riderId },
         data: {
@@ -236,10 +245,6 @@ export class TransactionLedgerService {
     }, tx);
   }
 
-  /**
-   * Record vendor payout request and completion
-   * Commission is deducted during payout (not when earnings are credited)
-   */
   async recordVendorPayout(
     payout: {
       id: string;
@@ -358,10 +363,6 @@ export class TransactionLedgerService {
     }, tx);
   }
 
-  /**
-   * Record rider payout
-   * Commission is deducted during payout (not when earnings are credited)
-   */
   async recordRiderPayout(
     payout: {
       id: string;
@@ -369,7 +370,7 @@ export class TransactionLedgerService {
       amount: number;
       status: 'PENDING' | 'PAID' | 'FAILED';
       reference?: string;
-      commissionRate?: number; // Optional override; if not provided, fetched from Rider
+      commissionRate?: number;
     },
     tx?: Prisma.TransactionClient,
   ) {
@@ -380,7 +381,6 @@ export class TransactionLedgerService {
       });
 
       const currentBalance = rider?.walletBalance || 0;
-      // Use provided rate, or fetch from rider, or default to 20%
       const commissionRate =
         payout.commissionRate ?? rider?.commissionRate ?? 20;
       const commission = payout.amount * (commissionRate / 100);
@@ -417,7 +417,6 @@ export class TransactionLedgerService {
           data: { status: 'COMPLETED' },
         });
 
-        // Record commission deduction
         await client.transaction.create({
           data: {
             type: 'COMMISSION_DEDUCTED',
@@ -481,9 +480,6 @@ export class TransactionLedgerService {
     }, tx);
   }
 
-  /**
-   * Record refund
-   */
   async recordRefund(
     payment: {
       id: string;
@@ -514,9 +510,6 @@ export class TransactionLedgerService {
     }, tx);
   }
 
-  /**
-   * Record manual adjustment (admin action)
-   */
   async recordAdjustment(
     data: {
       entityType: 'STORE' | 'RIDER';
@@ -528,7 +521,6 @@ export class TransactionLedgerService {
     tx?: Prisma.TransactionClient,
   ) {
     return this.withTransaction(async (client) => {
-      // Get current balance
       let currentBalance = 0;
 
       if (data.entityType === 'STORE') {
@@ -538,7 +530,6 @@ export class TransactionLedgerService {
         });
         currentBalance = store?.walletBalance || 0;
 
-        // Update store balance
         await client.store.update({
           where: { id: data.entityId },
           data: {

@@ -13,7 +13,8 @@ import {
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { UsersService } from './users.service';
-import { CreateAddressDto, CreateOrderDto } from './dto/users.dto'; // <--- Import DTOs
+import { OrdersService } from './orders.service'; // Import OrdersService
+import { CreateAddressDto, CreateOrderDto } from './dto/users.dto';
 import {
   CreateEmergencyContactDto,
   UpdateEmergencyContactDto,
@@ -25,24 +26,58 @@ import {
 })
 @UseGuards(JwtAuthGuard)
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(
+    private readonly usersService: UsersService,
+    private readonly ordersService: OrdersService, // Inject OrdersService
+  ) {}
 
   @Get('profile')
   async getProfile(@Request() req) {
     return this.usersService.getUserProfile(req.user.id);
   }
 
+  // ==================================================================
+  // ORDER ENDPOINTS (Refactored for Multi-Vendor & Idempotency)
+  // ==================================================================
+
+  // [NEW] Canonical Pricing Endpoint (Fixes Delivery Fee Shock)
+  @Post('cart/quote')
+  async getCartQuote(@Request() req, @Body() dto: CreateOrderDto) {
+    // This calls the unified pricing logic we added to OrdersService
+    return this.ordersService.calculateOrderBreakdown(req.user.id, dto);
+  }
+
   @Post('orders')
   async createOrder(
     @Request() req,
-    @Body() createOrderDto: CreateOrderDto,
-    @Headers('idempotency-key') idempotencyKey?: string, // <--- Capture Header
+    @Body() dto: CreateOrderDto,
+    @Headers('idempotency-key') idempotencyKey?: string,
   ) {
-    return this.usersService.createOrder(
-      req.user.id,
-      createOrderDto,
-      idempotencyKey, // Pass to service
-    );
+    // Determine if this is a multi-vendor cart
+    // Note: Assuming logic was moved to OrdersService for cohesion, 
+    // otherwise use usersService.checkIfMultiVendor(dto.items)
+    const isMultiVendor = await this.usersService.checkIfMultiVendor(dto.items);
+
+    if (isMultiVendor) {
+      // FIX: Pass idempotencyKey to the multi-vendor handler
+      return this.ordersService.createMultiOrder(
+        req.user.id,
+        dto,
+        idempotencyKey,
+      );
+    } else {
+      // Single vendor flow
+      if (!dto.restaurantId) {
+        dto.restaurantId = await this.usersService.deriveRestaurantId(
+          dto.items,
+        );
+      }
+      return this.ordersService.createOrder(
+        req.user.id,
+        dto,
+        idempotencyKey,
+      );
+    }
   }
 
   @Get('orders')
@@ -51,13 +86,15 @@ export class UsersController {
     const page = parseInt(req.query.page) || 1;
     const pageSize = parseInt(req.query.pageSize) || 10;
     const status = req.query.status as string | undefined;
-    return this.usersService.getUserOrders(userId, { page, pageSize, status });
+    // Route to OrdersService directly
+    return this.ordersService.getUserOrders(userId, { page, pageSize, status });
   }
 
   @Get('orders/:id')
   async getOrderDetails(@Request() req, @Param('id') orderId: string) {
     const userId = req.user.id;
-    const order = await this.usersService.getOrderDetails(userId, orderId);
+    // Route to OrdersService directly
+    const order = await this.ordersService.getOrderDetails(userId, orderId);
 
     if (!order) {
       throw new NotFoundException('Order not found');
@@ -96,8 +133,13 @@ export class UsersController {
     return this.usersService.addUserAddress(req.user.id, body);
   }
 
+  @Delete('addresses/:id')
+  async deleteAddress(@Request() req, @Param('id') addressId: string) {
+    return this.usersService.deleteUserAddress(req.user.id, addressId);
+  }
+
   // ==================================================================
-  // DELIVERY & RIDE ENDPOINTS (UNCHANGED)
+  // DELIVERY & RIDE ENDPOINTS
   // ==================================================================
 
   @Get('deliveries')
@@ -126,6 +168,11 @@ export class UsersController {
     if (!ride) throw new NotFoundException('Ride not found');
     return ride;
   }
+
+  // ==================================================================
+  // PROFILE MANAGEMENT
+  // ==================================================================
+
   @Patch('profile')
   async updateProfile(
     @Request() req,
@@ -133,13 +180,15 @@ export class UsersController {
   ) {
     return this.usersService.updateUserProfile(req.user.id, body);
   }
+
   @Delete('profile')
   async deleteProfile(@Request() req) {
     return this.usersService.softDeleteUser(req.user.id);
   }
-  @Delete('addresses/:id')
-  async deleteAddress(@Request() req, @Param('id') addressId: string) {
-    return this.usersService.deleteUserAddress(req.user.id, addressId);
+
+  @Delete('delete-account')
+  async deleteAccount(@Request() req) {
+    return this.usersService.softDeleteUser(req.user.id);
   }
 
   // ==================================================================
@@ -173,10 +222,9 @@ export class UsersController {
     return this.usersService.deleteEmergencyContact(req.user.id, id);
   }
 
-  @Delete('delete-account')
-  async deleteAccount(@Request() req) {
-    return this.usersService.softDeleteUser(req.user.id);
-  }
+  // ==================================================================
+  // SETTINGS & CONFIG
+  // ==================================================================
 
   @Get('notification-config')
   async getNotificationConfig(@Request() req) {
@@ -198,6 +246,7 @@ export class UsersController {
   }
 
   @Get('payment/cards')
+
   async getSavedCards(@Request() req) {
     return this.usersService.getSavedCards(req.user.id);
   }

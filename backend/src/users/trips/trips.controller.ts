@@ -153,4 +153,6 @@ export class TripsController {
   async driverArrived(@Request() req, @Param('id') rideId: string) {
     return this.tripsService.driverArrived(rideId, req.user.id);
   }
+ 
+
 }
