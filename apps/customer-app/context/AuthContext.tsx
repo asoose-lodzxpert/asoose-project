@@ -11,6 +11,7 @@ import { useBiometric } from "../hooks/useBiometric";
 import {
   login as loginService,
   logout as logoutService,
+  refreshAccessToken,
 } from "../services/auth.service";
 import {
   deleteExpoPushTokenFromBackend,
@@ -50,21 +51,61 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const biometric = useBiometric();
 
+  // Single atomic initialization flow
   useEffect(() => {
+    let isMounted = true;
     async function initializeAuth() {
       try {
+        // 1. Check for access token in SecureStore
+        const accessToken = await SecureStore.getItemAsync(ACCESS_TOKEN_KEY);
+        if (!accessToken) {
+          // No token: fail closed
+          await clearSession();
+          if (isMounted) {
+            setUser(null);
+            setLoading(false);
+          }
+          return;
+        }
+
+        // 2. Optionally: try to refresh token (handles expiry)
+        try {
+          await refreshAccessToken();
+        } catch {
+          // Token refresh failed: fail closed
+          await clearSession();
+          if (isMounted) {
+            setUser(null);
+            setLoading(false);
+          }
+          return;
+        }
+
+        // 3. Restore user only if token is valid
         const storedUser = await AsyncStorage.getItem(USER_KEY);
-        if (storedUser) setUser(JSON.parse(storedUser));
+        if (storedUser) {
+          setUser(JSON.parse(storedUser));
+        } else {
+          // No user data: treat as logged out
+          await clearSession();
+          setUser(null);
+        }
+      } catch {
+        // Any error: fail closed
+        await clearSession();
+        setUser(null);
       } finally {
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     }
     initializeAuth();
-
-    // Check biometric availability
     biometric.checkBiometricAvailability();
+    return () => {
+      isMounted = false;
+    };
   }, [biometric]);
 
+  // Save session: only after successful login
   const saveSession = async (
     u: User,
     accessToken?: string | null,
@@ -78,6 +119,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, refreshToken);
   };
 
+  // Clear all auth state and storage
   const clearSession = async () => {
     setUser(null);
     await AsyncStorage.removeItem(USER_KEY);
@@ -86,9 +128,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await biometric.clearCredentials();
   };
 
+  // Login flow
   const login = useCallback(
     async ({ email, password }: { email: string; password: string }) => {
-      // setLoading(true);
       try {
         const resp = await loginService(email, password);
         await saveSession(
@@ -102,14 +144,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (token) await sendExpoPushTokenToBackend(token);
         } catch {}
       } catch (err) {
+        // On login failure, clear all state
+        await clearSession();
         throw err;
-      } finally {
-        // setLoading(false);
       }
     },
     [],
   );
 
+  // Logout: always clear all storage and state
   const logout = useCallback(async () => {
     setLoading(true);
     setUser(null);
@@ -145,37 +188,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return creds !== null;
   }, [biometric]);
 
-  /**
-   * CRITICAL: Biometric login with blocking logic
-   * 1. Check biometric availability
-   * 2. Prompt for biometric verification
-   * 3. MUST succeed before proceeding
-   * 4. Retrieve saved credentials
-   * 5. Perform actual login
-   */
   const biometricLogin = useCallback(async () => {
-    // Step 1: Check availability
     if (!biometric.isAvailable || !biometric.isEnrolled) {
       throw new Error("Biometric authentication not available on this device");
     }
-
-    // Step 2: Authenticate with biometric - THIS IS THE GATE
     const authResult = await biometric.authenticate(
       "Verify your fingerprint to login",
     );
-
-    // Step 3: Block further execution if verification failed
     if (!authResult.success) {
       throw new Error(authResult.error || "Biometric verification failed");
     }
-
-    // Step 4: Only after verification succeeds, get credentials
     const creds = await biometric.getCredentials();
     if (!creds) {
       throw new Error("No biometric credentials saved");
     }
-
-    // Step 5: Perform actual login with retrieved credentials
     try {
       setLoading(true);
       const resp = await loginService(creds.email, creds.password);
@@ -187,6 +213,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       biometric.resetStatus();
     } catch (err) {
       biometric.resetStatus();
+      await clearSession();
       throw err;
     } finally {
       setLoading(false);
