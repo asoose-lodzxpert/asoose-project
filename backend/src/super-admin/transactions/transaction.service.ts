@@ -21,6 +21,7 @@ import {
 } from '@prisma/client';
 import { PaymentService } from 'src/payment/payment.service';
 import { PaymentGateway } from 'src/payment/enums/payment.enums';
+
 @Injectable()
 export class TransactionsService {
   constructor(
@@ -31,6 +32,7 @@ export class TransactionsService {
 
   /**
    * Get all transactions with filters and pagination
+   * ✅ FIX: Updated to include OrderGroup relations
    */
   async findAll(query: TransactionFilterDto) {
     const { search, status, type, from, to, page = 1, limit = 10 } = query;
@@ -95,9 +97,20 @@ export class TransactionsService {
           payment: {
             include: {
               user: { select: { id: true, name: true, email: true } },
+              // ✅ FIX: Include Direct Order relation
               order: {
                 include: {
                   store: { select: { name: true } },
+                },
+              },
+              // ✅ FIX: Include Multi-Vendor Order Group relation
+              orderGroup: {
+                include: {
+                  orders: {
+                    include: {
+                      store: { select: { name: true } },
+                    },
+                  },
                 },
               },
               ride: { select: { id: true } },
@@ -157,15 +170,16 @@ export class TransactionsService {
 
   /**
    * Get single transaction detail
+   * ✅ FIX: Updated to fetch OrderGroup details for multi-cart transactions
    */
   async findOne(id: string) {
-    // 1. Fetch the base transaction with existing relations
     const t = await this.prisma.transaction.findUnique({
       where: { id },
       include: {
         payment: {
           include: {
             user: true,
+            // 1. Single Order Context
             order: {
               include: {
                 store: {
@@ -178,6 +192,24 @@ export class TransactionsService {
                 },
               },
             },
+            // 2. Multi-Vendor Group Context
+            orderGroup: {
+              include: {
+                orders: {
+                  include: {
+                    store: {
+                      select: { name: true, address: true, commissionRate: true } 
+                    },
+                    items: {
+                      include: {
+                        product: { select: { name: true, images: true } },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            // 3. Ride Context
             ride: {
               include: {
                 pickupAddress: true,
@@ -243,113 +275,7 @@ export class TransactionsService {
       throw new NotFoundException('Transaction not found');
     }
 
-    // 2. Transform the base data
-    const detail = this.transformTransactionDetail(t);
-
-    // =========================================================
-    // 🚀 MANUAL FETCH: Fill in missing context (Order/Ride)
-    // =========================================================
-
-    // A. Fetch Order if we have ID but no details
-    if (t.orderId && !detail.orderDetails) {
-      const order = await this.prisma.order.findUnique({
-        where: { id: t.orderId },
-        include: {
-          store: true,
-          items: { include: { product: true } },
-        },
-      });
-
-      if (order) {
-        const subtotal = order.items.reduce(
-          (sum, i) => sum + i.quantity * i.price,
-          0,
-        );
-        const commission = subtotal * (order.store.commissionRate / 100);
-
-        detail.orderDetails = {
-          orderId: order.id,
-          vendor: order.store.name,
-          vendorAddress: order.store.address,
-          commissionRate: order.store.commissionRate,
-          commissionAmount: commission,
-          items: order.items.map((i) => ({
-            name: i.nameSnap,
-            qty: i.quantity,
-            price: i.price,
-            total: i.quantity * i.price,
-            image: i.product?.images?.[0] || null,
-            options: i.selectedOptions,
-          })),
-          subtotal,
-          total: order.total,
-        };
-
-        if (!detail.financialBreakdown) {
-          detail.financialBreakdown = {
-            customerPaid: order.total,
-            platformCommission: commission,
-            vendorReceives: subtotal - commission,
-          };
-        }
-      }
-    }
-
-    // B. Fetch Ride if we have ID but no details
-    if (t.rideId && !detail.rideDetails) {
-      const ride = await this.prisma.ride.findUnique({
-        where: { id: t.rideId },
-        include: {
-          rider: { include: { vehicle: true } },
-          pickupAddress: true,
-          dropoffAddress: true,
-          customer: { select: { name: true, email: true, phone: true } },
-        },
-      });
-
-      if (ride) {
-        if (!detail.customer) {
-          detail.customer = {
-            name: ride.customer.name,
-            email: ride.customer.email,
-            phone: ride.customer.phone,
-          };
-        }
-
-        detail.rideDetails = {
-          rideId: ride.id,
-          driver: ride.rider?.name || 'Unassigned',
-          vehicle: ride.rider?.vehicle
-            ? `${ride.rider.vehicle.brand} ${ride.rider.vehicle.model}`
-            : null,
-          pickup: {
-            address: ride.pickupAddress.street,
-            lat: ride.pickupAddress.lat,
-            lng: ride.pickupAddress.lng,
-          },
-          dropoff: {
-            address: ride.dropoffAddress.street,
-            lat: ride.dropoffAddress.lat,
-            lng: ride.dropoffAddress.lng,
-          },
-          distance: ride.distanceKm ? `${ride.distanceKm} km` : null,
-          duration: ride.durationMin ? `${ride.durationMin} min` : null,
-          status: ride.status,
-        };
-
-        detail.ridePricing = {
-          baseFare: ride.baseFare || 0,
-          distanceFare: ride.distanceFare || 0,
-          timeFare: ride.timeFare || 0,
-          surgeMultiplier: ride.surgeMultiplier || 1,
-          platformFee: ride.platformFee || 0,
-          driverFee: ride.driverFee || 0,
-          totalFare: ride.totalFare || 0,
-        };
-      }
-    }
-
-    return detail;
+    return this.transformTransactionDetail(t);
   }
 
   /**
@@ -373,7 +299,6 @@ export class TransactionsService {
     status?: string;
     processedBy?: string;
   }) {
-    // ✅ FIX: Explicitly type as UncheckedCreateInput to allow raw IDs (paymentId, orderId, etc.)
     const createData: Prisma.TransactionUncheckedCreateInput = {
       type: data.type as TransactionType,
       amount: data.amount,
@@ -383,13 +308,11 @@ export class TransactionsService {
       status: (data.status as TransactionStatus) || TransactionStatus.COMPLETED,
       metadata: data.metadata || {},
 
-      // Handle Enums and Optionals explicitly
       entityType: data.entityType
         ? (data.entityType as WalletEntityType)
         : null,
       entityId: data.entityId || null,
 
-      // Foreign Keys
       paymentId: data.paymentId || null,
       vendorPayoutId: data.vendorPayoutId || null,
       riderPayoutId: data.riderPayoutId || null,
@@ -538,7 +461,6 @@ export class TransactionsService {
       'ADJUSTMENT',
     ].includes(t.type);
 
-    // Determine user/entity name
     let userName = 'System';
     let userEmail = null;
 
@@ -554,13 +476,20 @@ export class TransactionsService {
     }
 
     // Determine reference
-    // ✅ FIX: Explicitly type nullable variable to allow reassignment
     let refId: string | null = null;
     let refType: string | null = null;
 
+    // ✅ FIX: Order Resolution
     if (t.orderId) {
       refId = t.orderId;
       refType = 'Order';
+    } else if (t.payment?.order) {
+      refId = t.payment.order.id;
+      refType = 'Order';
+    } else if (t.payment?.orderGroup) {
+      // ✅ FIX: Handle Multi-Vendor Group Reference
+      refId = t.payment.orderGroup.id;
+      refType = 'OrderGroup';
     } else if (t.rideId) {
       refId = t.rideId;
       refType = 'Ride';
@@ -569,11 +498,18 @@ export class TransactionsService {
       refType = 'Delivery';
     }
 
+    // Generate descriptive text for grouped orders
+    let description = t.description;
+    if (refType === 'OrderGroup' && t.payment?.orderGroup) {
+      const storeCount = t.payment.orderGroup.orders?.length || 0;
+      description = `Multi-Vendor Checkout (${storeCount} Stores)`;
+    }
+
     return {
       id: t.id,
       type: isCredit ? 'Credit' : 'Debit',
       amount: `${isCredit ? '+' : '-'}$${Math.abs(t.amount).toFixed(2)}`,
-      desc: t.description,
+      desc: description,
       method: t.payment?.method || 'BANK_TRANSFER',
       refId,
       refType,
@@ -586,14 +522,6 @@ export class TransactionsService {
   };
 
   private transformTransactionDetail(t: any) {
-    const isCredit = [
-      'PAYMENT_RECEIVED',
-      'WALLET_TOPUP',
-      'VENDOR_EARNING',
-      'RIDER_EARNING',
-    ].includes(t.type);
-
-    // Base transaction info
     const detail: any = {
       id: t.id,
       status: this.mapDbStatusToFrontend(t.status),
@@ -617,7 +545,6 @@ export class TransactionsService {
       timeline: this.buildTimeline(t),
     };
 
-    // Payment details
     if (t.payment) {
       detail.customer = {
         name: t.payment.user.name,
@@ -632,6 +559,7 @@ export class TransactionsService {
         failureReason: t.payment.failureReason,
       };
 
+      // ✅ FIX: Handle Single Order
       if (t.payment.order) {
         const order = t.payment.order;
         const subtotal = order.items.reduce(
@@ -641,6 +569,7 @@ export class TransactionsService {
         const commission = subtotal * (order.store.commissionRate / 100);
 
         detail.orderDetails = {
+          type: 'SINGLE_ORDER',
           orderId: order.id,
           vendor: order.store.name,
           vendorAddress: order.store.address,
@@ -651,7 +580,7 @@ export class TransactionsService {
             qty: i.quantity,
             price: i.price,
             total: i.quantity * i.price,
-            image: i.product?.image,
+            image: i.product?.images?.[0] || null,
             options: i.selectedOptions,
           })),
           subtotal,
@@ -662,6 +591,42 @@ export class TransactionsService {
           customerPaid: order.total,
           platformCommission: commission,
           vendorReceives: subtotal - commission,
+        };
+      }
+      
+      // ✅ FIX: Handle Multi-Vendor Group
+      else if (t.payment.orderGroup) {
+        const orders = t.payment.orderGroup.orders || [];
+        const groupTotal = orders.reduce((sum, o) => sum + o.total, 0);
+        
+        // Aggregate items from all stores
+        const allItems = orders.flatMap(o => o.items.map(i => ({
+            storeName: o.store.name,
+            name: i.nameSnap,
+            qty: i.quantity,
+            price: i.price,
+            total: i.quantity * i.price,
+            image: i.product?.images?.[0] || null,
+            options: i.selectedOptions,
+        })));
+
+        detail.orderDetails = {
+          type: 'GROUP_ORDER',
+          groupId: t.payment.orderGroup.id,
+          vendor: 'Multi-Vendor',
+          subOrders: orders.map(o => ({
+             orderId: o.id,
+             store: o.store.name,
+             total: o.total,
+             commissionRate: o.store.commissionRate
+          })),
+          items: allItems,
+          total: groupTotal,
+        };
+
+        detail.financialBreakdown = {
+          customerPaid: groupTotal,
+          note: "Split across multiple vendors (See sub-orders)"
         };
       }
 
@@ -708,7 +673,7 @@ export class TransactionsService {
       }
     }
 
-    // Vendor Payout
+    // Vendor Payout transformation... (Kept as is)
     if (t.vendorPayout) {
       const payout = t.vendorPayout;
       detail.customer = {
@@ -751,7 +716,7 @@ export class TransactionsService {
       }
     }
 
-    // Rider Payout
+    // Rider Payout transformation... (Kept as is)
     if (t.riderPayout) {
       const payout = t.riderPayout;
       detail.customer = {
@@ -904,7 +869,6 @@ export class TransactionsService {
   async adjustWallet(dto: AdjustWalletDto, adminId: string) {
     const { targetId, targetType, type, amount, description } = dto;
 
-    // 1. Determine direction (Credit = positive, Debit = negative)
     const finalAmount = type === AdjustmentType.CREDIT ? amount : -amount;
 
     return this.prisma.$transaction(async (tx) => {
@@ -912,7 +876,6 @@ export class TransactionsService {
       let entityType: WalletEntityType;
       let entityName = '';
 
-      // 2. Fetch current entity and validate
       if (targetType === WalletTargetType.VENDOR) {
         const store = await tx.store.findUnique({ where: { id: targetId } });
         if (!store) throw new NotFoundException('Vendor Store not found');
@@ -920,14 +883,12 @@ export class TransactionsService {
         entityType = WalletEntityType.STORE;
         entityName = store.name;
 
-        // Prevent debiting below zero (optional, remove if overdrafts allowed)
         if (type === AdjustmentType.DEBIT && currentBalance < amount) {
           throw new BadRequestException(
             'Insufficient wallet balance for debit',
           );
         }
 
-        // Update Store
         await tx.store.update({
           where: { id: targetId },
           data: { walletBalance: { increment: finalAmount } },
@@ -945,14 +906,12 @@ export class TransactionsService {
           );
         }
 
-        // Update Rider
         await tx.rider.update({
           where: { id: targetId },
           data: { walletBalance: { increment: finalAmount } },
         });
       }
 
-      // 3. Create Ledger Entry
       const transaction = await tx.transaction.create({
         data: {
           type: TransactionType.ADJUSTMENT,
@@ -972,7 +931,6 @@ export class TransactionsService {
         },
       });
 
-      // 4. Log Admin Activity
       await tx.activityLog.create({
         data: {
           userId: adminId,
@@ -988,18 +946,15 @@ export class TransactionsService {
   }
 
   async verifyTransactionPayment(id: string, adminId: string) {
-    // 1. Fetch Transaction with Payment relation
     const transaction = await this.prisma.transaction.findUnique({
       where: { id },
       include: {
-        payment: true, // Required to get reference and gateway
+        payment: true,
       },
     });
 
     if (!transaction) throw new NotFoundException('Transaction not found');
 
-    // 2. Validate Links
-    // The transaction MUST be linked to a payment to be verified via this flow
     if (!transaction.payment) {
       throw new BadRequestException(
         'This transaction is not linked to a verifyable payment record.',
@@ -1014,10 +969,9 @@ export class TransactionsService {
 
     const verificationResult = await this.paymentService.verifyPayment(
       reference,
-      gateway as PaymentGateway, // Cast string from DB to Enum
+      gateway as PaymentGateway,
     );
 
-    // 4. Audit Log
     await this.prisma.activityLog.create({
       data: {
         userId: adminId,

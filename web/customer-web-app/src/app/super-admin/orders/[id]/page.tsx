@@ -8,18 +8,15 @@ import {
   Phone,
   MapPin,
   User,
-  Mail,
   AlertTriangle,
   Package,
-  Loader2,
-  Store,
   CreditCard,
   Check,
   Copy,
-  ExternalLink,
   RefreshCw,
   Clock,
   Navigation,
+  Layers, // Icon for Group context
 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -33,6 +30,7 @@ import { OrderDetailsSkeleton } from "./component/skeleton";
 // --- Types ---
 interface OrderDetail {
   id: string;
+  groupId?: string; // ✅ Multi-vendor context
   serviceType: string;
   status: string;
   amount: number;
@@ -52,29 +50,33 @@ interface OrderDetail {
     quantity: number;
     price: number;
     options?: any;
+    modifiers?: { name: string; price: number }[]; // ✅ Added modifiers support
     image?: string;
   }[];
-  payment: { status: string; method: string; total: number };
+  payment: { 
+    status: string; 
+    method: string; 
+    total: number;
+    isGroupPayment?: boolean; // ✅ Detects if payment was a multi-cart transaction
+  };
   logs: { date: string; user: string; action: string; details?: string }[];
 }
 
-// Helper to safely render options
-const renderItemOptions = (options: any) => {
-  if (!options) return "Standard";
-  if (typeof options === "string") return options;
-  if (typeof options === "object") {
-    return Object.entries(options)
-      .map(([key, value]) => `${key}: ${value}`)
-      .join(", ");
+const renderItemDetails = (item: OrderDetail['items'][0]) => {
+  const parts = [];
+  if (item.options) parts.push(typeof item.options === 'string' ? item.options : JSON.stringify(item.options));
+  if (item.modifiers && item.modifiers.length > 0) {
+    parts.push(...item.modifiers.map(m => m.name));
   }
-  return "Standard";
+  return parts.length > 0 ? parts.join(", ") : "Standard";
 };
 
 const OrderStepper = ({ status }: { status: string }) => {
-  const STEPS = ["PLACED", "PREPARING", "READY", "PICKED_UP", "DELIVERED"];
+  const STEPS = ["PENDING", "PREPARING", "READY", "DISPATCHED", "DELIVERED"];
 
   const statusMap: Record<string, number> = {
     PENDING: 0,
+    CONFIRMED: 0,
     PREPARING: 1,
     READY: 2,
     DISPATCHED: 3,
@@ -93,18 +95,12 @@ const OrderStepper = ({ status }: { status: string }) => {
   }
 
   return (
-    // Added scrollbar hiding style directly for compatibility
     <div
-      className="w-full bg-[#1E293B] p-4 md:p-6 rounded-xl border border-gray-800 mb-6 overflow-x-auto print:hidden shadow-sm"
-      style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+      className="w-full bg-[#1E293B] p-4 md:p-6 rounded-xl border border-gray-800 mb-6 overflow-x-auto print:hidden shadow-sm no-scrollbar"
     >
       <div className="flex items-center justify-between min-w-[600px] md:min-w-full pb-2 md:pb-0">
         {STEPS.map((step, i) => (
-          <div
-            key={step}
-            className="flex flex-col items-center relative z-10 w-full"
-          >
-            {/* Connecting Line */}
+          <div key={step} className="flex flex-col items-center relative z-10 w-full">
             {i !== 0 && (
               <div
                 className={`absolute top-3 -left-1/2 w-full h-1 transition-colors duration-500 ${
@@ -112,8 +108,6 @@ const OrderStepper = ({ status }: { status: string }) => {
                 }`}
               />
             )}
-
-            {/* Step Circle */}
             <div
               className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all bg-slate-900 ${
                 i <= activeIndex
@@ -123,8 +117,6 @@ const OrderStepper = ({ status }: { status: string }) => {
             >
               {i < activeIndex ? <Check className="w-4 h-4" /> : i + 1}
             </div>
-
-            {/* Step Label */}
             <span
               className={`text-[10px] uppercase mt-3 font-bold transition-colors ${
                 i <= activeIndex ? "text-white" : "text-gray-500"
@@ -165,10 +157,7 @@ export default function OrderDetailsPage() {
         <div className="text-center">
           <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
           <h2 className="text-xl font-bold">Order Not Found</h2>
-          <Link
-            href="/super-admin/orders"
-            className="text-yellow-500 hover:underline mt-2 block"
-          >
+          <Link href="/super-admin/orders" className="text-yellow-500 hover:underline mt-2 block">
             Back to Orders
           </Link>
         </div>
@@ -177,9 +166,7 @@ export default function OrderDetailsPage() {
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto p-4 md:p-6 pb-20 print:p-0 print:bg-white overflow-hidden">
-      {/* 1. Responsive Sticky Header 
-          -mx-4 px-4 allows it to span full width on mobile while respecting container padding
-      */}
+      {/* Sticky Header */}
       <div className="flex flex-col md:flex-row justify-between items-start gap-4 print:hidden sticky top-0 z-20 bg-[#0F172A]/95 backdrop-blur-md py-4 border-b border-gray-800 -mx-4 px-4 md:-mx-6 md:px-6 shadow-xl">
         <div className="w-full md:w-auto">
           <Link
@@ -190,15 +177,22 @@ export default function OrderDetailsPage() {
           </Link>
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-lg md:text-2xl font-bold text-white whitespace-nowrap">
-              Order{" "}
-              <span className="text-yellow-500">
-                #{order.id.substring(0, 8).toUpperCase()}
-              </span>
+              Order <span className="text-yellow-500">#{order.id.substring(0, 8).toUpperCase()}</span>
             </h1>
+            
+            {/* ✅ Multi-vendor Group Badge */}
+            {order.groupId && (
+              <div 
+                className="bg-purple-500/20 text-purple-400 border border-purple-500/30 text-[10px] font-bold px-2 py-0.5 rounded flex items-center gap-1 cursor-help"
+                title={`Part of Multi-vendor Group: ${order.groupId}`}
+              >
+                <Layers className="w-3 h-3" /> GROUP ORDER
+              </div>
+            )}
+
             <button
               onClick={() => copyToClipboard(order.id, "Order ID")}
               className="p-1.5 rounded bg-slate-800 text-gray-400 hover:text-white transition-all"
-              title="Copy Full ID"
             >
               <Copy className="w-4 h-4" />
             </button>
@@ -216,40 +210,32 @@ export default function OrderDetailsPage() {
         <div className="flex gap-2 w-full md:w-auto mt-2 md:mt-0">
           <button
             onClick={() => mutate()}
-            className="p-2.5 bg-slate-800 border border-slate-700 rounded-lg text-gray-300 hover:text-white transition-all shadow-sm"
+            className="p-2.5 bg-slate-800 border border-slate-700 rounded-lg text-gray-300 hover:text-white transition-all"
           >
-            <RefreshCw
-              className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`}
-            />
+            <RefreshCw className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`} />
           </button>
           <button
             onClick={() => window.print()}
-            className="flex-1 md:flex-none justify-center px-5 py-2.5 bg-white text-black rounded-lg text-xs font-bold flex items-center gap-2 hover:bg-gray-200 transition-all shadow-sm whitespace-nowrap"
+            className="flex-1 md:flex-none justify-center px-5 py-2.5 bg-white text-black rounded-lg text-xs font-bold flex items-center gap-2 hover:bg-gray-200 transition-all shadow-sm"
           >
-            <Printer className="w-4 h-4" />{" "}
-            <span className="hidden sm:inline">PRINT INVOICE</span>
-            <span className="sm:hidden">PRINT</span>
+            <Printer className="w-4 h-4" /> PRINT INVOICE
           </button>
         </div>
       </div>
 
       <OrderStepper status={order.status} />
 
-      {/* 2. Dispute Alert */}
+      {/* Dispute Alert */}
       {order.dispute && (
         <div className="bg-red-500 border border-red-400 p-4 rounded-xl flex flex-col md:flex-row items-start md:items-center gap-4 text-white shadow-md">
           <AlertTriangle className="w-8 h-8 flex-shrink-0" />
-          <div className="flex-1 w-full text-left">
-            <h3 className="font-bold uppercase text-sm">
-              Active Dispute Reported
-            </h3>
-            <p className="text-sm opacity-90 break-words">
-              Reason: {order.dispute.reason}
-            </p>
+          <div className="flex-1 w-full">
+            <h3 className="font-bold uppercase text-sm text-left">Active Dispute Reported</h3>
+            <p className="text-sm opacity-90 break-words text-left">Reason: {order.dispute.reason}</p>
           </div>
           <Link
             href={`/super-admin/disputes/${order.dispute.id}`}
-            className="w-full md:w-auto text-center px-6 py-2 bg-white text-red-600 text-xs font-bold rounded-lg hover:bg-gray-100 transition-all uppercase whitespace-nowrap"
+            className="w-full md:w-auto text-center px-6 py-2 bg-white text-red-600 text-xs font-bold rounded-lg hover:bg-gray-100 uppercase"
           >
             View Dispute
           </Link>
@@ -257,9 +243,8 @@ export default function OrderDetailsPage() {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* LEFT COLUMN: Main Order Info */}
+        {/* LEFT COLUMN */}
         <div className="lg:col-span-2 space-y-6 min-w-0">
-          {/* Ledger Section */}
           <div className="bg-[#1E293B] border border-slate-800 rounded-xl overflow-hidden shadow-sm">
             <div className="p-4 md:p-5 border-b border-slate-800 flex justify-between items-center bg-slate-800/30">
               <h2 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
@@ -271,66 +256,35 @@ export default function OrderDetailsPage() {
             </div>
             <div className="p-4 md:p-5 divide-y divide-slate-800">
               {order.items.map((item, i) => (
-                <div
-                  key={i}
-                  className="py-4 flex items-start justify-between gap-3 md:gap-4"
-                >
+                <div key={i} className="py-4 flex items-start justify-between gap-3 md:gap-4">
                   <div className="flex items-start gap-3 md:gap-4 flex-1 min-w-0">
-                    {/* Image Container */}
                     <div className="w-12 h-12 md:w-14 md:h-14 bg-slate-900 rounded-lg flex items-center justify-center border border-slate-800 overflow-hidden flex-shrink-0">
                       {item.image ? (
-                        <img
-                          src={item.image}
-                          alt={item.name}
-                          className="w-full h-full object-cover"
-                        />
+                        <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
                       ) : (
                         <Package className="w-5 h-5 text-slate-700" />
                       )}
                     </div>
-                    {/* Item Text */}
                     <div className="flex-1 min-w-0">
-                      <p className="text-white text-sm font-bold truncate pr-2">
-                        {item.name}
-                      </p>
+                      <p className="text-white text-sm font-bold truncate pr-2">{item.name}</p>
                       <p className="text-gray-500 text-[10px] font-medium uppercase truncate">
-                        {renderItemOptions(item.options)}
+                        {renderItemDetails(item)}
                       </p>
-                      <span className="text-yellow-500 text-[10px] font-bold md:hidden">
-                        x{item.quantity}
-                      </span>
+                      <span className="text-yellow-500 text-[10px] font-bold md:hidden">x{item.quantity}</span>
                     </div>
                   </div>
-
-                  {/* Price Section */}
                   <div className="text-right flex-shrink-0">
-                    <p className="text-white text-sm font-bold">
-                      <Currency amount={item.price * item.quantity} />
-                    </p>
-                    <p className="text-gray-500 text-[10px] font-bold hidden md:block">
-                      <Currency amount={item.price} /> Each
-                    </p>
-                    <p className="text-gray-500 text-[10px] font-bold hidden md:block">
-                      Qty: {item.quantity}
-                    </p>
+                    <p className="text-white text-sm font-bold"><Currency amount={item.price * item.quantity} /></p>
+                    <p className="text-gray-500 text-[10px] font-bold hidden md:block"><Currency amount={item.price} /> Each</p>
+                    <p className="text-gray-500 text-[10px] font-bold hidden md:block">Qty: {item.quantity}</p>
                   </div>
                 </div>
               ))}
             </div>
             <div className="bg-slate-900/50 p-4 md:p-5 space-y-2 border-t border-slate-800">
-              <div className="flex justify-between text-xs text-gray-500 font-bold uppercase">
-                <span>Subtotal</span>
-                <span className="text-gray-400">
-                  <Currency amount={order.payment?.total || order.amount} />
-                </span>
-              </div>
-              <div className="flex justify-between items-center pt-2 border-t border-slate-800/50">
-                <span className="text-sm font-bold text-white uppercase">
-                  Order Total
-                </span>
-                <span className="text-xl font-bold text-yellow-500">
-                  <Currency amount={order.amount} />
-                </span>
+              <div className="flex justify-between items-center pt-2">
+                <span className="text-sm font-bold text-white uppercase">Order Total</span>
+                <span className="text-xl font-bold text-yellow-500"><Currency amount={order.amount} /></span>
               </div>
             </div>
           </div>
@@ -343,28 +297,17 @@ export default function OrderDetailsPage() {
             <div className="space-y-6">
               {order.logs.map((log, i) => (
                 <div key={i} className="flex gap-4 relative">
-                  {/* Vertical Connector Line */}
-                  {i !== order.logs.length - 1 && (
-                    <div className="absolute top-6 left-3 w-px h-full bg-slate-800" />
-                  )}
+                  {i !== order.logs.length - 1 && <div className="absolute top-6 left-3 w-px h-full bg-slate-800" />}
                   <div className="w-6 h-6 rounded-full bg-slate-900 border border-slate-700 flex items-center justify-center flex-shrink-0 z-10">
                     <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
                   </div>
                   <div className="flex-1 bg-slate-900/40 p-4 rounded-xl border border-slate-800/50 min-w-0">
                     <div className="flex flex-col sm:flex-row justify-between sm:items-center mb-1 gap-1">
-                      <p className="text-xs text-white font-bold uppercase">
-                        {log.action.replace("_", " ")}
-                      </p>
-                      <span className="text-[10px] text-gray-500 font-medium whitespace-nowrap">
-                        {new Date(log.date).toLocaleTimeString()}
-                      </span>
+                      <p className="text-xs text-white font-bold uppercase">{log.action.replace("_", " ")}</p>
+                      <span className="text-[10px] text-gray-500 font-medium">{new Date(log.date).toLocaleTimeString()}</span>
                     </div>
                     <p className="text-[10px] text-gray-400 break-words">
-                      Performed by{" "}
-                      <span className="text-blue-400 font-bold">
-                        {log.user}
-                      </span>{" "}
-                      • {new Date(log.date).toLocaleDateString()}
+                      Performed by <span className="text-blue-400 font-bold">{log.user}</span> • {new Date(log.date).toLocaleDateString()}
                     </p>
                     {log.details && (
                       <div className="mt-2 text-[10px] text-gray-400 bg-black/20 p-2 rounded border border-slate-800 break-words">
@@ -378,99 +321,62 @@ export default function OrderDetailsPage() {
           </div>
         </div>
 
-        {/* RIGHT COLUMN: Contact & Logistics */}
+        {/* RIGHT COLUMN */}
         <div className="lg:col-span-1 space-y-6 print:hidden min-w-0">
-          {/* Recipient Details */}
+          {/* Recipient */}
           <div className="bg-[#1E293B] border border-slate-800 rounded-xl p-4 md:p-5 shadow-sm">
             <h2 className="text-xs font-bold text-white uppercase tracking-wider mb-4 flex items-center gap-2">
-              <User className="w-4 h-4 text-emerald-500" /> Recipient
-              Information
+              <User className="w-4 h-4 text-emerald-500" /> Recipient Information
             </h2>
-            <div className="p-4 bg-slate-900/50 rounded-lg border border-slate-800 mb-4 min-w-0">
-              <p className="text-white font-bold text-lg mb-1 truncate">
-                {order.customer.name}
-              </p>
-              <p className="text-gray-500 text-xs font-medium truncate">
-                {order.customer.email}
-              </p>
+            <div className="p-4 bg-slate-900/50 rounded-lg border border-slate-800 mb-4">
+              <p className="text-white font-bold text-lg mb-1 truncate">{order.customer.name}</p>
+              <p className="text-gray-500 text-xs font-medium truncate">{order.customer.email}</p>
             </div>
             <div className="space-y-3">
               <button
                 onClick={() => copyToClipboard(order.customer.phone, "Phone")}
-                className="w-full flex items-center justify-between p-3 bg-slate-900 border border-slate-800 rounded-lg hover:bg-slate-800 transition-all group"
+                className="w-full flex items-center justify-between p-3 bg-slate-900 border border-slate-800 rounded-lg hover:bg-slate-800 group"
               >
                 <div className="flex items-center gap-3">
                   <Phone className="w-4 h-4 text-emerald-500" />
-                  <span className="text-white text-xs font-bold">
-                    {order.customer.phone}
-                  </span>
+                  <span className="text-white text-xs font-bold">{order.customer.phone}</span>
                 </div>
                 <Copy className="w-3 h-3 text-gray-600" />
               </button>
-              <div className="p-3 bg-slate-900 border border-slate-800 rounded-lg">
-                <div className="flex gap-3">
-                  <MapPin className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
-                  <span className="text-gray-300 text-xs leading-relaxed font-medium break-words">
-                    {order.customer.address}
-                  </span>
-                </div>
+              <div className="p-3 bg-slate-900 border border-slate-800 rounded-lg flex gap-3">
+                <MapPin className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
+                <span className="text-gray-300 text-xs leading-relaxed font-medium break-words">{order.customer.address}</span>
               </div>
             </div>
           </div>
 
-          {/* Fulfilment Entities */}
+          {/* Fulfillment */}
           <div className="bg-[#1E293B] border border-slate-800 rounded-xl p-4 md:p-5 shadow-sm">
             <h2 className="text-xs font-bold text-white uppercase tracking-wider mb-4 flex items-center gap-2">
               <Navigation className="w-4 h-4 text-purple-500" /> Fulfillment
             </h2>
             <div className="space-y-4">
-              {/* Vendor Info */}
               <div className="p-4 bg-slate-900/50 rounded-lg border border-slate-800 min-w-0">
-                <p className="text-[10px] font-bold text-purple-400 uppercase tracking-widest mb-1">
-                  Store / Vendor
-                </p>
-                <p className="text-white font-bold text-sm mb-1 truncate">
-                  {order.vendor.name}
-                </p>
-                <p className="text-gray-500 text-[10px] font-bold">
-                  {order.vendor.ownerPhone}
-                </p>
-                <div className="flex gap-2 mt-3">
-                  <a
-                    href={`tel:${order.vendor.ownerPhone}`}
-                    className="flex-1 py-2 bg-purple-500/10 text-purple-400 border border-purple-500/20 rounded-lg text-[10px] font-bold text-center uppercase hover:bg-purple-500 hover:text-white transition-all"
-                  >
-                    Call Vendor
-                  </a>
-                </div>
+                <p className="text-[10px] font-bold text-purple-400 uppercase tracking-widest mb-1">Store / Vendor</p>
+                <p className="text-white font-bold text-sm mb-1 truncate">{order.vendor.name}</p>
+                <p className="text-gray-500 text-[10px] font-bold">{order.vendor.ownerPhone}</p>
+                <a href={`tel:${order.vendor.ownerPhone}`} className="block w-full mt-3 py-2 bg-purple-500/10 text-purple-400 border border-purple-500/20 rounded-lg text-[10px] font-bold text-center uppercase hover:bg-purple-500 hover:text-white transition-all">
+                  Call Vendor
+                </a>
               </div>
 
-              {/* Logistics Info */}
               {order.rider ? (
                 <div className="p-4 bg-slate-900/50 rounded-lg border border-slate-800 min-w-0">
-                  <p className="text-[10px] font-bold text-blue-400 uppercase tracking-widest mb-1">
-                    Logistics / Rider
-                  </p>
-                  <p className="text-white font-bold text-sm mb-1 truncate">
-                    {order.rider.name}
-                  </p>
-                  <p className="text-gray-500 text-[10px] font-bold truncate">
-                    {order.rider.vehicle} • {order.rider.phone}
-                  </p>
-                  <div className="flex gap-2 mt-3">
-                    <a
-                      href={`tel:${order.rider.phone}`}
-                      className="flex-1 py-2 bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded-lg text-[10px] font-bold text-center uppercase hover:bg-blue-500 hover:text-white transition-all"
-                    >
-                      Call Rider
-                    </a>
-                  </div>
+                  <p className="text-[10px] font-bold text-blue-400 uppercase tracking-widest mb-1">Logistics / Rider</p>
+                  <p className="text-white font-bold text-sm mb-1 truncate">{order.rider.name}</p>
+                  <p className="text-gray-500 text-[10px] font-bold truncate">{order.rider.vehicle} • {order.rider.phone}</p>
+                  <a href={`tel:${order.rider.phone}`} className="block w-full mt-3 py-2 bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded-lg text-[10px] font-bold text-center uppercase hover:bg-blue-500 hover:text-white transition-all">
+                    Call Rider
+                  </a>
                 </div>
               ) : (
                 <div className="p-5 border border-dashed border-slate-700 rounded-xl text-center bg-slate-900/20">
-                  <p className="text-gray-500 text-[10px] font-bold uppercase mb-3">
-                    No Rider Assigned
-                  </p>
+                  <p className="text-gray-500 text-[10px] font-bold uppercase mb-3">No Rider Assigned</p>
                   <button className="w-full py-2 bg-yellow-500 text-slate-900 text-[10px] font-bold rounded-lg uppercase tracking-wider hover:bg-yellow-400 transition-all">
                     Assign Rider
                   </button>
@@ -479,39 +385,39 @@ export default function OrderDetailsPage() {
             </div>
           </div>
 
-          {/* Payment & Settlement */}
+          {/* Payment */}
           <div className="bg-[#1E293B] border border-slate-800 rounded-xl p-4 md:p-5 shadow-sm">
             <h2 className="text-xs font-bold text-white uppercase tracking-wider mb-4 flex items-center gap-2">
               <CreditCard className="w-4 h-4 text-gray-400" /> Payment Details
             </h2>
             <div className="space-y-4">
               <div className="flex justify-between items-center">
-                <span className="text-gray-500 text-[10px] font-bold uppercase">
-                  Status
-                </span>
-                <span
-                  className={`px-2.5 py-1 rounded text-[10px] font-bold uppercase border ${
-                    order.payment?.status === "PAID" ||
-                    order.payment?.status === "COMPLETED"
-                      ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
-                      : "bg-red-500/10 text-red-500 border-red-500/20"
-                  }`}
-                >
+                <span className="text-gray-500 text-[10px] font-bold uppercase">Status</span>
+                <span className={`px-2.5 py-1 rounded text-[10px] font-bold uppercase border ${
+                  order.payment?.status === "PAID" || order.payment?.status === "COMPLETED" || order.payment?.status === "PARTIALLY_REFUNDED"
+                    ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
+                    : "bg-red-500/10 text-red-500 border-red-500/20"
+                }`}>
                   {order.payment?.status || "UNPAID"}
                 </span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-gray-500 text-[10px] font-bold uppercase">
-                  Method
-                </span>
+                <span className="text-gray-500 text-[10px] font-bold uppercase">Method</span>
                 <span className="text-white text-[10px] font-bold uppercase bg-slate-900 px-2 py-1 rounded border border-slate-800">
                   {order.payment?.method || "CASH"}
                 </span>
               </div>
+              {/* ✅ Information about group transaction total */}
+              {order.payment?.isGroupPayment && (
+                <div className="pt-2 border-t border-slate-800">
+                  <p className="text-[10px] text-gray-500 italic">
+                    Note: This order was part of a larger transaction totaling <Currency amount={order.payment.total} />.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Danger Zone / Admin Actions */}
           <OrderActionsPanel
             orderId={order.id}
             currentStatus={order.status}

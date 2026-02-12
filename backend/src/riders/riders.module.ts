@@ -21,6 +21,8 @@ import { TripsModule } from '../users/trips/trips.module';
 import { StorageModule } from '../storage/storage.module';
 import { MatchingModule } from '../matching/matching.module';
 import { RidersController } from './riders.controller';
+// ✅ IMPORT THIS
+import { TransactionsModule } from '../super-admin/transactions/transaction.module';
 
 @Module({
   imports: [
@@ -29,6 +31,8 @@ import { RidersController } from './riders.controller';
     forwardRef(() => UsersModule),
     TripsModule,
     MatchingModule,
+    // ✅ ADD THIS
+    TransactionsModule, 
   ],
   controllers: [
     ProfileController,

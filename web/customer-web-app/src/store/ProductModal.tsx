@@ -1,9 +1,11 @@
 "use client";
 
 import React, { useState, useMemo, useEffect } from "react";
-import { X, Minus, Plus } from "lucide-react";
+import { X, Minus, Plus, Loader2 } from "lucide-react";
 import { useCartStore } from "@/store/useCartStore";
 import { toast } from "react-toastify";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 
 // --- Types must match what is passed from the page ---
 export interface Modifier {
@@ -44,7 +46,11 @@ export const ProductModal = ({
   const [selectedModifiers, setSelectedModifiers] = useState<
     Record<string, string[]>
   >({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const addItem = useCartStore((state) => state.addItem);
+  const { data: session, status } = useSession();
+  const router = useRouter();
 
   // Reset state when product changes
   useEffect(() => {
@@ -101,22 +107,69 @@ export const ProductModal = ({
     });
   }, [product, selectedModifiers]);
 
-  const handleAddToOrder = () => {
+  const handleAddToOrder = async () => {
     if (!product || !isValid) return;
 
-    // FIX: Removed await and success check since addItem is synchronous/void
-    addItem({
-      id: product.id,
-      name: product.name,
-      price: totalPrice / quantity, // Unit price (base + mods)
-      quantity,
-      restaurantId: storeId,
-      image: product.image,
-    });
+    // 1. Frontend Security Gate
+    if (status !== "authenticated") {
+      toast.info("Please log in to add items to your cart", {
+        position: "bottom-center",
+        autoClose: 3000,
+      });
+      router.push("/sign-in");
+      return;
+    }
 
-    // Valid feedback flow
-    onClose();
-    toast.success("Added to basket");
+    setIsSubmitting(true);
+
+    try {
+      // 2. Backend Enforcement (Critical)
+      // Sync with server session to ensure stock and validity
+      const token =
+        (session as any)?.accessToken || (session as any)?.user?.accessToken;
+
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/cart/add`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            productId: product.id,
+            quantity: quantity,
+          }),
+        },
+      );
+
+      if (!res.ok) {
+        if (res.status === 401) {
+          router.push("/sign-in");
+          throw new Error("Session expired");
+        }
+        const errorData = await res.json();
+        throw new Error(errorData.message || "Failed to add to cart");
+      }
+
+      // 3. Success: Update Local Store
+      // We pass the calculated unit price (base + modifiers) to the local store
+      addItem({
+        id: product.id,
+        name: product.name,
+        price: totalPrice / quantity, // Unit price including modifiers
+        quantity,
+        restaurantId: storeId,
+        image: product.image,
+      });
+
+      onClose();
+      toast.success("Added to basket");
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   if (!product) return null;
@@ -243,15 +296,23 @@ export const ProductModal = ({
 
           <button
             onClick={handleAddToOrder}
-            disabled={!isValid}
-            className={`w-full py-4 rounded-xl font-bold flex justify-between px-6 transition-all ${
-              isValid
+            disabled={!isValid || isSubmitting}
+            className={`w-full py-4 rounded-xl font-bold flex justify-between items-center px-6 transition-all ${
+              isValid && !isSubmitting
                 ? "bg-yellow-500 text-black hover:bg-yellow-400 shadow-lg shadow-yellow-500/20"
                 : "bg-gray-200 dark:bg-white/10 text-gray-500 cursor-not-allowed"
             }`}
           >
-            <span>Add to Order</span>
-            <span>₦{totalPrice.toLocaleString()}</span>
+            {isSubmitting ? (
+              <div className="w-full flex justify-center">
+                <Loader2 className="w-5 h-5 animate-spin" />
+              </div>
+            ) : (
+              <>
+                <span>Add to Order</span>
+                <span>₦{totalPrice.toLocaleString()}</span>
+              </>
+            )}
           </button>
         </div>
       </div>
