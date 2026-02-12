@@ -174,4 +174,13 @@ export class JobEventsService {
     this.reconnectAttempts = 0; // Reset attempts for manual reconnect
     return this.connect(this.callbacks);
   }
+
+  /**
+   * Join a specific order/job room for granular updates
+   */
+  joinOrderRoom(orderId: string) {
+    if (this.socket && orderId) {
+      this.socket.emit("joinOrderRoom", { orderId });
+    }
+  }
 }

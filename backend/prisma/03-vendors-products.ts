@@ -11,23 +11,6 @@ import {
 export async function seedVendorsAndProducts() {
   console.log('🌱 Seeding Vendors, Stores, and Products...');
 
-  const categories = [
-    'Rice Bowls',
-    'Swallows',
-    'Drinks',
-    'Pharmacy',
-    'Groceries',
-  ];
-
-  // Ensure Categories Exist
-  for (const catName of categories) {
-    await prisma.category.upsert({
-      where: { name: catName },
-      update: {},
-      create: { name: catName, slug: catName.toLowerCase().replace(' ', '-') },
-    });
-  }
-
   const storeTypes = [
     StoreType.RESTAURANT,
     StoreType.RESTAURANT,

@@ -1,25 +1,24 @@
-import React, { useEffect, useState, useCallback } from "react";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import React, { useCallback, useEffect, useState } from "react";
 import {
-  View,
-  StyleSheet,
-  Pressable,
-  ScrollView,
-  RefreshControl,
-  Alert,
   Dimensions,
   DimensionValue,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  View,
 } from "react-native";
-import { useLocalSearchParams, useRouter } from "expo-router";
 import Animated, {
-  useSharedValue,
+  Easing,
   useAnimatedStyle,
+  useSharedValue,
   withRepeat,
   withTiming,
-  Easing,
 } from "react-native-reanimated";
 
-import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
+import { ThemedView } from "@/components/themed-view";
 import { IconSymbol, IconSymbolName } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { RideService } from "@/services/ride.service";
@@ -56,30 +55,67 @@ export default function RideDetailsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
+  const retryTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
 
-  /* -------- Data Loader -------- */
-  const loadRide = useCallback(async () => {
-    if (!id || typeof id !== "string") {
-      setRide(null);
-      setError("Ride not found");
-      setLoading(false);
-      return;
-    }
+  /* -------- Data Loader with Auto-Retry -------- */
+  const loadRide = useCallback(
+    async (attempt = 0) => {
+      if (!id || typeof id !== "string") {
+        setRide(null);
+        setError("Ride not found");
+        setLoading(false);
+        return;
+      }
 
-    setLoading(true);
-    setError(null);
+      if (attempt === 0) {
+        setLoading(true);
+        setError(null);
+        setRetryCount(0);
+      }
 
-    try {
-      const data = await RideService.getRideById(id);
-      setRide(data);
-      console.log("Ride Details:", JSON.stringify(data, null, 2));
-    } catch (e) {
-      setRide(null);
-      setError((e as Error)?.message || "Failed to load ride");
-    } finally {
-      setLoading(false);
-    }
-  }, [id]);
+      try {
+        const data = await RideService.getRideById(id);
+        setRide(data);
+        setError(null);
+        setRetryCount(0);
+        setLoading(false);
+        setRefreshing(false);
+      } catch (e) {
+        const errorMessage = (e as Error)?.message || "Failed to load ride";
+        const isNetworkError =
+          errorMessage.toLowerCase().includes("network") ||
+          errorMessage.toLowerCase().includes("fetch") ||
+          errorMessage.toLowerCase().includes("connection");
+
+        const maxRetries = isNetworkError ? 3 : 1;
+
+        if (attempt < maxRetries) {
+          const delay = Math.min(1000 * Math.pow(2, attempt), 5000);
+          setRetryCount(attempt + 1);
+
+          retryTimeoutRef.current = setTimeout(() => {
+            loadRide(attempt + 1);
+          }, delay);
+        } else {
+          setRide(null);
+          setError(errorMessage);
+          setLoading(false);
+          setRefreshing(false);
+          setRetryCount(0);
+        }
+      }
+    },
+    [id],
+  );
+
+  useEffect(() => {
+    return () => {
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     loadRide();
@@ -87,8 +123,7 @@ export default function RideDetailsScreen() {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await loadRide();
-    setRefreshing(false);
+    await loadRide(0);
   }, [loadRide]);
 
   /* ---------------- UI ---------------- */

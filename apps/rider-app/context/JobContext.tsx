@@ -44,7 +44,7 @@ export const JobsProvider = ({ children }: { children: ReactNode }) => {
   const locationStreamStatus = useLocationStream({ enabled: isOnline });
 
   // Unified job event handlers - Lazy initialization to avoid early imports
-  const { reconnect } = useJobEvents({
+  const { reconnect, joinOrderRoom } = useJobEvents({
     enabled: isOnline,
     onJobAssigned: (job: IncomingJobOffer) => {
       setIncomingJob(job);
@@ -127,6 +127,8 @@ export const JobsProvider = ({ children }: { children: ReactNode }) => {
       setIncomingJob(null);
 
       await jobsService.acceptJob(jobId, jobType);
+      // After successful accept, join the order/job room for granular updates
+      joinOrderRoom(jobId);
     } catch (error: any) {
       // Rollback on error
       setIncomingJob(previousJob);

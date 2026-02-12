@@ -1,19 +1,19 @@
-import React, { useState, useEffect, useCallback } from "react";
-import {
-  View,
-  StyleSheet,
-  Pressable,
-  FlatList,
-  RefreshControl,
-} from "react-native";
-import { SkeletonRideCard } from "@/components/ui/Skeleton";
-import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
+import { ThemedView } from "@/components/themed-view";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { SkeletonRideCard } from "@/components/ui/Skeleton";
 import { useThemeColor } from "@/hooks/use-theme-color";
-import { RelativePathString, useRouter } from "expo-router";
 import { RideService } from "@/services/ride.service";
 import { Ride } from "@/types/ride";
+import { RelativePathString, useRouter } from "expo-router";
+import React, { useCallback, useEffect, useState } from "react";
+import {
+  FlatList,
+  Pressable,
+  RefreshControl,
+  StyleSheet,
+  View,
+} from "react-native";
 
 const PAGE_SIZE = 10;
 
@@ -23,6 +23,8 @@ export default function RidesHistoryScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
+  const [retryCount, setRetryCount] = useState(0);
+  const retryTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
 
   const brandPrimary = useThemeColor({}, "brandPrimary");
   const textColor = useThemeColor({}, "textPrimary");
@@ -35,8 +37,8 @@ export default function RidesHistoryScreen() {
   const router = useRouter();
 
   const loadRides = useCallback(
-    async (refresh = false) => {
-      if (loading) return;
+    async (refresh = false, attempt = 0) => {
+      if (loading && attempt === 0) return;
       if (!hasMore && !refresh) return;
 
       setLoading(true);
@@ -57,15 +59,44 @@ export default function RidesHistoryScreen() {
         }
 
         setHasMore(data.length === PAGE_SIZE);
-      } catch (error) {
-        console.error("Failed to load rides:", error);
-      } finally {
+        setRetryCount(0);
         setLoading(false);
         setRefreshing(false);
+      } catch (error) {
+        const shouldRetry = refresh || page === 1; // Only retry on initial load or refresh
+        const errorMessage = (error as Error)?.message || "Failed to load";
+        const isNetworkError =
+          errorMessage.toLowerCase().includes("network") ||
+          errorMessage.toLowerCase().includes("fetch") ||
+          errorMessage.toLowerCase().includes("connection");
+
+        const maxRetries = isNetworkError && shouldRetry ? 3 : 0;
+
+        if (attempt < maxRetries) {
+          const delay = Math.min(1000 * Math.pow(2, attempt), 5000);
+          setRetryCount(attempt + 1);
+
+          retryTimeoutRef.current = setTimeout(() => {
+            loadRides(refresh, attempt + 1);
+          }, delay);
+        } else {
+          console.error("Failed to load rides:", error);
+          setLoading(false);
+          setRefreshing(false);
+          setRetryCount(0);
+        }
       }
     },
     [page, hasMore, loading],
   );
+
+  useEffect(() => {
+    return () => {
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     loadRides(true);

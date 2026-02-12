@@ -1,29 +1,29 @@
-import React, { useEffect, useState, useCallback } from "react";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import React, { useCallback, useEffect, useState } from "react";
 import {
-  View,
-  StyleSheet,
-  Pressable,
-  ScrollView,
-  Image,
-  RefreshControl,
   Dimensions,
   DimensionValue,
+  Image,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  View,
 } from "react-native";
-import { useLocalSearchParams, useRouter } from "expo-router";
 import Animated, {
-  useSharedValue,
+  Easing,
   useAnimatedStyle,
+  useSharedValue,
   withRepeat,
   withTiming,
-  Easing,
 } from "react-native-reanimated";
 
-import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
+import { ThemedView } from "@/components/themed-view";
 import { IconSymbol } from "@/components/ui/icon-symbol";
-import { useThemeColor } from "@/hooks/use-theme-color";
-import { useCart } from "@/context/CartContext";
 import { useToast } from "@/components/ui/ThemedToast";
+import { useCart } from "@/context/CartContext";
+import { useThemeColor } from "@/hooks/use-theme-color";
 import {
   fetchProductById,
   ProductDetails,
@@ -50,33 +50,85 @@ export default function ProductDetailsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
+  const [retryCount, setRetryCount] = useState(0);
+  const retryTimeoutRef = React.useRef<number | null>(null);
 
-  const { addItem } = useCart();
+  const {
+    items: cartItems,
+    addItem,
+    removeItem,
+    increaseQty,
+    decreaseQty,
+  } = useCart();
   const showToast = useToast();
 
-  /* -------- Data Loader -------- */
-  const loadProduct = useCallback(async () => {
-    if (!id || typeof id !== "string") {
-      setProduct(null);
-      setError("Product not found");
-      setLoading(false);
-      return;
-    }
+  // Check if product is in cart and get its quantity
+  const cartItem = product
+    ? cartItems.find((item) => item.id === product.id)
+    : null;
+  const cartQuantity = cartItem ? cartItem.qty : 0;
 
-    setLoading(true);
-    setError(null);
+  /* -------- Data Loader with Auto-Retry -------- */
+  const loadProduct = useCallback(
+    async (attempt = 0) => {
+      if (!id || typeof id !== "string") {
+        setProduct(null);
+        setError("Product not found");
+        setLoading(false);
+        return;
+      }
 
-    try {
-      const data = await fetchProductById(id);
-      setProduct(data);
-    } catch (e) {
-      setProduct(null);
-      setError((e as Error)?.message || "Failed to load product");
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [id]);
+      if (attempt === 0) {
+        setLoading(true);
+        setError(null);
+        setRetryCount(0);
+      }
+
+      try {
+        const data = await fetchProductById(id);
+        setProduct(data);
+        setError(null);
+        setRetryCount(0);
+        setLoading(false);
+        setRefreshing(false);
+      } catch (e) {
+        const errorMessage = (e as Error)?.message || "Failed to load product";
+        const isNetworkError =
+          errorMessage.toLowerCase().includes("network") ||
+          errorMessage.toLowerCase().includes("fetch") ||
+          errorMessage.toLowerCase().includes("connection");
+
+        // Retry up to 3 times with exponential backoff for network errors
+        const maxRetries = isNetworkError ? 3 : 1;
+
+        if (attempt < maxRetries) {
+          const delay = Math.min(1000 * Math.pow(2, attempt), 5000);
+          setRetryCount(attempt + 1);
+
+          retryTimeoutRef.current = setTimeout(() => {
+            loadProduct(attempt + 1);
+          }, delay);
+        } else {
+          // Only show error and stop loading after all retries exhausted
+          setProduct(null);
+          setError(errorMessage);
+          setLoading(false);
+          setRefreshing(false);
+          setRetryCount(0);
+        }
+      }
+    },
+    [id],
+  );
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     loadProduct();
@@ -107,13 +159,39 @@ export default function ProductDetailsScreen() {
         message: `Added ${quantity} item(s) to cart`,
       });
 
-      router.back();
+      // router.back();
     } catch (e) {
       showToast({
         variant: "error",
         message: "Could not add to cart. Please try again.",
       });
     }
+  };
+
+  const handleRemoveFromCart = async () => {
+    if (!product) return;
+    try {
+      await removeItem(product.id);
+      showToast({
+        variant: "success",
+        message: `Removed from cart`,
+      });
+    } catch (e) {
+      showToast({
+        variant: "error",
+        message: "Could not remove from cart. Please try again.",
+      });
+    }
+  };
+
+  const handleIncrement = async () => {
+    if (!product) return;
+    await increaseQty(product.id);
+  };
+
+  const handleDecrement = async () => {
+    if (!product) return;
+    await decreaseQty(product.id);
   };
 
   /* ---------------- Skeleton Components ---------------- */
@@ -363,16 +441,81 @@ export default function ProductDetailsScreen() {
               Total
             </ThemedText>
             <ThemedText style={[styles.totalPrice, { color: brandPrimary }]}>
-              ₦{((product.price || 0) * quantity).toFixed(2)}
+              ₦{((product.price || 0) * (cartQuantity || quantity)).toFixed(2)}
             </ThemedText>
           </View>
-          <Pressable
-            style={[styles.addToCartButton, { backgroundColor: brandPrimary }]}
-            onPress={handleAddToCart}
-          >
-            <IconSymbol name="cart" size={20} color="#FFF" />
-            <ThemedText style={styles.addToCartText}>Add to Cart</ThemedText>
-          </Pressable>
+          {/* Add to Cart / Remove from Cart & Quantity Controls */}
+          {cartItem ? (
+            <View
+              style={{ flexDirection: "row", alignItems: "center", gap: 12 }}
+            >
+              <Pressable
+                style={[
+                  styles.addToCartButton,
+                  {
+                    flex: 1,
+                    backgroundColor: "#FFF",
+                    borderWidth: 1,
+                    borderColor: brandPrimary,
+                  },
+                ]}
+                onPress={handleRemoveFromCart}
+              >
+                <IconSymbol name="trash" size={20} color={brandPrimary} />
+                <ThemedText
+                  style={[styles.addToCartText, { color: brandPrimary }]}
+                >
+                  Remove from Cart
+                </ThemedText>
+              </Pressable>
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 0,
+                  backgroundColor: surface,
+                  borderRadius: 8,
+                  borderWidth: 1,
+                  borderColor: border,
+                }}
+              >
+                <Pressable
+                  style={{ paddingHorizontal: 12, paddingVertical: 8 }}
+                  onPress={handleDecrement}
+                >
+                  <IconSymbol name="minus" size={18} color={textColor} />
+                </Pressable>
+                <ThemedText
+                  style={{
+                    fontSize: 18,
+                    fontWeight: "700",
+                    minWidth: 32,
+                    textAlign: "center",
+                    color: textColor,
+                  }}
+                >
+                  {cartQuantity}
+                </ThemedText>
+                <Pressable
+                  style={{ paddingHorizontal: 12, paddingVertical: 8 }}
+                  onPress={handleIncrement}
+                >
+                  <IconSymbol name="plus" size={18} color={textColor} />
+                </Pressable>
+              </View>
+            </View>
+          ) : (
+            <Pressable
+              style={[
+                styles.addToCartButton,
+                { backgroundColor: brandPrimary },
+              ]}
+              onPress={handleAddToCart}
+            >
+              <IconSymbol name="cart" size={20} color="#FFF" />
+              <ThemedText style={styles.addToCartText}>Add to Cart</ThemedText>
+            </Pressable>
+          )}
         </View>
       )}
     </ThemedView>

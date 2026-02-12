@@ -1,21 +1,21 @@
-import React, { useState, useCallback } from "react";
-import {
-  View,
-  FlatList,
-  StyleSheet,
-  RefreshControl,
-  TouchableOpacity,
-} from "react-native";
-import { Stack } from "expo-router";
-import { ThemedView } from "@/components/themed-view";
-import { ThemedText } from "@/components/themed-text";
-import { IconSymbol } from "@/components/ui/icon-symbol";
-import { VendorCard } from "@/components/home/VendorCard";
 import { CategoryPillFilter } from "@/components/home/CategoryPillFilter";
-import { useThemeColor } from "@/hooks/use-theme-color";
-import { useHomeContext } from "@/context/HomeContext";
-import type { StoreFilterSlug } from "@/types/home";
+import { VendorCard } from "@/components/home/VendorCard";
+import { ThemedText } from "@/components/themed-text";
+import { ThemedView } from "@/components/themed-view";
 import type { IconSymbolName } from "@/components/ui/icon-symbol";
+import { IconSymbol } from "@/components/ui/icon-symbol";
+import { useHomeContext } from "@/context/HomeContext";
+import { useThemeColor } from "@/hooks/use-theme-color";
+import type { StoreFilterSlug } from "@/types/home";
+import { useRouter } from "expo-router";
+import React, { useCallback, useMemo, useState } from "react";
+import {
+  FlatList,
+  RefreshControl,
+  StyleSheet,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
 const TYPE_ICON_MAP: Record<string, IconSymbolName> = {
   RESTAURANT: "fork.knife",
@@ -33,6 +33,7 @@ function getIconForType(type?: string): IconSymbolName {
 }
 
 export default function DiscoverScreen() {
+  const router = useRouter();
   const {
     stores,
     storesError,
@@ -47,8 +48,12 @@ export default function DiscoverScreen() {
 
   const [refreshing, setRefreshing] = useState(false);
 
+  // Theme colors
   const primary = useThemeColor({}, "brandPrimary");
   const mutedColor = useThemeColor({}, "textMuted");
+  const background = useThemeColor({}, "surfaceBackground");
+  const border = useThemeColor({}, "borderDefault");
+  const text = useThemeColor({}, "textPrimary");
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -59,7 +64,8 @@ export default function DiscoverScreen() {
     }
   }, [refreshStores]);
 
-  const categories = React.useMemo(() => {
+  // FIXED: Properly closed useMemo and logic
+  const categories = useMemo(() => {
     const base = [
       {
         key: "all" as StoreFilterSlug,
@@ -67,33 +73,47 @@ export default function DiscoverScreen() {
         icon: "storefront" as IconSymbolName,
       },
     ];
-    const dynamic = verticals.map((section) => ({
+
+    const dynamic = (verticals || []).map((section) => ({
       key: section.id as StoreFilterSlug,
       label: section.title,
       icon: getIconForType(section.type),
     }));
-    const seen = new Set(base.map((item) => item.key));
-    const merged = [...base];
-    for (const item of dynamic) {
-      if (seen.has(item.key)) continue;
-      seen.add(item.key);
-      merged.push(item);
-    }
-    return merged;
+
+    return [...base, ...dynamic];
   }, [verticals]);
 
   return (
-    <ThemedView style={styles.container}>
-      <Stack.Screen
-        options={{
-          title: "Discover Stores",
-          headerShown: true,
-          headerBackTitle: "Back",
+    <ThemedView style={[styles.container, { backgroundColor: background }]}>
+      {/* Custom Header */}
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          paddingHorizontal: 16,
+          paddingTop: 60, // Added padding for status bar area
+          paddingBottom: 8,
+          backgroundColor: background,
+          borderBottomWidth: 1,
+          borderBottomColor: border,
         }}
-      />
+      >
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={{ padding: 8, marginRight: 8 }}
+        >
+          <IconSymbol name="chevron.left" size={24} color={primary} />
+        </TouchableOpacity>
+        <ThemedText
+          type="title"
+          style={{ fontSize: 20, fontWeight: "bold", color: text }}
+        >
+          Discover Stores
+        </ThemedText>
+      </View>
 
       {/* Category Filter */}
-      <View style={styles.filterContainer}>
+      <View style={[styles.filterContainer, { borderBottomColor: border }]}>
         <CategoryPillFilter
           categories={categories}
           value={category}
@@ -112,7 +132,11 @@ export default function DiscoverScreen() {
         keyExtractor={(item) => item.id}
         contentContainerStyle={{ padding: 16 }}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={primary}
+          />
         }
         onEndReached={loadMore}
         onEndReachedThreshold={0.4}
@@ -150,14 +174,14 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderBottomWidth: 1,
-    borderBottomColor: "#e0e0e0",
   },
   storeItem: {
     marginBottom: 16,
   },
   emptyContainer: {
-    paddingVertical: 64,
+    paddingVertical: 120,
     alignItems: "center",
+    justifyContent: "center",
   },
   emptyText: {
     fontSize: 16,
@@ -171,6 +195,6 @@ const styles = StyleSheet.create({
   footerText: {
     textAlign: "center",
     fontSize: 14,
-    paddingVertical: 16,
+    paddingVertical: 24,
   },
 });

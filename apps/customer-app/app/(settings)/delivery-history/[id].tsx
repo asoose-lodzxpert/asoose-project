@@ -1,26 +1,26 @@
-import React, { useEffect, useState, useCallback } from "react";
-import {
-  View,
-  StyleSheet,
-  Pressable,
-  ScrollView,
-  RefreshControl,
-  DimensionValue,
-  Dimensions,
-} from "react-native";
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withRepeat,
-  withTiming,
-  Easing,
-} from "react-native-reanimated";
-import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
+import { ThemedView } from "@/components/themed-view";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
-import { useRouter, useLocalSearchParams } from "expo-router";
 import { fetchDeliveryDetails } from "@/services/delivery-details.service";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import React, { useCallback, useEffect, useState } from "react";
+import {
+  DimensionValue,
+  Dimensions,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  View,
+} from "react-native";
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withTiming,
+} from "react-native-reanimated";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -54,21 +54,60 @@ export default function DeliveryDetailsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [delivery, setDelivery] = useState<Delivery | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
+  const retryTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const deliveryId = Array.isArray(id) ? id[0] : id;
-      const data = await fetchDeliveryDetails(deliveryId as string);
-      setDelivery(data);
-    } catch (e) {
-      setDelivery(null);
-      setError((e as Error)?.message || "Failed to load delivery");
-    } finally {
-      setLoading(false);
-    }
-  }, [id]);
+  const fetchData = useCallback(
+    async (attempt = 0) => {
+      if (attempt === 0) {
+        setLoading(true);
+        setError(null);
+        setRetryCount(0);
+      }
+
+      try {
+        const deliveryId = Array.isArray(id) ? id[0] : id;
+        const data = await fetchDeliveryDetails(deliveryId as string);
+        setDelivery(data);
+        setError(null);
+        setRetryCount(0);
+        setLoading(false);
+        setRefreshing(false);
+      } catch (e) {
+        const errorMessage = (e as Error)?.message || "Failed to load delivery";
+        const isNetworkError =
+          errorMessage.toLowerCase().includes("network") ||
+          errorMessage.toLowerCase().includes("fetch") ||
+          errorMessage.toLowerCase().includes("connection");
+
+        const maxRetries = isNetworkError ? 3 : 1;
+
+        if (attempt < maxRetries) {
+          const delay = Math.min(1000 * Math.pow(2, attempt), 5000);
+          setRetryCount(attempt + 1);
+
+          retryTimeoutRef.current = setTimeout(() => {
+            fetchData(attempt + 1);
+          }, delay);
+        } else {
+          setDelivery(null);
+          setError(errorMessage);
+          setLoading(false);
+          setRefreshing(false);
+          setRetryCount(0);
+        }
+      }
+    },
+    [id],
+  );
+
+  useEffect(() => {
+    return () => {
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     fetchData();
@@ -76,7 +115,7 @@ export default function DeliveryDetailsScreen() {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await fetchData();
+    await fetchData(0);
     setRefreshing(false);
   }, [fetchData]);
 

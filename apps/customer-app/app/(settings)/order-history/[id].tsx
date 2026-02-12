@@ -1,23 +1,23 @@
-import React, { useEffect, useState, useCallback, useRef } from "react";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-  View,
-  StyleSheet,
-  Pressable,
-  ScrollView,
-  RefreshControl,
-  Share,
   Animated,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  Share,
   StyleProp,
+  StyleSheet,
+  View,
   ViewStyle,
 } from "react-native";
-import { useLocalSearchParams, useRouter } from "expo-router";
 
-import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
-import { fetchOrderById } from "@/services/order-history.service";
+import { ThemedView } from "@/components/themed-view";
 import { IconSymbol } from "@/components/ui/icon-symbol";
-import { useThemeColor } from "@/hooks/use-theme-color";
 import { useToast } from "@/components/ui/ThemedToast";
+import { useThemeColor } from "@/hooks/use-theme-color";
+import { fetchOrderById } from "@/services/order-history.service";
 
 function formatCurrency(value: string | number | undefined | null) {
   const num = typeof value === "string" ? parseFloat(value) : Number(value);
@@ -50,32 +50,70 @@ export default function OrderDetailsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
+  const retryTimeoutRef = React.useRef<number | null>(null);
 
   const hasShare = order?.status === "delivered";
 
-  /* -------- Data Loader -------- */
+  /* -------- Data Loader with Auto-Retry -------- */
 
-  const loadOrder = useCallback(async () => {
-    if (!id || typeof id !== "string") {
-      setOrder(null);
-      setError("Order not found");
-      setLoading(false);
-      return;
-    }
+  const loadOrder = useCallback(
+    async (attempt = 0) => {
+      if (!id || typeof id !== "string") {
+        setOrder(null);
+        setError("Order not found");
+        setLoading(false);
+        return;
+      }
 
-    setLoading(true);
-    setError(null);
+      if (attempt === 0) {
+        setLoading(true);
+        setError(null);
+        setRetryCount(0);
+      }
 
-    try {
-      const data = await fetchOrderById(id);
-      setOrder(data);
-    } catch (e) {
-      setOrder(null);
-      setError((e as Error)?.message || "Failed to load order");
-    } finally {
-      setLoading(false);
-    }
-  }, [id]);
+      try {
+        const data = await fetchOrderById(id);
+        setOrder(data);
+        setError(null);
+        setRetryCount(0);
+        setLoading(false);
+        setRefreshing(false);
+      } catch (e) {
+        const errorMessage = (e as Error)?.message || "Failed to load order";
+        const isNetworkError =
+          errorMessage.toLowerCase().includes("network") ||
+          errorMessage.toLowerCase().includes("fetch") ||
+          errorMessage.toLowerCase().includes("connection");
+
+        const maxRetries = isNetworkError ? 3 : 1;
+
+        if (attempt < maxRetries) {
+          const delay = Math.min(1000 * Math.pow(2, attempt), 5000);
+          setRetryCount(attempt + 1);
+
+          retryTimeoutRef.current = setTimeout(() => {
+            loadOrder(attempt + 1);
+          }, delay);
+        } else {
+          setOrder(null);
+          setError(errorMessage);
+          setLoading(false);
+          setRefreshing(false);
+          setRetryCount(0);
+        }
+      }
+    },
+    [id],
+  );
+
+  useEffect(() => {
+    return () => {
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     loadOrder();
@@ -83,8 +121,7 @@ export default function OrderDetailsScreen() {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await loadOrder();
-    setRefreshing(false);
+    await loadOrder(0);
   }, [loadOrder]);
 
   const handleShare = useCallback(async () => {

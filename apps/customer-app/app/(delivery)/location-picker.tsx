@@ -1,20 +1,20 @@
-import { View, Pressable, ActivityIndicator } from "react-native";
-import { useEffect, useRef, useState } from "react";
-import MapView, { Marker } from "react-native-maps";
 import * as Location from "expo-location";
 import { router, useLocalSearchParams } from "expo-router";
+import { useEffect, useRef, useState } from "react";
+import { ActivityIndicator, Pressable, View } from "react-native";
+import MapView, { Marker } from "react-native-maps";
 
-import { ThemedText } from "@/components/themed-text";
-import { IconSymbol } from "@/components/ui/icon-symbol";
-import { AddressSearchInput } from "@/components/location/AddressSearchInput";
 import { AddressResultsList } from "@/components/location/AddressResultsList";
-import { useAddressSearch } from "@/hooks/useAddressSearch";
-import { useSendPackage } from "@/context/SendPackageContext";
-import { resolveAddress } from "@/lib/reverse-address";
-import { useThemeColor } from "@/hooks/use-theme-color";
+import { AddressSearchInput } from "@/components/location/AddressSearchInput";
+import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
-import { request } from "@/lib/authFetch";
+import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useToast } from "@/components/ui/toast";
+import { useSendPackage } from "@/context/SendPackageContext";
+import { useThemeColor } from "@/hooks/use-theme-color";
+import { useAddressSearch } from "@/hooks/useAddressSearch";
+import { request } from "@/lib/authFetch";
+import { resolveAddress } from "@/lib/reverse-address";
 
 export default function LocationPickerScreen() {
   const { type } = useLocalSearchParams<{ type: "pickup" | "delivery" }>();
@@ -142,8 +142,6 @@ export default function LocationPickerScreen() {
           return;
         }
 
-        console.log("Result from BE:", JSON.stringify(result, null, 2));
-
         const payload = {
           address: {
             id: placeId,
@@ -155,8 +153,6 @@ export default function LocationPickerScreen() {
             },
           },
         };
-
-        console.log("Payload Address:", JSON.stringify(payload, null, 2));
 
         type === "pickup" ? setPickup(payload) : setDropoff(payload);
         setSelectingLocation(false);

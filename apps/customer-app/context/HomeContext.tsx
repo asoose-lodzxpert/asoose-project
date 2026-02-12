@@ -1,17 +1,18 @@
 import {
-  createContext,
-  useContext,
-  useState,
-  useCallback,
-  useMemo,
-  useEffect,
-  ReactNode,
-} from "react";
-import {
   fetchMarketplaceHome,
   fetchPaginatedStores,
 } from "@/services/marketplace.service";
 import { Banner, HomeVertical, StoreFilterSlug, Vendor } from "@/types/home";
+import {
+  createContext,
+  ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 export type HomeContextType = {
   banners: Banner[];
@@ -37,6 +38,7 @@ const HomeContext = createContext<HomeContextType | undefined>(undefined);
 
 export function HomeProvider({ children }: { children: ReactNode }) {
   const [category, setCategory] = useState<StoreFilterSlug | string>("all");
+  const isFirstMount = useRef(true);
 
   // Banners
   const [banners, setBanners] = useState<Banner[]>([]);
@@ -121,13 +123,12 @@ export function HomeProvider({ children }: { children: ReactNode }) {
     await loadStores(1, true);
   }, [loadStores]);
 
+  // Refresh stores when category changes (but not on initial mount)
   useEffect(() => {
-    refreshBanners();
-    refreshVerticals();
-    refreshStores();
-  }, [refreshBanners, refreshVerticals, refreshStores]);
-
-  useEffect(() => {
+    if (isFirstMount.current) {
+      isFirstMount.current = false;
+      return;
+    }
     refreshStores();
   }, [category, refreshStores]);
 

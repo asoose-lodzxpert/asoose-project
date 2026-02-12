@@ -1,7 +1,8 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Stack, useRouter, useSegments } from "expo-router";
 import React, { useEffect, useState } from "react";
-import { Image, StyleSheet, View } from "react-native";
+import { StyleSheet, View, Image } from "react-native";
+import { Stack } from "expo-router";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // Providers & Context
 import ConfirmProvider from "@/components/ui/ConfirmDialogProvider";
@@ -16,32 +17,11 @@ import { SendPackageProvider } from "@/context/SendPackageContext";
 import WelcomeScreen from "./onboarding";
 
 const ONBOARDING_KEY = "asoose_customer_onboarded";
-const AUTH_GROUPS = ["(auth)"];
 
-/**
- * 1. Simple Loading Component
- */
-const LoadingSplash = () => (
-  <View style={styles.loadingContainer}>
-    <Image
-      source={require("@/assets/images/icon.png")}
-      style={styles.logo}
-      resizeMode="contain"
-    />
-  </View>
-);
-
-/**
- * 2. Navigation Logic
- * Handles guards, onboarding, and routing
- */
 function RootNavigator() {
   const { user, loading: authLoading } = useAuth();
   const [showWelcome, setShowWelcome] = useState<boolean | null>(null);
-  const router = useRouter();
-  const segments = useSegments();
 
-  // Onboarding check
   useEffect(() => {
     const checkOnboarding = async () => {
       try {
@@ -54,28 +34,19 @@ function RootNavigator() {
     checkOnboarding();
   }, []);
 
-  // Centralized route guard
-  useEffect(() => {
-    if (authLoading || showWelcome === null) return;
-
-    const inAuthGroup = AUTH_GROUPS.includes(segments[0]);
-
-    if (showWelcome) {
-      // If we need to show welcome, we stay put;
-      // the conditional return below handles the UI.
-      return;
-    }
-
-    if (!user && !inAuthGroup) {
-      // Not logged in -> Redirect to Login
-      router.replace("/(auth)/login");
-    } else if (user && inAuthGroup) {
-      // Logged in but trying to access Login/Signup -> Redirect to Home
-      router.replace("/(tabs)/home");
-    }
-  }, [user, authLoading, showWelcome, segments]);
-
-  if (authLoading || showWelcome === null) return <LoadingSplash />;
+  if (authLoading || showWelcome === null) {
+    return (
+      <View style={styles.loadingContainer}>
+        <View>
+          <Image
+            source={require("@/assets/images/icon.png")}
+            style={styles.logo}
+            resizeMode="contain"
+          />
+        </View>
+      </View>
+    );
+  }
 
   if (showWelcome) {
     return (
@@ -88,26 +59,27 @@ function RootNavigator() {
     );
   }
 
+  if (!user) {
+    return (
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="(auth)" />
+      </Stack>
+    );
+  }
+
+  // You can add account status logic here if needed, similar to vendor app
   return (
     <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="(auth)" />
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="(store)" />
       <Stack.Screen name="(settings)" />
       <Stack.Screen name="(delivery)" />
-      <Stack.Screen name="(ride)" />
-      <Stack.Screen name="(notifications)" />
     </Stack>
   );
 }
 
-/**
- * 3. Inner Provider Wrapper
- * This allows providers like CartProvider to access the Auth context safely
- */
 function AuthDependentProviders({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
-
   return (
     <CartProvider userId={user?.id}>
       <HomeProvider>
@@ -119,23 +91,38 @@ function AuthDependentProviders({ children }: { children: React.ReactNode }) {
   );
 }
 
-/**
- * 4. Main Entry Point
- */
 export default function RootLayout() {
+  const [permissionsReady, setPermissionsReady] = useState(true); // No permissions logic for now
+
+  if (!permissionsReady) {
+    return (
+      <View style={styles.loadingContainer}>
+        <View>
+          <Image
+            source={require("@/assets/images/icon.png")}
+            style={styles.logo}
+            resizeMode="contain"
+          />
+        </View>
+      </View>
+    );
+  }
+
   return (
-    <AuthProvider>
-      <LocationProvider>
-        <ConfirmProvider>
-          <ToastProvider>
-            <AuthDependentProviders>
-              <RootNavigator />
-              <ThemedToastProvider />
-            </AuthDependentProviders>
-          </ToastProvider>
-        </ConfirmProvider>
-      </LocationProvider>
-    </AuthProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <ConfirmProvider>
+        <ToastProvider>
+          <AuthProvider>
+            <LocationProvider>
+              <AuthDependentProviders>
+                <RootNavigator />
+                <ThemedToastProvider />
+              </AuthDependentProviders>
+            </LocationProvider>
+          </AuthProvider>
+        </ToastProvider>
+      </ConfirmProvider>
+    </GestureHandlerRootView>
   );
 }
 
@@ -144,10 +131,10 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#ffffff", // Match your app theme
   },
   logo: {
     width: 120,
     height: 120,
+    marginBottom: 24,
   },
 });

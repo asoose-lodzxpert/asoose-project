@@ -1,6 +1,10 @@
+import {
+  AUTH_ACCESS_TOKEN_KEY,
+  AUTH_REFRESH_TOKEN_KEY,
+} from "@/constants/static-config";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as AppleAuthentication from "expo-apple-authentication";
 import * as Google from "expo-auth-session/providers/google";
-import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
 
 const API_BASE = (() => {
@@ -21,9 +25,6 @@ const API_BASE = (() => {
 })();
 
 const AUTH_BASE = `${API_BASE}/auth/user`;
-
-const ACCESS_TOKEN_KEY = "@auth/access_token";
-const REFRESH_TOKEN_KEY = "@auth/refresh_token";
 
 // Google OAuth Configuration
 const GOOGLE_CLIENT_ID_IOS = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_IOS || "";
@@ -118,8 +119,8 @@ export async function authenticateWithGoogle(
     });
 
     // Store tokens
-    await SecureStore.setItemAsync(ACCESS_TOKEN_KEY, response.access_token);
-    await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, response.refresh_token);
+    await AsyncStorage.setItem(AUTH_ACCESS_TOKEN_KEY, response.access_token);
+    await AsyncStorage.setItem(AUTH_REFRESH_TOKEN_KEY, response.refresh_token);
 
     return response;
   } catch (error) {
@@ -165,8 +166,8 @@ export async function authenticateWithApple(): Promise<OAuthResponse> {
     });
 
     // Store tokens
-    await SecureStore.setItemAsync(ACCESS_TOKEN_KEY, response.access_token);
-    await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, response.refresh_token);
+    await AsyncStorage.setItem(AUTH_ACCESS_TOKEN_KEY, response.access_token);
+    await AsyncStorage.setItem(AUTH_REFRESH_TOKEN_KEY, response.refresh_token);
 
     return response;
   } catch (error: any) {

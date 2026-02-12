@@ -1,30 +1,30 @@
-import {
-  FlatList,
-  View,
-  RefreshControl,
-  ActivityIndicator,
-  Linking,
-} from "react-native";
-import { useState, useCallback, useMemo } from "react";
-import { ThemedView } from "@/components/themed-view";
+import { CategoryPillFilter } from "@/components/home/CategoryPillFilter";
+import { FloatingCart } from "@/components/home/FloatingCart";
+import { HomeHeader } from "@/components/home/HomeHeader";
+import { HorizontalSpacer } from "@/components/home/HorizontalSpacer";
+import { LocationPickerModal } from "@/components/home/LocationPickerModal";
 import {
   PromotionsCarousel,
   type Promotion,
 } from "@/components/home/PromotionsCarousel";
-import { VendorCard } from "@/components/home/VendorCard";
-import { FloatingCart } from "@/components/home/FloatingCart";
-import { HomeHeader } from "@/components/home/HomeHeader";
-import { LocationPickerModal } from "@/components/home/LocationPickerModal";
-import { CategoryPillFilter } from "@/components/home/CategoryPillFilter";
 import { SectionHeader } from "@/components/home/SectionHeader";
 import { SkeletonCard } from "@/components/home/SkeletonCard";
-import { HorizontalSpacer } from "@/components/home/HorizontalSpacer";
+import { VendorCard } from "@/components/home/VendorCard";
 import { ThemedText } from "@/components/themed-text";
-import { useHomeContext } from "@/context/HomeContext";
-import type { StoreFilterSlug, Banner } from "@/types/home";
+import { ThemedView } from "@/components/themed-view";
 import type { IconSymbolName } from "@/components/ui/icon-symbol";
-import { SkeletonStoreCard } from "@/components/ui/Skeleton";
+import { useHomeContext } from "@/context/HomeContext";
 import { useThemeColor } from "@/hooks/use-theme-color";
+import type { Banner, StoreFilterSlug } from "@/types/home";
+import { useFocusEffect } from "@react-navigation/native";
+import { useCallback, useMemo, useRef, useState } from "react";
+import {
+  ActivityIndicator,
+  FlatList,
+  Linking,
+  RefreshControl,
+  View,
+} from "react-native";
 
 export type CategoryOption = {
   key: StoreFilterSlug | string;
@@ -86,6 +86,17 @@ export default function HomeScreen() {
   } = useHomeContext();
 
   const [refreshing, setRefreshing] = useState(false);
+  const hasLoaded = useRef(false);
+
+  // Load data only when screen is fully mounted and focused
+  useFocusEffect(
+    useCallback(() => {
+      if (!hasLoaded.current) {
+        hasLoaded.current = true;
+        Promise.all([refreshBanners(), refreshVerticals(), refreshStores()]);
+      }
+    }, [refreshBanners, refreshVerticals, refreshStores]),
+  );
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);

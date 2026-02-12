@@ -1,5 +1,9 @@
+import {
+  AUTH_ACCESS_TOKEN_KEY,
+  AUTH_REFRESH_TOKEN_KEY,
+  AUTH_USER_KEY,
+} from "@/constants/static-config";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import * as SecureStore from "expo-secure-store";
 import React, {
   createContext,
   useCallback,
@@ -42,58 +46,71 @@ type AuthContextType = {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-const USER_KEY = "@auth/user";
-const ACCESS_TOKEN_KEY = "@auth/access_token";
-const REFRESH_TOKEN_KEY = "@auth/refresh_token";
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const biometric = useBiometric();
+  const isLoggingIn = React.useRef(false);
+  const hasInitialized = React.useRef(false);
 
   // Single atomic initialization flow
   useEffect(() => {
     let isMounted = true;
     async function initializeAuth() {
-      try {
-        // 1. Check for access token in SecureStore
-        const accessToken = await SecureStore.getItemAsync(ACCESS_TOKEN_KEY);
-        if (!accessToken) {
-          // No token: fail closed
-          await clearSession();
-          if (isMounted) {
-            setUser(null);
-            setLoading(false);
-          }
-          return;
-        }
+      // Skip init if actively logging in OR already initialized
+      if (isLoggingIn.current || hasInitialized.current) {
+        if (isMounted) setLoading(false);
+        return;
+      }
 
-        // 2. Optionally: try to refresh token (handles expiry)
+      hasInitialized.current = true;
+
+      try {
+        // 1. Check for access token in AsyncStorage
+        const accessToken = await AsyncStorage.getItem(AUTH_ACCESS_TOKEN_KEY);
+        // if (!accessToken) {
+        //   // No token: fail closed
+        //   await clearSession();
+        //   if (isMounted) {
+        //     setUser(null);
+        //     setLoading(false);
+        //   }
+        //   return;
+        // }
+
         try {
           await refreshAccessToken();
-        } catch {
-          // Token refresh failed: fail closed
-          await clearSession();
-          if (isMounted) {
-            setUser(null);
-            setLoading(false);
+        } catch (err) {
+          // Only clear session if error is 'No refresh token available' or 'Failed to refresh session'
+          const msg = err instanceof Error ? err.message : String(err);
+          if (
+            msg.includes("No refresh token available") ||
+            msg.includes("Failed to refresh session") ||
+            msg.includes("Login response missing tokens")
+          ) {
+            await clearSession();
+            if (isMounted) {
+              setUser(null);
+              setLoading(false);
+            }
+            return;
+          } else {
+            // For transient errors (e.g., network), do not clear tokens, just set loading false
+            if (isMounted) setLoading(false);
+            return;
           }
-          return;
         }
 
         // 3. Restore user only if token is valid
-        const storedUser = await AsyncStorage.getItem(USER_KEY);
+        const storedUser = await AsyncStorage.getItem(AUTH_USER_KEY);
         if (storedUser) {
           setUser(JSON.parse(storedUser));
         } else {
-          // No user data: treat as logged out
           await clearSession();
-          setUser(null);
         }
       } catch {
         // Any error: fail closed
         await clearSession();
-        setUser(null);
       } finally {
         if (isMounted) setLoading(false);
       }
@@ -111,20 +128,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     accessToken?: string | null,
     refreshToken?: string | null,
   ) => {
+    // Save tokens FIRST, before setting user state (to avoid race condition)
+    if (
+      accessToken &&
+      typeof accessToken === "string" &&
+      accessToken.length < 4096
+    ) {
+      await AsyncStorage.setItem(AUTH_ACCESS_TOKEN_KEY, accessToken);
+    }
+
+    if (refreshToken && typeof refreshToken === "string") {
+      await AsyncStorage.setItem(AUTH_REFRESH_TOKEN_KEY, refreshToken);
+    }
+
+    // Save user data and set state AFTER tokens are saved
+    await AsyncStorage.setItem(AUTH_USER_KEY, JSON.stringify(u));
     setUser(u);
-    await AsyncStorage.setItem(USER_KEY, JSON.stringify(u));
-    if (accessToken)
-      await SecureStore.setItemAsync(ACCESS_TOKEN_KEY, accessToken);
-    if (refreshToken)
-      await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, refreshToken);
   };
 
   // Clear all auth state and storage
   const clearSession = async () => {
     setUser(null);
-    await AsyncStorage.removeItem(USER_KEY);
-    await SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY);
-    await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY);
+    hasInitialized.current = false; // Reset so init can run again
+    await AsyncStorage.removeItem(AUTH_USER_KEY);
+    await AsyncStorage.removeItem(AUTH_ACCESS_TOKEN_KEY);
+    await AsyncStorage.removeItem(AUTH_REFRESH_TOKEN_KEY);
     await biometric.clearCredentials();
   };
 
@@ -132,18 +160,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = useCallback(
     async ({ email, password }: { email: string; password: string }) => {
       try {
+        isLoggingIn.current = true;
+        hasInitialized.current = true; // Prevent init from running after login
         const resp = await loginService(email, password);
         await saveSession(
           resp.user,
           resp.accessToken || null,
           resp.refreshToken || null,
         );
+        isLoggingIn.current = false;
         // Send expo push token to backend
         try {
           const token = await getExpoPushToken();
-          if (token) await sendExpoPushTokenToBackend(token);
-        } catch {}
+          if (token) {
+            await sendExpoPushTokenToBackend(token);
+          }
+        } catch (pushErr) {
+          // Silently handle push token errors
+        }
       } catch (err) {
+        isLoggingIn.current = false;
         // On login failure, clear all state
         await clearSession();
         throw err;
@@ -156,6 +192,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = useCallback(async () => {
     setLoading(true);
     setUser(null);
+    hasInitialized.current = false; // Reset so init can run again after logout
     try {
       try {
         await logoutService();

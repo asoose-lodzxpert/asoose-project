@@ -31,8 +31,7 @@ type PaymentMethod = "paystack" | "flutterwave" | "monnify" | "transfer";
 export default function CheckoutScreen() {
   const router = useRouter();
   const { user } = useAuth();
-  const { items, restaurants, subtotal, deliveryFee, total, clearCart } =
-    useCart();
+  const { items, groups, subtotal, deliveryFee, total, clearCart } = useCart();
   const showToast = useToast();
 
   // Theme Colors
@@ -62,8 +61,7 @@ export default function CheckoutScreen() {
   const [orderId, setOrderId] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  const restaurant = restaurants[0];
-  const currencySymbol = restaurant?.currency ?? "₦";
+  const currencySymbol = groups[0]?.restaurant.currency ?? "₦";
 
   // ---------------- Effects ----------------
 
@@ -99,21 +97,22 @@ export default function CheckoutScreen() {
     setIsProcessing(true);
 
     try {
-      // 1. Create Order
+      // 1. Create Multi-Order (backend handles grouping by store)
       const orderPayload = {
         addressId: selectedAddress.id,
-        restaurantId: restaurant.id,
         items: items.map((item) => ({ id: item.id, quantity: item.qty })),
       };
 
       const orderResponse = await createOrder(orderPayload);
-      const createdOrderId = orderResponse.id;
-      setOrderId(createdOrderId);
+      // Multi-order returns { orderGroupId, orders[], grandTotal }
+      const createdOrderGroupId =
+        orderResponse.orderGroupId || orderResponse.id;
+      setOrderId(createdOrderGroupId);
 
-      // 2. Initiate Payment
+      // 2. Initiate Payment for entire order group
       const paymentPayload = {
         amount: total,
-        orderId: createdOrderId,
+        orderGroupId: createdOrderGroupId,
         type: "ORDER",
         callbackUrl: `https://asoose.com/payment/callback/paystack`,
       };
@@ -256,92 +255,122 @@ export default function CheckoutScreen() {
           </Pressable>
         </View>
 
-        {/* 3. Order Details (Receipt Style) */}
+        {/* 3. Order Details (Receipt Style) - Multi-Cart */}
         <View style={styles.sectionContainer}>
           <ThemedText style={[styles.sectionLabel, { color: textSecondary }]}>
             ORDER SUMMARY
           </ThemedText>
-          <View
-            style={[
-              styles.receiptCard,
-              { backgroundColor: surface, borderColor: border },
-            ]}
-          >
-            {/* Store Header */}
-            <View style={[styles.storeHeader, { borderBottomColor: border }]}>
-              {restaurant?.image && (
-                <Image
-                  source={{ uri: restaurant.image }}
-                  style={styles.miniStoreLogo}
-                />
-              )}
-              <ThemedText style={styles.storeName}>
-                {restaurant?.name || "Store"}
-              </ThemedText>
-              <ThemedText style={{ color: textSecondary, fontSize: 13 }}>
-                {" "}
-                • {items.length} items
-              </ThemedText>
-            </View>
 
-            {/* Items List */}
-            <View style={styles.itemsList}>
-              {items.map((item, index) => (
-                <View key={item.id} style={styles.itemRow}>
-                  <View style={styles.qtyBadge}>
-                    <ThemedText style={{ fontSize: 12, fontWeight: "700" }}>
-                      {item.qty}x
-                    </ThemedText>
-                  </View>
-                  <ThemedText
-                    style={[styles.itemName, { flex: 1 }]}
-                    numberOfLines={1}
-                  >
-                    {item.name}
-                  </ThemedText>
-                  <ThemedText style={styles.itemPrice}>
-                    {formatCurrency(item.price * item.qty, currencySymbol)}
-                  </ThemedText>
-                </View>
-              ))}
-            </View>
-
-            {/* Financials Breakdown */}
+          {groups.map((group, groupIndex) => (
             <View
+              key={group.restaurant.id}
               style={[
-                styles.financials,
-                { backgroundColor: background, borderTopColor: border },
+                styles.receiptCard,
+                { backgroundColor: surface, borderColor: border },
+                groupIndex > 0 && { marginTop: 12 },
               ]}
             >
-              <View style={styles.row}>
-                <ThemedText style={{ color: textSecondary }}>
-                  Subtotal
+              {/* Store Header */}
+              <View style={[styles.storeHeader, { borderBottomColor: border }]}>
+                {group.restaurant?.image && (
+                  <Image
+                    source={{ uri: group.restaurant.image }}
+                    style={styles.miniStoreLogo}
+                  />
+                )}
+                <ThemedText style={styles.storeName}>
+                  {group.restaurant?.name || "Store"}
                 </ThemedText>
-                <ThemedText style={{ fontWeight: "600" }}>
-                  {formatCurrency(subtotal, currencySymbol)}
+                <ThemedText style={{ color: textSecondary, fontSize: 13 }}>
+                  {" "}
+                  • {group.items.length} items
                 </ThemedText>
               </View>
-              <View style={styles.row}>
-                <ThemedText style={{ color: textSecondary }}>
-                  Delivery Fee
-                </ThemedText>
-                <ThemedText style={{ fontWeight: "600" }}>
-                  {formatCurrency(deliveryFee, currencySymbol)}
-                </ThemedText>
+
+              {/* Items List */}
+              <View style={styles.itemsList}>
+                {group.items.map((item) => (
+                  <View key={item.id} style={styles.itemRow}>
+                    <View style={styles.qtyBadge}>
+                      <ThemedText style={{ fontSize: 12, fontWeight: "700" }}>
+                        {item.qty}x
+                      </ThemedText>
+                    </View>
+                    <ThemedText
+                      style={[styles.itemName, { flex: 1 }]}
+                      numberOfLines={1}
+                    >
+                      {item.name}
+                    </ThemedText>
+                    <ThemedText style={styles.itemPrice}>
+                      {formatCurrency(item.price * item.qty, currencySymbol)}
+                    </ThemedText>
+                  </View>
+                ))}
               </View>
-              <View style={[styles.divider, { backgroundColor: border }]} />
-              <View style={styles.row}>
-                <ThemedText style={{ fontSize: 16, fontWeight: "700" }}>
-                  Total
-                </ThemedText>
-                <ThemedText
-                  style={{ fontSize: 18, fontWeight: "800", color: primary }}
-                >
-                  {formatCurrency(total, currencySymbol)}
-                </ThemedText>
+
+              {/* Group Subtotal */}
+              <View
+                style={[
+                  styles.financials,
+                  { backgroundColor: background, borderTopColor: border },
+                ]}
+              >
+                <View style={styles.row}>
+                  <ThemedText style={{ color: textSecondary }}>
+                    Subtotal
+                  </ThemedText>
+                  <ThemedText style={{ fontWeight: "600" }}>
+                    {formatCurrency(group.subtotal, currencySymbol)}
+                  </ThemedText>
+                </View>
+                <View style={styles.row}>
+                  <ThemedText style={{ color: textSecondary }}>
+                    Delivery Fee
+                  </ThemedText>
+                  <ThemedText style={{ fontWeight: "600" }}>
+                    {formatCurrency(group.deliveryFee, currencySymbol)}
+                  </ThemedText>
+                </View>
+                <View style={[styles.divider, { backgroundColor: border }]} />
+                <View style={styles.row}>
+                  <ThemedText style={{ fontSize: 14, fontWeight: "700" }}>
+                    Store Total
+                  </ThemedText>
+                  <ThemedText style={{ fontSize: 15, fontWeight: "700" }}>
+                    {formatCurrency(group.total, currencySymbol)}
+                  </ThemedText>
+                </View>
               </View>
             </View>
-          </View>
+          ))}
+
+          {/* Grand Total Card - Only show if multiple groups */}
+          {groups.length > 1 && (
+            <View
+              style={[
+                styles.receiptCard,
+                {
+                  backgroundColor: primary + "10",
+                  borderColor: primary,
+                  marginTop: 12,
+                },
+              ]}
+            >
+              <View style={{ padding: 16 }}>
+                <View style={styles.row}>
+                  <ThemedText style={{ fontSize: 16, fontWeight: "700" }}>
+                    Grand Total
+                  </ThemedText>
+                  <ThemedText
+                    style={{ fontSize: 18, fontWeight: "800", color: primary }}
+                  >
+                    {formatCurrency(total, currencySymbol)}
+                  </ThemedText>
+                </View>
+              </View>
+            </View>
+          )}
         </View>
 
         {/* 4. Payment Method */}

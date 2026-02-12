@@ -1,30 +1,28 @@
-import {
-  View,
-  Pressable,
-  StyleSheet,
-  ActivityIndicator,
-  ScrollView,
-} from "react-native";
-import { useState, useMemo, useEffect, useRef } from "react";
+import { PaymentWebView } from "@/components/checkout/PaymentWebView";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
+import { IconSymbol } from "@/components/ui/icon-symbol";
+import { useToast } from "@/components/ui/ThemedToast";
 import { useSendPackage } from "@/context/SendPackageContext";
-import { formatCurrency, createDelivery } from "@/services/sendPackage.api";
-import {
-  initiatePayment,
-  createBankTransfer,
-  checkBankTransferStatus,
-  openInAppCheckout,
-  checkInAppPaymentStatus,
-} from "@/services/payment.service";
+import { useThemeColor } from "@/hooks/use-theme-color";
 import { useUserProfile } from "@/hooks/useUserProfile";
+import {
+  checkBankTransferStatus,
+  createBankTransfer,
+  initiatePayment,
+} from "@/services/payment.service";
+import { createDelivery, formatCurrency } from "@/services/sendPackage.api";
+import { PaymentMethod } from "@/types/payment";
 import * as Clipboard from "expo-clipboard";
 import { useRouter } from "expo-router";
-import { IconSymbol } from "@/components/ui/icon-symbol";
-import { useThemeColor } from "@/hooks/use-theme-color";
-import { PaymentMethod } from "@/types/payment";
-import { PaymentWebView } from "@/components/checkout/PaymentWebView";
-import { useToast } from "@/components/ui/ThemedToast";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+} from "react-native";
 
 export default function PaymentScreen() {
   const { returnData, resetDelivery } = useSendPackage();
@@ -334,6 +332,22 @@ export default function PaymentScreen() {
                 size={20}
                 color={success}
               />
+            </View>
+            <View style={styles.contactInfo}>
+              <ThemedText type="default" style={{ fontSize: 15 }}>
+                {data.deliveryDetails?.name || "-"}
+              </ThemedText>
+              <ThemedText type="caption" style={{ color: muted, marginTop: 2 }}>
+                {data.deliveryDetails?.phone || "-"}
+              </ThemedText>
+              {data.deliveryDetails?.instructions ? (
+                <ThemedText
+                  type="caption"
+                  style={{ color: muted, marginTop: 2 }}
+                >
+                  {data.deliveryDetails.instructions}
+                </ThemedText>
+              ) : null}
             </View>
           </View>
         </View>

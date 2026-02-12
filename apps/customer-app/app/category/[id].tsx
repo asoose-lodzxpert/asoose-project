@@ -1,27 +1,26 @@
-import React, { useEffect, useState, useCallback } from "react";
-import {
-  View,
-  FlatList,
-  StyleSheet,
-  ActivityIndicator,
-  RefreshControl,
-  TouchableOpacity,
-} from "react-native";
-import { useLocalSearchParams, useRouter, Stack } from "expo-router";
-import { ThemedView } from "@/components/themed-view";
-import { ThemedText } from "@/components/themed-text";
-import { IconSymbol } from "@/components/ui/icon-symbol";
 import { VendorCard } from "@/components/home/VendorCard";
+import { ThemedText } from "@/components/themed-text";
+import { ThemedView } from "@/components/themed-view";
+import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import {
   fetchCategoryDetail,
   getCategorySortOptions,
 } from "@/services/search.service";
+import type { Vendor } from "@/types/home";
 import type {
   CategoryDetailResponse,
   CategorySortOption,
 } from "@/types/marketplace";
-import type { Vendor } from "@/types/home";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import React, { useCallback, useEffect, useState } from "react";
+import {
+  FlatList,
+  RefreshControl,
+  StyleSheet,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
 export default function CategoryDetailScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
@@ -34,6 +33,8 @@ export default function CategoryDetailScreen() {
   const [error, setError] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<CategorySortOption>("all");
   const [sortMenuVisible, setSortMenuVisible] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+  const retryTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
 
   const primary = useThemeColor({}, "brandPrimary");
   const textColor = useThemeColor({}, "textPrimary");
@@ -42,26 +43,61 @@ export default function CategoryDetailScreen() {
 
   const sortOptions = getCategorySortOptions();
 
-  const loadCategory = useCallback(async () => {
-    if (!id || typeof id !== "string") {
-      setError("Invalid category");
-      setLoading(false);
-      return;
-    }
+  const loadCategory = useCallback(
+    async (attempt = 0) => {
+      if (!id || typeof id !== "string") {
+        setError("Invalid category");
+        setLoading(false);
+        return;
+      }
 
-    try {
-      setError(null);
-      const data = await fetchCategoryDetail(id, sortBy);
-      setCategoryData(data);
-      console.log("Catrgory data:", JSON.stringify(data, null, 2));
-    } catch (err: any) {
-      setError(err.message || "Failed to load category");
-      setCategoryData(null);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [id, sortBy]);
+      if (attempt === 0) {
+        setError(null);
+        setRetryCount(0);
+      }
+
+      try {
+        const data = await fetchCategoryDetail(id, sortBy);
+        setCategoryData(data);
+        setError(null);
+        setRetryCount(0);
+        setLoading(false);
+        setRefreshing(false);
+      } catch (err: any) {
+        const errorMessage = err.message || "Failed to load category";
+        const isNetworkError =
+          errorMessage.toLowerCase().includes("network") ||
+          errorMessage.toLowerCase().includes("fetch") ||
+          errorMessage.toLowerCase().includes("connection");
+
+        const maxRetries = isNetworkError ? 3 : 1;
+
+        if (attempt < maxRetries) {
+          const delay = Math.min(1000 * Math.pow(2, attempt), 5000);
+          setRetryCount(attempt + 1);
+
+          retryTimeoutRef.current = setTimeout(() => {
+            loadCategory(attempt + 1);
+          }, delay);
+        } else {
+          setError(errorMessage);
+          setCategoryData(null);
+          setLoading(false);
+          setRefreshing(false);
+          setRetryCount(0);
+        }
+      }
+    },
+    [id, sortBy],
+  );
+
+  useEffect(() => {
+    return () => {
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     setLoading(true);
@@ -70,7 +106,7 @@ export default function CategoryDetailScreen() {
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    loadCategory();
+    loadCategory(0);
   }, [loadCategory]);
 
   const handleSortChange = (option: CategorySortOption) => {
