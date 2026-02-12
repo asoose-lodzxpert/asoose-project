@@ -420,7 +420,7 @@ export class DeliveriesService {
       // ✅ FIX: Access rider fields directly
       courier: d.rider
         ? {
-            name: d.rider.name, 
+            name: d.rider.name,
             id: d.rider.id,
             vehicle: d.rider.vehicle
               ? `${d.rider.vehicle.color} ${d.rider.vehicle.model}`

@@ -92,7 +92,7 @@ export class RidesService {
     return estimates;
   }
 
-async requestRide(userId: string, dto: RequestRideDto) {
+  async requestRide(userId: string, dto: RequestRideDto) {
     this.logger.log(
       `Request Ride - User: ${userId}, DTO: ${JSON.stringify(dto, null, 2)}`,
     );
@@ -572,7 +572,6 @@ async requestRide(userId: string, dto: RequestRideDto) {
       orderBy: { createdAt: 'desc' },
     });
   }
-
 
   async getRideById(userId: string, rideId: string) {
     const ride = await this.prisma.ride.findUnique({

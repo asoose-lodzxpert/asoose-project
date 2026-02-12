@@ -38,7 +38,7 @@ export class TransactionLedgerService {
       orderGroupId?: string; // <--- NEW FIELD
       method: string;
       status: string;
-      description?: string;  // <--- NEW FIELD
+      description?: string; // <--- NEW FIELD
     },
     tx?: Prisma.TransactionClient,
   ) {
@@ -81,7 +81,7 @@ export class TransactionLedgerService {
   }
 
   // ... (Keep the rest of the existing methods: recordOrderCommission, recordRideEarnings, etc.)
-  
+
   /**
    * Record vendor earning from an order
    * Note: Commission is deducted later during withdrawal, not here
@@ -195,7 +195,7 @@ export class TransactionLedgerService {
   }
 
   // ... (Include recordDeliveryEarnings, recordVendorPayout, recordRiderPayout, recordRefund, recordAdjustment methods here as they were)
-  
+
   async recordDeliveryEarnings(
     delivery: {
       id: string;

@@ -12,7 +12,10 @@ export class InventoryService {
    * Performs validation AND update in a single DB statement.
    * Prevents race conditions where two requests read available stock simultaneously.
    */
-  async atomicDecrementStock(tx: Prisma.TransactionClient, items: OrderItemDto[]) {
+  async atomicDecrementStock(
+    tx: Prisma.TransactionClient,
+    items: OrderItemDto[],
+  ) {
     // Sort items by ID to prevent Deadlocks during concurrent access
     const sortedItems = [...items].sort((a, b) => a.id.localeCompare(b.id));
 
@@ -32,13 +35,15 @@ export class InventoryService {
       if (result.count === 0) {
         // If count is 0, it means either Product ID didn't exist OR Stock was insufficient
         // We treat this as a hard failure and rollback the transaction
-        this.logger.warn(`Stock contention or insufficiency for Product: ${item.id}`);
+        this.logger.warn(
+          `Stock contention or insufficiency for Product: ${item.id}`,
+        );
         throw new BadRequestException(
           `Insufficient stock for product ID: ${item.id}. Transaction rolled back.`,
         );
       }
     }
-    
+
     this.logger.debug(`Successfully reserved stock for ${items.length} items`);
   }
 }

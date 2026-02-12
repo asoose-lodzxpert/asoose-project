@@ -76,7 +76,7 @@ export class CreateOrderDto {
   // Make optional so multi-vendor orders don't fail validation
   @IsString()
   @IsOptional()
-  restaurantId?: string; 
+  restaurantId?: string;
 
   @IsArray()
   @ArrayMinSize(1)

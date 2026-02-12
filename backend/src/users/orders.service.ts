@@ -322,7 +322,9 @@ export class OrdersService {
     try {
       this.validateOrderItems(data.items);
       if (!data.restaurantId)
-        throw new BadRequestException('Restaurant ID required for single order');
+        throw new BadRequestException(
+          'Restaurant ID required for single order',
+        );
 
       // 2. Prepare Context (Outside Transaction)
       // This fetches data, resolves addresses, and calculates prices efficiently
@@ -491,7 +493,7 @@ export class OrdersService {
   /**
    * Get paginated list of user's orders
    */
- async getUserOrders(
+  async getUserOrders(
     userId: string,
     opts?: { page?: number; pageSize?: number; status?: string },
   ) {
@@ -804,7 +806,7 @@ export class OrdersService {
         name: 'order.notifications',
         data: { orderId: o.id, userId: o.userId, type: 'MULTI_ORDER' },
       }));
-      
+
       await this.queueService.enqueueOrderNotificationBulk(jobs);
 
       // Optimistic UI updates
@@ -817,8 +819,12 @@ export class OrdersService {
           customerEmail: order.user.email,
           customerName: order.user.name,
         };
-        this.sendOrderNotifications(order, context, prep.emailItems as any).catch(
-          (e) => this.logger.error(`Optimistic multi-notification failed`, e),
+        this.sendOrderNotifications(
+          order,
+          context,
+          prep.emailItems as any,
+        ).catch((e) =>
+          this.logger.error(`Optimistic multi-notification failed`, e),
         );
       });
     } catch (e) {

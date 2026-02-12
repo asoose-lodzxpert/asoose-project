@@ -453,11 +453,7 @@ export class RidersService {
     return { total, online, suspended, pending };
   }
 
-  async sendMessageToRider(
-    riderId: string,
-    message: string,
-    adminId: string,
-  ) {
+  async sendMessageToRider(riderId: string, message: string, adminId: string) {
     const rider = await this.prisma.rider.findUnique({
       where: { id: riderId },
       select: { email: true, name: true },

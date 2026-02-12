@@ -5,7 +5,11 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreateAddressDto, CreateOrderDto, OrderItemDto } from './dto/users.dto';
+import {
+  CreateAddressDto,
+  CreateOrderDto,
+  OrderItemDto,
+} from './dto/users.dto';
 import { OrdersService } from './orders.service';
 import { AddressesService } from './addresses.service';
 import {
@@ -42,7 +46,7 @@ export class UsersService {
   // Helper: Check if items belong to different stores
   async checkIfMultiVendor(items: OrderItemDto[]): Promise<boolean> {
     if (!items || items.length === 0) return false;
-    
+
     const ids = items.map((i) => i.id);
     // Fetch only the storeIds for these products
     const products = await this.prisma.product.findMany({
@@ -57,9 +61,9 @@ export class UsersService {
   // Helper: Derive a single restaurantId from the items
   async deriveRestaurantId(items: OrderItemDto[]): Promise<string> {
     if (!items || items.length === 0) {
-        throw new BadRequestException('Order has no items');
+      throw new BadRequestException('Order has no items');
     }
-    
+
     const product = await this.prisma.product.findUnique({
       where: { id: items[0].id },
       select: { storeId: true },
@@ -99,7 +103,7 @@ export class UsersService {
   async deleteUserAddress(userId: string, addressId: string) {
     return this.addressesService.deleteUserAddress(userId, addressId);
   }
-  
+
   async updateExpoPushToken(userId: string, expoPushToken: string) {
     try {
       return await this.prisma.user.update({
@@ -171,7 +175,10 @@ export class UsersService {
         recipient: d.recipientName,
       }));
     } catch (error) {
-      this.logger.error(`Failed to fetch deliveries for user ${userId}`, error.stack);
+      this.logger.error(
+        `Failed to fetch deliveries for user ${userId}`,
+        error.stack,
+      );
       throw new BadRequestException('Failed to retrieve deliveries');
     }
   }
@@ -189,15 +196,23 @@ export class UsersService {
 
       if (!delivery) throw new NotFoundException('Delivery not found');
 
-      const formatAddress = (addr: any) => 
-        addr ? [addr.street, addr.city, addr.state].filter(Boolean).join(', ') : '';
+      const formatAddress = (addr: any) =>
+        addr
+          ? [addr.street, addr.city, addr.state].filter(Boolean).join(', ')
+          : '';
 
       return {
         ...delivery,
         riderName: delivery.rider?.name,
         riderPhone: delivery.rider?.phone,
-        pickupAddress: { ...delivery.pickupAddress, address: formatAddress(delivery.pickupAddress) },
-        dropoffAddress: { ...delivery.dropoffAddress, address: formatAddress(delivery.dropoffAddress) },
+        pickupAddress: {
+          ...delivery.pickupAddress,
+          address: formatAddress(delivery.pickupAddress),
+        },
+        dropoffAddress: {
+          ...delivery.dropoffAddress,
+          address: formatAddress(delivery.dropoffAddress),
+        },
       };
     } catch (error) {
       if (error instanceof NotFoundException) throw error;
@@ -222,7 +237,10 @@ export class UsersService {
         description: `Ride to ${r.dropoffAddress.city}`,
       }));
     } catch (error) {
-      this.logger.error(`Failed to fetch rides for user ${userId}`, error.stack);
+      this.logger.error(
+        `Failed to fetch rides for user ${userId}`,
+        error.stack,
+      );
       throw new BadRequestException('Failed to retrieve rides');
     }
   }
@@ -275,7 +293,10 @@ export class UsersService {
     return { ...user, avatarUrl: user.image };
   }
 
-  async updateUserProfile(userId: string, data: { name: string; phone: string }) {
+  async updateUserProfile(
+    userId: string,
+    data: { name: string; phone: string },
+  ) {
     return this.prisma.user.update({
       where: { id: userId },
       data: { name: data.name, phone: data.phone },
@@ -302,7 +323,11 @@ export class UsersService {
     });
   }
 
-  async upsertEmergencyContact(userId: string, id: string, data: UpdateEmergencyContactDto) {
+  async upsertEmergencyContact(
+    userId: string,
+    id: string,
+    data: UpdateEmergencyContactDto,
+  ) {
     return this.prisma.emergencyContact.upsert({
       where: { id },
       update: { ...data },
@@ -311,7 +336,9 @@ export class UsersService {
   }
 
   async deleteEmergencyContact(userId: string, id: string) {
-    const contact = await this.prisma.emergencyContact.findFirst({ where: { id, userId } });
+    const contact = await this.prisma.emergencyContact.findFirst({
+      where: { id, userId },
+    });
     if (!contact) throw new NotFoundException('Contact not found');
     return this.prisma.emergencyContact.delete({ where: { id } });
   }
@@ -324,9 +351,10 @@ export class UsersService {
     let prefs: any = {};
     if (user?.notificationsPreferences) {
       try {
-        prefs = typeof user.notificationsPreferences === 'string'
-          ? JSON.parse(user.notificationsPreferences)
-          : user.notificationsPreferences;
+        prefs =
+          typeof user.notificationsPreferences === 'string'
+            ? JSON.parse(user.notificationsPreferences)
+            : user.notificationsPreferences;
       } catch {
         prefs = {};
       }
@@ -342,7 +370,9 @@ export class UsersService {
 
   async updateNotificationConfig(userId: string, config: any) {
     const allowed = ['push', 'sms', 'email', 'emergencyAlerts', 'tripUpdates'];
-    const filtered = Object.fromEntries(Object.entries(config).filter(([k]) => allowed.includes(k)));
+    const filtered = Object.fromEntries(
+      Object.entries(config).filter(([k]) => allowed.includes(k)),
+    );
     await this.prisma.user.update({
       where: { id: userId },
       data: { notificationsPreferences: JSON.stringify(filtered) },

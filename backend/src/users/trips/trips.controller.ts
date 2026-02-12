@@ -123,11 +123,7 @@ export class TripsController {
     @Body() dto: RequestDeliveryDto,
     @Headers('idempotency-key') idempotencyKey?: string,
   ) {
-    return this.tripsService.requestDelivery(
-      req.user.id,
-      dto,
-      idempotencyKey,
-    );
+    return this.tripsService.requestDelivery(req.user.id, dto, idempotencyKey);
   }
 
   @Get('deliveries')
@@ -153,6 +149,4 @@ export class TripsController {
   async driverArrived(@Request() req, @Param('id') rideId: string) {
     return this.tripsService.driverArrived(rideId, req.user.id);
   }
- 
-
 }

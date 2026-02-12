@@ -55,12 +55,12 @@ export class PaymentService {
   // =================================================================
   private normalizeGatewayStatus(gatewayStatus: string): PaymentStatus {
     const normalized = gatewayStatus.toLowerCase();
-    
+
     // Map 'success'/'paid' to Prisma's 'COMPLETED'
     if (['success', 'successful', 'completed', 'paid'].includes(normalized)) {
-      return PaymentStatus.COMPLETED; 
+      return PaymentStatus.COMPLETED;
     }
-    
+
     // Map failure strings
     if (['failed', 'abandoned', 'cancelled', 'rejected'].includes(normalized)) {
       return PaymentStatus.FAILED;
@@ -103,16 +103,13 @@ export class PaymentService {
           where: { id: orderGroupId },
         });
         if (!group)
-          throw new NotFoundException(
-            `Order Group ${orderGroupId} not found`,
-          );
+          throw new NotFoundException(`Order Group ${orderGroupId} not found`);
         amount = group.totalAmount;
       } else if (orderId) {
         const order = await this.prisma.order.findUnique({
           where: { id: orderId },
         });
-        if (!order)
-          throw new NotFoundException(`Order ${orderId} not found`);
+        if (!order) throw new NotFoundException(`Order ${orderId} not found`);
         amount = order.total;
       } else {
         throw new BadRequestException(
@@ -126,12 +123,14 @@ export class PaymentService {
       });
       if (!ride) throw new NotFoundException('Ride not found');
       if (!ride.totalFare) {
-         throw new BadRequestException('Ride fare has not been calculated yet');
+        throw new BadRequestException('Ride fare has not been calculated yet');
       }
       amount = ride.totalFare;
-    } else if ((dto.type as any) === 'DELIVERY' || dto.type === PaymentType.DELIVERY) {
-      if (!deliveryId)
-        throw new BadRequestException('Delivery ID is required');
+    } else if (
+      (dto.type as any) === 'DELIVERY' ||
+      dto.type === PaymentType.DELIVERY
+    ) {
+      if (!deliveryId) throw new BadRequestException('Delivery ID is required');
       const delivery = await this.prisma.delivery.findUnique({
         where: { id: deliveryId },
       });
@@ -301,7 +300,7 @@ export class PaymentService {
     signature: string,
   ): Promise<void> {
     let isValid = false;
-    
+
     switch (gateway) {
       case PaymentGateway.PAYSTACK:
         isValid = this.paystackService.verifyWebhookSignature(
@@ -344,7 +343,7 @@ export class PaymentService {
       case PaymentGateway.PAYSTACK:
         if (payload.event !== 'charge.success') return;
         reference = payload.data.reference;
-        status = payload.data.status; 
+        status = payload.data.status;
         amount = payload.data.amount / 100;
         paidAt = new Date(payload.data.paid_at);
         break;
@@ -403,7 +402,7 @@ export class PaymentService {
     }
 
     // Cast to any to compare Prisma Enum (generated) vs App Enum (interface)
-    if ((payment.status as any).toUpperCase() === PaymentStatus.SUCCESS) {
+    if ((payment.status as any).toUpperCase() === PaymentStatus.COMPLETED) {
       this.logger.log(`Payment ${verification.reference} already processed.`);
       return;
     }
@@ -428,9 +427,10 @@ export class PaymentService {
     }
 
     // 1. Normalize Status
-    const targetStatus = typeof verification.status === 'string'
-      ? this.normalizeGatewayStatus(verification.status)
-      : (verification.status as unknown as PaymentStatus); 
+    const targetStatus =
+      typeof verification.status === 'string'
+        ? this.normalizeGatewayStatus(verification.status)
+        : (verification.status as unknown as PaymentStatus);
 
     const finalStatus = Object.values(PaymentStatus).includes(targetStatus)
       ? targetStatus
@@ -442,184 +442,202 @@ export class PaymentService {
 
     // === ATOMIC TRANSACTION START ===
     // FIX: Added timeout configuration to handle long-running ledger updates
-    const result = await this.prisma.$transaction(async (tx) => {
-      // 1. Update Payment Record
-      const updatedPayment = await tx.payment.update({
-        where: { reference: verification.reference },
-        data: {
-          status: finalStatus,
-          paidAt: paidAt,
-          verifiedAt: new Date(),
-        },
-        include: {
-          order: { include: { user: true, store: true, delivery: true } },
-          orderGroup: { include: { orders: { include: { store: true } } } },
-          ride: { include: { customer: true } },
-        },
-      });
+    const result = await this.prisma.$transaction(
+      async (tx) => {
+        // 1. Update Payment Record
+        const updatedPayment = await tx.payment.update({
+          where: { reference: verification.reference },
+          data: {
+            status: finalStatus,
+            paidAt: paidAt,
+            verifiedAt: new Date(),
+          },
+          include: {
+            order: { include: { user: true, store: true, delivery: true } },
+            orderGroup: { include: { orders: { include: { store: true } } } },
+            ride: { include: { customer: true } },
+          },
+        });
 
-      // 2. Handle Status Updates & Ledger Recording
-      if (finalStatus === PaymentStatus.COMPLETED) {
-        if (payment.orderGroupId) {
-          // A. Multi-Vendor Order Group
-          await tx.orderGroup.update({
-            where: { id: payment.orderGroupId },
-            data: { paymentStatus: PaymentStatus.COMPLETED }, 
-          });
+        // 2. Handle Status Updates & Ledger Recording
+        if (finalStatus === PaymentStatus.COMPLETED) {
+          if (payment.orderGroupId) {
+            // A. Multi-Vendor Order Group
+            await tx.orderGroup.update({
+              where: { id: payment.orderGroupId },
+              data: { paymentStatus: PaymentStatus.COMPLETED },
+            });
 
-          await tx.order.updateMany({
-            where: { orderGroupId: payment.orderGroupId },
-            data: { status: OrderStatus.CONFIRMED },
-          });
+            await tx.order.updateMany({
+              where: { orderGroupId: payment.orderGroupId },
+              data: { status: OrderStatus.CONFIRMED },
+            });
 
-          // Ledger: Record Incoming Payment
-          await this.ledger.recordPayment({
-            id: payment.id,
-            amount: payment.amount,
-            userId: payment.orderGroup!.userId,
-            method: payment.gateway,
-            status: 'COMPLETED',
-            orderGroupId: payment.orderGroupId,
-            description: `Payment for Order Group #${payment.orderGroupId}`,
-          }, tx);
-
-          // Ledger: Record Commissions (Can be slow for many orders)
-          if (payment.orderGroup?.orders) {
-             for (const order of payment.orderGroup.orders) {
-                await this.ledger.recordOrderCommission({
-                  id: order.id,
-                  storeId: order.storeId,
-                  total: order.total,
-                  commissionRate: 10,
-                }, tx);
-             }
-          }
-
-        } else if (payment.orderId) {
-          // B. Single Order
-          await tx.order.update({
-            where: { id: payment.orderId },
-            data: { status: OrderStatus.CONFIRMED },
-          });
-
-          if (payment.order) {
-             await this.ledger.recordPayment({
+            // Ledger: Record Incoming Payment
+            await this.ledger.recordPayment(
+              {
                 id: payment.id,
                 amount: payment.amount,
-                userId: payment.order.userId,
-                orderId: payment.orderId,
+                userId: payment.orderGroup!.userId,
                 method: payment.gateway,
                 status: 'COMPLETED',
-             }, tx);
+                orderGroupId: payment.orderGroupId,
+                description: `Payment for Order Group #${payment.orderGroupId}`,
+              },
+              tx,
+            );
 
-             await this.ledger.recordOrderCommission({
-                id: payment.orderId,
-                storeId: payment.order.storeId,
-                total: payment.amount,
-                commissionRate: 10,
-             }, tx);
+            // Ledger: Record Commissions (Can be slow for many orders)
+            if (payment.orderGroup?.orders) {
+              for (const order of payment.orderGroup.orders) {
+                await this.ledger.recordOrderCommission(
+                  {
+                    id: order.id,
+                    storeId: order.storeId,
+                    total: order.total,
+                    commissionRate: 10,
+                  },
+                  tx,
+                );
+              }
+            }
+          } else if (payment.orderId) {
+            // B. Single Order
+            await tx.order.update({
+              where: { id: payment.orderId },
+              data: { status: OrderStatus.CONFIRMED },
+            });
+
+            if (payment.order) {
+              await this.ledger.recordPayment(
+                {
+                  id: payment.id,
+                  amount: payment.amount,
+                  userId: payment.order.userId,
+                  orderId: payment.orderId,
+                  method: payment.gateway,
+                  status: 'COMPLETED',
+                },
+                tx,
+              );
+
+              await this.ledger.recordOrderCommission(
+                {
+                  id: payment.orderId,
+                  storeId: payment.order.storeId,
+                  total: payment.amount,
+                  commissionRate: 10,
+                },
+                tx,
+              );
+            }
+          } else if (payment.rideId && payment.ride) {
+            // C. Ride
+            const ride = payment.ride;
+            if (ride.riderId) {
+              const platformFeeRate = 0.2;
+
+              await this.ledger.recordPayment(
+                {
+                  id: payment.id,
+                  amount: payment.amount,
+                  userId: ride.customerId,
+                  rideId: payment.rideId,
+                  method: payment.gateway,
+                  status: 'COMPLETED',
+                },
+                tx,
+              );
+
+              await this.ledger.recordRideEarnings(
+                {
+                  id: payment.rideId,
+                  riderId: ride.riderId,
+                  totalFare: payment.amount,
+                  platformFee: payment.amount * platformFeeRate,
+                  driverFee: payment.amount,
+                },
+                tx,
+              );
+            }
           }
-
-        } else if (payment.rideId && payment.ride) {
-          // C. Ride
-          const ride = payment.ride;
-          if (ride.riderId) {
-            const platformFeeRate = 0.2; 
-            
-            await this.ledger.recordPayment({
-              id: payment.id,
-              amount: payment.amount,
-              userId: ride.customerId,
-              rideId: payment.rideId,
-              method: payment.gateway,
-              status: 'COMPLETED',
-            }, tx);
-
-            await this.ledger.recordRideEarnings({
-              id: payment.rideId,
-              riderId: ride.riderId,
-              totalFare: payment.amount,
-              platformFee: payment.amount * platformFeeRate,
-              driverFee: payment.amount, 
-            }, tx);
+        } else if (finalStatus === PaymentStatus.FAILED) {
+          // Handle Failures
+          if (payment.orderGroupId) {
+            await tx.orderGroup.update({
+              where: { id: payment.orderGroupId },
+              data: { paymentStatus: PaymentStatus.FAILED },
+            });
+            await tx.order.updateMany({
+              where: { orderGroupId: payment.orderGroupId },
+              data: { status: OrderStatus.CANCELLED },
+            });
+          } else if (payment.orderId) {
+            await tx.order.update({
+              where: { id: payment.orderId },
+              data: { status: OrderStatus.CANCELLED },
+            });
           }
         }
-      } else if (finalStatus === PaymentStatus.FAILED) {
-        // Handle Failures
-        if (payment.orderGroupId) {
-          await tx.orderGroup.update({
-             where: { id: payment.orderGroupId },
-             data: { paymentStatus: PaymentStatus.FAILED }
-          });
-          await tx.order.updateMany({
-            where: { orderGroupId: payment.orderGroupId },
-            data: { status: OrderStatus.CANCELLED },
-          });
-        } else if (payment.orderId) {
-          await tx.order.update({
-            where: { id: payment.orderId },
-            data: { status: OrderStatus.CANCELLED },
-          });
-        }
-      }
 
-      return updatedPayment;
-    }, {
-      // FIX: Increase timeout to 30s to allow complex ledger updates
-      timeout: 30000, 
-      maxWait: 5000 
-    });
+        return updatedPayment;
+      },
+      {
+        // FIX: Increase timeout to 30s to allow complex ledger updates
+        timeout: 30000,
+        maxWait: 5000,
+      },
+    );
     // === ATOMIC TRANSACTION END ===
 
-      // =========================================================
-      // 👇 MATCHING LOGIC FIXED HERE
-      // =========================================================
-      // New logic: use metadata.type for routing
-      const meta = payment.metadata as any;
-      if (meta && meta.type) {
-        if (meta.type === 'ride') {
-          // Ride request
-          if (meta.rideId) {
-            await this.startRideMatching(meta.rideId);
-            // Notify rider and customer
-            await this.sendMatchingNotifications({
-              type: 'ride',
-              rideId: meta.rideId,
-              customerId: result.ride?.customer?.id,
-              riderId: result.ride?.riderId ?? undefined,
-            });
-          }
-        } else if (meta.type === 'order') {
-          // E-commerce order delivery
-          if (result.order?.delivery?.id) {
-            await this.startDeliveryMatching(result.order.delivery.id);
-            // Notify customer and vendor
-            await this.sendMatchingNotifications({
-              type: 'order',
-              orderId: result.order.id,
-              deliveryId: result.order.delivery.id,
-              customerId: result.order.userId,
-              vendorId: result.order.store?.vendorId,
-            });
-          }
-        } else if (meta.type === 'delivery') {
-          // Direct delivery request: notify admin for manual assignment
-          await this.sendAdminAssignmentNotification(
-            meta.deliveryId,
-            payment.userId,
-          );
-          // Notify customer
+    // =========================================================
+    // 👇 MATCHING LOGIC FIXED HERE
+    // =========================================================
+    // New logic: use metadata.type for routing
+    const meta = payment.metadata as any;
+    if (meta && meta.type) {
+      if (meta.type === 'ride') {
+        // Ride request
+        if (meta.rideId) {
+          await this.startRideMatching(meta.rideId);
+          // Notify rider and customer
           await this.sendMatchingNotifications({
-            type: 'delivery',
-            deliveryId: meta.deliveryId,
-            customerId: payment.userId,
+            type: 'ride',
+            rideId: meta.rideId,
+            customerId: result.ride?.customer?.id,
+            riderId: result.ride?.riderId ?? undefined,
           });
-          // DO NOT start delivery matching for direct delivery
         }
+      } else if (meta.type === 'order') {
+        // E-commerce order delivery
+        if (result.order?.delivery?.id) {
+          await this.startDeliveryMatching(result.order.delivery.id);
+          // Notify customer and vendor
+          await this.sendMatchingNotifications({
+            type: 'order',
+            orderId: result.order.id,
+            deliveryId: result.order.delivery.id,
+            customerId: result.order.userId,
+            vendorId: result.order.store?.vendorId,
+          });
+        }
+      } else if (meta.type === 'delivery') {
+        // Direct delivery request: notify admin for manual assignment
+        await this.sendAdminAssignmentNotification(
+          meta.deliveryId,
+          payment.userId,
+        );
+        // Notify customer
+        await this.sendMatchingNotifications({
+          type: 'delivery',
+          deliveryId: meta.deliveryId,
+          customerId: payment.userId,
+        });
+        // DO NOT start delivery matching for direct delivery
       }
-
-      await this.sendPaymentNotifications(result);
     }
+
+    await this.sendPaymentNotifications(result);
   }
 
   // Send notifications to involved parties after matching
@@ -722,10 +740,7 @@ export class PaymentService {
     }
   }
 
-  // =================================================================
-  //  SAFE HELPERS
-  // =================================================================
-
+  // SAFE HELPERS
   private async startRideMatching(rideId: string): Promise<void> {
     try {
       if (!this.tripsService) return;
@@ -993,7 +1008,9 @@ export class PaymentService {
       }
 
       const newStatus =
-        refundAmount < payment.amount ? PaymentStatus.PARTIALLY_REFUNDED : PaymentStatus.REFUNDED;
+        refundAmount < payment.amount
+          ? PaymentStatus.PARTIALLY_REFUNDED
+          : PaymentStatus.REFUNDED;
 
       await this.prisma.payment.update({
         where: { id: payment.id },
