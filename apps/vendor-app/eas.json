@@ -20,7 +20,8 @@
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://api.asoose.com/api/v1"
+        "EXPO_PUBLIC_API_URL": "https://api.asoose.com/api/v1",
+        "EXPO_ANDROID_BUILD_DEOBFUSCATION": "1"
       }
     }
   },
