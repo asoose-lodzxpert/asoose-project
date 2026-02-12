@@ -4,6 +4,7 @@
     "slug": "asoose-customer-app",
     "version": "1.0.0",
     "orientation": "portrait",
+    "privacyPolicyUrl": "https://asoose.com/privacy-policy",
     "icon": "./assets/images/asoose icon.png",
     "scheme": "asoose-app",
     "userInterfaceStyle": "automatic",
@@ -29,14 +30,12 @@
         "NSCameraUsageDescription": "This app requires camera access to take photos and scan documents.",
         "NSPhotoLibraryUsageDescription": "This app requires access to your photo library to select images.",
         "NSLocationWhenInUseUsageDescription": "Location is used to provide location-based services.",
-        "NSLocationAlwaysUsageDescription": "Location is used to provide location-based services even when the app is in the background.",
         "NSUserNotificationUsageDescription": "Notifications are used to keep you updated about your account and activity."
-      }
+      },
+      "bundleIdentifier": "com.iamwyteshadow.asoosecustomerapp",
+      "usesAppleSignIn": true
     },
-    "platforms": [
-      "ios",
-      "android"
-    ],
+    "platforms": ["ios", "android"],
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
@@ -46,11 +45,8 @@
         "USE_BIOMETRIC",
         "USE_FINGERPRINT",
         "CAMERA",
-        "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE",
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
-        "FOREGROUND_SERVICE",
         "POST_NOTIFICATIONS"
       ],
       "edgeToEdgeEnabled": true,
@@ -59,6 +55,7 @@
     },
     "plugins": [
       "expo-router",
+      "expo-apple-authentication",
       [
         "expo-splash-screen",
         {

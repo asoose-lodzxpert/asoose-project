@@ -142,7 +142,7 @@ export default function AsooseLanding() {
               className="flex transition-transform duration-700 ease-in-out w-full"
               style={{ transform: `translateX(-${activeIndex * 100}%)` }}
             >
-              {SERVICE_KEYS.map((key) => (
+              {SERVICE_KEYS.map((key, index) => (
                 <div
                   key={key}
                   className="w-full flex-shrink-0 grid md:grid-cols-2 gap-8 md:gap-12 items-center px-6 py-12 sm:px-12 md:px-16"
@@ -175,16 +175,21 @@ export default function AsooseLanding() {
                     </Link>
                   </div>
 
-                  {/* RIGHT: IMAGE */}
-                  <div className="relative w-full h-[300px] md:h-[450px] rounded-3xl overflow-hidden order-1 md:order-2">
+                  {/* RIGHT: IMAGE - Optimized with priority for first slide */}
+                  <div className="relative w-full h-[300px] md:h-[450px] rounded-3xl overflow-hidden order-1 md:order-2 bg-zinc-100 dark:bg-zinc-900">
                     <Image
                       src={SERVICE_DATA[key].image}
                       alt={SERVICE_DATA[key].title}
                       fill
                       className="object-cover hover:scale-105 transition-transform duration-700"
-                      priority
+                      priority={index === 0} // Only prioritize the first image
+                      loading={index === 0 ? "eager" : "lazy"} // Lazy load non-visible slides
+                      sizes="(max-width: 768px) 100vw, 50vw"
+                      quality={85} // Slightly reduce quality for faster loading
+                      placeholder="blur"
+                      blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAIAAoDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCwAB//2Q=="
                     />
-                    {/* Subtle overlay for depth if needed, mostly clean image */}
+                    {/* Subtle overlay for depth */}
                     <div className="absolute inset-0 bg-black/5 dark:bg-white/5 pointer-events-none" />
                   </div>
                 </div>
@@ -259,7 +264,7 @@ export default function AsooseLanding() {
           </div>
         </section>
 
-        {/* MERCHANT SECTION */}
+        {/* MERCHANT SECTION - Lazy loaded image */}
         <section className="py-16 sm:py-20 md:py-24 px-4 sm:px-6 max-w-7xl mx-auto grid md:grid-cols-2 gap-10 sm:gap-12 md:gap-16 items-center border-t border-black/5 dark:border-white/5">
           <div className="order-2 md:order-1 space-y-6 sm:space-y-8">
             <h3 className="text-3xl sm:text-4xl font-black tracking-tight">
@@ -290,22 +295,41 @@ export default function AsooseLanding() {
               className="inline-flex items-center gap-2 font-black uppercase tracking-widest text-xs sm:text-sm text-yellow-500 hover:text-yellow-400 transition-colors"
             >
               Download Vendors App{" "}
-              <Minus size={18} className="flex-shrink-0 hidden" />
               <ArrowRight size={18} className="flex-shrink-0" />
             </a>
           </div>
-          <div className="order-1 md:order-2 relative h-[300px] sm:h-[400px] md:h-[450px] rounded-3xl overflow-hidden">
-            <Image src="/vendor.jpg" alt="Become a merchant" fill className="object-cover" />
+          <div className="order-1 md:order-2 relative h-[300px] sm:h-[400px] md:h-[450px] rounded-3xl overflow-hidden bg-zinc-100 dark:bg-zinc-900">
+            <Image 
+              src="/vendor.jpg" 
+              alt="Become a merchant" 
+              fill 
+              className="object-cover" 
+              loading="lazy"
+              sizes="(max-width: 768px) 100vw, 50vw"
+              quality={85}
+              placeholder="blur"
+              blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAIAAoDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCwAB//2Q=="
+            />
           </div>
         </section>
 
-        {/* RIDER SECTION */}
+        {/* RIDER SECTION - Lazy loaded image */}
         <section
           className={`py-16 sm:py-20 md:py-24 px-4 sm:px-6 border-t ${darkMode ? "bg-[#0a0a0a] border-white/5" : "bg-white border-black/5"}`}
         >
           <div className="max-w-7xl mx-auto grid md:grid-cols-2 gap-10 sm:gap-12 md:gap-16 items-center">
-            <div className="relative h-[300px] sm:h-[400px] md:h-[450px] rounded-3xl overflow-hidden">
-              <Image src="/driver.jpg" alt="Become a rider" fill className="object-cover" />
+            <div className="relative h-[300px] sm:h-[400px] md:h-[450px] rounded-3xl overflow-hidden bg-zinc-100 dark:bg-zinc-900">
+              <Image 
+                src="/driver.jpg" 
+                alt="Become a rider" 
+                fill 
+                className="object-cover" 
+                loading="lazy"
+                sizes="(max-width: 768px) 100vw, 50vw"
+                quality={85}
+                placeholder="blur"
+                blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAIAAoDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCwAB//2Q=="
+              />
             </div>
             <div className="space-y-6 sm:space-y-8">
               <h3 className="text-3xl sm:text-4xl font-black tracking-tight">

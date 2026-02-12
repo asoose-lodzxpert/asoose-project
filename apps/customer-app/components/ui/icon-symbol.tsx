@@ -4,7 +4,6 @@ import { OpaqueColorValue, type StyleProp, type TextStyle } from "react-native";
 export type IconSymbolName =
   | "mappin.and.ellipse"
   | "building.columns.fill"
-  // ...existing code...
   | "radio"
   | "map-pin"
   | "flag"

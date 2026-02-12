@@ -7,11 +7,12 @@ export interface InitiatePaymentPayload {
   method: "CARD" | "BANK_TRANSFER" | "CASH";
   type: "ORDER" | "RIDE" | "DELIVERY";
   orderId?: string;
+  orderGroupId?: string; // FIX: Added OrderGroup support
   rideId?: string;
   deliveryId?: string;
   callbackUrl?: string;
   metadata?: any;
-  state?: string; // <--- FIX: Added this field
+  state?: string;
 }
 
 export interface PaymentInitResponse {

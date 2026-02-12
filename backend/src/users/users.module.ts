@@ -19,6 +19,7 @@ import { NotificationsModule } from 'src/notifications/notifications.module';
 import { FcmModule } from 'src/libs/fcm/fcm.module';
 import { TripsModule } from './trips/trips.module';
 import { VendorModule } from 'src/vendor/vendor.module';
+import { QueueModule } from 'src/matching/queue/queue.module'; // ✅ IMPORTED
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { VendorModule } from 'src/vendor/vendor.module';
     FcmModule,
     TripsModule,
     VendorModule,
+    QueueModule, // ✅ ADDED HERE
     BullModule.registerQueue({
       name: 'email',
     }),

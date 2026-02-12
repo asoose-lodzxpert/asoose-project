@@ -303,10 +303,11 @@ export default function OrderDetailsPage() {
         </div>
       </div>
 
-      <ReportDisputeModal
+<ReportDisputeModal
         isOpen={isDisputeModalOpen}
         onClose={() => setIsDisputeModalOpen(false)}
-        orderId={orderId}
+        referenceId={orderId} // FIXED: Changed from orderId to referenceId
+        type="ORDER"          // FIXED: Added required type prop
         onSuccess={() => mutate()}
       />
     </div>

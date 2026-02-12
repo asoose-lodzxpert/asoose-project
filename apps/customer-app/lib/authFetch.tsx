@@ -13,6 +13,8 @@ type FetchOpts = RequestInit & { absolute?: boolean };
  * included as a Bearer token in the Authorization header.
  */
 
+let refreshPromise: Promise<string | null> | null = null;
+
 export async function request(path: string, opts: FetchOpts = {}) {
   const { absolute = false, headers: incomingHeaders, ...rest } = opts;
   const url = absolute ? path : BACKEND_URL + path.replace(/^\/+/, "");
@@ -37,11 +39,25 @@ export async function request(path: string, opts: FetchOpts = {}) {
 
   if (response.status === 401 && token) {
     try {
-      const newToken = await refreshAccessToken();
+      if (!refreshPromise) {
+        refreshPromise = (async () => {
+          try {
+            const newToken = await refreshAccessToken();
+            return newToken;
+          } catch (err) {
+            return null;
+          } finally {
+            refreshPromise = null;
+          }
+        })();
+      }
+      const newToken = await refreshPromise;
+      if (!newToken) throw new Error("Session expired");
       token = newToken;
       headers["Authorization"] = `Bearer ${newToken}`;
       ({ response, parsed } = await execute());
     } catch (error) {
+      refreshPromise = null;
       throw error instanceof Error ? error : new Error("Session expired");
     }
   }

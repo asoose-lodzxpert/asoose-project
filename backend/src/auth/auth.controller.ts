@@ -10,6 +10,7 @@ import { ResetPasswordDto } from './dto/reset-password.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { GoogleOAuthDto } from './dto/google-oauth.dto';
+import { AppleOAuthDto } from './dto/apple-oauth.dto';
 import { UserRole } from '../common/enums/user-role.enum';
 
 @Controller({
@@ -58,6 +59,11 @@ export class UserAuthController {
   @Post('oauth/google')
   googleOAuth(@Body() dto: GoogleOAuthDto) {
     return this.authService.googleOAuthUser(dto);
+  }
+
+  @Post('oauth/apple')
+  appleOAuth(@Body() dto: AppleOAuthDto) {
+    return this.authService.appleOAuthUser(dto);
   }
 
   @Post('forgot-password')

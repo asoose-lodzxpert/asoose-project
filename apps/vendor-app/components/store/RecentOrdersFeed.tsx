@@ -276,6 +276,12 @@ export const RecentOrdersFeed: React.FC<Props> = ({
                     image: item.customerProfile,
                   },
                   total: item.total,
+                  items: Array.isArray(item.items)
+                    ? item.items.map((it: any) => ({
+                        ...it,
+                        nameSnap: it.name,
+                      }))
+                    : [],
                 } as any
               }
               tab={getTab(item.status)}

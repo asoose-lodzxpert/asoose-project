@@ -27,7 +27,6 @@ export class MonnifyService {
   }
 
   private async getAccessToken(): Promise<string> {
-    // Return cached token if still valid
     if (this.accessToken && this.tokenExpiry && new Date() < this.tokenExpiry) {
       return this.accessToken;
     }
@@ -48,7 +47,6 @@ export class MonnifyService {
       );
 
       this.accessToken = response.data.responseBody.accessToken;
-      // Set expiry to 1 hour from now (Monnify tokens typically last 1 hour)
       this.tokenExpiry = new Date(Date.now() + 3600000);
 
       return this.accessToken;
@@ -175,7 +173,7 @@ export class MonnifyService {
           destinationBankCode: bankCode,
           destinationAccountNumber: accountNumber,
           currency: 'NGN',
-          sourceAccountNumber: this.contractCode, // Use contract code as source
+          sourceAccountNumber: this.contractCode,
         },
         {
           headers: {
@@ -208,12 +206,12 @@ export class MonnifyService {
   private mapStatus(status: string): PaymentStatus {
     switch (status) {
       case 'PAID':
-        return PaymentStatus.SUCCESS;
+        return PaymentStatus.COMPLETED; // ✅ FIXED
       case 'FAILED':
         return PaymentStatus.FAILED;
       case 'CANCELLED':
       case 'EXPIRED':
-        return PaymentStatus.CANCELLED;
+        return PaymentStatus.FAILED; // ✅ FIXED: Mapped to FAILED
       default:
         return PaymentStatus.PENDING;
     }

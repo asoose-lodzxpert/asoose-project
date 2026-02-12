@@ -28,10 +28,11 @@ export const ProductCard = ({
 }: ProductProps) => {
   const addItem = useCartStore((state) => state.addItem);
 
-  const handleQuickAdd = async (e: React.MouseEvent) => {
+  const handleQuickAdd = (e: React.MouseEvent) => {
     e.stopPropagation();
 
-    const success = await addItem({
+    // 1. Call the action synchronously
+    addItem({
       id,
       name,
       price,
@@ -40,9 +41,8 @@ export const ProductCard = ({
       restaurantId: storeId,
     });
 
-    if (success) {
-      toast.success("Added to basket");
-    }
+    // 2. Fire toast immediately since the state update is guaranteed
+    toast.success("Added to basket");
   };
 
   return (

@@ -190,6 +190,7 @@ export class RidesService {
             status: RideStatus.PENDING,
             distanceKm,
             durationMin,
+            // displayOtp: rawOtp, // Ensure this is removed if not in schema (from previous fix)
             totalFare: this.common.round(dto.fare),
             startOtp: hashedOtp,
             surgeMultiplier: 1.0,
@@ -219,7 +220,8 @@ export class RidesService {
           message: 'Ride created. Please confirm to find a driver.',
         };
       },
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      // FIX: Use string literal 'Serializable' instead of Prisma.TransactionIsolationLevel.Serializable
+      { isolationLevel: 'Serializable' },
     );
   }
 

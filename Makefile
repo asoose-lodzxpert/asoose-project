@@ -11,6 +11,11 @@ CONTAINER_NAME = asoose-backend
 DOCKERFILE = backend/Dockerfile
 ENV_FILE = backend/.env
 
+# Redis (Development only)
+REDIS_IMAGE = redis:7-alpine
+REDIS_CONTAINER = asoose-redis-dev
+REDIS_PORT = 6379
+
 # =========================
 # Help
 # =========================
@@ -68,6 +73,25 @@ db-studio: ## Open Prisma Studio
 	docker exec -it $(CONTAINER_NAME) yarn prisma studio
 
 # =========================
+# Redis (Development Only)
+# =========================
+redis-run: ## Start Redis container for development
+	docker run -d --name $(REDIS_CONTAINER) \
+		-p $(REDIS_PORT):6379 \
+		$(REDIS_IMAGE)
+	@echo "Redis started at localhost:$(REDIS_PORT)"
+
+redis-stop: ## Stop Redis container
+	docker stop $(REDIS_CONTAINER) || true
+	docker rm $(REDIS_CONTAINER) || true
+
+redis-logs: ## View Redis logs
+	docker logs -f $(REDIS_CONTAINER)
+
+redis-clean: ## Remove Redis container
+	docker rm -f $(REDIS_CONTAINER) || true
+
+# =========================
 # Development (Local)
 # =========================
 dev-install: ## Install dependencies
@@ -75,6 +99,14 @@ dev-install: ## Install dependencies
 
 dev-start: ## Start backend in dev mode
 	yarn workspace backend start:dev
+
+dev-full: redis-run ## Start Redis and backend for development
+	@echo "Starting full development environment..."
+	@sleep 2
+	yarn workspace backend start:dev
+
+dev-stop: redis-stop ## Stop all development services
+	@echo "Development services stopped"
 
 # =========================
 # Testing
@@ -94,5 +126,5 @@ clean: ## Clean build artifacts
 	rm -rf backend/node_modules
 	find . -name "*.log" -delete
 
-clean-all: clean docker-clean ## Clean everything including Docker
+clean-all: clean docker-clean redis-clean ## Clean everything including Docker
 	@echo "Cleaned all artifacts and Docker resources"

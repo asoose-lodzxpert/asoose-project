@@ -24,7 +24,7 @@ export default function Navbar() {
     { name: 'About', href: '/about' },
     { name: 'Contact', href: '/contact' },
     { name: 'Book a Ride', href: '/main/ride' },
-    { name: 'Make orders', href: '/main/store' },
+    { name: 'Shop online ', href: '/main/store' },
     { name: 'Make Deliveries', href: '/main/delivery' },
   ];
 

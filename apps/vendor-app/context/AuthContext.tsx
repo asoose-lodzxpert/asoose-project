@@ -1,12 +1,12 @@
 // context/AuthContext.tsx
-import React, { createContext, useContext, useEffect, useState } from "react";
 import {
-  login,
   getAccessToken,
-  refreshAccessToken,
+  login,
   logout,
+  refreshAccessToken,
 } from "@/services/auth";
 import { fetchCurrentUser } from "@/services/auth-fetch";
+import React, { createContext, useContext, useEffect, useState } from "react";
 
 type User = {
   id: string;
@@ -56,7 +56,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUser(userData);
         }
       } catch (err) {
-        console.error("Auth initialization failed:", err);
+        if (__DEV__) {
+          console.error("Auth initialization failed:", err);
+        }
         if (isMounted) {
           setUser(null);
         }

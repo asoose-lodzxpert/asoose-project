@@ -14,6 +14,7 @@ import { ResetPasswordDto } from './dto/reset-password.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { GoogleOAuthDto } from './dto/google-oauth.dto';
+import { AppleOAuthDto } from './dto/apple-oauth.dto';
 import { OtpService } from './otp.service';
 import { EmailProducer } from '../mail/email.producer';
 import * as bcrypt from 'bcryptjs';
@@ -210,6 +211,79 @@ export class AuthService {
             },
           });
         }
+      }
+
+      // Generate JWT access and refresh tokens
+      const payload = {
+        sub: user.id,
+        email: user.email,
+        role: user.role,
+      };
+      const access_token = this.jwtService.sign(payload);
+      const refresh_token = this.jwtService.sign(payload, { expiresIn: '30d' });
+
+      // Split name into firstName and lastName for response
+      const nameParts = user.name.split(' ');
+      const firstName = nameParts[0] || '';
+      const lastName = nameParts.slice(1).join(' ') || '';
+
+      return {
+        access_token,
+        refresh_token,
+        user: {
+          id: user.id,
+          email: user.email,
+          firstName,
+          lastName,
+          role: user.role,
+          profilePicture: user.image,
+        },
+      };
+    } catch (error) {
+      if (error instanceof ConflictException) {
+        throw error;
+      }
+      throw new ConflictException('OAuth authentication failed');
+    }
+  }
+
+  async appleOAuthUser(dto: AppleOAuthDto) {
+    try {
+      // Check if user exists by appleId first (primary check for OAuth users)
+      let user = await this.prisma.user.findUnique({
+        where: { appleId: dto.appleId },
+      });
+
+      if (!user) {
+        // Check if email exists (user might have registered with password)
+        const existingEmailUser = await this.prisma.user.findUnique({
+          where: { email: dto.email },
+        });
+
+        if (existingEmailUser) {
+          // Email exists but no appleId - this is a password-based account
+          // Don't auto-link for security - require email verification first
+          throw new ConflictException(
+            'An account with this email already exists. Please sign in with your password or reset it.',
+          );
+        }
+
+        // Create new user with Apple auth
+        const fullName =
+          [dto.firstName, dto.lastName].filter(Boolean).join(' ').trim() ||
+          dto.email.split('@')[0];
+
+        user = await this.prisma.user.create({
+          data: {
+            email: dto.email,
+            appleId: dto.appleId,
+            password: '', // Empty password for OAuth-only users
+            name: fullName,
+            role: 'CUSTOMER',
+            verificationStatus: 'VERIFIED', // OAuth users are pre-verified
+            status: 'ACTIVE',
+          },
+        });
       }
 
       // Generate JWT access and refresh tokens

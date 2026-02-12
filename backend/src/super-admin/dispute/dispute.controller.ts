@@ -31,7 +31,7 @@ import {
 
 @ApiTags('Disputes')
 @ApiBearerAuth()
-@Controller('disputes') 
+@Controller('disputes')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class DisputesController {
   constructor(private readonly disputesService: DisputesService) {}

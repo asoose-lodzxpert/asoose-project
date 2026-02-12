@@ -1,5 +1,5 @@
-import { Address } from "@/types/address";
 import { request } from "@/lib/authFetch";
+import { Address } from "@/types/address";
 
 export const fetchSuggestions = async (input: string): Promise<any[]> => {
   if (!input) return [];
@@ -19,7 +19,7 @@ export const fetchSuggestions = async (input: string): Promise<any[]> => {
       },
     }));
   } catch (error) {
-    console.error("Error fetching suggestions:", error);
+    if (__DEV__) console.error("Error fetching suggestions:", error);
     return [];
   }
 };
@@ -45,7 +45,7 @@ export const selectPlace = async (placeId: string): Promise<Address | null> => {
       isDefault: false,
     };
   } catch (error) {
-    console.error("Error selecting place:", error);
+    if (__DEV__) console.error("Error selecting place:", error);
     return null;
   }
 };
@@ -78,7 +78,7 @@ export const resolveAddressFromCoords = async (coords: {
     }
     return null;
   } catch (error) {
-    console.error("Error resolving address:", error);
+    if (__DEV__) console.error("Error resolving address:", error);
     return null;
   }
 };

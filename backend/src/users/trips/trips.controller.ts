@@ -123,11 +123,7 @@ export class TripsController {
     @Body() dto: RequestDeliveryDto,
     @Headers('idempotency-key') idempotencyKey?: string,
   ) {
-    return this.tripsService.requestDelivery(
-      req.user.id,
-      dto,
-      idempotencyKey,
-    );
+    return this.tripsService.requestDelivery(req.user.id, dto, idempotencyKey);
   }
 
   @Get('deliveries')

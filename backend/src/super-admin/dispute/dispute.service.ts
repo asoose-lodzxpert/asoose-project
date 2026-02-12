@@ -30,11 +30,13 @@ export class DisputesService {
     private paymentService: PaymentService,
   ) {}
 
-// ==================== CREATE DISPUTE ====================
+  // ==================== CREATE DISPUTE ====================
   async create(userId: string, dto: CreateDisputeDto) {
     // 1. Validation: Ensure at least one reference ID exists
     if (!dto.orderId && !dto.rideId && !dto.deliveryId) {
-      throw new BadRequestException('A dispute must be linked to an Order, Ride, or Delivery.');
+      throw new BadRequestException(
+        'A dispute must be linked to an Order, Ride, or Delivery.',
+      );
     }
 
     let targetUserEmail: string | undefined;
@@ -48,31 +50,38 @@ export class DisputesService {
       });
 
       if (!order) throw new NotFoundException('Order not found');
-      if (order.userId !== userId) throw new BadRequestException('You can only report disputes for your own orders.');
+      if (order.userId !== userId)
+        throw new BadRequestException(
+          'You can only report disputes for your own orders.',
+        );
 
       // Target: The Vendor of the store
       targetUserEmail = order.store?.vendor?.email;
-    } 
-    else if (dto.rideId) {
+    } else if (dto.rideId) {
       const ride = await this.prisma.ride.findUnique({
         where: { id: dto.rideId },
         include: { rider: true },
       });
 
       if (!ride) throw new NotFoundException('Ride not found');
-      if (ride.customerId !== userId) throw new BadRequestException('You can only report disputes for your own rides.');
+      if (ride.customerId !== userId)
+        throw new BadRequestException(
+          'You can only report disputes for your own rides.',
+        );
 
       // Target: The Rider
       targetUserEmail = ride.rider?.email;
-    } 
-    else if (dto.deliveryId) {
+    } else if (dto.deliveryId) {
       const delivery = await this.prisma.delivery.findUnique({
         where: { id: dto.deliveryId },
         include: { rider: true },
       });
 
       if (!delivery) throw new NotFoundException('Delivery not found');
-      if (delivery.customerId !== userId) throw new BadRequestException('You can only report disputes for your own deliveries.');
+      if (delivery.customerId !== userId)
+        throw new BadRequestException(
+          'You can only report disputes for your own deliveries.',
+        );
 
       // Target: The Rider
       targetUserEmail = delivery.rider?.email;
@@ -92,10 +101,24 @@ export class DisputesService {
     // 4. Dynamic Priority Assignment
     // Auto-escalate based on sensitive keywords in reason or description
     const sensitiveKeywords = [
-      'safety', 'accident', 'harassment', 'assault', 'threat', 'emergency', 
-      'injury', 'police', 'danger', 'reckless'
+      'safety',
+      'accident',
+      'harassment',
+      'assault',
+      'threat',
+      'emergency',
+      'injury',
+      'police',
+      'danger',
+      'reckless',
     ];
-    const highKeywords = ['stolen', 'fraud', 'missing', 'aggressive', 'stealing'];
+    const highKeywords = [
+      'stolen',
+      'fraud',
+      'missing',
+      'aggressive',
+      'stealing',
+    ];
 
     const combinedText = `${dto.reason} ${dto.description}`.toLowerCase();
 

@@ -156,7 +156,7 @@ export default function MenuScreen() {
     <MenuItemCard
       item={item}
       onToggleStock={() => handleToggleStock(item.id)}
-      onEdit={() => router.push(`/(main)/(menu)/add-item?id=${item.id}`)}
+      onEdit={() => router.push(`/(menu)/add-item?id=${item.id}`)}
       onDelete={() => setDeleteTarget(item)}
     />
   );
@@ -340,7 +340,7 @@ export default function MenuScreen() {
       {/* Floating Action Button */}
       <FloatingActionButton
         icon="plus"
-        onPress={() => router.push("/(main)/(menu)/add-item")}
+        onPress={() => router.push("/(menu)/add-item")}
       />
 
       {/* Delete Confirmation */}

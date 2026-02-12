@@ -175,8 +175,10 @@ model User {
   phone     String?
   image     String?
   googleId  String?    @unique @map("google_id")
+  appleId   String?    @unique @map("apple_id")
   notifications Notification[]
   fcmToken  String?  @map("fcm_token")
+  expoPushToken String? @map("expo_push_token")
   role      UserRole   @default(CUSTOMER)
   status    UserStatus @default(ACTIVE)
   verificationStatus String? @default("UNVERIFIED")
@@ -185,6 +187,7 @@ model User {
   updatedAt DateTime   @updatedAt
 
   orders       Order[]
+  orderGroups  OrderGroup[]
   addresses    Address[]
   reviews      Review[]
   activityLogs ActivityLog[]
@@ -205,6 +208,7 @@ model User {
 
   @@index([email])
   @@index([googleId])
+  @@index([appleId])
   @@index([role, status])
   @@index([createdAt])
   @@index([status, createdAt(sort: Desc)])
@@ -695,6 +699,8 @@ model Order {
   storeId   String
   total     Float
   status    OrderStatus @default(PENDING)
+  orderGroupId  String?     // Nullable for backward compatibility
+  orderGroup    OrderGroup? @relation(fields: [orderGroupId], references: [id])
   paymentStatus String?  @default("PENDING") // PENDING, PAID, FAILED
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
@@ -717,6 +723,21 @@ model Order {
   @@index([status, deliveredAt(sort: Desc)])
   @@index([createdAt(sort: Desc), status]) 
 }
+
+model OrderGroup {
+  id            String        @id @default(uuid())
+  userId        String
+  user          User          @relation(fields: [userId], references: [id])
+  totalAmount   Float         
+  paymentStatus PaymentStatus @default(PENDING)
+  
+  // Update this line: remove (fields: [paymentId], references: [id])
+  payment       Payment?      @relation("GroupPayment") 
+  transactions  Transaction[]
+  orders        Order[]       
+  createdAt     DateTime      @default(now())
+}
+
 
 model OrderItemModifier {
   id         String    @id @default(uuid())
@@ -758,23 +779,30 @@ model Payment {
   failureReason String?
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
-  
+
+  // === Multi-Vendor Cart Field (Fixed) ===
+  // This connects the Payment to the Group of orders
+  orderGroupId  String?       @unique
+  orderGroup    OrderGroup?   @relation("GroupPayment", fields: [orderGroupId], references: [id])
+  // =======================================
+
   // Payment Gateway Fields
-  reference           String  @unique
-  gateway             String  // PAYSTACK, FLUTTERWAVE, MONNIFY
-  authorizationUrl    String?
-  accessCode          String?
-  accountNumber       String?
-  bankName            String?
-  accountName         String?
-  expiresAt           DateTime?
-  paidAt              DateTime?
-  verifiedAt          DateTime?
-  customerEmail       String?
-  customerName        String?
-  metadata            Json?
-  paymentStatus       String? // PAID, FAILED, PENDING (for order relation)
-  
+  reference        String    @unique
+  gateway          String    // PAYSTACK, FLUTTERWAVE, MONNIFY
+  authorizationUrl String?
+  accessCode       String?
+  accountNumber    String?
+  bankName         String?
+  accountName      String?
+  expiresAt        DateTime?
+  paidAt           DateTime?
+  verifiedAt       DateTime?
+  customerEmail    String?
+  customerName     String?
+  metadata         Json?
+  paymentStatus    String?   // PAID, FAILED, PENDING (for order relation)
+
+  // Relations
   disputes      Dispute[]
   order         Order?        @relation("OrderPayment", fields: [orderId], references: [id], onDelete: Cascade)
   ride          Ride?         @relation("RidePayment", fields: [rideId], references: [id], onDelete: Cascade)
@@ -782,6 +810,7 @@ model Payment {
   user          User          @relation(fields: [userId], references: [id], onDelete: Restrict)
   transactions  Transaction[] // Link to transaction ledger
 
+  // Indexes
   @@index([userId, status])
   @@index([status, createdAt])
   @@index([transactionId])
@@ -913,6 +942,10 @@ model Transaction {
   orderId         String?
   rideId          String?
   deliveryId      String?
+
+  // === FIX: Add Traceability for Multi-Vendor Orders ===
+  orderGroupId    String?
+  // ====================================================
   
   // Financial tracking
   balanceBefore Float
@@ -932,11 +965,14 @@ model Transaction {
   vendorPayout  VendorPayout? @relation(fields: [vendorPayoutId], references: [id], onDelete: Restrict)
   riderPayout   RiderPayout?  @relation(fields: [riderPayoutId], references: [id], onDelete: Restrict)
   
-  // 👇 ADD THESE LINES
   delivery      Delivery?     @relation(fields: [deliveryId], references: [id])
   order         Order?        @relation(fields: [orderId], references: [id])
   ride          Ride?         @relation(fields: [rideId], references: [id])
   
+  // === FIX: Relation to OrderGroup ===
+  orderGroup    OrderGroup?   @relation(fields: [orderGroupId], references: [id])
+  // ===================================
+
   @@index([entityType, entityId, createdAt])
   @@index([type, status, createdAt])
   @@index([paymentId])
@@ -945,6 +981,9 @@ model Transaction {
   @@index([orderId])
   @@index([rideId])
   @@index([deliveryId])
+  // === FIX: Index for fast lookups ===
+  @@index([orderGroupId])
+  // ===================================
   @@index([createdAt(sort: Desc)])
   @@index([status, createdAt])
   @@index([type, createdAt(sort: Desc), amount])

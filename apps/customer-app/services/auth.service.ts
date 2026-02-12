@@ -1,9 +1,21 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as SecureStore from "expo-secure-store";
 
-const DEFAULT_API_URL = "https://asoose.com/api/v1";
-const API_BASE = (process.env.EXPO_PUBLIC_API_URL || DEFAULT_API_URL)
-  .replace(/\/+$/, "")
-  .replace(/\/$/, "");
+const API_BASE = (() => {
+  const url = process.env.EXPO_PUBLIC_API_URL;
+  if (!url) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error(
+        "EXPO_PUBLIC_API_URL is required in production. Please set it via EAS secrets or environment variables.",
+      );
+    }
+    // In development, you may fallback or warn
+    console.warn(
+      "EXPO_PUBLIC_API_URL is not set. Using default development URL.",
+    );
+    return "https://asoose.com/api/v1";
+  }
+  return url.replace(/\/+$/, "").replace(/\/$/, "");
+})();
 const AUTH_BASE = `${API_BASE}/auth/user`;
 const UNIVERSAL_AUTH_BASE = `${API_BASE}/auth`;
 
@@ -178,11 +190,11 @@ export async function logout() {
 }
 
 export async function getAccessToken() {
-  return AsyncStorage.getItem(ACCESS_TOKEN_KEY);
+  return SecureStore.getItemAsync(ACCESS_TOKEN_KEY);
 }
 
 export async function getRefreshToken() {
-  return AsyncStorage.getItem(REFRESH_TOKEN_KEY);
+  return SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
 }
 
 export async function setTokens(tokens: {
@@ -191,22 +203,25 @@ export async function setTokens(tokens: {
 }) {
   const ops: Promise<void>[] = [];
   if (typeof tokens.accessToken === "string") {
-    ops.push(AsyncStorage.setItem(ACCESS_TOKEN_KEY, tokens.accessToken));
+    ops.push(SecureStore.setItemAsync(ACCESS_TOKEN_KEY, tokens.accessToken));
   } else if (tokens.accessToken === null) {
-    ops.push(AsyncStorage.removeItem(ACCESS_TOKEN_KEY));
+    ops.push(SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY));
   }
 
   if (typeof tokens.refreshToken === "string") {
-    ops.push(AsyncStorage.setItem(REFRESH_TOKEN_KEY, tokens.refreshToken));
+    ops.push(SecureStore.setItemAsync(REFRESH_TOKEN_KEY, tokens.refreshToken));
   } else if (tokens.refreshToken === null) {
-    ops.push(AsyncStorage.removeItem(REFRESH_TOKEN_KEY));
+    ops.push(SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY));
   }
 
   await Promise.all(ops);
 }
 
 export async function clearTokens() {
-  await AsyncStorage.multiRemove([ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY]);
+  await Promise.all([
+    SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY),
+    SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY),
+  ]);
 }
 
 export const authConfig = {
