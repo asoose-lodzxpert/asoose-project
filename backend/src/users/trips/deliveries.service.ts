@@ -248,6 +248,10 @@ export class DeliveriesService {
 
       const deliveryOtp = this.geo.generateOTP(TRIPS_CONFIG.OTP_LENGTH);
 
+      // as/backend/src/users/trips/deliveries.service.ts
+
+// ... inside requestDelivery method ...
+
       const delivery = await tx.delivery.create({
         data: {
           customerId: userId,
@@ -260,8 +264,16 @@ export class DeliveriesService {
           recipientName: this.common.sanitizeText(dto.recipientName),
           recipientPhone: dto.recipientPhone,
           packageDetails: this.common.sanitizeText(dto.packageDetails),
-          weightKg: dto.weightKg,
           deliveryOtp,
+          
+          // ✅ Package Metadata Mapping
+          weightKg: dto.weightKg,                 // Existing
+          isFragile: dto.fragile ?? false,        // Existing
+          
+          // New Fields
+          isPerishable: dto.perishable ?? false,
+          containsLiquid: dto.containsLiquid ?? false,
+          declaredValue: dto.declaredValue ?? 0,
         },
       });
 

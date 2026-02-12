@@ -7,6 +7,7 @@ import {
   Min,
   IsEnum,
   ValidateNested,
+  IsBoolean, // ✅ Added for checkbox validation
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -85,7 +86,6 @@ export class CancelTripDto {
   reason?: string;
 }
 
-// Keep RequestDeliveryDto as is, or update similarly if needed...
 export class RequestDeliveryDto {
   @ApiPropertyOptional()
   @IsOptional()
@@ -172,18 +172,22 @@ export class RequestDeliveryDto {
 
   @ApiPropertyOptional()
   @IsOptional()
-  @IsString()
-  declaredValue?: string;
+  @IsNumber() // ✅ Changed from String to Number
+  @Min(0)     // ✅ Enforce positive value
+  declaredValue?: number;
 
   @ApiPropertyOptional()
   @IsOptional()
+  @IsBoolean() // ✅ Added Validation
   fragile?: boolean;
 
   @ApiPropertyOptional()
   @IsOptional()
+  @IsBoolean() // ✅ Added Validation
   perishable?: boolean;
 
   @ApiPropertyOptional()
   @IsOptional()
+  @IsBoolean() // ✅ Added Validation
   containsLiquid?: boolean;
 }

@@ -10,7 +10,7 @@ import { toast } from "react-toastify";
 import { Loader2, Trash2, ExternalLink, Edit2, X } from "lucide-react";
 import Image from "next/image";
 import { getSession } from "next-auth/react";
-import Swal from "sweetalert2"; // ✅ Import SweetAlert2
+import Swal from "sweetalert2";
 
 import ImageUpload from "@/app/main/components/ImageUpload";
 import { fetcher } from "../hooks/useSuperAdminFetch";
@@ -157,7 +157,6 @@ export default function BannerManagement() {
     });
   };
 
-  // ✅ Updated Delete Confirmation with SweetAlert2
   const handleDelete = async (id: string) => {
     const result = await Swal.fire({
       title: "Are you sure?",

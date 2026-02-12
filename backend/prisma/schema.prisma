@@ -904,6 +904,10 @@ model Delivery {
   weightKg       Float?
   isFragile      Boolean @default(false)
 
+  isPerishable   Boolean @default(false)
+  containsLiquid Boolean @default(false)
+  declaredValue  Float?  @default(0)     // For insurance/liability
+
   // Pricing
   deliveryFee Float
   distanceKm  Float?
