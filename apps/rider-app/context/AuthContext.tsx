@@ -4,14 +4,8 @@ import {
   getAccessToken,
   refreshAccessToken,
   logout,
-  isBiometricSupported,
-  isBiometricEnrolled,
-  isBiometricEnabled,
-  enableBiometric,
-  disableBiometric,
-  authenticateWithBiometric,
-  getBiometricCredentials,
 } from "@/services/auth";
+import { useBiometric } from "../hooks/useBiometric";
 import { fetchCurrentUser } from "@/services/auth-fetch";
 
 type User = {
@@ -21,50 +15,28 @@ type User = {
   phone?: string;
 };
 
-type BiometricState = {
-  isSupported: boolean;
-  isEnrolled: boolean;
-  isEnabled: boolean;
-};
-
-type AuthContextType = {
+interface AuthContextType {
   user: User | null;
   loading: boolean;
-  biometric: BiometricState;
-  signIn: (identifier: string, password: string) => Promise<void>;
-  signOut: () => Promise<void>;
-  signInWithBiometric: () => Promise<void>;
-  enableBiometricAuth: (identifier: string, password: string) => Promise<void>;
-  disableBiometricAuth: () => Promise<void>;
-};
+  login: (credentials: { email: string; password: string }) => Promise<void>;
+  logout: () => Promise<void>;
+  biometricAvailable: boolean;
+  biometricEnrolled: boolean;
+  biometricLogin: () => Promise<void>;
+  enableBiometrics: (email: string, password: string) => Promise<void>;
+  disableBiometrics: () => Promise<void>;
+  isBiometricEnabled: () => Promise<boolean>;
+}
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [biometric, setBiometric] = useState<BiometricState>({
-    isSupported: false,
-    isEnrolled: false,
-    isEnabled: false,
-  });
-
-  // Check biometric availability on mount
+  const biometric = useBiometric();
   useEffect(() => {
-    async function checkBiometric() {
-      const supported = await isBiometricSupported();
-      const enrolled = await isBiometricEnrolled();
-      const enabled = await isBiometricEnabled();
-
-      setBiometric({
-        isSupported: supported,
-        isEnrolled: enrolled,
-        isEnabled: enabled,
-      });
-    }
-
-    checkBiometric();
-  }, []);
+    biometric.checkBiometricAvailability();
+  }, [biometric]);
 
   // Check for existing session on mount
   useEffect(() => {
@@ -90,65 +62,95 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     checkToken();
   }, []);
 
-  async function signIn(identifier: string, password: string) {
-    let prevBiometric: { identifier: string; password: string } | null = null;
-    try {
-      prevBiometric = await getBiometricCredentials();
-    } catch {}
-    const { user } = await login(identifier, password);
-    if (
-      prevBiometric &&
-      prevBiometric.identifier &&
-      prevBiometric.identifier !== identifier
-    ) {
-      await disableBiometricAuth();
-    }
-    setUser(user);
-  }
+  const saveSession = async (u: User) => {
+    setUser(u);
+  };
 
-  async function signInWithBiometric() {
-    const authenticated = await authenticateWithBiometric();
-    if (!authenticated) {
-      throw new Error("Biometric authentication failed");
-    }
-
-    const credentials = await getBiometricCredentials();
-    if (!credentials) {
-      throw new Error("No biometric credentials found");
-    }
-
-    const { user } = await login(credentials.identifier, credentials.password);
-    setUser(user);
-  }
-
-  async function enableBiometricAuth(identifier: string, password: string) {
-    await enableBiometric(identifier, password);
-    setBiometric((prev) => ({ ...prev, isEnabled: true }));
-  }
-
-  async function disableBiometricAuth() {
-    await disableBiometric();
-    setBiometric((prev) => ({ ...prev, isEnabled: false }));
-  }
-
-  async function signOut() {
+  const clearSession = async () => {
     setUser(null);
-    await logout();
-    // Always clear biometric credentials on logout
-    await disableBiometricAuth();
-  }
+    await biometric.clearCredentials();
+  };
+
+  const loginHandler = async ({
+    email,
+    password,
+  }: {
+    email: string;
+    password: string;
+  }) => {
+    setLoading(true);
+    try {
+      const resp = await login(email, password);
+      await saveSession(resp.user);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const logoutHandler = async () => {
+    setLoading(true);
+    try {
+      await logout();
+      await clearSession();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const enableBiometrics = async (email: string, password: string) => {
+    const success = await biometric.saveCredentials(email, password);
+    if (!success) throw new Error("Failed to enable biometric authentication");
+  };
+
+  const disableBiometrics = async () => {
+    await biometric.clearCredentials();
+  };
+
+  const isBiometricEnabled = async (): Promise<boolean> => {
+    const creds = await biometric.getCredentials();
+    return creds !== null;
+  };
+
+  const biometricLogin = async () => {
+    if (!biometric.isAvailable || !biometric.isEnrolled) {
+      throw new Error("Biometric authentication not available on this device");
+    }
+    const authResult = await biometric.authenticate(
+      "Verify your fingerprint to login",
+    );
+    if (!authResult.success) {
+      throw new Error(authResult.error || "Biometric verification failed");
+    }
+    const creds = await biometric.getCredentials();
+    if (!creds) {
+      throw new Error("No biometric credentials saved");
+    }
+    setLoading(true);
+    try {
+      const resp = await login(creds.email, creds.password);
+      await saveSession(resp.user);
+      biometric.resetStatus();
+    } catch (err) {
+      biometric.resetStatus();
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <AuthContext.Provider
       value={{
         user,
         loading,
-        biometric,
-        signIn,
-        signOut,
-        signInWithBiometric,
-        enableBiometricAuth,
-        disableBiometricAuth,
+        login: loginHandler,
+        logout: logoutHandler,
+        biometricAvailable: biometric.isAvailable,
+        biometricEnrolled: biometric.isEnrolled,
+        biometricLogin,
+        enableBiometrics,
+        disableBiometrics,
+        isBiometricEnabled,
       }}
     >
       {children}

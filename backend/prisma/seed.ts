@@ -10,7 +10,7 @@ import { seedVerificationQueue } from './07-verification';
 import { seedBanks } from './08-bank';
 
 async function main() {
-  // await cleanDatabase(); // Optional
+  await cleanDatabase(); // Optional
 
   await seedAddresses();
   await seedUsersAndRiders();

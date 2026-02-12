@@ -258,4 +258,37 @@ export class QueueService implements OnModuleInit {
   private calculatePriority(attempt: number): number {
     return Math.max(1, 10 - attempt); // higher priority for retries
   }
+  async enqueueOrderNotification(data: {
+    orderId: string;
+    userId: string;
+    type: string;
+  }) {
+    const job = await this.notificationQueue.add(
+      'order.notifications', // Job Name
+      data,
+      QUEUE_OPTIONS.notification,
+    );
+
+    this.logger.debug(`Enqueued order notification: ${data.orderId}`);
+    return job;
+  }
+  async enqueueOrderNotificationBulk(
+    jobs: Array<{
+      name: string;
+      data: { orderId: string; userId: string; type: string };
+    }>,
+  ) {
+    const jobOpts = QUEUE_OPTIONS.notification;
+
+    // Map to BullMQ bulk format
+    const bulkJobs = jobs.map((job) => ({
+      name: job.name,
+      data: job.data,
+      opts: jobOpts,
+    }));
+
+    const result = await this.notificationQueue.addBulk(bulkJobs);
+    this.logger.debug(`Enqueued ${result.length} bulk order notifications`);
+    return result;
+  }
 }

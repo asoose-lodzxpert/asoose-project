@@ -1,126 +1,153 @@
-import { Stack } from "expo-router";
-import { View, ActivityIndicator } from "react-native";
-import { GestureHandlerRootView } from "react-native-gesture-handler";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useEffect, useState } from "react";
-import * as Location from "expo-location";
+import { Stack, useRouter, useSegments } from "expo-router";
+import React, { useEffect, useState } from "react";
+import { Image, StyleSheet, View } from "react-native";
 
-import { AuthProvider, useAuth } from "@/context/AuthContext";
+// Providers & Context
 import ConfirmProvider from "@/components/ui/ConfirmDialogProvider";
-import { LocationProvider } from "@/context/LocationContext";
-import { CartProvider } from "@/context/CartContext";
-import { SendPackageProvider } from "@/context/SendPackageContext";
 import ThemedToastProvider from "@/components/ui/ThemedToast";
-import { HomeProvider } from "@/context/HomeContext";
 import { ToastProvider } from "@/components/ui/toast";
+import { AuthProvider, useAuth } from "@/context/AuthContext";
+import { CartProvider } from "@/context/CartContext";
+import { HomeProvider } from "@/context/HomeContext";
+import { LocationProvider } from "@/context/LocationContext";
 import { RideProvider } from "@/context/RideContext";
+import { SendPackageProvider } from "@/context/SendPackageContext";
+import WelcomeScreen from "./onboarding";
 
-/* ---------------------------------- */
-/* Root Navigator */
-/* ---------------------------------- */
+const ONBOARDING_KEY = "asoose_customer_onboarded";
+const AUTH_GROUPS = ["(auth)"];
+
+/**
+ * 1. Simple Loading Component
+ */
+const LoadingSplash = () => (
+  <View style={styles.loadingContainer}>
+    <Image
+      source={require("@/assets/images/icon.png")}
+      style={styles.logo}
+      resizeMode="contain"
+    />
+  </View>
+);
+
+/**
+ * 2. Navigation Logic
+ * Handles guards, onboarding, and routing
+ */
 function RootNavigator() {
-  const { user, loading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
+  const [showWelcome, setShowWelcome] = useState<boolean | null>(null);
+  const router = useRouter();
+  const segments = useSegments();
 
-  const [hasLaunched, setHasLaunched] = useState<boolean | null>(null);
-  const [locationGranted, setLocationGranted] = useState<boolean | null>(null);
-
-  /* ---------- First Launch ---------- */
+  // Onboarding check
   useEffect(() => {
-    async function checkFirstLaunch() {
+    const checkOnboarding = async () => {
       try {
-        const value = await AsyncStorage.getItem("hasLaunched");
-        if (!value) {
-          await AsyncStorage.setItem("hasLaunched", "true");
-          setHasLaunched(false);
-        } else {
-          setHasLaunched(true);
-        }
-      } catch {
-        setHasLaunched(true);
+        const seen = await AsyncStorage.getItem(ONBOARDING_KEY);
+        setShowWelcome(seen !== "true");
+      } catch (e) {
+        setShowWelcome(false);
       }
-    }
-
-    checkFirstLaunch();
+    };
+    checkOnboarding();
   }, []);
 
-  /* ---------- Location Permission ---------- */
+  // Centralized route guard
   useEffect(() => {
-    async function checkLocationPermission() {
-      if (!user) {
-        setLocationGranted(null);
-        return;
-      }
+    if (authLoading || showWelcome === null) return;
 
-      const { status } = await Location.getForegroundPermissionsAsync();
-      setLocationGranted(status === Location.PermissionStatus.GRANTED);
+    const inAuthGroup = AUTH_GROUPS.includes(segments[0]);
+
+    if (showWelcome) {
+      // If we need to show welcome, we stay put;
+      // the conditional return below handles the UI.
+      return;
     }
 
-    checkLocationPermission();
-  }, [user]);
+    if (!user && !inAuthGroup) {
+      // Not logged in -> Redirect to Login
+      router.replace("/(auth)/login");
+    } else if (user && inAuthGroup) {
+      // Logged in but trying to access Login/Signup -> Redirect to Home
+      router.replace("/(tabs)/home");
+    }
+  }, [user, authLoading, showWelcome, segments]);
 
-  /* ---------- Loading State ---------- */
-  if (loading || hasLaunched === null || (user && locationGranted === null)) {
+  if (authLoading || showWelcome === null) return <LoadingSplash />;
+
+  if (showWelcome) {
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-        <ActivityIndicator />
-      </View>
+      <WelcomeScreen
+        onDone={async () => {
+          await AsyncStorage.setItem(ONBOARDING_KEY, "true");
+          setShowWelcome(false);
+        }}
+      />
     );
   }
 
-  /* ---------- Navigation ---------- */
-  // Always render all screens, use initialRouteName and navigation guards
-  let initialRouteName = "onboarding";
-  if (hasLaunched) {
-    if (!user) initialRouteName = "(auth)";
-    else if (!locationGranted) initialRouteName = "enable-location";
-    else initialRouteName = "(tabs)";
-  }
-
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <Stack
-        screenOptions={{ headerShown: false }}
-        initialRouteName={initialRouteName}
-      >
-        <Stack.Screen name="onboarding" />
-        <Stack.Screen name="(auth)" />
-        <Stack.Screen name="enable-location" />
-        <Stack.Screen name="(tabs)" />
-        {/* Global modal routes */}
-        <Stack.Screen
-          name="(delivery)/location-picker"
-          options={{
-            presentation: "modal",
-            animation: "slide_from_bottom",
-          }}
-        />
-      </Stack>
-    </GestureHandlerRootView>
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="(auth)" />
+      <Stack.Screen name="(tabs)" />
+      <Stack.Screen name="(store)" />
+      <Stack.Screen name="(settings)" />
+      <Stack.Screen name="(delivery)" />
+      <Stack.Screen name="(ride)" />
+      <Stack.Screen name="(notifications)" />
+    </Stack>
   );
 }
 
-/* ---------------------------------- */
-/* Root Layout (MUST be default export) */
-/* ---------------------------------- */
+/**
+ * 3. Inner Provider Wrapper
+ * This allows providers like CartProvider to access the Auth context safely
+ */
+function AuthDependentProviders({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
+
+  return (
+    <CartProvider userId={user?.id}>
+      <HomeProvider>
+        <RideProvider>
+          <SendPackageProvider>{children}</SendPackageProvider>
+        </RideProvider>
+      </HomeProvider>
+    </CartProvider>
+  );
+}
+
+/**
+ * 4. Main Entry Point
+ */
 export default function RootLayout() {
   return (
     <AuthProvider>
       <LocationProvider>
         <ConfirmProvider>
-          <CartProvider>
-            <HomeProvider>
-              <RideProvider>
-                <SendPackageProvider>
-                  <ToastProvider>
-                    <RootNavigator />
-                    <ThemedToastProvider />
-                  </ToastProvider>
-                </SendPackageProvider>
-              </RideProvider>
-            </HomeProvider>
-          </CartProvider>
+          <ToastProvider>
+            <AuthDependentProviders>
+              <RootNavigator />
+              <ThemedToastProvider />
+            </AuthDependentProviders>
+          </ToastProvider>
         </ConfirmProvider>
       </LocationProvider>
     </AuthProvider>
   );
 }
+
+const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#ffffff", // Match your app theme
+  },
+  logo: {
+    width: 120,
+    height: 120,
+  },
+});

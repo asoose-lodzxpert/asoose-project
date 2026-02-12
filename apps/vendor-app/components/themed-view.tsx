@@ -12,8 +12,9 @@ export function ThemedView({
   style,
   lightColor,
   darkColor,
+  children,
   ...otherProps
-}: ThemedViewProps) {
+}: ThemedViewProps & { children?: React.ReactNode }) {
   const backgroundColor = useThemeColor(
     { light: lightColor, dark: darkColor },
     "surfaceBackground",
@@ -28,7 +29,9 @@ export function ThemedView({
         barStyle={isDark ? "light-content" : "dark-content"}
         backgroundColor={backgroundColor}
       />
-      <SafeAreaView style={[{ backgroundColor }, style]} {...otherProps} />
+      <SafeAreaView style={[{ backgroundColor }, style]} {...otherProps}>
+        {children}
+      </SafeAreaView>
     </>
   );
 }

@@ -1,161 +1,165 @@
+import React, { useEffect, useState } from "react";
+import { StyleSheet, View } from "react-native";
+import { Stack } from "expo-router";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import Toast from "react-native-toast-message";
+
+// Components & Context
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { ThemedText } from "@/components/themed-text";
-import { ThemedView } from "@/components/themed-view";
 import { toastConfig } from "@/components/ThemedToast";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { NotificationProvider } from "@/context/NotificationContext";
 import { NotificationPreferencesProvider } from "@/context/NotificationPreferencesContext";
+import WelcomeScreen from "./welcome";
+
+// Utils
 import {
   checkStartupPermissions,
   requestStartupPermissions,
 } from "@/utils/permissions";
-import { Stack } from "expo-router";
-import { useEffect, useRef, useState } from "react";
-import { Animated, Image, StyleSheet, View } from "react-native";
-import { GestureHandlerRootView } from "react-native-gesture-handler";
-import Toast from "react-native-toast-message";
 
-function LoadingScreen() {
-  const dot1 = useRef(new Animated.Value(0)).current;
-  const dot2 = useRef(new Animated.Value(0)).current;
-  const dot3 = useRef(new Animated.Value(0)).current;
+const ONBOARDING_KEY = "asoose_vendor_onboarded";
 
+/**
+ * RootNavigator handles the conditional rendering of screens based on:
+ * 1. Onboarding status (Welcome Screen)
+ * 2. Authentication status
+ * 3. Account status (Pending, Active, Banned, etc.)
+ */
+function RootNavigator() {
+  const { user, loading: authLoading } = useAuth();
+  const [showWelcome, setShowWelcome] = useState<boolean | null>(null);
+
+  // Check if user has completed onboarding
   useEffect(() => {
-    const createAnimation = (dot: Animated.Value, delay: number) => {
-      return Animated.sequence([
-        Animated.delay(delay),
-        Animated.loop(
-          Animated.sequence([
-            Animated.timing(dot, {
-              toValue: -10,
-              duration: 400,
-              useNativeDriver: true,
-            }),
-            Animated.timing(dot, {
-              toValue: 0,
-              duration: 400,
-              useNativeDriver: true,
-            }),
-          ]),
-        ),
-      ]);
+    const checkOnboarding = async () => {
+      try {
+        const seen = await AsyncStorage.getItem(ONBOARDING_KEY);
+        setShowWelcome(seen !== "true");
+      } catch (e) {
+        setShowWelcome(false); // Fallback to app if storage fails
+      }
     };
-
-    Animated.parallel([
-      createAnimation(dot1, 0),
-      createAnimation(dot2, 150),
-      createAnimation(dot3, 300),
-    ]).start();
+    checkOnboarding();
   }, []);
 
-  return (
-    <ThemedView style={styles.loadingContainer}>
-      <Image
-        source={require("@/assets/images/icon.png")}
-        style={styles.logo}
-        resizeMode="contain"
-      />
-      <ThemedText type="title" style={styles.appName}>
-        ASOOSE VENDOR
-      </ThemedText>
-      <View style={styles.dotsContainer}>
-        <Animated.View
-          style={[styles.dot, { transform: [{ translateY: dot1 }] }]}
-        />
-        <Animated.View
-          style={[styles.dot, { transform: [{ translateY: dot2 }] }]}
-        />
-        <Animated.View
-          style={[styles.dot, { transform: [{ translateY: dot3 }] }]}
-        />
-      </View>
-    </ThemedView>
-  );
-}
-
-function RootNavigator() {
-  const { user, loading } = useAuth();
-
-  if (loading) {
-    return <LoadingScreen />;
-  }
-
-  if (!user) {
+  // Prevent flicker: Wait for both Auth and Onboarding checks
+  if (authLoading || showWelcome === null) {
     return (
-      <GestureHandlerRootView style={{ flex: 1 }}>
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="(auth)" />
-        </Stack>
-      </GestureHandlerRootView>
+      <View style={styles.loadingContainer}>
+        {/* App Logo as loading screen */}
+        <View>
+          <Image
+            source={require("@/assets/images/icon.png")}
+            style={styles.logo}
+            resizeMode="contain"
+          />
+        </View>
+      </View>
     );
   }
 
+  // 1. Onboarding Flow
+  if (showWelcome) {
+    return (
+      <WelcomeScreen
+        onDone={async () => {
+          await AsyncStorage.setItem(ONBOARDING_KEY, "true");
+          setShowWelcome(false);
+        }}
+      />
+    );
+  }
+
+  // 2. Unauthenticated Flow
+  if (!user) {
+    return (
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="(auth)" />
+      </Stack>
+    );
+  }
+
+  // 3. Authenticated & Account Status Flow
   const status = user.status?.trim().toUpperCase() ?? "";
 
-  console.log("User status:", status);
+  // Mapping statuses to their respective route groups
+  const statusRoutes: Record<string, string> = {
+    PENDING: "(status)/pending",
+    SUSPENDED: "(status)/suspended",
+    CLOSED_PERMANENTLY: "(status)/closed-permanently",
+    BANNED: "(status)/banned",
+    ACTIVE: "(main)",
+  };
+
+  const currentRoute = statusRoutes[status] || "(auth)";
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <Stack screenOptions={{ headerShown: false }}>
-        {status === "PENDING" ? (
-          <Stack.Screen name="(status)/pending" />
-        ) : status === "SUSPENDED" ? (
-          <Stack.Screen name="(status)/suspended" />
-        ) : status === "CLOSED_PERMANENTLY" ? (
-          <Stack.Screen name="(status)/closed-permanently" />
-        ) : status === "BANNED" ? (
-          <Stack.Screen name="(status)/banned" />
-        ) : status === "ACTIVE" ? (
-          <Stack.Screen name="(main)" />
-        ) : (
-          <Stack.Screen name="(auth)" />
-        )}
-      </Stack>
-    </GestureHandlerRootView>
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name={currentRoute} />
+    </Stack>
   );
 }
 
+/**
+ * RootLayout handles top-level providers and app-wide initialization (Permissions)
+ */
 export default function RootLayout() {
   const [permissionsReady, setPermissionsReady] = useState(false);
 
   useEffect(() => {
-    let mounted = true;
+    let isMounted = true;
 
     const initPermissions = async () => {
       try {
         await requestStartupPermissions();
         await checkStartupPermissions();
       } catch (e) {
-        console.warn("Startup permission check failed:", e);
+        if (__DEV__) console.warn("Startup permission check failed:", e);
       } finally {
-        if (mounted) setPermissionsReady(true);
+        if (isMounted) setPermissionsReady(true);
       }
     };
 
     initPermissions();
-
     return () => {
-      mounted = false;
+      isMounted = false;
     };
   }, []);
 
   if (!permissionsReady) {
-    return <LoadingScreen />;
+    return (
+      <View style={styles.loadingContainer}>
+        {/* App Logo as loading screen */}
+        <View>
+          <Image
+            source={require("@/assets/images/icon.png")}
+            style={styles.logo}
+            resizeMode="contain"
+          />
+        </View>
+      </View>
+    );
   }
+
   return (
-    <ErrorBoundary>
-      <AuthProvider>
-        <NotificationProvider>
-          <NotificationPreferencesProvider>
-            <RootNavigator />
-            <Toast config={toastConfig} />
-          </NotificationPreferencesProvider>
-        </NotificationProvider>
-      </AuthProvider>
-    </ErrorBoundary>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <ErrorBoundary>
+        <AuthProvider>
+          <NotificationProvider>
+            <NotificationPreferencesProvider>
+              <RootNavigator />
+              <Toast config={toastConfig} />
+            </NotificationPreferencesProvider>
+          </NotificationProvider>
+        </AuthProvider>
+      </ErrorBoundary>
+    </GestureHandlerRootView>
   );
 }
 
+import { Image } from "react-native";
 const styles = StyleSheet.create({
   loadingContainer: {
     flex: 1,

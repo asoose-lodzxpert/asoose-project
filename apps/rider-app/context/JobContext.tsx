@@ -5,6 +5,7 @@ import { ConnectionStatus } from "@/services/job-events.service";
 import { CurrentJob, IncomingJobOffer, JobStatus, JobType } from "@/types/job";
 import React, { createContext, ReactNode, useContext, useState } from "react";
 import Toast from "react-native-toast-message";
+import { useLocationStream } from "@/hooks/useLocationStream";
 
 interface JobsContextState {
   status: JobStatus;
@@ -12,6 +13,11 @@ interface JobsContextState {
   incomingJob: IncomingJobOffer | null;
   activeJob: CurrentJob | null;
   connectionStatus: ConnectionStatus;
+  locationStreamStatus: {
+    isActive: boolean;
+    isConnected: boolean;
+    queueSize: number;
+  };
   goOnline(): Promise<void>;
   goOffline(): Promise<void>;
   acceptJob(jobId: string, jobType: JobType): Promise<void>;
@@ -34,8 +40,12 @@ export const JobsProvider = ({ children }: { children: ReactNode }) => {
   const [connectionStatus, setConnectionStatus] =
     useState<ConnectionStatus>("disconnected");
 
-  // Unified job event handlers
+  // Start location streaming when rider is online
+  const locationStreamStatus = useLocationStream({ enabled: isOnline });
+
+  // Unified job event handlers - Lazy initialization to avoid early imports
   const { reconnect } = useJobEvents({
+    enabled: isOnline,
     onJobAssigned: (job: IncomingJobOffer) => {
       setIncomingJob(job);
       setStatus("incoming-job");
@@ -78,7 +88,6 @@ export const JobsProvider = ({ children }: { children: ReactNode }) => {
         });
       }
     },
-    enabled: isOnline,
   });
 
   const goOnline = async () => {
@@ -279,6 +288,7 @@ export const JobsProvider = ({ children }: { children: ReactNode }) => {
         incomingJob,
         activeJob,
         connectionStatus,
+        locationStreamStatus,
         goOnline,
         goOffline,
         acceptJob,

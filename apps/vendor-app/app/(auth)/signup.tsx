@@ -40,6 +40,8 @@ export default function Signup() {
   const border = useThemeColor({}, "borderDefault");
   const brandPrimary = useThemeColor({}, "brandPrimary");
   const textOnPrimary = useThemeColor({}, "textOnPrimary");
+  const shadowColor = useThemeColor({}, "surfaceSubtle");
+  const buttonText = useThemeColor({}, "textPrimary");
 
   // Change handlers
   const handleChangeStep1 = <K extends keyof SignupStep1Data>(
@@ -192,6 +194,7 @@ export default function Signup() {
             backgroundColor: surfaceCard,
             borderTopColor: border,
             borderTopWidth: Platform.OS === "ios" ? 0 : 1,
+            shadowColor: shadowColor,
           },
         ]}
       >
@@ -200,7 +203,9 @@ export default function Signup() {
           onPress={() => step > 1 && setStep(step - 1)}
           disabled={step === 1 || submitting}
         >
-          <ThemedText type="defaultSemiBold">Back</ThemedText>
+          <ThemedText type="defaultSemiBold" style={{ color: buttonText }}>
+            Back
+          </ThemedText>
         </Pressable>
 
         <Pressable
@@ -232,7 +237,7 @@ const styles = StyleSheet.create({
     padding: 16,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    shadowColor: "#000",
+    // shadowColor is set dynamically from theme
     shadowOpacity: 0.05,
     shadowRadius: 5,
     shadowOffset: { width: 0, height: -2 },

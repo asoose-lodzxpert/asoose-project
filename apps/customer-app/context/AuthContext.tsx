@@ -1,17 +1,23 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as SecureStore from "expo-secure-store";
 import React, {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useState,
-  useCallback,
 } from "react";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useBiometric } from "../hooks/useBiometric";
 import {
   login as loginService,
-  refreshToken as refreshTokenService,
   logout as logoutService,
+  refreshAccessToken,
 } from "../services/auth.service";
-import { useBiometric } from "../hooks/useBiometric";
+import {
+  deleteExpoPushTokenFromBackend,
+  getExpoPushToken,
+  sendExpoPushTokenToBackend,
+} from "../services/expo-push-token.service";
 
 type User = {
   id: string;
@@ -45,21 +51,61 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const biometric = useBiometric();
 
+  // Single atomic initialization flow
   useEffect(() => {
+    let isMounted = true;
     async function initializeAuth() {
       try {
+        // 1. Check for access token in SecureStore
+        const accessToken = await SecureStore.getItemAsync(ACCESS_TOKEN_KEY);
+        if (!accessToken) {
+          // No token: fail closed
+          await clearSession();
+          if (isMounted) {
+            setUser(null);
+            setLoading(false);
+          }
+          return;
+        }
+
+        // 2. Optionally: try to refresh token (handles expiry)
+        try {
+          await refreshAccessToken();
+        } catch {
+          // Token refresh failed: fail closed
+          await clearSession();
+          if (isMounted) {
+            setUser(null);
+            setLoading(false);
+          }
+          return;
+        }
+
+        // 3. Restore user only if token is valid
         const storedUser = await AsyncStorage.getItem(USER_KEY);
-        if (storedUser) setUser(JSON.parse(storedUser));
+        if (storedUser) {
+          setUser(JSON.parse(storedUser));
+        } else {
+          // No user data: treat as logged out
+          await clearSession();
+          setUser(null);
+        }
+      } catch {
+        // Any error: fail closed
+        await clearSession();
+        setUser(null);
       } finally {
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     }
     initializeAuth();
-
-    // Check biometric availability
     biometric.checkBiometricAvailability();
+    return () => {
+      isMounted = false;
+    };
   }, [biometric]);
 
+  // Save session: only after successful login
   const saveSession = async (
     u: User,
     accessToken?: string | null,
@@ -67,55 +113,55 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   ) => {
     setUser(u);
     await AsyncStorage.setItem(USER_KEY, JSON.stringify(u));
-    if (accessToken) await AsyncStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
+    if (accessToken)
+      await SecureStore.setItemAsync(ACCESS_TOKEN_KEY, accessToken);
     if (refreshToken)
-      await AsyncStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+      await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, refreshToken);
   };
 
+  // Clear all auth state and storage
   const clearSession = async () => {
     setUser(null);
-    await AsyncStorage.multiRemove([
-      USER_KEY,
-      ACCESS_TOKEN_KEY,
-      REFRESH_TOKEN_KEY,
-    ]);
+    await AsyncStorage.removeItem(USER_KEY);
+    await SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY);
+    await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY);
     await biometric.clearCredentials();
   };
 
+  // Login flow
   const login = useCallback(
     async ({ email, password }: { email: string; password: string }) => {
-      setLoading(true);
       try {
-        console.log("[AuthContext] login called", { email });
         const resp = await loginService(email, password);
-        console.log("[AuthContext] loginService response", resp);
-        // resp expected: { user, accessToken, refreshToken }
         await saveSession(
           resp.user,
           resp.accessToken || null,
           resp.refreshToken || null,
         );
-        console.log("[AuthContext] saveSession complete", {
-          user: resp.user,
-          accessToken: resp.accessToken,
-          refreshToken: resp.refreshToken,
-        });
+        // Send expo push token to backend
+        try {
+          const token = await getExpoPushToken();
+          if (token) await sendExpoPushTokenToBackend(token);
+        } catch {}
       } catch (err) {
-        console.error("[AuthContext] login error", err);
+        // On login failure, clear all state
+        await clearSession();
         throw err;
-      } finally {
-        setLoading(false);
-        console.log("[AuthContext] login finished, loading:", false);
       }
     },
     [],
   );
 
+  // Logout: always clear all storage and state
   const logout = useCallback(async () => {
     setLoading(true);
+    setUser(null);
     try {
       try {
         await logoutService();
+      } catch {}
+      try {
+        await deleteExpoPushTokenFromBackend();
       } catch {}
       await clearSession();
     } finally {
@@ -142,37 +188,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return creds !== null;
   }, [biometric]);
 
-  /**
-   * CRITICAL: Biometric login with blocking logic
-   * 1. Check biometric availability
-   * 2. Prompt for biometric verification
-   * 3. MUST succeed before proceeding
-   * 4. Retrieve saved credentials
-   * 5. Perform actual login
-   */
   const biometricLogin = useCallback(async () => {
-    // Step 1: Check availability
     if (!biometric.isAvailable || !biometric.isEnrolled) {
       throw new Error("Biometric authentication not available on this device");
     }
-
-    // Step 2: Authenticate with biometric - THIS IS THE GATE
     const authResult = await biometric.authenticate(
       "Verify your fingerprint to login",
     );
-
-    // Step 3: Block further execution if verification failed
     if (!authResult.success) {
       throw new Error(authResult.error || "Biometric verification failed");
     }
-
-    // Step 4: Only after verification succeeds, get credentials
     const creds = await biometric.getCredentials();
     if (!creds) {
       throw new Error("No biometric credentials saved");
     }
-
-    // Step 5: Perform actual login with retrieved credentials
     try {
       setLoading(true);
       const resp = await loginService(creds.email, creds.password);
@@ -184,6 +213,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       biometric.resetStatus();
     } catch (err) {
       biometric.resetStatus();
+      await clearSession();
       throw err;
     } finally {
       setLoading(false);

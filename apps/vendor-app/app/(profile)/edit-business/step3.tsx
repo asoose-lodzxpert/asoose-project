@@ -4,6 +4,7 @@ import * as Location from "expo-location";
 import { useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -11,7 +12,6 @@ import {
   StyleSheet,
   View,
 } from "react-native";
-import MapView from "react-native-maps";
 import Toast from "react-native-toast-message";
 
 import { ImageUpload } from "@/components/signup/step3/ImageUpload";
@@ -20,19 +20,20 @@ import { StoreInfo } from "@/components/signup/step3/StoreInfo";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { useConfirm } from "@/hooks/use-confirm"; // Updated to use the hook
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { OpenHour, SignupStep3Data } from "@/types/signup";
 
 export default function EditStoreDetailsScreen() {
   const router = useRouter();
-  const mapRef = useRef<MapView | null>(null);
   const isMountedRef = useRef(true);
+  const { confirm, ConfirmModal } = useConfirm();
 
   const [locating, setLocating] = useState(false);
-  const [mapReady, setMapReady] = useState(false);
-
   const primary = useThemeColor({}, "brandPrimary");
   const borderColor = useThemeColor({}, "borderDefault");
+  const surfaceSubtle = useThemeColor({}, "surfaceSubtle");
+  const textOnPrimary = useThemeColor({}, "textOnPrimary");
 
   const [storeData, setStoreData] = useState<SignupStep3Data | null>(null);
   const [openHours, setOpenHours] = useState<Record<string, OpenHour>>({});
@@ -41,34 +42,33 @@ export default function EditStoreDetailsScreen() {
 
   useEffect(() => {
     isMountedRef.current = true;
-
-    (async () => {
-      try {
-        const details = await getBusinessDetails();
-        if (isMountedRef.current && details?.step3) {
-          setStoreData({
-            storeName: details.step3.storeName || "",
-            storeDescription: details.step3.storeDescription || "",
-            storeLogo: details.step3.storeLogo || "",
-            storeBanner: details.step3.storeBanner || "",
-            location: details.step3.location || { lat: 6.5244, lng: 3.3792 },
-            openHours: details.step3.openHours || {},
-          });
-          setOpenHours(details.step3.openHours || {});
-        }
-      } catch {
-        Toast.show({ type: "error", text1: "Failed to load store details" });
-      } finally {
-        if (isMountedRef.current) setLoading(false);
-      }
-    })();
-
+    loadStoreDetails();
     return () => {
       isMountedRef.current = false;
     };
   }, []);
 
-  /** Update store data */
+  const loadStoreDetails = async () => {
+    try {
+      const details = await getBusinessDetails();
+      if (isMountedRef.current && details?.step3) {
+        setStoreData({
+          storeName: details.step3.storeName || "",
+          storeDescription: details.step3.storeDescription || "",
+          storeLogo: details.step3.storeLogo || "",
+          storeBanner: details.step3.storeBanner || "",
+          location: details.step3.location || { lat: 6.5244, lng: 3.3792 },
+          openHours: details.step3.openHours || {},
+        });
+        setOpenHours(details.step3.openHours || {});
+      }
+    } catch {
+      Toast.show({ type: "error", text1: "Failed to load store details" });
+    } finally {
+      if (isMountedRef.current) setLoading(false);
+    }
+  };
+
   const handleChange = <K extends keyof SignupStep3Data>(
     key: K,
     value: SignupStep3Data[K],
@@ -76,7 +76,6 @@ export default function EditStoreDetailsScreen() {
     setStoreData((prev) => (prev ? { ...prev, [key]: value } : prev));
   };
 
-  /** Update open hours */
   const updateOpenHours = (next: Record<string, OpenHour>) => {
     setOpenHours(next);
     handleChange("openHours", next);
@@ -86,14 +85,7 @@ export default function EditStoreDetailsScreen() {
     if (!storeData) return;
     setSaving(true);
     try {
-      await updateStoreDetails({
-        storeName: storeData.storeName,
-        storeDescription: storeData.storeDescription,
-        storeLogo: storeData.storeLogo,
-        storeBanner: storeData.storeBanner,
-        location: storeData.location,
-        openHours: storeData.openHours,
-      });
+      await updateStoreDetails(storeData);
       Toast.show({ type: "success", text1: "Store details updated" });
       router.back();
     } catch {
@@ -106,15 +98,17 @@ export default function EditStoreDetailsScreen() {
   const useCurrentLocation = async () => {
     if (locating) return;
 
+    const confirmed = await confirm({
+      title: "Update Store Location",
+      message:
+        "Do you want to update your store location to your current location?",
+      confirmText: "Update",
+      type: "warning",
+    });
+    if (!confirmed) return;
+
     try {
       setLocating(true);
-
-      const servicesEnabled = await Location.hasServicesEnabledAsync();
-      if (!servicesEnabled) {
-        Toast.show({ type: "error", text1: "Location services are disabled" });
-        return;
-      }
-
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== "granted") {
         Toast.show({ type: "error", text1: "Location permission denied" });
@@ -126,20 +120,8 @@ export default function EditStoreDetailsScreen() {
       });
 
       const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-
-      if (!isMountedRef.current) return;
-
-      handleChange("location", coords);
-
-      if (mapReady && mapRef.current) {
-        requestAnimationFrame(() => {
-          mapRef.current?.animateToRegion({
-            latitude: coords.lat,
-            longitude: coords.lng,
-            latitudeDelta: 0.01,
-            longitudeDelta: 0.01,
-          });
-        });
+      if (isMountedRef.current) {
+        handleChange("location", coords);
       }
     } catch {
       Toast.show({ type: "error", text1: "Unable to get location" });
@@ -148,184 +130,22 @@ export default function EditStoreDetailsScreen() {
     }
   };
 
+  /**
+   * Generates a Static Map URL.
+   * This is the crash-proof alternative to MapView.
+   */
+  const getStaticMapUrl = (lat: number, lng: number) => {
+    // You can replace this with your Google Maps API Key or a free service like Mapbox/Stadia
+    // Using a placeholder style for demonstration
+    return `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=15&size=600x300&maptype=roadmap&markers=color:red%7C${lat},${lng}&key=YOUR_GOOGLE_API_KEY`;
+  };
+
   if (loading || !storeData) {
     return (
-      <ThemedView style={{ flex: 1 }}>
-        <View style={styles.header}>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-            <View
-              style={{
-                width: 24,
-                height: 24,
-                borderRadius: 12,
-                backgroundColor: borderColor,
-                opacity: 0.3,
-              }}
-            />
-            <View
-              style={{
-                width: 60,
-                height: 20,
-                borderRadius: 4,
-                backgroundColor: borderColor,
-                opacity: 0.3,
-              }}
-            />
-          </View>
-
-          <View
-            style={{
-              width: 140,
-              height: 24,
-              borderRadius: 4,
-              backgroundColor: borderColor,
-              opacity: 0.3,
-            }}
-          />
-
-          <View style={{ width: 40 }} />
-        </View>
-
-        <ScrollView
-          style={{ flex: 1 }}
-          contentContainerStyle={{
-            gap: 20,
-            paddingBottom: 32,
-            paddingHorizontal: 16,
-          }}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Store Info Skeleton */}
-          <View
-            style={{
-              borderRadius: 14,
-              padding: 16,
-              gap: 12,
-              backgroundColor: "transparent",
-            }}
-          >
-            <View
-              style={{
-                width: 180,
-                height: 20,
-                borderRadius: 4,
-                backgroundColor: borderColor,
-                opacity: 0.3,
-              }}
-            />
-            <View style={{ gap: 12 }}>
-              {[1, 2, 3, 4].map((i) => (
-                <View key={i} style={{ gap: 6 }}>
-                  <View
-                    style={{
-                      width: 120,
-                      height: 12,
-                      borderRadius: 4,
-                      backgroundColor: borderColor,
-                      opacity: 0.3,
-                    }}
-                  />
-                  <View
-                    style={{
-                      width: "80%",
-                      height: 18,
-                      borderRadius: 4,
-                      backgroundColor: borderColor,
-                      opacity: 0.3,
-                    }}
-                  />
-                </View>
-              ))}
-            </View>
-          </View>
-
-          {/* Images skeleton */}
-          <View style={{ gap: 8 }}>
-            <View
-              style={{
-                width: "100%",
-                height: 110,
-                borderRadius: 12,
-                backgroundColor: borderColor,
-                opacity: 0.3,
-              }}
-            />
-            <View
-              style={{
-                width: "100%",
-                height: 110,
-                borderRadius: 12,
-                backgroundColor: borderColor,
-                opacity: 0.3,
-              }}
-            />
-          </View>
-
-          {/* Location skeleton (map) */}
-          <View>
-            <View
-              style={{
-                width: "100%",
-                height: 200,
-                borderRadius: 12,
-                backgroundColor: borderColor,
-                opacity: 0.3,
-              }}
-            />
-          </View>
-
-          {/* Open hours skeleton */}
-          <View style={{ gap: 8 }}>
-            <View
-              style={{
-                width: 140,
-                height: 18,
-                borderRadius: 4,
-                backgroundColor: borderColor,
-                opacity: 0.3,
-              }}
-            />
-            {["Mon", "Tue", "Wed"].map((d) => (
-              <View
-                key={d}
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "space-between",
-                }}
-              >
-                <View
-                  style={{
-                    width: "30%",
-                    height: 14,
-                    borderRadius: 4,
-                    backgroundColor: borderColor,
-                    opacity: 0.3,
-                  }}
-                />
-                <View
-                  style={{
-                    width: "50%",
-                    height: 14,
-                    borderRadius: 4,
-                    backgroundColor: borderColor,
-                    opacity: 0.3,
-                  }}
-                />
-              </View>
-            ))}
-          </View>
-
-          {/* Save button skeleton */}
-          <View
-            style={{
-              marginTop: 12,
-              height: 50,
-              borderRadius: 14,
-              backgroundColor: borderColor,
-              opacity: 0.3,
-            }}
-          />
-        </ScrollView>
+      <ThemedView
+        style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
+      >
+        <ActivityIndicator size="large" color={primary} />
       </ThemedView>
     );
   }
@@ -335,95 +155,190 @@ export default function EditStoreDetailsScreen() {
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={{ flex: 1 }}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
       >
         <ScrollView
           style={{ flex: 1 }}
-          contentContainerStyle={{
-            gap: 20,
-            paddingBottom: 100,
-            paddingHorizontal: 16,
-          }}
+          contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
         >
-          {/* ================= Header ================= */}
+          {/* Header */}
           <View style={styles.header}>
-            <Pressable
-              onPress={() => router.back()}
-              style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
-            >
+            <Pressable onPress={() => router.back()} style={styles.backBtn}>
               <IconSymbol name="chevron.left" size={24} color={primary} />
               <ThemedText type="defaultSemiBold" style={{ color: primary }}>
                 Back
               </ThemedText>
             </Pressable>
+            <ThemedText type="subtitle">Edit Store</ThemedText>
+            <View style={{ width: 60 }} />
           </View>
 
           <StoreInfo data={storeData} onChange={handleChange} />
 
-          {/* ================= Images ================= */}
-          <ThemedText type="subtitle">Images</ThemedText>
-          <ImageUpload
-            label="Store Logo"
-            value={storeData.storeLogo}
-            circular
-            onPick={(v) => handleChange("storeLogo", v)}
-          />
-          <ImageUpload
-            label="Store Banner"
-            value={storeData.storeBanner}
-            onPick={(v) => handleChange("storeBanner", v)}
-          />
+          {/* Images */}
+          <ThemedText type="defaultSemiBold" style={styles.sectionTitle}>
+            Branding
+          </ThemedText>
+          <View style={styles.imageGrid}>
+            <ImageUpload
+              label="Store Logo"
+              value={storeData.storeLogo}
+              circular
+              onPick={(v) => handleChange("storeLogo", v)}
+            />
+            <ImageUpload
+              label="Store Banner"
+              value={storeData.storeBanner}
+              onPick={(v) => handleChange("storeBanner", v)}
+            />
+          </View>
 
-          {/* ================= Location ================= */}
-          {/**
-          <ThemedText type="subtitle">Location</ThemedText>
-          <LocationBlock
-            mapRef={mapRef}
-            primary={primary}
-            location={storeData.location}
-            loading={locating}
-            onUseCurrent={useCurrentLocation}
-            onPick={(v) => handleChange("location", v)}
-            // 👇 this is new
-            // LocationBlock uses this to avoid marker/map race
-            // and parent avoids animating until ready
-            // (you added mapReady inside LocationBlock earlier)
-          />
-          */}
+          {/* Location Replacement */}
+          <ThemedText type="defaultSemiBold" style={styles.sectionTitle}>
+            Store Location
+          </ThemedText>
+          <View style={styles.locationContainer}>
+            {/* <View
+              style={[
+                styles.mapPlaceholder,
+                { borderColor, backgroundColor: surfaceSubtle },
+              ]}
+            >
+              <Image
+                source={{
+                  uri: `https://api.mapbox.com/styles/v1/mapbox/streets-v11/static/pin-s-l+ff0000(${storeData.location?.lng},${storeData.location?.lat})/${storeData.location?.lng},${storeData.location?.lat},14/600x300?access_token=YOUR_MAPBOX_TOKEN`,
+                }}
+                style={styles.staticMap}
+                resizeMode="cover"
+              />
+              <View style={styles.coordinateBadge}>
+                <ThemedText style={styles.coordinateText}>
+                  {storeData.location?.lat?.toFixed(4)},{" "}
+                  {storeData.location?.lng?.toFixed(4)}
+                </ThemedText>
+              </View>
+            </View> */}
 
-          {/* ================= Open Hours ================= */}
-          <ThemedText type="subtitle">Open Hours</ThemedText>
+            <Pressable
+              style={[
+                styles.locationBtn,
+                { backgroundColor: primary, opacity: locating ? 0.7 : 1 },
+              ]}
+              onPress={useCurrentLocation}
+              disabled={locating}
+            >
+              {locating ? (
+                <ActivityIndicator size="small" color={textOnPrimary} />
+              ) : (
+                <View
+                  style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
+                >
+                  <IconSymbol
+                    name="location.fill"
+                    size={16}
+                    color={textOnPrimary}
+                  />
+                  <ThemedText
+                    style={{ color: textOnPrimary, fontWeight: "600" }}
+                  >
+                    Update to Current Location
+                  </ThemedText>
+                </View>
+              )}
+            </Pressable>
+          </View>
+
+          {/* Open Hours */}
+          <ThemedText type="defaultSemiBold" style={styles.sectionTitle}>
+            Operation Hours
+          </ThemedText>
           <OpenHoursBlock value={openHours} onChange={updateOpenHours} />
 
           <Pressable
-            style={{
-              marginTop: 24,
-              backgroundColor: primary,
-              paddingVertical: 14,
-              borderRadius: 14,
-              alignItems: "center",
-              opacity: saving ? 0.7 : 1,
-            }}
+            style={[
+              styles.saveBtn,
+              { backgroundColor: primary, opacity: saving ? 0.7 : 1 },
+            ]}
             onPress={handleSave}
             disabled={saving}
           >
-            <ThemedText type="defaultSemiBold" style={{ color: "#fff" }}>
-              {saving ? "Saving..." : "Save changes"}
-            </ThemedText>
+            {saving ? (
+              <ActivityIndicator size="small" color={textOnPrimary} />
+            ) : (
+              <ThemedText style={{ color: textOnPrimary, fontWeight: "700" }}>
+                Save Changes
+              </ThemedText>
+            )}
           </Pressable>
         </ScrollView>
       </KeyboardAvoidingView>
+      <ConfirmModal />
+      <Toast />
     </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
+  scrollContent: {
+    paddingBottom: 100,
+    paddingHorizontal: 16,
+    gap: 16,
+  },
   header: {
     paddingVertical: 14,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+  },
+  backBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  sectionTitle: {
+    marginTop: 10,
+  },
+  imageGrid: {
+    gap: 16,
+  },
+  locationContainer: {
+    gap: 12,
+  },
+  mapPlaceholder: {
+    height: 180,
+    borderRadius: 16,
+    overflow: "hidden",
+    borderWidth: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  staticMap: {
+    width: "100%",
+    height: "100%",
+  },
+  coordinateBadge: {
+    position: "absolute",
+    bottom: 10,
+    right: 10,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+  },
+  coordinateText: {
+    color: "#fff",
+    fontSize: 10,
+  },
+  locationBtn: {
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+  saveBtn: {
+    marginTop: 20,
+    height: 56,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });

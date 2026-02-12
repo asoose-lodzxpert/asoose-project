@@ -21,8 +21,7 @@ export async function signupVendor(data: SignupData) {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          // Add ngrok bypass header for development
-          "ngrok-skip-browser-warning": "true",
+          ...(__DEV__ ? { "ngrok-skip-browser-warning": "true" } : {}),
         },
         body: JSON.stringify({
           name: data.step1.businessName,

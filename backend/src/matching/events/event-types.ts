@@ -42,7 +42,7 @@ export interface BaseJobEvent {
  * Emitted exactly once when a job is assigned to a driver
  */
 export interface JobAssignedEvent extends BaseJobEvent {
-  jobType: 'ride'; // enforced at compile-time for drivers
+  jobType: 'ride' | 'delivery'; // enforced at compile-time for drivers
   driverId: string;
   customerId: string;
   expiresAt?: number; // assignment TTL

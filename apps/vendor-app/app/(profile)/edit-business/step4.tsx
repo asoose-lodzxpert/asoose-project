@@ -1,28 +1,28 @@
-import React, { useState, useEffect } from "react";
+import { useRouter } from "expo-router";
+import React, { useEffect, useState } from "react";
 import {
-  View,
-  StyleSheet,
-  Pressable,
-  ScrollView,
-  TextInput,
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  View,
 } from "react-native";
-import { useRouter } from "expo-router";
 import Toast from "react-native-toast-message";
 
-import { ThemedView } from "@/components/themed-view";
-import { ThemedText } from "@/components/themed-text";
-import { IconSymbol } from "@/components/ui/icon-symbol";
 import { CustomDropdown } from "@/components/CustomDropdown";
-import { useThemeColor } from "@/hooks/use-theme-color";
+import { ThemedText } from "@/components/themed-text";
+import { ThemedView } from "@/components/themed-view";
+import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useConfirm } from "@/hooks/use-confirm";
+import { useThemeColor } from "@/hooks/use-theme-color";
 import {
-  getBankAccount,
-  saveBankAccount,
   deleteBankAccount,
+  getBankAccount,
   getBanks,
+  saveBankAccount,
 } from "@/services/bank-account.service";
 
 interface BankAccountData {
@@ -74,7 +74,9 @@ export default function Step4BankAccountScreen() {
       const banksData = await getBanks();
       setBanks(Array.isArray(banksData) ? banksData : []);
     } catch (e) {
-      console.error("Failed to load banks", e);
+      if (__DEV__) {
+        console.error("Failed to load banks", e);
+      }
       setBanks([]);
     }
 
@@ -90,7 +92,9 @@ export default function Step4BankAccountScreen() {
         setHasExisting(true);
       }
     } catch (e) {
-      console.error("Failed to load account", e);
+      if (__DEV__) {
+        console.error("Failed to load account", e);
+      }
     } finally {
       setLoading(false);
     }

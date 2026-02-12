@@ -4,7 +4,7 @@ import {
   IsUUID,
   IsArray,
   IsUrl,
-  IsNotEmpty
+  IsNotEmpty,
 } from 'class-validator';
 
 export class CreateDisputeDto {
@@ -16,7 +16,6 @@ export class CreateDisputeDto {
   @IsString()
   @IsNotEmpty()
   description: string;
-
 
   @IsOptional()
   @IsUUID()

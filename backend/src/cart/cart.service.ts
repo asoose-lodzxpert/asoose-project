@@ -6,84 +6,64 @@ import { GetCartSummaryDto, CartItemDto } from './dto/cart-summary.dto';
 export class CartService {
   constructor(private prisma: PrismaService) {}
 
+  // Replace the existing getCartSummary method
   async getCartSummary(dto: GetCartSummaryDto) {
-    if (!dto.items.length) {
-      return { items: [], total: 0, restaurant: null };
-    }
+    if (!dto.items.length) return { groups: [], total: 0 };
 
-    // 1. Fetch all products involved in the cart
+    // 1. Fetch Products & Stores
     const productIds = dto.items.map((i) => i.productId);
     const products = await this.prisma.product.findMany({
       where: { id: { in: productIds } },
-      include: {
-        store: true,
-      },
+      include: { store: true },
     });
 
-    if (products.length === 0) {
-      throw new BadRequestException('Invalid products in cart');
+    // 2. Group by Store
+    const storeGroups = new Map<
+      string,
+      { store: any; items: any[]; total: number }
+    >();
+
+    for (const itemDto of dto.items) {
+      const product = products.find((p) => p.id === itemDto.productId);
+      if (!product) continue;
+
+      if (!storeGroups.has(product.storeId)) {
+        storeGroups.set(product.storeId, {
+          store: product.store,
+          items: [],
+          total: 0,
+        });
+      }
+
+      const group = storeGroups.get(product.storeId)!;
+      const lineTotal = product.price * itemDto.quantity;
+
+      group.items.push({
+        ...product, // map fields as needed
+        quantity: itemDto.quantity,
+        lineTotal,
+      });
+      group.total += lineTotal;
     }
 
-    // 2. Validate Restaurant Consistency (All items should be from the same store)
-    const storeId = products[0].storeId;
-    const isDifferentStore = products.some((p) => p.storeId !== storeId);
-    if (isDifferentStore) {
-      throw new BadRequestException(
-        'Cart contains items from multiple restaurants. Please clear and start over.',
-      );
-    }
-
-    const store = products[0].store;
-
-    // 3. Calculate Totals & Build Response
-    let subtotal = 0;
-
-    const validatedItems = await Promise.all(
-      dto.items.map(async (itemDto) => {
-        const product = products.find((p) => p.id === itemDto.productId);
-        if (!product) return null; // Should be handled by initial check, but safety first
-
-        const itemPrice = product.price;
-
-        // Note: If you implement modifiers later, fetch and add their prices here
-        // const modifierPrice = ...
-
-        const lineTotal = itemPrice * itemDto.quantity;
-        subtotal += lineTotal;
-
-        return {
-          id: product.id,
-          name: product.name,
-          image: product.images[0] || null,
-          description: product.slug,
-          price: itemPrice,
-          quantity: itemDto.quantity,
-          total: lineTotal,
-          available:
-            product.status === 'ACTIVE' &&
-            (typeof product.stock === 'number' ? product.stock > 0 : true),
-        };
-      }),
-    );
-
-    // Filter out nulls if any products weren't found
-    const finalItems = validatedItems.filter((i) => i !== null);
-
-    // 4. Return formatted data matching your Cart Page needs
-    return {
+    // 3. Build Response
+    const groups = Array.from(storeGroups.values()).map((g) => ({
       restaurant: {
-        id: store.id,
-        name: store.name,
-        image: store.logo,
-        // Format time range based on prepTime (e.g., "20-35 min")
-        time: `${store.prepTime || 20}-${(store.prepTime || 20) + 15} min`,
-        currency: '₦', // Or dynamic based on region
+        id: g.store.id,
+        name: g.store.name,
+        image: g.store.logo,
       },
-      items: finalItems,
-      subtotal: subtotal,
-      // Example delivery fee logic (can be made complex later)
-      deliveryFee: 500,
-      total: subtotal + 500,
+      items: g.items,
+      subtotal: g.total,
+      deliveryFee: 500, // TODO: Call pricing service per store location
+      total: g.total + 500,
+    }));
+
+    const grandTotal = groups.reduce((acc, g) => acc + g.total, 0);
+
+    return {
+      groups, // Frontend must update to iterate this array
+      grandTotal,
     };
   }
 }

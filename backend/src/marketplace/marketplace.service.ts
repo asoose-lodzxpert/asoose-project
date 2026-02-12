@@ -87,7 +87,7 @@ export class MarketplaceService {
     return { verticals, banners };
   }
 
-private async resolveImage(key: string | null): Promise<string | null> {
+  private async resolveImage(key: string | null): Promise<string | null> {
     if (!key) return null;
     if (key.startsWith('http')) return key; // Handle legacy or external URLs
     try {

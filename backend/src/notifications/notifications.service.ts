@@ -49,10 +49,17 @@ export class NotificationsService {
     try {
       const user = await this.prisma.user.findUnique({
         where: { id: data.userId },
-        select: { fcmToken: true },
+        select: { expoPushToken: true, fcmToken: true },
       });
 
-      if (user?.fcmToken) {
+      if (user?.expoPushToken) {
+        await this.expoPushService.sendToDevice(
+          user.expoPushToken,
+          data.title,
+          data.message,
+          data.metadata,
+        );
+      } else if (user?.fcmToken) {
         await this.fcmService.sendToDevice(
           user.fcmToken,
           data.title,

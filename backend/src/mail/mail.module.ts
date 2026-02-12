@@ -27,7 +27,7 @@ import { join } from 'path';
           },
         },
         defaults: {
-          from: `"Asoose Admin" <${config.get<string>('MAIL_FROM')}>`,
+          from: `"Asoose " <${config.get<string>('MAIL_FROM')}>`,
         },
         template: {
           dir: join(__dirname, '..', 'libs', 'mail', 'templates'),

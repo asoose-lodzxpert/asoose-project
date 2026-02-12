@@ -19,9 +19,13 @@ import {
 export { PaymentType, RecipientType, PaymentGateway, PaymentMethod };
 
 export class InitiatePaymentDto {
+  // ✅ FIX: Made amount optional.
+  // The backend will now calculate the total from the Order/Ride/Delivery ID.
+  // It is only strictly required for specific types like Wallet Top-up.
+  @IsOptional()
   @IsNumber()
   @Min(100)
-  amount: number;
+  amount?: number;
 
   @IsEmail()
   email: string;
@@ -43,9 +47,15 @@ export class InitiatePaymentDto {
   @IsEnum(PaymentType)
   type: PaymentType;
 
-  @ValidateIf((o) => o.type === PaymentType.ORDER)
+  // FIX: Allow orderGroupId for multi-vendor orders
+  @ValidateIf((o) => o.type === PaymentType.ORDER && !o.orderGroupId)
   @IsString()
   orderId?: string;
+
+  @ValidateIf((o) => o.type === PaymentType.ORDER)
+  @IsString()
+  @IsOptional()
+  orderGroupId?: string;
 
   @ValidateIf((o) => o.type === PaymentType.RIDE)
   @IsString()
@@ -68,9 +78,9 @@ export class VerifyPaymentDto {
   @IsString()
   reference: string;
 
+  // FIX: Made gateway required to satisfy PaymentService signature
   @IsEnum(PaymentGateway)
-  @IsOptional()
-  gateway?: PaymentGateway;
+  gateway: PaymentGateway;
 }
 
 export class DisbursePaymentDto {
@@ -99,7 +109,6 @@ export class DisbursePaymentDto {
   @IsOptional()
   rideId?: string;
 
-  // FIX: Added support for Delivery Disbursements
   @IsString()
   @IsOptional()
   deliveryId?: string;
