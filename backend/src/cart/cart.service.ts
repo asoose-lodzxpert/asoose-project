@@ -11,46 +11,6 @@ import type { RedisClientType } from 'redis';
 
 @Injectable()
 export class CartService {
-<<<<<<< HEAD
-  constructor(private prisma: PrismaService) {}
-
-  // Replace the existing getCartSummary method
-  async getCartSummary(dto: GetCartSummaryDto) {
-    if (!dto.items.length) return { groups: [], total: 0 };
-
-    // 1. Fetch Products & Stores
-    const productIds = dto.items.map((i) => i.productId);
-    const products = await this.prisma.product.findMany({
-      where: { id: { in: productIds } },
-      include: { store: true },
-    });
-
-    // 2. Group by Store
-    const storeGroups = new Map<
-      string,
-      { store: any; items: any[]; total: number }
-    >();
-
-    for (const itemDto of dto.items) {
-      const product = products.find((p) => p.id === itemDto.productId);
-      if (!product) continue;
-
-      if (!storeGroups.has(product.storeId)) {
-        storeGroups.set(product.storeId, {
-          store: product.store,
-          items: [],
-          total: 0,
-        });
-      }
-
-      const group = storeGroups.get(product.storeId)!;
-      const lineTotal = product.price * itemDto.quantity;
-
-      group.items.push({
-        ...product, // map fields as needed
-        quantity: itemDto.quantity,
-        lineTotal,
-=======
   constructor(
     private prisma: PrismaService,
     @Inject('REDIS_CLIENT') private readonly redis: RedisClientType,
@@ -99,13 +59,9 @@ export class CartService {
         quantity: dto.quantity,
         price: product.price, // Snapshot price for security
         storeId: product.storeId,
->>>>>>> payout
       });
-      group.total += lineTotal;
     }
 
-<<<<<<< HEAD
-=======
     // 5. Persist to Redis (TTL 7 days)
     await this.redis.set(cartKey, JSON.stringify(cart), {
       EX: 60 * 60 * 24 * 7,
@@ -156,7 +112,6 @@ export class CartService {
       group.total += lineTotal;
     }
 
->>>>>>> payout
     // 3. Build Response
     const groups = Array.from(storeGroups.values()).map((g) => ({
       restaurant: {
@@ -173,16 +128,8 @@ export class CartService {
     const grandTotal = groups.reduce((acc, g) => acc + g.total, 0);
 
     return {
-<<<<<<< HEAD
-      groups, // Frontend must update to iterate this array
-      grandTotal,
-    };
-  }
-}
-=======
       groups,
       grandTotal,
     };
   }
 }
->>>>>>> payout

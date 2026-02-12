@@ -1,27 +1,25 @@
 import { Observable } from 'rxjs';
 
-import { Injectable, Inject, forwardRef, Logger } from '@nestjs/common';
+import { Injectable, Inject, forwardRef } from '@nestjs/common';
 import {
   JobType,
   JobSummaryDto,
   rideToJobSummary,
   deliveryToJobSummary,
 } from './job.dto';
-import { NotificationsGateway } from 'src/notifications/notifications.gateway';
+import { RidersStreamService } from 'src/riders/riders-stream.service';
 import { DeliveriesService } from 'src/users/trips/deliveries.service';
 import { RideStatus } from '@prisma/client';
 import { RidesService } from 'src/users/trips/rides.service';
 
 @Injectable()
 export class JobsService {
-  private readonly logger = new Logger(JobsService.name);
-
   constructor(
     @Inject(forwardRef(() => RidesService))
     private readonly rideService: RidesService,
     @Inject(forwardRef(() => DeliveriesService))
     private readonly deliveryService: DeliveriesService,
-    private readonly notificationsGateway: NotificationsGateway,
+    private readonly ridersStreamService: RidersStreamService,
   ) {}
 
   async findActiveJobForUser(
@@ -58,20 +56,22 @@ export class JobsService {
     let job;
     if (jobType === 'ride') {
       job = await this.rideService.acceptRide(jobId, userId);
-      if (job) {
-        this.notificationsGateway.emitJobAssigned(
+      if (job)
+        this.ridersStreamService.emitJobAssigned(
           userId,
+          job.id,
+          'RIDE',
           rideToJobSummary(job),
         );
-      }
     } else if (jobType === 'delivery') {
       job = await this.deliveryService.acceptDelivery(jobId, userId);
-      if (job) {
-        this.notificationsGateway.emitJobAssigned(
+      if (job)
+        this.ridersStreamService.emitJobAssigned(
           userId,
+          job.id,
+          'DELIVERY',
           deliveryToJobSummary(job),
         );
-      }
     }
     return job;
   }
@@ -83,20 +83,22 @@ export class JobsService {
         jobId,
         status as RideStatus,
       );
-      if (job) {
-        this.notificationsGateway.emitJobUpdated(
+      if (job)
+        this.ridersStreamService.emitJobUpdate(
           job.riderId,
+          job.id,
+          'RIDE',
           rideToJobSummary(job),
         );
-      }
     } else if (jobType === 'delivery') {
       job = await this.deliveryService.updateDeliveryStatus(jobId, status);
-      if (job) {
-        this.notificationsGateway.emitJobUpdated(
+      if (job)
+        this.ridersStreamService.emitJobUpdate(
           job.riderId,
+          job.id,
+          'DELIVERY',
           deliveryToJobSummary(job),
         );
-      }
     }
     return job;
   }
@@ -105,12 +107,13 @@ export class JobsService {
     let job;
     if (jobType === 'ride') {
       job = await this.rideService.completeRide(jobId, payload, 14.11, 23.32);
-      if (job) {
-        this.notificationsGateway.emitJobUpdated(
+      if (job)
+        this.ridersStreamService.emitJobUpdate(
           job.riderId,
+          job.id,
+          'RIDE',
           rideToJobSummary(job),
         );
-      }
     } else if (jobType === 'delivery') {
       // Expecting payload to have: riderId, otp, proof, lat, lng
       const { riderId, otp, proof, lat, lng } = payload;
@@ -122,12 +125,13 @@ export class JobsService {
         lat,
         lng,
       );
-      if (job) {
-        this.notificationsGateway.emitJobUpdated(
+      if (job)
+        this.ridersStreamService.emitJobUpdate(
           job.riderId,
+          job.id,
+          'DELIVERY',
           deliveryToJobSummary(job),
         );
-      }
     }
     return job;
   }
@@ -168,6 +172,7 @@ export class JobsService {
     return { success: false };
   }
 
-  // SSE stream method removed - riders now use WebSocket (NotificationsGateway)
-  // Events are emitted directly via socket to user_${riderId} rooms
+  streamJobs(userId: string): Observable<any> {
+    return this.ridersStreamService.getRiderStream(userId);
+  }
 }

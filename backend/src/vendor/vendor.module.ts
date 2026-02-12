@@ -32,14 +32,16 @@ import { ActivityLogService } from 'src/common/services/activity-log.services';
 // Ensure this path points to where your StoresService actually is
 // import { StoresService } from './stores/stores.service';
 import { StoresService } from 'src/super-admin/vendors/vendors.service';
+import { TransactionsModule } from 'src/super-admin/transactions/transaction.module';
 @Module({
   imports: [
     PrismaModule,
     StorageModule,
     JwtModule,
-    MailModule, // Provides EmailProducer
+    MailModule, 
     OtpModule,
     NotificationsModule,
+    TransactionsModule,
   ],
   controllers: [
     VendorProductsController,

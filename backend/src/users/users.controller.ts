@@ -54,7 +54,7 @@ export class UsersController {
     @Headers('idempotency-key') idempotencyKey?: string,
   ) {
     // Determine if this is a multi-vendor cart
-    // Note: Assuming logic was moved to OrdersService for cohesion,
+    // Note: Assuming logic was moved to OrdersService for cohesion, 
     // otherwise use usersService.checkIfMultiVendor(dto.items)
     const isMultiVendor = await this.usersService.checkIfMultiVendor(dto.items);
 
@@ -72,7 +72,11 @@ export class UsersController {
           dto.items,
         );
       }
-      return this.ordersService.createOrder(req.user.id, dto, idempotencyKey);
+      return this.ordersService.createOrder(
+        req.user.id,
+        dto,
+        idempotencyKey,
+      );
     }
   }
 
@@ -97,22 +101,6 @@ export class UsersController {
     }
 
     return order;
-  }
-
-  @Patch('expo-push-token')
-  async updateExpoPushToken(
-    @Request() req,
-    @Body() body: { expoPushToken: string },
-  ) {
-    return this.usersService.updateExpoPushToken(
-      req.user.id,
-      body.expoPushToken,
-    );
-  }
-
-  @Delete('expo-push-token')
-  async deleteExpoPushToken(@Request() req) {
-    return this.usersService.deleteExpoPushToken(req.user.id);
   }
 
   // ==================================================================
@@ -242,6 +230,7 @@ export class UsersController {
   }
 
   @Get('payment/cards')
+
   async getSavedCards(@Request() req) {
     return this.usersService.getSavedCards(req.user.id);
   }
