@@ -29,10 +29,16 @@ type CartContextType = {
 
 const CartContext = createContext<CartContextType | null>(null);
 
-const CART_STORAGE_KEY = "@asoose/cart-items";
+function getCartStorageKey(userId?: string | null) {
+  return userId
+    ? `@asoose/cart-items:${userId}`
+    : "@asoose/cart-items:anonymous";
+}
 
-export const CartProvider: React.FC<{ children: React.ReactNode }> = ({
+type CartProviderProps = { children: React.ReactNode; userId?: string | null };
+export const CartProvider: React.FC<CartProviderProps> = ({
   children,
+  userId,
 }) => {
   const [items, setItems] = useState<CartItem[]>([]);
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
@@ -46,13 +52,19 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const loading = hydrating || syncing;
 
-  const persistItems = useCallback(async (nextItems: CartItem[]) => {
-    try {
-      await AsyncStorage.setItem(CART_STORAGE_KEY, JSON.stringify(nextItems));
-    } catch {
-      // best-effort persistence; ignore errors silently for now
-    }
-  }, []);
+  const persistItems = useCallback(
+    async (nextItems: CartItem[]) => {
+      try {
+        await AsyncStorage.setItem(
+          getCartStorageKey(userId),
+          JSON.stringify(nextItems),
+        );
+      } catch {
+        // best-effort persistence; ignore errors silently for now
+      }
+    },
+    [userId],
+  );
 
   const syncSummary = useCallback(
     async (nextItems: CartItem[]) => {
@@ -129,26 +141,34 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({
     [persistItems],
   );
 
+  // Hydrate cart on mount or when userId changes
   useEffect(() => {
     const hydrate = async () => {
+      setHydrating(true);
       try {
-        const stored = await AsyncStorage.getItem(CART_STORAGE_KEY);
+        const stored = await AsyncStorage.getItem(getCartStorageKey(userId));
         if (stored) {
           const parsed: CartItem[] = JSON.parse(stored);
           if (parsed.length) {
             setItems(parsed);
             await syncSummary(parsed);
+          } else {
+            setItems([]);
           }
+        } else {
+          setItems([]);
         }
       } catch (err) {
         if (__DEV__) console.warn("Unable to hydrate cart", err);
+        setItems([]);
       } finally {
         setHydrating(false);
       }
     };
-
     hydrate();
-  }, [syncSummary]);
+    // Clear cart if user changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]);
 
   async function addItem(item: CartItem) {
     const existingVendorId = items[0]?.vendorId;
