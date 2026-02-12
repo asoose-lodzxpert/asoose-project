@@ -1,4 +1,8 @@
-import * as SecureStore from "expo-secure-store";
+import {
+  AUTH_ACCESS_TOKEN_KEY,
+  AUTH_REFRESH_TOKEN_KEY,
+} from "@/constants/authStorageKeys";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const API_BASE = (() => {
   const url = process.env.EXPO_PUBLIC_API_URL;
@@ -18,9 +22,6 @@ const API_BASE = (() => {
 })();
 const AUTH_BASE = `${API_BASE}/auth/user`;
 const UNIVERSAL_AUTH_BASE = `${API_BASE}/auth`;
-
-const ACCESS_TOKEN_KEY = "@auth/access_token";
-const REFRESH_TOKEN_KEY = "@auth/refresh_token";
 
 type SignupPayload = {
   name: string;
@@ -135,12 +136,7 @@ export async function login<UserShape = any>(
     throw new Error("Login response missing tokens");
   }
 
-  await setTokens({
-    accessToken,
-    refreshToken,
-  });
-
-  // Always return camelCase for frontend
+  // Remove token saving from here, only return values
   return {
     ...data,
     accessToken,
@@ -159,14 +155,18 @@ export async function refreshAccessToken(): Promise<string> {
     baseUrl: UNIVERSAL_AUTH_BASE,
   });
 
-  if (!data?.accessToken) throw new Error("Failed to refresh session");
+  // Support both camelCase and snake_case from backend
+  const accessToken = data?.accessToken || data?.access_token;
+  const newRefreshToken = data?.refreshToken || data?.refresh_token;
+
+  if (!accessToken) throw new Error("Failed to refresh session");
 
   await setTokens({
-    accessToken: data.accessToken,
-    refreshToken: data.refreshToken || refreshToken,
+    accessToken,
+    refreshToken: newRefreshToken || refreshToken,
   });
 
-  return data.accessToken;
+  return accessToken;
 }
 
 export async function refreshToken() {
@@ -190,11 +190,11 @@ export async function logout() {
 }
 
 export async function getAccessToken() {
-  return SecureStore.getItemAsync(ACCESS_TOKEN_KEY);
+  return AsyncStorage.getItem(AUTH_ACCESS_TOKEN_KEY);
 }
 
 export async function getRefreshToken() {
-  return SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
+  return AsyncStorage.getItem(AUTH_REFRESH_TOKEN_KEY);
 }
 
 export async function setTokens(tokens: {
@@ -203,15 +203,15 @@ export async function setTokens(tokens: {
 }) {
   const ops: Promise<void>[] = [];
   if (typeof tokens.accessToken === "string") {
-    ops.push(SecureStore.setItemAsync(ACCESS_TOKEN_KEY, tokens.accessToken));
+    ops.push(AsyncStorage.setItem(AUTH_ACCESS_TOKEN_KEY, tokens.accessToken));
   } else if (tokens.accessToken === null) {
-    ops.push(SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY));
+    ops.push(AsyncStorage.removeItem(AUTH_ACCESS_TOKEN_KEY));
   }
 
   if (typeof tokens.refreshToken === "string") {
-    ops.push(SecureStore.setItemAsync(REFRESH_TOKEN_KEY, tokens.refreshToken));
+    ops.push(AsyncStorage.setItem(AUTH_REFRESH_TOKEN_KEY, tokens.refreshToken));
   } else if (tokens.refreshToken === null) {
-    ops.push(SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY));
+    ops.push(AsyncStorage.removeItem(AUTH_REFRESH_TOKEN_KEY));
   }
 
   await Promise.all(ops);
@@ -219,16 +219,16 @@ export async function setTokens(tokens: {
 
 export async function clearTokens() {
   await Promise.all([
-    SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY),
-    SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY),
+    AsyncStorage.removeItem(AUTH_ACCESS_TOKEN_KEY),
+    AsyncStorage.removeItem(AUTH_REFRESH_TOKEN_KEY),
   ]);
 }
 
 export const authConfig = {
   apiBase: API_BASE,
   authBase: AUTH_BASE,
-  accessTokenKey: ACCESS_TOKEN_KEY,
-  refreshTokenKey: REFRESH_TOKEN_KEY,
+  accessTokenKey: AUTH_ACCESS_TOKEN_KEY,
+  refreshTokenKey: AUTH_REFRESH_TOKEN_KEY,
 };
 
 export default {

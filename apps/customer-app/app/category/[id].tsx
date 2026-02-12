@@ -1,27 +1,26 @@
-import React, { useEffect, useState, useCallback } from "react";
-import {
-  View,
-  FlatList,
-  StyleSheet,
-  ActivityIndicator,
-  RefreshControl,
-  TouchableOpacity,
-} from "react-native";
-import { useLocalSearchParams, useRouter, Stack } from "expo-router";
-import { ThemedView } from "@/components/themed-view";
-import { ThemedText } from "@/components/themed-text";
-import { IconSymbol } from "@/components/ui/icon-symbol";
 import { VendorCard } from "@/components/home/VendorCard";
+import { ThemedText } from "@/components/themed-text";
+import { ThemedView } from "@/components/themed-view";
+import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import {
   fetchCategoryDetail,
   getCategorySortOptions,
 } from "@/services/search.service";
+import type { Vendor } from "@/types/home";
 import type {
   CategoryDetailResponse,
   CategorySortOption,
 } from "@/types/marketplace";
-import type { Vendor } from "@/types/home";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import React, { useCallback, useEffect, useState } from "react";
+import {
+  FlatList,
+  RefreshControl,
+  StyleSheet,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
 export default function CategoryDetailScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
@@ -53,7 +52,6 @@ export default function CategoryDetailScreen() {
       setError(null);
       const data = await fetchCategoryDetail(id, sortBy);
       setCategoryData(data);
-      console.log("Catrgory data:", JSON.stringify(data, null, 2));
     } catch (err: any) {
       setError(err.message || "Failed to load category");
       setCategoryData(null);

@@ -1,25 +1,24 @@
-import React, { useEffect, useState, useCallback } from "react";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import React, { useCallback, useEffect, useState } from "react";
 import {
-  View,
-  StyleSheet,
-  Pressable,
-  ScrollView,
-  RefreshControl,
-  Alert,
   Dimensions,
   DimensionValue,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  View,
 } from "react-native";
-import { useLocalSearchParams, useRouter } from "expo-router";
 import Animated, {
-  useSharedValue,
+  Easing,
   useAnimatedStyle,
+  useSharedValue,
   withRepeat,
   withTiming,
-  Easing,
 } from "react-native-reanimated";
 
-import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
+import { ThemedView } from "@/components/themed-view";
 import { IconSymbol, IconSymbolName } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { RideService } from "@/services/ride.service";
@@ -72,7 +71,6 @@ export default function RideDetailsScreen() {
     try {
       const data = await RideService.getRideById(id);
       setRide(data);
-      console.log("Ride Details:", JSON.stringify(data, null, 2));
     } catch (e) {
       setRide(null);
       setError((e as Error)?.message || "Failed to load ride");

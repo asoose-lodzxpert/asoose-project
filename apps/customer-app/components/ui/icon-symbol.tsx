@@ -12,6 +12,7 @@ export type IconSymbolName =
   | "file-text"
   | "box"
   | "wallet"
+  | "cross" // Added cross to IconSymbolName
   | "house.fill"
   | "ticket.fill"
   | "fork.knife"
@@ -327,6 +328,7 @@ export const MAPPING: Record<
   "arrow.down.circle.fill": "arrow-circle-down",
   "scalemass.fill": "scale",
   "wallet-giftcard": "card-giftcard",
+  cross: "close", // Mapped cross to MaterialIcons close
   bicycle: "directions-bike",
 };
 

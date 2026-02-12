@@ -27,6 +27,20 @@ export async function request(path: string, opts: FetchOpts = {}) {
   };
 
   let token = await getAccessToken();
+
+  // Check if this is an auth-related endpoint
+  const isAuthEndpoint =
+    path.includes("/auth/") ||
+    path.includes("login") ||
+    path.includes("register") ||
+    path.includes("forgot-password") ||
+    path.includes("reset-password");
+
+  // Block non-auth requests when user is not logged in
+  if (!token && !isAuthEndpoint) {
+    throw new Error("Authentication required. Please log in.");
+  }
+
   if (token) headers["Authorization"] = `Bearer ${token}`;
 
   async function execute() {
@@ -37,7 +51,8 @@ export async function request(path: string, opts: FetchOpts = {}) {
 
   let { response, parsed } = await execute();
 
-  if (response.status === 401 && token) {
+  // Attempt refresh on 401 if we have a token (even if initial token was null, refresh might exist)
+  if (response.status === 401) {
     try {
       if (!refreshPromise) {
         refreshPromise = (async () => {

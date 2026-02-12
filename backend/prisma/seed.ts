@@ -8,11 +8,13 @@ import { seedPayouts } from './05-payouts';
 import { seedDisputes } from './06-disputes';
 import { seedVerificationQueue } from './07-verification';
 import { seedBanks } from './08-bank';
+import { seedCategories } from './categories';
 
 async function main() {
-  await cleanDatabase(); // Optional
+  // await cleanDatabase(); // Optional
 
   await seedAddresses();
+  await seedCategories();
   await seedUsersAndRiders();
   await seedVendorsAndProducts();
   await seedWalletsAndTransactions();
