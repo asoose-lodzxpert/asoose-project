@@ -19,6 +19,7 @@ jobs:
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
+          # Use Docker Hub Personal Access Token for DOCKER_PASSWORD
           password: ${{ secrets.DOCKER_PASSWORD }}
 
       # 3. Build Docker image with SHA tag
