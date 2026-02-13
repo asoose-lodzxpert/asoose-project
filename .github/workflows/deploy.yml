@@ -71,7 +71,7 @@ jobs:
       - name: Save deployment SHA
         run: echo "${GITHUB_SHA}" > last_successful_sha.txt
       - name: Upload deployment SHA
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: last-successful-sha
           path: last_successful_sha.txt
