@@ -60,7 +60,7 @@ export default function CartScreen() {
   const currencySymbol = restaurants[0]?.currency ?? "₦";
 
   /* ------------------------------------------------------------------------ */
-  /* GROUP ITEMS BY RESTAURANT */
+  /* GROUP ITEMS BY STORE */
   /* ------------------------------------------------------------------------ */
 
   const groupedByRestaurant = useMemo<CartGroup[]>(() => {
@@ -167,7 +167,7 @@ export default function CartScreen() {
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {groupedByRestaurant.map((group) => (
           <View key={group.id} style={styles.restaurantBlock}>
-            {/* Restaurant header */}
+            {/* Store header */}
             <View
               style={[
                 styles.restaurantHeader,

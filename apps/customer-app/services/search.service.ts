@@ -107,7 +107,7 @@ function applyClientSideFilters(
 
 /**
  * Fetch vendors/stores for a specific category
- * @param categoryId - The category vertical ID (e.g., "restaurant", "grocery")
+ * @param categoryId - The category vertical ID (e.g., "food", "grocery")
  * @param sort - Sort option (all, rating, delivery_time, distance, popular)
  */
 export async function fetchCategoryDetail(

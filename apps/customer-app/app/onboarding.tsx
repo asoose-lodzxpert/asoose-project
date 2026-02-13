@@ -82,7 +82,7 @@ export default function OnboardingScreen() {
           <CategoryCard
             icon="fork.knife"
             title="Order Food & More"
-            description="Restaurants and essentials delivered fast"
+            description="Stores and essentials delivered fast"
           />
           <CategoryCard
             icon="car.fill"

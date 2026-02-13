@@ -137,7 +137,7 @@ export function StoreInfo({
             color={primary}
           />
           <ThemedText style={[styles.sectionTitle, { color: text }]}>
-            {isRestaurant ? "About Restaurant" : "About Store"}
+            About Store
           </ThemedText>
         </View>
 
@@ -169,7 +169,7 @@ export function StoreInfo({
             <View style={styles.infoRow}>
               <IconSymbol name="tag.fill" size={16} color={textSecondary} />
               <ThemedText style={[styles.infoText, { color: text }]}>
-                Type: {isRestaurant ? "Restaurant" : "Store"}
+                Type: Store
               </ThemedText>
             </View>
           </>
