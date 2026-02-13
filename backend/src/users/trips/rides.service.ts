@@ -51,18 +51,29 @@ export class RidesService {
   // ========================================
 
   async getEstimate(dto: RideEstimateDto) {
-    // Input Validation: Coordinates
-    this.validateCoordinates(dto.pickupLat, dto.pickupLng);
-    this.validateCoordinates(dto.dropoffLat, dto.dropoffLng);
+    // ✅ FIX: Use Backend Resolver as Source of Truth
+    const pickup = await this.common.resolveSecureLocation({
+      addressText: 'Pickup', // Placeholder for resolver
+      placeId: dto.pickupPlaceId,
+      lat: dto.pickupLat,
+      lng: dto.pickupLng,
+    });
+
+    const dropoff = await this.common.resolveSecureLocation({
+      addressText: 'Dropoff', // Placeholder for resolver
+      placeId: dto.dropoffPlaceId,
+      lat: dto.dropoffLat,
+      lng: dto.dropoffLng,
+    });
 
     const estimates: Record<string, any> = {};
     const types = Object.values(VehicleType);
 
     const distanceKm = this.geo.calculateDistance(
-      dto.pickupLat,
-      dto.pickupLng,
-      dto.dropoffLat,
-      dto.dropoffLng,
+      pickup.lat,
+      pickup.lng,
+      dropoff.lat,
+      dropoff.lng,
     );
     const durationMin = Math.ceil(distanceKm * 3);
 
@@ -97,14 +108,9 @@ export class RidesService {
       `Request Ride - User: ${userId}, DTO: ${JSON.stringify(dto, null, 2)}`,
     );
 
-    this.validateCoordinates(
-      dto.pickupLocation.latitude,
-      dto.pickupLocation.longitude,
-    );
-    this.validateCoordinates(
-      dto.dropoffLocation.latitude,
-      dto.dropoffLocation.longitude,
-    );
+    // ✅ FIX: Discard client coordinates. Force strict backend resolution.
+    const securePickup = await this.common.resolveSecureLocation(dto.pickupLocation);
+    const secureDropoff = await this.common.resolveSecureLocation(dto.dropoffLocation);
 
     if (!Object.values(VehicleType).includes(dto.vehicleType)) {
       throw new BadRequestException('Invalid vehicle type');
@@ -143,14 +149,14 @@ export class RidesService {
 
     return this.prisma.$transaction(
       async (tx) => {
-        // 4. Create Addresses
+        // 4. Create Addresses from trusted server data ONLY
         const pickupAddress = await tx.address.create({
           data: {
             userId,
             label: 'Pickup',
-            street: this.common.sanitizeText(dto.pickupLocation.address),
-            lat: dto.pickupLocation.latitude,
-            lng: dto.pickupLocation.longitude,
+            street: this.common.sanitizeText(securePickup.address), // Trusted Maps text
+            lat: securePickup.lat, // Trusted coordinate
+            lng: securePickup.lng, // Trusted coordinate
             city: 'Unknown',
             state: 'Unknown',
           },
@@ -160,9 +166,9 @@ export class RidesService {
           data: {
             userId,
             label: 'Dropoff',
-            street: this.common.sanitizeText(dto.dropoffLocation.address),
-            lat: dto.dropoffLocation.latitude,
-            lng: dto.dropoffLocation.longitude,
+            street: this.common.sanitizeText(secureDropoff.address), // Trusted Maps text
+            lat: secureDropoff.lat, // Trusted coordinate
+            lng: secureDropoff.lng, // Trusted coordinate
             city: 'Unknown',
             state: 'Unknown',
           },
@@ -190,7 +196,6 @@ export class RidesService {
             status: RideStatus.PENDING,
             distanceKm,
             durationMin,
-            // displayOtp: rawOtp, // Ensure this is removed if not in schema (from previous fix)
             totalFare: this.common.round(dto.fare),
             startOtp: hashedOtp,
             surgeMultiplier: 1.0,
@@ -220,14 +225,11 @@ export class RidesService {
           message: 'Ride created. Please confirm to find a driver.',
         };
       },
-      // FIX: Use string literal 'Serializable' instead of Prisma.TransactionIsolationLevel.Serializable
       { isolationLevel: 'Serializable' },
     );
   }
 
-  // Fixes: "Broken Transaction Integrity in confirmRide"
   async confirmRide(userId: string, rideId: string, paymentMethod: string) {
-    // Validate Payment Method Enum
     const methodEnum =
       paymentMethod.toUpperCase() === 'CASH'
         ? PaymentMethod.CASH
@@ -240,7 +242,6 @@ export class RidesService {
         throw new NotFoundException('Ride not found');
       }
       if (ride.status !== RideStatus.PENDING) {
-        // Idempotency check: if already REQUESTED, return success
         if (ride.status === RideStatus.REQUESTED)
           return { status: 'CONFIRMED', rideId };
         throw new BadRequestException(
@@ -248,7 +249,6 @@ export class RidesService {
         );
       }
 
-      // 1. Update Payment
       await tx.payment.updateMany({
         where: { rideId: rideId },
         data: {
@@ -260,16 +260,11 @@ export class RidesService {
         },
       });
 
-      // 2. Transition Ride Status
       await tx.ride.update({
         where: { id: rideId },
         data: { status: RideStatus.REQUESTED },
       });
 
-      // 3. Trigger Async Matching (Side Effect)
-      // We do this AFTER the transaction ensures data consistency.
-      // Note: In strict distributed systems, we'd use the Transaction Outbox pattern here.
-      // For now, we call the helper but handle errors so we don't revert the valid transaction.
       this.triggerMatchingSideEffects(rideId, userId).catch((err) => {
         this.logger.error(`Failed to trigger matching for ride ${rideId}`, err);
       });
@@ -279,14 +274,12 @@ export class RidesService {
   }
 
   private async triggerMatchingSideEffects(rideId: string, userId: string) {
-    // Re-fetch with relations needed for event
     const ride = await this.prisma.ride.findUnique({
       where: { id: rideId },
       include: { pickupAddress: true, dropoffAddress: true },
     });
     if (!ride) return;
 
-    // Fixes: "Notification Failures Are Silently Ignored"
     try {
       this.notificationsGateway.server
         .to(`user_${userId}`)
@@ -298,7 +291,6 @@ export class RidesService {
         });
     } catch (e) {
       this.logger.error(`Socket emit failed for ride ${rideId}`, e);
-      // Non-critical failure; client can poll /rides/current
     }
 
     const job = rideToJobSummary(ride);
@@ -307,16 +299,14 @@ export class RidesService {
     await this.queue.enqueueRideMatching(eventPayload);
   }
 
-  // Fixes: "Race Condition in Ride Acceptance"
   async acceptRide(rideId: string, riderId: string) {
     if (!riderId) throw new ForbiddenException('Rider identity missing');
 
-    // Atomic Compare-and-Swap
     const result = await this.prisma.ride.updateMany({
       where: {
         id: rideId,
-        status: RideStatus.REQUESTED, // ONLY accept if currently REQUESTED
-        riderId: null, // Double check it's not assigned
+        status: RideStatus.REQUESTED, 
+        riderId: null, 
       },
       data: {
         status: RideStatus.ACCEPTED,
@@ -360,7 +350,6 @@ export class RidesService {
     return ride;
   }
 
-  // Fixes: "OTP Stored in Plain Text"
   async startRide(rideId: string, riderId: string, otp: string) {
     await this.common.checkOtpRateLimit(rideId, 'start_ride');
 
@@ -381,13 +370,11 @@ export class RidesService {
     if (ride.status !== RideStatus.ACCEPTED)
       throw new BadRequestException('Ride not ready to start');
 
-    // Secure Comparison
     const isMatch = await bcrypt.compare(otp, ride.startOtp || '');
     if (!isMatch) {
       throw new BadRequestException('Invalid OTP');
     }
 
-    // Update Status
     await this.prisma.ride.update({
       where: { id: rideId },
       data: {
@@ -408,7 +395,6 @@ export class RidesService {
     return { success: true };
   }
 
-  // Fixes: "Money Safety Issues"
   async completeRide(
     rideId: string,
     riderId: string,
@@ -436,15 +422,12 @@ export class RidesService {
         ride.dropoffAddress.lng,
       );
 
-      // Fixes: "Rigid Distance Completion Logic" - allowing slight tolerance or using config
-      // Ideally this comes from a dynamic config service, using TRIPS_CONFIG for now
       if (dist > TRIPS_CONFIG.COMPLETION_RADIUS_KM) {
         throw new BadRequestException(
           `Too far from destination (${dist.toFixed(2)}km)`,
         );
       }
 
-      // Money Safety: Ensure values are rounded and positive
       const earning = this.common.round(
         Math.max(0, Number(ride.driverFee) || 0),
       );
@@ -469,7 +452,6 @@ export class RidesService {
         data: { walletBalance: balanceAfter },
       });
 
-      // Audit Trail
       await tx.transaction.create({
         data: {
           type: TransactionType.RIDER_EARNING,
@@ -496,7 +478,6 @@ export class RidesService {
     });
   }
 
-  // Helper: Validating methods moved to Service for strictness
   private validateCoordinates(lat: number, lng: number) {
     if (!this.geo.validateCoordinates(lat, lng)) {
       throw new BadRequestException(`Invalid coordinates: ${lat}, ${lng}`);
@@ -504,9 +485,6 @@ export class RidesService {
   }
 
   async startRideMatching(rideId: string) {
-    // Internal method for manual triggering if needed
-    // Logic moved to triggerMatchingSideEffects to avoid duplication
-    // This wrapper maintains API compatibility if called elsewhere
     const ride = await this.prisma.ride.findUnique({ where: { id: rideId } });
     if (ride) await this.triggerMatchingSideEffects(rideId, ride.customerId);
   }
@@ -550,7 +528,6 @@ export class RidesService {
     return { message: 'Ride cancelled' };
   }
 
-  // Getters (Standard)
   async getCurrentRide(userId: string) {
     return this.prisma.ride.findFirst({
       where: {
@@ -587,7 +564,7 @@ export class RidesService {
       throw new NotFoundException('Ride not found');
     if (ride.rider)
       ride.rider.phone = this.common.maskPhoneNumber(ride.rider.phone);
-    return { ...ride, startOtp: undefined }; // Security: Hide OTP
+    return { ...ride, startOtp: undefined }; 
   }
 
   async getUserRides(userId: string, status?: string, page = 1, limit = 20) {
@@ -651,7 +628,6 @@ export class RidesService {
     if (ride.riderId !== riderId)
       throw new ForbiddenException('Unauthorized driver');
 
-    // Allow transition from ACCEPTED to ARRIVED
     if (ride.status !== RideStatus.ACCEPTED) {
       throw new BadRequestException(
         `Cannot mark arrived from status ${ride.status}`,
@@ -680,39 +656,13 @@ export class RidesService {
     await this.common.logActivity(riderId, 'DRIVER_ARRIVED', { rideId });
     return { success: true, message: 'Driver arrival confirmed' };
   }
+  
   // --- JOBS SERVICE STUBS ---
-  async findActiveRideForDriver(driverId: string): Promise<any> {
-    // TODO: Implement actual logic
-    return null;
-  }
-
-  async findIncomingRidesForDriver(driverId: string): Promise<any[]> {
-    // TODO: Implement actual logic
-    return [];
-  }
-
-  async updateRideStatus(rideId: string, status: string): Promise<any> {
-    // TODO: Implement actual logic
-    return null;
-  }
-
-  async declineRide(rideId: string, driverId: string): Promise<any> {
-    // TODO: Implement actual logic
-    return { success: false };
-  }
-
-  async arrivePickup(rideId: string, driverId: string): Promise<any> {
-    // TODO: Implement actual logic
-    return { success: false };
-  }
-
-  async confirmPickup(rideId: string, driverId: string): Promise<any> {
-    // TODO: Implement actual logic
-    return { success: false };
-  }
-
-  async arriveDropoff(rideId: string, driverId: string): Promise<any> {
-    // TODO: Implement actual logic
-    return { success: false };
-  }
+  async findActiveRideForDriver(driverId: string): Promise<any> { return null; }
+  async findIncomingRidesForDriver(driverId: string): Promise<any[]> { return []; }
+  async updateRideStatus(rideId: string, status: string): Promise<any> { return null; }
+  async declineRide(rideId: string, driverId: string): Promise<any> { return { success: false }; }
+  async arrivePickup(rideId: string, driverId: string): Promise<any> { return { success: false }; }
+  async confirmPickup(rideId: string, driverId: string): Promise<any> { return { success: false }; }
+  async arriveDropoff(rideId: string, driverId: string): Promise<any> { return { success: false }; }
 }

@@ -5,6 +5,7 @@ import { RideService } from "@/services/ride.service";
 
 export type RideStage =
   | "IDLE"
+  | "PROCESSING_PAYMENT"
   | "FINDING_DRIVER"
   | "ON_WAY"
   | "ARRIVED"
@@ -19,14 +20,20 @@ interface RideState {
   destination: { address: string; lat: number; lng: number } | null;
   priceEstimates: Record<string, any> | null; // Changed to keyed object
   driverInfo: any | null;
-  driverLocation: google.maps.LatLngLiteral | undefined;
+  
+  // ✅ FIX: Extended LatLngLiteral to accept an optional heading
+  driverLocation: (google.maps.LatLngLiteral & { heading?: number }) | undefined;
+  
   isCalculating: boolean;
 
   // Actions
   setRideStage: (stage: RideStage) => void;
   setLocations: (pickup: google.maps.LatLngLiteral, dropoff: any) => void;
   setDriverInfo: (info: any) => void;
-  updateDriverLocation: (loc: google.maps.LatLngLiteral) => void;
+  
+  // ✅ FIX: Update parameter type to accept heading
+  updateDriverLocation: (loc: google.maps.LatLngLiteral & { heading?: number }) => void;
+  
   setPriceEstimates: (est: any) => void;
   resetRide: () => void;
 }

@@ -1,6 +1,13 @@
-import { Injectable, Logger, ForbiddenException } from '@nestjs/common';
+import { 
+  Injectable, 
+  Logger, 
+  ForbiddenException, 
+  BadRequestException 
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RedisService } from '../../matching/redis/redis.service';
+import { MapsService } from '../../maps/maps.service';
+import { LocationPayloadDto } from './dto/trip.dto';
 
 export const TRIPS_CONFIG = {
   OTP_LENGTH: 6,
@@ -19,9 +26,16 @@ export const TRIPS_CONFIG = {
 export class TripsCommonService {
   private readonly logger = new Logger(TripsCommonService.name);
 
+  // ✅ ADDED: Strict Geofence boundaries (Update these coordinates to match your actual operating region, e.g., Abuja)
+  private readonly GEOFENCE_BOUNDS = {
+    minLat: 8.9,  maxLat: 9.2,   // Example Abuja bounds (approximate)
+    minLng: 7.3,  maxLng: 7.6 
+  };
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
+    private readonly mapsService: MapsService, // ✅ Injected MapsService
   ) {}
 
   round(value: number): number {
@@ -60,6 +74,40 @@ export class TripsCommonService {
         'Too many failed OTP attempts. Please try again later.',
       );
     }
+  }
+
+  // ✅ ADDED: Geofence Validator
+  validateGeofence(lat: number, lng: number) {
+    if (
+      lat < this.GEOFENCE_BOUNDS.minLat || lat > this.GEOFENCE_BOUNDS.maxLat ||
+      lng < this.GEOFENCE_BOUNDS.minLng || lng > this.GEOFENCE_BOUNDS.maxLng
+    ) {
+      throw new BadRequestException(`Location (${lat}, ${lng}) is outside our active service area.`);
+    }
+  }
+
+  // ✅ ADDED: Secure Location Resolver (Source of Truth)
+  async resolveSecureLocation(dto: LocationPayloadDto): Promise<{ lat: number, lng: number, address: string }> {
+    let resolved;
+
+    if (dto.placeId) {
+      // 1. Primary Source of Truth: Google Place ID
+      resolved = await this.mapsService.geocodePlace(dto.placeId);
+    } else if (dto.lat && dto.lng) {
+      // 2. Fallback: Snap raw GPS coordinates to trusted road network via Reverse Geocoding
+      resolved = await this.mapsService.reverseGeocode(dto.lat, dto.lng);
+    } else {
+      throw new BadRequestException('Invalid location payload. Provide placeId or coordinates.');
+    }
+
+    // 3. Security Check: Enforce boundaries before billing/dispatching
+    this.validateGeofence(resolved.lat, resolved.lng);
+
+    return {
+      lat: resolved.lat,
+      lng: resolved.lng,
+      address: resolved.address, // Overrides the client's textual address to prevent spoofing
+    };
   }
 
   async logActivity(

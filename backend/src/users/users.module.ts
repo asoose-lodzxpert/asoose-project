@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common'; // ✅ IMPORTED forwardRef
 import { UsersController } from './users.controller';
 import { UsersService } from './users.service';
 import { PrismaModule } from '../prisma/prisma.module';
@@ -19,7 +19,7 @@ import { NotificationsModule } from 'src/notifications/notifications.module';
 import { FcmModule } from 'src/libs/fcm/fcm.module';
 import { TripsModule } from './trips/trips.module';
 import { VendorModule } from 'src/vendor/vendor.module';
-import { QueueModule } from 'src/matching/queue/queue.module'; // ✅ IMPORTED
+import { QueueModule } from 'src/matching/queue/queue.module';
 
 @Module({
   imports: [
@@ -29,9 +29,9 @@ import { QueueModule } from 'src/matching/queue/queue.module'; // ✅ IMPORTED
     RedisModule,
     NotificationsModule,
     FcmModule,
-    TripsModule,
+    forwardRef(() => TripsModule), // ✅ FIXED: Wrapped in forwardRef to break circular dependency
     VendorModule,
-    QueueModule, // ✅ ADDED HERE
+    QueueModule, 
     BullModule.registerQueue({
       name: 'email',
     }),

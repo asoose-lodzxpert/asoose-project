@@ -1,6 +1,7 @@
 'use client';
 
-import { ChevronRight, Box, FileText, Truck, Layers, Info, ShieldAlert } from 'lucide-react';
+import React from 'react';
+import { ChevronRight, Box, FileText, Truck, Layers, Info } from 'lucide-react';
 import { useDeliveryStore } from '@/store/useDeliveryStore';
 import { PACKAGE_TYPES } from '@/constants/packageTypes';
 
@@ -21,7 +22,6 @@ export default function PackageForm({ onContinue }: PackageFormProps) {
     }
   };
 
-  // Helper to handle numeric inputs safely
   const handleNumberInput = (field: 'weightKg' | 'declaredValue', value: string) => {
     if (value === '') {
       setPackageInfo({ [field]: '' });
@@ -35,7 +35,7 @@ export default function PackageForm({ onContinue }: PackageFormProps) {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-20">
-      {/* 1. Existing Package Type Selection */}
+      {/* Existing Package Type Selection */}
       <div>
         <label className="text-xs font-black uppercase text-gray-400 dark:text-zinc-500 mb-3 block tracking-widest">
           Package Type
@@ -49,7 +49,7 @@ export default function PackageForm({ onContinue }: PackageFormProps) {
                 key={type.id}
                 onClick={() => setPackageInfo({ 
                   type: type.id, 
-                  weight: type.weightLabel // Keep legacy weight label
+                  weight: type.weightLabel 
                 })}
                 className={`flex flex-col items-center justify-center gap-3 p-4 rounded-2xl border-2 transition-all h-32 ${
                   isSelected
@@ -72,7 +72,7 @@ export default function PackageForm({ onContinue }: PackageFormProps) {
         </div>
       </div>
 
-      {/* 2. ✅ NEW: Optional Package Details Section */}
+      {/* Package Details Section */}
       <div className="bg-gray-50 dark:bg-zinc-900/50 rounded-2xl p-5 border border-gray-100 dark:border-zinc-800">
         <div className="flex items-center gap-2 mb-4">
           <Info size={16} className="text-yellow-500" />
@@ -82,7 +82,7 @@ export default function PackageForm({ onContinue }: PackageFormProps) {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-          {/* Declared Value Input */}
+          {/* Declared Value */}
           <div>
             <label className="text-[10px] uppercase font-bold text-gray-400 mb-1.5 block">
               Declared Value (₦)
@@ -91,29 +91,31 @@ export default function PackageForm({ onContinue }: PackageFormProps) {
               type="number"
               min="0"
               placeholder="0.00"
-              value={packageInfo.declaredValue}
+              // ✅ FIX: Use null coalescing (?? '') to ensure value is never undefined
+              value={packageInfo.declaredValue ?? ''}
               onChange={(e) => handleNumberInput('declaredValue', e.target.value)}
-              className="w-full p-3 rounded-xl bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 text-sm focus:ring-2 focus:ring-yellow-500 outline-none transition-all placeholder:text-gray-300"
+              className="w-full p-3 rounded-xl bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 text-sm focus:ring-2 focus:ring-yellow-500 outline-none transition-all"
             />
           </div>
 
           {/* Weight Input */}
           <div>
             <label className="text-[10px] uppercase font-bold text-gray-400 mb-1.5 block">
-              Exact Weight (kg)
+              Weight (kg)
             </label>
             <input
               type="number"
               min="0"
               placeholder="e.g. 2.5"
-              value={packageInfo.weightKg}
+              // ✅ FIX: Use null coalescing (?? '') here as well
+              value={packageInfo.weightKg ?? ''}
               onChange={(e) => handleNumberInput('weightKg', e.target.value)}
-              className="w-full p-3 rounded-xl bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 text-sm focus:ring-2 focus:ring-yellow-500 outline-none transition-all placeholder:text-gray-300"
+              className="w-full p-3 rounded-xl bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 text-sm focus:ring-2 focus:ring-yellow-500 outline-none transition-all"
             />
           </div>
         </div>
 
-        {/* Handling Attributes Checkboxes */}
+        {/* Checkbox Attributes */}
         <div className="flex flex-wrap gap-3">
           {[
             { id: 'isFragile', label: 'Fragile' },
@@ -146,7 +148,7 @@ export default function PackageForm({ onContinue }: PackageFormProps) {
         </div>
       </div>
 
-      {/* 3. Existing Instructions Field */}
+      {/* Special Instructions */}
       <div>
         <label className="text-xs font-black uppercase text-gray-400 dark:text-zinc-500 mb-3 block tracking-widest">
           Special Instructions
@@ -154,7 +156,7 @@ export default function PackageForm({ onContinue }: PackageFormProps) {
         <textarea
           value={packageInfo.instructions}
           onChange={(e) => setPackageInfo({ instructions: e.target.value })}
-          placeholder="e.g. Leave at front desk, code is 1234..."
+          placeholder="e.g. Leave at front desk..."
           className="w-full p-4 rounded-2xl bg-gray-50 dark:bg-zinc-900 border border-transparent dark:border-zinc-800 text-sm focus:ring-2 focus:ring-yellow-500 outline-none h-24 resize-none dark:text-white placeholder:text-gray-400 transition-colors"
         />
       </div>

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
 import { AppLogger } from '../libs/logger/app-logger.service';
 import axios from 'axios';
 import * as polyline from '@mapbox/polyline';
@@ -11,6 +11,7 @@ export class MapsService {
     this.apiKey = process.env.GOOGLE_MAPS_API_KEY!;
   }
 
+  // Used internally if needed
   async searchAddress(
     query: string,
     latitude?: string,
@@ -40,6 +41,7 @@ export class MapsService {
     }
   }
 
+  // Used internally if needed
   async placesAutocomplete(
     query: string,
     location?: string,
@@ -65,11 +67,14 @@ export class MapsService {
     }
   }
 
+  /**
+   * Translates a Place ID (provided by frontend) into trusted coordinates.
+   */
   async geocodePlace(
     placeId: string,
   ): Promise<{ lat: number; lng: number; address: string }> {
     if (!placeId) {
-      throw new Error('Place ID is required');
+      throw new BadRequestException('Place ID is required');
     }
 
     const url = `https://maps.googleapis.com/maps/api/geocode/json?place_id=${placeId}&key=${this.apiKey}`;
@@ -90,7 +95,35 @@ export class MapsService {
         error,
         placeId,
       });
-      throw new Error('Failed to geocode place');
+      throw new BadRequestException('Failed to geocode place');
+    }
+  }
+
+  /**
+   * ADDED FIX: Reverse Geocode for "Current Location" fallback.
+   * Takes raw GPS data from the device and snaps it securely to a known map entity.
+   */
+  async reverseGeocode(
+    lat: number,
+    lng: number,
+  ): Promise<{ lat: number; lng: number; address: string; placeId: string }> {
+    const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${this.apiKey}`;
+    
+    try {
+      const res = await axios.get(url);
+      if (res.data.results && res.data.results.length > 0) {
+        const result = res.data.results[0]; // Snaps to nearest known road/address
+        return {
+          lat: result.geometry.location.lat,
+          lng: result.geometry.location.lng,
+          address: result.formatted_address,
+          placeId: result.place_id,
+        };
+      }
+      throw new Error('No address found for these coordinates');
+    } catch (error) {
+      this.appLogger.error('Error reverse geocoding', error?.stack, { lat, lng });
+      throw new BadRequestException('Unroutable location coordinates.');
     }
   }
 
@@ -157,7 +190,6 @@ export class MapsService {
 
   /**
    * Generate a Google Static Maps URL with markers and optional path
-   * Format: markers=color:label|lat,lng&markers=...&path=...
    */
   getStaticMapUrl(
     markers: string,
@@ -180,8 +212,6 @@ export class MapsService {
       params.append('zoom', zoom);
     }
 
-    // Parse and add markers
-    // Format: pickup:6.5244,3.3792|dropoff:6.4698,3.5852|driver:6.5100,3.4000
     if (markers) {
       const markerList = markers.split('|');
       markerList.forEach((marker) => {
@@ -197,7 +227,6 @@ export class MapsService {
       });
     }
 
-    // Add path if provided (encoded polyline or lat,lng pairs)
     if (path) {
       params.append('path', `color:0x0000ff|weight:3|${path}`);
     }

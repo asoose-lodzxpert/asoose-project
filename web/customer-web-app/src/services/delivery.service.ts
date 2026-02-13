@@ -18,6 +18,10 @@ export interface Delivery {
   recipientPhone?: string;
   weightKg?: number;
   isFragile?: boolean;
+  // ✅ NEW FIELDS MATCHING BACKEND
+  isPerishable?: boolean;
+  containsLiquid?: boolean;
+  declaredValue?: number;
   
   // Relations
   rider?: {
@@ -60,6 +64,11 @@ export class DeliveryService {
     recipientPhone: string;
     packageDetails: string;
     weightKg: number;
+    // ✅ FIX: Added optional fields to match usage in DeliveryPage
+    declaredValue?: number;
+    fragile?: boolean;
+    perishable?: boolean;
+    containsLiquid?: boolean;
   }, token?: string) {
     const response = await api.post('/trips/deliveries/request', data, getAuthHeader(token));
     return response.data;

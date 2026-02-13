@@ -1,9 +1,7 @@
-import { useEffect, useRef } from "react";
-import { io, Socket } from "socket.io-client";
+import { useEffect } from "react";
 import { z } from "zod";
+import { socketService } from "@/services/socket.service"; // Unified Singleton
 
-// Phase 2.2: Schema Validation
-// Define strict schemas for incoming data to prevent runtime errors and injection attacks
 const DriverSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -20,9 +18,9 @@ const DriverSchema = z.object({
 const LocationSchema = z.object({
   lat: z.number(),
   lng: z.number(),
+  heading: z.number().optional(), // FIXED: Included heading to fix map rotation
 });
 
-// Phase 3.2: Event Schemas
 const SocketEventSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("DRIVER_FOUND"),
@@ -42,38 +40,22 @@ const SocketEventSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("RIDE_CANCELLED"), metadata: z.any().optional() }),
 ]);
 
-const SOCKET_URL =
-  process.env.NEXT_PUBLIC_SOCKET_URL ||
-  process.env.NEXT_PUBLIC_API_URL ||
-  "http://localhost:3000";
-
 export const useRideSocket = (
-  token: string | null, // Phase 1.1: Explicit Token Injection
+  token: string | null,
   onEvent: (event: z.infer<typeof SocketEventSchema>) => void,
   onReconnected?: () => void,
 ) => {
-  const socketRef = useRef<Socket | null>(null);
-
   useEffect(() => {
-    if (!token) return; // Don't connect without auth
+    if (!token) return;
 
-    socketRef.current = io(SOCKET_URL, {
-      path: "/socket.io",
-      auth: { token }, // Secure handshake
-      reconnection: true,
-      reconnectionAttempts: 5,
-      reconnectionDelay: 1000,
-      transports: ["websocket"],
-    });
+    // Use singleton socket service instead of creating new io() instance
+    const socket = socketService.connect(token);
 
-    const socket = socketRef.current;
+    const handleConnect = () => {
+      if (socket?.recovered && onReconnected) onReconnected();
+    };
+    socketService.on("connect", handleConnect);
 
-    socket.on("connect", () => {
-      console.log("Socket connected safe:", socket.id);
-      if (socket.recovered && onReconnected) onReconnected();
-    });
-
-    // Validated Event Listener
     const handleEvent = (type: string, data: any) => {
       const payload = { type, ...data };
       const result = SocketEventSchema.safeParse(payload);
@@ -81,11 +63,7 @@ export const useRideSocket = (
       if (result.success) {
         onEvent(result.data);
       } else {
-        console.error(
-          `Socket Security Warning: Invalid payload for ${type}`,
-          result.error,
-        );
-        // Phase 3.3: You could track this in Sentry
+        console.error(`Socket Security Warning: Invalid payload for ${type}`, result.error);
       }
     };
 
@@ -99,14 +77,18 @@ export const useRideSocket = (
       "RIDE_CANCELLED",
     ];
 
+    const listeners: Record<string, (data: any) => void> = {};
     events.forEach((evt) => {
-      socket.on(evt, (data) => handleEvent(evt, data));
+      listeners[evt] = (data) => handleEvent(evt, data);
+      socketService.on(evt, listeners[evt]);
     });
 
     return () => {
-      socket.disconnect();
+      events.forEach((evt) => {
+        socketService.off(evt, listeners[evt]);
+      });
+      socketService.off("connect", handleConnect);
+      // Removed socket.disconnect() to preserve the singleton's lifetime
     };
-  }, [token, onEvent, onReconnected]); // Re-connect only if token changes
-
-  return socketRef.current;
+  }, [token, onEvent, onReconnected]);
 };
