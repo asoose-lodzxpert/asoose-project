@@ -1,0 +1,75 @@
+name: Deploy Backend
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Checkout code
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # 2. Log in to Docker Hub
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      # 3. Build Docker image with SHA tag
+      - name: Build Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: ./backend
+          push: false
+          tags: devenochphilip/asoose-backend:${{ github.sha }}
+
+      # 4. Test Docker image (NestJS backend)
+      - name: Test Docker image
+        run: |
+          docker run -d --name test-container -p 3001:3000 devenochphilip/asoose-backend:${{ github.sha }}
+          echo "Waiting for backend to start..."
+          MAX_RETRIES=10
+          RETRY=0
+          until curl -s http://localhost:3001/api/v1/health | grep "ok"; do
+            RETRY=$((RETRY+1))
+            if [ $RETRY -ge $MAX_RETRIES ]; then
+              echo "Backend failed to start!"
+              docker logs test-container
+              docker stop test-container
+              docker rm test-container
+              exit 1
+            fi
+            sleep 3
+          done
+          echo "Backend started successfully!"
+          docker stop test-container
+          docker rm test-container
+
+      # 5. Push Docker image after verification
+      - name: Push Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: ./backend
+          push: true
+          tags: |
+            devenochphilip/asoose-backend:latest
+            devenochphilip/asoose-backend:${{ github.sha }}
+
+      # 6. Deploy to Railway
+      - name: Deploy to Railway
+        run: |
+          railway up --project YOUR_PROJECT_ID --token ${{ secrets.RAILWAY_TOKEN }} --docker-image devenochphilip/asoose-backend:${GITHUB_SHA}
+
+      # 7. Save SHA as artifact for rollback
+      - name: Save deployment SHA
+        uses: actions/upload-artifact@v3
+        with:
+          name: last-successful-sha
+          path: last_successful_sha.txt
+        run: echo "${GITHUB_SHA}" > last_successful_sha.txt

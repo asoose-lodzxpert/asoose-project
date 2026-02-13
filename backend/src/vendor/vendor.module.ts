@@ -1,4 +1,5 @@
-import { Module, OnModuleInit, forwardRef } from '@nestjs/common'; // ✅ IMPORTED forwardRef
+import { Module, OnModuleInit, forwardRef } from '@nestjs/common';
+import { CacheModule } from '@nestjs/cache-manager';
 import { VendorController } from './vendor.controller';
 import { VendorService } from './vendor.service';
 
@@ -39,10 +40,11 @@ import { TransactionsModule } from 'src/super-admin/transactions/transaction.mod
     PrismaModule,
     StorageModule,
     JwtModule,
-    MailModule, 
+    MailModule,
     OtpModule,
     NotificationsModule,
-    forwardRef(() => TransactionsModule), // ✅ FIXED: Wrapped in forwardRef to break circular dependency
+    forwardRef(() => TransactionsModule),
+    CacheModule.register(),
   ],
   controllers: [
     VendorProductsController,
@@ -60,9 +62,8 @@ import { TransactionsModule } from 'src/super-admin/transactions/transaction.mod
     VendorAuthService,
     NubanService,
 
-    // 👇 2. VITAL: Add BOTH Services here
-    ActivityLogService, // Fixes the "?" at index [2]
-    StoresService, // The service itself
+    ActivityLogService,
+    StoresService,
   ],
   exports: [VendorSecurityNotificationsService, VendorOrdersStreamService],
 })
