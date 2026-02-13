@@ -130,7 +130,7 @@ jobs:
 
       # 6. Install Railway CLI
       - name: Install Railway CLI
-        run: npm install -g railway
+        run: npm install -g @railway/cli
 
       # 7. Deploy to Railway
       - name: Deploy to Railway

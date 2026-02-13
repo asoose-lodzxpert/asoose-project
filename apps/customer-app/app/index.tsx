@@ -14,7 +14,7 @@ const ONBOARDING_KEY = "asoose_customer_onboarded";
  */
 export default function Index() {
   const { user, loading: authLoading } = useAuth();
-  const segments = useSegments();
+  const segments: string[] = useSegments();
   const router = useRouter();
 
   const [onboardingChecked, setOnboardingChecked] = useState(false);
