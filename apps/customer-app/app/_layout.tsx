@@ -1,7 +1,5 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Stack } from "expo-router";
-import React, { useEffect, useState } from "react";
-import { Image, StyleSheet, View } from "react-native";
+import React from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 // Providers & Context
@@ -14,65 +12,37 @@ import { HomeProvider } from "@/context/HomeContext";
 import { LocationProvider } from "@/context/LocationContext";
 import { RideProvider } from "@/context/RideContext";
 import { SendPackageProvider } from "@/context/SendPackageContext";
-import WelcomeScreen from "./onboarding";
 
-const ONBOARDING_KEY = "asoose_customer_onboarded";
-
+/**
+ * RootNavigator now ALWAYS renders all routes.
+ * This ensures the route manifest is properly generated in production builds.
+ * Navigation/redirect logic is handled in app/index.tsx instead.
+ */
 function RootNavigator() {
-  const { user, loading: authLoading } = useAuth();
-  const [showWelcome, setShowWelcome] = useState<boolean | null>(null);
-
-  useEffect(() => {
-    const checkOnboarding = async () => {
-      try {
-        const seen = await AsyncStorage.getItem(ONBOARDING_KEY);
-        setShowWelcome(seen !== "true");
-      } catch (e) {
-        setShowWelcome(false);
-      }
-    };
-    checkOnboarding();
-  }, []);
-
-  if (authLoading || showWelcome === null) {
-    return (
-      <View style={styles.loadingContainer}>
-        <View>
-          <Image
-            source={require("@/assets/images/icon.png")}
-            style={styles.logo}
-            resizeMode="contain"
-          />
-        </View>
-      </View>
-    );
-  }
-
-  if (showWelcome) {
-    return (
-      <WelcomeScreen
-        onDone={async () => {
-          await AsyncStorage.setItem(ONBOARDING_KEY, "true");
-          setShowWelcome(false);
-        }}
-      />
-    );
-  }
-
-  if (!user) {
-    return (
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="(auth)" />
-      </Stack>
-    );
-  }
-
-  // You can add account status logic here if needed, similar to vendor app
   return (
     <Stack screenOptions={{ headerShown: false }}>
+      {/* Index route handles initial redirects */}
+      <Stack.Screen name="index" />
+
+      {/* Onboarding screen */}
+      <Stack.Screen name="onboarding" />
+
+      {/* Auth screens */}
+      <Stack.Screen name="(auth)" />
+
+      {/* Main app screens */}
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="(store)" />
       <Stack.Screen name="(settings)" />
+
+      {/* Other screens */}
+      <Stack.Screen name="cart" />
+      <Stack.Screen name="checkout" />
+      <Stack.Screen name="discover" />
+      <Stack.Screen name="enable-location" />
+      <Stack.Screen name="search" />
+      <Stack.Screen name="category/[id]" />
+      <Stack.Screen name="modal" options={{ presentation: "modal" }} />
     </Stack>
   );
 }
@@ -90,23 +60,11 @@ function AuthDependentProviders({ children }: { children: React.ReactNode }) {
   );
 }
 
+/**
+ * Root Layout - sets up all providers and renders the navigator.
+ * No conditional logic here - all routes are registered for production builds.
+ */
 export default function RootLayout() {
-  const [permissionsReady, setPermissionsReady] = useState(true); // No permissions logic for now
-
-  if (!permissionsReady) {
-    return (
-      <View style={styles.loadingContainer}>
-        <View>
-          <Image
-            source={require("@/assets/images/icon.png")}
-            style={styles.logo}
-            resizeMode="contain"
-          />
-        </View>
-      </View>
-    );
-  }
-
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ConfirmProvider>
@@ -124,16 +82,3 @@ export default function RootLayout() {
     </GestureHandlerRootView>
   );
 }
-
-const styles = StyleSheet.create({
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  logo: {
-    width: 120,
-    height: 120,
-    marginBottom: 24,
-  },
-});

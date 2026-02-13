@@ -128,7 +128,11 @@ jobs:
             devenochphilip/asoose-backend:latest
             devenochphilip/asoose-backend:${{ github.sha }}
 
-      # 6. Deploy to Railway
+      # 6. Install Railway CLI
+      - name: Install Railway CLI
+        run: npm install -g railway
+
+      # 7. Deploy to Railway
       - name: Deploy to Railway
         run: |
           railway up --project YOUR_PROJECT_ID --token ${{ secrets.RAILWAY_TOKEN }} --docker-image devenochphilip/asoose-backend:${GITHUB_SHA}
