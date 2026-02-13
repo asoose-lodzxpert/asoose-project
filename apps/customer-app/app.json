@@ -51,9 +51,21 @@
       ],
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.iamwyteshadow.asoosecustomerapp"
+      "package": "com.iamwyteshadow.asoosecustomerapp",
+      "versionCode": 1,
+      "notification": {
+        "icon": "./assets/images/asoose icon.png"
+      },
+      "blockedPermissions": [
+        "RECORD_AUDIO",
+        "ACCESS_BACKGROUND_LOCATION",
+        "READ_CONTACTS",
+        "CALL_PHONE",
+        "SEND_SMS"
+      ]
     },
     "plugins": [
+      "expo-font",
       "expo-router",
       "expo-apple-authentication",
       [
@@ -68,7 +80,28 @@
             "backgroundColor": "#000000"
           }
         }
-      ]
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "ASOOSE needs access to your photo library to upload profile pictures and share images."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "ASOOSE needs your location to show nearby stores, calculate delivery fees, and provide accurate delivery tracking."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/asoose icon.png",
+          "color": "#0EA5E9",
+          "mode": "production"
+        }
+      ],
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true,

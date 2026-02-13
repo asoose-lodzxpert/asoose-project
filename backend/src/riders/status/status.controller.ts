@@ -7,7 +7,7 @@ import { StatusService } from './status.service';
 import { UpdateRiderStatusDto } from '../dto/update-status.dto';
 
 @Controller({
-  path: 'riders/status',
+  path: 'rider/status',
   version: '1',
 })
 export class StatusController {

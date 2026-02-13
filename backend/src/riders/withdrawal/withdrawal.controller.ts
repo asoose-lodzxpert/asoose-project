@@ -7,7 +7,7 @@ import { WithdrawalService } from './withdrawal.service';
 import { CreateWithdrawalDto } from '../dto/create-withdrawal.dto';
 
 @Controller({
-  path: 'riders/withdrawal',
+  path: 'rider/withdrawal',
   version: '1',
 })
 export class WithdrawalController {

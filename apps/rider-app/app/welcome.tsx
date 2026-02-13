@@ -1,10 +1,13 @@
 import React from "react";
 import { View, StyleSheet, Image, Pressable } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { useRouter } from "expo-router";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+
+const ONBOARDING_KEY = "asoose_rider_onboarded";
 
 export default function OnboardingScreen() {
   const router = useRouter();
@@ -12,6 +15,11 @@ export default function OnboardingScreen() {
   const primary = useThemeColor({}, "brandPrimary");
   const textOnPrimary = useThemeColor({}, "textOnPrimary");
   const muted = useThemeColor({}, "textMuted");
+
+  const handleGetStarted = async () => {
+    await AsyncStorage.setItem(ONBOARDING_KEY, "true");
+    router.replace("/(auth)/signin");
+  };
 
   return (
     <ThemedView style={styles.container}>
@@ -65,7 +73,7 @@ export default function OnboardingScreen() {
 
         <Pressable
           style={[styles.button, { backgroundColor: primary }]}
-          onPress={() => router.push("/(auth)/signin")}
+          onPress={handleGetStarted}
         >
           <ThemedText type="defaultSemiBold" style={{ color: textOnPrimary }}>
             Get Started

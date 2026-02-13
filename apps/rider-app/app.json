@@ -9,29 +9,75 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.asoose.rider.app",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
-    "platforms": ["ios", "android"],
+    "platforms": [
+      "ios",
+      "android"
+    ],
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.asoose.rider.app"
+      "package": "com.asoose.rider.app",
+      "versionCode": 1,
+      "notification": {
+        "icon": "./assets/images/icon.png"
+      },
+      "permissions": [
+        "INTERNET",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "POST_NOTIFICATIONS"
+      ],
+      "blockedPermissions": [
+        "CAMERA",
+        "RECORD_AUDIO",
+        "ACCESS_BACKGROUND_LOCATION",
+        "READ_CONTACTS",
+        "CALL_PHONE",
+        "SEND_SMS"
+      ]
     },
     "plugins": [
+      "expo-font",
       "expo-router",
       [
         "expo-splash-screen",
         {
           "image": "./assets/images/splash-icon.png",
+          "dark": {
+            "image": "./assets/images/splash-icon.png",
+            "backgroundColor": "#0A0A0A"
+          },
+          "backgroundColor": "#F9FAFB",
           "imageWidth": 200,
           "resizeMode": "contain"
         }
       ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "ASOOSE Rider App needs your location to show your real-time position, match you with nearby orders, and provide accurate navigation. Location is required for delivery services."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#0EA5E9",
+          "mode": "production"
+        }
+      ],
       "expo-secure-store",
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      "@rnmapbox/maps"
     ],
     "experiments": {
       "typedRoutes": true,

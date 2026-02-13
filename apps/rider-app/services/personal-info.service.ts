@@ -9,7 +9,7 @@ const EXPO_PUBLIC_API_URL = process.env.EXPO_PUBLIC_API_URL;
 export async function getPersonalInfo(): Promise<PersonalInfo> {
   try {
     const response = await fetchWithAuth(
-      `${EXPO_PUBLIC_API_URL}/riders/personal-info`,
+      `${EXPO_PUBLIC_API_URL}/rider/profile/personal-info`,
     );
     return response.personalInfo;
   } catch (error) {
@@ -23,7 +23,7 @@ export async function updatePersonalInfo(
 ): Promise<PersonalInfo> {
   try {
     const response = await fetchWithAuth(
-      `${EXPO_PUBLIC_API_URL}/riders/personal-info`,
+      `${EXPO_PUBLIC_API_URL}/rider/profile/personal-info`,
       {
         method: "PATCH",
         body: JSON.stringify(data),
@@ -51,7 +51,7 @@ export async function uploadProfileImage(imageUri: string): Promise<string> {
     } as any);
 
     const response = await fetchWithAuthMultipart(
-      `${EXPO_PUBLIC_API_URL}/riders/upload-profile-image`,
+      `${EXPO_PUBLIC_API_URL}/rider/profile/upload-profile-image`,
       formData,
     );
 

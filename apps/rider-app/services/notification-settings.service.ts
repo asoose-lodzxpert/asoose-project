@@ -9,7 +9,7 @@ const EXPO_PUBLIC_API_URL = process.env.EXPO_PUBLIC_API_URL;
 export async function getNotificationSettings(): Promise<NotificationSettings> {
   try {
     const response = await fetchWithAuth(
-      `${EXPO_PUBLIC_API_URL}/riders/notification/settings`,
+      `${EXPO_PUBLIC_API_URL}/rider/notification/settings`,
     );
     return response.settings;
   } catch (error) {
@@ -23,7 +23,7 @@ export async function updateNotificationSettings(
 ): Promise<NotificationSettings> {
   try {
     const response = await fetchWithAuth(
-      `${EXPO_PUBLIC_API_URL}/riders/notification/settings`,
+      `${EXPO_PUBLIC_API_URL}/rider/notification/settings`,
       {
         method: "PATCH",
         body: JSON.stringify(data),

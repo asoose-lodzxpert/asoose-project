@@ -60,7 +60,9 @@ export async function fetchWithAuth(url: string, options: RequestInit = {}) {
 }
 
 export async function fetchCurrentUser() {
-  return await fetchWithAuth(`${process.env.EXPO_PUBLIC_API_URL}/riders/me`);
+  return await fetchWithAuth(
+    `${process.env.EXPO_PUBLIC_API_URL}/rider/profile/me`,
+  );
 }
 
 export async function fetchWithAuthMultipart(url: string, formData: FormData) {

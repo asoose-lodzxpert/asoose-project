@@ -1,7 +1,6 @@
 import * as Location from "expo-location";
-import { io, Socket } from "socket.io-client";
-import { getAccessToken } from "./auth";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { JobEventsService } from "./job-events.service";
 
 const LOCATION_QUEUE_KEY = "rider_location_queue";
 const LOCATION_UPDATE_INTERVAL = 5000; // 5 seconds
@@ -14,12 +13,18 @@ interface QueuedLocation {
 }
 
 export class LocationStreamService {
-  private socket: Socket | null = null;
+  private jobEventsService: JobEventsService | null = null;
   private locationSubscription: Location.LocationSubscription | null = null;
   private intervalId: ReturnType<typeof setInterval> | null = null;
   private isActive: boolean = false;
-  private isConnected: boolean = false;
   private locationQueue: QueuedLocation[] = [];
+
+  /**
+   * Set the JobEventsService instance to use its socket
+   */
+  setJobEventsService(service: JobEventsService) {
+    this.jobEventsService = service;
+  }
 
   /**
    * Start streaming location when rider goes active
@@ -27,6 +32,13 @@ export class LocationStreamService {
   async start() {
     if (this.isActive) {
       console.log("Location streaming already active");
+      return;
+    }
+
+    if (!this.jobEventsService) {
+      console.error(
+        "JobEventsService not set. Call setJobEventsService first.",
+      );
       return;
     }
 
@@ -50,8 +62,10 @@ export class LocationStreamService {
       console.warn("Background location permission not granted");
     }
 
-    // Connect to socket
-    await this.connectSocket();
+    // Flush queued locations if connected
+    if (this.jobEventsService.isConnected()) {
+      await this.flushQueue();
+    }
 
     // Start location polling
     this.startLocationPolling();
@@ -75,57 +89,8 @@ export class LocationStreamService {
       this.locationSubscription = null;
     }
 
-    // Save queue before disconnecting
+    // Save queue before stopping
     await this.saveQueue();
-
-    // Disconnect socket
-    if (this.socket) {
-      this.socket.disconnect();
-      this.socket = null;
-      this.isConnected = false;
-    }
-  }
-
-  /**
-   * Connect to socket with authentication
-   */
-  private async connectSocket() {
-    try {
-      const token = await getAccessToken();
-      if (!token) {
-        console.error("No access token available");
-        return;
-      }
-
-      const apiUrl = process.env.EXPO_PUBLIC_API_URL || "";
-      this.socket = io(apiUrl, {
-        auth: { token },
-        transports: ["websocket"],
-        reconnection: true,
-        reconnectionDelay: 1000,
-        reconnectionAttempts: 10,
-      });
-
-      this.socket.on("connect", async () => {
-        console.log("Socket connected for location streaming");
-        this.isConnected = true;
-
-        // Flush queued locations
-        await this.flushQueue();
-      });
-
-      this.socket.on("disconnect", () => {
-        console.log("Socket disconnected");
-        this.isConnected = false;
-      });
-
-      this.socket.on("connect_error", (error) => {
-        console.error("Socket connection error:", error);
-        this.isConnected = false;
-      });
-    } catch (error) {
-      console.error("Failed to connect socket:", error);
-    }
   }
 
   /**
@@ -175,13 +140,12 @@ export class LocationStreamService {
       timestamp: Date.now(),
     };
 
-    if (this.isConnected && this.socket) {
+    if (this.jobEventsService && this.jobEventsService.isConnected()) {
       // Send immediately if connected
-      try {
-        this.socket.emit("rider_location_update", { lat, lng });
+      const sent = this.jobEventsService.sendLocationUpdate(lat, lng);
+      if (sent) {
         console.log(`Location sent: [${lat}, ${lng}]`);
-      } catch (error) {
-        console.error("Error sending location:", error);
+      } else {
         // Queue if send fails
         this.queueLocation(locationData);
       }
@@ -209,25 +173,24 @@ export class LocationStreamService {
    * Flush queued locations when connected
    */
   private async flushQueue() {
-    if (this.locationQueue.length === 0 || !this.socket || !this.isConnected) {
+    if (
+      this.locationQueue.length === 0 ||
+      !this.jobEventsService ||
+      !this.jobEventsService.isConnected()
+    ) {
       return;
     }
 
     console.log(`Flushing ${this.locationQueue.length} queued locations...`);
 
-    try {
-      // Send batch to backend
-      this.socket.emit("rider_location_batch", {
-        locations: this.locationQueue,
-      });
-
+    const sent = this.jobEventsService.sendLocationBatch(this.locationQueue);
+    if (sent) {
       // Clear queue after successful send
       this.locationQueue = [];
       await this.saveQueue();
-
       console.log("Queue flushed successfully");
-    } catch (error) {
-      console.error("Error flushing queue:", error);
+    } else {
+      console.error("Failed to flush queue");
     }
   }
 
@@ -267,7 +230,7 @@ export class LocationStreamService {
   getStatus() {
     return {
       isActive: this.isActive,
-      isConnected: this.isConnected,
+      isConnected: this.jobEventsService?.isConnected() || false,
       queueSize: this.locationQueue.length,
     };
   }

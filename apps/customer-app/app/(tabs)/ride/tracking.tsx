@@ -7,6 +7,7 @@ import {
   Dimensions,
   Platform,
   SafeAreaView,
+  useColorScheme,
 } from "react-native";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "expo-router";
@@ -28,8 +29,7 @@ import { get } from "@/lib/authFetch";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
-// 1. Uber-like Clean Silver Map Style
-const MODERN_MAP_STYLE = [
+const LIGHT_MAP_STYLE = [
   {
     elementType: "geometry",
     stylers: [{ color: "#f5f5f5" }],
@@ -118,6 +118,95 @@ const MODERN_MAP_STYLE = [
   },
 ];
 
+const DARK_MAP_STYLE = [
+  {
+    elementType: "geometry",
+    stylers: [{ color: "#1a1a1a" }],
+  },
+  {
+    elementType: "labels.icon",
+    stylers: [{ visibility: "off" }],
+  },
+  {
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#8a8a8a" }],
+  },
+  {
+    elementType: "labels.text.stroke",
+    stylers: [{ color: "#1a1a1a" }],
+  },
+  {
+    featureType: "administrative.land_parcel",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#5a5a5a" }],
+  },
+  {
+    featureType: "poi",
+    elementType: "geometry",
+    stylers: [{ color: "#2a2a2a" }],
+  },
+  {
+    featureType: "poi",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#6a6a6a" }],
+  },
+  {
+    featureType: "poi.park",
+    elementType: "geometry",
+    stylers: [{ color: "#263c3f" }],
+  },
+  {
+    featureType: "poi.park",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#6b9a76" }],
+  },
+  {
+    featureType: "road",
+    elementType: "geometry",
+    stylers: [{ color: "#2c2c2c" }],
+  },
+  {
+    featureType: "road.arterial",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#7a7a7a" }],
+  },
+  {
+    featureType: "road.highway",
+    elementType: "geometry",
+    stylers: [{ color: "#3c3c3c" }],
+  },
+  {
+    featureType: "road.highway",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#8a8a8a" }],
+  },
+  {
+    featureType: "road.local",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#6a6a6a" }],
+  },
+  {
+    featureType: "transit.line",
+    elementType: "geometry",
+    stylers: [{ color: "#2a2a2a" }],
+  },
+  {
+    featureType: "transit.station",
+    elementType: "geometry",
+    stylers: [{ color: "#2a2a2a" }],
+  },
+  {
+    featureType: "water",
+    elementType: "geometry",
+    stylers: [{ color: "#000000" }],
+  },
+  {
+    featureType: "water",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#515c6d" }],
+  },
+];
+
 export default function RideTrackingScreen() {
   const router = useRouter();
   const showConfirm = useConfirm();
@@ -128,6 +217,7 @@ export default function RideTrackingScreen() {
     refreshCurrentRide,
     socketConnected,
   } = useRide();
+  const colorScheme = useColorScheme();
 
   // Colors
   const primary = useThemeColor({}, "brandPrimary");
@@ -149,6 +239,8 @@ export default function RideTrackingScreen() {
   >([]);
 
   const mapRef = useRef<MapView>(null);
+
+  const mapStyle = colorScheme === "dark" ? DARK_MAP_STYLE : LIGHT_MAP_STYLE;
 
   // --- Location & Route Logic (Kept mostly same, adjusted padding) ---
   useEffect(() => {
@@ -297,7 +389,7 @@ export default function RideTrackingScreen() {
         ref={mapRef}
         provider={PROVIDER_GOOGLE}
         style={StyleSheet.absoluteFillObject} // Fills the screen behind everything
-        customMapStyle={MODERN_MAP_STYLE} // The modern look
+        customMapStyle={mapStyle} // The modern look
         // Padding forces map center to be in the top visible area
         mapPadding={{ top: 20, right: 0, bottom: SCREEN_HEIGHT * 0.4, left: 0 }}
         initialRegion={{

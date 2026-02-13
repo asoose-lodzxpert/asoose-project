@@ -4,6 +4,7 @@ import {
   JobEventsService,
   ConnectionStatus,
 } from "../services/job-events.service";
+import { locationStreamService } from "@/services/location-stream.service";
 
 interface UseJobEventsOptions {
   onJobAssigned?: (job: IncomingJobOffer) => void;
@@ -30,6 +31,8 @@ export function useJobEvents(options: UseJobEventsOptions) {
     try {
       if (!serviceRef.current) {
         serviceRef.current = new JobEventsService();
+        // Wire the socket service to location stream
+        locationStreamService.setJobEventsService(serviceRef.current);
       }
       serviceRef.current.connect({
         onJobAssigned,

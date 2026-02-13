@@ -177,11 +177,7 @@ export const JobsProvider = ({ children }: { children: ReactNode }) => {
 
     try {
       setStatus("at-pickup");
-      await jobsService.updateJobStatus(
-        activeJob.id,
-        activeJob.jobType,
-        "at-pickup",
-      );
+      await jobsService.arriveAtPickup(activeJob.id, activeJob.jobType);
     } catch (error: any) {
       setStatus(previousStatus);
       Toast.show({
@@ -201,11 +197,7 @@ export const JobsProvider = ({ children }: { children: ReactNode }) => {
 
     try {
       setStatus("en-route-dropoff");
-      await jobsService.updateJobStatus(
-        activeJob.id,
-        activeJob.jobType,
-        "en-route-dropoff",
-      );
+      await jobsService.confirmPickup(activeJob.id, activeJob.jobType);
     } catch (error: any) {
       setStatus(previousStatus);
       Toast.show({
@@ -225,11 +217,7 @@ export const JobsProvider = ({ children }: { children: ReactNode }) => {
 
     try {
       setStatus("confirm-job");
-      await jobsService.updateJobStatus(
-        activeJob.id,
-        activeJob.jobType,
-        "confirm-job",
-      );
+      await jobsService.arriveAtDropoff(activeJob.id, activeJob.jobType);
     } catch (error: any) {
       setStatus(previousStatus);
       Toast.show({

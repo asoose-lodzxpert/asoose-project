@@ -55,7 +55,6 @@ export default function OnlineWaitingScreen() {
       </View>
 
       <View style={[styles.bottomCard, { backgroundColor: surface }]}>
-        ...
         <IconSymbol
           name={isRide ? "car" : "package"}
           size={60}

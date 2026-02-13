@@ -7,7 +7,7 @@ import { BankService } from './bank.service';
 import { UpdateBankAccountDto } from '../dto/update-bank-account.dto';
 
 @Controller({
-  path: 'riders/bank',
+  path: 'rider/bank',
   version: '1',
 })
 export class BankController {

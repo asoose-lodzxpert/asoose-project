@@ -7,7 +7,7 @@ import { NotificationService } from './notification.service';
 import { UpdateNotificationSettingsDto } from '../dto/update-notification-settings.dto';
 
 @Controller({
-  path: 'riders/notification',
+  path: 'rider/notification',
   version: '1',
 })
 export class NotificationController {

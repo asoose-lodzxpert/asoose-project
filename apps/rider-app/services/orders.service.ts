@@ -27,7 +27,7 @@ export async function getAllJobs(
       params.append("status", status);
     }
     const response = await fetchWithAuth(
-      `${EXPO_PUBLIC_API_URL}/riders/orders/history?${params}`,
+      `${EXPO_PUBLIC_API_URL}/rider/order/history?${params}`,
     );
     return response;
   } catch (error) {

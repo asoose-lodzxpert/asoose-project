@@ -5,38 +5,14 @@ import { fetchWithAuth } from "./auth-fetch";
 const EXPO_PUBLIC_API_URL = process.env.EXPO_PUBLIC_API_URL;
 
 export const jobsService = {
-  async updateJobStatus(jobId: string, jobType: JobType, status: string) {
-    return retryWithBackoff(
-      async () => {
-        const response = await fetchWithAuth(
-          `${EXPO_PUBLIC_API_URL}/riders/jobs/${jobId}/status`,
-          {
-            method: "PATCH",
-            body: JSON.stringify({ jobType, status }),
-          },
-        );
-        return response;
-      },
-      {
-        maxAttempts: 3,
-        onRetry: (attempt, error) => {
-          console.log(
-            `Retrying updateJobStatus (attempt ${attempt}):`,
-            error.message,
-          );
-        },
-      },
-    );
-  },
-
   async acceptJob(jobId: string, jobType: JobType) {
     return retryWithBackoff(
       async () => {
         const response = await fetchWithAuth(
-          `${EXPO_PUBLIC_API_URL}/riders/jobs/accept`,
+          `${EXPO_PUBLIC_API_URL}/rider/jobs/${jobId}/accept`,
           {
             method: "POST",
-            body: JSON.stringify({ jobId, jobType }),
+            body: JSON.stringify({ jobType }),
           },
         );
         return response;
@@ -56,23 +32,95 @@ export const jobsService = {
   async declineJob(jobId: string, jobType: JobType) {
     // Don't retry decline - if it fails, the job will auto-decline anyway
     const response = await fetchWithAuth(
-      `${EXPO_PUBLIC_API_URL}/riders/jobs/decline`,
+      `${EXPO_PUBLIC_API_URL}/rider/jobs/${jobId}/decline`,
       {
         method: "POST",
-        body: JSON.stringify({ jobId, jobType }),
+        body: JSON.stringify({ jobType }),
       },
     );
     return response;
+  },
+
+  async arriveAtPickup(jobId: string, jobType: JobType) {
+    return retryWithBackoff(
+      async () => {
+        const response = await fetchWithAuth(
+          `${EXPO_PUBLIC_API_URL}/rider/jobs/${jobId}/arrive-pickup`,
+          {
+            method: "POST",
+            body: JSON.stringify({ jobType }),
+          },
+        );
+        return response;
+      },
+      {
+        maxAttempts: 3,
+        onRetry: (attempt, error) => {
+          console.log(
+            `Retrying arriveAtPickup (attempt ${attempt}):`,
+            error.message,
+          );
+        },
+      },
+    );
+  },
+
+  async confirmPickup(jobId: string, jobType: JobType) {
+    return retryWithBackoff(
+      async () => {
+        const response = await fetchWithAuth(
+          `${EXPO_PUBLIC_API_URL}/rider/jobs/${jobId}/confirm-pickup`,
+          {
+            method: "POST",
+            body: JSON.stringify({ jobType }),
+          },
+        );
+        return response;
+      },
+      {
+        maxAttempts: 3,
+        onRetry: (attempt, error) => {
+          console.log(
+            `Retrying confirmPickup (attempt ${attempt}):`,
+            error.message,
+          );
+        },
+      },
+    );
+  },
+
+  async arriveAtDropoff(jobId: string, jobType: JobType) {
+    return retryWithBackoff(
+      async () => {
+        const response = await fetchWithAuth(
+          `${EXPO_PUBLIC_API_URL}/rider/jobs/${jobId}/arrive-dropoff`,
+          {
+            method: "POST",
+            body: JSON.stringify({ jobType }),
+          },
+        );
+        return response;
+      },
+      {
+        maxAttempts: 3,
+        onRetry: (attempt, error) => {
+          console.log(
+            `Retrying arriveAtDropoff (attempt ${attempt}):`,
+            error.message,
+          );
+        },
+      },
+    );
   },
 
   async completeJob(jobId: string, jobType: JobType, payload?: any) {
     return retryWithBackoff(
       async () => {
         const response = await fetchWithAuth(
-          `${EXPO_PUBLIC_API_URL}/riders/jobs/complete`,
+          `${EXPO_PUBLIC_API_URL}/rider/jobs/${jobId}/complete`,
           {
             method: "POST",
-            body: JSON.stringify({ jobId, jobType, ...payload }),
+            body: JSON.stringify({ jobType, payload }),
           },
         );
         return response;
@@ -93,7 +141,7 @@ export const jobsService = {
     return retryWithBackoff(
       async () => {
         const response = await fetchWithAuth(
-          `${EXPO_PUBLIC_API_URL}/riders/online`,
+          `${EXPO_PUBLIC_API_URL}/rider/status/online`,
           {
             method: "POST",
             body: JSON.stringify(coords),
@@ -114,7 +162,7 @@ export const jobsService = {
   async goOffline(coords: { latitude: number; longitude: number }) {
     // Don't retry offline - rider can manually go offline again if needed
     const response = await fetchWithAuth(
-      `${EXPO_PUBLIC_API_URL}/riders/offline`,
+      `${EXPO_PUBLIC_API_URL}/rider/status/offline`,
       {
         method: "POST",
         body: JSON.stringify(coords),

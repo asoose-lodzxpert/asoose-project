@@ -6,7 +6,7 @@ const EXPO_PUBLIC_API_URL = process.env.EXPO_PUBLIC_API_URL;
 export async function getBankAccount(): Promise<BankAccount | null> {
   try {
     const response = await fetchWithAuth(
-      `${EXPO_PUBLIC_API_URL}/riders/bank-account`,
+      `${EXPO_PUBLIC_API_URL}/rider/bank/account`,
     );
     return response.bankAccount || null;
   } catch (error) {
@@ -20,7 +20,7 @@ export async function updateBankAccount(
 ): Promise<BankAccount> {
   try {
     const response = await fetchWithAuth(
-      `${EXPO_PUBLIC_API_URL}/riders/bank-account`,
+      `${EXPO_PUBLIC_API_URL}/rider/bank/account`,
       {
         method: "PATCH",
         body: JSON.stringify(data),

@@ -8,7 +8,7 @@ import { Roles } from '../auth/roles.decorator';
 import { UserRole } from '../common/enums/user-role.enum';
 
 @Controller({
-  path: 'riders/jobs',
+  path: 'rider/jobs',
   version: '1',
 })
 export class JobsController {

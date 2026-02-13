@@ -48,12 +48,16 @@ export class JobEventsService {
         this.socket.disconnect();
       }
 
-      const apiUrl = process.env.EXPO_PUBLIC_API_URL || "";
+      let apiUrl = process.env.EXPO_PUBLIC_API_URL || "";
+      // Remove /api/v1 or /v1/api for socket connection
+      apiUrl = apiUrl.replace(/\/api\/v1$/, "").replace(/\/v1\/api$/, "");
+
       this.socket = io(apiUrl, {
         auth: { token },
         transports: ["websocket"],
         reconnection: true,
-        reconnectionDelay: 1000,
+        reconnectionDelay: 2000,
+        reconnectionDelayMax: 10000,
         reconnectionAttempts: this.maxReconnectAttempts,
       });
 
@@ -182,5 +186,43 @@ export class JobEventsService {
     if (this.socket && orderId) {
       this.socket.emit("joinOrderRoom", { orderId });
     }
+  }
+
+  /**
+   * Send location update via the shared socket
+   */
+  sendLocationUpdate(lat: number, lng: number): boolean {
+    if (this.socket && this.connectionStatus === "connected") {
+      this.socket.emit("rider_location_update", { lat, lng });
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Send batch location updates via the shared socket
+   */
+  sendLocationBatch(
+    locations: Array<{ lat: number; lng: number; timestamp: number }>,
+  ): boolean {
+    if (this.socket && this.connectionStatus === "connected") {
+      this.socket.emit("rider_location_batch", { locations });
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Get the socket instance for direct access if needed
+   */
+  getSocket(): Socket | null {
+    return this.socket;
+  }
+
+  /**
+   * Check if socket is connected
+   */
+  isConnected(): boolean {
+    return this.connectionStatus === "connected" && this.socket !== null;
   }
 }

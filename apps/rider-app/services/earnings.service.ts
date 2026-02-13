@@ -22,7 +22,7 @@ export async function getEarnings(
 ): Promise<EarningsData> {
   try {
     const data = await fetchWithAuth(
-      `${EXPO_PUBLIC_API_URL}/riders/earnings?timeframe=${timeframe}`,
+      `${EXPO_PUBLIC_API_URL}/rider/order/earnings?timeframe=${timeframe}`,
     );
     return data;
   } catch (error) {
@@ -34,7 +34,7 @@ export async function getEarnings(
 export async function getWalletBalance(): Promise<{ balance: number }> {
   try {
     const data = await fetchWithAuth(
-      `${EXPO_PUBLIC_API_URL}/riders/wallet/balance`,
+      `${EXPO_PUBLIC_API_URL}/rider/order/wallet/balance`,
     );
     return data;
   } catch (error) {
