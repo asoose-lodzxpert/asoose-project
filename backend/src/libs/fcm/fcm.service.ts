@@ -1,87 +1,83 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as admin from 'firebase-admin';
 
 @Injectable()
-export class FcmService {
+export class FcmService implements OnModuleInit {
   private readonly logger = new Logger(FcmService.name);
-  private firebaseApp: admin.app.App | null = null;
 
-  constructor(private configService: ConfigService) {
-    this.initializeFirebase();
-  }
+  constructor(private readonly configService: ConfigService) {}
 
-  private initializeFirebase() {
+  onModuleInit() {
+    if (admin.apps.length > 0) {
+      this.logger.log('Firebase Admin already initialized');
+      return;
+    }
+
+    const projectId = this.configService.get<string>('FIREBASE_PROJECT_ID');
+    const clientEmail = this.configService.get<string>('FIREBASE_CLIENT_EMAIL');
+    let privateKey = this.configService.get<string>('FIREBASE_PRIVATE_KEY');
+
+    // Validate credentials
+    if (!projectId || !clientEmail || !privateKey) {
+      this.logger.error('Firebase credentials missing in .env file');
+      if (!projectId) this.logger.error('  ✗ FIREBASE_PROJECT_ID is missing');
+      if (!clientEmail) this.logger.error('  ✗ FIREBASE_CLIENT_EMAIL is missing');
+      if (!privateKey) this.logger.error('  ✗ FIREBASE_PRIVATE_KEY is missing');
+      this.logger.warn('⚠️  Push notifications will NOT work until credentials are configured');
+      return;
+    }
+
+    // Process the private key
+    privateKey = privateKey.replace(/^"|"$/g, '').replace(/\\n/g, '\n');
+
+    // Initialize Firebase Admin
     try {
-      // Check if Firebase is already initialized
-      if (admin.apps.length > 0) {
-        this.firebaseApp = admin.apps[0];
-        this.logger.log('Firebase Admin SDK already initialized');
-        return;
-      }
-
-      const fcmProjectId = this.configService.get<string>('FCM_PROJECT_ID');
-      const fcmClientEmail = this.configService.get<string>('FCM_CLIENT_EMAIL');
-      const fcmPrivateKey = this.configService.get<string>('FCM_PRIVATE_KEY');
-
-      // Only initialize if credentials are provided
-      if (!fcmProjectId || !fcmClientEmail || !fcmPrivateKey) {
-        this.logger.warn(
-          'FCM credentials not configured. Push notifications will be disabled.',
-        );
-        this.logger.warn(
-          'Required env vars: FCM_PROJECT_ID, FCM_CLIENT_EMAIL, FCM_PRIVATE_KEY',
-        );
-        return;
-      }
-
-      // Initialize Firebase Admin SDK with service account credentials
-      this.firebaseApp = admin.initializeApp({
+      admin.initializeApp({
         credential: admin.credential.cert({
-          projectId: fcmProjectId,
-          clientEmail: fcmClientEmail,
-          // Replace escaped newlines with actual newlines
-          privateKey: fcmPrivateKey.replace(/\\n/g, '\n'),
+          projectId,
+          clientEmail,
+          privateKey,
         }),
       });
-
-      this.logger.log(
-        `Firebase Admin SDK initialized successfully for project: ${fcmProjectId}`,
-      );
+      
+      this.logger.log('✓ Firebase Admin initialized successfully');
+      this.logger.log(`  - Project: ${projectId}`);
+      
     } catch (error) {
-      this.logger.error('Failed to initialize Firebase Admin SDK:', error);
-      this.logger.error(
-        'Please check your FCM credentials in environment variables',
-      );
+      this.logger.error('Firebase initialization failed:', error.message);
+      this.logger.warn('⚠️  Push notifications will NOT work');
+      
+      if (error.message.includes('Invalid PEM')) {
+        this.logger.error('Check that FIREBASE_PRIVATE_KEY is complete and properly formatted');
+      }
     }
   }
 
-  async sendToDevice(
-    token: string,
-    title: string,
-    body: string,
-    data?: Record<string, any>,
-  ): Promise<boolean> {
+  /**
+   * Send a push notification to a specific device
+   */
+  async sendToDevice(token: string, title: string, body: string, data?: Record<string, any>) {
     try {
-      if (!this.firebaseApp) {
-        this.logger.warn(
-          'Firebase not initialized. Skipping push notification.',
-        );
-        return false;
+      if (!token) {
+        this.logger.warn('Cannot send notification: token is missing');
+        return;
       }
 
-      const message: admin.messaging.Message = {
+      if (!admin.apps.length) {
+        this.logger.error('Cannot send notification: Firebase Admin is not initialized');
+        return;
+      }
+
+      const message = {
         token,
-        notification: {
-          title,
-          body,
-        },
-        data: data || {},
+        notification: { title, body },
+        data: this.formatData(data),
         android: {
-          priority: 'high',
+          priority: 'high' as const,
           notification: {
             sound: 'default',
-            priority: 'high',
+            clickAction: 'FLUTTER_NOTIFICATION_CLICK',
           },
         },
         apns: {
@@ -94,158 +90,67 @@ export class FcmService {
         },
       };
 
-      await admin.messaging().send(message);
-      this.logger.log(
-        `Push notification sent to device: ${token.substring(0, 20)}...`,
-      );
-      return true;
+      const response = await admin.messaging().send(message);
+      this.logger.log(`✓ Push notification sent (ID: ${response})`);
+      
     } catch (error) {
-      this.logger.error(
-        `Failed to send push notification to ${token.substring(0, 20)}...:`,
-        error.message,
-      );
-      return false;
+      this.logger.error(`FCM Send Error: ${error.message}`);
+      
+      if (error.code === 'messaging/registration-token-not-registered') {
+        this.logger.warn('Token is no longer valid - consider removing from database');
+      } else if (error.code === 'messaging/invalid-registration-token') {
+        this.logger.error('Invalid token format');
+      } else if (error.code === 'messaging/mismatched-credential') {
+        this.logger.error('Firebase credentials do not match the app');
+      }
     }
   }
 
-  async sendToMultipleDevices(
-    tokens: string[],
-    title: string,
-    body: string,
-    data?: Record<string, any>,
-  ): Promise<{ successCount: number; failureCount: number }> {
-    if (!this.firebaseApp) {
-      this.logger.warn(
-        'Firebase not initialized. Skipping push notifications.',
-      );
-      return { successCount: 0, failureCount: tokens.length };
+  /**
+   * Send to multiple devices (Multicast)
+   */
+  async sendToDevices(tokens: string[], title: string, body: string, data?: Record<string, any>) {
+    if (!tokens.length) {
+      this.logger.warn('Cannot send multicast: no tokens provided');
+      return;
     }
 
+    if (!admin.apps.length) {
+      this.logger.error('Cannot send multicast: Firebase Admin is not initialized');
+      return;
+    }
+    
     try {
-      const message: admin.messaging.MulticastMessage = {
+      const response = await admin.messaging().sendEachForMulticast({
         tokens,
-        notification: {
-          title,
-          body,
-        },
-        data: data || {},
-        android: {
-          priority: 'high',
-          notification: {
-            sound: 'default',
-            priority: 'high',
-          },
-        },
-        apns: {
-          payload: {
-            aps: {
-              sound: 'default',
-              badge: 1,
-            },
-          },
-        },
-      };
-
-      const response = await admin.messaging().sendEachForMulticast(message);
-      this.logger.log(
-        `Push notifications sent: ${response.successCount} successful, ${response.failureCount} failed`,
-      );
-
-      return {
-        successCount: response.successCount,
-        failureCount: response.failureCount,
-      };
+        notification: { title, body },
+        data: this.formatData(data),
+      });
+      
+      this.logger.log(`Multicast: ${response.successCount}/${tokens.length} successful, ${response.failureCount} failed`);
+      
+      if (response.failureCount > 0) {
+        response.responses.forEach((resp, idx) => {
+          if (!resp.success) {
+            this.logger.warn(`Failed token ${idx + 1}: ${resp.error?.code || 'Unknown error'}`);
+          }
+        });
+      }
+      
     } catch (error) {
-      this.logger.error(
-        'Failed to send multicast push notification:',
-        error.message,
-      );
-      return { successCount: 0, failureCount: tokens.length };
+      this.logger.error(`Multicast Error: ${error.message}`);
     }
   }
 
-  async sendToTopic(
-    topic: string,
-    title: string,
-    body: string,
-    data?: Record<string, any>,
-  ): Promise<boolean> {
-    try {
-      if (!this.firebaseApp) {
-        this.logger.warn(
-          'Firebase not initialized. Skipping push notification.',
-        );
-        return false;
+  private formatData(data: Record<string, any> | undefined): Record<string, string> {
+    if (!data) return {};
+    
+    const formatted = {};
+    for (const key in data) {
+      if (data[key] !== null && data[key] !== undefined) {
+        formatted[key] = String(data[key]);
       }
-
-      const message: admin.messaging.Message = {
-        topic,
-        notification: {
-          title,
-          body,
-        },
-        data: data || {},
-        android: {
-          priority: 'high',
-        },
-        apns: {
-          payload: {
-            aps: {
-              sound: 'default',
-            },
-          },
-        },
-      };
-
-      await admin.messaging().send(message);
-      this.logger.log(`Push notification sent to topic: ${topic}`);
-      return true;
-    } catch (error) {
-      this.logger.error(
-        `Failed to send push notification to topic ${topic}:`,
-        error.message,
-      );
-      return false;
     }
-  }
-
-  async subscribeToTopic(tokens: string[], topic: string): Promise<void> {
-    try {
-      if (!this.firebaseApp) {
-        this.logger.warn(
-          'Firebase not initialized. Cannot subscribe to topic.',
-        );
-        return;
-      }
-
-      await admin.messaging().subscribeToTopic(tokens, topic);
-      this.logger.log(`${tokens.length} tokens subscribed to topic: ${topic}`);
-    } catch (error) {
-      this.logger.error(
-        `Failed to subscribe to topic ${topic}:`,
-        error.message,
-      );
-    }
-  }
-
-  async unsubscribeFromTopic(tokens: string[], topic: string): Promise<void> {
-    try {
-      if (!this.firebaseApp) {
-        this.logger.warn(
-          'Firebase not initialized. Cannot unsubscribe from topic.',
-        );
-        return;
-      }
-
-      await admin.messaging().unsubscribeFromTopic(tokens, topic);
-      this.logger.log(
-        `${tokens.length} tokens unsubscribed from topic: ${topic}`,
-      );
-    } catch (error) {
-      this.logger.error(
-        `Failed to unsubscribe from topic ${topic}:`,
-        error.message,
-      );
-    }
+    return formatted;
   }
 }
