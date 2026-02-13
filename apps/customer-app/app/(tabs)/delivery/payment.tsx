@@ -132,7 +132,7 @@ export default function PaymentScreen() {
     if (!bankAccount) return;
     setProcessing(true);
     try {
-      const res = await checkBankTransferStatus(bankAccount.reference);
+      const res = await checkBankTransferStatus(bankAccount.reference, method);
       if (res.status === "paid") {
         clearPolling();
         router.push({
@@ -183,7 +183,7 @@ export default function PaymentScreen() {
   function startBankPolling(reference: string, deliveryId: string) {
     clearPolling();
     pollRef.current = setInterval(async () => {
-      const res = await checkBankTransferStatus(reference);
+      const res = await checkBankTransferStatus(reference, method);
       if (res.status === "paid") {
         clearPolling();
         router.push({
@@ -577,6 +577,7 @@ export default function PaymentScreen() {
             visible={showPaymentWebView}
             url={checkoutTx.checkoutUrl}
             reference={checkoutTx.transactionId}
+            paymentMethod={method}
             onSuccess={handlePaymentSuccess}
             onCancel={handlePaymentCancel}
             onPaymentComplete={resetDelivery}

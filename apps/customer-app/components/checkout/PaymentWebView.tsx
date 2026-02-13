@@ -17,6 +17,7 @@ interface PaymentWebViewProps {
   visible: boolean;
   url: string;
   reference: string;
+  paymentMethod?: string;
   onSuccess: () => void;
   onCancel: () => void;
   onPaymentComplete?: () => void | Promise<void>;
@@ -26,6 +27,7 @@ export function PaymentWebView({
   visible,
   url,
   reference,
+  paymentMethod,
   onSuccess,
   onCancel,
   onPaymentComplete,
@@ -62,7 +64,10 @@ export function PaymentWebView({
       try {
         if (urlStatus === "success") {
           // Verify payment status with backend for extra security
-          const result = await checkPaymentStatus(urlReference || reference);
+          const result = await checkPaymentStatus(
+            urlReference || reference,
+            paymentMethod as any,
+          );
 
           if (
             result.success ||
@@ -103,7 +108,10 @@ export function PaymentWebView({
 
       try {
         // Verify payment status with backend
-        const result = await checkPaymentStatus(reference);
+        const result = await checkPaymentStatus(
+          reference,
+          paymentMethod as any,
+        );
 
         if (
           result.success ||
@@ -146,7 +154,10 @@ export function PaymentWebView({
 
       try {
         // Verify payment status with backend
-        const result = await checkPaymentStatus(reference);
+        const result = await checkPaymentStatus(
+          reference,
+          paymentMethod as any,
+        );
 
         if (
           result.success ||

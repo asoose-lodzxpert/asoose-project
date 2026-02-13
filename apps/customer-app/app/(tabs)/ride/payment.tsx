@@ -171,7 +171,10 @@ export default function RidePaymentScreen() {
     setPollingStatus("Verifying payment...");
 
     try {
-      const status = await checkBankTransferStatus(bankAccount.reference);
+      const status = await checkBankTransferStatus(
+        bankAccount.reference,
+        selectedMethod,
+      );
       if (status.paid) {
         showToast({ message: "Payment confirmed!", variant: "success" });
         setShowBankModal(false);
@@ -516,6 +519,7 @@ export default function RidePaymentScreen() {
           visible={showPaymentWebView}
           url={checkoutTx.checkoutUrl}
           reference={checkoutTx.transactionId}
+          paymentMethod={selectedMethod}
           onSuccess={handlePaymentSuccess}
           onCancel={handlePaymentCancel}
         />

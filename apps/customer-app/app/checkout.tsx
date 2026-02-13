@@ -106,7 +106,7 @@ export default function CheckoutScreen() {
       const orderResponse = await createOrder(orderPayload);
       // Multi-order returns { orderGroupId, orders[], grandTotal }
       const createdOrderGroupId =
-        orderResponse.orderGroupId || orderResponse.id;
+        (orderResponse as any).orderGroupId || orderResponse.id;
       setOrderId(createdOrderGroupId);
 
       // 2. Initiate Payment for entire order group
@@ -293,7 +293,7 @@ export default function CheckoutScreen() {
                   <View key={item.id} style={styles.itemRow}>
                     <View style={styles.qtyBadge}>
                       <ThemedText style={{ fontSize: 12, fontWeight: "700" }}>
-                        {item.qty}x
+                        {item.quantity}x
                       </ThemedText>
                     </View>
                     <ThemedText
@@ -303,7 +303,10 @@ export default function CheckoutScreen() {
                       {item.name}
                     </ThemedText>
                     <ThemedText style={styles.itemPrice}>
-                      {formatCurrency(item.price * item.qty, currencySymbol)}
+                      {formatCurrency(
+                        item.price * item.quantity,
+                        currencySymbol,
+                      )}
                     </ThemedText>
                   </View>
                 ))}
@@ -453,11 +456,12 @@ export default function CheckoutScreen() {
         }}
         selectedMethod={selectedPaymentMethod}
       />
-      {paymentUrl && paymentReference && (
+      {paymentUrl && paymentReference && selectedPaymentMethod && (
         <PaymentWebView
           visible={showPaymentWebView}
           url={paymentUrl}
           reference={paymentReference}
+          paymentMethod={selectedPaymentMethod}
           onSuccess={() => {
             setShowPaymentWebView(false);
             setShowSuccessModal(true);

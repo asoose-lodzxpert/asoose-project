@@ -38,6 +38,7 @@ export async function initiatePayment(
     0;
   const type = payload.type || "DELIVERY";
   const orderId = payload.orderId;
+  const orderGroupId = payload.orderGroupId;
   const rideId = payload.rideId;
   const deliveryId = payload.deliveryId;
   const callbackUrl = payload.callbackUrl;
@@ -52,6 +53,7 @@ export async function initiatePayment(
     method: mappedMethod,
     type,
     orderId,
+    orderGroupId,
     rideId,
     deliveryId,
     callbackUrl,
@@ -64,9 +66,13 @@ export async function initiatePayment(
   return parsed;
 }
 
-export async function checkPaymentStatus(reference: string) {
+export async function checkPaymentStatus(
+  reference: string,
+  method?: PaymentMethod,
+) {
+  const gateway = method ? gatewayMap[method] : "PAYSTACK";
   const parsed = await request(
-    `payment/verify?reference=${encodeURIComponent(reference)}`,
+    `payment/verify?reference=${encodeURIComponent(reference)}&gateway=${gateway}`,
     { method: "GET" },
   );
   return parsed;
@@ -112,8 +118,11 @@ export async function createBankTransfer(
   return parsed;
 }
 
-export async function checkBankTransferStatus(reference: string) {
-  return checkPaymentStatus(reference);
+export async function checkBankTransferStatus(
+  reference: string,
+  method?: PaymentMethod,
+) {
+  return checkPaymentStatus(reference, method || "monnify");
 }
 
 // In-app checkout (Paystack, Flutterwave, Monnify)
