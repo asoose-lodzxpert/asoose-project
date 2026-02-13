@@ -24,17 +24,23 @@ export class LocationPayloadDto {
   @IsString()
   addressText: string;
 
-  @ApiPropertyOptional({ description: 'Google Maps Place ID (Primary source of truth)' })
+  @ApiPropertyOptional({
+    description: 'Google Maps Place ID (Primary source of truth)',
+  })
   @IsOptional()
   @IsString()
   placeId?: string;
 
-  @ApiPropertyOptional({ description: 'Latitude (Fallback ONLY for Current Location)' })
+  @ApiPropertyOptional({
+    description: 'Latitude (Fallback ONLY for Current Location)',
+  })
   @IsOptional()
   @IsNumber()
   lat?: number;
 
-  @ApiPropertyOptional({ description: 'Longitude (Fallback ONLY for Current Location)' })
+  @ApiPropertyOptional({
+    description: 'Longitude (Fallback ONLY for Current Location)',
+  })
   @IsOptional()
   @IsNumber()
   lng?: number;
@@ -124,7 +130,8 @@ export class RequestDeliveryDto {
   pickupAddressId?: string;
 
   @ApiPropertyOptional({
-    description: 'Dropoff address ID (optional if coordinates/placeId provided)',
+    description:
+      'Dropoff address ID (optional if coordinates/placeId provided)',
   })
   @IsOptional()
   @IsUUID()
@@ -197,7 +204,7 @@ export class RequestDeliveryDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsNumber() // ✅ Changed from String to Number
-  @Min(0)     // ✅ Enforce positive value
+  @Min(0) // ✅ Enforce positive value
   declaredValue?: number;
 
   @ApiPropertyOptional()

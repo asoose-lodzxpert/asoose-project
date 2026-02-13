@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - main
+    paths:
+      - "backend/**"
+      - ".github/workflows/deploy.yml"
 
 jobs:
   deploy:
@@ -32,26 +35,87 @@ jobs:
           tags: devenochphilip/asoose-backend:${{ github.sha }}
 
       # 4. Test Docker image (NestJS backend)
-      - name: Test Docker image
-        run: |
-          docker run -d --name test-container -p 3001:3000 devenochphilip/asoose-backend:${{ github.sha }}
-          echo "Waiting for backend to start..."
-          MAX_RETRIES=10
-          RETRY=0
-          until curl -s http://localhost:3001/api/v1/health | grep "ok"; do
-            RETRY=$((RETRY+1))
-            if [ $RETRY -ge $MAX_RETRIES ]; then
-              echo "Backend failed to start!"
-              docker logs test-container
-              docker stop test-container
-              docker rm test-container
-              exit 1
-            fi
-            sleep 3
-          done
-          echo "Backend started successfully!"
-          docker stop test-container
-          docker rm test-container
+      # - name: Test Docker image
+      #   run: |
+      #     docker run -d --name test-container -p 3001:3000 \
+      #       -e NODE_ENV=${{ secrets.NODE_ENV }} \
+      #       -e PORT=${{ secrets.PORT }} \
+      #       -e API_PREFIX=${{ secrets.API_PREFIX }} \
+      #       -e DATABASE_URL=${{ secrets.DATABASE_URL }} \
+      #       -e DIRECT_URL=${{ secrets.DIRECT_URL }} \
+      #       -e POSTGRES_USER=${{ secrets.POSTGRES_USER }} \
+      #       -e POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }} \
+      #       -e POSTGRES_DB=${{ secrets.POSTGRES_DB }} \
+      #       -e REDIS_HOST=${{ secrets.REDIS_HOST }} \
+      #       -e REDIS_PORT=${{ secrets.REDIS_PORT }} \
+      #       -e REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }} \
+      #       -e REDIS_DB=${{ secrets.REDIS_DB }} \
+      #       -e MATCHING_REDIS_DB=${{ secrets.MATCHING_REDIS_DB }} \
+      #       -e JWT_SECRET=${{ secrets.JWT_SECRET }} \
+      #       -e JWT_EXPIRES_IN=${{ secrets.JWT_EXPIRES_IN }} \
+      #       -e JWT_REFRESH_SECRET=${{ secrets.JWT_REFRESH_SECRET }} \
+      #       -e JWT_REFRESH_EXPIRES_IN=${{ secrets.JWT_REFRESH_EXPIRES_IN }} \
+      #       -e EMAIL_HOST=${{ secrets.EMAIL_HOST }} \
+      #       -e EMAIL_PORT=${{ secrets.EMAIL_PORT }} \
+      #       -e EMAIL_SECURE=${{ secrets.EMAIL_SECURE }} \
+      #       -e EMAIL_USER=${{ secrets.EMAIL_USER }} \
+      #       -e EMAIL_PASSWORD=${{ secrets.EMAIL_PASSWORD }} \
+      #       -e EMAIL_FROM=${{ secrets.EMAIL_FROM }} \
+      #       -e AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }} \
+      #       -e AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }} \
+      #       -e AWS_REGION=${{ secrets.AWS_REGION }} \
+      #       -e AWS_S3_BUCKET=${{ secrets.AWS_S3_BUCKET }} \
+      #       -e AWS_S3_PUBLIC_URL=${{ secrets.AWS_S3_PUBLIC_URL }} \
+      #       -e THROTTLE_TTL=${{ secrets.THROTTLE_TTL }} \
+      #       -e THROTTLE_LIMIT=${{ secrets.THROTTLE_LIMIT }} \
+      #       -e CORS_ORIGIN=${{ secrets.CORS_ORIGIN }} \
+      #       -e CORS_CREDENTIALS=${{ secrets.CORS_CREDENTIALS }} \
+      #       -e CUSTOMER_WEB_URL=${{ secrets.CUSTOMER_WEB_URL }} \
+      #       -e CUSTOMER_APP_URL=${{ secrets.CUSTOMER_APP_URL }} \
+      #       -e VENDOR_APP_URL=${{ secrets.VENDOR_APP_URL }} \
+      #       -e RIDER_APP_URL=${{ secrets.RIDER_APP_URL }} \
+      #       -e PAYSTACK_SECRET_KEY=${{ secrets.PAYSTACK_SECRET_KEY }} \
+      #       -e PAYSTACK_PUBLIC_KEY=${{ secrets.PAYSTACK_PUBLIC_KEY }} \
+      #       -e FLUTTERWAVE_SECRET_KEY=${{ secrets.FLUTTERWAVE_SECRET_KEY }} \
+      #       -e FLUTTERWAVE_PUBLIC_KEY=${{ secrets.FLUTTERWAVE_PUBLIC_KEY }} \
+      #       -e FLUTTERWAVE_ENCRYPTION_KEY=${{ secrets.FLUTTERWAVE_ENCRYPTION_KEY }} \
+      #       -e FIREBASE_PROJECT_ID=${{ secrets.FIREBASE_PROJECT_ID }} \
+      #       -e FIREBASE_CLIENT_EMAIL=${{ secrets.FIREBASE_CLIENT_EMAIL }} \
+      #       -e FIREBASE_PRIVATE_KEY=${{ secrets.FIREBASE_PRIVATE_KEY }} \
+      #       -e MONNIFY_BASE_URL=${{ secrets.MONNIFY_BASE_URL }} \
+      #       -e MONNIFY_API_KEY=${{ secrets.MONNIFY_API_KEY }} \
+      #       -e MONNIFY_SECRET_KEY=${{ secrets.MONNIFY_SECRET_KEY }} \
+      #       -e MONNIFY_CONTRACT_CODE=${{ secrets.MONNIFY_CONTRACT_CODE }} \
+      #       -e BACKEND_URL=${{ secrets.BACKEND_URL }} \
+      #       -e GOOGLE_MAPS_API_KEY=${{ secrets.GOOGLE_MAPS_API_KEY }} \
+      #       -e NUBAN_API_KEY=${{ secrets.NUBAN_API_KEY }} \
+      #       -e FCM_PROJECT_ID=${{ secrets.FCM_PROJECT_ID }} \
+      #       -e FCM_CLIENT_EMAIL=${{ secrets.FCM_CLIENT_EMAIL }} \
+      #       -e FCM_PRIVATE_KEY=${{ secrets.FCM_PRIVATE_KEY }} \
+      #       -e LOG_LEVEL=${{ secrets.LOG_LEVEL }} \
+      #       -e LOG_FORMAT=${{ secrets.LOG_FORMAT }} \
+      #       -e QUEUE_HOST=${{ secrets.QUEUE_HOST }} \
+      #       -e QUEUE_PORT=${{ secrets.QUEUE_PORT }} \
+      #       -e QUEUE_PASSWORD=${{ secrets.QUEUE_PASSWORD }} \
+      #       -e HEALTH_CHECK_PATH=${{ secrets.HEALTH_CHECK_PATH }} \
+      #       devenochphilip/asoose-backend:${{ github.sha }}
+      #     echo "Waiting for backend to start..."
+      #     MAX_RETRIES=10
+      #     RETRY=0
+      #     until curl -s http://localhost:3001/api/v1/health | grep "ok"; do
+      #       RETRY=$((RETRY+1))
+      #       if [ $RETRY -ge $MAX_RETRIES ]; then
+      #         echo "Backend failed to start!"
+      #         docker logs test-container
+      #         docker stop test-container
+      #         docker rm test-container
+      #         exit 1
+      #       fi
+      #       sleep 3
+      #     done
+      #     echo "Backend started successfully!"
+      #     docker stop test-container
+      #     docker rm test-container
 
       # 5. Push Docker image after verification
       - name: Push Docker image

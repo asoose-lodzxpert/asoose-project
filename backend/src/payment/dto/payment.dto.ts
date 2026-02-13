@@ -151,7 +151,7 @@ export class ProcessRefundDto {
   @IsNumber()
   @Min(100)
   @IsOptional()
-  amount?: number; 
+  amount?: number;
 
   @IsString()
   reason: string;

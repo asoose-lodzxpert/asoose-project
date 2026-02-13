@@ -92,10 +92,10 @@ export class PaymentService {
 
     // 2. Calculate Amount from Source of Truth
     let amount = dto.amount;
-    let orderGroupId = dto.orderGroupId;
-    let orderId = dto.orderId;
-    let rideId = dto.rideId;
-    let deliveryId = dto.deliveryId || dto.metadata?.deliveryId;
+    const orderGroupId = dto.orderGroupId;
+    const orderId = dto.orderId;
+    const rideId = dto.rideId;
+    const deliveryId = dto.deliveryId || dto.metadata?.deliveryId;
 
     if ((dto.type as any) === 'ORDER' || dto.type === PaymentType.ORDER) {
       if (orderGroupId) {

@@ -109,8 +109,12 @@ export class RidesService {
     );
 
     // ✅ FIX: Discard client coordinates. Force strict backend resolution.
-    const securePickup = await this.common.resolveSecureLocation(dto.pickupLocation);
-    const secureDropoff = await this.common.resolveSecureLocation(dto.dropoffLocation);
+    const securePickup = await this.common.resolveSecureLocation(
+      dto.pickupLocation,
+    );
+    const secureDropoff = await this.common.resolveSecureLocation(
+      dto.dropoffLocation,
+    );
 
     if (!Object.values(VehicleType).includes(dto.vehicleType)) {
       throw new BadRequestException('Invalid vehicle type');
@@ -305,8 +309,8 @@ export class RidesService {
     const result = await this.prisma.ride.updateMany({
       where: {
         id: rideId,
-        status: RideStatus.REQUESTED, 
-        riderId: null, 
+        status: RideStatus.REQUESTED,
+        riderId: null,
       },
       data: {
         status: RideStatus.ACCEPTED,
@@ -564,7 +568,7 @@ export class RidesService {
       throw new NotFoundException('Ride not found');
     if (ride.rider)
       ride.rider.phone = this.common.maskPhoneNumber(ride.rider.phone);
-    return { ...ride, startOtp: undefined }; 
+    return { ...ride, startOtp: undefined };
   }
 
   async getUserRides(userId: string, status?: string, page = 1, limit = 20) {
@@ -656,13 +660,27 @@ export class RidesService {
     await this.common.logActivity(riderId, 'DRIVER_ARRIVED', { rideId });
     return { success: true, message: 'Driver arrival confirmed' };
   }
-  
+
   // --- JOBS SERVICE STUBS ---
-  async findActiveRideForDriver(driverId: string): Promise<any> { return null; }
-  async findIncomingRidesForDriver(driverId: string): Promise<any[]> { return []; }
-  async updateRideStatus(rideId: string, status: string): Promise<any> { return null; }
-  async declineRide(rideId: string, driverId: string): Promise<any> { return { success: false }; }
-  async arrivePickup(rideId: string, driverId: string): Promise<any> { return { success: false }; }
-  async confirmPickup(rideId: string, driverId: string): Promise<any> { return { success: false }; }
-  async arriveDropoff(rideId: string, driverId: string): Promise<any> { return { success: false }; }
+  async findActiveRideForDriver(driverId: string): Promise<any> {
+    return null;
+  }
+  async findIncomingRidesForDriver(driverId: string): Promise<any[]> {
+    return [];
+  }
+  async updateRideStatus(rideId: string, status: string): Promise<any> {
+    return null;
+  }
+  async declineRide(rideId: string, driverId: string): Promise<any> {
+    return { success: false };
+  }
+  async arrivePickup(rideId: string, driverId: string): Promise<any> {
+    return { success: false };
+  }
+  async confirmPickup(rideId: string, driverId: string): Promise<any> {
+    return { success: false };
+  }
+  async arriveDropoff(rideId: string, driverId: string): Promise<any> {
+    return { success: false };
+  }
 }

@@ -22,9 +22,12 @@ export class FcmService implements OnModuleInit {
     if (!projectId || !clientEmail || !privateKey) {
       this.logger.error('Firebase credentials missing in .env file');
       if (!projectId) this.logger.error('  ✗ FIREBASE_PROJECT_ID is missing');
-      if (!clientEmail) this.logger.error('  ✗ FIREBASE_CLIENT_EMAIL is missing');
+      if (!clientEmail)
+        this.logger.error('  ✗ FIREBASE_CLIENT_EMAIL is missing');
       if (!privateKey) this.logger.error('  ✗ FIREBASE_PRIVATE_KEY is missing');
-      this.logger.warn('⚠️  Push notifications will NOT work until credentials are configured');
+      this.logger.warn(
+        '⚠️  Push notifications will NOT work until credentials are configured',
+      );
       return;
     }
 
@@ -40,16 +43,17 @@ export class FcmService implements OnModuleInit {
           privateKey,
         }),
       });
-      
+
       this.logger.log('✓ Firebase Admin initialized successfully');
       this.logger.log(`  - Project: ${projectId}`);
-      
     } catch (error) {
       this.logger.error('Firebase initialization failed:', error.message);
       this.logger.warn('⚠️  Push notifications will NOT work');
-      
+
       if (error.message.includes('Invalid PEM')) {
-        this.logger.error('Check that FIREBASE_PRIVATE_KEY is complete and properly formatted');
+        this.logger.error(
+          'Check that FIREBASE_PRIVATE_KEY is complete and properly formatted',
+        );
       }
     }
   }
@@ -57,7 +61,12 @@ export class FcmService implements OnModuleInit {
   /**
    * Send a push notification to a specific device
    */
-  async sendToDevice(token: string, title: string, body: string, data?: Record<string, any>) {
+  async sendToDevice(
+    token: string,
+    title: string,
+    body: string,
+    data?: Record<string, any>,
+  ) {
     try {
       if (!token) {
         this.logger.warn('Cannot send notification: token is missing');
@@ -65,7 +74,9 @@ export class FcmService implements OnModuleInit {
       }
 
       if (!admin.apps.length) {
-        this.logger.error('Cannot send notification: Firebase Admin is not initialized');
+        this.logger.error(
+          'Cannot send notification: Firebase Admin is not initialized',
+        );
         return;
       }
 
@@ -92,12 +103,13 @@ export class FcmService implements OnModuleInit {
 
       const response = await admin.messaging().send(message);
       this.logger.log(`✓ Push notification sent (ID: ${response})`);
-      
     } catch (error) {
       this.logger.error(`FCM Send Error: ${error.message}`);
-      
+
       if (error.code === 'messaging/registration-token-not-registered') {
-        this.logger.warn('Token is no longer valid - consider removing from database');
+        this.logger.warn(
+          'Token is no longer valid - consider removing from database',
+        );
       } else if (error.code === 'messaging/invalid-registration-token') {
         this.logger.error('Invalid token format');
       } else if (error.code === 'messaging/mismatched-credential') {
@@ -109,42 +121,54 @@ export class FcmService implements OnModuleInit {
   /**
    * Send to multiple devices (Multicast)
    */
-  async sendToDevices(tokens: string[], title: string, body: string, data?: Record<string, any>) {
+  async sendToDevices(
+    tokens: string[],
+    title: string,
+    body: string,
+    data?: Record<string, any>,
+  ) {
     if (!tokens.length) {
       this.logger.warn('Cannot send multicast: no tokens provided');
       return;
     }
 
     if (!admin.apps.length) {
-      this.logger.error('Cannot send multicast: Firebase Admin is not initialized');
+      this.logger.error(
+        'Cannot send multicast: Firebase Admin is not initialized',
+      );
       return;
     }
-    
+
     try {
       const response = await admin.messaging().sendEachForMulticast({
         tokens,
         notification: { title, body },
         data: this.formatData(data),
       });
-      
-      this.logger.log(`Multicast: ${response.successCount}/${tokens.length} successful, ${response.failureCount} failed`);
-      
+
+      this.logger.log(
+        `Multicast: ${response.successCount}/${tokens.length} successful, ${response.failureCount} failed`,
+      );
+
       if (response.failureCount > 0) {
         response.responses.forEach((resp, idx) => {
           if (!resp.success) {
-            this.logger.warn(`Failed token ${idx + 1}: ${resp.error?.code || 'Unknown error'}`);
+            this.logger.warn(
+              `Failed token ${idx + 1}: ${resp.error?.code || 'Unknown error'}`,
+            );
           }
         });
       }
-      
     } catch (error) {
       this.logger.error(`Multicast Error: ${error.message}`);
     }
   }
 
-  private formatData(data: Record<string, any> | undefined): Record<string, string> {
+  private formatData(
+    data: Record<string, any> | undefined,
+  ): Record<string, string> {
     if (!data) return {};
-    
+
     const formatted = {};
     for (const key in data) {
       if (data[key] !== null && data[key] !== undefined) {

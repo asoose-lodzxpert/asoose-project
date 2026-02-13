@@ -76,7 +76,11 @@ export class BannersService {
       // Case A: New File Uploaded -> Delete old, upload new
       if (banner.image) {
         await this.storage.deleteFile(banner.image).catch((error) => {
-          this.appLogger.error('Failed to delete old banner image', error?.stack, { error });
+          this.appLogger.error(
+            'Failed to delete old banner image',
+            error?.stack,
+            { error },
+          );
         });
       }
       const upload = await this.storage.uploadFile(file);
@@ -86,7 +90,11 @@ export class BannersService {
       // ✅ FIX: If the image URL string has changed, delete the old image
       if (banner.image && banner.image !== data.image) {
         await this.storage.deleteFile(banner.image).catch((error) => {
-          this.appLogger.error('Failed to delete replaced banner image', error?.stack, { error });
+          this.appLogger.error(
+            'Failed to delete replaced banner image',
+            error?.stack,
+            { error },
+          );
         });
       }
       imageKey = data.image;

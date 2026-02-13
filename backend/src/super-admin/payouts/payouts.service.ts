@@ -1,14 +1,14 @@
-import { 
-  Injectable, 
-  BadRequestException, 
-  Logger, 
-  NotFoundException 
+import {
+  Injectable,
+  BadRequestException,
+  Logger,
+  NotFoundException,
 } from '@nestjs/common';
 import { TransactionLedgerService } from '../transactions/transaction-ledger.service';
 import { PayoutStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { PaymentService } from '../../payment/payment.service';
-import { ActivityLogService } from '../../common/services/activity-log.services'; 
+import { ActivityLogService } from '../../common/services/activity-log.services';
 // Import Enums correctly
 import { RecipientType, PaymentGateway } from '../../payment/dto/payment.dto';
 
@@ -26,7 +26,7 @@ export class PayoutsService {
   async getPendingPayouts() {
     const vendorPayouts = await this.prisma.vendorPayout.findMany({
       where: { status: PayoutStatus.PENDING },
-      include: { store: { select: { name: true } } }, 
+      include: { store: { select: { name: true } } },
     });
 
     const riderPayouts = await this.prisma.riderPayout.findMany({
@@ -41,25 +41,32 @@ export class PayoutsService {
     return { vendorPayouts, riderPayouts };
   }
 
-  async approvePayout(payoutId: string, type: 'VENDOR' | 'RIDER', adminId: string) {
+  async approvePayout(
+    payoutId: string,
+    type: 'VENDOR' | 'RIDER',
+    adminId: string,
+  ) {
     // ====================================================
     // STEP 1: LOCK & VALIDATE (Database Transaction 1)
     // ====================================================
-    
+
     const payoutData = await this.prisma.$transaction(async (tx) => {
       // 1. Fetch Payout
-      const p = type === 'VENDOR' 
-        ? await tx.vendorPayout.findUnique({ where: { id: payoutId } })
-        : await tx.riderPayout.findUnique({ where: { id: payoutId } });
+      const p =
+        type === 'VENDOR'
+          ? await tx.vendorPayout.findUnique({ where: { id: payoutId } })
+          : await tx.riderPayout.findUnique({ where: { id: payoutId } });
 
       if (!p) throw new NotFoundException('Payout record not found');
       if (p.status !== PayoutStatus.PENDING) {
         throw new BadRequestException(`Payout is ${p.status}, cannot approve.`);
       }
-      
+
       // Safety check for bank account snapshot
       if (!p.bankAccountId) {
-         throw new BadRequestException('No bank account snapshot attached to this payout.');
+        throw new BadRequestException(
+          'No bank account snapshot attached to this payout.',
+        );
       }
 
       // 2. Fetch Actual Bank Details (Safe Lookup)
@@ -68,14 +75,22 @@ export class PayoutsService {
       });
 
       if (!bankDetails) {
-        throw new BadRequestException('The attached bank account no longer exists.');
+        throw new BadRequestException(
+          'The attached bank account no longer exists.',
+        );
       }
 
       // 3. Update Status to APPROVED (Locking it)
       if (type === 'VENDOR') {
-        await tx.vendorPayout.update({ where: { id: payoutId }, data: { status: PayoutStatus.APPROVED } }); 
+        await tx.vendorPayout.update({
+          where: { id: payoutId },
+          data: { status: PayoutStatus.APPROVED },
+        });
       } else {
-        await tx.riderPayout.update({ where: { id: payoutId }, data: { status: PayoutStatus.APPROVED } });
+        await tx.riderPayout.update({
+          where: { id: payoutId },
+          data: { status: PayoutStatus.APPROVED },
+        });
       }
 
       return { payout: p, bankDetails };
@@ -84,35 +99,41 @@ export class PayoutsService {
     // ====================================================
     // STEP 2: EXTERNAL TRANSFER (No DB Transaction)
     // ====================================================
-    
+
     // ✅ FIX 1: Safely access storeId/riderId using Type Assertion or 'any' cast
     // Since we know 'type', we can safely access the specific ID.
-    const recipientId = type === 'VENDOR' 
-      ? (payoutData.payout as any).storeId 
-      : (payoutData.payout as any).riderId;
+    const recipientId =
+      type === 'VENDOR'
+        ? (payoutData.payout as any).storeId
+        : (payoutData.payout as any).riderId;
 
     let transferResult;
     try {
-      this.logger.log(`Initiating Transfer: ${payoutId} -> ${payoutData.bankDetails.accountNumber}`);
-      
-      transferResult = await this.paymentService.disbursePayment({
-        amount: payoutData.payout.amount,
-        bankAccount: {
-          accountNumber: payoutData.bankDetails.accountNumber,
-          bankCode: payoutData.bankDetails.bankCode,
-          accountName: payoutData.bankDetails.accountName,
-        },
-        reference: payoutData.payout.id, // Idempotency Key
-        narration: `Payout ${payoutData.payout.id}`,
-        
-        // ✅ FIX 2: Use passed recipientId variable
-        recipientId: recipientId, 
-        
-        // ✅ FIX 3: Use proper Enum values
-        recipientType: type === 'VENDOR' ? RecipientType.VENDOR : RecipientType.RIDER,
-        gateway: PaymentGateway.PAYSTACK 
-      }, adminId);
+      this.logger.log(
+        `Initiating Transfer: ${payoutId} -> ${payoutData.bankDetails.accountNumber}`,
+      );
 
+      transferResult = await this.paymentService.disbursePayment(
+        {
+          amount: payoutData.payout.amount,
+          bankAccount: {
+            accountNumber: payoutData.bankDetails.accountNumber,
+            bankCode: payoutData.bankDetails.bankCode,
+            accountName: payoutData.bankDetails.accountName,
+          },
+          reference: payoutData.payout.id, // Idempotency Key
+          narration: `Payout ${payoutData.payout.id}`,
+
+          // ✅ FIX 2: Use passed recipientId variable
+          recipientId: recipientId,
+
+          // ✅ FIX 3: Use proper Enum values
+          recipientType:
+            type === 'VENDOR' ? RecipientType.VENDOR : RecipientType.RIDER,
+          gateway: PaymentGateway.PAYSTACK,
+        },
+        adminId,
+      );
     } catch (error) {
       this.logger.error(`Transfer Failed for ${payoutId}`, error);
       // DO NOT auto-revert to PENDING. Leave as APPROVED for manual review.
@@ -122,19 +143,19 @@ export class PayoutsService {
     // ====================================================
     // STEP 3: FINALIZE (Database Transaction 2)
     // ====================================================
-    
+
     if (transferResult.success) {
       await this.prisma.$transaction(async (tx) => {
         // 1. Mark as PAID
         if (type === 'VENDOR') {
-          await tx.vendorPayout.update({ 
-            where: { id: payoutId }, 
-            data: { status: PayoutStatus.PAID, processedAt: new Date() } 
+          await tx.vendorPayout.update({
+            where: { id: payoutId },
+            data: { status: PayoutStatus.PAID, processedAt: new Date() },
           });
         } else {
-          await tx.riderPayout.update({ 
-            where: { id: payoutId }, 
-            data: { status: PayoutStatus.PAID, processedAt: new Date() } 
+          await tx.riderPayout.update({
+            where: { id: payoutId },
+            data: { status: PayoutStatus.PAID, processedAt: new Date() },
           });
         }
 
@@ -151,15 +172,20 @@ export class PayoutsService {
       });
 
       return { status: 'SUCCESS' };
-
     } else {
       // Transfer explicitly failed at Gateway
       await this.prisma.$transaction(async (tx) => {
         // 1. Mark as FAILED
         if (type === 'VENDOR') {
-          await tx.vendorPayout.update({ where: { id: payoutId }, data: { status: PayoutStatus.FAILED } });
+          await tx.vendorPayout.update({
+            where: { id: payoutId },
+            data: { status: PayoutStatus.FAILED },
+          });
         } else {
-          await tx.riderPayout.update({ where: { id: payoutId }, data: { status: PayoutStatus.FAILED } });
+          await tx.riderPayout.update({
+            where: { id: payoutId },
+            data: { status: PayoutStatus.FAILED },
+          });
         }
 
         // 2. Ledger: REFUND the wallet (Credit back)
@@ -185,12 +211,18 @@ export class PayoutsService {
     // 1. Perform Transaction (Update DB + Refund Ledger)
     const result = await this.prisma.$transaction(async (tx) => {
       let payout;
-      
+
       // Update Status
       if (type === 'VENDOR') {
-        payout = await tx.vendorPayout.update({ where: { id }, data: updateData });
+        payout = await tx.vendorPayout.update({
+          where: { id },
+          data: updateData,
+        });
       } else {
-        payout = await tx.riderPayout.update({ where: { id }, data: updateData });
+        payout = await tx.riderPayout.update({
+          where: { id },
+          data: updateData,
+        });
       }
 
       // Refund the wallet

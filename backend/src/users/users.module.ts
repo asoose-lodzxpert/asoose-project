@@ -31,7 +31,7 @@ import { QueueModule } from 'src/matching/queue/queue.module';
     FcmModule,
     forwardRef(() => TripsModule), // ✅ FIXED: Wrapped in forwardRef to break circular dependency
     VendorModule,
-    QueueModule, 
+    QueueModule,
     BullModule.registerQueue({
       name: 'email',
     }),

@@ -8,7 +8,7 @@ import { MapsService } from './maps.service';
 export class MapsController {
   constructor(private readonly mapsService: MapsService) {}
 
-  /* * 🛑 SECURITY UPDATE: 
+  /* * 🛑 SECURITY UPDATE:
    * `address-search` and `places-autocomplete` have been permanently removed.
    * Autocomplete is now handled securely by the frontend using Google Maps JS SDK + Session Tokens.
    * Exposing REST endpoints for Autocomplete on the backend creates a severe billing vulnerability.
@@ -24,14 +24,13 @@ export class MapsController {
 
   // ✅ ADDED: Expose reverse geocoding for internal/admin mapping utilities
   @Get('reverse-geocode')
-  async reverseGeocode(
-    @Query('lat') lat: string,
-    @Query('lng') lng: string,
-  ) {
+  async reverseGeocode(@Query('lat') lat: string, @Query('lng') lng: string) {
     if (!lat || !lng) {
-      throw new BadRequestException('lat and lng query parameters are required');
+      throw new BadRequestException(
+        'lat and lng query parameters are required',
+      );
     }
-    
+
     const parsedLat = parseFloat(lat);
     const parsedLng = parseFloat(lng);
 
@@ -70,7 +69,9 @@ export class MapsController {
     @Query('size') size?: string,
   ) {
     if (!markers && !center) {
-      throw new BadRequestException('Either markers or center point is required');
+      throw new BadRequestException(
+        'Either markers or center point is required',
+      );
     }
 
     return this.mapsService.getStaticMapUrl(markers, path, center, zoom, size);

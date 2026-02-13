@@ -1,4 +1,8 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import { AppLogger } from '../libs/logger/app-logger.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { NubanService } from '../libs/nuban/nuban.service';
@@ -459,11 +463,11 @@ export class VendorService {
     data: { amount: number; bankAccountId: string },
   ) {
     // 1. Fetch Store & Bank Account
-    const store = await this.prisma.store.findUnique({ 
+    const store = await this.prisma.store.findUnique({
       where: { vendorId },
-      select: { id: true, walletBalance: true } // ✅ Using walletBalance
+      select: { id: true, walletBalance: true }, // ✅ Using walletBalance
     });
-    
+
     if (!store) throw new NotFoundException('Store not found');
 
     const bankAccount = await this.prisma.bankAccount.findUnique({
@@ -477,9 +481,11 @@ export class VendorService {
     // 2. Validate Balance
     const minWithdrawal = 5000;
     if (data.amount < minWithdrawal) {
-      throw new BadRequestException(`Minimum withdrawal is ₦${minWithdrawal.toLocaleString()}`);
+      throw new BadRequestException(
+        `Minimum withdrawal is ₦${minWithdrawal.toLocaleString()}`,
+      );
     }
-    
+
     if (store.walletBalance < data.amount) {
       throw new BadRequestException('Insufficient wallet balance');
     }
@@ -499,16 +505,22 @@ export class VendorService {
     // This creates the ledger entry AND decrements the balance safely
     try {
       await this.ledger.recordPayoutRequest(
-        store.id,           
-        UserRole.VENDOR,    
-        data.amount,        
-        withdrawal.id,      
+        store.id,
+        UserRole.VENDOR,
+        data.amount,
+        withdrawal.id,
       );
     } catch (error) {
       // Rollback payout record if ledger fails
       await this.prisma.vendorPayout.delete({ where: { id: withdrawal.id } });
-      this.appLogger.error('Ledger transaction failed for vendor withdrawal', error.stack, { error });
-      throw new BadRequestException('Failed to process withdrawal request. Please try again.');
+      this.appLogger.error(
+        'Ledger transaction failed for vendor withdrawal',
+        error.stack,
+        { error },
+      );
+      throw new BadRequestException(
+        'Failed to process withdrawal request. Please try again.',
+      );
     }
 
     // 5. Send Notification
