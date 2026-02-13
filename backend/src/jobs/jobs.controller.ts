@@ -16,14 +16,6 @@ export class JobsController {
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.DRIVER, UserRole.RIDER)
-  @Get('stream')
-  @Sse()
-  streamJobs(@Req() req) {
-    return this.jobsService.streamJobs(req.user.id);
-  }
-
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.DRIVER, UserRole.RIDER)
   @Post(':id/accept')
   async acceptJob(
     @Req() req,

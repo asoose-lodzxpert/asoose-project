@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from "react";
-import { StyleSheet, View, Image } from "react-native";
-import { Stack } from "expo-router";
-import { GestureHandlerRootView } from "react-native-gesture-handler";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Stack } from "expo-router";
+import React, { useEffect, useState } from "react";
+import { Image, StyleSheet, View } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 // Providers & Context
 import ConfirmProvider from "@/components/ui/ConfirmDialogProvider";
@@ -73,7 +73,6 @@ function RootNavigator() {
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="(store)" />
       <Stack.Screen name="(settings)" />
-      <Stack.Screen name="(delivery)" />
     </Stack>
   );
 }
