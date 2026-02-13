@@ -1,16 +1,21 @@
 "use client";
 
-import { Plus } from "lucide-react";
+import { Plus, Loader2 } from "lucide-react";
 import { useCartStore } from "@/store/useCartStore";
 import { toast } from "react-toastify";
+import Image from "next/image";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 
-interface ProductProps {
+export interface ProductProps {
   id: string;
   name: string;
   description: string;
   price: number;
   image?: string;
   storeId: string;
+  storeName?: string;
   onClick?: () => void;
 }
 
@@ -21,25 +26,70 @@ export const ProductCard = ({
   price,
   image,
   storeId,
+  storeName,
   onClick,
 }: ProductProps) => {
   const addItem = useCartStore((state) => state.addItem);
+  const { data: session, status } = useSession();
+  const router = useRouter();
+  const [loading, setLoading] = useState(false);
 
-  const handleQuickAdd = (e: React.MouseEvent) => {
+  const handleQuickAdd = async (e: React.MouseEvent) => {
     e.stopPropagation();
 
-    // 1. Call addItem (it is synchronous and returns void)
-    addItem({
-      id,
-      name,
-      price,
-      quantity: 1,
-      restaurantId: storeId, // image property was missing in your interface but passed here, usually safe if store handles it
-      image: image,          // Explicitly passing image if your store expects it
-    });
+    // 1. Frontend Security Gate
+    if (status !== "authenticated") {
+      toast.info("Please log in to add items to your cart", {
+        position: "bottom-center",
+        autoClose: 3000,
+      });
+      router.push("/sign-in"); // Redirect preserves intent better than just blocking
+      return;
+    }
 
-    // 2. Show toast immediately
-    toast.success("Added to basket");
+    setLoading(true);
+
+    try {
+      // 2. Backend Enforcement (Critical)
+      const token = (session as any)?.accessToken || (session as any)?.user?.accessToken;
+      
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/cart/add`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          productId: id,
+          quantity: 1,
+        }),
+      });
+
+      if (!res.ok) {
+        if (res.status === 401) {
+            router.push("/sign-in"); // Handle expired session
+            throw new Error("Session expired");
+        }
+        const errorData = await res.json();
+        throw new Error(errorData.message || "Failed to add to cart");
+      }
+
+      // 3. Success: Update Local Store (Optimistic or Sync)
+      addItem({
+        id,
+        name,
+        price,
+        quantity: 1,
+        image: image,
+        restaurantId: storeId,
+      });
+
+      toast.success("Added to basket");
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -49,10 +99,11 @@ export const ProductCard = ({
     >
       <div className="w-24 h-24 sm:w-28 sm:h-28 bg-gray-100 dark:bg-white/5 rounded-xl flex-shrink-0 overflow-hidden relative">
         {image ? (
-          <img
+          <Image
             src={image}
             alt={name}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+            fill
+            className="object-cover group-hover:scale-105 transition-transform duration-500"
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-2xl">
@@ -63,6 +114,11 @@ export const ProductCard = ({
 
       <div className="flex-1 flex flex-col justify-between py-1">
         <div>
+          {storeName && (
+            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1 block">
+              {storeName}
+            </span>
+          )}
           <h4 className="font-bold text-gray-900 dark:text-gray-100 line-clamp-2 leading-tight mb-1">
             {name}
           </h4>
@@ -75,9 +131,10 @@ export const ProductCard = ({
           <span className="font-black text-lg">₦{price.toLocaleString()}</span>
           <button
             onClick={handleQuickAdd}
-            className="w-8 h-8 rounded-full bg-gray-100 dark:bg-white/10 flex items-center justify-center text-gray-900 dark:text-white hover:bg-yellow-500 hover:text-black transition-colors z-10"
+            disabled={loading}
+            className="w-8 h-8 rounded-full bg-gray-100 dark:bg-white/10 flex items-center justify-center text-gray-900 dark:text-white hover:bg-yellow-500 hover:text-black transition-colors z-10 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <Plus className="w-4 h-4" />
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
           </button>
         </div>
       </div>

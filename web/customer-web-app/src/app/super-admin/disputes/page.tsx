@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import { Filter, RefreshCw } from "lucide-react";
+import { Filter, RefreshCw, FileText } from "lucide-react";
 import useSWR from "swr";
 import { DataTable } from "@/app/super-admin/component/datatable";
 import DisputesPageSkeleton from "./component/skeleton";
@@ -35,7 +35,7 @@ export default function DisputesPage() {
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
 
   // ===========================================================================
-  //  ✅ SWR DATA FETCHING
+  //  DATA FETCHING
   // ===========================================================================
 
   // 1. Fetch Stats
@@ -76,34 +76,40 @@ export default function DisputesPage() {
   const mappedDisputes: Dispute[] = useMemo(() => {
     if (!disputesData?.data) return [];
 
-    return disputesData.data.map((d: any) => ({
-      id: d.id,
-      status: d.status,
-      priority: d.priority,
-      category: d.order
-        ? "Order"
+    return disputesData.data.map((d: any) => {
+      // Determine relevant financial amount
+      const rawAmount = d.order
+        ? d.order.total
         : d.ride
-          ? "Ride"
+          ? d.ride.totalFare
           : d.delivery
-            ? "Delivery"
-            : "General",
-      relatedType: d.order ? "Order" : d.ride ? "Ride" : "N/A",
-      // ✅ FIX: Replaced $ with ₦
-      relatedAmount: d.order
-        ? `₦${d.order.total.toFixed(2)}`
-        : d.ride
-          ? `₦${d.ride.totalFare?.toFixed(2) || "0.00"}`
-          : "₦0.00",
-      parties: d.targetUser
-        ? `${d.openedByUser?.name} vs ${d.targetUser.name}`
-        : `${d.openedByUser?.name} vs Platform`,
-      reportedBy: d.openedByUser?.name || "Unknown",
-      reportedAt: d.createdAt,
-      messageCount: d.messageCount || 0,
-      isUrgent: d.priority === "URGENT" || d.priority === "HIGH",
-      hoursOpen: d.hoursOpen || 0,
-      breachedSLA: d.breachedSLA || false,
-    }));
+            ? d.delivery.deliveryFee
+            : 0;
+            
+      return {
+        id: d.id,
+        status: d.status,
+        priority: d.priority,
+        category: d.order
+          ? "Order"
+          : d.ride
+            ? "Ride"
+            : d.delivery
+              ? "Delivery"
+              : "General",
+        relatedType: d.order ? "Order" : d.ride ? "Ride" : "N/A",
+        relatedAmount: `₦${(rawAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+        parties: d.targetUser
+          ? `${d.openedByUser?.name || 'User'} vs ${d.targetUser.name}`
+          : `${d.openedByUser?.name || 'User'} vs Platform`,
+        reportedBy: d.openedByUser?.name || "Unknown",
+        reportedAt: d.createdAt,
+        messageCount: d.messageCount || 0,
+        isUrgent: d.priority === "URGENT" || d.priority === "HIGH",
+        hoursOpen: d.hoursOpen || 0,
+        breachedSLA: d.breachedSLA || false,
+      };
+    });
   }, [disputesData]);
 
   const filteredDisputes = useMemo(() => {
@@ -156,7 +162,8 @@ export default function DisputesPage() {
       "Status",
       "Priority",
       "Category",
-      "Reported By",
+      "Parties",
+      "Value",
       "Date",
     ]);
 
@@ -166,8 +173,9 @@ export default function DisputesPage() {
         d.status,
         d.priority,
         d.category,
-        d.reportedBy,
-        d.reportedAt,
+        d.parties,
+        d.relatedAmount,
+        new Date(d.reportedAt).toISOString(),
       ]);
     });
 
@@ -197,7 +205,6 @@ export default function DisputesPage() {
       <div className="max-w-7xl mx-auto space-y-6">
         <DisputeHeader total={total} onExport={handleExport} />
 
-        {/* Pass null if stats is undefined to avoid type mismatch */}
         <DisputeStatsCard stats={stats ?? null} />
 
         <DisputeFilters
@@ -209,11 +216,12 @@ export default function DisputesPage() {
           onCategoryChange={setCategoryFilter}
           stats={stats ?? null}
         />
+        
         <div className="bg-[#1E293B] border border-gray-800 rounded-xl overflow-hidden min-h-[400px]">
           {filteredDisputes.length === 0 && !isLoading ? (
-            <div className="flex flex-col items-center justify-center h-[400px] text-center">
+            <div className="flex flex-col items-center justify-center h-[400px] text-center p-6">
               <div className="bg-gray-800 p-4 rounded-full mb-4">
-                <Filter className="w-8 h-8 text-gray-500" />
+                <FileText className="w-8 h-8 text-gray-500" />
               </div>
               <h3 className="text-white font-bold text-lg">
                 No disputes found

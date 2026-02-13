@@ -8,7 +8,6 @@ import { OrderFilterDto } from './dto/order-filter.dto';
 import { Prisma, StoreType, OrderStatus } from '@prisma/client';
 import { TransactionLedgerService } from '../transactions/transaction-ledger.service';
 
-// Helper to map friendly frontend names to DB Enums
 const SERVICE_TYPE_MAP: Record<string, StoreType> = {
   Food: 'RESTAURANT',
   Grocery: 'GROCERY',
@@ -23,7 +22,9 @@ export class OrdersService {
     private ledgerService: TransactionLedgerService,
   ) {}
 
-  // 📋 1. List All Orders
+  // ===========================================================================
+  // 1. LIST ORDERS (Fixed for Multi-Vendor)
+  // ===========================================================================
   async findAll(query: OrderFilterDto) {
     const { search, status, type, from, to, page = 1, limit = 10 } = query;
     const skip = (Number(page) - 1) * Number(limit);
@@ -37,6 +38,8 @@ export class OrdersService {
           { id: { contains: search, mode: 'insensitive' } },
           { user: { name: { contains: search, mode: 'insensitive' } } },
           { store: { name: { contains: search, mode: 'insensitive' } } },
+          // Added: Search by OrderGroup ID
+          { orderGroupId: { contains: search, mode: 'insensitive' } },
         ],
       }),
       ...(status &&
@@ -63,7 +66,13 @@ export class OrdersService {
         include: {
           user: { select: { name: true } },
           store: { select: { name: true, type: true } },
-          payment: { select: { status: true, amount: true } },
+          // ✅ FIX: Include Direct Payment AND Group Payment
+          payment: { select: { status: true, amount: true, method: true } },
+          orderGroup: {
+            include: {
+              payment: { select: { status: true, amount: true, method: true } },
+            },
+          },
           delivery: {
             include: { rider: { select: { name: true } } },
           },
@@ -73,17 +82,24 @@ export class OrdersService {
     ]);
 
     return {
-      data: orders.map((order) => ({
-        id: order.id,
-        status: order.status,
-        customer: order.user.name,
-        vendor: order.store.name,
-        rider: order.delivery?.rider?.name ?? 'Unassigned',
-        amount: order.payment?.amount ?? order.total,
-        paymentStatus: order.payment?.status ?? 'UNPAID',
-        type: this.mapStoreTypeToService(order.store.type),
-        placedAt: order.createdAt.toISOString(),
-      })),
+      data: orders.map((order) => {
+        // Resolve Payment Source
+        const payment = order.payment || order.orderGroup?.payment;
+
+        return {
+          id: order.id,
+          groupId: order.orderGroupId, // Expose Group ID
+          status: order.status,
+          customer: order.user.name,
+          vendor: order.store.name,
+          rider: order.delivery?.rider?.name ?? 'Unassigned',
+          // Show Order Total, not Transaction Total
+          amount: order.total,
+          paymentStatus: payment?.status ?? 'UNPAID',
+          type: this.mapStoreTypeToService(order.store.type),
+          placedAt: order.createdAt.toISOString(),
+        };
+      }),
       meta: {
         total,
         page: Number(page),
@@ -93,7 +109,9 @@ export class OrdersService {
     };
   }
 
-  // 🔍 2. Get Single Order Details
+  // ===========================================================================
+  // 2. GET SINGLE ORDER (Fixed for Multi-Vendor)
+  // ===========================================================================
   async findOne(id: string) {
     const order = await this.prisma.order.findUnique({
       where: { id },
@@ -107,10 +125,14 @@ export class OrdersService {
         items: {
           include: {
             product: true,
-            modifiers: true, // ✅ include the modifiers relation
+            modifiers: true,
           },
         },
+        // ✅ FIX: Include Direct Payment AND Group Payment
         payment: true,
+        orderGroup: {
+          include: { payment: true },
+        },
         delivery: {
           include: {
             rider: { include: { vehicle: true } },
@@ -138,12 +160,15 @@ export class OrdersService {
     return this.transformForDetail(order, logs, dispute);
   }
 
-  // ✅ 3. Complete Order (Triggers Ledger Recording)
+  // ===========================================================================
+  // 3. COMPLETE ORDER (Fixed Ledger Logic)
+  // ===========================================================================
   async completeOrder(id: string) {
     const order = await this.prisma.order.findUnique({
       where: { id },
       include: {
         payment: true,
+        orderGroup: { include: { payment: true } }, // Fetch group payment
         store: { select: { id: true, commissionRate: true } },
         user: { select: { id: true } },
       },
@@ -154,28 +179,25 @@ export class OrdersService {
       throw new BadRequestException('Order already completed');
     }
 
+    // Resolve Payment
+    const payment = order.payment || order.orderGroup?.payment;
+
     return this.prisma.$transaction(async (tx) => {
       const updatedOrder = await tx.order.update({
         where: { id },
         data: { status: 'DELIVERED', deliveredAt: new Date() },
       });
 
-      if (order.payment && order.payment.status === 'COMPLETED') {
-        await this.ledgerService.recordPayment({
-          id: order.payment.id,
-          amount: order.payment.amount,
-          userId: order.user.id,
-          orderId: order.id,
-          method: order.payment.method,
-          status: order.payment.status,
-        });
-
+      // ✅ LOGIC FIX: Check resolved payment
+      if (payment && payment.status === 'COMPLETED') {
+        // Record Commission (Vendor Earning)
         await this.ledgerService.recordOrderCommission({
           id: order.id,
           storeId: order.store.id,
           total: order.total,
           commissionRate: order.store.commissionRate || 20,
         });
+        // Note: We do NOT record 'PAYMENT_RECEIVED' here as it's handled by Webhook
       }
 
       await tx.activityLog.create({
@@ -186,6 +208,7 @@ export class OrdersService {
           metadata: {
             completedAt: new Date().toISOString(),
             totalAmount: order.total,
+            paymentSource: order.orderGroupId ? 'GROUP' : 'DIRECT',
           },
         },
       });
@@ -194,11 +217,17 @@ export class OrdersService {
     });
   }
 
-  // ❌ 4. Cancel Order
+  // ===========================================================================
+  // 4. CANCEL ORDER (Fixed for Multi-Vendor Refund Safety)
+  // ===========================================================================
   async remove(id: string, adminUserId?: string) {
     const order = await this.prisma.order.findUnique({
       where: { id },
-      include: { payment: true, user: { select: { id: true } } },
+      include: {
+        payment: true,
+        orderGroup: { include: { payment: true } },
+        user: { select: { id: true } },
+      },
     });
 
     if (!order) throw new NotFoundException('Order not found');
@@ -208,21 +237,30 @@ export class OrdersService {
       );
     }
 
+    // Resolve Payment
+    const payment = order.payment || order.orderGroup?.payment;
+
     return this.prisma.$transaction(async (tx) => {
       await tx.order.update({
         where: { id },
         data: { status: 'CANCELLED', cancelledAt: new Date() },
       });
 
-      if (order.payment && order.payment.status === 'COMPLETED') {
+      if (payment && payment.status === 'COMPLETED') {
+        // Logic: If Group Payment, mark Partially Refunded. If Single, Refunded.
+        const newPaymentStatus = order.orderGroupId
+          ? 'PARTIALLY_REFUNDED'
+          : 'REFUNDED';
+
         await tx.payment.update({
-          where: { id: order.payment.id },
-          data: { status: 'REFUNDED' },
+          where: { id: payment.id },
+          data: { status: newPaymentStatus },
         });
 
+        // Record Refund (Only for this order's amount)
         await this.ledgerService.recordRefund({
-          id: order.payment.id,
-          amount: order.payment.amount,
+          id: payment.id,
+          amount: order.total,
           userId: order.user.id,
           orderId: order.id,
         });
@@ -235,44 +273,60 @@ export class OrdersService {
           target: id,
           metadata: {
             reason: 'Admin Force Cancel',
-            refunded: order.payment?.status === 'COMPLETED',
+            refunded: payment?.status === 'COMPLETED',
+            isGroupCancel: !!order.orderGroupId,
           },
         },
       });
     });
   }
 
-  // 💰 5. Refund Order
+  // ===========================================================================
+  // 5. REFUND ORDER (New Partial Refund Architecture)
+  // ===========================================================================
   async refundOrder(id: string, refundAmount?: number, reason?: string) {
     const order = await this.prisma.order.findUnique({
       where: { id },
-      include: { payment: true, user: { select: { id: true } } },
+      include: {
+        payment: true,
+        orderGroup: { include: { payment: true } },
+        user: { select: { id: true } },
+      },
     });
 
     if (!order) throw new NotFoundException('Order not found');
-    const payment = order.payment;
+
+    // Resolve Payment
+    const payment = order.payment || order.orderGroup?.payment;
+
     if (!payment)
       throw new BadRequestException('No payment found for this order');
-    if (payment.status !== 'COMPLETED') {
+    if (
+      payment.status !== 'COMPLETED' &&
+      payment.status !== 'PARTIALLY_REFUNDED'
+    ) {
       throw new BadRequestException('Can only refund completed payments');
     }
 
-    const amountToRefund = refundAmount || payment.amount;
-    if (amountToRefund > payment.amount) {
-      throw new BadRequestException('Refund amount exceeds payment amount');
+    // Cap refund at Order Total (not Payment Total, which might be group total)
+    const amountToRefund = refundAmount || order.total;
+    if (amountToRefund > order.total) {
+      throw new BadRequestException('Refund amount exceeds order total');
     }
 
     return this.prisma.$transaction(async (tx) => {
+      // Update Payment Status
+      const newStatus =
+        amountToRefund === payment.amount
+          ? 'REFUNDED'
+          : 'PARTIALLY_REFUNDED';
+
       await tx.payment.update({
         where: { id: payment.id },
-        data: {
-          status:
-            amountToRefund === payment.amount
-              ? 'REFUNDED'
-              : 'PARTIALLY_REFUNDED',
-        },
+        data: { status: newStatus },
       });
 
+      // Record Refund in Ledger linked to this specific orderId
       await this.ledgerService.recordRefund({
         id: payment.id,
         amount: amountToRefund,
@@ -288,14 +342,16 @@ export class OrdersService {
           metadata: {
             amount: amountToRefund,
             reason: reason || 'Refund processed',
-            isPartial: amountToRefund < payment.amount,
+            isGroupRefund: !!order.orderGroupId,
           },
         },
       });
     });
   }
 
-  // ⚠️ 6. Force Status Override
+  // ===========================================================================
+  // 6. FORCE STATUS OVERRIDE
+  // ===========================================================================
   async forceStatusChange(
     orderId: string,
     newStatus: OrderStatus,
@@ -340,8 +396,12 @@ export class OrdersService {
   }
 
   private transformForDetail(order: any, logs: any[], dispute: any) {
+    // Resolve Payment for Transformer
+    const payment = order.payment || order.orderGroup?.payment;
+
     return {
       id: order.id,
+      groupId: order.orderGroupId, // Expose Group ID
       serviceType: this.mapStoreTypeToService(order.store.type),
       status: order.status,
       dispute,
@@ -353,7 +413,7 @@ export class OrdersService {
 
       customer: {
         name: order.user.name,
-        phone: order.user.phone,
+        phone: order.delivery?.recipientPhone || order.user.phone || 'N/A',
         email: order.user.email,
         address: order.delivery?.dropoffAddress?.street || 'N/A',
       },
@@ -378,18 +438,20 @@ export class OrdersService {
         quantity: item.quantity,
         price: item.price,
         options: item.selectedOptions,
-        modifiers: item.modifiers.map((m: any) => ({
-          name: m.name,
-          price: m.price,
-        })), // ✅ include modifiers
+        modifiers:
+          item.modifiers?.map((m: any) => ({
+            name: m.name,
+            price: m.price,
+          })) || [],
         product: item.product,
       })),
 
-      payment: order.payment
+      payment: payment
         ? {
-            status: order.payment.status,
-            method: order.payment.method,
-            total: order.payment.amount,
+            status: payment.status,
+            method: payment.method,
+            total: payment.amount, // Transaction Total (may be group total)
+            isGroupPayment: !!order.orderGroupId,
           }
         : null,
 

@@ -7,7 +7,9 @@ import {
   IsString,
   Min,
   ValidateIf,
+  ValidateNested, // ✅ Import this
 } from 'class-validator';
+import { Type } from 'class-transformer'; // ✅ Import this
 
 import {
   PaymentGateway,
@@ -18,10 +20,20 @@ import {
 
 export { PaymentType, RecipientType, PaymentGateway, PaymentMethod };
 
+// ✅ Add this Helper Class
+export class BankAccountDto {
+  @IsString()
+  accountNumber: string;
+
+  @IsString()
+  bankCode: string;
+
+  @IsString()
+  @IsOptional()
+  accountName?: string;
+}
+
 export class InitiatePaymentDto {
-  // ✅ FIX: Made amount optional.
-  // The backend will now calculate the total from the Order/Ride/Delivery ID.
-  // It is only strictly required for specific types like Wallet Top-up.
   @IsOptional()
   @IsNumber()
   @Min(100)
@@ -47,7 +59,6 @@ export class InitiatePaymentDto {
   @IsEnum(PaymentType)
   type: PaymentType;
 
-  // FIX: Allow orderGroupId for multi-vendor orders
   @ValidateIf((o) => o.type === PaymentType.ORDER && !o.orderGroupId)
   @IsString()
   orderId?: string;
@@ -78,7 +89,6 @@ export class VerifyPaymentDto {
   @IsString()
   reference: string;
 
-  // FIX: Made gateway required to satisfy PaymentService signature
   @IsEnum(PaymentGateway)
   gateway: PaymentGateway;
 }
@@ -100,6 +110,22 @@ export class DisbursePaymentDto {
   @IsString()
   @IsOptional()
   reason?: string;
+
+  // ✅ ADDED: Explicit Bank Account Snapshot (Critical for Payout Safety)
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => BankAccountDto)
+  bankAccount?: BankAccountDto;
+
+  // ✅ ADDED: Idempotency Reference
+  @IsString()
+  @IsOptional()
+  reference?: string;
+
+  // ✅ ADDED: Narration
+  @IsString()
+  @IsOptional()
+  narration?: string;
 
   @IsString()
   @IsOptional()
@@ -125,7 +151,7 @@ export class ProcessRefundDto {
   @IsNumber()
   @Min(100)
   @IsOptional()
-  amount?: number; // If not provided, full refund
+  amount?: number; 
 
   @IsString()
   reason: string;

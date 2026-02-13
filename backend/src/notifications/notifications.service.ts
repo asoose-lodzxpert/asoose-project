@@ -4,6 +4,13 @@ import { NotificationsGateway } from './notifications.gateway';
 import { ExpoPushService } from '../libs/expo/expo-push.service';
 import { FcmService } from '../libs/fcm/fcm.service';
 
+export interface NotificationPayload {
+  title: string;
+  body: string;
+  data?: Record<string, any>;
+  type?: string;
+}
+
 @Injectable()
 export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
@@ -14,6 +21,20 @@ export class NotificationsService {
     private expoPushService: ExpoPushService,
     private fcmService: FcmService,
   ) {}
+
+  /**
+   * ✅ ADAPTER METHOD: Fixes 'Property sendToUser does not exist' error
+   * Maps the generic payload to the specific 'create' method structure
+   */
+  async sendToUser(userId: string, payload: NotificationPayload) {
+    return this.create({
+      userId,
+      title: payload.title,
+      message: payload.body,
+      type: payload.type || 'SYSTEM',
+      metadata: payload.data,
+    });
+  }
 
   /**
    * Create notification for a user (customer)
@@ -49,17 +70,10 @@ export class NotificationsService {
     try {
       const user = await this.prisma.user.findUnique({
         where: { id: data.userId },
-        select: { expoPushToken: true, fcmToken: true },
+        select: { fcmToken: true },
       });
 
-      if (user?.expoPushToken) {
-        await this.expoPushService.sendToDevice(
-          user.expoPushToken,
-          data.title,
-          data.message,
-          data.metadata,
-        );
-      } else if (user?.fcmToken) {
+      if (user?.fcmToken) {
         await this.fcmService.sendToDevice(
           user.fcmToken,
           data.title,
@@ -351,6 +365,7 @@ export class NotificationsService {
       data: { isRead: true },
     });
   }
+
   async delete(userId: string, notificationId: string) {
     return this.prisma.notification.deleteMany({
       where: { id: notificationId, userId },

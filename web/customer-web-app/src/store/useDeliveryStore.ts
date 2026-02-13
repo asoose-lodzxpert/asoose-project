@@ -1,14 +1,14 @@
-import { create } from "zustand";
-import { persist, createJSONStorage } from "zustand/middleware";
+import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
 
-// 1. Update the Stage type to include REVIEW_PAYMENT
+// 1. Update the Stage type to include ALL steps used in the page
 export type DeliveryStage = 
   | 'IDLE' 
   | 'CONFIGURING' 
   | 'Processing_Address' 
   | 'Calculating_Fee' 
-  | 'REVIEW_PAYMENT'      // ✅ ADDED THIS
-  | 'SELECTING_VEHICLE'   // Kept for backward compatibility if needed, or you can remove it
+  | 'REVIEW_PAYMENT'      // ✅ Added back (required for flow)
+  | 'SELECTING_VEHICLE' 
   | 'Payment_Pending' 
   | 'FINDING_COURIER' 
   | 'COURIER_ASSIGNED' 
@@ -20,12 +20,19 @@ type Position = { lat: number; lng: number };
 
 interface PackageInfo {
   type: string;
-  weight: string;
+  weight: string; // Legacy label (e.g., "< 5kg")
   instructions: string;
   recipientName: string;
   recipientPhone: string;
   pickupAddress: string;
   destinationAddress: string;
+
+  // ✅ NEW OPTIONAL FIELDS (for Metadata)
+  weightKg?: number | "";      // Numeric input for exact weight
+  declaredValue?: number | ""; // Numeric input for value
+  isFragile?: boolean;
+  isPerishable?: boolean;
+  containsLiquid?: boolean;
 }
 
 interface DeliveryState {
@@ -34,14 +41,16 @@ interface DeliveryState {
   pickupPos: Position | null;
   dropoffPos: Position | null;
   
+  // Added address IDs for backend linkage
   pickupAddressId: string | null;
   dropoffAddressId: string | null;
 
   courierPos: Position | undefined;
   packageInfo: PackageInfo;
   
+  // Changed from generic 'priceEstimates' to specific fee
   calculatedFee: number | null;
-
+  
   courierInfo: any | null;
   isCalculating: boolean;
 
@@ -55,19 +64,26 @@ interface DeliveryState {
 }
 
 const initialPackageInfo: PackageInfo = {
-  type: "Document",
-  weight: "< 5kg",
-  instructions: "",
-  recipientName: "",
-  recipientPhone: "",
-  pickupAddress: "",
-  destinationAddress: "",
+  type: 'Document',
+  weight: '< 5kg',
+  instructions: '',
+  recipientName: '',
+  recipientPhone: '',
+  pickupAddress: '',
+  destinationAddress: '',
+  
+  // ✅ Initialize new fields
+  weightKg: "",
+  declaredValue: "",
+  isFragile: false,
+  isPerishable: false,
+  containsLiquid: false,
 };
 
 export const useDeliveryStore = create<DeliveryState>()(
   persist(
     (set) => ({
-      stage: "IDLE",
+      stage: 'IDLE',
       activeDeliveryId: null,
       pickupPos: null,
       dropoffPos: null,
@@ -80,53 +96,49 @@ export const useDeliveryStore = create<DeliveryState>()(
       isCalculating: false,
 
       setStage: (stage) => set({ stage }),
+      
+      setLocations: (pickup, dropoff) => set((state) => ({ 
+        pickupPos: pickup ?? state.pickupPos, 
+        dropoffPos: dropoff ?? state.dropoffPos 
+      })),
 
-      setLocations: (pickup, dropoff) =>
-        set((state) => ({
-          pickupPos: pickup ?? state.pickupPos,
-          dropoffPos: dropoff ?? state.dropoffPos,
-        })),
+      setAddressIds: (pickupId, dropoffId) => set((state) => ({
+        pickupAddressId: pickupId ?? state.pickupAddressId,
+        dropoffAddressId: dropoffId ?? state.dropoffAddressId
+      })),
 
-      setAddressIds: (pickupId, dropoffId) =>
-        set((state) => ({
-          pickupAddressId: pickupId ?? state.pickupAddressId,
-          dropoffAddressId: dropoffId ?? state.dropoffAddressId,
-        })),
-
-      setPackageInfo: (info) =>
-        set((state) => ({
-          packageInfo: { ...state.packageInfo, ...info },
-        })),
+      setPackageInfo: (info) => set((state) => ({ 
+        packageInfo: { ...state.packageInfo, ...info } 
+      })),
 
       setCalculatedFee: (fee) => set({ calculatedFee: fee }),
 
-      resetDelivery: () =>
-        set({
-          stage: "IDLE",
-          activeDeliveryId: null,
-          pickupPos: null,
-          dropoffPos: null,
-          pickupAddressId: null,
-          dropoffAddressId: null,
-          courierPos: undefined,
-          calculatedFee: null,
-          courierInfo: null,
-          packageInfo: initialPackageInfo,
-        }),
+      resetDelivery: () => set({
+        stage: 'IDLE',
+        activeDeliveryId: null,
+        pickupPos: null,
+        dropoffPos: null,
+        pickupAddressId: null,
+        dropoffAddressId: null,
+        courierPos: undefined,
+        calculatedFee: null,
+        courierInfo: null,
+        packageInfo: initialPackageInfo,
+      }),
     }),
     {
-      name: "asoose-delivery-storage",
+      name: 'asoose-delivery-storage',
       storage: createJSONStorage(() => localStorage),
-      partialize: (state) => ({
-        stage: state.stage,
+      partialize: (state) => ({ 
+        stage: state.stage, 
         packageInfo: state.packageInfo,
         activeDeliveryId: state.activeDeliveryId,
         pickupPos: state.pickupPos,
         dropoffPos: state.dropoffPos,
         pickupAddressId: state.pickupAddressId,
         dropoffAddressId: state.dropoffAddressId,
-        calculatedFee: state.calculatedFee,
+        calculatedFee: state.calculatedFee
       }),
-    },
-  ),
+    }
+  )
 );

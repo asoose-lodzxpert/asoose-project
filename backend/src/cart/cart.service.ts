@@ -1,12 +1,78 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+  Inject,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { GetCartSummaryDto, CartItemDto } from './dto/cart-summary.dto';
+import { GetCartSummaryDto } from './dto/cart-summary.dto';
+import { AddToCartDto } from './dto/add-to-cart.dto';
+import type { RedisClientType } from 'redis';
 
 @Injectable()
 export class CartService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    @Inject('REDIS_CLIENT') private readonly redis: RedisClientType,
+  ) {}
 
-  // Replace the existing getCartSummary method
+  /**
+   * Secure Add to Cart
+   * Validates product status/stock and persists to Redis
+   */
+  async addToCart(userId: string, dto: AddToCartDto) {
+    // 1. Validate Product Exists & Status
+    const product = await this.prisma.product.findUnique({
+      where: { id: dto.productId },
+      select: {
+        id: true,
+        price: true,
+        storeId: true,
+        status: true,
+        stock: true,
+      },
+    });
+
+    if (!product) throw new NotFoundException('Product not found');
+    if (product.status !== 'ACTIVE')
+      throw new BadRequestException('Product is not available');
+    if (product.stock < dto.quantity)
+      throw new BadRequestException('Insufficient stock');
+
+    // 2. Define Redis Key for User Cart
+    const cartKey = `cart:${userId}`;
+
+    // 3. Fetch Existing Cart (if any)
+    const existingCartRaw = await this.redis.get(cartKey);
+    const cart = existingCartRaw ? JSON.parse(existingCartRaw) : { items: [] };
+
+    // 4. Update Logic (Merge or Add)
+    const existingItemIndex = cart.items.findIndex(
+      (i: any) => i.productId === dto.productId,
+    );
+
+    if (existingItemIndex > -1) {
+      cart.items[existingItemIndex].quantity += dto.quantity;
+    } else {
+      cart.items.push({
+        productId: dto.productId,
+        quantity: dto.quantity,
+        price: product.price, // Snapshot price for security
+        storeId: product.storeId,
+      });
+    }
+
+    // 5. Persist to Redis (TTL 7 days)
+    await this.redis.set(cartKey, JSON.stringify(cart), {
+      EX: 60 * 60 * 24 * 7,
+    });
+
+    return { message: 'Item added to cart', cartSize: cart.items.length };
+  }
+
+  /**
+   * Calculate Cart Summary / Checkout Breakdown
+   */
   async getCartSummary(dto: GetCartSummaryDto) {
     if (!dto.items.length) return { groups: [], total: 0 };
 
@@ -62,7 +128,7 @@ export class CartService {
     const grandTotal = groups.reduce((acc, g) => acc + g.total, 0);
 
     return {
-      groups, // Frontend must update to iterate this array
+      groups,
       grandTotal,
     };
   }

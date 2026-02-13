@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { AppLogger } from 'src/libs/logger/app-logger.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { StorageService } from 'src/storage/storage.service';
@@ -43,6 +47,9 @@ export class BannersService {
     } else if (data.image) {
       // Persist the pre-uploaded URL/Key if no file is present
       imageKey = data.image;
+    } else {
+      // ✅ FIX: Mandatory image validation
+      throw new BadRequestException('Banner image is required');
     }
 
     return this.prisma.banner.create({
@@ -66,13 +73,22 @@ export class BannersService {
     let imageKey = banner.image;
 
     if (file) {
+      // Case A: New File Uploaded -> Delete old, upload new
       if (banner.image) {
-        // FIX 1: Changed deleteFileByKey -> deleteFile
-        await this.storage.deleteFile(banner.image).catch(console.error);
+        await this.storage.deleteFile(banner.image).catch((error) => {
+          this.appLogger.error('Failed to delete old banner image', error?.stack, { error });
+        });
       }
       const upload = await this.storage.uploadFile(file);
       imageKey = upload.key;
     } else if (data.image !== undefined) {
+      // Case B: JSON Update (Frontend Flow)
+      // ✅ FIX: If the image URL string has changed, delete the old image
+      if (banner.image && banner.image !== data.image) {
+        await this.storage.deleteFile(banner.image).catch((error) => {
+          this.appLogger.error('Failed to delete replaced banner image', error?.stack, { error });
+        });
+      }
       imageKey = data.image;
     }
 

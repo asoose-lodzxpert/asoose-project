@@ -3,9 +3,15 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
-  Package, ChevronRight, Box, Layers, Truck, 
-  Loader2, User, Phone, AlertCircle, RefreshCw, CreditCard, CheckCircle2,
-  FileText
+  ChevronRight, 
+  Loader2, 
+  AlertCircle, 
+  RefreshCw, 
+  CreditCard, 
+  CheckCircle2,
+  MapPin,
+  User,
+  Phone
 } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { useSession } from 'next-auth/react';
@@ -13,11 +19,11 @@ import BottomNav from '../components/layout/BottomNav';
 import { useDeliveryStore } from '@/store/useDeliveryStore';
 import LocationAutocomplete from '../ride/components/LocationAutocomplete';
 import DeliveryProgressUI from './components/DeliveryProgressUi';
+import PackageForm from './components/PackageForm'; // ✅ Imported new component
 import { ReviewModal } from '@/store/ReviewModal';
 import { paymentService } from '@/services/payment.service';
 import { DeliveryService } from '@/services/delivery.service';
 import { socketService } from '@/services/socket.service';
-import { PACKAGE_TYPES } from '@/constants/packageTypes'; 
 
 // CONSTANTS & TYPES
 
@@ -58,7 +64,6 @@ interface SessionWithToken {
 // UTILITIES
 
 const normalizePhoneNumber = (phone: string): string => {
-  // FIX: Remove spaces and dashes to prevent validation errors
   let cleaned = phone.replace(/[\s-]/g, '');
   if (cleaned.startsWith("+234")) {
     cleaned = "0" + cleaned.slice(4);
@@ -88,7 +93,7 @@ const getAuthToken = (session: any): string | null => {
 };
 
 const sanitizeInput = (input: string, maxLength: number = 255): string => {
-  return input.trim().slice(0, maxLength);
+  return input ? input.trim().slice(0, maxLength) : '';
 };
 
 // MAIN COMPONENT
@@ -105,7 +110,6 @@ export default function DeliveryPage() {
     stage,
     courierInfo,
     activeDeliveryId,
-    resetDelivery,
     setAddressIds,
     setCalculatedFee,
     calculatedFee,
@@ -237,44 +241,8 @@ export default function DeliveryPage() {
     [setPackageInfo],
   );
 
-  const isFormValid = useMemo(() => {
-    return Boolean(
-      pickupPos &&
-      dropoffPos &&
-      packageInfo.recipientName &&
-      packageInfo.recipientPhone &&
-      !phoneError &&
-      validatePhoneNumber(packageInfo.recipientPhone).valid,
-    );
-  }, [pickupPos, dropoffPos, packageInfo, phoneError]);
-
-  const getPackageIcon = (id: string) => {
-    switch (id) {
-      case "Document":
-        return FileText;
-      case "Parcel":
-        return Box;
-      case "Bulk":
-        return Layers;
-      case "Heavy":
-        return Truck;
-      default:
-        return Package;
-    }
-  };
-
-  const getRadiusStyle = (index: number) => {
-    const radii = ["rounded-lg", "rounded-xl", "rounded-2xl", "rounded-3xl"];
-    return radii[index] || "rounded-lg";
-  };
-
-  const getSelectedWeight = (): number => {
-    const selected = PACKAGE_TYPES.find(p => p.id === packageInfo.type);
-    return selected ? selected.weightValue : 2.5;
-  };
-
+  // ✅ Updated Logic: Initialize Delivery with Metadata
   const handleInitializeDelivery = async () => {
-    // FIX: Provide specific feedback instead of a disabled button
     if (!pickupPos) {
       toast.error("Please select a valid Pickup Location from the suggestions.");
       return;
@@ -327,13 +295,24 @@ export default function DeliveryPage() {
       setAddressIds(pickupRes.id, dropoffRes.id);
       setStage(DeliveryStage.CALCULATING_FEE);
 
+      // ✅ Use user-provided exact weight if available, else fallback to package type logic
+      const finalWeight = typeof packageInfo.weightKg === 'number' && packageInfo.weightKg > 0 
+        ? packageInfo.weightKg 
+        : 2.5; // Default fallback
+
       const deliveryRes = await DeliveryService.createDelivery({
         pickupAddressId: pickupRes.id,
         dropoffAddressId: dropoffRes.id,
         recipientName: sanitizeInput(packageInfo.recipientName),
         recipientPhone: normalizePhoneNumber(packageInfo.recipientPhone),
         packageDetails: sanitizeInput(`${packageInfo.type} - ${packageInfo.instructions || ''}`),
-        weightKg: getSelectedWeight() 
+        
+        // ✅ NEW: Optional Metadata Fields
+        weightKg: finalWeight,
+        declaredValue: typeof packageInfo.declaredValue === 'number' ? packageInfo.declaredValue : undefined,
+        fragile: packageInfo.isFragile,
+        perishable: packageInfo.isPerishable,
+        containsLiquid: packageInfo.containsLiquid
       }, token);
 
       if (deliveryRes?.delivery?.id) {
@@ -550,8 +529,10 @@ export default function DeliveryPage() {
             <div className="lg:col-span-7 space-y-12">
               <section>
                 <div className="relative space-y-8 mt-10">
+                  {/* Pickup Address */}
                   <div className="border-b border-zinc-200 dark:border-zinc-800 pb-2">
-                    <label className="text-sm font-medium mb-2 block text-zinc-500">
+                    <label className="text-sm font-medium mb-2 flex items-center gap-2 text-zinc-500">
+                      <MapPin size={16} className="text-yellow-500" />
                       Pickup Location
                     </label>
                     <LocationAutocomplete
@@ -566,8 +547,11 @@ export default function DeliveryPage() {
                       }}
                     />
                   </div>
+                  
+                  {/* Delivery Address */}
                   <div className="border-b border-zinc-200 dark:border-zinc-800 pb-2">
-                    <label className="text-sm font-medium mb-2 block text-zinc-500">
+                    <label className="text-sm font-medium mb-2 flex items-center gap-2 text-zinc-500">
+                      <MapPin size={16} className="text-blue-500" />
                       Delivery Address
                     </label>
                     <LocationAutocomplete
@@ -610,60 +594,11 @@ export default function DeliveryPage() {
               </section>
             </div>
 
-            {/* Right Column: Package Size */}
+            {/* Right Column: Package Form */}
             <div className="lg:col-span-5 space-y-12">
               <section>
-                <h3 className="text-lg font-semibold mb-4 dark:text-white">
-                  Package Size
-                </h3>
-                <div className="grid grid-cols-2 gap-4">
-                  {PACKAGE_TYPES.map((type, index) => {
-                    const Icon = getPackageIcon(type.id);
-                    const radiusClass = getRadiusStyle(index);
-                    const isSelected = packageInfo.type === type.id;
-
-                    return (
-                      <button
-                        key={type.id}
-                        onClick={() =>
-                          setPackageInfo({
-                            type: type.id,
-                            weight: type.weightLabel,
-                          })
-                        }
-                        className={`p-6 border transition-all duration-300 text-left flex flex-col gap-4 ${radiusClass} ${
-                          isSelected
-                            ? "border-yellow-500 bg-yellow-500/5 shadow-md"
-                            : "border-zinc-200 dark:border-white/10 hover:border-yellow-500/50"
-                        }`}
-                      >
-                        <Icon
-                          className={`w-6 h-6 ${isSelected ? "text-yellow-500" : "text-zinc-400"}`}
-                        />
-                        <div>
-                          <p className="text-base font-medium dark:text-white">
-                            {type.label}
-                          </p>
-                          <p className="text-xs text-gray-500 mt-1">
-                            {type.weightLabel}
-                          </p>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
+                <PackageForm onContinue={handleInitializeDelivery} />
               </section>
-
-              <div className="pt-8 border-t border-zinc-200 dark:border-zinc-800">
-                {/* FIX: Removed disabled logic to show Toast errors on click instead */}
-                <button 
-                  onClick={handleInitializeDelivery} 
-                  className="w-full group bg-zinc-900 dark:bg-white hover:bg-yellow-500 text-white dark:text-black py-4 px-6 flex items-center justify-between transition-all duration-300 rounded-xl shadow-xl"
-                >
-                  <span className="font-medium">Calculate Price & Proceed</span>
-                  <ChevronRight size={20} className="transition-transform group-hover:translate-x-2" />
-                </button>
-              </div>
             </div>
           </div>
         );

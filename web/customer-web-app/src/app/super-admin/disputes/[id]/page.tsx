@@ -6,7 +6,8 @@ import useSWR from "swr";
 import { getSession } from "next-auth/react";
 import { fetcher } from "../../hooks/useSuperAdminFetch";
 import DisputeDetailSkeleton from "./component/skeleton";
-import { DisputeDetail, ModalType } from "./types";
+import { DisputeDetail as BaseDisputeDetail, ModalType } from "./types";
+import { Layers, Info, DollarSign, ExternalLink, Banknote } from "lucide-react";
 
 // Sub-components
 import DisputeHeader from "./component/DisputeHeader";
@@ -18,78 +19,65 @@ import DisputeTimeline from "./component/DisputeTimeline";
 import ResolutionModal from "./component/ResolutionModal";
 import ImageLightbox from "./component/ImageLightbox";
 
-interface DisputeDetailPageProps {
-  params: Promise<{ id: string }>;
+// Extended Interface for Multi-Vendor Data & Payment Context
+interface DisputeDetail extends BaseDisputeDetail {
+  effectivePayment?: {
+    id: string;
+    reference: string;
+    amount: number;
+    status: string;
+    method: string;
+    gateway: string;
+  };
+  siblings?: Array<{
+    id: string;
+    store: { name: string };
+    total: number;
+    status: string;
+  }>;
 }
 
-export default function DisputeDetailPage({ params }: DisputeDetailPageProps) {
-  // --- UI State ---
+export default function DisputeDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
   const [modalType, setModalType] = useState<ModalType>(null);
   const [processing, setProcessing] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [disputeId, setDisputeId] = useState<string | null>(null);
 
-  // --- Unwrap params Promise ---
   useEffect(() => {
-    params.then((resolvedParams) => {
-      setDisputeId(resolvedParams.id);
-    });
+    params.then((p) => setDisputeId(p.id));
   }, [params]);
-
-  // ===========================================================================
-  //  ✅ SWR DATA FETCHING
-  // ===========================================================================
 
   const {
     data: dispute,
-    error,
     isLoading,
     mutate,
   } = useSWR<DisputeDetail>(
     disputeId ? `/super-admin/disputes/${disputeId}` : null,
     fetcher,
-    {
-      refreshInterval: 15000,
-      revalidateOnFocus: true,
-    },
+    { refreshInterval: 15000 }
   );
 
-  // --- Helpers ---
+  // Strict Max Refund Calculation
+  // Prioritizes the specific sub-order total over the global payment to prevent over-refunding groups
   const getMaxRefundAmount = () => {
     if (dispute?.order) return dispute.order.total;
     if (dispute?.ride) return dispute.ride.totalFare;
     if (dispute?.delivery) return dispute.delivery.deliveryFee;
-    return 0;
+    return dispute?.effectivePayment?.amount || 0;
   };
 
-  // ===========================================================================
-  //  HANDLERS (Includes Audit Logging logic on the Backend)
-  // ===========================================================================
-
+  // Handle Chat Logic
   const handleSendMessage = async (message: string, isInternal: boolean) => {
     if (!disputeId) return;
 
-    // Optimistic UI Update
-    if (dispute) {
-      const optimisticMsg = {
-        id: "temp-" + Date.now(),
-        message,
-        isInternal,
-        sender: { id: "self", name: "You", role: "ADMIN" },
-        createdAt: new Date().toISOString(),
-        isAdmin: true,
-      };
-      mutate(
-        { ...dispute, messages: [...dispute.messages, optimisticMsg as any] },
-        false,
-      );
-    }
-
     try {
-      const API_URL =
-        process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
       const session = await getSession();
       const authToken = (session as any)?.accessToken;
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
       const res = await fetch(
         `${API_URL}/super-admin/disputes/${disputeId}/messages`,
@@ -100,26 +88,26 @@ export default function DisputeDetailPage({ params }: DisputeDetailPageProps) {
             Authorization: `Bearer ${authToken}`,
           },
           body: JSON.stringify({ message, isInternal }),
-        },
+        }
       );
 
-      if (!res.ok) throw new Error("Failed");
+      if (!res.ok) throw new Error("Failed to send message");
 
       toast.success(isInternal ? "Internal note added" : "Message sent");
       mutate();
     } catch (e) {
+      console.error(e);
       toast.error("Failed to send message");
-      mutate();
     }
   };
 
+  // Handle Priority Updates
   const handleUpdatePriority = async (priority: string) => {
     if (!disputeId) return;
     try {
       const session = await getSession();
       const authToken = (session as any)?.accessToken;
-      const API_URL =
-        process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
       await fetch(`${API_URL}/super-admin/disputes/${disputeId}/priority`, {
         method: "PATCH",
@@ -137,57 +125,41 @@ export default function DisputeDetailPage({ params }: DisputeDetailPageProps) {
     }
   };
 
-  // ✅ FIX: Updated signature to accept (notes, refundSource, amountInput)
-  // This matches the updated ResolutionModal logic
+  // Handle Dispute Resolution & Refunds
   const handleResolution = async (
     notes: string,
     refundSource: string,
-    amountInput?: string,
+    amountInput?: string
   ) => {
     if (!dispute || !disputeId) return;
     setProcessing(true);
     try {
       const session = await getSession();
       const authToken = (session as any)?.accessToken;
-      const API_URL =
-        process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
-      let endpoint = `${API_URL}/super-admin/disputes/${disputeId}/resolve`;
-      let body: any = {};
+      const isReject = modalType === "REJECT";
+      const endpoint = `${API_URL}/super-admin/disputes/${disputeId}/${
+        isReject ? "reject" : "resolve"
+      }`;
 
-      if (modalType === "REJECT") {
-        endpoint = `${API_URL}/super-admin/disputes/${disputeId}/reject`;
-        body = { reason: notes }; // For reject, the first arg is the reason
-      } else {
-        let action = "NO_REFUND";
-        let refundAmount = 0;
+      const refundAmount =
+        modalType === "REFUND_FULL"
+          ? getMaxRefundAmount()
+          : modalType === "REFUND_PARTIAL"
+          ? parseFloat(amountInput || "0")
+          : 0;
 
-        if (modalType === "REFUND_FULL") {
-          action = "REFUND_FULL";
-          refundAmount = getMaxRefundAmount() || 0;
-        } else if (modalType === "REFUND_PARTIAL") {
-          action = "REFUND_PARTIAL";
-          // ✅ FIX: Use the 3rd argument (amountInput) for partial amount
-          refundAmount = parseFloat(amountInput || "0");
-        }
-
-        // ✅ FIX: Formatted string with Naira (₦) symbol
-        const resolutionNotes =
-          modalType === "REFUND_PARTIAL"
-            ? `Partial Refund of ₦${amountInput} | ${notes}`
-            : notes;
-
-        body = {
-          action,
-          resolutionNotes: resolutionNotes,
-          ...(refundAmount > 0 && {
-            refundAmount,
-            refundSource: refundSource,
-          }),
-        };
-      }
-
-      console.log("Sending Payload:", body); // Debug check
+      const body = isReject
+        ? { reason: notes }
+        : {
+            action: modalType, // REFUND_FULL, REFUND_PARTIAL, RESOLVE_NO_REFUND
+            resolutionNotes:
+              modalType === "REFUND_PARTIAL"
+                ? `Partial Refund: ₦${amountInput} | ${notes}`
+                : notes,
+            ...(refundAmount > 0 && { refundAmount, refundSource }),
+          };
 
       const res = await fetch(endpoint, {
         method: "POST",
@@ -198,33 +170,23 @@ export default function DisputeDetailPage({ params }: DisputeDetailPageProps) {
         body: JSON.stringify(body),
       });
 
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.message || "Action failed");
-      }
+      if (!res.ok)
+        throw new Error((await res.json()).message || "Action failed");
 
-      toast.success(
-        "Dispute resolved. Action has been recorded in audit logs.",
-      );
+      toast.success("Dispute resolved successfully.");
       setModalType(null);
       mutate();
     } catch (e: any) {
-      toast.error(e.message || "Failed to process request");
+      toast.error(e.message);
     } finally {
       setProcessing(false);
     }
   };
 
-  // ===========================================================================
-  //  RENDER
-  // ===========================================================================
-
   if (isLoading) return <DisputeDetailSkeleton />;
-  if (error || !dispute)
+  if (!dispute)
     return (
-      <div className="min-h-screen bg-[#0F172A] flex items-center justify-center text-white">
-        Dispute not found or access denied.
-      </div>
+      <div className="p-20 text-center text-white">Dispute not found.</div>
     );
 
   return (
@@ -243,7 +205,6 @@ export default function DisputeDetailPage({ params }: DisputeDetailPageProps) {
               dispute={dispute}
               onImageClick={setSelectedImage}
             />
-
             <DisputeChat
               messages={dispute.messages}
               canAddMessage={dispute.canAddMessage}
@@ -253,11 +214,78 @@ export default function DisputeDetailPage({ params }: DisputeDetailPageProps) {
 
           <div className="lg:col-span-1 space-y-6">
             <div className="sticky top-6 space-y-6">
+              
+              {/* Multi-Vendor Group Order Context */}
+              {dispute.siblings && dispute.siblings.length > 0 && (
+                <div className="bg-purple-500/10 border border-purple-500/20 p-4 rounded-xl">
+                  <h4 className="text-xs font-bold text-purple-400 uppercase flex items-center gap-2 mb-3">
+                    <Layers size={14} /> Group Order Items
+                  </h4>
+                  <div className="space-y-2">
+                    <div className="text-[10px] text-gray-400 mb-2">
+                      This order is part of a larger transaction group.
+                    </div>
+                    {dispute.siblings.map((s: any) => (
+                      <div
+                        key={s.id}
+                        className="flex justify-between items-center text-xs border-b border-purple-500/10 pb-2 last:border-0"
+                      >
+                        <span className="text-gray-300 font-medium">{s.store.name}</span>
+                        <div className="flex flex-col items-end">
+                          <span className="text-white font-mono">
+                            ₦{s.total.toLocaleString()}
+                          </span>
+                          <span className="text-[9px] text-gray-500 uppercase">{s.status}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <RelatedEntityCard
                 order={dispute.order}
                 ride={dispute.ride}
                 delivery={dispute.delivery}
               />
+
+              {/* Payment Context */}
+              <div className="bg-[#1E293B] border border-gray-800 p-4 rounded-xl shadow-sm">
+                <h4 className="text-xs font-bold text-gray-400 uppercase flex items-center gap-2 mb-3">
+                  <Banknote size={14} /> Payment Info
+                </h4>
+                <div className="space-y-3">
+                   <div className="flex justify-between items-center">
+                    <span className="text-xs text-gray-500">Total Charged</span>
+                    <span className="text-sm text-white font-mono font-bold">
+                       ₦{dispute.effectivePayment?.amount.toLocaleString(undefined, { minimumFractionDigits: 2 }) || "0.00"}
+                    </span>
+                  </div>
+                  
+                  <div className="space-y-1 bg-[#0F172A] p-2 rounded border border-gray-700/50">
+                    <p className="text-[10px] text-gray-500 uppercase tracking-wider">Gateway Reference</p>
+                    <div className="flex items-center gap-2">
+                        <p className="text-xs text-blue-400 font-mono break-all cursor-pointer hover:underline truncate" 
+                           onClick={() => {
+                              navigator.clipboard.writeText(dispute.effectivePayment?.reference || "");
+                              toast.success("Reference copied");
+                           }}
+                           title="Click to copy"
+                        >
+                          {dispute.effectivePayment?.reference || "N/A"}
+                        </p>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-between pt-1">
+                     <span className="text-[10px] text-gray-500">Method</span>
+                     <span className="text-[10px] text-white bg-gray-700 px-1.5 py-0.5 rounded uppercase">
+                        {dispute.effectivePayment?.method || "Unknown"}
+                     </span>
+                  </div>
+                </div>
+              </div>
+
               <DisputeActions
                 priority={dispute.priority}
                 canResolve={dispute.canResolve}
@@ -278,9 +306,8 @@ export default function DisputeDetailPage({ params }: DisputeDetailPageProps) {
         maxRefundAmount={getMaxRefundAmount() || 0}
         isProcessing={processing}
         onClose={() => setModalType(null)}
-        onConfirm={handleResolution} // Logic matches updated signature
+        onConfirm={handleResolution}
       />
-
       <ImageLightbox
         imageUrl={selectedImage}
         onClose={() => setSelectedImage(null)}

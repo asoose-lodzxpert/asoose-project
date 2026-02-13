@@ -31,7 +31,7 @@ import {
 
 @ApiTags('Disputes')
 @ApiBearerAuth()
-@Controller('disputes')
+@Controller('super-admin/disputes')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class DisputesController {
   constructor(private readonly disputesService: DisputesService) {}
@@ -119,20 +119,19 @@ export class DisputesController {
     return this.disputesService.addAdminNote(id, note, req.user.id);
   }
 
-  // 🔒 ADMIN ONLY: Update Priority
-  @Patch(':id/priority')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN_MANAGER, UserRole.ADMIN_SUPPORT)
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Update dispute priority' })
-  async updatePriority(
-    @Param('id') id: string,
-    @Body() dto: UpdatePriorityDto,
-  ) {
-    return this.disputesService['prisma'].dispute.update({
-      where: { id },
-      data: { priority: dto.priority },
-    });
-  }
+// ✅ FIX: Redirect to service method to ensure ActivityLog entry
+@Patch(':id/priority')
+@Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN_MANAGER, UserRole.ADMIN_SUPPORT)
+@HttpCode(HttpStatus.OK)
+@ApiOperation({ summary: 'Update dispute priority' })
+async updatePriority(
+  @Param('id') id: string,
+  @Body() dto: UpdatePriorityDto,
+  @Request() req,
+) {
+  // Use service method instead of direct prisma update
+  return this.disputesService.updatePriority(id, dto.priority, req.user.id);
+}
 
   // 🔒 ADMIN ONLY: Resolve
   @Post(':id/resolve')

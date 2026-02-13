@@ -14,13 +14,15 @@ import { StatusService } from './status/status.service';
 import { RiderNotificationsController } from './rider-notifications.controller';
 import { RiderNotificationsService } from './rider-notifications.service';
 import { RiderDispatchListener } from './rider-dispatch.listener';
+import { RidersStreamService } from './riders-stream.service';
 import { PrismaModule } from '../prisma/prisma.module';
 import { UsersModule } from '../users/users.module';
 import { TripsModule } from '../users/trips/trips.module';
 import { StorageModule } from '../storage/storage.module';
 import { MatchingModule } from '../matching/matching.module';
-import { NotificationsModule } from '../notifications/notifications.module';
 import { RidersController } from './riders.controller';
+// ✅ IMPORT THIS
+import { TransactionsModule } from '../super-admin/transactions/transaction.module';
 
 @Module({
   imports: [
@@ -29,7 +31,8 @@ import { RidersController } from './riders.controller';
     forwardRef(() => UsersModule),
     TripsModule,
     MatchingModule,
-    NotificationsModule,
+    // ✅ ADD THIS
+    TransactionsModule, 
   ],
   controllers: [
     ProfileController,
@@ -50,6 +53,7 @@ import { RidersController } from './riders.controller';
     StatusService,
     RiderNotificationsService,
     RiderDispatchListener,
+    RidersStreamService,
   ],
   exports: [
     ProfileService,
@@ -59,6 +63,7 @@ import { RidersController } from './riders.controller';
     WithdrawalService,
     StatusService,
     RiderNotificationsService,
+    RidersStreamService,
   ],
 })
 export class RidersModule {}

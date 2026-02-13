@@ -5,10 +5,15 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateWithdrawalDto } from '../dto/create-withdrawal.dto';
+import { TransactionLedgerService } from '../../super-admin/transactions/transaction-ledger.service';
+import { UserRole } from '../../common/enums/user-role.enum';
 
 @Injectable()
 export class WithdrawalService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly ledger: TransactionLedgerService,
+  ) {}
 
   async getWithdrawalInfo(riderId: string) {
     const rider = await this.prisma.rider.findUnique({
@@ -47,6 +52,8 @@ export class WithdrawalService {
     createWithdrawalDto: CreateWithdrawalDto,
   ) {
     const { amount, bankAccountId } = createWithdrawalDto;
+    
+    // 1. Fetch Rider & Validate Eligibility
     const rider = await this.prisma.rider.findUnique({
       where: { id: riderId },
       select: {
@@ -63,6 +70,7 @@ export class WithdrawalService {
         },
       },
     });
+
     if (!rider) {
       throw new NotFoundException('Rider not found');
     }
@@ -72,12 +80,14 @@ export class WithdrawalService {
     if (rider.bankAccount.id !== bankAccountId) {
       throw new BadRequestException('Invalid bank account');
     }
+
     const minWithdrawalSetting = await this.prisma.systemSetting.findUnique({
       where: { key: 'min_withdrawal' },
     });
     const minWithdrawal = minWithdrawalSetting
       ? Number(minWithdrawalSetting.value)
       : 5000;
+
     if (amount < minWithdrawal) {
       throw new BadRequestException(
         `Minimum withdrawal is ₦${minWithdrawal.toLocaleString()}`,
@@ -86,10 +96,13 @@ export class WithdrawalService {
     if (amount > rider.walletBalance) {
       throw new BadRequestException('Insufficient balance');
     }
+
+    // 2. Create Payout Record (PENDING)
     const withdrawal = await this.prisma.riderPayout.create({
       data: {
         riderId,
         amount,
+        bankAccountId, // Ensure we track where the money is going
         status: 'PENDING',
       },
       select: {
@@ -100,14 +113,17 @@ export class WithdrawalService {
         processedAt: true,
       },
     });
-    await this.prisma.rider.update({
-      where: { id: riderId },
-      data: {
-        walletBalance: {
-          decrement: amount,
-        },
-      },
-    });
+
+    // 3. Call Ledger to Handle Debit & Audit (CRITICAL FIX)
+    // This replaces the unsafe `this.prisma.rider.update` balance decrement.
+    // The ledger service handles the decrement transactionally and creates the ledger entry.
+    await this.ledger.recordPayoutRequest(
+      riderId,
+      UserRole.RIDER,
+      amount,
+      withdrawal.id,
+    );
+
     return {
       message: 'Withdrawal request submitted successfully',
       withdrawal: {
