@@ -1,4 +1,4 @@
-import { Module, OnModuleInit } from '@nestjs/common';
+import { Module, OnModuleInit, forwardRef } from '@nestjs/common'; // ✅ IMPORTED forwardRef
 import { VendorController } from './vendor.controller';
 import { VendorService } from './vendor.service';
 
@@ -33,6 +33,7 @@ import { ActivityLogService } from 'src/common/services/activity-log.services';
 // import { StoresService } from './stores/stores.service';
 import { StoresService } from 'src/super-admin/vendors/vendors.service';
 import { TransactionsModule } from 'src/super-admin/transactions/transaction.module';
+
 @Module({
   imports: [
     PrismaModule,
@@ -41,7 +42,7 @@ import { TransactionsModule } from 'src/super-admin/transactions/transaction.mod
     MailModule, 
     OtpModule,
     NotificationsModule,
-    TransactionsModule,
+    forwardRef(() => TransactionsModule), // ✅ FIXED: Wrapped in forwardRef to break circular dependency
   ],
   controllers: [
     VendorProductsController,

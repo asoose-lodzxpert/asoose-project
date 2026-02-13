@@ -5,10 +5,8 @@ import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { BullModule } from '@nestjs/bullmq';
-import { CacheModule } from '@nestjs/cache-manager';
 
 import { AppController } from './app.controller';
-import { BullBoardController } from './system/bullboard.controller';
 import { AppService } from './app.service';
 
 import { AuthModule } from './auth/auth.module';
@@ -16,34 +14,27 @@ import { PrismaModule } from './prisma/prisma.module';
 import { RedisModule } from './redis/redis.module';
 import { SuperAdminModule } from './super-admin/super-admin.module';
 import { VendorModule } from './vendor/vendor.module';
-import { RidersModule } from './riders/riders.module';
 import { MarketplaceModule } from './marketplace/marketplace.module';
 import { CartModule } from './cart/cart.module';
 import { UsersModule } from './users/users.module';
 import { NotificationsModule } from './notifications/notifications.module';
 
 import { QueueModule } from './queue/queue.module';
-import { MailModule } from './mail/mail.module';
 import { FcmModule } from './libs/fcm/fcm.module';
 import { MapsModule } from './maps/maps.module';
 import { StorageModule } from './storage/storage.module';
 import { PaymentModule } from './payment/payment.module';
-import { MatchingModule } from './matching/matching.module';
-import { ProductsModule } from './products/products.module';
-import { FareModule } from './fare/fare.module';
+import { MailModule } from './mail/mail.module';
 
 @Module({
   imports: [
+    // ---------- Global Config ----------
     ConfigModule.forRoot({ isGlobal: true }),
 
-    CacheModule.register({
-      isGlobal: true,
-      ttl: 60,
-      max: 100,
-    }),
-
+    // ---------- Rate Limiting ----------
     ThrottlerModule.forRoot(),
 
+    // ---------- BullMQ / Redis ----------
     BullModule.forRoot({
       connection: {
         host: process.env.REDIS_HOST || 'localhost',
@@ -59,30 +50,28 @@ import { FareModule } from './fare/fare.module';
       },
     }),
 
+    // ---------- Scheduling & Events ----------
     ScheduleModule.forRoot(),
     EventEmitterModule.forRoot({ global: true }),
 
+    // ---------- App Modules ----------
     AuthModule,
     PrismaModule,
     RedisModule,
     SuperAdminModule,
     VendorModule,
-    RidersModule,
     MarketplaceModule,
     CartModule,
-    FareModule,
     UsersModule,
     NotificationsModule,
     QueueModule,
-    MailModule,
     FcmModule,
     MapsModule,
     StorageModule,
     PaymentModule,
-    MatchingModule,
-    ProductsModule,
+    MailModule,
   ],
-  controllers: [AppController, BullBoardController],
+  controllers: [AppController],
   providers: [
     AppService,
     {

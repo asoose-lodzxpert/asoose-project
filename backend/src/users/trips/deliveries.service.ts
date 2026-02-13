@@ -22,6 +22,7 @@ import { NotificationsGateway } from '../../notifications/notifications.gateway'
 import { RequestDeliveryDto, CancelTripDto } from './dto/trip.dto';
 import { TripsCommonService, TRIPS_CONFIG } from './trips.common.service';
 import { deliveryToJobSummary } from '../../jobs/job.dto';
+import { AddressesService } from '../addresses.service';
 
 @Injectable()
 export class DeliveriesService {
@@ -34,10 +35,11 @@ export class DeliveriesService {
     private readonly queue: QueueService,
     private readonly notificationsGateway: NotificationsGateway,
     private readonly common: TripsCommonService,
+    private readonly addressesService: AddressesService, 
   ) {}
 
   // ==================================================================
-  // ✅ FIX: Added missing methods for JobsService compatibility
+  // JOBS SERVICE COMPATIBILITY METHODS
   // ==================================================================
 
   async findActiveDeliveryForRider(riderId: string) {
@@ -62,8 +64,6 @@ export class DeliveriesService {
   }
 
   async findIncomingDeliveriesForRider(riderId: string) {
-    // Logic to find deliveries available for this rider
-    // For now, returning REQUESTED deliveries (simplified)
     return this.prisma.delivery.findMany({
       where: {
         status: DeliveryStatus.REQUESTED,
@@ -90,13 +90,10 @@ export class DeliveriesService {
   }
 
   async declineDelivery(deliveryId: string, riderId: string) {
-    // Logic to unassign rider or log decline
-    // For now returning success stub
     return { success: true };
   }
 
   async arrivePickup(deliveryId: string, riderId: string) {
-    // Update status if applicable, otherwise just return delivery
     return this.prisma.delivery.findUnique({
       where: { id: deliveryId },
       include: { pickupAddress: true, dropoffAddress: true, customer: true },
@@ -111,48 +108,10 @@ export class DeliveriesService {
   }
 
   // ==================================================================
-  // End of Fixes
+  // DELIVERY REQUEST LOGIC
   // ==================================================================
 
-  /**
-   * Parse address string to extract city and state
-   * Expected format: "Street, City, State" or "Street, City"
-   */
-  private parseAddress(fullAddress: string): {
-    street: string;
-    city: string;
-    state: string;
-  } {
-    const parts = fullAddress.split(',').map((p) => p.trim());
-
-    if (parts.length >= 3) {
-      return {
-        street: parts[0] || fullAddress,
-        city: parts[1] || '',
-        state: parts[2] || '',
-      };
-    } else if (parts.length === 2) {
-      return {
-        street: parts[0] || fullAddress,
-        city: parts[1] || '',
-        state: '',
-      };
-    } else {
-      return {
-        street: fullAddress,
-        city: '',
-        state: '',
-      };
-    }
-  }
-
   async requestDelivery(userId: string, dto: RequestDeliveryDto) {
-    // ... (keep existing implementation)
-    // For brevity, assuming the file content I have is correct. 
-    // I will paste the core logic back if you need the full file, 
-    // but the critical part was adding the methods above.
-    
-    // Copying the existing requestDelivery logic from your upload:
     this.logger.debug(`Request delivery DTO: ${JSON.stringify(dto, null, 2)}`);
 
     if (
@@ -175,6 +134,7 @@ export class DeliveriesService {
       let pickupAddress: any;
       let dropoffAddress: any;
 
+      // Case A: Using Existing Address IDs
       if (dto.pickupAddressId && dto.dropoffAddressId) {
         [pickupAddress, dropoffAddress] = await Promise.all([
           tx.address.findUnique({ where: { id: dto.pickupAddressId } }),
@@ -187,53 +147,50 @@ export class DeliveriesService {
         if (!dropoffAddress || dropoffAddress.userId !== userId) {
           throw new BadRequestException('Invalid dropoff address');
         }
-      } else if (dto.pickupLocation && dto.dropoffLocation) {
-        if (
-          !this.geo.validateCoordinates(
-            dto.pickupLocation.latitude,
-            dto.pickupLocation.longitude,
-          ) ||
-          !this.geo.validateCoordinates(
-            dto.dropoffLocation.latitude,
-            dto.dropoffLocation.longitude,
-          )
-        ) {
-          throw new BadRequestException('Invalid coordinates');
+      } 
+      
+      // Case B: Creating New Addresses from Client Payload (Place ID or GPS Fallback)
+      // ✅ FIX: Strict Hybrid Architecture Trust Boundary Enforced
+      else if (dto.pickupLocation && dto.dropoffLocation) {
+        try {
+          // 1. Backend resolves exact coordinates securely via Google Maps
+          const securePickup = await this.common.resolveSecureLocation(dto.pickupLocation);
+          const secureDropoff = await this.common.resolveSecureLocation(dto.dropoffLocation);
+
+          // 2. Generate database records ONLY from the trusted, server-resolved data
+          [pickupAddress, dropoffAddress] = await Promise.all([
+            this.addressesService.createAddressFromData(
+              userId,
+              {
+                street: securePickup.address, // Trusted text directly from Maps API
+                lat: securePickup.lat,        // Trusted coordinate
+                lng: securePickup.lng,        // Trusted coordinate
+                label: 'Pickup Location',
+              },
+              tx,
+            ),
+            this.addressesService.createAddressFromData(
+              userId,
+              {
+                street: secureDropoff.address, // Trusted text directly from Maps API
+                lat: secureDropoff.lat,        // Trusted coordinate
+                lng: secureDropoff.lng,        // Trusted coordinate
+                label: 'Dropoff Location',
+              },
+              tx,
+            ),
+          ]);
+        } catch (error) {
+          // Will throw if geofence fails or coordinates are completely unroutable
+          throw error;
         }
-
-        const pickupParsed = this.parseAddress(dto.pickupLocation.address);
-        const dropoffParsed = this.parseAddress(dto.dropoffLocation.address);
-
-        [pickupAddress, dropoffAddress] = await Promise.all([
-          tx.address.create({
-            data: {
-              userId,
-              street: pickupParsed.street,
-              city: pickupParsed.city,
-              state: pickupParsed.state,
-              lat: dto.pickupLocation.latitude,
-              lng: dto.pickupLocation.longitude,
-              label: 'Pickup Location',
-            },
-          }),
-          tx.address.create({
-            data: {
-              userId,
-              street: dropoffParsed.street,
-              city: dropoffParsed.city,
-              state: dropoffParsed.state,
-              lat: dto.dropoffLocation.latitude,
-              lng: dto.dropoffLocation.longitude,
-              label: 'Dropoff Location',
-            },
-          }),
-        ]);
       } else {
         throw new BadRequestException(
-          'Either address IDs or location coordinates must be provided',
+          'Either address IDs or location payload (Place ID) must be provided',
         );
       }
 
+      // Calculate Distance & Fee securely from DB-verified addresses
       const distanceKm = this.geo.calculateDistance(
         pickupAddress.lat,
         pickupAddress.lng,
@@ -247,10 +204,6 @@ export class DeliveriesService {
       );
 
       const deliveryOtp = this.geo.generateOTP(TRIPS_CONFIG.OTP_LENGTH);
-
-      // as/backend/src/users/trips/deliveries.service.ts
-
-// ... inside requestDelivery method ...
 
       const delivery = await tx.delivery.create({
         data: {
@@ -266,11 +219,8 @@ export class DeliveriesService {
           packageDetails: this.common.sanitizeText(dto.packageDetails),
           deliveryOtp,
           
-          // ✅ Package Metadata Mapping
-          weightKg: dto.weightKg,                 // Existing
-          isFragile: dto.fragile ?? false,        // Existing
-          
-          // New Fields
+          weightKg: dto.weightKg,
+          isFragile: dto.fragile ?? false,
           isPerishable: dto.perishable ?? false,
           containsLiquid: dto.containsLiquid ?? false,
           declaredValue: dto.declaredValue ?? 0,
@@ -286,6 +236,10 @@ export class DeliveriesService {
       };
     });
   }
+
+  // ==================================================================
+  // DELIVERY LIFECYCLE
+  // ==================================================================
 
   async startDeliveryMatching(deliveryId: string) {
     const deliveryCheck = await this.prisma.delivery.findUnique({
@@ -330,7 +284,7 @@ export class DeliveriesService {
       include: {
         pickupAddress: true,
         dropoffAddress: true,
-        customer: true, // Included customer
+        customer: true,
       },
     });
 
@@ -378,10 +332,8 @@ export class DeliveriesService {
     return { success: true };
   }
 
-  // ✅ FIX: Made proof optional
   async confirmPickup(deliveryId: string, riderId: string, proof?: string) {
     if (!riderId) throw new ForbiddenException();
-    // Only validate proof length if proof is provided
     if (proof && proof.length > 2048)
       throw new BadRequestException('Invalid proof');
 
@@ -389,7 +341,7 @@ export class DeliveriesService {
       where: {
         id: deliveryId,
         riderId: riderId,
-        status: DeliveryStatus.ASSIGNED, // Or ACCEPTED if applicable
+        status: DeliveryStatus.ASSIGNED,
       },
       data: {
         status: DeliveryStatus.PICKED_UP,
@@ -589,7 +541,7 @@ export class DeliveriesService {
       where: { id: deliveryId },
       include: { 
         rider: { include: { vehicle: true } }, 
-        customer: true, // Needed for notification and response
+        customer: true,
         pickupAddress: true,
         dropoffAddress: true
       },

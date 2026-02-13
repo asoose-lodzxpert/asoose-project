@@ -14,7 +14,6 @@ import { useRideSocket } from "@/hooks/useRideSocket";
 import { paymentService } from "@/services/payment.service";
 import { PAYMENT_METHODS } from "./constants/config";
 
-// Component Imports
 import GoogleMapView from "./components/map";
 import RideSelector, { RideRequestPayload, AVAILABLE_RIDE_TYPES } from "./components/RideSelector";
 import DriverStatusUI from "./components/DriverStatus";
@@ -22,28 +21,32 @@ import TripProgressUI from "./components/TripProgressUI";
 import TripCompleteUI from "./components/TripCompleteUi";
 import FindingDriverUI from "./components/findingDriverui";
 
+interface LocationState {
+  lat?: number;
+  lng?: number;
+  placeId?: string;
+  address?: string;
+}
+
 export default function RidePage() {
   const { data: session } = useSession();
   const { isLoaded: isGoogleLoaded } = useGoogleMaps();
   const token = session?.accessToken || (session as any)?.user?.accessToken || null;
 
-  // --- State Management ---
   const [rideStage, setRideStage] = useState<string>("IDLE");
   const [activeRide, setActiveRide] = useState<any>(null);
   const [selectedVehicleType, setSelectedVehicleType] = useState<VehicleType>("CAR");
   const [priceEstimates, setPriceEstimates] = useState<PriceEstimate | null>(null);
   const [isCalculating, setIsCalculating] = useState(false);
-  const [isRequestingRide, setIsRequestingRide] = useState(false); // Resolved: Missing isRequesting prop
+  const [isRequestingRide, setIsRequestingRide] = useState(false); 
   const [errorState, setErrorState] = useState<{ title: string; message: string } | null>(null);
 
-  // Locations
-  const [userLocation, setUserLocation] = useState<google.maps.LatLngLiteral | null>(null);
-  const [destLocation, setDestLocation] = useState<google.maps.LatLngLiteral | null>(null);
+  // ✅ FIX 3: Extended location state to hold `placeId`
+  const [userLocation, setUserLocation] = useState<LocationState | null>(null);
+  const [destLocation, setDestLocation] = useState<LocationState | null>(null);
   const [pickupAddress, setPickupAddress] = useState("");
   const [destinationAddress, setDestinationAddress] = useState("");
   const [driverLocation, setDriverLocation] = useState<any>(undefined);
-
-  // --- Actions ---
 
   const resetApp = useCallback(() => {
     setRideStage("IDLE");
@@ -59,9 +62,9 @@ export default function RidePage() {
       const ride = await RideService.getCurrentRide(token);
       if (ride) {
         setActiveRide(ride);
-        setRideStage(mapStatusToView(ride.status)); //
-        if (ride.pickupAddress) setPickupAddress(ride.pickupAddress.address);
-        if (ride.dropoffAddress) setDestinationAddress(ride.dropoffAddress.address);
+        setRideStage(mapStatusToView(ride.status));
+        if (ride.pickupAddress) setPickupAddress(ride.pickupAddress.address || ride.pickupAddress.street);
+        if (ride.dropoffAddress) setDestinationAddress(ride.dropoffAddress.address || ride.dropoffAddress.street);
       } else if (rideStage !== "IDLE" && rideStage !== "COMPLETED") {
         resetApp();
       }
@@ -70,9 +73,6 @@ export default function RidePage() {
     }
   }, [token, rideStage, resetApp]);
 
-  // --- Effects ---
-
-  // Initial Sync & Polling for Payment/Matching Recovery
   useEffect(() => {
     syncRideState();
     if (rideStage === "PROCESSING_PAYMENT" || localStorage.getItem("pending_ride")) {
@@ -81,25 +81,26 @@ export default function RidePage() {
     }
   }, [token, rideStage, syncRideState]);
 
-  // Price Estimation Logic - Extracts specific type from backend dictionary
   useEffect(() => {
     if (!userLocation || !destLocation || !token) return;
     setIsCalculating(true);
+    
+    // ✅ Supply Backend the newly authoritative Place IDs
     RideService.getEstimate({
+      pickupPlaceId: userLocation.placeId,
       pickupLat: userLocation.lat,
       pickupLng: userLocation.lng,
+      dropoffPlaceId: destLocation.placeId,
       dropoffLat: destLocation.lat,
       dropoffLng: destLocation.lng,
       vehicleType: selectedVehicleType,
     }, token)
     .then((data: any) => {
-      // Backend returns Record<VehicleType, PriceEstimate>
       setPriceEstimates(data[selectedVehicleType] || null);
     })
     .finally(() => setIsCalculating(false));
   }, [userLocation, destLocation, selectedVehicleType, token]);
 
-  // Socket Handler
   const handleSocketEvent = useCallback((event: any) => {
     switch (event.type) {
       case "DRIVER_FOUND":
@@ -107,11 +108,7 @@ export default function RidePage() {
         syncRideState();
         break;
       case "DRIVER_LOCATION_UPDATE":
-        setDriverLocation({ 
-          lat: event.metadata.lat, 
-          lng: event.metadata.lng, 
-          heading: event.metadata.heading 
-        });
+        setDriverLocation({ lat: event.metadata.lat, lng: event.metadata.lng, heading: event.metadata.heading });
         break;
       case "TRIP_STARTED":
         setRideStage("IN_PROGRESS");
@@ -121,31 +118,42 @@ export default function RidePage() {
         break;
       case "RIDE_CANCELLED":
         resetApp();
-        setErrorState({ title: "Cancelled", message: "The ride was cancelled." });
+        setErrorState({ title: "Cancelled", message: "The ride was cancelled by the driver or system." });
         break;
     }
   }, [syncRideState, resetApp]);
 
-  useRideSocket(token, handleSocketEvent, syncRideState); //
+  useRideSocket(token, handleSocketEvent, syncRideState);
 
-  // Request Ride Logic
   const handleRequestRide = async (data: RideRequestPayload) => {
     if (!token || !priceEstimates) return;
     setIsRequestingRide(true);
     setRideStage("FINDING_DRIVER");
+    setErrorState(null);
     
     try {
+      // ✅ Hand off Location Truth to the Backend Resolver using DTO standards
       const res = await RideService.createRide({
-        pickupLocation: { latitude: data.pickup.lat, longitude: data.pickup.lng, address: data.pickup.address },
-        dropoffLocation: { latitude: data.dropoff.lat, longitude: data.dropoff.lng, address: data.dropoff.address },
-        vehicleType: data.rideType as VehicleType, // Resolved: Type assertion for strict enum
-        fare: priceEstimates.total, // Resolved: Passed fare number required by backend
+        pickupLocation: { 
+          addressText: data.pickup.address,
+          placeId: data.pickup.placeId,
+          lat: data.pickup.lat, 
+          lng: data.pickup.lng 
+        },
+        dropoffLocation: { 
+          addressText: data.dropoff.address,
+          placeId: data.dropoff.placeId,
+          lat: data.dropoff.lat, 
+          lng: data.dropoff.lng 
+        },
+        vehicleType: data.rideType as VehicleType,
+        fare: data.price,
       }, token);
 
       const selectedMethod = PAYMENT_METHODS.find(m => m.id === data.paymentMethodId);
       if (selectedMethod?.type !== "CASH" && selectedMethod?.gateway) {
         localStorage.setItem("pending_ride", "true");
-        const paymentRes = await paymentService.initiatePayment({ //
+        const paymentRes = await paymentService.initiatePayment({ 
           amount: res.payment.amount,
           email: session?.user?.email || "",
           gateway: selectedMethod.gateway as any,
@@ -156,10 +164,12 @@ export default function RidePage() {
         if (paymentRes.authorizationUrl) window.open(paymentRes.authorizationUrl, "_blank");
         return;
       }
-      await RideService.confirmRide(res.ride.id, "CASH", token); //
+      await RideService.confirmRide(res.ride.id, "CASH", token); 
     } catch (error: any) {
-      resetApp();
-      setErrorState({ title: "Request Failed", message: error.message || "Unable to request ride." });
+      // ✅ FIX 6: Graceful fallback without wiping UI data on backend rejection
+      setRideStage("IDLE");
+      const errorMessage = error.response?.data?.message || error.message || "Unable to request ride right now.";
+      setErrorState({ title: "Request Failed", message: errorMessage });
     } finally {
       setIsRequestingRide(false);
     }
@@ -172,12 +182,12 @@ export default function RidePage() {
           <RideSelector 
             pickupAddress={pickupAddress} 
             destinationAddress={destinationAddress}
-            onPickupSelect={(d) => { setPickupAddress(d.address); setUserLocation({ lat: d.lat, lng: d.lng }); }}
-            onDestinationSelect={(d) => { setDestinationAddress(d.address); setDestLocation({ lat: d.lat, lng: d.lng }); }}
+            onPickupSelect={(d) => { setPickupAddress(d.address); setUserLocation(d); }}
+            onDestinationSelect={(d) => { setDestinationAddress(d.address); setDestLocation(d); }}
             priceEstimates={priceEstimates} 
             isCalculatingPrice={isCalculating}
             onRequestRide={handleRequestRide}
-            isRequesting={isRequestingRide} // Resolved: Missing required prop
+            isRequesting={isRequestingRide} 
             availableRideTypes={AVAILABLE_RIDE_TYPES}
             isGoogleLoaded={isGoogleLoaded}
           />
@@ -198,7 +208,7 @@ export default function RidePage() {
           <DriverStatusUI 
             status={rideStage as any} 
             driver={activeRide?.rider} 
-            tripDetails={{ pickup: pickupAddress, dropoff: destinationAddress }} // Resolved: Missing required prop
+            tripDetails={{ pickup: pickupAddress, dropoff: destinationAddress }}
             otp={activeRide?.otp} 
             onCancel={resetApp} 
           />
@@ -208,7 +218,7 @@ export default function RidePage() {
           <TripProgressUI
             destination={destinationAddress}
             driverName={activeRide?.rider?.name || "Driver"}
-            etaMinutes={activeRide?.rider?.etaMinutes || 10} // Resolved: Missing required prop
+            etaMinutes={activeRide?.rider?.etaMinutes || 10} 
           />
         );
       case "COMPLETED":
@@ -216,8 +226,8 @@ export default function RidePage() {
           <TripCompleteUI
             pickup={pickupAddress}
             dropoff={destinationAddress}
-            price={activeRide?.totalFare || priceEstimates?.total || 0} // Resolved: Extraction of numeric value
-            driverName={activeRide?.rider?.name || "Your Driver"} // Resolved: Missing required prop
+            price={activeRide?.totalFare || priceEstimates?.total || 0}
+            driverName={activeRide?.rider?.name || "Your Driver"} 
             onClose={resetApp}
           />
         );

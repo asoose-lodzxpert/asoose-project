@@ -10,6 +10,7 @@ import React, {
 import { GoogleMap, Marker, Polyline, Circle } from "@react-google-maps/api";
 import { Loader2, AlertCircle, Crosshair } from "lucide-react";
 import { MAP_ICONS } from "./mapIcons";
+
 const containerStyle = { width: "100%", height: "100%" };
 
 const mapOptions: google.maps.MapOptions = {
@@ -29,11 +30,23 @@ const mapOptions: google.maps.MapOptions = {
   ],
 };
 
+// ✅ FIX 1: Strict guard against NaN and undefined coordinates
+export const isValidLatLng = (pos: any): pos is { lat: number; lng: number } => {
+  return (
+    pos !== null &&
+    pos !== undefined &&
+    typeof pos.lat === "number" &&
+    isFinite(pos.lat) &&
+    typeof pos.lng === "number" &&
+    isFinite(pos.lng)
+  );
+};
+
 interface MapProps {
-  userPos: { lat: number; lng: number } | null;
-  destPos: { lat: number; lng: number; address?: string } | null;
+  userPos: { lat?: number; lng?: number } | null;
+  destPos: { lat?: number; lng?: number; address?: string } | null;
   isLoaded: boolean;
-  driverPos?: { lat: number; lng: number } | null;
+  driverPos?: { lat?: number; lng?: number } | null;
   rideStage?: string;
   onRouteCalculated?: (distance: number, duration: number) => void;
   onDriverRouteCalculated?: (distance: number, duration: number) => void;
@@ -56,10 +69,8 @@ export default function GoogleMapView({
   const [mapError, setMapError] = useState<string | null>(null);
   const animationRef = useRef<number | null>(null);
 
-  // Custom Markers from Constants
   const markers = useMemo(() => {
     if (!isLoaded || !window.google) return null;
-
     return {
       userLocation: {
         ...MAP_ICONS.userLocation,
@@ -67,10 +78,7 @@ export default function GoogleMapView({
           MAP_ICONS.userLocation.scaledSize.width,
           MAP_ICONS.userLocation.scaledSize.height,
         ),
-        anchor: new google.maps.Point(
-          MAP_ICONS.userLocation.anchor.x,
-          MAP_ICONS.userLocation.anchor.y,
-        ),
+        anchor: new google.maps.Point(MAP_ICONS.userLocation.anchor.x, MAP_ICONS.userLocation.anchor.y),
       },
       pickupPin: {
         ...MAP_ICONS.pickupPin,
@@ -78,10 +86,7 @@ export default function GoogleMapView({
           MAP_ICONS.pickupPin.scaledSize.width,
           MAP_ICONS.pickupPin.scaledSize.height,
         ),
-        anchor: new google.maps.Point(
-          MAP_ICONS.pickupPin.anchor.x,
-          MAP_ICONS.pickupPin.anchor.y,
-        ),
+        anchor: new google.maps.Point(MAP_ICONS.pickupPin.anchor.x, MAP_ICONS.pickupPin.anchor.y),
       },
       destinationPin: {
         ...MAP_ICONS.destinationPin,
@@ -89,28 +94,26 @@ export default function GoogleMapView({
           MAP_ICONS.destinationPin.scaledSize.width,
           MAP_ICONS.destinationPin.scaledSize.height,
         ),
-        anchor: new google.maps.Point(
-          MAP_ICONS.destinationPin.anchor.x,
-          MAP_ICONS.destinationPin.anchor.y,
-        ),
+        anchor: new google.maps.Point(MAP_ICONS.destinationPin.anchor.x, MAP_ICONS.destinationPin.anchor.y),
       },
       carIcon: (heading: number) => {
         const iconData = MAP_ICONS.carIcon(heading);
         return {
           ...iconData,
-          scaledSize: new google.maps.Size(
-            iconData.scaledSize.width,
-            iconData.scaledSize.height,
-          ),
+          scaledSize: new google.maps.Size(iconData.scaledSize.width, iconData.scaledSize.height),
           anchor: new google.maps.Point(iconData.anchor.x, iconData.anchor.y),
         };
       },
     };
   }, [isLoaded]);
 
-  // Calculate main route (user to destination)
+  // Main route calculation
   useEffect(() => {
-    if (!isLoaded || !userPos || !destPos || !window.google) return;
+    // ✅ Defensive rendering: Ensure valid coords before querying route
+    if (!isLoaded || !isValidLatLng(userPos) || !isValidLatLng(destPos) || !window.google) {
+      setRoute([]);
+      return;
+    }
 
     const directionsService = new google.maps.DirectionsService();
     directionsService.route(
@@ -128,19 +131,18 @@ export default function GoogleMapView({
           if (onRouteCalculated && leg.distance && leg.duration) {
             onRouteCalculated(leg.distance.value, leg.duration.value);
           }
-
           setMapError(null);
         } else {
           setMapError("Unable to calculate route");
-          console.error("Directions request failed:", status);
         }
       },
     );
   }, [isLoaded, userPos, destPos, onRouteCalculated]);
 
-  // Calculate driver route (driver to user pickup)
+  // Driver route calculation
   useEffect(() => {
-    if (!isLoaded || !driverPos || !userPos || !window.google) return;
+    // ✅ Defensive rendering
+    if (!isLoaded || !isValidLatLng(driverPos) || !isValidLatLng(userPos) || !window.google) return;
     if (rideStage !== "ON_WAY" && rideStage !== "ARRIVED") return;
 
     const directionsService = new google.maps.DirectionsService();
@@ -164,14 +166,14 @@ export default function GoogleMapView({
     );
   }, [isLoaded, driverPos, userPos, rideStage, onDriverRouteCalculated]);
 
-  // Smooth car animation with heading calculation
+  // Smooth car animation
   useEffect(() => {
-    if (!driverPos) {
+    if (!isValidLatLng(driverPos)) {
       setAnimatedDriverPos(null);
       return;
     }
 
-    if (!animatedDriverPos) {
+    if (!animatedDriverPos || !isValidLatLng(animatedDriverPos)) {
       setAnimatedDriverPos(driverPos);
       return;
     }
@@ -182,9 +184,7 @@ export default function GoogleMapView({
       const dLng = ((to.lng - from.lng) * Math.PI) / 180;
 
       const y = Math.sin(dLng) * Math.cos(lat2);
-      const x =
-        Math.cos(lat1) * Math.sin(lat2) -
-        Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng);
+      const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng);
 
       return (Math.atan2(y, x) * 180) / Math.PI;
     };
@@ -215,31 +215,29 @@ export default function GoogleMapView({
     animate();
 
     return () => {
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
-      }
+      if (animationRef.current) cancelAnimationFrame(animationRef.current);
     };
   }, [driverPos]);
 
   const centerOnUser = useCallback(() => {
-    if (mapRef.current && userPos) {
+    if (mapRef.current && isValidLatLng(userPos)) {
       mapRef.current.panTo(userPos);
       mapRef.current.setZoom(16);
     }
   }, [userPos]);
 
-  // Auto-adjust view based on ride stage
+  // Auto-adjust bounds securely
   useEffect(() => {
-    if (!mapRef.current || !userPos) return;
+    if (!mapRef.current || !isValidLatLng(userPos)) return;
 
     const bounds = new google.maps.LatLngBounds();
     bounds.extend(new google.maps.LatLng(userPos.lat, userPos.lng));
 
-    if (driverPos && (rideStage === "ON_WAY" || rideStage === "ARRIVED")) {
+    if (isValidLatLng(driverPos) && (rideStage === "ON_WAY" || rideStage === "ARRIVED")) {
       bounds.extend(new google.maps.LatLng(driverPos.lat, driverPos.lng));
     }
 
-    if (destPos && (rideStage === "IN_PROGRESS" || rideStage === "IDLE")) {
+    if (isValidLatLng(destPos) && (rideStage === "IN_PROGRESS" || rideStage === "IDLE")) {
       bounds.extend(new google.maps.LatLng(destPos.lat, destPos.lng));
     }
 
@@ -263,7 +261,9 @@ export default function GoogleMapView({
     );
   }
 
-  const center = userPos || { lat: 9.07, lng: 7.39 };
+  // ✅ Fallback to Abuja if coordinates are corrupted
+  const defaultCenter = { lat: 9.07, lng: 7.39 };
+  const center = isValidLatLng(userPos) ? userPos : defaultCenter;
 
   return (
     <div className="relative w-full h-full">
@@ -274,99 +274,45 @@ export default function GoogleMapView({
         options={mapOptions}
         onLoad={onMapLoad}
       >
-        {/* User Location */}
-        {userPos && markers && (
+        {/* Guarded Render: User Location */}
+        {isValidLatLng(userPos) && markers && (
           <>
             <Circle
               center={userPos}
               radius={50}
               options={{
-                fillColor: "#10b981",
-                fillOpacity: 0.1,
-                strokeColor: "#10b981",
-                strokeOpacity: 0.3,
-                strokeWeight: 1,
+                fillColor: "#10b981", fillOpacity: 0.1,
+                strokeColor: "#10b981", strokeOpacity: 0.3, strokeWeight: 1,
               }}
             />
-            <Marker
-              position={userPos}
-              icon={
-                rideStage === "IDLE" ? markers.userLocation : markers.pickupPin
-              }
-              zIndex={100}
-            />
+            <Marker position={userPos} icon={rideStage === "IDLE" ? markers.userLocation : markers.pickupPin} zIndex={100} />
           </>
         )}
 
-        {/* Destination */}
-        {destPos && markers && (
-          <Marker
-            position={destPos}
-            icon={markers.destinationPin}
-            zIndex={99}
-          />
+        {/* Guarded Render: Destination */}
+        {isValidLatLng(destPos) && markers && (
+          <Marker position={destPos} icon={markers.destinationPin} zIndex={99} />
         )}
 
-        {/* Main Route */}
-        {route.length > 0 &&
-          (rideStage === "IDLE" || rideStage === "IN_PROGRESS") && (
-            <Polyline
-              path={route}
-              options={{
-                strokeColor:
-                  rideStage === "IN_PROGRESS" ? "#10b981" : "#6b7280",
-                strokeOpacity: 0.8,
-                strokeWeight: 5,
-                geodesic: true,
-              }}
-            />
-          )}
+        {/* Guarded Render: Main Route */}
+        {route.length > 0 && (rideStage === "IDLE" || rideStage === "IN_PROGRESS") && (
+          <Polyline path={route} options={{ strokeColor: rideStage === "IN_PROGRESS" ? "#10b981" : "#6b7280", strokeOpacity: 0.8, strokeWeight: 5, geodesic: true }} />
+        )}
 
-        {/* Driver Route */}
-        {driverRoute.length > 0 &&
-          (rideStage === "ON_WAY" || rideStage === "ARRIVED") && (
-            <Polyline
-              path={driverRoute}
-              options={{
-                strokeColor: "#3b82f6",
-                strokeOpacity: 0.7,
-                strokeWeight: 4,
-                geodesic: true,
-                icons: [
-                  {
-                    icon: { path: "M 0,-1 0,1", strokeOpacity: 0.7, scale: 3 },
-                    offset: "0",
-                    repeat: "20px",
-                  },
-                ],
-              }}
-            />
-          )}
+        {/* Guarded Render: Driver Route */}
+        {driverRoute.length > 0 && (rideStage === "ON_WAY" || rideStage === "ARRIVED") && (
+          <Polyline path={driverRoute} options={{ strokeColor: "#3b82f6", strokeOpacity: 0.7, strokeWeight: 4, geodesic: true }} />
+        )}
 
-        {/* Driver Car */}
-        {animatedDriverPos && markers && (
+        {/* Guarded Render: Driver Car */}
+        {isValidLatLng(animatedDriverPos) && markers && (
           <>
-            <Marker
-              position={animatedDriverPos}
-              icon={markers.carIcon(carHeading)}
-              zIndex={200}
-            />
-            <Circle
-              center={animatedDriverPos}
-              radius={30}
-              options={{
-                fillColor: "#000000",
-                fillOpacity: 0.08,
-                strokeColor: "#000000",
-                strokeOpacity: 0.2,
-                strokeWeight: 1,
-              }}
-            />
+            <Marker position={animatedDriverPos} icon={markers.carIcon(carHeading)} zIndex={200} />
+            <Circle center={animatedDriverPos} radius={30} options={{ fillColor: "#000000", fillOpacity: 0.08, strokeColor: "#000000", strokeOpacity: 0.2, strokeWeight: 1 }} />
           </>
         )}
       </GoogleMap>
 
-      {/* Error Banner */}
       {mapError && (
         <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-red-500 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 z-20">
           <AlertCircle className="w-4 h-4" />
@@ -374,21 +320,11 @@ export default function GoogleMapView({
         </div>
       )}
 
-      {/* Recenter Button */}
-      {userPos && (
-        <button
-          onClick={centerOnUser}
-          className="absolute top-4 right-4 bg-white p-3 rounded-full shadow-lg hover:bg-gray-50 transition-colors z-10 active:scale-95"
-          aria-label="Center on your location"
-        >
+      {isValidLatLng(userPos) && (
+        <button onClick={centerOnUser} className="absolute top-4 right-4 bg-white p-3 rounded-full shadow-lg hover:bg-gray-50 transition-colors z-10 active:scale-95">
           <Crosshair className="w-5 h-5 text-gray-700" />
         </button>
       )}
-
-      {/* Map Attribution */}
-      <div className="absolute bottom-2 left-2 text-xs text-gray-500 bg-white/80 px-2 py-1 rounded pointer-events-none">
-        © Google Maps
-      </div>
     </div>
   );
 }

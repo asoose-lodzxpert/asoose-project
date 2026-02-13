@@ -17,30 +17,39 @@ export enum VehicleType {
   BUSINESS = 'BUSINESS',
 }
 
-export class LocationDto {
-  @ApiProperty()
-  @IsNumber()
-  latitude: number;
-
-  @ApiProperty()
-  @IsNumber()
-  longitude: number;
-
-  @ApiProperty()
+// ✅ REFACTORED: Hybrid Architecture Location Payload
+export class LocationPayloadDto {
+  @ApiProperty({ description: 'The text address used for UI display' })
+  @IsNotEmpty()
   @IsString()
-  address: string;
+  addressText: string;
+
+  @ApiPropertyOptional({ description: 'Google Maps Place ID (Primary source of truth)' })
+  @IsOptional()
+  @IsString()
+  placeId?: string;
+
+  @ApiPropertyOptional({ description: 'Latitude (Fallback ONLY for Current Location)' })
+  @IsOptional()
+  @IsNumber()
+  lat?: number;
+
+  @ApiPropertyOptional({ description: 'Longitude (Fallback ONLY for Current Location)' })
+  @IsOptional()
+  @IsNumber()
+  lng?: number;
 }
 
 export class RequestRideDto {
-  @ApiProperty({ type: LocationDto })
+  @ApiProperty({ type: LocationPayloadDto })
   @ValidateNested()
-  @Type(() => LocationDto)
-  pickupLocation: LocationDto;
+  @Type(() => LocationPayloadDto)
+  pickupLocation: LocationPayloadDto;
 
-  @ApiProperty({ type: LocationDto })
+  @ApiProperty({ type: LocationPayloadDto })
   @ValidateNested()
-  @Type(() => LocationDto)
-  dropoffLocation: LocationDto;
+  @Type(() => LocationPayloadDto)
+  dropoffLocation: LocationPayloadDto;
 
   @ApiProperty({ enum: VehicleType })
   @IsEnum(VehicleType)
@@ -56,22 +65,37 @@ export class RequestRideDto {
   notes?: string;
 }
 
+// ✅ REFACTORED: Estimate DTO modified to accept Place IDs or fallbacks
 export class RideEstimateDto {
-  @ApiProperty()
-  @IsNumber()
-  pickupLat: number;
+  @ApiPropertyOptional({ description: 'Pickup Google Place ID' })
+  @IsOptional()
+  @IsString()
+  pickupPlaceId?: string;
 
-  @ApiProperty()
+  @ApiPropertyOptional({ description: 'Pickup Latitude (Fallback)' })
+  @IsOptional()
   @IsNumber()
-  pickupLng: number;
+  pickupLat?: number;
 
-  @ApiProperty()
+  @ApiPropertyOptional({ description: 'Pickup Longitude (Fallback)' })
+  @IsOptional()
   @IsNumber()
-  dropoffLat: number;
+  pickupLng?: number;
 
-  @ApiProperty()
+  @ApiPropertyOptional({ description: 'Dropoff Google Place ID' })
+  @IsOptional()
+  @IsString()
+  dropoffPlaceId?: string;
+
+  @ApiPropertyOptional({ description: 'Dropoff Latitude (Fallback)' })
+  @IsOptional()
   @IsNumber()
-  dropoffLng: number;
+  dropoffLat?: number;
+
+  @ApiPropertyOptional({ description: 'Dropoff Longitude (Fallback)' })
+  @IsOptional()
+  @IsNumber()
+  dropoffLng?: number;
 
   @ApiPropertyOptional({ enum: VehicleType })
   @IsOptional()
@@ -93,36 +117,36 @@ export class RequestDeliveryDto {
   orderId?: string;
 
   @ApiPropertyOptional({
-    description: 'Pickup address ID (optional if coordinates provided)',
+    description: 'Pickup address ID (optional if coordinates/placeId provided)',
   })
   @IsOptional()
   @IsUUID()
   pickupAddressId?: string;
 
   @ApiPropertyOptional({
-    description: 'Dropoff address ID (optional if coordinates provided)',
+    description: 'Dropoff address ID (optional if coordinates/placeId provided)',
   })
   @IsOptional()
   @IsUUID()
   dropoffAddressId?: string;
 
   @ApiPropertyOptional({
-    type: LocationDto,
-    description: 'Pickup location with coordinates and address',
+    type: LocationPayloadDto,
+    description: 'Pickup location using Place ID or Fallback Coordinates',
   })
   @IsOptional()
   @ValidateNested()
-  @Type(() => LocationDto)
-  pickupLocation?: LocationDto;
+  @Type(() => LocationPayloadDto)
+  pickupLocation?: LocationPayloadDto;
 
   @ApiPropertyOptional({
-    type: LocationDto,
-    description: 'Dropoff location with coordinates and address',
+    type: LocationPayloadDto,
+    description: 'Dropoff location using Place ID or Fallback Coordinates',
   })
   @IsOptional()
   @ValidateNested()
-  @Type(() => LocationDto)
-  dropoffLocation?: LocationDto;
+  @Type(() => LocationPayloadDto)
+  dropoffLocation?: LocationPayloadDto;
 
   @ApiProperty()
   @IsNotEmpty()

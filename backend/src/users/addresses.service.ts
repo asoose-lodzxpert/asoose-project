@@ -12,7 +12,8 @@ export const ADDRESS_LABELS = {
   STORE_LOCATION: 'Store Location',
 } as const;
 
-const CITY_BOUNDS = {
+// ✅ EXPORTED: Explicit bounds for transparency (though validation is internal)
+export const CITY_BOUNDS = {
   MIN_LAT: 11.75, // South-most edge
   MAX_LAT: 11.95, // North-most edge
   MIN_LNG: 13.05, // West-most edge
@@ -40,60 +41,79 @@ export class AddressesService {
     }
   }
 
+  /**
+   * Wrapper for HTTP requests to add an address.
+   * Manages its own transaction.
+   */
   async addUserAddress(userId: string, data: CreateAddressDto) {
-    // 2. Validate Coordinates (Geofencing)
-    this.validateCoordinates(data.lat, data.lng);
-
-    const sanitizedData = {
-      ...data,
-      street: this.sanitizeString(data.street),
-      city: this.sanitizeString(data.city),
-      state: data.state ? this.sanitizeString(data.state) : undefined,
-      label: data.label ? this.sanitizeString(data.label) : undefined,
-      phone: data.phone ? this.sanitizeString(data.phone) : undefined,
-    };
-
-    try {
-      return await this.prisma.$transaction(async (tx) => {
-        if (sanitizedData.isDefault) {
-          await tx.address.updateMany({
-            where: { userId, isDefault: true },
-            data: { isDefault: false },
-          });
-        }
-
-        return tx.address.create({
-          data: {
-            userId, // Explicitly linking to User
-            street: sanitizedData.street,
-            city: sanitizedData.city,
-            state: sanitizedData.state || 'Maiduguri',
-            label: sanitizedData.label || 'Home',
-            isDefault: sanitizedData.isDefault || false,
-            // 3. Use Real Coordinates
-            lat: data.lat,
-            lng: data.lng,
-            ...(sanitizedData.phone ? { phone: sanitizedData.phone } : {}),
-          } as Prisma.AddressCreateInput,
+    return this.prisma.$transaction(async (tx) => {
+      // Handle "Default" logic toggle
+      if (data.isDefault) {
+        await tx.address.updateMany({
+          where: { userId, isDefault: true },
+          data: { isDefault: false },
         });
-      });
-    } catch (error) {
-      if (error instanceof BadRequestException) throw error;
-
-      this.logger.error(
-        `Failed to add address for user ${userId}`,
-        error.stack,
-      );
-      throw new BadRequestException('Failed to add address');
-    }
+      }
+      // Delegate to the core creation logic
+      return this.createAddressFromData(userId, data, tx);
+    });
   }
 
   /**
-   * FIX APPLIED:
-   * 1. Renamed ownerId -> vendorId for type safety.
-   * 2. Writes to 'vendorId' column instead of 'userId'.
-   * 3. Leaves 'userId' null for store addresses to prevent FK violations.
+   * ✅ CORE METHOD: Single Source of Truth for Address Creation
+   * 1. Validates Coordinates (Geofencing)
+   * 2. Sanitizes Inputs
+   * 3. Supports External Transactions (for Delivery/Order flows)
    */
+  async createAddressFromData(
+    userId: string,
+    data: {
+      street: string;
+      city?: string;
+      state?: string;
+      label?: string;
+      phone?: string;
+      lat: number;
+      lng: number;
+      isDefault?: boolean;
+    },
+    tx: Prisma.TransactionClient = this.prisma, // Defaults to main client if no tx provided
+  ) {
+    // 1. CRITICAL: Enforce Geofence Validation
+    this.validateCoordinates(data.lat, data.lng);
+
+    // 2. Data Integrity: Sanitize inputs
+    // Fallbacks provided for City/State if missing from frontend map data
+    const sanitizedCity = data.city
+      ? this.sanitizeString(data.city)
+      : 'Maiduguri';
+    const sanitizedState = data.state
+      ? this.sanitizeString(data.state)
+      : 'Borno';
+
+    try {
+      return await tx.address.create({
+        data: {
+          userId,
+          street: this.sanitizeString(data.street),
+          city: sanitizedCity,
+          state: sanitizedState,
+          label: data.label ? this.sanitizeString(data.label) : 'Delivery Location',
+          isDefault: data.isDefault || false,
+          lat: data.lat,
+          lng: data.lng,
+          phone: data.phone ? this.sanitizeString(data.phone) : undefined,
+        },
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to create address for user ${userId}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+      throw new BadRequestException('Failed to save valid address');
+    }
+  }
+
   async getOrCreateStoreAddress(
     vendorId: string,
     storeAddress: string,
@@ -101,15 +121,9 @@ export class AddressesService {
     lng: number,
     tx: Prisma.TransactionClient = this.prisma,
   ) {
-    // Validate Store coordinates
-    if (!this.isWithinCity(lat, lng)) {
-      this.logger.warn(
-        `Store ${vendorId} has invalid coordinates: ${lat}, ${lng}`,
-      );
-      throw new BadRequestException('Store location is outside service area');
-    }
+    // Re-use validation logic
+    this.validateCoordinates(lat, lng);
 
-    // Fix: Query against vendorId
     let pickupAddress = await tx.address.findFirst({
       where: {
         vendorId: vendorId,
@@ -119,11 +133,10 @@ export class AddressesService {
     });
 
     if (!pickupAddress) {
-      // Fix: Create with vendorId, leaving userId null
       pickupAddress = await tx.address.create({
         data: {
           vendorId: vendorId,
-          userId: null, // Explicitly null ensuring no Foreign Key constraint violation
+          userId: null,
           label: ADDRESS_LABELS.STORE_LOCATION,
           street: storeAddress,
           city: 'Maiduguri',
@@ -140,24 +153,19 @@ export class AddressesService {
 
   async deleteUserAddress(userId: string, addressId: string) {
     try {
-      // 1. Verify ownership
       const address = await this.prisma.address.findUnique({
         where: { id: addressId },
       });
 
-      // Ensure we only delete if the userId matches (security check)
       if (!address || address.userId !== userId) {
         throw new NotFoundException('Address not found or access denied');
       }
 
-      // 2. Delete
       return await this.prisma.address.delete({
         where: { id: addressId },
       });
     } catch (error) {
       if (error instanceof NotFoundException) throw error;
-
-      // Handle Foreign Key constraints (e.g. if address is used in an order)
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === 'P2003'
@@ -166,8 +174,6 @@ export class AddressesService {
           'Cannot delete address used in previous orders/rides',
         );
       }
-
-      this.logger.error(`Failed to delete address ${addressId}`, error.stack);
       throw new BadRequestException('Failed to delete address');
     }
   }
@@ -180,11 +186,12 @@ export class AddressesService {
     return input.trim().replace(/[<>]/g, '').substring(0, 500);
   }
 
-  private validateCoordinates(lat: number, lng: number): void {
+  public validateCoordinates(lat: number, lng: number): void {
     if (!lat || !lng || (lat === 0 && lng === 0)) {
       throw new BadRequestException('Valid GPS coordinates are required');
     }
 
+    // ✅ Enforce Maiduguri Geofence
     if (!this.isWithinCity(lat, lng)) {
       throw new BadRequestException(
         'Sorry, this location is outside our Maiduguri service area.',
@@ -192,7 +199,7 @@ export class AddressesService {
     }
   }
 
-  private isWithinCity(lat: number, lng: number): boolean {
+  public isWithinCity(lat: number, lng: number): boolean {
     return (
       lat >= CITY_BOUNDS.MIN_LAT &&
       lat <= CITY_BOUNDS.MAX_LAT &&
