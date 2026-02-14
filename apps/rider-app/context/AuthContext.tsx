@@ -17,7 +17,8 @@ type User = {
 
 interface AuthContextType {
   user: User | null;
-  loading: boolean;
+  initialLoading: boolean;
+  actionLoading: boolean;
   login: (credentials: { email: string; password: string }) => Promise<void>;
   logout: () => Promise<void>;
   biometricAvailable: boolean;
@@ -32,7 +33,8 @@ const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(false);
   const biometric = useBiometric();
   useEffect(() => {
     biometric.checkBiometricAvailability();
@@ -56,7 +58,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUser(null);
         }
       } finally {
-        setLoading(false);
+        setInitialLoading(false);
       }
     }
     checkToken();
@@ -78,22 +80,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     email: string;
     password: string;
   }) => {
-    setLoading(true);
+    setActionLoading(true);
     try {
       const resp = await login(email, password);
       await saveSession(resp.user);
     } finally {
-      setLoading(false);
+      setActionLoading(false);
     }
   };
 
   const logoutHandler = async () => {
-    setLoading(true);
+    setActionLoading(true);
     try {
       await logout();
       await clearSession();
     } finally {
-      setLoading(false);
+      setActionLoading(false);
     }
   };
 
@@ -125,7 +127,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!creds) {
       throw new Error("No biometric credentials saved");
     }
-    setLoading(true);
+    setActionLoading(true);
     try {
       const resp = await login(creds.email, creds.password);
       await saveSession(resp.user);
@@ -134,7 +136,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       biometric.resetStatus();
       throw err;
     } finally {
-      setLoading(false);
+      setActionLoading(false);
     }
   };
 
@@ -142,7 +144,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     <AuthContext.Provider
       value={{
         user,
-        loading,
+        initialLoading,
+        actionLoading,
         login: loginHandler,
         logout: logoutHandler,
         biometricAvailable: biometric.isAvailable,

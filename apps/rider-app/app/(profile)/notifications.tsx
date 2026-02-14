@@ -425,7 +425,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     marginTop: 8,
     fontSize: 14,
-    color: "#6B7280",
   },
 
   section: {

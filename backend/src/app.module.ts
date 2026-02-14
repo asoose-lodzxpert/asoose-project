@@ -13,6 +13,7 @@ import { AuthModule } from './auth/auth.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { RedisModule } from './redis/redis.module';
 import { SuperAdminModule } from './super-admin/super-admin.module';
+import { RidersModule } from './riders/riders.module';
 import { VendorModule } from './vendor/vendor.module';
 import { MarketplaceModule } from './marketplace/marketplace.module';
 import { CartModule } from './cart/cart.module';
@@ -59,6 +60,7 @@ import { MailModule } from './mail/mail.module';
     PrismaModule,
     RedisModule,
     SuperAdminModule,
+    RidersModule,
     VendorModule,
     MarketplaceModule,
     CartModule,

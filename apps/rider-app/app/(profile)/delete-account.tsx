@@ -20,6 +20,12 @@ export default function DeleteAccountScreen() {
   const router = useRouter();
   const primary = useThemeColor({}, "brandPrimary");
   const surface = useThemeColor({}, "surfaceBackground");
+  const border = useThemeColor({}, "borderDefault");
+  const textSecondary = useThemeColor({}, "textSecondary");
+  const textOnPrimary = useThemeColor({}, "textOnPrimary");
+  const surfaceCard = useThemeColor({}, "surfaceCard");
+  const statusError = useThemeColor({}, "statusError");
+  const statusSuccess = useThemeColor({}, "statusSuccess");
   const [selectedReason, setSelectedReason] = useState<string | null>(null);
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [loading, setLoading] = useState(false);
@@ -59,7 +65,7 @@ export default function DeleteAccountScreen() {
       <ScrollView contentContainerStyle={{ padding: 24 }}>
         {step === 1 && (
           <>
-            <ThemedText style={styles.warning}>
+            <ThemedText style={[styles.warning, { color: statusError }]}>
               Deleting your account is permanent and cannot be undone. All your
               data will be lost.
             </ThemedText>
@@ -70,7 +76,14 @@ export default function DeleteAccountScreen() {
               <Pressable
                 key={reason}
                 style={[
-                  styles.reasonButton,
+                  {
+                    borderWidth: 1,
+                    borderColor: border,
+                    borderRadius: 8,
+                    padding: 14,
+                    marginBottom: 10,
+                    backgroundColor: surfaceCard,
+                  },
                   selectedReason === reason && {
                     borderColor: primary,
                     backgroundColor: primary + "10",
@@ -90,14 +103,14 @@ export default function DeleteAccountScreen() {
             <Pressable
               style={[
                 styles.nextButton,
-                { backgroundColor: selectedReason ? primary : "#E5E7EB" },
+                { backgroundColor: selectedReason ? primary : border },
               ]}
               disabled={!selectedReason}
               onPress={() => setStep(2)}
             >
               <ThemedText
                 style={{
-                  color: selectedReason ? "#fff" : "#9CA3AF",
+                  color: selectedReason ? textOnPrimary : textSecondary,
                   fontWeight: "700",
                 }}
               >
@@ -108,13 +121,13 @@ export default function DeleteAccountScreen() {
         )}
         {step === 2 && (
           <>
-            <ThemedText style={styles.warning}>
+            <ThemedText style={[styles.warning, { color: statusError }]}>
               Are you absolutely sure you want to delete your account?
             </ThemedText>
             <Pressable
               style={[
                 styles.nextButton,
-                { backgroundColor: "#EF4444", marginTop: 32 },
+                { backgroundColor: statusError, marginTop: 32 },
               ]}
               onPress={async () => {
                 const confirmed = await confirm({
@@ -128,31 +141,35 @@ export default function DeleteAccountScreen() {
               }}
               disabled={loading}
             >
-              <ThemedText style={{ color: "#fff", fontWeight: "700" }}>
+              <ThemedText style={{ color: textOnPrimary, fontWeight: "700" }}>
                 Delete Account
               </ThemedText>
             </Pressable>
             <Pressable
               style={[
                 styles.nextButton,
-                { backgroundColor: "#E5E7EB", marginTop: 16 },
+                { backgroundColor: border, marginTop: 16 },
               ]}
               onPress={() => setStep(1)}
             >
-              <ThemedText style={{ color: "#374151" }}>Back</ThemedText>
+              <ThemedText>Back</ThemedText>
             </Pressable>
           </>
         )}
         {step === 3 && (
           <View style={{ alignItems: "center", marginTop: 60 }}>
-            <IconSymbol name="checkmark.seal" size={48} color="#16A34A" />
+            <IconSymbol name="checkmark.seal" size={48} color={statusSuccess} />
             <ThemedText
               style={{ fontSize: 18, fontWeight: "700", marginTop: 16 }}
             >
               Account Deleted
             </ThemedText>
             <ThemedText
-              style={{ color: "#6B7280", marginTop: 8, textAlign: "center" }}
+              style={{
+                color: textSecondary,
+                marginTop: 8,
+                textAlign: "center",
+              }}
             >
               Your account has been deleted. We&apos;re sorry to see you go.
             </ThemedText>
@@ -163,7 +180,7 @@ export default function DeleteAccountScreen() {
               ]}
               onPress={() => router.replace("/")}
             >
-              <ThemedText style={{ color: "#fff", fontWeight: "700" }}>
+              <ThemedText style={{ color: textOnPrimary, fontWeight: "700" }}>
                 Go to Home
               </ThemedText>
             </Pressable>
@@ -184,18 +201,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   warning: {
-    color: "#EF4444",
     fontWeight: "600",
     fontSize: 16,
     marginBottom: 12,
-  },
-  reasonButton: {
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    borderRadius: 8,
-    padding: 14,
-    marginBottom: 10,
-    backgroundColor: "#fff",
   },
   nextButton: {
     marginTop: 32,

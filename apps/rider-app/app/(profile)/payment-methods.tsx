@@ -31,6 +31,7 @@ const SkeletonBox = ({
   radius?: number;
 }) => {
   const opacity = React.useRef(new Animated.Value(0.3)).current;
+  const surfaceSubtle = useThemeColor({}, "surfaceSubtle");
 
   React.useEffect(() => {
     const animation = Animated.loop(
@@ -56,7 +57,7 @@ const SkeletonBox = ({
       style={[
         {
           height,
-          backgroundColor: "#E5E7EB",
+          backgroundColor: surfaceSubtle,
           borderRadius: radius,
           opacity,
         },
@@ -69,22 +70,12 @@ const SkeletonBox = ({
 const BankCardSkeleton = ({ border }: { border: string }) => {
   return (
     <View style={[styles.card, { borderColor: border }]}>
-      <View style={styles.field}>
-        <SkeletonBox width={80} height={16} />
-        <SkeletonBox width="100%" height={48} radius={12} />
-      </View>
-      <View style={styles.field}>
-        <SkeletonBox width={75} height={16} />
-        <SkeletonBox width="100%" height={48} radius={12} />
-      </View>
-      <View style={styles.field}>
-        <SkeletonBox width={110} height={16} />
-        <SkeletonBox width="100%" height={48} radius={12} />
-      </View>
-      <View style={styles.field}>
-        <SkeletonBox width={95} height={16} />
-        <SkeletonBox width="100%" height={48} radius={12} />
-      </View>
+      {[80, 75, 110, 95].map((w, i) => (
+        <View key={i} style={styles.field}>
+          <SkeletonBox width={w} height={16} />
+          <SkeletonBox width="100%" height={48} radius={12} />
+        </View>
+      ))}
     </View>
   );
 };
@@ -94,6 +85,8 @@ export default function PaymentMethodsScreen() {
   const primary = useThemeColor({}, "brandPrimary");
   const surface = useThemeColor({}, "surfaceBackground");
   const border = useThemeColor({}, "borderDefault");
+  const textSecondary = useThemeColor({}, "textSecondary");
+  const textMuted = useThemeColor({}, "textMuted");
 
   const [bankAccount, setBankAccount] = useState<BankAccount | null>(null);
   const [loading, setLoading] = useState(true);
@@ -163,10 +156,7 @@ export default function PaymentMethodsScreen() {
     <ThemedView style={[styles.container, { backgroundColor: surface }]}>
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: primary + "40" }]}>
-        <Pressable
-          onPress={() => router.back()}
-          style={{ flexDirection: "row", alignItems: "center" }}
-        >
+        <Pressable onPress={() => router.back()} style={styles.backButton}>
           <IconSymbol name="chevron.left" size={24} color={primary} />
           <ThemedText
             style={{ color: primary, marginLeft: 4, fontWeight: "500" }}
@@ -174,25 +164,20 @@ export default function PaymentMethodsScreen() {
             Back
           </ThemedText>
         </Pressable>
-        <ThemedText type="subtitle" style={{ flex: 1, textAlign: "center" }}>
+
+        <ThemedText type="subtitle" style={styles.headerTitle}>
           Bank Account
         </ThemedText>
-        {!loading && bankAccount && (
-          <Pressable
-            onPress={() => {
-              if (editing) {
-                saveChanges();
-              } else {
-                setEditing(true);
-              }
-            }}
-          >
-            <ThemedText style={{ color: primary, fontWeight: "600" }}>
-              {editing ? "Save" : "Edit"}
-            </ThemedText>
-          </Pressable>
-        )}
-        {!bankAccount && !loading && <View style={{ width: 40 }} />}
+
+        <View style={styles.headerRight}>
+          {!loading && bankAccount && (
+            <Pressable onPress={editing ? saveChanges : () => setEditing(true)}>
+              <ThemedText style={{ color: primary, fontWeight: "600" }}>
+                {editing ? "Save" : "Edit"}
+              </ThemedText>
+            </Pressable>
+          )}
+        </View>
       </View>
 
       <ScrollView
@@ -201,7 +186,7 @@ export default function PaymentMethodsScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            colors={[primary]}
+            tintColor={primary}
           />
         }
       >
@@ -244,9 +229,9 @@ export default function PaymentMethodsScreen() {
               />
             </Field>
 
-            <View style={styles.infoBox}>
+            <View style={[styles.infoBox, { backgroundColor: primary + "15" }]}>
               <IconSymbol name="info.circle" size={20} color={primary} />
-              <ThemedText style={styles.infoText}>
+              <ThemedText style={[styles.infoText, { color: primary }]}>
                 This is your default withdrawal account. All earnings will be
                 transferred here.
               </ThemedText>
@@ -254,13 +239,13 @@ export default function PaymentMethodsScreen() {
           </View>
         ) : (
           <View style={styles.emptyState}>
-            <IconSymbol name="creditcard" size={48} color="#9CA3AF" />
-            <ThemedText type="subtitle" style={{ color: "#6B7280" }}>
+            <IconSymbol name="creditcard" size={48} color={textMuted} />
+            <ThemedText type="subtitle" style={{ color: textSecondary }}>
               No Bank Account
             </ThemedText>
-            <ThemedText style={{ color: "#9CA3AF", textAlign: "center" }}>
-              You haven&apos;t added a bank account yet. Contact support to add
-              your withdrawal account.
+            <ThemedText style={{ color: textMuted, textAlign: "center" }}>
+              You haven't added a bank account yet. Contact support to add your
+              withdrawal account.
             </ThemedText>
           </View>
         )}
@@ -269,7 +254,6 @@ export default function PaymentMethodsScreen() {
   );
 }
 
-/* Field wrapper */
 function Field({
   label,
   children,
@@ -294,11 +278,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderBottomWidth: 1,
   },
+  headerTitle: { flex: 1, textAlign: "center" },
+  headerRight: { width: 50, alignItems: "flex-end" },
+  backButton: { flexDirection: "row", alignItems: "center", width: 50 },
   card: {
     padding: 16,
     borderRadius: 14,
     borderWidth: 2,
-    borderColor: "#D1D5DB",
     backgroundColor: "transparent",
     gap: 12,
   },
@@ -306,7 +292,6 @@ const styles = StyleSheet.create({
   infoBox: {
     flexDirection: "row",
     gap: 12,
-    backgroundColor: "#EFF6FF",
     padding: 12,
     borderRadius: 10,
     marginTop: 12,
@@ -314,7 +299,6 @@ const styles = StyleSheet.create({
   infoText: {
     flex: 1,
     fontSize: 13,
-    color: "#1E40AF",
     lineHeight: 18,
   },
   emptyState: {

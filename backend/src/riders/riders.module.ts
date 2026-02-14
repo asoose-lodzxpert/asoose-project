@@ -1,4 +1,5 @@
 import { Module, forwardRef } from '@nestjs/common';
+import { CacheModule } from '@nestjs/cache-manager';
 import { ProfileController } from './profile/profile.controller';
 import { ProfileService } from './profile/profile.service';
 import { BankController } from './bank/bank.controller';
@@ -31,6 +32,7 @@ import { TransactionsModule } from '../super-admin/transactions/transaction.modu
     TripsModule,
     MatchingModule,
     TransactionsModule,
+    CacheModule.register(),
   ],
   controllers: [
     ProfileController,

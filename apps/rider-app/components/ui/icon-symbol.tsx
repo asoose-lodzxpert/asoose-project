@@ -17,6 +17,7 @@ export type IconSymbolName =
   | "chevron.up"
   | "info.circle"
   | "cloud.upload"
+  | "cloud.fill" // Added this as you used it in previous screens
   | "camera.fill"
   | "check"
   | "circle.fill"
@@ -103,7 +104,9 @@ export type IconSymbolName =
   | "shippingbox.fill"
   | "calendar"
   | "exclamationmark.triangle"
-  | "exclamationmark.triangle.fill";
+  | "exclamationmark.triangle.fill"
+  | "info.circle.fill"
+  | "checkmark.circle.fill";
 
 export const MAPPING: Record<
   IconSymbolName,
@@ -114,41 +117,34 @@ export const MAPPING: Record<
   "fork.knife": "restaurant",
   "chart.line.uptrend.xyaxis": "show-chart",
   "person.crop.circle.fill": "account-circle",
-
   "eye.fill": "remove-red-eye",
   "eye.slash.fill": "visibility-off",
-
   "paperplane.fill": "send",
   send: "send",
-
   "chevron.left.forwardslash.chevron.right": "code",
   "chevron.right": "chevron-right",
   "chevron.left": "chevron-left",
   "chevron.down": "keyboard-arrow-down",
   "chevron.up": "keyboard-arrow-up",
-
   "info.circle": "info",
+  "info.circle.fill": "info",
   "cloud.upload": "cloud-upload",
+  "cloud.fill": "cloud",
   "camera.fill": "photo-camera",
-
   check: "check",
   "circle.fill": "circle",
   "car.fill": "directions-car",
   "mappin.circle.fill": "location-on",
-
   "map.marker": "place",
   "location.fill": "location-on",
   "map.fill": "map",
-
   "arrow.up.left.and.arrow.down.right": "fullscreen",
   fullscreen: "fullscreen",
-
   xmark: "close",
   "lock.fill": "lock",
   pencil: "edit",
   trash: "delete",
   plus: "add",
-
   home: "home",
   restaurant: "restaurant",
   notifications: "notifications",
@@ -162,10 +158,10 @@ export const MAPPING: Record<
   "arrow.left": "arrow-back",
   "arrow.up": "arrow-upward",
   "arrow-up": "arrow-upward",
-  "arrow-u-turn-left": "arrow-left",
-  "arrow-u-turn-right": "arrow-right",
-  "arrow-left": "arrow-left",
-  "arrow-right": "arrow-right",
+  "arrow-u-turn-left": "arrow-back",
+  "arrow-u-turn-right": "arrow-forward",
+  "arrow-left": "arrow-back",
+  "arrow-right": "arrow-forward",
   settings: "settings",
   bell: "notifications",
   list: "list",
@@ -203,13 +199,13 @@ export const MAPPING: Record<
   "p.square": "crop-square",
   "d.square": "crop-square",
   clock: "access-time",
-  "arrow.right.circle": "arrow-forward-ios",
+  "arrow.right.circle": "arrow-forward",
   note: "note",
   phone: "phone",
   checkmark: "check",
   navigation: "navigation",
   person: "person",
-  "checkmark.seal": "check-circle",
+  "checkmark.seal": "verified",
   "star.fill": "star",
   "person.text.rectangle": "badge",
   "doc.text": "article",
@@ -232,7 +228,7 @@ interface IconSymbolProps {
 export function IconSymbol({ name, size = 24, color, style }: IconSymbolProps) {
   return (
     <MaterialIcons
-      name={MAPPING[name] as keyof typeof MaterialIcons.glyphMap}
+      name={MAPPING[name]}
       size={size}
       color={color}
       style={style}

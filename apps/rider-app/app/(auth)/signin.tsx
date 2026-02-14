@@ -1,8 +1,6 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useState } from "react";
 import {
   ActivityIndicator,
-  Animated,
-  Image,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
@@ -20,8 +18,8 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useAuth } from "@/context/AuthContext";
 import { useConfirm } from "@/hooks/use-confirm";
 import { useThemeColor } from "@/hooks/use-theme-color";
-import { useRouter } from "expo-router";
 import Toast from "react-native-toast-message";
+import { useRouter } from "expo-router";
 
 export default function LoginScreen() {
   const [identifier, setIdentifier] = useState("");
@@ -46,37 +44,6 @@ export default function LoginScreen() {
   const textOnPrimary = useThemeColor({}, "textOnPrimary");
   const muted = useThemeColor({}, "textMuted");
 
-  /* ------------------ Animated logo shift ------------------ */
-
-  const logoTranslateY = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    const showSub = Keyboard.addListener("keyboardWillShow", () => {
-      Animated.timing(logoTranslateY, {
-        toValue: -60,
-        duration: 300,
-        useNativeDriver: true,
-      }).start();
-    });
-
-    const hideSub = Keyboard.addListener("keyboardWillHide", () => {
-      Animated.timing(logoTranslateY, {
-        toValue: 0,
-        duration: 300,
-        useNativeDriver: true,
-      }).start();
-    });
-
-    return () => {
-      showSub.remove();
-      hideSub.remove();
-    };
-  }, []);
-
-  const logoStyle = {
-    transform: [{ translateY: logoTranslateY }],
-  };
-
   /* ------------------ Logic ------------------ */
 
   function validateForm() {
@@ -97,6 +64,8 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       await login({ email: identifier, password });
+
+      // After successful login, check if biometric should be offered
       const enabled = await isBiometricEnabled();
       if (biometricAvailable && !enabled) {
         const wantsBiometric = await confirm({
@@ -125,14 +94,10 @@ export default function LoginScreen() {
             });
           } finally {
             setBiometricLoading(false);
-            router.replace("/(tabs)");
           }
-        } else {
-          router.replace("/(tabs)");
         }
-      } else {
-        router.replace("/(tabs)");
       }
+      // Navigation is handled automatically by index.tsx based on auth state
     } catch (e: any) {
       setError(e.message || "Login failed. Please try again.");
     } finally {
@@ -172,7 +137,7 @@ export default function LoginScreen() {
     setError("");
     try {
       await biometricLogin();
-      router.replace("/(tabs)");
+      // Navigation is handled automatically by index.tsx based on auth state
     } catch (e: any) {
       setError(e.message || "Biometric authentication failed.");
     } finally {
@@ -187,17 +152,6 @@ export default function LoginScreen() {
       <ConfirmModal />
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <View style={{ flex: 1 }}>
-          <Animated.View style={[styles.logoContainer, logoStyle]}>
-            <Image
-              source={require("@/assets/images/icon.png")}
-              style={styles.logoImage}
-              resizeMode="contain"
-            />
-            <ThemedText type="title" style={styles.logoText}>
-              ASOOSE
-            </ThemedText>
-          </Animated.View>
-
           <KeyboardAvoidingView
             style={{ flex: 1 }}
             behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -209,10 +163,14 @@ export default function LoginScreen() {
               showsVerticalScrollIndicator={false}
             >
               <View style={styles.form}>
-                <ThemedText type="title">Welcome back</ThemedText>
-                <ThemedText style={[styles.subtitle, { color: muted }]}>
-                  Sign in to continue riding
-                </ThemedText>
+                <View style={styles.welcomeSection}>
+                  <ThemedText type="title" style={styles.welcomeTitle}>
+                    Welcome back
+                  </ThemedText>
+                  <ThemedText style={[styles.subtitle, { color: muted }]}>
+                    Sign in to continue riding
+                  </ThemedText>
+                </View>
 
                 <View style={styles.field}>
                   <ThemedInput
@@ -321,29 +279,22 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 24,
   },
-  logoContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 64,
-    gap: 12,
-  },
-  logoImage: {
-    width: 48,
-    height: 48,
-  },
-  logoText: {
-    fontSize: 32,
-    fontWeight: "bold",
-  },
   form: {
     flex: 1,
     justifyContent: "center",
     gap: 16,
   },
+  welcomeSection: {
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  welcomeTitle: {
+    textAlign: "center",
+  },
   subtitle: {
-    marginTop: -8,
+    marginTop: 8,
     fontSize: 14,
+    textAlign: "center",
   },
   field: {
     marginTop: 12,

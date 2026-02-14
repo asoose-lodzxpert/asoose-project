@@ -137,7 +137,7 @@ jobs:
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: |
-          railway up --project d66b9f91-4b15-4e28-b760-6121f59e77ce --docker-image devenochphilip/asoose-backend:${GITHUB_SHA}
+          railway up --project d66b9f91-4b15-4e28-b760-6121f59e77ce -- --docker-image devenochphilip/asoose-backend:${GITHUB_SHA}
 
       # 7. Save SHA as artifact for rollback
       - name: Save deployment SHA

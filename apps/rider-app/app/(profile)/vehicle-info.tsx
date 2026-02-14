@@ -44,6 +44,8 @@ export default function VehicleInfoScreen() {
   const router = useRouter();
   const primary = useThemeColor({}, "brandPrimary");
   const surface = useThemeColor({}, "surfaceBackground");
+  const surfaceSubtle = useThemeColor({}, "surfaceSubtle");
+  const textMuted = useThemeColor({}, "textMuted");
   const [data, setData] = useState<VehicleInfo | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -80,7 +82,7 @@ export default function VehicleInfoScreen() {
               <View
                 style={[
                   styles.vehicle,
-                  { borderColor: primary, backgroundColor: "#F3F4F6" },
+                  { borderColor: primary, backgroundColor: surfaceSubtle },
                 ]}
               />
             </View>
@@ -90,7 +92,7 @@ export default function VehicleInfoScreen() {
               style={{
                 height: 44,
                 borderRadius: 8,
-                backgroundColor: "#F3F4F6",
+                backgroundColor: surfaceSubtle,
                 marginTop: 6,
               }}
             />
@@ -100,7 +102,7 @@ export default function VehicleInfoScreen() {
               style={{
                 height: 44,
                 borderRadius: 8,
-                backgroundColor: "#F3F4F6",
+                backgroundColor: surfaceSubtle,
                 marginTop: 6,
               }}
             />
@@ -110,7 +112,7 @@ export default function VehicleInfoScreen() {
               style={{
                 height: 44,
                 borderRadius: 8,
-                backgroundColor: "#F3F4F6",
+                backgroundColor: surfaceSubtle,
                 marginTop: 6,
               }}
             />
@@ -120,7 +122,7 @@ export default function VehicleInfoScreen() {
               style={{
                 height: 44,
                 borderRadius: 8,
-                backgroundColor: "#F3F4F6",
+                backgroundColor: surfaceSubtle,
                 marginTop: 6,
               }}
             />
@@ -220,7 +222,7 @@ const styles = StyleSheet.create({
   },
   vehicleIcon: { width: 40, height: 40, marginBottom: 8 },
   section: { gap: 8, marginTop: 12 },
-  hintText: { fontSize: 12, textAlign: "center", color: "#9CA3AF" },
+  hintText: { fontSize: 12, textAlign: "center" },
   removeButton: { marginTop: 6 },
   loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
 });

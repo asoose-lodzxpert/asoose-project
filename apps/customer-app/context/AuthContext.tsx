@@ -192,7 +192,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = useCallback(async () => {
     setLoading(true);
     setUser(null);
-    hasInitialized.current = false; // Reset so init can run again after logout
+    hasInitialized.current = false;
     try {
       try {
         await logoutService();

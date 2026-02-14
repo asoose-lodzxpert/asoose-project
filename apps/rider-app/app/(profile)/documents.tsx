@@ -14,12 +14,23 @@ import { useThemeColor } from "@/hooks/use-theme-color";
 import { useRouter } from "expo-router";
 
 type DocumentKey = "id" | "license" | "insurance";
-type DocumentFile = any;
+
+// Defining a more specific type for the file object
+interface DocumentFile {
+  name?: string;
+  uri?: string;
+}
 
 export default function DocumentsScreen() {
   const router = useRouter();
+
+  // Theme Colors
   const primary = useThemeColor({}, "brandPrimary");
   const surface = useThemeColor({}, "surfaceBackground");
+  const border = useThemeColor({}, "borderDefault");
+  const surfaceSubtle = useThemeColor({}, "surfaceSubtle");
+  const textMuted = useThemeColor({}, "textMuted");
+  const statusSuccess = useThemeColor({}, "statusSuccess");
 
   const [documents, setDocuments] = useState<
     Record<DocumentKey, DocumentFile | null>
@@ -28,13 +39,14 @@ export default function DocumentsScreen() {
     license: null,
     insurance: null,
   });
-  // Editing is disabled; documents are view-only
+
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  /* Simulate fetch */
+  /* Simulate initial fetch */
   useEffect(() => {
     const timeout = setTimeout(() => {
+      // Logic to populate data if needed
       setDocuments({
         id: null,
         license: null,
@@ -48,75 +60,63 @@ export default function DocumentsScreen() {
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     setTimeout(() => {
-      setDocuments((prev) => ({ ...prev })); // simulate reload
+      // Simulate data refresh
       setRefreshing(false);
     }, 1000);
   }, []);
 
-  // Remove pickFile and removeFile logic; view-only
+  const renderHeader = () => (
+    <View
+      style={[
+        styles.header,
+        { borderBottomColor: border, backgroundColor: surface },
+      ]}
+    >
+      <Pressable onPress={() => router.back()} style={styles.backButton}>
+        <IconSymbol name="chevron.left" size={24} color={primary} />
+        <ThemedText style={[styles.backText, { color: primary }]}>
+          Back
+        </ThemedText>
+      </Pressable>
+      <ThemedText type="subtitle" style={styles.headerTitle}>
+        Documents
+      </ThemedText>
+      <View style={{ width: 60 }} />
+    </View>
+  );
 
   if (loading) {
     return (
       <ThemedView style={[styles.container, { backgroundColor: surface }]}>
-        {/* Header */}
-        <View style={[styles.header, { borderBottomColor: primary + "40" }]}>
-          <Pressable
-            onPress={() => router.back()}
-            style={{ flexDirection: "row", alignItems: "center" }}
-          >
-            <IconSymbol name="chevron.left" size={24} color={primary} />
-            <ThemedText
-              style={{ color: primary, marginLeft: 4, fontWeight: "500" }}
-            >
-              Back
-            </ThemedText>
-          </Pressable>
-          <ThemedText type="subtitle" style={{ flex: 1, textAlign: "center" }}>
-            Documents
-          </ThemedText>
-          <View style={{ width: 40 }} />
-        </View>
-        <ScrollView contentContainerStyle={{ padding: 20, gap: 20 }}>
-          {["ID Document", "Driver's License", "Vehicle Insurance"].map(
-            (label, idx) => (
-              <View key={label} style={styles.section}>
-                <ThemedText type="defaultSemiBold">{label}</ThemedText>
+        {renderHeader()}
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          {[1, 2, 3].map((i) => (
+            <View key={i} style={styles.section}>
+              <View
+                style={[styles.skeletonText, { backgroundColor: border }]}
+              />
+              <View
+                style={[
+                  styles.uploadCard,
+                  {
+                    backgroundColor: surfaceSubtle,
+                    borderColor: border,
+                    borderStyle: "solid",
+                  },
+                ]}
+              >
+                <View
+                  style={[styles.skeletonCircle, { backgroundColor: border }]}
+                />
                 <View
                   style={[
-                    styles.uploadCard,
-                    { backgroundColor: "#F3F4F6", borderColor: "#E5E7EB" },
+                    styles.skeletonLine,
+                    { backgroundColor: border, width: "40%" },
                   ]}
-                >
-                  <View
-                    style={{
-                      width: 32,
-                      height: 32,
-                      borderRadius: 16,
-                      backgroundColor: "#E5E7EB",
-                    }}
-                  />
-                  <View
-                    style={{
-                      height: 18,
-                      width: 120,
-                      backgroundColor: "#E5E7EB",
-                      borderRadius: 4,
-                      marginTop: 8,
-                    }}
-                  />
-                  <View
-                    style={{
-                      height: 14,
-                      width: 100,
-                      backgroundColor: "#E5E7EB",
-                      borderRadius: 4,
-                      marginTop: 6,
-                    }}
-                  />
-                </View>
+                />
               </View>
-            ),
-          )}
+            </View>
+          ))}
         </ScrollView>
       </ThemedView>
     );
@@ -124,29 +124,16 @@ export default function DocumentsScreen() {
 
   return (
     <ThemedView style={[styles.container, { backgroundColor: surface }]}>
-      {/* Header */}
-      <View style={[styles.header, { borderBottomColor: primary + "40" }]}>
-        <Pressable
-          onPress={() => router.back()}
-          style={{ flexDirection: "row", alignItems: "center" }}
-        >
-          <IconSymbol name="chevron.left" size={24} color={primary} />
-          <ThemedText
-            style={{ color: primary, marginLeft: 4, fontWeight: "500" }}
-          >
-            Back
-          </ThemedText>
-        </Pressable>
-        <ThemedText type="title" style={{ flex: 1, textAlign: "center" }}>
-          Documents
-        </ThemedText>
-        <View style={{ width: 40 }} />
-      </View>
+      {renderHeader()}
 
       <ScrollView
-        contentContainerStyle={{ padding: 20, gap: 20 }}
+        contentContainerStyle={styles.scrollContent}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={primary}
+          />
         }
       >
         {[
@@ -157,29 +144,29 @@ export default function DocumentsScreen() {
           const docKey = key as DocumentKey;
           const file = documents[docKey];
           const uploaded = Boolean(file);
+
           return (
             <View key={key} style={styles.section}>
               <ThemedText type="defaultSemiBold">{label}</ThemedText>
               <View
                 style={[
                   styles.uploadCard,
-                  uploaded && { borderColor: primary, opacity: 0.9 },
+                  { borderColor: uploaded ? statusSuccess : border },
+                  uploaded && { backgroundColor: surfaceSubtle },
                 ]}
               >
                 <IconSymbol
                   size={32}
-                  name={uploaded ? "check" : "cloud.upload"}
-                  color={uploaded ? "#22C55E" : "#9CA3AF"}
+                  name={uploaded ? "checkmark.circle.fill" : "cloud.fill"}
+                  color={uploaded ? statusSuccess : textMuted}
                 />
                 <ThemedText style={styles.uploadText}>
-                  {uploaded ? "File uploaded successfully" : "No file uploaded"}
+                  {uploaded ? "Verified Document" : "No file available"}
                 </ThemedText>
-                <ThemedText style={styles.hintText}>
+                <ThemedText style={[styles.hintText, { color: textMuted }]}>
                   {uploaded && file
-                    ? (file as any).name ||
-                      (file as any).uri?.split("/").pop() ||
-                      ""
-                    : "PDF, JPG, PNG (max 5MB)"}
+                    ? file.name || file.uri?.split("/").pop()
+                    : "Only administrators can upload documents"}
                 </ThemedText>
               </View>
             </View>
@@ -191,7 +178,9 @@ export default function DocumentsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
+  container: {
+    flex: 1,
+  },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -199,19 +188,60 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderBottomWidth: 1,
   },
-  section: { gap: 8, marginTop: 12 },
+  headerTitle: {
+    flex: 1,
+    textAlign: "center",
+  },
+  backButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    width: 60,
+  },
+  backText: {
+    marginLeft: 4,
+    fontWeight: "500",
+  },
+  scrollContent: {
+    padding: 20,
+    gap: 20,
+  },
+  section: {
+    gap: 8,
+  },
   uploadCard: {
-    height: 150,
+    height: 140,
     borderRadius: 14,
     borderWidth: 1,
     borderStyle: "dashed",
-    borderColor: "#D1D5DB",
     alignItems: "center",
     justifyContent: "center",
-    gap: 8,
-    backgroundColor: "transparent",
+    gap: 6,
   },
-  uploadText: { fontSize: 15, textAlign: "center" },
-  hintText: { fontSize: 12, textAlign: "center", color: "#9CA3AF" },
-  removeButton: { marginTop: 6 },
+  uploadText: {
+    fontSize: 15,
+    fontWeight: "500",
+    textAlign: "center",
+  },
+  hintText: {
+    fontSize: 12,
+    textAlign: "center",
+    paddingHorizontal: 20,
+  },
+  // Skeleton Styles
+  skeletonText: {
+    height: 16,
+    width: 100,
+    borderRadius: 4,
+    marginBottom: 4,
+  },
+  skeletonCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+  },
+  skeletonLine: {
+    height: 12,
+    borderRadius: 4,
+    marginTop: 8,
+  },
 });
