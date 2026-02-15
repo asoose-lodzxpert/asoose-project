@@ -30,7 +30,7 @@ import { join } from 'path';
           from: `"Asoose " <${config.get<string>('MAIL_FROM')}>`,
         },
         template: {
-          dir: join(__dirname, '..', 'libs', 'mail', 'templates'),
+          dir: join(__dirname, '..', '..', 'libs', 'mail', 'templates'),
           adapter: new HandlebarsAdapter(),
           options: {
             strict: true,

@@ -41,17 +41,8 @@ export const AddCategoryModal: React.FC<Props> = ({
     }
   }, [categoryToEdit, visible]);
 
-  const showToast = (msg: string) => {
-    Toast.show({
-      type: "error",
-      text1: msg,
-      position: "top",
-      visibilityTime: 2000,
-    });
-  };
-
   const handleSave = () => {
-    if (!name.trim()) return showToast("Category name is required");
+    if (!name.trim()) return Toast.show({ text1: "Category name is required" });
     onSave(name.trim());
     onClose();
   };

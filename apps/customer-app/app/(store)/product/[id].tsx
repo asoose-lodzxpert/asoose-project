@@ -17,6 +17,7 @@ import Animated, {
   withRepeat,
   withTiming,
 } from "react-native-reanimated";
+import Toast from "react-native-toast-message"; // Correct Import
 
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
@@ -50,7 +51,6 @@ export default function ProductDetailsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
-  const [retryCount, setRetryCount] = useState(0);
   const retryTimeoutRef = React.useRef<number | null>(null);
 
   const {
@@ -60,15 +60,13 @@ export default function ProductDetailsScreen() {
     increaseQty,
     decreaseQty,
   } = useCart();
-  const Toast = require('react-native-toast-message');
 
-  // Check if product is in cart and get its quantity
   const cartItem = product
     ? cartItems.find((item) => item.id === product.id)
     : null;
   const cartQuantity = cartItem ? cartItem.qty : 0;
 
-  /* -------- Data Loader with Auto-Retry -------- */
+  /* -------- Data Loader -------- */
   const loadProduct = useCallback(
     async (attempt = 0) => {
       if (!id || typeof id !== "string") {
@@ -78,60 +76,41 @@ export default function ProductDetailsScreen() {
         return;
       }
 
-      if (attempt === 0) {
-        setLoading(true);
-        setError(null);
-        setRetryCount(0);
-      }
+      if (attempt === 0) setLoading(true);
 
       try {
         const data = await fetchProductById(id);
         setProduct(data);
         setError(null);
-        setRetryCount(0);
         setLoading(false);
         setRefreshing(false);
       } catch (e) {
         const errorMessage = (e as Error)?.message || "Failed to load product";
-        const isNetworkError =
-          errorMessage.toLowerCase().includes("network") ||
-          errorMessage.toLowerCase().includes("fetch") ||
-          errorMessage.toLowerCase().includes("connection");
+        const isNetworkError = errorMessage.toLowerCase().includes("network");
 
-        // Retry up to 3 times with exponential backoff for network errors
         const maxRetries = isNetworkError ? 3 : 1;
 
         if (attempt < maxRetries) {
           const delay = Math.min(1000 * Math.pow(2, attempt), 5000);
-          setRetryCount(attempt + 1);
-
           retryTimeoutRef.current = setTimeout(() => {
             loadProduct(attempt + 1);
           }, delay);
         } else {
-          // Only show error and stop loading after all retries exhausted
           setProduct(null);
           setError(errorMessage);
           setLoading(false);
           setRefreshing(false);
-          setRetryCount(0);
         }
       }
     },
     [id],
   );
 
-  // Cleanup timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (retryTimeoutRef.current) {
-        clearTimeout(retryTimeoutRef.current);
-      }
-    };
-  }, []);
-
   useEffect(() => {
     loadProduct();
+    return () => {
+      if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current);
+    };
   }, [loadProduct]);
 
   const onRefresh = useCallback(async () => {
@@ -141,7 +120,6 @@ export default function ProductDetailsScreen() {
 
   const handleAddToCart = async () => {
     if (!product) return;
-
     try {
       await addItem({
         id: product.id,
@@ -154,19 +132,16 @@ export default function ProductDetailsScreen() {
         available: product.available,
       });
 
-      showToast({
-          Toast.show({
-          Toast.show({
-          Toast.show({
-        variant: "success",
-        message: `Added ${quantity} item(s) to cart`,
+      Toast.show({
+        type: "success",
+        text1: "Added to cart",
+        text2: `${quantity} item(s) of ${product.name} added.`,
       });
-
-      // router.back();
     } catch (e) {
-      showToast({
-        variant: "error",
-        message: "Could not add to cart. Please try again.",
+      Toast.show({
+        type: "error",
+        text1: "Error",
+        text2: "Could not add to cart. Please try again.",
       });
     }
   };
@@ -175,29 +150,21 @@ export default function ProductDetailsScreen() {
     if (!product) return;
     try {
       await removeItem(product.id);
-      showToast({
-        variant: "success",
-        message: `Removed from cart`,
+      Toast.show({
+        type: "success",
+        text1: "Removed",
+        text2: "Item removed from your cart",
       });
     } catch (e) {
-      showToast({
-        variant: "error",
-        message: "Could not remove from cart. Please try again.",
+      Toast.show({
+        type: "error",
+        text1: "Error",
+        text2: "Could not remove item.",
       });
     }
   };
 
-  const handleIncrement = async () => {
-    if (!product) return;
-    await increaseQty(product.id);
-  };
-
-  const handleDecrement = async () => {
-    if (!product) return;
-    await decreaseQty(product.id);
-  };
-
-  /* ---------------- Skeleton Components ---------------- */
+  /* ---------------- Skeleton Component ---------------- */
   const SkeletonLine = ({
     width = "100%",
     height = 14,
@@ -208,7 +175,6 @@ export default function ProductDetailsScreen() {
     radius?: number;
   }) => {
     const progress = useSharedValue(-SCREEN_WIDTH);
-
     const animatedStyle = useAnimatedStyle(() => ({
       transform: [{ translateX: progress.value }],
     }));
@@ -247,55 +213,9 @@ export default function ProductDetailsScreen() {
     );
   };
 
-  /* ---------------- UI Components ---------------- */
-  const renderImageGallery = () => {
-    if (!product?.images?.length) {
-      return (
-        <View
-          style={[styles.imagePlaceholder, { backgroundColor: surfaceSubtle }]}
-        >
-          <IconSymbol name="basket.fill" size={64} color={border} />
-        </View>
-      );
-    }
-
-    return (
-      <Image
-        source={{ uri: product.images[0] }}
-        style={styles.productImage}
-        resizeMode="cover"
-      />
-    );
-  };
-
-  const renderQuantitySelector = () => (
-    <View style={styles.quantitySelector}>
-      <ThemedText style={[styles.quantityLabel, { color: textSecondary }]}>
-        Quantity
-      </ThemedText>
-      <View style={styles.quantityControls}>
-        <Pressable
-          style={[styles.quantityButton, { borderColor: border }]}
-          onPress={() => setQuantity(Math.max(1, quantity - 1))}
-        >
-          <IconSymbol name="minus" size={20} color={textColor} />
-        </Pressable>
-        <ThemedText style={[styles.quantityValue, { color: textColor }]}>
-          {quantity}
-        </ThemedText>
-        <Pressable
-          style={[styles.quantityButton, { borderColor: border }]}
-          onPress={() => setQuantity(quantity + 1)}
-        >
-          <IconSymbol name="plus" size={20} color={textColor} />
-        </Pressable>
-      </View>
-    </View>
-  );
-
+  /* ---------------- UI Renderers ---------------- */
   const renderProductInfo = () => {
     if (!product) return null;
-
     return (
       <View style={styles.infoSection}>
         <View style={styles.nameRow}>
@@ -315,7 +235,7 @@ export default function ProductDetailsScreen() {
             )}
           </View>
           <ThemedText style={[styles.productPrice, { color: brandPrimary }]}>
-            ₦{product.price?.toFixed(2) || "0.00"}
+            ₦{product.price?.toFixed(2)}
           </ThemedText>
         </View>
 
@@ -330,81 +250,34 @@ export default function ProductDetailsScreen() {
           </View>
         )}
 
-        {renderQuantitySelector()}
+        <View style={styles.quantitySelector}>
+          <ThemedText style={[styles.quantityLabel, { color: textSecondary }]}>
+            Quantity
+          </ThemedText>
+          <View style={styles.quantityControls}>
+            <Pressable
+              style={[styles.quantityButton, { borderColor: border }]}
+              onPress={() => setQuantity(Math.max(1, quantity - 1))}
+            >
+              <IconSymbol name="minus" size={20} color={textColor} />
+            </Pressable>
+            <ThemedText style={[styles.quantityValue, { color: textColor }]}>
+              {quantity}
+            </ThemedText>
+            <Pressable
+              style={[styles.quantityButton, { borderColor: border }]}
+              onPress={() => setQuantity(quantity + 1)}
+            >
+              <IconSymbol name="plus" size={20} color={textColor} />
+            </Pressable>
+          </View>
+        </View>
       </View>
     );
   };
 
-  const renderEmptyState = () => (
-    <ScrollView
-      contentContainerStyle={styles.errorContainer}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={onRefresh}
-          tintColor={brandPrimary}
-        />
-      }
-    >
-      <IconSymbol name="alert-circle" size={48} color={brandPrimary} />
-      <ThemedText style={[styles.errorTitle, { color: textColor }]}>
-        Oops!
-      </ThemedText>
-      <ThemedText style={[styles.errorText, { color: textSecondary }]}>
-        {error || "Product not available"}
-      </ThemedText>
-
-      <Pressable
-        style={[styles.retryButton, { borderColor: brandPrimary }]}
-        onPress={() => router.back()}
-      >
-        <ThemedText style={[styles.retryButtonText, { color: brandPrimary }]}>
-          Go Back
-        </ThemedText>
-      </Pressable>
-    </ScrollView>
-  );
-
-  const renderContent = () => (
-    <ScrollView
-      showsVerticalScrollIndicator={false}
-      style={styles.scrollView}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={onRefresh}
-          tintColor={brandPrimary}
-        />
-      }
-    >
-      {renderImageGallery()}
-      <View style={[styles.contentContainer, { backgroundColor: surface }]}>
-        {renderProductInfo()}
-      </View>
-    </ScrollView>
-  );
-
-  const renderSkeletonContent = () => (
-    <ScrollView showsVerticalScrollIndicator={false}>
-      <View
-        style={[styles.imagePlaceholder, { backgroundColor: surfaceSubtle }]}
-      />
-      <View style={styles.contentContainer}>
-        <View style={styles.infoSection}>
-          <SkeletonLine width="70%" height={28} />
-          <SkeletonLine width="30%" height={20} />
-          <SkeletonLine width="100%" height={16} />
-          <SkeletonLine width="90%" height={16} />
-          <SkeletonLine width="95%" height={16} />
-          <SkeletonLine width="40%" height={40} />
-        </View>
-      </View>
-    </ScrollView>
-  );
-
   return (
     <ThemedView style={[styles.mainContainer, { backgroundColor: surface }]}>
-      {/* Header */}
       <View
         style={[
           styles.header,
@@ -414,24 +287,89 @@ export default function ProductDetailsScreen() {
         <Pressable onPress={() => router.back()} style={styles.backButton}>
           <IconSymbol name="chevron.left" size={22} color={brandPrimary} />
         </Pressable>
-
         <View style={styles.headerTitleContainer}>
           <ThemedText type="subtitle" style={styles.headerTitle}>
             Product Details
           </ThemedText>
         </View>
-
-        <View style={styles.headerSpacer} />
+        <View style={{ width: 32 }} />
       </View>
 
-      {/* Body */}
-      {loading
-        ? renderSkeletonContent()
-        : error || !product
-          ? renderEmptyState()
-          : renderContent()}
+      {loading ? (
+        <ScrollView showsVerticalScrollIndicator={false}>
+          <View
+            style={[
+              styles.imagePlaceholder,
+              { backgroundColor: surfaceSubtle },
+            ]}
+          />
+          <View style={styles.contentContainer}>
+            <View style={styles.infoSection}>
+              <SkeletonLine width="70%" height={28} />
+              <SkeletonLine width="100%" height={60} />
+            </View>
+          </View>
+        </ScrollView>
+      ) : error || !product ? (
+        <ScrollView
+          contentContainerStyle={styles.errorContainer}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={brandPrimary}
+            />
+          }
+        >
+          <IconSymbol
+            name="exclamationmark.triangle"
+            size={48}
+            color={brandPrimary}
+          />
+          <ThemedText style={styles.errorTitle}>Product Unavailable</ThemedText>
+          <ThemedText style={styles.errorText}>
+            {error || "This item couldn't be loaded."}
+          </ThemedText>
+          <Pressable
+            style={[styles.retryButton, { borderColor: brandPrimary }]}
+            onPress={() => router.back()}
+          >
+            <ThemedText style={{ color: brandPrimary }}>Go Back</ThemedText>
+          </Pressable>
+        </ScrollView>
+      ) : (
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={brandPrimary}
+            />
+          }
+        >
+          {product.images?.[0] ? (
+            <Image
+              source={{ uri: product.images[0] }}
+              style={styles.productImage}
+              resizeMode="cover"
+            />
+          ) : (
+            <View
+              style={[
+                styles.imagePlaceholder,
+                { backgroundColor: surfaceSubtle },
+              ]}
+            >
+              <IconSymbol name="basket.fill" size={64} color={border} />
+            </View>
+          )}
+          <View style={[styles.contentContainer, { backgroundColor: surface }]}>
+            {renderProductInfo()}
+          </View>
+        </ScrollView>
+      )}
 
-      {/* Add to Cart Button */}
       {!loading && product && (
         <View
           style={[
@@ -440,14 +378,12 @@ export default function ProductDetailsScreen() {
           ]}
         >
           <View style={styles.totalSection}>
-            <ThemedText style={[styles.totalLabel, { color: textSecondary }]}>
-              Total
-            </ThemedText>
+            <ThemedText style={styles.totalLabel}>Total</ThemedText>
             <ThemedText style={[styles.totalPrice, { color: brandPrimary }]}>
               ₦{((product.price || 0) * (cartQuantity || quantity)).toFixed(2)}
             </ThemedText>
           </View>
-          {/* Add to Cart / Remove from Cart & Quantity Controls */}
+
           {cartItem ? (
             <View
               style={{ flexDirection: "row", alignItems: "center", gap: 12 }}
@@ -465,43 +401,23 @@ export default function ProductDetailsScreen() {
                 onPress={handleRemoveFromCart}
               >
                 <IconSymbol name="trash" size={20} color={brandPrimary} />
-                <ThemedText
-                  style={[styles.addToCartText, { color: brandPrimary }]}
-                >
-                  Remove from Cart
+                <ThemedText style={{ color: brandPrimary, fontWeight: "700" }}>
+                  Remove
                 </ThemedText>
               </Pressable>
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: 0,
-                  backgroundColor: surface,
-                  borderRadius: 8,
-                  borderWidth: 1,
-                  borderColor: border,
-                }}
-              >
+              <View style={[styles.cartStepper, { borderColor: border }]}>
                 <Pressable
-                  style={{ paddingHorizontal: 12, paddingVertical: 8 }}
-                  onPress={handleDecrement}
+                  onPress={() => decreaseQty(product.id)}
+                  style={styles.stepperBtn}
                 >
                   <IconSymbol name="minus" size={18} color={textColor} />
                 </Pressable>
-                <ThemedText
-                  style={{
-                    fontSize: 18,
-                    fontWeight: "700",
-                    minWidth: 32,
-                    textAlign: "center",
-                    color: textColor,
-                  }}
-                >
+                <ThemedText style={styles.stepperValue}>
                   {cartQuantity}
                 </ThemedText>
                 <Pressable
-                  style={{ paddingHorizontal: 12, paddingVertical: 8 }}
-                  onPress={handleIncrement}
+                  onPress={() => increaseQty(product.id)}
+                  style={styles.stepperBtn}
                 >
                   <IconSymbol name="plus" size={18} color={textColor} />
                 </Pressable>
@@ -521,14 +437,13 @@ export default function ProductDetailsScreen() {
           )}
         </View>
       )}
+      <Toast />
     </ThemedView>
   );
 }
 
-/* ---------------- Styles ---------------- */
 const styles = StyleSheet.create({
   mainContainer: { flex: 1 },
-
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -536,24 +451,16 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderBottomWidth: 1,
   },
-  backButton: { padding: 8, borderRadius: 12, marginRight: 12 },
-  headerTitleContainer: { flex: 1 },
-  headerTitle: { fontSize: 20, fontWeight: "600" },
-  headerSpacer: { width: 32 },
-
-  scrollView: { flex: 1 },
-
-  productImage: {
-    width: "100%",
-    height: 300,
-  },
+  backButton: { padding: 8 },
+  headerTitleContainer: { flex: 1, alignItems: "center" },
+  headerTitle: { fontSize: 18, fontWeight: "700" },
+  productImage: { width: "100%", height: 300 },
   imagePlaceholder: {
     width: "100%",
     height: 300,
     justifyContent: "center",
     alignItems: "center",
   },
-
   contentContainer: {
     flex: 1,
     borderTopLeftRadius: 24,
@@ -561,26 +468,14 @@ const styles = StyleSheet.create({
     marginTop: -24,
     paddingTop: 24,
   },
-
-  infoSection: {
-    paddingHorizontal: 24,
-    paddingBottom: 24,
-  },
-
+  infoSection: { paddingHorizontal: 24, paddingBottom: 24 },
   nameRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "flex-start",
     marginBottom: 16,
   },
-
-  productName: {
-    fontSize: 24,
-    fontWeight: "700",
-    marginBottom: 8,
-    lineHeight: 32,
-  },
-
+  productName: { fontSize: 22, fontWeight: "700", flex: 1 },
+  productPrice: { fontSize: 24, fontWeight: "800", marginLeft: 12 },
   categoryBadge: {
     flexDirection: "row",
     alignItems: "center",
@@ -590,49 +485,15 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     alignSelf: "flex-start",
     backgroundColor: "rgba(0,0,0,0.05)",
+    marginTop: 4,
   },
-
-  categoryText: {
-    fontSize: 12,
-    fontWeight: "600",
-  },
-
-  productPrice: {
-    fontSize: 28,
-    fontWeight: "800",
-  },
-
-  descriptionSection: {
-    marginBottom: 24,
-  },
-
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    marginBottom: 8,
-  },
-
-  description: {
-    fontSize: 15,
-    lineHeight: 22,
-  },
-
-  quantitySelector: {
-    marginTop: 8,
-  },
-
-  quantityLabel: {
-    fontSize: 14,
-    fontWeight: "600",
-    marginBottom: 12,
-  },
-
-  quantityControls: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 16,
-  },
-
+  categoryText: { fontSize: 12, fontWeight: "600" },
+  descriptionSection: { marginBottom: 24 },
+  sectionTitle: { fontSize: 16, fontWeight: "700", marginBottom: 8 },
+  description: { fontSize: 15, lineHeight: 22 },
+  quantitySelector: { marginTop: 8 },
+  quantityLabel: { fontSize: 14, fontWeight: "600", marginBottom: 12 },
+  quantityControls: { flexDirection: "row", alignItems: "center", gap: 16 },
   quantityButton: {
     width: 40,
     height: 40,
@@ -641,67 +502,65 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-
   quantityValue: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: "700",
-    minWidth: 40,
+    minWidth: 30,
     textAlign: "center",
   },
-
   footer: {
     paddingHorizontal: 24,
     paddingVertical: 16,
     borderTopWidth: 1,
     gap: 12,
   },
-
   totalSection: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
   },
-
-  totalLabel: {
-    fontSize: 14,
-    fontWeight: "600",
-  },
-
-  totalPrice: {
-    fontSize: 24,
-    fontWeight: "800",
-  },
-
+  totalLabel: { fontSize: 14, fontWeight: "600", opacity: 0.6 },
+  totalPrice: { fontSize: 22, fontWeight: "800" },
   addToCartButton: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 16,
-    borderRadius: 12,
+    borderRadius: 16,
     gap: 8,
   },
-
-  addToCartText: {
-    color: "#FFF",
-    fontSize: 16,
-    fontWeight: "700",
+  addToCartText: { color: "#FFF", fontSize: 16, fontWeight: "700" },
+  cartStepper: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 12,
+    borderWidth: 1,
   },
-
+  stepperBtn: { padding: 12 },
+  stepperValue: {
+    fontSize: 18,
+    fontWeight: "700",
+    minWidth: 30,
+    textAlign: "center",
+  },
   errorContainer: {
     flexGrow: 1,
     justifyContent: "center",
     alignItems: "center",
     padding: 24,
-    gap: 16,
+    gap: 12,
   },
-  errorTitle: { fontSize: 24, fontWeight: "700", marginTop: 8 },
-  errorText: { fontSize: 16, textAlign: "center", marginBottom: 24 },
-
+  errorTitle: { fontSize: 20, fontWeight: "700" },
+  errorText: {
+    fontSize: 16,
+    textAlign: "center",
+    opacity: 0.6,
+    marginBottom: 20,
+  },
   retryButton: {
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderWidth: 1,
-    borderRadius: 8,
+    borderRadius: 12,
   },
-  retryButtonText: { fontSize: 16, fontWeight: "600" },
 });

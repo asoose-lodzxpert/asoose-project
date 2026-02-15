@@ -1,7 +1,16 @@
 import React from "react";
-import { View, Pressable, StyleSheet } from "react-native";
+import { View, StyleSheet, Pressable } from "react-native";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ThemedText } from "@/components/themed-text";
+import { Address } from "@/types/address";
+
+interface AddressCardProps {
+  address: Address;
+  border: string;
+  primary: string;
+  onEdit: () => void;
+  onDelete: () => void;
+}
 
 export function AddressCard({
   address,
@@ -9,27 +18,44 @@ export function AddressCard({
   primary,
   onEdit,
   onDelete,
-}: any) {
+}: AddressCardProps) {
+  // Determine icon based on label
+  const getIcon = () => {
+    switch (address.label.toLowerCase()) {
+      case "home":
+        return "house.fill";
+      case "work":
+        return "bag"; // or "briefcase"
+      default:
+        return "mappin.circle.fill";
+    }
+  };
+
+  const isSystemLabel = address.label === "Home" || address.label === "Work";
+
   return (
-    <View style={[styles.addressCard, { borderColor: border }]}>
-      <View style={{ flex: 1 }}>
-        <ThemedText style={styles.addressLabel}>{address.label}</ThemedText>
-        <ThemedText style={styles.addressText}>{address.address}</ThemedText>
-        {address.coordinates.lat && address.coordinates.lng && (
-          <ThemedText style={styles.coords}>
-            {address.coordinates.lat}, {address.coordinates.lng}
-          </ThemedText>
-        )}
+    <View style={[styles.card, { borderColor: border }]}>
+      <View style={[styles.iconContainer, { backgroundColor: primary + "10" }]}>
+        <IconSymbol name={getIcon()} size={20} color={primary} />
       </View>
-      <View style={styles.addressActions}>
-        <Pressable style={{ marginRight: 12 }} onPress={onEdit}>
-          <ThemedText style={{ color: primary, fontWeight: "600" }}>
-            Edit
-          </ThemedText>
+
+      <View style={styles.content}>
+        <ThemedText type="defaultSemiBold" style={styles.label}>
+          {address.label}
+        </ThemedText>
+        <ThemedText numberOfLines={1} style={styles.addressLine}>
+          {address.address}
+        </ThemedText>
+      </View>
+
+      <View style={styles.actions}>
+        <Pressable onPress={onEdit} style={styles.actionBtn}>
+          <IconSymbol name="pencil" size={18} color={primary} />
         </Pressable>
-        {address.label !== "Home" && address.label !== "Work" && (
-          <Pressable onPress={onDelete}>
-            <IconSymbol name="trash" size={20} color="#FF4D4F" />
+
+        {!isSystemLabel && (
+          <Pressable onPress={onDelete} style={styles.actionBtn}>
+            <IconSymbol name="trash" size={18} color="#EF4444" />
           </Pressable>
         )}
       </View>
@@ -38,16 +64,41 @@ export function AddressCard({
 }
 
 const styles = StyleSheet.create({
-  addressCard: {
+  card: {
     flexDirection: "row",
     alignItems: "center",
-    borderWidth: 1,
-    borderRadius: 12,
     padding: 16,
-    marginVertical: 8,
+    borderRadius: 16,
+    borderWidth: 1,
+    backgroundColor: "transparent",
+    marginBottom: 4,
   },
-  addressLabel: { fontSize: 15, fontWeight: "600" },
-  addressText: { fontSize: 14, marginTop: 4 },
-  coords: { fontSize: 12, color: "#888", marginTop: 2 },
-  addressActions: { flexDirection: "row", marginLeft: 12 },
+  iconContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  content: {
+    flex: 1,
+    marginLeft: 14,
+  },
+  label: {
+    fontSize: 16,
+    marginBottom: 2,
+  },
+  addressLine: {
+    fontSize: 13,
+    opacity: 0.6,
+  },
+  actions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  actionBtn: {
+    padding: 8,
+    borderRadius: 8,
+  },
 });

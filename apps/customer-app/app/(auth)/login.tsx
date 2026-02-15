@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { RelativePathString, useRouter } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
+import Toast from "react-native-toast-message"; // Corrected import
 import {
   useGoogleSignIn,
   authenticateWithGoogle,
@@ -26,7 +27,6 @@ import { ThemedInput } from "@/components/ThemedInput";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { useAuth } from "@/context/AuthContext";
-
 import { useConfirm } from "@/components/ui/ConfirmDialogProvider";
 
 export default function LoginScreen() {
@@ -45,7 +45,6 @@ export default function LoginScreen() {
   } = useAuth();
 
   const router = useRouter();
-  const Toast = require('react-native-toast-message');
   const showConfirm = useConfirm();
 
   // Form state
@@ -61,14 +60,24 @@ export default function LoginScreen() {
   const [appleAvailable, setAppleAvailable] = useState(false);
   const [oauthLoading, setOauthLoading] = useState(false);
 
+  // Initial check for biometrics and Apple availability
   useEffect(() => {
     (async () => {
       const enabled = await isBiometricEnabled();
       setBiometricEnabled(enabled);
+
       const available = await isAppleSignInAvailable();
       setAppleAvailable(available);
+
+      // Automatic biometric prompt on mount
+      if (enabled && biometricAvailable && biometricEnrolled) {
+        // Short timeout to ensure UI is ready
+        setTimeout(() => {
+          handleBiometricLogin();
+        }, 500);
+      }
     })();
-  }, [isBiometricEnabled]);
+  }, []);
 
   useEffect(() => {
     if (response?.type === "success" && response.authentication) {
@@ -102,8 +111,7 @@ export default function LoginScreen() {
       router.replace({ pathname: "/(tabs)/home" });
     } catch (err: any) {
       setError(err.message || "Login failed");
-      showToast({ message: err.message || "Login failed", variant: "error" });
-      Toast.show({ type: 'error', text1: err.message || "Login failed" });
+      Toast.show({ type: "error", text1: err.message || "Login failed" });
     } finally {
       setLoading(false);
     }
@@ -115,12 +123,10 @@ export default function LoginScreen() {
       await authenticateWithGoogle(token);
       router.replace({ pathname: "/(tabs)/home" });
     } catch (err: any) {
-      showToast({
-          Toast.show({
-          Toast.show({
-          Toast.show({
-        message: err.message || "Google sign-in failed",
-        variant: "error",
+      Toast.show({
+        type: "error",
+        text1: "Google Login Error",
+        text2: err.message || "Google sign-in failed",
       });
     } finally {
       setOauthLoading(false);
@@ -134,9 +140,10 @@ export default function LoginScreen() {
       router.replace({ pathname: "/(tabs)/home" });
     } catch (err: any) {
       if (err.message !== "Apple Sign-In was cancelled") {
-        showToast({
-          message: err.message || "Apple sign-in failed",
-          variant: "error",
+        Toast.show({
+          type: "error",
+          text1: "Apple Login Error",
+          text2: err.message || "Apple sign-in failed",
         });
       }
     } finally {
@@ -149,10 +156,9 @@ export default function LoginScreen() {
       await biometricLogin();
       router.replace({ pathname: "/(tabs)/home" });
     } catch (err: any) {
-      showToast({
-        message: err.message || "Biometric login failed",
-        variant: "error",
-      });
+      // If user cancels biometric, we don't necessarily want an intrusive error
+      // unless it's an actual hardware failure.
+      console.log("Biometric login failed or cancelled");
     }
   };
 
@@ -304,6 +310,7 @@ export default function LoginScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+      <Toast />
     </ThemedView>
   );
 }

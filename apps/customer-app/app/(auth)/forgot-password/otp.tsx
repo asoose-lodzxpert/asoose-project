@@ -65,14 +65,14 @@ export default function ForgotPasswordOtpScreen() {
     setResending(true);
     try {
       await requestPasswordReset(email);
-      showToast({
-        variant: "success",
-        message: "A new code has been sent to your email.",
+      Toast.show({
+        type: "success",
+        text1: "A new code has been sent to your email.",
       });
     } catch (err: any) {
-      showToast({
-        variant: "error",
-        message: err?.message || "Unable to resend code",
+      Toast.show({
+        type: "error",
+        text1: err?.message || "Unable to resend code",
       });
     } finally {
       setResending(false);

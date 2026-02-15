@@ -19,15 +19,6 @@ import { UserRole } from '../common/enums/user-role.enum';
 })
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
-
-  // Universal login route (role-based)
-  @Post('login')
-  @Throttle({ default: { limit: 10, ttl: 60 * 1000 } }) // 10 requests per minute
-  login(@Body() body) {
-    // body: { email, password, role }
-    return this.authService.login(body);
-  }
-
   // Universal refresh route
   @Post('refresh')
   @Throttle({ default: { limit: 10, ttl: 60 * 1000 } })

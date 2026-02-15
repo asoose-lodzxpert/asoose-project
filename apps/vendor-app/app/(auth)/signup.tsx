@@ -89,14 +89,15 @@ export default function Signup() {
           !s1.businessType ||
           !s1.employees
         ) {
-          showToast("Please fill all business information fields.");
+          Toast.show({ text1: "Please fill all business information fields." });
           return false;
         }
 
         if (!passwordRegex.test(s1.password)) {
-          showToast(
-            "Password must be at least 8 characters long and include an uppercase letter, a lowercase letter, a number, and a symbol.",
-          );
+          Toast.show({
+            text1:
+              "Password must be at least 8 characters long and include an uppercase letter, a lowercase letter, a number, and a symbol.",
+          });
           return false;
         }
 
@@ -104,7 +105,7 @@ export default function Signup() {
       case 2:
         const s2 = data.step2;
         if (!s2.businessRegCert || !s2.taxIdDoc || !s2.proofOfAddress) {
-          showToast("Please upload all required documents.");
+          Toast.show({ text1: "Please upload all required documents." });
           return false;
         }
         return true;
@@ -117,17 +118,13 @@ export default function Signup() {
           !s3.storeBanner ||
           !s3.location
         ) {
-          showToast("Please complete your store setup.");
+          Toast.show({ text1: "Please complete your store setup." });
           return false;
         }
         return true;
       default:
         return true;
     }
-  };
-
-  const showToast = (message: string) => {
-    Toast.show({ type: "error", text1: message });
   };
 
   const handleNext = async () => {

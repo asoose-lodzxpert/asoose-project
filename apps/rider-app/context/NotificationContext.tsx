@@ -18,6 +18,7 @@ import React, {
 import Toast from "react-native-toast-message";
 import { useAuth } from "./AuthContext";
 import { jobsService } from "@/services/jobs.service";
+import { getUnreadCount } from "@/services/notifications.service";
 
 type NotificationContextType = {
   expoPushToken: string | undefined;
@@ -47,9 +48,8 @@ export function NotificationProvider({
   // Function to refresh unread count from backend
   const refreshUnreadCount = async () => {
     try {
-      // TODO: Implement getUnreadCount API call for riders
-      // const { count } = await getUnreadCount();
-      // setUnreadCount(count);
+      const count = await getUnreadCount();
+      setUnreadCount(count);
     } catch (error) {
       // Silent error handling
     }

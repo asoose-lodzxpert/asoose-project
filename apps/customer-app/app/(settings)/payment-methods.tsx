@@ -14,7 +14,7 @@ import { useThemeColor } from "@/hooks/use-theme-color";
 import { useRouter } from "expo-router";
 import { get, request } from "@/lib/authFetch";
 import { useConfirm } from "@/components/ui/ConfirmDialogProvider";
-
+import Toast from "react-native-toast-message";
 
 type SavedCard = {
   id: string;
@@ -32,7 +32,6 @@ type WalletBalance = {
 
 export default function PaymentMethodsScreen() {
   const router = useRouter();
-  const Toast = require('react-native-toast-message');
   const primary = useThemeColor({}, "brandPrimary");
   const border = useThemeColor({}, "borderDefault");
   const card = useThemeColor({}, "surfaceCard");
@@ -111,12 +110,9 @@ export default function PaymentMethodsScreen() {
       }
       setCards((prev) => prev.filter((c) => c.id !== cardId));
     } catch (err) {
-      showToast({
-          Toast.show({
-                              Toast.show({
-                          Toast.show({
-        message: err instanceof Error ? err.message : "Failed to remove card",
-        variant: "error",
+      Toast.show({
+        text1: err instanceof Error ? err.message : "Failed to remove card",
+        type: "error",
       });
     }
   };
@@ -227,9 +223,9 @@ export default function PaymentMethodsScreen() {
                   <Pressable
                     style={[styles.topUpBtn, { backgroundColor: primary }]}
                     onPress={() => {
-                      showToast({
-                        message: "Top up feature coming soon!",
-                        variant: "info",
+                      Toast.show({
+                        text1: "Top up feature coming soon!",
+                        type: "info",
                       });
                     }}
                   >
@@ -321,9 +317,9 @@ export default function PaymentMethodsScreen() {
               <Pressable
                 style={[styles.addCardBtn, { borderColor: border }]}
                 onPress={() => {
-                  showToast({
-                    message: "Add card feature coming soon!",
-                    variant: "info",
+                  Toast.show({
+                    text1: "Add card feature coming soon!",
+                    type: "info",
                   });
                 }}
               >

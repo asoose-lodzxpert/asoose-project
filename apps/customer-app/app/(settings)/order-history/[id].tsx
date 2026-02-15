@@ -134,10 +134,9 @@ export default function OrderDetailsScreen() {
     try {
       await Share.share({ message });
     } catch (error: any) {
-      showToast({ message: error.message || "Share failed", variant: "error" });
       Toast.show({ type: "error", text1: error.message || "Share failed" });
     }
-  }, [order, showToast]);
+  }, [order]);
 
   /* ---------------- Skeleton Components ---------------- */
 

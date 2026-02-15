@@ -27,12 +27,6 @@ export class AuthService {
     private readonly otpService: OtpService,
     private readonly emailProducer: EmailProducer,
   ) {}
-  // Universal login
-  login(body: any) {
-    // TODO: Implement role-based login
-    return { message: 'Login not implemented', body };
-  }
-
   // User
   async loginUser(body: { email: string; password: string }) {
     try {

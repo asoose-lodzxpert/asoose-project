@@ -41,10 +41,10 @@ export default function ForgotPasswordEmailScreen() {
     setError(null);
     try {
       await requestPasswordReset(email.trim());
-      showToast({
-        variant: "success",
-        title: "OTP sent",
-        message: "Check your email for the 6-digit code.",
+      Toast.show({
+        type: "success",
+        text1: "OTP sent",
+        text2: "Check your email for the 6-digit code.",
       });
       router.push({
         pathname: "/(auth)/forgot-password/otp",

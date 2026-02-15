@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, useRef } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { z } from "zod";
 import {
   View,
@@ -11,6 +11,7 @@ import {
   ScrollView,
 } from "react-native";
 import { router } from "expo-router";
+import Toast from "react-native-toast-message";
 
 import * as WebBrowser from "expo-web-browser";
 import {
@@ -43,7 +44,6 @@ export default function Signup() {
   });
 
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
-  const Toast = require('react-native-toast-message');
 
   // Theme Colors
   const primary = useThemeColor({}, "brandPrimary");
@@ -94,18 +94,13 @@ export default function Signup() {
     setOauthLoading(true);
     try {
       await authenticateWithGoogle(accessToken);
-      showToast({ variant: "success", message: "Account created!" });
-        Toast.show({ type: 'success', text1: "Account created!" });
+      Toast.show({ type: "success", text1: "Account created!" });
       router.replace("/(tabs)/home");
     } catch (err: any) {
-      showToast({
-          Toast.show({
-          Toast.show({ type: 'success', text1: "Account created!" });
-          Toast.show({
-          Toast.show({ type: 'success', text1: "Account created!" });
-          Toast.show({
-        variant: "error",
-        message: err.message || "Google sign-in failed",
+      Toast.show({
+        type: "error",
+        text1: "Sign-in Error",
+        text2: err.message || "Google sign-in failed",
       });
     } finally {
       setOauthLoading(false);
@@ -116,13 +111,14 @@ export default function Signup() {
     setOauthLoading(true);
     try {
       await authenticateWithApple();
-      showToast({ variant: "success", message: "Account created!" });
+      Toast.show({ type: "success", text1: "Account created!" });
       router.replace("/(tabs)/home");
     } catch (err: any) {
       if (err.message !== "Apple Sign-In was cancelled") {
-        showToast({
-          variant: "error",
-          message: err.message || "Apple sign-in failed",
+        Toast.show({
+          type: "error",
+          text1: "Sign-in Error",
+          text2: err.message || "Apple sign-in failed",
         });
       }
     } finally {
@@ -158,12 +154,13 @@ export default function Signup() {
         phone,
         password,
       });
-      showToast({ variant: "success", message: "Account created!" });
+      Toast.show({ type: "success", text1: "Account created!" });
       router.replace("/login");
     } catch (err: any) {
-      showToast({
-        variant: "error",
-        message: err.message || "Could not create account",
+      Toast.show({
+        type: "error",
+        text1: "Signup Failed",
+        text2: err.message || "Could not create account",
       });
     } finally {
       setLoading(false);
@@ -181,7 +178,6 @@ export default function Signup() {
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.scrollContent}
           >
-            {/* Header */}
             <View style={styles.header}>
               <ThemedText
                 type="title"
@@ -194,7 +190,6 @@ export default function Signup() {
               </ThemedText>
             </View>
 
-            {/* Form Fields */}
             <View style={styles.form}>
               <ThemedInput
                 placeholder="Full name"
@@ -246,7 +241,6 @@ export default function Signup() {
                     </Pressable>
                   }
                 />
-                {/* Strength Indicator */}
                 {password.length > 0 && (
                   <View style={styles.strengthRow}>
                     {[0, 1, 2].map((i) => (
@@ -265,7 +259,6 @@ export default function Signup() {
                 )}
               </View>
 
-              {/* Terms Checkbox */}
               <Pressable
                 style={styles.termsRow}
                 onPress={() => setAccepted(!accepted)}
@@ -300,7 +293,6 @@ export default function Signup() {
                 </ThemedText>
               )}
 
-              {/* Action Button */}
               <Pressable
                 onPress={handleSignup}
                 disabled={loading}
@@ -321,7 +313,6 @@ export default function Signup() {
               </Pressable>
             </View>
 
-            {/* OAuth Section */}
             <View style={styles.socialSection}>
               <View style={styles.dividerRow}>
                 <View style={[styles.line, { backgroundColor: border }]} />
@@ -372,7 +363,6 @@ export default function Signup() {
               </View>
             </View>
 
-            {/* Login Link */}
             <Pressable
               onPress={() => router.replace("/login")}
               style={styles.footer}
@@ -387,6 +377,7 @@ export default function Signup() {
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
+      <Toast />
     </ThemedView>
   );
 }

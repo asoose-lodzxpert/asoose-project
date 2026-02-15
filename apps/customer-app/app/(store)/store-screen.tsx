@@ -30,8 +30,8 @@ import { useThemeColor } from "@/hooks/use-theme-color";
 import { fetchStoreBySlug } from "@/services/store.service";
 import type { StoreData } from "@/types/store-types";
 
-
 import { useCart } from "@/context/CartContext";
+import Toast from "react-native-toast-message";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -47,7 +47,7 @@ export default function StoreScreen() {
   const [error, setError] = useState<string | null>(null);
   const [reviewModalVisible, setReviewModalVisible] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
-  const retryTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+  const retryTimeoutRef = React.useRef<number | null>(null);
 
   const [currentTab, setCurrentTab] = useState<TabType>("all");
   const [activeCategory, setActiveCategory] = useState("Popular");
@@ -134,7 +134,6 @@ export default function StoreScreen() {
     currentTab === "favorites" ? favorites : (storeData?.products ?? []);
 
   const { addItem } = useCart();
-  const Toast = require('react-native-toast-message');
   const handleAddToCart = useCallback(
     async (productId: string) => {
       if (!storeData) return;
@@ -156,16 +155,15 @@ export default function StoreScreen() {
           available: true,
         });
       } catch (e) {
-        showToast({
-            Toast.show({
-          variant: "error",
-          message:
+        Toast.show({
+          type: "error",
+          text1:
             "Could not add to cart. Please try again." +
             (e instanceof Error ? e.message : ""),
         });
       }
     },
-    [addItem, storeData, showToast],
+    [addItem, storeData],
   );
 
   /* ---------------- Skeleton Components ---------------- */

@@ -7,11 +7,10 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { useRide } from "@/context/RideContext";
 import { RideService } from "@/services/ride.service";
-
+import Toast from "react-native-toast-message";
 
 export default function RideSuccessScreen() {
   const router = useRouter();
-  const Toast = require('react-native-toast-message');
   const { currentRide, resetBooking } = useRide();
 
   const primary = useThemeColor({}, "brandPrimary");
@@ -34,19 +33,17 @@ export default function RideSuccessScreen() {
 
   const handleSubmitRating = () => {
     if (rating === 0) {
-      showToast({
-          Toast.show({
-          Toast.show({
-        message: "Please select a rating before submitting",
-        variant: "error",
+      Toast.show({
+        text1: "Please select a rating before submitting",
+        type: "error",
       });
       return;
     }
 
     // TODO: Submit rating to backend
-    showToast({
-      message: "Your rating has been submitted. Thank you!",
-      variant: "success",
+    Toast.show({
+      text1: "Your rating has been submitted. Thank you!",
+      type: "success",
     });
     setTimeout(handleGoHome, 1500);
   };

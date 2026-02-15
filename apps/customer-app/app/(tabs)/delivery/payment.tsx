@@ -23,12 +23,12 @@ import {
   StyleSheet,
   View,
 } from "react-native";
+import Toast from "react-native-toast-message";
 
 export default function PaymentScreen() {
   const { returnData, resetDelivery } = useSendPackage();
   const router = useRouter();
   const { user, loading: userLoading, error: userError } = useUserProfile();
-  const Toast = require('react-native-toast-message');
 
   const primary = useThemeColor({}, "brandPrimary");
   const surface = useThemeColor({}, "surfaceBackground");
@@ -56,24 +56,23 @@ export default function PaymentScreen() {
 
   async function confirmPayment() {
     if (!user) {
-      Toast.show({ type: 'error', text1: "User not loaded. Please wait." });
+      Toast.show({ type: "error", text1: "User not loaded. Please wait." });
       return;
     }
 
     // Validate required fields
     if (!data.deliveryDetails?.name || !data.deliveryDetails?.phone) {
-      showToast({
-          Toast.show({
-        message: "Please provide recipient name and phone number.",
-        variant: "error",
+      Toast.show({
+        text1: "Please provide recipient name and phone number.",
+        type: "error",
       });
       return;
     }
 
     if (!data.pickup?.address || !data.dropoff?.address) {
-      showToast({
-        message: "Please select both pickup and delivery locations.",
-        variant: "error",
+      Toast.show({
+        text1: "Please select both pickup and delivery locations.",
+        type: "error",
       });
       return;
     }
@@ -123,8 +122,7 @@ export default function PaymentScreen() {
         err && typeof err === "object" && "message" in err
           ? (err as any).message
           : String(err);
-      showToast({ message: "Payment failed: " + msg, variant: "error" });
-      Toast.show({ type: 'error', text1: "Payment failed: " + msg });
+      Toast.show({ type: "error", text1: "Payment failed: " + msg });
     } finally {
       setProcessing(false);
     }
