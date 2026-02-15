@@ -11,7 +11,7 @@ import {
   ScrollView,
 } from "react-native";
 import { router } from "expo-router";
-import { useToast } from "@/components/ui/ThemedToast";
+
 import * as WebBrowser from "expo-web-browser";
 import {
   useGoogleSignIn,
@@ -43,7 +43,7 @@ export default function Signup() {
   });
 
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
-  const showToast = useToast();
+  const Toast = require('react-native-toast-message');
 
   // Theme Colors
   const primary = useThemeColor({}, "brandPrimary");
@@ -95,9 +95,15 @@ export default function Signup() {
     try {
       await authenticateWithGoogle(accessToken);
       showToast({ variant: "success", message: "Account created!" });
+        Toast.show({ type: 'success', text1: "Account created!" });
       router.replace("/(tabs)/home");
     } catch (err: any) {
       showToast({
+          Toast.show({
+          Toast.show({ type: 'success', text1: "Account created!" });
+          Toast.show({
+          Toast.show({ type: 'success', text1: "Account created!" });
+          Toast.show({
         variant: "error",
         message: err.message || "Google sign-in failed",
       });

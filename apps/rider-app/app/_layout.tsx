@@ -3,9 +3,13 @@ import { StyleSheet, View, Image } from "react-native";
 import { Stack } from "expo-router";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import Toast from "react-native-toast-message";
 
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { JobsProvider } from "@/context/JobContext";
+import { NotificationProvider } from "@/context/NotificationContext";
+import { NotificationPreferencesProvider } from "@/context/NotificationPreferencesContext";
+import { toastConfig } from "@/components/ThemedToast";
 
 const ONBOARDING_KEY = "asoose_rider_onboarded";
 
@@ -13,20 +17,18 @@ function RootNavigator() {
   const { user, initialLoading } = useAuth();
   const [showWelcome, setShowWelcome] = useState<boolean | null>(null);
 
-  // Check if user has completed onboarding
   useEffect(() => {
     const checkOnboarding = async () => {
       try {
         const seen = await AsyncStorage.getItem(ONBOARDING_KEY);
         setShowWelcome(seen !== "true");
       } catch (e) {
-        setShowWelcome(false); // Fallback to app if storage fails
+        setShowWelcome(false);
       }
     };
     checkOnboarding();
   }, []);
 
-  // Prevent flicker: Wait for both Auth and Onboarding checks
   if (initialLoading || showWelcome === null) {
     return (
       <View style={styles.loadingContainer}>
@@ -41,7 +43,6 @@ function RootNavigator() {
     );
   }
 
-  // 1. Onboarding Flow
   if (showWelcome) {
     // Inline import to avoid circular dependency
     const WelcomeScreen = require("./welcome").default;
@@ -76,7 +77,13 @@ function RootNavigator() {
 }
 
 function AuthDependentProviders({ children }: { children: React.ReactNode }) {
-  return <JobsProvider>{children}</JobsProvider>;
+  return (
+    <NotificationProvider>
+      <NotificationPreferencesProvider>
+        <JobsProvider>{children}</JobsProvider>
+      </NotificationPreferencesProvider>
+    </NotificationProvider>
+  );
 }
 
 export default function RootLayout() {
@@ -85,6 +92,7 @@ export default function RootLayout() {
       <AuthProvider>
         <AuthDependentProviders>
           <RootNavigator />
+          <Toast config={toastConfig} />
         </AuthDependentProviders>
       </AuthProvider>
     </GestureHandlerRootView>

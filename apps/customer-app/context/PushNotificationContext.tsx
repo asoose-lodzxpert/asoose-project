@@ -1,11 +1,12 @@
 import {
-  addNotificationReceivedListener,
-  addNotificationResponseListener,
   initializeNotificationHandler,
   registerForPushNotificationsAsync,
   savePushToken,
   setupNotificationCategories,
-} from "@/services/notification.service";
+  addNotificationReceivedListener,
+  addNotificationResponseListener,
+} from "@/services/push-notifications.service";
+import { fetchUnreadCount } from "@/services/user-notifications.service";
 import * as Notifications from "expo-notifications";
 import { useRouter } from "expo-router";
 import React, {
@@ -17,7 +18,6 @@ import React, {
 } from "react";
 import Toast from "react-native-toast-message";
 import { useAuth } from "./AuthContext";
-import { jobsService } from "@/services/jobs.service";
 
 type NotificationContextType = {
   expoPushToken: string | undefined;
@@ -47,9 +47,12 @@ export function NotificationProvider({
   // Function to refresh unread count from backend
   const refreshUnreadCount = async () => {
     try {
-      // TODO: Implement getUnreadCount API call for riders
-      // const { count } = await getUnreadCount();
-      // setUnreadCount(count);
+      const result = await fetchUnreadCount();
+      if (typeof result === "number") {
+        setUnreadCount(result);
+      } else if (result?.count != null) {
+        setUnreadCount(result.count);
+      }
     } catch (error) {
       // Silent error handling
     }
@@ -95,29 +98,14 @@ export function NotificationProvider({
         const actionId = response.actionIdentifier;
 
         // Handle action buttons
-        if (actionId === "accept" && data.orderId) {
-          try {
-            await jobsService.acceptJob(
-              data.jobId as string,
-              data.jobType as "ride" | "delivery",
-            );
-            Toast.show({
-              type: "success",
-              text1: "Job accepted",
-            });
-            router.push("/(tabs)/orders");
-          } catch (error: any) {
-            Toast.show({
-              type: "error",
-              text1: error.message || "Failed to accept job",
-            });
-          }
-        } else if (actionId === "decline" && data.jobId) {
-          router.push("/(tabs)/orders");
-        } else if (data.jobId) {
-          router.push("/(tabs)/orders");
-        } else if (data.payoutId) {
-          router.push("/(earnings)/withdraw");
+        if (actionId === "view" && data.orderId) {
+          router.push("/(tabs)/orders" as any);
+        } else if (data.orderId) {
+          router.push("/(tabs)/orders" as any);
+        } else if (data.rideId) {
+          router.push("/(tabs)/activity" as any);
+        } else if (data.deliveryId) {
+          router.push("/(tabs)/activity" as any);
         }
       },
     );

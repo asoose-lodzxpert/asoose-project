@@ -11,7 +11,7 @@ import { ThemedText } from "@/components/themed-text";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { checkPaymentStatus } from "@/services/payment.service";
-import { useToast } from "@/components/ui/ThemedToast";
+
 
 interface PaymentWebViewProps {
   visible: boolean;
@@ -34,7 +34,7 @@ export function PaymentWebView({
 }: PaymentWebViewProps) {
   const [loading, setLoading] = useState(true);
   const [verifying, setVerifying] = useState(false);
-  const showToast = useToast();
+  const Toast = require('react-native-toast-message');
 
   const accent = useThemeColor({}, "brandPrimary");
   const surface = useThemeColor({}, "surfaceBackground");
@@ -81,6 +81,11 @@ export function PaymentWebView({
             onSuccess();
           } else {
             showToast({
+                          Toast.show({
+                Toast.show({
+                Toast.show({
+                        Toast.show({
+                Toast.show({
               message: "Payment verification failed. Please contact support.",
               variant: "error",
             });

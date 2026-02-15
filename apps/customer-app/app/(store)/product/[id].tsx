@@ -21,7 +21,7 @@ import Animated, {
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { IconSymbol } from "@/components/ui/icon-symbol";
-import { useToast } from "@/components/ui/ThemedToast";
+
 import { useCart } from "@/context/CartContext";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import {
@@ -60,7 +60,7 @@ export default function ProductDetailsScreen() {
     increaseQty,
     decreaseQty,
   } = useCart();
-  const showToast = useToast();
+  const Toast = require('react-native-toast-message');
 
   // Check if product is in cart and get its quantity
   const cartItem = product
@@ -155,6 +155,9 @@ export default function ProductDetailsScreen() {
       });
 
       showToast({
+          Toast.show({
+          Toast.show({
+          Toast.show({
         variant: "success",
         message: `Added ${quantity} item(s) to cart`,
       });

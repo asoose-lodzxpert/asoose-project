@@ -71,7 +71,7 @@ export default function Index() {
         style={styles.logo}
         resizeMode="contain"
       />
-      <ActivityIndicator size="large" color="#007AFF" style={styles.spinner} />
+      <ActivityIndicator size="large" color="#E5A503" style={styles.spinner} />
     </View>
   );
 }

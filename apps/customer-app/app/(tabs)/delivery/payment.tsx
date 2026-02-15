@@ -2,7 +2,7 @@ import { PaymentWebView } from "@/components/checkout/PaymentWebView";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { IconSymbol } from "@/components/ui/icon-symbol";
-import { useToast } from "@/components/ui/ThemedToast";
+
 import { useSendPackage } from "@/context/SendPackageContext";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { useUserProfile } from "@/hooks/useUserProfile";
@@ -28,7 +28,7 @@ export default function PaymentScreen() {
   const { returnData, resetDelivery } = useSendPackage();
   const router = useRouter();
   const { user, loading: userLoading, error: userError } = useUserProfile();
-  const showToast = useToast();
+  const Toast = require('react-native-toast-message');
 
   const primary = useThemeColor({}, "brandPrimary");
   const surface = useThemeColor({}, "surfaceBackground");
@@ -56,13 +56,14 @@ export default function PaymentScreen() {
 
   async function confirmPayment() {
     if (!user) {
-      showToast({ message: "User not loaded. Please wait.", variant: "error" });
+      Toast.show({ type: 'error', text1: "User not loaded. Please wait." });
       return;
     }
 
     // Validate required fields
     if (!data.deliveryDetails?.name || !data.deliveryDetails?.phone) {
       showToast({
+          Toast.show({
         message: "Please provide recipient name and phone number.",
         variant: "error",
       });
@@ -123,6 +124,7 @@ export default function PaymentScreen() {
           ? (err as any).message
           : String(err);
       showToast({ message: "Payment failed: " + msg, variant: "error" });
+      Toast.show({ type: 'error', text1: "Payment failed: " + msg });
     } finally {
       setProcessing(false);
     }

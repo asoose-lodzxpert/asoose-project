@@ -33,6 +33,9 @@
         "NSUserNotificationUsageDescription": "Notifications are used to keep you updated about your account and activity."
       },
       "bundleIdentifier": "com.asoose.app",
+      "config": {
+        "googleMapsApiKey": "AIzaSyC1QLEDtvDu8r1gLtEec4d28aWP8VozXfA"
+      },
       "usesAppleSignIn": true
     },
     "platforms": ["ios", "android"],
@@ -40,6 +43,11 @@
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/adaptive-icon.png"
+      },
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyCor0YAMApwfowNFC-EXSOwrKq0mxdwMP8"
+        }
       },
       "permissions": [
         "USE_BIOMETRIC",

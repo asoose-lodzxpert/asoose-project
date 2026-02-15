@@ -7,11 +7,11 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { useRide } from "@/context/RideContext";
 import { RideService } from "@/services/ride.service";
-import { useToast } from "@/components/ui/ThemedToast";
+
 
 export default function RideSuccessScreen() {
   const router = useRouter();
-  const showToast = useToast();
+  const Toast = require('react-native-toast-message');
   const { currentRide, resetBooking } = useRide();
 
   const primary = useThemeColor({}, "brandPrimary");
@@ -35,6 +35,8 @@ export default function RideSuccessScreen() {
   const handleSubmitRating = () => {
     if (rating === 0) {
       showToast({
+          Toast.show({
+          Toast.show({
         message: "Please select a rating before submitting",
         variant: "error",
       });

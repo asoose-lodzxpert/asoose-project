@@ -14,7 +14,7 @@ import { ThemedText } from "@/components/themed-text";
 import { ThemedInput } from "@/components/ThemedInput";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
-import { useToast } from "@/components/ui/toast";
+import Toast from "react-native-toast-message";
 import { requestPasswordReset } from "@/services/auth.service";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
@@ -26,7 +26,6 @@ export default function ForgotPasswordEmailScreen() {
   const border = useThemeColor({}, "borderDefault");
 
   const router = useRouter();
-  const showToast = useToast();
 
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);

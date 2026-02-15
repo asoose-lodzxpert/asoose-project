@@ -30,7 +30,7 @@ import { useThemeColor } from "@/hooks/use-theme-color";
 import { fetchStoreBySlug } from "@/services/store.service";
 import type { StoreData } from "@/types/store-types";
 
-import { useToast } from "@/components/ui/ThemedToast";
+
 import { useCart } from "@/context/CartContext";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -134,7 +134,7 @@ export default function StoreScreen() {
     currentTab === "favorites" ? favorites : (storeData?.products ?? []);
 
   const { addItem } = useCart();
-  const showToast = useToast();
+  const Toast = require('react-native-toast-message');
   const handleAddToCart = useCallback(
     async (productId: string) => {
       if (!storeData) return;
@@ -157,6 +157,7 @@ export default function StoreScreen() {
         });
       } catch (e) {
         showToast({
+            Toast.show({
           variant: "error",
           message:
             "Could not add to cart. Please try again." +

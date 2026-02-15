@@ -14,7 +14,7 @@ import { useThemeColor } from "@/hooks/use-theme-color";
 import { useRouter } from "expo-router";
 import { get, request } from "@/lib/authFetch";
 import { useConfirm } from "@/components/ui/ConfirmDialogProvider";
-import { useToast } from "@/components/ui/ThemedToast";
+
 
 type SavedCard = {
   id: string;
@@ -32,7 +32,7 @@ type WalletBalance = {
 
 export default function PaymentMethodsScreen() {
   const router = useRouter();
-  const showToast = useToast();
+  const Toast = require('react-native-toast-message');
   const primary = useThemeColor({}, "brandPrimary");
   const border = useThemeColor({}, "borderDefault");
   const card = useThemeColor({}, "surfaceCard");
@@ -112,6 +112,9 @@ export default function PaymentMethodsScreen() {
       setCards((prev) => prev.filter((c) => c.id !== cardId));
     } catch (err) {
       showToast({
+          Toast.show({
+                              Toast.show({
+                          Toast.show({
         message: err instanceof Error ? err.message : "Failed to remove card",
         variant: "error",
       });

@@ -97,7 +97,8 @@ export default function LoginScreen() {
           }
         }
       }
-      // Navigation is handled automatically by index.tsx based on auth state
+
+      router.replace("/(tabs)");
     } catch (e: any) {
       setError(e.message || "Login failed. Please try again.");
     } finally {

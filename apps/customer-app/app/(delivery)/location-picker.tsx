@@ -9,7 +9,7 @@ import { AddressSearchInput } from "@/components/location/AddressSearchInput";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { IconSymbol } from "@/components/ui/icon-symbol";
-import { useToast } from "@/components/ui/toast";
+import Toast from "react-native-toast-message";
 import { useSendPackage } from "@/context/SendPackageContext";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { useAddressSearch } from "@/hooks/useAddressSearch";
@@ -25,8 +25,6 @@ export default function LocationPickerScreen() {
   const muted = useThemeColor({}, "textMuted");
 
   const mapRef = useRef<MapView>(null);
-
-  const toast = useToast();
 
   const [query, setQuery] = useState("");
   const [showMap, setShowMap] = useState(false);

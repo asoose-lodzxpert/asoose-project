@@ -24,7 +24,7 @@ import { Address } from "@/types/address";
 import { request } from "@/lib/authFetch";
 import { initiatePayment } from "@/services/payment.service";
 import { createOrder } from "@/services/order.service";
-import { useToast } from "@/components/ui/ThemedToast";
+
 
 type PaymentMethod = "paystack" | "flutterwave" | "monnify" | "transfer";
 
@@ -32,7 +32,7 @@ export default function CheckoutScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const { items, groups, subtotal, deliveryFee, total, clearCart } = useCart();
-  const showToast = useToast();
+  const Toast = require('react-native-toast-message');
 
   // Theme Colors
   const primary = useThemeColor({}, "brandPrimary");
@@ -142,7 +142,8 @@ export default function CheckoutScreen() {
       }
     } catch (error) {
       console.error("Order/Payment failed:", error);
-      showToast({
+      Toast.show({
+          Toast.show({ type: 'success', text1: "Order placed!" });
         message: "Failed to process order. Please try again.",
         variant: "error",
       });

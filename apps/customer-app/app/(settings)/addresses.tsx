@@ -3,7 +3,7 @@ import { ThemedView } from "@/components/themed-view";
 import { ThemedInput } from "@/components/ThemedInput";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { SkeletonAddressCard } from "@/components/ui/Skeleton";
-import { useToast } from "@/components/ui/toast";
+import Toast from "react-native-toast-message";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import * as Location from "expo-location";
 import { useRouter } from "expo-router";
@@ -38,7 +38,6 @@ export default function Addresses() {
   const router = useRouter();
   const primary = useThemeColor({}, "brandPrimary");
   const border = useThemeColor({}, "borderDefault");
-  const toast = useToast();
 
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [loading, setLoading] = useState(true);

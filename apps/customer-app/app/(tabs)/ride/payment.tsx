@@ -22,14 +22,14 @@ import {
 import { PaymentWebView } from "@/components/checkout/PaymentWebView";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import type { PaymentMethod, BankAccount, InAppTx } from "@/types/payment";
-import { useToast } from "@/components/ui/ThemedToast";
+
 import { useConfirm } from "@/components/ui/ConfirmDialogProvider";
 
 export default function RidePaymentScreen() {
   const router = useRouter();
   const { currentRide, loading, confirmPayment } = useRide();
   const { user } = useUserProfile();
-  const showToast = useToast();
+  const Toast = require('react-native-toast-message');
   const showConfirm = useConfirm();
 
   const primary = useThemeColor({}, "brandPrimary");
@@ -70,6 +70,8 @@ export default function RidePaymentScreen() {
   const handleConfirmPayment = async () => {
     if (!user || !currentRide) {
       showToast({
+          Toast.show({
+          Toast.show({
         message: "User or ride information missing",
         variant: "error",
       });
@@ -155,6 +157,7 @@ export default function RidePaymentScreen() {
   const handlePaymentSuccess = async () => {
     setShowPaymentWebView(false);
     showToast({ message: "Payment confirmed!", variant: "success" });
+      Toast.show({ type: 'success', text1: "Payment confirmed!" });
     confirmPayment(currentRide.id, "CARD");
     router.replace("/ride/tracking");
   };
@@ -162,6 +165,10 @@ export default function RidePaymentScreen() {
   const handlePaymentCancel = () => {
     setShowPaymentWebView(false);
     showToast({ message: "Payment cancelled", variant: "info" });
+    Toast.show({ type: 'info', text1: "Payment cancelled" });
+    Toast.show({ type: 'success', text1: "Payment confirmed!" });
+    Toast.show({
+    Toast.show({
   };
 
   const checkBankNow = async () => {
@@ -200,6 +207,7 @@ export default function RidePaymentScreen() {
   const copyToClipboard = (text: string) => {
     Clipboard.setStringAsync(text);
     showToast({ message: "Account number copied", variant: "success" });
+    Toast.show({ type: 'success', text1: "Account number copied" });
   };
 
   return (

@@ -1,17 +1,20 @@
 import { Stack } from "expo-router";
 import React from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import Toast from "react-native-toast-message";
 
 // Providers & Context
 import ConfirmProvider from "@/components/ui/ConfirmDialogProvider";
-import ThemedToastProvider from "@/components/ui/ThemedToast";
-import { ToastProvider } from "@/components/ui/toast";
+
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { CartProvider } from "@/context/CartContext";
 import { HomeProvider } from "@/context/HomeContext";
 import { LocationProvider } from "@/context/LocationContext";
 import { RideProvider } from "@/context/RideContext";
 import { SendPackageProvider } from "@/context/SendPackageContext";
+import { NotificationProvider } from "@/context/PushNotificationContext";
+import { NotificationPreferencesProvider } from "@/context/NotificationPreferencesContext";
+import { toastConfig } from "@/components/ui/ThemedToast";
 
 /**
  * RootNavigator now ALWAYS renders all routes.
@@ -50,34 +53,32 @@ function RootNavigator() {
 function AuthDependentProviders({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   return (
-    <CartProvider userId={user?.id}>
-      <HomeProvider>
-        <RideProvider>
-          <SendPackageProvider>{children}</SendPackageProvider>
-        </RideProvider>
-      </HomeProvider>
-    </CartProvider>
+    <NotificationProvider>
+      <NotificationPreferencesProvider>
+        <CartProvider userId={user?.id}>
+          <HomeProvider>
+            <RideProvider>
+              <SendPackageProvider>{children}</SendPackageProvider>
+            </RideProvider>
+          </HomeProvider>
+        </CartProvider>
+      </NotificationPreferencesProvider>
+    </NotificationProvider>
   );
 }
 
-/**
- * Root Layout - sets up all providers and renders the navigator.
- * No conditional logic here - all routes are registered for production builds.
- */
 export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ConfirmProvider>
-        <ToastProvider>
-          <AuthProvider>
-            <LocationProvider>
-              <AuthDependentProviders>
-                <RootNavigator />
-                <ThemedToastProvider />
-              </AuthDependentProviders>
-            </LocationProvider>
-          </AuthProvider>
-        </ToastProvider>
+        <AuthProvider>
+          <LocationProvider>
+            <AuthDependentProviders>
+              <RootNavigator />
+              <Toast config={toastConfig} />
+            </AuthDependentProviders>
+          </LocationProvider>
+        </AuthProvider>
       </ConfirmProvider>
     </GestureHandlerRootView>
   );

@@ -14,7 +14,7 @@ import { ThemedText } from "@/components/themed-text";
 import { ThemedInput } from "@/components/ThemedInput";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
-import { useToast } from "@/components/ui/toast";
+import Toast from "react-native-toast-message";
 import { requestPasswordReset } from "@/services/auth.service";
 
 const OTP_LENGTH = 6;
@@ -26,7 +26,7 @@ export default function ForgotPasswordOtpScreen() {
   const border = useThemeColor({}, "borderDefault");
 
   const router = useRouter();
-  const showToast = useToast();
+
   const params = useLocalSearchParams<{ email?: string }>();
   const emailParam = typeof params.email === "string" ? params.email : "";
   const email = emailParam.trim();
