@@ -7,6 +7,7 @@ import {
 } from "@/services/auth";
 import { fetchCurrentUser } from "@/services/auth-fetch";
 import React, { createContext, useContext, useEffect, useState } from "react";
+import { useRouter } from "expo-router";
 
 type User = {
   id: string;
@@ -29,6 +30,7 @@ const AuthContext = createContext<AuthContextType | null>(null);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const router = useRouter();
 
   useEffect(() => {
     let isMounted = true;
@@ -56,9 +58,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUser(userData);
         }
       } catch (err) {
-        if (__DEV__) {
-          console.error("Auth initialization failed:", err);
-        }
         if (isMounted) {
           setUser(null);
         }
@@ -82,6 +81,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   async function signOut() {
     setUser(null);
     await logout();
+    router.replace("/");
   }
 
   async function getToken() {

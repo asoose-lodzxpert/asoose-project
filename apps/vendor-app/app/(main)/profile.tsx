@@ -74,7 +74,7 @@ export default function ProfileScreen() {
   const [uploadingImage, setUploadingImage] = useState(false);
   const { confirm, ConfirmModal } = useConfirm();
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
-  const balanceInterval = useRef<NodeJS.Timeout | null>(null);
+  const balanceInterval = useRef<number | null>(null);
 
   const loadProfile = async (isRefresh = false) => {
     if (!isRefresh) setLoading(true);
@@ -214,8 +214,11 @@ export default function ProfileScreen() {
       case "PENDING":
         return statusPending + "FF";
       case "APPROVED":
+      case "ACTIVE":
         return statusSuccess + "FF";
       case "SUSPENDED":
+      case "BANNED":
+      case "CLOSED_PERMANENTLY":
         return statusError + "FF";
       default:
         return borderColor;

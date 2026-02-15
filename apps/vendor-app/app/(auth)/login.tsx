@@ -78,7 +78,7 @@ export default function LoginScreen() {
 
     try {
       await signIn(identifier, password);
-      router.replace("/(main)");
+      router.replace("/");
     } catch (e: any) {
       setError(e.message);
     } finally {

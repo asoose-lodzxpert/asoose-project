@@ -87,9 +87,8 @@ export async function registerForPushNotificationsAsync(): Promise<
 
     try {
       const projectId =
-        Constants.easConfig?.projectId ??
-        Constants.expoConfig?.extra?.eas?.projectId ??
-        Constants.expoConfig?.extra?.expoProjectId;
+        Constants?.expoConfig?.extra?.eas?.projectId ??
+        Constants?.easConfig?.projectId;
       if (!projectId) {
         throw new Error("Expo projectId missing in production build");
       }

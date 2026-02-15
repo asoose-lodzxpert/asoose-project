@@ -16,7 +16,7 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import {
   fetchStoreBalance,
-  fetchBankAccounts,
+  fetchBankAccounts, // Keeping name for service consistency, but treating as single
   createWithdrawal,
 } from "@/services/withdrawal.service";
 import { WithdrawalHistoryModal } from "@/components/withdrawal/WithdrawalHistoryModal";
@@ -38,8 +38,7 @@ export default function WithdrawalScreen() {
 
   const [balance, setBalance] = useState(0);
   const [amount, setAmount] = useState("");
-  const [selectedBank, setSelectedBank] = useState<BankAccount | null>(null);
-  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+  const [bankAccount, setBankAccount] = useState<BankAccount | null>(null);
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [showHistory, setShowHistory] = useState(false);
@@ -50,15 +49,15 @@ export default function WithdrawalScreen() {
 
   const loadData = async () => {
     try {
-      const [balanceData, accounts] = await Promise.all([
+      const [balanceData, accountData] = await Promise.all([
         fetchStoreBalance(),
         fetchBankAccounts(),
       ]);
+
       setBalance(balanceData?.amount ?? 0);
-      setBankAccounts(accounts);
-      if (accounts.length > 0) {
-        setSelectedBank(accounts[0]);
-      }
+      // Handle case where it might come as an array or object
+      const account = Array.isArray(accountData) ? accountData[0] : accountData;
+      setBankAccount(account || null);
     } catch (error: any) {
       Toast.show({
         type: "error",
@@ -69,9 +68,7 @@ export default function WithdrawalScreen() {
     }
   };
 
-  const handleMaxPress = () => {
-    setAmount(balance.toString());
-  };
+  const handleMaxPress = () => setAmount(balance.toString());
 
   const handleWithdraw = async () => {
     if (!amount || parseFloat(amount) <= 0) {
@@ -82,25 +79,21 @@ export default function WithdrawalScreen() {
     }
 
     if (parseFloat(amount) > balance) {
-      return Toast.show({
-        type: "error",
-        text1: "Insufficient balance",
-      });
+      return Toast.show({ type: "error", text1: "Insufficient balance" });
     }
 
-    if (!selectedBank) {
+    if (!bankAccount) {
       return Toast.show({
         type: "error",
-        text1: "Please select a bank account",
+        text1: "Please add a bank account first",
       });
     }
 
     setLoading(true);
-
     try {
       await createWithdrawal({
         amount: parseFloat(amount),
-        bankAccountId: selectedBank.id,
+        bankAccountId: bankAccount.id,
       });
 
       Toast.show({
@@ -109,7 +102,6 @@ export default function WithdrawalScreen() {
         text2: "Your withdrawal is pending approval",
       });
 
-      // Refresh balance
       const balanceData = await fetchStoreBalance();
       setBalance(balanceData?.amount ?? 0);
       setAmount("");
@@ -126,178 +118,29 @@ export default function WithdrawalScreen() {
   if (initialLoading) {
     return (
       <ThemedView style={{ flex: 1 }}>
-        {/* Header Skeleton */}
-        <View style={[styles.header, { borderBottomColor: borderColor }]}>
-          <View style={styles.backButton}>
-            <View
-              style={{
-                width: 24,
-                height: 24,
-                backgroundColor: borderColor,
-                borderRadius: 12,
-                opacity: 0.3,
-              }}
-            />
-            <View
-              style={{
-                width: 50,
-                height: 20,
-                backgroundColor: borderColor,
-                borderRadius: 4,
-                opacity: 0.3,
-              }}
-            />
-          </View>
+        <View style={[styles.header, { borderBottomColor: borderColor }]} />
+        <View style={styles.content}>
           <View
-            style={{
-              width: 120,
-              height: 24,
-              backgroundColor: borderColor,
-              borderRadius: 4,
-              opacity: 0.3,
-            }}
+            style={[
+              styles.balanceCard,
+              { backgroundColor: surfaceCard, height: 120, opacity: 0.3 },
+            ]}
           />
           <View
             style={{
-              width: 24,
-              height: 24,
-              backgroundColor: borderColor,
+              height: 56,
+              backgroundColor: surfaceCard,
               borderRadius: 12,
               opacity: 0.3,
             }}
           />
-        </View>
-
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.content}>
-          {/* Balance Card Skeleton */}
-          <View style={[styles.balanceCard, { backgroundColor: surfaceCard }]}>
-            <View
-              style={{
-                width: 120,
-                height: 16,
-                backgroundColor: borderColor,
-                borderRadius: 4,
-                opacity: 0.3,
-                marginBottom: 12,
-              }}
-            />
-            <View
-              style={{
-                width: 150,
-                height: 36,
-                backgroundColor: borderColor,
-                borderRadius: 6,
-                opacity: 0.3,
-              }}
-            />
-          </View>
-
-          {/* Amount Input Skeleton */}
-          <View style={styles.section}>
-            <View
-              style={{
-                width: 150,
-                height: 20,
-                backgroundColor: borderColor,
-                borderRadius: 4,
-                opacity: 0.3,
-                marginBottom: 12,
-              }}
-            />
-            <View
-              style={[
-                styles.inputContainer,
-                {
-                  backgroundColor: surfaceCard,
-                  borderColor: borderColor,
-                },
-              ]}
-            >
-              <View
-                style={{
-                  flex: 1,
-                  height: 24,
-                  backgroundColor: borderColor,
-                  borderRadius: 4,
-                  opacity: 0.3,
-                }}
-              />
-            </View>
-          </View>
-
-          {/* Bank Account Skeleton */}
-          <View style={styles.section}>
-            <View
-              style={{
-                width: 100,
-                height: 20,
-                backgroundColor: borderColor,
-                borderRadius: 4,
-                opacity: 0.3,
-                marginBottom: 12,
-              }}
-            />
-            {[1, 2].map((item) => (
-              <View
-                key={item}
-                style={[
-                  styles.bankCard,
-                  {
-                    backgroundColor: surfaceCard,
-                    borderColor: borderColor,
-                    marginBottom: 12,
-                  },
-                ]}
-              >
-                <View style={styles.bankCardLeft}>
-                  <View
-                    style={[
-                      styles.bankIcon,
-                      { backgroundColor: borderColor, opacity: 0.3 },
-                    ]}
-                  />
-                  <View style={{ flex: 1, gap: 6 }}>
-                    <View
-                      style={{
-                        width: "60%",
-                        height: 16,
-                        backgroundColor: borderColor,
-                        borderRadius: 4,
-                        opacity: 0.3,
-                      }}
-                    />
-                    <View
-                      style={{
-                        width: "40%",
-                        height: 14,
-                        backgroundColor: borderColor,
-                        borderRadius: 4,
-                        opacity: 0.3,
-                      }}
-                    />
-                    <View
-                      style={{
-                        width: "50%",
-                        height: 14,
-                        backgroundColor: borderColor,
-                        borderRadius: 4,
-                        opacity: 0.3,
-                      }}
-                    />
-                  </View>
-                </View>
-              </View>
-            ))}
-          </View>
-        </ScrollView>
-
-        {/* Footer Skeleton */}
-        <View style={[styles.footer, { borderTopColor: borderColor }]}>
           <View
-            style={[
-              styles.withdrawButton,
-              { backgroundColor: borderColor, opacity: 0.3 },
-            ]}
+            style={{
+              height: 100,
+              backgroundColor: surfaceCard,
+              borderRadius: 12,
+              opacity: 0.3,
+            }}
           />
         </View>
       </ThemedView>
@@ -306,7 +149,6 @@ export default function WithdrawalScreen() {
 
   return (
     <ThemedView style={{ flex: 1 }}>
-      {/* Header */}
       <View style={[styles.header, { borderBottomColor: borderColor }]}>
         <Pressable onPress={() => router.back()} style={styles.backButton}>
           <IconSymbol name="chevron.left" size={24} color={primary} />
@@ -326,7 +168,6 @@ export default function WithdrawalScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        {/* Balance Card */}
         <View style={[styles.balanceCard, { backgroundColor: surfaceCard }]}>
           <ThemedText style={{ color: mutedText, fontSize: 14 }}>
             Available Balance
@@ -336,7 +177,6 @@ export default function WithdrawalScreen() {
           </ThemedText>
         </View>
 
-        {/* Amount Input */}
         <View style={styles.section}>
           <ThemedText type="defaultSemiBold" style={{ marginBottom: 12 }}>
             Withdrawal Amount
@@ -344,10 +184,7 @@ export default function WithdrawalScreen() {
           <View
             style={[
               styles.inputContainer,
-              {
-                backgroundColor: surfaceCard,
-                borderColor: borderColor,
-              },
+              { backgroundColor: surfaceCard, borderColor: borderColor },
             ]}
           >
             <ThemedText style={{ fontSize: 18, marginRight: 8 }}>₦</ThemedText>
@@ -370,104 +207,70 @@ export default function WithdrawalScreen() {
           </View>
         </View>
 
-        {/* Bank Account Selection */}
         <View style={styles.section}>
           <ThemedText type="defaultSemiBold" style={{ marginBottom: 12 }}>
-            Bank Account
+            Settlement Account
           </ThemedText>
-
-          {bankAccounts.length === 0 ? (
+          {!bankAccount ? (
             <View
               style={[
                 styles.emptyCard,
-                {
-                  backgroundColor: surfaceCard,
-                  borderColor: borderColor,
-                },
+                { backgroundColor: surfaceCard, borderColor: borderColor },
               ]}
             >
-              <IconSymbol name="alert-circle" size={40} color={mutedText} />
-              <ThemedText style={{ color: mutedText, marginTop: 12 }}>
-                No bank accounts found
+              <ThemedText style={{ color: mutedText }}>
+                No bank account linked
               </ThemedText>
               <Pressable
                 onPress={() => router.push("/(profile)/edit-business")}
                 style={[styles.addBankButton, { borderColor: primary }]}
               >
                 <ThemedText style={{ color: primary }}>
-                  Add Bank Account
+                  Link Bank Account
                 </ThemedText>
               </Pressable>
             </View>
           ) : (
-            <View style={{ gap: 12 }}>
-              {bankAccounts.map((account) => (
-                <Pressable
-                  key={account.id}
-                  onPress={() => setSelectedBank(account)}
-                  style={[
-                    styles.bankCard,
-                    {
-                      backgroundColor: surfaceCard,
-                      borderColor:
-                        selectedBank?.id === account.id ? primary : borderColor,
-                      borderWidth: selectedBank?.id === account.id ? 2 : 1,
-                    },
-                  ]}
+            <View
+              style={[
+                styles.bankCard,
+                {
+                  backgroundColor: surfaceCard,
+                  borderColor: primary,
+                  borderWidth: 1,
+                },
+              ]}
+            >
+              <View style={styles.bankCardLeft}>
+                <View
+                  style={[styles.bankIcon, { backgroundColor: primary + "15" }]}
                 >
-                  <View style={styles.bankCardLeft}>
-                    <View
-                      style={[
-                        styles.bankIcon,
-                        {
-                          backgroundColor:
-                            selectedBank?.id === account.id
-                              ? primary + "20"
-                              : borderColor,
-                        },
-                      ]}
-                    >
-                      <IconSymbol
-                        name="credit-card"
-                        size={20}
-                        color={
-                          selectedBank?.id === account.id ? primary : mutedText
-                        }
-                      />
-                    </View>
-                    <View>
-                      <ThemedText type="defaultSemiBold">
-                        {account.bankName}
-                      </ThemedText>
-                      <ThemedText style={{ color: mutedText, fontSize: 12 }}>
-                        {account.accountNumber}
-                      </ThemedText>
-                      <ThemedText style={{ color: mutedText, fontSize: 12 }}>
-                        {account.accountName}
-                      </ThemedText>
-                    </View>
-                  </View>
-                  {selectedBank?.id === account.id && (
-                    <IconSymbol name="check" size={24} color={primary} />
-                  )}
-                </Pressable>
-              ))}
+                  <IconSymbol name="credit-card" size={20} color={primary} />
+                </View>
+                <View>
+                  <ThemedText type="defaultSemiBold">
+                    {bankAccount.bankName}
+                  </ThemedText>
+                  <ThemedText style={{ color: mutedText, fontSize: 12 }}>
+                    {bankAccount.accountNumber}
+                  </ThemedText>
+                  <ThemedText style={{ color: mutedText, fontSize: 12 }}>
+                    {bankAccount.accountName}
+                  </ThemedText>
+                </View>
+              </View>
             </View>
           )}
         </View>
       </ScrollView>
 
-      {/* Withdraw Button */}
       <View style={[styles.footer, { borderTopColor: borderColor }]}>
         <Pressable
           onPress={handleWithdraw}
-          disabled={loading || bankAccounts.length === 0}
+          disabled={loading || !bankAccount}
           style={[
             styles.withdrawButton,
-            {
-              backgroundColor:
-                loading || bankAccounts.length === 0 ? mutedText : primary,
-            },
+            { backgroundColor: loading || !bankAccount ? mutedText : primary },
           ]}
         >
           {loading ? (
@@ -480,23 +283,16 @@ export default function WithdrawalScreen() {
         </Pressable>
       </View>
 
-      {/* History Modal */}
       <WithdrawalHistoryModal
         visible={showHistory}
         onClose={() => setShowHistory(false)}
       />
-
       <Toast />
     </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -505,26 +301,11 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderBottomWidth: 1,
   },
-  backButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  historyButton: {
-    padding: 4,
-  },
-  content: {
-    padding: 20,
-    gap: 24,
-  },
-  balanceCard: {
-    padding: 24,
-    borderRadius: 16,
-    alignItems: "center",
-  },
-  section: {
-    gap: 4,
-  },
+  backButton: { flexDirection: "row", alignItems: "center", gap: 4 },
+  historyButton: { padding: 4 },
+  content: { padding: 20, gap: 24 },
+  balanceCard: { padding: 24, borderRadius: 16, alignItems: "center" },
+  section: { gap: 4 },
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -533,16 +314,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     height: 56,
   },
-  input: {
-    flex: 1,
-    fontSize: 18,
-    fontWeight: "600",
-  },
-  maxButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
+  input: { flex: 1, fontSize: 18, fontWeight: "600" },
+  maxButton: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 },
   emptyCard: {
     padding: 32,
     borderRadius: 12,
@@ -563,7 +336,6 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     padding: 16,
     borderRadius: 12,
-    borderWidth: 1,
   },
   bankCardLeft: {
     flexDirection: "row",
@@ -578,10 +350,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  footer: {
-    padding: 20,
-    borderTopWidth: 1,
-  },
+  footer: { padding: 20, borderTopWidth: 1 },
   withdrawButton: {
     height: 52,
     borderRadius: 12,
