@@ -1,14 +1,14 @@
-"use client";
+'use client';
 
-import { createContext, useContext, ReactNode, useMemo } from "react";
-import { useJsApiLoader, Libraries } from "@react-google-maps/api";
+import { createContext, useContext, ReactNode } from 'react';
+import { useJsApiLoader } from '@react-google-maps/api';
 
-const LIBRARIES: Libraries = ["places"];
+// 1. Define libraries outside the component to guarantee referential stability (Prevents re-render loops)
+const LIBRARIES: ("places" | "geometry")[] = ['places', 'geometry'];
 
-// FIX: Add loadError to the context definition
 interface GoogleMapsContextType {
   isLoaded: boolean;
-  loadError?: Error;
+  loadError: Error | undefined;
 }
 
 const GoogleMapsContext = createContext<GoogleMapsContextType>({
@@ -16,21 +16,25 @@ const GoogleMapsContext = createContext<GoogleMapsContextType>({
   loadError: undefined,
 });
 
-export const GoogleMapsProvider = ({ children }: { children: ReactNode }) => {
-  // FIX: Destructure loadError from the hook
+export function GoogleMapsProvider({ children }: { children: ReactNode }) {
+  // 2. The SINGLE global loader call
   const { isLoaded, loadError } = useJsApiLoader({
-    id: "google-map-script",
-    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY || "",
+    id: 'google-map-script',
+    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!,
     libraries: LIBRARIES,
+    language: 'en', // Optional: Lock language to prevent hydration mismatches
   });
 
-  const value = useMemo(() => ({ isLoaded, loadError }), [isLoaded, loadError]);
+  if (loadError) {
+    console.error("Google Maps Load Error:", loadError);
+  }
 
   return (
-    <GoogleMapsContext.Provider value={value}>
+    <GoogleMapsContext.Provider value={{ isLoaded, loadError }}>
       {children}
     </GoogleMapsContext.Provider>
   );
-};
+}
 
+// 3. Custom Hook for child components to consume
 export const useGoogleMaps = () => useContext(GoogleMapsContext);
