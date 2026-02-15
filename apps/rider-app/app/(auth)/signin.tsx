@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react"; // Added useEffect
 import {
   ActivityIndicator,
   Keyboard,
@@ -44,6 +44,22 @@ export default function LoginScreen() {
   const textOnPrimary = useThemeColor({}, "textOnPrimary");
   const muted = useThemeColor({}, "textMuted");
 
+  /* ------------------ Auto Prompt Logic ------------------ */
+
+  useEffect(() => {
+    async function checkAutoBiometric() {
+      if (biometricAvailable && biometricEnrolled) {
+        const enabled = await isBiometricEnabled();
+        if (enabled) {
+          handleBiometricLogin();
+        }
+      }
+    }
+    // Delay slightly to ensure UI is ready and doesn't feel jarring
+    const timer = setTimeout(checkAutoBiometric, 500);
+    return () => clearTimeout(timer);
+  }, [biometricAvailable, biometricEnrolled]);
+
   /* ------------------ Logic ------------------ */
 
   function validateForm() {
@@ -65,7 +81,6 @@ export default function LoginScreen() {
     try {
       await login({ email: identifier, password });
 
-      // After successful login, check if biometric should be offered
       const enabled = await isBiometricEnabled();
       if (biometricAvailable && !enabled) {
         const wantsBiometric = await confirm({
@@ -98,7 +113,7 @@ export default function LoginScreen() {
         }
       }
 
-      router.replace("/(tabs)");
+      router.replace("/");
     } catch (e: any) {
       setError(e.message || "Login failed. Please try again.");
     } finally {
@@ -107,40 +122,20 @@ export default function LoginScreen() {
   }
 
   async function handleBiometricLogin() {
-    if (!biometricAvailable) {
-      Toast.show({
-        type: "error",
-        text1: "Not Supported",
-        text2: "Your device doesn't support biometric authentication.",
-      });
-      return;
-    }
-    if (!biometricEnrolled) {
-      Toast.show({
-        type: "error",
-        text1: "Not Enrolled",
-        text2:
-          "Please set up biometric authentication in your device settings.",
-      });
-      return;
-    }
+    if (!biometricAvailable || !biometricEnrolled) return;
+
     const enabled = await isBiometricEnabled();
-    if (!enabled) {
-      Toast.show({
-        type: "info",
-        text1: "Biometric Login Disabled",
-        text2:
-          "Please login with your credentials first and enable biometric login in settings.",
-      });
-      return;
-    }
+    if (!enabled) return;
+
     setBiometricLoading(true);
     setError("");
     try {
       await biometricLogin();
-      // Navigation is handled automatically by index.tsx based on auth state
+      router.replace("/");
     } catch (e: any) {
-      setError(e.message || "Biometric authentication failed.");
+      // If auto-prompt fails or is cancelled, we don't necessarily want an intrusive error
+      // but we log it for the user if they pressed the button manually.
+      console.log("Biometric failed", e.message);
     } finally {
       setBiometricLoading(false);
     }
@@ -228,23 +223,23 @@ export default function LoginScreen() {
                     )}
                   </Pressable>
 
-                  <Pressable
-                    style={[
-                      styles.fingerprintButton,
-                      { borderColor: primary },
-                      biometricLoading && {
-                        opacity: 0.5,
-                      },
-                    ]}
-                    onPress={handleBiometricLogin}
-                    disabled={biometricLoading}
-                  >
-                    {biometricLoading ? (
-                      <ActivityIndicator color={primary} />
-                    ) : (
-                      <IconSymbol name="touchid" size={26} color={primary} />
-                    )}
-                  </Pressable>
+                  {biometricAvailable && (
+                    <Pressable
+                      style={[
+                        styles.fingerprintButton,
+                        { borderColor: primary },
+                        biometricLoading && { opacity: 0.5 },
+                      ]}
+                      onPress={handleBiometricLogin}
+                      disabled={biometricLoading}
+                    >
+                      {biometricLoading ? (
+                        <ActivityIndicator color={primary} />
+                      ) : (
+                        <IconSymbol name="touchid" size={26} color={primary} />
+                      )}
+                    </Pressable>
+                  )}
                 </View>
 
                 <View style={styles.divider}>
@@ -273,38 +268,14 @@ export default function LoginScreen() {
   );
 }
 
-/* ------------------ Styles ------------------ */
-
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    paddingHorizontal: 24,
-  },
-  form: {
-    flex: 1,
-    justifyContent: "center",
-    gap: 16,
-  },
-  welcomeSection: {
-    alignItems: "center",
-    marginBottom: 16,
-  },
-  welcomeTitle: {
-    textAlign: "center",
-  },
-  subtitle: {
-    marginTop: 8,
-    fontSize: 14,
-    textAlign: "center",
-  },
-  field: {
-    marginTop: 12,
-  },
-  actionsRow: {
-    flexDirection: "row",
-    gap: 12,
-    marginTop: 24,
-  },
+  container: { flex: 1, paddingHorizontal: 24 },
+  form: { flex: 1, justifyContent: "center", gap: 16 },
+  welcomeSection: { alignItems: "center", marginBottom: 16 },
+  welcomeTitle: { textAlign: "center" },
+  subtitle: { marginTop: 8, fontSize: 14, textAlign: "center" },
+  field: { marginTop: 12 },
+  actionsRow: { flexDirection: "row", gap: 12, marginTop: 24 },
   loginButton: {
     flex: 1,
     height: 52,
@@ -320,28 +291,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  divider: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginVertical: 24,
-  },
-  line: {
-    flex: 1,
-    height: 1,
-    backgroundColor: "#E5E7EB",
-  },
-  orText: {
-    marginHorizontal: 12,
-    fontSize: 12,
-    opacity: 0.6,
-  },
-  signup: {
-    alignItems: "center",
-    marginBottom: 24,
-  },
-  inputError: {
-    marginTop: 4,
-    color: "#EF4444",
-    textAlign: "left",
-  },
+  divider: { flexDirection: "row", alignItems: "center", marginVertical: 24 },
+  line: { flex: 1, height: 1, backgroundColor: "#E5E7EB" },
+  orText: { marginHorizontal: 12, fontSize: 12, opacity: 0.6 },
+  signup: { alignItems: "center", marginBottom: 24 },
+  inputError: { marginTop: 4, color: "#EF4444", textAlign: "left" },
 });

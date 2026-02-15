@@ -130,7 +130,7 @@ export function StepVehicleInfo({ data, onChange }: Props) {
 
       setUploading(null);
     } catch (error) {
-      console.error("Error picking image:", error);
+      // ...existing code...
       Alert.alert("Error", "Failed to pick image");
       setUploading(null);
     }

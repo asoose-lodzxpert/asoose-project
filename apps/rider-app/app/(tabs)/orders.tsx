@@ -72,7 +72,7 @@ export default function OrdersScreen() {
         }
         setPagination(response.pagination);
       } catch (error) {
-        console.error("Error fetching jobs:", error);
+        // ...existing code...
         Toast.show({
           type: "error",
           text1: "Failed to fetch jobs",

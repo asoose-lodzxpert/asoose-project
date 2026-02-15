@@ -288,7 +288,7 @@ const MapCanvas = forwardRef<MapCanvasHandle>((_, ref) => {
         });
 
         if (error) {
-          console.error("Failed to fetch route:", error);
+          // ...existing code...
           return;
         }
 
@@ -296,7 +296,7 @@ const MapCanvas = forwardRef<MapCanvasHandle>((_, ref) => {
         setDistanceLeft(distance.text);
         setEta(duration.text);
       } catch (error) {
-        console.error("Error fetching route:", error);
+        // ...existing code...
       }
     }
 

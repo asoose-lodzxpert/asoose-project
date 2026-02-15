@@ -19,6 +19,7 @@ import {
   type RiderProfile,
   type ProfileStats,
 } from "@/services/profile.service";
+import { Image } from "react-native";
 import { getRoleLabel } from "@/utils/role";
 
 const accountManagementItems = [
@@ -183,10 +184,11 @@ export default function ProfileScreen() {
           <View style={[styles.profileCard, { borderColor: border }]}>
             <View style={[styles.avatar, { backgroundColor: primary }]}>
               {profile.image ? (
-                <View style={{ width: 64, height: 64, borderRadius: 32 }}>
-                  {/* TODO: Add image component */}
-                  <IconSymbol name="person" size={36} color={textOnPrimary} />
-                </View>
+                <Image
+                  source={{ uri: profile.image }}
+                  style={{ width: 64, height: 64, borderRadius: 32 }}
+                  resizeMode="cover"
+                />
               ) : (
                 <IconSymbol name="person" size={36} color={textOnPrimary} />
               )}

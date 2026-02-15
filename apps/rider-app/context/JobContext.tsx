@@ -3,7 +3,13 @@ import { jobsService } from "@/services/jobs.service";
 import { getCurrentCoords } from "@/services/location";
 import { ConnectionStatus } from "@/services/job-events.service";
 import { CurrentJob, IncomingJobOffer, JobStatus, JobType } from "@/types/job";
-import React, { createContext, ReactNode, useContext, useState } from "react";
+import React, {
+  createContext,
+  ReactNode,
+  useContext,
+  useState,
+  useCallback,
+} from "react";
 import Toast from "react-native-toast-message";
 import { useLocationStream } from "@/hooks/useLocationStream";
 
@@ -40,37 +46,44 @@ export const JobsProvider = ({ children }: { children: ReactNode }) => {
   const [connectionStatus, setConnectionStatus] =
     useState<ConnectionStatus>("disconnected");
 
-  // Start location streaming when rider is online
-  const locationStreamStatus = useLocationStream({ enabled: isOnline });
+  // Memoize callbacks to prevent re-renders
+  const handleJobAssigned = useCallback((job: IncomingJobOffer) => {
+    setIncomingJob(job);
+    setStatus("incoming-job");
+    Toast.show({ type: "info", text1: "New Job", text2: job.customerName });
+  }, []);
 
-  // Unified job event handlers - Lazy initialization to avoid early imports
-  const { reconnect, joinOrderRoom } = useJobEvents({
-    enabled: isOnline,
-    onJobAssigned: (job: IncomingJobOffer) => {
-      setIncomingJob(job);
-      setStatus("incoming-job");
-      Toast.show({ type: "info", text1: "New Job", text2: job.customerName });
-    },
-    onJobUpdated: (jobId: string, newStatus: string) => {
-      if (activeJob && activeJob.id === jobId) {
-        setActiveJob({ ...activeJob, status: newStatus });
-
-        // Map backend status to JobStatus if needed
+  const handleJobUpdated = useCallback((jobId: string, newStatus: string) => {
+    setActiveJob((prevActiveJob) => {
+      if (prevActiveJob && prevActiveJob.id === jobId) {
         setStatus(newStatus as JobStatus);
+        return { ...prevActiveJob, status: newStatus };
       }
-    },
-    onJobCancelled: (jobId: string) => {
-      if (activeJob && activeJob.id === jobId) {
-        setActiveJob(null);
+      return prevActiveJob;
+    });
+  }, []);
+
+  const handleJobCancelled = useCallback((jobId: string) => {
+    setActiveJob((prevActiveJob) => {
+      if (prevActiveJob && prevActiveJob.id === jobId) {
         setStatus("online-waiting");
         Toast.show({ type: "error", text1: "Job Cancelled" });
+        return null;
       }
-      if (incomingJob && incomingJob.id === jobId) {
-        setIncomingJob(null);
+      return prevActiveJob;
+    });
+    setIncomingJob((prevIncomingJob) => {
+      if (prevIncomingJob && prevIncomingJob.id === jobId) {
         setStatus("online-waiting");
+        return null;
       }
-    },
-    onConnectionStatusChange: (status: ConnectionStatus) => {
+      return prevIncomingJob;
+    });
+  }, []);
+
+  const handleConnectionStatusChange = useCallback(
+    (status: ConnectionStatus) => {
+      // ...existing code...
       setConnectionStatus(status);
 
       if (status === "failed") {
@@ -88,7 +101,21 @@ export const JobsProvider = ({ children }: { children: ReactNode }) => {
         });
       }
     },
+    [],
+  );
+
+  // IMPORTANT: Initialize job events BEFORE location stream
+  // The location stream service needs the JobEventsService to be set first
+  const { reconnect, joinOrderRoom } = useJobEvents({
+    enabled: isOnline,
+    onJobAssigned: handleJobAssigned,
+    onJobUpdated: handleJobUpdated,
+    onJobCancelled: handleJobCancelled,
+    onConnectionStatusChange: handleConnectionStatusChange,
   });
+
+  // Start location streaming when rider is online (after JobEventsService is set)
+  const locationStreamStatus = useLocationStream({ enabled: isOnline });
 
   const goOnline = async () => {
     try {

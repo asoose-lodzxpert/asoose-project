@@ -86,7 +86,7 @@ export async function registerForPushNotificationsAsync(): Promise<
       Constants?.easConfig?.projectId;
     token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
   } catch (e: any) {
-    console.warn("Push notification registration failed:", e?.message ?? e);
+    // ...existing code...
     return undefined;
   }
 

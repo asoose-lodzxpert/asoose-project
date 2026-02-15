@@ -7,6 +7,7 @@ import { Dimensions, Pressable, StyleSheet, Switch, View } from "react-native";
 
 import { useConfirm } from "@/hooks/use-confirm";
 import { useRouter } from "expo-router";
+import { ConnectionStatusIndicator } from "@/components/ConnectionStatusIndicator";
 
 const { width } = Dimensions.get("window");
 
@@ -67,6 +68,8 @@ export default function FloatingHeader() {
             <ThemedText style={[styles.statusText, { color: statusColor }]}>
               {status.replace("-", " ")}
             </ThemedText>
+            {/* Connection indicator */}
+            <ConnectionStatusIndicator />
           </View>
 
           <Switch
@@ -104,7 +107,10 @@ const styles = StyleSheet.create({
     position: "absolute",
     left: 0,
     right: 0,
+    flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
   },
   statusText: {
     fontWeight: "600",

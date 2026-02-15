@@ -13,7 +13,7 @@ export async function getPersonalInfo(): Promise<PersonalInfo> {
     );
     return response.personalInfo;
   } catch (error) {
-    console.error("Error fetching personal info:", error);
+    // ...existing code...
     throw error;
   }
 }
@@ -31,7 +31,7 @@ export async function updatePersonalInfo(
     );
     return response.personalInfo;
   } catch (error) {
-    console.error("Error updating personal info:", error);
+    // ...existing code...
     throw error;
   }
 }
@@ -57,7 +57,7 @@ export async function uploadProfileImage(imageUri: string): Promise<string> {
 
     return response.imageUrl;
   } catch (error) {
-    console.error("Error uploading profile image:", error);
+    // ...existing code...
     throw error;
   }
 }

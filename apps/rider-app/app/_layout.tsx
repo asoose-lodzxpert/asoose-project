@@ -1,11 +1,9 @@
-import React, { useEffect, useState } from "react";
-import { StyleSheet, View, Image } from "react-native";
+import React from "react";
 import { Stack } from "expo-router";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import Toast from "react-native-toast-message";
 
-import { AuthProvider, useAuth } from "@/context/AuthContext";
+import { AuthProvider } from "@/context/AuthContext";
 import { JobsProvider } from "@/context/JobContext";
 import { NotificationProvider } from "@/context/NotificationContext";
 import { NotificationPreferencesProvider } from "@/context/NotificationPreferencesContext";
@@ -14,60 +12,13 @@ import { toastConfig } from "@/components/ThemedToast";
 const ONBOARDING_KEY = "asoose_rider_onboarded";
 
 function RootNavigator() {
-  const { user, initialLoading } = useAuth();
-  const [showWelcome, setShowWelcome] = useState<boolean | null>(null);
-
-  useEffect(() => {
-    const checkOnboarding = async () => {
-      try {
-        const seen = await AsyncStorage.getItem(ONBOARDING_KEY);
-        setShowWelcome(seen !== "true");
-      } catch (e) {
-        setShowWelcome(false);
-      }
-    };
-    checkOnboarding();
-  }, []);
-
-  if (initialLoading || showWelcome === null) {
-    return (
-      <View style={styles.loadingContainer}>
-        <View>
-          <Image
-            source={require("@/assets/images/icon.png")}
-            style={styles.logo}
-            resizeMode="contain"
-          />
-        </View>
-      </View>
-    );
-  }
-
-  if (showWelcome) {
-    // Inline import to avoid circular dependency
-    const WelcomeScreen = require("./welcome").default;
-    return (
-      <WelcomeScreen
-        onDone={async () => {
-          await AsyncStorage.setItem(ONBOARDING_KEY, "true");
-          setShowWelcome(false);
-        }}
-      />
-    );
-  }
-
-  // 2. Unauthenticated Flow
-  if (!user) {
-    return (
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="(auth)" />
-      </Stack>
-    );
-  }
-
-  // 3. Authenticated Flow
+  // Always render all routes - navigation logic is handled by index.tsx
   return (
     <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="index" />
+      <Stack.Screen name="welcome" />
+      <Stack.Screen name="(auth)" />
+      <Stack.Screen name="(status)" />
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="(earnings)" />
       <Stack.Screen name="(profile)" />
@@ -98,16 +49,3 @@ export default function RootLayout() {
     </GestureHandlerRootView>
   );
 }
-
-const styles = StyleSheet.create({
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  logo: {
-    width: 120,
-    height: 120,
-    marginBottom: 24,
-  },
-});

@@ -102,7 +102,7 @@ export default function WithdrawEarningsScreen() {
       try {
         await loadWithdrawalInfo();
       } catch (err) {
-        console.error("Error in initial withdrawal info load:", err);
+        // ...existing code...
       }
     })();
   }, []);
@@ -116,7 +116,7 @@ export default function WithdrawEarningsScreen() {
         setAccount(data.bankAccount);
       }
     } catch (err) {
-      console.error("Error loading withdrawal info:", err);
+      // ...existing code...
       setError("Failed to load withdrawal info. Please try again later.");
     } finally {
       setLoading(false);
@@ -181,7 +181,7 @@ export default function WithdrawEarningsScreen() {
       setSuccessModal(true);
       setAmountDisplay("");
     } catch (err: any) {
-      console.error("Error processing withdrawal:", err);
+      // ...existing code...
       setError(err?.message || "Failed to process withdrawal");
     } finally {
       setWithdrawing(false);

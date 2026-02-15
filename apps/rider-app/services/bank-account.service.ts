@@ -10,7 +10,7 @@ export async function getBankAccount(): Promise<BankAccount | null> {
     );
     return response.bankAccount || null;
   } catch (error) {
-    console.error("Error fetching bank account:", error);
+    // ...existing code...
     throw error;
   }
 }
@@ -28,7 +28,7 @@ export async function updateBankAccount(
     );
     return response.bankAccount;
   } catch (error) {
-    console.error("Error updating bank account:", error);
+    // ...existing code...
     throw error;
   }
 }

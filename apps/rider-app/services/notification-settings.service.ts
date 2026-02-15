@@ -13,7 +13,7 @@ export async function getNotificationSettings(): Promise<NotificationSettings> {
     );
     return response.settings;
   } catch (error) {
-    console.error("Error fetching notification settings:", error);
+    // ...existing code...
     throw error;
   }
 }
@@ -31,7 +31,7 @@ export async function updateNotificationSettings(
     );
     return response.settings;
   } catch (error) {
-    console.error("Error updating notification settings:", error);
+    // ...existing code...
     throw error;
   }
 }

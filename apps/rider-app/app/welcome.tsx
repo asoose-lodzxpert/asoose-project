@@ -1,177 +1,332 @@
-import React from "react";
-import { View, StyleSheet, Image, Pressable } from "react-native";
+import React, { useRef, useState } from "react";
+import {
+  View,
+  StyleSheet,
+  Image,
+  Pressable,
+  FlatList,
+  Dimensions,
+} from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { useRouter } from "expo-router";
-import { IconSymbol } from "@/components/ui/icon-symbol";
+import { IconSymbol, IconSymbolName } from "@/components/ui/icon-symbol";
 
+const { width } = Dimensions.get("window");
 const ONBOARDING_KEY = "asoose_rider_onboarded";
+
+type Step = {
+  key: string;
+  content: React.ReactNode;
+};
 
 export default function OnboardingScreen() {
   const router = useRouter();
+  const [index, setIndex] = useState(0);
+  const ref = useRef<FlatList>(null);
 
   const primary = useThemeColor({}, "brandPrimary");
+  const textPrimary = useThemeColor({}, "textPrimary");
+  const textSecondary = useThemeColor({}, "textSecondary");
   const textOnPrimary = useThemeColor({}, "textOnPrimary");
-  const muted = useThemeColor({}, "textMuted");
+  const surfaceSubtle = useThemeColor({}, "surfaceSubtle");
+  const dotInactive = useThemeColor({}, "borderDefault");
 
-  const handleGetStarted = async () => {
-    await AsyncStorage.setItem(ONBOARDING_KEY, "true");
-    router.replace("/(auth)/signin");
+  const steps: Step[] = [
+    {
+      key: "branding",
+      content: (
+        <View style={styles.slide}>
+          <Image
+            source={require("@/assets/images/icon.png")}
+            style={styles.logo}
+          />
+          <ThemedText style={[styles.appName, { color: textPrimary }]}>
+            ASOOSE RIDER
+          </ThemedText>
+          <ThemedText style={[styles.slogan, { color: textSecondary }]}>
+            Deliver. Drive. Earn.
+          </ThemedText>
+        </View>
+      ),
+    },
+    {
+      key: "services",
+      content: (
+        <View style={styles.slide}>
+          <ThemedText style={[styles.stepTitle, { color: textPrimary }]}>
+            Multiple ways{"\n"}to earn
+          </ThemedText>
+          <View style={styles.iconRow}>
+            <ServiceBubble icon="package" label="Deliveries" />
+            <ServiceBubble icon="car.fill" label="Rides" />
+            <ServiceBubble icon="dollar-sign" label="Earnings" />
+          </View>
+        </View>
+      ),
+    },
+    {
+      key: "features",
+      content: (
+        <View style={styles.slide}>
+          <ThemedText
+            style={[styles.stepTitle, { color: textPrimary, marginBottom: 32 }]}
+          >
+            Why choose Asoose?
+          </ThemedText>
+          <FeatureCard
+            icon="clock.fill"
+            title="Flexible Hours"
+            description="Work on your own schedule, whenever you want"
+          />
+          <FeatureCard
+            icon="dollar-sign"
+            title="Fast Payments"
+            description="Weekly payouts with instant withdrawal options"
+          />
+          <FeatureCard
+            icon="navigation"
+            title="Smart Routes"
+            description="Optimized delivery paths to maximize earnings"
+          />
+        </View>
+      ),
+    },
+  ];
+
+  const isLastStep = index === steps.length - 1;
+
+  const handleFinish = async () => {
+    try {
+      await AsyncStorage.setItem(ONBOARDING_KEY, "true");
+      router.replace("/(auth)/signin");
+    } catch (error) {
+      // ...existing code...
+      router.replace("/(auth)/signin");
+    }
+  };
+
+  const next = () => {
+    if (isLastStep) {
+      handleFinish();
+    } else {
+      ref.current?.scrollToIndex({ index: index + 1, animated: true });
+    }
   };
 
   return (
     <ThemedView style={styles.container}>
-      <View style={styles.header}>
-        <Image
-          source={require("@/assets/images/icon.png")}
-          style={styles.logo}
-          resizeMode="contain"
-        />
-
-        <ThemedText type="title" style={styles.appName}>
-          Asoose Rider
-        </ThemedText>
-
-        <ThemedText style={[styles.tagline, { color: muted }]}>
-          Deliver & Drive. Earn. Succeed.
-        </ThemedText>
-      </View>
-
-      <View style={styles.illustrationSection}>
-        <Image
-          source={require("@/assets/images/rider-image.png")}
-          style={styles.illustration}
-          resizeMode="contain"
-        />
-      </View>
-
-      <View style={styles.bottomSection}>
-        <View style={styles.features}>
-          <Feature
-            icon="calendar"
-            title="Flexible Hours"
-            description="Work on your schedule."
-            color={primary}
-          />
-
-          <Feature
-            icon="dollar-sign"
-            title="Fast Payments"
-            description="Weekly payouts, instant withdrawals."
-            color={primary}
-          />
-
-          <Feature
-            icon="clock.fill"
-            title="Smart Routes"
-            description="Optimized delivery paths."
-            color={primary}
-          />
+      <SafeAreaView style={{ flex: 1 }}>
+        {/* Header - Skip */}
+        <View style={styles.header}>
+          {!isLastStep && (
+            <Pressable onPress={handleFinish} style={styles.skipBtn}>
+              <ThemedText style={[styles.skipText, { color: textSecondary }]}>
+                Skip
+              </ThemedText>
+            </Pressable>
+          )}
         </View>
 
-        <Pressable
-          style={[styles.button, { backgroundColor: primary }]}
-          onPress={handleGetStarted}
-        >
-          <ThemedText type="defaultSemiBold" style={{ color: textOnPrimary }}>
-            Get Started
-          </ThemedText>
-        </Pressable>
-      </View>
+        <FlatList
+          ref={ref}
+          data={steps}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          onMomentumScrollEnd={(e) =>
+            setIndex(Math.round(e.nativeEvent.contentOffset.x / width))
+          }
+          keyExtractor={(i) => i.key}
+          renderItem={({ item }) => (
+            <View style={{ width }}>{item.content}</View>
+          )}
+        />
+
+        {/* Footer Actions */}
+        <View style={styles.footer}>
+          <View style={styles.pagination}>
+            {steps.map((_, i) => (
+              <View
+                key={i}
+                style={[
+                  styles.dot,
+                  i === index
+                    ? [styles.activeDot, { backgroundColor: primary }]
+                    : { backgroundColor: dotInactive },
+                ]}
+              />
+            ))}
+          </View>
+
+          <Pressable
+            style={[styles.button, { backgroundColor: primary }]}
+            onPress={next}
+          >
+            <ThemedText style={[styles.buttonText, { color: textOnPrimary }]}>
+              {isLastStep ? "Get Started" : "Continue"}
+            </ThemedText>
+          </Pressable>
+        </View>
+      </SafeAreaView>
     </ThemedView>
   );
 }
 
-/* ---------------------------------- */
-/* Feature Item */
-/* ---------------------------------- */
-function Feature({
+/* ───────── Sub-Components ───────── */
+
+function ServiceBubble({
+  icon,
+  label,
+}: {
+  icon: IconSymbolName;
+  label: string;
+}) {
+  const primary = useThemeColor({}, "brandPrimary");
+  const textSecondary = useThemeColor({}, "textSecondary");
+
+  return (
+    <View style={styles.bubbleContainer}>
+      <View style={[styles.bubble, { backgroundColor: `${primary}15` }]}>
+        <IconSymbol name={icon} size={28} color={primary} />
+      </View>
+      <ThemedText style={[styles.bubbleLabel, { color: textSecondary }]}>
+        {label}
+      </ThemedText>
+    </View>
+  );
+}
+
+function FeatureCard({
   icon,
   title,
   description,
-  color,
 }: {
-  icon: any;
+  icon: IconSymbolName;
   title: string;
   description: string;
-  color: string;
 }) {
+  const primary = useThemeColor({}, "brandPrimary");
+  const surface = useThemeColor({}, "surfaceSubtle");
+  const textPrimary = useThemeColor({}, "textPrimary");
+  const textSecondary = useThemeColor({}, "textSecondary");
+
   return (
-    <View style={styles.featureItem}>
-      <View style={[styles.featureIcon, { backgroundColor: color }]}>
-        <IconSymbol name={icon} size={20} color="#fff" />
+    <View style={[styles.card, { backgroundColor: surface }]}>
+      <View style={styles.cardIcon}>
+        <IconSymbol name={icon} size={24} color={primary} />
       </View>
       <View style={{ flex: 1 }}>
-        <ThemedText type="defaultSemiBold">{title}</ThemedText>
-        <ThemedText style={styles.featureText}>{description}</ThemedText>
+        <ThemedText style={[styles.cardTitle, { color: textPrimary }]}>
+          {title}
+        </ThemedText>
+        <ThemedText style={[styles.cardDesc, { color: textSecondary }]}>
+          {description}
+        </ThemedText>
       </View>
     </View>
   );
 }
 
-/* ---------------------------------- */
-/* Styles */
-/* ---------------------------------- */
+/* ───────── Styles ───────── */
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    paddingHorizontal: 24,
-    paddingTop: 56,
-  },
-
+  container: { flex: 1 },
   header: {
-    alignItems: "center",
+    height: 50,
+    justifyContent: "center",
+    alignItems: "flex-end",
+    paddingHorizontal: 24,
   },
-
+  skipBtn: { padding: 8 },
+  skipText: { fontSize: 16, fontWeight: "600" },
+  slide: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 32,
+  },
   logo: {
-    width: 56,
-    height: 56,
+    width: 100,
+    height: 100,
+    marginBottom: 24,
+  },
+  appName: {
+    fontSize: 32,
+    fontWeight: "900",
+    letterSpacing: 2,
+    marginBottom: 8,
+  },
+  slogan: {
+    fontSize: 18,
+    fontWeight: "500",
+  },
+  stepTitle: {
+    fontSize: 28,
+    fontWeight: "800",
+    textAlign: "center",
+    lineHeight: 36,
+  },
+  iconRow: {
+    flexDirection: "row",
+    gap: 24,
+    marginTop: 40,
+  },
+  bubbleContainer: { alignItems: "center", gap: 12 },
+  bubble: {
+    width: 72,
+    height: 72,
+    borderRadius: 24,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  bubbleLabel: { fontSize: 14, fontWeight: "600" },
+  card: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 16,
+    padding: 20,
+    borderRadius: 24,
+    width: "100%",
     marginBottom: 12,
   },
-
-  appName: {
-    fontSize: 28,
-    fontWeight: "bold",
-  },
-
-  tagline: {
-    marginTop: 4,
-    fontSize: 14,
-  },
-
-  illustrationSection: {
-    flex: 1, // ⬅️ fills middle space
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  illustration: {
-    width: "100%",
-    height: "100%",
-    maxHeight: 260,
-  },
-
-  bottomSection: {
-    justifyContent: "flex-end",
+  cardIcon: { width: 32, alignItems: "center" },
+  cardTitle: { fontWeight: "700", fontSize: 17, marginBottom: 2 },
+  cardDesc: { fontSize: 14, lineHeight: 20 },
+  footer: {
+    paddingHorizontal: 24,
     paddingBottom: 24,
   },
-
-  features: { gap: 20, marginBottom: 32 },
-  featureItem: { flexDirection: "row", alignItems: "center", gap: 14 },
-  featureIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    alignItems: "center",
+  pagination: {
+    flexDirection: "row",
     justifyContent: "center",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 32,
   },
-  featureText: { fontSize: 13, opacity: 0.7, marginTop: 2 },
+  dot: {
+    height: 6,
+    width: 6,
+    borderRadius: 3,
+  },
+  activeDot: {
+    width: 20,
+  },
   button: {
-    height: 54,
-    borderRadius: 16,
+    height: 60,
+    borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 2,
+  },
+  buttonText: {
+    fontWeight: "700",
+    fontSize: 18,
   },
 });

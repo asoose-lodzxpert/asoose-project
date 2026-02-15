@@ -30,20 +30,11 @@ export class LocationStreamService {
    * Start streaming location when rider goes active
    */
   async start() {
-    if (this.isActive) {
-      console.log("Location streaming already active");
-      return;
-    }
-
-    if (!this.jobEventsService) {
-      console.error(
-        "JobEventsService not set. Call setJobEventsService first.",
-      );
+    if (this.isActive || !this.jobEventsService) {
       return;
     }
 
     this.isActive = true;
-    console.log("Starting location stream...");
 
     // Load queued locations from storage
     await this.loadQueue();
@@ -51,16 +42,12 @@ export class LocationStreamService {
     // Request location permissions
     const { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== "granted") {
-      console.error("Location permission not granted");
       this.isActive = false;
       return;
     }
 
     // Request background permissions for continued tracking
-    const bgStatus = await Location.requestBackgroundPermissionsAsync();
-    if (bgStatus.status !== "granted") {
-      console.warn("Background location permission not granted");
-    }
+    await Location.requestBackgroundPermissionsAsync();
 
     // Flush queued locations if connected
     if (this.jobEventsService.isConnected()) {
@@ -75,7 +62,6 @@ export class LocationStreamService {
    * Stop streaming location when rider goes inactive
    */
   async stop() {
-    console.log("Stopping location stream...");
     this.isActive = false;
 
     // Stop location polling
@@ -97,7 +83,6 @@ export class LocationStreamService {
    * Start polling location at intervals
    */
   private startLocationPolling() {
-    // Use interval-based polling for reliability
     this.intervalId = setInterval(async () => {
       if (!this.isActive) return;
 
@@ -109,16 +94,15 @@ export class LocationStreamService {
         const { latitude, longitude } = location.coords;
         await this.sendLocation(latitude, longitude);
       } catch (error) {
-        console.error("Error getting location:", error);
+        // Silent fail
       }
     }, LOCATION_UPDATE_INTERVAL);
 
-    // Also start watching position for more frequent updates
     Location.watchPositionAsync(
       {
         accuracy: Location.Accuracy.Balanced,
         timeInterval: LOCATION_UPDATE_INTERVAL,
-        distanceInterval: 10, // Update every 10 meters
+        distanceInterval: 10,
       },
       async (location) => {
         if (!this.isActive) return;
@@ -141,16 +125,11 @@ export class LocationStreamService {
     };
 
     if (this.jobEventsService && this.jobEventsService.isConnected()) {
-      // Send immediately if connected
       const sent = this.jobEventsService.sendLocationUpdate(lat, lng);
-      if (sent) {
-        console.log(`Location sent: [${lat}, ${lng}]`);
-      } else {
-        // Queue if send fails
+      if (!sent) {
         this.queueLocation(locationData);
       }
     } else {
-      // Queue if not connected
       this.queueLocation(locationData);
     }
   }
@@ -161,12 +140,9 @@ export class LocationStreamService {
   private queueLocation(location: QueuedLocation) {
     this.locationQueue.push(location);
 
-    // Limit queue size
     if (this.locationQueue.length > MAX_QUEUE_SIZE) {
       this.locationQueue = this.locationQueue.slice(-MAX_QUEUE_SIZE);
     }
-
-    console.log(`Location queued (${this.locationQueue.length} in queue)`);
   }
 
   /**
@@ -181,16 +157,10 @@ export class LocationStreamService {
       return;
     }
 
-    console.log(`Flushing ${this.locationQueue.length} queued locations...`);
-
     const sent = this.jobEventsService.sendLocationBatch(this.locationQueue);
     if (sent) {
-      // Clear queue after successful send
       this.locationQueue = [];
       await this.saveQueue();
-      console.log("Queue flushed successfully");
-    } else {
-      console.error("Failed to flush queue");
     }
   }
 
@@ -204,7 +174,7 @@ export class LocationStreamService {
         JSON.stringify(this.locationQueue),
       );
     } catch (error) {
-      console.error("Error saving location queue:", error);
+      // Silent fail
     }
   }
 
@@ -216,10 +186,8 @@ export class LocationStreamService {
       const stored = await AsyncStorage.getItem(LOCATION_QUEUE_KEY);
       if (stored) {
         this.locationQueue = JSON.parse(stored);
-        console.log(`Loaded ${this.locationQueue.length} queued locations`);
       }
     } catch (error) {
-      console.error("Error loading location queue:", error);
       this.locationQueue = [];
     }
   }
@@ -236,5 +204,4 @@ export class LocationStreamService {
   }
 }
 
-// Singleton instance
 export const locationStreamService = new LocationStreamService();

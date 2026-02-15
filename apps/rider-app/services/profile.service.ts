@@ -52,7 +52,7 @@ export async function getRiderProfile(): Promise<RiderProfile> {
     const data = await fetchWithAuth(`${EXPO_PUBLIC_API_URL}/rider/profile/me`);
     return data;
   } catch (error) {
-    console.error("Error fetching rider profile:", error);
+    // ...existing code...
     throw error;
   }
 }
@@ -70,7 +70,7 @@ export async function getProfileStats(): Promise<ProfileStats> {
       rating: earningsData.rating || 5.0,
     };
   } catch (error) {
-    console.error("Error fetching profile stats:", error);
+    // ...existing code...
     throw error;
   }
 }
@@ -88,7 +88,7 @@ export async function updateRiderProfile(
     );
     return data;
   } catch (error) {
-    console.error("Error updating rider profile:", error);
+    // ...existing code...
     throw error;
   }
 }

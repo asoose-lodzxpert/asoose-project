@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
+import { useRouter } from "expo-router";
 import {
   login,
   getAccessToken,
@@ -13,6 +14,7 @@ type User = {
   name: string;
   email: string;
   phone?: string;
+  status: "ACTIVE" | "PENDING" | "SUSPENDED" | "BANNED";
 };
 
 interface AuthContextType {
@@ -34,6 +36,7 @@ const AuthContext = createContext<AuthContextType | null>(null);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [initialLoading, setInitialLoading] = useState(true);
+  const router = useRouter();
   const [actionLoading, setActionLoading] = useState(false);
   const biometric = useBiometric();
   useEffect(() => {
@@ -93,6 +96,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setActionLoading(true);
     try {
       await logout();
+      router.replace("/");
       await clearSession();
     } finally {
       setActionLoading(false);

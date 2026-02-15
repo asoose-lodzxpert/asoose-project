@@ -31,7 +31,7 @@ export async function getAllJobs(
     );
     return response;
   } catch (error) {
-    console.error("Error fetching jobs:", error);
+    // ...existing code...
     throw error;
   }
 }

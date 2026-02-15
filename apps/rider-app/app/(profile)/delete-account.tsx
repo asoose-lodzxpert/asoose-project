@@ -23,6 +23,7 @@ export default function DeleteAccountScreen() {
   const border = useThemeColor({}, "borderDefault");
   const textSecondary = useThemeColor({}, "textSecondary");
   const textOnPrimary = useThemeColor({}, "textOnPrimary");
+  const textPrimary = useThemeColor({}, "textPrimary");
   const surfaceCard = useThemeColor({}, "surfaceCard");
   const statusError = useThemeColor({}, "statusError");
   const statusSuccess = useThemeColor({}, "statusSuccess");
@@ -93,7 +94,7 @@ export default function DeleteAccountScreen() {
               >
                 <ThemedText
                   style={{
-                    color: selectedReason === reason ? primary : undefined,
+                    color: selectedReason === reason ? primary : textPrimary,
                   }}
                 >
                   {reason}

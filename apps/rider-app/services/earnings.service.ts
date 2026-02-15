@@ -26,7 +26,7 @@ export async function getEarnings(
     );
     return data;
   } catch (error) {
-    console.error("Error fetching earnings:", error);
+    // ...existing code...
     throw error;
   }
 }
@@ -38,7 +38,7 @@ export async function getWalletBalance(): Promise<{ balance: number }> {
     );
     return data;
   } catch (error) {
-    console.error("Error fetching wallet balance:", error);
+    // ...existing code...
     throw error;
   }
 }

@@ -8,11 +8,11 @@ import { fetchWithAuth } from "./auth-fetch";
 const EXPO_PUBLIC_API_URL = process.env.EXPO_PUBLIC_API_URL;
 
 export const getWithdrawalInfo = async (): Promise<WithdrawalInfo> => {
-  console.log("Base Url:", EXPO_PUBLIC_API_URL);
+  // ...existing code...
   try {
     return await fetchWithAuth(`${EXPO_PUBLIC_API_URL}/rider/withdrawal/info`);
   } catch (err) {
-    console.error("getWithdrawalInfo: Error occurred", err);
+    // ...existing code...
     throw err;
   }
 };
@@ -32,7 +32,7 @@ export const requestWithdrawal = async (
       },
     );
   } catch (err) {
-    console.error("requestWithdrawal: Error occurred", err);
+    // ...existing code...
     throw err;
   }
 };

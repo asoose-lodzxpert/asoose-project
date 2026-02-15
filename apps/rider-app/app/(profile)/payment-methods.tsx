@@ -1,3 +1,15 @@
+import React, { useCallback, useEffect, useState } from "react";
+import {
+  View,
+  StyleSheet,
+  ScrollView,
+  Pressable,
+  RefreshControl,
+  ActivityIndicator,
+} from "react-native";
+import { useRouter } from "expo-router";
+import Toast from "react-native-toast-message";
+
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { ThemedInput } from "@/components/ThemedInput";
@@ -8,77 +20,6 @@ import {
   updateBankAccount,
 } from "@/services/bank-account.service";
 import type { BankAccount } from "@/types/bank-account";
-import { useRouter } from "expo-router";
-import React, { useCallback, useEffect, useState } from "react";
-import {
-  Animated,
-  Pressable,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  View,
-} from "react-native";
-import Toast from "react-native-toast-message";
-
-// Skeleton loader component
-const SkeletonBox = ({
-  width,
-  height,
-  radius = 8,
-}: {
-  width: number | string;
-  height: number;
-  radius?: number;
-}) => {
-  const opacity = React.useRef(new Animated.Value(0.3)).current;
-  const surfaceSubtle = useThemeColor({}, "surfaceSubtle");
-
-  React.useEffect(() => {
-    const animation = Animated.loop(
-      Animated.sequence([
-        Animated.timing(opacity, {
-          toValue: 0.7,
-          duration: 800,
-          useNativeDriver: true,
-        }),
-        Animated.timing(opacity, {
-          toValue: 0.3,
-          duration: 800,
-          useNativeDriver: true,
-        }),
-      ]),
-    );
-    animation.start();
-    return () => animation.stop();
-  }, [opacity]);
-
-  return (
-    <Animated.View
-      style={[
-        {
-          height,
-          backgroundColor: surfaceSubtle,
-          borderRadius: radius,
-          opacity,
-        },
-        typeof width === "number" ? { width } : { width: width as any },
-      ]}
-    />
-  );
-};
-
-const BankCardSkeleton = ({ border }: { border: string }) => {
-  return (
-    <View style={[styles.card, { borderColor: border }]}>
-      {[80, 75, 110, 95].map((w, i) => (
-        <View key={i} style={styles.field}>
-          <SkeletonBox width={w} height={16} />
-          <SkeletonBox width="100%" height={48} radius={12} />
-        </View>
-      ))}
-    </View>
-  );
-};
 
 export default function PaymentMethodsScreen() {
   const router = useRouter();
@@ -86,24 +27,23 @@ export default function PaymentMethodsScreen() {
   const surface = useThemeColor({}, "surfaceBackground");
   const border = useThemeColor({}, "borderDefault");
   const textSecondary = useThemeColor({}, "textSecondary");
-  const textMuted = useThemeColor({}, "textMuted");
+  const statusError = "#EF4444";
 
   const [bankAccount, setBankAccount] = useState<BankAccount | null>(null);
+  const [tempAccount, setTempAccount] = useState<BankAccount | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   const fetchBankAccount = useCallback(async () => {
     try {
       setLoading(true);
       const account = await getBankAccount();
       setBankAccount(account);
+      setTempAccount(account);
     } catch (error: any) {
-      Toast.show({
-        type: "error",
-        text1: "Failed to load bank account",
-        text2: error.message || "Please try again",
-      });
+      Toast.show({ type: "error", text1: "Failed to load account" });
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -119,69 +59,93 @@ export default function PaymentMethodsScreen() {
     fetchBankAccount();
   }, [fetchBankAccount]);
 
-  const updateAccount = (key: keyof BankAccount, value: string) => {
-    if (bankAccount) {
-      setBankAccount({ ...bankAccount, [key]: value });
+  const handleEditToggle = () => {
+    if (editing) {
+      // If canceling, revert changes
+      setTempAccount(bankAccount);
+      setEditing(false);
+    } else {
+      setEditing(true);
     }
   };
 
   const saveChanges = async () => {
-    if (!bankAccount) return;
-
+    if (!tempAccount) return;
+    setIsSaving(true);
     try {
-      const updatedAccount = await updateBankAccount({
-        bankName: bankAccount.bankName,
-        bankCode: bankAccount.bankCode,
-        accountNumber: bankAccount.accountNumber,
-        accountName: bankAccount.accountName,
-      });
-
-      setBankAccount(updatedAccount);
-      Toast.show({
-        type: "success",
-        text1: "Saved",
-        text2: "Bank account updated successfully",
-      });
+      const updated = await updateBankAccount(tempAccount);
+      setBankAccount(updated);
+      setTempAccount(updated);
       setEditing(false);
+      Toast.show({ type: "success", text1: "Bank details updated" });
     } catch (error: any) {
-      Toast.show({
-        type: "error",
-        text1: "Update failed",
-        text2: error.message || "Failed to update bank account",
-      });
+      Toast.show({ type: "error", text1: "Update failed" });
+    } finally {
+      setIsSaving(false);
     }
   };
+
+  const renderDataRow = (label: string, value: string, icon: any) => (
+    <View style={[styles.dataRow, { borderBottomColor: border }]}>
+      <IconSymbol
+        name={icon}
+        size={20}
+        color={textSecondary}
+        style={styles.rowIcon}
+      />
+      <View style={{ flex: 1 }}>
+        <ThemedText style={[styles.label, { color: textSecondary }]}>
+          {label}
+        </ThemedText>
+        <ThemedText type="defaultSemiBold" style={styles.value}>
+          {value || "Not set"}
+        </ThemedText>
+      </View>
+    </View>
+  );
 
   return (
     <ThemedView style={[styles.container, { backgroundColor: surface }]}>
       {/* Header */}
-      <View style={[styles.header, { borderBottomColor: primary + "40" }]}>
-        <Pressable onPress={() => router.back()} style={styles.backButton}>
-          <IconSymbol name="chevron.left" size={24} color={primary} />
-          <ThemedText
-            style={{ color: primary, marginLeft: 4, fontWeight: "500" }}
-          >
-            Back
-          </ThemedText>
-        </Pressable>
+      <View style={[styles.header, { borderBottomColor: border }]}>
+        <View style={styles.headerSide}>
+          {editing ? (
+            <Pressable onPress={handleEditToggle}>
+              <ThemedText style={{ color: statusError, fontWeight: "600" }}>
+                Cancel
+              </ThemedText>
+            </Pressable>
+          ) : (
+            <Pressable onPress={() => router.back()} style={styles.backBtn}>
+              <IconSymbol name="chevron.left" size={24} color={primary} />
+            </Pressable>
+          )}
+        </View>
 
         <ThemedText type="subtitle" style={styles.headerTitle}>
-          Bank Account
+          Bank Details
         </ThemedText>
 
-        <View style={styles.headerRight}>
-          {!loading && bankAccount && (
-            <Pressable onPress={editing ? saveChanges : () => setEditing(true)}>
-              <ThemedText style={{ color: primary, fontWeight: "600" }}>
-                {editing ? "Save" : "Edit"}
-              </ThemedText>
+        <View style={styles.headerSide}>
+          {loading ? null : (
+            <Pressable
+              onPress={editing ? saveChanges : handleEditToggle}
+              disabled={isSaving}
+            >
+              {isSaving ? (
+                <ActivityIndicator size="small" color={primary} />
+              ) : (
+                <ThemedText style={{ color: primary, fontWeight: "700" }}>
+                  {editing ? "Done" : "Edit"}
+                </ThemedText>
+              )}
             </Pressable>
           )}
         </View>
       </View>
 
       <ScrollView
-        contentContainerStyle={{ padding: 20, gap: 20 }}
+        contentContainerStyle={styles.scrollContent}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -190,62 +154,81 @@ export default function PaymentMethodsScreen() {
           />
         }
       >
-        {loading && !bankAccount ? (
-          <BankCardSkeleton border={border} />
-        ) : bankAccount ? (
-          <View style={[styles.card, { borderColor: primary }]}>
-            <Field label="Bank Name">
+        {loading ? (
+          <ActivityIndicator
+            size="large"
+            color={primary}
+            style={{ marginTop: 50 }}
+          />
+        ) : editing ? (
+          <View style={styles.formContainer}>
+            <View style={styles.inputGap}>
+              <ThemedText type="defaultSemiBold">Bank Name</ThemedText>
               <ThemedInput
-                placeholder="Bank Name"
-                value={bankAccount.bankName}
-                onChangeText={(v) => updateAccount("bankName", v)}
-                editable={editing}
+                value={tempAccount?.bankName}
+                onChangeText={(v) =>
+                  setTempAccount((p) => (p ? { ...p, bankName: v } : null))
+                }
+                placeholder="Enter bank name"
               />
-            </Field>
-            <Field label="Bank Code">
-              <ThemedInput
-                placeholder="e.g., 044 (Optional)"
-                value={bankAccount.bankCode || ""}
-                onChangeText={(v) => updateAccount("bankCode", v)}
-                editable={editing}
-                keyboardType="numeric"
-              />
-            </Field>
-            <Field label="Account Number">
-              <ThemedInput
-                placeholder="1234567890"
-                value={bankAccount.accountNumber}
-                onChangeText={(v) => updateAccount("accountNumber", v)}
-                editable={editing}
-                keyboardType="numeric"
-              />
-            </Field>
-            <Field label="Account Name">
-              <ThemedInput
-                placeholder="John Smith"
-                value={bankAccount.accountName}
-                onChangeText={(v) => updateAccount("accountName", v)}
-                editable={editing}
-              />
-            </Field>
+            </View>
 
-            <View style={[styles.infoBox, { backgroundColor: primary + "15" }]}>
-              <IconSymbol name="info.circle" size={20} color={primary} />
-              <ThemedText style={[styles.infoText, { color: primary }]}>
-                This is your default withdrawal account. All earnings will be
-                transferred here.
-              </ThemedText>
+            <View style={styles.inputGap}>
+              <ThemedText type="defaultSemiBold">Account Number</ThemedText>
+              <ThemedInput
+                value={tempAccount?.accountNumber}
+                onChangeText={(v) =>
+                  setTempAccount((p) => (p ? { ...p, accountNumber: v } : null))
+                }
+                keyboardType="numeric"
+                maxLength={10}
+                placeholder="10 digit NUBAN"
+              />
+            </View>
+
+            <View style={styles.inputGap}>
+              <ThemedText type="defaultSemiBold">Account Name</ThemedText>
+              <ThemedInput
+                value={tempAccount?.accountName}
+                onChangeText={(v) =>
+                  setTempAccount((p) => (p ? { ...p, accountName: v } : null))
+                }
+                placeholder="Enter account name"
+              />
             </View>
           </View>
         ) : (
-          <View style={styles.emptyState}>
-            <IconSymbol name="creditcard" size={48} color={textMuted} />
-            <ThemedText type="subtitle" style={{ color: textSecondary }}>
-              No Bank Account
-            </ThemedText>
-            <ThemedText style={{ color: textMuted, textAlign: "center" }}>
-              You haven't added a bank account yet. Contact support to add your
-              withdrawal account.
+          <View style={styles.viewContainer}>
+            <View style={styles.payoutBadge}>
+              <IconSymbol
+                name="checkmark.seal.fill"
+                size={16}
+                color="#10B981"
+              />
+              <ThemedText style={styles.payoutText}>
+                Active Settlement Account
+              </ThemedText>
+            </View>
+
+            {renderDataRow(
+              "Bank Name",
+              bankAccount?.bankName || "",
+              "house.fill",
+            )}
+            {renderDataRow(
+              "Account Number",
+              bankAccount?.accountNumber || "",
+              "credit-card",
+            )}
+            {renderDataRow(
+              "Account Holder",
+              bankAccount?.accountName || "",
+              "person.crop.circle.fill",
+            )}
+
+            <ThemedText style={[styles.disclaimer, { color: textSecondary }]}>
+              This account will receive all your automated payouts. Please
+              ensure the details are accurate to avoid delays.
             </ThemedText>
           </View>
         )}
@@ -254,57 +237,54 @@ export default function PaymentMethodsScreen() {
   );
 }
 
-function Field({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <View style={styles.field}>
-      <ThemedText type="defaultSemiBold">{label}</ThemedText>
-      {children}
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 12,
+    justifyContent: "space-between",
+    paddingVertical: 14,
     paddingHorizontal: 16,
     borderBottomWidth: 1,
   },
-  headerTitle: { flex: 1, textAlign: "center" },
-  headerRight: { width: 50, alignItems: "flex-end" },
-  backButton: { flexDirection: "row", alignItems: "center", width: 50 },
-  card: {
-    padding: 16,
-    borderRadius: 14,
-    borderWidth: 2,
-    backgroundColor: "transparent",
-    gap: 12,
-  },
-  field: { marginTop: 12, gap: 6 },
-  infoBox: {
-    flexDirection: "row",
-    gap: 12,
-    padding: 12,
-    borderRadius: 10,
-    marginTop: 12,
-  },
-  infoText: {
+  headerSide: { minWidth: 60 },
+  headerTitle: {
+    fontSize: 17,
+    fontWeight: "700",
     flex: 1,
-    fontSize: 13,
-    lineHeight: 18,
+    textAlign: "center",
   },
-  emptyState: {
+  backBtn: { marginLeft: -8, padding: 8 },
+  scrollContent: { padding: 20 },
+  viewContainer: { gap: 10 },
+  formContainer: { gap: 24 },
+  inputGap: { gap: 8 },
+  dataRow: {
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 60,
-    gap: 12,
+    paddingVertical: 16,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  rowIcon: { marginRight: 16, opacity: 0.7 },
+  label: {
+    fontSize: 12,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginBottom: 2,
+  },
+  value: { fontSize: 16 },
+  payoutBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 20,
+  },
+  payoutText: { color: "#10B981", fontSize: 14, fontWeight: "600" },
+  disclaimer: {
+    fontSize: 13,
+    lineHeight: 20,
+    marginTop: 30,
+    textAlign: "center",
+    paddingHorizontal: 20,
   },
 });
