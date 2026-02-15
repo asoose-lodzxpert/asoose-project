@@ -103,19 +103,42 @@ export class RidesService {
     return estimates;
   }
 
-  async requestRide(userId: string, dto: RequestRideDto) {
+async requestRide(userId: string, dto: RequestRideDto, idempotencyKey: string) {
     this.logger.log(
-      `Request Ride - User: ${userId}, DTO: ${JSON.stringify(dto, null, 2)}`,
+      `Request Ride - User: ${userId}, Vehicle: ${dto.vehicleType}, IdempotencyKey: ${idempotencyKey}`,
     );
 
-    // ✅ FIX: Discard client coordinates. Force strict backend resolution.
+    // 0. Idempotency Check (Done FIRST to prevent duplicate Maps API billing & Ghost Rides)
+    if (!idempotencyKey) {
+      throw new BadRequestException('Idempotency key is required to prevent duplicate requests.');
+    }
+
+    const existingRequest = await this.prisma.ride.findFirst({
+      where: { customerId: userId, idempotencyKey },
+      include: { pickupAddress: true, dropoffAddress: true, payment: true },
+    });
+
+    if (existingRequest) {
+      this.logger.log(`Idempotency match found for key: ${idempotencyKey}. Returning cached ride.`);
+      return {
+        ride: { ...existingRequest, startOtp: undefined },
+        fare: existingRequest.totalFare,
+        payment: existingRequest.payment?.[0] || null, 
+        message: 'Ride request recovered from previous attempt.',
+      };
+    }
+
+    // 1. Discard client coordinates. Force strict backend resolution.
+    // The backend translates placeIds or fallback coordinates into trusted server data.
     const securePickup = await this.common.resolveSecureLocation(dto.pickupLocation);
     const secureDropoff = await this.common.resolveSecureLocation(dto.dropoffLocation);
 
+    // 2. Validate Vehicle Type against strict backend enum
     if (!Object.values(VehicleType).includes(dto.vehicleType)) {
-      throw new BadRequestException('Invalid vehicle type');
+      throw new BadRequestException('Invalid vehicle type requested.');
     }
 
+    // 3. Prevent duplicate active rides (excludes PENDING, as they await payment)
     const activeRide = await this.prisma.ride.findFirst({
       where: {
         customerId: userId,
@@ -134,10 +157,28 @@ export class RidesService {
       throw new ConflictException('You already have an active ride request');
     }
 
+    // 4. Cleanup: Purge expired payment intents (older than 5 minutes)
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
     await this.prisma.ride.updateMany({
       where: {
         customerId: userId,
         status: RideStatus.PENDING,
+        createdAt: { lt: fiveMinutesAgo },
+      },
+      data: {
+        status: RideStatus.CANCELLED,
+        cancellationReason: 'Expired payment intent',
+        cancelledBy: 'SYSTEM',
+        cancelledAt: new Date(),
+      },
+    });
+
+    // Cancel any recent conflicting PENDING requests that are NOT this current idempotency key
+    await this.prisma.ride.updateMany({
+      where: {
+        customerId: userId,
+        status: RideStatus.PENDING,
+        idempotencyKey: { not: idempotencyKey }
       },
       data: {
         status: RideStatus.CANCELLED,
@@ -149,7 +190,7 @@ export class RidesService {
 
     return this.prisma.$transaction(
       async (tx) => {
-        // 4. Create Addresses from trusted server data ONLY
+        // 5. Create Addresses from trusted server data ONLY
         const pickupAddress = await tx.address.create({
           data: {
             userId,
@@ -174,6 +215,8 @@ export class RidesService {
           },
         });
 
+        // 🛑 CRITICAL FIX: Backend recalculates distance & fare natively.
+        // It does not trust any price shown to or provided by the client to prevent fare spoofing.
         const distanceKm = this.geo.calculateDistance(
           pickupAddress.lat,
           pickupAddress.lng,
@@ -182,12 +225,20 @@ export class RidesService {
         );
 
         const durationMin = Math.ceil(distanceKm * 3);
+        const fareDetails = this.geo.calculateFare(distanceKm, durationMin);
+
+        // Apply strict multiplier based on vehicle type
+        let multiplier = 1.0;
+        if (dto.vehicleType === VehicleType.BUSINESS) multiplier = 1.5;
+        if (dto.vehicleType === VehicleType.ECONOMY) multiplier = 1.0;
+
+        const finalCalculatedFare = this.common.round(fareDetails.totalFare * multiplier);
 
         // 6. Security: Hash OTP
         const rawOtp = this.geo.generateOTP(TRIPS_CONFIG.OTP_LENGTH);
         const hashedOtp = await bcrypt.hash(rawOtp, this.SALT_ROUNDS);
 
-        // 7. Create Ride
+        // 7. Create Ride using the server-calculated fare AND bind Idempotency Key
         const ride = await tx.ride.create({
           data: {
             customerId: userId,
@@ -196,9 +247,10 @@ export class RidesService {
             status: RideStatus.PENDING,
             distanceKm,
             durationMin,
-            totalFare: this.common.round(dto.fare),
+            totalFare: finalCalculatedFare, // <-- ONLY TRUST BACKEND CALCULATION
             startOtp: hashedOtp,
             surgeMultiplier: 1.0,
+            idempotencyKey, // <-- GUARANTEES 1-TO-1 CREATION
           },
           include: { pickupAddress: true, dropoffAddress: true },
         });
@@ -220,15 +272,14 @@ export class RidesService {
 
         return {
           ride: { ...ride, startOtp: undefined },
-          fare: dto.fare,
+          fare: finalCalculatedFare,
           payment,
           message: 'Ride created. Please confirm to find a driver.',
         };
       },
-      { isolationLevel: 'Serializable' },
+      { isolationLevel: 'Serializable' }, // Prevents race conditions during ride creation
     );
   }
-
   async confirmRide(userId: string, rideId: string, paymentMethod: string) {
     const methodEnum =
       paymentMethod.toUpperCase() === 'CASH'

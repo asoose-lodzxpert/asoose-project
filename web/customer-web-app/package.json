@@ -7,7 +7,9 @@
     "build": "next build ",
     "start": "next start",
     "lint": "eslint",
-    "test:payouts": "playwright test tests/super-admin/payout-concurrency.spec.ts"
+    "test:payouts": "playwright test tests/super-admin/payout-concurrency.spec.ts",
+    "test": "jest",
+  "test:watch": "jest --watch"
   },
   "dependencies": {
     "@auth/core": "^0.34.3",
@@ -37,6 +39,7 @@
     "sweetalert2": "^11.26.10",
     "swr": "^2.3.8",
     "use-places-autocomplete": "^4.0.1",
+    "uuid": "10.0.0",
     "zod": "^4.3.5",
     "zustand": "^5.0.9"
   },
@@ -44,16 +47,24 @@
     "@eslint/eslintrc": "^3",
     "@playwright/test": "^1.58.0",
     "@tailwindcss/postcss": "^4",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@types/jest": "^30.0.0",
     "@types/leaflet": "^1.9.21",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/react-is": "^19",
+    "@types/uuid": "^11.0.0",
     "autoprefixer": "^10.4.23",
     "eslint": "^9",
     "eslint-config-next": "15.5.4",
+    "jest": "^30.2.0",
+    "jest-environment-jsdom": "^30.2.0",
     "postcss": "^8.5.6",
     "tailwindcss": "^3.4.17",
+    "ts-jest": "^29.4.6",
     "typescript": "^5"
   }
 }

@@ -1,50 +1,50 @@
 import { useState, useEffect, useRef } from "react";
-import { RideService, VehicleType } from "@/services/ride.service";
+import { RideService, PriceEstimate, LocationPayloadDto } from "@/services/ride.service";
 
 export const useRideEstimates = (
-  pickup: google.maps.LatLngLiteral | null,
-  dropoff: google.maps.LatLngLiteral | null,
-  vehicleType: VehicleType,
-  token: string | null,
+  pickup: LocationPayloadDto | null,
+  dropoff: LocationPayloadDto | null,
+  token: string | null
 ) => {
-  const [estimates, setEstimates] = useState<any | null>(null); // Replace 'any' with PriceEstimate type
+  const [estimates, setEstimates] = useState<Record<string, PriceEstimate> | null>(null);
   const [loading, setLoading] = useState(false);
   const abortController = useRef<AbortController | null>(null);
 
   useEffect(() => {
-    if (!pickup || !dropoff || !token) return;
+    // CRITICAL FIX: Explicitly set loading to false in the early return
+    // This prevents the UI from getting permanently stuck if inputs are cleared mid-fetch
+    if (!token || (!pickup?.placeId && !pickup?.lat) || (!dropoff?.placeId && !dropoff?.lat)) {
+      setEstimates(null);
+      setLoading(false); 
+      return;
+    }
 
-    // Resource Management: Cancel previous pending request
     if (abortController.current) abortController.current.abort();
     abortController.current = new AbortController();
+    const { signal } = abortController.current;
 
     const fetchEstimates = async () => {
       setLoading(true);
       try {
-        const data = await RideService.getEstimate(
-          {
-            pickupLat: pickup.lat,
-            pickupLng: pickup.lng,
-            dropoffLat: dropoff.lat,
-            dropoffLng: dropoff.lng,
-            vehicleType,
-          },
-          token,
-        );
-        setEstimates(data);
+        const data = await RideService.getEstimate({
+          pickupPlaceId: pickup.placeId, pickupLat: pickup.lat, pickupLng: pickup.lng,
+          dropoffPlaceId: dropoff.placeId, dropoffLat: dropoff.lat, dropoffLng: dropoff.lng,
+        }, token, signal);
+        
+        if (!signal.aborted) setEstimates(data);
       } catch (error: any) {
-        if (error.name !== "CanceledError") {
-          console.error("Estimate error:", error);
+        if (error.name !== "AbortError" && error.name !== "CanceledError") {
+          console.error("Estimate failed:", error);
+          if (!signal.aborted) setEstimates(null);
         }
       } finally {
-        setLoading(false);
+        if (!signal.aborted) setLoading(false);
       }
     };
 
-    // Phase 3.2: Debouncing (500ms)
-    const timer = setTimeout(fetchEstimates, 500);
+    const timer = setTimeout(fetchEstimates, 500); // 500ms Debounce
     return () => clearTimeout(timer);
-  }, [pickup, dropoff, vehicleType, token]);
+  }, [pickup, dropoff, token]);
 
   return { estimates, loading };
 };

@@ -14,9 +14,9 @@ export class FcmService implements OnModuleInit {
       return;
     }
 
-    const projectId = this.configService.get<string>('FIREBASE_PROJECT_ID');
-    const clientEmail = this.configService.get<string>('FIREBASE_CLIENT_EMAIL');
-    let privateKey = this.configService.get<string>('FIREBASE_PRIVATE_KEY');
+    const projectId = this.configService.get<string>('FCM_PROJECT_ID');
+    const clientEmail = this.configService.get<string>('FCM_CLIENT_EMAIL');
+    let privateKey = this.configService.get<string>('FCM_PRIVATE_KEY');
 
     // Validate credentials
     if (!projectId || !clientEmail || !privateKey) {

@@ -107,7 +107,9 @@ class SocketService {
 // Export singleton instance
 export const socketService = new SocketService();
 
-// --- Ride Event Listeners ---
+// ============================================================================
+// --- RIDE EVENT LISTENERS ---
+// ============================================================================
 
 export interface RideDriverAssignedEvent {
   rideId: string;
@@ -121,6 +123,7 @@ export interface RideDriverAssignedEvent {
     location: {
       latitude: number;
       longitude: number;
+      heading?: number; // <--- FIXED: Added heading
     };
   };
   eta: number;
@@ -138,7 +141,7 @@ export interface DriverLocationUpdateEvent {
   location: {
     latitude: number;
     longitude: number;
-    heading?: number;
+    heading?: number; // <--- FIXED: Added heading
   };
   timestamp: string;
 }
@@ -153,31 +156,19 @@ export const subscribeToRideEvents = (
   },
 ) => {
   if (callbacks.onDriverAssigned) {
-    socketService.on(
-      `ride.${rideId}.driver.assigned`,
-      callbacks.onDriverAssigned,
-    );
+    socketService.on(`ride.${rideId}.driver.assigned`, callbacks.onDriverAssigned);
   }
 
   if (callbacks.onStatusChanged) {
-    socketService.on(
-      `ride.${rideId}.status.changed`,
-      callbacks.onStatusChanged,
-    );
+    socketService.on(`ride.${rideId}.status.changed`, callbacks.onStatusChanged);
   }
 
   if (callbacks.onDriverLocationUpdate) {
-    socketService.on(
-      `ride.${rideId}.driver.location`,
-      callbacks.onDriverLocationUpdate,
-    );
+    socketService.on(`ride.${rideId}.driver.location`, callbacks.onDriverLocationUpdate);
   }
 
   if (callbacks.onDriverArrived) {
-    socketService.on(
-      `ride.${rideId}.driver.arrived`,
-      callbacks.onDriverArrived,
-    );
+    socketService.on(`ride.${rideId}.driver.arrived`, callbacks.onDriverArrived);
   }
 };
 
@@ -188,8 +179,11 @@ export const unsubscribeFromRideEvents = (rideId: string) => {
   socketService.off(`ride.${rideId}.driver.arrived`);
 };
 
-// --- Delivery Event Listeners ---
+// ============================================================================
+// --- DELIVERY EVENT LISTENERS ---
+// ============================================================================
 
+// <--- FIXED: Renamed back to DeliveryRiderAssignedEvent, changed rideId to deliveryId, and driver to rider
 export interface DeliveryRiderAssignedEvent {
   deliveryId: string;
   rider: {
@@ -202,6 +196,7 @@ export interface DeliveryRiderAssignedEvent {
     location: {
       latitude: number;
       longitude: number;
+      heading?: number; // <--- FIXED: Added heading
     };
   };
   eta: number;
@@ -235,38 +230,23 @@ export const subscribeToDeliveryEvents = (
   },
 ) => {
   if (callbacks.onRiderAssigned) {
-    socketService.on(
-      `delivery.${deliveryId}.rider.assigned`,
-      callbacks.onRiderAssigned,
-    );
+    socketService.on(`delivery.${deliveryId}.rider.assigned`, callbacks.onRiderAssigned);
   }
 
   if (callbacks.onStatusChanged) {
-    socketService.on(
-      `delivery.${deliveryId}.status.changed`,
-      callbacks.onStatusChanged,
-    );
+    socketService.on(`delivery.${deliveryId}.status.changed`, callbacks.onStatusChanged);
   }
 
   if (callbacks.onRiderLocationUpdate) {
-    socketService.on(
-      `delivery.${deliveryId}.rider.location`,
-      callbacks.onRiderLocationUpdate,
-    );
+    socketService.on(`delivery.${deliveryId}.rider.location`, callbacks.onRiderLocationUpdate);
   }
 
   if (callbacks.onRiderArrived) {
-    socketService.on(
-      `delivery.${deliveryId}.rider.arrived`,
-      callbacks.onRiderArrived,
-    );
+    socketService.on(`delivery.${deliveryId}.rider.arrived`, callbacks.onRiderArrived);
   }
 
   if (callbacks.onPackagePickedUp) {
-    socketService.on(
-      `delivery.${deliveryId}.package.picked_up`,
-      callbacks.onPackagePickedUp,
-    );
+    socketService.on(`delivery.${deliveryId}.package.picked_up`, callbacks.onPackagePickedUp);
   }
 };
 

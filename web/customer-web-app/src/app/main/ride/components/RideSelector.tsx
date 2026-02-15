@@ -14,7 +14,7 @@ import LocationAutocomplete from "./LocationAutocomplete";
 import { PAYMENT_METHODS } from "../constants/config";
 
 export interface RideType {
-  id: string;
+  id: string; // Maps directly to Backend VehicleType Enum (e.g., "ECONOMY", "BUSINESS")
   displayName: string;
   icon?: string;
 }
@@ -26,12 +26,23 @@ export interface LocationData {
   lng?: number;
 }
 
+// 🛑 ARCHITECTURE FIX: Price is strictly removed to prevent fare spoofing.
+// Payload keys updated to match backend RequestRideDto perfectly.
 export interface RideRequestPayload {
-  pickup: LocationData;
-  dropoff: LocationData;
-  rideType: string;
+  pickupLocation: {
+    addressText: string;
+    placeId?: string;
+    lat?: number;
+    lng?: number;
+  };
+  dropoffLocation: {
+    addressText: string;
+    placeId?: string;
+    lat?: number;
+    lng?: number;
+  };
+  vehicleType: string;
   paymentMethodId: string;
-  price: number;
 }
 
 export interface PriceEstimate {
@@ -54,17 +65,8 @@ interface RideSelectorProps {
   onRequestRide: (data: RideRequestPayload) => void;
   isRequesting: boolean;
   isGoogleLoaded: boolean;
-  availableRideTypes: RideType[];
+  availableRideTypes: RideType[]; // SSOT: Strictly sourced from backend config
 }
-
-export const AVAILABLE_RIDE_TYPES: RideType[] = [
-  { id: "BIKE", displayName: "Bike" },
-  { id: "CAR", displayName: "Car" },
-  { id: "VAN", displayName: "Van" },
-];
-
-// ✅ FIX 2: Strict UI-to-Backend Enum Mapping for Validation
-const ALLOWED_VEHICLE_TYPES = ["ECONOMY", "BUSINESS", "CAR", "BIKE", "VAN"];
 
 export default function RideSelector({
   pickupAddress,
@@ -83,37 +85,43 @@ export default function RideSelector({
   const [isSelectingPayment, setIsSelectingPayment] = useState(false);
   const [showBreakdown, setShowBreakdown] = useState(false);
 
-  // Keep full local objects to map to the strict backend LocationPayloadDto
   const [pickupLoc, setPickupLoc] = useState<LocationData | null>(null);
   const [dropoffLoc, setDropoffLoc] = useState<LocationData | null>(null);
 
   useEffect(() => {
+    // Auto-select the first backend-provided ride type when loaded
     if (availableRideTypes.length > 0 && !selectedRideId) {
       setSelectedRideId(availableRideTypes[0].id);
     }
   }, [availableRideTypes, selectedRideId]);
 
   const handleConfirm = () => {
-    if (!priceEstimates || !selectedRideId || !pickupLoc || !dropoffLoc) return;
+    if (!selectedRideId || !pickupLoc || !dropoffLoc) return;
 
-    const normalizedRideType = selectedRideId.toUpperCase();
-
-    // ✅ Validate vehicle type before request to prevent 400 Bad Request
-    if (!ALLOWED_VEHICLE_TYPES.includes(normalizedRideType)) {
-      console.error(`Validation Failed: ${normalizedRideType} is not a valid vehicle type.`);
+    // 1. Strict Validation: Ensure selected ride exists in the backend-provided list
+    const validVehicle = availableRideTypes.find((t) => t.id === selectedRideId);
+    if (!validVehicle) {
+      console.error(`Validation Failed: ${selectedRideId} is not a valid vehicle type.`);
       return; 
     }
 
-    const tier = priceEstimates[selectedRideId];
-    if (!tier) return;
-
-    // ✅ Send Backend the accurate payload including `placeId`
+    // 2. Contract Fix: Send the exact DTO required by the backend.
+    // 🛑 We DO NOT send `price`. The backend recalculates it securely.
     onRequestRide({
-      pickup: pickupLoc,
-      dropoff: dropoffLoc,
-      rideType: normalizedRideType,
+      pickupLocation: {
+        addressText: pickupLoc.address || pickupAddress || "Pickup Location",
+        placeId: pickupLoc.placeId,
+        lat: pickupLoc.lat,
+        lng: pickupLoc.lng,
+      },
+      dropoffLocation: {
+        addressText: dropoffLoc.address || destinationAddress || "Dropoff Location",
+        placeId: dropoffLoc.placeId,
+        lat: dropoffLoc.lat,
+        lng: dropoffLoc.lng,
+      },
+      vehicleType: validVehicle.id, // Strictly uses the backend ID (e.g., 'BUSINESS')
       paymentMethodId: selectedPayment.id,
-      price: tier.total,
     });
   };
 
@@ -124,13 +132,14 @@ export default function RideSelector({
   const getRideIcon = (type: RideType) => {
     if (type.icon) return <img src={type.icon} alt={type.displayName} className="w-8 h-8" />;
     const id = type.id.toLowerCase();
-    if (id.includes("van") || id.includes("xl")) return "🚙";
+    if (id.includes("business") || id.includes("premium")) return "🚙";
     if (id.includes("bike")) return "🏍️";
-    return "🚗";
+    return "🚗"; // Default to economy/standard car
   };
 
   return (
     <div className="flex flex-col h-full font-sans bg-white dark:bg-[#0a0a0a] overflow-hidden transition-colors duration-300">
+      {/* Location Inputs */}
       <div className="p-4 border-b border-gray-100 dark:border-zinc-800 shadow-sm z-20">
         <div className="bg-gray-50 dark:bg-zinc-900/50 rounded-2xl p-2 space-y-2 relative border border-gray-100 dark:border-zinc-800">
           <div className="absolute left-[27px] top-8 bottom-8 w-0.5 bg-gray-200 dark:bg-zinc-700 pointer-events-none" />
@@ -168,6 +177,7 @@ export default function RideSelector({
         </div>
       </div>
 
+      {/* Ride/Payment Selection Content */}
       <div className="flex-1 overflow-y-auto p-4 no-scrollbar">
         {isSelectingPayment ? (
           <div className="animate-in slide-in-from-right-10">
@@ -228,6 +238,7 @@ export default function RideSelector({
                       </div>
                       <div className="text-right">
                         <span className="block font-bold text-lg dark:text-white">
+                          {/* Price is strictly for display; actual deduction relies on backend server calc */}
                           {isCalculatingPrice ? <Loader2 className="w-4 h-4 animate-spin inline" /> : estimate ? `₦${estimate.total.toLocaleString()}` : "---"}
                         </span>
                       </div>
@@ -254,6 +265,7 @@ export default function RideSelector({
         )}
       </div>
 
+      {/* Footer / Confirm Action */}
       <div className="p-4 border-t border-gray-100 dark:border-zinc-800 bg-white dark:bg-[#0a0a0a]">
         <div className="flex items-center justify-between mb-4">
           <button onClick={() => setIsSelectingPayment(true)} className="flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-zinc-300">
@@ -262,7 +274,7 @@ export default function RideSelector({
         </div>
         <button
           onClick={handleConfirm}
-          disabled={isRequesting || !priceEstimates || isCalculatingPrice || !selectedRideId || !priceEstimates[selectedRideId] || !pickupLoc || !dropoffLoc}
+          disabled={isRequesting || isCalculatingPrice || !selectedRideId || !pickupLoc || !dropoffLoc}
           className="w-full py-4 rounded-xl font-bold text-white dark:text-black bg-gray-900 dark:bg-white hover:bg-black dark:hover:bg-zinc-200 transition-all disabled:opacity-50"
         >
           {isRequesting ? <Loader2 className="animate-spin mx-auto" /> : `Confirm ${availableRideTypes.find((t) => t.id === selectedRideId)?.displayName || "Ride"}`}

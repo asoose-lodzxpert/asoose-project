@@ -8,6 +8,7 @@ import {
   Query,
   UseGuards,
   Request,
+  BadRequestException,
   Headers, // FIX: Added Headers import
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
@@ -17,6 +18,7 @@ import {
   RequestDeliveryDto,
   CancelTripDto,
   RideEstimateDto,
+  VehicleType,
 } from './dto/trip.dto';
 
 @Controller({
@@ -39,19 +41,14 @@ export class TripsController {
    * Request a new ride
    * POST /trips/rides/request
    */
-  @Post('rides/request')
-  async requestRide(@Request() req, @Body() dto: RequestRideDto) {
-    return this.tripsService.requestRide(req.user.id, dto);
-  }
+ 
 
   /**
    * Get current active ride
    * GET /trips/rides/current
    */
   @Get('rides/current')
-  async getCurrentRide(@Request() req) {
-    return this.tripsService.getCurrentRide(req.user.id);
-  }
+  
 
   @Post('rides/:id/confirm')
   async confirmRide(
@@ -149,4 +146,23 @@ export class TripsController {
   async driverArrived(@Request() req, @Param('id') rideId: string) {
     return this.tripsService.driverArrived(rideId, req.user.id);
   }
+  @Get('vehicle-types')
+  getVehicleTypes() {
+    // Single Source of Truth for the frontend
+    return Object.values(VehicleType); // Returns ["ECONOMY", "BUSINESS"]
+  }
+  @Get('rides/current')
+async getCurrentRide(@Request() req) {
+  // Returns the current ride, ensuring PENDING rides with expired payment intents are purged.
+  return this.tripsService.getCurrentRide(req.user.id);
+}
+@Post('rides/request')
+async requestRide(
+  @Request() req, 
+  @Body() dto: RequestRideDto,
+  @Headers('x-idempotency-key') idempotencyKey: string,
+) {
+  if (!idempotencyKey) throw new BadRequestException('Idempotency key required to prevent ghost rides.');
+  return this.tripsService.requestRide(req.user.id, dto, idempotencyKey);
+}
 }

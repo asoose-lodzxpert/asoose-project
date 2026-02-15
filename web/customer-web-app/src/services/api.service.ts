@@ -79,20 +79,25 @@ export class ApiService {
     }
   }
 
-  static async get<T>(endpoint: string, token?: string): Promise<T> {
-    return this.request<T>(endpoint, { method: "GET" }, token);
+
+ // --- Replace everything from static async get() downwards with this: ---
+
+  static async get<T>(endpoint: string, token?: string, options?: RequestInit): Promise<T> {
+    return this.request<T>(endpoint, { method: "GET", ...options }, token);
   }
 
   static async post<T>(
     endpoint: string,
     data?: any,
     token?: string,
+    options?: RequestInit // ✅ Added options to accept signal
   ): Promise<T> {
     return this.request<T>(
       endpoint,
       {
         method: "POST",
         body: data ? JSON.stringify(data) : undefined,
+        ...options, // ✅ Pass options down
       },
       token,
     );
@@ -102,12 +107,14 @@ export class ApiService {
     endpoint: string,
     data?: any,
     token?: string,
+    options?: RequestInit
   ): Promise<T> {
     return this.request<T>(
       endpoint,
       {
         method: "PUT",
         body: data ? JSON.stringify(data) : undefined,
+        ...options,
       },
       token,
     );
@@ -117,18 +124,27 @@ export class ApiService {
     endpoint: string,
     data?: any,
     token?: string,
+    options?: RequestInit
   ): Promise<T> {
     return this.request<T>(
       endpoint,
       {
         method: "PATCH",
         body: data ? JSON.stringify(data) : undefined,
+        ...options,
       },
       token,
     );
   }
 
-  static async delete<T>(endpoint: string, token?: string): Promise<T> {
-    return this.request<T>(endpoint, { method: "DELETE" }, token);
+  static async delete<T>(endpoint: string, token?: string, options?: RequestInit): Promise<T> {
+    return this.request<T>(endpoint, { method: "DELETE", ...options }, token);
   }
 }
+
+  
+
+ 
+
+
+

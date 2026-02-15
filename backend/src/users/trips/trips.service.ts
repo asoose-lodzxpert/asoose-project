@@ -23,10 +23,10 @@ export class TripsService {
     return this.ridesService.getEstimate(dto);
   }
 
-  async requestRide(userId: string, dto: RequestRideDto) {
-    return this.ridesService.requestRide(userId, dto);
+async requestRide(userId: string, dto: RequestRideDto, idempotencyKey: string) {
+    // Pass it down to the ridesService
+    return this.ridesService.requestRide(userId, dto, idempotencyKey);
   }
-
   // FIX: Added method required by TripsController
   async confirmRide(userId: string, rideId: string, paymentMethod: string) {
     return this.ridesService.confirmRide(userId, rideId, paymentMethod);

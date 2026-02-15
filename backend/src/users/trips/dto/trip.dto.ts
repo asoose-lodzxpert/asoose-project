@@ -55,9 +55,7 @@ export class RequestRideDto {
   @IsEnum(VehicleType)
   vehicleType: VehicleType;
 
-  @ApiProperty()
-  @IsNumber()
-  fare: number;
+ 
 
   @ApiPropertyOptional()
   @IsOptional()

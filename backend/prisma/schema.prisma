@@ -844,6 +844,7 @@ model Ride {
   updatedAt        DateTime   @updatedAt
   disputes         Dispute[]
   transactions Transaction[]
+  idempotencyKey     String?
   // Security
   startOtp           String?
   cancellationReason String?
