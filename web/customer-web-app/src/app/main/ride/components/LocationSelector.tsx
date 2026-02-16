@@ -11,7 +11,9 @@ export function LocationSelector() {
   const setRideStatus = useRideStore((state) => state.setRideStatus);
 
   const handleConfirm = () => {
-    setRideStatus('confirmed');
+    // STRICT FIX: Must transition to 'searching' to trigger simulation/driver assignment.
+    // Previous setting of 'confirmed' skipped the driver finding phase, causing a soft-lock.
+    setRideStatus('searching');
   };
 
   return (

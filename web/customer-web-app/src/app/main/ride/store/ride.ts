@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
 
 export type RideStage = 'idle' | 'configuring' | 'searching' | 'confirmed' | 'arrived' | 'in-progress' | 'finished';
 export type RideType = 'economy' | 'business';
@@ -88,37 +89,59 @@ const initialState = {
   isConfiguring: null,
 };
 
-export const useRideStore = create<RideState>((set) => ({
-  ...initialState,
-
-  // Setters
-  setMapInstance: (map) => set({ mapInstance: map }),
-  setIsGoogleMapsLoaded: (isLoaded) => set({ isGoogleMapsLoaded: isLoaded }),
-  setUserLocation: (location) => set({ userLocation: location }),
-  setPickupLocation: (location) => set({ pickupLocation: location }),
-  setDropoffLocation: (location) => set({ dropoffLocation: location }),
-  setGeolocationError: (error) => set({ geolocationError: error }),
-  setWatchId: (id) => set({ watchId: id }),
-  setRoutePolyline: (polyline) => set({ routePolyline: polyline }),
-  
-  // PURE STATE UPDATE - No side effects
-  setRideStatus: (status) => set({ rideStatus: status }),
-  
-  setDriverLocation: (location) => set({ driverLocation: location }),
-  setIsFollowingDriver: (isFollowing) => set({ isFollowingDriver: isFollowing }),
-  setRideType: (type) => set({ rideType: type }),
-  setDriver: (driver) => set({ driver: driver }),
-  setTripSummary: (summary) => set({ tripSummary: summary }),
-  setRating: (rating) => set({ rating: rating }),
-  setFeedback: (feedback) => set({ feedback: feedback }),
-  setIsConfiguring: (isConfiguring) => set({ isConfiguring: isConfiguring }),
-
-  // Reset ride to initial state
-  resetRide: () =>
-    set((state) => ({
+export const useRideStore = create<RideState>()(
+  persist(
+    (set) => ({
       ...initialState,
-      userLocation: state.userLocation, // Keep user location and map instance
-      mapInstance: state.mapInstance,
-      isGoogleMapsLoaded: state.isGoogleMapsLoaded,
-    })),
-}));
+
+      // Setters
+      setMapInstance: (map) => set({ mapInstance: map }),
+      setIsGoogleMapsLoaded: (isLoaded) => set({ isGoogleMapsLoaded: isLoaded }),
+      setUserLocation: (location) => set({ userLocation: location }),
+      setPickupLocation: (location) => set({ pickupLocation: location }),
+      setDropoffLocation: (location) => set({ dropoffLocation: location }),
+      setGeolocationError: (error) => set({ geolocationError: error }),
+      setWatchId: (id) => set({ watchId: id }),
+      setRoutePolyline: (polyline) => set({ routePolyline: polyline }),
+      
+      // PURE STATE UPDATE
+      setRideStatus: (status) => set({ rideStatus: status }),
+      
+      setDriverLocation: (location) => set({ driverLocation: location }),
+      setIsFollowingDriver: (isFollowing) => set({ isFollowingDriver: isFollowing }),
+      setRideType: (type) => set({ rideType: type }),
+      setDriver: (driver) => set({ driver: driver }),
+      setTripSummary: (summary) => set({ tripSummary: summary }),
+      setRating: (rating) => set({ rating: rating }),
+      setFeedback: (feedback) => set({ feedback: feedback }),
+      setIsConfiguring: (isConfiguring) => set({ isConfiguring: isConfiguring }),
+
+      // Reset ride to initial state
+      resetRide: () =>
+        set((state) => ({
+          ...initialState,
+          userLocation: state.userLocation, // Keep user location and map instance
+          mapInstance: state.mapInstance,
+          isGoogleMapsLoaded: state.isGoogleMapsLoaded,
+        })),
+    }),
+    {
+      name: 'ride-storage', // name of the item in the storage (must be unique)
+      storage: createJSONStorage(() => localStorage),
+      partialize: (state) => ({
+        // Only persist these fields
+        pickupLocation: state.pickupLocation,
+        dropoffLocation: state.dropoffLocation,
+        rideStatus: state.rideStatus,
+        rideType: state.rideType,
+        driverLocation: state.driverLocation,
+        driver: state.driver,
+        tripSummary: state.tripSummary,
+        rating: state.rating,
+        feedback: state.feedback,
+        isConfiguring: state.isConfiguring,
+        routePolyline: state.routePolyline,
+      }),
+    }
+  )
+);

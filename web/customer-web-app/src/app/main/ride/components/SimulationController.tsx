@@ -5,18 +5,17 @@ import { useRideStore } from '../store/ride';
 
 // CONSTANTS
 const SEARCH_DELAY_MS = 3000;
-const PICKUP_WAIT_MS = 2000;
 const MOCK_SPEED_KMH = 120; // Fast speed for testing
 
-// FORCE ENABLE MOCK for debugging
-const ENABLE_MOCK = true; 
-
 export function SimulationController() {
-  // GRANULAR SELECTORS (Prevents re-render loops)
+  // GRANULAR SELECTORS
   const rideStatus = useRideStore((s) => s.rideStatus);
   const pickupLocation = useRideStore((s) => s.pickupLocation);
   const dropoffLocation = useRideStore((s) => s.dropoffLocation);
   const driverLocation = useRideStore((s) => s.driverLocation);
+  
+  // FIX: Select the loading state from the store
+  const isGoogleMapsLoaded = useRideStore((s) => s.isGoogleMapsLoaded);
   
   // ACTIONS
   const setDriver = useRideStore((s) => s.setDriver);
@@ -55,7 +54,6 @@ export function SimulationController() {
       const timer = setTimeout(() => {
         log('Timer Fired: Finding Driver');
         
-        // 1. Create Mock Driver
         const mockDriver = {
           name: 'Michael K.',
           photoUrl: 'https://i.pravatar.cc/150?u=driver',
@@ -63,14 +61,11 @@ export function SimulationController() {
           vehicle: { make: 'Toyota', model: 'Camry', licensePlate: 'MOCK-123' }
         };
 
-        // 2. Set Spawn Point (Near Pickup)
         const spawnPoint = {
           lat: pickupLocation.lat - 0.005,
           lng: pickupLocation.lng - 0.005
         };
 
-        // 3. EXECUTE ATOMIC UPDATE
-        // We set driver FIRST to ensure UI has data when status flips
         setDriver(mockDriver);
         setDriverLocation(spawnPoint);
         setRideStatus('confirmed');
@@ -85,26 +80,28 @@ export function SimulationController() {
     }
   }, [rideStatus, pickupLocation, setDriver, setDriverLocation, setRideStatus]);
 
-  // 2. PHASE: ARRIVED -> IN-PROGRESS
+  // 2. PHASE: ARRIVED (WAIT FOR USER)
   useEffect(() => {
     if (rideStatus === 'arrived') {
-      log('Driver Arrived at Pickup. Waiting 2s...');
-      isPausedRef.current = true;
-
-      const timer = setTimeout(() => {
-        log('Pickup Complete. Starting Trip.');
-        setRideStatus('in-progress');
-      }, PICKUP_WAIT_MS);
-
-      return () => clearTimeout(timer);
+       // Pause and wait for user interaction (Confirm Pickup)
+       isPausedRef.current = true;
     }
-  }, [rideStatus, setRideStatus]);
+  }, [rideStatus]);
 
   // 3. ROUTING LOGIC (Only runs when entering a moving phase)
   useEffect(() => {
-    // Only fetch route if we are in a moving state and have locations
     const isMovingState = rideStatus === 'confirmed' || rideStatus === 'in-progress';
-    if (!isMovingState || !pickupLocation || !dropoffLocation || typeof google === 'undefined') return;
+    
+    // FIX: Strict check ensures Google Maps is fully loaded before constructor access
+    if (
+      !isMovingState || 
+      !pickupLocation || 
+      !dropoffLocation || 
+      !isGoogleMapsLoaded || 
+      !window.google?.maps
+    ) {
+      return;
+    }
 
     const directionsService = new google.maps.DirectionsService();
 
@@ -118,7 +115,8 @@ export function SimulationController() {
         origin = driverLocation || { lat: pickupLocation.lat - 0.005, lng: pickupLocation.lng - 0.005 };
         destination = pickupLocation;
       } else if (rideStatus === 'in-progress') {
-        origin = pickupLocation;
+        // Resume from current driver location if available
+        origin = driverLocation || pickupLocation;
         destination = dropoffLocation;
       }
 
@@ -134,16 +132,20 @@ export function SimulationController() {
           if (status === google.maps.DirectionsStatus.OK && result) {
             log('Route Found', result.routes[0].overview_path.length + ' points');
             
-            // Generate Fare if starting trip
+            // Generate Fare if starting trip (AND if not already persisted)
             if (rideStatus === 'in-progress') {
-              const leg = result.routes[0].legs[0];
-              const distMiles = (leg.distance?.value || 0) / 1609.34;
-              const durMins = (leg.duration?.value || 0) / 60;
-              setTripSummary({
-                distance: distMiles,
-                duration: durMins,
-                fare: 2.50 + (distMiles * 1.50) + (durMins * 0.20)
-              });
+              const currentSummary = useRideStore.getState().tripSummary;
+              
+              if (!currentSummary) {
+                const leg = result.routes[0].legs[0];
+                const distMiles = (leg.distance?.value || 0) / 1609.34;
+                const durMins = (leg.duration?.value || 0) / 60;
+                setTripSummary({
+                  distance: distMiles,
+                  duration: durMins,
+                  fare: 2.50 + (distMiles * 1.50) + (durMins * 0.20)
+                });
+              }
             }
 
             // Reset Animation
@@ -159,7 +161,7 @@ export function SimulationController() {
     };
 
     fetchRoute();
-  }, [rideStatus, pickupLocation, dropoffLocation, setTripSummary]); // Intentionally removed driverLocation to prevent loops
+  }, [rideStatus, pickupLocation, dropoffLocation, setTripSummary, isGoogleMapsLoaded]); // FIX: Added dependency
 
   // 4. ANIMATION LOOP
   useEffect(() => {
