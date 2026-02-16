@@ -18,7 +18,10 @@
         "ITSAppUsesNonExemptEncryption": false
       }
     },
-    "platforms": ["ios", "android"],
+    "platforms": [
+      "ios",
+      "android"
+    ],
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png"
@@ -39,7 +42,9 @@
         "INTERNET",
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
-        "POST_NOTIFICATIONS"
+        "POST_NOTIFICATIONS",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
       ],
       "blockedPermissions": [
         "CAMERA",
@@ -91,8 +96,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "2d48f46a-1d28-48e3-9a5b-77e6256bdc3b"
+        "projectId": "990d22a4-4537-482c-ab95-6b5197fb8484"
       }
-    }
+    },
+    "owner": "enoch-dev"
   }
 }

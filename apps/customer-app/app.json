@@ -38,7 +38,10 @@
       },
       "usesAppleSignIn": true
     },
-    "platforms": ["ios", "android"],
+    "platforms": [
+      "ios",
+      "android"
+    ],
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
@@ -50,12 +53,13 @@
         }
       },
       "permissions": [
-        "USE_BIOMETRIC",
-        "USE_FINGERPRINT",
-        "CAMERA",
-        "ACCESS_FINE_LOCATION",
-        "ACCESS_COARSE_LOCATION",
-        "POST_NOTIFICATIONS"
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT",
+        "android.permission.CAMERA",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.RECORD_AUDIO"
       ],
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
@@ -118,8 +122,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "efdbbc55-7bbe-4db6-9a9d-d7116d8d3d8d"
+        "projectId": "96eb2069-3bed-40fc-8bf8-d8a7a75d4a62"
       }
-    }
+    },
+    "owner": "enoch-dev"
   }
 }
