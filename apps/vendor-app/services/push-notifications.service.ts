@@ -7,6 +7,36 @@ import { fetchWithAuth } from "./auth-fetch";
 
 const EXPO_PUBLIC_API_URL = process.env.EXPO_PUBLIC_API_URL;
 
+/** * Centralized Error Logger
+ * Sends the error to your backend so you can see what went wrong.
+ */
+async function logErrorToBackend(context: string, error: any) {
+  try {
+    await fetchWithAuth(`${EXPO_PUBLIC_API_URL}/logs/error`, {
+      method: "POST",
+      body: JSON.stringify({
+        context,
+        message: error?.message || "Unknown error",
+        stack: error?.stack,
+        device: Device.modelName,
+        platform: Platform.OS,
+        timestamp: new Date().toISOString(),
+      }),
+    });
+  } catch (e) {
+    console.error("Failed to log error to backend", e);
+  }
+}
+
+/** Utility to show Toast */
+function showToast(message: string, type: "error" | "warning" = "error") {
+  Toast.show({
+    type,
+    autoHide: true,
+    text1: message,
+  });
+}
+
 // Flag to ensure handler is only set once
 let isNotificationHandlerSet = false;
 
@@ -98,14 +128,8 @@ export async function registerForPushNotificationsAsync(): Promise<
         })
       ).data;
     } catch (e: any) {
-      // Silently fail if push notifications cannot be registered
-      // This prevents app crashes on Android 12+ when background services are restricted
-
-      Toast.show({
-        type: "warning",
-        text1: "Push notification setup failed",
-        text2: "You may not receive order notifications",
-      });
+      await logErrorToBackend("registerForPushNotificationsAsync", e);
+      showToast("Failed to initialize notifications.", "warning");
       return undefined;
     }
   } else {
@@ -127,13 +151,8 @@ export async function savePushToken(token: string): Promise<void> {
     );
   } catch (error: any) {
     // Surface error for debugging
-
-    Toast.show({
-      type: "error",
-      text1: "Push notification setup failed",
-      text2: error.message || "Failed to send push token",
-    });
-
+    await logErrorToBackend("savePushToken", error);
+    showToast("Connection error: Notifications might not be synced.");
     throw error; // Re-throw to allow caller to handle
   }
 }
