@@ -18,7 +18,10 @@
         "ITSAppUsesNonExemptEncryption": false
       }
     },
-    "platforms": ["ios", "android"],
+    "platforms": [
+      "ios",
+      "android"
+    ],
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png"
@@ -31,7 +34,7 @@
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.asoose.rider.app",
-      "versionCode": 2,
+      "versionCode": 3,
       "notification": {
         "icon": "./assets/images/icon.png"
       },

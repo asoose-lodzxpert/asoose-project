@@ -5,6 +5,7 @@ import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { BullModule } from '@nestjs/bullmq';
+import { MongooseModule } from '@nestjs/mongoose';
 
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -26,6 +27,7 @@ import { MapsModule } from './maps/maps.module';
 import { StorageModule } from './storage/storage.module';
 import { PaymentModule } from './payment/payment.module';
 import { MailModule } from './mail/mail.module';
+import { LogsModule } from './logs/logs.module';
 
 @Module({
   imports: [
@@ -55,6 +57,9 @@ import { MailModule } from './mail/mail.module';
     ScheduleModule.forRoot(),
     EventEmitterModule.forRoot({ global: true }),
 
+    // ---------- MongoDB ----------
+    MongooseModule.forRoot(process.env.MONGODB_URI || ''),
+
     // ---------- App Modules ----------
     AuthModule,
     PrismaModule,
@@ -72,6 +77,7 @@ import { MailModule } from './mail/mail.module';
     StorageModule,
     PaymentModule,
     MailModule,
+    LogsModule,
   ],
   controllers: [AppController],
   providers: [
