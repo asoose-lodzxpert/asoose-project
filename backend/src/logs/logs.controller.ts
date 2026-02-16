@@ -22,7 +22,6 @@ export class LogsController {
     return {
       success: true,
       message: 'Error logged successfully',
-      // Accessing _id safely for MongoDB/Mongoose
       id: (log as any)._id?.toString() || (log as any).id,
     };
   }

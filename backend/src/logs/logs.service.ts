@@ -22,7 +22,7 @@ export class LogsService {
     return this.errorLogModel.find().sort({ createdAt: -1 }).limit(100).exec();
   }
 
-  async findById(id: string): Promise<ErrorLog> {
+  async findById(id: string): Promise<ErrorLog | null> {
     return this.errorLogModel.findById(id).exec();
   }
 }

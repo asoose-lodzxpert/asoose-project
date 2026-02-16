@@ -1,41 +1,37 @@
-import { Module } from '@nestjs/common';
-import { APP_GUARD } from '@nestjs/core';
-import { ConfigModule } from '@nestjs/config';
-import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
-import { ScheduleModule } from '@nestjs/schedule';
-import { EventEmitterModule } from '@nestjs/event-emitter';
 import { BullModule } from '@nestjs/bullmq';
+import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
+import { APP_GUARD } from '@nestjs/core';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { MongooseModule } from '@nestjs/mongoose';
+import { ScheduleModule } from '@nestjs/schedule';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
 import { AuthModule } from './auth/auth.module';
-import { PrismaModule } from './prisma/prisma.module';
-import { RedisModule } from './redis/redis.module';
-import { SuperAdminModule } from './super-admin/super-admin.module';
-import { RidersModule } from './riders/riders.module';
-import { VendorModule } from './vendor/vendor.module';
-import { MarketplaceModule } from './marketplace/marketplace.module';
 import { CartModule } from './cart/cart.module';
-import { UsersModule } from './users/users.module';
-import { NotificationsModule } from './notifications/notifications.module';
-
-import { QueueModule } from './queue/queue.module';
 import { FcmModule } from './libs/fcm/fcm.module';
-import { MapsModule } from './maps/maps.module';
-import { StorageModule } from './storage/storage.module';
-import { PaymentModule } from './payment/payment.module';
-import { MailModule } from './mail/mail.module';
 import { LogsModule } from './logs/logs.module';
+import { MailModule } from './mail/mail.module';
+import { MapsModule } from './maps/maps.module';
+import { MarketplaceModule } from './marketplace/marketplace.module';
+import { NotificationsModule } from './notifications/notifications.module';
+import { PaymentModule } from './payment/payment.module';
+import { PrismaModule } from './prisma/prisma.module';
+import { QueueModule } from './queue/queue.module';
+import { RedisModule } from './redis/redis.module';
+import { RidersModule } from './riders/riders.module';
+import { StorageModule } from './storage/storage.module';
+import { SuperAdminModule } from './super-admin/super-admin.module';
+import { UsersModule } from './users/users.module';
+import { VendorModule } from './vendor/vendor.module';
 
 @Module({
   imports: [
     // ---------- Global Config ----------
     ConfigModule.forRoot({ isGlobal: true }),
-
-    // ---------- Rate Limiting ----------
-    ThrottlerModule.forRoot(),
 
     // ---------- BullMQ / Redis ----------
     BullModule.forRoot({
@@ -48,36 +44,44 @@ import { LogsModule } from './logs/logs.module';
           tls: { servername: process.env.REDIS_HOST },
         }),
         maxRetriesPerRequest: null,
-        enableReadyCheck: true,
-        connectTimeout: 10000,
       },
     }),
 
     // ---------- Scheduling & Events ----------
-    ScheduleModule.forRoot(),
     EventEmitterModule.forRoot({ global: true }),
+    ScheduleModule.forRoot(),
 
     // ---------- MongoDB ----------
-    MongooseModule.forRoot(process.env.MONGODB_URI || ''),
+    MongooseModule.forRoot(
+      process.env.MONGODB_URI || 'mongodb://localhost:27017/asoose',
+    ),
+
+    // ---------- Rate Limiting ----------
+    ThrottlerModule.forRoot([
+      {
+        ttl: 60000,
+        limit: 20,
+      },
+    ]),
 
     // ---------- App Modules ----------
     AuthModule,
-    PrismaModule,
-    RedisModule,
-    SuperAdminModule,
-    RidersModule,
-    VendorModule,
-    MarketplaceModule,
     CartModule,
-    UsersModule,
-    NotificationsModule,
-    QueueModule,
     FcmModule,
-    MapsModule,
-    StorageModule,
-    PaymentModule,
-    MailModule,
     LogsModule,
+    MailModule,
+    MapsModule,
+    MarketplaceModule,
+    NotificationsModule,
+    PaymentModule,
+    PrismaModule,
+    QueueModule,
+    RedisModule,
+    RidersModule,
+    StorageModule,
+    SuperAdminModule,
+    UsersModule,
+    VendorModule,
   ],
   controllers: [AppController],
   providers: [
