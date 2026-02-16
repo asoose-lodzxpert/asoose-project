@@ -31,7 +31,7 @@
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.asoose.vendor.app",
-      "versionCode": 11,
+      "versionCode": 10,
       "notification": {
         "icon": "./assets/images/icon.png"
       },
