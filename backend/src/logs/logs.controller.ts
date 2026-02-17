@@ -10,7 +10,10 @@ import {
 import { LogsService } from './logs.service';
 import { CreateErrorLogDto } from './dto/create-error-log.dto';
 
-@Controller('logs')
+@Controller({
+  path: 'logs',
+  version: '1',
+})
 export class LogsController {
   constructor(private readonly logsService: LogsService) {}
 
