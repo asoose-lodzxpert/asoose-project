@@ -1,5 +1,13 @@
-import { Controller, Get, Query, BadRequestException } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Query,
+  BadRequestException,
+  UseGuards,
+} from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { MapsService } from './maps.service';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller({
   path: 'maps',
@@ -8,11 +16,41 @@ import { MapsService } from './maps.service';
 export class MapsController {
   constructor(private readonly mapsService: MapsService) {}
 
-  /* * 🛑 SECURITY UPDATE:
-   * `address-search` and `places-autocomplete` have been permanently removed.
-   * Autocomplete is now handled securely by the frontend using Google Maps JS SDK + Session Tokens.
-   * Exposing REST endpoints for Autocomplete on the backend creates a severe billing vulnerability.
+  /**
+   * 🔒 SECURED AUTOCOMPLETE ENDPOINTS
+   * These endpoints are now protected with:
+   * - JWT Authentication (requires logged-in user)
+   * - Strict rate limiting (20 requests per minute per user)
+   * - Input validation (minimum 3 characters)
+   * - Geographic bias to Nigeria only
    */
+
+  @Get('address-search')
+  @UseGuards(JwtAuthGuard)
+  @Throttle({ default: { limit: 20, ttl: 60 * 1000 } }) // 20 requests per minute
+  async addressSearch(
+    @Query('query') query: string,
+    @Query('latitude') latitude?: string,
+    @Query('longitude') longitude?: string,
+  ) {
+    if (!query || query.trim().length < 3) {
+      throw new BadRequestException('Query must be at least 3 characters long');
+    }
+    return this.mapsService.searchAddress(query.trim(), latitude, longitude);
+  }
+
+  @Get('places-autocomplete')
+  @UseGuards(JwtAuthGuard)
+  @Throttle({ default: { limit: 20, ttl: 60 * 1000 } }) // 20 requests per minute
+  async placesAutocomplete(
+    @Query('query') query: string,
+    @Query('location') location?: string,
+  ) {
+    if (!query || query.trim().length < 3) {
+      throw new BadRequestException('Query must be at least 3 characters long');
+    }
+    return this.mapsService.placesAutocomplete(query.trim(), location);
+  }
 
   @Get('geocode')
   async geocode(@Query('placeId') placeId: string) {
@@ -22,7 +60,6 @@ export class MapsController {
     return this.mapsService.geocodePlace(placeId);
   }
 
-  // ✅ ADDED: Expose reverse geocoding for internal/admin mapping utilities
   @Get('reverse-geocode')
   async reverseGeocode(@Query('lat') lat: string, @Query('lng') lng: string) {
     if (!lat || !lng) {
