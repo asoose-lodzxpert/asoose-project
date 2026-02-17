@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState, useRef } from "react";
 import {
   View,
   StyleSheet,
@@ -7,6 +7,9 @@ import {
   RefreshControl,
   ActivityIndicator,
   Modal,
+  KeyboardAvoidingView,
+  Platform,
+  Keyboard,
 } from "react-native";
 import { useRouter } from "expo-router";
 import Toast from "react-native-toast-message";
@@ -24,10 +27,13 @@ import type { BankAccount } from "@/types/bank-account";
 
 export default function PaymentMethodsScreen() {
   const router = useRouter();
+  const isMountedRef = useRef(true);
+
   const primary = useThemeColor({}, "brandPrimary");
   const surface = useThemeColor({}, "surfaceBackground");
   const border = useThemeColor({}, "borderDefault");
   const textSecondary = useThemeColor({}, "textSecondary");
+  const cardBg = useThemeColor({}, "surfaceCard");
   const statusError = "#EF4444";
 
   const [bankAccount, setBankAccount] = useState<BankAccount | null>(null);
@@ -36,72 +42,130 @@ export default function PaymentMethodsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [editing, setEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const fetchBankAccount = useCallback(async () => {
     try {
-      setLoading(true);
+      if (!refreshing) setLoading(true);
       const account = await getBankAccount();
       setBankAccount(account);
       setTempAccount(account);
-    } catch (error: any) {
+    } catch {
       Toast.show({ type: "error", text1: "Failed to load account" });
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [refreshing]);
 
   useEffect(() => {
     fetchBankAccount();
   }, [fetchBankAccount]);
 
-  const onRefresh = useCallback(() => {
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  const onRefresh = () => {
     setRefreshing(true);
     fetchBankAccount();
-  }, [fetchBankAccount]);
+  };
 
   const handleEditToggle = () => {
     if (editing) {
-      // If canceling, revert changes
       setTempAccount(bankAccount);
       setEditing(false);
+      setErrors({});
     } else {
       setEditing(true);
+      setTempAccount(
+        bankAccount ||
+          ({
+            id: "",
+            bankName: "",
+            accountNumber: "",
+            accountName: "",
+            bankCode: "",
+            riderId: "",
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          } as BankAccount),
+      );
+      setErrors({});
     }
   };
 
-  const saveChanges = async () => {
-    if (!tempAccount) return;
+  const validateFields = () => {
+    const newErrors: Record<string, string> = {};
 
-    // Validation
-    if (!tempAccount.bankName || tempAccount.bankName.trim() === "") {
-      Toast.show({ type: "error", text1: "Bank name is required" });
+    if (!tempAccount?.bankName?.trim()) {
+      newErrors.bankName = "Bank name is required";
+    }
+
+    if (!tempAccount?.accountNumber?.trim()) {
+      newErrors.accountNumber = "Account number is required";
+    } else if (tempAccount.accountNumber.length !== 10) {
+      newErrors.accountNumber = "Account number must be exactly 10 digits";
+    } else if (!/^\d+$/.test(tempAccount.accountNumber)) {
+      newErrors.accountNumber = "Account number must contain only digits";
+    }
+
+    if (!tempAccount?.accountName?.trim()) {
+      newErrors.accountName = "Account name is required";
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const saveChanges = async () => {
+    Keyboard.dismiss();
+
+    if (!tempAccount) {
+      Toast.show({ type: "error", text1: "No account data" });
       return;
     }
-    if (!tempAccount.accountNumber || tempAccount.accountNumber.trim() === "") {
-      Toast.show({ type: "error", text1: "Account number is required" });
-      return;
-    }
-    if (!tempAccount.accountName || tempAccount.accountName.trim() === "") {
-      Toast.show({ type: "error", text1: "Account name is required" });
+
+    // Validate all fields
+    if (!validateFields()) {
+      Toast.show({ type: "error", text1: "Please fix validation errors" });
       return;
     }
 
     setIsSaving(true);
+
     try {
-      const updated = await updateBankAccount(tempAccount);
-      setBankAccount(updated);
-      setTempAccount(updated);
-      setEditing(false);
-      Toast.show({ type: "success", text1: "Bank details updated" });
-      // Navigate back after successful save
-      setTimeout(() => {
-        router.back();
-      }, 500);
+      // Only send fields the backend expects
+      const payload = {
+        bankName: tempAccount.bankName,
+        accountNumber: tempAccount.accountNumber,
+        accountName: tempAccount.accountName,
+        ...(tempAccount.bankCode && { bankCode: tempAccount.bankCode }),
+      };
+
+      const updated = await updateBankAccount(payload as BankAccount);
+      if (isMountedRef.current) {
+        setBankAccount(updated);
+        setTempAccount(updated);
+        setEditing(false);
+        Toast.show({ type: "success", text1: "Bank details updated" });
+        setTimeout(() => {
+          router.back();
+        }, 500);
+      }
     } catch (error: any) {
-      Toast.show({ type: "error", text1: "Update failed" });
+      console.warn("Save error:", error);
+      Toast.show({
+        type: "error",
+        text1: "Update failed",
+        text2: error?.message || "Please try again",
+      });
     } finally {
-      setIsSaving(false);
+      if (isMountedRef.current) {
+        setIsSaving(false);
+      }
     }
   };
 
@@ -126,31 +190,53 @@ export default function PaymentMethodsScreen() {
 
   return (
     <ThemedView style={[styles.container, { backgroundColor: surface }]}>
-      {/* Header */}
+      {/* HEADER */}
       <View style={[styles.header, { borderBottomColor: border }]}>
         <View style={styles.headerSide}>
           {editing ? (
-            <Pressable onPress={handleEditToggle}>
+            <Pressable
+              onPress={handleEditToggle}
+              hitSlop={20}
+              style={({ pressed }) => [
+                styles.clickableArea,
+                { opacity: pressed ? 0.5 : 1 },
+              ]}
+            >
               <ThemedText style={{ color: statusError, fontWeight: "600" }}>
                 Cancel
               </ThemedText>
             </Pressable>
           ) : (
-            <Pressable onPress={() => router.back()} style={styles.backBtn}>
+            <Pressable
+              onPress={() => router.back()}
+              hitSlop={20}
+              style={({ pressed }) => [
+                styles.backBtn,
+                styles.clickableArea,
+                { opacity: pressed ? 0.5 : 1 },
+              ]}
+            >
               <IconSymbol name="chevron.left" size={24} color={primary} />
             </Pressable>
           )}
         </View>
 
-        <ThemedText type="subtitle" style={styles.headerTitle}>
-          Bank Details
-        </ThemedText>
+        <View style={styles.titleContainer}>
+          <ThemedText type="subtitle" style={styles.headerTitle}>
+            Bank Details
+          </ThemedText>
+        </View>
 
-        <View style={styles.headerSide}>
-          {loading ? null : (
+        <View style={[styles.headerSide, { alignItems: "flex-end" }]}>
+          {!loading && (
             <Pressable
               onPress={editing ? saveChanges : handleEditToggle}
               disabled={isSaving}
+              hitSlop={20}
+              style={({ pressed }) => [
+                styles.clickableArea,
+                { opacity: pressed || isSaving ? 0.5 : 1 },
+              ]}
             >
               {isSaving ? (
                 <ActivityIndicator size="small" color={primary} />
@@ -164,118 +250,178 @@ export default function PaymentMethodsScreen() {
         </View>
       </View>
 
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={primary}
-          />
-        }
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        style={{ flex: 1 }}
       >
-        {loading ? (
-          <ActivityIndicator
-            size="large"
-            color={primary}
-            style={{ marginTop: 50 }}
-          />
-        ) : editing ? (
-          <View style={styles.formContainer}>
-            <View style={styles.inputGap}>
-              <ThemedText type="defaultSemiBold">Bank Name</ThemedText>
-              <ThemedInput
-                value={tempAccount?.bankName}
-                onChangeText={(v) =>
-                  setTempAccount((p) => (p ? { ...p, bankName: v } : null))
-                }
-                placeholder="Enter bank name"
-              />
-            </View>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="always"
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={primary}
+            />
+          }
+        >
+          {loading ? (
+            <ActivityIndicator
+              size="large"
+              color={primary}
+              style={{ marginTop: 50 }}
+            />
+          ) : editing ? (
+            <View style={styles.formContainer}>
+              <View style={styles.inputGap}>
+                <ThemedText type="defaultSemiBold">Bank Name</ThemedText>
+                <ThemedInput
+                  value={tempAccount?.bankName || ""}
+                  onChangeText={(v) => {
+                    setTempAccount(
+                      (p) =>
+                        ({
+                          ...(p || {}),
+                          bankName: v,
+                        }) as BankAccount,
+                    );
+                    if (errors.bankName) {
+                      setErrors((prev) => {
+                        const next = { ...prev };
+                        delete next.bankName;
+                        return next;
+                      });
+                    }
+                  }}
+                  placeholder="Enter bank name"
+                />
+                {errors.bankName && (
+                  <ThemedText
+                    style={{ color: statusError, fontSize: 12, marginTop: 4 }}
+                  >
+                    {errors.bankName}
+                  </ThemedText>
+                )}
+              </View>
 
-            <View style={styles.inputGap}>
-              <ThemedText type="defaultSemiBold">Account Number</ThemedText>
-              <ThemedInput
-                value={tempAccount?.accountNumber}
-                onChangeText={(v) =>
-                  setTempAccount((p) => (p ? { ...p, accountNumber: v } : null))
-                }
-                keyboardType="numeric"
-                maxLength={10}
-                placeholder="10 digit NUBAN"
-              />
-            </View>
+              <View style={styles.inputGap}>
+                <ThemedText type="defaultSemiBold">Account Number</ThemedText>
+                <ThemedInput
+                  value={tempAccount?.accountNumber || ""}
+                  onChangeText={(v) => {
+                    const numOnly = v.replace(/[^0-9]/g, "").slice(0, 10);
+                    setTempAccount(
+                      (p) =>
+                        ({
+                          ...(p || {}),
+                          accountNumber: numOnly,
+                        }) as BankAccount,
+                    );
+                    if (errors.accountNumber) {
+                      setErrors((prev) => {
+                        const next = { ...prev };
+                        delete next.accountNumber;
+                        return next;
+                      });
+                    }
+                  }}
+                  keyboardType="number-pad"
+                  maxLength={10}
+                  placeholder="10 digit NUBAN"
+                />
+                {errors.accountNumber && (
+                  <ThemedText
+                    style={{ color: statusError, fontSize: 12, marginTop: 4 }}
+                  >
+                    {errors.accountNumber}
+                  </ThemedText>
+                )}
+                {tempAccount?.accountNumber && !errors.accountNumber && (
+                  <ThemedText
+                    style={{ color: "#10B981", fontSize: 12, marginTop: 4 }}
+                  >
+                    ✓ {tempAccount.accountNumber.length}/10 digits
+                  </ThemedText>
+                )}
+              </View>
 
-            <View style={styles.inputGap}>
-              <ThemedText type="defaultSemiBold">Account Name</ThemedText>
-              <ThemedInput
-                value={tempAccount?.accountName}
-                onChangeText={(v) =>
-                  setTempAccount((p) => (p ? { ...p, accountName: v } : null))
-                }
-                placeholder="Enter account name"
-              />
-            </View>
+              <View style={styles.inputGap}>
+                <ThemedText type="defaultSemiBold">Account Name</ThemedText>
+                <ThemedInput
+                  value={tempAccount?.accountName || ""}
+                  onChangeText={(v) => {
+                    setTempAccount(
+                      (p) =>
+                        ({
+                          ...(p || {}),
+                          accountName: v,
+                        }) as BankAccount,
+                    );
+                    if (errors.accountName) {
+                      setErrors((prev) => {
+                        const next = { ...prev };
+                        delete next.accountName;
+                        return next;
+                      });
+                    }
+                  }}
+                  placeholder="Enter account name"
+                  returnKeyType="done"
+                  onSubmitEditing={saveChanges}
+                />
+                {errors.accountName && (
+                  <ThemedText
+                    style={{ color: statusError, fontSize: 12, marginTop: 4 }}
+                  >
+                    {errors.accountName}
+                  </ThemedText>
+                )}
+              </View>
 
-            {/* Done Button */}
-            <Pressable
-              style={[styles.doneButton, { backgroundColor: primary }]}
-              onPress={saveChanges}
-              disabled={isSaving}
-            >
-              {isSaving ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <ThemedText style={styles.doneButtonText}>Done</ThemedText>
+              <Pressable
+                onPress={saveChanges}
+                disabled={isSaving || Object.keys(errors).length > 0}
+                style={({ pressed }) => [
+                  styles.doneButton,
+                  {
+                    backgroundColor: primary,
+                    opacity:
+                      pressed || isSaving || Object.keys(errors).length > 0
+                        ? 0.7
+                        : 1,
+                  },
+                ]}
+              >
+                <ThemedText style={styles.doneButtonText}>
+                  {isSaving ? "Saving..." : "Update Account"}
+                </ThemedText>
+              </Pressable>
+            </View>
+          ) : (
+            <View style={styles.viewContainer}>
+              {renderDataRow(
+                "Bank Name",
+                bankAccount?.bankName || "",
+                "house.fill",
               )}
-            </Pressable>
-          </View>
-        ) : (
-          <View style={styles.viewContainer}>
-            <View style={styles.payoutBadge}>
-              <IconSymbol
-                name="checkmark.seal.fill"
-                size={16}
-                color="#10B981"
-              />
-              <ThemedText style={styles.payoutText}>
-                Active Settlement Account
-              </ThemedText>
+              {renderDataRow(
+                "Account Number",
+                bankAccount?.accountNumber || "",
+                "creditcard.fill",
+              )}
+              {renderDataRow(
+                "Account Holder",
+                bankAccount?.accountName || "",
+                "person.crop.circle.fill",
+              )}
             </View>
+          )}
+        </ScrollView>
+      </KeyboardAvoidingView>
 
-            {renderDataRow(
-              "Bank Name",
-              bankAccount?.bankName || "",
-              "house.fill",
-            )}
-            {renderDataRow(
-              "Account Number",
-              bankAccount?.accountNumber || "",
-              "credit-card",
-            )}
-            {renderDataRow(
-              "Account Holder",
-              bankAccount?.accountName || "",
-              "person.crop.circle.fill",
-            )}
-
-            <ThemedText style={[styles.disclaimer, { color: textSecondary }]}>
-              This account will receive all your automated payouts. Please
-              ensure the details are accurate to avoid delays.
-            </ThemedText>
-          </View>
-        )}
-      </ScrollView>
-
-      {/* Updating Overlay */}
-      <Modal
-        visible={isSaving}
-        transparent
-        animationType="fade"
-        onRequestClose={() => {}}
-      >
+      <Modal visible={isSaving} transparent animationType="fade">
         <View style={styles.overlayContainer}>
-          <View style={styles.overlayBox}>
+          <View style={[styles.overlayBox, { backgroundColor: cardBg }]}>
             <ActivityIndicator size="large" color={primary} />
             <ThemedText style={styles.overlayText}>
               Saving bank details...
@@ -292,20 +438,27 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
     paddingVertical: 14,
-    paddingLeft: 16,
+    paddingHorizontal: 16,
     borderBottomWidth: 1,
   },
-  headerSide: { minWidth: 60 },
-  headerTitle: {
-    fontSize: 17,
-    fontWeight: "700",
-    flex: 1,
-    textAlign: "center",
+  headerSide: {
+    width: 70,
+    justifyContent: "center",
   },
-  backBtn: { marginLeft: -8, padding: 8 },
-  scrollContent: { padding: 20 },
+  titleContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  headerTitle: { fontSize: 17, fontWeight: "700" },
+  clickableArea: {
+    paddingVertical: 8,
+    minHeight: 40,
+    justifyContent: "center",
+  },
+  backBtn: { marginLeft: -8 },
+  scrollContent: { padding: 20, paddingBottom: 40 },
   viewContainer: { gap: 10 },
   formContainer: { gap: 24 },
   inputGap: { gap: 8 },
@@ -317,61 +470,34 @@ const styles = StyleSheet.create({
   },
   rowIcon: { marginRight: 16, opacity: 0.7 },
   label: {
-    fontSize: 12,
+    fontSize: 11,
     textTransform: "uppercase",
     letterSpacing: 0.5,
     marginBottom: 2,
   },
   value: { fontSize: 16 },
-  payoutBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    marginBottom: 20,
-  },
-  payoutText: { color: "#10B981", fontSize: 14, fontWeight: "600" },
-  disclaimer: {
-    fontSize: 13,
-    lineHeight: 20,
-    marginTop: 30,
-    textAlign: "center",
-    paddingHorizontal: 20,
-  },
   overlayContainer: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    backgroundColor: "rgba(0,0,0,0.5)",
     justifyContent: "center",
     alignItems: "center",
   },
   overlayBox: {
-    backgroundColor: "#ffffff",
-    borderRadius: 12,
+    borderRadius: 16,
     paddingVertical: 32,
-    paddingHorizontal: 48,
+    paddingHorizontal: 40,
     alignItems: "center",
     gap: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3,
-    elevation: 5,
+    width: "80%",
   },
-  overlayText: {
-    fontSize: 14,
-    fontWeight: "600",
-    textAlign: "center",
-  },
+  overlayText: { fontSize: 15, fontWeight: "600", textAlign: "center" },
   doneButton: {
-    marginTop: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
+    marginTop: 10,
+    paddingVertical: 14,
+    borderRadius: 12,
     alignItems: "center",
+    minHeight: 50,
     justifyContent: "center",
-    minHeight: 48,
   },
-  doneButtonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "700",
-  },
+  doneButtonText: { color: "#fff", fontSize: 16, fontWeight: "700" },
 });
