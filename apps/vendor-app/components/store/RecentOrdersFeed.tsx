@@ -4,7 +4,10 @@ import { StoreOrder } from "@/types/store";
 import { OrderCard } from "@/components/order/OrderCard";
 import { ThemedText } from "@/components/themed-text";
 import { useThemeColor } from "@/hooks/use-theme-color";
-import { useOrderStream, OrderStreamEvent } from "@/hooks/use-order-stream";
+import {
+  useWebSocketOrders,
+  OrderStreamEvent,
+} from "@/hooks/use-websocket-orders";
 import Toast from "react-native-toast-message";
 
 interface Props {
@@ -34,7 +37,7 @@ export const RecentOrdersFeed: React.FC<Props> = ({
 
   const [showLiveIndicator, setShowLiveIndicator] = useState(false);
 
-  // SSE event handlers
+  // WebSocket event handlers
   const handleNewOrder = useCallback(
     (orderData: OrderStreamEvent) => {
       // Show live indicator with animation
@@ -63,11 +66,11 @@ export const RecentOrdersFeed: React.FC<Props> = ({
     [onRefresh],
   );
 
-  // SSE Connection
-  const { isConnected } = useOrderStream({
+  // WebSocket Connection
+  const { isConnected } = useWebSocketOrders({
     onNewOrder: handleNewOrder,
     onOrderUpdate: handleOrderUpdate,
-    enabled: true, // Always enabled for dashboard
+    enabled: true,
   });
 
   const getTab = (status: string): "pending" | "active" | "history" => {

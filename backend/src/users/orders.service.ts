@@ -838,16 +838,21 @@ export class OrdersService {
     items: any[],
   ) {
     await Promise.all([
-      this.vendorOrdersStreamService.emitNewOrder(order.storeId, order.id, {
-        id: order.id,
-        status: order.status,
-        total: order.total,
-        customerName: context.customerName,
-        customerEmail: context.customerEmail,
-        storeName: context.storeName,
-        itemCount: items.length,
-        createdAt: order.createdAt,
-      }),
+      this.vendorOrdersStreamService.emitNewOrder(
+        order.storeId,
+        order.id,
+        {
+          id: order.id,
+          status: order.status,
+          total: order.total,
+          customerName: context.customerName,
+          customerEmail: context.customerEmail,
+          storeName: context.storeName,
+          itemCount: items.length,
+          createdAt: order.createdAt,
+        },
+        context.storeOwnerId,
+      ),
       this.notificationFacade.sendOrderNotifications(
         order.userId,
         context.storeOwnerId,

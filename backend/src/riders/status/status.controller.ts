@@ -1,4 +1,12 @@
-import { Controller, Post, Patch, Body, Req, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Patch,
+  Body,
+  Req,
+  UseGuards,
+  Get,
+} from '@nestjs/common';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { RolesGuard } from '../../auth/roles.guards';
 import { Roles } from '../../auth/roles.decorator';
@@ -38,5 +46,13 @@ export class StatusController {
   async updateStatus(@Req() req, @Body() dto: UpdateRiderStatusDto) {
     const { id } = req.user || {};
     return this.statusService.updateRiderStatus(id, dto);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.RIDER, UserRole.DRIVER)
+  @Get('me')
+  async getRealtimeStatus(@Req() req) {
+    const { id } = req.user || {};
+    return this.statusService.getRealtimeStatus(id);
   }
 }

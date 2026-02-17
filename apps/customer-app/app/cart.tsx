@@ -14,6 +14,7 @@ import { RelativePathString, useRouter } from "expo-router";
 import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { CartItemModifiers } from "@/components/CartItemModifiers";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { useCart } from "@/context/CartContext";
 import { CartItem, Restaurant } from "@/types/cart";
@@ -250,6 +251,12 @@ export default function CartScreen() {
                         >
                           {item.description}
                         </ThemedText>
+                      ) : null}
+
+                      {item.modifierGroups && item.modifierGroups.length > 0 ? (
+                        <CartItemModifiers
+                          modifierGroups={item.modifierGroups}
+                        />
                       ) : null}
 
                       <View style={styles.itemFooter}>

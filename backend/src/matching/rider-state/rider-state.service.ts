@@ -198,4 +198,9 @@ export class RiderStateService {
       state.status === 'ONLINE' && !state.pendingJobId && !state.currentJobId
     );
   }
-}
+
+  async getRealtimeStatus(riderId: string): Promise<'ONLINE' | 'OFFLINE'> {
+    const status = await this.redis.getClient().get(`rider:${riderId}:status`);
+    // Default to OFFLINE if not found in Redis
+    return (status as 'ONLINE' | 'OFFLINE') || 'OFFLINE';
+  }

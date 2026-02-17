@@ -86,4 +86,16 @@ export class StatusService {
         : 'You are now offline',
     };
   }
+
+  /**
+   * Get real-time online status from Redis (matching system)
+   * This is more accurate than database isOnline field
+   */
+  async getRealtimeStatus(riderId: string) {
+    const redisStatus = await this.riderStateService.getRealtimeStatus(riderId);
+    return {
+      isOnline: redisStatus === 'ONLINE',
+      status: redisStatus,
+    };
+  }
 }

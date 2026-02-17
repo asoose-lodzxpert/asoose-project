@@ -1,3 +1,4 @@
+import { ThemedView } from "@/components/themed-view";
 import { useAuth } from "@/context/AuthContext";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter, useSegments } from "expo-router";
@@ -119,14 +120,14 @@ export default function Index() {
 
   // Show loading screen while checking state
   return (
-    <View style={styles.container}>
+    <ThemedView style={styles.container}>
       <Image
         source={require("@/assets/images/icon.png")}
         style={styles.logo}
         resizeMode="contain"
       />
-      <ActivityIndicator size="large" color="#007AFF" style={styles.spinner} />
-    </View>
+      <ActivityIndicator size="large" color="#E5A503" style={styles.spinner} />
+    </ThemedView>
   );
 }
 

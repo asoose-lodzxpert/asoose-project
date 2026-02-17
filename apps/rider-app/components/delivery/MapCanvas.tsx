@@ -231,20 +231,22 @@ const MapCanvas = forwardRef<MapCanvasHandle>((_, ref) => {
       try {
         const { status: permission } =
           await Location.requestForegroundPermissionsAsync();
-        console.log('[MapCanvas] Location permission status:', permission);
+        console.log("[MapCanvas] Location permission status:", permission);
         if (permission !== "granted") {
-          console.warn('[MapCanvas] Location permission denied - map will not display');
-          setMapError('Location permission denied');
+          console.warn(
+            "[MapCanvas] Location permission denied - map will not display",
+          );
+          setMapError("Location permission denied");
           return;
         }
 
         const current = await Location.getCurrentPositionAsync({});
-        console.log('[MapCanvas] Current location obtained:', current.coords);
+        console.log("[MapCanvas] Current location obtained:", current.coords);
         setLocation(current);
         setMapError(null);
 
         // Start watching position
-        console.log('[MapCanvas] Starting location watch');
+        console.log("[MapCanvas] Starting location watch");
         const subscription = await Location.watchPositionAsync(
           {
             accuracy: Location.Accuracy.High,
@@ -252,7 +254,7 @@ const MapCanvas = forwardRef<MapCanvasHandle>((_, ref) => {
             distanceInterval: 5,
           },
           (loc) => {
-            console.log('[MapCanvas] Location updated:', loc.coords);
+            console.log("[MapCanvas] Location updated:", loc.coords);
             setLocation(loc);
             mapRef.current?.animateToRegion(
               {
@@ -268,11 +270,11 @@ const MapCanvas = forwardRef<MapCanvasHandle>((_, ref) => {
 
         // Return cleanup function
         return () => {
-          console.log('[MapCanvas] Stopping location watch');
+          console.log("[MapCanvas] Stopping location watch");
           subscription.remove();
         };
       } catch (error) {
-        console.error('[MapCanvas] Location initialization error:', error);
+        console.error("[MapCanvas] Location initialization error:", error);
         setMapError(`Location error: ${error}`);
       }
     })();
@@ -353,10 +355,26 @@ const MapCanvas = forwardRef<MapCanvasHandle>((_, ref) => {
   }));
 
   if (mapError) {
-    console.error('[MapCanvas] Rendering error state:', mapError);
+    console.error("[MapCanvas] Rendering error state:", mapError);
     return (
-      <View style={[StyleSheet.absoluteFillObject, { justifyContent: 'center', alignItems: 'center', backgroundColor: colorScheme === 'dark' ? '#1a1a1a' : '#f5f5f5' }]}>
-        <Text style={{ color: colorScheme === 'dark' ? '#fff' : '#000', fontSize: 16, textAlign: 'center', paddingHorizontal: 20 }}>
+      <View
+        style={[
+          StyleSheet.absoluteFillObject,
+          {
+            justifyContent: "center",
+            alignItems: "center",
+            backgroundColor: colorScheme === "dark" ? "#1a1a1a" : "#f5f5f5",
+          },
+        ]}
+      >
+        <Text
+          style={{
+            color: colorScheme === "dark" ? "#fff" : "#000",
+            fontSize: 16,
+            textAlign: "center",
+            paddingHorizontal: 20,
+          }}
+        >
           ⚠️ Map Error: {mapError}
         </Text>
       </View>
@@ -364,15 +382,26 @@ const MapCanvas = forwardRef<MapCanvasHandle>((_, ref) => {
   }
 
   if (!location) {
-    console.log('[MapCanvas] Waiting for location - map not rendered');
+    console.log("[MapCanvas] Waiting for location - map not rendered");
     return (
-      <View style={[StyleSheet.absoluteFillObject, { justifyContent: 'center', alignItems: 'center', backgroundColor: colorScheme === 'dark' ? '#1a1a1a' : '#f5f5f5' }]}>
-        <Text style={{ color: colorScheme === 'dark' ? '#fff' : '#000' }}>Loading map...</Text>
+      <View
+        style={[
+          StyleSheet.absoluteFillObject,
+          {
+            justifyContent: "center",
+            alignItems: "center",
+            backgroundColor: colorScheme === "dark" ? "#1a1a1a" : "#f5f5f5",
+          },
+        ]}
+      >
+        <Text style={{ color: colorScheme === "dark" ? "#fff" : "#000" }}>
+          Loading map...
+        </Text>
       </View>
     );
   }
 
-  console.log('[MapCanvas] Rendering map with location:', location.coords);
+  console.log("[MapCanvas] Rendering map with location:", location.coords);
 
   return (
     <>
@@ -394,12 +423,12 @@ const MapCanvas = forwardRef<MapCanvasHandle>((_, ref) => {
         showsMyLocationButton={false}
         showsCompass={false}
         onMapReady={() => {
-          console.log('[MapCanvas] ✅ Map ready and rendered successfully');
+          console.log("[MapCanvas] ✅ Map ready and rendered successfully");
           setIsMapReady(true);
           setMapError(null);
         }}
         onError={(error) => {
-          console.error('[MapCanvas] ❌ Map error event:', error);
+          console.error("[MapCanvas] ❌ Map error event:", error);
           setMapError(JSON.stringify(error));
           setIsMapReady(false);
         }}
