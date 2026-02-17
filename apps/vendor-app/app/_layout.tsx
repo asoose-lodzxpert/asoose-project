@@ -9,6 +9,7 @@ import { toastConfig } from "@/components/ThemedToast";
 import { AuthProvider } from "@/context/AuthContext";
 import { NotificationProvider } from "@/context/NotificationContext";
 import { NotificationPreferencesProvider } from "@/context/NotificationPreferencesContext";
+import { BalanceProvider } from "@/context/BalanceContext";
 
 /**
  * RootNavigator now ALWAYS renders all routes.
@@ -49,12 +50,14 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ErrorBoundary>
         <AuthProvider>
-          <NotificationProvider>
-            <NotificationPreferencesProvider>
-              <RootNavigator />
-              <Toast config={toastConfig} />
-            </NotificationPreferencesProvider>
-          </NotificationProvider>
+          <BalanceProvider>
+            <NotificationProvider>
+              <NotificationPreferencesProvider>
+                <RootNavigator />
+                <Toast config={toastConfig} />
+              </NotificationPreferencesProvider>
+            </NotificationProvider>
+          </BalanceProvider>
         </AuthProvider>
       </ErrorBoundary>
     </GestureHandlerRootView>

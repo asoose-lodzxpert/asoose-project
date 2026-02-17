@@ -15,10 +15,10 @@ import { ThemedText } from "@/components/themed-text";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import {
-  fetchStoreBalance,
-  fetchBankAccounts, // Keeping name for service consistency, but treating as single
+  fetchBankAccounts,
   createWithdrawal,
 } from "@/services/withdrawal.service";
+import { useBalance } from "@/context/BalanceContext";
 import { WithdrawalHistoryModal } from "@/components/withdrawal/WithdrawalHistoryModal";
 
 interface BankAccount {
@@ -35,8 +35,7 @@ export default function WithdrawalScreen() {
   const surfaceCard = useThemeColor({}, "surfaceCard");
   const mutedText = useThemeColor({}, "textDisabled");
   const textPrimary = useThemeColor({}, "textPrimary");
-
-  const [balance, setBalance] = useState(0);
+  const { balance, refetchBalance } = useBalance();
   const [amount, setAmount] = useState("");
   const [bankAccount, setBankAccount] = useState<BankAccount | null>(null);
   const [loading, setLoading] = useState(false);
@@ -49,12 +48,11 @@ export default function WithdrawalScreen() {
 
   const loadData = async () => {
     try {
-      const [balanceData, accountData] = await Promise.all([
-        fetchStoreBalance(),
+      const [_, accountData] = await Promise.all([
+        refetchBalance(),
         fetchBankAccounts(),
       ]);
 
-      setBalance(balanceData?.amount ?? 0);
       // Handle case where it might come as an array or object
       const account = Array.isArray(accountData) ? accountData[0] : accountData;
       setBankAccount(account || null);
@@ -78,7 +76,7 @@ export default function WithdrawalScreen() {
       });
     }
 
-    if (parseFloat(amount) > balance) {
+    if (parseFloat(amount) > (balance ?? 0)) {
       return Toast.show({ type: "error", text1: "Insufficient balance" });
     }
 
@@ -102,8 +100,7 @@ export default function WithdrawalScreen() {
         text2: "Your withdrawal is pending approval",
       });
 
-      const balanceData = await fetchStoreBalance();
-      setBalance(balanceData?.amount ?? 0);
+      await refetchBalance();
       setAmount("");
     } catch (error: any) {
       Toast.show({
@@ -118,31 +115,11 @@ export default function WithdrawalScreen() {
   if (initialLoading) {
     return (
       <ThemedView style={{ flex: 1 }}>
-        <View style={[styles.header, { borderBottomColor: borderColor }]} />
-        <View style={styles.content}>
-          <View
-            style={[
-              styles.balanceCard,
-              { backgroundColor: surfaceCard, height: 120, opacity: 0.3 },
-            ]}
-          />
-          <View
-            style={{
-              height: 56,
-              backgroundColor: surfaceCard,
-              borderRadius: 12,
-              opacity: 0.3,
-            }}
-          />
-          <View
-            style={{
-              height: 100,
-              backgroundColor: surfaceCard,
-              borderRadius: 12,
-              opacity: 0.3,
-            }}
-          />
-        </View>
+        <ActivityIndicator
+          size="large"
+          color={primary}
+          style={{ marginTop: 40 }}
+        />
       </ThemedView>
     );
   }
@@ -173,7 +150,7 @@ export default function WithdrawalScreen() {
             Available Balance
           </ThemedText>
           <ThemedText type="title" style={{ fontSize: 32, marginTop: 8 }}>
-            ₦{balance.toLocaleString()}
+            ₦{(balance ?? 0).toLocaleString()}
           </ThemedText>
         </View>
 

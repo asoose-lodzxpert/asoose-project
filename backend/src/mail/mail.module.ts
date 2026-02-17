@@ -18,16 +18,16 @@ import { join } from 'path';
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
         transport: {
-          host: config.get<string>('MAIL_HOST'),
-          port: config.get<number>('MAIL_PORT'),
-          secure: String(config.get('MAIL_SECURE')) === 'true',
+          host: config.get<string>('EMAIL_HOST'),
+          port: config.get<number>('EMAIL_PORT'),
+          secure: String(config.get('EMAIL_SECURE')) === 'true',
           auth: {
-            user: config.get<string>('MAIL_USER'),
-            pass: config.get<string>('MAIL_PASS'),
+            user: config.get<string>('EMAIL_USER'),
+            pass: config.get<string>('EMAIL_PASSWORD'),
           },
         },
         defaults: {
-          from: `"Asoose " <${config.get<string>('MAIL_FROM')}>`,
+          from: `"Asoose " <${config.get<string>('EMAIL_FROM')}>`,
         },
         template: {
           dir: join(__dirname, '..', '..', 'libs', 'mail', 'templates'),

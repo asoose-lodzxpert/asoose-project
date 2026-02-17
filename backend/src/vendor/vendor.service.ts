@@ -99,7 +99,7 @@ export class VendorService {
   async getStoreBalance(vendorId: string) {
     const store = await this.prisma.store.findUnique({
       where: { vendorId },
-      select: { walletBalance: true }, // ✅ FIX: Using correct ledger-backed balance
+      select: { walletBalance: true },
     });
     return { amount: store?.walletBalance ?? 0 };
   }
@@ -128,18 +128,37 @@ export class VendorService {
       };
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+
+    // Fetch all PAID orders for today (any status)
     const orders = await this.prisma.order.findMany({
       where: {
         storeId: store.id,
         createdAt: { gte: today },
+        paymentStatus: 'PAID',
       },
     });
-    const todaysOrders = orders.length;
-    const todaysSales = orders.reduce((sum, o) => sum + (o.total || 0), 0);
 
+    // Only count DELIVERED orders for metrics
+    let todaysOrders = 0;
+    let todaysSales = 0;
+    for (const o of orders) {
+      if (o.status === 'DELIVERED') {
+        todaysOrders++;
+        todaysSales += o.total || 0;
+      }
+    }
+
+    // Count all orders for today NOT DELIVERED, CANCELLED, or REJECTED
     const pendingApprovals = await this.prisma.order.count({
-      where: { storeId: store.id, status: 'PENDING' },
+      where: {
+        storeId: store.id,
+        createdAt: { gte: today },
+        status: {
+          notIn: ['DELIVERED', 'CANCELLED', 'REJECTED'],
+        },
+      },
     });
+
     const avgRating = Math.round(store.rating || 0);
     return { todaysOrders, todaysSales, pendingApprovals, avgRating };
   }
