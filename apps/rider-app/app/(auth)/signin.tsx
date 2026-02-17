@@ -10,11 +10,13 @@ import {
   TouchableWithoutFeedback,
   View,
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { ThemedInput } from "@/components/ThemedInput";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { LocationDisclosureModal } from "@/components/LocationDisclosureModal";
 import { useAuth } from "@/context/AuthContext";
 import { useConfirm } from "@/hooks/use-confirm";
 import { useThemeColor } from "@/hooks/use-theme-color";
@@ -28,6 +30,7 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const [biometricLoading, setBiometricLoading] = useState(false);
   const [error, setError] = useState("");
+  const [showLocationDisclosure, setShowLocationDisclosure] = useState(false);
 
   const {
     login,
@@ -81,6 +84,15 @@ export default function LoginScreen() {
     try {
       await login({ email: identifier, password });
 
+      // Check if user has seen location disclosure
+      const hasSeenDisclosure = await AsyncStorage.getItem(
+        "locationDisclosureSeen",
+      );
+      if (!hasSeenDisclosure) {
+        setShowLocationDisclosure(true);
+        return;
+      }
+
       const enabled = await isBiometricEnabled();
       if (biometricAvailable && !enabled) {
         const wantsBiometric = await confirm({
@@ -121,6 +133,56 @@ export default function LoginScreen() {
     }
   }
 
+  async function handleLocationDisclosureAccepted() {
+    try {
+      // Mark disclosure as seen
+      await AsyncStorage.setItem("locationDisclosureSeen", "true");
+      setShowLocationDisclosure(false);
+
+      // Continue with biometric prompt if needed
+      const enabled = await isBiometricEnabled();
+      if (biometricAvailable && !enabled) {
+        const wantsBiometric = await confirm({
+          title: "Enable Biometric Login?",
+          message:
+            "Would you like to enable biometric authentication for faster login in the future?",
+          confirmText: "Yes",
+          cancelText: "No",
+          type: "info",
+          icon: "touchid",
+        });
+        if (wantsBiometric) {
+          try {
+            setBiometricLoading(true);
+            await enableBiometrics(identifier, password);
+            Toast.show({
+              type: "success",
+              text1: "Biometric Enabled",
+              text2: "You can now use biometric login.",
+            });
+          } catch (e: any) {
+            Toast.show({
+              type: "error",
+              text1: "Biometric Setup Failed",
+              text2: e.message || "Could not enable biometric login.",
+            });
+          } finally {
+            setBiometricLoading(false);
+          }
+        }
+      }
+
+      // Navigate to home
+      router.replace("/");
+    } catch (e: any) {
+      Toast.show({
+        type: "error",
+        text1: "Error",
+        text2: "Failed to proceed. Please try again.",
+      });
+    }
+  }
+
   async function handleBiometricLogin() {
     if (!biometricAvailable || !biometricEnrolled) return;
 
@@ -146,6 +208,10 @@ export default function LoginScreen() {
   return (
     <ThemedView style={styles.container}>
       <ConfirmModal />
+      <LocationDisclosureModal
+        visible={showLocationDisclosure}
+        onAccept={handleLocationDisclosureAccepted}
+      />
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <View style={{ flex: 1 }}>
           <KeyboardAvoidingView

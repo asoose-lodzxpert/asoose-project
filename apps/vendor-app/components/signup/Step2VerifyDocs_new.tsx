@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { View, StyleSheet, Pressable, ScrollView, Image } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system";
@@ -19,6 +19,7 @@ export const Step2VerifyDocs: React.FC<Step2Props> = ({ data, onChange }) => {
   const primary = useThemeColor({}, "brandPrimary");
   const successColor = useThemeColor({}, "statusSuccess");
   const textMuted = useThemeColor({}, "textMuted");
+  const borderDefault = useThemeColor({}, "borderDefault");
   const errorColor = useThemeColor({}, "statusError");
 
   const pickFile = async (

@@ -3,6 +3,9 @@ import { BusinessType, EmployeeRange, CountryCode } from "@/config/signup";
 export interface SignupStep1Data {
   businessName: string;
   businessEmail: string;
+  businessEmailVerified: boolean;
+  otpCode: string;
+  otpSent: boolean;
   countryCode: CountryCode | "";
   phoneNumber: string;
   businessType: BusinessType | "";
@@ -11,9 +14,12 @@ export interface SignupStep1Data {
 }
 
 export interface SignupStep2Data {
-  businessRegCert?: string;
-  taxIdDoc?: string;
-  proofOfAddress?: string;
+  businessRegCertUri?: string;
+  businessRegCertName?: string;
+  taxIdDocUri?: string;
+  taxIdDocName?: string;
+  proofOfAddressUri?: string;
+  proofOfAddressName?: string;
 }
 
 export type DayOfWeek =
@@ -37,8 +43,10 @@ export type OpenHours = Partial<Record<DayOfWeek, OpenHour>>;
 export interface SignupStep3Data {
   storeName: string;
   storeDescription: string;
-  storeLogo?: string;
-  storeBanner?: string;
+  storeLogoUri?: string;
+  storeLogoName?: string;
+  storeBannerUri?: string;
+  storeBannerName?: string;
   location?: { lat: number; lng: number };
   openHours?: OpenHours;
 }

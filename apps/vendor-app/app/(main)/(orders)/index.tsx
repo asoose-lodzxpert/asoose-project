@@ -384,7 +384,7 @@ export default function OrderScreen() {
                 }}
               />
               <ThemedText type="caption" style={{ fontSize: 11 }}>
-                {isConnected ? "Live" : sseError ? "Polling" : "Connecting..."}
+                {isConnected ? "Live" : wsError ? "Polling" : "Connecting..."}
               </ThemedText>
               <ThemedText type="caption" style={{ marginLeft: 4 }}>
                 •

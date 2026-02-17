@@ -1,8 +1,11 @@
 import { useAuth } from "@/context/AuthContext";
+import { useThemeColor } from "@/hooks/use-theme-color";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter, useSegments } from "expo-router";
 import React, { useEffect, useState } from "react";
 import { ActivityIndicator, Image, StyleSheet, View } from "react-native";
+import { ThemedView } from "@/components/themed-view";
+import { ThemedText } from "@/components/themed-text";
 
 const ONBOARDING_KEY = "asoose_vendor_onboarded";
 
@@ -17,6 +20,7 @@ export default function Index() {
   const { user, loading: authLoading } = useAuth();
   const segments: string[] = useSegments();
   const router = useRouter();
+  const primaryColor = useThemeColor({}, "brandPrimary");
 
   const [onboardingChecked, setOnboardingChecked] = useState(false);
   const [hasSeenOnboarding, setHasSeenOnboarding] = useState(false);
@@ -35,8 +39,6 @@ export default function Index() {
     };
     checkOnboarding();
   }, []);
-
-  // ...existing code...
 
   // Handle navigation once we have all the info
   useEffect(() => {
@@ -142,14 +144,21 @@ export default function Index() {
 
   // Show loading screen while checking state
   return (
-    <View style={styles.container}>
+    <ThemedView style={styles.container}>
       <Image
         source={require("@/assets/images/icon.png")}
         style={styles.logo}
         resizeMode="contain"
       />
-      <ActivityIndicator size="large" color="#E5A503" style={styles.spinner} />
-    </View>
+      <View style={styles.spinnerContainer}>
+        <ActivityIndicator
+          size="large"
+          color={primaryColor}
+          style={styles.spinner}
+        />
+      </View>
+      <ThemedText style={styles.loadingText}>Getting you ready...</ThemedText>
+    </ThemedView>
   );
 }
 
@@ -165,7 +174,15 @@ const styles = StyleSheet.create({
     height: 120,
     marginBottom: 24,
   },
+  spinnerContainer: {
+    marginTop: 16,
+  },
   spinner: {
     marginTop: 16,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 14,
+    fontWeight: "500",
   },
 });

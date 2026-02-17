@@ -12,10 +12,12 @@ import {
   TouchableWithoutFeedback,
   Animated,
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { ThemedView } from "@/components/themed-view";
 import { ThemedInput } from "@/components/ThemedInput";
 import { ThemedText } from "@/components/themed-text";
+import { LocationDisclosureModal } from "@/components/LocationDisclosureModal";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "expo-router";
 import { IconSymbol } from "@/components/ui/icon-symbol";
@@ -26,6 +28,7 @@ export default function LoginScreen() {
   const [secure, setSecure] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [showLocationDisclosure, setShowLocationDisclosure] = useState(false);
 
   const { signIn } = useAuth();
   const router = useRouter();
@@ -78,6 +81,16 @@ export default function LoginScreen() {
 
     try {
       await signIn(identifier, password);
+
+      // Check if user has seen location disclosure
+      const hasSeenDisclosure = await AsyncStorage.getItem(
+        "locationDisclosureSeen",
+      );
+      if (!hasSeenDisclosure) {
+        setShowLocationDisclosure(true);
+        return;
+      }
+
       router.replace("/");
     } catch (e: any) {
       setError(e.message);
@@ -86,8 +99,25 @@ export default function LoginScreen() {
     }
   }
 
+  async function handleLocationDisclosureAccepted() {
+    try {
+      // Mark disclosure as seen
+      await AsyncStorage.setItem("locationDisclosureSeen", "true");
+      setShowLocationDisclosure(false);
+
+      // Navigate to home
+      router.replace("/");
+    } catch (e: any) {
+      setError("Failed to proceed. Please try again.");
+    }
+  }
+
   return (
     <ThemedView style={styles.container}>
+      <LocationDisclosureModal
+        visible={showLocationDisclosure}
+        onAccept={handleLocationDisclosureAccepted}
+      />
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <View style={{ flex: 1 }}>
           {/* Logo removed for cleaner, centered layout */}

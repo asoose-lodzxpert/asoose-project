@@ -109,9 +109,9 @@ export const Step4Review: React.FC<Step4Props> = ({ data }) => {
       >
         <ThemedText type="subtitle">Verification Documents</ThemedText>
         <View style={styles.documentsGrid}>
-          {renderDocument(step2.businessRegCert, "Business Registration")}
-          {renderDocument(step2.taxIdDoc, "Tax ID")}
-          {renderDocument(step2.proofOfAddress, "Proof of Address")}
+          {renderDocument(step2.businessRegCertUri, "Business Registration")}
+          {renderDocument(step2.taxIdDocUri, "Tax ID")}
+          {renderDocument(step2.proofOfAddressUri, "Proof of Address")}
         </View>
       </View>
 
@@ -132,15 +132,15 @@ export const Step4Review: React.FC<Step4Props> = ({ data }) => {
         </View>
 
         <ThemedText style={{ marginTop: 8 }}>Store Logo</ThemedText>
-        {step3.storeLogo ? (
-          <Image source={{ uri: step3.storeLogo }} style={styles.logo} />
+        {step3.storeLogoUri ? (
+          <Image source={{ uri: step3.storeLogoUri }} style={styles.logo} />
         ) : (
           <IconSymbol size={40} name="camera.fill" color={textSecondary} />
         )}
 
         <ThemedText style={{ marginTop: 8 }}>Store Banner</ThemedText>
-        {step3.storeBanner ? (
-          <Image source={{ uri: step3.storeBanner }} style={styles.banner} />
+        {step3.storeBannerUri ? (
+          <Image source={{ uri: step3.storeBannerUri }} style={styles.banner} />
         ) : (
           <IconSymbol size={40} name="camera.fill" color={textSecondary} />
         )}
