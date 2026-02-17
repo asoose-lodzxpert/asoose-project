@@ -41,14 +41,15 @@
         "INTERNET",
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
         "POST_NOTIFICATIONS",
         "android.permission.ACCESS_COARSE_LOCATION",
-        "android.permission.ACCESS_FINE_LOCATION"
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_BACKGROUND_LOCATION"
       ],
       "blockedPermissions": [
         "CAMERA",
         "RECORD_AUDIO",
-        "ACCESS_BACKGROUND_LOCATION",
         "READ_CONTACTS",
         "CALL_PHONE",
         "SEND_SMS"
@@ -73,7 +74,8 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "ASOOSE Rider App needs your location to show your real-time position, match you with nearby orders, and provide accurate navigation. Location is required for delivery services."
+          "locationAlwaysAndWhenInUsePermission": "ASOOSE Rider App needs your location to show your real-time position, match you with nearby orders, and provide accurate navigation. Location is required for delivery services.",
+          "locationAlwaysPermission": "ASOOSE Rider App requires background location access to track your position and keep you matched with orders while the app is closed."
         }
       ],
       [

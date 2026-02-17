@@ -23,6 +23,14 @@
         "EXPO_PUBLIC_API_URL": "https://api.asoose.com/api/v1",
         "EXPO_ANDROID_BUILD_DEOBFUSCATION": "1"
       }
+    },
+    "development-simulator": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "ios": {
+        "simulator": true
+      },
+      "environment": "development"
     }
   },
   "submit": {

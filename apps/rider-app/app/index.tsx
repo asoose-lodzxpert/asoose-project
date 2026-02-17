@@ -1,23 +1,19 @@
 import { ThemedView } from "@/components/themed-view";
 import { useAuth } from "@/context/AuthContext";
+import { useThemeColor } from "@/hooks/use-theme-color";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter, useSegments } from "expo-router";
 import React, { useEffect, useState } from "react";
 import { ActivityIndicator, Image, StyleSheet, View } from "react-native";
+import { ThemedText } from "@/components/themed-text";
 
 const ONBOARDING_KEY = "asoose_rider_onboarded";
 
-/**
- * This is the initial route "/" that handles all redirects.
- * It determines where the user should go based on:
- * 1. Onboarding/welcome status
- * 2. Authentication status
- * 3. Rider account status (PENDING, ACTIVE, SUSPENDED, BANNED)
- */
 export default function Index() {
   const { user, initialLoading } = useAuth();
   const segments: string[] = useSegments();
   const router = useRouter();
+  const primaryColor = useThemeColor({}, "brandPrimary");
 
   const [onboardingChecked, setOnboardingChecked] = useState(false);
   const [hasSeenWelcome, setHasSeenWelcome] = useState(false);
@@ -29,7 +25,7 @@ export default function Index() {
         const seen = await AsyncStorage.getItem(ONBOARDING_KEY);
         setHasSeenWelcome(seen === "true");
       } catch (e) {
-        setHasSeenWelcome(false); // Show welcome on error
+        setHasSeenWelcome(false);
       } finally {
         setOnboardingChecked(true);
       }
@@ -39,38 +35,28 @@ export default function Index() {
 
   // Handle navigation once we have all the info
   useEffect(() => {
-    if (!onboardingChecked || initialLoading) {
-      return; // Still loading, don't navigate yet
-    }
+    if (!onboardingChecked || initialLoading) return;
 
     const inAuthGroup = segments[0] === "(auth)";
     const inWelcome = segments[0] === "welcome";
     const inStatusGroup = segments[0] === "(status)";
     const inTabs = segments[0] === "(tabs)";
 
-    // User hasn't seen welcome screen AND is not authenticated
     if (!hasSeenWelcome && !inWelcome && !user) {
       router.replace("/welcome");
       return;
     }
 
-    // User is not authenticated (has seen welcome per previous check)
     if (!user && !inAuthGroup) {
       router.replace("/(auth)/signin");
       return;
     }
 
-    // User is authenticated - check rider status and route accordingly
     if (user) {
       const status = user.status?.trim().toUpperCase() ?? "";
-
-      // Check if we're in the wrong group or at root
-      const shouldRedirect =
-        segments.length === 0 || // At root
-        inAuthGroup; // In auth when should be authenticated
+      const shouldRedirect = segments.length === 0 || inAuthGroup;
 
       if (shouldRedirect) {
-        // Route based on rider status
         switch (status) {
           case "PENDING":
             router.replace("/(status)/pending");
@@ -91,14 +77,12 @@ export default function Index() {
         return;
       }
 
-      // Also redirect if status changed (e.g., was active, now suspended)
       if (status === "ACTIVE" && !inTabs) {
         router.replace("/(tabs)");
         return;
       }
 
       if (status !== "ACTIVE" && !inStatusGroup) {
-        // Non-active rider but not in status pages
         switch (status) {
           case "PENDING":
             router.replace("/(status)/pending");
@@ -118,7 +102,6 @@ export default function Index() {
     }
   }, [user, segments, onboardingChecked, initialLoading, hasSeenWelcome]);
 
-  // Show loading screen while checking state
   return (
     <ThemedView style={styles.container}>
       <Image
@@ -126,7 +109,10 @@ export default function Index() {
         style={styles.logo}
         resizeMode="contain"
       />
-      <ActivityIndicator size="large" color="#E5A503" style={styles.spinner} />
+      <View style={styles.spinnerContainer}>
+        <ActivityIndicator size="large" color={primaryColor} />
+      </View>
+      <ThemedText style={styles.loadingText}>Getting you ready...</ThemedText>
     </ThemedView>
   );
 }
@@ -136,14 +122,20 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#fff",
   },
   logo: {
     width: 120,
     height: 120,
     marginBottom: 24,
   },
-  spinner: {
+  spinnerContainer: {
     marginTop: 16,
+    height: 40,
+    justifyContent: "center",
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 14,
+    fontWeight: "500",
   },
 });

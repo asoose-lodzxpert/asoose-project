@@ -6,6 +6,7 @@ import {
   Pressable,
   RefreshControl,
   ActivityIndicator,
+  Modal,
 } from "react-native";
 import { useRouter } from "expo-router";
 import Toast from "react-native-toast-message";
@@ -71,6 +72,21 @@ export default function PaymentMethodsScreen() {
 
   const saveChanges = async () => {
     if (!tempAccount) return;
+
+    // Validation
+    if (!tempAccount.bankName || tempAccount.bankName.trim() === "") {
+      Toast.show({ type: "error", text1: "Bank name is required" });
+      return;
+    }
+    if (!tempAccount.accountNumber || tempAccount.accountNumber.trim() === "") {
+      Toast.show({ type: "error", text1: "Account number is required" });
+      return;
+    }
+    if (!tempAccount.accountName || tempAccount.accountName.trim() === "") {
+      Toast.show({ type: "error", text1: "Account name is required" });
+      return;
+    }
+
     setIsSaving(true);
     try {
       const updated = await updateBankAccount(tempAccount);
@@ -78,6 +94,10 @@ export default function PaymentMethodsScreen() {
       setTempAccount(updated);
       setEditing(false);
       Toast.show({ type: "success", text1: "Bank details updated" });
+      // Navigate back after successful save
+      setTimeout(() => {
+        router.back();
+      }, 500);
     } catch (error: any) {
       Toast.show({ type: "error", text1: "Update failed" });
     } finally {
@@ -196,6 +216,19 @@ export default function PaymentMethodsScreen() {
                 placeholder="Enter account name"
               />
             </View>
+
+            {/* Done Button */}
+            <Pressable
+              style={[styles.doneButton, { backgroundColor: primary }]}
+              onPress={saveChanges}
+              disabled={isSaving}
+            >
+              {isSaving ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <ThemedText style={styles.doneButtonText}>Done</ThemedText>
+              )}
+            </Pressable>
           </View>
         ) : (
           <View style={styles.viewContainer}>
@@ -233,6 +266,23 @@ export default function PaymentMethodsScreen() {
           </View>
         )}
       </ScrollView>
+
+      {/* Updating Overlay */}
+      <Modal
+        visible={isSaving}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {}}
+      >
+        <View style={styles.overlayContainer}>
+          <View style={styles.overlayBox}>
+            <ActivityIndicator size="large" color={primary} />
+            <ThemedText style={styles.overlayText}>
+              Saving bank details...
+            </ThemedText>
+          </View>
+        </View>
+      </Modal>
     </ThemedView>
   );
 }
@@ -244,7 +294,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingVertical: 14,
-    paddingHorizontal: 16,
+    paddingLeft: 16,
     borderBottomWidth: 1,
   },
   headerSide: { minWidth: 60 },
@@ -286,5 +336,42 @@ const styles = StyleSheet.create({
     marginTop: 30,
     textAlign: "center",
     paddingHorizontal: 20,
+  },
+  overlayContainer: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  overlayBox: {
+    backgroundColor: "#ffffff",
+    borderRadius: 12,
+    paddingVertical: 32,
+    paddingHorizontal: 48,
+    alignItems: "center",
+    gap: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3,
+    elevation: 5,
+  },
+  overlayText: {
+    fontSize: 14,
+    fontWeight: "600",
+    textAlign: "center",
+  },
+  doneButton: {
+    marginTop: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 48,
+  },
+  doneButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "700",
   },
 });

@@ -7,6 +7,25 @@
   "client": [
     {
       "client_info": {
+        "mobilesdk_app_id": "1:520199690549:android:ee6b0579848bfc4675547c",
+        "android_client_info": {
+          "package_name": "com.asoose.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAtqHfcdAnzptfNEOVEzabs5l7nB1hTJmg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
         "mobilesdk_app_id": "1:520199690549:android:0b514966f03ed50975547c",
         "android_client_info": {
           "package_name": "com.asoose.customer.app"

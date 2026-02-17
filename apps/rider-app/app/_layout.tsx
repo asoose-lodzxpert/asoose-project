@@ -20,8 +20,8 @@ function RootNavigator() {
       <Stack.Screen name="(auth)" />
       <Stack.Screen name="(status)" />
       <Stack.Screen name="(tabs)" />
-      <Stack.Screen name="(earnings)" />
-      <Stack.Screen name="(profile)" />
+      {/* <Stack.Screen name="(earnings)" />
+      <Stack.Screen name="(profile)" /> */}
       <Stack.Screen name="modal" options={{ presentation: "modal" }} />
     </Stack>
   );
