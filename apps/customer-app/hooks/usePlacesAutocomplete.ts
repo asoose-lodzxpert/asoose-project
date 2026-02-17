@@ -1,7 +1,6 @@
-import axios from "axios";
 import { useEffect, useRef, useState } from "react";
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL;
+const GOOGLE_MAPS_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
 
 export function usePlacesAutocomplete(query: string, location?: string) {
   const [results, setResults] = useState<any[]>([]);
@@ -17,13 +16,16 @@ export function usePlacesAutocomplete(query: string, location?: string) {
     debounceRef.current = window.setTimeout(async () => {
       setLoading(true);
       try {
-        const params: any = { query };
-        if (location) params.location = location;
-        const res = await axios.get(`${API_URL}/maps/places-autocomplete`, {
-          params,
-        });
-        setResults(res.data);
-      } catch {
+        // Use Google Places Autocomplete API directly
+        let url = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(query)}&key=${GOOGLE_MAPS_API_KEY}`;
+        if (location) {
+          url += `&location=${location}`;
+        }
+        const res = await fetch(url);
+        const data = await res.json();
+        setResults(data.predictions || []);
+      } catch (error) {
+        if (__DEV__) console.error("Places autocomplete error:", error);
         setResults([]);
       } finally {
         setLoading(false);

@@ -56,7 +56,7 @@ export default function LocationPickerScreen() {
   const [reverseGeocodedAddress, setReverseGeocodedAddress] = useState("");
   const [gettingPlaceDetails, setGettingPlaceDetails] = useState(false);
   const mapRef = useRef<MapView>(null);
-  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const searchTimeoutRef = useRef<number | null>(null);
 
   // Debounced autocomplete search
   const searchPlaces = useCallback(
@@ -68,20 +68,16 @@ export default function LocationPickerScreen() {
 
       setSearching(true);
       try {
-        const location = currentLocation?.coords
-          ? `${currentLocation.coords.latitude},${currentLocation.coords.longitude}`
-          : undefined;
+        const GOOGLE_MAPS_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
+        let url = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(query)}&key=${GOOGLE_MAPS_API_KEY}`;
 
-        const params: any = { query };
-        if (location) params.location = location;
+        if (currentLocation?.coords) {
+          url += `&location=${currentLocation.coords.latitude},${currentLocation.coords.longitude}`;
+        }
 
-        const response = await axios.get(
-          `${API_URL}/maps/places-autocomplete`,
-          {
-            params,
-          },
-        );
-        setAutocompleteResults(response.data || []);
+        const response = await fetch(url);
+        const data = await response.json();
+        setAutocompleteResults(data.predictions || []);
       } catch (error) {
         console.error("Autocomplete error:", error);
         setAutocompleteResults([]);

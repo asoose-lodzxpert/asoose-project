@@ -160,7 +160,7 @@ export async function registerForPushNotificationsAsync(): Promise<
 // Save push token to backend
 export async function savePushToken(token: string): Promise<void> {
   try {
-    await request("users/push-token", {
+    await request("auth/user/push-token", {
       method: "POST",
       body: JSON.stringify({ token, platform: Platform.OS }),
     });
@@ -175,7 +175,7 @@ export async function savePushToken(token: string): Promise<void> {
 // Remove push token (on logout)
 export async function removePushToken(): Promise<void> {
   try {
-    await request("users/push-token", {
+    await request("auth/user/push-token", {
       method: "DELETE",
     });
   } catch (error) {

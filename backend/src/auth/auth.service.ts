@@ -483,4 +483,36 @@ export class AuthService {
       throw new ConflictException('Profile update failed');
     }
   }
+
+  async savePushToken(userId: string, token: string, platform: string) {
+    try {
+      // Update user with push token
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: {
+          expoPushToken: token,
+        },
+      });
+
+      return { success: true, message: 'Push token saved' };
+    } catch (error) {
+      throw new ConflictException('Failed to save push token');
+    }
+  }
+
+  async removePushToken(userId: string) {
+    try {
+      // Clear push token
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: {
+          expoPushToken: null,
+        },
+      });
+
+      return { success: true, message: 'Push token removed' };
+    } catch (error) {
+      throw new ConflictException('Failed to remove push token');
+    }
+  }
 }

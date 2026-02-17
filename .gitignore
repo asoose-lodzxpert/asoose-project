@@ -38,5 +38,5 @@ yarn-error.log*
 *.pem
 
 *keys.ts
-*google-services.json
+# *google-services.json
 *credentials.json

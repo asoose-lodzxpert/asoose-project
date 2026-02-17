@@ -38,15 +38,13 @@
       },
       "usesAppleSignIn": true
     },
-    "platforms": [
-      "ios",
-      "android"
-    ],
+    "platforms": ["ios", "android"],
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/adaptive-icon.png"
       },
+      "googleServicesFile": "./google-services.json",
       "config": {
         "googleMaps": {
           "apiKey": "AIzaSyCor0YAMApwfowNFC-EXSOwrKq0mxdwMP8"
