@@ -204,3 +204,4 @@ export class RiderStateService {
     // Default to OFFLINE if not found in Redis
     return (status as 'ONLINE' | 'OFFLINE') || 'OFFLINE';
   }
+}
