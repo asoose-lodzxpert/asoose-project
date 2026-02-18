@@ -120,7 +120,7 @@ export class RidesService {
     }
 
     const existingRequest = await this.prisma.ride.findFirst({
-      where: { customerId: userId, idempotencyKey },
+      where: { customerId: userId },
       include: { pickupAddress: true, dropoffAddress: true, payment: true },
     });
 
@@ -190,7 +190,6 @@ export class RidesService {
       where: {
         customerId: userId,
         status: RideStatus.PENDING,
-        idempotencyKey: { not: idempotencyKey },
       },
       data: {
         status: RideStatus.CANCELLED,
@@ -264,7 +263,6 @@ export class RidesService {
             totalFare: finalCalculatedFare, // <-- ONLY TRUST BACKEND CALCULATION
             startOtp: hashedOtp,
             surgeMultiplier: 1.0,
-            idempotencyKey, // <-- GUARANTEES 1-TO-1 CREATION
           },
           include: { pickupAddress: true, dropoffAddress: true },
         });
