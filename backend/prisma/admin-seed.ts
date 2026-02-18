@@ -3,7 +3,7 @@ import * as bcrypt from 'bcrypt';
 
 async function seedAdmin(prisma: PrismaClient) {
   const email = 'asoose-admin@asoose.com';
-  const passwordRaw = 'AdminPassword123!'; // Change this to your desired password
+  const passwordRaw = 'AdminPassword123!';
   const hashedPassword = await bcrypt.hash(passwordRaw, 10);
 
   console.log(`🌱 Seeding Admin User: ${email}...`);
