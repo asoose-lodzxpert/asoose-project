@@ -23,7 +23,6 @@ import { VendorOrdersStreamService } from './orders/vendor-orders-stream.service
 import { VendorNotificationsService } from './notifications/vendor-notifications.service';
 import { VendorNotificationsController } from './notifications/vendor-notifications.controller';
 import { VendorSecurityNotificationsService } from './notifications/vendor-security-notifications.service';
-import { VendorAccountNotificationsService } from './notifications/vendor-account-notifications.service';
 
 import { StorageModule } from '../storage/storage.module';
 import { NotificationsModule } from '../notifications/notifications.module';
@@ -34,6 +33,7 @@ import { ActivityLogService } from 'src/common/services/activity-log.services';
 // import { StoresService } from './stores/stores.service';
 import { StoresService } from 'src/super-admin/vendors/vendors.service';
 import { TransactionsModule } from 'src/super-admin/transactions/transaction.module';
+import { VendorAccountNotificationsService } from './notifications/vendor-account-notifications.service';
 
 @Module({
   imports: [
@@ -61,9 +61,8 @@ import { TransactionsModule } from 'src/super-admin/transactions/transaction.mod
     VendorAuthService,
     NubanService,
 
-    // 👇 2. VITAL: Add BOTH Services here
-    ActivityLogService, // Fixes the "?" at index [2]
-    StoresService, // The service itself
+    ActivityLogService,
+    StoresService,
   ],
   exports: [
     VendorSecurityNotificationsService,

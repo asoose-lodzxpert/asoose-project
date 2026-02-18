@@ -9,9 +9,9 @@ import { PayoutStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { PaymentService } from '../../payment/payment.service';
 import { ActivityLogService } from '../../common/services/activity-log.services';
-import { AdminNotificationsService } from '../../admin/notifications/admin-notifications.service';
 // Import Enums correctly
 import { RecipientType, PaymentGateway } from '../../payment/dto/payment.dto';
+import { AdminNotificationsService } from 'src/admin/notifications/admin-notifications.service';
 
 @Injectable()
 export class PayoutsService {

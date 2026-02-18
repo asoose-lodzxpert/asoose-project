@@ -19,7 +19,7 @@ import {
 import { CreateVendorDto, VendorQueryDto } from './dto/vendor.dto';
 import { EmailProducer } from '../../mail/email.producer';
 import { ActivityLogService } from 'src/common/services/activity-log.services';
-import { VendorAccountNotificationsService } from '../../vendor/notifications/vendor-account-notifications.service';
+import { VendorAccountNotificationsService } from 'src/vendor/notifications/vendor-account-notifications.service';
 
 @Injectable()
 export class StoresService {

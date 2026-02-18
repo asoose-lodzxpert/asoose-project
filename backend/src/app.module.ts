@@ -13,7 +13,6 @@ import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { CartModule } from './cart/cart.module';
 import { FcmModule } from './libs/fcm/fcm.module';
-import { LogsModule } from './logs/logs.module';
 import { MailModule } from './mail/mail.module';
 import { MapsModule } from './maps/maps.module';
 import { MarketplaceModule } from './marketplace/marketplace.module';
@@ -27,6 +26,7 @@ import { StorageModule } from './storage/storage.module';
 import { SuperAdminModule } from './super-admin/super-admin.module';
 import { UsersModule } from './users/users.module';
 import { VendorModule } from './vendor/vendor.module';
+import { LogsModule } from './logs/logs.module';
 
 @Module({
   imports: [
