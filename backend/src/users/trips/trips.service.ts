@@ -23,7 +23,11 @@ export class TripsService {
     return this.ridesService.getEstimate(dto);
   }
 
-async requestRide(userId: string, dto: RequestRideDto, idempotencyKey: string) {
+  async requestRide(
+    userId: string,
+    dto: RequestRideDto,
+    idempotencyKey: string,
+  ) {
     // Pass it down to the ridesService
     return this.ridesService.requestRide(userId, dto, idempotencyKey);
   }
@@ -71,19 +75,6 @@ async requestRide(userId: string, dto: RequestRideDto, idempotencyKey: string) {
 
   async getRideById(userId: string, rideId: string) {
     return this.ridesService.getRideById(userId, rideId);
-  }
-
-  // ========================================
-  // DELIVERY DELEGATION
-  // ========================================
-
-  // FIX: Updated to accept and pass idempotencyKey
-  async requestDelivery(
-    userId: string,
-    dto: RequestDeliveryDto,
-    idempotencyKey?: string,
-  ) {
-    return this.deliveriesService.requestDelivery(userId, dto);
   }
 
   async startDeliveryMatching(deliveryId: string) {

@@ -1,10 +1,8 @@
 import { request, get, post, patch } from "@/lib/authFetch";
 import {
   Ride,
-  FareEstimate,
   CreateRidePayload,
   RideEstimatePayload,
-  ConfirmRidePayload,
   CancelRidePayload,
   DriverLocation,
 } from "@/types/ride";
@@ -34,27 +32,48 @@ export class RideService {
    */
   static async requestRide(payload: CreateRidePayload): Promise<{
     ride: Ride;
-    fare: number;
     payment: any;
     message: string;
   }> {
+    const idempotencyKey = `${Date.now()}_${Math.floor(Math.random() * 100000)}`;
     const dto = {
       pickupLocation: {
-        latitude: Number(payload.pickupLocation.latitude),
-        longitude: Number(payload.pickupLocation.longitude),
-        address: payload.pickupLocation.address,
+        addressText:
+          payload.pickupLocation.address?.trim() || "Unknown location",
+        lat: Number(payload.pickupLocation.latitude),
+        lng: Number(payload.pickupLocation.longitude),
       },
+
       dropoffLocation: {
-        latitude: Number(payload.dropoffLocation.latitude),
-        longitude: Number(payload.dropoffLocation.longitude),
-        address: payload.dropoffLocation.address,
+        addressText:
+          payload.dropoffLocation.address?.trim() || "Unknown location",
+        lat: Number(payload.dropoffLocation.latitude),
+        lng: Number(payload.dropoffLocation.longitude),
       },
-      vehicleType: payload.vehicleType as string,
-      fare: payload.fare,
-      notes: payload.notes,
+
+      vehicleType: payload.vehicleType,
+
+      fare: Number(payload.fare),
+      distanceKm: Number(payload.distanceKm),
+      durationMin: Number(payload.durationMin),
+
+      // Optional
+      ...(payload.notes?.trim() && {
+        notes: payload.notes.trim(),
+      }),
     };
 
-    return post("trips/rides/request", dto);
+    if (__DEV__)
+      console.log(
+        "Requesting ride with payload:",
+        JSON.stringify(dto, null, 2),
+        `\n[x-idempotency-key: ${idempotencyKey}]`,
+      );
+
+    // Pass idempotency key in header
+    return post("trips/rides/request", dto, {
+      headers: { "x-idempotency-key": idempotencyKey },
+    });
   }
 
   /**
@@ -85,7 +104,7 @@ export class RideService {
     }
   }
 
-  /**
+  /*
    * Get specific ride by ID
    */
   static async getRideById(rideId: string): Promise<Ride> {

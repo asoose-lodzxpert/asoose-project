@@ -8,6 +8,7 @@ export type Address = {
   label: string;
   fullAddress: string;
   coords: Coordinates;
+  placeId?: string;
 };
 
 export type LocationPoint = {

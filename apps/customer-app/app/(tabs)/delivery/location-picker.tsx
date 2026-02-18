@@ -1,4 +1,5 @@
-// LocationPickerScreen.tsx
+// LocationPickerScreen for Delivery (location-picker.tsx)
+// This is a copy of the ride location picker, adapted for delivery context.
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
@@ -19,14 +20,14 @@ import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
 import { IconSymbol, IconSymbolName } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
-import { useRide } from "@/context/RideContext";
-import { useLocation } from "@/context/LocationContext";
 import { useSendPackage } from "@/context/SendPackageContext";
+import type { Address, LocationPoint } from "@/types/delivery";
+import { useLocation } from "@/context/LocationContext";
 import { getAccessToken } from "@/services/auth.service";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "";
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get("window");
-const MODAL_MAP_HEIGHT = SCREEN_HEIGHT * 0.78; // leaves space for header & buttons
+const MODAL_MAP_HEIGHT = SCREEN_HEIGHT * 0.78;
 
 interface PlacePrediction {
   id: string;
@@ -48,7 +49,6 @@ interface SavedAddress {
   longitude: number;
 }
 
-// ─── Location Row ──────────────────────────────────────────────
 function LocationRow({
   title,
   subtitle,
@@ -92,16 +92,14 @@ function LocationRow({
   );
 }
 
-// ─── Main Component ────────────────────────────────────────────
 export default function LocationPickerScreen() {
   const router = useRouter();
   const { type = "pickup" } = useLocalSearchParams<{
     type: "pickup" | "dropoff";
   }>();
 
-  const { setPickupLocation, setDropoffLocation } = useRide();
+  const { setPickup, setDropoff, savedAddresses = [] } = useSendPackage();
   const { location: currentLocation } = useLocation();
-  const { savedAddresses = [] } = useSendPackage(); // fallback to empty array
 
   const primary = useThemeColor({}, "brandPrimary");
   const surface = useThemeColor({}, "surfaceBackground");
@@ -122,7 +120,6 @@ export default function LocationPickerScreen() {
   const mapRef = useRef<MapView>(null);
   const searchTimeout = useRef<number | null>(null);
 
-  // ─── Search ────────────────────────────────────────────────────
   const searchPlaces = useCallback(
     async (query: string) => {
       if (query.trim().length < 3) {
@@ -163,7 +160,6 @@ export default function LocationPickerScreen() {
     return () => clearTimeout(searchTimeout.current!);
   }, [searchQuery, searchPlaces]);
 
-  // ─── Map / Reverse Geocode ─────────────────────────────────────
   const reverseGeocode = useCallback(async (lat: number, lng: number) => {
     try {
       const res = await fetch(
@@ -195,14 +191,21 @@ export default function LocationPickerScreen() {
     [reverseGeocode],
   );
 
-  // ─── Confirm & Navigation ──────────────────────────────────────
+  // Convert Location to Address and wrap in LocationPoint
   const confirmLocation = useCallback(
     (loc: Location) => {
-      if (type === "pickup") setPickupLocation(loc);
-      else setDropoffLocation(loc);
+      const address: Address = {
+        id: "",
+        label: "",
+        fullAddress: loc.address,
+        coords: { latitude: loc.latitude, longitude: loc.longitude },
+      };
+      const payload: LocationPoint = { address };
+      if (type === "pickup") setPickup(payload);
+      else setDropoff(payload);
       router.back();
     },
-    [type, setPickupLocation, setDropoffLocation, router],
+    [type, setPickup, setDropoff, router],
   );
 
   const handleConfirmFromMap = () => {
@@ -237,17 +240,16 @@ export default function LocationPickerScreen() {
     [confirmLocation],
   );
 
-  const handleSelectSaved = (addr: SavedAddress) => {
-    confirmLocation({
-      latitude: addr.latitude,
-      longitude: addr.longitude,
-      address: addr.address,
-    });
+  const handleSelectSaved = (addr: any) => {
+    // addr is Address type from context
+    const payload: LocationPoint = { address: addr };
+    if (type === "pickup") setPickup(payload);
+    else setDropoff(payload);
+    router.back();
   };
 
   const openMapModal = () => {
     setMapModalVisible(true);
-    // Optional: reset selection when opening modal
     setSelectedLocation(null);
     setReverseAddress("");
   };
@@ -256,7 +258,6 @@ export default function LocationPickerScreen() {
     setMapModalVisible(false);
   };
 
-  // ─── Render ────────────────────────────────────────────────────
   const showCurrent = !searchQuery && !!currentLocation?.coords;
   const showSaved = !searchQuery && savedAddresses.length > 0;
   const showEmpty = searchQuery && !searching && predictions.length === 0;
@@ -274,7 +275,6 @@ export default function LocationPickerScreen() {
           </ThemedText>
           <View style={{ width: 44 }} />
         </View>
-
         <View style={[styles.searchBar, { backgroundColor: card }]}>
           <IconSymbol name="magnifyingglass" size={20} color={textSecondary} />
           <TextInput
@@ -290,7 +290,6 @@ export default function LocationPickerScreen() {
           )}
         </View>
       </View>
-
       <ScrollView
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={styles.scrollContent}
@@ -319,7 +318,6 @@ export default function LocationPickerScreen() {
             />
           </>
         )}
-
         {/* Saved */}
         {showSaved && (
           <>
@@ -335,25 +333,15 @@ export default function LocationPickerScreen() {
                 color="#F59E0B"
                 bg={card}
                 textSec={textSecondary}
-                onPress={() =>
-                  handleSelectSaved({
-                    id: addr.id,
-                    name: addr.label,
-                    address: addr.fullAddress,
-                    latitude: addr.coords.latitude,
-                    longitude: addr.coords.longitude,
-                  })
-                }
+                onPress={() => handleSelectSaved(addr)}
               />
             ))}
           </>
         )}
-
         {/* Search results or suggested */}
         <ThemedText style={[styles.sectionTitle, { color: textSecondary }]}>
           {searchQuery ? "Search Results" : "Suggested Places"}
         </ThemedText>
-
         {predictions.map((place) => (
           <LocationRow
             key={place.id}
@@ -366,7 +354,6 @@ export default function LocationPickerScreen() {
             onPress={() => handleSelectPrediction(place)}
           />
         ))}
-
         {showEmpty && (
           <View style={styles.empty}>
             <ThemedText style={{ color: textSecondary }}>
@@ -374,7 +361,6 @@ export default function LocationPickerScreen() {
             </ThemedText>
           </View>
         )}
-
         {/* Open Map Button */}
         <View style={styles.mapTriggerSection}>
           <ThemedText
@@ -395,10 +381,8 @@ export default function LocationPickerScreen() {
             </ThemedText>
           </Pressable>
         </View>
-
         <View style={{ height: 80 }} />
       </ScrollView>
-
       {/* ─── MAP MODAL ──────────────────────────────────────────────── */}
       <Modal
         visible={mapModalVisible}
@@ -419,7 +403,6 @@ export default function LocationPickerScreen() {
             </ThemedText>
             <View style={{ width: 44 }} />
           </View>
-
           {/* Map */}
           <View style={styles.modalMapContainer}>
             <MapView
@@ -446,7 +429,6 @@ export default function LocationPickerScreen() {
                 />
               )}
             </MapView>
-
             {selectedLocation && (
               <View style={[styles.confirmOverlay, { backgroundColor: card }]}>
                 <View style={{ flex: 1 }}>

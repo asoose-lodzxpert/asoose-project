@@ -15,7 +15,7 @@ export const DeliveryTabs: React.FC<Props> = ({ active, onChange }) => {
   const border = useThemeColor({}, "borderDefault");
 
   return (
-    <View style={[styles.container, { borderColor: border }]}>
+    <View style={[styles.container]}>
       {(["active", "completed"] as DeliveryTab[]).map((tab) => (
         <Pressable
           key={tab}

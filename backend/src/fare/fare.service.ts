@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
-import axios from 'axios';
 import { RideFareDto } from './dto/ride-fare-dto';
 import { DeliveryFareDto } from './dto/delivery-fare-dto';
+import { GeoService } from '../matching/geo/geo.service';
 
 type DistanceResult = {
   distanceMeters: number;
@@ -13,6 +13,7 @@ type DistanceResult = {
 @Injectable()
 export class FareService {
   private readonly logger = new Logger(FareService.name);
+  constructor(private readonly geoService: GeoService) {}
 
   // Total fare = Base fare + (Distance × per km rate)
   // Ride fare constants
@@ -23,78 +24,29 @@ export class FareService {
   readonly BaseDeliveryFare = 700;
   readonly DeliveryPerKm = 400;
 
-  private googleApiKey(): string {
-    const key = process.env.GOOGLE_MAPS_API_KEY;
-    if (!key) {
-      this.logger.error('Missing GOOGLE_MAPS_API_KEY in environment');
-      throw new Error('Missing GOOGLE_MAPS_API_KEY');
-    }
-    return key;
-  }
-
-  private async getDistanceAndEta(
-    pickuplat: string,
-    pickuplong: string,
-    dropofflat: string,
-    dropofflong: string,
-  ): Promise<DistanceResult> {
-    const key = this.googleApiKey();
-    const origins = `${pickuplat},${pickuplong}`;
-    const destinations = `${dropofflat},${dropofflong}`;
-
-    const url = `https://maps.googleapis.com/maps/api/distancematrix/json`;
-    try {
-      const res = await axios.get(url, {
-        params: {
-          origins,
-          destinations,
-          key,
-          units: 'metric',
-        },
-        timeout: 5000,
-      });
-
-      const data = res.data;
-      if (data.status !== 'OK') {
-        this.logger.error('Google Distance Matrix error', data);
-        throw new Error('Google Distance Matrix API error');
-      }
-
-      const element = data.rows?.[0]?.elements?.[0];
-      if (!element || element.status !== 'OK') {
-        this.logger.error('No element or element not OK', element);
-        throw new Error(
-          'Could not get distance/duration for provided coordinates',
-        );
-      }
-
-      return {
-        distanceMeters: element.distance.value,
-        distanceText: element.distance.text,
-        durationSeconds: element.duration.value,
-        durationText: element.duration.text,
-      };
-    } catch (err) {
-      this.logger.error('Failed to fetch distance matrix', err);
-      throw err;
-    }
-  }
-
   /**
    * Returns an object with price (number), distance (meters + text) and eta (seconds + text)
    */
   async getRideFare(dto: RideFareDto) {
     const { pickuplat, pickuplong, dropofflat, dropofflong } = dto;
 
-    const { distanceMeters, distanceText, durationSeconds, durationText } =
-      await this.getDistanceAndEta(
-        pickuplat,
-        pickuplong,
-        dropofflat,
-        dropofflong,
-      );
+    // Use backend geo service for distance calculation
+    const lat1 = Number(pickuplat);
+    const lng1 = Number(pickuplong);
+    const lat2 = Number(dropofflat);
+    const lng2 = Number(dropofflong);
+    const distanceKm = this.geoService.calculateDistance(
+      lat1,
+      lng1,
+      lat2,
+      lng2,
+    );
+    const distanceMeters = Math.round(distanceKm * 1000);
 
-    const distanceKm = distanceMeters / 1000;
+    // No ETA calculation (could be added if needed)
+    const durationSeconds = Math.round(distanceKm * 180); // rough estimate: 3 min/km
+    const durationText = `${Math.round(durationSeconds / 60)} min`;
+    const distanceText = `${distanceKm.toFixed(2)} km`;
 
     // Get current time in Africa/Lagos
     const now = new Date();
@@ -124,15 +76,23 @@ export class FareService {
   async getDeliveryFare(dto: DeliveryFareDto) {
     const { pickuplat, pickuplong, dropofflat, dropofflong } = dto;
 
-    const { distanceMeters, distanceText, durationSeconds, durationText } =
-      await this.getDistanceAndEta(
-        pickuplat,
-        pickuplong,
-        dropofflat,
-        dropofflong,
-      );
+    // Use backend geo service for distance calculation
+    const lat1 = Number(pickuplat);
+    const lng1 = Number(pickuplong);
+    const lat2 = Number(dropofflat);
+    const lng2 = Number(dropofflong);
+    const distanceKm = this.geoService.calculateDistance(
+      lat1,
+      lng1,
+      lat2,
+      lng2,
+    );
+    const distanceMeters = Math.round(distanceKm * 1000);
 
-    const distanceKm = distanceMeters / 1000;
+    const durationSeconds = Math.round(distanceKm * 180);
+    const durationText = `${Math.round(durationSeconds / 60)} min`;
+    const distanceText = `${distanceKm.toFixed(2)} km`;
+
     const variableFare = Math.round(distanceKm * this.DeliveryPerKm);
     const price = this.BaseDeliveryFare + variableFare;
 

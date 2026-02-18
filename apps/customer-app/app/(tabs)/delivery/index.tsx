@@ -8,8 +8,12 @@ import {
   KeyboardAvoidingView,
   Platform,
   Keyboard,
+  View,
+  StyleSheet,
 } from "react-native";
 import { useEffect, useState } from "react";
+import { ThemedText } from "@/components/themed-text";
+import { useThemeColor } from "@/hooks/use-theme-color";
 
 export default function SendPackageScreen() {
   return <Screen />;
@@ -17,6 +21,7 @@ export default function SendPackageScreen() {
 
 function Screen() {
   const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const textSecondary = useThemeColor({}, "textSecondary");
 
   useEffect(() => {
     const showSub = Keyboard.addListener("keyboardDidShow", () =>
@@ -32,6 +37,12 @@ function Screen() {
   }, []);
   return (
     <ThemedView style={{ flex: 1 }}>
+      <View style={styles.header}>
+        <ThemedText type="title">Request Delivery</ThemedText>
+        <ThemedText type="caption" style={{ color: textSecondary }}>
+          Enter your delivery details
+        </ThemedText>
+      </View>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -46,7 +57,9 @@ function Screen() {
           <LocationCard type="pickup" title="Pickup Location" />
 
           <LocationCard type="delivery" title="Delivery Location" />
+
           <PackageSizeSelector />
+
           <PackageDetailsSection />
         </ScrollView>
       </KeyboardAvoidingView>
@@ -55,3 +68,11 @@ function Screen() {
     </ThemedView>
   );
 }
+
+const styles = StyleSheet.create({
+  header: {
+    paddingHorizontal: 16,
+    paddingTop: 20,
+    paddingBottom: 16,
+  },
+});

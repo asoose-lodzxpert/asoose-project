@@ -82,6 +82,7 @@ import { LogsModule } from './logs/logs.module';
     SuperAdminModule,
     UsersModule,
     VendorModule,
+    require('./fare/fare.module').FareModule,
   ],
   controllers: [AppController],
   providers: [

@@ -112,7 +112,6 @@ export class RidesService {
       `Request Ride - User: ${userId}, Vehicle: ${dto.vehicleType}, IdempotencyKey: ${idempotencyKey}`,
     );
 
-    // 0. Idempotency Check (Done FIRST to prevent duplicate Maps API billing & Ghost Rides)
     if (!idempotencyKey) {
       throw new BadRequestException(
         'Idempotency key is required to prevent duplicate requests.',
@@ -136,7 +135,7 @@ export class RidesService {
       };
     }
 
-    // 1. Discard client coordinates. Force strict backend resolution.
+    // 1. Securely resolve addresses (DO NOT trust raw client coords)
     const securePickup = await this.common.resolveSecureLocation(
       dto.pickupLocation,
     );
@@ -144,12 +143,12 @@ export class RidesService {
       dto.dropoffLocation,
     );
 
-    // 2. Validate Vehicle Type against strict backend enum
+    // 2. Validate Vehicle Type
     if (!Object.values(VehicleType).includes(dto.vehicleType)) {
       throw new BadRequestException('Invalid vehicle type requested.');
     }
 
-    // 3. Prevent duplicate active rides (excludes PENDING, as they await payment)
+    // 3. Prevent duplicate active rides
     const activeRide = await this.prisma.ride.findFirst({
       where: {
         customerId: userId,
@@ -168,8 +167,9 @@ export class RidesService {
       throw new ConflictException('You already have an active ride request');
     }
 
-    // 4. Cleanup: Purge expired payment intents (older than 5 minutes)
+    // 4. Cleanup expired PENDING rides
     const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+
     await this.prisma.ride.updateMany({
       where: {
         customerId: userId,
@@ -184,7 +184,6 @@ export class RidesService {
       },
     });
 
-    // Cancel any recent conflicting PENDING requests that are NOT this current idempotency key
     await this.prisma.ride.updateMany({
       where: {
         customerId: userId,
@@ -200,14 +199,14 @@ export class RidesService {
 
     return this.prisma.$transaction(
       async (tx) => {
-        // 5. Create Addresses from trusted server data ONLY
+        // 5. Create trusted addresses
         const pickupAddress = await tx.address.create({
           data: {
             userId,
             label: 'Pickup',
-            street: this.common.sanitizeText(securePickup.address), // Trusted Maps text
-            lat: securePickup.lat, // Trusted coordinate
-            lng: securePickup.lng, // Trusted coordinate
+            street: this.common.sanitizeText(securePickup.address),
+            lat: securePickup.lat,
+            lng: securePickup.lng,
             city: 'Unknown',
             state: 'Unknown',
           },
@@ -217,40 +216,64 @@ export class RidesService {
           data: {
             userId,
             label: 'Dropoff',
-            street: this.common.sanitizeText(secureDropoff.address), // Trusted Maps text
-            lat: secureDropoff.lat, // Trusted coordinate
-            lng: secureDropoff.lng, // Trusted coordinate
+            street: this.common.sanitizeText(secureDropoff.address),
+            lat: secureDropoff.lat,
+            lng: secureDropoff.lng,
             city: 'Unknown',
             state: 'Unknown',
           },
         });
 
-        // 🛑 CRITICAL FIX: Backend recalculates distance & fare natively.
-        // It does not trust any price shown to or provided by the client to prevent fare spoofing.
-        const distanceKm = this.geo.calculateDistance(
+        // 6. Extract client-provided values
+        const { fare, distanceKm, durationMin } = dto;
+
+        // Basic validation
+        if (fare <= 0 || distanceKm <= 0 || durationMin <= 0) {
+          throw new BadRequestException('Invalid trip values provided.');
+        }
+
+        // Hard caps to prevent abuse
+        const MAX_FARE = 1_000_000;
+        const MAX_DISTANCE = 10000;
+        const MAX_DURATION = 10000;
+
+        if (fare > MAX_FARE) {
+          throw new BadRequestException('Fare exceeds allowed limit.');
+        }
+
+        if (distanceKm > MAX_DISTANCE) {
+          throw new BadRequestException('Distance exceeds allowed limit.');
+        }
+
+        if (durationMin > MAX_DURATION) {
+          throw new BadRequestException('Duration exceeds allowed limit.');
+        }
+
+        // 🔐 Optional Anti-Tampering Check (Recommended)
+        const serverDistance = this.geo.calculateDistance(
           pickupAddress.lat,
           pickupAddress.lng,
           dropoffAddress.lat,
           dropoffAddress.lng,
         );
 
-        const durationMin = Math.ceil(distanceKm * 3);
-        const fareDetails = this.geo.calculateFare(distanceKm, durationMin);
+        this.logger.log(`Server calculated distance: ${serverDistance} km`);
+        this.logger.log(`Client provided distance: ${distanceKm} km`);
 
-        // Apply strict multiplier based on vehicle type
-        let multiplier = 1.0;
-        if (dto.vehicleType === VehicleType.BUSINESS) multiplier = 1.5;
-        if (dto.vehicleType === VehicleType.ECONOMY) multiplier = 1.0;
+        const distanceDifference = Math.abs(serverDistance - distanceKm);
 
-        const finalCalculatedFare = this.common.round(
-          fareDetails.totalFare * multiplier,
-        );
+        // Allow tolerance (e.g., 1km difference)
+        if (distanceDifference > 1) {
+          throw new BadRequestException('Trip distance mismatch detected.');
+        }
 
-        // 6. Security: Hash OTP
+        const finalFare = this.common.round(fare);
+
+        // 7. Generate & hash OTP
         const rawOtp = this.geo.generateOTP(TRIPS_CONFIG.OTP_LENGTH);
         const hashedOtp = await bcrypt.hash(rawOtp, this.SALT_ROUNDS);
 
-        // 7. Create Ride using the server-calculated fare AND bind Idempotency Key
+        // 8. Create Ride
         const ride = await tx.ride.create({
           data: {
             customerId: userId,
@@ -259,21 +282,21 @@ export class RidesService {
             status: RideStatus.PENDING,
             distanceKm,
             durationMin,
-            totalFare: finalCalculatedFare, // <-- ONLY TRUST BACKEND CALCULATION
+            totalFare: finalFare,
             startOtp: hashedOtp,
             surgeMultiplier: 1.0,
           },
           include: { pickupAddress: true, dropoffAddress: true },
         });
 
-        // 8. Security: Cryptographically Secure Reference
+        // 9. Create Payment
         const secureReference = `REF-${randomUUID()}`;
 
         const payment = await tx.payment.create({
           data: {
             userId,
             rideId: ride.id,
-            amount: ride.totalFare || 0,
+            amount: finalFare,
             status: PaymentStatus.PENDING,
             method: PaymentMethod.CASH,
             reference: secureReference,
@@ -283,14 +306,15 @@ export class RidesService {
 
         return {
           ride: { ...ride, startOtp: undefined },
-          fare: finalCalculatedFare,
+          fare: finalFare,
           payment,
           message: 'Ride created. Please confirm to find a driver.',
         };
       },
-      { isolationLevel: 'Serializable' }, // Prevents race conditions during ride creation
+      { isolationLevel: 'Serializable' },
     );
   }
+
   async confirmRide(userId: string, rideId: string, paymentMethod: string) {
     const methodEnum =
       paymentMethod.toUpperCase() === 'CASH'

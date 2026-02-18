@@ -106,8 +106,10 @@ export type CreateRidePayload = {
   pickupLocation: Location;
   dropoffLocation: Location;
   vehicleType: VehicleType;
-  fare: number;
   notes?: string;
+  fare: number;
+  distanceKm: number;
+  durationMin: number;
 };
 
 export type RideEstimatePayload = {

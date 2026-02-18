@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   View,
   StyleSheet,
@@ -6,9 +6,10 @@ import {
   Image,
   ScrollView,
   ActivityIndicator,
-  SafeAreaView,
+  Platform,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
@@ -17,44 +18,33 @@ import { useThemeColor } from "@/hooks/use-theme-color";
 import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
 import { AddressSelectionModal } from "@/components/checkout/AddressSelectionModal";
-import { PaymentMethodModal } from "@/components/checkout/PaymentMethodModal";
 import { PaymentWebView } from "@/components/checkout/PaymentWebView";
 import { PaymentSuccessModal } from "@/components/checkout/PaymentSuccessModal";
 import { Address } from "@/types/address";
 import { request } from "@/lib/authFetch";
 import { initiatePayment } from "@/services/payment.service";
 import { createOrder } from "@/services/order.service";
-
-type PaymentMethod = "paystack" | "flutterwave" | "monnify" | "transfer";
+import Toast from "react-native-toast-message";
 
 export default function CheckoutScreen() {
   const router = useRouter();
   const { user } = useAuth();
-  const { items, groups, subtotal, deliveryFee, total, clearCart } = useCart();
-  const Toast = require("react-native-toast-message");
+  const { items, groups, total, clearCart } = useCart();
 
   // Theme Colors
   const primary = useThemeColor({}, "brandPrimary");
   const background = useThemeColor({}, "surfaceBackground");
-  const surface = useThemeColor({}, "surfaceBackground");
-  const textPrimary = useThemeColor({}, "textPrimary");
+  const card = useThemeColor({}, "surfaceCard");
   const textSecondary = useThemeColor({}, "textSecondary");
   const border = useThemeColor({}, "borderDefault");
-  const error = useThemeColor({}, "statusError");
 
   // State
   const [selectedAddress, setSelectedAddress] = useState<Address | null>(null);
-  const [addresses, setAddresses] = useState<Address[]>([]);
-  const [selectedPaymentMethod, setSelectedPaymentMethod] =
-    useState<PaymentMethod | null>("paystack");
-
-  // Modals
   const [showAddressModal, setShowAddressModal] = useState(false);
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showPaymentWebView, setShowPaymentWebView] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
-  // Payment Data
+  // Payment State
   const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
   const [paymentReference, setPaymentReference] = useState<string | null>(null);
   const [orderId, setOrderId] = useState<string | null>(null);
@@ -62,10 +52,8 @@ export default function CheckoutScreen() {
 
   const currencySymbol = groups[0]?.restaurant.currency ?? "₦";
 
-  // ---------------- Effects ----------------
-
   useEffect(() => {
-    if (!items.length) {
+    if (!items.length && !showSuccessModal) {
       router.replace("/cart");
     }
   }, [items]);
@@ -74,13 +62,11 @@ export default function CheckoutScreen() {
     const loadAddresses = async () => {
       try {
         const response = await request("users/addresses", { method: "GET" });
-        setAddresses(response || []);
-        if (!selectedAddress && response && Array.isArray(response)) {
+        if (response && Array.isArray(response) && response.length > 0) {
           const homeAddr = response.find(
             (a: Address) => a.label?.toLowerCase() === "home",
           );
-          if (homeAddr) setSelectedAddress(homeAddr);
-          else if (response.length > 0) setSelectedAddress(response[0]);
+          setSelectedAddress(homeAddr || response[0]);
         }
       } catch (error) {
         console.error("Failed to load addresses:", error);
@@ -89,29 +75,27 @@ export default function CheckoutScreen() {
     loadAddresses();
   }, [user]);
 
-  // ---------------- Handlers ----------------
-
   const handlePlaceOrder = async () => {
-    if (!selectedAddress || !selectedPaymentMethod || !user) return;
+    if (!selectedAddress || !user) {
+      Toast.show({ type: "info", text1: "Please select an address" });
+      return;
+    }
     setIsProcessing(true);
 
     try {
-      // 1. Create Multi-Order (backend handles grouping by store)
       const orderPayload = {
         addressId: selectedAddress.id,
         items: items.map((item) => ({ id: item.id, quantity: item.qty })),
       };
 
       const orderResponse = await createOrder(orderPayload);
-      // Multi-order returns { orderGroupId, orders[], grandTotal }
-      const createdOrderGroupId =
+      const createdOrderId =
         (orderResponse as any).orderGroupId || orderResponse.id;
-      setOrderId(createdOrderGroupId);
+      setOrderId(createdOrderId);
 
-      // 2. Initiate Payment for entire order group
       const paymentPayload = {
         amount: total,
-        orderGroupId: createdOrderGroupId,
+        orderGroupId: createdOrderId,
         type: "ORDER",
         callbackUrl: `https://asoose.com/payment/callback/paystack`,
       };
@@ -122,318 +106,204 @@ export default function CheckoutScreen() {
         phone: user.phone ?? undefined,
       };
 
+      // Force Paystack
       const paymentResponse = await initiatePayment(
-        selectedPaymentMethod,
+        "paystack",
         paymentPayload,
         userIdentity,
       );
 
-      if (
-        selectedPaymentMethod === "transfer" ||
-        selectedPaymentMethod === "monnify"
-      ) {
-        setPaymentReference(paymentResponse.reference);
-        setShowSuccessModal(true);
-      } else if (selectedPaymentMethod === "paystack") {
-        setPaymentUrl(paymentResponse.authorizationUrl);
-        setPaymentReference(paymentResponse.reference);
-        setShowPaymentWebView(true);
-      }
+      setPaymentUrl(paymentResponse.authorizationUrl);
+      setPaymentReference(paymentResponse.reference);
+      setShowPaymentWebView(true);
     } catch (error) {
-      console.error("Order/Payment failed:", error);
-      Toast.show({ type: "success", text1: "Order placed!" });
+      Toast.show({ type: "error", text1: "Payment initialization failed" });
     } finally {
       setIsProcessing(false);
     }
   };
 
-  const canProceed = selectedAddress && selectedPaymentMethod && !isProcessing;
-
-  // ---------------- Render Helpers ----------------
-
-  const renderPaymentIcon = (method: PaymentMethod) => {
-    const iconName =
-      method === "transfer" || method === "monnify"
-        ? "building.columns.fill"
-        : "creditcard.fill";
-    return <IconSymbol name={iconName} size={22} color={primary} />;
-  };
-
   return (
-    <ThemedView style={styles.container}>
-      {/* 1. Navbar */}
-      <View
-        style={[
-          styles.header,
-          { backgroundColor: surface, borderBottomColor: border },
-        ]}
-      >
-        <Pressable onPress={() => router.back()} style={styles.backButton}>
-          <IconSymbol name="arrow.left" size={24} color={textPrimary} />
-        </Pressable>
-        <ThemedText
-          type="subtitle"
-          style={{ flex: 1, textAlign: "center", paddingRight: 40 }}
-        >
-          Checkout
-        </ThemedText>
-      </View>
-
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* 2. Delivery Section (Hero) */}
-        <View style={styles.sectionContainer}>
-          <ThemedText style={[styles.sectionLabel, { color: textSecondary }]}>
-            DELIVERY LOCATION
-          </ThemedText>
-          <Pressable
-            style={[
-              styles.addressCard,
-              { backgroundColor: surface, borderColor: border },
-            ]}
-            onPress={() => setShowAddressModal(true)}
-          >
-            <View
-              style={[styles.iconCircle, { backgroundColor: primary + "20" }]}
-            >
-              <IconSymbol name="mappin.and.ellipse" size={22} color={primary} />
-            </View>
-
-            <View style={{ flex: 1 }}>
-              {selectedAddress ? (
-                <>
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      gap: 6,
-                    }}
-                  >
-                    <ThemedText style={styles.addressTitle}>
-                      {selectedAddress.label}
-                    </ThemedText>
-                    {selectedAddress.isDefault && (
-                      <View
-                        style={[
-                          styles.defaultBadge,
-                          { backgroundColor: border },
-                        ]}
-                      >
-                        <ThemedText style={{ fontSize: 10, fontWeight: "600" }}>
-                          DEFAULT
-                        </ThemedText>
-                      </View>
-                    )}
-                  </View>
-                  <ThemedText
-                    numberOfLines={1}
-                    style={[styles.addressSub, { color: textSecondary }]}
-                  >
-                    {selectedAddress.address}
-                  </ThemedText>
-                </>
-              ) : (
-                <ThemedText style={{ color: error, fontWeight: "600" }}>
-                  Add a delivery address
-                </ThemedText>
-              )}
-            </View>
-
-            <View style={styles.editButton}>
-              <ThemedText
-                style={{ color: primary, fontWeight: "600", fontSize: 13 }}
-              >
-                CHANGE
-              </ThemedText>
-            </View>
+    <ThemedView style={[styles.container, { backgroundColor: background }]}>
+      <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
+        {/* Header */}
+        <View style={styles.header}>
+          <Pressable onPress={() => router.back()} style={styles.iconBtn}>
+            <IconSymbol name="chevron.left" size={24} color={primary} />
           </Pressable>
+          <ThemedText style={styles.headerTitle}>Review Order</ThemedText>
+          <View style={{ width: 40 }} />
         </View>
 
-        {/* 3. Order Details (Receipt Style) - Multi-Cart */}
-        <View style={styles.sectionContainer}>
-          <ThemedText style={[styles.sectionLabel, { color: textSecondary }]}>
-            ORDER SUMMARY
-          </ThemedText>
-
-          {groups.map((group, groupIndex) => (
-            <View
-              key={group.restaurant.id}
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Section: Delivery */}
+          <View style={styles.section}>
+            <ThemedText style={styles.sectionLabel}>
+              DELIVERY ADDRESS
+            </ThemedText>
+            <Pressable
               style={[
-                styles.receiptCard,
-                { backgroundColor: surface, borderColor: border },
-                groupIndex > 0 && { marginTop: 12 },
+                styles.glassCard,
+                { backgroundColor: card, borderColor: border },
               ]}
+              onPress={() => setShowAddressModal(true)}
             >
-              {/* Store Header */}
-              <View style={[styles.storeHeader, { borderBottomColor: border }]}>
-                {group.restaurant?.image && (
-                  <Image
-                    source={{ uri: group.restaurant.image }}
-                    style={styles.miniStoreLogo}
-                  />
-                )}
-                <ThemedText style={styles.storeName}>
-                  {group.restaurant?.name || "Store"}
+              <View
+                style={[styles.iconBox, { backgroundColor: primary + "15" }]}
+              >
+                <IconSymbol
+                  name="mappin.and.ellipse"
+                  size={20}
+                  color={primary}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <ThemedText style={styles.addressLabel}>
+                  {selectedAddress?.label || "Select Address"}
                 </ThemedText>
-                <ThemedText style={{ color: textSecondary, fontSize: 13 }}>
-                  {" "}
-                  • {group.items.length} items
+                <ThemedText
+                  style={[styles.addressText, { color: textSecondary }]}
+                  numberOfLines={1}
+                >
+                  {selectedAddress?.address || "Tap to add a delivery location"}
                 </ThemedText>
               </View>
+              <IconSymbol
+                name="chevron.right"
+                size={16}
+                color={textSecondary}
+              />
+            </Pressable>
+          </View>
 
-              {/* Items List */}
-              <View style={styles.itemsList}>
-                {group.items.map((item) => (
-                  <View key={item.id} style={styles.itemRow}>
-                    <View style={styles.qtyBadge}>
-                      <ThemedText style={{ fontSize: 12, fontWeight: "700" }}>
-                        {item.quantity}x
-                      </ThemedText>
-                    </View>
-                    <ThemedText
-                      style={[styles.itemName, { flex: 1 }]}
-                      numberOfLines={1}
-                    >
-                      {item.name}
-                    </ThemedText>
-                    <ThemedText style={styles.itemPrice}>
-                      {formatCurrency(
-                        item.price * item.quantity,
-                        currencySymbol,
-                      )}
+          {/* Section: Payment (Locked to Paystack) */}
+          <View style={styles.section}>
+            <ThemedText style={styles.sectionLabel}>PAYMENT METHOD</ThemedText>
+            <View
+              style={[
+                styles.glassCard,
+                { backgroundColor: card, borderColor: border },
+              ]}
+            >
+              <View style={[styles.iconBox, { backgroundColor: "#011b3315" }]}>
+                <IconSymbol name="creditcard.fill" size={20} color="#011b33" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <ThemedText style={styles.addressLabel}>Paystack</ThemedText>
+                <ThemedText
+                  style={[styles.addressText, { color: textSecondary }]}
+                >
+                  Cards, Bank, Transfer & USSD
+                </ThemedText>
+              </View>
+              <IconSymbol name="lock.fill" size={14} color={textSecondary} />
+            </View>
+          </View>
+
+          {/* Section: Summary */}
+          <View style={styles.section}>
+            <ThemedText style={styles.sectionLabel}>ORDER SUMMARY</ThemedText>
+            <View
+              style={[
+                styles.summaryCard,
+                { backgroundColor: card, borderColor: border },
+              ]}
+            >
+              {groups.map((group, idx) => (
+                <View key={idx} style={idx > 0 && styles.groupDivider}>
+                  {/* Restaurant Title */}
+                  <View style={styles.storeRow}>
+                    <ThemedText style={styles.storeName}>
+                      {group.restaurant.name}
                     </ThemedText>
                   </View>
-                ))}
-              </View>
 
-              {/* Group Subtotal */}
-              <View
-                style={[
-                  styles.financials,
-                  { backgroundColor: background, borderTopColor: border },
-                ]}
-              >
-                <View style={styles.row}>
-                  <ThemedText style={{ color: textSecondary }}>
-                    Subtotal
-                  </ThemedText>
-                  <ThemedText style={{ fontWeight: "600" }}>
-                    {formatCurrency(group.subtotal, currencySymbol)}
-                  </ThemedText>
-                </View>
-                <View style={styles.row}>
-                  <ThemedText style={{ color: textSecondary }}>
-                    Delivery Fee
-                  </ThemedText>
-                  <ThemedText style={{ fontWeight: "600" }}>
-                    {formatCurrency(group.deliveryFee, currencySymbol)}
-                  </ThemedText>
-                </View>
-                <View style={[styles.divider, { backgroundColor: border }]} />
-                <View style={styles.row}>
-                  <ThemedText style={{ fontSize: 14, fontWeight: "700" }}>
-                    Store Total
-                  </ThemedText>
-                  <ThemedText style={{ fontSize: 15, fontWeight: "700" }}>
-                    {formatCurrency(group.total, currencySymbol)}
-                  </ThemedText>
-                </View>
-              </View>
-            </View>
-          ))}
+                  {/* Items */}
+                  {group.items.map((item, i) => (
+                    <View key={i} style={styles.itemRow}>
+                      <ThemedText
+                        style={[styles.itemQty, { color: textSecondary }]}
+                      >
+                        {item.quantity}x
+                      </ThemedText>
+                      <ThemedText style={styles.itemName} numberOfLines={1}>
+                        {item.name}
+                      </ThemedText>
+                      <ThemedText style={styles.itemPrice}>
+                        {formatCurrency(
+                          item.price * item.quantity,
+                          currencySymbol,
+                        )}
+                      </ThemedText>
+                    </View>
+                  ))}
 
-          {/* Grand Total Card - Only show if multiple groups */}
-          {groups.length > 1 && (
-            <View
-              style={[
-                styles.receiptCard,
-                {
-                  backgroundColor: primary + "10",
-                  borderColor: primary,
-                  marginTop: 12,
-                },
-              ]}
-            >
-              <View style={{ padding: 16 }}>
-                <View style={styles.row}>
-                  <ThemedText style={{ fontSize: 16, fontWeight: "700" }}>
-                    Grand Total
+                  {/* Specific Delivery Fee for this Restaurant */}
+                  <View style={styles.feeRow}>
+                    <ThemedText
+                      style={[styles.feeLabel, { color: textSecondary }]}
+                    >
+                      Delivery Fee
+                    </ThemedText>
+                    <ThemedText style={styles.feeAmount}>
+                      {group.deliveryFee > 0
+                        ? formatCurrency(group.deliveryFee, currencySymbol)
+                        : "FREE"}
+                    </ThemedText>
+                  </View>
+                </View>
+              ))}
+
+              {/* Final Calculations */}
+              <View style={[styles.totalContainer, { borderTopColor: border }]}>
+                <View style={styles.summaryRow}>
+                  <ThemedText style={{ color: textSecondary, fontSize: 15 }}>
+                    Total to pay
                   </ThemedText>
-                  <ThemedText
-                    style={{ fontSize: 18, fontWeight: "800", color: primary }}
-                  >
+                  <ThemedText style={styles.grandTotal}>
                     {formatCurrency(total, currencySymbol)}
                   </ThemedText>
                 </View>
               </View>
             </View>
-          )}
-        </View>
+          </View>
 
-        {/* 4. Payment Method */}
-        <View style={styles.sectionContainer}>
-          <ThemedText style={[styles.sectionLabel, { color: textSecondary }]}>
-            PAYMENT METHOD
-          </ThemedText>
-          <Pressable
-            style={[
-              styles.paymentCard,
-              { backgroundColor: surface, borderColor: border },
-            ]}
-            onPress={() => setShowPaymentModal(true)}
-          >
-            <View
-              style={{ flexDirection: "row", alignItems: "center", gap: 12 }}
-            >
-              {renderPaymentIcon(selectedPaymentMethod || "paystack")}
-              <ThemedText style={{ fontWeight: "600", fontSize: 15 }}>
-                {getPaymentMethodLabel(selectedPaymentMethod || "paystack")}
-              </ThemedText>
-            </View>
-            <IconSymbol name="chevron.right" size={18} color={textSecondary} />
-          </Pressable>
-        </View>
+          <View style={{ height: 120 }} />
+        </ScrollView>
 
-        {/* Spacer for Floating Footer */}
-        <View style={{ height: 100 }} />
-      </ScrollView>
-
-      {/* 5. Sticky Footer */}
-      <View
-        style={[
-          styles.footer,
-          { backgroundColor: surface, borderTopColor: border },
-        ]}
-      >
-        <Pressable
-          disabled={!canProceed}
-          onPress={handlePlaceOrder}
+        {/* Action Bar */}
+        <View
           style={[
-            styles.placeOrderBtn,
-            { backgroundColor: primary },
-            !canProceed && styles.disabledBtn,
+            styles.actionBar,
+            { backgroundColor: background, borderTopColor: border },
           ]}
         >
-          {isProcessing ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <>
-              <ThemedText style={styles.btnText}>Place Order</ThemedText>
-              <View style={styles.btnPricePill}>
-                <ThemedText
-                  style={{ color: primary, fontWeight: "700", fontSize: 13 }}
-                >
-                  {formatCurrency(total, currencySymbol)}
+          <Pressable
+            disabled={isProcessing || !selectedAddress}
+            onPress={handlePlaceOrder}
+            style={[
+              styles.payButton,
+              { backgroundColor: primary },
+              (!selectedAddress || isProcessing) && styles.disabled,
+            ]}
+          >
+            {isProcessing ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <View style={styles.payButtonContent}>
+                <ThemedText style={styles.payText}>
+                  Pay {formatCurrency(total, currencySymbol)}
                 </ThemedText>
+                <IconSymbol name="arrow.right" size={18} color="#fff" />
               </View>
-            </>
-          )}
-        </Pressable>
-      </View>
+            )}
+          </Pressable>
+        </View>
+      </SafeAreaView>
 
-      {/* --- Modals (Logic unchanged) --- */}
       <AddressSelectionModal
         visible={showAddressModal}
         onClose={() => setShowAddressModal(false)}
@@ -443,21 +313,13 @@ export default function CheckoutScreen() {
         }}
         selectedAddressId={selectedAddress?.id}
       />
-      <PaymentMethodModal
-        visible={showPaymentModal}
-        onClose={() => setShowPaymentModal(false)}
-        onSelect={(method) => {
-          setSelectedPaymentMethod(method);
-          setShowPaymentModal(false);
-        }}
-        selectedMethod={selectedPaymentMethod}
-      />
-      {paymentUrl && paymentReference && selectedPaymentMethod && (
+
+      {paymentUrl && paymentReference && (
         <PaymentWebView
           visible={showPaymentWebView}
           url={paymentUrl}
           reference={paymentReference}
-          paymentMethod={selectedPaymentMethod}
+          paymentMethod="paystack"
           onSuccess={() => {
             setShowPaymentWebView(false);
             setShowSuccessModal(true);
@@ -466,6 +328,7 @@ export default function CheckoutScreen() {
           onPaymentComplete={clearCart}
         />
       )}
+
       <PaymentSuccessModal
         visible={showSuccessModal}
         onClose={() => {
@@ -480,141 +343,114 @@ export default function CheckoutScreen() {
   );
 }
 
-// Helpers
 function formatCurrency(value: number, currency: string) {
   return `${currency}${value.toLocaleString()}`;
 }
 
-function getPaymentMethodLabel(method: PaymentMethod): string {
-  const labels: Record<PaymentMethod, string> = {
-    paystack: "Paystack",
-    flutterwave: "Flutterwave",
-    monnify: "Bank Transfer (Monnify)",
-    transfer: "Direct Bank Transfer",
-  };
-  return labels[method] || method;
-}
-
-// Styles
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
   },
-  backButton: { padding: 8, marginLeft: -8 },
-  scrollContent: { padding: 16 },
-
-  // Section Headers
-  sectionContainer: { marginBottom: 24 },
+  headerTitle: { fontSize: 18, fontWeight: "700" },
+  iconBtn: { padding: 8 },
+  scrollContent: { padding: 20 },
+  section: { marginBottom: 24 },
   sectionLabel: {
     fontSize: 12,
-    fontWeight: "700",
-    letterSpacing: 0.8,
-    marginBottom: 8,
-    marginLeft: 4,
+    fontWeight: "800",
+    letterSpacing: 1,
+    marginBottom: 12,
+    opacity: 0.6,
   },
-
-  // Address Card
-  addressCard: {
+  glassCard: {
     flexDirection: "row",
     alignItems: "center",
     padding: 16,
-    borderRadius: 16,
-    borderWidth: 1,
-    gap: 12,
-  },
-  iconCircle: {
-    width: 40,
-    height: 40,
     borderRadius: 20,
+    borderWidth: 1,
+    gap: 16,
+  },
+  iconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
   },
-  addressTitle: { fontWeight: "700", fontSize: 15 },
-  addressSub: { fontSize: 13, marginTop: 2 },
-  defaultBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
-  editButton: { padding: 4 },
-
-  // Receipt Card
-  receiptCard: {
-    borderRadius: 16,
+  addressLabel: { fontSize: 16, fontWeight: "700" },
+  addressText: { fontSize: 13, marginTop: 2 },
+  summaryCard: {
+    borderRadius: 24,
     borderWidth: 1,
-    overflow: "hidden",
+    padding: 20,
   },
-  storeHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 12,
-    borderBottomWidth: 1,
-    gap: 8,
+  storeRow: { marginBottom: 12 },
+  storeName: {
+    fontSize: 14,
+    fontWeight: "800",
+    textTransform: "uppercase",
+    opacity: 0.8,
   },
-  miniStoreLogo: { width: 24, height: 24, borderRadius: 6 },
-  storeName: { fontWeight: "700", fontSize: 14 },
-
-  itemsList: { padding: 16, paddingBottom: 8 },
-  itemRow: { flexDirection: "row", alignItems: "center", marginBottom: 12 },
-  qtyBadge: {
-    backgroundColor: "#eee",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    marginRight: 10,
+  itemRow: { flexDirection: "row", alignItems: "center", marginBottom: 10 },
+  itemQty: { width: 30, fontSize: 13, fontWeight: "600" },
+  itemName: { flex: 1, fontSize: 14 },
+  itemPrice: { fontSize: 14, fontWeight: "700" },
+  groupDivider: {
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: "#eee",
+    borderStyle: "dashed",
   },
-  itemName: { fontSize: 14 },
-  itemPrice: { fontWeight: "600", fontSize: 14 },
-
-  // Financials
-  financials: { padding: 16, borderTopWidth: 1 },
-  row: {
+  totalContainer: { marginTop: 16, paddingTop: 16, borderTopWidth: 1 },
+  summaryRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 8,
-  },
-  divider: { height: 1, marginVertical: 8 },
-
-  // Payment Card
-  paymentCard: {
-    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    padding: 16,
-    borderRadius: 16,
-    borderWidth: 1,
   },
-
-  // Footer
-  footer: {
+  grandTotal: { fontSize: 20, fontWeight: "900" },
+  actionBar: {
     position: "absolute",
     bottom: 0,
     left: 0,
     right: 0,
-    padding: 16,
-    paddingBottom: 32,
+    padding: 20,
+    paddingBottom: Platform.OS === "ios" ? 40 : 24,
     borderTopWidth: 1,
   },
-  placeOrderBtn: {
-    flexDirection: "row",
+  payButton: {
+    height: 60,
+    borderRadius: 20,
+    justifyContent: "center",
     alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    borderRadius: 16,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 10,
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
     elevation: 4,
   },
-  disabledBtn: { opacity: 0.5 },
-  btnText: { color: "#fff", fontSize: 16, fontWeight: "700" },
-  btnPricePill: {
-    backgroundColor: "#fff",
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
+  payButtonContent: { flexDirection: "row", alignItems: "center", gap: 10 },
+  payText: { color: "#fff", fontSize: 18, fontWeight: "800" },
+  disabled: { opacity: 0.5 },
+  feeRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: "#eee",
+  },
+  feeLabel: {
+    fontSize: 13,
+    fontWeight: "500",
+  },
+  feeAmount: {
+    fontSize: 13,
+    fontWeight: "600",
   },
 });

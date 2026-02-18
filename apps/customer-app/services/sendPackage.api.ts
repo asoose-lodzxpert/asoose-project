@@ -1,18 +1,26 @@
 import { request } from "@/lib/authFetch";
-import { Address } from "@/types/delivery";
+import { Address, DeliveryQuote } from "@/types/delivery";
 
+/**
+ * Formats a numeric amount to Nigerian Naira (NGN) currency string.
+ */
 export function formatCurrency(amount: number): string {
-  return `₦${amount.toLocaleString("en-NG", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+  return `₦${amount.toLocaleString("en-NG", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  })}`;
 }
 
-// Call backend to get a delivery fare based on coordinates.
+/**
+ * Fetches a delivery fare quote from the backend.
+ * Matches: RideEstimateDto (but backend expects pickuplat, pickuplong, dropofflat, dropofflong as strings)
+ */
 export async function fetchDeliveryQuote(
   pickuplat: number,
   pickuplong: number,
   dropofflat: number,
   dropofflong: number,
-) {
-  // Build DTO expected by backend
+): Promise<DeliveryQuote> {
   const body = {
     pickuplat: String(pickuplat),
     pickuplong: String(pickuplong),
@@ -25,69 +33,103 @@ export async function fetchDeliveryQuote(
     body: JSON.stringify(body),
   });
 
-  // Some request wrappers return { parsed } while others return the parsed body directly.
+  // Handle various wrapper formats
   const data = res && (res as any).parsed ? (res as any).parsed : res;
 
-  // backend returns price, distance (meters + text), and eta (seconds + text)
   const price = Number(data?.price ?? 0);
   const distanceMeters = Number(data?.distance?.meters ?? 0);
   const durationSeconds = Number(data?.eta?.seconds ?? 0);
 
-  const distanceKm = Math.round((distanceMeters / 1000) * 10) / 10;
-  const etaMinutes = Math.max(0, Math.round(durationSeconds / 60));
-
   return {
-    distanceKm,
-    etaMinutes,
-    price, // Use only the backend price
+    distanceKm: Math.round((distanceMeters / 1000) * 10) / 10,
+    etaMinutes: Math.max(0, Math.round(durationSeconds / 60)),
+    price,
   };
 }
 
+/**
+ * Retrieves the current user's saved addresses and maps them to the local Address type.
+ */
 export async function fetchSavedAddresses(): Promise<Address[]> {
-  const parsed = await request("users/addresses", { method: "GET" });
+  const res = await request("users/addresses", { method: "GET" });
+  const data = res && (res as any).parsed ? (res as any).parsed : res;
 
-  return parsed.map((a: any) => ({
+  if (!Array.isArray(data)) return [];
+
+  return data.map((a: any) => ({
     id: a.id,
     label: a.label || a.street,
     fullAddress: `${a.street}, ${a.city}${a.state ? ", " + a.state : ""}`,
     coords: { latitude: a.lat, longitude: a.lng },
+    placeId: a.placeId,
   }));
 }
 
-// Create delivery request in backend
+/**
+ * Creates a new delivery request.
+ * Matches: RequestDeliveryDto
+ */
 export async function createDelivery(deliveryData: any) {
-  const body = {
-    pickupLocation: {
-      latitude: Number(deliveryData.pickup.address.coords.latitude),
-      longitude: Number(deliveryData.pickup.address.coords.longitude),
-      address: deliveryData.pickup.address.fullAddress,
-    },
-    dropoffLocation: {
-      latitude: Number(deliveryData.dropoff.address.coords.latitude),
-      longitude: Number(deliveryData.dropoff.address.coords.longitude),
-      address: deliveryData.dropoff.address.fullAddress,
-    },
-    recipientName: deliveryData.deliveryDetails.name,
-    recipientPhone: deliveryData.deliveryDetails.phone,
-    recipientInstructions: deliveryData.deliveryDetails.instructions,
-    senderName: deliveryData.pickupDetails.name,
-    senderPhone: deliveryData.pickupDetails.phone,
-    senderInstructions: deliveryData.pickupDetails.instructions,
-    packageSize: deliveryData.packageSize,
-    weightKg: deliveryData.packageOptions.weightKg
-      ? Number(deliveryData.packageOptions.weightKg)
-      : undefined,
-    declaredValue: deliveryData.packageOptions.declaredValue,
-    fragile: deliveryData.packageOptions.fragile,
-    perishable: deliveryData.packageOptions.perishable,
-    containsLiquid: deliveryData.packageOptions.containsLiquid,
-    packageDetails: `${deliveryData.packageSize} package${deliveryData.packageOptions.fragile ? ", Fragile" : ""}${deliveryData.packageOptions.perishable ? ", Perishable" : ""}${deliveryData.packageOptions.containsLiquid ? ", Contains Liquid" : ""}`,
+  const pickup = deliveryData.pickup?.address || {};
+  const dropoff = deliveryData.dropoff?.address || {};
+
+  const parseNum = (val: any) => {
+    const n = Number(val);
+    return isNaN(n) || val === "" || val === null ? undefined : n;
   };
 
-  const parsed = await request("trips/deliveries/request", {
+  const body = {
+    // Nested LocationPayloadDto
+    pickupLocation: {
+      addressText: pickup.fullAddress || pickup.label || "",
+      lat: parseNum(pickup.coords?.latitude),
+      lng: parseNum(pickup.coords?.longitude),
+      placeId: pickup.placeId || undefined,
+    },
+    // Nested LocationPayloadDto
+    dropoffLocation: {
+      addressText: dropoff.fullAddress || dropoff.label || "",
+      lat: parseNum(dropoff.coords?.latitude),
+      lng: parseNum(dropoff.coords?.longitude),
+      placeId: dropoff.placeId || undefined,
+    },
+
+    // Recipient & Sender info
+    recipientName: deliveryData.deliveryDetails?.name || "",
+    recipientPhone: deliveryData.deliveryDetails?.phone || "",
+    recipientInstructions:
+      deliveryData.deliveryDetails?.instructions || undefined,
+    senderName: deliveryData.pickupDetails?.name || undefined,
+    senderPhone: deliveryData.pickupDetails?.phone || undefined,
+    senderInstructions: deliveryData.pickupDetails?.instructions || undefined,
+
+    // Package details
+    packageSize: deliveryData.packageSize || undefined,
+    packageDetails:
+      deliveryData.packageDetails ||
+      `${deliveryData.packageSize || ""} package${deliveryData.packageOptions?.fragile ? ", Fragile" : ""}`,
+
+    // Numeric & Boolean values (validated for NestJS)
+    weightKg: parseNum(deliveryData.packageOptions?.weightKg),
+    declaredValue: parseNum(deliveryData.packageOptions?.declaredValue),
+    fragile: deliveryData.packageOptions?.fragile,
+    perishable: deliveryData.packageOptions?.perishable,
+    containsLiquid: deliveryData.packageOptions?.containsLiquid,
+
+    // Optional IDs
+    orderId: deliveryData.orderId || undefined,
+    pickupAddressId: deliveryData.pickupAddressId || undefined,
+    dropoffAddressId: deliveryData.dropoffAddressId || undefined,
+  };
+
+  if (__DEV__)
+    console.log(
+      "Creating delivery with payload:",
+      JSON.stringify(body, null, 2),
+    );
+
+  return await request("trips/deliveries/request", {
     method: "POST",
     body: JSON.stringify(body),
   });
-
-  return parsed;
 }

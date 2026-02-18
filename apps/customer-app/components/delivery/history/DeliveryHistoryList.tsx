@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useCallback } from "react";
 import {
   View,
   Pressable,
@@ -36,32 +36,56 @@ export const DeliveryHistoryList: React.FC<Props> = ({
   onEndReached,
 }) => {
   const router = useRouter();
-  const brandPrimary = useThemeColor({}, "brandPrimary");
-  const surfaceCard = useThemeColor({}, "surfaceCard");
-  const border = useThemeColor({}, "borderDefault");
-  const skeletonBg = useThemeColor({}, "surfaceBackground");
-  const skeletonBorder = useThemeColor({}, "borderDefault");
-  const textColor = useThemeColor({}, "textPrimary");
-  const captionColor = useThemeColor({}, "textSecondary");
+
+  // ✅ All hooks at top level
+  const primary = useThemeColor({}, "brandPrimary");
+  const white = useThemeColor({}, "surfaceCard");
+  const bgGrey = useThemeColor({}, "surfaceBackground");
+  const textMain = useThemeColor({}, "textPrimary");
+  const textMuted = useThemeColor({}, "textMuted");
+  const borderLight = useThemeColor({}, "surfaceSubtle");
+  const success = useThemeColor({}, "statusSuccess");
+  const error = useThemeColor({}, "statusError");
+  const pending = useThemeColor({}, "statusPending");
+
+  const getStatusConfig = useCallback(
+    (status: string) => {
+      const s = status.toLowerCase();
+
+      if (s.includes("delivered") || s.includes("success")) {
+        return { color: success, label: "DELIVERED" };
+      }
+
+      if (s.includes("cancel")) {
+        return { color: error, label: "CANCELLED" };
+      }
+
+      return {
+        color: pending,
+        label: status.toUpperCase(),
+      };
+    },
+    [success, error, pending],
+  );
 
   const renderItem = ({ item }: { item: DeliveryHistoryItem }) => {
-    // Format createdAt as e.g. 'Jan 5, 2026, 2:30 PM'
-    let timeString = "";
-    if (item.createdAt) {
-      const date = new Date(item.createdAt);
-      timeString = date.toLocaleString(undefined, {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-    }
+    const status = getStatusConfig(item.status);
+
+    const dateString = new Date(item.createdAt).toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+
     return (
       <Pressable
-        style={[
-          styles.card,
-          { backgroundColor: surfaceCard, borderColor: border },
+        style={({ pressed }) => [
+          styles.itemRow,
+          {
+            backgroundColor: white,
+            opacity: pressed ? 0.85 : 1,
+            borderBottomColor: borderLight,
+          },
         ]}
         onPress={() =>
           router.push(
@@ -69,57 +93,65 @@ export const DeliveryHistoryList: React.FC<Props> = ({
           )
         }
       >
-        <View style={styles.cardRow}>
-          <IconSymbol
-            name="truck"
-            size={20}
-            color={brandPrimary}
-            style={styles.icon}
-          />
-          <View style={styles.cardContent}>
-            <ThemedText style={[styles.cardFromTo, { color: textColor }]}>
+        <View style={styles.topLine}>
+          <View
+            style={[
+              styles.statusBadge,
+              { backgroundColor: `${status.color}15` },
+            ]}
+          >
+            <ThemedText style={[styles.statusText, { color: status.color }]}>
+              {status.label}
+            </ThemedText>
+          </View>
+
+          <ThemedText style={[styles.dateText, { color: textMuted }]}>
+            {dateString}
+          </ThemedText>
+        </View>
+
+        <View style={styles.mainContent}>
+          <View
+            style={[styles.imagePlaceholder, { backgroundColor: borderLight }]}
+          >
+            <IconSymbol name="shippingbox.fill" size={24} color={textMuted} />
+          </View>
+
+          <View style={styles.infoCol}>
+            <ThemedText
+              style={[styles.description, { color: textMain }]}
+              numberOfLines={1}
+            >
               {item.description}
             </ThemedText>
-            <ThemedText type="caption" style={{ color: captionColor }}>
-              Recipient: {item.recipient}
+
+            <ThemedText style={[styles.orderId, { color: textMuted }]}>
+              Order #{item.id.slice(-8).toUpperCase()}
             </ThemedText>
-            <ThemedText type="caption" style={{ color: captionColor }}>
+
+            <ThemedText style={[styles.recipient, { color: textMuted }]}>
+              To: {item.recipient}
+            </ThemedText>
+          </View>
+
+          <View style={styles.priceCol}>
+            <ThemedText style={[styles.priceText, { color: textMain }]}>
               ₦{item.total.toLocaleString()}
             </ThemedText>
-            <ThemedText type="caption" style={{ color: captionColor }}>
-              Status: {item.status}
-            </ThemedText>
-            {timeString && (
-              <ThemedText
-                type="caption"
-                style={[styles.timeInitiated, { color: captionColor }]}
-              >
-                {timeString}
-              </ThemedText>
-            )}
+            <IconSymbol name="chevron.right" size={14} color={textMuted} />
           </View>
-          <IconSymbol name="chevron.right" size={18} color={brandPrimary} />
         </View>
       </Pressable>
     );
   };
 
-  // Skeleton loader
   if (loading && data.length === 0) {
     return (
-      <View style={styles.listContent}>
-        {[...Array(4)].map((_, i) => (
+      <View style={{ flex: 1, backgroundColor: bgGrey, padding: 15 }}>
+        {[...Array(5)].map((_, i) => (
           <View
             key={i}
-            style={[
-              styles.card,
-              {
-                backgroundColor: skeletonBg,
-                borderColor: skeletonBorder,
-                minHeight: 70,
-                marginBottom: 12,
-              },
-            ]}
+            style={[styles.skeletonCard, { backgroundColor: borderLight }]}
           />
         ))}
       </View>
@@ -131,17 +163,25 @@ export const DeliveryHistoryList: React.FC<Props> = ({
       data={data}
       keyExtractor={(item) => item.id}
       renderItem={renderItem}
-      contentContainerStyle={styles.listContent}
+      style={{ backgroundColor: bgGrey }}
+      contentContainerStyle={styles.listPadding}
       refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor={primary}
+        />
       }
       onEndReached={onEndReached}
       onEndReachedThreshold={0.4}
       ListEmptyComponent={
         !loading ? (
-          <ThemedText style={[styles.centerText, { color: textColor }]}>
-            No deliveries found.
-          </ThemedText>
+          <View style={styles.emptyContainer}>
+            <IconSymbol name="tray.fill" size={60} color={borderLight} />
+            <ThemedText style={{ color: textMuted, marginTop: 10 }}>
+              No history found
+            </ThemedText>
+          </View>
         ) : null
       }
     />
@@ -149,37 +189,91 @@ export const DeliveryHistoryList: React.FC<Props> = ({
 };
 
 const styles = StyleSheet.create({
-  listContent: {
+  listPadding: { paddingBottom: 40 },
+
+  itemRow: {
     padding: 16,
-    paddingBottom: 32,
+    borderBottomWidth: 1,
+    marginBottom: 8,
   },
-  centerText: {
-    textAlign: "center",
-    marginTop: 32,
-  },
-  card: {
-    borderRadius: 12,
-    padding: 14,
-    borderWidth: 1,
+
+  topLine: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 12,
   },
-  cardRow: {
+
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+
+  statusText: {
+    fontSize: 10,
+    fontWeight: "800",
+  },
+
+  dateText: {
+    fontSize: 12,
+    fontWeight: "500",
+  },
+
+  mainContent: {
     flexDirection: "row",
     alignItems: "center",
   },
-  icon: {
+
+  imagePlaceholder: {
+    width: 50,
+    height: 50,
+    borderRadius: 4,
+    justifyContent: "center",
+    alignItems: "center",
     marginRight: 12,
   },
-  cardContent: {
+
+  infoCol: {
     flex: 1,
   },
-  cardFromTo: {
+
+  description: {
     fontSize: 15,
-    fontWeight: "500",
+    fontWeight: "600",
     marginBottom: 2,
   },
-  timeInitiated: {
+
+  orderId: {
     fontSize: 12,
-    marginTop: 2,
+    marginBottom: 2,
+  },
+
+  recipient: {
+    fontSize: 12,
+  },
+
+  priceCol: {
+    alignItems: "flex-end",
+    flexDirection: "row",
+    gap: 8,
+  },
+
+  priceText: {
+    fontSize: 16,
+    fontWeight: "700",
+  },
+
+  skeletonCard: {
+    height: 100,
+    width: "100%",
+    marginBottom: 10,
+    borderRadius: 4,
+  },
+
+  emptyContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 100,
   },
 });

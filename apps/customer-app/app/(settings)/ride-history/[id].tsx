@@ -31,8 +31,8 @@ function formatCurrency(value: string | number | undefined | null) {
   if (isNaN(num)) return "0.00";
   return num.toLocaleString("en-NG", {
     style: "decimal",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
   });
 }
 
@@ -40,303 +40,109 @@ export default function RideDetailsScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
   const router = useRouter();
 
-  /* -------- Theme Colors -------- */
   const brandPrimary = useThemeColor({}, "brandPrimary");
   const textColor = useThemeColor({}, "textPrimary");
-  const textSecondary = useThemeColor({}, "textSecondary");
+  const textSecondary = useThemeColor({}, "textMuted");
   const border = useThemeColor({}, "borderDefault");
   const surface = useThemeColor({}, "surfaceBackground");
   const surfaceSubtle = useThemeColor({}, "surfaceSubtle");
+  const card = useThemeColor({}, "surfaceCard");
   const accentGreen = useThemeColor({}, "statusSuccess");
   const accentRed = useThemeColor({}, "statusError");
 
-  /* -------- State -------- */
   const [ride, setRide] = useState<Ride | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [retryCount, setRetryCount] = useState(0);
-  const retryTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
 
-  /* -------- Data Loader with Auto-Retry -------- */
-  const loadRide = useCallback(
-    async (attempt = 0) => {
-      if (!id || typeof id !== "string") {
-        setRide(null);
-        setError("Ride not found");
-        setLoading(false);
-        return;
-      }
-
-      if (attempt === 0) {
-        setLoading(true);
-        setError(null);
-        setRetryCount(0);
-      }
-
-      try {
-        const data = await RideService.getRideById(id);
-        setRide(data);
-        setError(null);
-        setRetryCount(0);
-        setLoading(false);
-        setRefreshing(false);
-      } catch (e) {
-        const errorMessage = (e as Error)?.message || "Failed to load ride";
-        const isNetworkError =
-          errorMessage.toLowerCase().includes("network") ||
-          errorMessage.toLowerCase().includes("fetch") ||
-          errorMessage.toLowerCase().includes("connection");
-
-        const maxRetries = isNetworkError ? 3 : 1;
-
-        if (attempt < maxRetries) {
-          const delay = Math.min(1000 * Math.pow(2, attempt), 5000);
-          setRetryCount(attempt + 1);
-
-          retryTimeoutRef.current = setTimeout(() => {
-            loadRide(attempt + 1);
-          }, delay);
-        } else {
-          setRide(null);
-          setError(errorMessage);
-          setLoading(false);
-          setRefreshing(false);
-          setRetryCount(0);
-        }
-      }
-    },
-    [id],
-  );
-
-  useEffect(() => {
-    return () => {
-      if (retryTimeoutRef.current) {
-        clearTimeout(retryTimeoutRef.current);
-      }
-    };
-  }, []);
+  const loadRide = useCallback(async () => {
+    if (!id) return;
+    try {
+      setLoading(true);
+      const data = await RideService.getRideById(id);
+      setRide(data);
+    } catch (e) {
+      setError("Failed to load ride details");
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [id]);
 
   useEffect(() => {
     loadRide();
   }, [loadRide]);
 
-  const onRefresh = useCallback(async () => {
+  const onRefresh = () => {
     setRefreshing(true);
-    await loadRide(0);
-  }, [loadRide]);
-
-  /* ---------------- UI ---------------- */
-  const renderEmptyState = () => (
-    <ScrollView
-      contentContainerStyle={styles.errorContainer}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={onRefresh}
-          tintColor={brandPrimary}
-        />
-      }
-    >
-      <IconSymbol name="alert-circle" size={48} color={brandPrimary} />
-      <ThemedText style={[styles.errorTitle, { color: textColor }]}>
-        Oops!
-      </ThemedText>
-      <ThemedText style={[styles.errorText, { color: textSecondary }]}>
-        {error || "Ride not available"}
-      </ThemedText>
-
-      <Pressable
-        style={[styles.retryButton, { borderColor: brandPrimary }]}
-        onPress={() => router.back()}
-      >
-        <ThemedText style={[styles.retryButtonText, { color: brandPrimary }]}>
-          Go Back
-        </ThemedText>
-      </Pressable>
-    </ScrollView>
-  );
-
-  /* ---------------- Skeleton Components ---------------- */
-  const SkeletonLine = ({
-    width = "100%",
-    height = 14,
-    radius = 8,
-  }: {
-    width?: DimensionValue;
-    height?: number;
-    radius?: number;
-  }) => {
-    const progress = useSharedValue(-SCREEN_WIDTH);
-
-    const animatedStyle = useAnimatedStyle(() => ({
-      transform: [{ translateX: progress.value }],
-    }));
-
-    useEffect(() => {
-      progress.value = withRepeat(
-        withTiming(SCREEN_WIDTH, { duration: 1400, easing: Easing.linear }),
-        -1,
-        false,
-      );
-    }, []);
-
-    return (
-      <View
-        style={{
-          width,
-          height,
-          borderRadius: radius,
-          backgroundColor: surfaceSubtle,
-          overflow: "hidden",
-        }}
-      >
-        <Animated.View
-          style={[
-            {
-              width: "40%",
-              height: "100%",
-              backgroundColor: border,
-              opacity: 0.4,
-            },
-            animatedStyle,
-          ]}
-        />
-      </View>
-    );
+    loadRide();
   };
 
-  const SkeletonInfo = () => (
-    <View style={styles.skeletonSection}>
-      <View style={{ gap: 10 }}>
-        {[1, 2, 3, 4].map((i) => (
-          <View key={i} style={styles.infoRow}>
-            <SkeletonLine width={80} height={12} />
-            <SkeletonLine width={140} height={12} />
-          </View>
-        ))}
-      </View>
-    </View>
-  );
-
-  const SkeletonTimeline = () => (
-    <View style={styles.skeletonSection}>
-      <SkeletonLine width={140} height={14} />
-
-      <View
-        style={{
-          marginTop: 12,
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: 8,
-        }}
-      >
-        {[1, 2, 3, 4].map((i) => (
-          <React.Fragment key={i}>
-            <SkeletonLine width={36} height={36} radius={18} />
-            {i < 4 && <SkeletonLine width={40} height={2} />}
-          </React.Fragment>
-        ))}
-      </View>
-
-      <View style={{ marginTop: 16, alignItems: "center", gap: 4 }}>
-        <SkeletonLine width="50%" height={14} />
-        <SkeletonLine width="40%" height={10} />
-      </View>
-    </View>
-  );
-
-  const SkeletonRoute = () => (
-    <View style={styles.skeletonSection}>
-      <SkeletonLine width={100} height={14} />
-
-      <View style={{ marginTop: 12, gap: 16 }}>
-        {[1, 2].map((i) => (
-          <View key={i} style={{ flexDirection: "row", gap: 12 }}>
-            <SkeletonLine width={20} height={20} radius={10} />
-            <View style={{ flex: 1, gap: 4 }}>
-              <SkeletonLine width="40%" height={12} />
-              <SkeletonLine width="80%" height={14} />
-              <SkeletonLine width="60%" height={12} />
-            </View>
-          </View>
-        ))}
-      </View>
-    </View>
-  );
-
-  const SkeletonFare = () => (
-    <View style={styles.skeletonSection}>
-      <SkeletonLine width={100} height={14} />
-
-      <View style={{ marginTop: 12, gap: 12 }}>
-        {[1, 2, 3].map((i) => (
-          <View key={i} style={styles.infoRow}>
-            <SkeletonLine width={100} height={12} />
-            <SkeletonLine width={80} height={12} />
-          </View>
-        ))}
-
-        <View style={[styles.totalRow, { borderTopColor: border }]}>
-          <SkeletonLine width={80} height={14} />
-          <SkeletonLine width={90} height={18} />
-        </View>
-      </View>
-    </View>
-  );
-
-  /* ---------------- Sections ---------------- */
   const renderTimeline = () => {
     if (!ride) return null;
 
-    const statusTimeline: {
-      status: string;
-      label: string;
-      icon: IconSymbolName;
-    }[] = [
-      { status: "REQUESTED", label: "Requested", icon: "checkmark.circle" },
-      { status: "ACCEPTED", label: "Accepted", icon: "checkmark.circle.fill" },
-      { status: "IN_PROGRESS", label: "In Progress", icon: "car.fill" },
-      { status: "COMPLETED", label: "Completed", icon: "checkmark.seal" },
+    const isCancelled = ride.status === "CANCELLED";
+
+    const steps: { label: string; icon: IconSymbolName; status: string }[] = [
+      { label: "Requested", icon: "checkmark.circle", status: "REQUESTED" },
+      { label: "Accepted", icon: "person.badge.plus", status: "ACCEPTED" },
+      { label: "On Trip", icon: "car.fill", status: "IN_PROGRESS" },
+      {
+        label: isCancelled ? "Cancelled" : "Completed",
+        icon: isCancelled ? "xmark.circle.fill" : "checkmark.seal.fill",
+        status: isCancelled ? "CANCELLED" : "COMPLETED",
+      },
     ];
 
-    const currentIndex = statusTimeline.findIndex(
-      (s) => s.status === ride.status,
-    );
-    const activeIndex = currentIndex >= 0 ? currentIndex : 0;
-    const currentStep = statusTimeline[activeIndex];
+    const activeIndex = isCancelled
+      ? 3
+      : steps.findIndex((s) => s.status === ride.status);
 
     return (
-      <View style={styles.timelineSection}>
-        <ThemedText style={[styles.sectionTitle, { color: textColor }]}>
-          Ride Status
+      <View
+        style={[
+          styles.sectionCard,
+          { backgroundColor: card, borderColor: border },
+        ]}
+      >
+        <ThemedText style={[styles.sectionHeader, { color: textSecondary }]}>
+          RIDE TIMELINE
         </ThemedText>
-        <View style={[styles.divider, { backgroundColor: border }]} />
-
-        <View style={styles.horizontalTimeline}>
-          {statusTimeline.map((step, idx) => {
-            const isPassed = idx <= activeIndex;
-            const iconColor = isPassed ? brandPrimary : "#D1D5DB";
-            const lineColor = isPassed ? brandPrimary : "#E5E7EB";
+        <View style={styles.timelineRow}>
+          {steps.map((step, idx) => {
+            const isCompleted =
+              idx < activeIndex || (idx === activeIndex && !isCancelled);
+            const isCurrent = idx === activeIndex;
+            const tint =
+              isCancelled && isCurrent
+                ? accentRed
+                : isCompleted || isCurrent
+                  ? brandPrimary
+                  : border;
 
             return (
               <React.Fragment key={idx}>
-                <View style={styles.timelineIconWrapper}>
-                  <View
+                <View style={styles.stepContainer}>
+                  <View style={[styles.stepIcon, { backgroundColor: tint }]}>
+                    <IconSymbol name={step.icon} size={14} color="#FFF" />
+                  </View>
+                  <ThemedText
                     style={[
-                      styles.timelineIconCircle,
-                      { backgroundColor: iconColor },
+                      styles.stepLabel,
+                      { color: isCurrent ? textColor : textSecondary },
                     ]}
                   >
-                    <IconSymbol name={step.icon} size={16} color="#FFF" />
-                  </View>
+                    {step.label}
+                  </ThemedText>
                 </View>
-                {idx < statusTimeline.length - 1 && (
+                {idx < steps.length - 1 && (
                   <View
                     style={[
-                      styles.timelineConnector,
-                      { backgroundColor: lineColor },
+                      styles.stepLine,
+                      {
+                        backgroundColor:
+                          idx < activeIndex ? brandPrimary : border,
+                      },
                     ]}
                   />
                 )}
@@ -345,146 +151,62 @@ export default function RideDetailsScreen() {
           })}
         </View>
 
-        <View style={styles.currentStatusContainer}>
-          <ThemedText style={[styles.currentStatusLabel, { color: textColor }]}>
-            {currentStep.label}
-          </ThemedText>
-          {ride.completedAt && (
+        {isCancelled && (
+          <View
+            style={[styles.cancelBanner, { backgroundColor: accentRed + "10" }]}
+          >
+            <IconSymbol
+              name="exclamationmark.triangle.fill"
+              size={16}
+              color={accentRed}
+            />
             <ThemedText
-              style={[styles.currentStatusTime, { color: textSecondary }]}
+              style={{
+                color: accentRed,
+                fontSize: 13,
+                fontWeight: "600",
+                marginLeft: 8,
+              }}
             >
-              {new Date(ride.completedAt).toLocaleString()}
+              {ride.cancellationReason || "Ride was cancelled"}
             </ThemedText>
-          )}
-        </View>
-      </View>
-    );
-  };
-
-  const renderRideInfo = () => {
-    if (!ride) return null;
-
-    return (
-      <View style={styles.infoSection}>
-        <ThemedText style={[styles.sectionTitle, { color: textColor }]}>
-          Ride Information
-        </ThemedText>
-        <View style={[styles.divider, { backgroundColor: border }]} />
-        <View style={styles.infoGrid}>
-          <InfoRow
-            label="Ride ID"
-            value={`#${ride.id.slice(-8).toUpperCase()}`}
-          />
-          <InfoRow
-            label="Requested On"
-            value={new Date(ride.createdAt).toLocaleDateString()}
-          />
-          <InfoRow
-            label="Time"
-            value={new Date(ride.createdAt).toLocaleTimeString()}
-          />
-          {ride.distanceKm && (
-            <InfoRow label="Distance" value={`${ride.distanceKm} km`} />
-          )}
-          {ride.durationMin && (
-            <InfoRow label="Duration" value={`${ride.durationMin} mins`} />
-          )}
-        </View>
+          </View>
+        )}
       </View>
     );
   };
 
   const renderRoute = () => {
-    if (!ride?.pickupAddress && !ride?.dropoffAddress) return null;
-
+    if (!ride) return null;
     return (
-      <View style={styles.routeSection}>
-        <ThemedText style={[styles.sectionTitle, { color: textColor }]}>
-          Route
-        </ThemedText>
-        <View style={[styles.divider, { backgroundColor: border }]} />
-        <View style={styles.routeContainer}>
-          {ride.pickupAddress && (
-            <View style={styles.locationRow}>
-              <IconSymbol name="location.fill" size={20} color={accentGreen} />
-              <View style={styles.locationInfo}>
-                <ThemedText
-                  style={[styles.locationLabel, { color: textSecondary }]}
-                >
-                  Pickup
-                </ThemedText>
-                <ThemedText style={[styles.locationText, { color: textColor }]}>
-                  {ride.pickupAddress.street}
-                </ThemedText>
-                <ThemedText
-                  style={[styles.locationSubtext, { color: textSecondary }]}
-                >
-                  {ride.pickupAddress.city}, {ride.pickupAddress.state}
-                </ThemedText>
-              </View>
-            </View>
-          )}
-
-          <View style={styles.routeLine} />
-
-          {ride.dropoffAddress && (
-            <View style={styles.locationRow}>
-              <IconSymbol name="mappin" size={20} color={accentRed} />
-              <View style={styles.locationInfo}>
-                <ThemedText
-                  style={[styles.locationLabel, { color: textSecondary }]}
-                >
-                  Dropoff
-                </ThemedText>
-                <ThemedText style={[styles.locationText, { color: textColor }]}>
-                  {ride.dropoffAddress.street}
-                </ThemedText>
-                <ThemedText
-                  style={[styles.locationSubtext, { color: textSecondary }]}
-                >
-                  {ride.dropoffAddress.city}, {ride.dropoffAddress.state}
-                </ThemedText>
-              </View>
-            </View>
-          )}
-        </View>
-      </View>
-    );
-  };
-
-  const renderDriver = () => {
-    if (!ride?.rider) return null;
-
-    return (
-      <View style={styles.driverSection}>
-        <ThemedText style={[styles.sectionTitle, { color: textColor }]}>
-          Driver
-        </ThemedText>
-        <View style={[styles.divider, { backgroundColor: border }]} />
-        <View style={styles.driverContainer}>
-          <View style={styles.driverRow}>
-            <View style={styles.driverIconWrapper}>
-              <IconSymbol name="person.fill" size={24} color={brandPrimary} />
-            </View>
-            <View style={styles.driverInfo}>
-              <ThemedText style={[styles.driverName, { color: textColor }]}>
-                {ride.rider.name}
+      <View
+        style={[
+          styles.sectionCard,
+          { backgroundColor: card, borderColor: border },
+        ]}
+      >
+        <View style={styles.routeRow}>
+          <View style={styles.routeIcons}>
+            <View style={[styles.dot, { backgroundColor: accentGreen }]} />
+            <View style={[styles.line, { backgroundColor: border }]} />
+            <IconSymbol name="mappin.and.ellipse" size={18} color={accentRed} />
+          </View>
+          <View style={styles.routeInfo}>
+            <View style={styles.addressBox}>
+              <ThemedText type="caption" style={{ color: textSecondary }}>
+                PICKUP
               </ThemedText>
-              <ThemedText
-                style={[styles.driverPhone, { color: textSecondary }]}
-              >
-                {ride.rider.phone}
+              <ThemedText numberOfLines={1} style={styles.addressText}>
+                {ride.pickupAddress?.street}
               </ThemedText>
-              {ride.rider.rating && (
-                <View style={styles.ratingContainer}>
-                  <IconSymbol name="star.fill" size={14} color="#F59E0B" />
-                  <ThemedText
-                    style={[styles.ratingText, { color: textSecondary }]}
-                  >
-                    {ride.rider.rating} ({ride.rider.totalRides} rides)
-                  </ThemedText>
-                </View>
-              )}
+            </View>
+            <View style={[styles.addressBox, { marginTop: 20 }]}>
+              <ThemedText type="caption" style={{ color: textSecondary }}>
+                DROPOFF
+              </ThemedText>
+              <ThemedText numberOfLines={1} style={styles.addressText}>
+                {ride.dropoffAddress?.street}
+              </ThemedText>
             </View>
           </View>
         </View>
@@ -494,422 +216,182 @@ export default function RideDetailsScreen() {
 
   const renderFare = () => {
     if (!ride) return null;
-
     return (
-      <View style={styles.fareSection}>
-        <ThemedText style={[styles.sectionTitle, { color: textColor }]}>
-          Fare Details
+      <View
+        style={[
+          styles.sectionCard,
+          { backgroundColor: card, borderColor: border },
+        ]}
+      >
+        <ThemedText style={[styles.sectionHeader, { color: textSecondary }]}>
+          PAYMENT SUMMARY
         </ThemedText>
-        <View style={[styles.divider, { backgroundColor: border }]} />
-        <View style={styles.fareContainer}>
-          {ride.baseFare && (
-            <View style={styles.fareRow}>
-              <ThemedText style={[styles.fareLabel, { color: textSecondary }]}>
-                Base Fare
-              </ThemedText>
-              <ThemedText style={[styles.fareValue, { color: textColor }]}>
-                ₦{formatCurrency(ride.baseFare)}
-              </ThemedText>
-            </View>
-          )}
-          {ride.distanceFare && (
-            <View style={styles.fareRow}>
-              <ThemedText style={[styles.fareLabel, { color: textSecondary }]}>
-                Distance Fare
-              </ThemedText>
-              <ThemedText style={[styles.fareValue, { color: textColor }]}>
-                ₦{formatCurrency(ride.distanceFare)}
-              </ThemedText>
-            </View>
-          )}
-          {ride.timeFare && (
-            <View style={styles.fareRow}>
-              <ThemedText style={[styles.fareLabel, { color: textSecondary }]}>
-                Time Fare
-              </ThemedText>
-              <ThemedText style={[styles.fareValue, { color: textColor }]}>
-                ₦{formatCurrency(ride.timeFare)}
-              </ThemedText>
-            </View>
-          )}
-          {ride.surgeMultiplier && ride.surgeMultiplier > 1 && (
-            <View style={styles.fareRow}>
-              <ThemedText style={[styles.fareLabel, { color: textSecondary }]}>
-                Surge ({ride.surgeMultiplier}x)
-              </ThemedText>
-              <ThemedText style={[styles.fareValue, { color: accentRed }]}>
-                +₦
-                {formatCurrency(
-                  (ride.totalFare || 0) * (ride.surgeMultiplier - 1),
-                )}
-              </ThemedText>
-            </View>
-          )}
-          {ride.platformFee && (
-            <View style={styles.fareRow}>
-              <ThemedText style={[styles.fareLabel, { color: textSecondary }]}>
-                Platform Fee
-              </ThemedText>
-              <ThemedText style={[styles.fareValue, { color: textColor }]}>
-                ₦{formatCurrency(ride.platformFee)}
-              </ThemedText>
-            </View>
-          )}
-
-          <View style={[styles.totalRow, { borderTopColor: border }]}>
-            <ThemedText style={[styles.totalLabel, { color: textColor }]}>
-              Total Fare
-            </ThemedText>
-            <ThemedText style={[styles.totalPrice, { color: brandPrimary }]}>
-              ₦{formatCurrency(ride.totalFare)}
+        <View style={styles.fareItem}>
+          <ThemedText style={{ color: textSecondary }}>Total Fare</ThemedText>
+          <ThemedText style={styles.fareValue}>
+            ₦{formatCurrency(ride.totalFare)}
+          </ThemedText>
+        </View>
+        <View style={styles.fareItem}>
+          <ThemedText style={{ color: textSecondary }}>Distance</ThemedText>
+          <ThemedText style={styles.fareValue}>{ride.distanceKm} km</ThemedText>
+        </View>
+        <View style={styles.fareItem}>
+          <ThemedText style={{ color: textSecondary }}>Status</ThemedText>
+          <View
+            style={[
+              styles.statusBadge,
+              {
+                backgroundColor:
+                  ride.payment?.status === "COMPLETED"
+                    ? accentGreen + "20"
+                    : border,
+              },
+            ]}
+          >
+            <ThemedText
+              style={{
+                color:
+                  ride.payment?.status === "COMPLETED"
+                    ? accentGreen
+                    : textColor,
+                fontSize: 12,
+                fontWeight: "700",
+              }}
+            >
+              {ride.payment?.status || "UNPAID"}
             </ThemedText>
           </View>
+        </View>
+        <View
+          style={[
+            styles.divider,
+            { backgroundColor: border, marginVertical: 12 },
+          ]}
+        />
+        <View style={styles.fareItem}>
+          <ThemedText style={{ fontWeight: "700" }}>Amount Paid</ThemedText>
+          <ThemedText style={[styles.totalPrice, { color: brandPrimary }]}>
+            ₦{formatCurrency(ride.payment?.amount || 0)}
+          </ThemedText>
         </View>
       </View>
     );
   };
 
-  const renderContent = () => (
-    <ScrollView
-      showsVerticalScrollIndicator={false}
-      style={styles.scrollView}
-      contentContainerStyle={styles.scrollContent}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={onRefresh}
-          tintColor={brandPrimary}
-        />
-      }
-    >
-      <View style={styles.contentContainer}>
-        {renderTimeline()}
-        {renderRideInfo()}
-        {renderRoute()}
-        {renderDriver()}
-        {renderFare()}
-      </View>
-      <View style={styles.footerSpacer} />
-    </ScrollView>
-  );
-
   return (
-    <ThemedView style={[styles.mainContainer, { backgroundColor: surface }]}>
-      {/* Header */}
-      <View
-        style={[
-          styles.header,
-          { borderBottomColor: border, backgroundColor: surface },
-        ]}
-      >
-        <Pressable onPress={() => router.back()} style={styles.backButton}>
-          <IconSymbol name="chevron.left" size={22} color={brandPrimary} />
+    <ThemedView style={[styles.container, { backgroundColor: surface }]}>
+      <View style={styles.header}>
+        <Pressable onPress={() => router.back()} style={styles.backBtn}>
+          <IconSymbol name="chevron.left" size={24} color={brandPrimary} />
         </Pressable>
+        <ThemedText type="subtitle">
+          Ride #ID...{ride?.id.slice(-5).toUpperCase()}
+        </ThemedText>
+      </View>
 
-        <View style={styles.headerTitleContainer}>
-          <ThemedText type="subtitle" style={styles.headerTitle}>
-            Ride Details
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={brandPrimary}
+          />
+        }
+      >
+        {renderTimeline()}
+        {renderRoute()}
+        {renderFare()}
+
+        <View style={styles.infoBox}>
+          <IconSymbol name="info.circle" size={16} color={textSecondary} />
+          <ThemedText
+            style={{ color: textSecondary, fontSize: 12, marginLeft: 8 }}
+          >
+            Request created at{" "}
+            {new Date(ride?.createdAt || "").toLocaleString()}
           </ThemedText>
         </View>
-
-        <View style={styles.headerSpacer} />
-      </View>
-
-      {/* Body */}
-      {loading ? (
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
-        >
-          <View style={styles.contentContainer}>
-            <SkeletonTimeline />
-            <SkeletonInfo />
-            <SkeletonRoute />
-            <SkeletonInfo />
-            <SkeletonFare />
-          </View>
-          <View style={styles.footerSpacer} />
-        </ScrollView>
-      ) : error || !ride ? (
-        renderEmptyState()
-      ) : (
-        renderContent()
-      )}
+      </ScrollView>
     </ThemedView>
   );
 }
 
-/* ---------------- Small Components ---------------- */
-function InfoRow({ label, value }: { label: string; value: string }) {
-  const textColor = useThemeColor({}, "textPrimary");
-  const textSecondary = useThemeColor({}, "textSecondary");
-
-  return (
-    <View style={styles.infoRow}>
-      <ThemedText style={[styles.infoLabel, { color: textSecondary }]}>
-        {label}
-      </ThemedText>
-      <ThemedText style={[styles.infoValue, { color: textColor }]}>
-        {value}
-      </ThemedText>
-    </View>
-  );
-}
-
-/* ---------------- Styles ---------------- */
 const styles = StyleSheet.create({
-  mainContainer: { flex: 1 },
-
+  container: { flex: 1 },
   header: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-  },
-  backButton: { padding: 8, borderRadius: 12, marginRight: 12 },
-  headerTitleContainer: { flex: 1 },
-  headerTitle: { fontSize: 20, fontWeight: "600" },
-  headerSpacer: { width: 32 },
-
-  scrollView: { flex: 1 },
-  scrollContent: { paddingBottom: 24, alignItems: "center" },
-
-  contentContainer: {
-    width: "100%",
-    maxWidth: 400,
-    borderRadius: 12,
-    overflow: "hidden",
-  },
-
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    paddingHorizontal: 24,
+    padding: 16,
     paddingTop: 20,
-    paddingBottom: 8,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
-
-  divider: {
-    height: StyleSheet.hairlineWidth,
-    marginHorizontal: 24,
-    marginBottom: 16,
-  },
-
-  // Timeline Section
-  timelineSection: {
-    paddingBottom: 12,
-  },
-  horizontalTimeline: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 24,
-    marginBottom: 16,
-  },
-  timelineIconWrapper: {
-    alignItems: "center",
-  },
-  timelineIconCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  timelineConnector: {
-    flex: 1,
-    height: 3,
-    marginHorizontal: 4,
-    borderRadius: 2,
-  },
-  currentStatusContainer: {
-    paddingHorizontal: 24,
-    paddingBottom: 8,
-    alignItems: "center",
-    gap: 4,
-  },
-  currentStatusLabel: {
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  currentStatusTime: {
-    fontSize: 12,
-    marginTop: 2,
-  },
-
-  // Info Section
-  infoSection: {
-    paddingBottom: 8,
-  },
-  infoGrid: { paddingHorizontal: 24, gap: 10, paddingBottom: 8 },
-  infoRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  infoLabel: { fontSize: 12, fontWeight: "500" },
-  infoValue: {
-    fontSize: 12,
-    fontWeight: "600",
-    textAlign: "right",
-    flexShrink: 1,
-  },
-
-  // Route Section
-  routeSection: {
-    paddingBottom: 8,
-  },
-  routeContainer: {
-    paddingHorizontal: 24,
-    paddingBottom: 8,
-  },
-  locationRow: {
-    flexDirection: "row",
     gap: 12,
-    alignItems: "flex-start",
   },
-  locationInfo: {
-    flex: 1,
-    gap: 2,
-  },
-  locationLabel: {
+  backBtn: { padding: 4 },
+  scrollContent: { padding: 16, gap: 16 },
+  sectionCard: { padding: 20, borderRadius: 20, borderWidth: 1 },
+  sectionHeader: {
     fontSize: 11,
-    fontWeight: "600",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
-  locationText: {
-    fontSize: 15,
-    fontWeight: "600",
-  },
-  locationSubtext: {
-    fontSize: 13,
-  },
-  routeLine: {
-    width: 2,
-    height: 20,
-    backgroundColor: "#E5E7EB",
-    marginLeft: 9,
-    marginVertical: 4,
-  },
-
-  // Driver Section
-  driverSection: {
-    paddingBottom: 8,
-  },
-  driverContainer: {
-    paddingHorizontal: 24,
-    paddingBottom: 8,
-  },
-  driverRow: {
-    flexDirection: "row",
-    gap: 12,
-    alignItems: "center",
-  },
-  driverIconWrapper: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: "#F3F4F6",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  driverInfo: {
-    flex: 1,
-    gap: 2,
-  },
-  driverName: {
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  driverPhone: {
-    fontSize: 14,
-  },
-  ratingContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    marginTop: 2,
-  },
-  ratingText: {
-    fontSize: 13,
-  },
-
-  // Fare Section
-  fareSection: {
-    paddingBottom: 8,
-  },
-  fareContainer: {
-    paddingHorizontal: 24,
-    paddingBottom: 8,
-  },
-  fareRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 6,
-  },
-  fareLabel: {
-    fontSize: 14,
-    fontWeight: "500",
-  },
-  fareValue: {
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  totalRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingTop: 12,
-    marginTop: 8,
-    borderTopWidth: 1,
-    paddingBottom: 4,
-  },
-  totalLabel: {
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  totalPrice: {
-    fontSize: 18,
     fontWeight: "800",
+    letterSpacing: 1,
+    marginBottom: 20,
   },
 
-  loadingContainer: {
+  // Timeline
+  timelineRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  stepContainer: { alignItems: "center", gap: 8, zIndex: 2 },
+  stepIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  stepLabel: { fontSize: 10, fontWeight: "600" },
+  stepLine: {
     flex: 1,
-    justifyContent: "center",
+    height: 2,
+    marginTop: -18,
+    marginHorizontal: -10,
+    zIndex: 1,
+  },
+  cancelBanner: {
+    flexDirection: "row",
     alignItems: "center",
+    padding: 12,
+    borderRadius: 12,
+    marginTop: 20,
   },
 
-  errorContainer: {
-    flexGrow: 1,
-    justifyContent: "center",
+  // Route
+  routeRow: { flexDirection: "row", gap: 16 },
+  routeIcons: { alignItems: "center", width: 20 },
+  dot: { width: 8, height: 8, borderRadius: 4 },
+  line: { width: 2, flex: 1, marginVertical: 4 },
+  routeInfo: { flex: 1 },
+  addressBox: { gap: 4 },
+  addressText: { fontSize: 14, fontWeight: "600" },
+
+  // Fare
+  fareItem: {
+    flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
-    padding: 24,
-    gap: 16,
+    marginVertical: 6,
   },
-  errorTitle: { fontSize: 24, fontWeight: "700", marginTop: 8 },
+  fareValue: { fontWeight: "600", fontSize: 14 },
+  statusBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
+  totalPrice: { fontSize: 20, fontWeight: "800" },
+  divider: { height: 1, width: "100%" },
 
-  /* Skeleton */
-  skeletonSection: {
-    paddingHorizontal: 24,
-    paddingVertical: 20,
-    gap: 8,
-    backgroundColor: "transparent",
+  infoBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 20,
   },
-  errorText: { fontSize: 16, textAlign: "center", marginBottom: 24 },
-
-  retryButton: {
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderWidth: 1,
-    borderRadius: 8,
-  },
-  retryButtonText: { fontSize: 16, fontWeight: "600" },
-
-  footerSpacer: { height: 80 },
 });

@@ -1,807 +1,337 @@
-import React, { useMemo, useRef, useEffect } from "react";
+import React, { useMemo } from "react";
 import {
   View,
   StyleSheet,
   Pressable,
   Image,
   ScrollView,
-  Animated,
-  StyleProp,
-  ViewStyle,
+  Platform,
 } from "react-native";
-import { RelativePathString, useRouter } from "expo-router";
-
+import { useRouter, RelativePathString } from "expo-router";
 import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
 import { IconSymbol } from "@/components/ui/icon-symbol";
-import { CartItemModifiers } from "@/components/CartItemModifiers";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { useCart } from "@/context/CartContext";
-import { CartItem, Restaurant } from "@/types/cart";
-
-/* -------------------------------------------------------------------------- */
-/* TYPES */
-/* -------------------------------------------------------------------------- */
-
-type CartGroup = {
-  id: string;
-  restaurant?: Restaurant;
-  items: CartItem[];
-};
-
-/* -------------------------------------------------------------------------- */
-/* SCREEN */
-/* -------------------------------------------------------------------------- */
 
 export default function CartScreen() {
   const {
     items,
     restaurants,
+    total,
     subtotal,
     deliveryFee,
-    total,
     removeItem,
     increaseQty,
     decreaseQty,
-    loading,
     canCheckout,
   } = useCart();
-
   const router = useRouter();
 
-  const accent = useThemeColor({}, "brandPrimary");
-  const surface = useThemeColor({}, "surfaceBackground");
-  const surfaceCard = useThemeColor({}, "surfaceCard");
-  const surfaceSubtle = useThemeColor({}, "surfaceSubtle");
-  const textPrimary = useThemeColor({}, "textPrimary");
-  const textSecondary = useThemeColor({}, "textSecondary");
-  const borderColor = useThemeColor({}, "borderDefault");
-  const statusError = useThemeColor({}, "statusError");
+  const primary = useThemeColor({}, "brandPrimary");
+  const bgGrey = useThemeColor({}, "surfaceBackground");
+  const white = useThemeColor({}, "surfaceCard");
+  const textMain = useThemeColor({}, "textPrimary");
+  const textMuted = useThemeColor({}, "textMuted");
+  const borderLight = useThemeColor({}, "surfaceSubtle");
 
-  const currencySymbol = restaurants[0]?.currency ?? "₦";
+  const currency = restaurants[0]?.currency ?? "₦";
 
-  /* ------------------------------------------------------------------------ */
-  /* GROUP ITEMS BY STORE */
-  /* ------------------------------------------------------------------------ */
-
-  const groupedByRestaurant = useMemo<CartGroup[]>(() => {
-    if (!items.length) return [];
-
-    const map = new Map<string, CartGroup>();
-
+  const grouped = useMemo(() => {
+    const map = new Map<string, any>();
     items.forEach((item) => {
       const restaurant = restaurants.find((r) => r.id === item.vendorId);
-      const key = restaurant?.id ?? item.vendorId;
-
-      if (!map.has(key)) {
-        map.set(key, {
-          id: key,
-          restaurant,
-          items: [],
-        });
-      }
-
-      map.get(key)!.items.push(item);
+      if (!map.has(item.vendorId))
+        map.set(item.vendorId, { restaurant, items: [] });
+      map.get(item.vendorId).items.push(item);
     });
-
     return Array.from(map.values());
   }, [items, restaurants]);
 
-  /* ------------------------------------------------------------------------ */
-  /* LOADING */
-  /* ------------------------------------------------------------------------ */
-
-  if (loading) {
-    return <CartSkeleton onBack={() => router.back()} color={accent} />;
-  }
-
-  /* ------------------------------------------------------------------------ */
-  /* EMPTY CART */
-  /* ------------------------------------------------------------------------ */
-
-  if (!items.length) {
-    return (
-      <ThemedView style={styles.container}>
-        <View style={[styles.header, { backgroundColor: surface }]}>
-          <Pressable onPress={() => router.back()} style={styles.backButton}>
-            <IconSymbol name="chevron.left" size={24} color={accent} />
-          </Pressable>
-          <ThemedText type="title">Cart</ThemedText>
-          <View style={{ width: 40 }} />
-        </View>
-
-        <View style={styles.emptyState}>
-          <View
-            style={[
-              styles.emptyIconContainer,
-              { backgroundColor: surfaceSubtle },
-            ]}
-          >
-            <IconSymbol name="cart" size={64} color={borderColor} />
-          </View>
-
-          <ThemedText type="subtitle" style={styles.emptyTitle}>
-            Your cart is empty
-          </ThemedText>
-          <ThemedText style={[styles.emptySubTitle, { color: textSecondary }]}>
-            Add items from stores to get started
-          </ThemedText>
-
-          <Pressable
-            style={[styles.browseBtn, { backgroundColor: accent }]}
-            onPress={() => router.back()}
-          >
-            <ThemedText style={styles.browseBtnText}>Browse Stores</ThemedText>
-            <IconSymbol name="chevron.right" size={18} color="#fff" />
-          </Pressable>
-        </View>
-      </ThemedView>
-    );
-  }
-
-  /* ------------------------------------------------------------------------ */
-  /* CART CONTENT */
-  /* ------------------------------------------------------------------------ */
+  if (!items.length) return <EmptyCart primary={primary} router={router} />;
 
   return (
-    <ThemedView style={styles.container}>
-      {/* Header */}
-      <View style={[styles.header, { backgroundColor: surface }]}>
-        <Pressable onPress={() => router.back()} style={styles.backButton}>
-          <IconSymbol name="chevron.left" size={24} color={accent} />
+    <View style={[styles.container, { backgroundColor: bgGrey }]}>
+      {/* 1. Header (Standard Pro Style) */}
+      <View style={[styles.header, { backgroundColor: white }]}>
+        <Pressable onPress={() => router.back()} style={styles.backBtn}>
+          <IconSymbol name="arrow.left" size={22} color={primary} />
         </Pressable>
-
-        <View style={styles.headerCenter}>
-          <ThemedText type="title" style={styles.headerTitle}>
-            Cart
-          </ThemedText>
-          <View style={[styles.itemCountBadge, { backgroundColor: accent }]}>
-            <ThemedText style={styles.itemCountText}>
-              {items.reduce((s, i) => s + i.qty, 0)}
-            </ThemedText>
-          </View>
-        </View>
-
+        <ThemedText style={styles.headerTitle}>
+          Cart ({items.length})
+        </ThemedText>
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        {groupedByRestaurant.map((group) => (
-          <View key={group.id} style={styles.restaurantBlock}>
-            {/* Store header */}
-            <View
-              style={[
-                styles.restaurantHeader,
-                { backgroundColor: surfaceCard },
-              ]}
-            >
-              {group.restaurant?.image ? (
-                <Image
-                  source={{ uri: group.restaurant.image }}
-                  style={styles.restaurantLogo}
-                />
-              ) : (
-                <View
-                  style={[
-                    styles.restaurantLogoPlaceholder,
-                    { backgroundColor: surfaceSubtle },
-                  ]}
-                >
-                  <IconSymbol name="house.fill" size={20} color={borderColor} />
-                </View>
-              )}
-
-              <View style={{ flex: 1 }}>
-                <ThemedText style={{ fontWeight: "700" }}>
-                  {group.restaurant?.name ?? "Store"}
-                </ThemedText>
-                {group.restaurant?.deliveryTime && (
-                  <ThemedText style={{ color: textSecondary, fontSize: 12 }}>
-                    {group.restaurant.deliveryTime}
-                  </ThemedText>
-                )}
-              </View>
-
-              <Pressable
-                onPress={() =>
-                  router.push(
-                    `/(store)/store-screen/${group.restaurant?.id}` as RelativePathString,
-                  )
-                }
-              >
-                <IconSymbol
-                  name="chevron.right"
-                  size={18}
-                  color={borderColor}
-                />
-              </Pressable>
+      <ScrollView showsVerticalScrollIndicator={false}>
+        {/* 2. Grouped Items */}
+        {grouped.map((group, idx) => (
+          <View key={idx} style={[styles.section, { backgroundColor: white }]}>
+            <View style={styles.vendorHeader}>
+              <IconSymbol name="storefront" size={16} color={textMuted} />
+              <ThemedText style={styles.vendorName}>
+                {group.restaurant?.name || "Seller"}
+              </ThemedText>
             </View>
 
-            {/* Items */}
-            <View
-              style={[styles.itemsWrapper, { backgroundColor: surfaceCard }]}
-            >
-              {group.items.map((item, index) => (
-                <View key={item.id}>
-                  <View style={styles.itemRow}>
-                    <Image
-                      source={
-                        item.image
-                          ? { uri: item.image }
-                          : require("@/assets/images/placeholder.png")
-                      }
-                      style={styles.itemImage}
-                    />
+            {group.items.map((item: any) => (
+              <View key={item.id} style={styles.itemRow}>
+                <Image source={{ uri: item.image }} style={styles.itemImg} />
 
-                    <View style={styles.itemInfo}>
-                      <ThemedText
-                        style={[styles.itemName, { color: textPrimary }]}
-                        numberOfLines={2}
-                      >
-                        {item.name}
-                      </ThemedText>
+                <View style={styles.itemInfo}>
+                  <ThemedText style={styles.itemName} numberOfLines={2}>
+                    {item.name}
+                  </ThemedText>
+                  <ThemedText style={[styles.itemPrice, { color: primary }]}>
+                    {currency}
+                    {item.price.toLocaleString()}
+                  </ThemedText>
 
-                      {item.description ? (
-                        <ThemedText
-                          style={[
-                            styles.itemDescription,
-                            { color: textSecondary },
-                          ]}
-                          numberOfLines={1}
-                        >
-                          {item.description}
-                        </ThemedText>
-                      ) : null}
-
-                      {item.modifierGroups && item.modifierGroups.length > 0 ? (
-                        <CartItemModifiers
-                          modifierGroups={item.modifierGroups}
-                        />
-                      ) : null}
-
-                      <View style={styles.itemFooter}>
-                        <ThemedText style={[styles.price, { color: accent }]}>
-                          {formatCurrency(
-                            item.price * item.qty,
-                            currencySymbol,
-                          )}
-                        </ThemedText>
-
-                        <View style={styles.qtyRow}>
-                          <Pressable
-                            onPress={() => decreaseQty(item.id)}
-                            style={[
-                              styles.qtyBtn,
-                              { backgroundColor: surfaceSubtle },
-                            ]}
-                          >
-                            <IconSymbol
-                              name="minus"
-                              size={16}
-                              color={textPrimary}
-                            />
-                          </Pressable>
-
-                          <ThemedText
-                            style={[styles.qtyText, { color: textPrimary }]}
-                          >
-                            {item.qty}
-                          </ThemedText>
-
-                          <Pressable
-                            onPress={() => increaseQty(item.id)}
-                            style={[
-                              styles.qtyBtn,
-                              { backgroundColor: surfaceSubtle },
-                            ]}
-                          >
-                            <IconSymbol
-                              name="plus"
-                              size={16}
-                              color={textPrimary}
-                            />
-                          </Pressable>
-                        </View>
-                      </View>
-                    </View>
-
+                  <View style={styles.itemActions}>
                     <Pressable
                       onPress={() => removeItem(item.id)}
-                      style={[
-                        styles.removeBtn,
-                        { backgroundColor: surfaceSubtle },
-                      ]}
+                      style={styles.removeBtn}
                     >
-                      <IconSymbol name="trash" size={18} color={statusError} />
+                      <IconSymbol name="trash" size={16} color={primary} />
+                      <ThemedText
+                        style={[styles.removeText, { color: primary }]}
+                      >
+                        REMOVE
+                      </ThemedText>
                     </Pressable>
+
+                    <View style={styles.stepper}>
+                      <Pressable
+                        onPress={() =>
+                          item.qty > 1
+                            ? decreaseQty(item.id)
+                            : removeItem(item.id)
+                        }
+                        style={styles.stepAction}
+                      >
+                        <ThemedText style={styles.stepText}>-</ThemedText>
+                      </Pressable>
+                      <ThemedText style={styles.qtyValue}>
+                        {item.qty}
+                      </ThemedText>
+                      <Pressable
+                        onPress={() => increaseQty(item.id)}
+                        style={styles.stepAction}
+                      >
+                        <ThemedText style={styles.stepText}>+</ThemedText>
+                      </Pressable>
+                    </View>
                   </View>
-
-                  {index < group.items.length - 1 && (
-                    <View
-                      style={[styles.divider, { backgroundColor: borderColor }]}
-                    />
-                  )}
                 </View>
-              ))}
-            </View>
-
-            <Pressable
-              style={[styles.addMoreBtn, { borderColor: borderColor }]}
-              onPress={() => router.back()}
-            >
-              <IconSymbol name="plus.circle.fill" size={20} color={accent} />
-              <ThemedText style={[styles.addMoreText, { color: accent }]}>
-                Add more items
-              </ThemedText>
-            </Pressable>
+              </View>
+            ))}
           </View>
         ))}
-      </ScrollView>
 
-      {/* Summary */}
-      <View
-        style={[
-          styles.summaryCard,
-          { backgroundColor: surfaceCard, borderTopColor: borderColor },
-        ]}
-      >
-        <View style={styles.summaryContent}>
+        {/* 3. Order Summary Section */}
+        <View style={[styles.summarySection, { backgroundColor: white }]}>
+          <ThemedText style={styles.summaryTitle}>ORDER SUMMARY</ThemedText>
           <View style={styles.summaryRow}>
-            <ThemedText style={[styles.summaryLabel, { color: textSecondary }]}>
-              Subtotal
-            </ThemedText>
-            <ThemedText style={[styles.summaryValue, { color: textPrimary }]}>
-              {formatCurrency(subtotal, currencySymbol)}
+            <ThemedText style={styles.summaryLabel}>Subtotal</ThemedText>
+            <ThemedText style={styles.summaryPrice}>
+              {currency}
+              {subtotal.toLocaleString()}
             </ThemedText>
           </View>
-
           <View style={styles.summaryRow}>
-            <View style={styles.summaryLabelWithIcon}>
-              <IconSymbol name="car.fill" size={16} color={textSecondary} />
-              <ThemedText
-                style={[styles.summaryLabel, { color: textSecondary }]}
-              >
-                Delivery Fee
-              </ThemedText>
-            </View>
-            <ThemedText style={[styles.summaryValue, { color: textPrimary }]}>
-              {formatCurrency(deliveryFee, currencySymbol)}
+            <ThemedText style={styles.summaryLabel}>Delivery Fee</ThemedText>
+            <ThemedText style={styles.summaryPrice}>
+              {currency}
+              {deliveryFee.toLocaleString()}
             </ThemedText>
           </View>
-
-          <View
-            style={[styles.summaryDivider, { backgroundColor: borderColor }]}
-          />
-
+          <View style={[styles.divider, { backgroundColor: borderLight }]} />
           <View style={styles.summaryRow}>
-            <ThemedText style={[styles.summaryTotal, { color: textPrimary }]}>
-              Total
-            </ThemedText>
-            <ThemedText style={[styles.summaryTotal, { color: accent }]}>
-              {formatCurrency(total, currencySymbol)}
+            <ThemedText style={styles.totalLabel}>Total</ThemedText>
+            <ThemedText style={[styles.totalPrice, { color: textMain }]}>
+              {currency}
+              {total.toLocaleString()}
             </ThemedText>
           </View>
         </View>
 
+        <View style={styles.trustBadge}>
+          <IconSymbol name="checkmark.shield.fill" size={14} color="#4CAF50" />
+          <ThemedText style={styles.trustText}>
+            Secure Checkout Guaranteed
+          </ThemedText>
+        </View>
+      </ScrollView>
+
+      {/* 4. Sticky Footer Button */}
+      <View style={[styles.footer, { backgroundColor: white }]}>
         <Pressable
-          disabled={!canCheckout}
           onPress={() => router.push("/checkout")}
+          disabled={!canCheckout}
           style={[
-            styles.placeOrderBtn,
-            { backgroundColor: accent },
-            !canCheckout && styles.placeOrderBtnDisabled,
+            styles.checkoutBtn,
+            { backgroundColor: primary },
+            !canCheckout && { opacity: 0.5 },
           ]}
         >
-          <ThemedText style={styles.placeOrderText}>
-            Proceed to Checkout
+          <ThemedText style={styles.checkoutBtnText}>
+            CHECKOUT ({currency}
+            {total.toLocaleString()})
           </ThemedText>
-          <IconSymbol name="arrow.right" size={20} color="#fff" />
         </Pressable>
       </View>
-    </ThemedView>
+    </View>
   );
 }
 
-/* -------------------------------------------------------------------------- */
-/* HELPERS */
-/* -------------------------------------------------------------------------- */
-
-function formatCurrency(value: number, currency: string) {
-  return `${currency}${value.toLocaleString()}`;
-}
-
-/* -------------------------------------------------------------------------- */
-/* SKELETON */
-/* -------------------------------------------------------------------------- */
-
-function SkeletonBlock({
-  height,
-  width,
-  style,
-}: {
-  height: number;
-  width?: number | string;
-  style?: StyleProp<ViewStyle>;
-}) {
-  const pulse = useRef(new Animated.Value(0.4)).current;
-
-  useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulse, {
-          toValue: 0.8,
-          duration: 600,
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulse, {
-          toValue: 0.4,
-          duration: 600,
-          useNativeDriver: true,
-        }),
-      ]),
-    ).start();
-  }, [pulse]);
-
-  const animatedStyle = {
-    height,
-    ...(typeof width === "number" && { width }),
-    borderRadius: 16,
-    backgroundColor: "#e0e0e0",
-    opacity: pulse,
-  };
-
+function EmptyCart({ primary, router }: any) {
   return (
-    <Animated.View
-      style={[
-        animatedStyle,
-        typeof width === "string" && { width: width as any },
-        style,
-      ]}
-    />
-  );
-}
-
-function CartSkeleton({
-  onBack,
-  color,
-}: {
-  onBack: () => void;
-  color: string;
-}) {
-  return (
-    <ThemedView style={styles.container}>
-      <Pressable onPress={onBack} style={styles.backButton}>
-        <IconSymbol name="arrow-left" size={20} color={color} />
+    <View style={styles.emptyContainer}>
+      <IconSymbol name="cart" size={80} color="#ccc" />
+      <ThemedText style={styles.emptyTitle}>Your cart is empty!</ThemedText>
+      <Pressable
+        onPress={() => router.back()}
+        style={[styles.shopBtn, { backgroundColor: primary }]}
+      >
+        <ThemedText style={styles.shopBtnText}>START SHOPPING</ThemedText>
       </Pressable>
-
-      <SkeletonBlock height={180} />
-      <SkeletonBlock height={100} style={{ marginTop: 16 }} />
-    </ThemedView>
+    </View>
   );
 }
-
-/* -------------------------------------------------------------------------- */
-/* STYLES */
-/* -------------------------------------------------------------------------- */
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-
   header: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 16,
-  },
 
-  backButton: {
-    width: 40,
-    height: 40,
-    justifyContent: "center",
-    alignItems: "center",
+    paddingTop: Platform.OS === "ios" ? 50 : 30,
+    height: Platform.OS === "ios" ? 100 : 100,
+    paddingHorizontal: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E0E0E0",
   },
-
-  headerCenter: {
+  headerTitle: {
     flex: 1,
+    textAlign: "center",
+    fontSize: 18,
+    fontWeight: "600",
+  },
+  backBtn: { width: 40 },
+  section: { marginTop: 10, paddingVertical: 10 },
+  vendorHeader: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
+    paddingHorizontal: 15,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F1F1F2",
     gap: 8,
   },
-
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: "700",
+  vendorName: {
+    fontSize: 13,
+    fontWeight: "600",
+    textTransform: "uppercase",
+    color: "#75757A",
   },
-
-  itemCountBadge: {
-    minWidth: 24,
-    height: 24,
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  itemCountText: {
-    color: "#fff",
-    fontSize: 12,
-    fontWeight: "700",
-  },
-
-  scrollContent: {
-    paddingHorizontal: 20,
-    paddingBottom: 200,
-    paddingTop: 8,
-  },
-
-  restaurantBlock: {
-    marginBottom: 20,
-  },
-
-  restaurantHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 16,
-    borderRadius: 16,
-    marginBottom: 12,
-    gap: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-
-  restaurantLogo: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-  },
-
-  restaurantLogoPlaceholder: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-
-  itemsWrapper: {
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-
   itemRow: {
     flexDirection: "row",
-    paddingVertical: 12,
-    gap: 12,
+    padding: 15,
+    borderBottomWidth: 8,
+    borderBottomColor: "#F1F1F2",
   },
-
-  itemImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 12,
+  itemImg: {
+    width: 90,
+    height: 90,
+    borderRadius: 4,
+    backgroundColor: "#F9F9F9",
   },
-
-  itemInfo: {
-    flex: 1,
-    justifyContent: "space-between",
-  },
-
-  itemName: {
-    fontSize: 16,
-    fontWeight: "700",
-    lineHeight: 22,
-    marginBottom: 4,
-  },
-
-  itemDescription: {
-    fontSize: 13,
-    lineHeight: 18,
-    marginBottom: 4,
-  },
-
-  itemFooter: {
+  itemInfo: { flex: 1, marginLeft: 15, justifyContent: "space-between" },
+  itemName: { fontSize: 15, color: "#282828" },
+  itemPrice: { fontSize: 17, fontWeight: "700", marginTop: 4 },
+  itemActions: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    marginTop: 10,
   },
-
-  price: {
-    fontSize: 18,
-    fontWeight: "800",
-  },
-
-  qtyRow: {
+  removeBtn: { flexDirection: "row", alignItems: "center", gap: 5 },
+  removeText: { fontSize: 13, fontWeight: "600" },
+  stepper: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+    borderRadius: 4,
   },
-
-  qtyBtn: {
+  stepAction: {
     width: 32,
     height: 32,
-    borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",
+    backgroundColor: "#F9F9F9",
   },
-
-  qtyText: {
-    minWidth: 28,
-    textAlign: "center",
+  stepText: { fontSize: 18, fontWeight: "600" },
+  qtyValue: { paddingHorizontal: 15, fontSize: 15, fontWeight: "600" },
+  summarySection: { marginTop: 10, padding: 15, paddingBottom: 30 },
+  summaryTitle: {
+    fontSize: 14,
     fontWeight: "700",
-    fontSize: 16,
+    marginBottom: 15,
+    color: "#75757A",
   },
-
-  removeBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  divider: {
-    height: 1,
-    opacity: 0.5,
-  },
-
-  addMoreBtn: {
-    marginTop: 12,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderStyle: "dashed",
-  },
-
-  addMoreText: {
-    fontWeight: "700",
-    fontSize: 15,
-  },
-
-  summaryCard: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingTop: 20,
-    paddingHorizontal: 20,
-    paddingBottom: 24,
-    borderTopWidth: 1,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-
-  summaryContent: {
-    marginBottom: 16,
-  },
-
   summaryRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 10,
+    marginBottom: 12,
   },
-
-  summaryLabelWithIcon: {
+  summaryLabel: { fontSize: 14, color: "#75757A" },
+  summaryPrice: { fontSize: 14, fontWeight: "600" },
+  divider: { height: 1, marginVertical: 10 },
+  totalLabel: { fontSize: 16, fontWeight: "700" },
+  totalPrice: { fontSize: 18, fontWeight: "800" },
+  trustBadge: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
+    padding: 20,
     gap: 6,
   },
-
-  summaryLabel: {
-    fontSize: 15,
+  trustText: { fontSize: 12, color: "#4CAF50", fontWeight: "600" },
+  footer: {
+    padding: 15,
+    borderTopWidth: 1,
+    borderTopColor: "#E0E0E0",
+    paddingBottom: Platform.OS === "ios" ? 35 : 15,
   },
-
-  summaryValue: {
-    fontWeight: "600",
-    fontSize: 15,
-  },
-
-  summaryDivider: {
-    height: 1,
-    marginVertical: 12,
-  },
-
-  summaryTotal: {
-    fontSize: 20,
-    fontWeight: "800",
-  },
-
-  warningBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    padding: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-    marginBottom: 16,
-  },
-
-  warningText: {
-    flex: 1,
-    fontSize: 13,
-    fontWeight: "600",
-  },
-
-  placeOrderBtn: {
-    flexDirection: "row",
+  checkoutBtn: {
+    height: 50,
+    borderRadius: 4,
     alignItems: "center",
     justifyContent: "center",
-    gap: 8,
-    paddingVertical: 16,
-    borderRadius: 14,
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
-
-  placeOrderBtnDisabled: {
-    opacity: 0.4,
-  },
-
-  placeOrderText: {
-    color: "#fff",
-    fontWeight: "700",
-    fontSize: 17,
-  },
-
-  emptyState: {
+  checkoutBtnText: { color: "#FFF", fontSize: 15, fontWeight: "700" },
+  emptyContainer: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 32,
-    gap: 16,
+    padding: 30,
   },
-
-  emptyIconContainer: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 8,
-  },
-
   emptyTitle: {
-    fontSize: 24,
-    fontWeight: "700",
+    fontSize: 18,
+    fontWeight: "600",
+    marginTop: 20,
+    marginBottom: 20,
   },
-
-  emptySubTitle: {
-    textAlign: "center",
-    fontSize: 15,
-    lineHeight: 22,
+  shopBtn: {
+    paddingHorizontal: 40,
+    height: 48,
+    borderRadius: 4,
+    justifyContent: "center",
   },
-
-  browseBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingVertical: 14,
-    paddingHorizontal: 28,
-    borderRadius: 12,
-    marginTop: 16,
-  },
-
-  browseBtnText: {
-    color: "#fff",
-    fontWeight: "700",
-    fontSize: 16,
-  },
+  shopBtnText: { color: "#FFF", fontWeight: "700" },
 });

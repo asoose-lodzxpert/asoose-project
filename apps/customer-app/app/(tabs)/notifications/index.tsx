@@ -7,6 +7,7 @@ import {
   RefreshControl,
   TouchableOpacity,
   ActivityIndicator,
+  Pressable,
 } from "react-native";
 import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
@@ -15,10 +16,8 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import {
   fetchUserNotifications,
-  fetchUnreadCount,
   markAllAsRead,
   markNotificationAsRead,
-  deleteNotification,
 } from "@/services/user-notifications.service";
 import { useNotificationCount } from "@/context/NotificationCountContext";
 
@@ -31,9 +30,10 @@ export default function NotificationsTab() {
   const [actionLoading, setActionLoading] = useState(false);
   const badgeCount = useNotificationCount();
 
-  const cardBg = useThemeColor({}, "surfaceCard");
+  const primary = useThemeColor({}, "brandPrimary");
+  const surface = useThemeColor({}, "surfaceBackground");
+  const textSecondary = useThemeColor({}, "textSecondary");
   const border = useThemeColor({}, "borderDefault");
-  const skeletonColor = useThemeColor({}, "surfaceSubtle");
 
   const loadNotifications = useCallback(
     async (reset = false) => {
@@ -42,14 +42,7 @@ export default function NotificationsTab() {
       setLoading(true);
       try {
         const res = await fetchUserNotifications(reset ? 1 : page);
-        if (reset) {
-          setNotifications(res.data);
-        } else {
-          setNotifications((prev) => [
-            ...prev,
-            ...(res.data as Notification[]),
-          ]);
-        }
+        setNotifications(reset ? res.data : [...notifications, ...res.data]);
         setHasMore(res.meta.page < res.meta.pages);
       } finally {
         setLoading(false);
@@ -76,159 +69,153 @@ export default function NotificationsTab() {
     setActionLoading(false);
   }
 
-  async function handleMarkAsRead(id: string) {
+  async function handleNotificationPress(item: Notification) {
+    if (item.isRead) return;
     setActionLoading(true);
-    await markNotificationAsRead(id);
-    await loadNotifications(true);
-    setActionLoading(false);
-  }
-
-  async function handleDelete(id: string) {
-    setActionLoading(true);
-    await deleteNotification(id);
+    await markNotificationAsRead(item.id);
     await loadNotifications(true);
     setActionLoading(false);
   }
 
   const renderItem = ({ item }: { item: Notification }) => (
-    <View
-      style={[styles.card, { backgroundColor: cardBg, borderColor: border }]}
+    <Pressable
+      onPress={() => handleNotificationPress(item)}
+      style={({ pressed }) => [
+        styles.notificationItem,
+        { borderBottomColor: border, opacity: pressed ? 0.7 : 1 },
+      ]}
     >
-      <IconSymbol
-        name="bell"
-        size={24}
-        style={{ marginRight: 12 }}
-        color={border}
-      />
-      <View style={{ flex: 1 }}>
-        <ThemedText
-          style={[
-            styles.title,
-            { fontWeight: item.isRead ? "normal" : "bold" },
-          ]}
-        >
-          {item.title}
-        </ThemedText>
-        <ThemedText style={styles.message}>{item.message}</ThemedText>
-        <ThemedText style={styles.meta}>
-          {new Date(item.createdAt).toLocaleString()}
-        </ThemedText>
-      </View>
-      {!item.isRead && (
-        <TouchableOpacity
-          onPress={() => handleMarkAsRead(item.id)}
-          disabled={actionLoading}
-          style={{ marginLeft: 8 }}
-        >
-          <ThemedText type="link" style={{ fontWeight: "bold" }}>
-            Mark as read
+      <View style={styles.contentRow}>
+        {/* Unread Indicator Dot */}
+        <View style={styles.indicatorContainer}>
+          {!item.isRead && (
+            <View style={[styles.unreadDot, { backgroundColor: primary }]} />
+          )}
+        </View>
+
+        <View style={styles.textContainer}>
+          <ThemedText
+            style={[styles.title, { opacity: item.isRead ? 0.6 : 1 }]}
+          >
+            {item.title}
           </ThemedText>
-        </TouchableOpacity>
-      )}
-      <TouchableOpacity
-        onPress={() => handleDelete(item.id)}
-        disabled={actionLoading}
-        style={{ marginLeft: 8 }}
-      >
-        <ThemedText
-          type="link"
-          style={{ fontWeight: "bold", color: "#EF4444" }}
-        >
-          Delete
-        </ThemedText>
-      </TouchableOpacity>
-    </View>
+          <ThemedText
+            style={[styles.message, { color: textSecondary }]}
+            numberOfLines={2}
+          >
+            {item.message}
+          </ThemedText>
+          <ThemedText style={[styles.meta, { color: textSecondary }]}>
+            {new Date(item.createdAt).toLocaleDateString()}
+          </ThemedText>
+        </View>
+      </View>
+    </Pressable>
   );
 
   return (
-    <ThemedView style={styles.container}>
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "space-between",
-          marginBottom: 16,
-        }}
-      >
-        <ThemedText style={styles.header}>Notifications</ThemedText>
+    <ThemedView style={[styles.container, { backgroundColor: surface }]}>
+      {/* Minimal Header */}
+      <View style={styles.headerRow}>
+        <View style={styles.titleWithCount}>
+          <ThemedText style={styles.headerText}>Notifications</ThemedText>
+          {badgeCount > 0 && (
+            <View style={[styles.badge, { backgroundColor: primary }]}>
+              <ThemedText style={styles.badgeText}>{badgeCount}</ThemedText>
+            </View>
+          )}
+        </View>
+
         <TouchableOpacity
           onPress={handleMarkAllAsRead}
           disabled={actionLoading || badgeCount === 0}
-          style={{ opacity: actionLoading || badgeCount === 0 ? 0.5 : 1 }}
         >
-          <ThemedText type="link" style={{ fontWeight: "bold" }}>
-            Mark all as read
+          <ThemedText
+            style={[
+              styles.markReadText,
+              { color: primary, opacity: badgeCount === 0 ? 0.3 : 1 },
+            ]}
+          >
+            Mark all read
           </ThemedText>
         </TouchableOpacity>
       </View>
-      {loading ? (
-        <>
-          {[...Array(5)].map((_, i) => (
-            <SkeletonCard
-              key={i}
-              style={{ backgroundColor: skeletonColor, marginBottom: 12 }}
-            />
-          ))}
-        </>
-      ) : (
-        <FlatList
-          data={notifications}
-          renderItem={renderItem}
-          keyExtractor={(item) => item.id}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+
+      <FlatList
+        data={notifications}
+        renderItem={renderItem}
+        keyExtractor={(item) => item.id}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.listPadding}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={primary}
+          />
+        }
+        onEndReached={() => {
+          if (hasMore && !loading) {
+            setPage((p) => p + 1);
+            loadNotifications();
           }
-          onEndReached={() => {
-            if (hasMore && !loading) {
-              setPage((p) => p + 1);
-              loadNotifications();
-            }
-          }}
-          onEndReachedThreshold={0.2}
-          ListEmptyComponent={
-            loading ? (
-              <ActivityIndicator style={{ marginTop: 32 }} />
-            ) : (
-              <ThemedText style={{ textAlign: "center", marginTop: 32 }}>
-                No notifications yet.
+        }}
+        ListEmptyComponent={
+          loading ? (
+            <ActivityIndicator style={styles.emptyLoader} color={primary} />
+          ) : (
+            <View style={styles.emptyContainer}>
+              <IconSymbol name="bell.slash" size={48} color={border} />
+              <ThemedText style={{ color: textSecondary, marginTop: 12 }}>
+                All caught up!
               </ThemedText>
-            )
-          }
-        />
-      )}
+            </View>
+          )
+        }
+      />
     </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 16,
-  },
-  header: {
-    fontSize: 22,
-    fontWeight: "bold",
-    marginBottom: 16,
-  },
-  card: {
+  container: { flex: 1 },
+  headerRow: {
     flexDirection: "row",
-    alignItems: "flex-start",
-    padding: 16,
-    marginBottom: 12,
-    borderRadius: 12,
-    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 10,
   },
-  title: {
-    fontSize: 16,
-    fontWeight: "bold",
-    marginBottom: 4,
+  titleWithCount: { flexDirection: "row", alignItems: "center", gap: 8 },
+  headerText: { fontSize: 24, fontWeight: "800", letterSpacing: -0.5 },
+  badge: {
+    paddingHorizontal: 8,
+    height: 20,
+    borderRadius: 10,
+    justifyContent: "center",
+    alignItems: "center",
   },
-  message: {
-    fontSize: 14,
-    marginBottom: 4,
+  badgeText: { color: "#fff", fontSize: 12, fontWeight: "700" },
+  markReadText: { fontSize: 14, fontWeight: "600" },
+  listPadding: { paddingBottom: 40 },
+  notificationItem: {
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  meta: {
-    fontSize: 12,
-    color: "#888",
+  contentRow: { flexDirection: "row", alignItems: "flex-start" },
+  indicatorContainer: { width: 12, paddingTop: 6 },
+  unreadDot: { width: 8, height: 8, borderRadius: 4 },
+  textContainer: { flex: 1, paddingLeft: 4 },
+  title: { fontSize: 16, fontWeight: "600", marginBottom: 2 },
+  message: { fontSize: 14, lineHeight: 20, marginBottom: 6 },
+  meta: { fontSize: 12, fontWeight: "500" },
+  emptyLoader: { marginTop: 40 },
+  emptyContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 100,
   },
 });

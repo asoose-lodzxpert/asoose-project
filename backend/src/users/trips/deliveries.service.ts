@@ -112,23 +112,32 @@ export class DeliveriesService {
   // ==================================================================
 
   async requestDelivery(userId: string, dto: RequestDeliveryDto) {
-    this.logger.debug(`Request delivery DTO: ${JSON.stringify(dto, null, 2)}`);
+    this.logger.debug(`[requestDelivery] userId=${userId}`);
+    this.logger.debug(`[requestDelivery] DTO: ${JSON.stringify(dto, null, 2)}`);
 
     if (
       dto.weightKg &&
       (dto.weightKg < TRIPS_CONFIG.MIN_DELIVERY_WEIGHT_KG ||
         dto.weightKg > TRIPS_CONFIG.MAX_DELIVERY_WEIGHT_KG)
     ) {
+      this.logger.warn(`[requestDelivery] Invalid weight: ${dto.weightKg}`);
       throw new BadRequestException('Invalid weight');
     }
 
+    const t0 = Date.now();
     return this.prisma.$transaction(async (tx) => {
+      this.logger.log(`[requestDelivery] Transaction started`);
       if (dto.orderId) {
+        this.logger.log(`[requestDelivery] Checking orderId: ${dto.orderId}`);
         const order = await tx.order.findUnique({
           where: { id: dto.orderId },
         });
-        if (!order || order.userId !== userId)
+        if (!order || order.userId !== userId) {
+          this.logger.warn(
+            `[requestDelivery] Invalid order link for orderId=${dto.orderId}`,
+          );
           throw new ForbiddenException('Invalid order link');
+        }
       }
 
       let pickupAddress: any;
@@ -136,15 +145,24 @@ export class DeliveriesService {
 
       // Case A: Using Existing Address IDs
       if (dto.pickupAddressId && dto.dropoffAddressId) {
+        this.logger.log(
+          `[requestDelivery] Using existing address IDs: pickup=${dto.pickupAddressId}, dropoff=${dto.dropoffAddressId}`,
+        );
         [pickupAddress, dropoffAddress] = await Promise.all([
           tx.address.findUnique({ where: { id: dto.pickupAddressId } }),
           tx.address.findUnique({ where: { id: dto.dropoffAddressId } }),
         ]);
 
         if (!pickupAddress || pickupAddress.userId !== userId) {
+          this.logger.warn(
+            `[requestDelivery] Invalid pickup address: ${dto.pickupAddressId}`,
+          );
           throw new BadRequestException('Invalid pickup address');
         }
         if (!dropoffAddress || dropoffAddress.userId !== userId) {
+          this.logger.warn(
+            `[requestDelivery] Invalid dropoff address: ${dto.dropoffAddressId}`,
+          );
           throw new BadRequestException('Invalid dropoff address');
         }
       }
@@ -152,16 +170,27 @@ export class DeliveriesService {
       // Case B: Creating New Addresses from Client Payload (Place ID or GPS Fallback)
       // ✅ FIX: Strict Hybrid Architecture Trust Boundary Enforced
       else if (dto.pickupLocation && dto.dropoffLocation) {
+        this.logger.log(
+          `[requestDelivery] Resolving pickup/dropoff locations from payload`,
+        );
         try {
           // 1. Backend resolves exact coordinates securely via Google Maps
+          const t1 = Date.now();
           const securePickup = await this.common.resolveSecureLocation(
             dto.pickupLocation,
           );
           const secureDropoff = await this.common.resolveSecureLocation(
             dto.dropoffLocation,
           );
+          this.logger.log(
+            `[requestDelivery] Location resolution took ${Date.now() - t1}ms`,
+          );
 
           // 2. Generate database records ONLY from the trusted, server-resolved data
+          this.logger.log(
+            `[requestDelivery] Creating pickup/dropoff addresses in DB`,
+          );
+          const t2 = Date.now();
           [pickupAddress, dropoffAddress] = await Promise.all([
             this.addressesService.createAddressFromData(
               userId,
@@ -184,17 +213,28 @@ export class DeliveriesService {
               tx,
             ),
           ]);
+          this.logger.log(
+            `[requestDelivery] Address creation took ${Date.now() - t2}ms`,
+          );
         } catch (error) {
+          this.logger.error(
+            `[requestDelivery] Error during location/address creation: ${error instanceof Error ? error.message : error}`,
+          );
           // Will throw if geofence fails or coordinates are completely unroutable
           throw error;
         }
       } else {
+        this.logger.warn(
+          `[requestDelivery] Missing address IDs or location payload`,
+        );
         throw new BadRequestException(
           'Either address IDs or location payload (Place ID) must be provided',
         );
       }
 
       // Calculate Distance & Fee securely from DB-verified addresses
+      this.logger.log(`[requestDelivery] Calculating distance and fee`);
+      const t3 = Date.now();
       const distanceKm = this.geo.calculateDistance(
         pickupAddress.lat,
         pickupAddress.lng,
@@ -206,9 +246,14 @@ export class DeliveriesService {
         distanceKm,
         dto.weightKg || 1,
       );
+      this.logger.log(
+        `[requestDelivery] Distance: ${distanceKm} km, Fee: ${deliveryFee} (calc took ${Date.now() - t3}ms)`,
+      );
 
       const deliveryOtp = this.geo.generateOTP(TRIPS_CONFIG.OTP_LENGTH);
 
+      this.logger.log(`[requestDelivery] Creating delivery record in DB`);
+      const t4 = Date.now();
       const delivery = await tx.delivery.create({
         data: {
           customerId: userId,
@@ -230,7 +275,11 @@ export class DeliveriesService {
           declaredValue: dto.declaredValue ?? 0,
         },
       });
+      this.logger.log(
+        `[requestDelivery] Delivery record created (took ${Date.now() - t4}ms)`,
+      );
 
+      this.logger.log(`[requestDelivery] SUCCESS (total ${Date.now() - t0}ms)`);
       return {
         delivery,
         deliveryId: delivery.id,

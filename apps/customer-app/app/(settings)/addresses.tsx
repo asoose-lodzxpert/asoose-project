@@ -30,6 +30,8 @@ import {
   selectPlace as selectPlaceHelper,
 } from "@/services/helpers/places-helper";
 import { Address } from "@/types/address";
+import { AddressLocationPickerModal } from "@/components/addresses/AddressLocationPickerModal";
+import { set } from "zod";
 
 export default function AddressesScreen() {
   const router = useRouter();
@@ -46,6 +48,12 @@ export default function AddressesScreen() {
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [locationPickerVisible, setLocationPickerVisible] = useState(false);
+  const [pickedLocation, setPickedLocation] = useState<{
+    latitude: number;
+    longitude: number;
+    address: string;
+  } | null>(null);
 
   const mapRef = useRef<MapView>(null);
   const debounceRef = useRef<any>(null);
@@ -91,7 +99,7 @@ export default function AddressesScreen() {
     });
     setAddressInput("");
     setSuggestions([]);
-    setStep("address");
+    setStep("label");
   };
 
   const handleSave = async () => {
@@ -113,6 +121,7 @@ export default function AddressesScreen() {
       });
       await loadAddresses();
       setStep(null);
+      setSelectedAddress(null);
       Toast.show({
         type: "success",
         text1: "Saved",
@@ -123,6 +132,31 @@ export default function AddressesScreen() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const openLocationPicker = () => {
+    setLocationPickerVisible(true);
+  };
+
+  const handleLocationPicked = (loc: {
+    latitude: number;
+    longitude: number;
+    address: string;
+  }) => {
+    setPickedLocation(loc);
+    setAddressInput(loc.address);
+    setSelectedAddress((prev) =>
+      prev
+        ? {
+            ...prev,
+            address: loc.address,
+            coordinates: {
+              lat: loc.latitude.toString(),
+              lng: loc.longitude.toString(),
+            },
+          }
+        : prev,
+    );
   };
 
   if (loading) {
@@ -162,7 +196,7 @@ export default function AddressesScreen() {
         onEdit={(addr) => {
           setSelectedAddress(addr);
           setAddressInput(addr.address);
-          setStep("address");
+          setStep("label");
         }}
         onDelete={(id) => {
           deleteAddressService(id).then(loadAddresses);
@@ -172,155 +206,21 @@ export default function AddressesScreen() {
         onAddOther={() => openAddFlow("")}
       />
 
-      <Modal
-        visible={step !== null}
-        animationType="slide"
-        presentationStyle="pageSheet"
-      >
-        <ThemedView style={{ flex: 1 }}>
-          <View style={styles.modalHeader}>
-            <Pressable onPress={() => setStep(null)}>
-              <ThemedText style={{ color: primary, fontWeight: "600" }}>
-                Cancel
-              </ThemedText>
-            </Pressable>
-            <ThemedText type="defaultSemiBold">
-              {step === "address"
-                ? "Search"
-                : step === "map"
-                  ? "Confirm Location"
-                  : "Name Address"}
-            </ThemedText>
-            <View style={{ width: 50 }} />
-          </View>
-
-          {step === "address" && (
-            <View style={styles.modalContent}>
-              <ThemedInput
-                placeholder="Enter street, building or city..."
-                value={addressInput}
-                onChangeText={handleSearch}
-                autoFocus
-                iconRight={
-                  searchLoading ? (
-                    <ActivityIndicator size="small" color={primary} />
-                  ) : null
-                }
-              />
-              <ScrollView
-                style={{ marginTop: 10 }}
-                keyboardShouldPersistTaps="handled"
-              >
-                {suggestions.map((s) => (
-                  <Pressable
-                    key={s.place_id}
-                    style={[styles.suggestion, { borderBottomColor: border }]}
-                    onPress={async () => {
-                      const addr = await selectPlaceHelper(s.place_id);
-                      setSelectedAddress((prev) => ({ ...prev!, ...addr }));
-                      setStep("map");
-                    }}
-                  >
-                    <IconSymbol
-                      name="mappin.circle.fill"
-                      size={20}
-                      color={textSecondary}
-                    />
-                    <ThemedText style={{ flex: 1 }}>{s.description}</ThemedText>
-                  </Pressable>
-                ))}
-              </ScrollView>
-            </View>
-          )}
-
-          {step === "map" && selectedAddress && (
-            <View style={{ flex: 1 }}>
-              <MapView
-                ref={mapRef}
-                style={{ flex: 1 }}
-                initialRegion={{
-                  latitude:
-                    parseFloat(selectedAddress.coordinates.lat) || 6.5244,
-                  longitude:
-                    parseFloat(selectedAddress.coordinates.lng) || 3.3792,
-                  latitudeDelta: 0.005,
-                  longitudeDelta: 0.005,
-                }}
-                onPress={async (e) => {
-                  const coords = e.nativeEvent.coordinate;
-                  const res = await resolveAddressFromCoords({
-                    lat: coords.latitude,
-                    lng: coords.longitude,
-                  });
-                  setSelectedAddress((prev) => ({
-                    ...prev!,
-                    address: res?.address || prev?.address || "",
-                    coordinates: {
-                      lat: coords.latitude.toString(),
-                      lng: coords.longitude.toString(),
-                    },
-                  }));
-                }}
-              >
-                <Marker
-                  coordinate={{
-                    latitude: parseFloat(selectedAddress.coordinates.lat) || 0,
-                    longitude: parseFloat(selectedAddress.coordinates.lng) || 0,
-                  }}
-                />
-              </MapView>
-              <View style={[styles.bottomSheet, { backgroundColor: surface }]}>
-                <ThemedText style={styles.sheetLabel}>
-                  PINNED LOCATION
-                </ThemedText>
-                <ThemedText
-                  type="defaultSemiBold"
-                  numberOfLines={2}
-                  style={styles.sheetAddress}
-                >
-                  {selectedAddress.address}
-                </ThemedText>
-                <Pressable
-                  style={[styles.primaryBtn, { backgroundColor: primary }]}
-                  onPress={() => setStep("label")}
-                >
-                  <ThemedText style={styles.btnText}>Confirm Pin</ThemedText>
-                </Pressable>
-              </View>
-            </View>
-          )}
-
-          {step === "label" && selectedAddress && (
-            <View style={styles.modalContent}>
-              <ThemedText style={styles.inputGuide}>
-                How would you like to save this address?
-              </ThemedText>
-              <ThemedInput
-                placeholder="e.g., Mom's House, Gym, Client A"
-                value={selectedAddress.label}
-                onChangeText={(v) =>
-                  setSelectedAddress((prev) => ({ ...prev!, label: v }))
-                }
-                autoFocus
-              />
-              <Pressable
-                style={[
-                  styles.primaryBtn,
-                  { backgroundColor: primary, marginTop: 24 },
-                ]}
-                onPress={handleSave}
-                disabled={saving}
-              >
-                {saving ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <ThemedText style={styles.btnText}>Save Address</ThemedText>
-                )}
-              </Pressable>
-            </View>
-          )}
-        </ThemedView>
-      </Modal>
+      <AddressLocationPickerModal
+        visible={!!selectedAddress}
+        onClose={() => {
+          setSelectedAddress(null);
+          setStep(null);
+        }}
+        onSelect={handleLocationPicked}
+        initialCoords={undefined}
+        labelValue={selectedAddress?.label || ""}
+        onLabelChange={(v: string) =>
+          setSelectedAddress((prev) => ({ ...prev!, label: v }))
+        }
+        onSave={handleSave}
+        saving={saving}
+      />
       <Toast />
     </ThemedView>
   );

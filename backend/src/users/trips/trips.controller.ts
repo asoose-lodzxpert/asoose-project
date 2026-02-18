@@ -20,6 +20,7 @@ import {
   RideEstimateDto,
   VehicleType,
 } from './dto/trip.dto';
+import { DeliveriesService } from './deliveries.service';
 
 @Controller({
   path: 'trips',
@@ -27,15 +28,10 @@ import {
 })
 @UseGuards(JwtAuthGuard)
 export class TripsController {
-  constructor(private readonly tripsService: TripsService) {}
-
-  // RIDE ENDPOINTS
-
-  @Post('rides/estimate')
-  async getRideEstimate(@Body() dto: RideEstimateDto) {
-    // Returns keyed object now
-    return this.tripsService.getRideEstimate(dto);
-  }
+  constructor(
+    private readonly tripsService: TripsService,
+    private readonly deliveryService: DeliveriesService,
+  ) {}
 
   @Post('rides/:id/confirm')
   async confirmRide(
@@ -107,7 +103,7 @@ export class TripsController {
     @Body() dto: RequestDeliveryDto,
     @Headers('idempotency-key') idempotencyKey?: string,
   ) {
-    return this.tripsService.requestDelivery(req.user.id, dto, idempotencyKey);
+    return this.deliveryService.requestDelivery(req.user.id, dto);
   }
 
   @Get('deliveries')
@@ -139,19 +135,21 @@ export class TripsController {
     return Object.values(VehicleType); // Returns ["ECONOMY", "BUSINESS"]
   }
   @Get('rides/current')
-async getCurrentRide(@Request() req) {
-  // Returns the current ride, ensuring PENDING rides with expired payment intents are purged.
-  return this.tripsService.getCurrentRide(req.user.id);
-}
+  async getCurrentRide(@Request() req) {
+    // Returns the current ride, ensuring PENDING rides with expired payment intents are purged.
+    return this.tripsService.getCurrentRide(req.user.id);
+  }
 
-@Post('rides/request')
-async requestRide(
-  @Request() req, 
-  @Body() dto: RequestRideDto,
-  @Headers('x-idempotency-key') idempotencyKey: string,
-) {
-  if (!idempotencyKey) throw new BadRequestException('Idempotency key required to prevent ghost rides.');
-  return this.tripsService.requestRide(req.user.id, dto, idempotencyKey);
-}
-
+  @Post('rides/request')
+  async requestRide(
+    @Request() req,
+    @Body() dto: RequestRideDto,
+    @Headers('x-idempotency-key') idempotencyKey: string,
+  ) {
+    if (!idempotencyKey)
+      throw new BadRequestException(
+        'Idempotency key required to prevent ghost rides.',
+      );
+    return this.tripsService.requestRide(req.user.id, dto, idempotencyKey);
+  }
 }

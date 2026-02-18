@@ -12,6 +12,7 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { Address } from "@/types/address";
 import { request } from "@/lib/authFetch";
+import { useRouter } from "expo-router";
 
 interface AddressSelectionModalProps {
   visible: boolean;
@@ -36,6 +37,8 @@ export function AddressSelectionModal({
   const textPrimary = useThemeColor({}, "textPrimary");
   const textSecondary = useThemeColor({}, "textSecondary");
   const borderColor = useThemeColor({}, "borderDefault");
+
+  const router = useRouter();
 
   useEffect(() => {
     if (visible) {
@@ -183,7 +186,7 @@ export function AddressSelectionModal({
                 ]}
                 onPress={() => {
                   onClose();
-                  // Navigate to add address screen
+                  router.push("/(settings)/addresses");
                 }}
               >
                 <IconSymbol name="plus.circle.fill" size={20} color={accent} />

@@ -34,6 +34,7 @@ import { ActivityLogService } from 'src/common/services/activity-log.services';
 import { StoresService } from 'src/super-admin/vendors/vendors.service';
 import { TransactionsModule } from 'src/super-admin/transactions/transaction.module';
 import { VendorAccountNotificationsService } from './notifications/vendor-account-notifications.service';
+import { CommonModule } from '../common/common.module';
 
 @Module({
   imports: [
@@ -43,6 +44,8 @@ import { VendorAccountNotificationsService } from './notifications/vendor-accoun
     MailModule,
     OtpModule,
     NotificationsModule,
+    CommonModule,
+    CacheModule.register(),
     forwardRef(() => TransactionsModule), // ✅ FIXED: Wrapped in forwardRef to break circular dependency
   ],
   controllers: [
@@ -57,6 +60,7 @@ import { VendorAccountNotificationsService } from './notifications/vendor-accoun
     VendorOrdersStreamService,
     VendorNotificationsService,
     VendorSecurityNotificationsService,
+    VendorAccountNotificationsService,
     VendorService,
     VendorAuthService,
     NubanService,

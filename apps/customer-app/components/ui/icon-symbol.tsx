@@ -163,13 +163,31 @@ export type IconSymbolName =
   | "arrow.down.circle.fill"
   | "scalemass.fill"
   | "wallet-giftcard"
-  | "bicycle";
+  | "bicycle"
+  | "wineglass.fill"
+  | "leaf.fill"
+  | "drop.fill"
+  | "person.badge.plus"
+  | "xmark.circle.fill"
+  | "checkmark.seal.fill"
+  | "tray.fill"
+  | "checkmark.shield.fill"
+  | "bell.slash";
 
 export const MAPPING: Record<
   IconSymbolName,
   keyof typeof MaterialIcons.glyphMap
 > = {
-  "mappin.and.ellipse": "my-location", // or another suitable MaterialIcon
+  "checkmark.shield.fill": "verified-user",
+  "tray.fill": "inbox",
+  "bell.slash": "notifications-off",
+  "wineglass.fill": "wine-bar",
+  "leaf.fill": "eco",
+  "drop.fill": "opacity",
+  "person.badge.plus": "person-add",
+  "xmark.circle.fill": "cancel",
+  "checkmark.seal.fill": "verified",
+  "mappin.and.ellipse": "my-location",
   "building.columns.fill": "account-balance",
   location: "location-on",
   "shopping-bag": "shopping-bag",
@@ -313,7 +331,6 @@ export const MAPPING: Record<
   "slider.horizontal.3": "tune",
   "xmark.circle": "cancel",
   "building.columns": "account-balance",
-  "xmark.circle.fill": "cancel",
   "doc.on.doc": "content-copy",
   "dollarsign.circle.fill": "payments",
   "creditcard.fill": "credit-card",

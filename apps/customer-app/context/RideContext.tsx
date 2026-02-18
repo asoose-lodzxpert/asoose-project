@@ -323,6 +323,8 @@ export function RideProvider({ children }: { children: ReactNode }) {
           dropoffLocation,
           vehicleType: selectedVehicleType,
           fare: fareEstimate.fareBreakdown.totalFare,
+          distanceKm: fareEstimate.distanceKm,
+          durationMin: fareEstimate.durationMin,
           notes,
         });
 

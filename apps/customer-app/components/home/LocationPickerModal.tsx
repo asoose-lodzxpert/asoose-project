@@ -1,59 +1,138 @@
-import { Modal, Pressable, StyleSheet, View } from "react-native";
-import MapView, { Marker, MapPressEvent } from "react-native-maps";
-import * as Location from "expo-location";
-import { useEffect, useRef, useState } from "react";
-
+import React, { useState, useCallback, useRef, useMemo } from "react";
+const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "";
+import {
+  Modal,
+  Pressable,
+  StyleSheet,
+  View,
+  TextInput,
+  ScrollView,
+  ActivityIndicator,
+  Keyboard,
+} from "react-native";
+import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
 import { useLocation } from "@/context/LocationContext";
+import { useAddressSearch } from "@/hooks/useAddressSearch";
 import { ThemedText } from "@/components/themed-text";
-import { IconSymbol } from "@/components/ui/icon-symbol";
+import { IconSymbol, IconSymbolName } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { ThemedView } from "../themed-view";
 
 export function LocationPickerModal() {
-  const { pickerVisible, closePicker, setFromMap, useCurrentLocation } =
-    useLocation();
-
+  const {
+    pickerVisible,
+    closePicker,
+    setFromMap,
+    useCurrentLocation,
+    location,
+  } = useLocation();
   const primary = useThemeColor({}, "brandPrimary");
+  const card = useThemeColor({}, "surfaceCard");
+  const textSecondary = useThemeColor({}, "textSecondary");
+  const success = useThemeColor({}, "statusSuccess");
+  const [searchQuery, setSearchQuery] = useState("");
 
-  const mapRef = useRef<MapView>(null);
-  const [marker, setMarker] = useState<{
-    latitude: number;
-    longitude: number;
-  } | null>(null);
-
-  /* ---------------------------------- */
-  /* Center map on current location     */
-  /* ---------------------------------- */
-  useEffect(() => {
-    if (!pickerVisible) return;
-
-    (async () => {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== "granted") return;
-
-      const loc = await Location.getCurrentPositionAsync({});
-      const coords = {
-        latitude: loc.coords.latitude,
-        longitude: loc.coords.longitude,
+  const coords = useMemo(() => {
+    if (location?.coords) {
+      return {
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
       };
+    }
+    return undefined;
+  }, [location?.coords?.latitude, location?.coords?.longitude]);
 
-      setMarker(coords);
+  const { results: predictions, loading: searching } = useAddressSearch(
+    searchQuery,
+    coords,
+  );
+  const [mapModalVisible, setMapModalVisible] = useState(false);
+  const [selectedLocation, setSelectedLocation] = useState<any>(null);
+  const [reverseAddress, setReverseAddress] = useState("");
+  const [confirming, setConfirming] = useState(false);
+  const mapRef = useRef<MapView>(null);
+  // Removed manual search logic, now using useAddressSearch
 
-      // Smoothly move map
-      mapRef.current?.animateToRegion(
-        {
-          ...coords,
-          latitudeDelta: 0.01,
-          longitudeDelta: 0.01,
-        },
-        500,
+  // Reverse geocode for map modal
+  const reverseGeocode = useCallback(async (lat: number, lng: number) => {
+    try {
+      const res = await fetch(
+        `${API_URL}/maps/reverse-geocode?lat=${lat}&lng=${lng}`,
       );
-    })();
-  }, [pickerVisible]);
+      const { address } = await res.json();
+      setReverseAddress(address || "Selected point");
+    } catch {
+      setReverseAddress("Selected point");
+    }
+  }, []); // API_URL is a constant, safe to omit
 
-  function onMapPress(e: MapPressEvent) {
-    setMarker(e.nativeEvent.coordinate);
-  }
+  const handleMapPress = useCallback(
+    (e: any) => {
+      Keyboard.dismiss();
+      const { coordinate } = e.nativeEvent;
+      setSelectedLocation({
+        latitude: coordinate.latitude,
+        longitude: coordinate.longitude,
+        address: "Fetching...",
+      });
+      reverseGeocode(coordinate.latitude, coordinate.longitude);
+      mapRef.current?.animateToRegion(
+        { ...coordinate, latitudeDelta: 0.009, longitudeDelta: 0.009 },
+        350,
+      );
+    },
+    [reverseGeocode],
+  );
+
+  const confirmLocation = useCallback(
+    (loc: any) => {
+      setFromMap({
+        latitude: loc.latitude,
+        longitude: loc.longitude,
+        accuracy: 0,
+        altitude: 0,
+        altitudeAccuracy: 0,
+        heading: 0,
+        speed: 0,
+      });
+      closePicker();
+    },
+    [setFromMap, closePicker],
+  );
+
+  const handleConfirmFromMap = () => {
+    if (!selectedLocation) return;
+    setConfirming(true);
+    confirmLocation({
+      ...selectedLocation,
+      address: reverseAddress || selectedLocation.address,
+    });
+  };
+
+  const handleSelectPrediction = useCallback(
+    async (place: any) => {
+      try {
+        const res = await fetch(`${API_URL}/maps/geocode?placeId=${place.id}`);
+        if (!res.ok) throw new Error();
+        const { lat, lng } = await res.json();
+        confirmLocation({
+          latitude: lat,
+          longitude: lng,
+          address: place.subtitle
+            ? `${place.title}, ${place.subtitle}`
+            : place.title,
+        });
+      } catch {
+        confirmLocation({ latitude: 0, longitude: 0, address: place.title });
+      }
+    },
+    [confirmLocation],
+  );
+
+  // Show current location row
+  const showCurrent = !searchQuery && !!location?.coords;
+  // No saved addresses in this modal, but you can add if needed
+  const showEmpty = searchQuery && !searching && predictions.length === 0;
 
   return (
     <Modal visible={pickerVisible} animationType="slide">
@@ -66,82 +145,288 @@ export function LocationPickerModal() {
           <ThemedText type="subtitle">Select Location</ThemedText>
         </View>
 
-        {/* Map */}
-        <MapView
-          ref={mapRef}
-          style={{ flex: 1 }}
-          showsUserLocation
-          onPress={onMapPress}
-          initialRegion={{
-            latitude: 6.5244,
-            longitude: 3.3792,
-            latitudeDelta: 0.01,
-            longitudeDelta: 0.01,
-          }}
-        >
-          {marker && <Marker coordinate={marker} />}
-        </MapView>
-
-        {/* Actions */}
-        <View style={styles.actions}>
-          <Pressable
-            style={[styles.primaryButton, { backgroundColor: primary }]}
-            disabled={!marker}
-            onPress={() =>
-              marker &&
-              setFromMap({
-                latitude: marker.latitude,
-                longitude: marker.longitude,
-                accuracy: 0,
-                altitude: 0,
-                altitudeAccuracy: 0,
-                heading: 0,
-                speed: 0,
-              })
-            }
-          >
-            <ThemedText style={styles.primaryText}>
-              Use Selected Location
-            </ThemedText>
-          </Pressable>
-
-          <Pressable style={styles.secondary} onPress={useCurrentLocation}>
-            <IconSymbol name="navigation" size={18} color={primary} />
-            <ThemedText style={{ color: primary }}>
-              Use Current Location
-            </ThemedText>
-          </Pressable>
+        {/* Search Bar */}
+        <View style={[styles.searchBar, { backgroundColor: card }]}>
+          <IconSymbol name="magnifyingglass" size={20} color={textSecondary} />
+          <TextInput
+            style={styles.input}
+            placeholder="Search for a place..."
+            placeholderTextColor={textSecondary}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            autoCorrect={false}
+          />
+          {searching && <ActivityIndicator size="small" color={primary} />}
         </View>
+
+        <ScrollView
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Current Location */}
+          {showCurrent && (
+            <Pressable
+              style={styles.locationItem}
+              onPress={() =>
+                confirmLocation({
+                  latitude: location.coords?.latitude ?? 0,
+                  longitude: location.coords?.longitude ?? 0,
+                  address: location.address || "Current Location",
+                })
+              }
+            >
+              <View
+                style={[
+                  styles.iconContainer,
+                  { backgroundColor: `${success}22` },
+                ]}
+              >
+                <IconSymbol name="location.fill" size={22} color={success} />
+              </View>
+              <View style={styles.locationInfo}>
+                <ThemedText style={styles.itemTitle}>
+                  Use Current Location
+                </ThemedText>
+                <ThemedText
+                  style={[styles.itemSubtitle, { color: textSecondary }]}
+                  numberOfLines={1}
+                >
+                  {location.address || "GPS Location"}
+                </ThemedText>
+              </View>
+              <IconSymbol
+                name="chevron.right"
+                size={18}
+                color={textSecondary}
+              />
+            </Pressable>
+          )}
+
+          {/* Search Results */}
+          {predictions.map((place) => (
+            <Pressable
+              key={place.id}
+              style={styles.locationItem}
+              onPress={() => handleSelectPrediction(place)}
+            >
+              <View
+                style={[
+                  styles.iconContainer,
+                  { backgroundColor: `${primary}22` },
+                ]}
+              >
+                <IconSymbol
+                  name="mappin.and.ellipse"
+                  size={22}
+                  color={primary}
+                />
+              </View>
+              <View style={styles.locationInfo}>
+                <ThemedText style={styles.itemTitle}>{place.title}</ThemedText>
+                <ThemedText
+                  style={[styles.itemSubtitle, { color: textSecondary }]}
+                  numberOfLines={1}
+                >
+                  {place.subtitle || ""}
+                </ThemedText>
+              </View>
+              <IconSymbol
+                name="chevron.right"
+                size={18}
+                color={textSecondary}
+              />
+            </Pressable>
+          ))}
+
+          {showEmpty && (
+            <View style={styles.empty}>
+              <ThemedText style={{ color: textSecondary }}>
+                No results for "{searchQuery.trim()}"
+              </ThemedText>
+            </View>
+          )}
+
+          {/* Open Map Button */}
+          <View style={styles.mapTriggerSection}>
+            <ThemedText
+              style={[
+                styles.sectionTitle,
+                { color: textSecondary, marginBottom: 12 },
+              ]}
+            >
+              Need more precision?
+            </ThemedText>
+            <Pressable
+              style={[styles.mapTriggerButton, { backgroundColor: card }]}
+              onPress={() => setMapModalVisible(true)}
+            >
+              <IconSymbol name="map" size={22} color={primary} />
+              <ThemedText style={[styles.mapTriggerText, { color: primary }]}>
+                Choose on map
+              </ThemedText>
+            </Pressable>
+          </View>
+          <View style={{ height: 80 }} />
+        </ScrollView>
+
+        {/* Map Modal */}
+        <Modal
+          visible={mapModalVisible}
+          animationType="slide"
+          transparent={false}
+          onRequestClose={() => setMapModalVisible(false)}
+        >
+          <ThemedView style={{ flex: 1 }}>
+            <View style={styles.header}>
+              <Pressable onPress={() => setMapModalVisible(false)}>
+                <IconSymbol name="chevron.left" size={22} color={primary} />
+              </Pressable>
+              <ThemedText type="subtitle">Pick location on map</ThemedText>
+            </View>
+            <View style={{ flex: 1 }}>
+              <MapView
+                ref={mapRef}
+                provider={PROVIDER_GOOGLE}
+                style={StyleSheet.absoluteFill}
+                initialRegion={{
+                  latitude: location?.coords?.latitude ?? 6.5244,
+                  longitude: location?.coords?.longitude ?? 3.3792,
+                  latitudeDelta: 0.07,
+                  longitudeDelta: 0.07,
+                }}
+                onPress={handleMapPress}
+                showsUserLocation
+                showsMyLocationButton
+              >
+                {selectedLocation && (
+                  <Marker
+                    coordinate={{
+                      latitude: selectedLocation.latitude,
+                      longitude: selectedLocation.longitude,
+                    }}
+                    pinColor={primary}
+                  />
+                )}
+              </MapView>
+              {selectedLocation && (
+                <View
+                  style={[styles.confirmOverlay, { backgroundColor: card }]}
+                >
+                  <View style={{ flex: 1 }}>
+                    <ThemedText style={styles.overlayLabel}>
+                      SELECTED LOCATION
+                    </ThemedText>
+                    <ThemedText style={styles.overlayAddress} numberOfLines={2}>
+                      {reverseAddress || "Loading..."}
+                    </ThemedText>
+                  </View>
+                  <Pressable
+                    style={[styles.confirmBtn, { backgroundColor: primary }]}
+                    onPress={handleConfirmFromMap}
+                    disabled={confirming}
+                  >
+                    {confirming ? (
+                      <ActivityIndicator color="white" size="small" />
+                    ) : (
+                      <ThemedText style={styles.confirmText}>
+                        Confirm
+                      </ThemedText>
+                    )}
+                  </Pressable>
+                </View>
+              )}
+            </View>
+          </ThemedView>
+        </Modal>
       </ThemedView>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
+  container: { flex: 1 },
   header: {
     padding: 16,
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
   },
-  actions: {
-    padding: 16,
+  searchBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    height: 52,
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    marginHorizontal: 16,
+    marginBottom: 8,
+  },
+  input: { flex: 1, marginLeft: 12, fontSize: 16 },
+  scrollContent: { paddingHorizontal: 16, paddingBottom: 40 },
+  sectionTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    marginTop: 20,
+    marginBottom: 10,
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
+  locationItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    borderRadius: 16,
+    marginBottom: 8,
+    backgroundColor: "#fff",
+  },
+  iconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  locationInfo: { flex: 1, marginLeft: 14 },
+  itemTitle: { fontSize: 16, fontWeight: "600" },
+  itemSubtitle: { fontSize: 13.5, marginTop: 1 },
+  empty: { alignItems: "center", marginTop: 50, paddingHorizontal: 30 },
+  mapTriggerSection: { marginTop: 32, marginBottom: 24 },
+  mapTriggerButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 16,
+    borderRadius: 16,
     gap: 12,
   },
-  primaryButton: {
-    height: 52,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  primaryText: {
-    fontWeight: "700",
-    color: "#000",
-  },
-  secondary: {
+  mapTriggerText: { fontSize: 16, fontWeight: "600" },
+  confirmOverlay: {
+    position: "absolute",
+    bottom: 32,
+    left: 16,
+    right: 16,
+    borderRadius: 20,
+    padding: 16,
     flexDirection: "row",
-    gap: 8,
     alignItems: "center",
-    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    elevation: 10,
   },
+  overlayLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#666",
+    textTransform: "uppercase",
+  },
+  overlayAddress: { fontSize: 15.5, fontWeight: "600", marginTop: 4 },
+  confirmBtn: {
+    paddingVertical: 12,
+    paddingHorizontal: 28,
+    borderRadius: 14,
+    marginLeft: 16,
+  },
+  confirmText: { color: "white", fontWeight: "700", fontSize: 15 },
 });

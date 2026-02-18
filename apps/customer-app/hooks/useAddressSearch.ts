@@ -1,5 +1,6 @@
 import axios from "axios";
 import { useEffect, useRef, useState } from "react";
+import { getAccessToken } from "@/services/auth.service";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
@@ -25,11 +26,14 @@ export function useAddressSearch(
           params.latitude = location.latitude;
           params.longitude = location.longitude;
         }
+        const token = await getAccessToken();
         const res = await axios.get(`${API_URL}/maps/address-search`, {
           params,
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
         });
         setResults(res.data);
-      } catch {
+      } catch (e) {
+        if (__DEV__) console.error("Address search error:", e);
         setResults([]);
       } finally {
         setLoading(false);

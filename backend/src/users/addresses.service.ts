@@ -51,12 +51,6 @@ export class AddressesService {
     });
   }
 
-  /**
-   * ✅ CORE METHOD: Single Source of Truth for Address Creation
-   * 1. Validates Coordinates (Geofencing)
-   * 2. Sanitizes Inputs
-   * 3. Supports External Transactions (for Delivery/Order flows)
-   */
   async createAddressFromData(
     userId: string,
     data: {
@@ -69,22 +63,35 @@ export class AddressesService {
       lng: number;
       isDefault?: boolean;
     },
-    tx: Prisma.TransactionClient = this.prisma, // Defaults to main client if no tx provided
+    tx: Prisma.TransactionClient = this.prisma,
   ) {
-    // 1. CRITICAL: Enforce Geofence Validation
-    await this.validateCoordinates(data.lat, data.lng);
+    const start = Date.now();
+    this.logger.log(`[createAddressFromData] START for user ${userId}`);
+    this.logger.log(`[createAddressFromData] Input: ${JSON.stringify(data)}`);
 
-    // 2. Data Integrity: Sanitize inputs
-    // Fallbacks provided for City/State if missing from frontend map data
+    this.logger.log(`[createAddressFromData] Step 1: validateCoordinates`);
+    const t1 = Date.now();
+    await this.validateCoordinates(data.lat, data.lng);
+    this.logger.log(
+      `[createAddressFromData] Step 1 done (${Date.now() - t1}ms)`,
+    );
+
+    this.logger.log(`[createAddressFromData] Step 2: sanitize city/state`);
+    const t2 = Date.now();
     const sanitizedCity = data.city
       ? this.sanitizeString(data.city)
       : 'Maiduguri';
     const sanitizedState = data.state
       ? this.sanitizeString(data.state)
       : 'Borno';
+    this.logger.log(
+      `[createAddressFromData] Step 2 done (${Date.now() - t2}ms)`,
+    );
 
+    this.logger.log(`[createAddressFromData] Step 3: address create`);
+    const t3 = Date.now();
     try {
-      return await tx.address.create({
+      const result = await tx.address.create({
         data: {
           userId,
           street: this.sanitizeString(data.street),
@@ -99,9 +106,16 @@ export class AddressesService {
           phone: data.phone ? this.sanitizeString(data.phone) : undefined,
         },
       });
+      this.logger.log(
+        `[createAddressFromData] Step 3 done (${Date.now() - t3}ms)`,
+      );
+      this.logger.log(
+        `[createAddressFromData] SUCCESS for user ${userId} (total ${Date.now() - start}ms)`,
+      );
+      return result;
     } catch (error) {
       this.logger.error(
-        `Failed to create address for user ${userId}`,
+        `[createAddressFromData] Failed to create address for user ${userId} after ${Date.now() - start}ms`,
         error instanceof Error ? error.stack : String(error),
       );
       throw new BadRequestException('Failed to save valid address');
@@ -181,48 +195,87 @@ export class AddressesService {
   }
 
   public async validateCoordinates(lat: number, lng: number): Promise<void> {
+    this.logger.log(`[validateCoordinates] lat=${lat}, lng=${lng}`);
     if (!lat || !lng || (lat === 0 && lng === 0)) {
+      this.logger.warn(
+        `[validateCoordinates] Invalid: missing or zero coordinates`,
+      );
       throw new BadRequestException('Valid GPS coordinates are required');
     }
     if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+      this.logger.warn(`[validateCoordinates] Invalid: out of bounds lat/lng`);
       throw new BadRequestException('Invalid GPS coordinates');
     }
 
+    const t0 = Date.now();
     const isInside = await this.isWithinServiceArea(lat, lng);
+    this.logger.log(
+      `[validateCoordinates] isWithinServiceArea=${isInside} (${Date.now() - t0}ms)`,
+    );
     if (!isInside) {
+      this.logger.warn(
+        `[validateCoordinates] Outside service area for lat=${lat}, lng=${lng}`,
+      );
       throw new BadRequestException(
         'Sorry, this location is outside our active service area.',
       );
     }
+    this.logger.log(`[validateCoordinates] PASSED for lat=${lat}, lng=${lng}`);
   }
 
   /**
    * Check coordinate against active ServiceZone polygons in DB.
    */
   public async isWithinServiceArea(lat: number, lng: number): Promise<boolean> {
+    this.logger.log(
+      `[isWithinServiceArea] Checking for lat=${lat}, lng=${lng}`,
+    );
+    const t0 = Date.now();
     const zones = await this.prisma.serviceZone.findMany({
       where: { isActive: true },
       select: { coordinates: true },
     });
+    this.logger.log(
+      `[isWithinServiceArea] Loaded ${zones.length} zones (${Date.now() - t0}ms)`,
+    );
 
     // If no zones configured, allow all (fail-open for new deployments)
-    if (zones.length === 0) return true;
+    if (zones.length === 0) {
+      this.logger.warn(
+        `[isWithinServiceArea] No zones configured, allowing all`,
+      );
+      return true;
+    }
 
-    return zones.some((zone) => {
+    for (const [i, zone] of zones.entries()) {
       const vertices = zone.coordinates as Array<{ lat: number; lng: number }>;
-      return this.isPointInPolygon(lat, lng, vertices);
-    });
+      const inside = this.isPointInPolygon(lat, lng, vertices);
+      this.logger.log(`[isWithinServiceArea] Zone ${i}: inside=${inside}`);
+      if (inside) return true;
+    }
+    return false;
   }
 
-  private isPointInPolygon(lat: number, lng: number, vertices: Array<{ lat: number; lng: number }>): boolean {
+  private isPointInPolygon(
+    lat: number,
+    lng: number,
+    vertices: Array<{ lat: number; lng: number }>,
+  ): boolean {
+    this.logger.log(
+      `[isPointInPolygon] Checking point (${lat},${lng}) in polygon with ${vertices.length} vertices`,
+    );
     let inside = false;
     for (let i = 0, j = vertices.length - 1; i < vertices.length; j = i++) {
-      const xi = vertices[i].lat, yi = vertices[i].lng;
-      const xj = vertices[j].lat, yj = vertices[j].lng;
-      const intersect = ((yi > lng) !== (yj > lng)) &&
-        (lat < (xj - xi) * (lng - yi) / (yj - yi) + xi);
+      const xi = vertices[i].lat,
+        yi = vertices[i].lng;
+      const xj = vertices[j].lat,
+        yj = vertices[j].lng;
+      const intersect =
+        yi > lng !== yj > lng &&
+        lat < ((xj - xi) * (lng - yi)) / (yj - yi) + xi;
       if (intersect) inside = !inside;
     }
+    this.logger.log(`[isPointInPolygon] Result: ${inside}`);
     return inside;
   }
 }

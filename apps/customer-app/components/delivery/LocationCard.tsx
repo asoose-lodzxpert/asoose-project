@@ -43,9 +43,7 @@ export function LocationCard({ type, title }: Props) {
   }, [isPickup, pickup, dropoff, success, danger]);
 
   const handleLocationSelect = () => {
-    // Navigate to the route-based picker screen and pass the type as a query param
-    // (using a string URL ensures the param is available via useLocalSearchParams)
-    router.push(`/location-picker?type=${type}`);
+    router.push(`/delivery/location-picker?type=${type}`);
   };
 
   const toggleDetails = () => {
@@ -67,9 +65,6 @@ export function LocationCard({ type, title }: Props) {
           {address ?? config.emptyLabel}
         </ThemedText>
       </Pressable>
-
-      {/* ---------- Saved Addresses ---------- */}
-      <SavedAddressPills type={type} />
 
       {/* ---------- Details Toggle ---------- */}
       {!isPickup && (

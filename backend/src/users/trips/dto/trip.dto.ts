@@ -7,7 +7,9 @@ import {
   Min,
   IsEnum,
   ValidateNested,
-  IsBoolean, // ✅ Added for checkbox validation
+  IsBoolean,
+  Max,
+  IsPositive,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -17,7 +19,6 @@ export enum VehicleType {
   BUSINESS = 'BUSINESS',
 }
 
-// ✅ REFACTORED: Hybrid Architecture Location Payload
 export class LocationPayloadDto {
   @ApiProperty({ description: 'The text address used for UI display' })
   @IsNotEmpty()
@@ -61,7 +62,21 @@ export class RequestRideDto {
   @IsEnum(VehicleType)
   vehicleType: VehicleType;
 
- 
+  @IsNumber()
+  @IsPositive()
+  fare: number;
+
+  @IsNumber()
+  @IsPositive()
+  @Min(0.1)
+  @Max(10000)
+  distanceKm: number;
+
+  @IsNumber()
+  @IsPositive()
+  @Min(1)
+  @Max(10000)
+  durationMin: number;
 
   @ApiPropertyOptional()
   @IsOptional()
@@ -69,7 +84,6 @@ export class RequestRideDto {
   notes?: string;
 }
 
-// ✅ REFACTORED: Estimate DTO modified to accept Place IDs or fallbacks
 export class RideEstimateDto {
   @ApiPropertyOptional({ description: 'Pickup Google Place ID' })
   @IsOptional()
