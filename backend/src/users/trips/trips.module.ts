@@ -13,8 +13,8 @@ import { NotificationsModule } from '../../notifications/notifications.module';
 import { MatchingRedisModule } from 'src/matching/redis/redis.module';
 import { TestController } from 'src/test/test.controller';
 
-import { UsersModule } from '../users.module'; 
-import { MapsModule } from '../../maps/maps.module'; 
+import { UsersModule } from '../users.module';
+import { MapsModule } from '../../maps/maps.module';
 
 @Module({
   imports: [
@@ -32,7 +32,7 @@ import { MapsModule } from '../../maps/maps.module';
     RidesService,
     DeliveriesService,
     TripsCommonService,
-    RidesCleanupService, 
+    RidesCleanupService,
   ],
   exports: [TripsService],
 })

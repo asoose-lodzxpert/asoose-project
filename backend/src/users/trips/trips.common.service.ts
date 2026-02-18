@@ -1,8 +1,8 @@
-import { 
-  Injectable, 
-  Logger, 
-  ForbiddenException, 
-  BadRequestException 
+import {
+  Injectable,
+  Logger,
+  ForbiddenException,
+  BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RedisService } from '../../matching/redis/redis.service';
@@ -28,8 +28,10 @@ export class TripsCommonService {
 
   // ✅ ADDED: Strict Geofence boundaries (Update these coordinates to match your actual operating region, e.g., Abuja)
   private readonly GEOFENCE_BOUNDS = {
-    minLat: 8.9,  maxLat: 9.2,   // Example Abuja bounds (approximate)
-    minLng: 7.3,  maxLng: 7.6 
+    minLat: 8.9,
+    maxLat: 9.2, // Example Abuja bounds (approximate)
+    minLng: 7.3,
+    maxLng: 7.6,
   };
 
   constructor(
@@ -79,15 +81,21 @@ export class TripsCommonService {
   // ✅ ADDED: Geofence Validator
   validateGeofence(lat: number, lng: number) {
     if (
-      lat < this.GEOFENCE_BOUNDS.minLat || lat > this.GEOFENCE_BOUNDS.maxLat ||
-      lng < this.GEOFENCE_BOUNDS.minLng || lng > this.GEOFENCE_BOUNDS.maxLng
+      lat < this.GEOFENCE_BOUNDS.minLat ||
+      lat > this.GEOFENCE_BOUNDS.maxLat ||
+      lng < this.GEOFENCE_BOUNDS.minLng ||
+      lng > this.GEOFENCE_BOUNDS.maxLng
     ) {
-      throw new BadRequestException(`Location (${lat}, ${lng}) is outside our active service area.`);
+      throw new BadRequestException(
+        `Location (${lat}, ${lng}) is outside our active service area.`,
+      );
     }
   }
 
   // ✅ ADDED: Secure Location Resolver (Source of Truth)
-  async resolveSecureLocation(dto: LocationPayloadDto): Promise<{ lat: number, lng: number, address: string }> {
+  async resolveSecureLocation(
+    dto: LocationPayloadDto,
+  ): Promise<{ lat: number; lng: number; address: string }> {
     let resolved;
 
     if (dto.placeId) {
@@ -97,7 +105,9 @@ export class TripsCommonService {
       // 2. Fallback: Snap raw GPS coordinates to trusted road network via Reverse Geocoding
       resolved = await this.mapsService.reverseGeocode(dto.lat, dto.lng);
     } else {
-      throw new BadRequestException('Invalid location payload. Provide placeId or coordinates.');
+      throw new BadRequestException(
+        'Invalid location payload. Provide placeId or coordinates.',
+      );
     }
 
     // 3. Security Check: Enforce boundaries before billing/dispatching

@@ -198,7 +198,11 @@ export class TransactionsService {
                 orders: {
                   include: {
                     store: {
-                      select: { name: true, address: true, commissionRate: true } 
+                      select: {
+                        name: true,
+                        address: true,
+                        commissionRate: true,
+                      },
                     },
                     items: {
                       include: {
@@ -593,14 +597,15 @@ export class TransactionsService {
           vendorReceives: subtotal - commission,
         };
       }
-      
+
       // ✅ FIX: Handle Multi-Vendor Group
       else if (t.payment.orderGroup) {
         const orders = t.payment.orderGroup.orders || [];
         const groupTotal = orders.reduce((sum, o) => sum + o.total, 0);
-        
+
         // Aggregate items from all stores
-        const allItems = orders.flatMap(o => o.items.map(i => ({
+        const allItems = orders.flatMap((o) =>
+          o.items.map((i) => ({
             storeName: o.store.name,
             name: i.nameSnap,
             qty: i.quantity,
@@ -608,17 +613,18 @@ export class TransactionsService {
             total: i.quantity * i.price,
             image: i.product?.images?.[0] || null,
             options: i.selectedOptions,
-        })));
+          })),
+        );
 
         detail.orderDetails = {
           type: 'GROUP_ORDER',
           groupId: t.payment.orderGroup.id,
           vendor: 'Multi-Vendor',
-          subOrders: orders.map(o => ({
-             orderId: o.id,
-             store: o.store.name,
-             total: o.total,
-             commissionRate: o.store.commissionRate
+          subOrders: orders.map((o) => ({
+            orderId: o.id,
+            store: o.store.name,
+            total: o.total,
+            commissionRate: o.store.commissionRate,
           })),
           items: allItems,
           total: groupTotal,
@@ -626,7 +632,7 @@ export class TransactionsService {
 
         detail.financialBreakdown = {
           customerPaid: groupTotal,
-          note: "Split across multiple vendors (See sub-orders)"
+          note: 'Split across multiple vendors (See sub-orders)',
         };
       }
 

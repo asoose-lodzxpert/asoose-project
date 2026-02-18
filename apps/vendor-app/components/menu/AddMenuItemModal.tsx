@@ -162,27 +162,26 @@ export const AddMenuItemModal: React.FC<Props> = ({
     setImages((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const showToast = (message: string) => {
-    Toast.show({
-      type: "error",
-      text1: message,
-    });
-  };
-
   const handleSave = () => {
-    if (!name.trim()) return showToast("Product name is required");
+    if (!name.trim())
+      return Toast.show({ text1: "Product name is required", type: "error" });
     if (!price.trim() || isNaN(Number(price)) || Number(price) <= 0)
-      return showToast("Valid price is required");
-    if (!selectedCategory) return showToast("Select a category");
-    if (images.length === 0) return showToast("At least one image is required");
+      return Toast.show({ text1: "Valid price is required", type: "error" });
+    if (!selectedCategory)
+      return Toast.show({ text1: "Select a category", type: "error" });
+    if (images.length === 0)
+      return Toast.show({
+        text1: "At least one image is required",
+        type: "error",
+      });
 
     onSave({
       name: name.trim(),
       price: Number(price),
       categoryId: selectedCategory,
       stock: stock ? Number(stock) : 0,
-      image: images[0], // First image as primary
-      images: images, // All images array
+      image: images[0],
+      images: images,
     });
   };
 

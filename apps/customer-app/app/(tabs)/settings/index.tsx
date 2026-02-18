@@ -92,7 +92,7 @@ export default function SettingsScreen() {
     if (!ok) return;
 
     await logout();
-    // Root layout will handle redirect to login automatically
+    router.replace("/(auth)/login");
   };
 
   return (

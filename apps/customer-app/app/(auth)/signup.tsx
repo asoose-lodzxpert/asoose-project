@@ -11,7 +11,6 @@ import {
   ScrollView,
 } from "react-native";
 import { router } from "expo-router";
-import { useToast } from "@/components/ui/ThemedToast";
 import * as WebBrowser from "expo-web-browser";
 import {
   useGoogleSignIn,
@@ -30,6 +29,7 @@ import { useThemeColor } from "@/hooks/use-theme-color";
 import { CustomDropdown } from "@/components/CustomDropdown";
 import { signup } from "@/services/auth.service";
 import { SafeAreaView } from "react-native-safe-area-context";
+import Toast from "react-native-toast-message";
 
 const COUNTRY_CODES = [{ label: "+234", value: "+234" }];
 
@@ -43,7 +43,6 @@ export default function Signup() {
   });
 
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
-  const showToast = useToast();
 
   // Theme Colors
   const primary = useThemeColor({}, "brandPrimary");
@@ -94,12 +93,12 @@ export default function Signup() {
     setOauthLoading(true);
     try {
       await authenticateWithGoogle(accessToken);
-      showToast({ variant: "success", message: "Account created!" });
+      Toast.show({ type: "success", text1: "Account created!" });
       router.replace("/(tabs)/home");
     } catch (err: any) {
-      showToast({
-        variant: "error",
-        message: err.message || "Google sign-in failed",
+      Toast.show({
+        type: "error",
+        text1: err.message || "Google sign-in failed",
       });
     } finally {
       setOauthLoading(false);
@@ -110,13 +109,13 @@ export default function Signup() {
     setOauthLoading(true);
     try {
       await authenticateWithApple();
-      showToast({ variant: "success", message: "Account created!" });
+      Toast.show({ type: "success", text1: "Account created!" });
       router.replace("/(tabs)/home");
     } catch (err: any) {
       if (err.message !== "Apple Sign-In was cancelled") {
-        showToast({
-          variant: "error",
-          message: err.message || "Apple sign-in failed",
+        Toast.show({
+          type: "error",
+          text1: err.message || "Apple sign-in failed",
         });
       }
     } finally {
@@ -152,12 +151,12 @@ export default function Signup() {
         phone,
         password,
       });
-      showToast({ variant: "success", message: "Account created!" });
+      Toast.show({ type: "success", text1: "Account created!" });
       router.replace("/login");
     } catch (err: any) {
-      showToast({
-        variant: "error",
-        message: err.message || "Could not create account",
+      Toast.show({
+        type: "error",
+        text1: err.message || "Could not create account",
       });
     } finally {
       setLoading(false);

@@ -9,6 +9,8 @@ import {
 import { useState } from "react";
 import { useRouter } from "expo-router";
 import * as Clipboard from "expo-clipboard";
+import Toast from "react-native-toast-message"; // Correct Import
+
 import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
 import { IconSymbol } from "@/components/ui/icon-symbol";
@@ -22,14 +24,12 @@ import {
 import { PaymentWebView } from "@/components/checkout/PaymentWebView";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import type { PaymentMethod, BankAccount, InAppTx } from "@/types/payment";
-import { useToast } from "@/components/ui/ThemedToast";
 import { useConfirm } from "@/components/ui/ConfirmDialogProvider";
 
 export default function RidePaymentScreen() {
   const router = useRouter();
   const { currentRide, loading, confirmPayment } = useRide();
   const { user } = useUserProfile();
-  const showToast = useToast();
   const showConfirm = useConfirm();
 
   const primary = useThemeColor({}, "brandPrimary");
@@ -69,17 +69,16 @@ export default function RidePaymentScreen() {
 
   const handleConfirmPayment = async () => {
     if (!user || !currentRide) {
-      showToast({
-        message: "User or ride information missing",
-        variant: "error",
+      Toast.show({
+        type: "error",
+        text1: "Payment Error",
+        text2: "User or ride information missing",
       });
       return;
     }
 
     setProcessing(true);
-
     try {
-      // For bank transfer (Monnify)
       if (selectedMethod === "transfer" || selectedMethod === "monnify") {
         const paymentPayload = {
           amount: currentRide.totalFare,
@@ -105,9 +104,7 @@ export default function RidePaymentScreen() {
           });
           setShowBankModal(true);
         }
-      }
-      // For card payments (Paystack/Flutterwave)
-      else if (
+      } else if (
         selectedMethod === "paystack" ||
         selectedMethod === "flutterwave"
       ) {
@@ -124,7 +121,6 @@ export default function RidePaymentScreen() {
           paymentPayload,
           user,
         );
-
         const checkoutUrl = response.authorizationUrl || response.checkoutUrl;
         const transactionId = response.reference || response.transactionId;
 
@@ -140,53 +136,55 @@ export default function RidePaymentScreen() {
         }
       }
     } catch (err: any) {
-      console.error("Payment error:", err);
-      showToast({
-        message: err.message || "Failed to initiate payment",
-        variant: "error",
+      Toast.show({
+        type: "error",
+        text1: "Payment failed",
+        text2: err.message || "Failed to initiate payment",
       });
     } finally {
       setProcessing(false);
     }
   };
 
-  // Remove pollInAppPaymentStatus, handled by PaymentWebView
-  // PaymentWebView handlers
   const handlePaymentSuccess = async () => {
     setShowPaymentWebView(false);
-    showToast({ message: "Payment confirmed!", variant: "success" });
+    Toast.show({ type: "success", text1: "Payment confirmed!" });
     confirmPayment(currentRide.id, "CARD");
     router.replace("/ride/tracking");
   };
 
   const handlePaymentCancel = () => {
     setShowPaymentWebView(false);
-    showToast({ message: "Payment cancelled", variant: "info" });
+    Toast.show({ type: "info", text1: "Payment cancelled" });
   };
 
   const checkBankNow = async () => {
     if (!bankAccount) return;
-
     setProcessing(true);
     setPollingStatus("Verifying payment...");
 
     try {
-      const status = await checkBankTransferStatus(bankAccount.reference);
+      const status = await checkBankTransferStatus(
+        bankAccount.reference,
+        selectedMethod,
+      );
       if (status.paid) {
-        showToast({ message: "Payment confirmed!", variant: "success" });
+        Toast.show({ type: "success", text1: "Payment confirmed!" });
         setShowBankModal(false);
         router.replace("/ride/tracking");
       } else {
-        showToast({
-          message:
-            "We haven't received your payment yet. Please make the transfer and try again.",
-          variant: "info",
+        Toast.show({
+          type: "info",
+          text1: "Pending",
+          text2:
+            "We haven't received your payment yet. Please transfer and try again.",
         });
       }
     } catch (err: any) {
-      showToast({
-        message: err.message || "Failed to check payment status",
-        variant: "error",
+      Toast.show({
+        type: "error",
+        text1: "Error",
+        text2: err.message || "Failed to check payment status",
       });
     } finally {
       setProcessing(false);
@@ -196,12 +194,11 @@ export default function RidePaymentScreen() {
 
   const copyToClipboard = (text: string) => {
     Clipboard.setStringAsync(text);
-    showToast({ message: "Account number copied", variant: "success" });
+    Toast.show({ type: "success", text1: "Account number copied" });
   };
 
   return (
     <ThemedView style={[styles.container, { backgroundColor: surface }]}>
-      {/* Header */}
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} style={styles.backButton}>
           <IconSymbol name="chevron.left" size={24} color={primary} />
@@ -213,7 +210,7 @@ export default function RidePaymentScreen() {
         style={styles.scrollView}
         contentContainerStyle={styles.content}
       >
-        {/* Trip Summary */}
+        {/* Trip Summary Card */}
         <View
           style={[
             styles.summaryCard,
@@ -223,7 +220,6 @@ export default function RidePaymentScreen() {
           <ThemedText type="subtitle" style={styles.cardTitle}>
             Trip Summary
           </ThemedText>
-
           <View style={styles.locationRow}>
             <View style={[styles.locationDot, { backgroundColor: success }]} />
             <View style={styles.locationText}>
@@ -235,9 +231,7 @@ export default function RidePaymentScreen() {
               </ThemedText>
             </View>
           </View>
-
           <View style={[styles.locationLine, { backgroundColor: border }]} />
-
           <View style={styles.locationRow}>
             <View style={[styles.locationDot, { backgroundColor: danger }]} />
             <View style={styles.locationText}>
@@ -249,9 +243,7 @@ export default function RidePaymentScreen() {
               </ThemedText>
             </View>
           </View>
-
           <View style={[styles.divider, { backgroundColor: border }]} />
-
           <View style={styles.infoRow}>
             <ThemedText type="caption" style={{ color: textSecondary }}>
               Distance
@@ -260,18 +252,9 @@ export default function RidePaymentScreen() {
               {RideService.formatDistance(currentRide.distanceKm || 0)}
             </ThemedText>
           </View>
-
-          <View style={styles.infoRow}>
-            <ThemedText type="caption" style={{ color: textSecondary }}>
-              Duration
-            </ThemedText>
-            <ThemedText type="default">
-              {RideService.formatDuration(currentRide.durationMin || 0)}
-            </ThemedText>
-          </View>
         </View>
 
-        {/* Fare Breakdown */}
+        {/* Fare Breakdown Card */}
         <View
           style={[
             styles.fareCard,
@@ -281,7 +264,6 @@ export default function RidePaymentScreen() {
           <ThemedText type="subtitle" style={styles.cardTitle}>
             Fare Breakdown
           </ThemedText>
-
           <View style={styles.fareRow}>
             <ThemedText type="caption" style={{ color: textSecondary }}>
               Base Fare
@@ -290,38 +272,7 @@ export default function RidePaymentScreen() {
               {RideService.formatCurrency(currentRide.baseFare || 0)}
             </ThemedText>
           </View>
-
-          <View style={styles.fareRow}>
-            <ThemedText type="caption" style={{ color: textSecondary }}>
-              Distance Fare
-            </ThemedText>
-            <ThemedText type="caption" style={{ color: textSecondary }}>
-              {RideService.formatCurrency(currentRide.distanceFare || 0)}
-            </ThemedText>
-          </View>
-
-          <View style={styles.fareRow}>
-            <ThemedText type="caption" style={{ color: textSecondary }}>
-              Time Fare
-            </ThemedText>
-            <ThemedText type="caption" style={{ color: textSecondary }}>
-              {RideService.formatCurrency(currentRide.timeFare || 0)}
-            </ThemedText>
-          </View>
-
-          {(currentRide.platformFee || 0) > 0 && (
-            <View style={styles.fareRow}>
-              <ThemedText type="caption" style={{ color: textSecondary }}>
-                Platform Fee
-              </ThemedText>
-              <ThemedText type="caption" style={{ color: textSecondary }}>
-                {RideService.formatCurrency(currentRide.platformFee || 0)}
-              </ThemedText>
-            </View>
-          )}
-
           <View style={[styles.divider, { backgroundColor: border }]} />
-
           <View style={styles.totalRow}>
             <ThemedText type="defaultSemiBold">Total</ThemedText>
             <ThemedText
@@ -333,7 +284,7 @@ export default function RidePaymentScreen() {
           </View>
         </View>
 
-        {/* Payment Method */}
+        {/* Payment Methods */}
         <View
           style={[
             styles.paymentCard,
@@ -343,127 +294,42 @@ export default function RidePaymentScreen() {
           <ThemedText type="subtitle" style={styles.cardTitle}>
             Payment Method
           </ThemedText>
-
-          {/* Card - Unavailable */}
-          <View
-            style={[
-              styles.methodOption,
-              {
-                borderColor: border,
-                backgroundColor: card,
-                opacity: 0.5,
-              },
-            ]}
-          >
-            <View style={styles.methodLeft}>
-              <IconSymbol name="creditcard" size={24} color={muted} />
-              <View>
-                <ThemedText type="defaultSemiBold" style={{ color: muted }}>
-                  Card
-                </ThemedText>
-                <ThemedText type="caption" style={{ color: muted }}>
-                  Unavailable now
-                </ThemedText>
-              </View>
-            </View>
-          </View>
-
-          {/* Paystack */}
-          <Pressable
-            onPress={() => setSelectedMethod("paystack")}
-            style={[
-              styles.methodOption,
-              {
-                borderColor: selectedMethod === "paystack" ? primary : border,
-                backgroundColor:
-                  selectedMethod === "paystack" ? `${primary}10` : card,
-              },
-            ]}
-          >
-            <View style={styles.methodLeft}>
-              <IconSymbol name="creditcard" size={24} color={primary} />
-              <View>
-                <ThemedText type="defaultSemiBold">Paystack</ThemedText>
-                <ThemedText type="caption" style={{ color: textSecondary }}>
-                  Pay with card via Paystack
+          {["paystack", "flutterwave", "transfer"].map((method) => (
+            <Pressable
+              key={method}
+              onPress={() => setSelectedMethod(method as PaymentMethod)}
+              style={[
+                styles.methodOption,
+                {
+                  borderColor: selectedMethod === method ? primary : border,
+                  backgroundColor:
+                    selectedMethod === method ? `${primary}10` : card,
+                },
+              ]}
+            >
+              <View style={styles.methodLeft}>
+                <IconSymbol name="creditcard" size={24} color={primary} />
+                <ThemedText
+                  type="defaultSemiBold"
+                  style={{ textTransform: "capitalize" }}
+                >
+                  {method}
                 </ThemedText>
               </View>
-            </View>
-            {selectedMethod === "paystack" && (
-              <IconSymbol
-                name="checkmark.circle.fill"
-                size={24}
-                color={primary}
-              />
-            )}
-          </Pressable>
-
-          {/* Flutterwave */}
-          <Pressable
-            onPress={() => setSelectedMethod("flutterwave")}
-            style={[
-              styles.methodOption,
-              {
-                borderColor:
-                  selectedMethod === "flutterwave" ? primary : border,
-                backgroundColor:
-                  selectedMethod === "flutterwave" ? `${primary}10` : card,
-              },
-            ]}
-          >
-            <View style={styles.methodLeft}>
-              <IconSymbol name="creditcard" size={24} color={primary} />
-              <View>
-                <ThemedText type="defaultSemiBold">Flutterwave</ThemedText>
-                <ThemedText type="caption" style={{ color: textSecondary }}>
-                  Pay with card via Flutterwave
-                </ThemedText>
-              </View>
-            </View>
-            {selectedMethod === "flutterwave" && (
-              <IconSymbol
-                name="checkmark.circle.fill"
-                size={24}
-                color={primary}
-              />
-            )}
-          </Pressable>
-
-          {/* Bank Transfer */}
-          <Pressable
-            onPress={() => setSelectedMethod("transfer")}
-            style={[
-              styles.methodOption,
-              {
-                borderColor: selectedMethod === "transfer" ? primary : border,
-                backgroundColor:
-                  selectedMethod === "transfer" ? `${primary}10` : card,
-              },
-            ]}
-          >
-            <View style={styles.methodLeft}>
-              <IconSymbol name="creditcard" size={24} color={primary} />
-              <View>
-                <ThemedText type="defaultSemiBold">Bank Transfer</ThemedText>
-                <ThemedText type="caption" style={{ color: textSecondary }}>
-                  Pay via bank transfer
-                </ThemedText>
-              </View>
-            </View>
-            {selectedMethod === "transfer" && (
-              <IconSymbol
-                name="checkmark.circle.fill"
-                size={24}
-                color={primary}
-              />
-            )}
-          </Pressable>
+              {selectedMethod === method && (
+                <IconSymbol
+                  name="checkmark.circle.fill"
+                  size={24}
+                  color={primary}
+                />
+              )}
+            </Pressable>
+          ))}
         </View>
-
-        <View style={{ height: 100 }} />
+        <View style={{ height: 120 }} />
       </ScrollView>
 
-      {/* Confirm Button */}
+      {/* Footer */}
       <View style={[styles.footer, { backgroundColor: surface }]}>
         {pollingStatus ? (
           <View style={styles.pollingContainer}>
@@ -495,8 +361,8 @@ export default function RidePaymentScreen() {
                   type="defaultSemiBold"
                   style={[styles.confirmButtonText, { color: textOnPrimary }]}
                 >
-                  {selectedMethod === "transfer" || selectedMethod === "monnify"
-                    ? "Generate Account Number"
+                  {selectedMethod === "transfer"
+                    ? "Generate Account"
                     : "Proceed to Payment"}
                 </ThemedText>
                 <IconSymbol
@@ -510,22 +376,21 @@ export default function RidePaymentScreen() {
         )}
       </View>
 
-      {/* Payment WebView Modal for Card Payments */}
+      {/* Modals */}
       {checkoutTx && showPaymentWebView && (
         <PaymentWebView
           visible={showPaymentWebView}
           url={checkoutTx.checkoutUrl}
           reference={checkoutTx.transactionId}
+          paymentMethod={selectedMethod}
           onSuccess={handlePaymentSuccess}
           onCancel={handlePaymentCancel}
         />
       )}
 
-      {/* Bank Transfer Modal */}
       <Modal
         visible={showBankModal}
         animationType="slide"
-        transparent={false}
         onRequestClose={() => setShowBankModal(false)}
       >
         <ThemedView
@@ -534,34 +399,21 @@ export default function RidePaymentScreen() {
           <View style={styles.modalHeader}>
             <ThemedText type="title">Bank Transfer</ThemedText>
             <Pressable onPress={() => setShowBankModal(false)}>
-              <IconSymbol name="xmark.circle" size={28} color={muted} />
+              <IconSymbol name="xmark" size={24} color={muted} />
             </Pressable>
           </View>
-
-          <ScrollView style={styles.modalContent}>
-            {bankAccount && (
+          {bankAccount && (
+            <ScrollView style={styles.modalContent}>
               <View
                 style={[
                   styles.bankCard,
                   { backgroundColor: card, borderColor: border },
                 ]}
               >
-                <ThemedText type="subtitle" style={{ marginBottom: 16 }}>
-                  Transfer to this account
-                </ThemedText>
-
+                <ThemedText type="subtitle">Transfer to:</ThemedText>
                 <View style={styles.bankInfoRow}>
-                  <ThemedText type="caption" style={{ color: textSecondary }}>
-                    Bank Name
-                  </ThemedText>
-                  <ThemedText type="defaultSemiBold">
-                    {bankAccount.bankName}
-                  </ThemedText>
-                </View>
-
-                <View style={styles.bankInfoRow}>
-                  <ThemedText type="caption" style={{ color: textSecondary }}>
-                    Account Number
+                  <ThemedText type="caption">
+                    Bank: {bankAccount.bankName}
                   </ThemedText>
                   <View style={styles.copyRow}>
                     <ThemedText type="defaultSemiBold">
@@ -570,83 +422,37 @@ export default function RidePaymentScreen() {
                     <Pressable
                       onPress={() => copyToClipboard(bankAccount.accountNumber)}
                     >
-                      <IconSymbol name="doc.text" size={20} color={primary} />
+                      <IconSymbol name="doc.on.doc" size={18} color={primary} />
                     </Pressable>
                   </View>
-                </View>
-
-                <View style={styles.bankInfoRow}>
-                  <ThemedText type="caption" style={{ color: textSecondary }}>
-                    Account Name
-                  </ThemedText>
-                  <ThemedText type="defaultSemiBold">
-                    {bankAccount.accountName}
+                  <ThemedText type="caption">
+                    Name: {bankAccount.accountName}
                   </ThemedText>
                 </View>
-
-                <View
-                  style={[
-                    styles.divider,
-                    { backgroundColor: border, marginVertical: 16 },
-                  ]}
-                />
-
-                <View style={styles.bankInfoRow}>
-                  <ThemedText type="caption" style={{ color: textSecondary }}>
-                    Amount
-                  </ThemedText>
-                  <ThemedText type="title" style={{ color: primary }}>
-                    {RideService.formatCurrency(bankAccount.amount)}
-                  </ThemedText>
-                </View>
-
-                <View style={styles.instructionsBox}>
-                  <IconSymbol name="info.circle" size={20} color={primary} />
-                  <ThemedText
-                    type="caption"
-                    style={{ color: textSecondary, flex: 1 }}
-                  >
-                    Transfer the exact amount to complete your payment. Click
-                    "Check Payment" after transfer.
-                  </ThemedText>
-                </View>
-
+                <View style={[styles.divider, { backgroundColor: border }]} />
+                <ThemedText type="title" style={{ color: primary }}>
+                  {RideService.formatCurrency(bankAccount.amount)}
+                </ThemedText>
                 <Pressable
                   onPress={checkBankNow}
-                  disabled={processing}
-                  style={[
-                    styles.checkButton,
-                    {
-                      backgroundColor: primary,
-                      opacity: processing ? 0.6 : 1,
-                      marginTop: 16,
-                    },
-                  ]}
+                  style={[styles.checkButton, { backgroundColor: primary }]}
                 >
-                  {processing ? (
-                    <ActivityIndicator color={textOnPrimary} />
-                  ) : (
-                    <ThemedText
-                      type="defaultSemiBold"
-                      style={{ color: textOnPrimary }}
-                    >
-                      Check Payment Status
-                    </ThemedText>
-                  )}
+                  <ThemedText style={{ color: textOnPrimary }}>
+                    Check Status
+                  </ThemedText>
                 </Pressable>
               </View>
-            )}
-          </ScrollView>
+            </ScrollView>
+          )}
         </ThemedView>
       </Modal>
+      <Toast />
     </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
+  container: { flex: 1 },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -654,70 +460,40 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     gap: 12,
   },
-  backButton: {
-    padding: 4,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  content: {
-    padding: 16,
-  },
+  backButton: { padding: 4 },
+  scrollView: { flex: 1 },
+  content: { padding: 16 },
   emptyState: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
     gap: 16,
   },
-  backLink: {
-    padding: 8,
-  },
+  backLink: { padding: 8 },
   summaryCard: {
     padding: 16,
     borderRadius: 12,
     borderWidth: 1,
     marginBottom: 16,
   },
-  fareCard: {
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    marginBottom: 16,
-  },
+  fareCard: { padding: 16, borderRadius: 12, borderWidth: 1, marginBottom: 16 },
   paymentCard: {
     padding: 16,
     borderRadius: 12,
     borderWidth: 1,
     marginBottom: 16,
   },
-  cardTitle: {
-    marginBottom: 16,
-  },
+  cardTitle: { marginBottom: 16 },
   locationRow: {
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 12,
     paddingVertical: 4,
   },
-  locationDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    marginTop: 6,
-  },
-  locationLine: {
-    width: 2,
-    height: 20,
-    marginLeft: 5,
-    marginVertical: 4,
-  },
-  locationText: {
-    flex: 1,
-  },
-  divider: {
-    height: 1,
-    marginVertical: 12,
-  },
+  locationDot: { width: 12, height: 12, borderRadius: 6, marginTop: 6 },
+  locationLine: { width: 2, height: 20, marginLeft: 5, marginVertical: 4 },
+  locationText: { flex: 1 },
+  divider: { height: 1, marginVertical: 12 },
   infoRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -736,9 +512,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingTop: 8,
   },
-  totalAmount: {
-    fontSize: 24,
-  },
+  totalAmount: { fontSize: 24 },
   methodOption: {
     flexDirection: "row",
     alignItems: "center",
@@ -748,11 +522,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     marginBottom: 12,
   },
-  methodLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
+  methodLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
   footer: {
     position: "absolute",
     bottom: 0,
@@ -771,17 +541,9 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderRadius: 12,
   },
-  confirmButtonText: {
-    fontSize: 16,
-  },
-  pollingContainer: {
-    alignItems: "center",
-    padding: 16,
-  },
-  modalContainer: {
-    flex: 1,
-    paddingTop: 60,
-  },
+  confirmButtonText: { fontSize: 16 },
+  pollingContainer: { alignItems: "center", padding: 16 },
+  modalContainer: { flex: 1, paddingTop: 60 },
   modalHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -789,36 +551,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 16,
   },
-  modalContent: {
-    flex: 1,
-    padding: 16,
-  },
-  bankCard: {
-    padding: 20,
-    borderRadius: 16,
-    borderWidth: 1,
-  },
-  bankInfoRow: {
-    marginBottom: 16,
-  },
-  copyRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginTop: 4,
-  },
-  instructionsBox: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 12,
-    padding: 12,
-    backgroundColor: "rgba(0, 123, 255, 0.1)",
-    borderRadius: 8,
-    marginTop: 8,
-  },
+  modalContent: { flex: 1, padding: 16 },
+  bankCard: { padding: 20, borderRadius: 16, borderWidth: 1 },
+  bankInfoRow: { marginBottom: 16 },
+  copyRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 4 },
   checkButton: {
     padding: 16,
     borderRadius: 12,
     alignItems: "center",
+    marginTop: 16,
   },
 });

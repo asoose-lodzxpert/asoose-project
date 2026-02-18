@@ -6,7 +6,7 @@ import { UserRole } from '../../common/enums/user-role.enum';
 import { OrderService } from './order.service';
 
 @Controller({
-  path: 'riders/order',
+  path: 'rider/order',
   version: '1',
 })
 export class OrderController {

@@ -2,13 +2,20 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service'; // Changed to relative path for safety
 import { UserStatus, UserRole, Prisma, OrderStatus } from '@prisma/client';
+import { UserAccountNotificationsService } from '../../users/notifications/user-account-notifications.service';
 
 @Injectable()
 export class CustomersService {
-  constructor(private prisma: PrismaService) {}
+  private readonly logger = new Logger(CustomersService.name);
+
+  constructor(
+    private prisma: PrismaService,
+    private userNotificationsService: UserAccountNotificationsService,
+  ) {}
 
   async findAll(params: {
     page: number;
@@ -192,6 +199,29 @@ export class CustomersService {
 
       return updatedCustomer;
     });
+
+    // Notify customer of status change (after transaction completes)
+    try {
+      if (['ACTIVE', 'SUSPENDED', 'BANNED', 'INACTIVE'].includes(status)) {
+        const reason =
+          status === 'SUSPENDED'
+            ? 'Your account has been suspended'
+            : status === 'BANNED'
+              ? 'Your account has been permanently banned'
+              : status === 'ACTIVE'
+                ? 'Your account has been reactivated'
+                : undefined;
+        await this.userNotificationsService.notifyAccountStatusChange(
+          id,
+          status as 'ACTIVE' | 'SUSPENDED' | 'BANNED' | 'INACTIVE',
+          reason,
+        );
+      }
+    } catch (error) {
+      this.logger.error(
+        `Failed to notify customer of status change: ${error.message}`,
+      );
+    }
   }
 
   async getCustomerOrders(userId: string) {

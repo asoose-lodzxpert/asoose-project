@@ -26,8 +26,8 @@ import { ThemedInput } from "@/components/ThemedInput";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { useAuth } from "@/context/AuthContext";
-import { useToast } from "@/components/ui/ThemedToast";
 import { useConfirm } from "@/components/ui/ConfirmDialogProvider";
+import Toast from "react-native-toast-message";
 
 export default function LoginScreen() {
   const primary = useThemeColor({}, "brandPrimary");
@@ -45,7 +45,6 @@ export default function LoginScreen() {
   } = useAuth();
 
   const router = useRouter();
-  const showToast = useToast();
   const showConfirm = useConfirm();
 
   // Form state
@@ -102,7 +101,7 @@ export default function LoginScreen() {
       router.replace({ pathname: "/(tabs)/home" });
     } catch (err: any) {
       setError(err.message || "Login failed");
-      showToast({ message: err.message || "Login failed", variant: "error" });
+      Toast.show({ type: "error", text1: err.message || "Login failed" });
     } finally {
       setLoading(false);
     }
@@ -114,9 +113,9 @@ export default function LoginScreen() {
       await authenticateWithGoogle(token);
       router.replace({ pathname: "/(tabs)/home" });
     } catch (err: any) {
-      showToast({
-        message: err.message || "Google sign-in failed",
-        variant: "error",
+      Toast.show({
+        type: "error",
+        text1: err.message || "Google sign-in failed",
       });
     } finally {
       setOauthLoading(false);
@@ -130,9 +129,9 @@ export default function LoginScreen() {
       router.replace({ pathname: "/(tabs)/home" });
     } catch (err: any) {
       if (err.message !== "Apple Sign-In was cancelled") {
-        showToast({
-          message: err.message || "Apple sign-in failed",
-          variant: "error",
+        Toast.show({
+          type: "error",
+          text1: err.message || "Apple sign-in failed",
         });
       }
     } finally {
@@ -145,9 +144,9 @@ export default function LoginScreen() {
       await biometricLogin();
       router.replace({ pathname: "/(tabs)/home" });
     } catch (err: any) {
-      showToast({
-        message: err.message || "Biometric login failed",
-        variant: "error",
+      Toast.show({
+        type: "error",
+        text1: err.message || "Biometric login failed",
       });
     }
   };

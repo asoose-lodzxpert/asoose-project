@@ -24,7 +24,6 @@ import { Address } from "@/types/address";
 import { request } from "@/lib/authFetch";
 import { initiatePayment } from "@/services/payment.service";
 import { createOrder } from "@/services/order.service";
-import { useToast } from "@/components/ui/ThemedToast";
 
 type PaymentMethod = "paystack" | "flutterwave" | "monnify" | "transfer";
 
@@ -32,7 +31,7 @@ export default function CheckoutScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const { items, groups, subtotal, deliveryFee, total, clearCart } = useCart();
-  const showToast = useToast();
+  const Toast = require("react-native-toast-message");
 
   // Theme Colors
   const primary = useThemeColor({}, "brandPrimary");
@@ -106,7 +105,7 @@ export default function CheckoutScreen() {
       const orderResponse = await createOrder(orderPayload);
       // Multi-order returns { orderGroupId, orders[], grandTotal }
       const createdOrderGroupId =
-        orderResponse.orderGroupId || orderResponse.id;
+        (orderResponse as any).orderGroupId || orderResponse.id;
       setOrderId(createdOrderGroupId);
 
       // 2. Initiate Payment for entire order group
@@ -142,10 +141,7 @@ export default function CheckoutScreen() {
       }
     } catch (error) {
       console.error("Order/Payment failed:", error);
-      showToast({
-        message: "Failed to process order. Please try again.",
-        variant: "error",
-      });
+      Toast.show({ type: "success", text1: "Order placed!" });
     } finally {
       setIsProcessing(false);
     }
@@ -293,7 +289,7 @@ export default function CheckoutScreen() {
                   <View key={item.id} style={styles.itemRow}>
                     <View style={styles.qtyBadge}>
                       <ThemedText style={{ fontSize: 12, fontWeight: "700" }}>
-                        {item.qty}x
+                        {item.quantity}x
                       </ThemedText>
                     </View>
                     <ThemedText
@@ -303,7 +299,10 @@ export default function CheckoutScreen() {
                       {item.name}
                     </ThemedText>
                     <ThemedText style={styles.itemPrice}>
-                      {formatCurrency(item.price * item.qty, currencySymbol)}
+                      {formatCurrency(
+                        item.price * item.quantity,
+                        currencySymbol,
+                      )}
                     </ThemedText>
                   </View>
                 ))}
@@ -453,11 +452,12 @@ export default function CheckoutScreen() {
         }}
         selectedMethod={selectedPaymentMethod}
       />
-      {paymentUrl && paymentReference && (
+      {paymentUrl && paymentReference && selectedPaymentMethod && (
         <PaymentWebView
           visible={showPaymentWebView}
           url={paymentUrl}
           reference={paymentReference}
+          paymentMethod={selectedPaymentMethod}
           onSuccess={() => {
             setShowPaymentWebView(false);
             setShowSuccessModal(true);

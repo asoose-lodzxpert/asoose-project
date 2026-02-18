@@ -12,10 +12,10 @@ interface IdempotencyRecord {
 
 /**
  * Idempotency Service
- * 
+ *
  * PRODUCTION NOTE: This implementation uses in-memory storage for development.
  * For production, replace with Redis using the following approach:
- * 
+ *
  * 1. Install Redis: npm install @nestjs/cache-manager cache-manager-redis-store
  * 2. Import: import { CACHE_MANAGER } from '@nestjs/cache-manager';
  * 3. Inject: constructor(@Inject(CACHE_MANAGER) private cacheManager: Cache)
@@ -23,13 +23,13 @@ interface IdempotencyRecord {
  *    - await this.cacheManager.get(key)
  *    - await this.cacheManager.set(key, value, TTL)
  *    - await this.cacheManager.del(key)
- * 
+ *
  * Redis ensures idempotency works across multiple server instances.
  */
 @Injectable()
 export class IdempotencyService {
   private readonly logger = new Logger(IdempotencyService.name);
-  
+
   // In-memory cache (replace with Redis in production)
   private readonly cache = new Map<string, IdempotencyRecord>();
 
@@ -45,13 +45,13 @@ export class IdempotencyService {
     userId: string,
     addressId: string,
     restaurantId: string,
-    items: OrderItemDto[]
+    items: OrderItemDto[],
   ): string {
     const itemsString = items
-      .map(i => `${i.id}:${i.quantity}`)
+      .map((i) => `${i.id}:${i.quantity}`)
       .sort()
       .join('|');
-    
+
     const data = `${userId}:${addressId}:${restaurantId}:${itemsString}`;
     return crypto.createHash('sha256').update(data).digest('hex');
   }
@@ -63,9 +63,9 @@ export class IdempotencyService {
   async check(key: string): Promise<string | null> {
     // PRODUCTION: Replace with Redis
     // const record = await this.cacheManager.get<IdempotencyRecord>(key);
-    
+
     const record = this.cache.get(key);
-    
+
     if (record) {
       const age = Date.now() - record.timestamp;
       if (age < IDEMPOTENCY_WINDOW_MS) {
@@ -75,7 +75,7 @@ export class IdempotencyService {
       // Expired, remove it
       this.cache.delete(key);
     }
-    
+
     return null;
   }
 
@@ -85,14 +85,14 @@ export class IdempotencyService {
   async store(key: string, orderId: string): Promise<void> {
     const record: IdempotencyRecord = {
       orderId,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     };
 
     // PRODUCTION: Replace with Redis
     // await this.cacheManager.set(key, record, IDEMPOTENCY_WINDOW_MS);
-    
+
     this.cache.set(key, record);
-    
+
     this.logger.debug(`Stored idempotency key: ${key.substring(0, 16)}...`);
   }
 
@@ -102,7 +102,7 @@ export class IdempotencyService {
   async remove(key: string): Promise<void> {
     // PRODUCTION: Replace with Redis
     // await this.cacheManager.del(key);
-    
+
     this.cache.delete(key);
     this.logger.debug(`Removed idempotency key: ${key.substring(0, 16)}...`);
   }
@@ -123,7 +123,9 @@ export class IdempotencyService {
     }
 
     if (cleanedCount > 0) {
-      this.logger.debug(`Cleaned up ${cleanedCount} expired idempotency records`);
+      this.logger.debug(
+        `Cleaned up ${cleanedCount} expired idempotency records`,
+      );
     }
   }
 

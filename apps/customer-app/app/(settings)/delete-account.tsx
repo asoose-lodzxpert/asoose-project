@@ -15,7 +15,7 @@ import { useRouter } from "expo-router";
 import { useConfirm } from "@/components/ui/ConfirmDialogProvider";
 
 import { deleteAccountRequest } from "@/services/delete-account.service";
-import { useToast } from "@/components/ui/toast";
+import Toast from "react-native-toast-message";
 
 /* ------------------ Options ------------------ */
 const deleteReasons = [
@@ -36,7 +36,6 @@ export default function DeleteAccountScreen() {
   const [loading, setLoading] = useState(false);
 
   const showConfirm = useConfirm();
-  const toast = useToast();
 
   /* ------------------ Handlers ------------------ */
   const handleDelete = async () => {

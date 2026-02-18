@@ -1,6 +1,5 @@
 import React, { useState } from "react";
-import { View, StyleSheet, Pressable } from "react-native";
-import Toast from "react-native-toast-message";
+import { View, StyleSheet } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
 import { ThemedInput } from "@/components/ThemedInput";
@@ -16,53 +15,18 @@ type Props = {
 
 export function StepAccountDetails({ data, onChange }: Props) {
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const primary = useThemeColor({}, "brandPrimary");
+  const mutedText = useThemeColor({}, "textSecondary");
   const errorColor = useThemeColor({}, "statusError");
-
-  const isValidAccountNumber = (value: string) => /^\d{10}$/.test(value);
-
-  const fetchAccountName = () => {
-    if (!isValidAccountNumber(data.accountNumber)) {
-      setError("Account number must be exactly 10 digits");
-      return;
-    }
-
-    setError(null);
-    setLoading(true);
-
-    // 🔹 Simulate API call
-    setTimeout(() => {
-      setLoading(false);
-
-      if (data.bank === null) {
-        Toast.show({
-          type: "error",
-          text1: "Bank not selected",
-          text2: "Please select a bank to proceed",
-        });
-        return;
-      }
-
-      // Demo logic: pretend some lookups fail
-      if (
-        data.accountNumber.startsWith("0") ||
-        data.accountNumber.startsWith("1")
-      ) {
-        onChange("accountName", "John Doe");
-      } else {
-        onChange("accountName", "");
-        Toast.show({
-          type: "error",
-          text1: "Lookup failed",
-          text2: "Unable to fetch account name",
-        });
-      }
-    }, 1500);
-  };
 
   return (
     <View>
+      <View style={styles.infoBox}>
+        <ThemedText style={[styles.infoText, { color: mutedText }]}>
+          Please ensure the bank details entered below are correct to avoid
+          payout issues.
+        </ThemedText>
+      </View>
+
       {/* Bank */}
       <CustomDropdown
         data={BANKS}
@@ -79,57 +43,34 @@ export function StepAccountDetails({ data, onChange }: Props) {
           placeholder="0123456789"
           value={data.accountNumber}
           keyboardType="numeric"
+          maxLength={10}
           onChangeText={(v) => {
             onChange("accountNumber", v);
-            onChange("accountName", "");
-
-            if (v.length === 0) {
-              setError(null);
-            } else if (!/^\d+$/.test(v)) {
+            if (v.length > 0 && !/^\d+$/.test(v)) {
               setError("Account number must contain only digits");
-            } else if (v.length !== 10) {
+            } else if (v.length > 0 && v.length !== 10) {
               setError("Account number must be exactly 10 digits");
             } else {
               setError(null);
             }
           }}
         />
-
         {error && (
-          <ThemedText
-            style={[styles.errorText, { backgroundColor: errorColor }]}
-          >
+          <ThemedText style={[styles.errorText, { color: errorColor }]}>
             {error}
           </ThemedText>
         )}
-
-        <Pressable
-          style={[
-            styles.button,
-            (!isValidAccountNumber(data.accountNumber) || loading) &&
-              styles.buttonDisabled,
-            { backgroundColor: primary },
-          ]}
-          onPress={fetchAccountName}
-          disabled={
-            !isValidAccountNumber(data.accountNumber) || !data.bank || loading
-          }
-        >
-          <ThemedText style={[styles.buttonText]}>
-            {loading ? "Fetching..." : "Fetch Account Name"}
-          </ThemedText>
-        </Pressable>
       </Field>
 
       {/* Account name */}
-      {data.accountName && (
-        <View style={{ marginTop: 12 }}>
-          <ThemedText>
-            Account name:{" "}
-            <ThemedText type="defaultSemiBold">{data.accountName}</ThemedText>
-          </ThemedText>
-        </View>
-      )}
+      <Field label="Account name">
+        <ThemedInput
+          placeholder="e.g. John Doe"
+          value={data.accountName}
+          autoCapitalize="characters"
+          onChangeText={(v) => onChange("accountName", v)}
+        />
+      </Field>
     </View>
   );
 }
@@ -160,21 +101,19 @@ const styles = StyleSheet.create({
     marginTop: 20,
     gap: 6,
   },
+  infoBox: {
+    marginTop: 10,
+    padding: 12,
+    borderRadius: 8,
+    backgroundColor: "rgba(0,0,0,0.05)",
+  },
+  infoText: {
+    fontSize: 13,
+    lineHeight: 18,
+    textAlign: "center",
+  },
   errorText: {
     fontSize: 12,
-    marginTop: 4,
-  },
-  button: {
-    marginTop: 12,
-    paddingVertical: 12,
-    borderRadius: 10,
-  },
-  buttonDisabled: {
-    opacity: 0.5,
-  },
-  buttonText: {
-    color: "white",
-    textAlign: "center",
-    fontWeight: "600",
+    marginTop: 2,
   },
 });

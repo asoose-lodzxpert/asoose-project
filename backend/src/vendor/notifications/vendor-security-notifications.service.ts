@@ -160,7 +160,7 @@ export class VendorSecurityNotificationsService {
 
       Time: ${timestamp.toLocaleString()}
 
-      If you did NOT request this password reset, please contact us immediately at security@asoose.com
+      If you did NOT request this password reset, please contact us immediately at hello@asoose.com
 
       For your security:
       - Never share your password with anyone
@@ -256,7 +256,7 @@ export class VendorSecurityNotificationsService {
       Account Number: ${maskedAccount}
       Updated: ${new Date().toLocaleString()}
 
-      If you did not make this change, please contact us immediately at security@asoose.com
+      If you did not make this change, please contact us immediately at hello@asoose.com
 
       Best regards,
       The Asoose Team
@@ -305,7 +305,7 @@ export class VendorSecurityNotificationsService {
 
       You will need to add a new bank account to receive payouts.
 
-      If you did not remove this account, please contact us immediately at security@asoose.com
+      If you did not remove this account, please contact us immediately at hello@asoose.com
 
       Best regards,
       The Asoose Team

@@ -63,7 +63,12 @@ export class VendorProductsService {
   private async validateProductOwnership(userId: string, productId: string) {
     const product = await this.prisma.product.findUnique({
       where: { id: productId },
-      include: { store: { select: { vendorId: true, id: true } } }, // Fixed: ownerId -> vendorId
+      include: {
+        store: { select: { vendorId: true, id: true } },
+        modifierGroups: {
+          include: { modifiers: true },
+        },
+      },
     });
 
     if (!product) {

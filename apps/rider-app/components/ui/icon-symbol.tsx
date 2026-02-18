@@ -1,8 +1,17 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { OpaqueColorValue, type StyleProp, type TextStyle } from "react-native";
 
+/**
+ * An icon symbol using MaterialIcons on Android and iOS.
+ * Maps SF Symbol-style names to MaterialIcons.
+ */
 export type IconSymbolName =
   | "house.fill"
+  | "eye"
+  | "doc.on.doc"
+  | "clock"
+  | "exclamationmark.octagon"
+  | "doc"
   | "ticket.fill"
   | "fork.knife"
   | "chart.line.uptrend.xyaxis"
@@ -17,6 +26,7 @@ export type IconSymbolName =
   | "chevron.up"
   | "info.circle"
   | "cloud.upload"
+  | "cloud.fill"
   | "camera.fill"
   | "check"
   | "circle.fill"
@@ -49,7 +59,7 @@ export type IconSymbolName =
   | "arrow-u-turn-left"
   | "arrow-u-turn-right"
   | "arrow.up"
-  | "arrow-up"
+  | "arrow-upward"
   | "settings"
   | "bell"
   | "list"
@@ -86,7 +96,6 @@ export type IconSymbolName =
   | "pizza"
   | "p.square"
   | "d.square"
-  | "clock"
   | "arrow.right.circle"
   | "note"
   | "phone"
@@ -103,52 +112,62 @@ export type IconSymbolName =
   | "shippingbox.fill"
   | "calendar"
   | "exclamationmark.triangle"
-  | "exclamationmark.triangle.fill";
+  | "exclamationmark.triangle.fill"
+  | "info.circle.fill"
+  | "checkmark.seal.fill"
+  | "exclamationmark.octagon.fill"
+  | "doc.fill"
+  | "doc.on.doc.fill"
+  | "hand.raised.fill"
+  | "pause.circle.fill"
+  | "list.clipboard.fill"
+  | "directions-walk"
+  | "motorcycle"
+  | "bicycle";
 
-export const MAPPING: Record<
-  IconSymbolName,
-  keyof typeof MaterialIcons.glyphMap
-> = {
+const MAPPING: Record<IconSymbolName, keyof typeof MaterialIcons.glyphMap> = {
+  // Vehicle/transport icons
+  "directions-walk": "directions-walk",
+  motorcycle: "motorcycle",
+  bicycle: "directions-bike",
   "house.fill": "home",
+  eye: "remove-red-eye",
+  "doc.on.doc": "library-books",
+  clock: "access-time",
+  "exclamationmark.octagon": "report-problem",
+  doc: "description",
   "ticket.fill": "confirmation-number",
   "fork.knife": "restaurant",
   "chart.line.uptrend.xyaxis": "show-chart",
   "person.crop.circle.fill": "account-circle",
-
-  "eye.fill": "remove-red-eye",
+  "eye.fill": "visibility",
   "eye.slash.fill": "visibility-off",
-
   "paperplane.fill": "send",
-  send: "send",
-
   "chevron.left.forwardslash.chevron.right": "code",
   "chevron.right": "chevron-right",
   "chevron.left": "chevron-left",
   "chevron.down": "keyboard-arrow-down",
   "chevron.up": "keyboard-arrow-up",
-
   "info.circle": "info",
+  "info.circle.fill": "info",
   "cloud.upload": "cloud-upload",
+  "cloud.fill": "cloud",
   "camera.fill": "photo-camera",
-
   check: "check",
   "circle.fill": "circle",
   "car.fill": "directions-car",
   "mappin.circle.fill": "location-on",
-
   "map.marker": "place",
   "location.fill": "location-on",
-  "map.fill": "map",
-
   "arrow.up.left.and.arrow.down.right": "fullscreen",
-  fullscreen: "fullscreen",
-
   xmark: "close",
+  "map.fill": "map",
   "lock.fill": "lock",
   pencil: "edit",
   trash: "delete",
   plus: "add",
-
+  fullscreen: "fullscreen",
+  send: "send",
   home: "home",
   restaurant: "restaurant",
   notifications: "notifications",
@@ -160,12 +179,12 @@ export const MAPPING: Record<
   power: "power",
   "arrow.right": "arrow-forward",
   "arrow.left": "arrow-back",
+  "arrow-left": "arrow-back",
+  "arrow-right": "arrow-forward",
+  "arrow-u-turn-left": "settings-backup-restore",
+  "arrow-u-turn-right": "redo",
   "arrow.up": "arrow-upward",
-  "arrow-up": "arrow-upward",
-  "arrow-u-turn-left": "arrow-left",
-  "arrow-u-turn-right": "arrow-right",
-  "arrow-left": "arrow-left",
-  "arrow-right": "arrow-right",
+  "arrow-upward": "arrow-upward",
   settings: "settings",
   bell: "notifications",
   list: "list",
@@ -174,11 +193,12 @@ export const MAPPING: Record<
   headphones: "headset",
   play: "play-arrow",
   activity: "show-chart",
+  lightbulb: "lightbulb",
+  shield: "security",
   close: "close",
   edit: "edit",
   delete: "delete",
-  shield: "security",
-  lightbulb: "lightbulb",
+  add: "add",
   share: "share",
   "file-text": "description",
   "credit-card": "credit-card",
@@ -191,35 +211,40 @@ export const MAPPING: Record<
   "checkmark.circle.fill": "check-circle",
   circle: "radio-button-unchecked",
   "arrow.down": "arrow-downward",
-  "location.on": "my-location",
+  "location.on": "location-on",
   map: "map",
-  storefront: "storefront",
-  "person.circle": "person",
-  bag: "work",
+  storefront: "store",
+  "person.circle": "account-circle",
+  bag: "local-mall",
   package: "inventory",
-  "arrow.clockwise": "rotate-right",
-  add: "add",
+  "arrow.clockwise": "refresh",
   pizza: "local-pizza",
-  "p.square": "crop-square",
-  "d.square": "crop-square",
-  clock: "access-time",
-  "arrow.right.circle": "arrow-forward-ios",
+  "p.square": "local-parking",
+  "d.square": "directions",
+  "arrow.right.circle": "arrow-circle-right",
   note: "note",
   phone: "phone",
   checkmark: "check",
   navigation: "navigation",
   person: "person",
-  "checkmark.seal": "check-circle",
+  "checkmark.seal": "verified",
+  "checkmark.seal.fill": "verified",
   "star.fill": "star",
   "person.text.rectangle": "badge",
   "doc.text": "article",
   creditcard: "credit-card",
   car: "directions-car",
   "box.truck": "local-shipping",
-  "shippingbox.fill": "inventory",
+  "shippingbox.fill": "unarchive",
   calendar: "calendar-today",
   "exclamationmark.triangle": "warning",
   "exclamationmark.triangle.fill": "warning",
+  "exclamationmark.octagon.fill": "report",
+  "doc.fill": "description",
+  "doc.on.doc.fill": "content-copy",
+  "hand.raised.fill": "front-hand",
+  "pause.circle.fill": "pause-circle",
+  "list.clipboard.fill": "assignment",
 };
 
 interface IconSymbolProps {
@@ -232,7 +257,7 @@ interface IconSymbolProps {
 export function IconSymbol({ name, size = 24, color, style }: IconSymbolProps) {
   return (
     <MaterialIcons
-      name={MAPPING[name] as keyof typeof MaterialIcons.glyphMap}
+      name={MAPPING[name]}
       size={size}
       color={color}
       style={style}

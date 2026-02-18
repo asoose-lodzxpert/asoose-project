@@ -15,6 +15,7 @@ const API_BASE = (() => {
         "EXPO_PUBLIC_API_URL is required in production. Please set it via EAS secrets or environment variables.",
       );
     }
+
     // In development, you may fallback or warn
     console.warn(
       "EXPO_PUBLIC_API_URL is not set. Using default development URL.",

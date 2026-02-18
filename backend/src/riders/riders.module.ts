@@ -1,4 +1,5 @@
 import { Module, forwardRef } from '@nestjs/common';
+import { CacheModule } from '@nestjs/cache-manager';
 import { ProfileController } from './profile/profile.controller';
 import { ProfileService } from './profile/profile.service';
 import { BankController } from './bank/bank.controller';
@@ -20,9 +21,12 @@ import { UsersModule } from '../users/users.module';
 import { TripsModule } from '../users/trips/trips.module';
 import { StorageModule } from '../storage/storage.module';
 import { MatchingModule } from '../matching/matching.module';
-import { RidersController } from './riders.controller';
-// ✅ IMPORT THIS
+
 import { TransactionsModule } from '../super-admin/transactions/transaction.module';
+import { MailModule } from '../mail/mail.module';
+
+import { RiderAccountNotificationsService } from './notifications/rider-account-notifications.service';
+import { CommonModule } from '../common/common.module';
 
 @Module({
   imports: [
@@ -31,8 +35,10 @@ import { TransactionsModule } from '../super-admin/transactions/transaction.modu
     forwardRef(() => UsersModule),
     TripsModule,
     MatchingModule,
-    // ✅ ADD THIS
-    TransactionsModule, 
+    TransactionsModule,
+    CacheModule.register(),
+    MailModule,
+    CommonModule,
   ],
   controllers: [
     ProfileController,
@@ -42,7 +48,6 @@ import { TransactionsModule } from '../super-admin/transactions/transaction.modu
     WithdrawalController,
     StatusController,
     RiderNotificationsController,
-    RidersController,
   ],
   providers: [
     ProfileService,
@@ -54,6 +59,7 @@ import { TransactionsModule } from '../super-admin/transactions/transaction.modu
     RiderNotificationsService,
     RiderDispatchListener,
     RidersStreamService,
+    RiderAccountNotificationsService,
   ],
   exports: [
     ProfileService,
@@ -64,6 +70,7 @@ import { TransactionsModule } from '../super-admin/transactions/transaction.modu
     StatusService,
     RiderNotificationsService,
     RidersStreamService,
+    RiderAccountNotificationsService,
   ],
 })
 export class RidersModule {}

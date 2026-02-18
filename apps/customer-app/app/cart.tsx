@@ -14,6 +14,7 @@ import { RelativePathString, useRouter } from "expo-router";
 import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { CartItemModifiers } from "@/components/CartItemModifiers";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { useCart } from "@/context/CartContext";
 import { CartItem, Restaurant } from "@/types/cart";
@@ -60,7 +61,7 @@ export default function CartScreen() {
   const currencySymbol = restaurants[0]?.currency ?? "₦";
 
   /* ------------------------------------------------------------------------ */
-  /* GROUP ITEMS BY RESTAURANT */
+  /* GROUP ITEMS BY STORE */
   /* ------------------------------------------------------------------------ */
 
   const groupedByRestaurant = useMemo<CartGroup[]>(() => {
@@ -167,7 +168,7 @@ export default function CartScreen() {
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {groupedByRestaurant.map((group) => (
           <View key={group.id} style={styles.restaurantBlock}>
-            {/* Restaurant header */}
+            {/* Store header */}
             <View
               style={[
                 styles.restaurantHeader,
@@ -250,6 +251,12 @@ export default function CartScreen() {
                         >
                           {item.description}
                         </ThemedText>
+                      ) : null}
+
+                      {item.modifierGroups && item.modifierGroups.length > 0 ? (
+                        <CartItemModifiers
+                          modifierGroups={item.modifierGroups}
+                        />
                       ) : null}
 
                       <View style={styles.itemFooter}>

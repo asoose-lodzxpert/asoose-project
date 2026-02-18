@@ -170,4 +170,25 @@ export class VendorAuthController {
     const { id } = req.user || {};
     return this.vendorAuthService.removePushToken(id);
   }
+
+  // ============ TEST ENDPOINTS (DEVELOPMENT ONLY) ============
+
+  // @Get('test-email')
+  // async testEmailSend() {
+  //   const testEmail = 'arhyelphilip024@gmail.com';
+  //   try {
+  //     await this.vendorAuthService.sendOtpForPasswordReset(testEmail);
+  //     return {
+  //       success: true,
+  //       message: `Test email queued successfully to ${testEmail}`,
+  //       timestamp: new Date().toISOString(),
+  //     };
+  //   } catch (error: any) {
+  //     return {
+  //       success: false,
+  //       message: `Failed to queue test email: ${error?.message}`,
+  //       timestamp: new Date().toISOString(),
+  //     };
+  //   }
+  // }
 }

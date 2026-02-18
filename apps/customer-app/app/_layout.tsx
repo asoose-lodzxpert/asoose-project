@@ -1,79 +1,51 @@
-import React, { useEffect, useState } from "react";
-import { StyleSheet, View, Image } from "react-native";
 import { Stack } from "expo-router";
+import React from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import Toast from "react-native-toast-message";
 
 // Providers & Context
 import ConfirmProvider from "@/components/ui/ConfirmDialogProvider";
-import ThemedToastProvider from "@/components/ui/ThemedToast";
-import { ToastProvider } from "@/components/ui/toast";
+
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { CartProvider } from "@/context/CartContext";
 import { HomeProvider } from "@/context/HomeContext";
 import { LocationProvider } from "@/context/LocationContext";
 import { RideProvider } from "@/context/RideContext";
 import { SendPackageProvider } from "@/context/SendPackageContext";
-import WelcomeScreen from "./onboarding";
+import { NotificationProvider } from "@/context/PushNotificationContext";
+import { NotificationPreferencesProvider } from "@/context/NotificationPreferencesContext";
+import { toastConfig } from "@/components/ui/ThemedToast";
 
-const ONBOARDING_KEY = "asoose_customer_onboarded";
-
+/**
+ * RootNavigator now ALWAYS renders all routes.
+ * This ensures the route manifest is properly generated in production builds.
+ * Navigation/redirect logic is handled in app/index.tsx instead.
+ */
 function RootNavigator() {
-  const { user, loading: authLoading } = useAuth();
-  const [showWelcome, setShowWelcome] = useState<boolean | null>(null);
-
-  useEffect(() => {
-    const checkOnboarding = async () => {
-      try {
-        const seen = await AsyncStorage.getItem(ONBOARDING_KEY);
-        setShowWelcome(seen !== "true");
-      } catch (e) {
-        setShowWelcome(false);
-      }
-    };
-    checkOnboarding();
-  }, []);
-
-  if (authLoading || showWelcome === null) {
-    return (
-      <View style={styles.loadingContainer}>
-        <View>
-          <Image
-            source={require("@/assets/images/icon.png")}
-            style={styles.logo}
-            resizeMode="contain"
-          />
-        </View>
-      </View>
-    );
-  }
-
-  if (showWelcome) {
-    return (
-      <WelcomeScreen
-        onDone={async () => {
-          await AsyncStorage.setItem(ONBOARDING_KEY, "true");
-          setShowWelcome(false);
-        }}
-      />
-    );
-  }
-
-  if (!user) {
-    return (
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="(auth)" />
-      </Stack>
-    );
-  }
-
-  // You can add account status logic here if needed, similar to vendor app
   return (
     <Stack screenOptions={{ headerShown: false }}>
+      {/* Index route handles initial redirects */}
+      <Stack.Screen name="index" />
+
+      {/* Onboarding screen */}
+      <Stack.Screen name="onboarding" />
+
+      {/* Auth screens */}
+      <Stack.Screen name="(auth)" />
+
+      {/* Main app screens */}
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="(store)" />
       <Stack.Screen name="(settings)" />
-      <Stack.Screen name="(delivery)" />
+
+      {/* Other screens */}
+      <Stack.Screen name="cart" />
+      <Stack.Screen name="checkout" />
+      <Stack.Screen name="discover" />
+      <Stack.Screen name="enable-location" />
+      <Stack.Screen name="search" />
+      <Stack.Screen name="category/[id]" />
+      <Stack.Screen name="modal" options={{ presentation: "modal" }} />
     </Stack>
   );
 }
@@ -81,60 +53,33 @@ function RootNavigator() {
 function AuthDependentProviders({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   return (
-    <CartProvider userId={user?.id}>
-      <HomeProvider>
-        <RideProvider>
-          <SendPackageProvider>{children}</SendPackageProvider>
-        </RideProvider>
-      </HomeProvider>
-    </CartProvider>
+    <NotificationProvider>
+      <NotificationPreferencesProvider>
+        <CartProvider userId={user?.id}>
+          <HomeProvider>
+            <RideProvider>
+              <SendPackageProvider>{children}</SendPackageProvider>
+            </RideProvider>
+          </HomeProvider>
+        </CartProvider>
+      </NotificationPreferencesProvider>
+    </NotificationProvider>
   );
 }
 
 export default function RootLayout() {
-  const [permissionsReady, setPermissionsReady] = useState(true); // No permissions logic for now
-
-  if (!permissionsReady) {
-    return (
-      <View style={styles.loadingContainer}>
-        <View>
-          <Image
-            source={require("@/assets/images/icon.png")}
-            style={styles.logo}
-            resizeMode="contain"
-          />
-        </View>
-      </View>
-    );
-  }
-
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ConfirmProvider>
-        <ToastProvider>
-          <AuthProvider>
-            <LocationProvider>
-              <AuthDependentProviders>
-                <RootNavigator />
-                <ThemedToastProvider />
-              </AuthDependentProviders>
-            </LocationProvider>
-          </AuthProvider>
-        </ToastProvider>
+        <AuthProvider>
+          <LocationProvider>
+            <AuthDependentProviders>
+              <RootNavigator />
+              <Toast config={toastConfig} />
+            </AuthDependentProviders>
+          </LocationProvider>
+        </AuthProvider>
       </ConfirmProvider>
     </GestureHandlerRootView>
   );
 }
-
-const styles = StyleSheet.create({
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  logo: {
-    width: 120,
-    height: 120,
-    marginBottom: 24,
-  },
-});

@@ -1,15 +1,15 @@
 import * as Location from "expo-location";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Pressable, View } from "react-native";
+import { ActivityIndicator, Pressable, View, StyleSheet } from "react-native";
 import MapView, { Marker } from "react-native-maps";
+import Toast from "react-native-toast-message";
 
 import { AddressResultsList } from "@/components/location/AddressResultsList";
 import { AddressSearchInput } from "@/components/location/AddressSearchInput";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { IconSymbol } from "@/components/ui/icon-symbol";
-import { useToast } from "@/components/ui/toast";
 import { useSendPackage } from "@/context/SendPackageContext";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { useAddressSearch } from "@/hooks/useAddressSearch";
@@ -23,10 +23,9 @@ export default function LocationPickerScreen() {
   const primary = useThemeColor({}, "brandPrimary");
   const textSecondary = useThemeColor({}, "textSecondary");
   const muted = useThemeColor({}, "textMuted");
+  const surface = useThemeColor({}, "surfaceBackground");
 
   const mapRef = useRef<MapView>(null);
-
-  const toast = useToast();
 
   const [query, setQuery] = useState("");
   const [showMap, setShowMap] = useState(false);
@@ -51,29 +50,37 @@ export default function LocationPickerScreen() {
 
     (async () => {
       setLoadingMap(true);
-
       const { status } = await Location.requestForegroundPermissionsAsync();
 
       if (status !== "granted") {
         setLoadingMap(false);
+        Toast.show({
+          type: "error",
+          text1: "Permission Denied",
+          text2: "Location permission is required to use the map.",
+        });
         return;
       }
 
-      const loc = await Location.getCurrentPositionAsync({});
-      const c = {
-        latitude: loc.coords.latitude,
-        longitude: loc.coords.longitude,
-      };
+      try {
+        const loc = await Location.getCurrentPositionAsync({});
+        const c = {
+          latitude: loc.coords.latitude,
+          longitude: loc.coords.longitude,
+        };
 
-      setCoords(c);
-      setLoadingMap(false);
+        setCoords(c);
+        setLoadingMap(false);
 
-      requestAnimationFrame(() => {
-        mapRef.current?.animateCamera({
-          center: c,
-          zoom: 16,
+        requestAnimationFrame(() => {
+          mapRef.current?.animateCamera({
+            center: c,
+            zoom: 16,
+          });
         });
-      });
+      } catch (err) {
+        setLoadingMap(false);
+      }
     })();
   }, [showMap]);
 
@@ -90,20 +97,21 @@ export default function LocationPickerScreen() {
       try {
         const resolved = await resolveAddress({
           ...coords,
-          accuracy: null,
-          altitude: null,
-          altitudeAccuracy: null,
-          heading: null,
-          speed: null,
-        });
+          accuracy: 0,
+          altitude: 0,
+          altitudeAccuracy: 0,
+          heading: 0,
+          speed: 0,
+          timestamp: Date.now(),
+        } as Location.LocationObjectCoords);
 
         setResolvedAddress(resolved?.address ?? null);
-      } catch {
+      } catch (err) {
         setResolvedAddress(null);
       } finally {
         setResolvingAddress(false);
       }
-    }, 400);
+    }, 600);
 
     return () => clearTimeout(timeout);
   }, [coords]);
@@ -116,62 +124,60 @@ export default function LocationPickerScreen() {
 
     const payload = {
       address: {
-        id: "map-selected",
-        label: type === "pickup" ? "Pickup location" : "Delivery location",
+        id: `map-${Date.now()}`,
+        label: resolvedAddress.split(",")[0],
         fullAddress: resolvedAddress,
         coords,
       },
     };
 
     type === "pickup" ? setPickup(payload) : setDropoff(payload);
-
     router.back();
   }
 
   /* ---------------------------------- */
   /* Select autocomplete result */
   /* ---------------------------------- */
-  function selectAutocomplete(placeId: string) {
-    (async () => {
-      try {
-        setSelectingLocation(true);
-        const result = await request(`maps/geocode?placeId=${placeId}`);
+  async function selectAutocomplete(placeId: string) {
+    try {
+      setSelectingLocation(true);
+      const result = await request(`maps/geocode?placeId=${placeId}`);
 
-        if (!result) {
-          setSelectingLocation(false);
-          return;
-        }
-
-        const payload = {
-          address: {
-            id: placeId,
-            label: result.address,
-            fullAddress: result.address,
-            coords: {
-              latitude: result.lat,
-              longitude: result.lng,
-            },
-          },
-        };
-
-        type === "pickup" ? setPickup(payload) : setDropoff(payload);
+      if (!result) {
         setSelectingLocation(false);
-        router.back();
-      } catch {
-        setSelectingLocation(false);
-        toast({
-          variant: "error",
-          message: "Failed to select location. Please try again.",
-        });
+        return;
       }
-    })();
+
+      const payload = {
+        address: {
+          id: placeId,
+          label: result.address.split(",")[0],
+          fullAddress: result.address,
+          coords: {
+            latitude: result.lat,
+            longitude: result.lng,
+          },
+        },
+      };
+
+      type === "pickup" ? setPickup(payload) : setDropoff(payload);
+      setSelectingLocation(false);
+      router.back();
+    } catch (err) {
+      setSelectingLocation(false);
+      Toast.show({
+        type: "error",
+        text1: "Selection Failed",
+        text2: "Failed to select location. Please try again.",
+      });
+    }
   }
 
   return (
     <ThemedView style={{ flex: 1, padding: 16 }}>
       {/* Header */}
-      <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
-        <Pressable onPress={router.back}>
+      <View style={styles.header}>
+        <Pressable onPress={router.back} style={styles.backBtn}>
           <IconSymbol name="chevron.left" size={24} color={primary} />
         </Pressable>
         <ThemedText type="subtitle">
@@ -189,10 +195,10 @@ export default function LocationPickerScreen() {
           />
 
           {selectingLocation && (
-            <View style={{ padding: 16, alignItems: "center" }}>
+            <View style={styles.loadingOverlay}>
               <ActivityIndicator size="small" color={primary} />
               <ThemedText style={{ marginTop: 8, color: muted }}>
-                Resolving address...
+                Resolving location...
               </ThemedText>
             </View>
           )}
@@ -200,7 +206,7 @@ export default function LocationPickerScreen() {
           <AddressResultsList results={results} onSelect={selectAutocomplete} />
         </>
       ) : (
-        <>
+        <View style={{ flex: 1 }}>
           {loadingMap || !coords ? (
             <ActivityIndicator
               style={{ flex: 1 }}
@@ -210,12 +216,12 @@ export default function LocationPickerScreen() {
           ) : (
             <MapView
               ref={mapRef}
-              style={{ flex: 1 }}
+              style={{ flex: 1, borderRadius: 16, overflow: "hidden" }}
               initialRegion={{
                 latitude: coords.latitude,
                 longitude: coords.longitude,
-                latitudeDelta: 0.02,
-                longitudeDelta: 0.02,
+                latitudeDelta: 0.01,
+                longitudeDelta: 0.01,
               }}
               onPress={(e) => setCoords(e.nativeEvent.coordinate)}
             >
@@ -227,48 +233,96 @@ export default function LocationPickerScreen() {
             </MapView>
           )}
 
-          {/* Footer */}
-          <View style={{ paddingVertical: 12, gap: 6 }}>
-            {/* Resolving state */}
-            {resolvingAddress && (
-              <View
-                style={{ flexDirection: "row", gap: 8, alignItems: "center" }}
-              >
+          {/* Footer Card */}
+          <View style={styles.footer}>
+            {resolvingAddress ? (
+              <View style={styles.resolveRow}>
                 <ActivityIndicator size="small" color={primary} />
                 <ThemedText style={{ color: textSecondary }}>
                   Resolving address…
                 </ThemedText>
               </View>
-            )}
-
-            {!resolvingAddress && resolvedAddress && (
-              <ThemedText numberOfLines={2} style={{ color: textSecondary }}>
-                {resolvedAddress}
+            ) : (
+              <ThemedText
+                numberOfLines={2}
+                style={[styles.addressText, { color: textSecondary }]}
+              >
+                {resolvedAddress || "Select a point on the map"}
               </ThemedText>
             )}
 
             <Pressable
               onPress={confirmMapLocation}
               disabled={!resolvedAddress || resolvingAddress}
-              style={{
-                backgroundColor: primary,
-                padding: 14,
-                borderRadius: 14,
-                alignItems: "center",
-                opacity: !resolvedAddress || resolvingAddress ? 0.5 : 1,
-              }}
+              style={[
+                styles.confirmBtn,
+                {
+                  backgroundColor: primary,
+                  opacity: !resolvedAddress || resolvingAddress ? 0.5 : 1,
+                },
+              ]}
             >
-              {resolvingAddress ? (
-                <ActivityIndicator color="#FFF" />
-              ) : (
-                <ThemedText style={{ color: "#FFF", fontWeight: "700" }}>
-                  Use this location
-                </ThemedText>
-              )}
+              <ThemedText style={styles.btnText}>Use this location</ThemedText>
+            </Pressable>
+
+            <Pressable
+              onPress={() => setShowMap(false)}
+              style={styles.cancelBtn}
+            >
+              <ThemedText style={{ color: primary }}>
+                Go back to search
+              </ThemedText>
             </Pressable>
           </View>
-        </>
+        </View>
       )}
+      <Toast />
     </ThemedView>
   );
 }
+
+const styles = StyleSheet.create({
+  header: {
+    flexDirection: "row",
+    gap: 8,
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  backBtn: {
+    padding: 4,
+    marginLeft: -4,
+  },
+  loadingOverlay: {
+    padding: 16,
+    alignItems: "center",
+  },
+  footer: {
+    paddingVertical: 16,
+    gap: 12,
+  },
+  resolveRow: {
+    flexDirection: "row",
+    gap: 8,
+    alignItems: "center",
+    height: 40,
+  },
+  addressText: {
+    fontSize: 15,
+    height: 40,
+    lineHeight: 20,
+  },
+  confirmBtn: {
+    padding: 16,
+    borderRadius: 16,
+    alignItems: "center",
+  },
+  btnText: {
+    color: "#FFF",
+    fontWeight: "700",
+    fontSize: 16,
+  },
+  cancelBtn: {
+    alignItems: "center",
+    padding: 8,
+  },
+});

@@ -15,7 +15,7 @@ import {
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { IconSymbol } from "@/components/ui/icon-symbol";
-import { useToast } from "@/components/ui/ThemedToast";
+
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { fetchOrderById } from "@/services/order-history.service";
 
@@ -32,7 +32,7 @@ function formatCurrency(value: string | number | undefined | null) {
 export default function OrderDetailsScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
   const router = useRouter();
-  const showToast = useToast();
+  const Toast = require("react-native-toast-message");
 
   /* -------- Theme Colors -------- */
   const brandPrimary = useThemeColor({}, "brandPrimary");
@@ -134,9 +134,9 @@ export default function OrderDetailsScreen() {
     try {
       await Share.share({ message });
     } catch (error: any) {
-      showToast({ message: error.message || "Share failed", variant: "error" });
+      Toast.show({ type: "error", text1: error.message || "Share failed" });
     }
-  }, [order, showToast]);
+  }, [order]);
 
   /* ---------------- Skeleton Components ---------------- */
 

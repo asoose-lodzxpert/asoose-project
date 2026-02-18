@@ -56,7 +56,7 @@ export default function LocationPickerScreen() {
   const [reverseGeocodedAddress, setReverseGeocodedAddress] = useState("");
   const [gettingPlaceDetails, setGettingPlaceDetails] = useState(false);
   const mapRef = useRef<MapView>(null);
-  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const searchTimeoutRef = useRef<number | null>(null);
 
   // Debounced autocomplete search
   const searchPlaces = useCallback(
@@ -68,20 +68,14 @@ export default function LocationPickerScreen() {
 
       setSearching(true);
       try {
-        const location = currentLocation?.coords
-          ? `${currentLocation.coords.latitude},${currentLocation.coords.longitude}`
-          : undefined;
-
-        const params: any = { query };
-        if (location) params.location = location;
-
-        const response = await axios.get(
-          `${API_URL}/maps/places-autocomplete`,
-          {
-            params,
-          },
-        );
-        setAutocompleteResults(response.data || []);
+        let url = `${API_URL}/maps/places-autocomplete?query=${encodeURIComponent(query)}`;
+        if (currentLocation?.coords) {
+          url += `&location=${currentLocation.coords.latitude},${currentLocation.coords.longitude}`;
+        }
+        const response = await fetch(url, { method: "GET" });
+        const data = await response.json();
+        // Backend returns an array, not { predictions: [...] }
+        setAutocompleteResults(Array.isArray(data) ? data : []);
       } catch (error) {
         console.error("Autocomplete error:", error);
         setAutocompleteResults([]);
@@ -112,16 +106,13 @@ export default function LocationPickerScreen() {
   // Reverse geocode when marker is moved
   const reverseGeocode = useCallback(async (lat: number, lng: number) => {
     try {
-      const results = await Location.reverseGeocodeAsync({
-        latitude: lat,
-        longitude: lng,
-      });
-      if (results && results.length > 0) {
-        const result = results[0];
-        const address = [result.name, result.street, result.city, result.region]
-          .filter(Boolean)
-          .join(", ");
-        setReverseGeocodedAddress(address || "Selected Location");
+      const url = `${API_URL}/maps/reverse-geocode?lat=${lat}&lng=${lng}`;
+      const res = await fetch(url);
+      const data = await res.json();
+      if (data && data.address) {
+        setReverseGeocodedAddress(data.address);
+      } else {
+        setReverseGeocodedAddress("Selected Location");
       }
     } catch (error) {
       console.error("Reverse geocode error:", error);

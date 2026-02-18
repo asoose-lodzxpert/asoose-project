@@ -1,3 +1,15 @@
+export type ModifierSelection = {
+  id: string;
+  name: string;
+  price: number;
+};
+
+export type ModifierGroupSelection = {
+  id: string;
+  name: string;
+  selectedModifiers: ModifierSelection[];
+};
+
 export type CartItem = {
   id: string;
   name: string;
@@ -5,6 +17,7 @@ export type CartItem = {
   price: number;
   qty: number;
   options?: string;
+  modifierGroups?: ModifierGroupSelection[];
   vendorId: string;
   description?: string | null;
   available?: boolean;
@@ -37,6 +50,7 @@ export type CartSummaryItem = {
   quantity: number;
   total: number;
   available: boolean;
+  modifierGroups?: ModifierGroupSelection[];
 };
 
 export type CartSummaryRestaurant = {

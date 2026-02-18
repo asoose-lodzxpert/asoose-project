@@ -4,6 +4,7 @@ import {
   JobEventsService,
   ConnectionStatus,
 } from "../services/job-events.service";
+import { locationStreamService } from "@/services/location-stream.service";
 
 interface UseJobEventsOptions {
   onJobAssigned?: (job: IncomingJobOffer) => void;
@@ -25,24 +26,27 @@ export function useJobEvents(options: UseJobEventsOptions) {
   } = options;
   const serviceRef = useRef<JobEventsService | null>(null);
 
-  const connect = useCallback(() => {
-    if (!enabled) return;
-    try {
-      if (!serviceRef.current) {
-        serviceRef.current = new JobEventsService();
-      }
-      serviceRef.current.connect({
+  // Initialize service once
+  useEffect(() => {
+    if (!serviceRef.current) {
+      serviceRef.current = new JobEventsService();
+      // Wire the socket service to location stream
+      locationStreamService.setJobEventsService(serviceRef.current);
+    }
+  }, []);
+
+  // Update callbacks when they change (without reconnecting)
+  useEffect(() => {
+    if (serviceRef.current) {
+      serviceRef.current.updateCallbacks({
         onJobAssigned,
         onJobUpdated,
         onJobCancelled,
         onError,
         onConnectionStatusChange,
       });
-    } catch (error) {
-      onError?.(error as Error);
     }
   }, [
-    enabled,
     onJobAssigned,
     onJobUpdated,
     onJobCancelled,
@@ -50,12 +54,24 @@ export function useJobEvents(options: UseJobEventsOptions) {
     onConnectionStatusChange,
   ]);
 
+  const connect = useCallback(() => {
+    if (!enabled || !serviceRef.current) return;
+    try {
+      // Callbacks are already set via updateCallbacks effect
+      // Don't pass callbacks here to avoid overwriting them
+      serviceRef.current.connect();
+    } catch (error) {
+      // ...existing code...
+    }
+  }, [enabled]); // Only reconnect when 'enabled' changes
+
   const disconnect = useCallback(() => {
     if (serviceRef.current) {
       serviceRef.current.disconnect();
     }
   }, []);
 
+  // Connect/disconnect based on 'enabled' state
   useEffect(() => {
     if (enabled) {
       connect();

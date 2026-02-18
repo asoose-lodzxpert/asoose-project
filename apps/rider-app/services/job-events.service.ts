@@ -27,17 +27,33 @@ export class JobEventsService {
 
   private setConnectionStatus(status: ConnectionStatus): void {
     this.connectionStatus = status;
-    this.callbacks.onConnectionStatusChange?.(status);
+    if (this.callbacks && this.callbacks.onConnectionStatusChange) {
+      this.callbacks.onConnectionStatusChange(status);
+    }
   }
 
   getConnectionStatus(): ConnectionStatus {
     return this.connectionStatus;
   }
 
-  async connect(callbacks: JobEventCallbacks): Promise<void> {
-    this.callbacks = callbacks;
+  async connect(callbacks?: JobEventCallbacks): Promise<void> {
+    // Only update callbacks if provided
+    if (callbacks) {
+      this.callbacks = { ...this.callbacks, ...callbacks };
+    }
+
+    // If already connected, just update callbacks and return
+    if (this.socket?.connected) {
+      // ...existing code...
+      return;
+    }
 
     try {
+      // Ensure callbacks object exists
+      if (!this.callbacks) {
+        this.callbacks = {};
+      }
+
       const token = await getAccessToken();
       if (!token) {
         throw new Error("No authentication token found");
@@ -48,20 +64,26 @@ export class JobEventsService {
         this.socket.disconnect();
       }
 
-      const apiUrl = process.env.EXPO_PUBLIC_API_URL || "";
+      let apiUrl = process.env.EXPO_PUBLIC_API_URL || "";
+      // Remove /api/v1 or /v1/api for socket connection
+      apiUrl = apiUrl.replace(/\/api\/v1$/, "").replace(/\/v1\/api$/, "");
+
       this.socket = io(apiUrl, {
         auth: { token },
         transports: ["websocket"],
         reconnection: true,
-        reconnectionDelay: 1000,
+        reconnectionDelay: 2000,
+        reconnectionDelayMax: 10000,
         reconnectionAttempts: this.maxReconnectAttempts,
       });
 
       this.setupEventListeners();
-      this.setConnectionStatus("connected");
+      // Don't set status to "connected" here - let the socket event handle it
     } catch (error) {
       this.setConnectionStatus("disconnected");
-      this.callbacks.onError?.(error as Error);
+      if (this.callbacks?.onError) {
+        this.callbacks.onError(error as Error);
+      }
       throw error;
     }
   }
@@ -70,26 +92,28 @@ export class JobEventsService {
     if (!this.socket) return;
 
     this.socket.on("connect", () => {
-      console.log("Job events socket connected");
+      // ...existing code...
       this.setConnectionStatus("connected");
       this.reconnectAttempts = 0;
     });
 
     this.socket.on("disconnect", () => {
-      console.log("Job events socket disconnected");
+      // ...existing code...
       this.setConnectionStatus("disconnected");
     });
 
     this.socket.on("connect_error", (error) => {
-      console.error("Job events socket connection error:", error);
+      // ...existing code...
       this.setConnectionStatus("reconnecting");
-      this.callbacks.onError?.(new Error("Connection error"));
+      if (this.callbacks?.onError) {
+        this.callbacks.onError(new Error("Connection error"));
+      }
     });
 
     // Listen for job.assigned event
     this.socket.on("job.assigned", (data: any) => {
       try {
-        console.log("Received job.assigned event:", data);
+        // ...existing code...
 
         // Map backend event to IncomingJobOffer format
         const job: IncomingJobOffer = {
@@ -102,46 +126,60 @@ export class JobEventsService {
           distanceKm: data.distance || data.distanceKm,
         };
 
-        this.callbacks.onJobAssigned?.(job);
+        if (this.callbacks?.onJobAssigned) {
+          this.callbacks.onJobAssigned(job);
+        }
         this.reconnectAttempts = 0;
       } catch (error) {
-        console.error("Error handling job.assigned event:", error);
-        this.callbacks.onError?.(new Error("Failed to process job assignment"));
+        // ...existing code...
+        if (this.callbacks?.onError) {
+          this.callbacks.onError(new Error("Failed to process job assignment"));
+        }
       }
     });
 
     // Listen for job.updated event
     this.socket.on("job.updated", (data: any) => {
       try {
-        console.log("Received job.updated event:", data);
-        this.callbacks.onJobUpdated?.(data.id, data.status);
+        // ...existing code...
+        if (this.callbacks?.onJobUpdated) {
+          this.callbacks.onJobUpdated(data.id, data.status);
+        }
       } catch (error) {
-        console.error("Error handling job.updated event:", error);
-        this.callbacks.onError?.(new Error("Failed to process job update"));
+        // ...existing code...
+        if (this.callbacks?.onError) {
+          this.callbacks.onError(new Error("Failed to process job update"));
+        }
       }
     });
 
     // Listen for job.cancelled event
     this.socket.on("job.cancelled", (data: any) => {
       try {
-        console.log("Received job.cancelled event:", data);
-        this.callbacks.onJobCancelled?.(data.id);
+        // ...existing code...
+        if (this.callbacks?.onJobCancelled) {
+          this.callbacks.onJobCancelled(data.id);
+        }
       } catch (error) {
-        console.error("Error handling job.cancelled event:", error);
-        this.callbacks.onError?.(
-          new Error("Failed to process job cancellation"),
-        );
+        // ...existing code...
+        if (this.callbacks?.onError) {
+          this.callbacks.onError(
+            new Error("Failed to process job cancellation"),
+          );
+        }
       }
     });
   }
 
   private handleReconnect(): void {
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.error("Max reconnect attempts reached");
+      // ...existing code...
       this.setConnectionStatus("failed");
-      this.callbacks.onError?.(
-        new Error("Connection failed after maximum retry attempts"),
-      );
+      if (this.callbacks?.onError) {
+        this.callbacks.onError(
+          new Error("Connection failed after maximum retry attempts"),
+        );
+      }
       return;
     }
 
@@ -176,11 +214,56 @@ export class JobEventsService {
   }
 
   /**
+   * Update callbacks without reconnecting
+   */
+  updateCallbacks(callbacks: JobEventCallbacks): void {
+    this.callbacks = { ...this.callbacks, ...callbacks };
+  }
+
+  /**
    * Join a specific order/job room for granular updates
    */
   joinOrderRoom(orderId: string) {
     if (this.socket && orderId) {
       this.socket.emit("joinOrderRoom", { orderId });
     }
+  }
+
+  /**
+   * Send location update via the shared socket
+   */
+  sendLocationUpdate(lat: number, lng: number): boolean {
+    if (this.socket && this.connectionStatus === "connected") {
+      this.socket.emit("rider_location_update", { lat, lng });
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Send batch location updates via the shared socket
+   */
+  sendLocationBatch(
+    locations: Array<{ lat: number; lng: number; timestamp: number }>,
+  ): boolean {
+    if (this.socket && this.connectionStatus === "connected") {
+      this.socket.emit("rider_location_batch", { locations });
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Get the socket instance for direct access if needed
+   */
+  getSocket(): Socket | null {
+    return this.socket;
+  }
+
+  /**
+   * Check if socket is connected
+   */
+  isConnected(): boolean {
+    return this.connectionStatus === "connected" && this.socket !== null;
   }
 }

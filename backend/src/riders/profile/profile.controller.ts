@@ -20,7 +20,7 @@ import { UpdatePersonalInfoDto } from '../dto/update-personal-info.dto';
 import { FileInterceptor } from '@nestjs/platform-express';
 
 @Controller({
-  path: 'riders/profile',
+  path: 'rider/profile',
   version: '1',
 })
 export class ProfileController {

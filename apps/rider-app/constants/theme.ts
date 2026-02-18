@@ -35,6 +35,7 @@ export const Colors = {
     statusSuccess: "#10B981",
     statusNeutral: "#6B7280",
     statusError: "#EF4444",
+    statusWarning: "#FACC15",
 
     // Navigation & icons
     iconDefault: "#6B7280",
@@ -66,6 +67,7 @@ export const Colors = {
     statusSuccess: "#34D399",
     statusNeutral: "#9CA3AF",
     statusError: "#F87171",
+    statusWarning: "#FACC15",
 
     // Navigation & icons
     iconDefault: "#9CA3AF",

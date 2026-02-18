@@ -72,7 +72,7 @@ export default function OrdersScreen() {
         }
         setPagination(response.pagination);
       } catch (error) {
-        console.error("Error fetching jobs:", error);
+        // ...existing code...
         Toast.show({
           type: "error",
           text1: "Failed to fetch jobs",
@@ -173,7 +173,7 @@ export default function OrdersScreen() {
 
   return (
     <ThemedView style={[styles.container, { backgroundColor: surface }]}>
-      <ThemedText type="title" style={styles.pageTitle}>
+      <ThemedText type="subtitle" style={styles.pageTitle}>
         Orders
       </ThemedText>
 
@@ -241,7 +241,7 @@ const styles = StyleSheet.create({
     paddingTop: 16,
   },
   pageTitle: {
-    fontSize: 28,
+    fontSize: 24,
     marginBottom: 16,
   },
   cardsList: {

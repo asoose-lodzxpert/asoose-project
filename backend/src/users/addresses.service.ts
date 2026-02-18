@@ -98,7 +98,9 @@ export class AddressesService {
           street: this.sanitizeString(data.street),
           city: sanitizedCity,
           state: sanitizedState,
-          label: data.label ? this.sanitizeString(data.label) : 'Delivery Location',
+          label: data.label
+            ? this.sanitizeString(data.label)
+            : 'Delivery Location',
           isDefault: data.isDefault || false,
           lat: data.lat,
           lng: data.lng,

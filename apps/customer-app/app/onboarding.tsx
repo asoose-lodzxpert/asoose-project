@@ -1,28 +1,30 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useRouter } from "expo-router";
 import React, { useRef, useState } from "react";
 import {
-  View,
-  StyleSheet,
+  Dimensions,
   FlatList,
   Image,
-  Dimensions,
   Pressable,
+  StyleSheet,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
 
-import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
+import { ThemedView } from "@/components/themed-view";
 import { IconSymbol, IconSymbolName } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
 
 const { width } = Dimensions.get("window");
+const ONBOARDING_KEY = "asoose_customer_onboarded";
 
 type Step = {
   key: string;
   content: React.ReactNode;
 };
 
-export default function OnboardingScreen({ onDone }: { onDone?: () => void }) {
+export default function OnboardingScreen() {
   const router = useRouter();
   const [index, setIndex] = useState(0);
   const ref = useRef<FlatList>(null);
@@ -80,7 +82,7 @@ export default function OnboardingScreen({ onDone }: { onDone?: () => void }) {
           <CategoryCard
             icon="fork.knife"
             title="Order Food & More"
-            description="Restaurants and essentials delivered fast"
+            description="Stores and essentials delivered fast"
           />
           <CategoryCard
             icon="car.fill"
@@ -99,9 +101,15 @@ export default function OnboardingScreen({ onDone }: { onDone?: () => void }) {
 
   const isLastStep = index === steps.length - 1;
 
-  const handleFinish = () => {
-    if (onDone) onDone();
-    else router.replace("/(auth)/login");
+  const handleFinish = async () => {
+    try {
+      await AsyncStorage.setItem(ONBOARDING_KEY, "true");
+      router.replace("/(auth)/login");
+    } catch (error) {
+      console.error("Failed to save onboarding status:", error);
+      // Navigate anyway
+      router.replace("/(auth)/login");
+    }
   };
 
   const next = () => {

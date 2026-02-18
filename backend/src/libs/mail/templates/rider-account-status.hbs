@@ -1,0 +1,108 @@
+<html>
+  <head>
+    <meta charset='utf-8' />
+    <meta name='viewport' content='width=device-width, initial-scale=1.0' />
+    <title>Account Status Update</title>
+  </head>
+  <body
+    style='margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;'
+  >
+    <table
+      width='100%'
+      cellpadding='0'
+      cellspacing='0'
+      style='background-color: #f4f4f4; padding: 20px;'
+    >
+      <tr>
+        <td align='center'>
+          <table
+            width='600'
+            cellpadding='0'
+            cellspacing='0'
+            style='background-color: #ffffff; border-radius: 8px; overflow: hidden;'
+          >
+            <!-- Header -->
+            <tr>
+              <td
+                style='background-color: #E5A503; padding: 30px; text-align: center;'
+              >
+                <h1 style='color: #ffffff; margin: 0; font-size: 24px;'>Account
+                  Status Update</h1>
+              </td>
+            </tr>
+
+            <!-- Content -->
+            <tr>
+              <td style='padding: 40px 30px;'>
+                <p
+                  style='color: #333333; font-size: 16px; line-height: 1.6; margin-bottom: 20px;'
+                >
+                  Dear
+                  {{riderName}},
+                </p>
+
+                <p
+                  style='color: #333333; font-size: 16px; line-height: 1.6; margin-bottom: 20px;'
+                >
+                  {{#if isActive}}
+                    We are pleased to inform you that your delivery account has
+                    been reactivated. You can now resume accepting delivery
+                    requests.
+                  {{else if isSuspended}}
+                    We are writing to inform you that your delivery account has
+                    been temporarily suspended. This may be due to policy
+                    violations or account review.
+                  {{else if isBanned}}
+                    We regret to inform you that your delivery account has been
+                    permanently banned from our platform. This decision is
+                    final.
+                  {{/if}}
+                </p>
+
+                {{#unless isActive}}
+                  <p
+                    style='color: #333333; font-size: 16px; line-height: 1.6; margin-bottom: 20px;'
+                  >
+                    <strong>Reason:</strong>
+                    {{reason}}
+                  </p>
+
+                  <p
+                    style='color: #666666; font-size: 14px; line-height: 1.6; margin-bottom: 20px;'
+                  >
+                    If you believe this action was taken in error or have
+                    questions about the decision, please contact our support
+                    team for more information.
+                  </p>
+                {{/unless}}
+
+                <p
+                  style='color: #333333; font-size: 16px; line-height: 1.6; margin-bottom: 30px;'
+                >
+                  Best regards,
+                  <br />
+                  The Asoose Support Team
+                </p>
+              </td>
+            </tr>
+
+            <!-- Footer -->
+            <tr>
+              <td
+                style='background-color: #f4f4f4; padding: 20px; text-align: center; border-top: 1px solid #e0e0e0;'
+              >
+                <p style='color: #999999; font-size: 12px; margin: 0;'>
+                  This is an automated notification. Please do not reply to this
+                  email.
+                </p>
+                <p style='color: #999999; font-size: 12px; margin: 5px 0 0 0;'>
+                  Asoose Platform
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

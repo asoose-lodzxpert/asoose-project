@@ -30,12 +30,23 @@ import { useThemeColor } from "@/hooks/use-theme-color";
 import { fetchStoreBySlug } from "@/services/store.service";
 import type { StoreData } from "@/types/store-types";
 
-import { useToast } from "@/components/ui/ThemedToast";
 import { useCart } from "@/context/CartContext";
+import Toast from "react-native-toast-message";
+import { ModifierSelectionModal } from "@/components/ModifierSelectionModal";
+import type { ModifierGroup } from "@/components/ModifierSelectionModal";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 type TabType = "all" | "favorites" | "info";
+
+interface ProductWithModifiers {
+  id: string;
+  name: string;
+  price: number;
+  description?: string;
+  images?: string[];
+  modifierGroups?: ModifierGroup[];
+}
 
 export default function StoreScreen() {
   const { slug } = useLocalSearchParams<{ slug?: string }>();
@@ -47,11 +58,16 @@ export default function StoreScreen() {
   const [error, setError] = useState<string | null>(null);
   const [reviewModalVisible, setReviewModalVisible] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
-  const retryTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+  const retryTimeoutRef = React.useRef<number | null>(null);
 
   const [currentTab, setCurrentTab] = useState<TabType>("all");
   const [activeCategory, setActiveCategory] = useState("Popular");
   const [searchValue, setSearchValue] = useState("");
+
+  // Modifier modal state
+  const [showModifierModal, setShowModifierModal] = useState(false);
+  const [selectedProduct, setSelectedProduct] =
+    useState<ProductWithModifiers | null>(null);
 
   const border = useThemeColor({}, "borderDefault");
   const surfaceSubtle = useThemeColor({}, "surfaceSubtle");
@@ -134,12 +150,20 @@ export default function StoreScreen() {
     currentTab === "favorites" ? favorites : (storeData?.products ?? []);
 
   const { addItem } = useCart();
-  const showToast = useToast();
   const handleAddToCart = useCallback(
     async (productId: string) => {
       if (!storeData) return;
       const product = storeData.products.find((p) => p.id === productId);
       if (!product) return;
+
+      // Check if product has modifiers
+      if (product.modifierGroups && product.modifierGroups.length > 0) {
+        setSelectedProduct(product as ProductWithModifiers);
+        setShowModifierModal(true);
+        return;
+      }
+
+      // No modifiers, add directly
       try {
         await addItem({
           id: product.id,
@@ -156,15 +180,78 @@ export default function StoreScreen() {
           available: true,
         });
       } catch (e) {
-        showToast({
-          variant: "error",
-          message:
+        Toast.show({
+          type: "error",
+          text1:
             "Could not add to cart. Please try again." +
             (e instanceof Error ? e.message : ""),
         });
       }
     },
-    [addItem, storeData, showToast],
+    [addItem, storeData],
+  );
+
+  const handleModifierConfirm = useCallback(
+    async (selectedModifiersMap: { [groupId: string]: string[] }) => {
+      if (!selectedProduct || !storeData) return;
+
+      try {
+        // Convert selectedModifiersMap to ModifierGroupSelection[] format
+        const modifierGroups = (selectedProduct.modifierGroups || []).map(
+          (group) => {
+            const selectedModifierIds = selectedModifiersMap[group.id] || [];
+            const selectedModifiers = group.modifiers
+              .filter((m) => selectedModifierIds.includes(m.id))
+              .map((m) => ({
+                id: m.id,
+                name: m.name,
+                price: m.price,
+              }));
+
+            return {
+              id: group.id,
+              name: group.name,
+              selectedModifiers,
+            };
+          },
+        );
+
+        await addItem({
+          id: selectedProduct.id,
+          name: selectedProduct.name,
+          image:
+            Array.isArray(selectedProduct.images) &&
+            selectedProduct.images.length > 0
+              ? selectedProduct.images[0]
+              : null,
+          price: selectedProduct.price,
+          qty: 1,
+          vendorId: storeData.id,
+          description:
+            typeof selectedProduct.description === "string"
+              ? selectedProduct.description
+              : "",
+          available: true,
+          modifierGroups,
+        });
+
+        Toast.show({
+          type: "success",
+          text1: "Added to cart",
+          text2: `${selectedProduct.name} with modifiers added to your cart`,
+        });
+
+        setShowModifierModal(false);
+        setSelectedProduct(null);
+      } catch (e) {
+        Toast.show({
+          type: "error",
+          text1: "Could not add to cart. Please try again.",
+          text2: e instanceof Error ? e.message : "",
+        });
+      }
+    },
+    [selectedProduct, storeData, addItem],
   );
 
   /* ---------------- Skeleton Components ---------------- */
@@ -359,6 +446,21 @@ export default function StoreScreen() {
       </ScrollView>
 
       <FloatingCart />
+
+      {selectedProduct && (
+        <ModifierSelectionModal
+          visible={showModifierModal}
+          modifierGroups={selectedProduct.modifierGroups || []}
+          basePrice={selectedProduct.price}
+          quantity={1}
+          productName={selectedProduct.name}
+          onConfirm={handleModifierConfirm}
+          onCancel={() => {
+            setShowModifierModal(false);
+            setSelectedProduct(null);
+          }}
+        />
+      )}
 
       {storeData && (
         <ReviewModal

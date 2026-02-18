@@ -1,3 +1,19 @@
+import React, { useCallback, useEffect, useState, useRef } from "react";
+import {
+  View,
+  StyleSheet,
+  ScrollView,
+  Pressable,
+  RefreshControl,
+  ActivityIndicator,
+  Modal,
+  KeyboardAvoidingView,
+  Platform,
+  Keyboard,
+} from "react-native";
+import { useRouter } from "expo-router";
+import Toast from "react-native-toast-message";
+
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { ThemedInput } from "@/components/ThemedInput";
@@ -8,280 +24,412 @@ import {
   updateBankAccount,
 } from "@/services/bank-account.service";
 import type { BankAccount } from "@/types/bank-account";
-import { useRouter } from "expo-router";
-import React, { useCallback, useEffect, useState } from "react";
-import {
-  Animated,
-  Pressable,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  View,
-} from "react-native";
-import Toast from "react-native-toast-message";
-
-// Skeleton loader component
-const SkeletonBox = ({
-  width,
-  height,
-  radius = 8,
-}: {
-  width: number | string;
-  height: number;
-  radius?: number;
-}) => {
-  const opacity = React.useRef(new Animated.Value(0.3)).current;
-
-  React.useEffect(() => {
-    const animation = Animated.loop(
-      Animated.sequence([
-        Animated.timing(opacity, {
-          toValue: 0.7,
-          duration: 800,
-          useNativeDriver: true,
-        }),
-        Animated.timing(opacity, {
-          toValue: 0.3,
-          duration: 800,
-          useNativeDriver: true,
-        }),
-      ]),
-    );
-    animation.start();
-    return () => animation.stop();
-  }, [opacity]);
-
-  return (
-    <Animated.View
-      style={[
-        {
-          height,
-          backgroundColor: "#E5E7EB",
-          borderRadius: radius,
-          opacity,
-        },
-        typeof width === "number" ? { width } : { width: width as any },
-      ]}
-    />
-  );
-};
-
-const BankCardSkeleton = ({ border }: { border: string }) => {
-  return (
-    <View style={[styles.card, { borderColor: border }]}>
-      <View style={styles.field}>
-        <SkeletonBox width={80} height={16} />
-        <SkeletonBox width="100%" height={48} radius={12} />
-      </View>
-      <View style={styles.field}>
-        <SkeletonBox width={75} height={16} />
-        <SkeletonBox width="100%" height={48} radius={12} />
-      </View>
-      <View style={styles.field}>
-        <SkeletonBox width={110} height={16} />
-        <SkeletonBox width="100%" height={48} radius={12} />
-      </View>
-      <View style={styles.field}>
-        <SkeletonBox width={95} height={16} />
-        <SkeletonBox width="100%" height={48} radius={12} />
-      </View>
-    </View>
-  );
-};
 
 export default function PaymentMethodsScreen() {
   const router = useRouter();
+  const isMountedRef = useRef(true);
+
   const primary = useThemeColor({}, "brandPrimary");
   const surface = useThemeColor({}, "surfaceBackground");
   const border = useThemeColor({}, "borderDefault");
+  const textSecondary = useThemeColor({}, "textSecondary");
+  const cardBg = useThemeColor({}, "surfaceCard");
+  const statusError = "#EF4444";
 
   const [bankAccount, setBankAccount] = useState<BankAccount | null>(null);
+  const [tempAccount, setTempAccount] = useState<BankAccount | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const fetchBankAccount = useCallback(async () => {
     try {
-      setLoading(true);
+      if (!refreshing) setLoading(true);
       const account = await getBankAccount();
       setBankAccount(account);
-    } catch (error: any) {
-      Toast.show({
-        type: "error",
-        text1: "Failed to load bank account",
-        text2: error.message || "Please try again",
-      });
+      setTempAccount(account);
+    } catch {
+      Toast.show({ type: "error", text1: "Failed to load account" });
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [refreshing]);
 
   useEffect(() => {
     fetchBankAccount();
   }, [fetchBankAccount]);
 
-  const onRefresh = useCallback(() => {
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  const onRefresh = () => {
     setRefreshing(true);
     fetchBankAccount();
-  }, [fetchBankAccount]);
+  };
 
-  const updateAccount = (key: keyof BankAccount, value: string) => {
-    if (bankAccount) {
-      setBankAccount({ ...bankAccount, [key]: value });
+  const handleEditToggle = () => {
+    if (editing) {
+      setTempAccount(bankAccount);
+      setEditing(false);
+      setErrors({});
+    } else {
+      setEditing(true);
+      setTempAccount(
+        bankAccount ||
+          ({
+            id: "",
+            bankName: "",
+            accountNumber: "",
+            accountName: "",
+            bankCode: "",
+            riderId: "",
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          } as BankAccount),
+      );
+      setErrors({});
     }
+  };
+
+  const validateFields = () => {
+    const newErrors: Record<string, string> = {};
+
+    if (!tempAccount?.bankName?.trim()) {
+      newErrors.bankName = "Bank name is required";
+    }
+
+    if (!tempAccount?.accountNumber?.trim()) {
+      newErrors.accountNumber = "Account number is required";
+    } else if (tempAccount.accountNumber.length !== 10) {
+      newErrors.accountNumber = "Account number must be exactly 10 digits";
+    } else if (!/^\d+$/.test(tempAccount.accountNumber)) {
+      newErrors.accountNumber = "Account number must contain only digits";
+    }
+
+    if (!tempAccount?.accountName?.trim()) {
+      newErrors.accountName = "Account name is required";
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
   const saveChanges = async () => {
-    if (!bankAccount) return;
+    Keyboard.dismiss();
+
+    if (!tempAccount) {
+      Toast.show({ type: "error", text1: "No account data" });
+      return;
+    }
+
+    // Validate all fields
+    if (!validateFields()) {
+      Toast.show({ type: "error", text1: "Please fix validation errors" });
+      return;
+    }
+
+    setIsSaving(true);
 
     try {
-      const updatedAccount = await updateBankAccount({
-        bankName: bankAccount.bankName,
-        bankCode: bankAccount.bankCode,
-        accountNumber: bankAccount.accountNumber,
-        accountName: bankAccount.accountName,
-      });
+      // Only send fields the backend expects
+      const payload = {
+        bankName: tempAccount.bankName,
+        accountNumber: tempAccount.accountNumber,
+        accountName: tempAccount.accountName,
+        ...(tempAccount.bankCode && { bankCode: tempAccount.bankCode }),
+      };
 
-      setBankAccount(updatedAccount);
-      Toast.show({
-        type: "success",
-        text1: "Saved",
-        text2: "Bank account updated successfully",
-      });
-      setEditing(false);
+      const updated = await updateBankAccount(payload as BankAccount);
+      if (isMountedRef.current) {
+        setBankAccount(updated);
+        setTempAccount(updated);
+        setEditing(false);
+        Toast.show({ type: "success", text1: "Bank details updated" });
+        setTimeout(() => {
+          router.back();
+        }, 500);
+      }
     } catch (error: any) {
+      console.warn("Save error:", error);
       Toast.show({
         type: "error",
         text1: "Update failed",
-        text2: error.message || "Failed to update bank account",
+        text2: error?.message || "Please try again",
       });
+    } finally {
+      if (isMountedRef.current) {
+        setIsSaving(false);
+      }
     }
   };
 
+  const renderDataRow = (label: string, value: string, icon: any) => (
+    <View style={[styles.dataRow, { borderBottomColor: border }]}>
+      <IconSymbol
+        name={icon}
+        size={20}
+        color={textSecondary}
+        style={styles.rowIcon}
+      />
+      <View style={{ flex: 1 }}>
+        <ThemedText style={[styles.label, { color: textSecondary }]}>
+          {label}
+        </ThemedText>
+        <ThemedText type="defaultSemiBold" style={styles.value}>
+          {value || "Not set"}
+        </ThemedText>
+      </View>
+    </View>
+  );
+
   return (
     <ThemedView style={[styles.container, { backgroundColor: surface }]}>
-      {/* Header */}
-      <View style={[styles.header, { borderBottomColor: primary + "40" }]}>
-        <Pressable
-          onPress={() => router.back()}
-          style={{ flexDirection: "row", alignItems: "center" }}
-        >
-          <IconSymbol name="chevron.left" size={24} color={primary} />
-          <ThemedText
-            style={{ color: primary, marginLeft: 4, fontWeight: "500" }}
-          >
-            Back
+      {/* HEADER */}
+      <View style={[styles.header, { borderBottomColor: border }]}>
+        <View style={styles.headerSide}>
+          {editing ? (
+            <Pressable
+              onPress={handleEditToggle}
+              hitSlop={20}
+              style={({ pressed }) => [
+                styles.clickableArea,
+                { opacity: pressed ? 0.5 : 1 },
+              ]}
+            >
+              <ThemedText style={{ color: statusError, fontWeight: "600" }}>
+                Cancel
+              </ThemedText>
+            </Pressable>
+          ) : (
+            <Pressable
+              onPress={() => router.back()}
+              hitSlop={20}
+              style={({ pressed }) => [
+                styles.backBtn,
+                styles.clickableArea,
+                { opacity: pressed ? 0.5 : 1 },
+              ]}
+            >
+              <IconSymbol name="chevron.left" size={24} color={primary} />
+            </Pressable>
+          )}
+        </View>
+
+        <View style={styles.titleContainer}>
+          <ThemedText type="subtitle" style={styles.headerTitle}>
+            Bank Details
           </ThemedText>
-        </Pressable>
-        <ThemedText type="subtitle" style={{ flex: 1, textAlign: "center" }}>
-          Bank Account
-        </ThemedText>
-        {!loading && bankAccount && (
-          <Pressable
-            onPress={() => {
-              if (editing) {
-                saveChanges();
-              } else {
-                setEditing(true);
-              }
-            }}
-          >
-            <ThemedText style={{ color: primary, fontWeight: "600" }}>
-              {editing ? "Save" : "Edit"}
-            </ThemedText>
-          </Pressable>
-        )}
-        {!bankAccount && !loading && <View style={{ width: 40 }} />}
+        </View>
+
+        <View style={[styles.headerSide, { alignItems: "flex-end" }]}>
+          {!loading && (
+            <Pressable
+              onPress={editing ? saveChanges : handleEditToggle}
+              disabled={isSaving}
+              hitSlop={20}
+              style={({ pressed }) => [
+                styles.clickableArea,
+                { opacity: pressed || isSaving ? 0.5 : 1 },
+              ]}
+            >
+              {isSaving ? (
+                <ActivityIndicator size="small" color={primary} />
+              ) : (
+                <ThemedText style={{ color: primary, fontWeight: "700" }}>
+                  {editing ? "Done" : "Edit"}
+                </ThemedText>
+              )}
+            </Pressable>
+          )}
+        </View>
       </View>
 
-      <ScrollView
-        contentContainerStyle={{ padding: 20, gap: 20 }}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            colors={[primary]}
-          />
-        }
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        style={{ flex: 1 }}
       >
-        {loading && !bankAccount ? (
-          <BankCardSkeleton border={border} />
-        ) : bankAccount ? (
-          <View style={[styles.card, { borderColor: primary }]}>
-            <Field label="Bank Name">
-              <ThemedInput
-                placeholder="Bank Name"
-                value={bankAccount.bankName}
-                onChangeText={(v) => updateAccount("bankName", v)}
-                editable={editing}
-              />
-            </Field>
-            <Field label="Bank Code">
-              <ThemedInput
-                placeholder="e.g., 044 (Optional)"
-                value={bankAccount.bankCode || ""}
-                onChangeText={(v) => updateAccount("bankCode", v)}
-                editable={editing}
-                keyboardType="numeric"
-              />
-            </Field>
-            <Field label="Account Number">
-              <ThemedInput
-                placeholder="1234567890"
-                value={bankAccount.accountNumber}
-                onChangeText={(v) => updateAccount("accountNumber", v)}
-                editable={editing}
-                keyboardType="numeric"
-              />
-            </Field>
-            <Field label="Account Name">
-              <ThemedInput
-                placeholder="John Smith"
-                value={bankAccount.accountName}
-                onChangeText={(v) => updateAccount("accountName", v)}
-                editable={editing}
-              />
-            </Field>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="always"
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={primary}
+            />
+          }
+        >
+          {loading ? (
+            <ActivityIndicator
+              size="large"
+              color={primary}
+              style={{ marginTop: 50 }}
+            />
+          ) : editing ? (
+            <View style={styles.formContainer}>
+              <View style={styles.inputGap}>
+                <ThemedText type="defaultSemiBold">Bank Name</ThemedText>
+                <ThemedInput
+                  value={tempAccount?.bankName || ""}
+                  onChangeText={(v) => {
+                    setTempAccount(
+                      (p) =>
+                        ({
+                          ...(p || {}),
+                          bankName: v,
+                        }) as BankAccount,
+                    );
+                    if (errors.bankName) {
+                      setErrors((prev) => {
+                        const next = { ...prev };
+                        delete next.bankName;
+                        return next;
+                      });
+                    }
+                  }}
+                  placeholder="Enter bank name"
+                />
+                {errors.bankName && (
+                  <ThemedText
+                    style={{ color: statusError, fontSize: 12, marginTop: 4 }}
+                  >
+                    {errors.bankName}
+                  </ThemedText>
+                )}
+              </View>
 
-            <View style={styles.infoBox}>
-              <IconSymbol name="info.circle" size={20} color={primary} />
-              <ThemedText style={styles.infoText}>
-                This is your default withdrawal account. All earnings will be
-                transferred here.
-              </ThemedText>
+              <View style={styles.inputGap}>
+                <ThemedText type="defaultSemiBold">Account Number</ThemedText>
+                <ThemedInput
+                  value={tempAccount?.accountNumber || ""}
+                  onChangeText={(v) => {
+                    const numOnly = v.replace(/[^0-9]/g, "").slice(0, 10);
+                    setTempAccount(
+                      (p) =>
+                        ({
+                          ...(p || {}),
+                          accountNumber: numOnly,
+                        }) as BankAccount,
+                    );
+                    if (errors.accountNumber) {
+                      setErrors((prev) => {
+                        const next = { ...prev };
+                        delete next.accountNumber;
+                        return next;
+                      });
+                    }
+                  }}
+                  keyboardType="number-pad"
+                  maxLength={10}
+                  placeholder="10 digit NUBAN"
+                />
+                {errors.accountNumber && (
+                  <ThemedText
+                    style={{ color: statusError, fontSize: 12, marginTop: 4 }}
+                  >
+                    {errors.accountNumber}
+                  </ThemedText>
+                )}
+                {tempAccount?.accountNumber && !errors.accountNumber && (
+                  <ThemedText
+                    style={{ color: "#10B981", fontSize: 12, marginTop: 4 }}
+                  >
+                    ✓ {tempAccount.accountNumber.length}/10 digits
+                  </ThemedText>
+                )}
+              </View>
+
+              <View style={styles.inputGap}>
+                <ThemedText type="defaultSemiBold">Account Name</ThemedText>
+                <ThemedInput
+                  value={tempAccount?.accountName || ""}
+                  onChangeText={(v) => {
+                    setTempAccount(
+                      (p) =>
+                        ({
+                          ...(p || {}),
+                          accountName: v,
+                        }) as BankAccount,
+                    );
+                    if (errors.accountName) {
+                      setErrors((prev) => {
+                        const next = { ...prev };
+                        delete next.accountName;
+                        return next;
+                      });
+                    }
+                  }}
+                  placeholder="Enter account name"
+                  returnKeyType="done"
+                  onSubmitEditing={saveChanges}
+                />
+                {errors.accountName && (
+                  <ThemedText
+                    style={{ color: statusError, fontSize: 12, marginTop: 4 }}
+                  >
+                    {errors.accountName}
+                  </ThemedText>
+                )}
+              </View>
+
+              <Pressable
+                onPress={saveChanges}
+                disabled={isSaving || Object.keys(errors).length > 0}
+                style={({ pressed }) => [
+                  styles.doneButton,
+                  {
+                    backgroundColor: primary,
+                    opacity:
+                      pressed || isSaving || Object.keys(errors).length > 0
+                        ? 0.7
+                        : 1,
+                  },
+                ]}
+              >
+                <ThemedText style={styles.doneButtonText}>
+                  {isSaving ? "Saving..." : "Update Account"}
+                </ThemedText>
+              </Pressable>
             </View>
-          </View>
-        ) : (
-          <View style={styles.emptyState}>
-            <IconSymbol name="creditcard" size={48} color="#9CA3AF" />
-            <ThemedText type="subtitle" style={{ color: "#6B7280" }}>
-              No Bank Account
-            </ThemedText>
-            <ThemedText style={{ color: "#9CA3AF", textAlign: "center" }}>
-              You haven&apos;t added a bank account yet. Contact support to add
-              your withdrawal account.
-            </ThemedText>
-          </View>
-        )}
-      </ScrollView>
-    </ThemedView>
-  );
-}
+          ) : (
+            <View style={styles.viewContainer}>
+              {renderDataRow(
+                "Bank Name",
+                bankAccount?.bankName || "",
+                "house.fill",
+              )}
+              {renderDataRow(
+                "Account Number",
+                bankAccount?.accountNumber || "",
+                "creditcard.fill",
+              )}
+              {renderDataRow(
+                "Account Holder",
+                bankAccount?.accountName || "",
+                "person.crop.circle.fill",
+              )}
+            </View>
+          )}
+        </ScrollView>
+      </KeyboardAvoidingView>
 
-/* Field wrapper */
-function Field({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <View style={styles.field}>
-      <ThemedText type="defaultSemiBold">{label}</ThemedText>
-      {children}
-    </View>
+      <Modal visible={isSaving} transparent animationType="fade">
+        <View style={styles.overlayContainer}>
+          <View style={[styles.overlayBox, { backgroundColor: cardBg }]}>
+            <ActivityIndicator size="large" color={primary} />
+            <ThemedText style={styles.overlayText}>
+              Saving bank details...
+            </ThemedText>
+          </View>
+        </View>
+      </Modal>
+    </ThemedView>
   );
 }
 
@@ -290,37 +438,66 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 12,
+    paddingVertical: 14,
     paddingHorizontal: 16,
     borderBottomWidth: 1,
   },
-  card: {
-    padding: 16,
-    borderRadius: 14,
-    borderWidth: 2,
-    borderColor: "#D1D5DB",
-    backgroundColor: "transparent",
-    gap: 12,
+  headerSide: {
+    width: 70,
+    justifyContent: "center",
   },
-  field: { marginTop: 12, gap: 6 },
-  infoBox: {
-    flexDirection: "row",
-    gap: 12,
-    backgroundColor: "#EFF6FF",
-    padding: 12,
-    borderRadius: 10,
-    marginTop: 12,
-  },
-  infoText: {
+  titleContainer: {
     flex: 1,
-    fontSize: 13,
-    color: "#1E40AF",
-    lineHeight: 18,
-  },
-  emptyState: {
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 60,
-    gap: 12,
   },
+  headerTitle: { fontSize: 17, fontWeight: "700" },
+  clickableArea: {
+    paddingVertical: 8,
+    minHeight: 40,
+    justifyContent: "center",
+  },
+  backBtn: { marginLeft: -8 },
+  scrollContent: { padding: 20, paddingBottom: 40 },
+  viewContainer: { gap: 10 },
+  formContainer: { gap: 24 },
+  inputGap: { gap: 8 },
+  dataRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 16,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  rowIcon: { marginRight: 16, opacity: 0.7 },
+  label: {
+    fontSize: 11,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginBottom: 2,
+  },
+  value: { fontSize: 16 },
+  overlayContainer: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  overlayBox: {
+    borderRadius: 16,
+    paddingVertical: 32,
+    paddingHorizontal: 40,
+    alignItems: "center",
+    gap: 16,
+    width: "80%",
+  },
+  overlayText: { fontSize: 15, fontWeight: "600", textAlign: "center" },
+  doneButton: {
+    marginTop: 10,
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: "center",
+    minHeight: 50,
+    justifyContent: "center",
+  },
+  doneButtonText: { color: "#fff", fontSize: 16, fontWeight: "700" },
 });

@@ -12,15 +12,15 @@ import { ThemedText } from "@/components/themed-text";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { useRide } from "@/context/RideContext";
-import { useToast } from "@/components/ui/ThemedToast";
+
 import { RideLocationCard } from "@/components/ride/RideLocationCard";
 import { VehicleTypeSelector } from "@/components/ride/VehicleTypeSelector";
 import { FareEstimateCard } from "@/components/ride/FareEstimateCard";
 import { VehicleType } from "@/types/ride";
+import Toast from "react-native-toast-message";
 
 export default function RideBookingScreen() {
   const router = useRouter();
-  const showToast = useToast();
   const {
     currentRide,
     pageView,
@@ -76,15 +76,15 @@ export default function RideBookingScreen() {
 
   const handleBookRide = async () => {
     if (!pickupLocation || !dropoffLocation) {
-      showToast({
-        message: "Please select both pickup and dropoff locations",
-        variant: "error",
+      Toast.show({
+        text1: "Please select both pickup and dropoff locations",
+        type: "error",
       });
       return;
     }
 
     if (!fareEstimate) {
-      showToast({ message: "Please wait for fare estimate", variant: "error" });
+      Toast.show({ type: "error", text1: "Please wait for fare estimate" });
       return;
     }
 

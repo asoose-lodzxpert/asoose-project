@@ -11,12 +11,13 @@ import { ThemedText } from "@/components/themed-text";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { checkPaymentStatus } from "@/services/payment.service";
-import { useToast } from "@/components/ui/ThemedToast";
+import Toast from "react-native-toast-message";
 
 interface PaymentWebViewProps {
   visible: boolean;
   url: string;
   reference: string;
+  paymentMethod?: string;
   onSuccess: () => void;
   onCancel: () => void;
   onPaymentComplete?: () => void | Promise<void>;
@@ -26,13 +27,13 @@ export function PaymentWebView({
   visible,
   url,
   reference,
+  paymentMethod,
   onSuccess,
   onCancel,
   onPaymentComplete,
 }: PaymentWebViewProps) {
   const [loading, setLoading] = useState(true);
   const [verifying, setVerifying] = useState(false);
-  const showToast = useToast();
 
   const accent = useThemeColor({}, "brandPrimary");
   const surface = useThemeColor({}, "surfaceBackground");
@@ -62,7 +63,10 @@ export function PaymentWebView({
       try {
         if (urlStatus === "success") {
           // Verify payment status with backend for extra security
-          const result = await checkPaymentStatus(urlReference || reference);
+          const result = await checkPaymentStatus(
+            urlReference || reference,
+            paymentMethod as any,
+          );
 
           if (
             result.success ||
@@ -75,9 +79,9 @@ export function PaymentWebView({
             }
             onSuccess();
           } else {
-            showToast({
-              message: "Payment verification failed. Please contact support.",
-              variant: "error",
+            Toast.show({
+              text1: "Payment verification failed. Please contact support.",
+              type: "error",
             });
             onCancel();
           }
@@ -86,9 +90,9 @@ export function PaymentWebView({
         }
       } catch (error) {
         console.error("Payment callback error:", error);
-        showToast({
-          message: "Failed to verify payment. Please contact support.",
-          variant: "error",
+        Toast.show({
+          text1: "Failed to verify payment. Please contact support.",
+          type: "error",
         });
         onCancel();
       } finally {
@@ -103,7 +107,10 @@ export function PaymentWebView({
 
       try {
         // Verify payment status with backend
-        const result = await checkPaymentStatus(reference);
+        const result = await checkPaymentStatus(
+          reference,
+          paymentMethod as any,
+        );
 
         if (
           result.success ||
@@ -126,9 +133,9 @@ export function PaymentWebView({
         // If status is still pending, keep waiting
       } catch (error) {
         console.error("Payment verification error:", error);
-        showToast({
-          message: "Failed to verify payment. Please contact support.",
-          variant: "error",
+        Toast.show({
+          text1: "Failed to verify payment. Please contact support.",
+          type: "error",
         });
         onCancel();
       } finally {
@@ -146,7 +153,10 @@ export function PaymentWebView({
 
       try {
         // Verify payment status with backend
-        const result = await checkPaymentStatus(reference);
+        const result = await checkPaymentStatus(
+          reference,
+          paymentMethod as any,
+        );
 
         if (
           result.success ||
@@ -159,17 +169,17 @@ export function PaymentWebView({
           }
           onSuccess();
         } else {
-          showToast({
-            message: "Payment verification failed. Please contact support.",
-            variant: "error",
+          Toast.show({
+            text1: "Payment verification failed. Please contact support.",
+            type: "error",
           });
           onCancel();
         }
       } catch (error) {
         console.error("Payment verification error:", error);
-        showToast({
-          message: "Failed to verify payment. Please contact support.",
-          variant: "error",
+        Toast.show({
+          text1: "Failed to verify payment. Please contact support.",
+          type: "error",
         });
         onCancel();
       } finally {

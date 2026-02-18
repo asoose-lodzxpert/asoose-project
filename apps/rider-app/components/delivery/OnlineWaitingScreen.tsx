@@ -9,7 +9,7 @@ import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
 
 export default function OnlineWaitingScreen() {
   const { goOffline, activeJob, incomingJob } = useJobs();
-  const { confirm } = useConfirm();
+  const { confirm, ConfirmModal } = useConfirm();
   const primary = useThemeColor({}, "brandPrimary");
   const surface = useThemeColor({}, "surfaceBackground");
 
@@ -55,7 +55,6 @@ export default function OnlineWaitingScreen() {
       </View>
 
       <View style={[styles.bottomCard, { backgroundColor: surface }]}>
-        ...
         <IconSymbol
           name={isRide ? "car" : "package"}
           size={60}
@@ -123,6 +122,7 @@ export default function OnlineWaitingScreen() {
           </Pressable>
         </View>
       </View>
+      <ConfirmModal />
     </View>
   );
 }

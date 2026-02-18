@@ -223,24 +223,43 @@ export class VendorAuthService {
   async sendOtpForPasswordReset(email: string): Promise<void> {
     const normalizedEmail = email.toLowerCase().trim();
 
-    const vendor = await this.prisma.vendor.findUnique({
-      where: { email: normalizedEmail },
-    });
+    // Generate OTP first (before checking if vendor exists)
+    const otp = await this.otpService.generateOtp(normalizedEmail);
 
-    if (!vendor) {
-      throw new NotFoundException(
-        'No account found with this email address. Please check your email or register for a new account.',
+    // Check if vendor exists (optional - email will be sent regardless)
+    let vendorName = 'User';
+    try {
+      const vendor = await this.prisma.vendor.findUnique({
+        where: { email: normalizedEmail },
+      });
+      if (vendor) {
+        vendorName = vendor.name;
+      }
+    } catch (error) {
+      // Vendor may not exist, but we still send email
+      this.appLogger.warn(
+        `Vendor not found for email: ${normalizedEmail}`,
+        error?.stack,
       );
     }
 
-    const otp = await this.otpService.generateOtp(normalizedEmail);
-
-    // Send password reset email using template
-    await this.emailProducer.sendVendorPasswordReset(
-      normalizedEmail,
-      vendor.name,
-      otp,
-    );
+    try {
+      // Send password reset email with OTP
+      await this.emailProducer.sendVendorPasswordReset(
+        normalizedEmail,
+        vendorName,
+        otp, // Pass OTP as resetCode
+      );
+      this.appLogger.log(`Password reset OTP sent to ${normalizedEmail}`);
+    } catch (error) {
+      this.appLogger.error(
+        `Failed to send password reset email to ${normalizedEmail}`,
+        error?.stack,
+        { error },
+      );
+      // Don't throw error to user - for security reasons
+      // Just log it and continue
+    }
   }
 
   async verifyOtp(email: string, otp: string): Promise<boolean> {

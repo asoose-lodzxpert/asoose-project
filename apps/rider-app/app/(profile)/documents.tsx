@@ -1,122 +1,136 @@
 import React, { useState, useEffect, useCallback } from "react";
 import {
+  Modal,
+  Image,
+  Dimensions,
   View,
   StyleSheet,
   ScrollView,
   Pressable,
   RefreshControl,
 } from "react-native";
-
+import Toast from "react-native-toast-message";
 import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
-import { IconSymbol } from "@/components/ui/icon-symbol";
+import { IconSymbol, IconSymbolName } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { useRouter } from "expo-router";
+import { getDocuments, type RiderDocument } from "@/services/documents.service";
 
-type DocumentKey = "id" | "license" | "insurance";
-type DocumentFile = any;
+const { width } = Dimensions.get("window");
 
 export default function DocumentsScreen() {
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const router = useRouter();
+
   const primary = useThemeColor({}, "brandPrimary");
   const surface = useThemeColor({}, "surfaceBackground");
+  const border = useThemeColor({}, "borderDefault");
+  const surfaceSubtle = useThemeColor({}, "surfaceSubtle");
+  const textMuted = useThemeColor({}, "textMuted");
+  const statusSuccess = useThemeColor({}, "statusSuccess");
+  const statusError = useThemeColor({}, "statusError");
+  const statusWarning = useThemeColor({}, "statusWarning");
+  const modalBg = useThemeColor({}, "surfaceSubtle");
+  const cardBg = useThemeColor({}, "surfaceCard");
+  const shadowColor = useThemeColor({}, "surfaceSubtle");
 
-  const [documents, setDocuments] = useState<
-    Record<DocumentKey, DocumentFile | null>
-  >({
-    id: null,
-    license: null,
-    insurance: null,
-  });
-  // Editing is disabled; documents are view-only
+  const [documents, setDocuments] = useState<RiderDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  /* Simulate fetch */
-  useEffect(() => {
-    const timeout = setTimeout(() => {
-      setDocuments({
-        id: null,
-        license: null,
-        insurance: null,
+  const fetchDocuments = useCallback(async () => {
+    try {
+      setLoading(true);
+      const docs = await getDocuments();
+      setDocuments(docs);
+    } catch (error: any) {
+      Toast.show({
+        type: "error",
+        text1: "Failed to load documents",
+        text2: error.message || "Please try again",
       });
+    } finally {
       setLoading(false);
-    }, 1200);
-    return () => clearTimeout(timeout);
+      setRefreshing(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchDocuments();
+  }, [fetchDocuments]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    setTimeout(() => {
-      setDocuments((prev) => ({ ...prev })); // simulate reload
-      setRefreshing(false);
-    }, 1000);
-  }, []);
+    fetchDocuments();
+  }, [fetchDocuments]);
 
-  // Remove pickFile and removeFile logic; view-only
+  const getStatusConfig = (
+    status: string,
+  ): { color: string; icon: IconSymbolName; label: string; bg: string } => {
+    switch (status) {
+      case "VERIFIED":
+        return {
+          color: statusSuccess,
+          icon: "checkmark.seal",
+          label: "Verified",
+          bg: statusSuccess + "20",
+        };
+      case "PENDING":
+        return {
+          color: statusWarning,
+          icon: "clock",
+          label: "Pending Review",
+          bg: statusWarning + "20",
+        };
+      case "REJECTED":
+        return {
+          color: statusError,
+          icon: "exclamationmark.octagon",
+          label: "Rejected",
+          bg: statusError + "20",
+        };
+      default:
+        return {
+          color: textMuted,
+          icon: "doc",
+          label: "Not Provided",
+          bg: surfaceSubtle,
+        };
+    }
+  };
+
+  const renderHeader = () => (
+    <View
+      style={[
+        styles.header,
+        { borderBottomColor: border, backgroundColor: surface },
+      ]}
+    >
+      <Pressable onPress={() => router.back()} style={styles.backButton}>
+        <IconSymbol name="chevron.left" size={24} color={primary} />
+      </Pressable>
+      <ThemedText type="subtitle" style={styles.headerTitle}>
+        My Documents
+      </ThemedText>
+      <View style={{ width: 44 }} />
+    </View>
+  );
 
   if (loading) {
     return (
       <ThemedView style={[styles.container, { backgroundColor: surface }]}>
-        {/* Header */}
-        <View style={[styles.header, { borderBottomColor: primary + "40" }]}>
-          <Pressable
-            onPress={() => router.back()}
-            style={{ flexDirection: "row", alignItems: "center" }}
-          >
-            <IconSymbol name="chevron.left" size={24} color={primary} />
-            <ThemedText
-              style={{ color: primary, marginLeft: 4, fontWeight: "500" }}
-            >
-              Back
-            </ThemedText>
-          </Pressable>
-          <ThemedText type="subtitle" style={{ flex: 1, textAlign: "center" }}>
-            Documents
-          </ThemedText>
-          <View style={{ width: 40 }} />
-        </View>
-        <ScrollView contentContainerStyle={{ padding: 20, gap: 20 }}>
-          {["ID Document", "Driver's License", "Vehicle Insurance"].map(
-            (label, idx) => (
-              <View key={label} style={styles.section}>
-                <ThemedText type="defaultSemiBold">{label}</ThemedText>
-                <View
-                  style={[
-                    styles.uploadCard,
-                    { backgroundColor: "#F3F4F6", borderColor: "#E5E7EB" },
-                  ]}
-                >
-                  <View
-                    style={{
-                      width: 32,
-                      height: 32,
-                      borderRadius: 16,
-                      backgroundColor: "#E5E7EB",
-                    }}
-                  />
-                  <View
-                    style={{
-                      height: 18,
-                      width: 120,
-                      backgroundColor: "#E5E7EB",
-                      borderRadius: 4,
-                      marginTop: 8,
-                    }}
-                  />
-                  <View
-                    style={{
-                      height: 14,
-                      width: 100,
-                      backgroundColor: "#E5E7EB",
-                      borderRadius: 4,
-                      marginTop: 6,
-                    }}
-                  />
-                </View>
-              </View>
-            ),
-          )}
+        {renderHeader()}
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          {[1, 2, 3].map((i) => (
+            <View
+              key={i}
+              style={[
+                styles.docCardSkeleton,
+                { backgroundColor: surfaceSubtle, borderColor: border },
+              ]}
+            />
+          ))}
         </ScrollView>
       </ThemedView>
     );
@@ -124,68 +138,127 @@ export default function DocumentsScreen() {
 
   return (
     <ThemedView style={[styles.container, { backgroundColor: surface }]}>
-      {/* Header */}
-      <View style={[styles.header, { borderBottomColor: primary + "40" }]}>
-        <Pressable
-          onPress={() => router.back()}
-          style={{ flexDirection: "row", alignItems: "center" }}
-        >
-          <IconSymbol name="chevron.left" size={24} color={primary} />
-          <ThemedText
-            style={{ color: primary, marginLeft: 4, fontWeight: "500" }}
-          >
-            Back
-          </ThemedText>
-        </Pressable>
-        <ThemedText type="title" style={{ flex: 1, textAlign: "center" }}>
-          Documents
-        </ThemedText>
-        <View style={{ width: 40 }} />
-      </View>
+      {renderHeader()}
 
       <ScrollView
-        contentContainerStyle={{ padding: 20, gap: 20 }}
+        contentContainerStyle={styles.scrollContent}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={primary}
+          />
         }
       >
-        {[
-          { key: "id", label: "ID Document" },
-          { key: "license", label: "Driver's License" },
-          { key: "insurance", label: "Vehicle Insurance" },
-        ].map(({ key, label }) => {
-          const docKey = key as DocumentKey;
-          const file = documents[docKey];
-          const uploaded = Boolean(file);
+        <View style={[styles.infoBanner, { backgroundColor: surfaceSubtle }]}>
+          <IconSymbol name="info.circle.fill" size={18} color={textMuted} />
+          <ThemedText style={[styles.infoText, { color: textMuted }]}>
+            Documents are managed and uploaded by the administration team.
+          </ThemedText>
+        </View>
+
+        {documents.map((doc) => {
+          const config = getStatusConfig(doc.status);
           return (
-            <View key={key} style={styles.section}>
-              <ThemedText type="defaultSemiBold">{label}</ThemedText>
+            <View
+              key={doc.id}
+              style={[
+                styles.docCard,
+                { borderColor: border, backgroundColor: surface },
+              ]}
+            >
               <View
-                style={[
-                  styles.uploadCard,
-                  uploaded && { borderColor: primary, opacity: 0.9 },
-                ]}
+                style={[styles.iconContainer, { backgroundColor: config.bg }]}
               >
-                <IconSymbol
-                  size={32}
-                  name={uploaded ? "check" : "cloud.upload"}
-                  color={uploaded ? "#22C55E" : "#9CA3AF"}
-                />
-                <ThemedText style={styles.uploadText}>
-                  {uploaded ? "File uploaded successfully" : "No file uploaded"}
-                </ThemedText>
-                <ThemedText style={styles.hintText}>
-                  {uploaded && file
-                    ? (file as any).name ||
-                      (file as any).uri?.split("/").pop() ||
-                      ""
-                    : "PDF, JPG, PNG (max 5MB)"}
-                </ThemedText>
+                <IconSymbol size={24} name={config.icon} color={config.color} />
               </View>
+
+              <View style={styles.docInfo}>
+                <ThemedText type="defaultSemiBold" style={styles.docType}>
+                  {doc.type}
+                </ThemedText>
+                <View style={styles.statusRow}>
+                  <View
+                    style={[
+                      styles.statusDot,
+                      { backgroundColor: config.color },
+                    ]}
+                  />
+                  <ThemedText
+                    style={[styles.statusLabel, { color: config.color }]}
+                  >
+                    {config.label}
+                  </ThemedText>
+                </View>
+              </View>
+
+              {doc.url && (
+                <Pressable
+                  style={[
+                    styles.actionButton,
+                    { backgroundColor: primary + "20" },
+                  ]}
+                  onPress={() => setPreviewUrl(doc.url)}
+                >
+                  <IconSymbol name="eye" size={18} color={primary} />
+                </Pressable>
+              )}
             </View>
           );
         })}
+
+        {documents.length === 0 && (
+          <View style={styles.emptyState}>
+            <IconSymbol name="doc.on.doc" size={48} color={textMuted} />
+            <ThemedText style={{ color: textMuted, marginTop: 12 }}>
+              No documents found
+            </ThemedText>
+          </View>
+        )}
       </ScrollView>
+
+      {/* Modern Preview Modal */}
+      <Modal
+        visible={!!previewUrl}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPreviewUrl(null)}
+      >
+        <View style={[styles.modalOverlay, { backgroundColor: modalBg }]}>
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => setPreviewUrl(null)}
+          />
+          <View
+            style={[
+              styles.modalContainer,
+              { backgroundColor: cardBg, shadowColor },
+            ]}
+          >
+            <View style={styles.modalHeader}>
+              <ThemedText type="defaultSemiBold">Document Preview</ThemedText>
+              <Pressable
+                onPress={() => setPreviewUrl(null)}
+                style={styles.closeBtn}
+              >
+                <IconSymbol name="xmark" size={20} color={textMuted} />
+              </Pressable>
+            </View>
+            <View style={styles.imageContainer}>
+              <Image
+                source={{ uri: previewUrl! }}
+                style={styles.previewImage}
+                resizeMode="contain"
+              />
+              <View pointerEvents="none" style={styles.watermarkContainer}>
+                <ThemedText style={[styles.watermark, { color: textMuted }]}>
+                  ASOOSE SECURE
+                </ThemedText>
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ThemedView>
   );
 }
@@ -195,23 +268,99 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 12,
+    paddingVertical: 16,
     paddingHorizontal: 16,
     borderBottomWidth: 1,
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
   },
-  section: { gap: 8, marginTop: 12 },
-  uploadCard: {
-    height: 150,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderStyle: "dashed",
-    borderColor: "#D1D5DB",
+  headerTitle: {
+    flex: 1,
+    textAlign: "center",
+    fontSize: 18,
+    fontWeight: "700",
+  },
+  backButton: { width: 44, height: 44, justifyContent: "center" },
+  scrollContent: { padding: 16 },
+  infoBanner: {
+    flexDirection: "row",
+    padding: 12,
+    borderRadius: 10,
+    marginBottom: 20,
     alignItems: "center",
-    justifyContent: "center",
     gap: 8,
-    backgroundColor: "transparent",
   },
-  uploadText: { fontSize: 15, textAlign: "center" },
-  hintText: { fontSize: 12, textAlign: "center", color: "#9CA3AF" },
-  removeButton: { marginTop: 6 },
+  infoText: { fontSize: 13, flex: 1 },
+  docCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    marginBottom: 12,
+  },
+  iconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  docInfo: { flex: 1, marginLeft: 14 },
+  docType: { fontSize: 16, marginBottom: 2 },
+  statusRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  statusDot: { width: 6, height: 6, borderRadius: 3 },
+  statusLabel: { fontSize: 12, fontWeight: "600", textTransform: "uppercase" },
+  actionButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  docCardSkeleton: {
+    height: 80,
+    borderRadius: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+  },
+  emptyState: { alignItems: "center", marginTop: 100, opacity: 0.5 },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalContainer: {
+    width: width * 0.9,
+    borderRadius: 24,
+    overflow: "hidden",
+    elevation: 8,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 16,
+    borderBottomWidth: 1,
+  },
+  closeBtn: { padding: 4 },
+  imageContainer: { width: "100%", aspectRatio: 1, backgroundColor: "#000" },
+  previewImage: { width: "100%", height: "100%" },
+  watermarkContainer: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  watermark: {
+    fontSize: 32,
+    fontWeight: "900",
+    opacity: 0.15,
+    transform: [{ rotate: "-30deg" }],
+  },
 });

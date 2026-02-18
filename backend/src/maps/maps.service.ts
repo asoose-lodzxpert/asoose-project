@@ -108,7 +108,7 @@ export class MapsService {
     lng: number,
   ): Promise<{ lat: number; lng: number; address: string; placeId: string }> {
     const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${this.apiKey}`;
-    
+
     try {
       const res = await axios.get(url);
       if (res.data.results && res.data.results.length > 0) {
@@ -122,7 +122,10 @@ export class MapsService {
       }
       throw new Error('No address found for these coordinates');
     } catch (error) {
-      this.appLogger.error('Error reverse geocoding', error?.stack, { lat, lng });
+      this.appLogger.error('Error reverse geocoding', error?.stack, {
+        lat,
+        lng,
+      });
       throw new BadRequestException('Unroutable location coordinates.');
     }
   }

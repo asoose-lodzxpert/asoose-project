@@ -2,7 +2,19 @@ export type StoreType = "RESTAURANT" | string; // Extend as needed
 
 export type Category = { name: string };
 
-export type ModifierGroup = any[]; // Placeholder
+export interface Modifier {
+  id: string;
+  name: string;
+  price: number;
+}
+
+export interface ModifierGroup {
+  id: string;
+  name: string;
+  minSelect: number;
+  maxSelect: number;
+  modifiers: Modifier[];
+}
 
 export type Review = {
   id: string;

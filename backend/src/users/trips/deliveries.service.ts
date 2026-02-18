@@ -35,7 +35,7 @@ export class DeliveriesService {
     private readonly queue: QueueService,
     private readonly notificationsGateway: NotificationsGateway,
     private readonly common: TripsCommonService,
-    private readonly addressesService: AddressesService, 
+    private readonly addressesService: AddressesService,
   ) {}
 
   // ==================================================================
@@ -147,15 +147,19 @@ export class DeliveriesService {
         if (!dropoffAddress || dropoffAddress.userId !== userId) {
           throw new BadRequestException('Invalid dropoff address');
         }
-      } 
-      
+      }
+
       // Case B: Creating New Addresses from Client Payload (Place ID or GPS Fallback)
       // ✅ FIX: Strict Hybrid Architecture Trust Boundary Enforced
       else if (dto.pickupLocation && dto.dropoffLocation) {
         try {
           // 1. Backend resolves exact coordinates securely via Google Maps
-          const securePickup = await this.common.resolveSecureLocation(dto.pickupLocation);
-          const secureDropoff = await this.common.resolveSecureLocation(dto.dropoffLocation);
+          const securePickup = await this.common.resolveSecureLocation(
+            dto.pickupLocation,
+          );
+          const secureDropoff = await this.common.resolveSecureLocation(
+            dto.dropoffLocation,
+          );
 
           // 2. Generate database records ONLY from the trusted, server-resolved data
           [pickupAddress, dropoffAddress] = await Promise.all([
@@ -163,8 +167,8 @@ export class DeliveriesService {
               userId,
               {
                 street: securePickup.address, // Trusted text directly from Maps API
-                lat: securePickup.lat,        // Trusted coordinate
-                lng: securePickup.lng,        // Trusted coordinate
+                lat: securePickup.lat, // Trusted coordinate
+                lng: securePickup.lng, // Trusted coordinate
                 label: 'Pickup Location',
               },
               tx,
@@ -173,8 +177,8 @@ export class DeliveriesService {
               userId,
               {
                 street: secureDropoff.address, // Trusted text directly from Maps API
-                lat: secureDropoff.lat,        // Trusted coordinate
-                lng: secureDropoff.lng,        // Trusted coordinate
+                lat: secureDropoff.lat, // Trusted coordinate
+                lng: secureDropoff.lng, // Trusted coordinate
                 label: 'Dropoff Location',
               },
               tx,
@@ -218,7 +222,7 @@ export class DeliveriesService {
           recipientPhone: dto.recipientPhone,
           packageDetails: this.common.sanitizeText(dto.packageDetails),
           deliveryOtp,
-          
+
           weightKg: dto.weightKg,
           isFragile: dto.fragile ?? false,
           isPerishable: dto.perishable ?? false,
@@ -539,11 +543,11 @@ export class DeliveriesService {
 
     const delivery = await this.prisma.delivery.findUnique({
       where: { id: deliveryId },
-      include: { 
-        rider: { include: { vehicle: true } }, 
+      include: {
+        rider: { include: { vehicle: true } },
         customer: true,
         pickupAddress: true,
-        dropoffAddress: true
+        dropoffAddress: true,
       },
     });
 

@@ -1,4 +1,3 @@
-import { jobsService } from "@/services/jobs.service";
 import {
   addNotificationReceivedListener,
   addNotificationResponseListener,
@@ -18,11 +17,15 @@ import React, {
 } from "react";
 import Toast from "react-native-toast-message";
 import { useAuth } from "./AuthContext";
+import { jobsService } from "@/services/jobs.service";
+import { getUnreadCount } from "@/services/notifications.service";
 
 type NotificationContextType = {
   expoPushToken: string | undefined;
   notification: Notifications.Notification | undefined;
   unreadCount: number;
+  setUnreadCount: (count: number) => void;
+  refreshUnreadCount: () => Promise<void>;
 };
 
 const NotificationContext = createContext<NotificationContextType | null>(null);
@@ -42,6 +45,16 @@ export function NotificationProvider({
   const notificationListener = useRef<Notifications.Subscription | null>(null);
   const responseListener = useRef<Notifications.Subscription | null>(null);
 
+  // Function to refresh unread count from backend
+  const refreshUnreadCount = async () => {
+    try {
+      const count = await getUnreadCount();
+      setUnreadCount(count);
+    } catch (error) {
+      // Silent error handling
+    }
+  };
+
   useEffect(() => {
     if (!user) return;
 
@@ -52,12 +65,20 @@ export function NotificationProvider({
     setupNotificationCategories();
 
     // Register for push notifications
-    registerForPushNotificationsAsync().then((token) => {
-      if (token) {
-        setExpoPushToken(token);
-        savePushToken(token);
-      }
-    });
+    registerForPushNotificationsAsync()
+      .then((token) => {
+        if (token) {
+          setExpoPushToken(token);
+          // Save token to backend
+          savePushToken(token)
+            .then(() => {})
+            .catch(() => {});
+        }
+      })
+      .catch(() => {});
+
+    // Load initial unread count
+    refreshUnreadCount();
 
     // Listen for notifications received while app is foregrounded
     notificationListener.current = addNotificationReceivedListener(
@@ -117,6 +138,8 @@ export function NotificationProvider({
         expoPushToken,
         notification,
         unreadCount,
+        setUnreadCount,
+        refreshUnreadCount,
       }}
     >
       {children}

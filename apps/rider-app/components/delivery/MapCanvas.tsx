@@ -6,13 +6,197 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { StyleSheet, Text, View } from "react-native";
-import MapView, { Circle, LatLng, Marker, Polyline } from "react-native-maps";
+import { StyleSheet, Text, View, useColorScheme } from "react-native";
+import MapView, {
+  Circle,
+  LatLng,
+  Marker,
+  Polyline,
+  PROVIDER_GOOGLE,
+} from "react-native-maps";
 
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useJobs } from "@/context/JobContext";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { getDirections } from "@/services/maps";
+
+const LIGHT_MAP_STYLE = [
+  {
+    elementType: "geometry",
+    stylers: [{ color: "#f5f5f5" }],
+  },
+  {
+    elementType: "labels.icon",
+    stylers: [{ visibility: "off" }],
+  },
+  {
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#616161" }],
+  },
+  {
+    elementType: "labels.text.stroke",
+    stylers: [{ color: "#f5f5f5" }],
+  },
+  {
+    featureType: "administrative.land_parcel",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#bdbdbd" }],
+  },
+  {
+    featureType: "poi",
+    elementType: "geometry",
+    stylers: [{ color: "#eeeeee" }],
+  },
+  {
+    featureType: "poi",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#757575" }],
+  },
+  {
+    featureType: "poi.park",
+    elementType: "geometry",
+    stylers: [{ color: "#e5e5e5" }],
+  },
+  {
+    featureType: "poi.park",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#9e9e9e" }],
+  },
+  {
+    featureType: "road",
+    elementType: "geometry",
+    stylers: [{ color: "#ffffff" }],
+  },
+  {
+    featureType: "road.arterial",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#757575" }],
+  },
+  {
+    featureType: "road.highway",
+    elementType: "geometry",
+    stylers: [{ color: "#dadada" }],
+  },
+  {
+    featureType: "road.highway",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#616161" }],
+  },
+  {
+    featureType: "road.local",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#9e9e9e" }],
+  },
+  {
+    featureType: "transit.line",
+    elementType: "geometry",
+    stylers: [{ color: "#e5e5e5" }],
+  },
+  {
+    featureType: "transit.station",
+    elementType: "geometry",
+    stylers: [{ color: "#eeeeee" }],
+  },
+  {
+    featureType: "water",
+    elementType: "geometry",
+    stylers: [{ color: "#c9c9c9" }],
+  },
+  {
+    featureType: "water",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#9e9e9e" }],
+  },
+];
+
+const DARK_MAP_STYLE = [
+  {
+    elementType: "geometry",
+    stylers: [{ color: "#1a1a1a" }],
+  },
+  {
+    elementType: "labels.icon",
+    stylers: [{ visibility: "off" }],
+  },
+  {
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#8a8a8a" }],
+  },
+  {
+    elementType: "labels.text.stroke",
+    stylers: [{ color: "#1a1a1a" }],
+  },
+  {
+    featureType: "administrative.land_parcel",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#5a5a5a" }],
+  },
+  {
+    featureType: "poi",
+    elementType: "geometry",
+    stylers: [{ color: "#2a2a2a" }],
+  },
+  {
+    featureType: "poi",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#6a6a6a" }],
+  },
+  {
+    featureType: "poi.park",
+    elementType: "geometry",
+    stylers: [{ color: "#263c3f" }],
+  },
+  {
+    featureType: "poi.park",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#6b9a76" }],
+  },
+  {
+    featureType: "road",
+    elementType: "geometry",
+    stylers: [{ color: "#2c2c2c" }],
+  },
+  {
+    featureType: "road.arterial",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#7a7a7a" }],
+  },
+  {
+    featureType: "road.highway",
+    elementType: "geometry",
+    stylers: [{ color: "#3c3c3c" }],
+  },
+  {
+    featureType: "road.highway",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#8a8a8a" }],
+  },
+  {
+    featureType: "road.local",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#6a6a6a" }],
+  },
+  {
+    featureType: "transit.line",
+    elementType: "geometry",
+    stylers: [{ color: "#2a2a2a" }],
+  },
+  {
+    featureType: "transit.station",
+    elementType: "geometry",
+    stylers: [{ color: "#2a2a2a" }],
+  },
+  {
+    featureType: "water",
+    elementType: "geometry",
+    stylers: [{ color: "#000000" }],
+  },
+  {
+    featureType: "water",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#515c6d" }],
+  },
+];
 
 export type MapCanvasHandle = {
   animateToPickup: () => void;
@@ -22,7 +206,10 @@ export type MapCanvasHandle = {
 const MapCanvas = forwardRef<MapCanvasHandle>((_, ref) => {
   const mapRef = useRef<MapView>(null);
   const { activeJob, status } = useJobs();
+  const colorScheme = useColorScheme();
   const primary = useThemeColor({}, "brandPrimary");
+  const success = useThemeColor({}, "statusSuccess");
+  const danger = useThemeColor({}, "statusError");
 
   const [location, setLocation] = useState<Location.LocationObject | null>(
     null,
@@ -30,38 +217,57 @@ const MapCanvas = forwardRef<MapCanvasHandle>((_, ref) => {
   const [routeCoords, setRouteCoords] = useState<LatLng[]>([]);
   const [distanceLeft, setDistanceLeft] = useState("");
   const [eta, setEta] = useState("");
+  const [mapError, setMapError] = useState<string | null>(null);
+  const [isMapReady, setIsMapReady] = useState(false);
+
+  // Select map style based on theme
+  const mapStyle = colorScheme === "dark" ? DARK_MAP_STYLE : LIGHT_MAP_STYLE;
 
   // vehicleRef is not used for animated marker, so can be removed for now
 
   /** Location tracking */
   useEffect(() => {
     (async () => {
-      const { status: permission } =
-        await Location.requestForegroundPermissionsAsync();
-      if (permission !== "granted") return;
+      try {
+        const { status: permission } =
+          await Location.requestForegroundPermissionsAsync();
+        if (permission !== "granted") {
+          setMapError("Location permission denied");
+          return;
+        }
 
-      const current = await Location.getCurrentPositionAsync({});
-      setLocation(current);
+        const current = await Location.getCurrentPositionAsync({});
+        setLocation(current);
+        setMapError(null);
 
-      Location.watchPositionAsync(
-        {
-          accuracy: Location.Accuracy.High,
-          timeInterval: 3000,
-          distanceInterval: 5,
-        },
-        (loc) => {
-          setLocation(loc);
-          mapRef.current?.animateToRegion(
-            {
-              latitude: loc.coords.latitude,
-              longitude: loc.coords.longitude,
-              latitudeDelta: 0.01,
-              longitudeDelta: 0.01,
-            },
-            800,
-          );
-        },
-      );
+        // Start watching position
+        const subscription = await Location.watchPositionAsync(
+          {
+            accuracy: Location.Accuracy.High,
+            timeInterval: 3000,
+            distanceInterval: 5,
+          },
+          (loc) => {
+            setLocation(loc);
+            mapRef.current?.animateToRegion(
+              {
+                latitude: loc.coords.latitude,
+                longitude: loc.coords.longitude,
+                latitudeDelta: 0.01,
+                longitudeDelta: 0.01,
+              },
+              800,
+            );
+          },
+        );
+
+        // Return cleanup function
+        return () => {
+          subscription.remove();
+        };
+      } catch (error) {
+        setMapError(`Location error: ${error}`);
+      }
     })();
   }, []);
 
@@ -98,7 +304,7 @@ const MapCanvas = forwardRef<MapCanvasHandle>((_, ref) => {
         });
 
         if (error) {
-          console.error("Failed to fetch route:", error);
+          // ...existing code...
           return;
         }
 
@@ -106,7 +312,7 @@ const MapCanvas = forwardRef<MapCanvasHandle>((_, ref) => {
         setDistanceLeft(distance.text);
         setEta(duration.text);
       } catch (error) {
-        console.error("Error fetching route:", error);
+        // ...existing code...
       }
     }
 
@@ -139,14 +345,57 @@ const MapCanvas = forwardRef<MapCanvasHandle>((_, ref) => {
     },
   }));
 
-  if (!location) return null;
+  if (mapError) {
+    return (
+      <View
+        style={[
+          StyleSheet.absoluteFillObject,
+          {
+            justifyContent: "center",
+            alignItems: "center",
+            backgroundColor: colorScheme === "dark" ? "#1a1a1a" : "#f5f5f5",
+          },
+        ]}
+      >
+        <Text
+          style={{
+            color: colorScheme === "dark" ? "#fff" : "#000",
+            fontSize: 16,
+            textAlign: "center",
+            paddingHorizontal: 20,
+          }}
+        >
+          ⚠️ Map Error: {mapError}
+        </Text>
+      </View>
+    );
+  }
+
+  if (!location) {
+    return (
+      <View
+        style={[
+          StyleSheet.absoluteFillObject,
+          {
+            justifyContent: "center",
+            alignItems: "center",
+            backgroundColor: colorScheme === "dark" ? "#1a1a1a" : "#f5f5f5",
+          },
+        ]}
+      >
+        <Text style={{ color: colorScheme === "dark" ? "#fff" : "#000" }}>
+          Loading map...
+        </Text>
+      </View>
+    );
+  }
 
   return (
     <>
       <MapView
         ref={mapRef}
-        provider="google"
-        mapType="standard"
+        provider={PROVIDER_GOOGLE}
+        customMapStyle={mapStyle}
         showsTraffic={false}
         pitchEnabled={true}
         rotateEnabled={true}
@@ -158,6 +407,12 @@ const MapCanvas = forwardRef<MapCanvasHandle>((_, ref) => {
           longitudeDelta: 0.02,
         }}
         showsUserLocation={true}
+        showsMyLocationButton={false}
+        showsCompass={false}
+        onMapReady={() => {
+          setIsMapReady(true);
+          setMapError(null);
+        }}
       >
         {/* Accuracy */}
         <Circle
@@ -166,15 +421,15 @@ const MapCanvas = forwardRef<MapCanvasHandle>((_, ref) => {
             longitude: location.coords.longitude,
           }}
           radius={location.coords.accuracy || 40}
-          strokeColor="rgba(59,130,246,0.3)"
-          fillColor="rgba(59,130,246,0.1)"
+          strokeColor={`${primary}4D`}
+          fillColor={`${primary}1A`}
         />
 
         {/* Route */}
         {routeCoords.length > 0 && (
           <Polyline
             coordinates={routeCoords}
-            strokeColor="#3B82F6"
+            strokeColor={colorScheme === "dark" ? "#fff" : "#000"}
             strokeWidth={4}
           />
         )}
@@ -198,7 +453,7 @@ const MapCanvas = forwardRef<MapCanvasHandle>((_, ref) => {
               <IconSymbol
                 name={activeJob.jobType === "ride" ? "car" : "storefront"}
                 size={28}
-                color={primary}
+                color={success}
               />
             </Marker>
           )}
@@ -221,25 +476,42 @@ const MapCanvas = forwardRef<MapCanvasHandle>((_, ref) => {
             <IconSymbol
               name={activeJob.jobType === "ride" ? "car" : "home"}
               size={28}
-              color={primary}
+              color={danger}
             />
           </Marker>
         )}
-
-        {/* Vehicle */}
-        {/* <Marker.Animated coordinate={vehicleRef as any}>
-          <IconSymbol name="navigation" size={32} color={primary} />
-        </Marker.Animated> */}
       </MapView>
 
       {distanceLeft && eta && activeJob && (
-        <View style={styles.overlay}>
-          <Text style={styles.text}>
+        <View
+          style={[
+            styles.overlay,
+            {
+              backgroundColor:
+                colorScheme === "dark"
+                  ? "rgba(255,255,255,0.9)"
+                  : "rgba(0,0,0,0.7)",
+            },
+          ]}
+        >
+          <Text
+            style={[
+              styles.text,
+              { color: colorScheme === "dark" ? "#000" : "#fff" },
+            ]}
+          >
             {activeJob.jobType === "ride"
               ? `${distanceLeft} left`
               : distanceLeft}
           </Text>
-          <Text style={styles.text}>ETA {eta}</Text>
+          <Text
+            style={[
+              styles.text,
+              { color: colorScheme === "dark" ? "#000" : "#fff" },
+            ]}
+          >
+            ETA {eta}
+          </Text>
         </View>
       )}
     </>
@@ -257,12 +529,10 @@ const styles = StyleSheet.create({
     position: "absolute",
     bottom: 60,
     left: 20,
-    backgroundColor: "rgba(0,0,0,0.6)",
     padding: 10,
     borderRadius: 8,
   },
   text: {
-    color: "#fff",
     fontWeight: "600",
   },
 });

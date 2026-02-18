@@ -7,27 +7,33 @@
     "icon": "./assets/images/icon.png",
     "scheme": "vendorapp",
     "userInterfaceStyle": "automatic",
-
     "newArchEnabled": true,
-
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.asoose.vendor.app",
+      "config": {
+        "googleMapsApiKey": "AIzaSyC1QLEDtvDu8r1gLtEec4d28aWP8VozXfA"
+      },
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
     },
-
     "platforms": ["ios", "android"],
-
     "android": {
       "adaptiveIcon": {
+        "backgroundColor": "#0A0A0A",
         "foregroundImage": "./assets/images/adaptive-icon.png"
+      },
+      "googleServicesFile": "./google-services.json",
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyCor0YAMApwfowNFC-EXSOwrKq0mxdwMP8"
+        }
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.asoose.vendor.app",
-      "versionCode": 1,
+      "versionCode": 11,
       "notification": {
         "icon": "./assets/images/icon.png"
       },
@@ -46,7 +52,6 @@
         "SEND_SMS"
       ]
     },
-
     "plugins": [
       "expo-font",
       "expo-router",
@@ -85,16 +90,17 @@
       ],
       "expo-secure-store"
     ],
-
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
     },
-
     "extra": {
       "eas": {
-        "projectId": "f144011b-bf0a-4ba1-9cdf-b89dd47a1a2b"
-      }
-    }
+        "projectId": "668d6cc5-56a0-43d1-bdfd-8a55768b35c1"
+      },
+      "expoProjectId": "f144011b-bf0a-4ba1-9cdf-b89dd47a1a2b",
+      "router": {}
+    },
+    "owner": "enoch-dev"
   }
 }

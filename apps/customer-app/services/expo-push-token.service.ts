@@ -1,5 +1,4 @@
 import * as Notifications from "expo-notifications";
-import { Platform } from "react-native";
 import { getAccessToken } from "./auth.service";
 
 const API_BASE = (

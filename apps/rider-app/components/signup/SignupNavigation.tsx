@@ -12,9 +12,10 @@ type Props = {
 export function SignupNavigation({ step, onNext, onBack, loading }: Props) {
   const primary = useThemeColor({}, "brandPrimary");
   const textOnPrimary = useThemeColor({}, "textOnPrimary");
+  const bg = useThemeColor({}, "surfaceBackground");
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: bg }]}>
       {step > 1 && (
         <Pressable
           style={styles.backButton}
@@ -46,7 +47,10 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: "row",
     gap: 12,
-    paddingTop: 12,
+    // paddingTop: 12,
+    borderRadius: 16,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
   },
   backButton: {
     width: 80,

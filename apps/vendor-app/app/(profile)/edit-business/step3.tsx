@@ -12,9 +12,11 @@ import {
   StyleSheet,
   View,
 } from "react-native";
+import MapView from "react-native-maps";
 import Toast from "react-native-toast-message";
 
 import { ImageUpload } from "@/components/signup/step3/ImageUpload";
+import { LocationBlock } from "@/components/signup/step3/LocationBlock";
 import { OpenHoursBlock } from "@/components/signup/step3/OpenHoursBlock";
 import { StoreInfo } from "@/components/signup/step3/StoreInfo";
 import { ThemedText } from "@/components/themed-text";
@@ -27,6 +29,7 @@ import { OpenHour, SignupStep3Data } from "@/types/signup";
 export default function EditStoreDetailsScreen() {
   const router = useRouter();
   const isMountedRef = useRef(true);
+  const mapRef = useRef<MapView | null>(null);
   const { confirm, ConfirmModal } = useConfirm();
 
   const [locating, setLocating] = useState(false);
@@ -55,8 +58,8 @@ export default function EditStoreDetailsScreen() {
         setStoreData({
           storeName: details.step3.storeName || "",
           storeDescription: details.step3.storeDescription || "",
-          storeLogo: details.step3.storeLogo || "",
-          storeBanner: details.step3.storeBanner || "",
+          storeLogoUri: details.step3.storeLogoUri || "",
+          storeBannerUri: details.step3.storeBannerUri || "",
           location: details.step3.location || { lat: 6.5244, lng: 3.3792 },
           openHours: details.step3.openHours || {},
         });
@@ -182,71 +185,32 @@ export default function EditStoreDetailsScreen() {
           <View style={styles.imageGrid}>
             <ImageUpload
               label="Store Logo"
-              value={storeData.storeLogo}
+              value={storeData.storeLogoUri}
               circular
-              onPick={(v) => handleChange("storeLogo", v)}
+              onPick={(v) => handleChange("storeLogoUri", v)}
             />
             <ImageUpload
               label="Store Banner"
-              value={storeData.storeBanner}
-              onPick={(v) => handleChange("storeBanner", v)}
+              value={storeData.storeBannerUri}
+              onPick={(v) => handleChange("storeBannerUri", v)}
             />
           </View>
 
-          {/* Location Replacement */}
+          {/* Location Block */}
           <ThemedText type="defaultSemiBold" style={styles.sectionTitle}>
             Store Location
           </ThemedText>
-          <View style={styles.locationContainer}>
-            {/* <View
-              style={[
-                styles.mapPlaceholder,
-                { borderColor, backgroundColor: surfaceSubtle },
-              ]}
-            >
-              <Image
-                source={{
-                  uri: `https://api.mapbox.com/styles/v1/mapbox/streets-v11/static/pin-s-l+ff0000(${storeData.location?.lng},${storeData.location?.lat})/${storeData.location?.lng},${storeData.location?.lat},14/600x300?access_token=YOUR_MAPBOX_TOKEN`,
-                }}
-                style={styles.staticMap}
-                resizeMode="cover"
-              />
-              <View style={styles.coordinateBadge}>
-                <ThemedText style={styles.coordinateText}>
-                  {storeData.location?.lat?.toFixed(4)},{" "}
-                  {storeData.location?.lng?.toFixed(4)}
-                </ThemedText>
-              </View>
-            </View> */}
-
-            <Pressable
-              style={[
-                styles.locationBtn,
-                { backgroundColor: primary, opacity: locating ? 0.7 : 1 },
-              ]}
-              onPress={useCurrentLocation}
-              disabled={locating}
-            >
-              {locating ? (
-                <ActivityIndicator size="small" color={textOnPrimary} />
-              ) : (
-                <View
-                  style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
-                >
-                  <IconSymbol
-                    name="location.fill"
-                    size={16}
-                    color={textOnPrimary}
-                  />
-                  <ThemedText
-                    style={{ color: textOnPrimary, fontWeight: "600" }}
-                  >
-                    Update to Current Location
-                  </ThemedText>
-                </View>
-              )}
-            </Pressable>
-          </View>
+          {storeData && (
+            <LocationBlock
+              mapRef={mapRef}
+              primary={primary}
+              location={storeData.location}
+              onUseCurrent={useCurrentLocation}
+              onPick={(location) => handleChange("location", location)}
+              disabled={saving}
+              loading={locating}
+            />
+          )}
 
           {/* Open Hours */}
           <ThemedText type="defaultSemiBold" style={styles.sectionTitle}>

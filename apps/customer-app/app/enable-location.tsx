@@ -67,7 +67,7 @@ export default function EnableLocationScreen() {
         <View style={styles.list}>
           <ValueItem
             icon="map.marker"
-            text="Find nearby restaurants and services"
+            text="Find nearby stores and services"
             color={primary}
           />
 

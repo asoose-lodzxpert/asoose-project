@@ -7,8 +7,10 @@ import {
   FlatList,
   NativeSyntheticEvent,
   NativeScrollEvent,
+  ActivityIndicator,
 } from "react-native";
 import { useRouter } from "expo-router";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
 import { useThemeColor } from "@/hooks/use-theme-color";
@@ -16,6 +18,7 @@ import { IconSymbol, IconSymbolName } from "@/components/ui/icon-symbol";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const { width } = Dimensions.get("window");
+const ONBOARDING_KEY = "asoose_vendor_onboarded";
 
 const steps: { icon: IconSymbolName; title: string; desc: string }[] = [
   {
@@ -35,10 +38,11 @@ const steps: { icon: IconSymbolName; title: string; desc: string }[] = [
   },
 ];
 
-export default function WelcomeScreen({ onDone }: { onDone?: () => void }) {
-  const router = useRouter();
+export default function WelcomeScreen() {
   const flatListRef = useRef<FlatList>(null);
   const [activeStep, setActiveStep] = useState(0);
+  const [continuePressed, setContinuePressed] = useState(false);
+  const router = useRouter();
 
   // Theme Colors
   const backgroundColor = useThemeColor({}, "surfaceBackground");
@@ -50,9 +54,14 @@ export default function WelcomeScreen({ onDone }: { onDone?: () => void }) {
 
   const isLastStep = activeStep === steps.length - 1;
 
-  const handleFinish = (target: "/(auth)/signup" | "/(auth)/login") => {
-    if (onDone) onDone();
-    else router.replace(target);
+  // When onboarding is complete, just mark as done. Navigation will handle redirect.
+  const handleFinish = async () => {
+    setContinuePressed(true);
+    await AsyncStorage.setItem(ONBOARDING_KEY, "true");
+    // Simulate a short delay for UX
+    setTimeout(() => {
+      router.replace("/(auth)/login");
+    }, 900);
   };
 
   const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -68,7 +77,7 @@ export default function WelcomeScreen({ onDone }: { onDone?: () => void }) {
         animated: true,
       });
     } else {
-      handleFinish("/(auth)/signup");
+      handleFinish();
     }
   };
 
@@ -78,10 +87,7 @@ export default function WelcomeScreen({ onDone }: { onDone?: () => void }) {
         {/* Header */}
         <View style={styles.header}>
           {!isLastStep && (
-            <Pressable
-              onPress={() => handleFinish("/(auth)/signup")}
-              style={styles.skipBtn}
-            >
+            <Pressable onPress={() => handleFinish()} style={styles.skipBtn}>
               <ThemedText style={[styles.skipText, { color: textSecondary }]}>
                 Skip
               </ThemedText>
@@ -140,29 +146,41 @@ export default function WelcomeScreen({ onDone }: { onDone?: () => void }) {
               />
             ))}
           </View>
-
           <Pressable
-            style={[styles.primaryButton, { backgroundColor: primary }]}
+            style={[
+              styles.primaryButton,
+              { backgroundColor: primary, opacity: continuePressed ? 0.7 : 1 },
+            ]}
             onPress={scrollToNext}
+            disabled={continuePressed}
           >
-            <ThemedText
-              type="defaultSemiBold"
-              style={{ color: textOnPrimary, fontSize: 17 }}
-            >
-              {isLastStep ? "Get Started" : "Next"}
-            </ThemedText>
-          </Pressable>
-
-          <Pressable
-            onPress={() => handleFinish("/(auth)/login")}
-            style={styles.loginBtn}
-          >
-            <ThemedText style={[styles.loginText, { color: textSecondary }]}>
-              Already have an account?{" "}
-              <ThemedText style={{ color: primary, fontWeight: "700" }}>
-                Log in
+            {continuePressed ? (
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <ActivityIndicator
+                  color={textOnPrimary}
+                  style={{ marginRight: 10 }}
+                />
+                <ThemedText
+                  type="defaultSemiBold"
+                  style={{ color: textOnPrimary, fontSize: 17 }}
+                >
+                  Please wait...
+                </ThemedText>
+              </View>
+            ) : (
+              <ThemedText
+                type="defaultSemiBold"
+                style={{ color: textOnPrimary, fontSize: 17 }}
+              >
+                {isLastStep ? "Get Started" : "Next"}
               </ThemedText>
-            </ThemedText>
+            )}
           </Pressable>
         </View>
       </SafeAreaView>

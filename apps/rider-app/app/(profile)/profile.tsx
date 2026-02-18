@@ -19,6 +19,7 @@ import {
   type RiderProfile,
   type ProfileStats,
 } from "@/services/profile.service";
+import { Image } from "react-native";
 import { getRoleLabel } from "@/utils/role";
 
 const accountManagementItems = [
@@ -111,6 +112,12 @@ export default function ProfileScreen() {
   const primary = useThemeColor({}, "brandPrimary");
   const surface = useThemeColor({}, "surfaceBackground");
   const border = useThemeColor({}, "borderDefault");
+  const textOnPrimary = useThemeColor({}, "textOnPrimary");
+  const textSecondary = useThemeColor({}, "textSecondary");
+  const textMuted = useThemeColor({}, "textMuted");
+  const statusSuccess = useThemeColor({}, "statusSuccess");
+  const statusError = useThemeColor({}, "statusError");
+  const statusWarning = useThemeColor({}, "statusWarning");
 
   const router = useRouter();
 
@@ -177,12 +184,13 @@ export default function ProfileScreen() {
           <View style={[styles.profileCard, { borderColor: border }]}>
             <View style={[styles.avatar, { backgroundColor: primary }]}>
               {profile.image ? (
-                <View style={{ width: 64, height: 64, borderRadius: 32 }}>
-                  {/* TODO: Add image component */}
-                  <IconSymbol name="person" size={36} color="#fff" />
-                </View>
+                <Image
+                  source={{ uri: profile.image }}
+                  style={{ width: 64, height: 64, borderRadius: 32 }}
+                  resizeMode="cover"
+                />
               ) : (
-                <IconSymbol name="person" size={36} color="#fff" />
+                <IconSymbol name="person" size={36} color={textOnPrimary} />
               )}
             </View>
             <View style={{ flex: 1 }}>
@@ -193,18 +201,24 @@ export default function ProfileScreen() {
               </ThemedText>
               {isVerified && (
                 <View style={styles.badge}>
-                  <IconSymbol name="checkmark.seal" size={14} color="#16A34A" />
-                  <ThemedText style={styles.badgeText}>
+                  <IconSymbol
+                    name="checkmark.seal"
+                    size={14}
+                    color={statusSuccess}
+                  />
+                  <ThemedText
+                    style={[styles.badgeText, { color: statusSuccess }]}
+                  >
                     Verified {getRoleLabel(profile.role)}
                   </ThemedText>
                 </View>
               )}
               <View style={styles.ratingRow}>
-                <IconSymbol name="star.fill" size={18} color="#FACC15" />
+                <IconSymbol name="star.fill" size={18} color={statusWarning} />
                 <ThemedText style={styles.ratingText}>
                   {profile.rating.toFixed(2)}
                 </ThemedText>
-                <ThemedText style={styles.subText}>
+                <ThemedText style={[styles.subText, { color: textSecondary }]}>
                   ({profile.totalRides} rides)
                 </ThemedText>
                 <Pressable>
@@ -341,6 +355,8 @@ function MenuItem({
   destructive?: boolean;
 }) {
   const primary = useThemeColor({}, "brandPrimary");
+  const statusError = useThemeColor({}, "statusError");
+  const textMuted = useThemeColor({}, "textMuted");
   return (
     <Pressable
       style={[styles.menuItem, { borderColor: border }]}
@@ -350,17 +366,17 @@ function MenuItem({
         <IconSymbol
           name={icon}
           size={22}
-          color={destructive ? "#EF4444" : primary}
+          color={destructive ? statusError : primary}
         />
         <ThemedText
           style={
-            destructive ? { color: "#EF4444", fontWeight: "600" } : undefined
+            destructive ? { color: statusError, fontWeight: "600" } : undefined
           }
         >
           {label}
         </ThemedText>
       </View>
-      <IconSymbol name="chevron.right" size={18} color="#9CA3AF" />
+      <IconSymbol name="chevron.right" size={18} color={textMuted} />
     </Pressable>
   );
 }
@@ -394,9 +410,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  subText: { color: "#6B7280", fontSize: 13 },
+  subText: { fontSize: 13 },
   badge: { flexDirection: "row", gap: 6, alignItems: "center", marginTop: 6 },
-  badgeText: { color: "#16A34A", fontSize: 13, fontWeight: "600" },
+  badgeText: { fontSize: 13, fontWeight: "600" },
   ratingRow: {
     flexDirection: "row",
     alignItems: "center",

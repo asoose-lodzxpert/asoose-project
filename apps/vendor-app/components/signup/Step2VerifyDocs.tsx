@@ -1,11 +1,5 @@
-import React, { useState } from "react";
-import {
-  View,
-  StyleSheet,
-  Pressable,
-  ScrollView,
-  ActivityIndicator,
-} from "react-native";
+import React from "react";
+import { View, StyleSheet, Pressable, ScrollView, Image } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system";
 import Toast from "react-native-toast-message";
@@ -13,31 +7,24 @@ import { ThemedText } from "@/components/themed-text";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { SignupStep2Data } from "@/types/signup";
 import { useThemeColor } from "@/hooks/use-theme-color";
-import { uploadFile, UploadProgress } from "@/services/storage.service";
 
 interface Step2Props {
   data: SignupStep2Data;
-  onChange: <K extends keyof SignupStep2Data>(key: K, value: string) => void;
+  onChange: <K extends keyof SignupStep2Data>(key: K, value: any) => void;
 }
 
 const MAX_SIZE = 5 * 1024 * 1024;
-
-type UploadState = {
-  [K in keyof SignupStep2Data]?: {
-    uploading: boolean;
-    progress: number;
-  };
-};
 
 export const Step2VerifyDocs: React.FC<Step2Props> = ({ data, onChange }) => {
   const primary = useThemeColor({}, "brandPrimary");
   const successColor = useThemeColor({}, "statusSuccess");
   const textMuted = useThemeColor({}, "textMuted");
-  const borderDefault = useThemeColor({}, "borderDefault");
-  const surfaceSubtle = useThemeColor({}, "surfaceSubtle");
-  const [uploadState, setUploadState] = useState<UploadState>({});
+  const errorColor = useThemeColor({}, "statusError");
 
-  const pickFile = async (key: keyof SignupStep2Data) => {
+  const pickFile = async (
+    key: "businessRegCertUri" | "taxIdDocUri" | "proofOfAddressUri",
+    nameKey: "businessRegCertName" | "taxIdDocName" | "proofOfAddressName",
+  ) => {
     try {
       // Request permission
       const permissionResult =
@@ -85,50 +72,32 @@ export const Step2VerifyDocs: React.FC<Step2Props> = ({ data, onChange }) => {
         // Continue anyway if we can't check size
       }
 
-      // Set uploading state
-      setUploadState((prev) => ({
-        ...prev,
-        [key]: { uploading: true, progress: 0 },
-      }));
-
-      // Upload image to backend
-      const url = await uploadFile(
-        {
-          uri: image.uri,
-          name: `document-${Date.now()}.jpg`,
-          type: "image/jpeg",
-        },
-        (progress: UploadProgress) => {
-          setUploadState((prev) => ({
-            ...prev,
-            [key]: { uploading: true, progress: progress.percentage },
-          }));
-        },
-      );
-
-      onChange(key, url);
-
-      setUploadState((prev) => ({
-        ...prev,
-        [key]: { uploading: false, progress: 100 },
-      }));
-    } catch (error) {
-      setUploadState((prev) => ({
-        ...prev,
-        [key]: { uploading: false, progress: 0 },
-      }));
+      // Store the file URI and name (won't upload until final submit)
+      const fileName = image.uri.split("/").pop() || "document.jpg";
+      onChange(key, image.uri);
+      onChange(nameKey, fileName);
 
       Toast.show({
+        type: "success",
+        text1: "Document selected",
+        text2: "Will be uploaded when you complete signup",
+      });
+    } catch (error) {
+      Toast.show({
         type: "error",
-        text1: "Upload Failed",
+        text1: "Error selecting file",
         text2:
-          error instanceof Error ? error.message : "Failed to upload image",
+          error instanceof Error ? error.message : "Failed to select document",
       });
     }
   };
 
   const removeFile = (key: keyof SignupStep2Data) => {
     onChange(key, "");
+  };
+
+  const getDocumentStatus = (uri?: string) => {
+    return uri ? { selected: true, uri } : { selected: false };
   };
 
   return (
@@ -143,139 +112,156 @@ export const Step2VerifyDocs: React.FC<Step2Props> = ({ data, onChange }) => {
       </ThemedText>
 
       {[
-        { key: "businessRegCert", label: "Business Registration Certificate" },
-        { key: "taxIdDoc", label: "Tax Identification Document" },
-        { key: "proofOfAddress", label: "Proof of Address (Optional)" },
-      ].map(({ key, label }) => {
-        const value = data[key as keyof SignupStep2Data];
-        const uploaded = Boolean(value);
-        const state = uploadState[key as keyof SignupStep2Data];
-        const isUploading = state?.uploading || false;
-        const progress = state?.progress || 0;
+        {
+          key: "businessRegCertUri" as const,
+          nameKey: "businessRegCertName" as const,
+          label: "Business Registration Certificate",
+          required: true,
+        },
+        {
+          key: "taxIdDocUri" as const,
+          nameKey: "taxIdDocName" as const,
+          label: "Tax Identification Document",
+          required: true,
+        },
+        {
+          key: "proofOfAddressUri" as const,
+          nameKey: "proofOfAddressName" as const,
+          label: "Proof of Address",
+          required: false,
+        },
+      ].map(({ key, nameKey, label, required }) => {
+        const status = getDocumentStatus(data[key]);
 
         return (
-          <View key={key} style={styles.section}>
-            <ThemedText type="defaultSemiBold" style={styles.label}>
-              {label}
-            </ThemedText>
-
-            <Pressable
-              disabled={uploaded || isUploading}
-              onPress={() => pickFile(key as keyof SignupStep2Data)}
-              style={[
-                styles.uploadCard,
-                { borderColor: borderDefault },
-                uploaded && {
-                  borderColor: primary,
-                  borderStyle: "solid",
-                  opacity: 0.9,
-                },
-                isUploading && {
-                  borderColor: primary,
-                  borderStyle: "solid",
-                  opacity: 0.7,
-                },
-              ]}
-            >
-              {isUploading ? (
-                <>
-                  <ActivityIndicator size="large" color={primary} />
-                  <ThemedText style={styles.uploadText}>
-                    Uploading... {progress}%
+          <View key={key} style={styles.documentCard}>
+            <View style={styles.documentHeader}>
+              <View style={{ flex: 1 }}>
+                <ThemedText type="defaultSemiBold">{label}</ThemedText>
+                {!required && (
+                  <ThemedText style={{ color: textMuted, fontSize: 12 }}>
+                    Optional
                   </ThemedText>
-                  <View
-                    style={[
-                      styles.progressBarContainer,
-                      { backgroundColor: surfaceSubtle },
-                    ]}
-                  >
-                    <View
-                      style={[
-                        styles.progressBar,
-                        { width: `${progress}%`, backgroundColor: primary },
-                      ]}
-                    />
-                  </View>
-                </>
-              ) : (
-                <>
-                  <IconSymbol
-                    size={32}
-                    name={uploaded ? "check" : "cloud.upload"}
-                    color={uploaded ? successColor : textMuted}
-                  />
-
-                  <ThemedText style={styles.uploadText}>
-                    {uploaded
-                      ? "File uploaded successfully"
-                      : "Tap to upload or drag & drop"}
-                  </ThemedText>
-
-                  <ThemedText style={[styles.hintText, { color: textMuted }]}>
-                    {uploaded
-                      ? value?.split("/").pop()
-                      : "PDF, JPG, PNG (max 5MB)"}
-                  </ThemedText>
-
-                  {uploaded && (
-                    <Pressable
-                      onPress={() => removeFile(key as keyof SignupStep2Data)}
-                      style={styles.removeButton}
-                    >
-                      <ThemedText type="link">Remove</ThemedText>
-                    </Pressable>
-                  )}
-                </>
+                )}
+              </View>
+              {status.selected && (
+                <IconSymbol
+                  name="checkmark.circle.fill"
+                  size={24}
+                  color={successColor}
+                />
               )}
-            </Pressable>
+            </View>
+
+            {status.selected && status.uri && (
+              <View style={styles.preview}>
+                <Image
+                  source={{ uri: status.uri }}
+                  style={styles.previewImage}
+                />
+                <ThemedText
+                  numberOfLines={1}
+                  style={{ fontSize: 12, color: textMuted, flex: 1 }}
+                >
+                  {data[nameKey] || "Selected"}
+                </ThemedText>
+              </View>
+            )}
+
+            <View style={styles.buttonRow}>
+              <Pressable
+                style={[
+                  styles.documentButton,
+                  { borderColor: primary, flex: 1 },
+                ]}
+                onPress={() => pickFile(key, nameKey)}
+              >
+                <IconSymbol name="photo" size={18} color={primary} />
+                <ThemedText style={{ color: primary }}>
+                  {status.selected ? "Change" : "Select"} Document
+                </ThemedText>
+              </Pressable>
+
+              {status.selected && (
+                <Pressable
+                  style={[
+                    styles.documentButton,
+                    {
+                      borderColor: errorColor,
+                      backgroundColor: `${errorColor}10`,
+                    },
+                  ]}
+                  onPress={() => removeFile(key)}
+                >
+                  <IconSymbol name="trash" size={18} color={errorColor} />
+                </Pressable>
+              )}
+            </View>
           </View>
         );
       })}
+
+      <View style={styles.note}>
+        <IconSymbol name="info.circle" size={16} color={primary} />
+        <ThemedText style={{ flex: 1, fontSize: 12, color: textMuted }}>
+          Documents will be uploaded when you complete the signup process
+        </ThemedText>
+      </View>
     </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    gap: 20,
+    flexGrow: 1,
+    gap: 16,
     paddingBottom: 24,
   },
-  section: {
+  documentCard: {
+    gap: 12,
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#e5e5e5",
+  },
+  documentHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  preview: {
+    flexDirection: "row",
+    gap: 8,
+    alignItems: "center",
+    padding: 8,
+    backgroundColor: "#f5f5f5",
+    borderRadius: 8,
+  },
+  previewImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 6,
+  },
+  buttonRow: {
+    flexDirection: "row",
     gap: 8,
   },
-  label: {
-    fontSize: 14,
-  },
-  uploadCard: {
-    height: 150,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderStyle: "dashed",
+  documentButton: {
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  note: {
+    flexDirection: "row",
     gap: 8,
-    backgroundColor: "transparent",
-  },
-  uploadText: {
-    fontSize: 15,
-    textAlign: "center",
-  },
-  hintText: {
-    fontSize: 12,
-    textAlign: "center",
-  },
-  removeButton: {
-    marginTop: 6,
-  },
-  progressBarContainer: {
-    width: "80%",
-    height: 6,
-    borderRadius: 3,
+    padding: 12,
+    backgroundColor: "#f5f5f5",
+    borderRadius: 8,
     marginTop: 8,
-    overflow: "hidden",
-  },
-  progressBar: {
-    height: "100%",
-    borderRadius: 3,
   },
 });

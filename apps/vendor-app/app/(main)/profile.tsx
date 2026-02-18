@@ -1,8 +1,7 @@
 import {
-  fetchStoreBalance,
-  fetchStorePublicDetails,
   fetchVendorProfile,
   updateVendorProfileImage,
+  fetchStorePublicDetails,
 } from "@/services/profile.service";
 import * as ImagePicker from "expo-image-picker";
 import { RelativePathString, useRouter } from "expo-router";
@@ -24,6 +23,7 @@ import { useConfirm } from "@/hooks/use-confirm";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useAuth } from "@/context/AuthContext";
 import { useThemeColor } from "@/hooks/use-theme-color";
+import { useBalance } from "@/context/BalanceContext";
 import { ProfileData, VendorStatus } from "@/types/profile";
 
 /* -------------------------------------------------------------------------- */
@@ -67,6 +67,7 @@ export default function ProfileScreen() {
   const statusSuccess = useThemeColor({}, "statusSuccess");
   const statusError = useThemeColor({}, "statusError");
   const { signOut } = useAuth();
+  const { balance, commissionRate, refetchBalance } = useBalance();
 
   const [profile, setProfile] = useState(INITIAL_PROFILE);
   const [loading, setLoading] = useState(true);
@@ -74,15 +75,14 @@ export default function ProfileScreen() {
   const [uploadingImage, setUploadingImage] = useState(false);
   const { confirm, ConfirmModal } = useConfirm();
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
-  const balanceInterval = useRef<NodeJS.Timeout | null>(null);
 
   const loadProfile = async (isRefresh = false) => {
     if (!isRefresh) setLoading(true);
     try {
-      const [vendor, store, balance] = await Promise.all([
+      const [vendor, store] = await Promise.all([
         fetchVendorProfile(),
         fetchStorePublicDetails(),
-        fetchStoreBalance(),
+        refetchBalance(),
       ]);
 
       setProfile({
@@ -91,7 +91,7 @@ export default function ProfileScreen() {
         shopName: store?.name || "",
         storeBanner: store?.banner || "",
         status: vendor.status || "PENDING",
-        balance: balance?.amount ?? 0,
+        balance: balance,
       });
     } finally {
       setLoading(false);
@@ -101,16 +101,12 @@ export default function ProfileScreen() {
 
   useEffect(() => {
     loadProfile();
-
-    balanceInterval.current = setInterval(async () => {
-      const balance = await fetchStoreBalance();
-      setProfile((p) => ({ ...p, balance: balance?.amount ?? 0 }));
-    }, 180000);
-
-    return () => {
-      if (balanceInterval.current) clearInterval(balanceInterval.current);
-    };
   }, []);
+
+  // Update profile balance when context balance changes
+  useEffect(() => {
+    setProfile((p) => ({ ...p, balance }));
+  }, [balance]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -214,8 +210,11 @@ export default function ProfileScreen() {
       case "PENDING":
         return statusPending + "FF";
       case "APPROVED":
+      case "ACTIVE":
         return statusSuccess + "FF";
       case "SUSPENDED":
+      case "BANNED":
+      case "CLOSED_PERMANENTLY":
         return statusError + "FF";
       default:
         return borderColor;
@@ -301,6 +300,11 @@ export default function ProfileScreen() {
                 </ThemedText>
                 <ThemedText type="title" style={{ marginTop: 4 }}>
                   ₦{profile.balance.toLocaleString()}
+                </ThemedText>
+                <ThemedText
+                  style={{ color: mutedText, fontSize: 12, marginTop: 4 }}
+                >
+                  Commission Rate: {commissionRate}%
                 </ThemedText>
               </View>
               <Pressable

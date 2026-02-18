@@ -1,4 +1,10 @@
-export type VendorStatus = "PENDING" | "APPROVED" | "SUSPENDED";
+export type VendorStatus =
+  | "PENDING"
+  | "APPROVED"
+  | "SUSPENDED"
+  | "BANNED"
+  | "CLOSED_PERMANENTLY"
+  | "ACTIVE";
 
 export interface ProfileData {
   storeBanner?: string;

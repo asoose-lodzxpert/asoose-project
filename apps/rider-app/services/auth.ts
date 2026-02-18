@@ -29,7 +29,7 @@ export async function authenticateWithBiometric(): Promise<boolean> {
     });
     return result.success;
   } catch (error) {
-    console.error("Biometric authentication error:", error);
+    // ...existing code...
     return false;
   }
 }
@@ -101,7 +101,7 @@ export async function login(identifier: string, password: string) {
 
     return { user: user };
   } catch (error) {
-    console.error("Login error:", error);
+    // ...existing code...
     throw error;
   }
 }
