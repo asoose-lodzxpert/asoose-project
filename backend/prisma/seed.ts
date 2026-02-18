@@ -30,7 +30,8 @@ async function main() {
       password: hashedPassword,
       role: UserRole.SUPER_ADMIN,
       status: UserStatus.ACTIVE,
-      verificationStatus: 'VERIFIED',
+      verificationStatus: 'VERIFIED', // Correct field from your schema
+      // isVerified: true, <--- REMOVED (This caused the error)
     },
   });
 

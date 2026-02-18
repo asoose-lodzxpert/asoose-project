@@ -103,14 +103,20 @@ export class RidesService {
     return estimates;
   }
 
-async requestRide(userId: string, dto: RequestRideDto, idempotencyKey: string) {
+  async requestRide(
+    userId: string,
+    dto: RequestRideDto,
+    idempotencyKey: string,
+  ) {
     this.logger.log(
       `Request Ride - User: ${userId}, Vehicle: ${dto.vehicleType}, IdempotencyKey: ${idempotencyKey}`,
     );
 
     // 0. Idempotency Check (Done FIRST to prevent duplicate Maps API billing & Ghost Rides)
     if (!idempotencyKey) {
-      throw new BadRequestException('Idempotency key is required to prevent duplicate requests.');
+      throw new BadRequestException(
+        'Idempotency key is required to prevent duplicate requests.',
+      );
     }
 
     const existingRequest = await this.prisma.ride.findFirst({
@@ -119,7 +125,9 @@ async requestRide(userId: string, dto: RequestRideDto, idempotencyKey: string) {
     });
 
     if (existingRequest) {
-      this.logger.log(`Idempotency match found for key: ${idempotencyKey}. Returning cached ride.`);
+      this.logger.log(
+        `Idempotency match found for key: ${idempotencyKey}. Returning cached ride.`,
+      );
       return {
         ride: { ...existingRequest, startOtp: undefined },
         fare: existingRequest.totalFare,
@@ -181,7 +189,7 @@ async requestRide(userId: string, dto: RequestRideDto, idempotencyKey: string) {
       where: {
         customerId: userId,
         status: RideStatus.PENDING,
-        idempotencyKey: { not: idempotencyKey }
+        idempotencyKey: { not: idempotencyKey },
       },
       data: {
         status: RideStatus.CANCELLED,
@@ -235,7 +243,9 @@ async requestRide(userId: string, dto: RequestRideDto, idempotencyKey: string) {
         if (dto.vehicleType === VehicleType.BUSINESS) multiplier = 1.5;
         if (dto.vehicleType === VehicleType.ECONOMY) multiplier = 1.0;
 
-        const finalCalculatedFare = this.common.round(fareDetails.totalFare * multiplier);
+        const finalCalculatedFare = this.common.round(
+          fareDetails.totalFare * multiplier,
+        );
 
         // 6. Security: Hash OTP
         const rawOtp = this.geo.generateOTP(TRIPS_CONFIG.OTP_LENGTH);

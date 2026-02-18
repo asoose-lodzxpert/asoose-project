@@ -1,8 +1,8 @@
-import {
-  Injectable,
-  Logger,
-  ForbiddenException,
-  BadRequestException,
+import { 
+  Injectable, 
+  Logger, 
+  ForbiddenException, 
+  BadRequestException 
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RedisService } from '../../matching/redis/redis.service';
@@ -151,9 +151,7 @@ export class TripsCommonService {
   }
 
   // ✅ ADDED: Secure Location Resolver (Source of Truth)
-  async resolveSecureLocation(
-    dto: LocationPayloadDto,
-  ): Promise<{ lat: number; lng: number; address: string }> {
+  async resolveSecureLocation(dto: LocationPayloadDto): Promise<{ lat: number, lng: number, address: string }> {
     let resolved;
 
     if (dto.placeId) {
@@ -166,9 +164,7 @@ export class TripsCommonService {
       resolved = await this.mapsService.reverseGeocode(dto.lat, dto.lng);
       this.logger.debug(`Reverse geocoding snapped to (${resolved.lat}, ${resolved.lng})`);
     } else {
-      throw new BadRequestException(
-        'Invalid location payload. Provide placeId or coordinates.',
-      );
+      throw new BadRequestException('Invalid location payload. Provide placeId or coordinates.');
     }
 
     // 3. Security Check: Enforce boundaries before billing/dispatching

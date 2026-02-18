@@ -18,6 +18,16 @@ export const BUSINESS_TYPES = [
   "Online Store",
   "Manufacturing",
   "Logistics & Shipping",
+  "Bookstore",
+  "Pet Store",
+  "Bakery",
+  "Florist",
+  "Jewelry",
+  "Sports & Outdoors",
+  "Toys & Games",
+  "Stationery",
+  "Hardware",
+  "Supermarket",
   "Other",
 ] as const;
 export type BusinessType = (typeof BUSINESS_TYPES)[number];
