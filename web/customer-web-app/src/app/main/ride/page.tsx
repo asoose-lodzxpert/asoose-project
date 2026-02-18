@@ -2,7 +2,7 @@
 
 import { RideController } from "./components/RideController";
 import { GlobalErrorBoundary } from "@/components/GlobalErrorBoundary";
-import { MapView } from "./components/mapView";
+import { MapView } from "./components/MapView";
 import { UserLocationTracker } from "./components/UserLocationTracker";
 import { MapCameraManager } from "./components/MapCameraManager";
 import { RideSocketListener } from "./components/RideSocketListener";

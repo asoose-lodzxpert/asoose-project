@@ -137,7 +137,6 @@ export class RidesService {
     }
 
     // 1. Discard client coordinates. Force strict backend resolution.
-    // The backend translates placeIds or fallback coordinates into trusted server data.
     const securePickup = await this.common.resolveSecureLocation(
       dto.pickupLocation,
     );

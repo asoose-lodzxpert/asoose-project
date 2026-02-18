@@ -1,7 +1,12 @@
 import dotenv from 'dotenv';
 import { PrismaClient, UserRole, UserStatus } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import { seedAdmin } from './admin-seed';
+import { seedBanks } from './08-bank';
 import { seedServiceZones } from './09-service-zones';
+
+// Load environment variables
+dotenv.config();
 
 const prisma = new PrismaClient();
 
@@ -10,7 +15,7 @@ async function main() {
   const passwordRaw = 'SuperAdmin123!';
   const hashedPassword = await bcrypt.hash(passwordRaw, 10);
 
-  // console.log(`🌱 Seeding Super Admin: ${email}...`);
+  console.log(`🌱 Seeding Super Admin: ${email}...`);
 
   const superAdmin = await prisma.user.upsert({
     where: { email },
@@ -37,6 +42,12 @@ async function main() {
     role: superAdmin.role,
     status: superAdmin.status,
   });
+
+  // Seed Admin
+  await seedAdmin(prisma);
+
+  // Seed banks
+  await seedBanks();
 
   // Seed service zones (Maiduguri only)
   await seedServiceZones(prisma);
