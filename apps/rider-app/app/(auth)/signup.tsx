@@ -1,4 +1,5 @@
 import { ThemedView } from "@/components/themed-view";
+import { SafeAreaView } from "react-native-safe-area-context";
 import React, { useState } from "react";
 import {
   Keyboard,
@@ -215,7 +216,7 @@ export default function SignupScreen() {
           <ScrollView
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
-            contentContainerStyle={{ paddingBottom: 20 }}
+            contentContainerStyle={{ paddingBottom: 100 }}
           >
             {step === 1 && (
               <StepPersonalDetails data={form} onChange={update} />
@@ -224,16 +225,16 @@ export default function SignupScreen() {
             {step === 3 && <StepAccountDetails data={form} onChange={update} />}
           </ScrollView>
         </TouchableWithoutFeedback>
+        {/* Bottom navigation fixed above safe area */}
+        <SafeAreaView edges={["bottom"]} style={styles.safeAreaNav}>
+          <SignupNavigation
+            step={step}
+            loading={loading}
+            onBack={() => setStep((s) => (s - 1) as SignupStep)}
+            onNext={handleNext}
+          />
+        </SafeAreaView>
       </KeyboardAvoidingView>
-
-      {/* Bottom navigation */}
-      <SignupNavigation
-        step={step}
-        loading={loading}
-        onBack={() => setStep((s) => (s - 1) as SignupStep)}
-        onNext={handleNext}
-      />
-
       <Toast />
     </ThemedView>
   );
@@ -243,5 +244,14 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     paddingHorizontal: 24,
+  },
+  safeAreaNav: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "transparent",
+    paddingHorizontal: 0,
+    zIndex: 10,
   },
 });

@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import {
@@ -12,13 +13,17 @@ import {
 } from '@prisma/client';
 import { EmailProducer } from 'src/mail/email.producer';
 import { ActivityLogService } from 'src/common/services/activity-log.services';
+import { RiderAccountNotificationsService } from 'src/riders/notifications/rider-account-notifications.service';
 
 @Injectable()
 export class RidersService {
+  private readonly logger = new Logger(RidersService.name);
+
   constructor(
     private prisma: PrismaService,
     private emailProducer: EmailProducer,
     private logService: ActivityLogService,
+    private riderNotificationsService: RiderAccountNotificationsService,
   ) {}
 
   async findAll(params: {
@@ -207,6 +212,29 @@ export class RidersService {
 
       return updatedRider;
     });
+
+    // Notify rider of status change (after transaction completes)
+    try {
+      if (['ACTIVE', 'SUSPENDED', 'BANNED', 'INACTIVE'].includes(status)) {
+        const reason =
+          status === 'SUSPENDED'
+            ? 'Your account has been suspended'
+            : status === 'BANNED'
+              ? 'Your account has been permanently banned'
+              : status === 'ACTIVE'
+                ? 'Your account has been reactivated'
+                : undefined;
+        await this.riderNotificationsService.notifyAccountStatusChange(
+          id,
+          status as 'ACTIVE' | 'SUSPENDED' | 'BANNED' | 'INACTIVE',
+          reason,
+        );
+      }
+    } catch (error) {
+      this.logger.error(
+        `Failed to notify rider of status change: ${error.message}`,
+      );
+    }
   }
 
   async verifyDocument(
@@ -227,6 +255,25 @@ export class RidersService {
       details: `Document (${result.type}) marked as ${status}`,
       metadata: { documentId: docId, status },
     });
+
+    // Notify rider of document verification result
+    try {
+      const rejectionReason =
+        status === 'REJECTED'
+          ? 'Your document did not meet our requirements. Please resubmit.'
+          : undefined;
+
+      await this.riderNotificationsService.notifyDocumentVerificationResult(
+        riderId,
+        result.type,
+        status,
+        rejectionReason,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to notify rider of document verification: ${error.message}`,
+      );
+    }
 
     return result;
   }

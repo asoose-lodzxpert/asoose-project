@@ -14,6 +14,24 @@ export class EmailProcessor extends WorkerHost {
         return this.sendWelcome(job);
       case 'send-vendor-message':
         return this.sendVendorMessage(job);
+      case 'send-user-message':
+        return this.sendUserMessage(job);
+      case 'send-rider-message':
+        return this.sendRiderMessage(job);
+      case 'admin-alert':
+        return this.sendAdminAlert(job);
+      case 'vendor-store-status':
+        return this.sendVendorStoreStatus(job);
+      case 'vendor-product-status':
+        return this.sendVendorProductStatus(job);
+      case 'rider-account-status':
+        return this.sendRiderAccountStatus(job);
+      case 'rider-document-verification':
+        return this.sendRiderDocumentVerification(job);
+      case 'customer-account-status':
+        return this.sendCustomerAccountStatus(job);
+      case 'admin-high-value-withdrawal':
+        return this.sendAdminHighValueWithdrawal(job);
       case 'order-created-customer':
         return this.sendOrderCreatedCustomer(job);
       case 'order-created-vendor':
@@ -64,6 +82,186 @@ export class EmailProcessor extends WorkerHost {
       to: job.data.email,
       subject: job.data.subject,
       text: job.data.message,
+    });
+  }
+
+  private async sendUserMessage(
+    job: Job<{ email: string; subject: string; message: string }>,
+  ) {
+    await this.mailer.sendMail({
+      to: job.data.email,
+      subject: job.data.subject,
+      text: job.data.message,
+    });
+  }
+
+  private async sendRiderMessage(
+    job: Job<{ email: string; subject: string; message: string }>,
+  ) {
+    await this.mailer.sendMail({
+      to: job.data.email,
+      subject: job.data.subject,
+      text: job.data.message,
+    });
+  }
+
+  private async sendAdminAlert(
+    job: Job<{ adminEmails: string; subject: string; message: string }>,
+  ) {
+    await this.mailer.sendMail({
+      to: job.data.adminEmails,
+      subject: `[ADMIN ALERT] ${job.data.subject}`,
+      text: job.data.message,
+    });
+  }
+
+  private async sendVendorStoreStatus(
+    job: Job<{
+      email: string;
+      vendorName: string;
+      storeName: string;
+      newStatus: string;
+      reason: string;
+      isSuspended: boolean;
+    }>,
+  ) {
+    await this.mailer.sendMail({
+      to: job.data.email,
+      subject: `Store Status Update - ${job.data.storeName}`,
+      template: './vendor-store-suspended',
+      context: {
+        vendorName: job.data.vendorName,
+        storeName: job.data.storeName,
+        newStatus: job.data.newStatus,
+        reason: job.data.reason,
+        isSuspended: job.data.isSuspended,
+      },
+    });
+  }
+
+  private async sendVendorProductStatus(
+    job: Job<{
+      email: string;
+      vendorName: string;
+      productName: string;
+      newStatus: string;
+      rejectionReason?: string;
+      isRejected: boolean;
+    }>,
+  ) {
+    await this.mailer.sendMail({
+      to: job.data.email,
+      subject: `Product Status Update - ${job.data.productName}`,
+      template: './vendor-product-status',
+      context: {
+        vendorName: job.data.vendorName,
+        productName: job.data.productName,
+        newStatus: job.data.newStatus,
+        rejectionReason: job.data.rejectionReason,
+        isRejected: job.data.isRejected,
+      },
+    });
+  }
+
+  private async sendRiderAccountStatus(
+    job: Job<{
+      email: string;
+      riderName: string;
+      newStatus: string;
+      reason: string;
+      isActive: boolean;
+      isSuspended: boolean;
+      isBanned: boolean;
+    }>,
+  ) {
+    await this.mailer.sendMail({
+      to: job.data.email,
+      subject: 'Account Status Update',
+      template: './rider-account-status',
+      context: {
+        riderName: job.data.riderName,
+        newStatus: job.data.newStatus,
+        reason: job.data.reason,
+        isActive: job.data.isActive,
+        isSuspended: job.data.isSuspended,
+        isBanned: job.data.isBanned,
+      },
+    });
+  }
+
+  private async sendRiderDocumentVerification(
+    job: Job<{
+      email: string;
+      riderName: string;
+      documentType: string;
+      status: string;
+      rejectionReason?: string;
+      isVerified: boolean;
+      isRejected: boolean;
+    }>,
+  ) {
+    await this.mailer.sendMail({
+      to: job.data.email,
+      subject: 'Document Verification Result',
+      template: './rider-document-verification',
+      context: {
+        riderName: job.data.riderName,
+        documentType: job.data.documentType,
+        status: job.data.status,
+        rejectionReason: job.data.rejectionReason,
+        isVerified: job.data.isVerified,
+        isRejected: job.data.isRejected,
+      },
+    });
+  }
+
+  private async sendCustomerAccountStatus(
+    job: Job<{
+      email: string;
+      userName: string;
+      newStatus: string;
+      reason: string;
+      isActive: boolean;
+      isSuspended: boolean;
+      isBanned: boolean;
+    }>,
+  ) {
+    await this.mailer.sendMail({
+      to: job.data.email,
+      subject: 'Account Status Update',
+      template: './customer-account-status',
+      context: {
+        userName: job.data.userName,
+        newStatus: job.data.newStatus,
+        reason: job.data.reason,
+        isActive: job.data.isActive,
+        isSuspended: job.data.isSuspended,
+        isBanned: job.data.isBanned,
+      },
+    });
+  }
+
+  private async sendAdminHighValueWithdrawal(
+    job: Job<{
+      adminEmails: string;
+      entityType: string;
+      amount: number;
+      accountName: string;
+      accountNumber: string;
+      bankCode: string;
+    }>,
+  ) {
+    await this.mailer.sendMail({
+      to: job.data.adminEmails,
+      subject: 'High Value Withdrawal Alert',
+      template: './admin-high-value-withdrawal',
+      context: {
+        entityType: job.data.entityType,
+        amount: job.data.amount,
+        accountName: job.data.accountName,
+        accountNumber: job.data.accountNumber,
+        bankCode: job.data.bankCode,
+      },
     });
   }
 

@@ -1,5 +1,15 @@
-import React, { useState, useEffect } from "react";
-import { View, StyleSheet, ScrollView, Pressable, Image } from "react-native";
+import React, { useState, useEffect, useCallback } from "react";
+import { View as SkeletonView } from "react-native";
+import {
+  View,
+  StyleSheet,
+  ScrollView,
+  Pressable,
+  Image,
+  RefreshControl,
+  Linking,
+} from "react-native";
+import Toast from "react-native-toast-message";
 
 import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
@@ -7,19 +17,7 @@ import { ThemedInput } from "@/components/ThemedInput";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { useRouter } from "expo-router";
-
-type VehicleInfo = {
-  vehicleType: string | null;
-  make: string;
-  model: string;
-  color: string;
-  plateNumber: string;
-  documents: {
-    id: any;
-    license: any;
-    insurance: any;
-  };
-};
+import { getVehicleInfo, type VehicleInfo } from "@/services/vehicle.service";
 
 const VEHICLES = [
   {
@@ -44,23 +42,40 @@ export default function VehicleInfoScreen() {
   const router = useRouter();
   const primary = useThemeColor({}, "brandPrimary");
   const surface = useThemeColor({}, "surfaceBackground");
+  const textSecondary = useThemeColor({}, "textSecondary");
   const [data, setData] = useState<VehicleInfo | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const fetchVehicleInfo = useCallback(async () => {
+    try {
+      setLoading(true);
+      const vehicleData = await getVehicleInfo();
+      setData(vehicleData);
+    } catch (error: any) {
+      Toast.show({
+        type: "error",
+        text1: "Failed to load vehicle info",
+        text2: error.message || "Please try again",
+      });
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
 
   useEffect(() => {
-    // Simulate loading and fetch data
-    setTimeout(() => {
-      setData({
-        vehicleType: "motorcycle",
-        make: "Honda",
-        model: "CBR",
-        color: "Red",
-        plateNumber: "ABC-123XY",
-        documents: { id: null, license: null, insurance: null },
-      });
-      setLoading(false);
-    }, 1200);
-  }, []);
+    fetchVehicleInfo();
+  }, [fetchVehicleInfo]);
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    fetchVehicleInfo();
+  }, [fetchVehicleInfo]);
+
+  const handleContactAdmin = () => {
+    Linking.openURL("mailto:hello@asoose.com");
+  };
 
   if (loading) {
     return (
@@ -77,60 +92,77 @@ export default function VehicleInfoScreen() {
         <ScrollView contentContainerStyle={{ padding: 20 }}>
           <Field label="Vehicle Type">
             <View style={styles.grid}>
-              <View
-                style={[
-                  styles.vehicle,
-                  { borderColor: primary, backgroundColor: "#F3F4F6" },
-                ]}
+              <SkeletonLoader
+                style={[styles.vehicle, { borderColor: primary }]}
               />
             </View>
           </Field>
-          <Field label="Make">
-            <View
-              style={{
-                height: 44,
-                borderRadius: 8,
-                backgroundColor: "#F3F4F6",
-                marginTop: 6,
-              }}
-            />
+          <Field label="Brand">
+            <SkeletonLoader style={styles.skeletonInput} />
           </Field>
           <Field label="Model">
-            <View
-              style={{
-                height: 44,
-                borderRadius: 8,
-                backgroundColor: "#F3F4F6",
-                marginTop: 6,
-              }}
-            />
-          </Field>
-          <Field label="Color">
-            <View
-              style={{
-                height: 44,
-                borderRadius: 8,
-                backgroundColor: "#F3F4F6",
-                marginTop: 6,
-              }}
-            />
-          </Field>
-          <Field label="Plate Number">
-            <View
-              style={{
-                height: 44,
-                borderRadius: 8,
-                backgroundColor: "#F3F4F6",
-                marginTop: 6,
-              }}
-            />
+            <SkeletonLoader style={styles.skeletonInput} />
           </Field>
         </ScrollView>
       </ThemedView>
     );
   }
 
-  if (!data) return null;
+  // Simple skeleton loader component
+  function SkeletonLoader({ style }: { style?: any }) {
+    return (
+      <SkeletonView
+        style={[
+          {
+            backgroundColor: "#e1e9ee",
+            borderRadius: 8,
+            minHeight: 44,
+            opacity: 0.7,
+          },
+          style,
+        ]}
+      />
+    );
+  }
+
+  // --- Null Data State ---
+  if (!data) {
+    return (
+      <ThemedView style={{ flex: 1, backgroundColor: surface }}>
+        <View style={[styles.header, { borderBottomColor: primary + "40" }]}>
+          <Pressable onPress={() => router.back()}>
+            <IconSymbol name="chevron.left" size={24} color={primary} />
+          </Pressable>
+          <ThemedText type="subtitle" style={{ flex: 1, textAlign: "center" }}>
+            Vehicle Information
+          </ThemedText>
+          <View style={{ width: 40 }} />
+        </View>
+        <View style={styles.emptyContainer}>
+          <IconSymbol
+            name="exclamationmark.triangle"
+            size={60}
+            color={textSecondary}
+          />
+          <ThemedText type="defaultSemiBold" style={styles.emptyTitle}>
+            No Vehicle Data Found
+          </ThemedText>
+          <ThemedText style={[styles.emptySubtitle, { color: textSecondary }]}>
+            It seems your vehicle profile is incomplete. Please contact our
+            admin team to update your details.
+          </ThemedText>
+          <Pressable
+            style={[styles.contactButton, { backgroundColor: primary }]}
+            onPress={handleContactAdmin}
+          >
+            <ThemedText style={{ color: "#fff", fontWeight: "600" }}>
+              Contact Admin
+            </ThemedText>
+          </Pressable>
+        </View>
+      </ThemedView>
+    );
+  }
 
   return (
     <ThemedView style={{ flex: 1, backgroundColor: surface }}>
@@ -151,10 +183,21 @@ export default function VehicleInfoScreen() {
         </ThemedText>
         <View style={{ width: 40 }} />
       </View>
-      <ScrollView contentContainerStyle={{ padding: 20 }}>
+      <ScrollView
+        contentContainerStyle={{ padding: 20 }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={primary}
+          />
+        }
+      >
         <Field label="Vehicle Type">
           <View style={styles.grid}>
-            {VEHICLES.filter((v) => v.key === data.vehicleType).map((v) => (
+            {VEHICLES.filter(
+              (v) => v.key.toLowerCase() === data.type?.toLowerCase(),
+            ).map((v) => (
               <View
                 key={v.key}
                 style={[styles.vehicle, { borderColor: primary }]}
@@ -163,23 +206,30 @@ export default function VehicleInfoScreen() {
                 <ThemedText>{v.label}</ThemedText>
               </View>
             ))}
+            {!VEHICLES.some(
+              (v) => v.key.toLowerCase() === data.type?.toLowerCase(),
+            ) && (
+              <View style={[styles.vehicle, { borderColor: primary }]}>
+                <ThemedText>{data.type}</ThemedText>
+              </View>
+            )}
           </View>
         </Field>
-        <Field label="Make">
-          <ThemedInput placeholder="Honda" value={data.make} editable={false} />
+
+        <Field label="Brand">
+          <ThemedInput value={data.brand} editable={false} />
         </Field>
         <Field label="Model">
-          <ThemedInput placeholder="CBR" value={data.model} editable={false} />
+          <ThemedInput value={data.model} editable={false} />
         </Field>
         <Field label="Color">
-          <ThemedInput placeholder="Red" value={data.color} editable={false} />
+          <ThemedInput value={data.color} editable={false} />
+        </Field>
+        <Field label="Year">
+          <ThemedInput value={data.year?.toString()} editable={false} />
         </Field>
         <Field label="Plate Number">
-          <ThemedInput
-            placeholder="ABC-123XY"
-            value={data.plateNumber}
-            editable={false}
-          />
+          <ThemedInput value={data.plateNumber} editable={false} />
         </Field>
       </ScrollView>
     </ThemedView>
@@ -219,8 +269,35 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   vehicleIcon: { width: 40, height: 40, marginBottom: 8 },
-  section: { gap: 8, marginTop: 12 },
-  hintText: { fontSize: 12, textAlign: "center", color: "#9CA3AF" },
-  removeButton: { marginTop: 6 },
-  loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
+  skeletonInput: {
+    height: 44,
+    borderRadius: 8,
+    backgroundColor: "#e1e9ee",
+    marginTop: 6,
+    opacity: 0.7,
+  },
+  // --- New Empty State Styles ---
+  emptyContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 40,
+  },
+  emptyTitle: {
+    fontSize: 20,
+    marginTop: 20,
+    textAlign: "center",
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    textAlign: "center",
+    marginTop: 8,
+    lineHeight: 20,
+  },
+  contactButton: {
+    marginTop: 24,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+  },
 });

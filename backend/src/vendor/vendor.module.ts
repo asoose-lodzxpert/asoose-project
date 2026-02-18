@@ -1,5 +1,5 @@
 import { Module, OnModuleInit, forwardRef } from '@nestjs/common';
-import { CacheModule } from '@nestjs/cache-manager'; // ✅ Fix for CACHE_MANAGER error
+import { CacheModule } from '@nestjs/cache-manager';
 import { VendorController } from './vendor.controller';
 import { VendorService } from './vendor.service';
 import { PrismaModule } from '../prisma/prisma.module';
@@ -23,12 +23,15 @@ import { VendorOrdersStreamService } from './orders/vendor-orders-stream.service
 import { VendorNotificationsService } from './notifications/vendor-notifications.service';
 import { VendorNotificationsController } from './notifications/vendor-notifications.controller';
 import { VendorSecurityNotificationsService } from './notifications/vendor-security-notifications.service';
+import { VendorAccountNotificationsService } from './notifications/vendor-account-notifications.service';
 
 import { StorageModule } from '../storage/storage.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 
 // Services
 import { ActivityLogService } from 'src/common/services/activity-log.services';
+// Ensure this path points to where your StoresService actually is
+// import { StoresService } from './stores/stores.service';
 import { StoresService } from 'src/super-admin/vendors/vendors.service';
 import { TransactionsModule } from 'src/super-admin/transactions/transaction.module';
 
@@ -37,16 +40,10 @@ import { TransactionsModule } from 'src/super-admin/transactions/transaction.mod
     PrismaModule,
     StorageModule,
     JwtModule,
-    MailModule, 
+    MailModule,
     OtpModule,
     NotificationsModule,
-    // ✅ Fix for Circular Dependency
-    forwardRef(() => TransactionsModule),
-    // ✅ Fix for "CACHE_MANAGER" unknown dependency
-    CacheModule.register({
-      ttl: 600, // default cache time (10 mins)
-      max: 100, // maximum number of items in cache
-    }),
+    forwardRef(() => TransactionsModule), // ✅ FIXED: Wrapped in forwardRef to break circular dependency
   ],
   controllers: [
     VendorProductsController,
@@ -63,11 +60,16 @@ import { TransactionsModule } from 'src/super-admin/transactions/transaction.mod
     VendorService,
     VendorAuthService,
     NubanService,
-    // ✅ Added missing support services
-    ActivityLogService, 
-    StoresService,
+
+    // 👇 2. VITAL: Add BOTH Services here
+    ActivityLogService, // Fixes the "?" at index [2]
+    StoresService, // The service itself
   ],
-  exports: [VendorSecurityNotificationsService, VendorOrdersStreamService],
+  exports: [
+    VendorSecurityNotificationsService,
+    VendorOrdersStreamService,
+    VendorAccountNotificationsService,
+  ],
 })
 export class VendorModule implements OnModuleInit {
   constructor(private moduleRef: ModuleRef) {}

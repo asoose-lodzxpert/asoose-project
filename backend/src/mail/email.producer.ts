@@ -287,4 +287,189 @@ export class EmailProducer {
       { attempts: 3, removeOnComplete: true },
     );
   }
+
+  // ========== USER EMAIL HANDLERS ==========
+
+  async sendUserMessage(email: string, subject: string, message: string) {
+    await this.emailQueue.add(
+      'send-user-message',
+      { email, subject, message },
+      {
+        attempts: 3,
+        removeOnComplete: true,
+      },
+    );
+  }
+
+  async sendRiderMessage(email: string, subject: string, message: string) {
+    await this.emailQueue.add(
+      'send-rider-message',
+      { email, subject, message },
+      {
+        attempts: 3,
+        removeOnComplete: true,
+      },
+    );
+  }
+
+  // ========== ADMIN ALERT HANDLERS ==========
+
+  async sendAdminAlert(adminEmails: string, subject: string, message: string) {
+    await this.emailQueue.add(
+      'admin-alert',
+      { adminEmails, subject, message },
+      {
+        attempts: 3,
+        removeOnComplete: true,
+      },
+    );
+  }
+
+  // ========== NOTIFICATION TEMPLATE HANDLERS ==========
+
+  async sendVendorStoreStatusNotification(
+    email: string,
+    vendorName: string,
+    storeName: string,
+    newStatus: string,
+    reason: string,
+  ) {
+    await this.emailQueue.add(
+      'vendor-store-status',
+      {
+        email,
+        vendorName,
+        storeName,
+        newStatus,
+        reason,
+        isSuspended: newStatus === 'SUSPENDED',
+      },
+      {
+        attempts: 3,
+        removeOnComplete: true,
+      },
+    );
+  }
+
+  async sendVendorProductStatusNotification(
+    email: string,
+    vendorName: string,
+    productName: string,
+    newStatus: string,
+    rejectionReason?: string,
+  ) {
+    await this.emailQueue.add(
+      'vendor-product-status',
+      {
+        email,
+        vendorName,
+        productName,
+        newStatus,
+        rejectionReason,
+        isRejected: newStatus === 'DISABLED' && rejectionReason,
+      },
+      {
+        attempts: 3,
+        removeOnComplete: true,
+      },
+    );
+  }
+
+  async sendRiderAccountStatusNotification(
+    email: string,
+    riderName: string,
+    newStatus: string,
+    reason: string,
+  ) {
+    await this.emailQueue.add(
+      'rider-account-status',
+      {
+        email,
+        riderName,
+        newStatus,
+        reason,
+        isActive: newStatus === 'ACTIVE',
+        isSuspended: newStatus === 'SUSPENDED',
+        isBanned: newStatus === 'BANNED',
+      },
+      {
+        attempts: 3,
+        removeOnComplete: true,
+      },
+    );
+  }
+
+  async sendRiderDocumentVerificationNotification(
+    email: string,
+    riderName: string,
+    documentType: string,
+    status: string,
+    rejectionReason?: string,
+  ) {
+    await this.emailQueue.add(
+      'rider-document-verification',
+      {
+        email,
+        riderName,
+        documentType,
+        status,
+        rejectionReason,
+        isVerified: status === 'VERIFIED',
+        isRejected: status === 'REJECTED',
+      },
+      {
+        attempts: 3,
+        removeOnComplete: true,
+      },
+    );
+  }
+
+  async sendCustomerAccountStatusNotification(
+    email: string,
+    userName: string,
+    newStatus: string,
+    reason: string,
+  ) {
+    await this.emailQueue.add(
+      'customer-account-status',
+      {
+        email,
+        userName,
+        newStatus,
+        reason,
+        isActive: newStatus === 'ACTIVE',
+        isSuspended: newStatus === 'SUSPENDED',
+        isBanned: newStatus === 'BANNED',
+      },
+      {
+        attempts: 3,
+        removeOnComplete: true,
+      },
+    );
+  }
+
+  async sendAdminHighValueWithdrawalAlert(
+    adminEmails: string,
+    entityType: string,
+    amount: number,
+    accountName: string,
+    accountNumber: string,
+    bankCode: string,
+  ) {
+    await this.emailQueue.add(
+      'admin-high-value-withdrawal',
+      {
+        adminEmails,
+        entityType,
+        amount,
+        accountName,
+        accountNumber,
+        bankCode,
+      },
+      {
+        attempts: 3,
+        removeOnComplete: true,
+      },
+    );
+  }
 }

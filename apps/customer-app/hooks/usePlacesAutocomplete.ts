@@ -1,7 +1,4 @@
-import axios from "axios";
 import { useEffect, useRef, useState } from "react";
-
-const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
 export function usePlacesAutocomplete(query: string, location?: string) {
   const [results, setResults] = useState<any[]>([]);
@@ -17,13 +14,16 @@ export function usePlacesAutocomplete(query: string, location?: string) {
     debounceRef.current = window.setTimeout(async () => {
       setLoading(true);
       try {
-        const params: any = { query };
-        if (location) params.location = location;
-        const res = await axios.get(`${API_URL}/maps/places-autocomplete`, {
-          params,
-        });
-        setResults(res.data);
-      } catch {
+        // Use backend endpoint for autocomplete
+        let url = `${process.env.EXPO_PUBLIC_API_URL}/maps/places-autocomplete?query=${encodeURIComponent(query)}`;
+        if (location) {
+          url += `&location=${location}`;
+        }
+        const res = await fetch(url);
+        const data = await res.json();
+        setResults(Array.isArray(data) ? data : []);
+      } catch (error) {
+        if (__DEV__) console.error("Places autocomplete error:", error);
         setResults([]);
       } finally {
         setLoading(false);

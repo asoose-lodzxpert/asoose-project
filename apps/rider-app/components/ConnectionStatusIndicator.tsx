@@ -1,99 +1,47 @@
 import { useJobs } from "@/context/JobContext";
 import React from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 
 export const ConnectionStatusIndicator = () => {
-  const { connectionStatus, isOnline, manualReconnect } = useJobs();
+  const { connectionStatus, isOnline } = useJobs();
 
   if (!isOnline) return null;
 
-  const getStatusConfig = () => {
+  const getStatusColor = () => {
     switch (connectionStatus) {
       case "connected":
-        return {
-          backgroundColor: "#10b981",
-          text: "Connected",
-          showReconnect: false,
-        };
+        return "#10b981"; // Green
       case "reconnecting":
-        return {
-          backgroundColor: "#f59e0b",
-          text: "Reconnecting...",
-          showReconnect: false,
-        };
+        return "#f59e0b"; // Orange
       case "disconnected":
-        return {
-          backgroundColor: "#6b7280",
-          text: "Disconnected",
-          showReconnect: true,
-        };
+        return "#6b7280";
       case "failed":
-        return {
-          backgroundColor: "#ef4444",
-          text: "Connection Failed",
-          showReconnect: true,
-        };
+        return "#ef4444"; // Red
       default:
-        return {
-          backgroundColor: "#6b7280",
-          text: "Unknown",
-          showReconnect: false,
-        };
+        return "#6b7280";
     }
   };
 
-  const config = getStatusConfig();
-
-  if (connectionStatus === "connected") {
-    // Don't show anything when connected
-    return null;
-  }
+  // Don't show anything when connected
+  // if (connectionStatus === "connected") {
+  //   return null;
+  // }
 
   return (
-    <View
-      style={[styles.container, { backgroundColor: config.backgroundColor }]}
-    >
-      <View style={styles.indicator} />
-      <Text style={styles.text}>{config.text}</Text>
-      {config.showReconnect && (
-        <TouchableOpacity onPress={manualReconnect} style={styles.button}>
-          <Text style={styles.buttonText}>Reconnect</Text>
-        </TouchableOpacity>
-      )}
+    <View style={styles.container}>
+      <View style={[styles.indicator, { backgroundColor: getStatusColor() }]} />
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    gap: 8,
   },
   indicator: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: "white",
-  },
-  text: {
-    color: "white",
-    fontSize: 14,
-    fontWeight: "600",
-    flex: 1,
-  },
-  button: {
-    backgroundColor: "rgba(255, 255, 255, 0.3)",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 4,
-  },
-  buttonText: {
-    color: "white",
-    fontSize: 12,
-    fontWeight: "600",
   },
 });

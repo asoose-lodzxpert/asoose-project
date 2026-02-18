@@ -1,8 +1,6 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useState, useEffect } from "react"; // Added useEffect
 import {
   ActivityIndicator,
-  Animated,
-  Image,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
@@ -12,16 +10,18 @@ import {
   TouchableWithoutFeedback,
   View,
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { ThemedInput } from "@/components/ThemedInput";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { LocationDisclosureModal } from "@/components/LocationDisclosureModal";
 import { useAuth } from "@/context/AuthContext";
 import { useConfirm } from "@/hooks/use-confirm";
 import { useThemeColor } from "@/hooks/use-theme-color";
-import { useRouter } from "expo-router";
 import Toast from "react-native-toast-message";
+import { useRouter } from "expo-router";
 
 export default function LoginScreen() {
   const [identifier, setIdentifier] = useState("");
@@ -30,6 +30,7 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const [biometricLoading, setBiometricLoading] = useState(false);
   const [error, setError] = useState("");
+  const [showLocationDisclosure, setShowLocationDisclosure] = useState(false);
 
   const {
     login,
@@ -46,36 +47,21 @@ export default function LoginScreen() {
   const textOnPrimary = useThemeColor({}, "textOnPrimary");
   const muted = useThemeColor({}, "textMuted");
 
-  /* ------------------ Animated logo shift ------------------ */
-
-  const logoTranslateY = useRef(new Animated.Value(0)).current;
+  /* ------------------ Auto Prompt Logic ------------------ */
 
   useEffect(() => {
-    const showSub = Keyboard.addListener("keyboardWillShow", () => {
-      Animated.timing(logoTranslateY, {
-        toValue: -60,
-        duration: 300,
-        useNativeDriver: true,
-      }).start();
-    });
-
-    const hideSub = Keyboard.addListener("keyboardWillHide", () => {
-      Animated.timing(logoTranslateY, {
-        toValue: 0,
-        duration: 300,
-        useNativeDriver: true,
-      }).start();
-    });
-
-    return () => {
-      showSub.remove();
-      hideSub.remove();
-    };
-  }, []);
-
-  const logoStyle = {
-    transform: [{ translateY: logoTranslateY }],
-  };
+    async function checkAutoBiometric() {
+      if (biometricAvailable && biometricEnrolled) {
+        const enabled = await isBiometricEnabled();
+        if (enabled) {
+          handleBiometricLogin();
+        }
+      }
+    }
+    // Delay slightly to ensure UI is ready and doesn't feel jarring
+    const timer = setTimeout(checkAutoBiometric, 500);
+    return () => clearTimeout(timer);
+  }, [biometricAvailable, biometricEnrolled]);
 
   /* ------------------ Logic ------------------ */
 
@@ -97,6 +83,16 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       await login({ email: identifier, password });
+
+      // Check if user has seen location disclosure
+      const hasSeenDisclosure = await AsyncStorage.getItem(
+        "locationDisclosureSeen",
+      );
+      if (!hasSeenDisclosure) {
+        setShowLocationDisclosure(true);
+        return;
+      }
+
       const enabled = await isBiometricEnabled();
       if (biometricAvailable && !enabled) {
         const wantsBiometric = await confirm({
@@ -125,14 +121,11 @@ export default function LoginScreen() {
             });
           } finally {
             setBiometricLoading(false);
-            router.replace("/(tabs)");
           }
-        } else {
-          router.replace("/(tabs)");
         }
-      } else {
-        router.replace("/(tabs)");
       }
+
+      router.replace("/");
     } catch (e: any) {
       setError(e.message || "Login failed. Please try again.");
     } finally {
@@ -140,41 +133,71 @@ export default function LoginScreen() {
     }
   }
 
+  async function handleLocationDisclosureAccepted() {
+    try {
+      // Mark disclosure as seen
+      await AsyncStorage.setItem("locationDisclosureSeen", "true");
+      setShowLocationDisclosure(false);
+
+      // Continue with biometric prompt if needed
+      const enabled = await isBiometricEnabled();
+      if (biometricAvailable && !enabled) {
+        const wantsBiometric = await confirm({
+          title: "Enable Biometric Login?",
+          message:
+            "Would you like to enable biometric authentication for faster login in the future?",
+          confirmText: "Yes",
+          cancelText: "No",
+          type: "info",
+          icon: "touchid",
+        });
+        if (wantsBiometric) {
+          try {
+            setBiometricLoading(true);
+            await enableBiometrics(identifier, password);
+            Toast.show({
+              type: "success",
+              text1: "Biometric Enabled",
+              text2: "You can now use biometric login.",
+            });
+          } catch (e: any) {
+            Toast.show({
+              type: "error",
+              text1: "Biometric Setup Failed",
+              text2: e.message || "Could not enable biometric login.",
+            });
+          } finally {
+            setBiometricLoading(false);
+          }
+        }
+      }
+
+      // Navigate to home
+      router.replace("/");
+    } catch (e: any) {
+      Toast.show({
+        type: "error",
+        text1: "Error",
+        text2: "Failed to proceed. Please try again.",
+      });
+    }
+  }
+
   async function handleBiometricLogin() {
-    if (!biometricAvailable) {
-      Toast.show({
-        type: "error",
-        text1: "Not Supported",
-        text2: "Your device doesn't support biometric authentication.",
-      });
-      return;
-    }
-    if (!biometricEnrolled) {
-      Toast.show({
-        type: "error",
-        text1: "Not Enrolled",
-        text2:
-          "Please set up biometric authentication in your device settings.",
-      });
-      return;
-    }
+    if (!biometricAvailable || !biometricEnrolled) return;
+
     const enabled = await isBiometricEnabled();
-    if (!enabled) {
-      Toast.show({
-        type: "info",
-        text1: "Biometric Login Disabled",
-        text2:
-          "Please login with your credentials first and enable biometric login in settings.",
-      });
-      return;
-    }
+    if (!enabled) return;
+
     setBiometricLoading(true);
     setError("");
     try {
       await biometricLogin();
-      router.replace("/(tabs)");
+      router.replace("/");
     } catch (e: any) {
-      setError(e.message || "Biometric authentication failed.");
+      // If auto-prompt fails or is cancelled, we don't necessarily want an intrusive error
+      // but we log it for the user if they pressed the button manually.
+      console.log("Biometric failed", e.message);
     } finally {
       setBiometricLoading(false);
     }
@@ -185,19 +208,12 @@ export default function LoginScreen() {
   return (
     <ThemedView style={styles.container}>
       <ConfirmModal />
+      <LocationDisclosureModal
+        visible={showLocationDisclosure}
+        onAccept={handleLocationDisclosureAccepted}
+      />
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <View style={{ flex: 1 }}>
-          <Animated.View style={[styles.logoContainer, logoStyle]}>
-            <Image
-              source={require("@/assets/images/icon.png")}
-              style={styles.logoImage}
-              resizeMode="contain"
-            />
-            <ThemedText type="title" style={styles.logoText}>
-              ASOOSE
-            </ThemedText>
-          </Animated.View>
-
           <KeyboardAvoidingView
             style={{ flex: 1 }}
             behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -209,10 +225,14 @@ export default function LoginScreen() {
               showsVerticalScrollIndicator={false}
             >
               <View style={styles.form}>
-                <ThemedText type="title">Welcome back</ThemedText>
-                <ThemedText style={[styles.subtitle, { color: muted }]}>
-                  Sign in to continue riding
-                </ThemedText>
+                <View style={styles.welcomeSection}>
+                  <ThemedText type="title" style={styles.welcomeTitle}>
+                    Welcome back
+                  </ThemedText>
+                  <ThemedText style={[styles.subtitle, { color: muted }]}>
+                    Sign in to continue riding
+                  </ThemedText>
+                </View>
 
                 <View style={styles.field}>
                   <ThemedInput
@@ -269,23 +289,23 @@ export default function LoginScreen() {
                     )}
                   </Pressable>
 
-                  <Pressable
-                    style={[
-                      styles.fingerprintButton,
-                      { borderColor: primary },
-                      biometricLoading && {
-                        opacity: 0.5,
-                      },
-                    ]}
-                    onPress={handleBiometricLogin}
-                    disabled={biometricLoading}
-                  >
-                    {biometricLoading ? (
-                      <ActivityIndicator color={primary} />
-                    ) : (
-                      <IconSymbol name="touchid" size={26} color={primary} />
-                    )}
-                  </Pressable>
+                  {biometricAvailable && (
+                    <Pressable
+                      style={[
+                        styles.fingerprintButton,
+                        { borderColor: primary },
+                        biometricLoading && { opacity: 0.5 },
+                      ]}
+                      onPress={handleBiometricLogin}
+                      disabled={biometricLoading}
+                    >
+                      {biometricLoading ? (
+                        <ActivityIndicator color={primary} />
+                      ) : (
+                        <IconSymbol name="touchid" size={26} color={primary} />
+                      )}
+                    </Pressable>
+                  )}
                 </View>
 
                 <View style={styles.divider}>
@@ -314,45 +334,14 @@ export default function LoginScreen() {
   );
 }
 
-/* ------------------ Styles ------------------ */
-
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    paddingHorizontal: 24,
-  },
-  logoContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 64,
-    gap: 12,
-  },
-  logoImage: {
-    width: 48,
-    height: 48,
-  },
-  logoText: {
-    fontSize: 32,
-    fontWeight: "bold",
-  },
-  form: {
-    flex: 1,
-    justifyContent: "center",
-    gap: 16,
-  },
-  subtitle: {
-    marginTop: -8,
-    fontSize: 14,
-  },
-  field: {
-    marginTop: 12,
-  },
-  actionsRow: {
-    flexDirection: "row",
-    gap: 12,
-    marginTop: 24,
-  },
+  container: { flex: 1, paddingHorizontal: 24 },
+  form: { flex: 1, justifyContent: "center", gap: 16 },
+  welcomeSection: { alignItems: "center", marginBottom: 16 },
+  welcomeTitle: { textAlign: "center" },
+  subtitle: { marginTop: 8, fontSize: 14, textAlign: "center" },
+  field: { marginTop: 12 },
+  actionsRow: { flexDirection: "row", gap: 12, marginTop: 24 },
   loginButton: {
     flex: 1,
     height: 52,
@@ -368,28 +357,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  divider: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginVertical: 24,
-  },
-  line: {
-    flex: 1,
-    height: 1,
-    backgroundColor: "#E5E7EB",
-  },
-  orText: {
-    marginHorizontal: 12,
-    fontSize: 12,
-    opacity: 0.6,
-  },
-  signup: {
-    alignItems: "center",
-    marginBottom: 24,
-  },
-  inputError: {
-    marginTop: 4,
-    color: "#EF4444",
-    textAlign: "left",
-  },
+  divider: { flexDirection: "row", alignItems: "center", marginVertical: 24 },
+  line: { flex: 1, height: 1, backgroundColor: "#E5E7EB" },
+  orText: { marginHorizontal: 12, fontSize: 12, opacity: 0.6 },
+  signup: { alignItems: "center", marginBottom: 24 },
+  inputError: { marginTop: 4, color: "#EF4444", textAlign: "left" },
 });

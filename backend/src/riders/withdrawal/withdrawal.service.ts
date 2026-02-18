@@ -52,7 +52,7 @@ export class WithdrawalService {
     createWithdrawalDto: CreateWithdrawalDto,
   ) {
     const { amount, bankAccountId } = createWithdrawalDto;
-    
+
     // 1. Fetch Rider & Validate Eligibility
     const rider = await this.prisma.rider.findUnique({
       where: { id: riderId },

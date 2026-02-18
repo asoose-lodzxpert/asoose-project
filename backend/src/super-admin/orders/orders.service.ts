@@ -317,9 +317,7 @@ export class OrdersService {
     return this.prisma.$transaction(async (tx) => {
       // Update Payment Status
       const newStatus =
-        amountToRefund === payment.amount
-          ? 'REFUNDED'
-          : 'PARTIALLY_REFUNDED';
+        amountToRefund === payment.amount ? 'REFUNDED' : 'PARTIALLY_REFUNDED';
 
       await tx.payment.update({
         where: { id: payment.id },

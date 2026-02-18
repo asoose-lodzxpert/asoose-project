@@ -1,23 +1,16 @@
 import { ThemedText } from "@/components/themed-text";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
-import { uploadFile } from "@/services/storage.service";
 import * as ImagePicker from "expo-image-picker";
-import React, { useState } from "react";
-import {
-  ActivityIndicator,
-  Image,
-  Pressable,
-  StyleSheet,
-  View,
-} from "react-native";
+import React from "react";
+import { Image, Pressable, StyleSheet, View } from "react-native";
 import Toast from "react-native-toast-message";
 
 interface Props {
   label: string;
   value?: string;
   circular?: boolean;
-  onPick: (url: string) => void;
+  onPick: (uri: string, name: string) => void;
 }
 
 export const ImageUpload: React.FC<Props> = ({
@@ -26,9 +19,10 @@ export const ImageUpload: React.FC<Props> = ({
   circular,
   onPick,
 }) => {
-  const [uploading, setUploading] = useState(false);
-  const textOnPrimary = useThemeColor({}, "textOnPrimary");
-  const borderDefault = useThemeColor({}, "borderDefault");
+  const primary = useThemeColor({}, "brandPrimary");
+  const successColor = useThemeColor({}, "statusSuccess");
+  const textMuted = useThemeColor({}, "textMuted");
+  const errorColor = useThemeColor({}, "statusError");
 
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -51,130 +45,116 @@ export const ImageUpload: React.FC<Props> = ({
 
     if (!result.canceled && result.assets.length > 0) {
       const asset = result.assets[0];
+      const fileName = asset.uri.split("/").pop() || "image.jpg";
 
-      // Extract filename and determine mime type
-      const uriParts = asset.uri.split("/");
-      const filename = uriParts[uriParts.length - 1];
-      const fileType =
-        asset.type === "image"
-          ? `image/${filename.split(".").pop()}`
-          : "image/jpeg";
+      // Just store the URI and filename - will upload on final submit
+      onPick(asset.uri, fileName);
 
-      setUploading(true);
-
-      try {
-        const uploadedUrl = await uploadFile(
-          {
-            uri: asset.uri,
-            name: filename,
-            type: fileType,
-          },
-          (progress) => {},
-        );
-
-        onPick(uploadedUrl);
-
-        Toast.show({
-          type: "success",
-          text1: "Upload successful",
-          text2: "Image uploaded successfully.",
-        });
-      } catch (error) {
-        Toast.show({
-          type: "error",
-          text1: "Upload failed",
-          text2:
-            error instanceof Error ? error.message : "Failed to upload image",
-        });
-      } finally {
-        setUploading(false);
-      }
+      Toast.show({
+        type: "success",
+        text1: "Image selected",
+        text2: "Will be uploaded when you complete signup",
+      });
     }
   };
 
+  const removeImage = () => {
+    onPick("", "");
+  };
+
   return (
-    <View>
+    <View style={{ gap: 8 }}>
       <ThemedText style={styles.label}>{label}</ThemedText>
 
       <Pressable
-        style={[
-          circular ? styles.circle : styles.banner,
-          { borderColor: borderDefault },
-        ]}
         onPress={pickImage}
-        disabled={uploading}
+        style={[
+          styles.imageCard,
+          value && { borderColor: primary, borderWidth: 2 },
+        ]}
       >
-        {value && (
-          <Image
-            source={{ uri: value }}
-            style={StyleSheet.absoluteFillObject}
-          />
-        )}
-
-        {uploading ? (
-          <View style={styles.uploadingOverlay}>
-            <ActivityIndicator size="large" color={textOnPrimary} />
-            <ThemedText
-              style={[styles.uploadingText, { color: textOnPrimary }]}
-            >
-              Uploading...
-            </ThemedText>
+        {value ? (
+          <View style={{ flex: 1, width: "100%" }}>
+            <Image
+              source={{ uri: value }}
+              style={[styles.image, circular && { borderRadius: 100 }]}
+            />
+            <View style={styles.imageOverlay}>
+              <IconSymbol
+                name="checkmark.circle.fill"
+                size={32}
+                color={successColor}
+              />
+              <ThemedText style={{ color: "#fff", marginTop: 8 }}>
+                Selected
+              </ThemedText>
+            </View>
           </View>
         ) : (
-          <View style={styles.overlay}>
-            <IconSymbol name="camera.fill" size={24} color={textOnPrimary} />
+          <View style={styles.placeholder}>
+            <IconSymbol name="photo" size={40} color={textMuted} />
+            <ThemedText style={{ marginTop: 8, color: textMuted }}>
+              Tap to select {label}
+            </ThemedText>
           </View>
         )}
       </Pressable>
+
+      {value && (
+        <Pressable
+          onPress={removeImage}
+          style={[styles.removeButton, { borderColor: errorColor }]}
+        >
+          <IconSymbol name="trash" size={18} color={errorColor} />
+          <ThemedText style={{ color: errorColor, fontSize: 12 }}>
+            Remove
+          </ThemedText>
+        </Pressable>
+      )}
+
+      <ThemedText style={{ fontSize: 12, color: textMuted }}>
+        Will be uploaded when you complete the signup
+      </ThemedText>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  circle: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
-    borderWidth: 1,
-    overflow: "hidden",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-
   label: {
-    marginBottom: 8,
-  },
-
-  banner: {
-    width: "100%",
-    aspectRatio: 16 / 9,
-    borderWidth: 1,
-    borderRadius: 12,
-    overflow: "hidden",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-
-  overlay: {
-    position: "absolute",
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: "rgba(0,0,0,0.45)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-
-  uploadingOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.7)",
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 12,
-  },
-
-  uploadingText: {
     fontSize: 14,
     fontWeight: "600",
+  },
+  imageCard: {
+    height: 200,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: "#e5e5e5",
+    borderStyle: "dashed",
+    overflow: "hidden",
+    backgroundColor: "#f9f9f9",
+  },
+  image: {
+    width: "100%",
+    height: "100%",
+  },
+  imageOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0, 0, 0, 0.4)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  placeholder: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  removeButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
   },
 });

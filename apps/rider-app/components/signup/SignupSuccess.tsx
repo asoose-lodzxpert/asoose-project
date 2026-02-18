@@ -7,202 +7,110 @@ import { StyleSheet, View } from "react-native";
 
 export function SignupSuccess() {
   const success = useThemeColor({}, "statusSuccess");
-  const warning = useThemeColor({}, "statusPending");
+  const pending = useThemeColor({}, "statusPending");
   const muted = useThemeColor({}, "textMuted");
-  const cardBg = useThemeColor({}, "surfaceSubtle");
+  const border = useThemeColor({}, "borderDefault");
 
   return (
     <ThemedView style={styles.container}>
-      {/* Header Confirmation */}
+      {/* 1. Minimal Header */}
       <View style={styles.header}>
-        <View style={[styles.successIcon, { backgroundColor: success }]}>
-          <IconSymbol name="check" size={36} color="#fff" />
-        </View>
-
-        <ThemedText type="title">Application Submitted!</ThemedText>
+        <IconSymbol name="checkmark.circle.fill" size={60} color={success} />
+        <ThemedText type="title" style={styles.title}>
+          Application Sent
+        </ThemedText>
         <ThemedText style={styles.subTitle}>
-          We&apos;re reviewing your documents
+          We're reviewing your profile
         </ThemedText>
       </View>
 
-      {/* Status Tracker */}
-      <View style={[styles.card, { backgroundColor: cardBg }]}>
-        {/* Status Header */}
-        <View style={styles.statusHeader}>
-          <IconSymbol name="file-text" size={18} color={warning} />
-          <ThemedText type="defaultSemiBold">Status: Under Review</ThemedText>
-        </View>
+      <View style={[styles.divider, { backgroundColor: border }]} />
 
-        {/* Timeline */}
+      <View style={styles.content}>
         <TimelineItem
           icon="checkmark.circle.fill"
-          iconColor={success}
-          title="Application submitted"
-          description="Just now"
-          active
+          color={success}
+          title="Submitted"
+          time="Just now"
+          isDone
         />
-
         <TimelineItem
           icon="clock.fill"
-          iconColor={warning}
-          title="Document verification"
-          description="Reviewing your documents (24-48 hours)"
+          color={pending}
+          title="Document Verification"
+          time="24-48 hours"
           active
         />
-
         <TimelineItem
           icon="circle"
-          iconColor={muted}
-          title="Background check"
-          description="Will begin after verification (1-3 days)"
+          color={muted}
+          title="Background Check"
+          time="1-3 days"
         />
-
         <TimelineItem
           icon="circle"
-          iconColor={muted}
-          title="Account activation"
-          description="Final step to start delivering"
+          color={muted}
+          title="Account Ready"
+          time="Final step"
           isLast
         />
       </View>
 
-      {/* What's Next */}
-      <View style={[styles.card, { backgroundColor: cardBg }]}>
-        <ThemedText type="defaultSemiBold">What&apos;s next?</ThemedText>
-
-        <View style={styles.nextItem}>
-          <IconSymbol name="1.circle.fill" size={20} color={warning} />
-          <ThemedText style={styles.nextText}>
-            We&apos;ll verify your documents within 24-48 hours.
-          </ThemedText>
-        </View>
-
-        <View style={styles.nextItem}>
-          <IconSymbol name="2.circle.fill" size={20} color={muted} />
-          <ThemedText style={styles.nextText}>
-            A background check will begin immediately after.
-          </ThemedText>
-        </View>
+      {/* 3. Simple Footer Info */}
+      <View style={styles.footer}>
+        <ThemedText style={[styles.footerText, { color: muted }]}>
+          We'll notify you via email as soon as your account is activated.
+        </ThemedText>
       </View>
     </ThemedView>
   );
 }
 
-/* ---------------------------------- */
-/* Timeline Item */
-/* ---------------------------------- */
 function TimelineItem({
   icon,
-  iconColor,
+  color,
   title,
-  description,
+  time,
   active,
+  isDone,
   isLast,
-}: {
-  icon: any;
-  iconColor: string;
-  title: string;
-  description: string;
-  active?: boolean;
-  isLast?: boolean;
-}) {
+}: any) {
   return (
-    <View style={styles.timelineRow}>
-      <View style={styles.timelineLeft}>
-        <IconSymbol name={icon} size={20} color={iconColor} />
-        {!isLast && <View style={styles.timelineLine} />}
+    <View style={styles.row}>
+      <View style={styles.leftColumn}>
+        <IconSymbol name={icon} size={18} color={color} />
+        {!isLast && (
+          <View
+            style={[
+              styles.line,
+              { backgroundColor: isDone ? color : "#E5E7EB" },
+            ]}
+          />
+        )}
       </View>
-
-      <View style={styles.timelineContent}>
-        <ThemedText type={active ? "defaultSemiBold" : "default"}>
+      <View style={styles.rightColumn}>
+        <ThemedText style={[styles.rowTitle, active && { fontWeight: "700" }]}>
           {title}
         </ThemedText>
-        <ThemedText style={styles.timelineText}>{description}</ThemedText>
+        <ThemedText style={styles.rowTime}>{time}</ThemedText>
       </View>
     </View>
   );
 }
 
-/* ---------------------------------- */
-/* Styles */
-/* ---------------------------------- */
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    paddingHorizontal: 24,
-    paddingTop: 48,
-  },
-
-  header: {
-    alignItems: "center",
-    marginBottom: 32,
-    gap: 8,
-  },
-
-  successIcon: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 8,
-  },
-
-  subTitle: {
-    opacity: 0.7,
-    textAlign: "center",
-  },
-
-  card: {
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 20,
-  },
-
-  statusHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginBottom: 16,
-  },
-
-  timelineRow: {
-    flexDirection: "row",
-    gap: 12,
-    marginBottom: 16,
-  },
-
-  timelineLeft: {
-    alignItems: "center",
-    width: 24,
-  },
-
-  timelineLine: {
-    flex: 1,
-    width: 2,
-    backgroundColor: "#E5E7EB",
-    marginTop: 4,
-  },
-
-  timelineContent: {
-    flex: 1,
-    gap: 2,
-  },
-
-  timelineText: {
-    fontSize: 13,
-    opacity: 0.7,
-  },
-
-  nextItem: {
-    flexDirection: "row",
-    gap: 10,
-    alignItems: "flex-start",
-    marginTop: 12,
-  },
-
-  nextText: {
-    flex: 1,
-    flexWrap: "wrap",
-  },
+  container: { flex: 1, paddingHorizontal: 32, justifyContent: "center" },
+  header: { alignItems: "center", marginBottom: 40 },
+  title: { marginTop: 16, fontSize: 24 },
+  subTitle: { fontSize: 15, opacity: 0.6, marginTop: 4 },
+  divider: { height: 1, width: "100%", marginBottom: 40, opacity: 0.5 },
+  content: { paddingLeft: 4 },
+  row: { flexDirection: "row", minHeight: 70 },
+  leftColumn: { alignItems: "center", marginRight: 16 },
+  line: { width: 2, flex: 1, marginVertical: 4 },
+  rightColumn: { flex: 1, paddingTop: -2 },
+  rowTitle: { fontSize: 16, marginBottom: 2 },
+  rowTime: { fontSize: 13, opacity: 0.5 },
+  footer: { marginTop: 40, alignItems: "center" },
+  footerText: { textAlign: "center", fontSize: 13, lineHeight: 18 },
 });

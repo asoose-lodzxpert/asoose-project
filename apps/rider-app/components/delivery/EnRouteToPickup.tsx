@@ -35,7 +35,7 @@ export default function EnRouteToPickup({
       try {
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== "granted") {
-          console.error("Location permission denied");
+          // ...existing code...
           return;
         }
 
@@ -54,7 +54,7 @@ export default function EnRouteToPickup({
 
             // Validate GPS accuracy
             if (newLoc.coords.accuracy && newLoc.coords.accuracy > 50) {
-              console.warn("Poor GPS accuracy:", newLoc.coords.accuracy);
+              // ...existing code...
               // Still update but with warning
             }
 
@@ -79,7 +79,7 @@ export default function EnRouteToPickup({
                   setDistanceToPickup(distData.distance);
                 }
               } catch (error) {
-                console.error("Distance calculation error:", error);
+                // ...existing code...
                 if (isMounted) setDistanceToPickup(null);
               }
 
@@ -123,13 +123,13 @@ export default function EnRouteToPickup({
                   }
                 }
               } catch (err) {
-                console.error("Directions API error:", err);
+                // ...existing code...
               }
             }
           },
         );
       } catch (error) {
-        console.error("Failed to start location tracking:", error);
+        // ...existing code...
       }
     };
 

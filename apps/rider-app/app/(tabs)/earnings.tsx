@@ -108,7 +108,7 @@ export default function EarningsScreen() {
   return (
     <ThemedView style={[styles.container, { backgroundColor: surface }]}>
       <View style={styles.fixedHeader}>
-        <ThemedText type="title">Earnings</ThemedText>
+        <ThemedText type="subtitle">Earnings</ThemedText>
 
         <CustomDropdown
           data={TIMEFRAMES}

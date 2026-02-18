@@ -3,16 +3,19 @@ import { Pressable, ActivityIndicator, StyleSheet, View } from "react-native";
 import { ThemedText } from "@/components/themed-text";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { useAuth } from "@/context/AuthContext";
+import { useRouter } from "expo-router";
 
 export const LogoutButton: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const primary = useThemeColor({}, "brandPrimary");
-  const { signOut } = useAuth();
+  const { logout } = useAuth();
+  const router = useRouter();
 
   const handleLogout = async () => {
     setLoading(true);
     try {
-      await signOut();
+      await logout();
+      router.replace("/");
     } finally {
       setLoading(false);
     }

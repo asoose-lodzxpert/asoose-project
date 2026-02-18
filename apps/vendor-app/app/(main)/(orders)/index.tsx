@@ -23,7 +23,10 @@ import {
 } from "@/services/orders.service";
 import { useFocusEffect } from "expo-router";
 import { useAuth } from "@/context/AuthContext";
-import { useOrderStream, OrderStreamEvent } from "@/hooks/use-order-stream";
+import {
+  useWebSocketOrders,
+  OrderStreamEvent,
+} from "@/hooks/use-websocket-orders";
 
 type OrderTab = "pending" | "active" | "history";
 
@@ -53,10 +56,10 @@ export default function OrderScreen() {
   // Track if component is mounted to prevent state updates after unmount
   const isMountedRef = React.useRef(true);
 
-  // SSE event handlers
+  // WebSocket event handlers
   const handleNewOrder = useCallback(
     (orderData: OrderStreamEvent) => {
-      // Only add to pending tab
+      // Only notify for pending tab
       if (tab === "pending" && isMountedRef.current) {
         Toast.show({
           type: "success",
@@ -74,7 +77,7 @@ export default function OrderScreen() {
 
   const handleOrderUpdate = useCallback(
     (orderData: OrderStreamEvent) => {
-      // Refresh current tab
+      // Refresh current tab on any update
       if (isMountedRef.current) {
         loadOrders(1, true);
       }
@@ -82,11 +85,12 @@ export default function OrderScreen() {
     [tab],
   );
 
-  // SSE Connection (disabled for history tab)
-  const { isConnected, error: sseError } = useOrderStream({
+  // WebSocket Connection (disabled for history tab)
+  const { isConnected, error: wsError } = useWebSocketOrders({
     onNewOrder: handleNewOrder,
     onOrderUpdate: handleOrderUpdate,
-    enabled: tab !== "history", // Disable SSE for history tab
+    enabled: tab !== "history",
+    storeId: user?.storeId,
   });
 
   // Cleanup on unmount
@@ -380,7 +384,7 @@ export default function OrderScreen() {
                 }}
               />
               <ThemedText type="caption" style={{ fontSize: 11 }}>
-                {isConnected ? "Live" : sseError ? "Polling" : "Connecting..."}
+                {isConnected ? "Live" : wsError ? "Polling" : "Connecting..."}
               </ThemedText>
               <ThemedText type="caption" style={{ marginLeft: 4 }}>
                 •

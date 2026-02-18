@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
+import { useRouter } from "expo-router";
 import {
   login,
   getAccessToken,
@@ -7,17 +8,21 @@ import {
 } from "@/services/auth";
 import { useBiometric } from "../hooks/useBiometric";
 import { fetchCurrentUser } from "@/services/auth-fetch";
+import { fetchRealtimeOnlineStatus } from "@/services/status-fetch";
 
 type User = {
   id: string;
   name: string;
   email: string;
   phone?: string;
+  status: "ACTIVE" | "PENDING" | "SUSPENDED" | "BANNED";
+  isOnline?: boolean;
 };
 
 interface AuthContextType {
   user: User | null;
-  loading: boolean;
+  initialLoading: boolean;
+  actionLoading: boolean;
   login: (credentials: { email: string; password: string }) => Promise<void>;
   logout: () => Promise<void>;
   biometricAvailable: boolean;
@@ -26,13 +31,16 @@ interface AuthContextType {
   enableBiometrics: (email: string, password: string) => Promise<void>;
   disableBiometrics: () => Promise<void>;
   isBiometricEnabled: () => Promise<boolean>;
+  refreshOnlineStatus: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const router = useRouter();
+  const [actionLoading, setActionLoading] = useState(false);
   const biometric = useBiometric();
   useEffect(() => {
     biometric.checkBiometricAvailability();
@@ -47,6 +55,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           try {
             await refreshAccessToken();
             const userData = await fetchCurrentUser();
+
+            // Fetch real-time online status from matching system
+            try {
+              const realtimeStatus = await fetchRealtimeOnlineStatus();
+              userData.isOnline = realtimeStatus.isOnline;
+            } catch (statusError) {
+              console.error(
+                "[AuthContext] Failed to fetch realtime status:",
+                statusError,
+              );
+              // Keep the isOnline from userData if realtime fetch fails
+            }
+
             setUser(userData);
           } catch {
             await logout();
@@ -56,13 +77,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUser(null);
         }
       } finally {
-        setLoading(false);
+        setInitialLoading(false);
       }
     }
     checkToken();
   }, []);
 
   const saveSession = async (u: User) => {
+    // Fetch real-time online status from matching system
+    try {
+      const realtimeStatus = await fetchRealtimeOnlineStatus();
+      u.isOnline = realtimeStatus.isOnline;
+    } catch (error) {
+      console.error("[AuthContext] Failed to fetch realtime status:", error);
+      // Keep isOnline from login response if fetch fails
+    }
     setUser(u);
   };
 
@@ -78,22 +107,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     email: string;
     password: string;
   }) => {
-    setLoading(true);
+    setActionLoading(true);
     try {
       const resp = await login(email, password);
       await saveSession(resp.user);
     } finally {
-      setLoading(false);
+      setActionLoading(false);
     }
   };
 
   const logoutHandler = async () => {
-    setLoading(true);
+    setActionLoading(true);
     try {
       await logout();
+      router.replace("/");
       await clearSession();
     } finally {
-      setLoading(false);
+      setActionLoading(false);
     }
   };
 
@@ -111,6 +141,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return creds !== null;
   };
 
+  const refreshOnlineStatus = async () => {
+    if (!user) return;
+    try {
+      const realtimeStatus = await fetchRealtimeOnlineStatus();
+      setUser({
+        ...user,
+        isOnline: realtimeStatus.isOnline,
+      });
+      console.log(
+        "[AuthContext] Updated online status:",
+        realtimeStatus.status,
+      );
+    } catch (error) {
+      console.error("[AuthContext] Failed to refresh online status:", error);
+    }
+  };
+
   const biometricLogin = async () => {
     if (!biometric.isAvailable || !biometric.isEnrolled) {
       throw new Error("Biometric authentication not available on this device");
@@ -125,7 +172,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!creds) {
       throw new Error("No biometric credentials saved");
     }
-    setLoading(true);
+    setActionLoading(true);
     try {
       const resp = await login(creds.email, creds.password);
       await saveSession(resp.user);
@@ -134,7 +181,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       biometric.resetStatus();
       throw err;
     } finally {
-      setLoading(false);
+      setActionLoading(false);
     }
   };
 
@@ -142,7 +189,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     <AuthContext.Provider
       value={{
         user,
-        loading,
+        initialLoading,
+        actionLoading,
         login: loginHandler,
         logout: logoutHandler,
         biometricAvailable: biometric.isAvailable,
@@ -151,6 +199,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         enableBiometrics,
         disableBiometrics,
         isBiometricEnabled,
+        refreshOnlineStatus,
       }}
     >
       {children}

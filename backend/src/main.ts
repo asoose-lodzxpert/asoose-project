@@ -10,6 +10,9 @@ import {
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'path';
 import 'dotenv/config';
+import { createBullBoard } from '@bull-board/api';
+import { ExpressAdapter } from '@bull-board/express';
+import { BullMQAdapter } from '@bull-board/api/bullMQAdapter';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
@@ -90,6 +93,47 @@ async function bootstrap() {
     });
   }
   const port = process.env.PORT ?? 3000;
+
+  // Setup Bull Board
+  try {
+    const serverAdapter = new ExpressAdapter();
+    serverAdapter.setBasePath('/api/v1/system/queues');
+
+    // Get queues from DI container
+    try {
+      const rideMatchingQueue = app.get('BullQueue_ride-matching');
+      const deliveryMatchingQueue = app.get('BullQueue_delivery-matching');
+      const driverInactivityQueue = app.get('BullQueue_driver-inactivity');
+      const notificationQueue = app.get('BullQueue_notification');
+      const assignmentTimeoutQueue = app.get('BullQueue_assignment-timeout');
+      const emailQueue = app.get('BullQueue_email');
+
+      createBullBoard({
+        queues: [
+          new BullMQAdapter(rideMatchingQueue),
+          new BullMQAdapter(deliveryMatchingQueue),
+          new BullMQAdapter(driverInactivityQueue),
+          new BullMQAdapter(notificationQueue),
+          new BullMQAdapter(assignmentTimeoutQueue),
+          new BullMQAdapter(emailQueue),
+        ],
+        serverAdapter,
+      });
+
+      app.use('/api/v1/system/queues', serverAdapter.getRouter());
+      appLogger.log('Bull Board initialized at /api/v1/system/queues', {
+        context: 'Main',
+      });
+    } catch (error: any) {
+      appLogger.warn('Could not initialize Bull Board: ' + error?.message, {
+        context: 'Main',
+      });
+    }
+  } catch (error: any) {
+    appLogger.warn('Bull Board setup error: ' + error?.message, {
+      context: 'Main',
+    });
+  }
 
   await app.listen(port, '0.0.0.0');
 

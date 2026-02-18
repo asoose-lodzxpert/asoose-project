@@ -14,7 +14,7 @@ import { ThemedText } from "@/components/themed-text";
 import { ThemedInput } from "@/components/ThemedInput";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
-import { useToast } from "@/components/ui/toast";
+import Toast from "react-native-toast-message";
 import { resetPasswordWithOtp } from "@/services/auth.service";
 
 export default function ForgotPasswordResetScreen() {
@@ -24,7 +24,7 @@ export default function ForgotPasswordResetScreen() {
   const border = useThemeColor({}, "borderDefault");
 
   const router = useRouter();
-  const showToast = useToast();
+
   const params = useLocalSearchParams<{ email?: string; token?: string }>();
 
   const email = typeof params.email === "string" ? params.email.trim() : "";
@@ -57,10 +57,10 @@ export default function ForgotPasswordResetScreen() {
     setError(null);
     try {
       await resetPasswordWithOtp({ email, token, newPassword: password });
-      showToast({
-        variant: "success",
-        title: "Password updated",
-        message: "You can now sign in with your new password.",
+      Toast.show({
+        type: "success",
+        text1: "Password updated",
+        text2: "You can now sign in with your new password.",
       });
       router.replace("/login");
     } catch (err: any) {

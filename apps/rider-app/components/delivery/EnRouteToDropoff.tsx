@@ -35,7 +35,7 @@ export default function EnRouteToDropoff({
       try {
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== "granted") {
-          console.error("Location permission denied");
+          // ...existing code...
           return;
         }
 
@@ -52,7 +52,7 @@ export default function EnRouteToDropoff({
 
             // Validate GPS accuracy
             if (loc.coords.accuracy && loc.coords.accuracy > 50) {
-              console.warn("Poor GPS accuracy:", loc.coords.accuracy);
+              // ...existing code...
             }
 
             const dropoffLat =
@@ -77,7 +77,7 @@ export default function EnRouteToDropoff({
                   setDistanceToCustomer(distData.distance);
                 }
               } catch (error) {
-                console.error("Distance calculation error:", error);
+                // ...existing code...
                 if (isMounted) setDistanceToCustomer(null);
               }
 
@@ -121,13 +121,13 @@ export default function EnRouteToDropoff({
                   }
                 }
               } catch (err) {
-                console.error("Directions API error:", err);
+                // ...existing code...
               }
             }
           },
         );
       } catch (error) {
-        console.error("Failed to start location tracking:", error);
+        // ...existing code...
       }
     };
 

@@ -1,23 +1,16 @@
 import { request } from "@/lib/authFetch";
 import { Address } from "@/types/address";
 
+const GOOGLE_MAPS_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
+
 export const fetchSuggestions = async (input: string): Promise<any[]> => {
   if (!input) return [];
   try {
-    // Backend expects 'query' parameter, returns array of { id, title, subtitle }
-    const response = await request(
-      `maps/places-autocomplete?query=${encodeURIComponent(input)}`,
-      { method: "GET" },
-    );
-    // Transform backend response to match expected format
-    return response.map((item: any) => ({
-      place_id: item.id,
-      description: `${item.title}, ${item.subtitle}`,
-      structured_formatting: {
-        main_text: item.title,
-        secondary_text: item.subtitle,
-      },
-    }));
+    // Use backend endpoint for autocomplete
+    let url = `${process.env.EXPO_PUBLIC_API_URL}/maps/places-autocomplete?query=${encodeURIComponent(input)}`;
+    const response = await fetch(url);
+    const data = await response.json();
+    return Array.isArray(data) ? data : [];
   } catch (error) {
     if (__DEV__) console.error("Error fetching suggestions:", error);
     return [];
@@ -50,12 +43,6 @@ export const selectPlace = async (placeId: string): Promise<Address | null> => {
   }
 };
 
-/**
- * Resolves a full address from latitude and longitude using backend Maps API.
- * Uses the geocode endpoint with coordinates.
- * @param coords Object with lat and lng (number or string)
- * @returns {Promise<{ address: string } | null>}
- */
 export const resolveAddressFromCoords = async (coords: {
   lat: number | string;
   lng: number | string;
@@ -66,15 +53,14 @@ export const resolveAddressFromCoords = async (coords: {
     typeof coords.lng === "string" ? coords.lng : coords.lng.toString();
 
   try {
-    // Use address-search endpoint which accepts latitude and longitude
+    // Use backend reverse-geocode endpoint which is still available
     const response = await request(
-      `maps/address-search?query=${lat},${lng}&latitude=${lat}&longitude=${lng}`,
+      `maps/reverse-geocode?lat=${lat}&lng=${lng}`,
       { method: "GET" },
     );
 
-    // If we get results, use the first one
-    if (response && response.length > 0) {
-      return { address: `${response[0].title}, ${response[0].subtitle}` };
+    if (response && response.address) {
+      return { address: response.address };
     }
     return null;
   } catch (error) {

@@ -56,7 +56,7 @@ export function StepPersonalDetails({ data, onChange }: Props) {
                 data.role === "RIDER" && { color: primary, fontWeight: "600" },
               ]}
             >
-              Delivery Rider
+              Rider
             </ThemedText>
             <ThemedText style={[styles.roleDesc, { color: muted }]}>
               Deliver packages & food
@@ -84,7 +84,7 @@ export function StepPersonalDetails({ data, onChange }: Props) {
                 data.role === "DRIVER" && { color: primary, fontWeight: "600" },
               ]}
             >
-              Ride Driver
+              Driver
             </ThemedText>
             <ThemedText style={[styles.roleDesc, { color: muted }]}>
               Transport passengers
@@ -332,5 +332,5 @@ const COUNTRY_CODES = [
 
 const LANGUAGES = [
   { label: "English", value: "en" },
-  { label: "French", value: "fr" },
+  // { label: "French", value: "fr" },
 ];

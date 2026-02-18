@@ -49,10 +49,10 @@ export interface ProfileStats {
 
 export async function getRiderProfile(): Promise<RiderProfile> {
   try {
-    const data = await fetchWithAuth(`${EXPO_PUBLIC_API_URL}/riders/me`);
+    const data = await fetchWithAuth(`${EXPO_PUBLIC_API_URL}/rider/profile/me`);
     return data;
   } catch (error) {
-    console.error("Error fetching rider profile:", error);
+    // ...existing code...
     throw error;
   }
 }
@@ -60,7 +60,7 @@ export async function getRiderProfile(): Promise<RiderProfile> {
 export async function getProfileStats(): Promise<ProfileStats> {
   try {
     const earningsData = await fetchWithAuth(
-      `${EXPO_PUBLIC_API_URL}/riders/earnings?timeframe={week}`,
+      `${EXPO_PUBLIC_API_URL}/rider/order/earnings?timeframe=week`,
     );
 
     return {
@@ -70,7 +70,7 @@ export async function getProfileStats(): Promise<ProfileStats> {
       rating: earningsData.rating || 5.0,
     };
   } catch (error) {
-    console.error("Error fetching profile stats:", error);
+    // ...existing code...
     throw error;
   }
 }
@@ -79,13 +79,16 @@ export async function updateRiderProfile(
   updates: Partial<RiderProfile>,
 ): Promise<RiderProfile> {
   try {
-    const data = await fetchWithAuth(`${EXPO_PUBLIC_API_URL}/riders/me`, {
-      method: "PATCH",
-      body: JSON.stringify(updates),
-    });
+    const data = await fetchWithAuth(
+      `${EXPO_PUBLIC_API_URL}/rider/profile/me`,
+      {
+        method: "PATCH",
+        body: JSON.stringify(updates),
+      },
+    );
     return data;
   } catch (error) {
-    console.error("Error updating rider profile:", error);
+    // ...existing code...
     throw error;
   }
 }

@@ -92,10 +92,10 @@ export class PaymentService {
 
     // 2. Calculate Amount from Source of Truth
     let amount = dto.amount;
-    let orderGroupId = dto.orderGroupId;
-    let orderId = dto.orderId;
-    let rideId = dto.rideId;
-    let deliveryId = dto.deliveryId || dto.metadata?.deliveryId;
+    const orderGroupId = dto.orderGroupId;
+    const orderId = dto.orderId;
+    const rideId = dto.rideId;
+    const deliveryId = dto.deliveryId || dto.metadata?.deliveryId;
 
     if ((dto.type as any) === 'ORDER' || dto.type === PaymentType.ORDER) {
       if (orderGroupId) {
@@ -160,7 +160,48 @@ export class PaymentService {
       rideId,
     };
 
-    // 3. Create Payment Record (Pending)
+    // 3. Check for existing payment and handle duplicates
+    let existingPayment: any = null;
+    if (orderGroupId) {
+      existingPayment = await this.prisma.payment.findUnique({
+        where: { orderGroupId },
+      });
+    } else if (orderId) {
+      existingPayment = await this.prisma.payment.findUnique({
+        where: { orderId },
+      });
+    } else if (rideId) {
+      existingPayment = await this.prisma.payment.findUnique({
+        where: { rideId },
+      });
+    } else if (deliveryId) {
+      existingPayment = await this.prisma.payment.findUnique({
+        where: { deliveryId },
+      });
+    }
+
+    // If payment already completed, prevent duplicate payment
+    if (existingPayment && existingPayment.status === PaymentStatus.COMPLETED) {
+      throw new BadRequestException(
+        'Payment already completed for this transaction',
+      );
+    }
+
+    // If payment exists but is PENDING or FAILED, delete it to allow retry
+    if (
+      existingPayment &&
+      (existingPayment.status === PaymentStatus.PENDING ||
+        existingPayment.status === PaymentStatus.FAILED)
+    ) {
+      await this.prisma.payment.delete({
+        where: { id: existingPayment.id },
+      });
+      this.logger.log(
+        `Deleted existing ${existingPayment.status} payment ${existingPayment.id} to allow retry`,
+      );
+    }
+
+    // 4. Create Payment Record (Pending)
     await this.prisma.payment.create({
       data: {
         reference,

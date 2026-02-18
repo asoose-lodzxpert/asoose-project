@@ -152,7 +152,6 @@ export class VendorAuthService {
         employees: dto.employees,
         password: hashedPassword,
         image: dto.image,
-
         store: {
           create: {
             name: dto.storeName,
@@ -163,7 +162,7 @@ export class VendorAuthService {
               Math.floor(Math.random() * 10000),
             type: VendorAuthService.mapBusinessTypeToStoreType(
               dto.businessType,
-            ),
+            ) as any,
             logo: dto.storeLogo,
             banner: dto.storeBanner,
             lat: dto.location?.lat,
@@ -204,7 +203,11 @@ export class VendorAuthService {
           vendor.id,
           vendor.email,
           vendor.name,
-          vendor.store?.name || 'Your Store',
+          vendor.store &&
+            typeof vendor.store === 'object' &&
+            'name' in vendor.store
+            ? vendor.store.name
+            : 'Your Store',
         );
       } catch (error) {
         this.appLogger.error(
@@ -223,24 +226,43 @@ export class VendorAuthService {
   async sendOtpForPasswordReset(email: string): Promise<void> {
     const normalizedEmail = email.toLowerCase().trim();
 
-    const vendor = await this.prisma.vendor.findUnique({
-      where: { email: normalizedEmail },
-    });
+    // Generate OTP first (before checking if vendor exists)
+    const otp = await this.otpService.generateOtp(normalizedEmail);
 
-    if (!vendor) {
-      throw new NotFoundException(
-        'No account found with this email address. Please check your email or register for a new account.',
+    // Check if vendor exists (optional - email will be sent regardless)
+    let vendorName = 'User';
+    try {
+      const vendor = await this.prisma.vendor.findUnique({
+        where: { email: normalizedEmail },
+      });
+      if (vendor) {
+        vendorName = vendor.name;
+      }
+    } catch (error) {
+      // Vendor may not exist, but we still send email
+      this.appLogger.warn(
+        `Vendor not found for email: ${normalizedEmail}`,
+        error?.stack,
       );
     }
 
-    const otp = await this.otpService.generateOtp(normalizedEmail);
-
-    // Send password reset email using template
-    await this.emailProducer.sendVendorPasswordReset(
-      normalizedEmail,
-      vendor.name,
-      otp,
-    );
+    try {
+      // Send password reset email with OTP
+      await this.emailProducer.sendVendorPasswordReset(
+        normalizedEmail,
+        vendorName,
+        otp, // Pass OTP as resetCode
+      );
+      this.appLogger.log(`Password reset OTP sent to ${normalizedEmail}`);
+    } catch (error) {
+      this.appLogger.error(
+        `Failed to send password reset email to ${normalizedEmail}`,
+        error?.stack,
+        { error },
+      );
+      // Don't throw error to user - for security reasons
+      // Just log it and continue
+    }
   }
 
   async verifyOtp(email: string, otp: string): Promise<boolean> {
@@ -612,18 +634,82 @@ export class VendorAuthService {
 
   static mapBusinessTypeToStoreType(
     businessType: string,
-  ): 'RESTAURANT' | 'GROCERY' | 'PHARMACY' | 'MARKET' {
+  ):
+    | 'RESTAURANT'
+    | 'GROCERY'
+    | 'PHARMACY'
+    | 'MARKET'
+    | 'FASHION'
+    | 'ELECTRONICS'
+    | 'FURNITURE'
+    | 'BEAUTY'
+    | 'HEALTH'
+    | 'EDUCATION'
+    | 'SERVICES'
+    | 'AUTOMOTIVE'
+    | 'TRAVEL'
+    | 'ENTERTAINMENT'
+    | 'RETAIL'
+    | 'ONLINE'
+    | 'MANUFACTURING'
+    | 'LOGISTICS'
+    | 'OTHER' {
     switch ((businessType || '').toUpperCase()) {
       case 'RESTAURANT':
+      case 'RESTAURANT & CAFE':
+      case 'FAST FOOD':
+      case 'FOOD DELIVERY':
         return 'RESTAURANT';
       case 'GROCERY':
+      case 'GROCERY & SUPERMARKET':
         return 'GROCERY';
       case 'PHARMACY':
         return 'PHARMACY';
+      case 'FASHION':
+      case 'FASHION & CLOTHING':
+        return 'FASHION';
+      case 'ELECTRONICS':
+      case 'ELECTRONICS & GADGETS':
+        return 'ELECTRONICS';
+      case 'HOME & FURNITURE':
+      case 'FURNITURE':
+        return 'FURNITURE';
+      case 'BEAUTY':
+      case 'BEAUTY & PERSONAL CARE':
+        return 'BEAUTY';
+      case 'HEALTH':
+      case 'HEALTH & FITNESS':
+        return 'HEALTH';
+      case 'EDUCATION':
+      case 'EDUCATION & TUTORING':
+        return 'EDUCATION';
+      case 'PROFESSIONAL SERVICES':
+      case 'SERVICES':
+        return 'SERVICES';
+      case 'AUTOMOTIVE':
+        return 'AUTOMOTIVE';
+      case 'TRAVEL':
+      case 'TRAVEL & TOURISM':
+        return 'TRAVEL';
+      case 'ENTERTAINMENT':
+        return 'ENTERTAINMENT';
+      case 'RETAIL SHOP':
+      case 'RETAIL':
+        return 'RETAIL';
+      case 'ONLINE STORE':
+      case 'ONLINE':
+        return 'ONLINE';
+      case 'MANUFACTURING':
+        return 'MANUFACTURING';
+      case 'LOGISTICS':
+      case 'LOGISTICS & SHIPPING':
+        return 'LOGISTICS';
       case 'MARKET':
         return 'MARKET';
+      case 'OTHER':
+        return 'OTHER';
       default:
-        return 'RESTAURANT';
+        return 'OTHER';
     }
   }
 }

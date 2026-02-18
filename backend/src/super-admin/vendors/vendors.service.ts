@@ -19,6 +19,8 @@ import {
 import { CreateVendorDto, VendorQueryDto } from './dto/vendor.dto';
 import { EmailProducer } from '../../mail/email.producer';
 import { ActivityLogService } from 'src/common/services/activity-log.services';
+import { VendorAccountNotificationsService } from '../../vendor/notifications/vendor-account-notifications.service';
+
 @Injectable()
 export class StoresService {
   private readonly logger = new Logger(StoresService.name);
@@ -27,6 +29,7 @@ export class StoresService {
     private prisma: PrismaService,
     private emailProducer: EmailProducer,
     private logService: ActivityLogService,
+    private vendorNotificationsService: VendorAccountNotificationsService,
   ) {}
 
   async findAll(query: VendorQueryDto) {
@@ -271,13 +274,29 @@ export class StoresService {
       details: 'Admin performed soft-delete/suspension on vendor',
     });
 
-    return this.prisma.store.update({
+    const result = await this.prisma.store.update({
       where: { id },
       data: {
         status: StoreStatus.SUSPENDED,
         slug: `${store.slug}-deleted-${Date.now()}`,
       },
     });
+
+    // Notify vendor of store suspension
+    try {
+      await this.vendorNotificationsService.notifyStoreStatusChange(
+        store.vendorId,
+        id,
+        StoreStatus.SUSPENDED,
+        'Your store has been suspended by the admin',
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to notify vendor of suspension: ${error.message}`,
+      );
+    }
+
+    return result;
   }
 
   async getPerformanceData(storeId: string, days = 30) {
@@ -412,6 +431,39 @@ export class StoresService {
       where: { id: productId },
       data: { status: validStatus },
     });
+
+    // Notify vendor of product status change
+    try {
+      const productWithStore = await this.prisma.product.findUnique({
+        where: { id: productId },
+        include: { store: true },
+      });
+
+      if (productWithStore) {
+        // Only notify for APPROVED or REJECTED
+        let notifyStatus: 'APPROVED' | 'REJECTED' | null = null;
+        let rejectionReason: string | undefined = undefined;
+        if (validStatus === ProductStatus.ACTIVE) {
+          notifyStatus = 'APPROVED';
+        } else if (validStatus === ProductStatus.DISABLED) {
+          notifyStatus = 'REJECTED';
+          rejectionReason = 'Product has been banned by admin';
+        }
+        if (notifyStatus) {
+          await this.vendorNotificationsService.notifyProductStatusChange(
+            productWithStore.store.vendorId,
+            productId,
+            product.name,
+            notifyStatus,
+            rejectionReason,
+          );
+        }
+      }
+    } catch (error) {
+      this.logger.error(
+        `Failed to notify vendor of product status change: ${error.message}`,
+      );
+    }
 
     return product;
   }

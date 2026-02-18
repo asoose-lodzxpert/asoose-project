@@ -1,6 +1,7 @@
-import { Injectable, Logger, MessageEvent } from '@nestjs/common';
+import { Injectable, Logger, MessageEvent, Inject } from '@nestjs/common';
 import { Subject, Observable } from 'rxjs';
 import { filter, map } from 'rxjs/operators';
+import { NotificationsGateway } from '../../notifications/notifications.gateway';
 
 export interface OrderEvent {
   type: 'order.created' | 'order.updated' | 'order.accepted' | 'order.declined';
@@ -8,12 +9,18 @@ export interface OrderEvent {
   orderId: string;
   data: any;
   timestamp: string;
+  vendorId?: string; // Optional vendor ID for direct WebSocket emission
 }
 
 @Injectable()
 export class VendorOrdersStreamService {
   private readonly logger = new Logger(VendorOrdersStreamService.name);
   private readonly orderEvents$ = new Subject<OrderEvent>();
+
+  constructor(
+    @Inject(NotificationsGateway)
+    private readonly notificationsGateway: NotificationsGateway,
+  ) {}
 
   /**
    * Emit an order event to all listening vendors
@@ -23,7 +30,19 @@ export class VendorOrdersStreamService {
     this.logger.log(
       `Emitting ${event.type} for store ${event.storeId}, order ${event.orderId}`,
     );
+
+    // Emit through RxJS Subject (for SSE connections)
     this.orderEvents$.next(event);
+
+    // Also emit through WebSocket to vendor
+    if (event.vendorId) {
+      this.notificationsGateway.sendToVendor(event.vendorId, {
+        type: event.type,
+        data: event.data,
+        orderId: event.orderId,
+        storeId: event.storeId,
+      });
+    }
   }
 
   /**
@@ -49,26 +68,38 @@ export class VendorOrdersStreamService {
   /**
    * Emit a new order created event
    */
-  emitNewOrder(storeId: string, orderId: string, orderData: any) {
+  emitNewOrder(
+    storeId: string,
+    orderId: string,
+    orderData: any,
+    vendorId?: string,
+  ) {
     this.emitOrderEvent({
       type: 'order.created',
       storeId,
       orderId,
       data: orderData,
       timestamp: new Date().toISOString(),
+      vendorId,
     });
   }
 
   /**
    * Emit order status update event
    */
-  emitOrderUpdate(storeId: string, orderId: string, orderData: any) {
+  emitOrderUpdate(
+    storeId: string,
+    orderId: string,
+    orderData: any,
+    vendorId?: string,
+  ) {
     this.emitOrderEvent({
       type: 'order.updated',
       storeId,
       orderId,
       data: orderData,
       timestamp: new Date().toISOString(),
+      vendorId,
     });
   }
 }

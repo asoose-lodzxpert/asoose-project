@@ -103,14 +103,20 @@ export class RidesService {
     return estimates;
   }
 
-async requestRide(userId: string, dto: RequestRideDto, idempotencyKey: string) {
+  async requestRide(
+    userId: string,
+    dto: RequestRideDto,
+    idempotencyKey: string,
+  ) {
     this.logger.log(
       `Request Ride - User: ${userId}, Vehicle: ${dto.vehicleType}, IdempotencyKey: ${idempotencyKey}`,
     );
 
     // 0. Idempotency Check (Done FIRST to prevent duplicate Maps API billing & Ghost Rides)
     if (!idempotencyKey) {
-      throw new BadRequestException('Idempotency key is required to prevent duplicate requests.');
+      throw new BadRequestException(
+        'Idempotency key is required to prevent duplicate requests.',
+      );
     }
 
     const existingRequest = await this.prisma.ride.findFirst({
@@ -119,19 +125,25 @@ async requestRide(userId: string, dto: RequestRideDto, idempotencyKey: string) {
     });
 
     if (existingRequest) {
-      this.logger.log(`Idempotency match found for key: ${idempotencyKey}. Returning cached ride.`);
+      this.logger.log(
+        `Idempotency match found for key: ${idempotencyKey}. Returning cached ride.`,
+      );
       return {
         ride: { ...existingRequest, startOtp: undefined },
         fare: existingRequest.totalFare,
-        payment: existingRequest.payment?.[0] || null, 
+        payment: existingRequest.payment?.[0] || null,
         message: 'Ride request recovered from previous attempt.',
       };
     }
 
     // 1. Discard client coordinates. Force strict backend resolution.
     // The backend translates placeIds or fallback coordinates into trusted server data.
-    const securePickup = await this.common.resolveSecureLocation(dto.pickupLocation);
-    const secureDropoff = await this.common.resolveSecureLocation(dto.dropoffLocation);
+    const securePickup = await this.common.resolveSecureLocation(
+      dto.pickupLocation,
+    );
+    const secureDropoff = await this.common.resolveSecureLocation(
+      dto.dropoffLocation,
+    );
 
     // 2. Validate Vehicle Type against strict backend enum
     if (!Object.values(VehicleType).includes(dto.vehicleType)) {
@@ -178,7 +190,7 @@ async requestRide(userId: string, dto: RequestRideDto, idempotencyKey: string) {
       where: {
         customerId: userId,
         status: RideStatus.PENDING,
-        idempotencyKey: { not: idempotencyKey }
+        idempotencyKey: { not: idempotencyKey },
       },
       data: {
         status: RideStatus.CANCELLED,
@@ -232,7 +244,9 @@ async requestRide(userId: string, dto: RequestRideDto, idempotencyKey: string) {
         if (dto.vehicleType === VehicleType.BUSINESS) multiplier = 1.5;
         if (dto.vehicleType === VehicleType.ECONOMY) multiplier = 1.0;
 
-        const finalCalculatedFare = this.common.round(fareDetails.totalFare * multiplier);
+        const finalCalculatedFare = this.common.round(
+          fareDetails.totalFare * multiplier,
+        );
 
         // 6. Security: Hash OTP
         const rawOtp = this.geo.generateOTP(TRIPS_CONFIG.OTP_LENGTH);
@@ -356,8 +370,8 @@ async requestRide(userId: string, dto: RequestRideDto, idempotencyKey: string) {
     const result = await this.prisma.ride.updateMany({
       where: {
         id: rideId,
-        status: RideStatus.REQUESTED, 
-        riderId: null, 
+        status: RideStatus.REQUESTED,
+        riderId: null,
       },
       data: {
         status: RideStatus.ACCEPTED,
@@ -615,7 +629,7 @@ async requestRide(userId: string, dto: RequestRideDto, idempotencyKey: string) {
       throw new NotFoundException('Ride not found');
     if (ride.rider)
       ride.rider.phone = this.common.maskPhoneNumber(ride.rider.phone);
-    return { ...ride, startOtp: undefined }; 
+    return { ...ride, startOtp: undefined };
   }
 
   async getUserRides(userId: string, status?: string, page = 1, limit = 20) {
@@ -707,13 +721,27 @@ async requestRide(userId: string, dto: RequestRideDto, idempotencyKey: string) {
     await this.common.logActivity(riderId, 'DRIVER_ARRIVED', { rideId });
     return { success: true, message: 'Driver arrival confirmed' };
   }
-  
+
   // --- JOBS SERVICE STUBS ---
-  async findActiveRideForDriver(driverId: string): Promise<any> { return null; }
-  async findIncomingRidesForDriver(driverId: string): Promise<any[]> { return []; }
-  async updateRideStatus(rideId: string, status: string): Promise<any> { return null; }
-  async declineRide(rideId: string, driverId: string): Promise<any> { return { success: false }; }
-  async arrivePickup(rideId: string, driverId: string): Promise<any> { return { success: false }; }
-  async confirmPickup(rideId: string, driverId: string): Promise<any> { return { success: false }; }
-  async arriveDropoff(rideId: string, driverId: string): Promise<any> { return { success: false }; }
+  async findActiveRideForDriver(driverId: string): Promise<any> {
+    return null;
+  }
+  async findIncomingRidesForDriver(driverId: string): Promise<any[]> {
+    return [];
+  }
+  async updateRideStatus(rideId: string, status: string): Promise<any> {
+    return null;
+  }
+  async declineRide(rideId: string, driverId: string): Promise<any> {
+    return { success: false };
+  }
+  async arrivePickup(rideId: string, driverId: string): Promise<any> {
+    return { success: false };
+  }
+  async confirmPickup(rideId: string, driverId: string): Promise<any> {
+    return { success: false };
+  }
+  async arriveDropoff(rideId: string, driverId: string): Promise<any> {
+    return { success: false };
+  }
 }

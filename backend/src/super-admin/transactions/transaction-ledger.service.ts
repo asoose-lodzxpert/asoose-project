@@ -87,10 +87,10 @@ export class TransactionLedgerService {
    * This ensures funds are locked at the moment of request (Ledger-First).
    */
   async recordPayoutRequest(
-    userId: string, 
-    userRole: UserRole, 
-    amount: number, 
-    payoutId: string
+    userId: string,
+    userRole: UserRole,
+    amount: number,
+    payoutId: string,
   ) {
     return this.prisma.$transaction(async (tx) => {
       // 1. Create Ledger Entry (Audit Trail)
@@ -101,12 +101,21 @@ export class TransactionLedgerService {
           status: 'PENDING',
           description: `Withdrawal Request (Funds Locked)`,
           // FIXED: Removed 'reference' property as it doesn't exist on Transaction model
-          
+
           // Map to the correct entity columns based on role
-          ...(userRole === UserRole.RIDER 
-              ? { riderId: userId, entityType: 'RIDER', entityId: userId, riderPayoutId: payoutId } 
-              : { vendorId: userId, entityType: 'STORE', entityId: userId, vendorPayoutId: payoutId }
-          ), 
+          ...(userRole === UserRole.RIDER
+            ? {
+                riderId: userId,
+                entityType: 'RIDER',
+                entityId: userId,
+                riderPayoutId: payoutId,
+              }
+            : {
+                vendorId: userId,
+                entityType: 'STORE',
+                entityId: userId,
+                vendorPayoutId: payoutId,
+              }),
           balanceBefore: 0, // In a full implementation, fetch current balance first for accuracy
           balanceAfter: 0,
         },
@@ -122,7 +131,7 @@ export class TransactionLedgerService {
         // For Vendors, usually the Vendor ID is passed, but we update the STORE wallet
         await tx.store.update({
           where: { vendorId: userId },
-          data: { walletBalance: { decrement: amount } }, 
+          data: { walletBalance: { decrement: amount } },
         });
       }
 
@@ -145,61 +154,64 @@ export class TransactionLedgerService {
       };
 
       if (status === 'COMPLETED') {
-        // SUCCESS: Just mark the ledger as COMPLETED. 
+        // SUCCESS: Just mark the ledger as COMPLETED.
         // Money was already debited at request time, so we do nothing to the wallet here.
         await client.transaction.updateMany({
           where: whereClause,
-          data: { status: 'COMPLETED', description: 'Withdrawal Successful' } 
+          data: { status: 'COMPLETED', description: 'Withdrawal Successful' },
         });
       } else {
         // FAILED: Mark as FAILED and REFUND the wallet.
-        
+
         // 1. Find the original transaction to get the amount and user ID
         const originalTx = await client.transaction.findFirst({
-          where: whereClause
+          where: whereClause,
         });
-        
+
         if (originalTx) {
           // 2. Mark original request as FAILED in ledger
           await client.transaction.update({
             where: { id: originalTx.id },
-            data: { status: 'FAILED', description: 'Withdrawal Failed - Refunded' }
+            data: {
+              status: 'FAILED',
+              description: 'Withdrawal Failed - Refunded',
+            },
           });
-          
+
           // 3. REFUND (Credit) the wallet
           if (originalTx.entityType === 'RIDER' && originalTx.entityId) {
             await client.rider.update({
               where: { id: originalTx.entityId },
-              data: { walletBalance: { increment: originalTx.amount } }
+              data: { walletBalance: { increment: originalTx.amount } },
             });
           } else if (originalTx.entityType === 'STORE' && originalTx.entityId) {
             await client.store.update({
-              where: { id: originalTx.entityId }, 
-              data: { walletBalance: { increment: originalTx.amount } }
+              where: { id: originalTx.entityId },
+              data: { walletBalance: { increment: originalTx.amount } },
             });
           }
-          
+
           // 4. Create a Refund Ledger Entry for strict audit trail
           await client.transaction.create({
-              data: {
-                  type: 'PAYOUT_FAILED',
-                  amount: originalTx.amount,
-                  entityType: originalTx.entityType,
-                  entityId: originalTx.entityId,
-                  riderPayoutId: originalTx.riderPayoutId,
-                  vendorPayoutId: originalTx.vendorPayoutId,
-                  // FIXED: Removed 'reference' property
-                  description: 'Refund for failed payout',
-                  status: 'COMPLETED',
-                  balanceBefore: 0, 
-                  balanceAfter: 0 
-              }
+            data: {
+              type: 'PAYOUT_FAILED',
+              amount: originalTx.amount,
+              entityType: originalTx.entityType,
+              entityId: originalTx.entityId,
+              riderPayoutId: originalTx.riderPayoutId,
+              vendorPayoutId: originalTx.vendorPayoutId,
+              // FIXED: Removed 'reference' property
+              description: 'Refund for failed payout',
+              status: 'COMPLETED',
+              balanceBefore: 0,
+              balanceAfter: 0,
+            },
           });
         }
       }
     });
   }
-  
+
   /**
    * Record vendor earning from an order
    * Note: Commission is deducted later during withdrawal, not here
@@ -361,7 +373,7 @@ export class TransactionLedgerService {
     }, tx);
   }
 
-  // NOTE: recordVendorPayout and recordRiderPayout are legacy methods replaced by the logic in 
+  // NOTE: recordVendorPayout and recordRiderPayout are legacy methods replaced by the logic in
   // recordPayoutRequest + finalizePayout, but kept for compatibility if needed elsewhere.
   // Ideally, they should be deprecated or refactored to use the new flow.
 
@@ -410,12 +422,12 @@ export class TransactionLedgerService {
           },
         });
       }
-      
+
       // ... Rest of legacy logic kept for safety/fallback ...
       if (payout.status === 'PAID') {
         await client.transaction.updateMany({
-            where: { vendorPayoutId: payout.id, type: 'PAYOUT_REQUESTED' },
-            data: { status: 'COMPLETED' },
+          where: { vendorPayoutId: payout.id, type: 'PAYOUT_REQUESTED' },
+          data: { status: 'COMPLETED' },
         });
         // ...
       }
@@ -434,7 +446,7 @@ export class TransactionLedgerService {
     tx?: Prisma.TransactionClient,
   ) {
     return this.withTransaction(async (client) => {
-        // ... legacy implementation ...
+      // ... legacy implementation ...
     }, tx);
   }
 

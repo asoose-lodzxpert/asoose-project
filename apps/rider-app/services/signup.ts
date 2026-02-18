@@ -68,7 +68,7 @@ export async function registerRider(
     const data = await res.json();
     return data;
   } catch (error) {
-    console.error("Registration error:", error);
+    // ...existing code...
     throw error;
   }
 }
@@ -103,7 +103,7 @@ export async function uploadDocument(
     const { url } = await res.json();
     return url;
   } catch (error) {
-    console.error("Upload error:", error);
+    // ...existing code...
     throw error;
   }
 }

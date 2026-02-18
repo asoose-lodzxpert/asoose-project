@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useCart } from "@/context/CartContext";
-import { useToast } from "@/components/ui/ThemedToast";
+
 import {
   Modal,
   View,
@@ -32,7 +32,7 @@ export function ProductModal({
   onChangeQty: (qty: number) => void;
 }) {
   const { items, addItem, increaseQty, decreaseQty } = useCart();
-  const showToast = useToast();
+  const Toast = require("react-native-toast-message");
   const [imgIdx, setImgIdx] = useState(0);
   const images = product?.images?.length ? product.images : [];
   const cardBg = useThemeColor({}, "surfaceCard");
@@ -106,9 +106,9 @@ export function ProductModal({
                   try {
                     await decreaseQty(product.id);
                   } catch (e) {
-                    showToast({
-                      message: "Could not update cart",
-                      variant: "error",
+                    Toast.show({
+                      type: "error",
+                      text1: "Could not update cart",
                     });
                   }
                 }}
@@ -124,9 +124,9 @@ export function ProductModal({
                   try {
                     await increaseQty(product.id);
                   } catch (e) {
-                    showToast({
-                      message: "Could not update cart",
-                      variant: "error",
+                    Toast.show({
+                      text1: "Could not update cart",
+                      type: "error",
                     });
                   }
                 }}
@@ -156,11 +156,11 @@ export function ProductModal({
                     description: product.description,
                     available: true,
                   });
-                  showToast({ message: "Added to cart!", variant: "success" });
+                  Toast.show({ type: "success", text1: "Added to cart!" });
                 } catch (e) {
-                  showToast({
-                    message: "Could not add to cart",
-                    variant: "error",
+                  Toast.show({
+                    type: "error",
+                    text1: "Could not add to cart",
                   });
                 }
               }}

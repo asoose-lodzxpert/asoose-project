@@ -34,10 +34,12 @@ const SkeletonBox = ({
   width,
   height,
   radius = 8,
+  backgroundColor,
 }: {
   width: number | string;
   height: number;
   radius?: number;
+  backgroundColor: string;
 }) => {
   const opacity = React.useRef(new Animated.Value(0.3)).current;
 
@@ -65,7 +67,7 @@ const SkeletonBox = ({
       style={[
         {
           height,
-          backgroundColor: "#E5E7EB",
+          backgroundColor,
           borderRadius: radius,
           opacity,
         },
@@ -76,18 +78,34 @@ const SkeletonBox = ({
 };
 
 const PersonalInfoSkeleton = () => {
+  const surfaceSubtle = useThemeColor({}, "surfaceSubtle");
+
   return (
     <View style={{ padding: 20 }}>
       {/* Profile Image Skeleton */}
       <View style={styles.imageContainer}>
-        <SkeletonBox width={120} height={120} radius={60} />
+        <SkeletonBox
+          width={120}
+          height={120}
+          radius={60}
+          backgroundColor={surfaceSubtle}
+        />
       </View>
 
       {/* Fields Skeletons */}
       {[1, 2, 3, 4, 5, 6, 7].map((i) => (
         <View key={i} style={styles.field}>
-          <SkeletonBox width={100} height={18} />
-          <SkeletonBox width="100%" height={48} radius={12} />
+          <SkeletonBox
+            width={100}
+            height={18}
+            backgroundColor={surfaceSubtle}
+          />
+          <SkeletonBox
+            width="100%"
+            height={48}
+            radius={12}
+            backgroundColor={surfaceSubtle}
+          />
         </View>
       ))}
     </View>
@@ -98,6 +116,9 @@ export default function EditPersonalInfoScreen() {
   const router = useRouter();
   const primary = useThemeColor({}, "brandPrimary");
   const surface = useThemeColor({}, "surfaceBackground");
+  const surfaceSubtle = useThemeColor({}, "surfaceSubtle");
+  const textMuted = useThemeColor({}, "textMuted");
+  const statusSuccess = useThemeColor({}, "statusSuccess");
 
   const [data, setData] = useState<PersonalInfo | null>(null);
   const [editing, setEditing] = useState(false);
@@ -272,8 +293,21 @@ export default function EditPersonalInfoScreen() {
                     style={styles.profileImage}
                   />
                 ) : (
-                  <View style={[styles.profileImage, styles.placeholder]}>
-                    <IconSymbol name="camera.fill" size={36} color="#9CA3AF" />
+                  <View
+                    style={[
+                      styles.profileImage,
+                      {
+                        backgroundColor: surfaceSubtle,
+                        justifyContent: "center",
+                        alignItems: "center",
+                      },
+                    ]}
+                  >
+                    <IconSymbol
+                      name="camera.fill"
+                      size={36}
+                      color={textMuted}
+                    />
                   </View>
                 )}
                 {editing && (
@@ -316,7 +350,7 @@ export default function EditPersonalInfoScreen() {
                       <IconSymbol
                         name="checkmark.seal"
                         size={16}
-                        color="#16A34A"
+                        color={statusSuccess}
                       />
                     ) : (
                       <Pressable style={{ marginLeft: 8 }}>
@@ -342,7 +376,7 @@ export default function EditPersonalInfoScreen() {
                       <IconSymbol
                         name="checkmark.seal"
                         size={16}
-                        color="#16A34A"
+                        color={statusSuccess}
                       />
                     ) : (
                       <Pressable style={{ marginLeft: 8 }}>
@@ -459,11 +493,6 @@ const styles = StyleSheet.create({
   },
   imageContainer: { alignItems: "center", marginBottom: 24 },
   profileImage: { width: 120, height: 120, borderRadius: 60 },
-  placeholder: {
-    backgroundColor: "#E5E7EB",
-    justifyContent: "center",
-    alignItems: "center",
-  },
   changeImageBtn: { marginTop: 12 },
   field: { marginTop: 20, gap: 6 },
   row: { flexDirection: "row", gap: 12 },

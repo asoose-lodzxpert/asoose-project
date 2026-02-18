@@ -119,19 +119,19 @@ export class DisputesController {
     return this.disputesService.addAdminNote(id, note, req.user.id);
   }
 
-// ✅ FIX: Redirect to service method to ensure ActivityLog entry
-@Patch(':id/priority')
-@Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN_MANAGER, UserRole.ADMIN_SUPPORT)
-@HttpCode(HttpStatus.OK)
-@ApiOperation({ summary: 'Update dispute priority' })
-async updatePriority(
-  @Param('id') id: string,
-  @Body() dto: UpdatePriorityDto,
-  @Request() req,
-) {
-  // Use service method instead of direct prisma update
-  return this.disputesService.updatePriority(id, dto.priority, req.user.id);
-}
+  // ✅ FIX: Redirect to service method to ensure ActivityLog entry
+  @Patch(':id/priority')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN_MANAGER, UserRole.ADMIN_SUPPORT)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Update dispute priority' })
+  async updatePriority(
+    @Param('id') id: string,
+    @Body() dto: UpdatePriorityDto,
+    @Request() req,
+  ) {
+    // Use service method instead of direct prisma update
+    return this.disputesService.updatePriority(id, dto.priority, req.user.id);
+  }
 
   // 🔒 ADMIN ONLY: Resolve
   @Post(':id/resolve')

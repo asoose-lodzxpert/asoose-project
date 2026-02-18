@@ -1,4 +1,12 @@
-import { Controller, Post, Body, Req, UseGuards, Patch } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  Req,
+  UseGuards,
+  Patch,
+  Delete,
+} from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
@@ -19,15 +27,6 @@ import { UserRole } from '../common/enums/user-role.enum';
 })
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
-
-  // Universal login route (role-based)
-  @Post('login')
-  @Throttle({ default: { limit: 10, ttl: 60 * 1000 } }) // 10 requests per minute
-  login(@Body() body) {
-    // body: { email, password, role }
-    return this.authService.login(body);
-  }
-
   // Universal refresh route
   @Post('refresh')
   @Throttle({ default: { limit: 10, ttl: 60 * 1000 } })
@@ -83,5 +82,23 @@ export class UserAuthController {
   @Roles(UserRole.CUSTOMER)
   updateProfile(@Body() dto: UpdateProfileDto, @Req() req) {
     return this.authService.updateUserProfile(req.user.id, dto);
+  }
+
+  @Post('push-token')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.CUSTOMER)
+  savePushToken(@Body() body, @Req() req) {
+    return this.authService.savePushToken(
+      req.user.id,
+      body.token,
+      body.platform,
+    );
+  }
+
+  @Delete('push-token')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.CUSTOMER)
+  removePushToken(@Req() req) {
+    return this.authService.removePushToken(req.user.id);
   }
 }

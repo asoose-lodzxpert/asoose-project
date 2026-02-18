@@ -106,11 +106,43 @@ export class OrderService {
     });
 
     if (!rider) throw new NotFoundException('Rider not found');
+    // DeliveryStatus enum: PENDING, REQUESTED, ASSIGNED, ACCEPTED, PICKED_UP, IN_TRANSIT, DELIVERED, CANCELLED
+    // RideStatus enum: PENDING, REQUESTED, ACCEPTED, ARRIVED, IN_PROGRESS, COMPLETED, CANCELLED
+    // Default: exclude PENDING, REQUESTED
     let statusFilter: any = { notIn: ['PENDING', 'REQUESTED'] };
 
     if (status) {
-      const statusArray = status.split(',').map((s) => s.trim());
-      statusFilter = { in: statusArray };
+      // Map incoming status to valid enums for DeliveryStatus
+      const validDeliveryStatuses = [
+        'PENDING',
+        'REQUESTED',
+        'ASSIGNED',
+        'ACCEPTED',
+        'PICKED_UP',
+        'IN_TRANSIT',
+        'DELIVERED',
+        'CANCELLED',
+      ];
+      const validRideStatuses = [
+        'PENDING',
+        'REQUESTED',
+        'ACCEPTED',
+        'ARRIVED',
+        'IN_PROGRESS',
+        'COMPLETED',
+        'CANCELLED',
+      ];
+      const statusArray = status.split(',').map((s) => s.trim().toUpperCase());
+      // Only use valid enums for filter
+      if (rider?.role === 'RIDER') {
+        statusFilter = {
+          in: statusArray.filter((s) => validDeliveryStatuses.includes(s)),
+        };
+      } else if (rider?.role === 'DRIVER') {
+        statusFilter = {
+          in: statusArray.filter((s) => validRideStatuses.includes(s)),
+        };
+      }
     }
 
     if (rider.role === 'DRIVER') {
@@ -166,6 +198,10 @@ export class OrderService {
         assignedAt: delivery.assignedAt,
         pickedUpAt: delivery.pickedUpAt,
       }));
+    } else {
+      // Unknown role, log error and return empty jobs
+      console.error(`Unknown rider role for riderId ${riderId}:`, rider.role);
+      jobs = [];
     }
     const total = jobs.length;
     const paginatedData = jobs.slice(skip, skip + limit);

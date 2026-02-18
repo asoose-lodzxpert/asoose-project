@@ -78,6 +78,7 @@ export type IconSymbolName =
   | "delete"
   | "add"
   | "share"
+  | "photo"
   | "file-text"
   | "credit-card"
   | "alert-circle"
@@ -106,6 +107,9 @@ const MAPPING: Record<IconSymbolName, keyof typeof MaterialIcons.glyphMap> = {
   "fork.knife": "restaurant",
   "chart.line.uptrend.xyaxis": "show-chart",
   "person.crop.circle.fill": "account-circle",
+
+  // Media
+  photo: "photo",
 
   // Auth & UI
   "eye.fill": "remove-red-eye",

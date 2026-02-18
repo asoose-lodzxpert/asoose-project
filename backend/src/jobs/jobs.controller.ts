@@ -8,19 +8,11 @@ import { Roles } from '../auth/roles.decorator';
 import { UserRole } from '../common/enums/user-role.enum';
 
 @Controller({
-  path: 'riders/jobs',
+  path: 'rider/jobs',
   version: '1',
 })
 export class JobsController {
   constructor(private readonly jobsService: JobsService) {}
-
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.DRIVER, UserRole.RIDER)
-  @Get('stream')
-  @Sse()
-  streamJobs(@Req() req) {
-    return this.jobsService.streamJobs(req.user.id);
-  }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.DRIVER, UserRole.RIDER)

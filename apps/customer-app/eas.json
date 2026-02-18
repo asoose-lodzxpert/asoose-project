@@ -8,19 +8,23 @@
       "developmentClient": true,
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://api.asoose.com/api/v1"
+        "EXPO_PUBLIC_API_URL": "https://api.asoose.com/api/v1",
+        "EXPO_PUBLIC_GOOGLE_MAPS_API_KEY": "AIzaSyDPw8HD12C_D6yyt6aFo2Pac20sEAWLIz8"
       }
     },
     "preview": {
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://api.asoose.com/api/v1"
+        "EXPO_PUBLIC_API_URL": "https://api.asoose.com/api/v1",
+        "EXPO_PUBLIC_GOOGLE_MAPS_API_KEY": "AIzaSyDPw8HD12C_D6yyt6aFo2Pac20sEAWLIz8"
       }
     },
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://api.asoose.com/api/v1"
+        "EXPO_PUBLIC_API_URL": "https://api.asoose.com/api/v1",
+        "EXPO_PUBLIC_GOOGLE_MAPS_API_KEY": "AIzaSyDPw8HD12C_D6yyt6aFo2Pac20sEAWLIz8",
+        "EXPO_ANDROID_BUILD_DEOBFUSCATION": "1"
       }
     }
   },

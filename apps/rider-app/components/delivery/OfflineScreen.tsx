@@ -10,7 +10,7 @@ import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
 
 export default function OfflineScreen() {
   const { goOnline } = useJobs();
-  const { confirm } = useConfirm();
+  const { confirm, ConfirmModal } = useConfirm();
   const primary = useThemeColor({}, "brandPrimary");
   const surface = useThemeColor({}, "surfaceBackground");
 
@@ -119,6 +119,7 @@ export default function OfflineScreen() {
           <ThemedText style={styles.goOnlineText}>Go Online</ThemedText>
         </Pressable>
       </View>
+      <ConfirmModal />
     </View>
   );
 }

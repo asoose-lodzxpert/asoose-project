@@ -32,7 +32,7 @@ export class BullBoardController {
     // Initialize Bull Board only once
     if (!BullBoardController.serverAdapter) {
       const serverAdapter = new ExpressAdapter();
-      serverAdapter.setBasePath('/system/queues');
+      serverAdapter.setBasePath('/api/v1/system/queues');
 
       createBullBoard({
         queues: [
@@ -51,18 +51,44 @@ export class BullBoardController {
   }
 
   @Get()
-  serveBullBoardRoot(@Req() req: Request, @Res() res: Response) {
-    if (BullBoardController.serverAdapter) {
-      return BullBoardController.serverAdapter.getRouter()(req, res);
+  serveBullBoardEmpty(@Req() req: Request, @Res() res: Response) {
+    try {
+      if (BullBoardController.serverAdapter) {
+        const router = BullBoardController.serverAdapter.getRouter();
+        return router(req, res);
+      }
+      res.status(500).send('Bull Board not initialized');
+    } catch (error: any) {
+      console.error('Bull Board error:', error);
+      res.status(500).send(`Bull Board error: ${error?.message}`);
     }
-    res.status(500).send('Bull Board not initialized');
   }
 
-  @Get('*path')
-  serveBullBoard(@Req() req: Request, @Res() res: Response) {
-    if (BullBoardController.serverAdapter) {
-      return BullBoardController.serverAdapter.getRouter()(req, res);
+  @Get('/')
+  serveBullBoardRoot(@Req() req: Request, @Res() res: Response) {
+    try {
+      if (BullBoardController.serverAdapter) {
+        const router = BullBoardController.serverAdapter.getRouter();
+        return router(req, res);
+      }
+      res.status(500).send('Bull Board not initialized');
+    } catch (error: any) {
+      console.error('Bull Board error:', error);
+      res.status(500).send(`Bull Board error: ${error?.message}`);
     }
-    res.status(500).send('Bull Board not initialized');
+  }
+
+  @Get('*')
+  serveBullBoard(@Req() req: Request, @Res() res: Response) {
+    try {
+      if (BullBoardController.serverAdapter) {
+        const router = BullBoardController.serverAdapter.getRouter();
+        return router(req, res);
+      }
+      res.status(500).send('Bull Board not initialized');
+    } catch (error: any) {
+      console.error('Bull Board error:', error);
+      res.status(500).send(`Bull Board error: ${error?.message}`);
+    }
   }
 }

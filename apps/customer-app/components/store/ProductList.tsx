@@ -31,7 +31,7 @@ export function ProductList({
   const price = useThemeColor({}, "textSecondary");
   const skeletonColor = useThemeColor({}, "surfaceSubtle");
 
-  const sectionTitle = isRestaurant ? "Popular Items" : "Featured Products";
+  const sectionTitle = "Featured Products";
 
   const handleProductPress = (item: Product) => {
     router.push(`/product/${item.id}` as RelativePathString);

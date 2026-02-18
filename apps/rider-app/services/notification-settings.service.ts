@@ -9,11 +9,11 @@ const EXPO_PUBLIC_API_URL = process.env.EXPO_PUBLIC_API_URL;
 export async function getNotificationSettings(): Promise<NotificationSettings> {
   try {
     const response = await fetchWithAuth(
-      `${EXPO_PUBLIC_API_URL}/riders/notification/settings`,
+      `${EXPO_PUBLIC_API_URL}/rider/notification/settings`,
     );
     return response.settings;
   } catch (error) {
-    console.error("Error fetching notification settings:", error);
+    // ...existing code...
     throw error;
   }
 }
@@ -23,7 +23,7 @@ export async function updateNotificationSettings(
 ): Promise<NotificationSettings> {
   try {
     const response = await fetchWithAuth(
-      `${EXPO_PUBLIC_API_URL}/riders/notification/settings`,
+      `${EXPO_PUBLIC_API_URL}/rider/notification/settings`,
       {
         method: "PATCH",
         body: JSON.stringify(data),
@@ -31,7 +31,7 @@ export async function updateNotificationSettings(
     );
     return response.settings;
   } catch (error) {
-    console.error("Error updating notification settings:", error);
+    // ...existing code...
     throw error;
   }
 }

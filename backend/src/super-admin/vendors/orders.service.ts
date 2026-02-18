@@ -16,18 +16,20 @@ export class OrdersService {
         items: true,
         // FIX: Include Payment context
         payment: { select: { status: true } },
-        orderGroup: { include: { payment: { select: { status: true } } } }
+        orderGroup: { include: { payment: { select: { status: true } } } },
       },
     });
 
-    const total = await this.prisma.order.count({ where: { storeId: storeId } });
+    const total = await this.prisma.order.count({
+      where: { storeId: storeId },
+    });
 
-    const transformed = orders.map(order => {
-       const effectivePayment = order.payment || order.orderGroup?.payment;
-       return {
-         ...order,
-         paymentStatus: effectivePayment?.status || 'UNPAID',
-       };
+    const transformed = orders.map((order) => {
+      const effectivePayment = order.payment || order.orderGroup?.payment;
+      return {
+        ...order,
+        paymentStatus: effectivePayment?.status || 'UNPAID',
+      };
     });
 
     return {

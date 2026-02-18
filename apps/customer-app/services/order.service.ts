@@ -3,7 +3,7 @@ import { request } from "@/lib/authFetch";
 // Align with backend CreateOrderDto
 export type CreateOrderPayload = {
   addressId: string;
-  restaurantId?: string; // Optional - backend will auto-detect multi-vendor
+  storeId?: string; // Optional - backend will auto-detect multi-vendor
   items: {
     id: string; // product id
     quantity: number;

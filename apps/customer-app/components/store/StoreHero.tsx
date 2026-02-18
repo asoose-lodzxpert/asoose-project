@@ -132,7 +132,7 @@ export function StoreHero({
               <View style={styles.metadataItem}>
                 <IconSymbol name="banknote.fill" size={14} color="#E5E7EB" />
                 <ThemedText style={[styles.metadataText, { color: "#E5E7EB" }]}>
-                  {isRestaurant ? "Restaurant" : "Store"}
+                  Store
                 </ThemedText>
               </View>
             </View>

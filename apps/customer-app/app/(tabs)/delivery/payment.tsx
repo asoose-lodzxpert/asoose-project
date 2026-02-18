@@ -2,7 +2,7 @@ import { PaymentWebView } from "@/components/checkout/PaymentWebView";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { IconSymbol } from "@/components/ui/icon-symbol";
-import { useToast } from "@/components/ui/ThemedToast";
+
 import { useSendPackage } from "@/context/SendPackageContext";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { useUserProfile } from "@/hooks/useUserProfile";
@@ -23,12 +23,12 @@ import {
   StyleSheet,
   View,
 } from "react-native";
+import Toast from "react-native-toast-message";
 
 export default function PaymentScreen() {
   const { returnData, resetDelivery } = useSendPackage();
   const router = useRouter();
   const { user, loading: userLoading, error: userError } = useUserProfile();
-  const showToast = useToast();
 
   const primary = useThemeColor({}, "brandPrimary");
   const surface = useThemeColor({}, "surfaceBackground");
@@ -56,23 +56,23 @@ export default function PaymentScreen() {
 
   async function confirmPayment() {
     if (!user) {
-      showToast({ message: "User not loaded. Please wait.", variant: "error" });
+      Toast.show({ type: "error", text1: "User not loaded. Please wait." });
       return;
     }
 
     // Validate required fields
     if (!data.deliveryDetails?.name || !data.deliveryDetails?.phone) {
-      showToast({
-        message: "Please provide recipient name and phone number.",
-        variant: "error",
+      Toast.show({
+        text1: "Please provide recipient name and phone number.",
+        type: "error",
       });
       return;
     }
 
     if (!data.pickup?.address || !data.dropoff?.address) {
-      showToast({
-        message: "Please select both pickup and delivery locations.",
-        variant: "error",
+      Toast.show({
+        text1: "Please select both pickup and delivery locations.",
+        type: "error",
       });
       return;
     }
@@ -122,7 +122,7 @@ export default function PaymentScreen() {
         err && typeof err === "object" && "message" in err
           ? (err as any).message
           : String(err);
-      showToast({ message: "Payment failed: " + msg, variant: "error" });
+      Toast.show({ type: "error", text1: "Payment failed: " + msg });
     } finally {
       setProcessing(false);
     }
@@ -132,7 +132,7 @@ export default function PaymentScreen() {
     if (!bankAccount) return;
     setProcessing(true);
     try {
-      const res = await checkBankTransferStatus(bankAccount.reference);
+      const res = await checkBankTransferStatus(bankAccount.reference, method);
       if (res.status === "paid") {
         clearPolling();
         router.push({
@@ -183,7 +183,7 @@ export default function PaymentScreen() {
   function startBankPolling(reference: string, deliveryId: string) {
     clearPolling();
     pollRef.current = setInterval(async () => {
-      const res = await checkBankTransferStatus(reference);
+      const res = await checkBankTransferStatus(reference, method);
       if (res.status === "paid") {
         clearPolling();
         router.push({
@@ -577,6 +577,7 @@ export default function PaymentScreen() {
             visible={showPaymentWebView}
             url={checkoutTx.checkoutUrl}
             reference={checkoutTx.transactionId}
+            paymentMethod={method}
             onSuccess={handlePaymentSuccess}
             onCancel={handlePaymentCancel}
             onPaymentComplete={resetDelivery}
