@@ -158,7 +158,7 @@ export default function DeliveriesPage() {
       color: "#fff",
     }).then((res) => {
       if (res.isConfirmed) {
-        // TODO: Add API call here
+        // Add API call here
         toast.success("Driver assigned successfully");
         mutate(); // Refresh list after assignment
       }

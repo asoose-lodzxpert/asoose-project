@@ -1,0 +1,118 @@
+/**
+ * Ride Status Formatter
+ * Converts RideStatus enums to user-friendly labels and colors
+ */
+
+import type { RideStatus } from '@/types/ride-view-model';
+
+export interface StatusDisplay {
+  label: string;
+  badge: string; // Tailwind color classes
+  icon: 'clock' | 'check' | 'x' | 'car' | 'person';
+}
+
+const STATUS_MAP: Record<RideStatus, StatusDisplay> = {
+  PENDING: {
+    label: 'Processing',
+    badge: 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200',
+    icon: 'clock',
+  },
+  REQUESTED: {
+    label: 'Finding Driver',
+    badge: 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200',
+    icon: 'clock',
+  },
+  ACCEPTED: {
+    label: 'Driver Arriving',
+    badge: 'bg-cyan-100 dark:bg-cyan-900 text-cyan-800 dark:text-cyan-200',
+    icon: 'car',
+  },
+  ARRIVED: {
+    label: 'Driver Arrived',
+    badge: 'bg-indigo-100 dark:bg-indigo-900 text-indigo-800 dark:text-indigo-200',
+    icon: 'person',
+  },
+  IN_PROGRESS: {
+    label: 'In Progress',
+    badge: 'bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200',
+    icon: 'car',
+  },
+  COMPLETED: {
+    label: 'Completed',
+    badge: 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200',
+    icon: 'check',
+  },
+  CANCELLED: {
+    label: 'Cancelled',
+    badge: 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200',
+    icon: 'x',
+  },
+};
+
+/**
+ * Convert RideStatus enum to human-readable label
+ */
+export function formatRideStatus(status: RideStatus): string {
+  return STATUS_MAP[status]?.label ?? status;
+}
+
+/**
+ * Get status display info (label, colors, icon)
+ */
+export function getStatusDisplay(status: RideStatus): StatusDisplay {
+  return STATUS_MAP[status] ?? {
+    label: status,
+    badge: 'bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200',
+    icon: 'clock',
+  };
+}
+
+/**
+ * Format ride time (used for pickup/dropoff times)
+ */
+export function formatRideTime(dateString?: string): string {
+  if (!dateString) return '--:--';
+  try {
+    const date = new Date(dateString);
+    return date.toLocaleTimeString('en-NG', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+    });
+  } catch {
+    return '--:--';
+  }
+}
+
+/**
+ * Format full ride datetime (used in headers)
+ */
+export function formatRideDateTime(dateString?: string): string {
+  if (!dateString) return '';
+  try {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-NG', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * Format currency (NGN)
+ */
+export function formatCurrency(amount?: number): string {
+  if (amount === null || amount === undefined) {
+    return '₦0.00';
+  }
+  return new Intl.NumberFormat('en-NG', {
+    style: 'currency',
+    currency: 'NGN',
+  }).format(amount);
+}

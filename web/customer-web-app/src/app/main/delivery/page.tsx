@@ -17,7 +17,7 @@ import { toast } from 'react-toastify';
 import { useSession } from 'next-auth/react';
 import BottomNav from '../components/layout/BottomNav';
 import { useDeliveryStore } from '@/store/useDeliveryStore';
-import LocationAutocomplete from '../ride/components/LocationAutocomplete';
+import { LocationInput } from '@/components/shared/LocationInput';
 import DeliveryProgressUI from './components/DeliveryProgressUi';
 import PackageForm from './components/PackageForm'; // ✅ Imported new component
 import { ReviewModal } from '@/store/ReviewModal';
@@ -26,19 +26,18 @@ import { DeliveryService } from '@/services/delivery.service';
 import { socketService } from '@/services/socket.service';
 
 // CONSTANTS & TYPES
-
+// Stage names aligned with backend DeliveryStatus enum where applicable
 const DeliveryStage = {
   IDLE: 'IDLE',
   CONFIGURING: 'CONFIGURING',
   PROCESSING_ADDRESS: 'Processing_Address',
   CALCULATING_FEE: 'Calculating_Fee',
   REVIEW_PAYMENT: 'REVIEW_PAYMENT',
-  SELECTING_VEHICLE: 'SELECTING_VEHICLE',
   PAYMENT_PENDING: 'Payment_Pending',
-  FINDING_COURIER: 'FINDING_COURIER',
-  COURIER_ASSIGNED: 'COURIER_ASSIGNED',
-  PICKED_UP: 'PICKED_UP',
-  COMPLETED: 'COMPLETED'
+  REQUESTED: 'REQUESTED',       // Backend: REQUESTED (finding courier)
+  ASSIGNED: 'ASSIGNED',         // Backend: ASSIGNED (courier matched)
+  PICKED_UP: 'PICKED_UP',       // Backend: PICKED_UP
+  DELIVERED: 'DELIVERED',       // Backend: DELIVERED (final)
 } as const;
 
 const PHONE_REGEX = /^(\+234|0)[789][01]\d{8}$/;
@@ -123,10 +122,10 @@ export default function DeliveryPage() {
   // Redirect if we are in a tracking state
   useEffect(() => {
     const trackingStages = [
-      DeliveryStage.FINDING_COURIER,
-      DeliveryStage.COURIER_ASSIGNED,
+      DeliveryStage.REQUESTED,
+      DeliveryStage.ASSIGNED,
       DeliveryStage.PICKED_UP,
-      DeliveryStage.COMPLETED,
+      DeliveryStage.DELIVERED,
     ];
     if (activeDeliveryId && trackingStages.includes(stage as any)) {
       router.push(`/main/delivery/${activeDeliveryId}`);
@@ -137,7 +136,7 @@ export default function DeliveryPage() {
   const handlePaymentSuccess = useCallback(
     (id?: string) => {
       localStorage.removeItem(PENDING_DELIVERY_KEY);
-      setStage(DeliveryStage.FINDING_COURIER);
+      setStage(DeliveryStage.REQUESTED);
       toast.success("Payment confirmed!");
       const targetId = id || activeDeliveryId;
       if (targetId) {
@@ -207,13 +206,13 @@ export default function DeliveryPage() {
       if (data.status === "ASSIGNED") {
         useDeliveryStore.setState({
           courierInfo: data.rider,
-          stage: DeliveryStage.COURIER_ASSIGNED,
+          stage: DeliveryStage.ASSIGNED,
         });
         toast.info("Courier found! They are on their way.");
       } else if (data.status === "PICKED_UP") {
         setStage(DeliveryStage.PICKED_UP);
-      } else if (data.status === "DELIVERED" || data.status === "COMPLETED") {
-        setStage(DeliveryStage.COMPLETED);
+      } else if (data.status === "DELIVERED") {
+        setStage(DeliveryStage.DELIVERED);
       }
     },
     [setStage],
@@ -270,12 +269,10 @@ export default function DeliveryPage() {
 
     try {
       setStage(DeliveryStage.PROCESSING_ADDRESS);
-      const cityFallback = "Lagos";
 
       const pickupRes = await DeliveryService.saveAddress(
         {
           street: sanitizeInput(packageInfo.pickupAddress),
-          city: cityFallback,
           lat: pickupPos.lat,
           lng: pickupPos.lng,
         },
@@ -285,7 +282,6 @@ export default function DeliveryPage() {
       const dropoffRes = await DeliveryService.saveAddress(
         {
           street: sanitizeInput(packageInfo.destinationAddress),
-          city: cityFallback,
           lat: dropoffPos.lat,
           lng: dropoffPos.lng,
         },
@@ -295,7 +291,7 @@ export default function DeliveryPage() {
       setAddressIds(pickupRes.id, dropoffRes.id);
       setStage(DeliveryStage.CALCULATING_FEE);
 
-      // ✅ Use user-provided exact weight if available, else fallback to package type logic
+      // Use user-provided exact weight if available, else fallback to package type logic
       const finalWeight = typeof packageInfo.weightKg === 'number' && packageInfo.weightKg > 0 
         ? packageInfo.weightKg 
         : 2.5; // Default fallback
@@ -307,7 +303,7 @@ export default function DeliveryPage() {
         recipientPhone: normalizePhoneNumber(packageInfo.recipientPhone),
         packageDetails: sanitizeInput(`${packageInfo.type} - ${packageInfo.instructions || ''}`),
         
-        // ✅ NEW: Optional Metadata Fields
+        // Optional Metadata Fields
         weightKg: finalWeight,
         declaredValue: typeof packageInfo.declaredValue === 'number' ? packageInfo.declaredValue : undefined,
         fragile: packageInfo.isFragile,
@@ -447,7 +443,6 @@ export default function DeliveryPage() {
         );
 
       case DeliveryStage.REVIEW_PAYMENT:
-      case DeliveryStage.SELECTING_VEHICLE:
         return (
           <div className="max-w-xl mx-auto p-6 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl animate-in fade-in slide-in-from-bottom-4 shadow-xl">
             <div className="text-center mb-8">
@@ -473,7 +468,7 @@ export default function DeliveryPage() {
               <CheckCircle2 className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
               <p className="text-sm text-blue-700 dark:text-blue-300">
                 Vehicle assigned automatically based on package weight (
-                {packageInfo.weight}).
+                {typeof packageInfo.weightKg === 'number' ? `${packageInfo.weightKg}kg` : packageInfo.weight}).
               </p>
             </div>
 
@@ -516,11 +511,11 @@ export default function DeliveryPage() {
           </div>
         );
 
-      case DeliveryStage.FINDING_COURIER:
-      case DeliveryStage.COURIER_ASSIGNED:
+      case DeliveryStage.REQUESTED:
+      case DeliveryStage.ASSIGNED:
       case DeliveryStage.PICKED_UP:
-      case DeliveryStage.COMPLETED:
-        return <DeliveryProgressUI stage={stage} courier={courierInfo} />;
+      case DeliveryStage.DELIVERED:
+        return <DeliveryProgressUI stage={stage} />;
 
       default: // CONFIGURING
         return (
@@ -535,16 +530,15 @@ export default function DeliveryPage() {
                       <MapPin size={16} className="text-yellow-500" />
                       Pickup Location
                     </label>
-                    <LocationAutocomplete
-                      placeholder="Current package location"
-                      initialValue={packageInfo.pickupAddress}
-                      onSelect={(data) => {
-                        setLocations(
-                          { lat: data.lat, lng: data.lng },
-                          undefined,
-                        );
-                        setPackageInfo({ pickupAddress: data.address });
+                    <LocationInput
+                      value={packageInfo.pickupAddress}
+                      onValueChange={(v) => setPackageInfo({ pickupAddress: v })}
+                      onLocationSelect={(location, address) => {
+                        setLocations(location, undefined);
+                        setPackageInfo({ pickupAddress: address });
                       }}
+                      placeholder="Enter pickup location"
+                      showGeolocation
                     />
                   </div>
                   
@@ -554,17 +548,14 @@ export default function DeliveryPage() {
                       <MapPin size={16} className="text-blue-500" />
                       Delivery Address
                     </label>
-                    <LocationAutocomplete
-                      placeholder="Enter full delivery address"
-                      initialValue={packageInfo.destinationAddress}
-                      showPinpoint={false}
-                      onSelect={(data) => {
-                        setLocations(undefined, {
-                          lat: data.lat,
-                          lng: data.lng,
-                        });
-                        setPackageInfo({ destinationAddress: data.address });
+                    <LocationInput
+                      value={packageInfo.destinationAddress}
+                      onValueChange={(v) => setPackageInfo({ destinationAddress: v })}
+                      onLocationSelect={(location, address) => {
+                        setLocations(undefined, location);
+                        setPackageInfo({ destinationAddress: address });
                       }}
+                      placeholder="Enter delivery address"
                     />
                   </div>
                 </div>

@@ -37,19 +37,6 @@ export class TripsController {
     return this.tripsService.getRideEstimate(dto);
   }
 
-  /**
-   * Request a new ride
-   * POST /trips/rides/request
-   */
- 
-
-  /**
-   * Get current active ride
-   * GET /trips/rides/current
-   */
-  @Get('rides/current')
-  
-
   @Post('rides/:id/confirm')
   async confirmRide(
     @Request() req,
@@ -156,6 +143,7 @@ async getCurrentRide(@Request() req) {
   // Returns the current ride, ensuring PENDING rides with expired payment intents are purged.
   return this.tripsService.getCurrentRide(req.user.id);
 }
+
 @Post('rides/request')
 async requestRide(
   @Request() req, 
@@ -165,4 +153,5 @@ async requestRide(
   if (!idempotencyKey) throw new BadRequestException('Idempotency key required to prevent ghost rides.');
   return this.tripsService.requestRide(req.user.id, dto, idempotencyKey);
 }
+
 }

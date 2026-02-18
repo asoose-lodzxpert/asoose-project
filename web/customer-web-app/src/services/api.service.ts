@@ -45,26 +45,32 @@ export class ApiService {
       },
     });
 
-    // ✅ FIX: Handle Unauthorized (401) explicitly
+    // Handle Unauthorized (401) explicitly
     if (response.status === 401) {
       console.error("ApiService: Unauthorized (401). Session may be expired.");
-      
-      // Force redirect to login if happening client-side
       if (typeof window !== "undefined" && !window.location.pathname.includes('/sign-in')) {
         window.location.href = "/sign-in?reason=session_expired";
       }
-      
-      throw new Error("Session expired. Please log in again.");
+      throw {
+        status: 401,
+        message: "Session expired. Please log in again.",
+        type: "unauthorized"
+      };
     }
 
     if (!response.ok) {
-      // Attempt to parse error message from backend
-      const error = await response
-        .json()
-        .catch(() => ({ message: "Request failed" }));
-      
-      // Throw error with status for easier debugging
-      throw new Error(error.message || `HTTP ${response.status} - Request failed`);
+      let error: Record<string, unknown> = {};
+      try {
+        error = await response.json();
+      } catch {
+        error = { message: "Request failed" };
+      }
+      throw {
+        status: response.status,
+        message: error.message || `HTTP ${response.status} - Request failed`,
+        details: error.details,
+        type: "api-error"
+      };
     }
 
     if (response.status === 204) {
@@ -80,7 +86,6 @@ export class ApiService {
   }
 
 
- // --- Replace everything from static async get() downwards with this: ---
 
   static async get<T>(endpoint: string, token?: string, options?: RequestInit): Promise<T> {
     return this.request<T>(endpoint, { method: "GET", ...options }, token);

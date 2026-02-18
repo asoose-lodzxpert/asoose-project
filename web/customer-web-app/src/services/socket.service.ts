@@ -131,7 +131,7 @@ export interface RideDriverAssignedEvent {
 
 export interface RideStatusChangedEvent {
   rideId: string;
-  status: "REQUESTED" | "ACCEPTED" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
+  status: "REQUESTED" | "ACCEPTED" | "ARRIVED" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
   timestamp: string;
   message?: string;
 }

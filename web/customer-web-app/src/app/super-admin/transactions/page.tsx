@@ -182,7 +182,7 @@ export default function TransactionsPage() {
             );
           }
 
-          // Legacy / Standard Link handling
+          // Standard Link handling
           if (row.refId && row.refType) {
             return (
               <Link

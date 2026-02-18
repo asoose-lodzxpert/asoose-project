@@ -92,8 +92,9 @@ export default function DeliveryProgressUI({ delivery, stage: propStage }: Deliv
   ];
 
   // Determine current active step index
+  // Backend DeliveryStatus: PENDING | REQUESTED | ASSIGNED | ACCEPTED | PICKED_UP | IN_TRANSIT | DELIVERED | CANCELLED
   const getCurrentStepIndex = () => {
-    if (status === 'DELIVERED' || status === 'COMPLETED') return 3;
+    if (status === 'DELIVERED') return 3;
     if (status === 'PICKED_UP' || status === 'IN_TRANSIT') return 2;
     if (status === 'ASSIGNED' || status === 'ACCEPTED') return 1;
     return 0; // REQUESTED / PENDING

@@ -56,6 +56,7 @@ async function bootstrap() {
         'Accept',
         'Origin',
         'Idempotency-Key',
+        'x-idempotency-key',
       ],
     });
   } else {
@@ -85,6 +86,7 @@ async function bootstrap() {
         'Accept',
         'Origin',
         'Idempotency-Key',
+        'x-idempotency-key',
       ],
       exposedHeaders: ['X-Total-Count', 'X-Page-Number'],
       maxAge: 86400,
