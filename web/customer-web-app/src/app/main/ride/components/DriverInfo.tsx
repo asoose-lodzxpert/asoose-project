@@ -1,15 +1,30 @@
 'use client';
 
 import { useRideStore } from "../store/ride";
-import { Star, Phone, MessageSquare } from "lucide-react";
+import { Star, Phone, MessageSquare, Loader2 } from "lucide-react";
 
 export function DriverInfo() {
   const driver = useRideStore((state) => state.driver);
+  const rideStatus = useRideStore((state) => state.rideStatus);
 
   if (!driver) return null;
 
   return (
     <div className="absolute bottom-6 left-6 right-6 md:left-6 md:right-auto md:w-96 bg-white dark:bg-zinc-900 shadow-2xl z-20 p-5 rounded-2xl border border-zinc-100 dark:border-zinc-800">
+      
+      {/* Status Header: Only shown when driver is on the way (confirmed state) */}
+      {rideStatus === 'confirmed' && (
+        <div className="flex items-center gap-3 mb-5 pb-5 border-b border-zinc-100 dark:border-zinc-800">
+           <div className="p-2 bg-yellow-100 dark:bg-yellow-900/30 rounded-full">
+             <Loader2 className="animate-spin text-yellow-600 dark:text-yellow-400" size={20} />
+           </div>
+           <div>
+             <h4 className="font-bold text-zinc-900 dark:text-white">Driver is on the way</h4>
+             <p className="text-xs text-zinc-500 dark:text-zinc-400">Please wait at the pickup point</p>
+           </div>
+        </div>
+      )}
+
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-4">
           <div className="relative">

@@ -1,19 +1,20 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 
-// 1. Update the Stage type to include ALL steps used in the page
+// Stage type: UI-only transient stages + backend-aligned tracking stages
+// Backend DeliveryStatus: PENDING | REQUESTED | ASSIGNED | ACCEPTED | PICKED_UP | IN_TRANSIT | DELIVERED | CANCELLED
 export type DeliveryStage = 
   | 'IDLE' 
   | 'CONFIGURING' 
   | 'Processing_Address' 
   | 'Calculating_Fee' 
-  | 'REVIEW_PAYMENT'      // ✅ Added back (required for flow)
-  | 'SELECTING_VEHICLE' 
+  | 'REVIEW_PAYMENT'
   | 'Payment_Pending' 
-  | 'FINDING_COURIER' 
-  | 'COURIER_ASSIGNED' 
-  | 'PICKED_UP' 
-  | 'COMPLETED' 
+  | 'REQUESTED'       // Backend: REQUESTED (finding courier)
+  | 'ASSIGNED'         // Backend: ASSIGNED/ACCEPTED (courier assigned)
+  | 'PICKED_UP'        // Backend: PICKED_UP
+  | 'IN_TRANSIT'       // Backend: IN_TRANSIT
+  | 'DELIVERED'        // Backend: DELIVERED (final state)
   | 'CANCELLED';
 
 type Position = { lat: number; lng: number };
@@ -27,9 +28,9 @@ interface PackageInfo {
   pickupAddress: string;
   destinationAddress: string;
 
-  // ✅ NEW OPTIONAL FIELDS (for Metadata)
-  weightKg?: number | "";      // Numeric input for exact weight
-  declaredValue?: number | ""; // Numeric input for value
+  // Numeric metadata fields
+  weightKg?: number | null;      // Numeric input for exact weight
+  declaredValue?: number | null;  // Numeric input for value
   isFragile?: boolean;
   isPerishable?: boolean;
   containsLiquid?: boolean;
@@ -72,9 +73,9 @@ const initialPackageInfo: PackageInfo = {
   pickupAddress: '',
   destinationAddress: '',
   
-  // ✅ Initialize new fields
-  weightKg: "",
-  declaredValue: "",
+  // Initialize new fields
+  weightKg: null,
+  declaredValue: null,
   isFragile: false,
   isPerishable: false,
   containsLiquid: false,

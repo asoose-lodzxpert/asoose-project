@@ -26,16 +26,14 @@ export const TRIPS_CONFIG = {
 export class TripsCommonService {
   private readonly logger = new Logger(TripsCommonService.name);
 
-  // ✅ ADDED: Strict Geofence boundaries (Update these coordinates to match your actual operating region, e.g., Abuja)
-  private readonly GEOFENCE_BOUNDS = {
-    minLat: 8.9,  maxLat: 9.2,   // Example Abuja bounds (approximate)
-    minLng: 7.3,  maxLng: 7.6 
-  };
+  // Cache service zones for 5 minutes to avoid DB hits on every request
+  private serviceZonesCache: { zones: Array<{ name: string; coordinates: Array<{ lat: number; lng: number }> }>; expiresAt: number } | null = null;
+  private readonly CACHE_TTL_MS = 5 * 60 * 1000;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
-    private readonly mapsService: MapsService, // ✅ Injected MapsService
+    private readonly mapsService: MapsService,
   ) {}
 
   round(value: number): number {
@@ -76,14 +74,80 @@ export class TripsCommonService {
     }
   }
 
-  // ✅ ADDED: Geofence Validator
-  validateGeofence(lat: number, lng: number) {
-    if (
-      lat < this.GEOFENCE_BOUNDS.minLat || lat > this.GEOFENCE_BOUNDS.maxLat ||
-      lng < this.GEOFENCE_BOUNDS.minLng || lng > this.GEOFENCE_BOUNDS.maxLng
-    ) {
-      throw new BadRequestException(`Location (${lat}, ${lng}) is outside our active service area.`);
+  // ── Geofence Validation (DB-backed ServiceZone polygons) ──
+
+  /**
+   * Load active service zones from DB with in-memory cache.
+   */
+  private async getActiveServiceZones(): Promise<Array<{ name: string; coordinates: Array<{ lat: number; lng: number }> }>> {
+    const now = Date.now();
+    if (this.serviceZonesCache && now < this.serviceZonesCache.expiresAt) {
+      return this.serviceZonesCache.zones;
     }
+
+    const zones = await this.prisma.serviceZone.findMany({
+      where: { isActive: true },
+      select: { name: true, coordinates: true },
+    });
+
+    const parsed = zones.map((z) => ({
+      name: z.name,
+      coordinates: z.coordinates as Array<{ lat: number; lng: number }>,
+    }));
+
+    this.serviceZonesCache = { zones: parsed, expiresAt: now + this.CACHE_TTL_MS };
+    this.logger.log(`Loaded ${parsed.length} active service zone(s): ${parsed.map(z => z.name).join(', ')}`);
+    return parsed;
+  }
+
+  /**
+   * Ray-casting point-in-polygon test.
+   * Returns true if (lat, lng) is inside the polygon defined by `vertices`.
+   */
+  private isPointInPolygon(lat: number, lng: number, vertices: Array<{ lat: number; lng: number }>): boolean {
+    let inside = false;
+    for (let i = 0, j = vertices.length - 1; i < vertices.length; j = i++) {
+      const xi = vertices[i].lat, yi = vertices[i].lng;
+      const xj = vertices[j].lat, yj = vertices[j].lng;
+
+      const intersect = ((yi > lng) !== (yj > lng)) &&
+        (lat < (xj - xi) * (lng - yi) / (yj - yi) + xi);
+      if (intersect) inside = !inside;
+    }
+    return inside;
+  }
+
+  /**
+   * Validates that a coordinate falls within at least one active ServiceZone.
+   * Throws BadRequestException if outside all zones.
+   */
+  async validateGeofence(lat: number, lng: number): Promise<void> {
+    // Basic range check
+    if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+      throw new BadRequestException(`Invalid coordinates: (${lat}, ${lng})`);
+    }
+
+    const zones = await this.getActiveServiceZones();
+
+    // If no zones are configured, allow all valid coordinates (fail-open for new deployments)
+    if (zones.length === 0) {
+      this.logger.warn('No active service zones configured — allowing all coordinates');
+      return;
+    }
+
+    for (const zone of zones) {
+      if (this.isPointInPolygon(lat, lng, zone.coordinates)) {
+        return; // Inside at least one zone
+      }
+    }
+
+    this.logger.warn(
+      `Geofence rejected: (${lat}, ${lng}) outside all ${zones.length} active zone(s)`,
+      { coordinate: { lat, lng }, zones: zones.map(z => z.name) },
+    );
+    throw new BadRequestException(
+      `Location (${lat}, ${lng}) is outside our active service area. We currently serve: ${zones.map(z => z.name).join(', ')}.`,
+    );
   }
 
   // ✅ ADDED: Secure Location Resolver (Source of Truth)
@@ -93,15 +157,18 @@ export class TripsCommonService {
     if (dto.placeId) {
       // 1. Primary Source of Truth: Google Place ID
       resolved = await this.mapsService.geocodePlace(dto.placeId);
+      this.logger.debug(`Resolved placeId ${dto.placeId} to (${resolved.lat}, ${resolved.lng})`);
     } else if (dto.lat && dto.lng) {
       // 2. Fallback: Snap raw GPS coordinates to trusted road network via Reverse Geocoding
+      this.logger.debug(`Resolving raw coordinates (${dto.lat}, ${dto.lng}) via reverse geocoding`);
       resolved = await this.mapsService.reverseGeocode(dto.lat, dto.lng);
+      this.logger.debug(`Reverse geocoding snapped to (${resolved.lat}, ${resolved.lng})`);
     } else {
       throw new BadRequestException('Invalid location payload. Provide placeId or coordinates.');
     }
 
     // 3. Security Check: Enforce boundaries before billing/dispatching
-    this.validateGeofence(resolved.lat, resolved.lng);
+    await this.validateGeofence(resolved.lat, resolved.lng);
 
     return {
       lat: resolved.lat,

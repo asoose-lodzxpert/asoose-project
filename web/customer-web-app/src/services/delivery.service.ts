@@ -55,6 +55,25 @@ export interface Delivery {
 
 export class DeliveryService {
   /**
+   * Get a fare estimate BEFORE creating the delivery.
+   * Backend endpoint: POST /v1/fare/delivery
+   * DeliveryFareDto uses string coordinates: pickuplat, pickuplong, dropofflat, dropofflong
+   */
+  static async getDeliveryFareEstimate(
+    pickup: { lat: number; lng: number },
+    dropoff: { lat: number; lng: number },
+    token?: string
+  ): Promise<{ fare: number; distance: number; duration: number }> {
+    const response = await api.post('/fare/delivery', {
+      pickuplat: String(pickup.lat),
+      pickuplong: String(pickup.lng),
+      dropofflat: String(dropoff.lat),
+      dropofflong: String(dropoff.lng),
+    }, getAuthHeader(token));
+    return response.data;
+  }
+
+  /**
    * Create a new delivery request
    */
   static async createDelivery(data: {
@@ -79,11 +98,18 @@ export class DeliveryService {
    */
   static async saveAddress(data: {
     street: string;
-    city: string;
+    city?: string;
     lat: number;
     lng: number;
   }, token?: string) {
-    const response = await api.post('/users/addresses', data, getAuthHeader(token));
+    // Strip empty/falsy optional fields to avoid DTO validation failures
+    const payload: Record<string, unknown> = {
+      street: data.street,
+      lat: data.lat,
+      lng: data.lng,
+    };
+    if (data.city) payload.city = data.city;
+    const response = await api.post('/users/addresses', payload, getAuthHeader(token));
     return response.data;
   }
 
@@ -97,10 +123,16 @@ export class DeliveryService {
   }
 
   static async rateDelivery(deliveryId: string, rating: number, comment?: string, token?: string) {
-    const response = await api.post(`/deliveries/${deliveryId}/rate`, { rating, comment }, getAuthHeader(token));
-    return response.data;
+    // TODO: Backend does not have a delivery rating endpoint yet.
+    // This is a no-op stub to prevent runtime errors until the backend implements it.
+    console.warn(`rateDelivery called for ${deliveryId} but no backend endpoint exists`);
+    return { success: false, message: 'Rating not yet supported' };
   }
 
+  /**
+   * Poll delivery status after payment, waiting for backend to transition from PENDING.
+   * Backend DeliveryStatus enum: PENDING | REQUESTED | ASSIGNED | ACCEPTED | PICKED_UP | IN_TRANSIT | DELIVERED | CANCELLED
+   */
   static async pollDeliveryStatus(
     deliveryId: string, 
     targetStatus: string = 'REQUESTED',
@@ -109,12 +141,14 @@ export class DeliveryService {
     token?: string
   ): Promise<boolean> {
     let attempts = 0;
+    // Only statuses that exist in the backend DeliveryStatus enum
+    const paidStatuses = ['REQUESTED', 'ASSIGNED', 'ACCEPTED', 'PICKED_UP', 'IN_TRANSIT', 'DELIVERED'];
     while (attempts < maxAttempts) {
       try {
         const res = await api.get(`/users/deliveries/${deliveryId}`, getAuthHeader(token));
         const currentStatus = res.data.status;
-        const successStates = ['REQUESTED', 'ASSIGNED', 'FINDING_COURIER', 'PICKED_UP', 'DELIVERED', 'COMPLETED'];
-        if (successStates.includes(currentStatus)) return true;
+        if (paidStatuses.includes(currentStatus)) return true;
+        if (currentStatus === 'CANCELLED') return false;
       } catch (e) {
         console.error("Polling error", e);
       }

@@ -12,14 +12,6 @@ export const ADDRESS_LABELS = {
   STORE_LOCATION: 'Store Location',
 } as const;
 
-// ✅ EXPORTED: Explicit bounds for transparency (though validation is internal)
-export const CITY_BOUNDS = {
-  MIN_LAT: 11.75, // South-most edge
-  MAX_LAT: 11.95, // North-most edge
-  MIN_LNG: 13.05, // West-most edge
-  MAX_LNG: 13.25, // East-most edge
-} as const;
-
 @Injectable()
 export class AddressesService {
   private readonly logger = new Logger(AddressesService.name);
@@ -80,7 +72,7 @@ export class AddressesService {
     tx: Prisma.TransactionClient = this.prisma, // Defaults to main client if no tx provided
   ) {
     // 1. CRITICAL: Enforce Geofence Validation
-    this.validateCoordinates(data.lat, data.lng);
+    await this.validateCoordinates(data.lat, data.lng);
 
     // 2. Data Integrity: Sanitize inputs
     // Fallbacks provided for City/State if missing from frontend map data
@@ -122,7 +114,7 @@ export class AddressesService {
     tx: Prisma.TransactionClient = this.prisma,
   ) {
     // Re-use validation logic
-    this.validateCoordinates(lat, lng);
+    await this.validateCoordinates(lat, lng);
 
     let pickupAddress = await tx.address.findFirst({
       where: {
@@ -186,25 +178,49 @@ export class AddressesService {
     return input.trim().replace(/[<>]/g, '').substring(0, 500);
   }
 
-  public validateCoordinates(lat: number, lng: number): void {
+  public async validateCoordinates(lat: number, lng: number): Promise<void> {
     if (!lat || !lng || (lat === 0 && lng === 0)) {
       throw new BadRequestException('Valid GPS coordinates are required');
     }
+    if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+      throw new BadRequestException('Invalid GPS coordinates');
+    }
 
-    // ✅ Enforce Maiduguri Geofence
-    if (!this.isWithinCity(lat, lng)) {
+    const isInside = await this.isWithinServiceArea(lat, lng);
+    if (!isInside) {
       throw new BadRequestException(
-        'Sorry, this location is outside our Maiduguri service area.',
+        'Sorry, this location is outside our active service area.',
       );
     }
   }
 
-  public isWithinCity(lat: number, lng: number): boolean {
-    return (
-      lat >= CITY_BOUNDS.MIN_LAT &&
-      lat <= CITY_BOUNDS.MAX_LAT &&
-      lng >= CITY_BOUNDS.MIN_LNG &&
-      lng <= CITY_BOUNDS.MAX_LNG
-    );
+  /**
+   * Check coordinate against active ServiceZone polygons in DB.
+   */
+  public async isWithinServiceArea(lat: number, lng: number): Promise<boolean> {
+    const zones = await this.prisma.serviceZone.findMany({
+      where: { isActive: true },
+      select: { coordinates: true },
+    });
+
+    // If no zones configured, allow all (fail-open for new deployments)
+    if (zones.length === 0) return true;
+
+    return zones.some((zone) => {
+      const vertices = zone.coordinates as Array<{ lat: number; lng: number }>;
+      return this.isPointInPolygon(lat, lng, vertices);
+    });
+  }
+
+  private isPointInPolygon(lat: number, lng: number, vertices: Array<{ lat: number; lng: number }>): boolean {
+    let inside = false;
+    for (let i = 0, j = vertices.length - 1; i < vertices.length; j = i++) {
+      const xi = vertices[i].lat, yi = vertices[i].lng;
+      const xj = vertices[j].lat, yj = vertices[j].lng;
+      const intersect = ((yi > lng) !== (yj > lng)) &&
+        (lat < (xj - xi) * (lng - yi) / (yj - yi) + xi);
+      if (intersect) inside = !inside;
+    }
+    return inside;
   }
 }

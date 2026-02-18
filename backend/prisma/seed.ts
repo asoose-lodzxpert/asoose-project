@@ -1,5 +1,6 @@
 import { PrismaClient, UserRole, UserStatus } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import { seedServiceZones } from './09-service-zones';
 
 const prisma = new PrismaClient();
 
@@ -23,8 +24,7 @@ async function main() {
       password: hashedPassword,
       role: UserRole.SUPER_ADMIN,
       status: UserStatus.ACTIVE,
-      verificationStatus: 'VERIFIED', // Correct field from your schema
-      // isVerified: true, <--- REMOVED (This caused the error)
+      verificationStatus: 'VERIFIED',
     },
   });
 
@@ -35,6 +35,9 @@ async function main() {
     role: superAdmin.role,
     status: superAdmin.status,
   });
+
+  // Seed service zones (Maiduguri only)
+  await seedServiceZones(prisma);
 }
 
 main()
