@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useCallback } from "react";
 
 interface BalanceContextType {
   balance: number;
+  commissionRate: number;
   refetchBalance: () => Promise<void>;
   setBalance: (balance: number) => void;
   isLoading: boolean;
@@ -11,6 +12,7 @@ const BalanceContext = createContext<BalanceContextType | undefined>(undefined);
 
 export function BalanceProvider({ children }: { children: React.ReactNode }) {
   const [balance, setBalance] = useState(0);
+  const [commissionRate, setCommissionRate] = useState(20); // Default 20%
   const [isLoading, setIsLoading] = useState(false);
 
   const refetchBalance = useCallback(async () => {
@@ -19,6 +21,7 @@ export function BalanceProvider({ children }: { children: React.ReactNode }) {
       const { fetchStoreBalance } = await import("@/services/profile.service");
       const data = await fetchStoreBalance();
       setBalance(data?.amount ?? 0);
+      setCommissionRate(data?.commissionRate ?? 20);
     } catch (error) {
       console.error("Failed to refetch balance:", error);
     } finally {
@@ -28,7 +31,7 @@ export function BalanceProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <BalanceContext.Provider
-      value={{ balance, refetchBalance, setBalance, isLoading }}
+      value={{ balance, commissionRate, refetchBalance, setBalance, isLoading }}
     >
       {children}
     </BalanceContext.Provider>

@@ -332,5 +332,5 @@ const COUNTRY_CODES = [
 
 const LANGUAGES = [
   { label: "English", value: "en" },
-  { label: "French", value: "fr" },
+  // { label: "French", value: "fr" },
 ];

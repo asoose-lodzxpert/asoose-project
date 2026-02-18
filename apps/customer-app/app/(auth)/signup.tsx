@@ -86,14 +86,14 @@ export default function Signup() {
 
   useEffect(() => {
     if (response?.type === "success" && response.authentication) {
-      handleGoogleSignIn(response.authentication.accessToken);
+      handleGoogleSignIn();
     }
   }, [response]);
 
-  const handleGoogleSignIn = async (accessToken: string) => {
+  const handleGoogleSignIn = async () => {
     setOauthLoading(true);
     try {
-      await authenticateWithGoogle(accessToken);
+      await authenticateWithGoogle();
       Toast.show({ type: "success", text1: "Account created!" });
       router.replace("/(tabs)/home");
     } catch (err: any) {

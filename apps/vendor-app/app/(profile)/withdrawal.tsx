@@ -35,12 +35,17 @@ export default function WithdrawalScreen() {
   const surfaceCard = useThemeColor({}, "surfaceCard");
   const mutedText = useThemeColor({}, "textDisabled");
   const textPrimary = useThemeColor({}, "textPrimary");
-  const { balance, refetchBalance } = useBalance();
+  const { balance, commissionRate, refetchBalance } = useBalance();
   const [amount, setAmount] = useState("");
   const [bankAccount, setBankAccount] = useState<BankAccount | null>(null);
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [showHistory, setShowHistory] = useState(false);
+
+  // Calculate commission breakdown
+  const requestedAmount = parseFloat(amount) || 0;
+  const commissionAmount = requestedAmount * (commissionRate / 100);
+  const netAmount = requestedAmount - commissionAmount;
 
   useEffect(() => {
     loadData();
@@ -183,6 +188,62 @@ export default function WithdrawalScreen() {
             </Pressable>
           </View>
         </View>
+
+        {/* Commission Breakdown */}
+        {requestedAmount > 0 && (
+          <View
+            style={[
+              styles.commissionCard,
+              { backgroundColor: surfaceCard, borderColor: borderColor },
+            ]}
+          >
+            <ThemedText type="defaultSemiBold" style={{ marginBottom: 12 }}>
+              Withdrawal Breakdown
+            </ThemedText>
+
+            <View style={styles.breakdownRow}>
+              <ThemedText style={{ color: mutedText, fontSize: 14 }}>
+                Requested Amount
+              </ThemedText>
+              <ThemedText type="defaultSemiBold">
+                ₦
+                {requestedAmount.toLocaleString(undefined, {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
+              </ThemedText>
+            </View>
+
+            <View style={styles.breakdownRow}>
+              <ThemedText style={{ color: mutedText, fontSize: 14 }}>
+                Platform Commission ({commissionRate}%)
+              </ThemedText>
+              <ThemedText style={{ color: "#FF6B6B", fontWeight: "600" }}>
+                -₦
+                {commissionAmount.toLocaleString(undefined, {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
+              </ThemedText>
+            </View>
+
+            <View style={[styles.divider, { backgroundColor: borderColor }]} />
+
+            <View style={styles.breakdownRow}>
+              <ThemedText type="defaultSemiBold">You'll Receive</ThemedText>
+              <ThemedText
+                type="defaultSemiBold"
+                style={{ color: primary, fontSize: 18 }}
+              >
+                ₦
+                {netAmount.toLocaleString(undefined, {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
+              </ThemedText>
+            </View>
+          </View>
+        )}
 
         <View style={styles.section}>
           <ThemedText type="defaultSemiBold" style={{ marginBottom: 12 }}>
@@ -333,5 +394,20 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
+  },
+  commissionCard: {
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 12,
+  },
+  breakdownRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  divider: {
+    height: 1,
+    marginVertical: 4,
   },
 });

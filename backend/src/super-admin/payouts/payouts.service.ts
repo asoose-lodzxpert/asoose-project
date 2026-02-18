@@ -9,6 +9,7 @@ import { PayoutStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { PaymentService } from '../../payment/payment.service';
 import { ActivityLogService } from '../../common/services/activity-log.services';
+import { AdminNotificationsService } from '../../admin/notifications/admin-notifications.service';
 // Import Enums correctly
 import { RecipientType, PaymentGateway } from '../../payment/dto/payment.dto';
 
@@ -21,6 +22,7 @@ export class PayoutsService {
     private ledger: TransactionLedgerService,
     private paymentService: PaymentService,
     private logService: ActivityLogService,
+    private adminNotificationsService: AdminNotificationsService,
   ) {}
 
   async getPendingPayouts() {
@@ -170,6 +172,26 @@ export class PayoutsService {
         target: payoutId,
         details: `Approved ${type} payout of ${payoutData.payout.amount}`,
       });
+
+      // 4. Alert admins if high-value withdrawal (threshold: ₦1,000,000)
+      try {
+        if (payoutData.payout.amount >= 1000000) {
+          await this.adminNotificationsService.notifyHighValueWithdrawal(
+            type === 'VENDOR' ? 'VENDOR' : 'RIDER',
+            recipientId,
+            payoutData.payout.amount,
+            {
+              accountNumber: payoutData.bankDetails.accountNumber,
+              accountName: payoutData.bankDetails.accountName,
+              bankName: payoutData.bankDetails.bankName,
+            },
+          );
+        }
+      } catch (error) {
+        this.logger.error(
+          `Failed to send high-value withdrawal alert: ${error.message}`,
+        );
+      }
 
       return { status: 'SUCCESS' };
     } else {

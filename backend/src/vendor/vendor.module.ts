@@ -24,12 +24,14 @@ import { VendorOrdersStreamService } from './orders/vendor-orders-stream.service
 import { VendorNotificationsService } from './notifications/vendor-notifications.service';
 import { VendorNotificationsController } from './notifications/vendor-notifications.controller';
 import { VendorSecurityNotificationsService } from './notifications/vendor-security-notifications.service';
+import { VendorAccountNotificationsService } from './notifications/vendor-account-notifications.service';
 
 import { StorageModule } from '../storage/storage.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 
 // 👇 1. Services IMPORTS
 import { ActivityLogService } from 'src/common/services/activity-log.services';
+import { CommonModule } from '../common/common.module';
 // Ensure this path points to where your StoresService actually is
 // import { StoresService } from './stores/stores.service';
 import { StoresService } from 'src/super-admin/vendors/vendors.service';
@@ -45,6 +47,7 @@ import { TransactionsModule } from 'src/super-admin/transactions/transaction.mod
     NotificationsModule,
     forwardRef(() => TransactionsModule),
     CacheModule.register(),
+    CommonModule,
   ],
   controllers: [
     VendorProductsController,
@@ -64,8 +67,13 @@ import { TransactionsModule } from 'src/super-admin/transactions/transaction.mod
 
     ActivityLogService,
     StoresService,
+    VendorAccountNotificationsService,
   ],
-  exports: [VendorSecurityNotificationsService, VendorOrdersStreamService],
+  exports: [
+    VendorSecurityNotificationsService,
+    VendorOrdersStreamService,
+    VendorAccountNotificationsService,
+  ],
 })
 export class VendorModule implements OnModuleInit {
   constructor(private moduleRef: ModuleRef) {}

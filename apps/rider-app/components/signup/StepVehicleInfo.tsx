@@ -1,18 +1,11 @@
 import { ThemedText } from "@/components/themed-text";
 import { ThemedInput } from "@/components/ThemedInput";
-import { IconSymbol } from "@/components/ui/icon-symbol";
+import { IconSymbol, IconSymbolName } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { SignupForm, VehicleType } from "@/types/signup";
 import * as ImagePicker from "expo-image-picker";
 import React, { useState } from "react";
-import {
-  Alert,
-  Image,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  View,
-} from "react-native";
+import { Alert, Pressable, ScrollView, StyleSheet, View } from "react-native";
 
 type Props = {
   data: SignupForm;
@@ -21,22 +14,22 @@ type Props = {
 
 // const MAX_SIZE = 5 * 1024 * 1024; // 5MB
 
-const VEHICLES: { key: VehicleType; label: string; icon: any }[] = [
+const VEHICLES: { key: VehicleType; label: string; icon: IconSymbolName }[] = [
   {
     key: "bicycle",
     label: "Bicycle",
-    icon: require("@/assets/vehicles/bicycle.png"),
+    icon: "bicycle",
   },
   {
     key: "motorcycle",
     label: "Motorcycle",
-    icon: require("@/assets/vehicles/motorcycle.png"),
+    icon: "motorcycle",
   },
-  { key: "car", label: "Car", icon: require("@/assets/vehicles/car.png") },
+  { key: "car", label: "Car", icon: "car" },
   {
     key: "walking",
     label: "Walking",
-    icon: require("@/assets/vehicles/walking.png"),
+    icon: "directions-walk",
   },
 ];
 
@@ -105,7 +98,7 @@ export function StepVehicleInfo({ data, onChange }: Props) {
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: "images",
         allowsEditing: true,
         quality: 0.8,
         base64: false,
@@ -161,7 +154,12 @@ export function StepVehicleInfo({ data, onChange }: Props) {
               ]}
               onPress={() => onChange("vehicleType", v.key)}
             >
-              <Image source={v.icon} style={styles.vehicleIcon} />
+              <IconSymbol
+                name={v.icon}
+                size={40}
+                style={styles.vehicleIcon}
+                color={primary}
+              />
               <ThemedText>{v.label}</ThemedText>
             </Pressable>
           ))}

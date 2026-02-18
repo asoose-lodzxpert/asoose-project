@@ -67,7 +67,7 @@ export default function ProfileScreen() {
   const statusSuccess = useThemeColor({}, "statusSuccess");
   const statusError = useThemeColor({}, "statusError");
   const { signOut } = useAuth();
-  const { balance, refetchBalance } = useBalance();
+  const { balance, commissionRate, refetchBalance } = useBalance();
 
   const [profile, setProfile] = useState(INITIAL_PROFILE);
   const [loading, setLoading] = useState(true);
@@ -300,6 +300,11 @@ export default function ProfileScreen() {
                 </ThemedText>
                 <ThemedText type="title" style={{ marginTop: 4 }}>
                   ₦{profile.balance.toLocaleString()}
+                </ThemedText>
+                <ThemedText
+                  style={{ color: mutedText, fontSize: 12, marginTop: 4 }}
+                >
+                  Commission Rate: {commissionRate}%
                 </ThemedText>
               </View>
               <Pressable

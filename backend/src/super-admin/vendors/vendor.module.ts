@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { VendorModule as VendorCoreModule } from '../../vendor/vendor.module';
 import { VendorsController } from './vendor.controller';
 import { StoresService } from './vendors.service';
 import { MailModule } from 'src/mail/mail.module';
@@ -9,7 +10,7 @@ import { DocumentsService } from './document.service';
 import { ActivityLogService } from 'src/common/services/activity-log.services';
 
 @Module({
-  imports: [MailModule],
+  imports: [MailModule, VendorCoreModule],
   controllers: [VendorsController],
   providers: [
     StoresService,

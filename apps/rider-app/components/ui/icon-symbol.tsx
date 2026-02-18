@@ -120,9 +120,16 @@ export type IconSymbolName =
   | "doc.on.doc.fill"
   | "hand.raised.fill"
   | "pause.circle.fill"
-  | "list.clipboard.fill";
+  | "list.clipboard.fill"
+  | "directions-walk"
+  | "motorcycle"
+  | "bicycle";
 
 const MAPPING: Record<IconSymbolName, keyof typeof MaterialIcons.glyphMap> = {
+  // Vehicle/transport icons
+  "directions-walk": "directions-walk",
+  motorcycle: "motorcycle",
+  bicycle: "directions-bike",
   "house.fill": "home",
   eye: "remove-red-eye",
   "doc.on.doc": "library-books",

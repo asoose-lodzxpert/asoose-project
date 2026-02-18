@@ -12,6 +12,8 @@ import { AddressesService } from './addresses.service';
 import { PricingService } from './pricing.service';
 import { InventoryService } from './inventory.service';
 import { NotificationFacade } from './notification.facade';
+import { CommonModule } from '../common/common.module';
+import { UserAccountNotificationsService } from './notifications/user-account-notifications.service';
 
 // Modules
 import { RedisModule } from 'src/redis/redis.module';
@@ -35,6 +37,7 @@ import { QueueModule } from 'src/matching/queue/queue.module';
     BullModule.registerQueue({
       name: 'email',
     }),
+    CommonModule,
   ],
   controllers: [UsersController],
   providers: [
@@ -44,7 +47,13 @@ import { QueueModule } from 'src/matching/queue/queue.module';
     PricingService,
     InventoryService,
     NotificationFacade,
+    UserAccountNotificationsService,
   ],
-  exports: [UsersService, AddressesService, NotificationFacade],
+  exports: [
+    UsersService,
+    AddressesService,
+    NotificationFacade,
+    UserAccountNotificationsService,
+  ],
 })
 export class UsersModule {}
