@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service'; // Changed to relative path for safety
 import { UserStatus, UserRole, Prisma, OrderStatus } from '@prisma/client';
-import { UserAccountNotificationsService } from '../../users/notifications/user-account-notifications.service';
+import { UserAccountNotificationsService } from 'src/users/notifications/user-account-notifications.service';
 
 @Injectable()
 export class CustomersService {

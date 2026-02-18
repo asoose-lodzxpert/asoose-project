@@ -23,16 +23,17 @@ import { VendorOrdersStreamService } from './orders/vendor-orders-stream.service
 import { VendorNotificationsService } from './notifications/vendor-notifications.service';
 import { VendorNotificationsController } from './notifications/vendor-notifications.controller';
 import { VendorSecurityNotificationsService } from './notifications/vendor-security-notifications.service';
-import { VendorAccountNotificationsService } from './notifications/vendor-account-notifications.service';
 
 import { StorageModule } from '../storage/storage.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 
 // Services
 import { ActivityLogService } from 'src/common/services/activity-log.services';
-import { CommonModule } from '../common/common.module';
+// Ensure this path points to where your StoresService actually is
+// import { StoresService } from './stores/stores.service';
 import { StoresService } from 'src/super-admin/vendors/vendors.service';
 import { TransactionsModule } from 'src/super-admin/transactions/transaction.module';
+import { VendorAccountNotificationsService } from './notifications/vendor-account-notifications.service';
 
 @Module({
   imports: [
@@ -42,12 +43,7 @@ import { TransactionsModule } from 'src/super-admin/transactions/transaction.mod
     MailModule,
     OtpModule,
     NotificationsModule,
-    forwardRef(() => TransactionsModule),
-    CacheModule.register({
-      ttl: 600,
-      max: 100,
-    }),
-    CommonModule,
+    forwardRef(() => TransactionsModule), // ✅ FIXED: Wrapped in forwardRef to break circular dependency
   ],
   controllers: [
     VendorProductsController,
@@ -64,9 +60,9 @@ import { TransactionsModule } from 'src/super-admin/transactions/transaction.mod
     VendorService,
     VendorAuthService,
     NubanService,
+
     ActivityLogService,
     StoresService,
-    VendorAccountNotificationsService,
   ],
   exports: [
     VendorSecurityNotificationsService,
