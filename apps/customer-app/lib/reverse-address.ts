@@ -1,14 +1,15 @@
-import * as Location from "expo-location";
-
-export async function resolveAddress(coords: Location.LocationObjectCoords) {
+export async function resolveAddress(coords: {
+  latitude: number;
+  longitude: number;
+}) {
   try {
-    const res = await Location.reverseGeocodeAsync(coords);
-    if (!res.length) return null;
-
-    const p = res[0];
+    const url = `${process.env.EXPO_PUBLIC_API_URL}/maps/reverse-geocode?lat=${coords.latitude}&lng=${coords.longitude}`;
+    const res = await fetch(url);
+    const data = await res.json();
+    if (!data || !data.address) return null;
     return {
       label: "Current location",
-      address: `${p.formattedAddress}`,
+      address: data.address,
     };
   } catch {
     return null;

@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect, useRef } from "react";
 import { z } from "zod";
 import {
   View,
@@ -11,8 +11,6 @@ import {
   ScrollView,
 } from "react-native";
 import { router } from "expo-router";
-import Toast from "react-native-toast-message";
-
 import * as WebBrowser from "expo-web-browser";
 import {
   useGoogleSignIn,
@@ -31,6 +29,7 @@ import { useThemeColor } from "@/hooks/use-theme-color";
 import { CustomDropdown } from "@/components/CustomDropdown";
 import { signup } from "@/services/auth.service";
 import { SafeAreaView } from "react-native-safe-area-context";
+import Toast from "react-native-toast-message";
 
 const COUNTRY_CODES = [{ label: "+234", value: "+234" }];
 
@@ -86,21 +85,20 @@ export default function Signup() {
 
   useEffect(() => {
     if (response?.type === "success" && response.authentication) {
-      handleGoogleSignIn();
+      handleGoogleSignIn(response.authentication.accessToken);
     }
   }, [response]);
 
-  const handleGoogleSignIn = async () => {
+  const handleGoogleSignIn = async (accessToken: string) => {
     setOauthLoading(true);
     try {
-      await authenticateWithGoogle();
+      await authenticateWithGoogle(accessToken);
       Toast.show({ type: "success", text1: "Account created!" });
       router.replace("/(tabs)/home");
     } catch (err: any) {
       Toast.show({
         type: "error",
-        text1: "Sign-in Error",
-        text2: err.message || "Google sign-in failed",
+        text1: err.message || "Google sign-in failed",
       });
     } finally {
       setOauthLoading(false);
@@ -117,8 +115,7 @@ export default function Signup() {
       if (err.message !== "Apple Sign-In was cancelled") {
         Toast.show({
           type: "error",
-          text1: "Sign-in Error",
-          text2: err.message || "Apple sign-in failed",
+          text1: err.message || "Apple sign-in failed",
         });
       }
     } finally {
@@ -159,8 +156,7 @@ export default function Signup() {
     } catch (err: any) {
       Toast.show({
         type: "error",
-        text1: "Signup Failed",
-        text2: err.message || "Could not create account",
+        text1: err.message || "Could not create account",
       });
     } finally {
       setLoading(false);
@@ -178,6 +174,7 @@ export default function Signup() {
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.scrollContent}
           >
+            {/* Header */}
             <View style={styles.header}>
               <ThemedText
                 type="title"
@@ -190,6 +187,7 @@ export default function Signup() {
               </ThemedText>
             </View>
 
+            {/* Form Fields */}
             <View style={styles.form}>
               <ThemedInput
                 placeholder="Full name"
@@ -241,6 +239,7 @@ export default function Signup() {
                     </Pressable>
                   }
                 />
+                {/* Strength Indicator */}
                 {password.length > 0 && (
                   <View style={styles.strengthRow}>
                     {[0, 1, 2].map((i) => (
@@ -259,6 +258,7 @@ export default function Signup() {
                 )}
               </View>
 
+              {/* Terms Checkbox */}
               <Pressable
                 style={styles.termsRow}
                 onPress={() => setAccepted(!accepted)}
@@ -293,6 +293,7 @@ export default function Signup() {
                 </ThemedText>
               )}
 
+              {/* Action Button */}
               <Pressable
                 onPress={handleSignup}
                 disabled={loading}
@@ -313,6 +314,7 @@ export default function Signup() {
               </Pressable>
             </View>
 
+            {/* OAuth Section */}
             <View style={styles.socialSection}>
               <View style={styles.dividerRow}>
                 <View style={[styles.line, { backgroundColor: border }]} />
@@ -363,6 +365,7 @@ export default function Signup() {
               </View>
             </View>
 
+            {/* Login Link */}
             <Pressable
               onPress={() => router.replace("/login")}
               style={styles.footer}
@@ -377,7 +380,6 @@ export default function Signup() {
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
-      <Toast />
     </ThemedView>
   );
 }

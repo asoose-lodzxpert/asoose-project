@@ -6,20 +6,11 @@ const GOOGLE_MAPS_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
 export const fetchSuggestions = async (input: string): Promise<any[]> => {
   if (!input) return [];
   try {
-    // Use Google Places Autocomplete API directly
-    const response = await fetch(
-      `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(input)}&key=${GOOGLE_MAPS_API_KEY}`,
-    );
+    // Use backend endpoint for autocomplete
+    let url = `${process.env.EXPO_PUBLIC_API_URL}/maps/places-autocomplete?query=${encodeURIComponent(input)}`;
+    const response = await fetch(url);
     const data = await response.json();
-
-    if (!data.predictions) return [];
-
-    // Transform Google's response to match expected format
-    return data.predictions.map((item: any) => ({
-      place_id: item.place_id,
-      description: item.description,
-      structured_formatting: item.structured_formatting,
-    }));
+    return Array.isArray(data) ? data : [];
   } catch (error) {
     if (__DEV__) console.error("Error fetching suggestions:", error);
     return [];

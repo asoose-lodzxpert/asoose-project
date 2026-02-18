@@ -10,23 +10,24 @@ import {
   ScrollView,
 } from "react-native";
 import { RelativePathString, useRouter } from "expo-router";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import Toast from "react-native-toast-message"; // Corrected import
+import * as WebBrowser from "expo-web-browser";
 import {
-  initializeGoogleSignIn,
+  useGoogleSignIn,
   authenticateWithGoogle,
   authenticateWithApple,
   isAppleSignInAvailable,
 } from "@/services/oauth.service";
 
+WebBrowser.maybeCompleteAuthSession();
+
 import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedInput } from "@/components/ThemedInput";
 import { IconSymbol } from "@/components/ui/icon-symbol";
-import { LocationDisclosureModal } from "@/components/LocationDisclosureModal";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { useAuth } from "@/context/AuthContext";
 import { useConfirm } from "@/components/ui/ConfirmDialogProvider";
+import Toast from "react-native-toast-message";
 
 export default function LoginScreen() {
   const primary = useThemeColor({}, "brandPrimary");
@@ -55,35 +56,24 @@ export default function LoginScreen() {
 
   // Biometric/OAuth state
   const [biometricEnabled, setBiometricEnabled] = useState(false);
+  const { request, response, promptAsync } = useGoogleSignIn();
   const [appleAvailable, setAppleAvailable] = useState(false);
   const [oauthLoading, setOauthLoading] = useState(false);
-  const [showLocationDisclosure, setShowLocationDisclosure] = useState(false);
 
-  // Initial check for biometrics, Apple availability, and Google Sign-In initialization
   useEffect(() => {
     (async () => {
-      try {
-        // Initialize Google Sign-In once
-        await initializeGoogleSignIn();
-      } catch (err) {
-        if (__DEV__) console.error("Failed to initialize Google Sign-In:", err);
-      }
-
       const enabled = await isBiometricEnabled();
       setBiometricEnabled(enabled);
-
       const available = await isAppleSignInAvailable();
       setAppleAvailable(available);
-
-      // Automatic biometric prompt on mount
-      if (enabled && biometricAvailable && biometricEnrolled) {
-        // Short timeout to ensure UI is ready
-        setTimeout(() => {
-          handleBiometricLogin();
-        }, 500);
-      }
     })();
-  }, []);
+  }, [isBiometricEnabled]);
+
+  useEffect(() => {
+    if (response?.type === "success" && response.authentication) {
+      handleGoogleSignIn(response.authentication.accessToken);
+    }
+  }, [response]);
 
   const handleLogin = async () => {
     if (!identifier || !password) {
@@ -94,15 +84,6 @@ export default function LoginScreen() {
     setError(null);
     try {
       await login({ email: identifier, password });
-
-      // Check if user has seen location disclosure
-      const hasSeenDisclosure = await AsyncStorage.getItem(
-        "locationDisclosureSeen",
-      );
-      if (!hasSeenDisclosure) {
-        setShowLocationDisclosure(true);
-        return;
-      }
 
       if (biometricAvailable && biometricEnrolled && !biometricEnabled) {
         const confirmed = await showConfirm({
@@ -126,19 +107,16 @@ export default function LoginScreen() {
     }
   };
 
-  const handleGoogleSignIn = async () => {
+  const handleGoogleSignIn = async (token: string) => {
     setOauthLoading(true);
     try {
-      await authenticateWithGoogle();
+      await authenticateWithGoogle(token);
       router.replace({ pathname: "/(tabs)/home" });
     } catch (err: any) {
-      if (err.message !== "Google Sign-In was cancelled") {
-        Toast.show({
-          type: "error",
-          text1: "Google Login Error",
-          text2: err.message || "Google sign-in failed",
-        });
-      }
+      Toast.show({
+        type: "error",
+        text1: err.message || "Google sign-in failed",
+      });
     } finally {
       setOauthLoading(false);
     }
@@ -153,8 +131,7 @@ export default function LoginScreen() {
       if (err.message !== "Apple Sign-In was cancelled") {
         Toast.show({
           type: "error",
-          text1: "Apple Login Error",
-          text2: err.message || "Apple sign-in failed",
+          text1: err.message || "Apple sign-in failed",
         });
       }
     } finally {
@@ -167,50 +144,15 @@ export default function LoginScreen() {
       await biometricLogin();
       router.replace({ pathname: "/(tabs)/home" });
     } catch (err: any) {
-      // If user cancels biometric, we don't necessarily want an intrusive error
-      // unless it's an actual hardware failure.
-      console.log("Biometric login failed or cancelled");
-    }
-  };
-
-  const handleLocationDisclosureAccepted = async () => {
-    try {
-      // Mark disclosure as seen
-      await AsyncStorage.setItem("locationDisclosureSeen", "true");
-      setShowLocationDisclosure(false);
-
-      // Continue with biometric prompt if needed
-      if (biometricAvailable && biometricEnrolled && !biometricEnabled) {
-        const confirmed = await showConfirm({
-          title: "Enable Biometric Login?",
-          message: "Use your fingerprint to login next time",
-          confirmLabel: "Enable",
-          cancelLabel: "Skip",
-        });
-
-        if (confirmed) {
-          await enableBiometrics(identifier, password);
-          setBiometricEnabled(true);
-        }
-      }
-
-      // Navigate to home
-      router.replace({ pathname: "/(tabs)/home" });
-    } catch (err: any) {
       Toast.show({
         type: "error",
-        text1: "Error",
-        text2: "Failed to proceed. Please try again.",
+        text1: err.message || "Biometric login failed",
       });
     }
   };
 
   return (
     <ThemedView style={[styles.container, { backgroundColor: surface }]}>
-      <LocationDisclosureModal
-        visible={showLocationDisclosure}
-        onAccept={handleLocationDisclosureAccepted}
-      />
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={{ flex: 1 }}
@@ -316,8 +258,8 @@ export default function LoginScreen() {
                   styles.socialButton,
                   { borderColor: border, opacity: oauthLoading ? 0.6 : 1 },
                 ]}
-                onPress={handleGoogleSignIn}
-                disabled={oauthLoading}
+                onPress={() => promptAsync()}
+                disabled={!request || oauthLoading}
               >
                 {oauthLoading ? (
                   <ActivityIndicator size="small" color={primary} />
@@ -357,7 +299,6 @@ export default function LoginScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-      <Toast />
     </ThemedView>
   );
 }

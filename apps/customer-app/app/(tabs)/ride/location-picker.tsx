@@ -68,16 +68,14 @@ export default function LocationPickerScreen() {
 
       setSearching(true);
       try {
-        const GOOGLE_MAPS_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
-        let url = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(query)}&key=${GOOGLE_MAPS_API_KEY}`;
-
+        let url = `${API_URL}/maps/places-autocomplete?query=${encodeURIComponent(query)}`;
         if (currentLocation?.coords) {
           url += `&location=${currentLocation.coords.latitude},${currentLocation.coords.longitude}`;
         }
-
-        const response = await fetch(url);
+        const response = await fetch(url, { method: "GET" });
         const data = await response.json();
-        setAutocompleteResults(data.predictions || []);
+        // Backend returns an array, not { predictions: [...] }
+        setAutocompleteResults(Array.isArray(data) ? data : []);
       } catch (error) {
         console.error("Autocomplete error:", error);
         setAutocompleteResults([]);
@@ -108,16 +106,13 @@ export default function LocationPickerScreen() {
   // Reverse geocode when marker is moved
   const reverseGeocode = useCallback(async (lat: number, lng: number) => {
     try {
-      const results = await Location.reverseGeocodeAsync({
-        latitude: lat,
-        longitude: lng,
-      });
-      if (results && results.length > 0) {
-        const result = results[0];
-        const address = [result.name, result.street, result.city, result.region]
-          .filter(Boolean)
-          .join(", ");
-        setReverseGeocodedAddress(address || "Selected Location");
+      const url = `${API_URL}/maps/reverse-geocode?lat=${lat}&lng=${lng}`;
+      const res = await fetch(url);
+      const data = await res.json();
+      if (data && data.address) {
+        setReverseGeocodedAddress(data.address);
+      } else {
+        setReverseGeocodedAddress("Selected Location");
       }
     } catch (error) {
       console.error("Reverse geocode error:", error);
