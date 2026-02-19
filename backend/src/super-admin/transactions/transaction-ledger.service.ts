@@ -105,13 +105,11 @@ export class TransactionLedgerService {
           // Map to the correct entity columns based on role
           ...(userRole === UserRole.RIDER
             ? {
-                riderId: userId,
                 entityType: 'RIDER',
                 entityId: userId,
                 riderPayoutId: payoutId,
               }
             : {
-                vendorId: userId,
                 entityType: 'STORE',
                 entityId: userId,
                 vendorPayoutId: payoutId,

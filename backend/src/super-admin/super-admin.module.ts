@@ -14,6 +14,7 @@ import { ZonesModule } from './zones/zones.modle';
 import { VerificationModule } from './verification/verification.module';
 import { AdminsModule } from './admins/admins.module';
 import { BannerModule } from './banners/banner.module';
+import { PayoutsModule } from './payouts/payouts.module';
 import { SettingsController } from './settings/settings.controller';
 import { SettingsService } from './settings/settings.service';
 import { ActivityLogService } from 'src/common/services/activity-log.services';
@@ -35,6 +36,7 @@ import { ActivityLogController } from './activity-logs/activity-log.controller';
     VerificationModule,
     AdminsModule,
     BannerModule,
+    PayoutsModule,
   ],
   controllers: [SettingsController, ActivityLogController],
   providers: [

@@ -627,7 +627,11 @@ export class PaymentService {
                 id: payment.rideId,
                 status: { notIn: ['COMPLETED', 'CANCELLED'] as any },
               },
-              data: { status: 'CANCELLED' as any, cancelledBy: 'SYSTEM', cancelledAt: new Date() },
+              data: {
+                status: 'CANCELLED' as any,
+                cancelledBy: 'SYSTEM',
+                cancelledAt: new Date(),
+              },
             });
           }
 
@@ -913,14 +917,14 @@ export class PaymentService {
     let recipientName: string;
 
     if (dto.recipientType === RecipientType.VENDOR) {
-      const vendor = await this.prisma.vendor.findUnique({
+      // recipientId is always a storeId (VendorPayout.storeId)
+      const store = await this.prisma.store.findUnique({
         where: { id: dto.recipientId },
-        include: { store: { include: { bankAccount: true } } },
+        include: { bankAccount: true },
       });
-      if (!vendor || !vendor.store)
-        throw new NotFoundException('Vendor or store not found');
-      bankAccount = vendor.store.bankAccount;
-      recipientName = vendor.name;
+      if (!store) throw new NotFoundException('Store not found');
+      bankAccount = store.bankAccount;
+      recipientName = store.name;
     } else if (dto.recipientType === RecipientType.RIDER) {
       const rider = await this.prisma.rider.findUnique({
         where: { id: dto.recipientId },
@@ -935,6 +939,26 @@ export class PaymentService {
 
     if (!bankAccount)
       throw new BadRequestException('Recipient has no bank account configured');
+
+    // ─── DEV / TEST MODE BYPASS ──────────────────────────────────────────────
+    // In non-production environments the seeded bank details are not real
+    // Paystack accounts, so gateway calls will always fail. We return a faked
+    // successful disbursement so payout approval can be tested end-to-end.
+    if (process.env.NODE_ENV !== 'production') {
+      this.logger.warn(
+        `[DEV] Skipping real gateway call for disbursement ${reference}. Returning mock success.`,
+      );
+      return {
+        success: true,
+        reference,
+        amount: dto.amount,
+        recipientId: dto.recipientId,
+        gateway: dto.gateway,
+        transferCode: `DEV_TRANSFER_${reference}`,
+        status: 'success',
+      } as DisbursementResponse;
+    }
+    // ─────────────────────────────────────────────────────────────────────────
 
     let disbursement: DisbursementResponse;
 

@@ -1,11 +1,17 @@
-import React, { useState, useEffect } from "react";
-import { View, StyleSheet, Modal, ScrollView, Pressable } from "react-native";
+﻿import React, { useState, useEffect } from "react";
+import {
+  View,
+  StyleSheet,
+  Modal,
+  ScrollView,
+  Pressable,
+  ActivityIndicator,
+} from "react-native";
 import Toast from "react-native-toast-message";
 
 import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
 import { IconSymbol } from "@/components/ui/icon-symbol";
-import { Collapsible } from "@/components/ui/collapsible";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { fetchWithdrawalHistory } from "@/services/withdrawal.service";
 
@@ -28,18 +34,20 @@ interface Props {
 
 export function WithdrawalHistoryModal({ visible, onClose }: Props) {
   const primary = useThemeColor({}, "brandPrimary");
-  const borderColor = useThemeColor({}, "borderDefault");
-  const surfaceCard = useThemeColor({}, "surfaceCard");
-  const mutedText = useThemeColor({}, "textDisabled");
-  const background = useThemeColor({}, "surfaceBackground");
+  const surface = useThemeColor({}, "surfaceBackground");
+  const surfaceSubtle = useThemeColor({}, "surfaceSubtle");
+  const border = useThemeColor({}, "borderDefault");
+  const textMuted = useThemeColor({}, "textMuted");
+  const textPrimary = useThemeColor({}, "textPrimary");
+  const statusPending = useThemeColor({}, "statusPending");
+  const statusSuccess = useThemeColor({}, "statusSuccess");
+  const statusError = useThemeColor({}, "statusError");
 
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (visible) {
-      loadHistory();
-    }
+    if (visible) loadHistory();
   }, [visible]);
 
   const loadHistory = async () => {
@@ -57,44 +65,39 @@ export function WithdrawalHistoryModal({ visible, onClose }: Props) {
     }
   };
 
-  const getStatusColor = (status: Withdrawal["status"]) => {
+  const getStatusConfig = (status: Withdrawal["status"]) => {
     switch (status) {
       case "PENDING":
-        return useThemeColor({}, "statusPending");
-      case "APPROVED":
-      case "COMPLETED":
-        return useThemeColor({}, "statusSuccess");
+        return {
+          color: statusPending,
+          label: "Processing",
+          icon: "clock.fill" as const,
+        };
       case "REJECTED":
-        return useThemeColor({}, "statusError");
+        return {
+          color: statusError,
+          label: "Declined",
+          icon: "xmark.circle" as const,
+        };
       default:
-        return mutedText;
-    }
-  };
-
-  const getStatusIcon = (status: Withdrawal["status"]) => {
-    switch (status) {
-      case "PENDING":
-        return "info.circle" as const;
-      case "APPROVED":
-      case "COMPLETED":
-        return "check" as const;
-      case "REJECTED":
-        return "close" as const;
-      default:
-        return "info.circle" as const;
+        return {
+          color: statusSuccess,
+          label: "Completed",
+          icon: "checkmark.circle.fill" as const,
+        };
     }
   };
 
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString("en-US", {
+    const d = new Date(dateString);
+    return d.toLocaleDateString("en-NG", {
       month: "short",
       day: "numeric",
       year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
     });
   };
+
+  const maskAccount = (num: string) => "****** " + num.slice(-4);
 
   return (
     <Modal
@@ -103,247 +106,188 @@ export function WithdrawalHistoryModal({ visible, onClose }: Props) {
       presentationStyle="pageSheet"
       onRequestClose={onClose}
     >
-      <ThemedView style={{ flex: 1 }}>
-        {/* Header */}
-        <View style={[styles.header, { borderBottomColor: borderColor }]}>
-          <ThemedText type="subtitle">Withdrawal History</ThemedText>
-          <Pressable onPress={onClose} style={styles.closeButton}>
-            <IconSymbol name="xmark" size={24} color={primary} />
+      <ThemedView style={[styles.container, { backgroundColor: surface }]}>
+        <View style={styles.dragHandleWrapper}>
+          <View style={[styles.dragHandle, { backgroundColor: border }]} />
+        </View>
+
+        <View style={styles.header}>
+          <View>
+            <ThemedText style={[styles.headerLabel, { color: textMuted }]}>
+              TRANSACTION LOG
+            </ThemedText>
+            <ThemedText style={[styles.headerTitle, { color: textPrimary }]}>
+              Withdrawals
+            </ThemedText>
+          </View>
+          <Pressable
+            onPress={onClose}
+            style={[styles.closeBtn, { backgroundColor: surfaceSubtle }]}
+          >
+            <IconSymbol name="xmark" size={16} color={textMuted} />
           </Pressable>
         </View>
 
-        {loading ? (
-          <ScrollView
-            style={{ flex: 1 }}
-            contentContainerStyle={styles.content}
+        {!loading && withdrawals.length > 0 && (
+          <View
+            style={[styles.summaryStrip, { backgroundColor: surfaceSubtle }]}
           >
-            {[1, 2, 3, 4].map((item) => (
-              <View
-                key={item}
-                style={[
-                  styles.withdrawalCard,
-                  {
-                    backgroundColor: surfaceCard,
-                    borderColor: borderColor,
-                  },
-                ]}
+            <View style={styles.summaryItem}>
+              <ThemedText style={[styles.summaryValue, { color: textPrimary }]}>
+                {withdrawals.length}
+              </ThemedText>
+              <ThemedText style={[styles.summaryLabel, { color: textMuted }]}>
+                Total
+              </ThemedText>
+            </View>
+            <View
+              style={[styles.summaryDivider, { backgroundColor: border }]}
+            />
+            <View style={styles.summaryItem}>
+              <ThemedText
+                style={[styles.summaryValue, { color: statusPending }]}
               >
-                {/* Header skeleton */}
-                <View style={styles.cardHeader}>
-                  <View
-                    style={{
-                      width: 100,
-                      height: 20,
-                      backgroundColor: borderColor,
-                      borderRadius: 4,
-                      opacity: 0.3,
-                    }}
-                  />
-                  <View
-                    style={{
-                      width: 80,
-                      height: 24,
-                      backgroundColor: borderColor,
-                      borderRadius: 12,
-                      opacity: 0.3,
-                    }}
-                  />
-                </View>
+                {withdrawals.filter((w) => w.status === "PENDING").length}
+              </ThemedText>
+              <ThemedText style={[styles.summaryLabel, { color: textMuted }]}>
+                Pending
+              </ThemedText>
+            </View>
+            <View
+              style={[styles.summaryDivider, { backgroundColor: border }]}
+            />
+            <View style={styles.summaryItem}>
+              <ThemedText
+                style={[styles.summaryValue, { color: statusSuccess }]}
+              >
+                {
+                  withdrawals.filter(
+                    (w) => w.status === "APPROVED" || w.status === "COMPLETED",
+                  ).length
+                }
+              </ThemedText>
+              <ThemedText style={[styles.summaryLabel, { color: textMuted }]}>
+                Completed
+              </ThemedText>
+            </View>
+          </View>
+        )}
 
-                {/* Bank details skeleton */}
-                <View style={{ gap: 8, marginTop: 12 }}>
-                  <View style={styles.detailRow}>
-                    <View
-                      style={{
-                        width: 80,
-                        height: 14,
-                        backgroundColor: borderColor,
-                        borderRadius: 4,
-                        opacity: 0.3,
-                      }}
-                    />
-                    <View
-                      style={{
-                        width: 120,
-                        height: 14,
-                        backgroundColor: borderColor,
-                        borderRadius: 4,
-                        opacity: 0.3,
-                      }}
-                    />
-                  </View>
-                  <View style={styles.detailRow}>
-                    <View
-                      style={{
-                        width: 100,
-                        height: 14,
-                        backgroundColor: borderColor,
-                        borderRadius: 4,
-                        opacity: 0.3,
-                      }}
-                    />
-                    <View
-                      style={{
-                        width: 100,
-                        height: 14,
-                        backgroundColor: borderColor,
-                        borderRadius: 4,
-                        opacity: 0.3,
-                      }}
-                    />
-                  </View>
-                  <View style={styles.detailRow}>
-                    <View
-                      style={{
-                        width: 90,
-                        height: 14,
-                        backgroundColor: borderColor,
-                        borderRadius: 4,
-                        opacity: 0.3,
-                      }}
-                    />
-                    <View
-                      style={{
-                        width: 130,
-                        height: 14,
-                        backgroundColor: borderColor,
-                        borderRadius: 4,
-                        opacity: 0.3,
-                      }}
-                    />
-                  </View>
-                </View>
-              </View>
-            ))}
-          </ScrollView>
-        ) : withdrawals.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <IconSymbol name="file-text" size={60} color={mutedText} />
-            <ThemedText
-              type="subtitle"
-              style={{ marginTop: 16, color: mutedText }}
-            >
-              No withdrawal history
+        {loading ? (
+          <View style={styles.center}>
+            <ActivityIndicator size="large" color={primary} />
+            <ThemedText style={[styles.loadingText, { color: textMuted }]}>
+              Fetching records...
             </ThemedText>
-            <ThemedText
-              style={{ color: mutedText, marginTop: 8, textAlign: "center" }}
+          </View>
+        ) : withdrawals.length === 0 ? (
+          <View style={styles.center}>
+            <View
+              style={[styles.emptyCircle, { backgroundColor: primary + "12" }]}
             >
-              Your withdrawal requests will appear here
+              <IconSymbol name="list" size={28} color={primary} />
+            </View>
+            <ThemedText style={[styles.emptyTitle, { color: textPrimary }]}>
+              No withdrawals yet
+            </ThemedText>
+            <ThemedText style={[styles.emptyDesc, { color: textMuted }]}>
+              Once you request a withdrawal, it will appear here.
             </ThemedText>
           </View>
         ) : (
           <ScrollView
-            style={{ flex: 1 }}
-            contentContainerStyle={styles.content}
+            contentContainerStyle={styles.list}
             showsVerticalScrollIndicator={false}
           >
-            {withdrawals.map((withdrawal) => (
-              <View
-                key={withdrawal.id}
-                style={[
-                  styles.withdrawalCard,
-                  {
-                    backgroundColor: surfaceCard,
-                    borderColor: borderColor,
-                  },
-                ]}
-              >
-                {/* Main Info */}
-                <View style={styles.withdrawalHeader}>
-                  <View style={{ flex: 1 }}>
-                    <ThemedText type="defaultSemiBold" style={{ fontSize: 18 }}>
-                      ₦{withdrawal.amount.toLocaleString()}
-                    </ThemedText>
-                    <ThemedText
-                      style={{ color: mutedText, fontSize: 12, marginTop: 4 }}
-                    >
-                      {formatDate(withdrawal.createdAt)}
-                    </ThemedText>
-                  </View>
-                  <View
-                    style={[
-                      styles.statusBadge,
-                      {
-                        backgroundColor:
-                          getStatusColor(withdrawal.status) + "20",
-                      },
-                    ]}
-                  >
-                    <IconSymbol
-                      name={getStatusIcon(withdrawal.status)}
-                      size={16}
-                      color={getStatusColor(withdrawal.status)}
+            {withdrawals.map((item, index) => {
+              const config = getStatusConfig(item.status);
+              const isLast = index === withdrawals.length - 1;
+              return (
+                <View key={item.id} style={styles.row}>
+                  <View style={styles.dotCol}>
+                    <View
+                      style={[styles.dot, { backgroundColor: config.color }]}
                     />
-                    <ThemedText
-                      style={{
-                        color: getStatusColor(withdrawal.status),
-                        fontSize: 12,
-                        fontWeight: "600",
-                      }}
-                    >
-                      {withdrawal.status}
-                    </ThemedText>
+                    {!isLast && (
+                      <View
+                        style={[styles.connector, { backgroundColor: border }]}
+                      />
+                    )}
+                  </View>
+
+                  <View style={styles.rowInfo}>
+                    <View style={styles.rowTop}>
+                      <ThemedText
+                        style={[styles.rowAmount, { color: textPrimary }]}
+                      >
+                        ₦{item.amount.toLocaleString()}
+                      </ThemedText>
+                      <View
+                        style={[
+                          styles.badge,
+                          { backgroundColor: config.color + "18" },
+                        ]}
+                      >
+                        <ThemedText
+                          style={[styles.badgeText, { color: config.color }]}
+                        >
+                          {config.label}
+                        </ThemedText>
+                      </View>
+                    </View>
+
+                    <View style={styles.rowMeta}>
+                      <ThemedText
+                        style={[styles.metaText, { color: textMuted }]}
+                      >
+                        {item.bankName} {maskAccount(item.accountNumber)}
+                      </ThemedText>
+                      <ThemedText
+                        style={[styles.metaText, { color: textMuted }]}
+                      >
+                        {formatDate(item.createdAt)}
+                      </ThemedText>
+                    </View>
+
+                    {item.referenceNumber && (
+                      <ThemedText
+                        style={[styles.refText, { color: textMuted }]}
+                      >
+                        Ref {item.referenceNumber}
+                      </ThemedText>
+                    )}
+
+                    {item.status === "REJECTED" && item.rejectionReason && (
+                      <View
+                        style={[
+                          styles.reasonBox,
+                          {
+                            backgroundColor: statusError + "12",
+                            borderColor: statusError + "30",
+                          },
+                        ]}
+                      >
+                        <IconSymbol
+                          name="info.circle"
+                          size={12}
+                          color={statusError}
+                        />
+                        <ThemedText
+                          style={[styles.reasonText, { color: statusError }]}
+                        >
+                          {item.rejectionReason}
+                        </ThemedText>
+                      </View>
+                    )}
+                    {!isLast && (
+                      <View
+                        style={[styles.rowDivider, { backgroundColor: border }]}
+                      />
+                    )}
                   </View>
                 </View>
-
-                {/* Collapsible Details */}
-                <View style={{ marginTop: 12 }}>
-                  <Collapsible title="View Details">
-                    <View style={styles.detailsContainer}>
-                      <View style={styles.detailRow}>
-                        <ThemedText style={{ color: mutedText }}>
-                          Bank Name
-                        </ThemedText>
-                        <ThemedText type="defaultSemiBold">
-                          {withdrawal.bankName}
-                        </ThemedText>
-                      </View>
-                      <View style={styles.detailRow}>
-                        <ThemedText style={{ color: mutedText }}>
-                          Account Number
-                        </ThemedText>
-                        <ThemedText type="defaultSemiBold">
-                          {withdrawal.accountNumber}
-                        </ThemedText>
-                      </View>
-                      {withdrawal.referenceNumber && (
-                        <View style={styles.detailRow}>
-                          <ThemedText style={{ color: mutedText }}>
-                            Reference
-                          </ThemedText>
-                          <ThemedText type="defaultSemiBold">
-                            {withdrawal.referenceNumber}
-                          </ThemedText>
-                        </View>
-                      )}
-                      {withdrawal.processedAt && (
-                        <View style={styles.detailRow}>
-                          <ThemedText style={{ color: mutedText }}>
-                            Processed At
-                          </ThemedText>
-                          <ThemedText type="defaultSemiBold">
-                            {formatDate(withdrawal.processedAt)}
-                          </ThemedText>
-                        </View>
-                      )}
-                      {withdrawal.rejectionReason && (
-                        <View style={styles.detailRow}>
-                          <ThemedText style={{ color: mutedText }}>
-                            Rejection Reason
-                          </ThemedText>
-                          <ThemedText
-                            type="defaultSemiBold"
-                            style={{ color: useThemeColor({}, "statusError") }}
-                          >
-                            {withdrawal.rejectionReason}
-                          </ThemedText>
-                        </View>
-                      )}
-                    </View>
-                  </Collapsible>
-                </View>
-              </View>
-            ))}
+              );
+            })}
           </ScrollView>
         )}
       </ThemedView>
@@ -352,62 +296,91 @@ export function WithdrawalHistoryModal({ visible, onClose }: Props) {
 }
 
 const styles = StyleSheet.create({
+  container: { flex: 1 },
+  dragHandleWrapper: { alignItems: "center", paddingTop: 14, paddingBottom: 4 },
+  dragHandle: { width: 36, height: 4, borderRadius: 2 },
   header: {
     flexDirection: "row",
-    alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
+    alignItems: "center",
+    paddingHorizontal: 24,
+    paddingTop: 12,
+    paddingBottom: 20,
   },
-  closeButton: {
-    padding: 4,
+  headerLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 1.5,
+    marginBottom: 2,
   },
-  loadingContainer: {
-    flex: 1,
+  headerTitle: { fontSize: 26, fontWeight: "800", letterSpacing: -0.5 },
+  closeBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: "center",
     justifyContent: "center",
-    alignItems: "center",
   },
-  emptyContainer: {
+  summaryStrip: {
+    flexDirection: "row",
+    marginHorizontal: 24,
+    borderRadius: 16,
+    paddingVertical: 14,
+    marginBottom: 20,
+  },
+  summaryItem: { flex: 1, alignItems: "center" },
+  summaryValue: { fontSize: 18, fontWeight: "800" },
+  summaryLabel: { fontSize: 11, fontWeight: "600", marginTop: 2 },
+  summaryDivider: { width: 1, marginVertical: 4 },
+  center: {
     flex: 1,
+    alignItems: "center",
     justifyContent: "center",
+    padding: 48,
+  },
+  loadingText: { marginTop: 12, fontSize: 13, fontWeight: "500" },
+  emptyCircle: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
     alignItems: "center",
-    paddingHorizontal: 40,
+    justifyContent: "center",
+    marginBottom: 16,
   },
-  content: {
-    padding: 20,
-    gap: 16,
-  },
-  withdrawalCard: {
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  cardHeader: {
+  emptyTitle: { fontSize: 17, fontWeight: "700", marginBottom: 6 },
+  emptyDesc: { textAlign: "center", lineHeight: 20, fontSize: 13 },
+  list: { paddingHorizontal: 24, paddingBottom: 40, paddingTop: 4 },
+  row: { flexDirection: "row" },
+  dotCol: { width: 32, alignItems: "center" },
+  dot: { width: 10, height: 10, borderRadius: 5, marginTop: 6 },
+  connector: { width: 1, flex: 1, marginTop: 4 },
+  rowInfo: { flex: 1, paddingBottom: 4 },
+  rowTop: {
     flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
-    justifyContent: "space-between",
+    marginBottom: 6,
   },
-  withdrawalHeader: {
+  rowAmount: { fontSize: 17, fontWeight: "800" },
+  badge: { paddingVertical: 3, paddingHorizontal: 8, borderRadius: 8 },
+  badgeText: { fontSize: 11, fontWeight: "700", textTransform: "uppercase" },
+  rowMeta: {
     flexDirection: "row",
-    alignItems: "flex-start",
     justifyContent: "space-between",
+    marginBottom: 4,
   },
-  statusBadge: {
+  metaText: { fontSize: 12, fontWeight: "500" },
+  refText: { fontSize: 11, fontWeight: "500", marginBottom: 6 },
+  reasonBox: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    borderWidth: 1,
     borderRadius: 8,
+    padding: 8,
+    marginTop: 6,
+    marginBottom: 8,
   },
-  detailsContainer: {
-    gap: 12,
-    marginTop: 8,
-  },
-  detailRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
+  reasonText: { fontSize: 12, fontWeight: "600", flex: 1 },
+  rowDivider: { height: 1, marginTop: 12, marginBottom: 16, marginRight: 0 },
 });

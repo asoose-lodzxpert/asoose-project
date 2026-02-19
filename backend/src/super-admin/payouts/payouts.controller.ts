@@ -4,6 +4,7 @@ import {
   Post,
   Body,
   Param,
+  Query,
   UseGuards,
   Request,
 } from '@nestjs/common';
@@ -21,6 +22,16 @@ import { Roles } from 'src/auth/roles.decorator';
 @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN_FINANCE)
 export class PayoutsController {
   constructor(private readonly payoutsService: PayoutsService) {}
+
+  @Get()
+  getAll(
+    @Query('status') status?: string,
+    @Query('type') type?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    return this.payoutsService.getPayouts({ status, type, from, to });
+  }
 
   @Get('pending')
   getPending() {
@@ -43,7 +54,6 @@ export class PayoutsController {
     @Body('reason') reason: string,
     @Request() req,
   ) {
-    // ✅ Updated: Pass req.user.id as the 4th argument
     return this.payoutsService.rejectPayout(id, type, reason, req.user.id);
   }
 }

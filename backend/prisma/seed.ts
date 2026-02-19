@@ -47,7 +47,7 @@ async function main() {
   await seedAdmin(prisma);
 
   // Seed banks
-  await seedBanks();
+  // await seedBanks();
 
   // Seed service zones (Maiduguri only)
   await seedServiceZones(prisma);

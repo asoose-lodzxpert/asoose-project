@@ -172,11 +172,13 @@ export class PaystackService {
 
       return response.data.data.recipient_code;
     } catch (error) {
+      const paystackError = error.response?.data;
       this.logger.error(
         'Paystack recipient creation error:',
-        error.response?.data || error.message,
+        paystackError ?? error.message,
       );
-      throw new Error('Failed to create transfer recipient');
+      const reason = paystackError?.message || error.message || 'Unknown error';
+      throw new Error(`Failed to create transfer recipient: ${reason}`);
     }
   }
 

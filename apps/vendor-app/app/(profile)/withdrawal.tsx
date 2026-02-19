@@ -61,11 +61,16 @@ export default function WithdrawalScreen() {
       // Handle case where it might come as an array or object
       const account = Array.isArray(accountData) ? accountData[0] : accountData;
       setBankAccount(account || null);
+      if (__DEV__) {
+        console.log("[DEV] Loaded bank account:", account);
+        console.log("[DEV] Loaded balance:", balance);
+      }
     } catch (error: any) {
       Toast.show({
         type: "error",
         text1: error.message || "Failed to load data",
       });
+      if (__DEV__) console.error("[DEV] Error loading data:", error);
     } finally {
       setInitialLoading(false);
     }
@@ -94,11 +99,20 @@ export default function WithdrawalScreen() {
 
     setLoading(true);
     try {
+      if (__DEV__) {
+        console.log("[DEV] Withdrawal payload:", {
+          amount: parseFloat(amount),
+          bankAccountId: bankAccount.id,
+        });
+      }
       await createWithdrawal({
         amount: parseFloat(amount),
         bankAccountId: bankAccount.id,
       });
 
+      if (__DEV__) {
+        console.log("[DEV] Withdrawal request successful");
+      }
       Toast.show({
         type: "success",
         text1: "Withdrawal request submitted",
@@ -112,6 +126,7 @@ export default function WithdrawalScreen() {
         type: "error",
         text1: error.message || "Failed to create withdrawal",
       });
+      if (__DEV__) console.error("[DEV] Withdrawal error:", error);
     } finally {
       setLoading(false);
     }

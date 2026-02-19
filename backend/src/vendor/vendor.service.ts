@@ -485,21 +485,29 @@ export class VendorService {
     }));
   }
 
-  // ✅ FIXED: Secure Withdrawal Creation using Ledger with Commission
   async createWithdrawal(
     vendorId: string,
     data: { amount: number; bankAccountId: string },
   ) {
+    this.appLogger.log(`[DEV] createWithdrawal called`, { vendorId, data });
+
     // 1. Fetch Store & Bank Account
     const store = await this.prisma.store.findUnique({
       where: { vendorId },
       select: { id: true, walletBalance: true, commissionRate: true }, // ✅ Include commission
     });
 
+    this.appLogger.log(`[DEV] Store lookup result`, { store });
+
     if (!store) throw new NotFoundException('Store not found');
 
     const bankAccount = await this.prisma.bankAccount.findUnique({
       where: { id: data.bankAccountId },
+    });
+
+    this.appLogger.log(`[DEV] Bank account lookup result`, {
+      bankAccount,
+      storeIdMatch: bankAccount?.storeId === store.id,
     });
 
     if (!bankAccount || bankAccount.storeId !== store.id) {
@@ -510,6 +518,14 @@ export class VendorService {
     const commissionRate = store.commissionRate ?? 20;
     const commissionAmount = data.amount * (commissionRate / 100);
     const netAmount = data.amount - commissionAmount; // Amount vendor receives after commission
+
+    this.appLogger.log(`[DEV] Commission breakdown`, {
+      commissionRate,
+      commissionAmount,
+      netAmount,
+      walletBalance: store.walletBalance,
+      requestedAmount: data.amount,
+    });
 
     // 3. Validate Balance
     const minWithdrawal = 5000;
@@ -533,20 +549,29 @@ export class VendorService {
       },
     });
 
+    this.appLogger.log(`[DEV] VendorPayout record created`, { withdrawal });
+
     try {
+      this.appLogger.log(`[DEV] Calling ledger.recordPayoutRequest`, {
+        vendorId,
+        role: UserRole.VENDOR,
+        amount: data.amount,
+        payoutId: withdrawal.id,
+      });
       await this.ledger.recordPayoutRequest(
-        store.id,
+        vendorId, // Pass vendorId so ledger can find store by vendorId
         UserRole.VENDOR,
         data.amount, // Deduct full amount from wallet
         withdrawal.id,
       );
+      this.appLogger.log(`[DEV] Ledger recordPayoutRequest succeeded`);
     } catch (error) {
       // Rollback payout record if ledger fails
       await this.prisma.vendorPayout.delete({ where: { id: withdrawal.id } });
       this.appLogger.error(
-        'Ledger transaction failed for vendor withdrawal',
+        '[DEV] Ledger transaction failed for vendor withdrawal',
         error.stack,
-        { error },
+        { error, message: error?.message },
       );
       throw new BadRequestException(
         'Failed to process withdrawal request. Please try again.',

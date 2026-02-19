@@ -26,21 +26,87 @@ export class PayoutsService {
   ) {}
 
   async getPendingPayouts() {
-    const vendorPayouts = await this.prisma.vendorPayout.findMany({
-      where: { status: PayoutStatus.PENDING },
-      include: { store: { select: { name: true } } },
-    });
+    return this.getPayouts({ status: 'PENDING' });
+  }
 
-    const riderPayouts = await this.prisma.riderPayout.findMany({
-      where: { status: PayoutStatus.PENDING },
-      include: {
-        rider: {
-          select: { name: true },
-        },
-      },
-    });
+  async getPayouts(filters: {
+    status?: string;
+    type?: string;
+    from?: string;
+    to?: string;
+  }) {
+    const { status, type, from, to } = filters;
 
-    return { vendorPayouts, riderPayouts };
+    const dateFilter: any = {};
+    if (from || to) {
+      dateFilter.createdAt = {
+        ...(from && { gte: new Date(from) }),
+        ...(to && { lte: new Date(to) }),
+      };
+    }
+
+    const statusFilter: any =
+      status && status !== 'ALL' ? { status: status as PayoutStatus } : {};
+
+    const vendorSelect = {
+      id: true,
+      name: true,
+      bankAccount: true,
+      vendor: { select: { id: true, name: true, email: true, phone: true } },
+    };
+
+    const riderSelect = {
+      id: true,
+      name: true,
+      email: true,
+      phone: true,
+      bankAccount: true,
+    };
+
+    let vendorPayouts: any[] = [];
+    let riderPayouts: any[] = [];
+
+    if (!type || type === 'ALL' || type === 'VENDOR') {
+      vendorPayouts = await this.prisma.vendorPayout.findMany({
+        where: { ...statusFilter, ...dateFilter },
+        include: { store: { select: vendorSelect } },
+        orderBy: { createdAt: 'desc' },
+      });
+    }
+
+    if (!type || type === 'ALL' || type === 'RIDER') {
+      riderPayouts = await this.prisma.riderPayout.findMany({
+        where: { ...statusFilter, ...dateFilter },
+        include: { rider: { select: riderSelect } },
+        orderBy: { createdAt: 'desc' },
+      });
+    }
+
+    const unified = [
+      ...vendorPayouts.map((p) => ({
+        ...p,
+        payoutType: 'VENDOR' as const,
+        recipientName: p.store?.name ?? 'Unknown Store',
+        bankAccount: p.store?.bankAccount ?? null,
+        vendorDetails: p.store?.vendor ?? null,
+        store: p.store ?? null,
+        rider: null,
+      })),
+      ...riderPayouts.map((p) => ({
+        ...p,
+        payoutType: 'RIDER' as const,
+        recipientName: p.rider?.name ?? 'Unknown Rider',
+        bankAccount: p.rider?.bankAccount ?? null,
+        vendorDetails: null,
+        store: null,
+        rider: p.rider ?? null,
+      })),
+    ].sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
+
+    return unified;
   }
 
   async approvePayout(
