@@ -339,13 +339,21 @@ export class PaymentService {
     gateway: PaymentGateway,
     payload: any,
     signature: string,
+    /**
+     * Raw request body string (exact bytes from the HTTP request).
+     * Required by Paystack for HMAC-SHA512 signature verification.
+     * Falls back to JSON.stringify(payload) when not provided.
+     */
+    rawBody?: string,
   ): Promise<void> {
     let isValid = false;
 
     switch (gateway) {
       case PaymentGateway.PAYSTACK:
+        // Prefer the raw body for signature verification; fall back to
+        // re-serialised JSON only when rawBody is unavailable (e.g. tests).
         isValid = this.paystackService.verifyWebhookSignature(
-          JSON.stringify(payload),
+          rawBody ?? JSON.stringify(payload),
           signature,
         );
         break;

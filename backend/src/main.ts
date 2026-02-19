@@ -15,7 +15,11 @@ import { ExpressAdapter } from '@bull-board/express';
 import { BullMQAdapter } from '@bull-board/api/bullMQAdapter';
 
 async function bootstrap() {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    // Required for Paystack (and other gateway) webhook HMAC signature verification.
+    // Provides req.rawBody as the exact byte-perfect request body before JSON parsing.
+    rawBody: true,
+  });
 
   app.setGlobalPrefix('api');
   app.enableVersioning({

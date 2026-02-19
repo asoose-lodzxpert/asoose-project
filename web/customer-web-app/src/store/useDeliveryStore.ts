@@ -3,18 +3,19 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 
 // Stage type: UI-only transient stages + backend-aligned tracking stages
 // Backend DeliveryStatus: PENDING | REQUESTED | ASSIGNED | ACCEPTED | PICKED_UP | IN_TRANSIT | DELIVERED | CANCELLED
-export type DeliveryStage = 
-  | 'IDLE' 
-  | 'CONFIGURING' 
-  | 'Processing_Address' 
-  | 'Calculating_Fee' 
+export type DeliveryStage =
+  | 'IDLE'
+  | 'CONFIGURING'
+  | 'Processing_Address'
+  | 'Calculating_Fee'
   | 'REVIEW_PAYMENT'
-  | 'Payment_Pending' 
-  | 'REQUESTED'       // Backend: REQUESTED (finding courier)
-  | 'ASSIGNED'         // Backend: ASSIGNED/ACCEPTED (courier assigned)
-  | 'PICKED_UP'        // Backend: PICKED_UP
-  | 'IN_TRANSIT'       // Backend: IN_TRANSIT
-  | 'DELIVERED'        // Backend: DELIVERED (final state)
+  | 'Payment_Pending'
+  | 'REQUESTED'    // Backend: REQUESTED (finding courier)
+  | 'ASSIGNED'     // Backend: ASSIGNED (courier matched)
+  | 'ACCEPTED'     // Backend: ACCEPTED (rider confirmed) — same UI step as ASSIGNED
+  | 'PICKED_UP'    // Backend: PICKED_UP
+  | 'IN_TRANSIT'   // Backend: IN_TRANSIT (en route to dropoff) — same UI step as PICKED_UP
+  | 'DELIVERED'    // Backend: DELIVERED (final state)
   | 'CANCELLED';
 
 type Position = { lat: number; lng: number };

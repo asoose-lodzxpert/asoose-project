@@ -14,6 +14,7 @@ import {
   Phone
 } from 'lucide-react';
 import { toast } from 'react-toastify';
+import { deliverySwal } from '@/lib/swal-theme';
 import { useSession } from 'next-auth/react';
 import BottomNav from '../components/layout/BottomNav';
 import { useDeliveryStore } from '@/store/useDeliveryStore';
@@ -26,7 +27,9 @@ import { DeliveryService } from '@/services/delivery.service';
 import { socketService } from '@/services/socket.service';
 
 // CONSTANTS & TYPES
-// Stage names aligned with backend DeliveryStatus enum where applicable
+// Stage names aligned with backend DeliveryStatus enum where applicable.
+// ⚠️  Backend statuses ACCEPTED and IN_TRANSIT must be present here so the
+//     redirect guard and socket handler can transition correctly.
 const DeliveryStage = {
   IDLE: 'IDLE',
   CONFIGURING: 'CONFIGURING',
@@ -36,11 +39,14 @@ const DeliveryStage = {
   PAYMENT_PENDING: 'Payment_Pending',
   REQUESTED: 'REQUESTED',       // Backend: REQUESTED (finding courier)
   ASSIGNED: 'ASSIGNED',         // Backend: ASSIGNED (courier matched)
+  ACCEPTED: 'ACCEPTED',         // Backend: ACCEPTED (rider confirmed acceptance)
   PICKED_UP: 'PICKED_UP',       // Backend: PICKED_UP
+  IN_TRANSIT: 'IN_TRANSIT',     // Backend: IN_TRANSIT (en route)
   DELIVERED: 'DELIVERED',       // Backend: DELIVERED (final)
 } as const;
 
 const PHONE_REGEX = /^(\+234|0)[789][01]\d{8}$/;
+// Stores { id, reference, gateway } so payment can be verified after redirect-back.
 const PENDING_DELIVERY_KEY = "pending_delivery_data";
 
 interface DetailInputProps {
@@ -119,15 +125,19 @@ export default function DeliveryPage() {
   const [apiError, setApiError] = useState<boolean>(false);
   const { data: session, status } = useSession();
 
-  // Redirect if we are in a tracking state
+  // Redirect if we are in a backend-sourced tracking state.
+  // ACCEPTED and IN_TRANSIT are valid backend DeliveryStatus values that must
+  // also trigger a redirect so the user is never stuck on the form page.
   useEffect(() => {
-    const trackingStages = [
+    const trackingStages: string[] = [
       DeliveryStage.REQUESTED,
       DeliveryStage.ASSIGNED,
+      DeliveryStage.ACCEPTED,
       DeliveryStage.PICKED_UP,
+      DeliveryStage.IN_TRANSIT,
       DeliveryStage.DELIVERED,
     ];
-    if (activeDeliveryId && trackingStages.includes(stage as any)) {
+    if (activeDeliveryId && trackingStages.includes(stage)) {
       router.push(`/main/delivery/${activeDeliveryId}`);
     }
   }, [stage, activeDeliveryId, router]);
@@ -146,72 +156,91 @@ export default function DeliveryPage() {
     [activeDeliveryId, router, setStage],
   );
 
+  // ─── Payment Recovery ────────────────────────────────────────────────────
+  // Run once per session-load.  `stage` is intentionally NOT in the dep-array:
+  // including it caused the effect to re-fire after `setStage()` was called
+  // inside `handlePaymentSuccess`, risking concurrent duplicate verification.
+  //
+  // Instead we read the current snapshot of `stage` from the Zustand store
+  // directly inside the async body, which is always fresh at call time.
   useEffect(() => {
     const recoverState = async () => {
-      if (status === "loading") return;
+      if (status === 'loading') return;
 
       const storedData = localStorage.getItem(PENDING_DELIVERY_KEY);
+      if (!storedData) return;
+
       const token = getAuthToken(session);
 
-      if (storedData) {
-        try {
-          const { id, reference } = JSON.parse(storedData);
-
-          if (
-            id &&
-            reference &&
-            (stage === DeliveryStage.PAYMENT_PENDING ||
-              stage === DeliveryStage.REVIEW_PAYMENT)
-          ) {
-            // 1. Force Active Verification First
-            const isVerified = await DeliveryService.verifyPayment(
-              reference,
-              token || undefined,
-            );
-
-            if (isVerified) {
-              handlePaymentSuccess(id);
-              return;
-            }
-
-            // 2. If verification failed (network/timing), fall back to Polling
-            useDeliveryStore.setState({ activeDeliveryId: id });
-            setStage(DeliveryStage.PAYMENT_PENDING);
-
-            const success = await DeliveryService.pollDeliveryStatus(
-              id,
-              undefined,
-              undefined,
-              undefined,
-              token || undefined,
-            );
-            if (success) {
-              handlePaymentSuccess(id);
-            }
-          }
-        } catch (e) {
-          console.error("Failed to parse pending delivery data", e);
+      try {
+        const { id, reference, gateway = 'PAYSTACK' } = JSON.parse(storedData);
+        if (!id || !reference) {
           localStorage.removeItem(PENDING_DELIVERY_KEY);
+          return;
         }
+
+        // Read current stage from store snapshot (not from closure)
+        const currentStage = useDeliveryStore.getState().stage;
+        const needsRecovery =
+          currentStage === DeliveryStage.PAYMENT_PENDING ||
+          currentStage === DeliveryStage.REVIEW_PAYMENT;
+
+        if (!needsRecovery) return;
+
+        // 1. Try active payment verification first
+        const isVerified = await DeliveryService.verifyPayment(
+          reference,
+          gateway,
+          token || undefined,
+        );
+
+        if (isVerified) {
+          handlePaymentSuccess(id);
+          return;
+        }
+
+        // 2. Fall back to polling the delivery status from the DB
+        useDeliveryStore.setState({ activeDeliveryId: id });
+        setStage(DeliveryStage.PAYMENT_PENDING);
+
+        const success = await DeliveryService.pollDeliveryStatus(
+          id,
+          undefined,
+          undefined,
+          undefined,
+          token || undefined,
+        );
+        if (success) {
+          handlePaymentSuccess(id);
+        }
+      } catch (e) {
+        console.error('Failed to recover pending delivery state', e);
+        localStorage.removeItem(PENDING_DELIVERY_KEY);
       }
     };
 
     recoverState();
-  }, [session, status, handlePaymentSuccess, stage]); 
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session, status, handlePaymentSuccess]);
 
   // EVENT HANDLERS
 
   const handleSocketUpdate = useCallback(
     (data: any) => {
-      if (data.status === "ASSIGNED") {
+      // Map backend ACCEPTED (rider confirmed) → ASSIGNED (same UI step)
+      if (data.status === 'ASSIGNED' || data.status === 'ACCEPTED') {
         useDeliveryStore.setState({
           courierInfo: data.rider,
           stage: DeliveryStage.ASSIGNED,
         });
-        toast.info("Courier found! They are on their way.");
-      } else if (data.status === "PICKED_UP") {
+        toast.info('Courier found! They are on their way.');
+      } else if (data.status === 'PICKED_UP') {
         setStage(DeliveryStage.PICKED_UP);
-      } else if (data.status === "DELIVERED") {
+        toast.info('Package picked up.');
+      } else if (data.status === 'IN_TRANSIT') {
+        // IN_TRANSIT is a valid backend status – redirect to detail tracking
+        setStage(DeliveryStage.IN_TRANSIT);
+      } else if (data.status === 'DELIVERED') {
         setStage(DeliveryStage.DELIVERED);
       }
     },
@@ -220,15 +249,21 @@ export default function DeliveryPage() {
 
   useEffect(() => {
     const token = getAuthToken(session);
-    if (token && activeDeliveryId) {
-      socketService.connect(token);
-      socketService.on("delivery_update", (data) => {
-        if (data.deliveryId === activeDeliveryId) handleSocketUpdate(data);
-      });
-      return () => {
-        socketService.off("delivery_update", handleSocketUpdate);
-      };
-    }
+    if (!token || !activeDeliveryId) return;
+
+    socketService.connect(token);
+
+    // ⚠️  CRITICAL: The handler passed to `on()` and `off()` MUST be the same
+    // reference.  Using an inline arrow function inside `on()` while passing
+    // `handleSocketUpdate` to `off()` means the listener is never removed.
+    const handler = (data: any) => {
+      if (data.deliveryId === activeDeliveryId) handleSocketUpdate(data);
+    };
+
+    socketService.on('delivery_update', handler);
+    return () => {
+      socketService.off('delivery_update', handler);
+    };
   }, [activeDeliveryId, session, handleSocketUpdate]);
 
   const handlePhoneChange = useCallback(
@@ -242,20 +277,75 @@ export default function DeliveryPage() {
 
   // ✅ Updated Logic: Initialize Delivery with Metadata
   const handleInitializeDelivery = async () => {
+    const swal = deliverySwal();
+
     if (!pickupPos) {
-      toast.error("Please select a valid Pickup Location from the suggestions.");
+      await swal.fire({
+        icon: 'warning',
+        title: 'Pickup Location Required',
+        html: `
+          <p>Please <strong>select a pickup location</strong> from the autocomplete suggestions.</p>
+          <p class="mt-2 text-sm">Start typing an address and choose one of the options that appear — this ensures we get exact coordinates.</p>
+        `,
+        confirmButtonText: 'Set Pickup',
+      });
       return;
     }
     if (!dropoffPos) {
-      toast.error("Please select a valid Delivery Address from the suggestions.");
+      await swal.fire({
+        icon: 'warning',
+        title: 'Delivery Address Required',
+        html: `
+          <p>Please <strong>select a delivery address</strong> from the autocomplete suggestions.</p>
+          <p class="mt-2 text-sm">Start typing an address and choose one of the options that appear — this ensures we get exact coordinates.</p>
+        `,
+        confirmButtonText: 'Set Address',
+      });
       return;
     }
-    if (!packageInfo.recipientName) {
-      toast.error("Please enter the recipient's name.");
+    if (!packageInfo.recipientName || !packageInfo.recipientName.trim()) {
+      await swal.fire({
+        icon: 'warning',
+        title: 'Recipient Name Required',
+        html: `
+          <p>Please enter the <strong>full name</strong> of the person receiving the package.</p>
+          <p class="mt-2 text-sm">This is used by the courier to identify the recipient on delivery.</p>
+        `,
+        confirmButtonText: 'Enter Name',
+      });
       return;
     }
-    if (!packageInfo.recipientPhone || phoneError) {
-      toast.error("Please enter a valid Nigerian phone number.");
+    if (!packageInfo.recipientPhone) {
+      await swal.fire({
+        icon: 'warning',
+        title: 'Phone Number Required',
+        html: `
+          <p>Please enter the <strong>recipient's Nigerian phone number</strong>.</p>
+          <p class="mt-2 text-sm">Accepted formats:</p>
+          <ul class="text-sm mt-1 list-disc list-inside">
+            <li><strong>08012345678</strong> (local format)</li>
+            <li><strong>+2348012345678</strong> (international format)</li>
+          </ul>
+        `,
+        confirmButtonText: 'Enter Phone',
+      });
+      return;
+    }
+    if (phoneError) {
+      await swal.fire({
+        icon: 'error',
+        title: 'Invalid Phone Number',
+        html: `
+          <p>The phone number you entered is <strong>not a valid Nigerian number</strong>.</p>
+          <p class="mt-2 text-sm">Accepted formats:</p>
+          <ul class="text-sm mt-1 list-disc list-inside">
+            <li><strong>080, 081, 090, 091, 070, 071</strong> prefixes — 11 digits total</li>
+            <li>e.g. <strong>08012345678</strong> or <strong>+2348012345678</strong></li>
+          </ul>
+          <p class="mt-2 text-xs" style="color:#ef4444">${phoneError}</p>
+        `,
+        confirmButtonText: 'Fix Number',
+      });
       return;
     }
 
@@ -270,8 +360,11 @@ export default function DeliveryPage() {
     try {
       setStage(DeliveryStage.PROCESSING_ADDRESS);
 
+      // `label` is required (non-nullable String) by the Address Prisma model.
+      // Omitting it causes a DB constraint violation on every delivery attempt.
       const pickupRes = await DeliveryService.saveAddress(
         {
+          label: 'Pickup Location',
           street: sanitizeInput(packageInfo.pickupAddress),
           lat: pickupPos.lat,
           lng: pickupPos.lng,
@@ -281,6 +374,7 @@ export default function DeliveryPage() {
 
       const dropoffRes = await DeliveryService.saveAddress(
         {
+          label: 'Delivery Address',
           street: sanitizeInput(packageInfo.destinationAddress),
           lat: dropoffPos.lat,
           lng: dropoffPos.lng,
@@ -301,7 +395,12 @@ export default function DeliveryPage() {
         dropoffAddressId: dropoffRes.id,
         recipientName: sanitizeInput(packageInfo.recipientName),
         recipientPhone: normalizePhoneNumber(packageInfo.recipientPhone),
-        packageDetails: sanitizeInput(`${packageInfo.type} - ${packageInfo.instructions || ''}`),
+        // Avoid a trailing dash ("Document - ") when instructions are empty.
+        packageDetails: sanitizeInput(
+          packageInfo.instructions
+            ? `${packageInfo.type} - ${packageInfo.instructions}`
+            : packageInfo.type
+        ),
         
         // Optional Metadata Fields
         weightKg: finalWeight,
@@ -341,6 +440,18 @@ export default function DeliveryPage() {
       const userEmail =
         session?.user?.email || `guest-${Date.now()}@asoose.com`;
 
+      // Build the frontend callback URL explicitly.
+      // The backend stores this in payment.metadata and uses it to redirect
+      // the user's browser BACK to the frontend after verifying with Paystack.
+      // Without this, the backend falls back to process.env.FRONTEND_URL which
+      // may be unset or wrong. NEXT_PUBLIC_APP_URL must be this app's port (3001),
+      // NOT the backend port (3000).
+      const appUrl =
+        process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3001";
+      // Send just the base URL — the backend GET /callback/paystack handler
+      // appends "/payment/callback" itself before redirecting the browser.
+      const frontendCallbackUrl = appUrl;
+
       const paymentRes = await paymentService.initiatePayment(
         {
           amount: calculatedFee,
@@ -348,6 +459,12 @@ export default function DeliveryPage() {
           gateway: "PAYSTACK",
           method: "CARD",
           type: "DELIVERY",
+          // deliveryId at the top level is used by the backend to look up the
+          // delivery record and authoritative fee — amount above is a hint only.
+          deliveryId: activeDeliveryId,
+          // callbackUrl goes into payment.metadata so the backend GET callback
+          // handler knows where to redirect the browser after verification.
+          callbackUrl: frontendCallbackUrl,
           metadata: {
             deliveryId: activeDeliveryId,
             purpose: "DELIVERY_REQUEST",
@@ -357,11 +474,14 @@ export default function DeliveryPage() {
       );
 
       if (paymentRes.authorizationUrl && paymentRes.reference) {
+        // Store gateway alongside reference so verifyPayment can use the correct
+        // gateway during recovery — without it the backend throws a validation error.
         localStorage.setItem(
           PENDING_DELIVERY_KEY,
           JSON.stringify({
             id: activeDeliveryId,
             reference: paymentRes.reference,
+            gateway: 'PAYSTACK',
           }),
         );
         window.location.href = paymentRes.authorizationUrl;
@@ -378,6 +498,28 @@ export default function DeliveryPage() {
   const handleManualPaymentCheck = useCallback(async () => {
     if (activeDeliveryId) {
       const token = getAuthToken(session);
+      // Read stored gateway so verification uses the correct payment provider
+      let gateway = 'PAYSTACK';
+      try {
+        const stored = localStorage.getItem(PENDING_DELIVERY_KEY);
+        if (stored) gateway = JSON.parse(stored).gateway || 'PAYSTACK';
+      } catch (_) {}
+
+      const storedRef = localStorage.getItem(PENDING_DELIVERY_KEY);
+      const reference = storedRef ? JSON.parse(storedRef).reference : null;
+
+      if (reference) {
+        const isVerified = await DeliveryService.verifyPayment(
+          reference,
+          gateway,
+          token || undefined,
+        );
+        if (isVerified) {
+          handlePaymentSuccess();
+          return;
+        }
+      }
+
       const success = await DeliveryService.pollDeliveryStatus(
         activeDeliveryId,
         undefined,
@@ -386,7 +528,7 @@ export default function DeliveryPage() {
         token || undefined,
       );
       if (success) handlePaymentSuccess();
-      else toast.info("Payment not yet confirmed. We are still checking...");
+      else toast.info('Payment not yet confirmed. We are still checking...');
     }
   }, [activeDeliveryId, handlePaymentSuccess, session]);
 
@@ -513,7 +655,9 @@ export default function DeliveryPage() {
 
       case DeliveryStage.REQUESTED:
       case DeliveryStage.ASSIGNED:
+      case DeliveryStage.ACCEPTED:
       case DeliveryStage.PICKED_UP:
+      case DeliveryStage.IN_TRANSIT:
       case DeliveryStage.DELIVERED:
         return <DeliveryProgressUI stage={stage} />;
 

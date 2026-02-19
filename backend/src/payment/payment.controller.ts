@@ -81,11 +81,16 @@ export class PaymentController {
     @Req() req: RawBodyRequest<Request>,
     @Headers('x-paystack-signature') signature: string,
   ) {
+    // Use the raw request body (exact bytes) for HMAC signature verification.
+    // JSON.stringify(req.body) is unreliable because key ordering or whitespace
+    // differences can cause signature mismatches.
+    const rawBodyString = req.rawBody?.toString('utf8') ?? JSON.stringify(req.body);
     const payload = req.body;
     await this.paymentService.handleWebhook(
       PaymentGateway.PAYSTACK,
       payload,
       signature,
+      rawBodyString,
     );
     return { status: 'success' };
   }

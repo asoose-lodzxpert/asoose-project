@@ -94,21 +94,29 @@ export class DeliveryService {
   }
 
   /**
-   * Save an address for the delivery
+   * Save an address for the delivery.
+   * NOTE: The Address Prisma model requires `label`, `street`, `city`, and `state` as
+   * non-nullable String fields. All four must be sent to avoid a DB constraint violation.
    */
   static async saveAddress(data: {
+    label: string;   // REQUIRED by Prisma schema (non-nullable String)
     street: string;
     city?: string;
+    state?: string;
     lat: number;
     lng: number;
   }, token?: string) {
-    // Strip empty/falsy optional fields to avoid DTO validation failures
     const payload: Record<string, unknown> = {
+      label: data.label,
       street: data.street,
+      // Provide sensible defaults so the DB constraint is never violated.
+      // The backend's geo-resolution layer may override these with accurate values,
+      // but they MUST be present in the DTO to pass server-side validation.
+      city: data.city || 'Unknown',
+      state: data.state || 'Unknown',
       lat: data.lat,
       lng: data.lng,
     };
-    if (data.city) payload.city = data.city;
     const response = await api.post('/users/addresses', payload, getAuthHeader(token));
     return response.data;
   }
@@ -158,9 +166,22 @@ export class DeliveryService {
     return false;
   }
 
-  static async verifyPayment(reference: string, token?: string): Promise<boolean> {
+  /**
+   * Verify a payment by reference.
+   * The backend's VerifyPaymentDto requires BOTH `reference` AND `gateway`.
+   * The delivery flow always uses PAYSTACK; gateway is stored alongside the
+   * reference in localStorage so future gateways can be supported.
+   */
+  static async verifyPayment(
+    reference: string,
+    gateway: string = 'PAYSTACK',
+    token?: string,
+  ): Promise<boolean> {
     try {
-      const res = await api.get(`/payment/verify?reference=${reference}`, getAuthHeader(token));
+      const res = await api.get(
+        `/payment/verify?reference=${encodeURIComponent(reference)}&gateway=${gateway}`,
+        getAuthHeader(token),
+      );
       return res.data.status === 'success' || res.data.success === true;
     } catch (error) {
       console.error("Manual verification failed", error);
