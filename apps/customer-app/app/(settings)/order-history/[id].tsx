@@ -2,15 +2,10 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
-  TextInput,
-  TouchableOpacity,
   View,
   Dimensions,
 } from "react-native";
@@ -20,8 +15,11 @@ import { ThemedView } from "@/components/themed-view";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { fetchOrderById } from "@/services/order-history.service";
-import { createDispute } from "@/services/dispute.service";
-import Toast from "react-native-toast-message";
+import { checkDispute, Dispute } from "@/services/dispute.service";
+import {
+  DisputeSheet,
+  ExistingDisputeCard,
+} from "@/components/dispute/DisputeSheet";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -48,11 +46,9 @@ export default function OrderDetailsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Dispute modal state
-  const [showDisputeModal, setShowDisputeModal] = useState(false);
-  const [disputeReason, setDisputeReason] = useState("");
-  const [disputeDescription, setDisputeDescription] = useState("");
-  const [submittingDispute, setSubmittingDispute] = useState(false);
+  // Dispute state
+  const [showDisputeSheet, setShowDisputeSheet] = useState(false);
+  const [existingDispute, setExistingDispute] = useState<Dispute | null>(null);
 
   const DISPUTE_REASONS = [
     "Missing Item",
@@ -67,8 +63,12 @@ export default function OrderDetailsScreen() {
     if (!id) return;
     try {
       setLoading(true);
-      const data = await fetchOrderById(id);
+      const [data, disputeRes] = await Promise.all([
+        fetchOrderById(id),
+        checkDispute({ orderId: id }).catch(() => ({ dispute: null })),
+      ]);
       setOrder(data);
+      setExistingDispute(disputeRes.dispute);
     } catch (e) {
       console.error(e);
     } finally {
@@ -258,187 +258,34 @@ export default function OrderDetailsScreen() {
         {renderDeliveryInfo()}
         {renderItems()}
 
-        <Pressable
-          style={[styles.supportBtn, { borderColor: border }]}
-          onPress={() => setShowDisputeModal(true)}
-        >
-          <ThemedText style={{ color: brandPrimary, fontWeight: "700" }}>
-            Need help with this order?
-          </ThemedText>
-        </Pressable>
+        {existingDispute ? (
+          <ExistingDisputeCard
+            dispute={existingDispute}
+            onPress={() =>
+              router.push(`/(settings)/dispute/${existingDispute.id}` as any)
+            }
+          />
+        ) : (
+          <Pressable
+            style={[styles.supportBtn, { borderColor: border }]}
+            onPress={() => setShowDisputeSheet(true)}
+          >
+            <ThemedText style={{ color: brandPrimary, fontWeight: "700" }}>
+              Need help with this order?
+            </ThemedText>
+          </Pressable>
+        )}
 
         {/* Dispute Modal */}
-        <Modal
-          visible={showDisputeModal}
-          animationType="slide"
-          transparent
-          onRequestClose={() => setShowDisputeModal(false)}
-        >
-          <KeyboardAvoidingView
-            behavior={Platform.OS === "ios" ? "padding" : "height"}
-            style={styles.modalOverlay}
-          >
-            <Pressable
-              style={StyleSheet.absoluteFill}
-              onPress={() => setShowDisputeModal(false)}
-            />
-            <View style={[styles.modalSheet, { backgroundColor: card }]}>
-              {/* Handle */}
-              <View style={[styles.modalHandle, { backgroundColor: border }]} />
-
-              {/* Header */}
-              <View style={styles.modalHeader}>
-                <ThemedText style={styles.modalTitle}>
-                  File a Dispute
-                </ThemedText>
-                <Pressable onPress={() => setShowDisputeModal(false)}>
-                  <IconSymbol name="xmark" size={20} color={textSecondary} />
-                </Pressable>
-              </View>
-
-              <ThemedText
-                style={[styles.modalSubtitle, { color: textSecondary }]}
-              >
-                Order #{order?.id?.slice(-6)?.toUpperCase()}
-              </ThemedText>
-
-              <ScrollView
-                showsVerticalScrollIndicator={false}
-                keyboardShouldPersistTaps="handled"
-              >
-                {/* Reason chips */}
-                <ThemedText
-                  style={[styles.inputLabel, { color: textSecondary }]}
-                >
-                  REASON
-                </ThemedText>
-                <View style={styles.reasonGrid}>
-                  {DISPUTE_REASONS.map((r) => (
-                    <TouchableOpacity
-                      key={r}
-                      onPress={() => setDisputeReason(r)}
-                      style={[
-                        styles.reasonChip,
-                        {
-                          borderColor:
-                            disputeReason === r ? brandPrimary : border,
-                          backgroundColor:
-                            disputeReason === r
-                              ? brandPrimary + "18"
-                              : "transparent",
-                        },
-                      ]}
-                    >
-                      <ThemedText
-                        style={[
-                          styles.reasonChipText,
-                          {
-                            color:
-                              disputeReason === r
-                                ? brandPrimary
-                                : textSecondary,
-                            fontWeight: disputeReason === r ? "700" : "400",
-                          },
-                        ]}
-                      >
-                        {r}
-                      </ThemedText>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-
-                {/* Description */}
-                <ThemedText
-                  style={[styles.inputLabel, { color: textSecondary }]}
-                >
-                  DESCRIBE THE ISSUE
-                </ThemedText>
-                <TextInput
-                  value={disputeDescription}
-                  onChangeText={setDisputeDescription}
-                  placeholder="Tell us exactly what went wrong…"
-                  placeholderTextColor={textSecondary}
-                  multiline
-                  numberOfLines={5}
-                  textAlignVertical="top"
-                  style={[
-                    styles.descriptionInput,
-                    {
-                      color: textColor,
-                      borderColor: border,
-                      backgroundColor: surface,
-                    },
-                  ]}
-                />
-
-                {/* Submit */}
-                <TouchableOpacity
-                  onPress={async () => {
-                    if (!disputeReason) {
-                      Toast.show({
-                        type: "error",
-                        text1: "Select a reason",
-                      });
-                      return;
-                    }
-                    if (disputeDescription.trim().length < 10) {
-                      Toast.show({
-                        type: "error",
-                        text1: "Description too short",
-                        text2: "Please describe the issue in more detail.",
-                      });
-                      return;
-                    }
-                    setSubmittingDispute(true);
-                    try {
-                      await createDispute({
-                        reason: disputeReason,
-                        description: disputeDescription.trim(),
-                        orderId: order?.id,
-                      });
-                      Toast.show({
-                        type: "success",
-                        text1: "Dispute filed",
-                        text2:
-                          "Our team will review and get back to you shortly.",
-                      });
-                      setShowDisputeModal(false);
-                      setDisputeReason("");
-                      setDisputeDescription("");
-                    } catch (err: any) {
-                      Toast.show({
-                        type: "error",
-                        text1: "Failed to file dispute",
-                        text2:
-                          err?.message ||
-                          "Please try again or contact support.",
-                      });
-                    } finally {
-                      setSubmittingDispute(false);
-                    }
-                  }}
-                  disabled={submittingDispute}
-                  style={[
-                    styles.submitBtn,
-                    {
-                      backgroundColor: brandPrimary,
-                      opacity: submittingDispute ? 0.6 : 1,
-                    },
-                  ]}
-                >
-                  {submittingDispute ? (
-                    <ActivityIndicator color="#fff" />
-                  ) : (
-                    <ThemedText style={styles.submitBtnText}>
-                      Submit Dispute
-                    </ThemedText>
-                  )}
-                </TouchableOpacity>
-              </ScrollView>
-            </View>
-          </KeyboardAvoidingView>
-        </Modal>
       </ScrollView>
+
+      <DisputeSheet
+        visible={showDisputeSheet}
+        onClose={() => setShowDisputeSheet(false)}
+        entityLabel={`Order #${(order?.id ?? "").slice(-6).toUpperCase()}`}
+        orderId={order?.id}
+        onDisputeFiled={(d) => setExistingDispute(d)}
+      />
     </ThemedView>
   );
 }
@@ -621,4 +468,59 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   submitBtnText: { fontSize: 16, fontWeight: "800", color: "#fff" },
+
+  // Dispute info card (when dispute exists)
+  disputeInfoCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 16,
+    gap: 8,
+    marginTop: 10,
+    marginBottom: 40,
+  },
+  disputeInfoRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  disputeInfoTitle: { fontSize: 14, fontWeight: "700", flex: 1 },
+  disputeStatusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 20,
+  },
+  disputeStatusText: { fontSize: 11, fontWeight: "700" },
+  disputeInfoDesc: { fontSize: 13, lineHeight: 18 },
+  disputeInfoFooter: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 2,
+  },
+  disputeInfoLink: { fontSize: 13, fontWeight: "600" },
+
+  // Image picker
+  imagePickerRow: { flexDirection: "row", gap: 12, marginBottom: 24 },
+  imageSlot: {
+    width: 110,
+    height: 110,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderStyle: "dashed",
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+  },
+  imagePreview: { width: "100%", height: "100%" },
+  imageRemoveBadge: {
+    position: "absolute",
+    top: 4,
+    right: 4,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    borderRadius: 10,
+    width: 20,
+    height: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
 });

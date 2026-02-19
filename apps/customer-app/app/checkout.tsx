@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   View,
   StyleSheet,
@@ -7,6 +7,7 @@ import {
   ScrollView,
   ActivityIndicator,
   Platform,
+  BackHandler,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -43,17 +44,32 @@ export default function CheckoutScreen() {
   const [showAddressModal, setShowAddressModal] = useState(false);
   const [showPaymentWebView, setShowPaymentWebView] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const orderCompleted = useRef(false); // guards against cart-empty redirect after payment
+
+  // Intercept Android back when order is done — prevent going back to delivery/cart
+  useEffect(() => {
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      if (orderCompleted.current) {
+        router.dismissAll();
+        router.replace("/(tabs)/home");
+        return true;
+      }
+      return false;
+    });
+    return () => sub.remove();
+  }, []);
 
   // Payment State
   const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
   const [paymentReference, setPaymentReference] = useState<string | null>(null);
   const [orderId, setOrderId] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const capturedAmount = useRef(0); // snapshot of total before cart is cleared
 
   const currencySymbol = groups[0]?.restaurant.currency ?? "₦";
 
   useEffect(() => {
-    if (!items.length && !showSuccessModal) {
+    if (!items.length && !orderCompleted.current) {
       router.replace("/cart");
     }
   }, [items]);
@@ -337,7 +353,11 @@ export default function CheckoutScreen() {
             setShowSuccessModal(true);
           }}
           onCancel={() => setShowPaymentWebView(false)}
-          onPaymentComplete={clearCart}
+          onPaymentComplete={async () => {
+            capturedAmount.current = total; // capture before clearCart zeroes it
+            orderCompleted.current = true;
+            await clearCart();
+          }}
         />
       )}
 
@@ -345,10 +365,19 @@ export default function CheckoutScreen() {
         visible={showSuccessModal}
         onClose={() => {
           setShowSuccessModal(false);
+          router.dismissAll();
           router.replace("/(tabs)/home");
         }}
+        onViewOrder={() => {
+          setShowSuccessModal(false);
+          router.dismissAll();
+          router.replace("/(tabs)/home");
+          setTimeout(() => {
+            router.push(`/order-history/${orderId}` as any);
+          }, 100);
+        }}
         orderId={orderId}
-        amount={total}
+        amount={capturedAmount.current}
         currency={currencySymbol}
       />
     </ThemedView>

@@ -17,7 +17,7 @@ const VEHICLE_OPTIONS: VehicleOption[] = [
     type: VehicleType.ECONOMY,
     name: "Economy",
     description: "Quick & affordable",
-    icon: "bicycle",
+    icon: "car",
     capacity: "Up to 3",
   },
   {

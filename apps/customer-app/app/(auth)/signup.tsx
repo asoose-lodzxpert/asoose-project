@@ -63,7 +63,12 @@ export default function Signup() {
   const [loading, setLoading] = useState(false);
 
   // OAuth state
-  const { request, response, promptAsync } = useGoogleSignIn();
+  const {
+    request,
+    response,
+    promptAsync,
+    isConfigured: googleConfigured,
+  } = useGoogleSignIn();
   const [appleAvailable, setAppleAvailable] = useState(false);
   const [oauthLoading, setOauthLoading] = useState(false);
 
@@ -92,7 +97,8 @@ export default function Signup() {
         response.error?.code ||
         "Google sign-in failed";
       Toast.show({ type: "error", text1: errMsg });
-      if (__DEV__) console.error("Google OAuth error response:", response.error);
+      if (__DEV__)
+        console.error("Google OAuth error response:", response.error);
     }
   }, [response]);
 
@@ -332,26 +338,30 @@ export default function Signup() {
               </View>
 
               <View style={styles.socialRow}>
-                <Pressable
-                  style={[
-                    styles.socialButton,
-                    { backgroundColor: surfaceSubtle },
-                  ]}
-                  onPress={() => promptAsync()}
-                  disabled={oauthLoading}
-                >
-                  {oauthLoading ? (
-                    <ActivityIndicator size="small" color={primary} />
-                  ) : (
-                    <>
-                      <Image
-                        source={require("@/assets/images/icons8-google-48.png")}
-                        style={styles.socialIcon}
-                      />
-                      <ThemedText style={styles.socialText}>Google</ThemedText>
-                    </>
-                  )}
-                </Pressable>
+                {googleConfigured && (
+                  <Pressable
+                    style={[
+                      styles.socialButton,
+                      { backgroundColor: surfaceSubtle },
+                    ]}
+                    onPress={() => promptAsync()}
+                    disabled={oauthLoading}
+                  >
+                    {oauthLoading ? (
+                      <ActivityIndicator size="small" color={primary} />
+                    ) : (
+                      <>
+                        <Image
+                          source={require("@/assets/images/icons8-google-48.png")}
+                          style={styles.socialIcon}
+                        />
+                        <ThemedText style={styles.socialText}>
+                          Google
+                        </ThemedText>
+                      </>
+                    )}
+                  </Pressable>
+                )}
 
                 {appleAvailable && (
                   <Pressable

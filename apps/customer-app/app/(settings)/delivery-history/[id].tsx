@@ -3,6 +3,11 @@ import { ThemedView } from "@/components/themed-view";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { fetchDeliveryDetails } from "@/services/delivery-details.service";
+import { checkDispute, Dispute } from "@/services/dispute.service";
+import {
+  DisputeSheet,
+  ExistingDisputeCard,
+} from "@/components/dispute/DisputeSheet";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import {
@@ -38,11 +43,19 @@ export default function DeliveryDetailsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [delivery, setDelivery] = useState<any | null>(null);
+  const [showDisputeSheet, setShowDisputeSheet] = useState(false);
+  const [existingDispute, setExistingDispute] = useState<Dispute | null>(null);
 
   const fetchData = useCallback(async () => {
     try {
-      const data = await fetchDeliveryDetails(id as string);
+      const [data, disputeRes] = await Promise.all([
+        fetchDeliveryDetails(id as string),
+        checkDispute({ deliveryId: id as string }).catch(() => ({
+          dispute: null,
+        })),
+      ]);
       setDelivery(data);
+      setExistingDispute(disputeRes.dispute);
       if (__DEV__)
         console.log("Fetched delivery details:", JSON.stringify(data, null, 2));
     } catch (e) {
@@ -197,10 +210,37 @@ export default function DeliveryDetailsScreen() {
         {renderContactCard()}
         {renderDeliverySpecs()}
 
+        {/* Dispute section */}
+        {existingDispute ? (
+          <ExistingDisputeCard
+            dispute={existingDispute}
+            onPress={() =>
+              router.push(`/(settings)/dispute/${existingDispute.id}` as any)
+            }
+          />
+        ) : (
+          <Pressable
+            style={[styles.supportBtn, { borderColor: border }]}
+            onPress={() => setShowDisputeSheet(true)}
+          >
+            <ThemedText style={{ color: primary, fontWeight: "700" }}>
+              Need help with this delivery?
+            </ThemedText>
+          </Pressable>
+        )}
+
         <ThemedText style={styles.timestampText}>
           Created on {new Date(delivery.createdAt).toLocaleString()}
         </ThemedText>
       </ScrollView>
+
+      <DisputeSheet
+        visible={showDisputeSheet}
+        onClose={() => setShowDisputeSheet(false)}
+        entityLabel={`Delivery #${(delivery?.id ?? "").slice(-6).toUpperCase()}`}
+        deliveryId={id as string}
+        onDisputeFiled={(d) => setExistingDispute(d)}
+      />
     </ThemedView>
   );
 }
@@ -306,5 +346,13 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 10,
     marginBottom: 40,
+  },
+  supportBtn: {
+    padding: 20,
+    borderRadius: 20,
+    borderWidth: 1,
+    alignItems: "center",
+    marginTop: 4,
+    marginBottom: 8,
   },
 });

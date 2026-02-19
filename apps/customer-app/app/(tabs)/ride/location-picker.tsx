@@ -109,8 +109,11 @@ export default function LocationPickerScreen() {
   const card = useThemeColor({}, "surfaceCard");
   const textSecondary = useThemeColor({}, "textSecondary");
   const textPrimary = useThemeColor({}, "textPrimary");
+  const textMuted = useThemeColor({}, "textMuted");
+  const textOnPrimary = useThemeColor({}, "textOnPrimary");
   const success = useThemeColor({}, "statusSuccess");
   const warning = useThemeColor({}, "statusPending");
+  const shadowColor = useThemeColor({}, "textPrimary");
 
   const [searchQuery, setSearchQuery] = useState("");
   const [searching, setSearching] = useState(false);
@@ -276,7 +279,10 @@ export default function LocationPickerScreen() {
       {/* Header */}
       <View style={[styles.header, { backgroundColor: surface }]}>
         <View style={styles.navRow}>
-          <Pressable onPress={() => router.back()} style={styles.backBtn}>
+          <Pressable
+            onPress={() => router.back()}
+            style={[styles.backBtn, { backgroundColor: card }]}
+          >
             <IconSymbol name="chevron.left" size={24} color={textPrimary} />
           </Pressable>
           <ThemedText style={styles.title}>
@@ -421,8 +427,11 @@ export default function LocationPickerScreen() {
         >
           {/* Modal Header */}
           <View style={styles.modalHeader}>
-            <Pressable onPress={closeMapModal} style={styles.closeBtn}>
-              <IconSymbol name="chevron.down" size={28} color="#000" />
+            <Pressable
+              onPress={closeMapModal}
+              style={[styles.closeBtn, { backgroundColor: card }]}
+            >
+              <IconSymbol name="chevron.down" size={28} color={textPrimary} />
             </Pressable>
             <ThemedText style={styles.modalTitle}>
               Pick location on map
@@ -460,7 +469,9 @@ export default function LocationPickerScreen() {
             {selectedLocation && (
               <View style={[styles.confirmOverlay, { backgroundColor: card }]}>
                 <View style={{ flex: 1 }}>
-                  <ThemedText style={styles.overlayLabel}>
+                  <ThemedText
+                    style={[styles.overlayLabel, { color: textMuted }]}
+                  >
                     SELECTED LOCATION
                   </ThemedText>
                   <ThemedText style={styles.overlayAddress} numberOfLines={2}>
@@ -473,9 +484,13 @@ export default function LocationPickerScreen() {
                   disabled={confirming}
                 >
                   {confirming ? (
-                    <ActivityIndicator color="white" size="small" />
+                    <ActivityIndicator color={textOnPrimary} size="small" />
                   ) : (
-                    <ThemedText style={styles.confirmText}>Confirm</ThemedText>
+                    <ThemedText
+                      style={[styles.confirmText, { color: textOnPrimary }]}
+                    >
+                      Confirm
+                    </ThemedText>
                   )}
                 </Pressable>
               </View>
@@ -504,7 +519,6 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: "#fff",
     alignItems: "center",
     justifyContent: "center",
     shadowColor: "#000",
@@ -581,7 +595,6 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: "#fff",
     alignItems: "center",
     justifyContent: "center",
     shadowColor: "#000",
@@ -607,7 +620,6 @@ const styles = StyleSheet.create({
   overlayLabel: {
     fontSize: 12,
     fontWeight: "700",
-    color: "#666",
     textTransform: "uppercase",
   },
   overlayAddress: { fontSize: 15.5, fontWeight: "600", marginTop: 4 },
@@ -617,5 +629,5 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     marginLeft: 16,
   },
-  confirmText: { color: "white", fontWeight: "700", fontSize: 15 },
+  confirmText: { fontWeight: "700", fontSize: 15 },
 });

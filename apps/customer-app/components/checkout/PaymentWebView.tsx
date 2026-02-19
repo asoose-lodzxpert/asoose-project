@@ -39,6 +39,7 @@ export function PaymentWebView({
 
   const accent = useThemeColor({}, "brandPrimary");
   const surface = useThemeColor({}, "surfaceBackground");
+  const subtle = useThemeColor({}, "surfaceSubtle");
   const textPrimary = useThemeColor({}, "textPrimary");
   const border = useThemeColor({}, "borderDefault");
 
@@ -212,13 +213,13 @@ export function PaymentWebView({
         {/* Modern Header with Handle */}
         <View style={[styles.header, { borderBottomColor: border }]}>
           <View style={styles.headerTop}>
-            <View style={styles.handle} />
+            <View style={[styles.handle, { backgroundColor: subtle }]} />
           </View>
 
           <View style={styles.headerContent}>
             <Pressable
               onPress={onCancel}
-              style={styles.iconButton}
+              style={[styles.iconButton, { backgroundColor: subtle }]}
               hitSlop={20}
             >
               <IconSymbol name="xmark" size={20} color={textPrimary} />
@@ -249,7 +250,9 @@ export function PaymentWebView({
 
         <View style={styles.webContainer}>
           {verifying ? (
-            <View style={styles.verifyingContainer}>
+            <View
+              style={[styles.verifyingContainer, { backgroundColor: surface }]}
+            >
               <ActivityIndicator size="small" color={accent} />
               <ThemedText style={styles.verifyingText}>
                 Finalizing your transaction...
@@ -296,7 +299,6 @@ const styles = StyleSheet.create({
     width: 36,
     height: 5,
     borderRadius: 2.5,
-    backgroundColor: "#E0E0E0",
   },
   headerContent: {
     flexDirection: "row",
@@ -321,7 +323,6 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: "#f5f5f5",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -347,7 +348,7 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.9)",
+    opacity: 0.95,
     zIndex: 10,
   },
   verifyingText: {

@@ -23,6 +23,11 @@ import { IconSymbol, IconSymbolName } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { RideService } from "@/services/ride.service";
 import { Ride } from "@/types/ride";
+import { checkDispute, Dispute } from "@/services/dispute.service";
+import {
+  DisputeSheet,
+  ExistingDisputeCard,
+} from "@/components/dispute/DisputeSheet";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -54,13 +59,19 @@ export default function RideDetailsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showDisputeSheet, setShowDisputeSheet] = useState(false);
+  const [existingDispute, setExistingDispute] = useState<Dispute | null>(null);
 
   const loadRide = useCallback(async () => {
     if (!id) return;
     try {
       setLoading(true);
-      const data = await RideService.getRideById(id);
+      const [data, disputeRes] = await Promise.all([
+        RideService.getRideById(id),
+        checkDispute({ rideId: id }).catch(() => ({ dispute: null })),
+      ]);
       setRide(data);
+      setExistingDispute(disputeRes.dispute);
     } catch (e) {
       setError("Failed to load ride details");
     } finally {
@@ -304,6 +315,25 @@ export default function RideDetailsScreen() {
         {renderRoute()}
         {renderFare()}
 
+        {/* Dispute section */}
+        {existingDispute ? (
+          <ExistingDisputeCard
+            dispute={existingDispute}
+            onPress={() =>
+              router.push(`/(settings)/dispute/${existingDispute.id}` as any)
+            }
+          />
+        ) : (
+          <Pressable
+            style={[styles.supportBtn, { borderColor: border }]}
+            onPress={() => setShowDisputeSheet(true)}
+          >
+            <ThemedText style={{ color: brandPrimary, fontWeight: "700" }}>
+              Need help with this ride?
+            </ThemedText>
+          </Pressable>
+        )}
+
         <View style={styles.infoBox}>
           <IconSymbol name="info.circle" size={16} color={textSecondary} />
           <ThemedText
@@ -314,6 +344,14 @@ export default function RideDetailsScreen() {
           </ThemedText>
         </View>
       </ScrollView>
+
+      <DisputeSheet
+        visible={showDisputeSheet}
+        onClose={() => setShowDisputeSheet(false)}
+        entityLabel={`Ride #${(ride?.id ?? "").slice(-6).toUpperCase()}`}
+        rideId={id}
+        onDisputeFiled={(d) => setExistingDispute(d)}
+      />
     </ThemedView>
   );
 }
@@ -393,5 +431,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginTop: 20,
+  },
+  supportBtn: {
+    padding: 20,
+    borderRadius: 20,
+    borderWidth: 1,
+    alignItems: "center",
+    marginTop: 4,
+    marginBottom: 8,
   },
 });

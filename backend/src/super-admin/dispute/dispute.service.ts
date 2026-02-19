@@ -299,6 +299,31 @@ export class DisputesService {
     };
   }
 
+  // ==================== FIND EXISTING DISPUTE FOR ENTITY ====================
+  async findExistingDispute(
+    userId: string,
+    orderId?: string,
+    rideId?: string,
+    deliveryId?: string,
+  ) {
+    const whereClause: any = { openedByUserId: userId };
+    if (orderId) whereClause.orderId = orderId;
+    else if (rideId) whereClause.rideId = rideId;
+    else if (deliveryId) whereClause.deliveryId = deliveryId;
+    else return { dispute: null };
+
+    const dispute = await this.prisma.dispute.findFirst({
+      where: whereClause,
+      include: {
+        openedByUser: { select: { id: true, name: true, email: true } },
+        _count: { select: { messages: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return { dispute };
+  }
+
   // ==================== CHECK SLA BREACH ====================
   private checkSLABreach(dispute: any): boolean {
     const hoursOpen = Math.floor(

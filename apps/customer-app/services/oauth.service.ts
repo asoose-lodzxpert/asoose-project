@@ -36,6 +36,17 @@ const GOOGLE_CLIENT_ID_ANDROID =
 const GOOGLE_CLIENT_ID_WEB =
   process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_WEB || undefined;
 
+// True only when at least the current platform has a real client ID
+const isGoogleConfigured = !!(
+  GOOGLE_CLIENT_ID_WEB ||
+  GOOGLE_CLIENT_ID_ANDROID ||
+  GOOGLE_CLIENT_ID_IOS
+);
+
+// Placeholder used so expo-auth-session hook never throws during init.
+// The button is disabled via `isConfigured: false` when this is active.
+const PLACEHOLDER = "not-configured";
+
 type OAuthResponse = {
   user: {
     id: string;
@@ -77,16 +88,25 @@ async function httpRequest({
 
 /**
  * Initialize Google Sign-In
- * Returns a request object and promptAsync function
+ * Returns a request object and promptAsync function.
+ * `isConfigured` is false when no client IDs are set — use it to hide the button.
  */
 export function useGoogleSignIn() {
+  // expo-auth-session throws if the platform-specific clientId is undefined.
+  // Always pass a non-undefined value; use isConfigured to disable the button
+  // when the real credentials are absent.
   const [request, response, promptAsync] = Google.useAuthRequest({
-    iosClientId: GOOGLE_CLIENT_ID_IOS,
-    androidClientId: GOOGLE_CLIENT_ID_ANDROID,
-    webClientId: GOOGLE_CLIENT_ID_WEB,
+    androidClientId: GOOGLE_CLIENT_ID_ANDROID ?? PLACEHOLDER,
+    iosClientId: GOOGLE_CLIENT_ID_IOS ?? PLACEHOLDER,
+    webClientId: GOOGLE_CLIENT_ID_WEB ?? PLACEHOLDER,
   });
 
-  return { request, response, promptAsync };
+  return {
+    request: isGoogleConfigured ? request : null,
+    response: isGoogleConfigured ? response : null,
+    promptAsync: isGoogleConfigured ? promptAsync : async () => null,
+    isConfigured: isGoogleConfigured,
+  };
 }
 
 /**

@@ -1,5 +1,6 @@
 import React from "react";
 import { View, StyleSheet, Modal, Pressable } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { ThemedText } from "@/components/themed-text";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
@@ -7,6 +8,7 @@ import { useThemeColor } from "@/hooks/use-theme-color";
 interface PaymentSuccessModalProps {
   visible: boolean;
   onClose: () => void;
+  onViewOrder?: () => void;
   orderId: string | null;
   amount: number;
   currency: string;
@@ -15,43 +17,60 @@ interface PaymentSuccessModalProps {
 export function PaymentSuccessModal({
   visible,
   onClose,
+  onViewOrder,
   orderId,
   amount,
   currency,
 }: PaymentSuccessModalProps) {
   const accent = useThemeColor({}, "brandPrimary");
   const surface = useThemeColor({}, "surfaceBackground");
+  const card = useThemeColor({}, "surfaceCard");
+  const border = useThemeColor({}, "borderDefault");
   const statusSuccess = useThemeColor({}, "statusSuccess");
-  const textPrimary = useThemeColor({}, "textPrimary");
+  const textOnPrimary = useThemeColor({}, "textOnPrimary");
   const textSecondary = useThemeColor({}, "textSecondary");
 
   return (
     <Modal
       visible={visible}
-      animationType="fade"
-      transparent
+      animationType="slide"
+      transparent={false}
       onRequestClose={onClose}
     >
-      <View style={styles.modalOverlay}>
-        <View style={[styles.modalContent, { backgroundColor: surface }]}>
-          {/* Success Icon */}
+      <SafeAreaView style={[styles.container, { backgroundColor: surface }]}>
+        {/* Top glow accent strip */}
+        <View style={[styles.accentStrip, { backgroundColor: accent }]} />
+
+        <View style={styles.content}>
+          {/* Animated check circle */}
           <View
-            style={[styles.iconContainer, { backgroundColor: statusSuccess }]}
+            style={[
+              styles.iconOuter,
+              { backgroundColor: statusSuccess + "20" },
+            ]}
           >
-            <IconSymbol name="checkmark" size={64} color="#fff" />
+            <View
+              style={[styles.iconInner, { backgroundColor: statusSuccess }]}
+            >
+              <IconSymbol name="checkmark" size={52} color={textOnPrimary} />
+            </View>
           </View>
 
-          {/* Success Message */}
+          {/* Title */}
           <ThemedText style={styles.title}>Payment Successful!</ThemedText>
-
           <ThemedText style={[styles.subtitle, { color: textSecondary }]}>
-            Your order has been placed successfully
+            Your order has been placed and{"\n"}is being prepared
           </ThemedText>
 
-          {/* Order Details */}
-          <View style={styles.detailsContainer}>
+          {/* Details card */}
+          <View
+            style={[
+              styles.detailsCard,
+              { backgroundColor: card, borderColor: border },
+            ]}
+          >
             {orderId && (
-              <View style={styles.detailRow}>
+              <View style={[styles.detailRow, { borderBottomColor: border }]}>
                 <ThemedText
                   style={[styles.detailLabel, { color: textSecondary }]}
                 >
@@ -63,105 +82,124 @@ export function PaymentSuccessModal({
               </View>
             )}
 
-            <View style={styles.detailRow}>
+            <View style={styles.detailRowLast}>
               <ThemedText
                 style={[styles.detailLabel, { color: textSecondary }]}
               >
                 Amount Paid
               </ThemedText>
               <ThemedText
-                style={[styles.detailValue, { color: statusSuccess }]}
+                style={[styles.detailValueLarge, { color: statusSuccess }]}
               >
                 {currency}
                 {amount.toLocaleString()}
               </ThemedText>
             </View>
           </View>
+        </View>
 
-          {/* Action Buttons */}
-          <View style={styles.buttonContainer}>
+        {/* Action Buttons pinned to bottom */}
+        <View style={styles.buttonContainer}>
+          {onViewOrder && (
             <Pressable
               style={[styles.primaryButton, { backgroundColor: accent }]}
-              onPress={onClose}
-            >
-              <ThemedText style={styles.primaryButtonText}>Done</ThemedText>
-            </Pressable>
-
-            <Pressable
-              style={styles.secondaryButton}
-              onPress={() => {
-                onClose();
-                // Navigate to orders screen
-              }}
+              onPress={onViewOrder}
             >
               <ThemedText
-                style={[styles.secondaryButtonText, { color: accent }]}
+                style={[styles.primaryButtonText, { color: textOnPrimary }]}
               >
                 View Order
               </ThemedText>
             </Pressable>
-          </View>
+          )}
+
+          <Pressable
+            style={[
+              styles.secondaryButton,
+              { borderColor: accent + "50", backgroundColor: card },
+            ]}
+            onPress={onClose}
+          >
+            <ThemedText style={[styles.secondaryButtonText, { color: accent }]}>
+              Back to Home
+            </ThemedText>
+          </Pressable>
         </View>
-      </View>
+      </SafeAreaView>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  modalOverlay: {
+  container: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.6)",
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 20,
   },
 
-  modalContent: {
+  accentStrip: {
+    height: 4,
     width: "100%",
-    maxWidth: 400,
-    borderRadius: 24,
-    padding: 32,
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
-    elevation: 10,
   },
 
-  iconContainer: {
+  content: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 24,
+  },
+
+  iconOuter: {
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 28,
+  },
+
+  iconInner: {
     width: 100,
     height: 100,
     borderRadius: 50,
-    justifyContent: "center",
     alignItems: "center",
-    marginBottom: 24,
+    justifyContent: "center",
   },
 
   title: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: "800",
-    marginBottom: 8,
+    marginBottom: 10,
     textAlign: "center",
   },
 
   subtitle: {
     fontSize: 15,
     textAlign: "center",
-    marginBottom: 24,
     lineHeight: 22,
+    marginBottom: 32,
   },
 
-  detailsContainer: {
+  detailsCard: {
     width: "100%",
-    gap: 12,
-    marginBottom: 32,
+    borderRadius: 20,
+    borderWidth: 1,
+    overflow: "hidden",
   },
 
   detailRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+  },
+
+  detailRowLast: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 16,
   },
 
   detailLabel: {
@@ -169,23 +207,28 @@ const styles = StyleSheet.create({
   },
 
   detailValue: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "700",
   },
 
+  detailValueLarge: {
+    fontSize: 22,
+    fontWeight: "800",
+  },
+
   buttonContainer: {
-    width: "100%",
+    paddingHorizontal: 24,
+    paddingBottom: 24,
     gap: 12,
   },
 
   primaryButton: {
     paddingVertical: 16,
-    borderRadius: 14,
+    borderRadius: 16,
     alignItems: "center",
   },
 
   primaryButtonText: {
-    color: "#fff",
     fontSize: 17,
     fontWeight: "700",
   },
@@ -193,6 +236,8 @@ const styles = StyleSheet.create({
   secondaryButton: {
     paddingVertical: 14,
     alignItems: "center",
+    borderWidth: 1,
+    borderRadius: 16,
   },
 
   secondaryButtonText: {

@@ -39,6 +39,9 @@ export type IconSymbolName =
   | "lock.fill"
   | "pencil"
   | "mappin.circle.fill"
+  | "eye"
+  | "eye.slash"
+  | "lock.shield.fill"
   | "trash"
   | "plus"
   | "fullscreen"
@@ -90,6 +93,7 @@ export type IconSymbolName =
   | "1.circle.fill"
   | "2.circle.fill"
   | "checkmark.circle.fill"
+  | "exclamationmark.circle.fill"
   | "circle"
   | "arrow.down"
   | "location.on"
@@ -104,6 +108,7 @@ export type IconSymbolName =
   | "p.square"
   | "d.square"
   | "clock"
+  | "faceid"
   | "arrow.right.circle"
   | "note"
   | "phone"
@@ -173,6 +178,7 @@ export type IconSymbolName =
   | "checkmark.seal.fill"
   | "tray.fill"
   | "checkmark.shield.fill"
+  | "info.circle.fill"
   | "bell.slash";
 
 export const MAPPING: Record<
@@ -210,6 +216,7 @@ export const MAPPING: Record<
   "chevron.down": "keyboard-arrow-down",
   "chevron.up": "keyboard-arrow-up",
   "info.circle": "info",
+  "info.circle.fill": "info",
   "cloud.upload": "cloud-upload",
   "camera.fill": "photo-camera",
   check: "check",
@@ -347,7 +354,12 @@ export const MAPPING: Record<
   "arrow.down.circle.fill": "arrow-circle-down",
   "scalemass.fill": "scale",
   "wallet-giftcard": "card-giftcard",
-  cross: "close", // Mapped cross to MaterialIcons close
+  "lock.shield.fill": "admin-panel-settings",
+  eye: "remove-red-eye",
+  "eye.slash": "visibility-off",
+  "exclamationmark.circle.fill": "error",
+  faceid: "face",
+  cross: "close",
   bicycle: "directions-bike",
 };
 

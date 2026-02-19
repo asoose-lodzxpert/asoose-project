@@ -265,7 +265,7 @@ export default function SettingsScreen() {
           </Pressable>
 
           <Pressable
-            style={styles.rowLast}
+            style={[styles.row, { borderBottomColor: border }]}
             onPress={() => router.push("/(delivery)/history")}
           >
             <View
@@ -276,6 +276,26 @@ export default function SettingsScreen() {
             <View style={styles.rowTextWrap}>
               <ThemedText style={styles.rowLabel}>Deliveries</ThemedText>
               <ThemedText type="caption">Package history</ThemedText>
+            </View>
+            <IconSymbol name="chevron.right" size={18} color={muted} />
+          </Pressable>
+
+          <Pressable
+            style={styles.rowLast}
+            onPress={() => router.push("/(settings)/disputes" as any)}
+          >
+            <View
+              style={[styles.iconBox, { backgroundColor: accentRed + "15" }]}
+            >
+              <IconSymbol
+                name="exclamationmark.circle.fill"
+                size={18}
+                color={accentRed}
+              />
+            </View>
+            <View style={styles.rowTextWrap}>
+              <ThemedText style={styles.rowLabel}>Disputes</ThemedText>
+              <ThemedText type="caption">Your filed disputes</ThemedText>
             </View>
             <IconSymbol name="chevron.right" size={18} color={muted} />
           </Pressable>

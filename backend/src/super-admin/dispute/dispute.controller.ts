@@ -51,6 +51,50 @@ export class DisputesController {
     return this.disputesService.create(req.user.id, dto);
   }
 
+  // ✅ CUSTOMER/VENDOR/RIDER: List own disputes
+  @Get('mine')
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN_MANAGER,
+    UserRole.ADMIN_SUPPORT,
+    UserRole.CUSTOMER,
+    UserRole.VENDOR,
+    UserRole.RIDER,
+  )
+  @ApiOperation({ summary: 'Get my own disputes' })
+  findMine(@Query() query: FilterDisputesDto, @Request() req) {
+    return this.disputesService.findAll({
+      ...query,
+      userId: req.user.id,
+      role: req.user.role,
+    });
+  }
+
+  // ✅ CUSTOMER/VENDOR/RIDER: Check if a dispute exists for a specific entity
+  @Get('check')
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN_MANAGER,
+    UserRole.ADMIN_SUPPORT,
+    UserRole.CUSTOMER,
+    UserRole.VENDOR,
+    UserRole.RIDER,
+  )
+  @ApiOperation({ summary: 'Check if dispute exists for order/ride/delivery' })
+  checkDispute(
+    @Query('orderId') orderId?: string,
+    @Query('rideId') rideId?: string,
+    @Query('deliveryId') deliveryId?: string,
+    @Request() req?: any,
+  ) {
+    return this.disputesService.findExistingDispute(
+      req.user.id,
+      orderId,
+      rideId,
+      deliveryId,
+    );
+  }
+
   // 🔒 ADMIN ONLY: Support Agents + Managers + Super Admin
   @Get()
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN_MANAGER, UserRole.ADMIN_SUPPORT)
