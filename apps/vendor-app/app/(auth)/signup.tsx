@@ -16,13 +16,7 @@ import {
 } from "@/types/signup";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
-import {
-  Platform,
-  Pressable,
-  StyleSheet,
-  View,
-  ActivityIndicator,
-} from "react-native";
+import { Pressable, StyleSheet, View, ActivityIndicator } from "react-native";
 import Toast from "react-native-toast-message";
 
 export default function Signup() {
@@ -50,8 +44,7 @@ export default function Signup() {
   const border = useThemeColor({}, "borderDefault");
   const brandPrimary = useThemeColor({}, "brandPrimary");
   const textOnPrimary = useThemeColor({}, "textOnPrimary");
-  const shadowColor = useThemeColor({}, "surfaceSubtle");
-  const buttonText = useThemeColor({}, "textPrimary");
+  const textSecondary = useThemeColor({}, "textSecondary");
 
   // Change handlers
   const handleChangeStep1 = <K extends keyof SignupStep1Data>(
@@ -261,17 +254,21 @@ export default function Signup() {
           {
             backgroundColor: surfaceCard,
             borderTopColor: border,
-            borderTopWidth: Platform.OS === "ios" ? 0 : 1,
-            shadowColor: shadowColor,
+            borderTopWidth: 1,
           },
         ]}
       >
         <Pressable
-          style={[styles.button, step === 1 && { opacity: 0.5 }]}
+          style={[
+            styles.button,
+            styles.backButton,
+            { borderColor: border },
+            step === 1 && { opacity: 0.4 },
+          ]}
           onPress={() => step > 1 && setStep(step - 1)}
           disabled={step === 1 || submitting}
         >
-          <ThemedText type="defaultSemiBold" style={{ color: buttonText }}>
+          <ThemedText type="defaultSemiBold" style={{ color: textSecondary }}>
             Back
           </ThemedText>
         </Pressable>
@@ -281,14 +278,18 @@ export default function Signup() {
             styles.button,
             styles.nextButton,
             { backgroundColor: brandPrimary },
-            submitting && { opacity: 0.5 },
+            submitting && { opacity: 0.6 },
           ]}
           onPress={handleNext}
           disabled={submitting}
         >
-          <ThemedText type="defaultSemiBold" style={{ color: textOnPrimary }}>
-            {submitting ? "Creating account..." : step < 4 ? "Next" : "Submit"}
-          </ThemedText>
+          {submitting ? (
+            <ActivityIndicator size="small" color={textOnPrimary} />
+          ) : (
+            <ThemedText type="defaultSemiBold" style={{ color: textOnPrimary }}>
+              {step < 4 ? "Continue" : "Submit"}
+            </ThemedText>
+          )}
         </Pressable>
       </View>
 
@@ -302,21 +303,20 @@ const styles = StyleSheet.create({
   navBar: {
     flexDirection: "row",
     gap: 12,
-    padding: 16,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    // shadowColor is set dynamically from theme
-    shadowOpacity: 0.05,
-    shadowRadius: 5,
-    shadowOffset: { width: 0, height: -2 },
-    elevation: 5,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderTopWidth: 1,
   },
   button: {
-    paddingVertical: 14,
-    paddingHorizontal: 24,
+    paddingVertical: 13,
+    paddingHorizontal: 20,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 8,
+    borderRadius: 10,
+  },
+  backButton: {
+    borderWidth: 1,
+    paddingHorizontal: 20,
   },
   nextButton: {
     flex: 1,

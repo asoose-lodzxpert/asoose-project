@@ -14,49 +14,68 @@ export const Step4Review: React.FC<Step4Props> = ({ data }) => {
   const successColor = useThemeColor({}, "statusSuccess");
   const errorColor = useThemeColor({}, "statusError");
   const textSecondary = useThemeColor({}, "textSecondary");
-  const surfaceCard = useThemeColor({}, "surfaceCard");
+  const textMuted = useThemeColor({}, "textMuted");
   const border = useThemeColor({}, "borderDefault");
-  const shadowColor = useThemeColor({}, "surfaceSubtle");
 
-  const renderDocument = (doc: string | undefined, type: string) => {
-    const uploaded = !!doc;
+  const InfoRow = ({
+    label,
+    value,
+  }: {
+    label: string;
+    value?: string | null;
+  }) => (
+    <View style={[styles.infoRow, { borderBottomColor: border }]}>
+      <ThemedText style={[styles.infoLabel, { color: textSecondary }]}>
+        {label}
+      </ThemedText>
+      <ThemedText style={styles.infoValue} numberOfLines={2}>
+        {value || "—"}
+      </ThemedText>
+    </View>
+  );
+
+  const SectionHeader = ({ title }: { title: string }) => (
+    <View style={[styles.sectionHeader, { borderBottomColor: border }]}>
+      <ThemedText style={[styles.sectionTitle, { color: textMuted }]}>
+        {title}
+      </ThemedText>
+    </View>
+  );
+
+  const DocRow = ({
+    uri,
+    name,
+    label,
+    required,
+  }: {
+    uri?: string;
+    name?: string;
+    label: string;
+    required: boolean;
+  }) => {
+    const selected = !!uri;
     return (
-      <View
-        key={type}
-        style={[
-          styles.documentCard,
-          { backgroundColor: surfaceCard, borderColor: border },
-        ]}
-      >
-        {uploaded ? (
-          <View style={styles.documentImageContainer}>
-            <Image
-              source={{ uri: doc }}
-              style={styles.documentImage}
-              resizeMode="cover"
-            />
-            <View
-              style={[styles.statusBadge, { backgroundColor: successColor }]}
-            >
-              <IconSymbol name="checkmark" size={14} color="#fff" />
-            </View>
-          </View>
+      <View style={[styles.docRow, { borderBottomColor: border }]}>
+        {selected ? (
+          <Image source={{ uri }} style={styles.docThumb} />
         ) : (
-          <View style={[styles.documentPlaceholder, { borderColor: border }]}>
-            <IconSymbol name="doc.fill" size={40} color={textSecondary} />
+          <View style={[styles.docThumbEmpty, { borderColor: border }]}>
+            <IconSymbol name="doc.fill" size={16} color={textMuted} />
           </View>
         )}
-        <View style={styles.documentInfo}>
-          <ThemedText type="defaultSemiBold" style={styles.documentTitle}>
-            {type}
-          </ThemedText>
-          <ThemedText
-            type="caption"
-            style={{ color: uploaded ? successColor : errorColor }}
-          >
-            {uploaded ? "✓ Uploaded" : "Not uploaded"}
-          </ThemedText>
+        <View style={{ flex: 1 }}>
+          <ThemedText style={styles.docLabel}>{label}</ThemedText>
+          {!required && (
+            <ThemedText style={[styles.docSub, { color: textMuted }]}>
+              Optional
+            </ThemedText>
+          )}
         </View>
+        <IconSymbol
+          name={selected ? "checkmark.circle.fill" : "xmark.circle"}
+          size={18}
+          color={selected ? successColor : errorColor}
+        />
       </View>
     );
   };
@@ -66,172 +85,193 @@ export const Step4Review: React.FC<Step4Props> = ({ data }) => {
       contentContainerStyle={styles.container}
       showsVerticalScrollIndicator={false}
     >
-      <ThemedText type="title">Review Your Information</ThemedText>
-      <ThemedText type="subtitle">Make sure everything is correct.</ThemedText>
+      <ThemedText type="title">Review</ThemedText>
+      <ThemedText style={[styles.subtitle, { color: textMuted }]}>
+        Confirm your details before submitting.
+      </ThemedText>
 
       {/* Business Information */}
-      <View
-        style={[styles.card, { backgroundColor: surfaceCard, shadowColor }]}
-      >
-        <ThemedText type="subtitle">Business Information</ThemedText>
+      <SectionHeader title="BUSINESS INFO" />
+      <InfoRow label="Business Name" value={step1.businessName} />
+      <InfoRow label="Email" value={step1.businessEmail} />
+      <InfoRow
+        label="Phone"
+        value={
+          step1.countryCode && step1.phoneNumber
+            ? `${step1.countryCode} ${step1.phoneNumber}`
+            : step1.phoneNumber
+        }
+      />
+      <InfoRow label="Business Type" value={step1.businessType} />
+      <InfoRow label="Employees" value={step1.employees} />
 
-        <View style={styles.infoRow}>
-          <ThemedText>Business Name</ThemedText>
-          <ThemedText type="value">{step1.businessName}</ThemedText>
-        </View>
-
-        <View style={styles.infoRow}>
-          <ThemedText>Business Email</ThemedText>
-          <ThemedText type="value">{step1.businessEmail}</ThemedText>
-        </View>
-
-        <View style={styles.infoRow}>
-          <ThemedText>Phone</ThemedText>
-          <ThemedText type="value">
-            {step1.countryCode} {step1.phoneNumber}
-          </ThemedText>
-        </View>
-
-        <View style={styles.infoRow}>
-          <ThemedText>Business Type</ThemedText>
-          <ThemedText type="value">{step1.businessType}</ThemedText>
-        </View>
-
-        <View style={styles.infoRow}>
-          <ThemedText>Employees</ThemedText>
-          <ThemedText type="value">{step1.employees}</ThemedText>
-        </View>
-      </View>
-
-      {/* Verification Documents */}
-      <View
-        style={[styles.card, { backgroundColor: surfaceCard, shadowColor }]}
-      >
-        <ThemedText type="subtitle">Verification Documents</ThemedText>
-        <View style={styles.documentsGrid}>
-          {renderDocument(step2.businessRegCertUri, "Business Registration")}
-          {renderDocument(step2.taxIdDocUri, "Tax ID")}
-          {renderDocument(step2.proofOfAddressUri, "Proof of Address")}
-        </View>
-      </View>
+      {/* Documents */}
+      <SectionHeader title="DOCUMENTS" />
+      <DocRow
+        uri={step2.businessRegCertUri}
+        name={step2.businessRegCertName}
+        label="Business Registration"
+        required
+      />
+      <DocRow
+        uri={step2.taxIdDocUri}
+        name={step2.taxIdDocName}
+        label="Tax ID Document"
+        required
+      />
+      <DocRow
+        uri={step2.proofOfAddressUri}
+        name={step2.proofOfAddressName}
+        label="Proof of Address"
+        required={false}
+      />
 
       {/* Store Setup */}
-      <View
-        style={[styles.card, { backgroundColor: surfaceCard, shadowColor }]}
-      >
-        <ThemedText type="subtitle">Store Setup</ThemedText>
+      <SectionHeader title="STORE SETUP" />
+      <InfoRow label="Store Name" value={step3.storeName} />
+      <InfoRow label="Description" value={step3.storeDescription} />
+      <InfoRow
+        label="Location"
+        value={
+          step3.location
+            ? `${step3.location.lat.toFixed(5)}, ${step3.location.lng.toFixed(5)}`
+            : undefined
+        }
+      />
 
-        <View style={styles.infoRow}>
-          <ThemedText>Store Name</ThemedText>
-          <ThemedText type="value">{step3.storeName}</ThemedText>
+      {/* Store images */}
+      {(step3.storeLogoUri || step3.storeBannerUri) && (
+        <View style={styles.imagesRow}>
+          {step3.storeLogoUri && (
+            <View style={styles.imageBlock}>
+              <Image source={{ uri: step3.storeLogoUri }} style={styles.logo} />
+              <ThemedText style={[styles.imageLabel, { color: textMuted }]}>
+                Logo
+              </ThemedText>
+            </View>
+          )}
+          {step3.storeBannerUri && (
+            <View style={[styles.imageBlock, { flex: 1 }]}>
+              <Image
+                source={{ uri: step3.storeBannerUri }}
+                style={styles.banner}
+              />
+              <ThemedText style={[styles.imageLabel, { color: textMuted }]}>
+                Banner
+              </ThemedText>
+            </View>
+          )}
         </View>
+      )}
 
-        <View style={styles.infoRow}>
-          <ThemedText>Store Description</ThemedText>
-          <ThemedText type="value">{step3.storeDescription}</ThemedText>
-        </View>
-
-        <ThemedText style={{ marginTop: 8 }}>Store Logo</ThemedText>
-        {step3.storeLogoUri ? (
-          <Image source={{ uri: step3.storeLogoUri }} style={styles.logo} />
-        ) : (
-          <IconSymbol size={40} name="camera.fill" color={textSecondary} />
-        )}
-
-        <ThemedText style={{ marginTop: 8 }}>Store Banner</ThemedText>
-        {step3.storeBannerUri ? (
-          <Image source={{ uri: step3.storeBannerUri }} style={styles.banner} />
-        ) : (
-          <IconSymbol size={40} name="camera.fill" color={textSecondary} />
-        )}
-
-        <View style={{ marginTop: 8 }}>
-          <ThemedText>Location</ThemedText>
-          <ThemedText type="value">
-            {step3.location
-              ? `${step3.location.lat}, ${step3.location.lng}`
-              : "Not selected"}
-          </ThemedText>
-        </View>
-
-        <View style={{ marginTop: 8 }}>
-          <ThemedText>Open Hours</ThemedText>
-          {step3.openHours &&
-            Object.entries(step3.openHours).map(([day, h]) => (
-              <ThemedText key={day}>
-                {day.charAt(0).toUpperCase() + day.slice(1)}:{" "}
+      {/* Open Hours */}
+      {step3.openHours && Object.keys(step3.openHours).length > 0 && (
+        <>
+          <SectionHeader title="OPEN HOURS" />
+          {Object.entries(step3.openHours).map(([day, h]) => (
+            <View
+              key={day}
+              style={[styles.infoRow, { borderBottomColor: border }]}
+            >
+              <ThemedText style={[styles.infoLabel, { color: textSecondary }]}>
+                {day.charAt(0).toUpperCase() + day.slice(1)}
+              </ThemedText>
+              <ThemedText style={styles.infoValue}>
                 {h.closed
                   ? "Closed"
                   : h.is24Hours
                     ? "24 Hours"
-                    : `${h.open} - ${h.close}`}
+                    : `${h.open || "?"} – ${h.close || "?"}`}
               </ThemedText>
-            ))}
-        </View>
-      </View>
+            </View>
+          ))}
+        </>
+      )}
+
+      <View style={{ height: 8 }} />
     </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flexGrow: 1, gap: 24 },
-  card: {
-    borderRadius: 12,
-    padding: 16,
-    shadowOpacity: 0.02,
-    shadowRadius: 5,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
-    gap: 12,
+  container: { flexGrow: 1, paddingBottom: 32 },
+  subtitle: { fontSize: 14, marginTop: 4, marginBottom: 16 },
+  sectionHeader: {
+    borderBottomWidth: 1,
+    paddingVertical: 8,
+    marginTop: 8,
+    marginBottom: 2,
+  },
+  sectionTitle: {
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 0.8,
   },
   infoRow: {
-    marginBottom: 8,
-  },
-  documentsGrid: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    paddingVertical: 11,
+    borderBottomWidth: StyleSheet.hairlineWidth,
     gap: 12,
   },
-  documentCard: {
-    borderRadius: 12,
-    padding: 12,
+  infoLabel: {
+    fontSize: 13,
+    flexShrink: 0,
+    width: 110,
+  },
+  infoValue: {
+    fontSize: 13,
+    fontWeight: "500",
+    flex: 1,
+    textAlign: "right",
+  },
+  docRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  docThumb: {
+    width: 36,
+    height: 36,
+    borderRadius: 6,
+    flexShrink: 0,
+  },
+  docThumbEmpty: {
+    width: 36,
+    height: 36,
+    borderRadius: 6,
     borderWidth: 1,
-    gap: 12,
-  },
-  documentImageContainer: {
-    width: "100%",
-    height: 160,
-    borderRadius: 8,
-    overflow: "hidden",
-    position: "relative",
-  },
-  documentImage: {
-    width: "100%",
-    height: "100%",
-  },
-  documentPlaceholder: {
-    width: "100%",
-    height: 160,
-    borderRadius: 8,
-    borderWidth: 2,
     borderStyle: "dashed",
-    justifyContent: "center",
     alignItems: "center",
-  },
-  statusBadge: {
-    position: "absolute",
-    top: 8,
-    right: 8,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
     justifyContent: "center",
-    alignItems: "center",
+    flexShrink: 0,
   },
-  documentInfo: {
+  docLabel: { fontSize: 13, fontWeight: "500" },
+  docSub: { fontSize: 11, marginTop: 1 },
+  imagesRow: {
+    flexDirection: "row",
+    gap: 12,
+    paddingVertical: 12,
+    alignItems: "flex-start",
+  },
+  imageBlock: {
     gap: 4,
+    alignItems: "center",
   },
-  documentTitle: {
-    fontSize: 15,
+  imageLabel: {
+    fontSize: 11,
   },
-  logo: { width: 80, height: 80, borderRadius: 40, marginTop: 4 },
-  banner: { width: "100%", height: 150, borderRadius: 12, marginTop: 4 },
+  logo: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+  },
+  banner: {
+    width: "100%",
+    height: 80,
+    borderRadius: 8,
+  },
 });

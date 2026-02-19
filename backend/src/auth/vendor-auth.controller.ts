@@ -47,8 +47,23 @@ export class VendorAuthController {
     return this.vendorAuthService.registerVendor(dto);
   }
 
+  // ---------- Signup Email Verification OTP ----------
+
+  @Post('send-signup-otp')
+  @Throttle({ default: { limit: 5, ttl: 60 * 60 * 1000 } }) // 5 requests per hour
+  sendSignupOtp(@Body() body: { email: string }) {
+    return this.vendorAuthService.sendSignupOtp(body.email);
+  }
+
+  @Post('verify-signup-otp')
+  async verifySignupOtp(@Body() body: { email: string; otp: string }) {
+    return await this.vendorAuthService.verifySignupOtp(body.email, body.otp);
+  }
+
+  // ---------- Password Reset OTP ----------
+
   @Post('send-otp')
-  @Throttle({ default: { limit: 3, ttl: 60 * 60 * 1000 } }) // 3 requests per hour
+  @Throttle({ default: { limit: 5, ttl: 60 * 60 * 1000 } }) // 5 requests per hour
   sendOtp(@Body() body: { email: string }) {
     return this.vendorAuthService.sendOtpForPasswordReset(body.email);
   }
@@ -61,7 +76,6 @@ export class VendorAuthController {
   @Post('reset-password')
   @Throttle({ default: { limit: 5, ttl: 60 * 60 * 1000 } }) // 5 requests per hour
   resetPassword(@Body() dto: ResetPasswordDto & { otp: string }) {
-    // Only resets password if OTP is valid (frontend should verify first)
     return this.vendorAuthService.resetVendorPassword(dto);
   }
 

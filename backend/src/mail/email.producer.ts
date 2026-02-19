@@ -152,6 +152,19 @@ export class EmailProducer {
     );
   }
 
+  async sendVendorSignupOtp(email: string, name: string, otp: string) {
+    await this.emailQueue.add(
+      'vendor-signup-otp',
+      {
+        email,
+        name,
+        otp,
+        year: new Date().getFullYear(),
+      },
+      { attempts: 3, removeOnComplete: true },
+    );
+  }
+
   async sendVendorBankAccountAdded(
     email: string,
     vendorName: string,

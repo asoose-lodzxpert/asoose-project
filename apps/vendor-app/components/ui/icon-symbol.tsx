@@ -63,6 +63,13 @@ export type IconSymbolName =
   | "arrow.right"
   | "arrow.left"
   | "arrow.up"
+  | "arrow.clockwise"
+  | "building.2"
+  | "envelope"
+  | "phone"
+  | "tag"
+  | "number"
+  | "shop"
   | "settings"
   | "bell"
   | "list"
@@ -129,6 +136,13 @@ const MAPPING: Record<IconSymbolName, keyof typeof MaterialIcons.glyphMap> = {
   "arrow.right": "arrow-right",
   "arrow.left": "arrow-left",
   "arrow.up": "arrow-upward",
+  "arrow.clockwise": "refresh",
+  "building.2": "business",
+  envelope: "mail",
+  phone: "phone",
+  tag: "local-offer",
+  number: "tag",
+  shop: "storefront",
 
   // Common UI
   "info.circle": "info",

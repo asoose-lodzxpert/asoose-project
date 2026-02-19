@@ -32,6 +32,7 @@ export default function TabLayout() {
         tabBarInactiveTintColor: Colors[colorScheme].tabIconDefault,
         tabBarStyle: {
           backgroundColor: Colors[colorScheme].surfaceBackground,
+          borderTopColor: Colors[colorScheme].borderDefault,
         },
       }}
     >

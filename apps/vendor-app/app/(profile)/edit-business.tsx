@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+﻿import React, { useState, useEffect } from "react";
 import {
   View,
   StyleSheet,
@@ -6,570 +6,350 @@ import {
   ScrollView,
   Modal,
   Image,
+  Dimensions,
+  ActivityIndicator,
 } from "react-native";
-import { getBusinessDetails } from "@/services/business-details.service";
-import Toast from "react-native-toast-message";
 import { useRouter } from "expo-router";
+import Toast from "react-native-toast-message";
+
 import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
-import { IconSymbol } from "@/components/ui/icon-symbol";
+import { IconSymbol, IconSymbolName } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
+import { getBusinessDetails } from "@/services/business-details.service";
 import type { OpenHours } from "@/types/signup";
 
-/**
- * Edit Business Details Screen
- */
+const { width } = Dimensions.get("window");
+
 export default function EditBusinessDetailsScreen() {
   const router = useRouter();
-
-  const background = useThemeColor({}, "surfaceBackground");
-  const brandPrimary = useThemeColor({}, "brandPrimary");
-  const surfaceCard = useThemeColor({}, "surfaceCard");
-  const textDisabled = useThemeColor({}, "textDisabled");
-  const borderColor = useThemeColor({}, "borderDefault");
-
+  const [activeTab, setActiveTab] = useState<"info" | "docs" | "store">("info");
   const [businessData, setBusinessData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
+  const brandPrimary = useThemeColor({}, "brandPrimary");
+  const surface = useThemeColor({}, "surfaceBackground");
+  const textMuted = useThemeColor({}, "textMuted");
+  const border = useThemeColor({}, "borderDefault");
+  const surfaceSubtle = useThemeColor({}, "surfaceSubtle");
+
   useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const data = await getBusinessDetails();
-        if (mounted) setBusinessData(data);
-      } catch (err) {
-        Toast.show({ type: "error", text1: "Failed to load business details" });
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    })();
-    return () => {
-      mounted = false;
-    };
+    loadData();
   }, []);
 
-  // ---------------- UI ----------------
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      const data = await getBusinessDetails();
+      if (__DEV__) console.log("Fetched business details:", data);
+      setBusinessData(data);
+    } catch (err) {
+      Toast.show({ type: "error", text1: "Failed to load data" });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   if (loading) {
     return (
-      <ThemedView style={{ flex: 1 }}>
-        {/* Header Skeleton */}
-        <View style={styles.header}>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-            <View
-              style={{
-                width: 24,
-                height: 24,
-                borderRadius: 12,
-                backgroundColor: borderColor,
-                opacity: 0.3,
-              }}
-            />
-            <View
-              style={{
-                width: 60,
-                height: 20,
-                borderRadius: 4,
-                backgroundColor: borderColor,
-                opacity: 0.3,
-              }}
-            />
-          </View>
-          <View
-            style={{
-              width: 140,
-              height: 24,
-              borderRadius: 4,
-              backgroundColor: borderColor,
-              opacity: 0.3,
-            }}
-          />
-          <View style={{ width: 40 }} />
-        </View>
-
-        <ScrollView
-          contentContainerStyle={[
-            styles.container,
-            { backgroundColor: background },
-          ]}
-        >
-          {/* Business Information Skeleton */}
-          <View style={[styles.card, { backgroundColor: surfaceCard }]}>
-            <View style={styles.cardHeader}>
-              <View
-                style={{
-                  width: 150,
-                  height: 20,
-                  borderRadius: 4,
-                  backgroundColor: borderColor,
-                  opacity: 0.3,
-                }}
-              />
-              <View
-                style={{
-                  width: 60,
-                  height: 20,
-                  borderRadius: 4,
-                  backgroundColor: borderColor,
-                  opacity: 0.3,
-                }}
-              />
-            </View>
-            <View style={{ gap: 12 }}>
-              {[1, 2, 3, 4, 5].map((i) => (
-                <View key={i} style={{ gap: 4 }}>
-                  <View
-                    style={{
-                      width: 100,
-                      height: 14,
-                      borderRadius: 4,
-                      backgroundColor: borderColor,
-                      opacity: 0.3,
-                    }}
-                  />
-                  <View
-                    style={{
-                      width: "70%",
-                      height: 18,
-                      borderRadius: 4,
-                      backgroundColor: borderColor,
-                      opacity: 0.3,
-                    }}
-                  />
-                </View>
-              ))}
-            </View>
-          </View>
-
-          {/* Business Documents Skeleton */}
-          <View style={[styles.card, { backgroundColor: surfaceCard }]}>
-            <View style={styles.cardHeader}>
-              <View
-                style={{
-                  width: 160,
-                  height: 20,
-                  borderRadius: 4,
-                  backgroundColor: borderColor,
-                  opacity: 0.3,
-                }}
-              />
-            </View>
-            <View style={{ gap: 12 }}>
-              {[1, 2, 3].map((i) => (
-                <View
-                  key={i}
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                  }}
-                >
-                  <View style={{ flex: 1, gap: 4 }}>
-                    <View
-                      style={{
-                        width: 140,
-                        height: 14,
-                        borderRadius: 4,
-                        backgroundColor: borderColor,
-                        opacity: 0.3,
-                      }}
-                    />
-                    <View
-                      style={{
-                        width: 80,
-                        height: 14,
-                        borderRadius: 4,
-                        backgroundColor: borderColor,
-                        opacity: 0.3,
-                      }}
-                    />
-                  </View>
-                  <View
-                    style={{
-                      width: 60,
-                      height: 30,
-                      borderRadius: 6,
-                      backgroundColor: borderColor,
-                      opacity: 0.3,
-                    }}
-                  />
-                </View>
-              ))}
-            </View>
-          </View>
-
-          {/* Store Details Skeleton */}
-          <View style={[styles.card, { backgroundColor: surfaceCard }]}>
-            <View style={styles.cardHeader}>
-              <View
-                style={{
-                  width: 120,
-                  height: 20,
-                  borderRadius: 4,
-                  backgroundColor: borderColor,
-                  opacity: 0.3,
-                }}
-              />
-              <View
-                style={{
-                  width: 60,
-                  height: 20,
-                  borderRadius: 4,
-                  backgroundColor: borderColor,
-                  opacity: 0.3,
-                }}
-              />
-            </View>
-            <View style={{ gap: 12 }}>
-              {[1, 2, 3].map((i) => (
-                <View key={i} style={{ gap: 4 }}>
-                  <View
-                    style={{
-                      width: 100,
-                      height: 14,
-                      borderRadius: 4,
-                      backgroundColor: borderColor,
-                      opacity: 0.3,
-                    }}
-                  />
-                  <View
-                    style={{
-                      width: "80%",
-                      height: 18,
-                      borderRadius: 4,
-                      backgroundColor: borderColor,
-                      opacity: 0.3,
-                    }}
-                  />
-                </View>
-              ))}
-            </View>
-          </View>
-
-          {/* Bank Account Skeleton */}
-          <View style={[styles.card, { backgroundColor: surfaceCard }]}>
-            <View style={styles.cardHeader}>
-              <View
-                style={{
-                  width: 110,
-                  height: 20,
-                  borderRadius: 4,
-                  backgroundColor: borderColor,
-                  opacity: 0.3,
-                }}
-              />
-              <View
-                style={{
-                  width: 60,
-                  height: 20,
-                  borderRadius: 4,
-                  backgroundColor: borderColor,
-                  opacity: 0.3,
-                }}
-              />
-            </View>
-            <View style={{ gap: 12 }}>
-              {[1, 2, 3].map((i) => (
-                <View key={i} style={{ gap: 4 }}>
-                  <View
-                    style={{
-                      width: 100,
-                      height: 14,
-                      borderRadius: 4,
-                      backgroundColor: borderColor,
-                      opacity: 0.3,
-                    }}
-                  />
-                  <View
-                    style={{
-                      width: "70%",
-                      height: 18,
-                      borderRadius: 4,
-                      backgroundColor: borderColor,
-                      opacity: 0.3,
-                    }}
-                  />
-                </View>
-              ))}
-            </View>
-          </View>
-        </ScrollView>
+      <ThemedView style={styles.loaderContainer}>
+        <ActivityIndicator size="large" color={brandPrimary} />
+        <ThemedText style={{ marginTop: 12, opacity: 0.6 }}>
+          Synchronizing Details...
+        </ThemedText>
       </ThemedView>
     );
   }
 
   return (
-    <ThemedView style={{ flex: 1 }}>
-      {/* ===== Header ===== */}
+    <ThemedView style={[styles.container, { backgroundColor: surface }]}>
+      {/* --- Modern Header --- */}
       <View style={styles.header}>
         <Pressable
           onPress={() => router.back()}
-          style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
+          style={[styles.backCircle, { backgroundColor: surfaceSubtle }]}
         >
-          <IconSymbol name="chevron.left" size={24} color={brandPrimary} />
-          <ThemedText type="defaultSemiBold" style={{ color: brandPrimary }}>
-            Back
-          </ThemedText>
+          <IconSymbol name="chevron.left" size={22} color={brandPrimary} />
         </Pressable>
+        <View style={styles.headerTitleContainer}>
+          <ThemedText style={[styles.headerSubtitle, { color: textMuted }]}>
+            Manage
+          </ThemedText>
+          <ThemedText type="subtitle" style={styles.headerTitle}>
+            Business Profile
+          </ThemedText>
+        </View>
+        <Pressable onPress={loadData} style={styles.refreshBtn}>
+          <IconSymbol name="arrow.clockwise" size={20} color={textMuted} />
+        </Pressable>
+      </View>
 
-        <ThemedText type="subtitle">Business Details</ThemedText>
-
-        <View style={{ width: 40 }} />
+      {/* --- Segmented Control --- */}
+      <View style={[styles.tabBar, { borderBottomColor: border }]}>
+        <TabItem
+          label="Profile"
+          active={activeTab === "info"}
+          onPress={() => setActiveTab("info")}
+        />
+        <TabItem
+          label="Documents"
+          active={activeTab === "docs"}
+          onPress={() => setActiveTab("docs")}
+        />
+        <TabItem
+          label="Store"
+          active={activeTab === "store"}
+          onPress={() => setActiveTab("store")}
+        />
       </View>
 
       <ScrollView
-        contentContainerStyle={[
-          styles.container,
-          { backgroundColor: background },
-        ]}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
       >
-        {/* ===== Business Info ===== */}
-        <InfoCard
-          title="Business Information"
-          onEdit={() => router.push("/(profile)/edit-business/step1")}
-        >
-          <InfoRow
-            label="Business Name"
-            value={businessData?.step1?.businessName}
-          />
-          <InfoRow label="Email" value={businessData?.step1?.businessEmail} />
-          <InfoRow label="Phone" value={businessData?.step1?.phoneNumber} />
-          <InfoRow label="Type" value={businessData?.step1?.businessType} />
-          <InfoRow label="Employees" value={businessData?.step1?.employees} />
-        </InfoCard>
+        {activeTab === "info" && (
+          <View style={styles.tabContent}>
+            <SectionHeader
+              title="Core Identity"
+              onEdit={() => router.push("/(profile)/edit-business/step1")}
+            />
+            <DetailTile
+              label="Legal Name"
+              value={businessData?.step1?.businessName}
+              icon="building.2"
+            />
+            <DetailTile
+              label="Email Address"
+              value={businessData?.step1?.businessEmail}
+              icon="envelope"
+            />
+            <DetailTile
+              label="Phone Line"
+              value={businessData?.step1?.phoneNumber}
+              icon="phone"
+            />
+            <DetailTile
+              label="Industry"
+              value={businessData?.step1?.businessType}
+              icon="tag"
+            />
 
-        {/* ===== Documents ===== */}
-        <View style={[styles.card, { backgroundColor: surfaceCard }]}>
-          <View style={styles.cardHeader}>
-            <ThemedText type="defaultSemiBold">Business Documents</ThemedText>
+            <SectionHeader
+              title="Financial Hub"
+              onEdit={() => router.push("/(profile)/edit-business/step4")}
+            />
+            <DetailTile
+              label="Settlement Bank"
+              value={businessData?.step4?.bankName}
+              icon="banknote"
+            />
+            <DetailTile
+              label="Account No."
+              value={businessData?.step4?.accountNumber}
+              icon="number"
+            />
           </View>
+        )}
 
-          <View style={{ gap: 12 }}>
-            <DocumentRow
-              label="Business Reg. Certificate"
-              documentUrl={businessData?.step2?.businessRegCert}
+        {activeTab === "docs" && (
+          <View style={styles.tabContent}>
+            <SectionHeader title="Compliance Vault" />
+            <DocTile
+              title="Registration Cert"
+              url={businessData?.step2?.businessRegCert}
               onView={setSelectedImage}
             />
-            <DocumentRow
-              label="Tax ID"
-              documentUrl={businessData?.step2?.taxIdDoc}
+            <DocTile
+              title="Tax Identification"
+              url={businessData?.step2?.taxIdDoc}
               onView={setSelectedImage}
             />
-            <DocumentRow
-              label="Proof of Address"
-              documentUrl={businessData?.step2?.proofOfAddress}
+            <DocTile
+              title="Utility Proof"
+              url={businessData?.step2?.proofOfAddress}
               onView={setSelectedImage}
             />
           </View>
-        </View>
+        )}
 
-        {/* ===== Store Details ===== */}
-        <InfoCard
-          title="Store Details"
-          onEdit={() => router.push("/(profile)/edit-business/step3")}
-        >
-          <InfoRow label="Store Name" value={businessData?.step3?.storeName} />
-          <InfoRow
-            label="Description"
-            value={businessData?.step3?.storeDescription}
-          />
-          <OpenHoursDisplay openHours={businessData?.step3?.openHours} />
-        </InfoCard>
+        {activeTab === "store" && (
+          <View style={styles.tabContent}>
+            <SectionHeader
+              title="Public Appearance"
+              onEdit={() => router.push("/(profile)/edit-business/step3")}
+            />
+            <DetailTile
+              label="Display Name"
+              value={businessData?.step3?.storeName}
+              icon="shop"
+            />
+            <DescriptionBox value={businessData?.step3?.storeDescription} />
 
-        {/* ===== Bank Account ===== */}
-        <InfoCard
-          title="Bank Account"
-          onEdit={() => router.push("/(profile)/edit-business/step4")}
-        >
-          {businessData?.step4?.bankName ? (
-            <>
-              <InfoRow
-                label="Bank Name"
-                value={businessData?.step4?.bankName}
-              />
-              <InfoRow
-                label="Account Number"
-                value={businessData?.step4?.accountNumber}
-              />
-              <InfoRow
-                label="Account Name"
-                value={businessData?.step4?.accountName}
-              />
-            </>
-          ) : (
-            <View style={styles.row}>
-              <ThemedText
-                style={{
-                  color: textDisabled,
-                  fontSize: 13,
-                }}
-              >
-                No bank account added yet
-              </ThemedText>
-            </View>
-          )}
-        </InfoCard>
+            <SectionHeader title="Operation Window" />
+            <OpenHoursList hours={businessData?.step3?.openHours} />
+          </View>
+        )}
       </ScrollView>
 
-      {/* Image Viewer Modal */}
-      <Modal
-        visible={!!selectedImage}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setSelectedImage(null)}
-      >
+      {/* --- Image Preview Modal --- */}
+      <Modal visible={!!selectedImage} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <Pressable
-            style={styles.modalClose}
+            style={styles.closeBtn}
             onPress={() => setSelectedImage(null)}
           >
-            <IconSymbol name="xmark" size={24} color="#fff" />
+            <IconSymbol name="xmark" size={22} color="#fff" />
           </Pressable>
-          {selectedImage && (
-            <Image
-              source={{ uri: selectedImage }}
-              style={styles.fullImage}
-              resizeMode="contain"
-            />
-          )}
+          <Image
+            source={{ uri: selectedImage! }}
+            style={styles.previewImage}
+            resizeMode="contain"
+          />
         </View>
       </Modal>
     </ThemedView>
   );
 }
 
-/* ============================================================
-   Card Component
-   ============================================================ */
+/* --- Sub-Components --- */
 
-interface InfoCardProps {
-  title: string;
-  children: React.ReactNode;
-  onEdit: () => void;
-}
-
-function InfoCard({ title, children, onEdit }: InfoCardProps) {
-  const cardBg = useThemeColor({}, "surfaceCard");
+const TabItem = ({ label, active, onPress }: any) => {
   const brandPrimary = useThemeColor({}, "brandPrimary");
-
+  const textMuted = useThemeColor({}, "textMuted");
   return (
-    <View style={[styles.card, { backgroundColor: cardBg }]}>
-      <View style={styles.cardHeader}>
-        <ThemedText type="defaultSemiBold">{title}</ThemedText>
-
-        <Pressable onPress={onEdit} style={styles.editButton}>
-          <IconSymbol name="pencil" size={14} color={brandPrimary} />
-          <ThemedText style={{ fontSize: 13 }} type="link">
-            Edit
-          </ThemedText>
-        </Pressable>
-      </View>
-
-      <View style={{ gap: 12 }}>{children}</View>
-    </View>
+    <Pressable
+      onPress={onPress}
+      style={[styles.tab, active && { borderBottomColor: brandPrimary }]}
+    >
+      <ThemedText
+        style={[
+          styles.tabLabel,
+          { color: textMuted },
+          active && { color: brandPrimary, fontWeight: "700" },
+        ]}
+      >
+        {label}
+      </ThemedText>
+    </Pressable>
   );
-}
+};
 
-/* ============================================================
-   Info Row
-   ============================================================ */
-
-function InfoRow({ label, value }: { label: string; value?: any }) {
-  const muted = useThemeColor({}, "textDisabled");
-
-  let displayValue = "—";
-  if (value !== undefined && value !== null) {
-    if (typeof value === "string") {
-      displayValue = value;
-    } else if (typeof value === "number") {
-      displayValue = String(value);
-    } else if (typeof value === "object") {
-      displayValue = "View details";
-    }
-  }
-
-  return (
-    <View style={styles.row}>
-      <ThemedText style={{ color: muted, fontSize: 13 }}>{label}</ThemedText>
-      <ThemedText type="defaultSemiBold">{displayValue}</ThemedText>
-    </View>
-  );
-}
-
-/* ============================================================
-   Document Row
-   ============================================================ */
-
-function DocumentRow({
-  label,
-  documentUrl,
-  onView,
-}: {
-  label: string;
-  documentUrl?: string;
-  onView: (url: string) => void;
-}) {
-  const muted = useThemeColor({}, "textDisabled");
+const SectionHeader = ({ title, onEdit }: any) => {
   const brandPrimary = useThemeColor({}, "brandPrimary");
-  const successColor = useThemeColor({}, "statusSuccess");
-  const errorColor = useThemeColor({}, "statusError");
-
-  const isUploaded = !!documentUrl;
-
-  const handleViewDocument = () => {
-    if (documentUrl) {
-      onView(documentUrl);
-    }
-  };
-
+  const textMuted = useThemeColor({}, "textMuted");
   return (
-    <View style={styles.documentRow}>
-      <View style={{ flex: 1 }}>
-        <ThemedText style={{ color: muted, fontSize: 13, marginBottom: 4 }}>
-          {label}
-        </ThemedText>
-        <ThemedText
-          type="defaultSemiBold"
-          style={{
-            color: isUploaded ? successColor : errorColor,
-            fontSize: 12,
-          }}
+    <View style={styles.sectionHeader}>
+      <ThemedText style={[styles.sectionTitle, { color: textMuted }]}>
+        {title}
+      </ThemedText>
+      {onEdit && (
+        <Pressable
+          onPress={onEdit}
+          style={[styles.editBadge, { backgroundColor: brandPrimary + "1A" }]}
         >
-          {isUploaded ? "✓ Uploaded" : "✗ Not uploaded"}
-        </ThemedText>
-      </View>
-      {isUploaded && (
-        <Pressable onPress={handleViewDocument} style={styles.viewButton}>
-          <ThemedText style={{ color: brandPrimary, fontSize: 13 }}>
-            View
+          <IconSymbol name="pencil" size={12} color={brandPrimary} />
+          <ThemedText
+            style={{ color: brandPrimary, fontSize: 12, fontWeight: "600" }}
+          >
+            Modify
           </ThemedText>
-          <IconSymbol name="eye.fill" size={16} color={brandPrimary} />
         </Pressable>
       )}
     </View>
   );
-}
+};
 
-/* ============================================================
-   Open Hours Display
-   ============================================================ */
-
-function OpenHoursDisplay({ openHours }: { openHours?: OpenHours }) {
-  const muted = useThemeColor({}, "textDisabled");
-
-  if (!openHours || Object.keys(openHours).length === 0) {
-    return (
-      <View style={styles.row}>
-        <ThemedText style={{ color: muted, fontSize: 13 }}>
-          Open Hours
-        </ThemedText>
-        <ThemedText type="defaultSemiBold">Not set</ThemedText>
+const DetailTile = ({
+  label,
+  value,
+  icon,
+}: {
+  label: string;
+  value?: string;
+  icon: IconSymbolName;
+}) => {
+  const cardBg = useThemeColor({}, "surfaceCard");
+  const brandPrimary = useThemeColor({}, "brandPrimary");
+  const textMuted = useThemeColor({}, "textMuted");
+  return (
+    <View style={[styles.tile, { backgroundColor: cardBg }]}>
+      <View style={[styles.tileIcon, { backgroundColor: brandPrimary + "1A" }]}>
+        <IconSymbol name={icon} size={18} color={brandPrimary} />
       </View>
-    );
-  }
+      <View style={{ flex: 1 }}>
+        <ThemedText style={[styles.tileLabel, { color: textMuted }]}>
+          {label}
+        </ThemedText>
+        <ThemedText style={styles.tileValue}>{value || "â€”"}</ThemedText>
+      </View>
+    </View>
+  );
+};
 
-  const daysOrder = [
+const DocTile = ({
+  title,
+  url,
+  onView,
+}: {
+  title: string;
+  url?: string;
+  onView: (url: string) => void;
+}) => {
+  const isUploaded = !!url;
+  const cardBg = useThemeColor({}, "surfaceCard");
+  const success = useThemeColor({}, "statusSuccess");
+  const error = useThemeColor({}, "statusError");
+  const brandPrimary = useThemeColor({}, "brandPrimary");
+
+  return (
+    <View style={[styles.tile, { backgroundColor: cardBg }]}>
+      <View style={{ flex: 1 }}>
+        <ThemedText style={styles.tileValue}>{title}</ThemedText>
+        <ThemedText
+          style={{ fontSize: 12, color: isUploaded ? success : error }}
+        >
+          {isUploaded ? "Verified Document" : "Pending Upload"}
+        </ThemedText>
+      </View>
+      {isUploaded && (
+        <Pressable
+          onPress={() => onView(url)}
+          style={[styles.viewBtn, { backgroundColor: brandPrimary + "1A" }]}
+        >
+          <IconSymbol name="eye.fill" size={16} color={brandPrimary} />
+          <ThemedText style={{ color: brandPrimary, fontWeight: "600" }}>
+            View
+          </ThemedText>
+        </Pressable>
+      )}
+    </View>
+  );
+};
+
+const DescriptionBox = ({ value }: { value?: string }) => {
+  const surfaceSubtle = useThemeColor({}, "surfaceSubtle");
+  const border = useThemeColor({}, "borderDefault");
+  const textMuted = useThemeColor({}, "textMuted");
+  return (
+    <View
+      style={[
+        styles.descriptionBox,
+        { backgroundColor: surfaceSubtle, borderColor: border },
+      ]}
+    >
+      <ThemedText style={[styles.label, { color: textMuted }]}>
+        Store Biography
+      </ThemedText>
+      <ThemedText style={styles.descText}>
+        {value || "No description provided"}
+      </ThemedText>
+    </View>
+  );
+};
+
+const OpenHoursList = ({ hours }: { hours?: OpenHours }) => {
+  const days = [
     "monday",
     "tuesday",
     "wednesday",
@@ -577,123 +357,149 @@ function OpenHoursDisplay({ openHours }: { openHours?: OpenHours }) {
     "friday",
     "saturday",
     "sunday",
-  ] as const;
-
-  const capitalizeDay = (day: string) =>
-    day.charAt(0).toUpperCase() + day.slice(1);
+  ];
+  const cardBg = useThemeColor({}, "surfaceCard");
 
   return (
-    <View style={styles.openHoursContainer}>
-      <ThemedText style={{ color: muted, fontSize: 13, marginBottom: 8 }}>
-        Open Hours
-      </ThemedText>
-      {daysOrder.map((day) => {
-        const hours = openHours[day];
-        if (!hours) return null;
-
-        let hoursText = "";
-        if (hours.closed) {
-          hoursText = "Closed";
-        } else if (hours.is24Hours) {
-          hoursText = "24 Hours";
-        } else {
-          hoursText = `${hours.open} - ${hours.close}`;
-        }
-
+    <View style={[styles.hoursCard, { backgroundColor: cardBg }]}>
+      {days.map((day) => {
+        const config = hours?.[day as keyof OpenHours];
         return (
-          <View key={day} style={styles.dayRow}>
-            <ThemedText style={{ fontSize: 13, width: 90 }}>
-              {capitalizeDay(day)}
+          <View key={day} style={styles.hourRow}>
+            <ThemedText style={styles.dayText}>
+              {day.charAt(0).toUpperCase() + day.slice(1)}
             </ThemedText>
-            <ThemedText type="defaultSemiBold" style={{ fontSize: 13 }}>
-              {hoursText}
+            <ThemedText style={styles.timeText}>
+              {config?.closed
+                ? "Closed"
+                : config?.is24Hours
+                  ? "Open 24h"
+                  : `${config?.open} - ${config?.close}`}
             </ThemedText>
           </View>
         );
       })}
     </View>
   );
-}
+};
 
-/* ============================================================
-   Styles
-   ============================================================ */
+/* --- Styles --- */
 
 const styles = StyleSheet.create({
+  container: { flex: 1 },
+  loaderContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
   header: {
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingTop: 20,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
-  container: {
-    padding: 16,
-    gap: 16,
-  },
-  card: {
-    padding: 16,
-    borderRadius: 16,
-    shadowColor: "#000",
-    shadowOpacity: 0.06,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 3,
-  },
-  cardHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 12,
-  },
-  editButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  row: {
-    gap: 2,
-  },
-  documentRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 4,
-  },
-  viewButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 6,
-    backgroundColor: "rgba(229, 165, 3, 0.1)",
-  },
-  openHoursContainer: {
-    gap: 6,
-  },
-  dayRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 4,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.95)",
+  backCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: "center",
     alignItems: "center",
   },
-  modalClose: {
-    position: "absolute",
-    top: 50,
-    right: 20,
-    zIndex: 10,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    borderRadius: 20,
-    padding: 8,
+  headerTitleContainer: { flex: 1, marginLeft: 15 },
+  headerSubtitle: {
+    fontSize: 12,
+    fontWeight: "700",
+    textTransform: "uppercase",
   },
-  fullImage: {
-    width: "90%",
-    height: "80%",
+  headerTitle: { fontSize: 22, fontWeight: "800" },
+  refreshBtn: { padding: 8 },
+  tabBar: {
+    flexDirection: "row",
+    paddingHorizontal: 20,
+    borderBottomWidth: 1,
+  },
+  tab: {
+    paddingVertical: 12,
+    marginRight: 25,
+    borderBottomWidth: 3,
+    borderBottomColor: "transparent",
+  },
+  tabLabel: { fontSize: 15, fontWeight: "600" },
+  scrollContent: { padding: 20 },
+  tabContent: { gap: 10 },
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 15,
+    marginBottom: 10,
+  },
+  sectionTitle: {
+    fontSize: 13,
+    fontWeight: "800",
+    textTransform: "uppercase",
+    letterSpacing: 1,
+  },
+  editBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 20,
+  },
+  tile: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 16,
+    borderRadius: 20,
+    gap: 15,
+    marginBottom: 8,
+  },
+  tileIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  tileLabel: { fontSize: 12, fontWeight: "600" },
+  tileValue: { fontSize: 15, fontWeight: "700" },
+  viewBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+  },
+  descriptionBox: {
+    padding: 16,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  label: { fontSize: 12, fontWeight: "700", marginBottom: 5 },
+  descText: { fontSize: 14, lineHeight: 20, fontWeight: "500" },
+  hoursCard: { padding: 16, borderRadius: 24, gap: 10 },
+  hourRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  dayText: { fontSize: 14, fontWeight: "600" },
+  timeText: { fontSize: 13, fontWeight: "700" },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.88)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  previewImage: { width: width * 0.9, height: "70%", borderRadius: 20 },
+  closeBtn: {
+    position: "absolute",
+    top: 60,
+    right: 30,
+    zIndex: 10,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    padding: 10,
+    borderRadius: 25,
   },
 });

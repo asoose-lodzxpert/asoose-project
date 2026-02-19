@@ -46,6 +46,8 @@ export class EmailProcessor extends WorkerHost {
         return this.sendVendorPasswordChanged(job);
       case 'vendor-password-reset':
         return this.sendVendorPasswordReset(job);
+      case 'vendor-signup-otp':
+        return this.sendVendorSignupOtp(job);
       case 'vendor-bank-added':
         return this.sendVendorBankAdded(job);
       case 'vendor-withdrawal':
@@ -310,6 +312,21 @@ export class EmailProcessor extends WorkerHost {
         name: job.data.name,
         otp: job.data.otp,
         year: new Date().getFullYear(),
+      },
+    });
+  }
+
+  private async sendVendorSignupOtp(
+    job: Job<{ email: string; name: string; otp: string; year: number }>,
+  ) {
+    await this.mailer.sendMail({
+      to: job.data.email,
+      subject: '✉️ Verify Your Email - Asoose',
+      template: './vendor-email-verification',
+      context: {
+        name: job.data.name,
+        otp: job.data.otp,
+        year: job.data.year,
       },
     });
   }

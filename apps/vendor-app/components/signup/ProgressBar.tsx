@@ -4,6 +4,8 @@ import { ThemedText } from "@/components/themed-text";
 import { useRouter } from "expo-router";
 import { useThemeColor } from "@/hooks/use-theme-color";
 
+const STEP_LABELS = ["Business Info", "Documents", "Store Setup", "Review"];
+
 interface ProgressBarProps {
   step: number;
   totalSteps?: number;
@@ -15,22 +17,26 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
 }) => {
   const primary = useThemeColor({}, "brandPrimary");
   const borderDefault = useThemeColor({}, "borderDefault");
+  const textMuted = useThemeColor({}, "textMuted");
   const router = useRouter();
 
   return (
     <View style={styles.wrapper}>
-      {/* Link back to login */}
-      <Pressable
-        onPress={() => router.replace("/login")}
-        style={styles.loginLink}
-      >
-        <ThemedText type="link">Already have an account? Log in</ThemedText>
-      </Pressable>
-
-      {/* Step Fraction */}
-      <ThemedText style={styles.stepText}>
-        Step {step} of {totalSteps}
-      </ThemedText>
+      <View style={styles.topRow}>
+        <View>
+          <ThemedText type="defaultSemiBold" style={styles.stepLabel}>
+            {STEP_LABELS[step - 1] ?? `Step ${step}`}
+          </ThemedText>
+          <ThemedText style={[styles.stepCounter, { color: textMuted }]}>
+            Step {step} of {totalSteps}
+          </ThemedText>
+        </View>
+        <Pressable onPress={() => router.replace("/login")} hitSlop={8}>
+          <ThemedText type="link" style={styles.loginLink}>
+            Sign in
+          </ThemedText>
+        </Pressable>
+      </View>
 
       {/* Progress Bar */}
       <View style={styles.container}>
@@ -50,26 +56,33 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
 
 const styles = StyleSheet.create({
   wrapper: {
-    marginVertical: 16,
     paddingHorizontal: 24,
+    paddingTop: 16,
+    paddingBottom: 12,
+    gap: 10,
+  },
+  topRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-end",
+  },
+  stepLabel: {
+    fontSize: 15,
+  },
+  stepCounter: {
+    fontSize: 12,
+    marginTop: 1,
   },
   loginLink: {
-    alignSelf: "flex-end",
-    marginBottom: 8,
-  },
-  stepText: {
-    marginBottom: 8,
-    fontSize: 14,
-    fontWeight: "500",
+    fontSize: 13,
   },
   container: {
     flexDirection: "row",
-    justifyContent: "space-between",
+    gap: 4,
   },
   step: {
     flex: 1,
-    height: 6,
-    borderRadius: 3,
-    marginHorizontal: 4,
+    height: 4,
+    borderRadius: 2,
   },
 });

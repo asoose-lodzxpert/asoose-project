@@ -15,18 +15,41 @@ interface Step2Props {
 
 const MAX_SIZE = 5 * 1024 * 1024;
 
+const DOCS = [
+  {
+    key: "businessRegCertUri" as const,
+    nameKey: "businessRegCertName" as const,
+    label: "Business Registration",
+    required: true,
+  },
+  {
+    key: "taxIdDocUri" as const,
+    nameKey: "taxIdDocName" as const,
+    label: "Tax ID Document",
+    required: true,
+  },
+  {
+    key: "proofOfAddressUri" as const,
+    nameKey: "proofOfAddressName" as const,
+    label: "Proof of Address",
+    required: false,
+  },
+];
+
 export const Step2VerifyDocs: React.FC<Step2Props> = ({ data, onChange }) => {
   const primary = useThemeColor({}, "brandPrimary");
   const successColor = useThemeColor({}, "statusSuccess");
   const textMuted = useThemeColor({}, "textMuted");
   const errorColor = useThemeColor({}, "statusError");
+  const border = useThemeColor({}, "borderDefault");
+  const surfaceSubtle = useThemeColor({}, "surfaceSubtle");
+  const textSecondary = useThemeColor({}, "textSecondary");
 
   const pickFile = async (
     key: "businessRegCertUri" | "taxIdDocUri" | "proofOfAddressUri",
     nameKey: "businessRegCertName" | "taxIdDocName" | "proofOfAddressName",
   ) => {
     try {
-      // Request permission
       const permissionResult =
         await ImagePicker.requestMediaLibraryPermissionsAsync();
 
@@ -49,39 +72,24 @@ export const Step2VerifyDocs: React.FC<Step2Props> = ({ data, onChange }) => {
 
       const image = result.assets[0];
 
-      // Check file size using expo-file-system
       try {
         const file = new FileSystem.File(image.uri);
         const fileInfo = await file.info();
-
-        if (fileInfo.exists && fileInfo.size) {
-          if (fileInfo.size > MAX_SIZE) {
-            Toast.show({
-              type: "error",
-              text1: "File too large",
-              text2: `Maximum file size is 5MB. Your file is ${(
-                fileInfo.size /
-                1024 /
-                1024
-              ).toFixed(2)}MB`,
-            });
-            return;
-          }
+        if (fileInfo.exists && fileInfo.size && fileInfo.size > MAX_SIZE) {
+          Toast.show({
+            type: "error",
+            text1: "File too large",
+            text2: `Max 5MB. Your file is ${(fileInfo.size / 1024 / 1024).toFixed(2)}MB`,
+          });
+          return;
         }
-      } catch (sizeError) {
-        // Continue anyway if we can't check size
+      } catch {
+        // Continue if size check fails
       }
 
-      // Store the file URI and name (won't upload until final submit)
       const fileName = image.uri.split("/").pop() || "document.jpg";
       onChange(key, image.uri);
       onChange(nameKey, fileName);
-
-      Toast.show({
-        type: "success",
-        text1: "Document selected",
-        text2: "Will be uploaded when you complete signup",
-      });
     } catch (error) {
       Toast.show({
         type: "error",
@@ -92,12 +100,10 @@ export const Step2VerifyDocs: React.FC<Step2Props> = ({ data, onChange }) => {
     }
   };
 
-  const removeFile = (key: keyof SignupStep2Data) => {
+  const removeFile = (
+    key: "businessRegCertUri" | "taxIdDocUri" | "proofOfAddressUri",
+  ) => {
     onChange(key, "");
-  };
-
-  const getDocumentStatus = (uri?: string) => {
-    return uri ? { selected: true, uri } : { selected: false };
   };
 
   return (
@@ -107,104 +113,107 @@ export const Step2VerifyDocs: React.FC<Step2Props> = ({ data, onChange }) => {
       showsVerticalScrollIndicator={false}
     >
       <ThemedText type="title">Verify Your Business</ThemedText>
-      <ThemedText type="subtitle" style={{ marginBottom: 16 }}>
-        Upload your documents for verification
+      <ThemedText style={[styles.subtitle, { color: textMuted }]}>
+        Upload clear photos of your documents.
       </ThemedText>
 
-      {[
-        {
-          key: "businessRegCertUri" as const,
-          nameKey: "businessRegCertName" as const,
-          label: "Business Registration Certificate",
-          required: true,
-        },
-        {
-          key: "taxIdDocUri" as const,
-          nameKey: "taxIdDocName" as const,
-          label: "Tax Identification Document",
-          required: true,
-        },
-        {
-          key: "proofOfAddressUri" as const,
-          nameKey: "proofOfAddressName" as const,
-          label: "Proof of Address",
-          required: false,
-        },
-      ].map(({ key, nameKey, label, required }) => {
-        const status = getDocumentStatus(data[key]);
+      {/* Document list */}
+      <View style={[styles.list, { borderColor: border }]}>
+        {DOCS.map(({ key, nameKey, label, required }, i) => {
+          const uri = data[key];
+          const selected = !!uri;
 
-        return (
-          <View key={key} style={styles.documentCard}>
-            <View style={styles.documentHeader}>
-              <View style={{ flex: 1 }}>
-                <ThemedText type="defaultSemiBold">{label}</ThemedText>
-                {!required && (
-                  <ThemedText style={{ color: textMuted, fontSize: 12 }}>
-                    Optional
+          return (
+            <Pressable
+              key={key}
+              style={[
+                styles.docRow,
+                i < DOCS.length - 1 && {
+                  borderBottomWidth: 1,
+                  borderBottomColor: border,
+                },
+              ]}
+              onPress={() => pickFile(key, nameKey)}
+            >
+              {/* Thumbnail or placeholder */}
+              {selected ? (
+                <Image source={{ uri }} style={styles.thumb} />
+              ) : (
+                <View
+                  style={[
+                    styles.thumbPlaceholder,
+                    { backgroundColor: surfaceSubtle },
+                  ]}
+                >
+                  <IconSymbol name="doc.fill" size={18} color={textMuted} />
+                </View>
+              )}
+
+              {/* Label + status text */}
+              <View style={styles.docMid}>
+                <View style={styles.docLabelRow}>
+                  <ThemedText type="defaultSemiBold" style={styles.docLabel}>
+                    {label}
                   </ThemedText>
+                  {!required && (
+                    <View
+                      style={[
+                        styles.optionalBadge,
+                        { backgroundColor: surfaceSubtle },
+                      ]}
+                    >
+                      <ThemedText
+                        style={[styles.optionalText, { color: textMuted }]}
+                      >
+                        Optional
+                      </ThemedText>
+                    </View>
+                  )}
+                </View>
+                <ThemedText
+                  style={[
+                    styles.docSub,
+                    { color: selected ? successColor : textMuted },
+                  ]}
+                  numberOfLines={1}
+                >
+                  {selected
+                    ? data[nameKey] || "Document selected"
+                    : "Tap to upload"}
+                </ThemedText>
+              </View>
+
+              {/* Right action */}
+              <View style={styles.docRight}>
+                {selected ? (
+                  <View style={styles.docActions}>
+                    <IconSymbol
+                      name="checkmark.circle.fill"
+                      size={20}
+                      color={successColor}
+                    />
+                    <Pressable hitSlop={8} onPress={() => removeFile(key)}>
+                      <IconSymbol name="xmark" size={16} color={errorColor} />
+                    </Pressable>
+                  </View>
+                ) : (
+                  <IconSymbol
+                    name="chevron.right"
+                    size={14}
+                    color={textMuted}
+                  />
                 )}
               </View>
-              {status.selected && (
-                <IconSymbol
-                  name="checkmark.circle.fill"
-                  size={24}
-                  color={successColor}
-                />
-              )}
-            </View>
+            </Pressable>
+          );
+        })}
+      </View>
 
-            {status.selected && status.uri && (
-              <View style={styles.preview}>
-                <Image
-                  source={{ uri: status.uri }}
-                  style={styles.previewImage}
-                />
-                <ThemedText
-                  numberOfLines={1}
-                  style={{ fontSize: 12, color: textMuted, flex: 1 }}
-                >
-                  {data[nameKey] || "Selected"}
-                </ThemedText>
-              </View>
-            )}
-
-            <View style={styles.buttonRow}>
-              <Pressable
-                style={[
-                  styles.documentButton,
-                  { borderColor: primary, flex: 1 },
-                ]}
-                onPress={() => pickFile(key, nameKey)}
-              >
-                <IconSymbol name="photo" size={18} color={primary} />
-                <ThemedText style={{ color: primary }}>
-                  {status.selected ? "Change" : "Select"} Document
-                </ThemedText>
-              </Pressable>
-
-              {status.selected && (
-                <Pressable
-                  style={[
-                    styles.documentButton,
-                    {
-                      borderColor: errorColor,
-                      backgroundColor: `${errorColor}10`,
-                    },
-                  ]}
-                  onPress={() => removeFile(key)}
-                >
-                  <IconSymbol name="trash" size={18} color={errorColor} />
-                </Pressable>
-              )}
-            </View>
-          </View>
-        );
-      })}
-
+      {/* Info note */}
       <View style={styles.note}>
-        <IconSymbol name="info.circle" size={16} color={primary} />
-        <ThemedText style={{ flex: 1, fontSize: 12, color: textMuted }}>
-          Documents will be uploaded when you complete the signup process
+        <IconSymbol name="info.circle" size={14} color={primary} />
+        <ThemedText style={[styles.noteText, { color: textSecondary }]}>
+          Accept JPG or PNG up to 5 MB. Documents upload on final submit.
         </ThemedText>
       </View>
     </ScrollView>
@@ -214,54 +223,78 @@ export const Step2VerifyDocs: React.FC<Step2Props> = ({ data, onChange }) => {
 const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
-    gap: 16,
+    gap: 20,
     paddingBottom: 24,
   },
-  documentCard: {
-    gap: 12,
-    padding: 16,
-    borderRadius: 12,
+  subtitle: {
+    fontSize: 14,
+    marginTop: 2,
+  },
+  list: {
     borderWidth: 1,
-    borderColor: "#e5e5e5",
+    borderRadius: 12,
+    overflow: "hidden",
   },
-  documentHeader: {
+  docRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
+    gap: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
   },
-  preview: {
-    flexDirection: "row",
-    gap: 8,
-    alignItems: "center",
-    padding: 8,
-    backgroundColor: "#f5f5f5",
+  thumb: {
+    width: 44,
+    height: 44,
     borderRadius: 8,
+    flexShrink: 0,
   },
-  previewImage: {
-    width: 40,
-    height: 40,
-    borderRadius: 6,
-  },
-  buttonRow: {
-    flexDirection: "row",
-    gap: 8,
-  },
-  documentButton: {
-    flexDirection: "row",
+  thumbPlaceholder: {
+    width: 44,
+    height: 44,
+    borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",
+    flexShrink: 0,
+  },
+  docMid: {
+    flex: 1,
+    gap: 3,
+  },
+  docLabelRow: {
+    flexDirection: "row",
+    alignItems: "center",
     gap: 6,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    borderWidth: 1,
+  },
+  docLabel: {
+    fontSize: 14,
+  },
+  optionalBadge: {
+    borderRadius: 4,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+  },
+  optionalText: {
+    fontSize: 10,
+  },
+  docSub: {
+    fontSize: 12,
+  },
+  docRight: {
+    flexShrink: 0,
+  },
+  docActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
   },
   note: {
     flexDirection: "row",
     gap: 8,
-    padding: 12,
-    backgroundColor: "#f5f5f5",
-    borderRadius: 8,
-    marginTop: 8,
+    alignItems: "flex-start",
+  },
+  noteText: {
+    fontSize: 12,
+    flex: 1,
+    lineHeight: 18,
   },
 });

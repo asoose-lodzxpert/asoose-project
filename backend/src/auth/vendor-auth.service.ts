@@ -221,13 +221,55 @@ export class VendorAuthService {
     return vendor;
   }
 
+  // ---------------- SIGNUP EMAIL VERIFICATION OTP ----------------
+
+  async sendSignupOtp(email: string): Promise<void> {
+    const normalizedEmail = email.toLowerCase().trim();
+    // Use a separate key prefix to avoid collision with password-reset OTPs
+    const otp = await this.otpService.generateOtp(`signup:${normalizedEmail}`);
+
+    try {
+      await this.emailProducer.sendVendorSignupOtp(
+        normalizedEmail,
+        'Vendor', // name is unknown at signup
+        otp,
+      );
+      this.appLogger.log(`Signup verification OTP sent to ${normalizedEmail}`);
+    } catch (error) {
+      this.appLogger.error(
+        `Failed to send signup OTP to ${normalizedEmail}`,
+        error?.stack,
+        { error },
+      );
+      throw error;
+    }
+  }
+
+  async verifySignupOtp(
+    email: string,
+    otp: string,
+  ): Promise<{ verified: boolean }> {
+    const normalizedEmail = email.toLowerCase().trim();
+    const isValid = await this.otpService.verifyOtp(
+      `signup:${normalizedEmail}`,
+      otp,
+    );
+    if (!isValid) {
+      throw new UnauthorizedException(
+        'Invalid or expired OTP. Please request a new code.',
+      );
+    }
+    await this.otpService.clearOtp(`signup:${normalizedEmail}`);
+    return { verified: true };
+  }
+
   // ---------------- OTP PASSWORD RESET ----------------
 
   async sendOtpForPasswordReset(email: string): Promise<void> {
     const normalizedEmail = email.toLowerCase().trim();
 
-    // Generate OTP first (before checking if vendor exists)
-    const otp = await this.otpService.generateOtp(normalizedEmail);
+    // Generate OTP with password-reset prefix to avoid collision with signup OTPs
+    const otp = await this.otpService.generateOtp(`reset:${normalizedEmail}`);
 
     // Check if vendor exists (optional - email will be sent regardless)
     let vendorName = 'User';
@@ -267,13 +309,16 @@ export class VendorAuthService {
 
   async verifyOtp(email: string, otp: string): Promise<boolean> {
     const normalizedEmail = email.toLowerCase().trim();
-    return this.otpService.verifyOtp(normalizedEmail, otp);
+    return this.otpService.verifyOtp(`reset:${normalizedEmail}`, otp);
   }
 
   async resetVendorPassword(dto: ResetPasswordDto & { otp: string }) {
     const normalizedEmail = dto.email.toLowerCase().trim();
 
-    const valid = await this.otpService.verifyOtp(normalizedEmail, dto.otp);
+    const valid = await this.otpService.verifyOtp(
+      `reset:${normalizedEmail}`,
+      dto.otp,
+    );
     if (!valid) {
       throw new UnauthorizedException(
         'Invalid or expired OTP. Please request a new OTP.',
@@ -282,7 +327,7 @@ export class VendorAuthService {
 
     const hashedPassword = await bcrypt.hash(dto.newPassword, 10);
 
-    await this.otpService.clearOtp(normalizedEmail);
+    await this.otpService.clearOtp(`reset:${normalizedEmail}`);
 
     const updatedVendor = await this.prisma.vendor.update({
       where: { email: normalizedEmail },
@@ -319,7 +364,10 @@ export class VendorAuthService {
   ): Promise<{ message: string }> {
     const normalizedEmail = email.toLowerCase().trim();
 
-    const valid = await this.otpService.verifyOtp(normalizedEmail, otp);
+    const valid = await this.otpService.verifyOtp(
+      `reset:${normalizedEmail}`,
+      otp,
+    );
     if (!valid) {
       throw new UnauthorizedException(
         'Invalid or expired OTP. Please request a new OTP.',
@@ -336,7 +384,7 @@ export class VendorAuthService {
 
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
-    await this.otpService.clearOtp(normalizedEmail);
+    await this.otpService.clearOtp(`reset:${normalizedEmail}`);
 
     await this.prisma.vendor.update({
       where: { email: normalizedEmail },

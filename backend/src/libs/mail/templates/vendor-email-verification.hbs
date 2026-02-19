@@ -1,0 +1,99 @@
+<html>
+  <head>
+    <meta charset='utf-8' />
+    <meta name='viewport' content='width=device-width, initial-scale=1.0' />
+    <title>Verify Your Email - Asoose</title>
+  </head>
+  <body
+    style='margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;'
+  >
+    <table
+      width='100%'
+      cellpadding='0'
+      cellspacing='0'
+      style='background-color: #f4f4f4; padding: 20px;'
+    >
+      <tr>
+        <td align='center'>
+          <table
+            width='600'
+            cellpadding='0'
+            cellspacing='0'
+            style='background-color: #ffffff; border-radius: 8px; overflow: hidden;'
+          >
+            <!-- Header -->
+            <tr>
+              <td
+                style='background-color: #E5A503; padding: 30px; text-align: center;'
+              >
+                <h1 style='color: #ffffff; margin: 0; font-size: 28px;'>✉️
+                  Verify Your Email</h1>
+              </td>
+            </tr>
+
+            <!-- Content -->
+            <tr>
+              <td style='padding: 40px 30px;'>
+                <p
+                  style='color: #333333; font-size: 16px; line-height: 1.6; margin-bottom: 20px;'
+                >
+                  Hi
+                  {{name}},
+                </p>
+
+                <p
+                  style='color: #333333; font-size: 16px; line-height: 1.6; margin-bottom: 30px;'
+                >
+                  Welcome to Asoose! To complete your vendor registration,
+                  please verify your email address using the code below.
+                </p>
+
+                <!-- OTP Box -->
+                <div
+                  style='background-color: #f8f9fa; border: 2px dashed #E5A503; border-radius: 8px; padding: 20px; text-align: center; margin-bottom: 30px;'
+                >
+                  <p
+                    style='color: #666666; font-size: 14px; margin: 0 0 10px 0;'
+                  >Your Verification Code:</p>
+                  <h2
+                    style='color: #E5A503; font-size: 36px; letter-spacing: 10px; margin: 0; font-weight: bold;'
+                  >{{otp}}</h2>
+                  <p
+                    style='color: #999999; font-size: 12px; margin: 10px 0 0 0;'
+                  >Valid for 10 minutes</p>
+                </div>
+
+                <p
+                  style='color: #333333; font-size: 15px; line-height: 1.6; margin-bottom: 20px;'
+                >
+                  Enter this code in the Asoose vendor app to verify your
+                  business email and continue setting up your store.
+                </p>
+
+                <p
+                  style='color: #666666; font-size: 13px; line-height: 1.6; margin-bottom: 20px;'
+                >
+                  If you didn't create an Asoose vendor account, you can safely
+                  ignore this email.
+                </p>
+              </td>
+            </tr>
+
+            <!-- Footer -->
+            <tr>
+              <td
+                style='background-color: #f8f9fa; padding: 20px 30px; text-align: center; border-top: 1px solid #e0e0e0;'
+              >
+                <p style='color: #999999; font-size: 12px; margin: 0;'>
+                  ©
+                  {{year}}
+                  Asoose. All rights reserved.
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

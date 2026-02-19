@@ -37,6 +37,9 @@ export const Step1BusinessInfo: React.FC<Step1Props> = ({ data, onChange }) => {
   const successColor = useThemeColor({}, "statusSuccess");
   const errorColor = useThemeColor({}, "statusError");
   const border = useThemeColor({}, "borderDefault");
+  const textOnPrimary = useThemeColor({}, "textOnPrimary");
+  const textMuted = useThemeColor({}, "textMuted");
+  const surfaceSubtle = useThemeColor({}, "surfaceSubtle");
   const [password, setPassword] = useState("");
   const [secure, setSecure] = useState(true);
   const [isPasswordFocused, setIsPasswordFocused] = useState(false);
@@ -100,15 +103,21 @@ export const Step1BusinessInfo: React.FC<Step1Props> = ({ data, onChange }) => {
     try {
       // Call backend to send OTP
       const response = await fetch(
-        `${process.env.EXPO_PUBLIC_API_URL}/auth/vendor/send-otp`,
+        `${process.env.EXPO_PUBLIC_API_URL}/auth/vendor/send-signup-otp`,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            ...((__DEV__ as boolean)
+              ? { "ngrok-skip-browser-warning": "true" }
+              : {}),
+          },
           body: JSON.stringify({ email: data.businessEmail }),
         },
       );
 
-      const result = await response.json();
+      const text = await response.text();
+      const result = text ? JSON.parse(text) : {};
 
       if (!response.ok) {
         throw new Error(result.message || "Failed to send OTP");
@@ -155,18 +164,24 @@ export const Step1BusinessInfo: React.FC<Step1Props> = ({ data, onChange }) => {
     try {
       // Call backend to verify OTP
       const response = await fetch(
-        `${process.env.EXPO_PUBLIC_API_URL}/auth/vendor/verify-otp`,
+        `${process.env.EXPO_PUBLIC_API_URL}/auth/vendor/verify-signup-otp`,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            ...((__DEV__ as boolean)
+              ? { "ngrok-skip-browser-warning": "true" }
+              : {}),
+          },
           body: JSON.stringify({
             email: data.businessEmail,
-            code: data.otpCode,
+            otp: data.otpCode,
           }),
         },
       );
 
-      const result = await response.json();
+      const text = await response.text();
+      const result = text ? JSON.parse(text) : {};
 
       if (!response.ok) {
         throw new Error(result.message || "Invalid OTP");
@@ -214,8 +229,8 @@ export const Step1BusinessInfo: React.FC<Step1Props> = ({ data, onChange }) => {
         showsVerticalScrollIndicator={false}
       >
         <ThemedText type="title">Let's get started</ThemedText>
-        <ThemedText type="subtitle" style={styles.subtitle}>
-          Verify your email first
+        <ThemedText style={[styles.subtitle, { color: textMuted }]}>
+          Start by verifying your business email address.
         </ThemedText>
 
         {/* Business Email - OTP Section */}
@@ -243,13 +258,13 @@ export const Step1BusinessInfo: React.FC<Step1Props> = ({ data, onChange }) => {
                 disabled={sendingOtp || !data.businessEmail || data.otpSent}
               >
                 {sendingOtp ? (
-                  <ActivityIndicator size="small" color="#fff" />
+                  <ActivityIndicator size="small" color={textOnPrimary} />
                 ) : data.otpSent ? (
-                  <ThemedText style={{ fontSize: 12, color: "#fff" }}>
+                  <ThemedText style={{ fontSize: 12, color: textOnPrimary }}>
                     Sent
                   </ThemedText>
                 ) : (
-                  <ThemedText style={{ fontSize: 12, color: "#fff" }}>
+                  <ThemedText style={{ fontSize: 12, color: textOnPrimary }}>
                     Send OTP
                   </ThemedText>
                 )}
@@ -300,9 +315,9 @@ export const Step1BusinessInfo: React.FC<Step1Props> = ({ data, onChange }) => {
                 disabled={verifyingOtp}
               >
                 {verifyingOtp ? (
-                  <ActivityIndicator size="small" color="#fff" />
+                  <ActivityIndicator size="small" color={textOnPrimary} />
                 ) : (
-                  <ThemedText style={{ fontSize: 12, color: "#fff" }}>
+                  <ThemedText style={{ fontSize: 12, color: textOnPrimary }}>
                     Verify
                   </ThemedText>
                 )}
@@ -434,7 +449,9 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
   },
   subtitle: {
-    marginVertical: 8,
+    marginTop: 4,
+    marginBottom: 8,
+    fontSize: 14,
   },
   field: {
     gap: 6,

@@ -23,6 +23,8 @@ export const ImageUpload: React.FC<Props> = ({
   const successColor = useThemeColor({}, "statusSuccess");
   const textMuted = useThemeColor({}, "textMuted");
   const errorColor = useThemeColor({}, "statusError");
+  const border = useThemeColor({}, "borderDefault");
+  const surfaceSubtle = useThemeColor({}, "surfaceSubtle");
 
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -63,14 +65,18 @@ export const ImageUpload: React.FC<Props> = ({
   };
 
   return (
-    <View style={{ gap: 8 }}>
+    <View style={{ gap: 6 }}>
       <ThemedText style={styles.label}>{label}</ThemedText>
 
       <Pressable
         onPress={pickImage}
         style={[
           styles.imageCard,
-          value && { borderColor: primary, borderWidth: 2 },
+          {
+            borderColor: value ? primary : border,
+            backgroundColor: surfaceSubtle,
+          },
+          value && { borderStyle: "solid", borderWidth: 2 },
         ]}
       >
         {value ? (
@@ -80,21 +86,19 @@ export const ImageUpload: React.FC<Props> = ({
               style={[styles.image, circular && { borderRadius: 100 }]}
             />
             <View style={styles.imageOverlay}>
-              <IconSymbol
-                name="checkmark.circle.fill"
-                size={32}
-                color={successColor}
-              />
-              <ThemedText style={{ color: "#fff", marginTop: 8 }}>
-                Selected
+              <IconSymbol name="checkmark.circle.fill" size={24} color="#fff" />
+              <ThemedText style={{ color: "#fff", fontSize: 12, marginTop: 4 }}>
+                Tap to change
               </ThemedText>
             </View>
           </View>
         ) : (
           <View style={styles.placeholder}>
-            <IconSymbol name="photo" size={40} color={textMuted} />
-            <ThemedText style={{ marginTop: 8, color: textMuted }}>
-              Tap to select {label}
+            <IconSymbol name="photo" size={28} color={textMuted} />
+            <ThemedText
+              style={{ marginTop: 6, fontSize: 13, color: textMuted }}
+            >
+              {label}
             </ThemedText>
           </View>
         )}
@@ -105,16 +109,12 @@ export const ImageUpload: React.FC<Props> = ({
           onPress={removeImage}
           style={[styles.removeButton, { borderColor: errorColor }]}
         >
-          <IconSymbol name="trash" size={18} color={errorColor} />
+          <IconSymbol name="trash" size={14} color={errorColor} />
           <ThemedText style={{ color: errorColor, fontSize: 12 }}>
             Remove
           </ThemedText>
         </Pressable>
       )}
-
-      <ThemedText style={{ fontSize: 12, color: textMuted }}>
-        Will be uploaded when you complete the signup
-      </ThemedText>
     </View>
   );
 };
@@ -125,13 +125,11 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   imageCard: {
-    height: 200,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: "#e5e5e5",
+    height: 120,
+    borderRadius: 10,
+    borderWidth: 1.5,
     borderStyle: "dashed",
     overflow: "hidden",
-    backgroundColor: "#f9f9f9",
   },
   image: {
     width: "100%",
@@ -139,7 +137,7 @@ const styles = StyleSheet.create({
   },
   imageOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0, 0, 0, 0.4)",
+    backgroundColor: "rgba(0, 0, 0, 0.45)",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -151,10 +149,11 @@ const styles = StyleSheet.create({
   removeButton: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 8,
+    gap: 5,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 6,
     borderWidth: 1,
+    alignSelf: "flex-start",
   },
 });

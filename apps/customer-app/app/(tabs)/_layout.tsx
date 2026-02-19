@@ -38,7 +38,10 @@ export default function TabLayout() {
           tabBarInactiveTintColor: themeColors.textSecondary,
           headerShown: false,
           tabBarButton: HapticTab,
-          tabBarStyle: { backgroundColor: themeColors.surfaceBackground },
+          tabBarStyle: {
+            backgroundColor: themeColors.surfaceBackground,
+            borderTopColor: themeColors.borderDefault,
+          },
         }}
       >
         <Tabs.Screen

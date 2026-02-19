@@ -20,15 +20,19 @@ interface Props {
 
 export const OpenHoursBlock: React.FC<Props> = ({ value, onChange }) => {
   const borderDefault = useThemeColor({}, "borderDefault");
+  const textMuted = useThemeColor({}, "textMuted");
+  const brandPrimary = useThemeColor({}, "brandPrimary");
 
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : undefined}
-      style={{ gap: 12 }}
+      style={{ gap: 4 }}
     >
-      <ThemedText>Open Hours</ThemedText>
+      <ThemedText type="defaultSemiBold" style={styles.blockTitle}>
+        Open Hours
+      </ThemedText>
 
-      {DAYS.map((day) => {
+      {DAYS.map((day, i) => {
         const h = value[day] || {};
 
         const update = (patch: Partial<OpenHour>) =>
@@ -40,40 +44,52 @@ export const OpenHoursBlock: React.FC<Props> = ({ value, onChange }) => {
         return (
           <View
             key={day}
-            style={[styles.dayContainer, { borderColor: borderDefault }]}
+            style={[
+              styles.dayRow,
+              {
+                borderBottomColor:
+                  i < DAYS.length - 1 ? borderDefault : "transparent",
+              },
+            ]}
           >
+            {/* Day name */}
             <ThemedText style={styles.dayLabel}>
               {day.charAt(0).toUpperCase() + day.slice(1)}
             </ThemedText>
 
-            <View style={styles.inputsRow}>
-              <View style={styles.inputContainer}>
-                <ThemedText>Open</ThemedText>
+            {h.closed ? (
+              <ThemedText style={[styles.closedText, { color: textMuted }]}>
+                Closed
+              </ThemedText>
+            ) : h.is24Hours ? (
+              <ThemedText style={[styles.closedText, { color: brandPrimary }]}>
+                24 hrs
+              </ThemedText>
+            ) : (
+              <View style={styles.timesRow}>
                 <ThemedInput
                   style={styles.timeInput}
-                  editable={!h.closed && !h.is24Hours}
+                  editable
                   value={h.open}
                   onChangeText={(v) => update({ open: v })}
-                  placeholder="HH:MM"
+                  placeholder="09:00"
                   keyboardType="numeric"
                 />
-              </View>
-
-              <View style={styles.inputContainer}>
-                <ThemedText>Close</ThemedText>
+                <ThemedText style={{ color: textMuted }}>–</ThemedText>
                 <ThemedInput
                   style={styles.timeInput}
-                  editable={!h.closed && !h.is24Hours}
+                  editable
                   value={h.close}
                   onChangeText={(v) => update({ close: v })}
-                  placeholder="HH:MM"
+                  placeholder="18:00"
                   keyboardType="numeric"
                 />
               </View>
-            </View>
+            )}
 
+            {/* Options */}
             <View style={styles.optionsRow}>
-              <View style={styles.checkboxContainer}>
+              <View style={styles.checkboxItem}>
                 <Checkbox
                   status={h.is24Hours ? "checked" : "unchecked"}
                   onPress={() =>
@@ -84,16 +100,14 @@ export const OpenHoursBlock: React.FC<Props> = ({ value, onChange }) => {
                     })
                   }
                 />
-                <ThemedText>24 Hours</ThemedText>
+                <ThemedText style={styles.checkboxLabel}>24h</ThemedText>
               </View>
 
-              <View style={styles.checkboxContainer}>
-                <Switch
-                  value={h.closed}
-                  onValueChange={(v) => update({ closed: v })}
-                />
-                <ThemedText>Closed</ThemedText>
-              </View>
+              <Switch
+                value={!!h.closed}
+                onValueChange={(v) => update({ closed: v })}
+                trackColor={{ true: brandPrimary }}
+              />
             </View>
           </View>
         );
@@ -103,42 +117,48 @@ export const OpenHoursBlock: React.FC<Props> = ({ value, onChange }) => {
 };
 
 const styles = StyleSheet.create({
-  dayContainer: {
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 12,
-    gap: 8,
+  blockTitle: {
+    fontSize: 14,
+    marginBottom: 4,
   },
-
-  dayLabel: {
-    fontWeight: "bold",
-    fontSize: 16,
-  },
-
-  inputsRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-
-  inputContainer: {
-    flex: 1,
-    gap: 4,
-  },
-
-  timeInput: {
-    width: "100%",
-  },
-
-  optionsRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 8,
-  },
-
-  checkboxContainer: {
+  dayRow: {
     flexDirection: "row",
     alignItems: "center",
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
     gap: 8,
+  },
+  dayLabel: {
+    width: 75,
+    fontSize: 13,
+    fontWeight: "500",
+    flexShrink: 0,
+  },
+  timesRow: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  timeInput: {
+    width: 70,
+    textAlign: "center",
+  },
+  closedText: {
+    flex: 1,
+    fontSize: 13,
+  },
+  optionsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+    flexShrink: 0,
+  },
+  checkboxItem: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  checkboxLabel: {
+    fontSize: 12,
   },
 });
