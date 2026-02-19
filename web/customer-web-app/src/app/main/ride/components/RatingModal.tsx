@@ -1,13 +1,40 @@
 'use client';
+import { useState } from 'react';
+import { useSession } from 'next-auth/react';
 import { useRideStore } from "../store/ride";
+import { RideService } from '@/services/ride.service';
 import { Star } from "lucide-react";
+import { toast } from 'react-toastify';
 
 export function RatingModal() {
+  const { data: session } = useSession();
+  const rideId = useRideStore((state) => state.rideId);
   const rating = useRideStore((state) => state.rating);
   const setRating = useRideStore((state) => state.setRating);
   const feedback = useRideStore((state) => state.feedback);
   const setFeedback = useRideStore((state) => state.setFeedback);
   const resetRide = useRideStore((state) => state.resetRide);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async () => {
+    if (isSubmitting) return;
+
+    // Submit to backend if we have the required data
+    if (rideId && rating && session?.accessToken) {
+      setIsSubmitting(true);
+      try {
+        await RideService.rateDriver(rideId, rating, feedback || '', session.accessToken);
+        toast.success('Thanks for your feedback!');
+      } catch (error) {
+        console.error('Failed to submit rating:', error);
+        toast.error('Could not submit rating. Please try again.');
+        setIsSubmitting(false);
+        return; // Don't reset if submission failed — let user retry
+      }
+    }
+
+    resetRide();
+  };
 
   return (
     <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
@@ -39,10 +66,11 @@ export function RatingModal() {
         />
         
         <button
-          className="w-full bg-yellow-400 text-black py-4 rounded-xl font-bold text-lg hover:bg-yellow-300 transition-colors shadow-lg active:scale-[0.98]"
-          onClick={resetRide}
+          className="w-full bg-yellow-400 text-black py-4 rounded-xl font-bold text-lg hover:bg-yellow-300 transition-colors shadow-lg active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+          onClick={handleSubmit}
+          disabled={isSubmitting}
         >
-          Submit Review
+          {isSubmitting ? 'Submitting...' : 'Submit Review'}
         </button>
       </div>
     </div>

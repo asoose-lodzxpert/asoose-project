@@ -1,11 +1,17 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRideStore, RideStage } from '../store/ride';
 import { RideService, RideStatus } from '@/services/ride.service';
 import { mapRideToViewModel } from '@/services/mappers/ride.mapper';
 import { toast } from 'react-toastify';
+
+/** Polling interval in ms — acts as safety net when socket drops */
+const POLL_INTERVAL_MS = 15_000;
+
+/** Ride stages that indicate an active ride worth polling for */
+const ACTIVE_STAGES: RideStage[] = ['searching', 'confirmed', 'arrived', 'in-progress'];
 
 export function useRideSynchronization() {
   const { data: session } = useSession();
@@ -22,102 +28,142 @@ export function useRideSynchronization() {
   const setTripSummary = useRideStore((state) => state.setTripSummary);
   const setRideType = useRideStore((state) => state.setRideType);
 
-  useEffect(() => {
-    async function syncRideState() {
-      if (!session?.accessToken || hasSynced.current) return;
+  const statusMap: Record<RideStatus, RideStage> = {
+    'PENDING': 'searching',
+    'REQUESTED': 'searching',
+    'ACCEPTED': 'confirmed',
+    'ARRIVED': 'arrived',
+    'IN_PROGRESS': 'in-progress',
+    'COMPLETED': 'finished',
+    'CANCELLED': 'idle',
+  };
 
-      try {
-        console.log("🔄 Syncing ride state with server...");
-        hasSynced.current = true;
-        
-        const backendRide = await RideService.getCurrentRide(session.accessToken);
+  /**
+   * Core sync function — fetches current ride from backend and reconciles store.
+   * Used for both initial sync and periodic polling.
+   */
+  const syncRideState = useCallback(async (token: string) => {
+    try {
+      const backendRide = await RideService.getCurrentRide(token);
 
-        if (!backendRide) {
-          console.log("✅ No active ride found. App is Idle.");
-          return;
+      if (!backendRide) {
+        // No active ride — if we previously had one, the ride ended
+        const currentStatus = useRideStore.getState().rideStatus;
+        if (ACTIVE_STAGES.includes(currentStatus)) {
+          console.log('🔄 Ride ended (detected via poll). Resetting to idle.');
+          setRideStatus('idle');
         }
-
-        // Transform backend ride to ViewModel (handles all mapping)
-        const activeRide = mapRideToViewModel(backendRide);
-
-        console.log("🚀 Restoring Active Ride:", activeRide.id, activeRide.status);
-
-        // 1. Restore IDs and Locations
-        setRideId(activeRide.id);
-        
-        // Pickup address is guaranteed by mapper
-        setPickupAddress(activeRide.pickupAddress.addressText);
-        if (activeRide.pickupAddress.lat !== null && activeRide.pickupAddress.lng !== null) {
-          setPickupLocation({ 
-            lat: activeRide.pickupAddress.lat, 
-            lng: activeRide.pickupAddress.lng 
-          });
-        }
-
-        // Dropoff address is guaranteed by mapper
-        setDropoffAddress(activeRide.dropoffAddress.addressText);
-        if (activeRide.dropoffAddress.lat !== null && activeRide.dropoffAddress.lng !== null) {
-          setDropoffLocation({ 
-            lat: activeRide.dropoffAddress.lat, 
-            lng: activeRide.dropoffAddress.lng 
-          });
-        }
-
-        // 2. Restore Driver (if assigned)
-        if (activeRide.driver) {
-          setDriver({
-            name: activeRide.driver.name,
-            photoUrl: activeRide.driver.image || '/profile.jpg',
-            vehicle: {
-              make: activeRide.driver.vehicleBrand || 'Vehicle',
-              model: activeRide.driver.vehicleModel || 'Car',
-              licensePlate: activeRide.driver.vehicleNumber || '---',
-            },
-            rating: activeRide.driver.rating || 5.0,
-            phone: '', // Not available in ViewModel (was never used)
-          });
-        }
-
-        // 3. Map Backend Status to Frontend View
-        const statusMap: Record<RideStatus, RideStage> = {
-          'PENDING': 'searching',
-          'REQUESTED': 'searching',
-          'ACCEPTED': 'confirmed',   // Driver is on the way
-          'ARRIVED': 'arrived',      // Driver is here
-          'IN_PROGRESS': 'in-progress',
-          'COMPLETED': 'finished',
-          'CANCELLED': 'idle',
-        };
-
-        const mappedStatus = statusMap[activeRide.status] || 'idle';
-        setRideStatus(mappedStatus);
-
-        // 4. Restore Financials (if finished)
-        if (mappedStatus === 'finished') {
-           setTripSummary({
-             fare: activeRide.actualFare,
-             distance: activeRide.distanceKm || 0,
-             duration: activeRide.durationMin || 0
-           });
-        }
-
-      } catch (error: any) {
-        // Silent fail for "no active ride" - this is expected when idle
-        const status = error?.status ?? error?.response?.status;
-        const message = error?.message ?? error?.response?.data?.message ?? String(error);
-        if (status === 404 || message?.includes('not found')) {
-          console.log("✅ No active ride found. App is Idle.");
-          return;
-        }
-
-        // Log actual errors
-        console.warn("Failed to sync ride state:", message, error);
-
-        // Don't toast on sync errors - just log
-        // The app will continue working in idle state
+        return;
       }
-    }
 
-    syncRideState();
-  }, [session, setRideId, setRideStatus]);
+      const activeRide = mapRideToViewModel(backendRide);
+      const mappedStatus = statusMap[activeRide.status] || 'idle';
+
+      // Only update store if something actually changed
+      const state = useRideStore.getState();
+      if (state.rideId !== activeRide.id) {
+        setRideId(activeRide.id);
+      }
+
+      // Always reconcile status — this is the key polling value
+      if (state.rideStatus !== mappedStatus) {
+        console.log(`🔄 Status sync: ${state.rideStatus} → ${mappedStatus}`);
+        setRideStatus(mappedStatus);
+      }
+
+      // Restore locations
+      setPickupAddress(activeRide.pickupAddress.addressText);
+      if (activeRide.pickupAddress.lat !== null && activeRide.pickupAddress.lng !== null) {
+        setPickupLocation({ 
+          lat: activeRide.pickupAddress.lat, 
+          lng: activeRide.pickupAddress.lng 
+        });
+      }
+      setDropoffAddress(activeRide.dropoffAddress.addressText);
+      if (activeRide.dropoffAddress.lat !== null && activeRide.dropoffAddress.lng !== null) {
+        setDropoffLocation({ 
+          lat: activeRide.dropoffAddress.lat, 
+          lng: activeRide.dropoffAddress.lng 
+        });
+      }
+
+      // Restore driver if assigned
+      if (activeRide.driver) {
+        setDriver({
+          name: activeRide.driver.name,
+          photoUrl: activeRide.driver.image || '/profile.jpg',
+          vehicle: {
+            make: activeRide.driver.vehicleBrand || 'Vehicle',
+            model: activeRide.driver.vehicleModel || 'Car',
+            licensePlate: activeRide.driver.vehicleNumber || '---',
+          },
+          rating: activeRide.driver.rating || 5.0,
+          phone: '',
+        });
+      }
+
+      // Restore financials if finished
+      if (mappedStatus === 'finished') {
+        setTripSummary({
+          fare: activeRide.actualFare,
+          distance: activeRide.distanceKm || 0,
+          duration: activeRide.durationMin || 0,
+        });
+      }
+    } catch (error: any) {
+      const status = error?.status ?? error?.response?.status;
+      const message = error?.message ?? error?.response?.data?.message ?? String(error);
+      if (status === 404 || message?.includes('not found')) {
+        return; // Expected when no active ride
+      }
+      console.warn('Failed to sync ride state:', message);
+    }
+  }, [setRideId, setRideStatus, setPickupLocation, setDropoffLocation, setPickupAddress, setDropoffAddress, setDriver, setTripSummary]);
+
+  // --- Initial one-shot sync on mount ---
+  useEffect(() => {
+    if (!session?.accessToken || hasSynced.current) return;
+    hasSynced.current = true;
+    console.log('🔄 Initial ride state sync...');
+    syncRideState(session.accessToken);
+  }, [session, syncRideState]);
+
+  // --- Periodic polling as socket backup ---
+  useEffect(() => {
+    if (!session?.accessToken) return;
+
+    const rideStatus = useRideStore.getState().rideStatus;
+
+    // Only poll during active ride stages
+    if (!ACTIVE_STAGES.includes(rideStatus)) return;
+
+    const interval = setInterval(() => {
+      const currentStatus = useRideStore.getState().rideStatus;
+      if (!ACTIVE_STAGES.includes(currentStatus)) {
+        clearInterval(interval);
+        return;
+      }
+      syncRideState(session.accessToken!);
+    }, POLL_INTERVAL_MS);
+
+    return () => clearInterval(interval);
+  }, [session, syncRideState, useRideStore((state) => state.rideStatus)]);
+
+  // --- Re-sync when tab regains focus (user switches back) ---
+  useEffect(() => {
+    if (!session?.accessToken) return;
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        const currentStatus = useRideStore.getState().rideStatus;
+        if (ACTIVE_STAGES.includes(currentStatus)) {
+          console.log('👁️ Tab visible — re-syncing ride state...');
+          syncRideState(session.accessToken!);
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [session, syncRideState]);
 }

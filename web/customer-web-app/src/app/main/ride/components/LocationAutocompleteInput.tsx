@@ -26,6 +26,9 @@ export function LocationAutocompleteInput({ onLocationSelect, type, initialValue
   // --- FIX 2: Selection guard — blocks debounced fetches after selection ---
   const justSelectedRef = useRef(false);
 
+  // --- FIX: Local loading state for geolocation — do NOT touch isConfiguring ---
+  const [isGeolocating, setIsGeolocating] = React.useState(false);
+
   // Zustand selectors for input
   const inputValue = useRideStore((state) =>
     type === 'pickup' ? state.pickupAddress || '' : state.dropoffAddress || ''
@@ -38,10 +41,6 @@ export function LocationAutocompleteInput({ onLocationSelect, type, initialValue
     }
   }, [type]);
 
-  const isGeolocating = useRideStore((state) => state.isConfiguring === type && !!state.geolocationError === false);
-  const setIsGeolocating = (flag: boolean) => {
-    useRideStore.getState().setIsConfiguring(flag ? type : null);
-  };
   const geoError = useRideStore((state) => state.geolocationError);
   const setGeoError = (err: string | null) => {
     useRideStore.getState().setGeolocationError(err);
@@ -309,7 +308,10 @@ export function LocationAutocompleteInput({ onLocationSelect, type, initialValue
           {suggestions.map((suggestion) => (
             <li
               key={suggestion.place_id}
-              onClick={() => handleSelect(suggestion.place_id, suggestion.description)}
+              onMouseDown={(e) => {
+                e.preventDefault(); // Prevent blur from firing before selection completes
+                handleSelect(suggestion.place_id, suggestion.description);
+              }}
               className="p-3.5 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800 flex items-center space-x-3 transition-colors border-b border-zinc-50 dark:border-zinc-800/50 last:border-0"
             >
               <div className="p-2 bg-zinc-100 dark:bg-zinc-800 rounded-full text-zinc-500 dark:text-zinc-400">

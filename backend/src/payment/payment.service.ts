@@ -619,6 +619,28 @@ export class PaymentService {
               data: { status: OrderStatus.CANCELLED },
             });
           }
+
+          // Cancel orphaned rides on payment failure
+          if (payment.rideId) {
+            await tx.ride.updateMany({
+              where: {
+                id: payment.rideId,
+                status: { notIn: ['COMPLETED', 'CANCELLED'] as any },
+              },
+              data: { status: 'CANCELLED' as any, cancelledBy: 'SYSTEM', cancelledAt: new Date() },
+            });
+          }
+
+          // Cancel orphaned deliveries on payment failure
+          if (payment.deliveryId) {
+            await tx.delivery.updateMany({
+              where: {
+                id: payment.deliveryId,
+                status: { notIn: ['DELIVERED', 'CANCELLED'] as any },
+              },
+              data: { status: 'CANCELLED' as any },
+            });
+          }
         }
 
         return updatedPayment;
@@ -632,14 +654,20 @@ export class PaymentService {
     // === ATOMIC TRANSACTION END ===
 
     // =========================================================
-    // 👇 MATCHING LOGIC FIXED HERE
+    // 👇 MATCHING LOGIC — case-insensitive type comparison
     // =========================================================
-    // New logic: use metadata.type for routing
     const meta = payment.metadata as any;
-    if (meta && meta.type) {
-      if (meta.type === 'ride') {
-        // Ride request
+    const metaType = meta?.type?.toUpperCase?.();
+    if (metaType) {
+      if (metaType === 'RIDE') {
+        // Ride request — transition ride to REQUESTED and start matching
         if (meta.rideId) {
+          // Transition ride from PENDING → REQUESTED so matching can proceed
+          await this.prisma.ride.updateMany({
+            where: { id: meta.rideId, status: 'PENDING' as any },
+            data: { status: 'REQUESTED' as any },
+          });
+
           await this.startRideMatching(meta.rideId);
           // Notify rider and customer
           await this.sendMatchingNotifications({
@@ -649,7 +677,7 @@ export class PaymentService {
             riderId: result.ride?.riderId ?? undefined,
           });
         }
-      } else if (meta.type === 'order') {
+      } else if (metaType === 'ORDER') {
         // E-commerce order delivery
         if (result.order?.delivery?.id) {
           await this.startDeliveryMatching(result.order.delivery.id);
@@ -662,8 +690,8 @@ export class PaymentService {
             vendorId: result.order.store?.vendorId,
           });
         }
-      } else if (meta.type === 'delivery') {
-        // Direct delivery request: notify admin for manual assignment
+      } else if (metaType === 'DELIVERY') {
+        // Direct delivery: admin manually assigns riders — no auto-matching
         await this.sendAdminAssignmentNotification(
           meta.deliveryId,
           payment.userId,
@@ -674,7 +702,6 @@ export class PaymentService {
           deliveryId: meta.deliveryId,
           customerId: payment.userId,
         });
-        // DO NOT start delivery matching for direct delivery
       }
     }
 

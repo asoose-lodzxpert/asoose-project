@@ -1,5 +1,7 @@
 'use client';
 
+import { useEffect } from 'react';
+import { useSession } from 'next-auth/react';
 import { RideController } from "./components/RideController";
 import { GlobalErrorBoundary } from "@/components/GlobalErrorBoundary";
 import { MapView } from "./components/MapView";
@@ -11,10 +13,22 @@ import { GlobalErrorBanner } from "./components/GlobalErrorBanner";
 import { RideSafetyControls } from "./components/RideSafetyControls";
 import { useRideSynchronization } from "./hooks/useRideSynchronization";
 import { Sidebar } from "./components/Sidebar";
+import { socketService } from '@/services/socket.service';
 
 export default function Home() {
+  const { data: session } = useSession();
   const rideStatus = useRideStore((state) => state.rideStatus);
   const isConfiguring = useRideStore((state) => state.isConfiguring);
+
+  // Connect socket when authenticated
+  useEffect(() => {
+    if (session?.accessToken && !socketService.isConnected()) {
+      socketService.connect(session.accessToken);
+    }
+    return () => {
+      socketService.disconnect();
+    };
+  }, [session?.accessToken]);
 
   // Activate State Recovery
   useRideSynchronization();

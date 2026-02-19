@@ -29,6 +29,10 @@ export class HttpExceptionFilter implements ExceptionFilter {
       this.logger.error(`Global Exception Filter: ${exception}`);
       if (exception instanceof Error) {
         this.logger.error(exception.stack);
+        // Include actual error message in dev for debuggability
+        if (process.env.NODE_ENV !== 'production') {
+          message = exception.message || message;
+        }
       }
     }
 

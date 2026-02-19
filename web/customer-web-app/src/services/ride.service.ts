@@ -33,6 +33,9 @@ export interface RideRequestPayload {
     addressText?: string;
   };
   vehicleType: string;
+  fare: number;
+  distanceKm: number;
+  durationMin: number;
   notes?: string;
 }
 
@@ -54,12 +57,60 @@ export interface CreateRideResponse {
 
 
 
+/** Response shape from the /fare/ride backend endpoint */
+interface FareRideResponse {
+  price: number;
+  distance: { meters: number; text: string };
+  eta: { seconds: number; text: string };
+}
+
+/** Business-class fare multiplier applied on top of the base (economy) price */
+const BUSINESS_MULTIPLIER = 1.5;
+
 export class RideService {
+  /**
+   * Fetch fare estimates from /fare/ride and map into ECONOMY / BUSINESS
+   * PriceEstimate records consumed by the booking UI.
+   */
   static async getEstimate(data: {
-    pickupPlaceId?: string; pickupLat?: number; pickupLng?: number;
-    dropoffPlaceId?: string; dropoffLat?: number; dropoffLng?: number;
+    pickupLat?: number; pickupLng?: number;
+    dropoffLat?: number; dropoffLng?: number;
   }, token: string, signal?: AbortSignal): Promise<Record<string, PriceEstimate>> {
-    return ApiService.post<Record<string, PriceEstimate>>("/trips/rides/estimate", data, token, { signal });
+    // Transform to the backend DTO field names (all strings)
+    const farePayload = {
+      pickuplat: String(data.pickupLat),
+      pickuplong: String(data.pickupLng),
+      dropofflat: String(data.dropoffLat),
+      dropofflong: String(data.dropoffLng),
+    };
+
+    const fare = await ApiService.post<FareRideResponse>(
+      "/fare/ride",
+      farePayload,
+      token,
+      { signal },
+    );
+
+    const distanceKm = fare.distance.meters / 1000;
+    const durationMin = Math.round(fare.eta.seconds / 60);
+
+    const economy: PriceEstimate = {
+      estimatedFare: fare.price,
+      distance: distanceKm,
+      duration: durationMin,
+      total: fare.price,
+      breakdown: { baseFare: 0, distanceFare: 0, timeFare: 0, platformFee: 0 },
+    };
+
+    const business: PriceEstimate = {
+      estimatedFare: Math.round(fare.price * BUSINESS_MULTIPLIER),
+      distance: distanceKm,
+      duration: durationMin,
+      total: Math.round(fare.price * BUSINESS_MULTIPLIER),
+      breakdown: { baseFare: 0, distanceFare: 0, timeFare: 0, platformFee: 0 },
+    };
+
+    return { ECONOMY: economy, BUSINESS: business };
   }
 
   static async createRide(data: RideRequestPayload, token: string, idempotencyKey: string): Promise<CreateRideResponse> {
@@ -68,8 +119,8 @@ export class RideService {
     });
   }
 
-  static async confirmRide(rideId: string, paymentMethod: "CASH" | "CARD", token: string) {
-    return ApiService.post(`/trips/rides/${rideId}/confirm`, { paymentMethod }, token);
+  static async confirmRide(rideId: string, paymentMethod: "CASH" | "CARD", token: string): Promise<{ status: string; rideId: string }> {
+    return ApiService.post<{ status: string; rideId: string }>(`/trips/rides/${rideId}/confirm`, { paymentMethod }, token);
   }
 
   /**

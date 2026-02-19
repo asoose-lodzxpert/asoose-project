@@ -51,9 +51,18 @@ import { LogsModule } from './logs/logs.module';
     EventEmitterModule.forRoot({ global: true }),
     ScheduleModule.forRoot(),
 
-    // ---------- MongoDB ----------
+    // ---------- MongoDB (optional — used only for error-log storage) ----------
     MongooseModule.forRoot(
       process.env.MONGODB_URI || 'mongodb://localhost:27017/asoose',
+      {
+        // Don't block server startup if MongoDB is unavailable
+        lazyConnection: true,
+        // Fail fast instead of retrying forever
+        serverSelectionTimeoutMS: 5_000,
+        connectTimeoutMS: 5_000,
+        retryAttempts: 2,
+        retryDelay: 1_000,
+      },
     ),
 
     // ---------- Rate Limiting ----------

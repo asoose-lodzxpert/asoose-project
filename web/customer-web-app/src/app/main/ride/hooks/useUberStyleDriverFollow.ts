@@ -22,7 +22,7 @@ export const useUberStyleDriverFollow = (map: google.maps.Map | null) => {
 
   useEffect(() => {
     // Only follow in specific states
-    const shouldFollow = ['in-progress', 'arriving', 'confirmed'].includes(rideStatus) && 
+    const shouldFollow = ['in-progress', 'arrived', 'confirmed'].includes(rideStatus) && 
                          driverLocation && 
                          map && 
                          isFollowing; // Check if user has enabled following

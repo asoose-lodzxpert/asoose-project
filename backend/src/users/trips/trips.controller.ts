@@ -33,6 +33,61 @@ export class TripsController {
     private readonly deliveryService: DeliveriesService,
   ) {}
 
+  // =============================================
+  // RIDES — Static routes MUST come before :id
+  // =============================================
+
+  @Get('vehicle-types')
+  getVehicleTypes() {
+    return Object.values(VehicleType);
+  }
+
+  @Post('rides/estimate')
+  async getRideEstimate(@Body() dto: RideEstimateDto) {
+    return this.tripsService.getRideEstimate(dto);
+  }
+
+  @Get('rides/current')
+  async getCurrentRide(@Request() req) {
+    return this.tripsService.getCurrentRide(req.user.id);
+  }
+
+  @Post('rides/request')
+  async requestRide(
+    @Request() req,
+    @Body() dto: RequestRideDto,
+    @Headers('x-idempotency-key') idempotencyKey: string,
+  ) {
+    if (!idempotencyKey)
+      throw new BadRequestException(
+        'Idempotency key required to prevent ghost rides.',
+      );
+    return this.tripsService.requestRide(req.user.id, dto, idempotencyKey);
+  }
+
+  /**
+   * Get all user's rides
+   * GET /trips/rides?status=REQUESTED&page=1&limit=10
+   */
+  @Get('rides')
+  async getUserRides(
+    @Request() req,
+    @Query('status') status?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const pageNum = page ? parseInt(page, 10) : 1;
+    const limitNum = limit ? parseInt(limit, 10) : 20;
+    return this.tripsService.getUserRides(
+      req.user.id,
+      status,
+      pageNum,
+      limitNum,
+    );
+  }
+
+  // Parameterized routes AFTER static routes
+
   @Post('rides/:id/confirm')
   async confirmRide(
     @Request() req,
@@ -61,27 +116,6 @@ export class TripsController {
   }
 
   /**
-   * Get all user's rides
-   * GET /trips/rides?status=REQUESTED&page=1&limit=10
-   */
-  @Get('rides')
-  async getUserRides(
-    @Request() req,
-    @Query('status') status?: string,
-    @Query('page') page?: string,
-    @Query('limit') limit?: string,
-  ) {
-    const pageNum = page ? parseInt(page, 10) : 1;
-    const limitNum = limit ? parseInt(limit, 10) : 20;
-    return this.tripsService.getUserRides(
-      req.user.id,
-      status,
-      pageNum,
-      limitNum,
-    );
-  }
-
-  /**
    * Cancel a ride
    * PATCH /trips/rides/:id/cancel
    */
@@ -94,9 +128,28 @@ export class TripsController {
     return this.tripsService.cancelRide(req.user.id, rideId, dto);
   }
 
-  // DELIVERY ENDPOINTS
+  /**
+   * Rate a ride driver
+   * POST /trips/rides/:id/rate
+   */
+  @Post('rides/:id/rate')
+  async rateRide(
+    @Request() req,
+    @Param('id') rideId: string,
+    @Body() body: { rating: number; comment?: string },
+  ) {
+    return this.tripsService.rateRide(req.user.id, rideId, body.rating, body.comment);
+  }
 
-  // FIX: Updated to capture idempotency-key header
+  @Patch('rides/:id/arrived')
+  async driverArrived(@Request() req, @Param('id') rideId: string) {
+    return this.tripsService.driverArrived(rideId, req.user.id);
+  }
+
+  // =============================================
+  // DELIVERIES
+  // =============================================
+
   @Post('deliveries/request')
   async requestDelivery(
     @Request() req,
@@ -123,33 +176,5 @@ export class TripsController {
     @Body() dto: CancelTripDto,
   ) {
     return this.tripsService.cancelDelivery(req.user.id, deliveryId, dto);
-  }
-
-  @Patch('rides/:id/arrived')
-  async driverArrived(@Request() req, @Param('id') rideId: string) {
-    return this.tripsService.driverArrived(rideId, req.user.id);
-  }
-  @Get('vehicle-types')
-  getVehicleTypes() {
-    // Single Source of Truth for the frontend
-    return Object.values(VehicleType); // Returns ["ECONOMY", "BUSINESS"]
-  }
-  @Get('rides/current')
-  async getCurrentRide(@Request() req) {
-    // Returns the current ride, ensuring PENDING rides with expired payment intents are purged.
-    return this.tripsService.getCurrentRide(req.user.id);
-  }
-
-  @Post('rides/request')
-  async requestRide(
-    @Request() req,
-    @Body() dto: RequestRideDto,
-    @Headers('x-idempotency-key') idempotencyKey: string,
-  ) {
-    if (!idempotencyKey)
-      throw new BadRequestException(
-        'Idempotency key required to prevent ghost rides.',
-      );
-    return this.tripsService.requestRide(req.user.id, dto, idempotencyKey);
   }
 }

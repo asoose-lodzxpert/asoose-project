@@ -112,18 +112,59 @@ export class RidesService {
       `Request Ride - User: ${userId}, Vehicle: ${dto.vehicleType}, IdempotencyKey: ${idempotencyKey}`,
     );
 
+    try {
+      return await this._requestRideImpl(userId, dto, idempotencyKey);
+    } catch (error: any) {
+      // Re-throw NestJS HTTP exceptions (BadRequest, Conflict, etc.) as-is
+      if (error?.getStatus && typeof error.getStatus === 'function') {
+        throw error;
+      }
+      // Prisma-specific errors
+      if (error?.code) {
+        this.logger.error(
+          `Prisma error in requestRide: code=${error.code}, meta=${JSON.stringify(error.meta)}, message=${error.message}`,
+        );
+        throw new InternalServerErrorException(
+          `Database error: ${error.code} — ${error.meta?.cause || error.message}`,
+        );
+      }
+      // Unknown errors
+      this.logger.error(
+        `Unexpected error in requestRide: ${error.message}`,
+        error.stack,
+      );
+      throw new InternalServerErrorException(
+        `Ride creation failed: ${error.message}`,
+      );
+    }
+  }
+
+  private async _requestRideImpl(
+    userId: string,
+    dto: RequestRideDto,
+    idempotencyKey: string,
+  ) {
+
     if (!idempotencyKey) {
       throw new BadRequestException(
         'Idempotency key is required to prevent duplicate requests.',
       );
     }
 
-    // Only recover a ride that is still in a resumable (non-terminal) state.
-    // Without this filter the query returns CANCELLED / COMPLETED rides and
-    // incorrectly hands them back as a "cache hit", breaking the next booking.
+    // Early DB health check — fast-fail with a clear error instead of 500
+    try {
+      await this.prisma.$queryRaw`SELECT 1`;
+    } catch {
+      throw new InternalServerErrorException(
+        'Database is currently unavailable. Please try again shortly.',
+      );
+    }
+
+    // Check idempotency: find a ride with same key in non-terminal status
     const existingRequest = await this.prisma.ride.findFirst({
       where: {
         customerId: userId,
+        idempotencyKey,
         status: {
           in: [
             RideStatus.PENDING,
@@ -140,12 +181,12 @@ export class RidesService {
 
     if (existingRequest) {
       this.logger.log(
-        `Idempotency match found for key: ${idempotencyKey}. Returning cached ride.`,
+        `Idempotency match found for key: ${idempotencyKey}. Returning cached ride ${existingRequest.id}.`,
       );
       return {
         ride: { ...existingRequest, startOtp: undefined },
         fare: existingRequest.totalFare,
-        payment: existingRequest.payment?.[0] || null,
+        payment: existingRequest.payment || null,
         message: 'Ride request recovered from previous attempt.',
       };
     }
@@ -295,6 +336,7 @@ export class RidesService {
             pickupAddressId: pickupAddress.id,
             dropoffAddressId: dropoffAddress.id,
             status: RideStatus.PENDING,
+            idempotencyKey,
             distanceKm,
             durationMin,
             totalFare: finalFare,
@@ -350,17 +392,21 @@ export class RidesService {
         );
       }
 
+      // Update payment method — always keep PENDING until real payment is confirmed
       await tx.payment.updateMany({
         where: { rideId: rideId },
         data: {
           method: methodEnum,
-          status:
-            methodEnum === PaymentMethod.CASH
-              ? PaymentStatus.PENDING
-              : PaymentStatus.COMPLETED,
+          status: PaymentStatus.PENDING,
         },
       });
 
+      // CARD: ride stays PENDING — wait for Paystack payment before matching
+      if (methodEnum === PaymentMethod.CARD) {
+        return { status: 'AWAITING_PAYMENT', rideId };
+      }
+
+      // CASH: transition to REQUESTED and start driver matching immediately
       await tx.ride.update({
         where: { id: rideId },
         data: { status: RideStatus.REQUESTED },
@@ -757,6 +803,59 @@ export class RidesService {
 
     await this.common.logActivity(riderId, 'DRIVER_ARRIVED', { rideId });
     return { success: true, message: 'Driver arrival confirmed' };
+  }
+
+  /**
+   * Rate the driver for a completed ride.
+   * Updates the rider's running average rating.
+   */
+  async rateRide(userId: string, rideId: string, rating: number, comment?: string) {
+    if (!rating || rating < 1 || rating > 5 || !Number.isInteger(rating)) {
+      throw new BadRequestException('Rating must be an integer between 1 and 5');
+    }
+
+    const ride = await this.prisma.ride.findUnique({
+      where: { id: rideId },
+      select: { customerId: true, riderId: true, status: true },
+    });
+
+    if (!ride || ride.customerId !== userId) {
+      throw new NotFoundException('Ride not found');
+    }
+    if (ride.status !== RideStatus.COMPLETED) {
+      throw new BadRequestException('Can only rate completed rides');
+    }
+    if (!ride.riderId) {
+      throw new BadRequestException('No driver assigned to this ride');
+    }
+
+    // Update rider's running average: newAvg = (old * count + new) / (count + 1)
+    const rider = await this.prisma.rider.findUnique({
+      where: { id: ride.riderId },
+      select: { rating: true, totalRides: true },
+    });
+
+    if (!rider) throw new NotFoundException('Rider not found');
+
+    const oldAvg = rider.rating || 5.0;
+    const count = rider.totalRides || 0;
+    const newAvg = count > 0
+      ? (oldAvg * count + rating) / (count + 1)
+      : rating;
+
+    await this.prisma.rider.update({
+      where: { id: ride.riderId },
+      data: { rating: Math.round(newAvg * 100) / 100 },
+    });
+
+    await this.common.logActivity(userId, 'RIDE_RATED', {
+      rideId,
+      riderId: ride.riderId,
+      rating,
+      comment: comment ? this.common.sanitizeText(comment) : undefined,
+    });
+
+    return { success: true, message: 'Rating submitted' };
   }
 
   // --- JOBS SERVICE STUBS ---

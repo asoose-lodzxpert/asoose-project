@@ -110,150 +110,108 @@ export const socketService = new SocketService();
 // ============================================================================
 // --- RIDE EVENT LISTENERS ---
 // ============================================================================
+// Event names & payloads match the NestJS backend exactly.
+// Backend emits to `user_${customerId}` room with flat event names.
 
-export interface RideDriverAssignedEvent {
-  rideId: string;
-  driver: {
-    id: string;
-    name: string;
-    phone: string;
-    rating: number;
-    vehicleNumber: string;
-    image?: string;
-    location: {
-      latitude: number;
-      longitude: number;
-      heading?: number; // <--- FIXED: Added heading
+/** Emitted when a rider accepts the ride request */
+export interface DriverFoundEvent {
+  type: 'DRIVER_FOUND';
+  metadata: {
+    rideId: string;
+    driver: {
+      id: string;
+      name: string;
+      phone: string;
+      vehicle: {
+        brand: string;
+        model: string;
+        plateNumber: string;
+        color: string;
+        year: number;
+      };
     };
   };
-  eta: number;
 }
 
-export interface RideStatusChangedEvent {
-  rideId: string;
-  status: "REQUESTED" | "ACCEPTED" | "ARRIVED" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
-  timestamp: string;
-  message?: string;
-}
-
+/** Real-time driver GPS pings while ride is active */
 export interface DriverLocationUpdateEvent {
-  rideId: string;
-  location: {
-    latitude: number;
-    longitude: number;
-    heading?: number; // <--- FIXED: Added heading
+  type: 'DRIVER_LOCATION_UPDATE';
+  metadata: {
+    lat: number;
+    lng: number;
+    heading: number;
+    rideId: string;
   };
-  timestamp: string;
+}
+
+/** Emitted when driver arrives at pickup point */
+export interface DriverArrivedEvent {
+  type: 'DRIVER_ARRIVED';
+  metadata: {
+    rideId: string;
+    message: string;
+  };
+}
+
+/** Emitted for TRIP_STARTED, TRIP_COMPLETED, RIDE_CANCELLED */
+export interface RideStatusEvent {
+  type: 'TRIP_STARTED' | 'TRIP_COMPLETED' | 'RIDE_CANCELLED';
+  rideId: string;
 }
 
 export const subscribeToRideEvents = (
-  rideId: string,
   callbacks: {
-    onDriverAssigned?: (data: RideDriverAssignedEvent) => void;
-    onStatusChanged?: (data: RideStatusChangedEvent) => void;
+    onDriverFound?: (data: DriverFoundEvent) => void;
     onDriverLocationUpdate?: (data: DriverLocationUpdateEvent) => void;
-    onDriverArrived?: () => void;
+    onDriverArrived?: (data: DriverArrivedEvent) => void;
+    onTripStarted?: (data: RideStatusEvent) => void;
+    onTripCompleted?: (data: RideStatusEvent) => void;
+    onRideCancelled?: (data: RideStatusEvent) => void;
   },
 ) => {
-  if (callbacks.onDriverAssigned) {
-    socketService.on(`ride.${rideId}.driver.assigned`, callbacks.onDriverAssigned);
+  if (callbacks.onDriverFound) {
+    socketService.on('DRIVER_FOUND', callbacks.onDriverFound);
   }
-
-  if (callbacks.onStatusChanged) {
-    socketService.on(`ride.${rideId}.status.changed`, callbacks.onStatusChanged);
-  }
-
   if (callbacks.onDriverLocationUpdate) {
-    socketService.on(`ride.${rideId}.driver.location`, callbacks.onDriverLocationUpdate);
+    socketService.on('DRIVER_LOCATION_UPDATE', callbacks.onDriverLocationUpdate);
   }
-
   if (callbacks.onDriverArrived) {
-    socketService.on(`ride.${rideId}.driver.arrived`, callbacks.onDriverArrived);
+    socketService.on('DRIVER_ARRIVED', callbacks.onDriverArrived);
+  }
+  if (callbacks.onTripStarted) {
+    socketService.on('TRIP_STARTED', callbacks.onTripStarted);
+  }
+  if (callbacks.onTripCompleted) {
+    socketService.on('TRIP_COMPLETED', callbacks.onTripCompleted);
+  }
+  if (callbacks.onRideCancelled) {
+    socketService.on('RIDE_CANCELLED', callbacks.onRideCancelled);
   }
 };
 
-export const unsubscribeFromRideEvents = (rideId: string) => {
-  socketService.off(`ride.${rideId}.driver.assigned`);
-  socketService.off(`ride.${rideId}.status.changed`);
-  socketService.off(`ride.${rideId}.driver.location`);
-  socketService.off(`ride.${rideId}.driver.arrived`);
+export const unsubscribeFromRideEvents = () => {
+  socketService.off('DRIVER_FOUND');
+  socketService.off('DRIVER_LOCATION_UPDATE');
+  socketService.off('DRIVER_ARRIVED');
+  socketService.off('TRIP_STARTED');
+  socketService.off('TRIP_COMPLETED');
+  socketService.off('RIDE_CANCELLED');
 };
 
 // ============================================================================
 // --- DELIVERY EVENT LISTENERS ---
 // ============================================================================
+// Backend emits 'delivery_update' to `user_${customerId}` room.
+// The delivery detail page subscribes directly via socketService.on('delivery_update', ...).
+// These types describe the actual backend payload shape.
 
-// <--- FIXED: Renamed back to DeliveryRiderAssignedEvent, changed rideId to deliveryId, and driver to rider
-export interface DeliveryRiderAssignedEvent {
+export interface DeliveryUpdateEvent {
   deliveryId: string;
-  rider: {
-    id: string;
+  status: 'ASSIGNED' | 'PICKED_UP' | 'DELIVERED' | 'CANCELLED';
+  label: string;
+  rider?: {
     name: string;
     phone: string;
-    rating: number;
-    vehicleNumber: string;
-    image?: string;
-    location: {
-      latitude: number;
-      longitude: number;
-      heading?: number; // <--- FIXED: Added heading
-    };
+    vehicle: string;
   };
-  eta: number;
 }
-
-export interface DeliveryStatusChangedEvent {
-  deliveryId: string;
-  status: "REQUESTED" | "ASSIGNED" | "PICKED_UP" | "DELIVERED" | "CANCELLED";
-  timestamp: string;
-  message?: string;
-}
-
-export interface RiderLocationUpdateEvent {
-  deliveryId: string;
-  location: {
-    latitude: number;
-    longitude: number;
-    heading?: number;
-  };
-  timestamp: string;
-}
-
-export const subscribeToDeliveryEvents = (
-  deliveryId: string,
-  callbacks: {
-    onRiderAssigned?: (data: DeliveryRiderAssignedEvent) => void;
-    onStatusChanged?: (data: DeliveryStatusChangedEvent) => void;
-    onRiderLocationUpdate?: (data: RiderLocationUpdateEvent) => void;
-    onRiderArrived?: () => void;
-    onPackagePickedUp?: () => void;
-  },
-) => {
-  if (callbacks.onRiderAssigned) {
-    socketService.on(`delivery.${deliveryId}.rider.assigned`, callbacks.onRiderAssigned);
-  }
-
-  if (callbacks.onStatusChanged) {
-    socketService.on(`delivery.${deliveryId}.status.changed`, callbacks.onStatusChanged);
-  }
-
-  if (callbacks.onRiderLocationUpdate) {
-    socketService.on(`delivery.${deliveryId}.rider.location`, callbacks.onRiderLocationUpdate);
-  }
-
-  if (callbacks.onRiderArrived) {
-    socketService.on(`delivery.${deliveryId}.rider.arrived`, callbacks.onRiderArrived);
-  }
-
-  if (callbacks.onPackagePickedUp) {
-    socketService.on(`delivery.${deliveryId}.package.picked_up`, callbacks.onPackagePickedUp);
-  }
-};
-
-export const unsubscribeFromDeliveryEvents = (deliveryId: string) => {
-  socketService.off(`delivery.${deliveryId}.rider.assigned`);
-  socketService.off(`delivery.${deliveryId}.status.changed`);
-  socketService.off(`delivery.${deliveryId}.rider.location`);
-  socketService.off(`delivery.${deliveryId}.rider.arrived`);
-  socketService.off(`delivery.${deliveryId}.package.picked_up`);
-};

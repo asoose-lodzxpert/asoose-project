@@ -1,129 +1,143 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useSession } from 'next-auth/react'; // 1. Import Session
+import { useSession } from 'next-auth/react';
 import { toast } from 'react-toastify';
 import { useRideStore } from '../store/ride';
 import { subscribeToRideEvents, unsubscribeFromRideEvents } from '@/services/socket.service';
-import { RideService } from '@/services/ride.service'; // 2. Import Service
+import { RideService } from '@/services/ride.service';
 
 export function RideSocketListener() {
-  const { data: session } = useSession(); // 3. Get Session
+  const { data: session } = useSession();
   
   const rideId = useRideStore((state) => state.rideId);
   const setDriver = useRideStore((state) => state.setDriver);
   const setRideStatus = useRideStore((state) => state.setRideStatus);
   const setDriverLocation = useRideStore((state) => state.setDriverLocation);
   const setDriverHeading = useRideStore((state) => state.setDriverHeading);
-  const setTripSummary = useRideStore((state) => state.setTripSummary); // 4. Get Summary Setter
+  const setTripSummary = useRideStore((state) => state.setTripSummary);
 
   useEffect(() => {
     if (!rideId) return;
 
     console.log(`📡 Initializing Socket Listener for Ride: ${rideId}`);
 
-    subscribeToRideEvents(rideId, {
-      // 1. Driver Found & Assigned
-      onDriverAssigned: (data) => {
+    subscribeToRideEvents({
+      // 1. Driver Found — backend emits DRIVER_FOUND with real vehicle data
+      onDriverFound: (data) => {
         try {
-          console.log('✅ Driver Assigned:', data);
+          // Guard: ignore events for a different ride
+          if (data.metadata.rideId !== rideId) return;
+
+          const { driver } = data.metadata;
+          console.log('✅ Driver Found:', driver.name);
+
           setDriver({
-            name: data.driver.name,
-            photoUrl: data.driver.image || '/profile.jpg',
+            name: driver.name,
+            photoUrl: '/profile.jpg',
             vehicle: {
-              make: 'Toyota', 
-              model: 'Corolla',
-              licensePlate: data.driver.vehicleNumber,
+              make: driver.vehicle?.brand || 'Vehicle',
+              model: driver.vehicle?.model || 'Car',
+              licensePlate: driver.vehicle?.plateNumber || '---',
             },
-            rating: data.driver.rating,
-            phone: data.driver.phone
-          });
-          setDriverLocation({
-            lat: data.driver.location.latitude,
-            lng: data.driver.location.longitude
+            rating: 5.0, // Backend doesn't send rating in this event
+            phone: driver.phone,
           });
           setRideStatus('confirmed');
-          toast.success(`Driver found! ${data.driver.name} is on the way.`);
+          toast.success(`Driver found! ${driver.name} is on the way.`);
         } catch (error) {
-          console.error('Socket error (onDriverAssigned):', error);
+          console.error('Socket error (onDriverFound):', error);
           toast.error('Error processing driver assignment.');
         }
       },
-      // 2. Real-time Driver Movement
+
+      // 2. Real-time Driver Location Updates
       onDriverLocationUpdate: (data) => {
         try {
+          if (data.metadata.rideId !== rideId) return;
+
           setDriverLocation({
-            lat: data.location.latitude,
-            lng: data.location.longitude
+            lat: data.metadata.lat,
+            lng: data.metadata.lng,
           });
-          if (data.location.heading) {
-            setDriverHeading(data.location.heading);
+          if (data.metadata.heading) {
+            setDriverHeading(data.metadata.heading);
           }
         } catch (error) {
           console.error('Socket error (onDriverLocationUpdate):', error);
         }
       },
-      // 3. Status Changes (Arrived, In Progress, Completed)
-      onStatusChanged: (data) => {
+
+      // 3. Driver Arrived at Pickup
+      onDriverArrived: (data) => {
         try {
-          console.log('🔄 Ride Status Changed:', data.status);
-          switch (data.status) {
-            case 'ACCEPTED':
-              setRideStatus('confirmed');
-              break;
-            case 'ARRIVED': 
-              setRideStatus('arrived');
-              toast.info('Driver has arrived!');
-              break;
-            case 'IN_PROGRESS':
-              setRideStatus('in-progress');
-              toast.info('Trip started.');
-              break;
-            case 'COMPLETED':
-              setRideStatus('finished');
-              toast.success('Trip completed!');
-              if (session?.accessToken) {
-                RideService.getCurrentRide(session.accessToken)
-                  .then((ride) => {
-                    if (ride) {
-                      setTripSummary({
-                        fare: ride.totalFare || ride.estimatedFare || 0,
-                        distance: ride.distanceKm || 0,
-                        duration: 0 // Duration calculation can be added here if start/end times exist
-                      });
-                    }
-                  })
-                  .catch((err) => {
-                    console.error("Failed to fetch final trip summary:", err);
-                    toast.error('Error fetching final trip summary.');
-                  });
-              }
-              break;
-            case 'CANCELLED':
-              setRideStatus('idle');
-              toast.error('Ride was cancelled.');
-              break;
-          }
-        } catch (error) {
-          console.error('Socket error (onStatusChanged):', error);
-          toast.error('Error processing ride status update.');
-        }
-      },
-      // 4. Specific Arrival Event (if backend emits this separately)
-      onDriverArrived: () => {
-        try {
+          if (data.metadata.rideId !== rideId) return;
+
           setRideStatus('arrived');
-          toast.info('Driver has arrived at pickup point.');
+          toast.info('Driver has arrived at pickup point!');
         } catch (error) {
           console.error('Socket error (onDriverArrived):', error);
         }
-      }
+      },
+
+      // 4. Trip Started (OTP verified)
+      onTripStarted: (data) => {
+        try {
+          if (data.rideId !== rideId) return;
+
+          setRideStatus('in-progress');
+          toast.info('Trip started.');
+        } catch (error) {
+          console.error('Socket error (onTripStarted):', error);
+        }
+      },
+
+      // 5. Trip Completed
+      onTripCompleted: (data) => {
+        try {
+          if (data.rideId !== rideId) return;
+
+          setRideStatus('finished');
+          toast.success('Trip completed!');
+
+          // Fetch final trip summary for the rating screen
+          if (session?.accessToken) {
+            RideService.getCurrentRide(session.accessToken)
+              .then((ride) => {
+                if (ride) {
+                  setTripSummary({
+                    fare: ride.totalFare || ride.estimatedFare || 0,
+                    distance: ride.distanceKm || 0,
+                    duration: 0,
+                  });
+                }
+              })
+              .catch((err) => {
+                console.error('Failed to fetch final trip summary:', err);
+              });
+          }
+        } catch (error) {
+          console.error('Socket error (onTripCompleted):', error);
+        }
+      },
+
+      // 6. Ride Cancelled
+      onRideCancelled: (data) => {
+        try {
+          if (data.rideId !== rideId) return;
+
+          setRideStatus('idle');
+          toast.error('Ride was cancelled.');
+        } catch (error) {
+          console.error('Socket error (onRideCancelled):', error);
+        }
+      },
     });
 
     // Cleanup on unmount or rideId change
     return () => {
       console.log(`🔌 Disconnecting Socket Listener for Ride: ${rideId}`);
-      unsubscribeFromRideEvents(rideId);
+      unsubscribeFromRideEvents();
     };
   }, [rideId, setDriver, setRideStatus, setDriverLocation, setDriverHeading, setTripSummary, session?.accessToken]);
 

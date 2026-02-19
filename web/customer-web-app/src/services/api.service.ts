@@ -4,6 +4,25 @@ import { getCookie } from "cookies-next"; // ✅ Import to access cookies
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1";
 
+/**
+ * Combines multiple AbortSignals so that aborting ANY one cancels the request.
+ * Returns a single AbortSignal that fires when the first source signal aborts.
+ */
+function anySignal(signals: AbortSignal[]): AbortSignal {
+  const controller = new AbortController();
+  for (const signal of signals) {
+    if (signal.aborted) {
+      controller.abort(signal.reason);
+      return controller.signal;
+    }
+    signal.addEventListener("abort", () => controller.abort(signal.reason), {
+      once: true,
+      signal: controller.signal,        // auto-cleanup when controller itself aborts
+    });
+  }
+  return controller.signal;
+}
+
 export class ApiService {
   private static async getHeaders(token?: string) {
     if (token) {
@@ -30,20 +49,70 @@ export class ApiService {
     };
   }
 
+  /** Default request timeout (15 seconds) */
+  private static readonly REQUEST_TIMEOUT_MS = 15_000;
+
   static async request<T>(
     endpoint: string,
     options: RequestInit = {},
     token?: string,
   ): Promise<T> {
     const headers = await this.getHeaders(token);
+    const url = `${API_URL}${endpoint}`;
 
-    const response = await fetch(`${API_URL}${endpoint}`, {
-      ...options,
-      headers: {
-        ...headers,
-        ...options.headers,
-      },
-    });
+    // --- Timeout handling ---
+    // If the caller already supplied a signal (e.g. for manual abort) we chain
+    // it with our own timeout so both can cancel the request.
+    const timeoutController = new AbortController();
+    const timeoutId = setTimeout(
+      () => timeoutController.abort(),
+      this.REQUEST_TIMEOUT_MS,
+    );
+
+    // Combine caller signal + timeout signal
+    const callerSignal = options.signal;
+    const combinedSignal = callerSignal
+      ? anySignal([callerSignal, timeoutController.signal])
+      : timeoutController.signal;
+
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        ...options,
+        signal: combinedSignal,
+        headers: {
+          ...headers,
+          ...options.headers,
+        },
+      });
+    } catch (networkError: any) {
+      clearTimeout(timeoutId);
+
+      // Re-throw caller-initiated aborts as-is (e.g. user navigated away)
+      if (callerSignal?.aborted) {
+        throw networkError;
+      }
+
+      // Timeout
+      if (timeoutController.signal.aborted) {
+        console.error(`ApiService: Request timed out after ${this.REQUEST_TIMEOUT_MS}ms — ${options.method ?? "GET"} ${url}`);
+        throw {
+          status: 0,
+          message: "Request timed out. The server took too long to respond.",
+          type: "timeout",
+        };
+      }
+
+      // Connection refused / DNS failure / network offline
+      console.error(`ApiService: Network error — ${options.method ?? "GET"} ${url}`, networkError);
+      throw {
+        status: 0,
+        message: "Cannot reach the server. Please check that the backend is running and try again.",
+        type: "network-error",
+      };
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
     // Handle Unauthorized (401) explicitly
     if (response.status === 401) {
@@ -146,10 +215,3 @@ export class ApiService {
     return this.request<T>(endpoint, { method: "DELETE", ...options }, token);
   }
 }
-
-  
-
- 
-
-
-

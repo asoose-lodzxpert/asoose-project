@@ -47,7 +47,7 @@ export class PaymentController {
     if (!req.user) {
       throw new Error('User not authenticated');
     }
-    const userId = req.user['userId'] || req.user['id'];
+    const userId = req.user['id'];
 
     try {
       return await this.paymentService.initiatePayment(dto, userId);

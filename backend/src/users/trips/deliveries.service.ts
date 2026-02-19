@@ -405,6 +405,26 @@ export class DeliveriesService {
 
     if (result.count === 0)
       throw new BadRequestException('Invalid state for pickup');
+
+    // Emit socket event so customer sees real-time pickup status
+    try {
+      const delivery = await this.prisma.delivery.findUnique({
+        where: { id: deliveryId },
+        select: { customerId: true },
+      });
+      if (delivery) {
+        this.notificationsGateway.server
+          .to(`user_${delivery.customerId}`)
+          .emit('delivery_update', {
+            deliveryId,
+            status: 'PICKED_UP',
+            label: 'Package Picked Up',
+          });
+      }
+    } catch (e) {
+      this.logger.error('Socket error confirmPickup', e);
+    }
+
     return { success: true };
   }
 
@@ -490,6 +510,19 @@ export class DeliveriesService {
           description: `Earnings for delivery ${delivery.id}`,
         },
       });
+
+      // Emit socket event so customer sees delivery completion in real-time
+      try {
+        this.notificationsGateway.server
+          .to(`user_${delivery.customerId}`)
+          .emit('delivery_update', {
+            deliveryId,
+            status: 'DELIVERED',
+            label: 'Package Delivered',
+          });
+      } catch (e) {
+        this.logger.error('Socket error completeDelivery', e);
+      }
 
       return { success: true };
     });
