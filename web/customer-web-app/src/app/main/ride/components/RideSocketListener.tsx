@@ -1,26 +1,52 @@
-'use client';
+"use client";
 
-import { useEffect } from 'react';
-import { useSession } from 'next-auth/react';
-import { toast } from 'react-toastify';
-import { useRideStore } from '../store/ride';
-import { subscribeToRideEvents, unsubscribeFromRideEvents } from '@/services/socket.service';
-import { RideService } from '@/services/ride.service';
+import { useEffect, useRef } from "react";
+import { useSession } from "next-auth/react";
+import { toast } from "react-toastify";
+import { useRideStore } from "../store/ride";
+import {
+  subscribeToRideEvents,
+  unsubscribeFromRideEvents,
+  socketService,
+} from "@/services/socket.service";
+import { RideService } from "@/services/ride.service";
+
+/** How often to poll driver location via REST when socket has not delivered an update */
+const DRIVER_LOCATION_POLL_MS = 5_000;
 
 export function RideSocketListener() {
   const { data: session } = useSession();
-  
+
   const rideId = useRideStore((state) => state.rideId);
+  const rideStatus = useRideStore((state) => state.rideStatus);
   const setDriver = useRideStore((state) => state.setDriver);
   const setRideStatus = useRideStore((state) => state.setRideStatus);
   const setDriverLocation = useRideStore((state) => state.setDriverLocation);
   const setDriverHeading = useRideStore((state) => state.setDriverHeading);
   const setTripSummary = useRideStore((state) => state.setTripSummary);
 
+  // Track whether we've received at least one live socket location update so
+  // we can skip the costly REST poll when the socket is working fine.
+  const receivedSocketLocation = useRef(false);
+
+  // ─── Socket events ──────────────────────────────────────────────────────────
   useEffect(() => {
     if (!rideId) return;
 
     console.log(`📡 Initializing Socket Listener for Ride: ${rideId}`);
+    receivedSocketLocation.current = false;
+
+    // Also subscribe to ride_update (FINDING_DRIVER emitted by backend on confirm)
+    const handleRideUpdate = (data: any) => {
+      if (data?.rideId && data.rideId !== rideId) return;
+      if (
+        data?.type === "FINDING_DRIVER" ||
+        data?.status === "FINDING_DRIVER"
+      ) {
+        setRideStatus("searching");
+      }
+    };
+    socketService.on("ride_update", handleRideUpdate);
 
     subscribeToRideEvents({
       // 1. Driver Found — backend emits DRIVER_FOUND with real vehicle data
@@ -30,32 +56,33 @@ export function RideSocketListener() {
           if (data.metadata.rideId !== rideId) return;
 
           const { driver } = data.metadata;
-          console.log('✅ Driver Found:', driver.name);
+          console.log("✅ Driver Found:", driver.name);
 
           setDriver({
             name: driver.name,
-            photoUrl: '/profile.jpg',
+            photoUrl: "/profile.jpg",
             vehicle: {
-              make: driver.vehicle?.brand || 'Vehicle',
-              model: driver.vehicle?.model || 'Car',
-              licensePlate: driver.vehicle?.plateNumber || '---',
+              make: driver.vehicle?.brand || "Vehicle",
+              model: driver.vehicle?.model || "Car",
+              licensePlate: driver.vehicle?.plateNumber || "---",
             },
             rating: 5.0, // Backend doesn't send rating in this event
             phone: driver.phone,
           });
-          setRideStatus('confirmed');
+          setRideStatus("confirmed");
           toast.success(`Driver found! ${driver.name} is on the way.`);
         } catch (error) {
-          console.error('Socket error (onDriverFound):', error);
-          toast.error('Error processing driver assignment.');
+          console.error("Socket error (onDriverFound):", error);
+          toast.error("Error processing driver assignment.");
         }
       },
 
-      // 2. Real-time Driver Location Updates
+      // 2. Real-time Driver Location Updates (emitted by rider app via socket relay)
       onDriverLocationUpdate: (data) => {
         try {
           if (data.metadata.rideId !== rideId) return;
 
+          receivedSocketLocation.current = true; // socket is delivering — skip REST poll
           setDriverLocation({
             lat: data.metadata.lat,
             lng: data.metadata.lng,
@@ -64,7 +91,7 @@ export function RideSocketListener() {
             setDriverHeading(data.metadata.heading);
           }
         } catch (error) {
-          console.error('Socket error (onDriverLocationUpdate):', error);
+          console.error("Socket error (onDriverLocationUpdate):", error);
         }
       },
 
@@ -73,10 +100,10 @@ export function RideSocketListener() {
         try {
           if (data.metadata.rideId !== rideId) return;
 
-          setRideStatus('arrived');
-          toast.info('Driver has arrived at pickup point!');
+          setRideStatus("arrived");
+          toast.info("Driver has arrived at pickup point!");
         } catch (error) {
-          console.error('Socket error (onDriverArrived):', error);
+          console.error("Socket error (onDriverArrived):", error);
         }
       },
 
@@ -85,10 +112,10 @@ export function RideSocketListener() {
         try {
           if (data.rideId !== rideId) return;
 
-          setRideStatus('in-progress');
-          toast.info('Trip started.');
+          setRideStatus("in-progress");
+          toast.info("Trip started.");
         } catch (error) {
-          console.error('Socket error (onTripStarted):', error);
+          console.error("Socket error (onTripStarted):", error);
         }
       },
 
@@ -97,8 +124,8 @@ export function RideSocketListener() {
         try {
           if (data.rideId !== rideId) return;
 
-          setRideStatus('finished');
-          toast.success('Trip completed!');
+          setRideStatus("finished");
+          toast.success("Trip completed!");
 
           // Fetch final trip summary for the rating screen
           if (session?.accessToken) {
@@ -113,11 +140,11 @@ export function RideSocketListener() {
                 }
               })
               .catch((err) => {
-                console.error('Failed to fetch final trip summary:', err);
+                console.error("Failed to fetch final trip summary:", err);
               });
           }
         } catch (error) {
-          console.error('Socket error (onTripCompleted):', error);
+          console.error("Socket error (onTripCompleted):", error);
         }
       },
 
@@ -126,10 +153,10 @@ export function RideSocketListener() {
         try {
           if (data.rideId !== rideId) return;
 
-          setRideStatus('idle');
-          toast.error('Ride was cancelled.');
+          setRideStatus("idle");
+          toast.error("Ride was cancelled.");
         } catch (error) {
-          console.error('Socket error (onRideCancelled):', error);
+          console.error("Socket error (onRideCancelled):", error);
         }
       },
     });
@@ -137,9 +164,60 @@ export function RideSocketListener() {
     // Cleanup on unmount or rideId change
     return () => {
       console.log(`🔌 Disconnecting Socket Listener for Ride: ${rideId}`);
+      socketService.off("ride_update", handleRideUpdate);
       unsubscribeFromRideEvents();
     };
-  }, [rideId, setDriver, setRideStatus, setDriverLocation, setDriverHeading, setTripSummary, session?.accessToken]);
+  }, [
+    rideId,
+    setDriver,
+    setRideStatus,
+    setDriverLocation,
+    setDriverHeading,
+    setTripSummary,
+    session?.accessToken,
+  ]);
 
-  return null; 
+  // ─── Driver location REST polling (fallback when socket isn't rebroadcasting) ─
+  // The backend gateway currently only saves rider GPS to Redis; it doesn't
+  // re-emit DRIVER_LOCATION_UPDATE to the customer room.  Poll the REST endpoint
+  // every 5s while the ride is active as a reliable fallback.
+  useEffect(() => {
+    const needsLocation =
+      rideStatus === "confirmed" ||
+      rideStatus === "arrived" ||
+      rideStatus === "in-progress";
+    if (!rideId || !session?.accessToken || !needsLocation) return;
+
+    const poll = async () => {
+      // If socket has recently delivered a location, skip this cycle.
+      if (receivedSocketLocation.current) {
+        receivedSocketLocation.current = false; // reset flag so next cycle re-evaluates
+        return;
+      }
+
+      try {
+        const loc = await RideService.getDriverLocation(
+          rideId,
+          session.accessToken!,
+        );
+        if (loc && (loc.latitude !== 0 || loc.longitude !== 0)) {
+          setDriverLocation({ lat: loc.latitude, lng: loc.longitude });
+          if (loc.heading) setDriverHeading(loc.heading);
+        }
+      } catch {
+        // Silently ignore — socket or next poll will recover
+      }
+    };
+
+    const interval = setInterval(poll, DRIVER_LOCATION_POLL_MS);
+    return () => clearInterval(interval);
+  }, [
+    rideId,
+    rideStatus,
+    session?.accessToken,
+    setDriverLocation,
+    setDriverHeading,
+  ]);
+
+  return null;
 }

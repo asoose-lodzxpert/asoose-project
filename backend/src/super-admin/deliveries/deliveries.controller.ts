@@ -1,10 +1,13 @@
 import {
   Controller,
   Get,
+  Post,
+  Body,
   Param,
   Query,
   Delete,
   UseGuards,
+  Req,
 } from '@nestjs/common';
 import { DeliveriesService } from './delivery.service';
 import { DeliveryFilterDto } from './dto/delivery-filter.dto';
@@ -38,5 +41,16 @@ export class DeliveriesController {
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN_MANAGER)
   remove(@Param('id') id: string) {
     return this.deliveriesService.remove(id);
+  }
+
+  @Post(':id/assign-rider')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN_MANAGER)
+  assignRider(
+    @Param('id') id: string,
+    @Body('riderId') riderId: string,
+    @Req() req: any,
+  ) {
+    const adminId = req.user.id || req.user.sub;
+    return this.deliveriesService.assignRider(id, riderId, adminId);
   }
 }

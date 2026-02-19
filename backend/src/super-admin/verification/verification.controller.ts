@@ -43,7 +43,7 @@ export class VerificationController {
   async handleDecision(
     @Param('id') id: string,
     @Param('type') type: string,
-    @Body() body: { action: string; note?: string },
+    @Body() body: { action: string; note?: string; commissionRate?: number },
     @Request() req,
   ) {
     const adminId = req.user.id || req.user.userId;
@@ -53,6 +53,7 @@ export class VerificationController {
       body.action,
       adminId,
       body.note,
+      body.commissionRate,
     );
   }
   @Get(':id')

@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { useEffect } from 'react';
-import { useSession } from 'next-auth/react';
+import { useEffect } from "react";
+import { useSession } from "next-auth/react";
 import { RideController } from "./components/RideController";
 import { GlobalErrorBoundary } from "@/components/GlobalErrorBoundary";
 import { MapView } from "./components/MapView";
@@ -13,12 +13,13 @@ import { GlobalErrorBanner } from "./components/GlobalErrorBanner";
 import { RideSafetyControls } from "./components/RideSafetyControls";
 import { useRideSynchronization } from "./hooks/useRideSynchronization";
 import { Sidebar } from "./components/Sidebar";
-import { socketService } from '@/services/socket.service';
+import { socketService } from "@/services/socket.service";
 
 export default function Home() {
   const { data: session } = useSession();
   const rideStatus = useRideStore((state) => state.rideStatus);
   const isConfiguring = useRideStore((state) => state.isConfiguring);
+  const rideId = useRideStore((state) => state.rideId);
 
   // Connect socket when authenticated
   useEffect(() => {
@@ -34,14 +35,14 @@ export default function Home() {
   useRideSynchronization();
 
   const isRideActive = [
-    'searching',
-    'confirmed',
-    'arrived',
-    'in-progress'
+    "searching",
+    "confirmed",
+    "arrived",
+    "in-progress",
   ].includes(rideStatus);
 
   // Sidebar-hosted states: idle (RideSelection) and configuring (LocationSelector)
-  const showSidebar = rideStatus === 'idle' || isConfiguring;
+  const showSidebar = rideStatus === "idle" || isConfiguring;
 
   return (
     <GlobalErrorBoundary>
@@ -49,7 +50,9 @@ export default function Home() {
         {/* --- Invisible logic-only components --- */}
         <UserLocationTracker />
         <MapCameraManager />
-        {isRideActive && <RideSocketListener />}
+        {/* Only mount socket listener when we have a confirmed rideId — prevents
+            a stale persisted status from opening a socket channel against no ride */}
+        {isRideActive && rideId && <RideSocketListener />}
 
         {/* --- Sidebar (left column, only for idle/configuring) --- */}
         {showSidebar && (

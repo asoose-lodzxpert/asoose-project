@@ -2,7 +2,14 @@
 
 import React, { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Loader2, Banknote, TrendingUp } from "lucide-react";
+import {
+  Loader2,
+  Banknote,
+  TrendingUp,
+  Percent,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
 import Swal from "sweetalert2";
 import useSWR from "swr";
 import { fetcher } from "@/app/super-admin/hooks/useSuperAdminFetch";
@@ -57,6 +64,27 @@ interface VendorDocument {
   createdAt?: string;
 }
 
+interface VendorReview {
+  id: string;
+  user: string;
+  rating: number;
+  comment: string;
+  date: string;
+  orderId: string;
+}
+
+interface PageMeta {
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+interface Paged<T> {
+  data: T[];
+  meta: PageMeta;
+}
+
 interface VendorDetails {
   id: string;
   name: string;
@@ -72,6 +100,7 @@ interface VendorDetails {
   orders: any[];
   reviews: any[];
   address?: string;
+  commissionRate: number;
   vendorDocuments: VendorDocument[];
   createdAt: string;
   updatedAt: string;
@@ -81,6 +110,71 @@ type PayoutsResponse = { history: any[] } | any[];
 
 const validateEmail = (email: string) =>
   /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
+function Pagination({
+  meta,
+  page,
+  onPageChange,
+}: {
+  meta: PageMeta;
+  page: number;
+  onPageChange: (p: number) => void;
+}) {
+  if (meta.totalPages <= 1) return null;
+  return (
+    <div className="flex items-center justify-between pt-4 border-t border-gray-800 mt-4">
+      <span className="text-xs text-gray-500">
+        {(page - 1) * meta.limit + 1}–{Math.min(page * meta.limit, meta.total)}{" "}
+        of {meta.total}
+      </span>
+      <div className="flex items-center gap-1">
+        <button
+          onClick={() => onPageChange(page - 1)}
+          disabled={page <= 1}
+          className="p-1.5 rounded-lg bg-gray-800 text-gray-400 hover:text-white disabled:opacity-30 transition-colors"
+        >
+          <ChevronLeft className="w-4 h-4" />
+        </button>
+        {Array.from({ length: meta.totalPages }, (_, i) => i + 1)
+          .filter(
+            (p) => p === 1 || p === meta.totalPages || Math.abs(p - page) <= 1,
+          )
+          .reduce<(number | string)[]>((acc, p, i, arr) => {
+            if (i > 0 && (p as number) - (arr[i - 1] as number) > 1)
+              acc.push("…");
+            acc.push(p);
+            return acc;
+          }, [])
+          .map((p, i) =>
+            p === "…" ? (
+              <span key={`e${i}`} className="px-1 text-gray-600 text-sm">
+                …
+              </span>
+            ) : (
+              <button
+                key={p}
+                onClick={() => onPageChange(p as number)}
+                className={`w-7 h-7 rounded-lg text-xs font-bold transition-colors ${
+                  p === page
+                    ? "bg-yellow-500 text-black"
+                    : "bg-gray-800 text-gray-400 hover:text-white"
+                }`}
+              >
+                {p}
+              </button>
+            ),
+          )}
+        <button
+          onClick={() => onPageChange(page + 1)}
+          disabled={page >= meta.totalPages}
+          className="p-1.5 rounded-lg bg-gray-800 text-gray-400 hover:text-white disabled:opacity-30 transition-colors"
+        >
+          <ChevronRight className="w-4 h-4" />
+        </button>
+      </div>
+    </div>
+  );
+}
 
 const TabLoader = () => (
   <div className="flex flex-col items-center justify-center h-64 space-y-4">
@@ -99,12 +193,19 @@ export default function VendorDetailPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
+  // Per-tab pagination
+  const [docsPage, setDocsPage] = useState(1);
+  const [payoutsPage, setPayoutsPage] = useState(1);
+  const [activityPage, setActivityPage] = useState(1);
+  const [reviewsPage, setReviewsPage] = useState(1);
+
   const [formData, setFormData] = useState({
     storeName: "",
     ownerName: "",
     phone: "",
     email: "",
     address: "",
+    commissionRate: 20,
   });
 
   // 1. Main Vendor Profile
@@ -125,6 +226,7 @@ export default function VendorDetailPage() {
             phone: data.phone || "",
             address: data.address || "",
             email: data.email,
+            commissionRate: data.commissionRate ?? 20,
           });
         }
       },
@@ -153,9 +255,9 @@ export default function VendorDetailPage() {
     data: documentsData,
     mutate: mutateDocuments,
     isLoading: isDocumentsLoading,
-  } = useSWR<VendorDocument[]>(
+  } = useSWR<Paged<VendorDocument>>(
     vendor?.id && activeTab === "Documents"
-      ? `/super-admin/vendors/${vendor.id}/documents`
+      ? `/super-admin/vendors/${vendor.id}/documents?page=${docsPage}&limit=10`
       : null,
     fetcher,
   );
@@ -164,25 +266,29 @@ export default function VendorDetailPage() {
     data: payoutsData,
     mutate: mutatePayouts,
     isLoading: isPayoutsLoading,
-  } = useSWR<PayoutsResponse>(
+  } = useSWR<Paged<any>>(
     vendor?.id && activeTab === "Payouts"
-      ? `/super-admin/vendors/${vendor.id}/payouts`
+      ? `/super-admin/vendors/${vendor.id}/payouts?page=${payoutsPage}&limit=10`
       : null,
     fetcher,
   );
 
-  const payoutsHistory =
-    (payoutsData && "history" in payoutsData
-      ? payoutsData.history
-      : Array.isArray(payoutsData)
-        ? payoutsData
-        : []) || [];
+  const payoutsHistory = payoutsData?.data || [];
 
-  const { data: activityLogs, isLoading: isActivityLoading } = useSWR<
-    ActivityLog[]
+  const { data: activityData, isLoading: isActivityLoading } = useSWR<
+    Paged<ActivityLog>
   >(
     vendor?.id && activeTab === "Activity Log"
-      ? `/super-admin/vendors/${vendor.id}/activity`
+      ? `/super-admin/vendors/${vendor.id}/activity?page=${activityPage}&limit=10`
+      : null,
+    fetcher,
+  );
+
+  const { data: reviewsData, isLoading: isReviewsLoading } = useSWR<
+    Paged<VendorReview>
+  >(
+    vendor?.id && activeTab === "Reviews"
+      ? `/super-admin/vendors/${vendor.id}/reviews?page=${reviewsPage}&limit=10`
       : null,
     fetcher,
   );
@@ -425,6 +531,39 @@ export default function VendorDetailPage() {
         {/* Left Column (Info) */}
         <div className="space-y-6 order-2 lg:order-1 min-w-0">
           <HealthScoreCard totalOrders={vendor.totalOrders} />
+
+          {/* Commission Rate Card */}
+          <div className="bg-[#1E293B] border border-gray-800 rounded-2xl p-5">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
+                <Percent className="w-4 h-4" /> Commission Rate
+              </h3>
+            </div>
+            {isEditing ? (
+              <div className="flex items-center gap-3">
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  step={0.5}
+                  value={formData.commissionRate}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      commissionRate: Number(e.target.value),
+                    }))
+                  }
+                  className="w-24 bg-[#0F172A] border border-gray-700 rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-yellow-500 transition-colors"
+                />
+                <span className="text-gray-400 text-sm">%</span>
+              </div>
+            ) : (
+              <p className="text-2xl font-bold text-yellow-500">
+                {vendor.commissionRate ?? 20}%
+              </p>
+            )}
+          </div>
+
           <BusinessInfoCard
             vendor={vendor}
             formData={formData}
@@ -503,20 +642,33 @@ export default function VendorDetailPage() {
             (isPayoutsLoading ? (
               <TabLoader />
             ) : (
-              <PayoutsTabContent
-                unpaidBalance={vendor.unpaidBalance}
-                payouts={payoutsHistory}
-                onProcessPayout={handleProcessPayout}
-              />
+              <>
+                <PayoutsTabContent
+                  unpaidBalance={vendor.unpaidBalance}
+                  payouts={payoutsHistory}
+                  onProcessPayout={handleProcessPayout}
+                />
+                {payoutsData?.meta && (
+                  <Pagination
+                    meta={payoutsData.meta}
+                    page={payoutsPage}
+                    onPageChange={setPayoutsPage}
+                  />
+                )}
+              </>
             ))}
 
           {activeTab === "Documents" &&
             (isDocumentsLoading ? (
               <TabLoader />
             ) : (
-              <DocumentsTab
-                documents={(documentsData || vendor?.vendorDocuments || []).map(
-                  (doc) => ({
+              <>
+                <DocumentsTab
+                  documents={(
+                    documentsData?.data ||
+                    vendor?.vendorDocuments ||
+                    []
+                  ).map((doc) => ({
                     id: doc.id,
                     url: doc.url,
                     status: doc.status,
@@ -526,25 +678,53 @@ export default function VendorDetailPage() {
                       doc.createdAt ||
                       doc.uploadedDate ||
                       new Date().toISOString(),
-                  }),
+                  }))}
+                  onVerify={(id) => handleVerifyDocument(id, "VERIFIED")}
+                  onReject={(id, reason) =>
+                    handleVerifyDocument(id, "REJECTED", reason)
+                  }
+                  showUploadButton={true}
+                />
+                {documentsData?.meta && (
+                  <Pagination
+                    meta={documentsData.meta}
+                    page={docsPage}
+                    onPageChange={setDocsPage}
+                  />
                 )}
-                onVerify={(id) => handleVerifyDocument(id, "VERIFIED")}
-                onReject={(id, reason) =>
-                  handleVerifyDocument(id, "REJECTED", reason)
-                }
-                showUploadButton={true}
-              />
+              </>
             ))}
 
-          {activeTab === "Reviews" && (
-            <ReviewsTab reviews={vendor.reviews || []} />
-          )}
+          {activeTab === "Reviews" &&
+            (isReviewsLoading ? (
+              <TabLoader />
+            ) : (
+              <>
+                <ReviewsTab reviews={reviewsData?.data || []} />
+                {reviewsData?.meta && (
+                  <Pagination
+                    meta={reviewsData.meta}
+                    page={reviewsPage}
+                    onPageChange={setReviewsPage}
+                  />
+                )}
+              </>
+            ))}
 
           {activeTab === "Activity Log" &&
             (isActivityLoading ? (
               <TabLoader />
             ) : (
-              <ActivityLogTab logs={activityLogs || []} />
+              <>
+                <ActivityLogTab logs={activityData?.data || []} />
+                {activityData?.meta && (
+                  <Pagination
+                    meta={activityData.meta}
+                    page={activityPage}
+                    onPageChange={setActivityPage}
+                  />
+                )}
+              </>
             ))}
         </div>
       </div>

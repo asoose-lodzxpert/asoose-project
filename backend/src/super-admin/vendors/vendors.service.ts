@@ -223,6 +223,10 @@ export class StoresService {
         slug: newSlug,
         address: dto.address || undefined,
         status: dto.status || undefined,
+        commissionRate:
+          dto.commissionRate !== undefined
+            ? Number(dto.commissionRate)
+            : undefined,
         vendor:
           dto.ownerName || dto.phone || dto.email
             ? {
@@ -368,6 +372,7 @@ export class StoresService {
       createdAt: store.createdAt,
       updatedAt: store.updatedAt,
       totalRevenue,
+      commissionRate: store.commissionRate ?? 20,
       unpaidBalance: Math.max(0, totalRevenue - paidOut),
       totalOrders: store.orders.length,
       reviewsCount: store.reviews.length,
@@ -486,14 +491,101 @@ export class StoresService {
 
     return { success: true, message: 'Email queued successfully' };
   }
-  async getVendorPayouts(storeId: string) {
-    return this.prisma.vendorPayout.findMany({
-      where: {
-        storeId: storeId,
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
+  async getVendorPayouts(storeId: string, page = 1, limit = 10) {
+    const skip = (page - 1) * limit;
+    const [data, total] = await Promise.all([
+      this.prisma.vendorPayout.findMany({
+        where: { storeId },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.vendorPayout.count({ where: { storeId } }),
+    ]);
+    return {
+      data,
+      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+    };
+  }
+
+  async getVendorDocuments(storeId: string, page = 1, limit = 10) {
+    const store = await this.prisma.store.findUnique({
+      where: { id: storeId },
+      select: { vendorId: true },
     });
+    if (!store) throw new NotFoundException('Store not found');
+
+    const skip = (page - 1) * limit;
+    const [data, total] = await Promise.all([
+      this.prisma.vendorDocument.findMany({
+        where: { vendorId: store.vendorId },
+        orderBy: { uploadedDate: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.vendorDocument.count({ where: { vendorId: store.vendorId } }),
+    ]);
+
+    return {
+      data: data.map((d) => ({
+        id: d.id,
+        name: d.name,
+        fileName: d.fileName,
+        url: d.url,
+        status: d.status,
+        uploadedDate: d.uploadedDate,
+      })),
+      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+    };
+  }
+
+  async getVendorActivity(storeId: string, page = 1, limit = 10) {
+    const skip = (page - 1) * limit;
+    const [data, total] = await Promise.all([
+      this.prisma.storeLog.findMany({
+        where: { storeId },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.storeLog.count({ where: { storeId } }),
+    ]);
+
+    return {
+      data: data.map((log) => ({
+        id: log.id,
+        action: log.action,
+        details: log.details,
+        user: log.performedBy || 'System',
+        timestamp: log.createdAt,
+      })),
+      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+    };
+  }
+
+  async getVendorReviews(storeId: string, page = 1, limit = 10) {
+    const skip = (page - 1) * limit;
+    const [data, total] = await Promise.all([
+      this.prisma.review.findMany({
+        where: { storeId },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+        include: { user: { select: { name: true } } },
+      }),
+      this.prisma.review.count({ where: { storeId } }),
+    ]);
+
+    return {
+      data: data.map((r) => ({
+        id: r.id,
+        user: r.user?.name || 'Anonymous',
+        rating: r.rating,
+        comment: r.comment || '',
+        date: r.createdAt,
+        orderId: '',
+      })),
+      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+    };
   }
 }

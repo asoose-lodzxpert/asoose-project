@@ -95,6 +95,7 @@ export class VerificationService {
     action: string,
     adminId: string,
     note?: string,
+    commissionRate?: number,
   ) {
     const isVendor = type === 'vendor';
     const vStatus =
@@ -119,25 +120,40 @@ export class VerificationService {
           data: { status: uStatus },
         });
 
-        // Update Store Entity and Verification status
-        const store = await tx.store.update({
+        // Update all vendor documents to match the decision
+        await tx.vendorDocument.updateMany({
           where: { vendorId: id },
-          data: {
-            verification: vStatus,
-            status:
-              action === 'APPROVE' ? StoreStatus.ACTIVE : StoreStatus.PENDING,
-          },
+          data: { status: vStatus },
         });
 
-        // Keep existing StoreLog for vendor-specific logic
-        await tx.storeLog.create({
-          data: {
-            storeId: store.id,
-            action: `VERIFICATION_${action}`,
-            details: note || `Admin ${action}ed vendor verification`,
-            performedBy: adminId,
-          },
+        // Update Store Entity and Verification status (store may not exist yet)
+        const existingStore = await tx.store.findFirst({
+          where: { vendorId: id },
         });
+
+        if (existingStore) {
+          await tx.store.update({
+            where: { id: existingStore.id },
+            data: {
+              verification: vStatus,
+              status:
+                action === 'APPROVE' ? StoreStatus.ACTIVE : StoreStatus.PENDING,
+              ...(action === 'APPROVE' && commissionRate !== undefined
+                ? { commissionRate }
+                : {}),
+            },
+          });
+
+          // Keep existing StoreLog for vendor-specific logic
+          await tx.storeLog.create({
+            data: {
+              storeId: existingStore.id,
+              action: `VERIFICATION_${action}`,
+              details: note || `Admin ${action}ed vendor verification`,
+              performedBy: adminId,
+            },
+          });
+        }
 
         return vendor;
       } else {

@@ -208,6 +208,45 @@ export class DeliveriesService {
     });
   }
 
+  async assignRider(deliveryId: string, riderId: string, adminId: string) {
+    const delivery = await this.prisma.delivery.findUnique({
+      where: { id: deliveryId },
+    });
+    if (!delivery) throw new NotFoundException('Delivery not found');
+
+    const rider = await this.prisma.rider.findUnique({
+      where: { id: riderId },
+    });
+    if (!rider) throw new NotFoundException('Rider not found');
+
+    if (rider.status !== 'ACTIVE') {
+      throw new BadRequestException('Rider is not active');
+    }
+
+    const updated = await this.prisma.delivery.update({
+      where: { id: deliveryId },
+      data: {
+        riderId,
+        status: DeliveryStatus.ASSIGNED,
+        assignedAt: new Date(),
+      },
+      include: {
+        rider: { select: { id: true, name: true, phone: true } },
+      },
+    });
+
+    await this.prisma.activityLog.create({
+      data: {
+        userId: adminId,
+        action: 'RIDER_MANUALLY_ASSIGNED',
+        target: deliveryId,
+        metadata: { riderId, riderName: rider.name },
+      },
+    });
+
+    return updated;
+  }
+
   async remove(id: string, adminUserId?: string, reason?: string) {
     const delivery = await this.prisma.delivery.findUnique({
       where: { id },

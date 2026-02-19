@@ -63,6 +63,7 @@ export default function VerificationDetailPage() {
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [rejectionNote, setRejectionNote] = useState("");
+  const [commissionRate, setCommissionRate] = useState<number>(20);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
   const {
@@ -106,7 +107,11 @@ export default function VerificationDetailPage() {
     try {
       await fetcher(`/super-admin/verification/${entityType}/${id}/decision`, {
         method: "PATCH",
-        body: JSON.stringify({ action, note: rejectionNote }),
+        body: JSON.stringify({
+          action,
+          note: rejectionNote,
+          ...(action === "APPROVE" && isVendor ? { commissionRate } : {}),
+        }),
       });
 
       toast.success(`${entityType} ${action.toLowerCase()}ed successfully`);
@@ -298,6 +303,30 @@ export default function VerificationDetailPage() {
                 onChange={(e) => setRejectionNote(e.target.value)}
               />
 
+              {isVendor && (
+                <div className="mb-4">
+                  <label className="block text-xs text-gray-400 font-bold uppercase tracking-wider mb-2">
+                    Commission Rate (%)
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      step={0.5}
+                      value={commissionRate}
+                      onChange={(e) =>
+                        setCommissionRate(Number(e.target.value))
+                      }
+                      className="w-32 bg-[#0F172A] border border-gray-700 rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-yellow-500 transition-colors"
+                    />
+                    <span className="text-gray-500 text-sm">
+                      Applied on approval
+                    </span>
+                  </div>
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-4">
                 <button
                   onClick={() => submitDecision("REJECT")}
@@ -337,6 +366,22 @@ export default function VerificationDetailPage() {
           value={rejectionNote}
           onChange={(e) => setRejectionNote(e.target.value)}
         />
+        {isVendor && (
+          <div className="mb-3">
+            <label className="block text-xs text-gray-400 font-bold uppercase tracking-wider mb-1.5">
+              Commission Rate (%)
+            </label>
+            <input
+              type="number"
+              min={0}
+              max={100}
+              step={0.5}
+              value={commissionRate}
+              onChange={(e) => setCommissionRate(Number(e.target.value))}
+              className="w-full bg-[#1E293B] border border-gray-700 rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-yellow-500"
+            />
+          </div>
+        )}
         <div className="grid grid-cols-2 gap-3">
           <button
             onClick={() => submitDecision("REJECT")}

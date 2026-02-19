@@ -66,6 +66,58 @@ export class VendorsController {
     return this.storesService.getVendorProducts(id);
   }
 
+  @Get(':id/documents')
+  getDocuments(
+    @Param('id') id: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.storesService.getVendorDocuments(
+      id,
+      Number(page) || 1,
+      Number(limit) || 10,
+    );
+  }
+
+  @Get(':id/payouts')
+  getPayouts(
+    @Param('id') id: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.storesService.getVendorPayouts(
+      id,
+      Number(page) || 1,
+      Number(limit) || 10,
+    );
+  }
+
+  @Get(':id/activity')
+  getActivity(
+    @Param('id') id: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.storesService.getVendorActivity(
+      id,
+      Number(page) || 1,
+      Number(limit) || 10,
+    );
+  }
+
+  @Get(':id/reviews')
+  getReviews(
+    @Param('id') id: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.storesService.getVendorReviews(
+      id,
+      Number(page) || 1,
+      Number(limit) || 10,
+    );
+  }
+
   @Patch('products/:productId/status')
   async updateProductStatus(
     @Param('productId') productId: string,
