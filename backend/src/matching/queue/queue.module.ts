@@ -39,6 +39,7 @@ import { QueueService } from './queue.service';
       { name: QUEUE_NAMES.RIDE_MATCHING },
       { name: QUEUE_NAMES.DELIVERY_MATCHING },
       { name: QUEUE_NAMES.DRIVER_INACTIVITY },
+      { name: QUEUE_NAMES.RIDER_INACTIVITY },
       { name: QUEUE_NAMES.NOTIFICATION },
       { name: QUEUE_NAMES.ASSIGNMENT_TIMEOUT },
     ),

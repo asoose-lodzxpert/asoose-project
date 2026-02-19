@@ -46,7 +46,7 @@ export class ProfileController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.RIDER)
+  @Roles(UserRole.RIDER, UserRole.DRIVER)
   @Get('personal-info')
   async getPersonalInfo(@Req() req) {
     const { id } = req.user || {};
@@ -54,7 +54,7 @@ export class ProfileController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.RIDER)
+  @Roles(UserRole.RIDER, UserRole.DRIVER)
   @Patch('personal-info')
   async updatePersonalInfo(
     @Req() req,
@@ -65,7 +65,7 @@ export class ProfileController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.RIDER)
+  @Roles(UserRole.RIDER, UserRole.DRIVER)
   @Post('upload-profile-image')
   @UseInterceptors(FileInterceptor('file'))
   async uploadProfileImage(

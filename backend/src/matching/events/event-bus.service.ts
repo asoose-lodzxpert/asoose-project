@@ -50,6 +50,16 @@ export class EventBusService {
     this.logger.warn(`[RIDER] Marked inactive: ${event.riderId}`);
     this.eventEmitter.emit('rider.marked.inactive', event);
   }
+
+  emitRiderPingInactive(event: {
+    riderId: string;
+    lastSeen: number;
+    timestamp: number;
+  }) {
+    this.logger.warn(`[RIDER] Ping inactive: ${event.riderId}`);
+    this.eventEmitter.emit('rider.ping.inactive', event);
+  }
+
   private readonly logger = new Logger(EventBusService.name);
 
   constructor(private readonly eventEmitter: EventEmitter2) {}

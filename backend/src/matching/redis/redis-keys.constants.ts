@@ -136,6 +136,9 @@ export const REDIS_TTL = {
   /** Driver inactivity threshold */
   DRIVER_INACTIVITY: 120,
 
+  /** Rider inactivity threshold */
+  RIDER_INACTIVITY: 120,
+
   /** Matching state cache */
   MATCHING_STATE: 300,
 

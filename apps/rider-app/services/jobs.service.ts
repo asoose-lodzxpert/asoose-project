@@ -5,6 +5,23 @@ import { fetchWithAuth } from "./auth-fetch";
 const EXPO_PUBLIC_API_URL = process.env.EXPO_PUBLIC_API_URL;
 
 export const jobsService = {
+  /**
+   * Fetches the currently assigned/active job for the logged-in rider or driver.
+   * Returns null if no active job exists.
+   * RIDER role → checks deliveries
+   * DRIVER role → checks rides
+   */
+  async getActiveJob() {
+    try {
+      const response = await fetchWithAuth(
+        `${EXPO_PUBLIC_API_URL}/rider/jobs/active`,
+      );
+      return response ?? null;
+    } catch {
+      return null;
+    }
+  },
+
   async acceptJob(jobId: string, jobType: JobType) {
     return retryWithBackoff(
       async () => {
@@ -135,6 +152,17 @@ export const jobsService = {
         },
       },
     );
+  },
+
+  async cancelJob(jobId: string, jobType: JobType, reason: string) {
+    const response = await fetchWithAuth(
+      `${EXPO_PUBLIC_API_URL}/rider/jobs/${jobId}/cancel`,
+      {
+        method: "POST",
+        body: JSON.stringify({ jobType, reason }),
+      },
+    );
+    return response;
   },
 
   async goOnline(coords: { latitude: number; longitude: number }) {

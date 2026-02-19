@@ -144,7 +144,6 @@ export class RidesService {
     dto: RequestRideDto,
     idempotencyKey: string,
   ) {
-
     if (!idempotencyKey) {
       throw new BadRequestException(
         'Idempotency key is required to prevent duplicate requests.',
@@ -809,9 +808,16 @@ export class RidesService {
    * Rate the driver for a completed ride.
    * Updates the rider's running average rating.
    */
-  async rateRide(userId: string, rideId: string, rating: number, comment?: string) {
+  async rateRide(
+    userId: string,
+    rideId: string,
+    rating: number,
+    comment?: string,
+  ) {
     if (!rating || rating < 1 || rating > 5 || !Number.isInteger(rating)) {
-      throw new BadRequestException('Rating must be an integer between 1 and 5');
+      throw new BadRequestException(
+        'Rating must be an integer between 1 and 5',
+      );
     }
 
     const ride = await this.prisma.ride.findUnique({
@@ -839,9 +845,7 @@ export class RidesService {
 
     const oldAvg = rider.rating || 5.0;
     const count = rider.totalRides || 0;
-    const newAvg = count > 0
-      ? (oldAvg * count + rating) / (count + 1)
-      : rating;
+    const newAvg = count > 0 ? (oldAvg * count + rating) / (count + 1) : rating;
 
     await this.prisma.rider.update({
       where: { id: ride.riderId },
@@ -860,10 +864,33 @@ export class RidesService {
 
   // --- JOBS SERVICE STUBS ---
   async findActiveRideForDriver(driverId: string): Promise<any> {
-    return null;
+    return this.prisma.ride.findFirst({
+      where: {
+        riderId: driverId,
+        status: {
+          in: [RideStatus.ACCEPTED, RideStatus.ARRIVED, RideStatus.IN_PROGRESS],
+        },
+      },
+      include: {
+        pickupAddress: true,
+        dropoffAddress: true,
+        customer: true,
+      },
+    });
   }
   async findIncomingRidesForDriver(driverId: string): Promise<any[]> {
-    return [];
+    return this.prisma.ride.findMany({
+      where: {
+        riderId: driverId,
+        status: RideStatus.REQUESTED,
+      },
+      include: {
+        pickupAddress: true,
+        dropoffAddress: true,
+        customer: true,
+      },
+      take: 10,
+    });
   }
   async updateRideStatus(rideId: string, status: string): Promise<any> {
     return null;

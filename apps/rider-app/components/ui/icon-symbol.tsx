@@ -108,7 +108,9 @@ export type IconSymbolName =
   | "doc.text"
   | "creditcard"
   | "car"
+  | "house"
   | "box.truck"
+  | "shippingbox"
   | "shippingbox.fill"
   | "calendar"
   | "exclamationmark.triangle"
@@ -234,7 +236,9 @@ const MAPPING: Record<IconSymbolName, keyof typeof MaterialIcons.glyphMap> = {
   "doc.text": "article",
   creditcard: "credit-card",
   car: "directions-car",
+  house: "home",
   "box.truck": "local-shipping",
+  shippingbox: "inventory-2",
   "shippingbox.fill": "unarchive",
   calendar: "calendar-today",
   "exclamationmark.triangle": "warning",

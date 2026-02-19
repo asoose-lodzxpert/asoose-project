@@ -14,7 +14,7 @@ export class NotificationController {
   constructor(private readonly notificationService: NotificationService) {}
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.RIDER)
+  @Roles(UserRole.RIDER, UserRole.DRIVER)
   @Get('settings')
   async getNotificationSettings(@Req() req) {
     const { id } = req.user || {};
@@ -22,7 +22,7 @@ export class NotificationController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.RIDER)
+  @Roles(UserRole.RIDER, UserRole.DRIVER)
   @Patch('settings')
   async updateNotificationSettings(
     @Req() req,

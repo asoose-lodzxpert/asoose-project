@@ -7,12 +7,14 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { DeliveryFilterDto } from './dto/delivery-filter.dto';
 import { Prisma, DeliveryStatus } from '@prisma/client';
 import { TransactionLedgerService } from '../transactions/transaction-ledger.service';
+import { NotificationsGateway } from '../../notifications/notifications.gateway';
 
 @Injectable()
 export class DeliveriesService {
   constructor(
     private prisma: PrismaService,
     private ledgerService: TransactionLedgerService,
+    private notificationsGateway: NotificationsGateway,
   ) {}
 
   async findAll(params: DeliveryFilterDto) {
@@ -232,6 +234,9 @@ export class DeliveriesService {
       },
       include: {
         rider: { select: { id: true, name: true, phone: true } },
+        customer: { select: { name: true, phone: true } },
+        pickupAddress: true,
+        dropoffAddress: true,
       },
     });
 
@@ -243,6 +248,33 @@ export class DeliveriesService {
         metadata: { riderId, riderName: rider.name },
       },
     });
+
+    // Emit job.assigned socket event to the rider so they receive the job offer
+    try {
+      this.notificationsGateway.emitJobAssigned(riderId, {
+        id: updated.id,
+        jobType: 'delivery',
+        customerName: updated.customer?.name || 'Customer',
+        pickupAddress: {
+          street: updated.pickupAddress?.street,
+          lat: updated.pickupAddress?.lat,
+          lng: updated.pickupAddress?.lng,
+        },
+        dropoffAddress: {
+          street: updated.dropoffAddress?.street,
+          lat: updated.dropoffAddress?.lat,
+          lng: updated.dropoffAddress?.lng,
+        },
+        earnings: updated.deliveryFee,
+        estimatedEarnings: updated.deliveryFee,
+        distanceKm: updated.distanceKm ?? 0,
+        packageDetails: updated.packageDetails ?? undefined,
+        assignedByAdmin: true,
+      });
+    } catch (e) {
+      // Non-fatal — delivery is already assigned in DB; socket failure shouldn't rollback
+      console.error(`Failed to emit job.assigned to rider ${riderId}:`, e);
+    }
 
     return updated;
   }

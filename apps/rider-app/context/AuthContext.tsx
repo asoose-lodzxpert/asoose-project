@@ -15,6 +15,7 @@ type User = {
   name: string;
   email: string;
   phone?: string;
+  role?: "RIDER" | "DRIVER";
   status: "ACTIVE" | "PENDING" | "SUSPENDED" | "BANNED";
   isOnline?: boolean;
 };

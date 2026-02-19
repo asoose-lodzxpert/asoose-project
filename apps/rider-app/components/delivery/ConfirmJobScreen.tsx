@@ -1,31 +1,29 @@
-import { ThemedText } from "@/components/themed-text";
+﻿import { ThemedText } from "@/components/themed-text";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useJobs } from "@/context/JobContext";
 import { useThemeColor } from "@/hooks/use-theme-color";
+import { resolveAddress } from "@/utils/address";
+import CancelJobModal from "@/components/delivery/CancelJobModal";
 import * as ImagePicker from "expo-image-picker";
-import * as ScreenOrientation from "expo-screen-orientation";
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { Image, Pressable, StyleSheet, View } from "react-native";
 
 export default function ConfirmJobScreen() {
   const [photoUri, setPhotoUri] = useState<string | null>(null);
-  const { activeJob, completeJob } = useJobs();
+  const [cancelVisible, setCancelVisible] = useState(false);
+  const { activeJob, completeJob, cancelJob } = useJobs();
+
   const primary = useThemeColor({}, "brandPrimary");
   const surface = useThemeColor({}, "surfaceBackground");
-  const cardBg = useThemeColor({}, "surfaceSubtle");
-
-  // Lock portrait for this screen
-  useEffect(() => {
-    ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT);
-    return () => {
-      ScreenOrientation.unlockAsync();
-    };
-  }, []);
+  const subtle = useThemeColor({}, "surfaceSubtle");
+  const textPrimary = useThemeColor({}, "textPrimary");
+  const textMuted = useThemeColor({}, "textMuted");
+  const danger = useThemeColor({}, "statusError");
 
   if (!activeJob) return null;
   const isRide = activeJob.jobType === "ride";
+  const dropoff = resolveAddress(activeJob.dropoffAddress);
 
-  // Only require photo for delivery
   const handleComplete = async () => {
     if (!isRide && !photoUri) return;
     await completeJob(!isRide ? { photoUri } : undefined);
@@ -34,67 +32,50 @@ export default function ConfirmJobScreen() {
   const takePhoto = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== "granted") return;
-    const result = await ImagePicker.launchCameraAsync({
-      cameraType: ImagePicker.CameraType.back,
-      quality: 0.7,
-      allowsEditing: false,
-    });
-    if (!result.canceled && result.assets && result.assets[0]?.uri) {
-      setPhotoUri(result.assets[0].uri);
-    }
+    const result = await ImagePicker.launchCameraAsync({ cameraType: ImagePicker.CameraType.back, quality: 0.7, allowsEditing: false });
+    if (!result.canceled && result.assets?.[0]?.uri) setPhotoUri(result.assets[0].uri);
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: surface }]}>
-      <View style={[styles.card, { backgroundColor: cardBg }]}>
-        <ThemedText type="title" style={{ color: primary }}>
-          {isRide ? "COMPLETE RIDE" : "CONFIRM DELIVERY"}
+    <>
+      <View style={[styles.sheet, { backgroundColor: surface }]}>
+        {/* Title */}
+        <ThemedText style={[styles.title, { color: textPrimary }]}>
+          {isRide ? "Complete ride" : "Confirm delivery"}
         </ThemedText>
 
-        {/* Customer info */}
-        <View style={styles.customerCard}>
+        {/* Customer row */}
+        <View style={[styles.customerCard, { backgroundColor: subtle }]}>
           <View style={[styles.avatar, { backgroundColor: primary }]}>
             <ThemedText style={styles.avatarText}>
-              {activeJob.customerName
-                ? activeJob.customerName
-                    .split(" ")
-                    .map((n) => n[0])
-                    .join("")
-                : ""}
+              {activeJob.customerName?.split(" ").map((n: string) => n[0]).join("")}
             </ThemedText>
           </View>
           <View style={{ flex: 1 }}>
-            <ThemedText type="defaultSemiBold">
-              {activeJob.customerName || ""}
+            <ThemedText style={[styles.customerName, { color: textPrimary }]}>
+              {activeJob.customerName}
             </ThemedText>
-            <ThemedText style={{ color: "#666" }}>
-              {activeJob.dropoffAddress?.address ||
-                activeJob.dropoffAddress ||
-                ""}
-            </ThemedText>
+            {dropoff ? (
+              <ThemedText style={[styles.dropoffText, { color: textMuted }]} numberOfLines={1}>
+                {dropoff}
+              </ThemedText>
+            ) : null}
           </View>
         </View>
 
-        {/* Photo required for delivery only */}
+        {/* Photo (delivery only) */}
         {!isRide && (
           <Pressable
-            style={[
-              styles.photoCard,
-              { borderColor: primary },
-              photoUri ? { borderStyle: "solid" } : {},
-            ]}
+            style={[styles.photoCard, { borderColor: primary }]}
             onPress={takePhoto}
           >
             {photoUri ? (
-              <Image
-                source={{ uri: photoUri as string }}
-                style={styles.photoPreview}
-              />
+              <Image source={{ uri: photoUri }} style={styles.photoPreview} />
             ) : (
               <>
-                <IconSymbol name="camera.fill" size={52} color={primary} />
-                <ThemedText style={{ color: primary, marginTop: 8 }}>
-                  Take delivery photo *
+                <IconSymbol name="camera.fill" size={28} color={primary} />
+                <ThemedText style={[styles.photoHint, { color: primary }]}>
+                  Take delivery photo
                 </ThemedText>
               </>
             )}
@@ -105,96 +86,67 @@ export default function ConfirmJobScreen() {
         <Pressable
           style={[
             styles.completeBtn,
-            !isRide && !photoUri ? { opacity: 0.5 } : {},
+            { backgroundColor: "#10B981", opacity: !isRide && !photoUri ? 0.4 : 1 },
           ]}
           disabled={!isRide && !photoUri}
           onPress={handleComplete}
         >
-          <IconSymbol name="checkmark" size={20} color="#fff" />
-          <ThemedText style={styles.completeText}>
-            {isRide ? "COMPLETE RIDE" : "COMPLETE DELIVERY"}
+          <IconSymbol name="checkmark" size={18} color="#fff" />
+          <ThemedText style={styles.completeBtnText}>
+            {isRide ? "Complete ride" : "Complete delivery"}
           </ThemedText>
         </Pressable>
 
-        {!isRide && (
-          <ThemedText style={styles.hint}>
-            Photo at delivery location is required
+        {/* Cancel */}
+        <Pressable style={styles.cancelLink} onPress={() => setCancelVisible(true)}>
+          <ThemedText style={[styles.cancelText, { color: textMuted }]}>Cancel job</ThemedText>
+        </Pressable>
+
+        {!isRide && !photoUri && (
+          <ThemedText style={[styles.hint, { color: textMuted }]}>
+            Photo required to complete delivery
           </ThemedText>
         )}
       </View>
-    </View>
+
+      <CancelJobModal
+        visible={cancelVisible}
+        onClose={() => setCancelVisible(false)}
+        onConfirm={async (reason) => {
+          await cancelJob(activeJob.id, activeJob.jobType, reason);
+          setCancelVisible(false);
+        }}
+      />
+    </>
   );
 }
 
-/* ───────────────── styles ───────────────── */
-
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: "flex-end",
+  sheet: {
+    borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    paddingHorizontal: 18, paddingTop: 18, paddingBottom: 36, gap: 12,
   },
-
-  card: {
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
-    padding: 20,
-    gap: 20,
-  },
-
+  title: { fontSize: 15, fontWeight: "700" },
   customerCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
+    flexDirection: "row", alignItems: "center",
+    gap: 12, padding: 14, borderRadius: 14,
   },
-
-  avatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  avatarText: {
-    color: "#fff",
-    fontWeight: "700",
-    fontSize: 18,
-  },
-
+  avatar: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
+  avatarText: { color: "#fff", fontWeight: "700", fontSize: 14 },
+  customerName: { fontSize: 14, fontWeight: "600", marginBottom: 2 },
+  dropoffText: { fontSize: 13 },
   photoCard: {
-    height: 180,
-    borderWidth: 2,
-    borderStyle: "dashed",
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
+    height: 130, borderWidth: 1.5, borderStyle: "dashed",
+    borderRadius: 14, alignItems: "center", justifyContent: "center", gap: 6,
   },
-
-  photoPreview: {
-    width: "100%",
-    height: "100%",
-    borderRadius: 18,
-  },
-
+  photoPreview: { width: "100%", height: "100%", borderRadius: 12 },
+  photoHint: { fontSize: 13 },
   completeBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 10,
-    backgroundColor: "#10B981",
-    paddingVertical: 16,
-    borderRadius: 18,
+    height: 50, borderRadius: 14, flexDirection: "row",
+    alignItems: "center", justifyContent: "center", gap: 8,
   },
-
-  completeText: {
-    color: "#fff",
-    fontWeight: "700",
-    fontSize: 16,
-  },
-
-  hint: {
-    fontSize: 12,
-    color: "#888",
-    textAlign: "center",
-  },
+  completeBtnText: { fontSize: 14, fontWeight: "600", color: "#fff" },
+  cancelLink: { alignItems: "center", paddingVertical: 4 },
+  cancelText: { fontSize: 13, fontWeight: "500" },
+  hint: { fontSize: 12, textAlign: "center" },
 });

@@ -16,6 +16,8 @@ import { RiderNotificationsController } from './rider-notifications.controller';
 import { RiderNotificationsService } from './rider-notifications.service';
 import { RiderDispatchListener } from './rider-dispatch.listener';
 import { RidersStreamService } from './riders-stream.service';
+import { JobsController } from './jobs/jobs.controller';
+import { JobsService } from './jobs/jobs.service';
 import { PrismaModule } from '../prisma/prisma.module';
 import { UsersModule } from '../users/users.module';
 import { TripsModule } from '../users/trips/trips.module';
@@ -48,6 +50,7 @@ import { CommonModule } from '../common/common.module';
     WithdrawalController,
     StatusController,
     RiderNotificationsController,
+    JobsController,
   ],
   providers: [
     ProfileService,
@@ -60,6 +63,7 @@ import { CommonModule } from '../common/common.module';
     RiderDispatchListener,
     RidersStreamService,
     RiderAccountNotificationsService,
+    JobsService,
   ],
   exports: [
     ProfileService,

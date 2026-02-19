@@ -14,7 +14,7 @@ export class BankController {
   constructor(private readonly bankService: BankService) {}
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.RIDER)
+  @Roles(UserRole.RIDER, UserRole.DRIVER)
   @Get('account')
   async getBankAccount(@Req() req) {
     const { id } = req.user || {};
@@ -22,7 +22,7 @@ export class BankController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.RIDER)
+  @Roles(UserRole.RIDER, UserRole.DRIVER)
   @Patch('account')
   async updateBankAccount(
     @Req() req,

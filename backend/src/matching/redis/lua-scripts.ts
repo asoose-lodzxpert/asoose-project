@@ -213,6 +213,23 @@ redis.call('SET', statusKey, 'OFFLINE')
 return 1
 `;
 
+export const ATOMIC_SET_RIDER_OFFLINE = `
+local riderId = ARGV[1]
+
+local statusKey = 'rider:' .. riderId .. ':status'
+local hexKey = 'rider:' .. riderId .. ':hex'
+local currentDeliveryKey = 'rider:' .. riderId .. ':currentDelivery'
+local pendingDeliveryKey = 'rider:' .. riderId .. ':pendingDelivery'
+
+if redis.call('GET', currentDeliveryKey) then
+  return 0
+end
+
+redis.call('DEL', pendingDeliveryKey)
+redis.call('SET', statusKey, 'OFFLINE')
+return 1
+`;
+
 export const ATOMIC_SET_ONLINE = `
 local driverId = ARGV[1]
 local hexId = ARGV[2]

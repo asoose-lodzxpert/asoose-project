@@ -24,6 +24,7 @@ import { RiderStateService } from './rider-state/rider-state.service'; // <--- A
 import { RideMatchingProcessor } from './workers/ride-matching.processor';
 import { DeliveryMatchingProcessor } from './workers/delivery-matching.processor';
 import { DriverInactivityProcessor } from './workers/driver-inactivity.processor';
+import { RiderInactivityProcessor } from './workers/rider-inactivity.processor';
 import { AssignmentTimeoutProcessor } from './workers/assignment-timeout.processor';
 
 // Prisma
@@ -54,6 +55,7 @@ import { PrismaModule } from '../prisma/prisma.module';
     RideMatchingProcessor,
     DeliveryMatchingProcessor,
     DriverInactivityProcessor,
+    RiderInactivityProcessor,
     AssignmentTimeoutProcessor,
   ],
   exports: [

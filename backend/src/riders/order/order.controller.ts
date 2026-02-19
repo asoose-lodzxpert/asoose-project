@@ -13,7 +13,7 @@ export class OrderController {
   constructor(private readonly orderService: OrderService) {}
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.RIDER)
+  @Roles(UserRole.RIDER, UserRole.DRIVER)
   @Get('wallet/balance')
   async getWalletBalance(@Req() req) {
     const { id } = req.user || {};
@@ -21,7 +21,7 @@ export class OrderController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.RIDER)
+  @Roles(UserRole.RIDER, UserRole.DRIVER)
   @Get('earnings')
   async getEarnings(
     @Req() req,

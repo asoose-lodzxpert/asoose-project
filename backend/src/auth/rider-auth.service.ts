@@ -151,7 +151,7 @@ export class RiderAuthService {
       );
     }
 
-    const payload = { sub: rider.id, email: rider.email, role: 'RIDER' };
+    const payload = { sub: rider.id, email: rider.email, role: rider.role };
     const accessToken = this.jwtService.sign(payload);
     const refreshToken = this.jwtService.sign(payload, { expiresIn: '30d' });
 
@@ -162,6 +162,7 @@ export class RiderAuthService {
         email: rider.email,
         phone: rider.phone,
         image: rider.image,
+        role: rider.role,
         status: rider.status,
         rating: rider.rating,
         totalRides: rider.totalRides,
@@ -288,7 +289,11 @@ export class RiderAuthService {
         throw new UnauthorizedException('Rider not found');
       }
 
-      const newPayload = { sub: rider.id, email: rider.email, role: 'RIDER' };
+      const newPayload = {
+        sub: rider.id,
+        email: rider.email,
+        role: rider.role,
+      };
       const accessToken = this.jwtService.sign(newPayload);
 
       return { accessToken };

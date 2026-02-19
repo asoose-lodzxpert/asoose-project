@@ -11,33 +11,45 @@ export interface JobSummaryDto {
   distanceKm?: number;
   durationMin?: number;
   packageDetails?: string;
+  /** OTPs for secure handover */
+  deliveryOtp?: string;
+  startOtp?: string;
+  /**
+   * Frontend JobStatus derived from DB status.
+   * Values: incoming-job | en-route-pickup | at-pickup | en-route-dropoff | confirm-job | online-waiting
+   */
   status: string;
 }
 
-// Status mapping from backend to frontend
+// Status mapping from DB → frontend JobStatus
 export function mapBackendStatusToFrontend(
   status: string,
   jobType: JobType,
 ): string {
-  const rideMap: Record<string, string> = {
-    REQUESTED: 'incoming-job',
-    ASSIGNED: 'en-route-pickup',
-    ACCEPTED: 'en-route-pickup',
-    STARTED: 'en-route-dropoff',
-    COMPLETED: 'online-waiting',
-    CANCELLED: 'cancelled',
-  };
-  const deliveryMap: Record<string, string> = {
-    REQUESTED: 'incoming-job',
-    ASSIGNED: 'en-route-pickup',
-    ACCEPTED: 'en-route-pickup',
-    PICKED_UP: 'en-route-dropoff',
-    DELIVERED: 'online-waiting',
-    CANCELLED: 'cancelled',
-  };
-  return jobType === 'ride'
-    ? rideMap[status] || status
-    : deliveryMap[status] || status;
+  if (jobType === 'ride') {
+    const map: Record<string, string> = {
+      REQUESTED: 'incoming-job',
+      ASSIGNED: 'incoming-job',
+      ACCEPTED: 'en-route-pickup',
+      ARRIVED: 'at-pickup',
+      IN_PROGRESS: 'en-route-dropoff',
+      COMPLETED: 'online-waiting',
+      CANCELLED: 'online-waiting',
+    };
+    return map[status] ?? 'online-waiting';
+  } else {
+    const map: Record<string, string> = {
+      PENDING: 'online-waiting',
+      REQUESTED: 'online-waiting',
+      ASSIGNED: 'incoming-job',
+      ACCEPTED: 'en-route-pickup',
+      PICKED_UP: 'en-route-dropoff',
+      IN_TRANSIT: 'en-route-dropoff',
+      DELIVERED: 'online-waiting',
+      CANCELLED: 'online-waiting',
+    };
+    return map[status] ?? 'online-waiting';
+  }
 }
 
 // Mapper: Ride → JobSummaryDto
@@ -52,6 +64,7 @@ export function rideToJobSummary(ride: any): JobSummaryDto {
     earnings: ride.totalFare || 0,
     distanceKm: ride.distanceKm,
     durationMin: ride.durationMin,
+    startOtp: ride.startOtp,
     status: mapBackendStatusToFrontend(ride.status, 'ride'),
   };
 }
@@ -68,6 +81,7 @@ export function deliveryToJobSummary(delivery: any): JobSummaryDto {
     earnings: delivery.deliveryFee || 0,
     distanceKm: delivery.distanceKm,
     packageDetails: delivery.packageDetails,
+    deliveryOtp: delivery.deliveryOtp,
     status: mapBackendStatusToFrontend(delivery.status, 'delivery'),
   };
 }

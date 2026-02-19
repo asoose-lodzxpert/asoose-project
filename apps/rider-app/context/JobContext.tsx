@@ -28,6 +28,7 @@ interface JobsContextState {
   goOffline(): Promise<void>;
   acceptJob(jobId: string, jobType: JobType): Promise<void>;
   declineJob(jobId: string, jobType: JobType): Promise<void>;
+  cancelJob(jobId: string, jobType: JobType, reason: string): Promise<void>;
   arriveAtPickup(): Promise<void>;
   confirmPickup(): Promise<void>;
   arriveAtDropoff(): Promise<void>;
@@ -117,6 +118,45 @@ export const JobsProvider = ({ children }: { children: ReactNode }) => {
   // Start location streaming when rider is online (after JobEventsService is set)
   const locationStreamStatus = useLocationStream({ enabled: isOnline });
 
+  /**
+   * After going online OR completing/cancelling a job, check whether the backend
+   * already has an active job assigned to this rider and restore the UI to the
+   * correct step. This handles:
+   *  - App restart / crash recovery
+   *  - Admin-assigned jobs waiting before the rider went online
+   *  - Back-to-back jobs: after finishing one, pick up the next assigned one
+   */
+  const checkAndRestoreActiveJob = useCallback(async () => {
+    try {
+      const job = await jobsService.getActiveJob();
+      if (!job || job.status === "online-waiting") return;
+
+      if (job.status === "incoming-job") {
+        // Show the accept/decline screen for an unconfirmed assignment
+        setIncomingJob(job as IncomingJobOffer);
+        setStatus("incoming-job");
+        Toast.show({
+          type: "info",
+          text1: "Job Waiting",
+          text2: "You have a new job assignment",
+        });
+      } else {
+        // Restore the active job at whatever step it was at
+        setActiveJob(job as CurrentJob);
+        setStatus(job.status as JobStatus);
+        // Re-join the socket room so we receive live status updates
+        joinOrderRoom(job.id);
+        Toast.show({
+          type: "info",
+          text1: "Job Resumed",
+          text2: "Continuing your active job",
+        });
+      }
+    } catch {
+      // Silently fail — rider stays on the waiting screen
+    }
+  }, [joinOrderRoom]);
+
   const goOnline = async () => {
     try {
       const coords = await getCurrentCoords();
@@ -124,6 +164,9 @@ export const JobsProvider = ({ children }: { children: ReactNode }) => {
       await jobsService.goOnline(coords);
       setIsOnline(true);
       setStatus("online-waiting");
+      // Check if a job was already assigned before going online
+      // (e.g. admin-dispatched, or app was restarted mid-job)
+      await checkAndRestoreActiveJob();
     } catch (error) {
       Toast.show({ type: "error", text1: "Failed to go online" });
     }
@@ -190,6 +233,30 @@ export const JobsProvider = ({ children }: { children: ReactNode }) => {
       Toast.show({
         type: "error",
         text1: "Failed to decline job",
+        text2: error.message || "Please try again",
+        visibilityTime: 5000,
+      });
+      throw error;
+    }
+  };
+
+  const cancelJob = async (jobId: string, jobType: JobType, reason: string) => {
+    const previousStatus = status;
+    const previousActiveJob = activeJob;
+
+    try {
+      setStatus("online-waiting");
+      setActiveJob(null);
+      setIncomingJob(null);
+      await jobsService.cancelJob(jobId, jobType, reason);
+      // After cancelling, check if another job is already waiting
+      await checkAndRestoreActiveJob();
+    } catch (error: any) {
+      setStatus(previousStatus);
+      setActiveJob(previousActiveJob);
+      Toast.show({
+        type: "error",
+        text1: "Failed to cancel job",
         text2: error.message || "Please try again",
         visibilityTime: 5000,
       });
@@ -267,6 +334,8 @@ export const JobsProvider = ({ children }: { children: ReactNode }) => {
       setStatus("online-waiting");
       setActiveJob(null);
       await jobsService.completeJob(activeJob.id, activeJob.jobType, payload);
+      // After finishing, check immediately if another job is already assigned
+      await checkAndRestoreActiveJob();
     } catch (error: any) {
       setStatus(previousStatus);
       setActiveJob(previousActiveJob);
@@ -310,6 +379,7 @@ export const JobsProvider = ({ children }: { children: ReactNode }) => {
         goOffline,
         acceptJob,
         declineJob,
+        cancelJob,
         arriveAtPickup,
         confirmPickup,
         arriveAtDropoff,

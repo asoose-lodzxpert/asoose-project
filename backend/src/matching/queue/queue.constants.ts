@@ -11,6 +11,7 @@ export const QUEUE_NAMES = {
   RIDE_MATCHING: 'ride-matching',
   DELIVERY_MATCHING: 'delivery-matching',
   DRIVER_INACTIVITY: 'driver-inactivity',
+  RIDER_INACTIVITY: 'rider-inactivity',
   NOTIFICATION: 'notification',
   ASSIGNMENT_TIMEOUT: 'assignment-timeout',
 } as const;
@@ -149,6 +150,7 @@ export const WORKER_CONCURRENCY = {
   RIDE_MATCHING: 10, // Handle up to 10 ride match jobs concurrently
   DELIVERY_MATCHING: 10,
   DRIVER_INACTIVITY: 1, // Single worker for inactivity check
+  RIDER_INACTIVITY: 1, // Single worker for rider inactivity check
   NOTIFICATION: 20, // High concurrency for notifications
   ASSIGNMENT_TIMEOUT: 5,
 } as const;
@@ -160,5 +162,9 @@ export const REPEAT_SCHEDULES = {
   INACTIVITY_CHECK: {
     pattern: '*/30 * * * * *', // Every 30 seconds
     jobId: 'inactivity-check',
+  },
+  RIDER_INACTIVITY_CHECK: {
+    pattern: '*/30 * * * * *', // Every 30 seconds
+    jobId: 'rider-inactivity-check',
   },
 } as const;

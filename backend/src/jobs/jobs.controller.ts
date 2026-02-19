@@ -14,6 +14,20 @@ import { UserRole } from '../common/enums/user-role.enum';
 export class JobsController {
   constructor(private readonly jobsService: JobsService) {}
 
+  /**
+   * Returns the currently active/in-progress job for the authenticated rider or driver.
+   * RIDER role → checks Delivery (ASSIGNED | ACCEPTED | PICKED_UP | IN_TRANSIT)
+   * DRIVER role → checks Ride (ACCEPTED | ARRIVED | IN_PROGRESS)
+   * Returns null when no active job exists.
+   */
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.DRIVER, UserRole.RIDER)
+  @Get('active')
+  async getActiveJob(@Req() req) {
+    const { id, role } = req.user;
+    return this.jobsService.findActiveJobForUser(id, role);
+  }
+
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.DRIVER, UserRole.RIDER)
   @Post(':id/accept')

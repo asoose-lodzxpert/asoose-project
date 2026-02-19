@@ -34,6 +34,9 @@ export class QueueService implements OnModuleInit {
     @InjectQueue(QUEUE_NAMES.DRIVER_INACTIVITY)
     private readonly driverInactivityQueue: Queue,
 
+    @InjectQueue(QUEUE_NAMES.RIDER_INACTIVITY)
+    private readonly riderInactivityQueue: Queue,
+
     @InjectQueue(QUEUE_NAMES.NOTIFICATION)
     private readonly notificationQueue: Queue,
 
@@ -165,6 +168,16 @@ export class QueueService implements OnModuleInit {
       },
     );
 
+    await this.riderInactivityQueue.add(
+      JOB_TYPES.CHECK_INACTIVITY,
+      { scheduledAt: Date.now() } as CheckInactivityJobData,
+      {
+        ...QUEUE_OPTIONS.inactivityCheck,
+        repeat: { pattern: REPEAT_SCHEDULES.RIDER_INACTIVITY_CHECK.pattern },
+        jobId: REPEAT_SCHEDULES.RIDER_INACTIVITY_CHECK.jobId,
+      },
+    );
+
     this.logger.log('✅ Recurring jobs configured');
   }
 
@@ -246,6 +259,8 @@ export class QueueService implements OnModuleInit {
         return this.deliveryMatchingQueue;
       case QUEUE_NAMES.DRIVER_INACTIVITY:
         return this.driverInactivityQueue;
+      case QUEUE_NAMES.RIDER_INACTIVITY:
+        return this.riderInactivityQueue;
       case QUEUE_NAMES.NOTIFICATION:
         return this.notificationQueue;
       case QUEUE_NAMES.ASSIGNMENT_TIMEOUT:
