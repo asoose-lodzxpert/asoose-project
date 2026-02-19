@@ -95,7 +95,7 @@ export default function ReportDisputeModal({
       else if (type === 'RIDE') payload.rideId = referenceId;
       else if (type === 'DELIVERY') payload.deliveryId = referenceId;
 
-      const res = await fetch(`${API_URL}/disputes`, {
+      const res = await fetch(`${API_URL}/super-admin/disputes`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

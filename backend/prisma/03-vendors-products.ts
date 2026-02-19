@@ -10,6 +10,7 @@ import {
 
 export async function seedVendorsAndProducts() {
   console.log('🌱 Seeding Vendors, Stores, and Products...');
+  await prisma.$connect();
 
   const storeTypes = [
     StoreType.RESTAURANT,

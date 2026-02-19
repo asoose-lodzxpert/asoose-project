@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
+import useSWR from 'swr';
 import { useParams, useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { RideService } from '@/services/ride.service';
@@ -17,8 +18,14 @@ import {
 } from '@/services/formatters/ride-status.formatter';
 import { 
   ArrowLeft, Clock, MapPin, CreditCard, User, Star, ShieldCheck, 
-  Receipt, Navigation, Loader2, AlertCircle
+  Receipt, Navigation, Loader2, AlertCircle, ShieldAlert, Flag, ExternalLink,
 } from 'lucide-react';
+import Link from 'next/link';
+import ReportDisputeModal from '@/app/main/orders/component/reportDisputeModal';
+
+const API_URL = (
+  process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'
+).replace(/\/$/, '');
 
 export default function RideDetailsPage() {
   const params = useParams();
@@ -127,6 +134,48 @@ export default function RideDetailsPage() {
       }
     };
   }, [session?.accessToken, params.id, isLoaded]);
+
+  // ========== DISPUTE ==========
+  const [isDisputeModalOpen, setIsDisputeModalOpen] = useState(false);
+  const rideId = params.id as string;
+
+  const disputeCheckKey =
+    ride?.status === 'COMPLETED' && rideId
+      ? `${API_URL}/super-admin/disputes/check?rideId=${rideId}`
+      : null;
+
+  const { data: disputeData, mutate: mutateDispute } = useSWR(
+    disputeCheckKey,
+    async (url: string) => {
+      const token = session?.accessToken as string;
+      if (!token) return null;
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return null;
+      return res.json();
+    },
+    { revalidateOnFocus: true, dedupingInterval: 5000 }
+  );
+
+  const { canReport, isExpired, hasDispute } = useMemo(() => {
+    if (!ride || ride.status !== 'COMPLETED') {
+      return { canReport: false, isExpired: false, hasDispute: false };
+    }
+    const hasActiveDispute = !!disputeData?.dispute;
+    let isPastWindow = false;
+    if (ride.completedTime) {
+      const completed = new Date(ride.completedTime);
+      const windowDate = new Date();
+      windowDate.setDate(windowDate.getDate() - 7);
+      isPastWindow = completed < windowDate;
+    }
+    return {
+      canReport: !isPastWindow && !hasActiveDispute,
+      isExpired: isPastWindow && !hasActiveDispute,
+      hasDispute: hasActiveDispute,
+    };
+  }, [ride, disputeData]);
 
   // ========== RENDER: LOADING STATE ==========
   if (loading) {
@@ -413,11 +462,62 @@ export default function RideDetailsPage() {
           </div>
         )}
 
-        {/* ========== REPORT ISSUE BUTTON ========== */}
-        <button className="w-full py-4 text-center text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white font-medium text-sm transition-colors flex items-center justify-center gap-2">
-          <ShieldCheck size={16} /> Report an issue with this ride
-        </button>
+        {/* ========== DISPUTE SECTION ========== */}
+        {ride.status === 'COMPLETED' && (
+          <div className="bg-white dark:bg-zinc-900 p-6 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm">
+            <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+              <ShieldAlert size={14} /> Report an Issue
+            </h3>
+
+            {hasDispute && (
+              <div className="flex items-start justify-between gap-3 p-4 bg-yellow-50 dark:bg-yellow-900/10 rounded-xl border border-yellow-100 dark:border-yellow-900/20">
+                <div className="flex items-start gap-2">
+                  <Flag size={14} className="text-yellow-600 dark:text-yellow-400 shrink-0 mt-0.5" />
+                  <p className="text-sm text-yellow-700 dark:text-yellow-400 font-medium">
+                    You have an open dispute for this ride.
+                  </p>
+                </div>
+                {disputeData?.dispute?.id && (
+                  <Link
+                    href={`/main/disputes/${disputeData.dispute.id}`}
+                    className="inline-flex items-center gap-1 text-xs font-bold text-yellow-700 dark:text-yellow-400 hover:underline shrink-0"
+                  >
+                    View <ExternalLink size={12} />
+                  </Link>
+                )}
+              </div>
+            )}
+
+            {canReport && (
+              <>
+                <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-4">
+                  Had a problem with this ride? You can report an issue within 7 days of completion.
+                </p>
+                <button
+                  onClick={() => setIsDisputeModalOpen(true)}
+                  className="w-full py-4 text-center text-red-500 font-bold rounded-xl border border-zinc-200 dark:border-zinc-700 hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors flex items-center justify-center gap-2"
+                >
+                  <ShieldAlert size={16} /> Report an Issue
+                </button>
+              </>
+            )}
+
+            {isExpired && (
+              <p className="text-xs text-zinc-400 uppercase tracking-widest font-bold text-center">
+                Dispute window closed (7 days)
+              </p>
+            )}
+          </div>
+        )}
       </div>
+
+      <ReportDisputeModal
+        isOpen={isDisputeModalOpen}
+        onClose={() => setIsDisputeModalOpen(false)}
+        referenceId={rideId}
+        type="RIDE"
+        onSuccess={() => mutateDispute()}
+      />
     </div>
   );
 }

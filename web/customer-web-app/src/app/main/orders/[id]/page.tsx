@@ -10,6 +10,7 @@ import {
   ShoppingBag,
   MapPin,
   Clock,
+  ExternalLink,
 } from "lucide-react";
 import Link from "next/link";
 import useSWR from "swr";
@@ -175,16 +176,26 @@ export default function OrderDetailsPage() {
 
         {/* Dispute Notice */}
         {hasDispute && (
-          <div className="p-4 bg-red-50 dark:bg-red-900/10 rounded-2xl flex items-start gap-3 border border-red-100 dark:border-red-900/20">
-            <MessageSquare className="w-5 h-5 text-red-500 mt-0.5" />
-            <div>
-              <p className="font-bold text-red-700 dark:text-red-400 text-sm">
-                Dispute Open
-              </p>
-              <p className="text-xs text-red-600 dark:text-red-300/80 mt-1 capitalize">
-                Status: {order.dispute.status}
-              </p>
+          <div className="p-4 bg-red-50 dark:bg-red-900/10 rounded-2xl flex items-start justify-between gap-3 border border-red-100 dark:border-red-900/20">
+            <div className="flex items-start gap-3">
+              <MessageSquare className="w-5 h-5 text-red-500 mt-0.5 shrink-0" />
+              <div>
+                <p className="font-bold text-red-700 dark:text-red-400 text-sm">
+                  Dispute Open
+                </p>
+                <p className="text-xs text-red-600 dark:text-red-300/80 mt-1 capitalize">
+                  Status: {order.dispute.status}
+                </p>
+              </div>
             </div>
+            {order.dispute?.id && (
+              <Link
+                href={`/main/disputes/${order.dispute.id}`}
+                className="inline-flex items-center gap-1 text-xs font-bold text-red-600 dark:text-red-400 hover:underline shrink-0 mt-0.5"
+              >
+                View <ExternalLink className="w-3 h-3" />
+              </Link>
+            )}
           </div>
         )}
 

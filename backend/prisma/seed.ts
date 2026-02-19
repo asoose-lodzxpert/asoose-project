@@ -4,6 +4,8 @@ import * as bcrypt from 'bcrypt';
 import { seedAdmin } from './admin-seed';
 import { seedBanks } from './08-bank';
 import { seedServiceZones } from './09-service-zones';
+import { seedCategories } from './categories';
+import { seedVendorsAndProducts } from './03-vendors-products';
 
 // Load environment variables
 dotenv.config();
@@ -51,6 +53,12 @@ async function main() {
 
   // Seed service zones (Maiduguri only)
   await seedServiceZones(prisma);
+
+  // Seed categories (required before vendors/products)
+  await seedCategories();
+
+  // Seed vendors, stores, and products
+  await seedVendorsAndProducts();
 }
 
 main()

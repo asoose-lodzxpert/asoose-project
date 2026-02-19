@@ -1,3 +1,4 @@
+import Link from "next/link";
 import {
   ShieldAlert,
   Calendar,
@@ -52,7 +53,10 @@ export const DisputeCard = ({
   hoursOpen,
 }: DisputeCardProps) => {
   return (
-    <div className="flex flex-col sm:flex-row gap-4 p-4 bg-white dark:bg-[#151515] rounded-2xl border border-gray-100 dark:border-white/5 hover:border-yellow-500/30 transition-all cursor-pointer group">
+    <Link
+      href={`/main/disputes/${id}`}
+      className="flex flex-col sm:flex-row gap-4 p-4 bg-white dark:bg-[#151515] rounded-2xl border border-gray-100 dark:border-white/5 hover:border-yellow-500/30 transition-all cursor-pointer group no-underline"
+    >
       {/* Icon */}
       <div className="w-12 h-12 rounded-full bg-red-50 dark:bg-red-500/10 flex items-center justify-center shrink-0 text-red-500 dark:text-red-400">
         <CategoryIcon category={category} />
@@ -100,6 +104,6 @@ export const DisputeCard = ({
       <div className="hidden sm:flex items-center justify-center text-gray-300 group-hover:text-yellow-500 transition-colors">
         <ChevronRight className="w-5 h-5" />
       </div>
-    </div>
+    </Link>
   );
 };

@@ -12,6 +12,7 @@ function slugify(text: string) {
 
 export async function seedCategories() {
   console.log('🌱 Seeding Categories...');
+  await prisma.$connect();
 
   const categories = [
     // Food

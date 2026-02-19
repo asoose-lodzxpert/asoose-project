@@ -22,6 +22,7 @@ import {
   Navigation,
   ShieldAlert,
   Flag,
+  ExternalLink,
 } from "lucide-react";
 import Link from "next/link";
 import useSWR from "swr";
@@ -584,11 +585,21 @@ export default function DeliveryDetailPage() {
             </h2>
 
             {hasDispute && (
-              <div className="flex items-start gap-3 p-4 bg-yellow-50 dark:bg-yellow-900/10 rounded-2xl border border-yellow-100 dark:border-yellow-900/20">
-                <Flag className="w-4 h-4 text-yellow-600 dark:text-yellow-400 shrink-0 mt-0.5" />
-                <p className="text-sm text-yellow-700 dark:text-yellow-400 font-medium">
-                  You've already submitted a dispute for this delivery. Our team is reviewing it.
-                </p>
+              <div className="flex items-start justify-between gap-3 p-4 bg-yellow-50 dark:bg-yellow-900/10 rounded-2xl border border-yellow-100 dark:border-yellow-900/20">
+                <div className="flex items-start gap-3">
+                  <Flag className="w-4 h-4 text-yellow-600 dark:text-yellow-400 shrink-0 mt-0.5" />
+                  <p className="text-sm text-yellow-700 dark:text-yellow-400 font-medium">
+                    You've already submitted a dispute for this delivery. Our team is reviewing it.
+                  </p>
+                </div>
+                {disputeData?.dispute?.id && (
+                  <Link
+                    href={`/main/disputes/${disputeData.dispute.id}`}
+                    className="inline-flex items-center gap-1 text-xs font-bold text-yellow-700 dark:text-yellow-400 hover:underline shrink-0"
+                  >
+                    View <ExternalLink className="w-3 h-3" />
+                  </Link>
+                )}
               </div>
             )}
 
