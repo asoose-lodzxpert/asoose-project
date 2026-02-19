@@ -737,7 +737,8 @@ export class PaymentService {
             userId: params.customerId,
             title: 'Ride Matching Started',
             message: 'We are finding a rider for your trip.',
-            type: 'RIDE_MATCHING',
+            type: 'RIDE',
+            category: 'RIDE_REQUESTED',
             metadata: { rideId: params.rideId },
           });
         }
@@ -756,7 +757,8 @@ export class PaymentService {
             userId: params.customerId,
             title: 'Order Delivery Matching Started',
             message: 'We are finding a courier for your order.',
-            type: 'ORDER_DELIVERY_MATCHING',
+            type: 'ORDER',
+            category: 'ORDER_DELIVERY_MATCHING',
             metadata: {
               orderId: params.orderId,
               deliveryId: params.deliveryId,
@@ -768,7 +770,8 @@ export class PaymentService {
             vendorId: params.vendorId,
             title: 'Order Delivery Matching Started',
             message: 'A courier is being assigned for your order.',
-            type: 'ORDER_DELIVERY_MATCHING',
+            type: 'ORDER',
+            category: 'ORDER_DELIVERY_MATCHING',
             metadata: {
               orderId: params.orderId,
               deliveryId: params.deliveryId,
@@ -782,7 +785,8 @@ export class PaymentService {
             title: 'Delivery Request Received',
             message:
               'Your delivery request is being processed. An admin will assign a rider soon.',
-            type: 'DELIVERY_REQUEST',
+            type: 'DELIVERY',
+            category: 'DELIVERY_CREATED',
             metadata: { deliveryId: params.deliveryId },
           });
         }

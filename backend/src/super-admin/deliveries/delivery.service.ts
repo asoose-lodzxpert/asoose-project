@@ -210,6 +210,124 @@ export class DeliveriesService {
     });
   }
 
+  async updateStatus(
+    id: string,
+    status: DeliveryStatus,
+    adminId: string,
+  ) {
+    const delivery = await this.prisma.delivery.findUnique({
+      where: { id },
+      include: {
+        rider: { select: { id: true } },
+        order: {
+          include: {
+            payment: true,
+            user: { select: { id: true } },
+          },
+        },
+      },
+    });
+
+    if (!delivery) throw new NotFoundException('Delivery not found');
+
+    if (delivery.status === DeliveryStatus.DELIVERED) {
+      throw new BadRequestException('Cannot change status of a completed delivery');
+    }
+    if (delivery.status === DeliveryStatus.CANCELLED) {
+      throw new BadRequestException('Cannot change status of a cancelled delivery');
+    }
+
+    // For DELIVERED: run the full earnings/ledger flow in a transaction
+    if (status === DeliveryStatus.DELIVERED) {
+      return this.prisma.$transaction(async (tx) => {
+        const updatedDelivery = await tx.delivery.update({
+          where: { id },
+          data: { status: DeliveryStatus.DELIVERED, deliveredAt: new Date() },
+        });
+
+        const deliveryFee = delivery.deliveryFee || 0;
+        if (deliveryFee > 0 && delivery.rider) {
+          await this.ledgerService.recordDeliveryEarnings({
+            id: delivery.id,
+            riderId: delivery.rider.id,
+            deliveryFee,
+          });
+        }
+
+        if (delivery.orderId && delivery.order) {
+          await tx.order.update({
+            where: { id: delivery.orderId },
+            data: { status: 'DELIVERED', deliveredAt: new Date() },
+          });
+
+          if (delivery.order.payment?.status === 'COMPLETED') {
+            await this.ledgerService.recordPayment({
+              id: delivery.order.payment.id,
+              amount: delivery.order.payment.amount,
+              userId: delivery.order.user.id,
+              orderId: delivery.orderId,
+              method: delivery.order.payment.method,
+              status: delivery.order.payment.status,
+            });
+
+            const order = await tx.order.findUnique({
+              where: { id: delivery.orderId },
+              include: { store: { select: { id: true, commissionRate: true } } },
+            });
+            if (order?.store) {
+              await this.ledgerService.recordOrderCommission({
+                id: order.id,
+                storeId: order.store.id,
+                total: delivery.order.total,
+                commissionRate: order.store.commissionRate || 20,
+              });
+            }
+          }
+        }
+
+        await tx.activityLog.create({
+          data: {
+            userId: adminId,
+            action: 'DELIVERY_COMPLETED',
+            target: id,
+            metadata: {
+              completedAt: new Date().toISOString(),
+              deliveryFee,
+              orderId: delivery.orderId,
+              overriddenByAdmin: true,
+            },
+          },
+        });
+
+        return updatedDelivery;
+      });
+    }
+
+    // All other status transitions
+    const extraData: any = {};
+    if (status === DeliveryStatus.PICKED_UP) extraData.pickedUpAt = new Date();
+    if (status === DeliveryStatus.ASSIGNED) extraData.assignedAt = new Date();
+
+    const updated = await this.prisma.delivery.update({
+      where: { id },
+      data: { status, ...extraData },
+    });
+
+    await this.prisma.activityLog.create({
+      data: {
+        userId: adminId,
+        action: 'DELIVERY_STATUS_UPDATED',
+        target: id,
+        metadata: {
+          previousStatus: delivery.status,
+          newStatus: status,
+        },
+      },
+    });
+
+    return updated;
+  }
+
   async assignRider(deliveryId: string, riderId: string, adminId: string) {
     const delivery = await this.prisma.delivery.findUnique({
       where: { id: deliveryId },
@@ -430,8 +548,8 @@ export class DeliveriesService {
     return {
       id: d.id,
       type: this.inferType(d.weightKg || 0, d.isFragile),
-      sender: d.order?.store?.name || d.customer?.name || 'Unknown',
-      recipient: d.recipientName || 'Unknown',
+      sender: d.order?.store?.name || d.customer?.name || '—',
+      recipient: d.recipientName || '—',
       driver: d.rider?.name || '-', // Direct access
       status:
         d.status === 'PICKED_UP'
@@ -494,8 +612,8 @@ export class DeliveriesService {
             name: d.rider.name,
             id: d.rider.id,
             vehicle: d.rider.vehicle
-              ? `${d.rider.vehicle.color} ${d.rider.vehicle.model}`
-              : 'Unknown',
+              ? `${d.rider.vehicle.color} ${d.rider.vehicle.model}`.trim()
+              : 'Not registered',
             phone: d.rider.phone,
           }
         : null,

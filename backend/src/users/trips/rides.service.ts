@@ -411,6 +411,18 @@ export class RidesService {
         data: { status: RideStatus.REQUESTED },
       });
 
+      // ✅ Broadcast new ride request to admin dashboard
+      this.notificationsGateway.sendToAdminRoom({
+        id: rideId,
+        type: 'RIDE',
+        category: 'RIDE_REQUESTED',
+        title: 'New Ride Request',
+        message: `A ride (${rideId.substring(0, 8)}…) has been confirmed and is awaiting a driver`,
+        isRead: false,
+        createdAt: new Date().toISOString(),
+        metadata: { rideId },
+      });
+
       this.triggerMatchingSideEffects(rideId, userId).catch((err) => {
         this.logger.error(`Failed to trigger matching for ride ${rideId}`, err);
       });

@@ -374,7 +374,20 @@ export class OrdersService {
       await this.completeIdempotency(redisKey, { orderId: order.id });
 
       // Async Notification (Safe)
-      // this.handoffNotifications(order, context.preparedStores[0].emailItems);
+      this.handoffNotifications(order, context.preparedStores[0].emailItems);
+
+      // ✅ Broadcast new order to admin dashboard in real-time
+      this.notificationsGateway.sendToAdminRoom({
+        id: order.id,
+        type: 'ORDER',
+        category: 'ORDER_CREATED',
+        title: 'New Order Placed',
+        message: `₦${order.total} order from ${order.user?.name || 'Customer'} at ${order.store?.name}`,
+        isRead: false,
+        createdAt: new Date().toISOString(),
+        metadata: { orderId: order.id },
+        recipientName: order.user?.name || '—',
+      });
 
       return order;
     } catch (error) {
@@ -482,6 +495,21 @@ export class OrdersService {
 
       // Async Notification Handoff
       this.handoffMultiNotifications(result.orders, preparedStores);
+
+      // ✅ Broadcast each order to admin dashboard in real-time
+      result.orders.forEach((order) => {
+        this.notificationsGateway.sendToAdminRoom({
+          id: order.id,
+          type: 'ORDER',
+          category: 'ORDER_CREATED',
+          title: 'New Order Placed',
+          message: `₦${order.total} order from ${order.user?.name || 'Customer'} at ${order.store?.name}`,
+          isRead: false,
+          createdAt: new Date().toISOString(),
+          metadata: { orderId: order.id },
+          recipientName: order.user?.name || '—',
+        });
+      });
 
       return responsePayload;
     } catch (error) {

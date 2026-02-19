@@ -19,6 +19,7 @@ import { SettingsController } from './settings/settings.controller';
 import { SettingsService } from './settings/settings.service';
 import { ActivityLogService } from 'src/common/services/activity-log.services';
 import { ActivityLogController } from './activity-logs/activity-log.controller';
+import { AdminNotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { ActivityLogController } from './activity-logs/activity-log.controller';
     AdminsModule,
     BannerModule,
     PayoutsModule,
+    AdminNotificationsModule,
   ],
   controllers: [SettingsController, ActivityLogController],
   providers: [

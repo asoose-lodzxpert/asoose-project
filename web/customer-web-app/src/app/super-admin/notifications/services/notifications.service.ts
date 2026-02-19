@@ -1,51 +1,54 @@
-import { getSession } from "next-auth/react"; // ✅ Import NextAuth
+import { getSession } from "next-auth/react";
 import { NotificationResponse } from "../types";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+const API_URL = (
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1"
+).replace(/\/$/, "");
 
+/** Shared auth-bearing fetch helper */
+async function authFetch(path: string, init?: RequestInit) {
+  const session = await getSession();
+  const token = (session as any)?.accessToken;
+  if (!token) throw new Error("No session found");
+
+  const res = await fetch(`${API_URL}${path}`, {
+    ...init,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+      ...(process.env.NODE_ENV === "development"
+        ? { "ngrok-skip-browser-warning": "true" }
+        : {}),
+      ...init?.headers,
+    },
+  });
+
+  if (!res.ok) throw new Error(`Request failed: ${res.status}`);
+  return res.json();
+}
+
+/**
+ * All methods point to the super-admin system-wide notifications endpoint.
+ * The `type` param narrows results to ORDER | RIDE | DELIVERY (omit for All).
+ */
 export const NotificationService = {
-  async getAll(page: number = 1): Promise<NotificationResponse> {
-    // ✅ Get NextAuth Session
-    const session = await getSession();
-    const token = (session as any)?.accessToken;
-
-    if (!token) throw new Error("No session found");
-
-    const res = await fetch(`${API_URL}/notifications?page=${page}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-
-    if (!res.ok) throw new Error("Failed to fetch notifications");
-    return res.json();
+  async getAll(page = 1, type?: string): Promise<NotificationResponse> {
+    const params = new URLSearchParams({ page: String(page) });
+    if (type && type !== "ALL") params.set("type", type);
+    return authFetch(`/super-admin/notifications?${params}`);
   },
 
   async markAsRead(id: string) {
-    const session = await getSession();
-    const token = (session as any)?.accessToken;
-
-    if (!token) throw new Error("No session found");
-
-    const res = await fetch(`${API_URL}/notifications/${id}/read`, {
+    return authFetch(`/super-admin/notifications/${id}/read`, {
       method: "PATCH",
-      headers: { Authorization: `Bearer ${token}` },
     });
-
-    if (!res.ok) throw new Error("Failed to mark as read");
-    return res.json();
   },
 
-  async markAllAsRead() {
-    const session = await getSession();
-    const token = (session as any)?.accessToken;
-
-    if (!token) throw new Error("No session found");
-
-    const res = await fetch(`${API_URL}/notifications/read-all`, {
+  async markAllAsRead(type?: string) {
+    const params = new URLSearchParams();
+    if (type && type !== "ALL") params.set("type", type);
+    return authFetch(`/super-admin/notifications/read-all?${params}`, {
       method: "PATCH",
-      headers: { Authorization: `Bearer ${token}` },
     });
-
-    if (!res.ok) throw new Error("Failed to mark all as read");
-    return res.json();
   },
 };

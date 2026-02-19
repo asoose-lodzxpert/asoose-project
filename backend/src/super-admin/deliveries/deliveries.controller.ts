@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Patch,
   Body,
   Param,
   Query,
@@ -41,6 +42,17 @@ export class DeliveriesController {
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN_MANAGER)
   remove(@Param('id') id: string) {
     return this.deliveriesService.remove(id);
+  }
+
+  @Patch(':id/status')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN_MANAGER)
+  updateStatus(
+    @Param('id') id: string,
+    @Body('status') status: string,
+    @Req() req: any,
+  ) {
+    const adminId = req.user.id || req.user.sub;
+    return this.deliveriesService.updateStatus(id, status as any, adminId);
   }
 
   @Post(':id/assign-rider')
