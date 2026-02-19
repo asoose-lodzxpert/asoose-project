@@ -95,9 +95,12 @@ export default function DeliveryProgressUI({ delivery, stage: propStage }: Deliv
   // Backend DeliveryStatus: PENDING | REQUESTED | ASSIGNED | ACCEPTED | PICKED_UP | IN_TRANSIT | DELIVERED | CANCELLED
   const getCurrentStepIndex = () => {
     if (status === 'DELIVERED') return 3;
+    // IN_TRANSIT is the same visual step as PICKED_UP (package already collected)
     if (status === 'PICKED_UP' || status === 'IN_TRANSIT') return 2;
+    // ACCEPTED is the same visual step as ASSIGNED (rider confirmed)
     if (status === 'ASSIGNED' || status === 'ACCEPTED') return 1;
-    return 0; // REQUESTED / PENDING
+    // CANCELLED shows step 0 with a distinct colour override in the badge
+    return 0; // REQUESTED / PENDING / CANCELLED
   };
 
   const currentStep = getCurrentStepIndex();
@@ -127,10 +130,17 @@ export default function DeliveryProgressUI({ delivery, stage: propStage }: Deliv
             <p className="text-zinc-500 text-sm">ID: {delivery?.id || '---'}</p>
           </div>
           <div className={`px-4 py-2 rounded-full font-bold text-sm flex items-center gap-2
-            ${status === 'DELIVERED' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-800'}`}>
+            ${
+              status === 'DELIVERED'
+                ? 'bg-green-100 text-green-700'
+                : status === 'CANCELLED'
+                ? 'bg-red-100 text-red-700'
+                : 'bg-yellow-100 text-yellow-800'
+            }`}>
             {status === 'REQUESTED' && <Clock size={16} className="animate-spin" />}
             {status === 'DELIVERED' && <CheckCircle2 size={16} />}
-            {status.replace('_', ' ')}
+            {/* Replace all underscores for readable display (e.g. IN_TRANSIT → IN TRANSIT) */}
+            {status.replace(/_/g, ' ')}
           </div>
         </div>
 

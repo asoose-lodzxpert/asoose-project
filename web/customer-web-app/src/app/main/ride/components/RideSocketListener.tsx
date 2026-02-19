@@ -23,6 +23,22 @@ export function RideSocketListener() {
     console.log(`📡 Initializing Socket Listener for Ride: ${rideId}`);
 
     subscribeToRideEvents({
+      // 0. Ride Matching Started — emitted by backend when CARD payment is confirmed
+      //    and the ride transitions from PENDING → REQUESTED.
+      onRideUpdate: (data) => {
+        try {
+          if (data.rideId !== rideId) return;
+
+          if (data.type === 'FINDING_DRIVER') {
+            console.log('💳 Card payment confirmed — driver matching started for ride:', rideId);
+            // Ensure UI shows the searching/finding-driver screen
+            setRideStatus('searching');
+          }
+        } catch (error) {
+          console.error('Socket error (onRideUpdate):', error);
+        }
+      },
+
       // 1. Driver Found — backend emits DRIVER_FOUND with real vehicle data
       onDriverFound: (data) => {
         try {

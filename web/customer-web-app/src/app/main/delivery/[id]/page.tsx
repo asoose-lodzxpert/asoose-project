@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { toast } from 'react-toastify';
@@ -10,6 +10,7 @@ import { DeliveryService, Delivery } from '@/services/delivery.service';
 import { socketService } from '@/services/socket.service';
 import BottomNav from '../../components/layout/BottomNav';
 import ReportDisputeModal from '../../orders/component/reportDisputeModal';
+import { useDeliveryStore } from '@/store/useDeliveryStore';
 
 export default function DeliveryDetailsPage() {
   const params = useParams();
@@ -20,6 +21,7 @@ export default function DeliveryDetailsPage() {
   const [isDisputeModalOpen, setIsDisputeModalOpen] = useState(false);
 
   const deliveryId = params.id as string;
+  const resetDelivery = useDeliveryStore((s) => s.resetDelivery);
 
   // Fetch initial data
   useEffect(() => {
@@ -42,6 +44,8 @@ export default function DeliveryDetailsPage() {
   }, [deliveryId, session, status]);
 
   // Socket Connection
+  // ⚠️  The effect must depend on `session` so it reconnects once next-auth
+  //     has finished loading — on first mount `session` may be null.
   useEffect(() => {
     const token = (session as any)?.accessToken || (session?.user as any)?.accessToken;
     if (!token || !deliveryId) return;
@@ -50,15 +54,37 @@ export default function DeliveryDetailsPage() {
 
     const handleUpdate = (data: any) => {
       if (data.deliveryId === deliveryId || data.id === deliveryId) {
-        setDelivery(prev => prev ? ({
-          ...prev,
-          status: data.status,
-          rider: data.rider || prev.rider
-        }) : null);
+        setDelivery(prev => {
+          if (!prev) return null;
 
-        if (data.status === 'ASSIGNED') toast.info("A rider has accepted your request!");
-        if (data.status === 'PICKED_UP') toast.info("Package picked up.");
-        if (data.status === 'DELIVERED') toast.success("Delivery completed!");
+          // ⚠️  The backend emits `rider.vehicle` as a FLAT STRING
+          // (e.g. "red Honda") but DeliveryProgressUI expects a
+          // { model, color, plateNumber } object fetched from DB.
+          // Only update top-level scalar fields from the socket; preserve
+          // the full rider object (including structured `vehicle`) from the
+          // HTTP fetch.  Merge rider name/phone only when socket provides them.
+          const updatedRider: typeof prev.rider = data.rider && prev.rider
+            ? {
+                ...prev.rider,                 // preserve DB-fetched vehicle object & required `id`
+                name: data.rider.name ?? prev.rider.name,
+                phone: data.rider.phone ?? prev.rider.phone,
+                // Never overwrite `vehicle` from socket — it is a flat string there
+              }
+            : prev.rider;
+
+          return {
+            ...prev,
+            status: data.status,
+            rider: updatedRider,
+          };
+        });
+
+        if (data.status === 'ASSIGNED' || data.status === 'ACCEPTED') {
+          toast.info('A rider has accepted your request!');
+        }
+        if (data.status === 'PICKED_UP') toast.info('Package picked up.');
+        if (data.status === 'IN_TRANSIT') toast.info('Your package is on the way!');
+        if (data.status === 'DELIVERED') toast.success('Delivery completed!');
       }
     };
 
@@ -111,7 +137,13 @@ export default function DeliveryDetailsPage() {
           {/* Send Another Package Button - Only if Delivered */}
           {delivery.status === 'DELIVERED' && (
             <button 
-              onClick={() => router.push('/main/delivery')}
+              onClick={() => {
+                // Reset the persisted Zustand store so returning to /main/delivery
+                // starts a fresh flow instead of being immediately redirected back
+                // here by the stage-tracking redirect guard.
+                resetDelivery();
+                router.push('/main/delivery');
+              }}
               className="w-full py-4 bg-yellow-500 hover:bg-yellow-600 text-black font-bold rounded-2xl shadow-lg hover:shadow-xl transform active:scale-[0.98] transition-all flex items-center justify-center gap-2"
             >
               <Package size={20} />

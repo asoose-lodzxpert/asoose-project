@@ -7,3 +7,177 @@
     @apply bg-white text-gray-900 dark:bg-[#0a0a0a] dark:text-gray-100 transition-colors duration-300;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Asoose SweetAlert2 Theme  —  delivery flow
+   All classes injected via Swal.mixin({ customClass: ... }) in swal-theme.ts
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Popup container ────────────────────────────────────────────────────── */
+.asoose-swal-popup {
+  font-family: inherit !important;   /* match app font stack */
+  border-radius: 1.25rem !important; /* rounded-2xl */
+  padding: 2rem 1.75rem !important;
+  box-shadow:
+    0 0 0 1px rgba(229, 165, 3, 0.12),
+    0 20px 60px rgba(0, 0, 0, 0.18) !important;
+  max-width: 420px !important;
+  width: 92vw !important;
+}
+
+/* Dark-mode border accent */
+.dark .asoose-swal-popup {
+  border: 1px solid #2a2a2a !important;
+  box-shadow:
+    0 0 0 1px rgba(229, 165, 3, 0.18),
+    0 24px 72px rgba(0, 0, 0, 0.56) !important;
+}
+
+/* ── Title ──────────────────────────────────────────────────────────────── */
+.asoose-swal-title {
+  font-size: 1.125rem !important; /* text-lg */
+  font-weight: 800 !important;    /* font-extrabold */
+  line-height: 1.35 !important;
+  margin-bottom: 0.25rem !important;
+  letter-spacing: -0.01em;
+}
+
+/* ── Body / HTML container ──────────────────────────────────────────────── */
+.asoose-swal-html {
+  font-size: 0.875rem !important;  /* text-sm */
+  line-height: 1.6 !important;
+  margin-top: 0.5rem !important;
+}
+
+/* Muted paragraph text inside html content */
+.asoose-swal-html p.mt-2 {
+  color: #6b7280; /* gray-500 */
+}
+.dark .asoose-swal-html p.mt-2 {
+  color: #a1a1aa; /* zinc-400 */
+}
+
+/* ── Icon ───────────────────────────────────────────────────────────────── */
+.asoose-swal-icon {
+  margin-bottom: 0.75rem !important;
+  margin-top: 0 !important;
+  border-width: 3px !important;
+  width: 4rem !important;
+  height: 4rem !important;
+}
+
+/* Tint brand yellow on warning icon to match palette */
+.asoose-swal-icon.swal2-warning {
+  border-color: #E5A503 !important;
+  color: #E5A503 !important;
+}
+.asoose-swal-icon.swal2-error {
+  border-color: #ef4444 !important;
+}
+.asoose-swal-icon.swal2-success {
+  border-color: #22c55e !important;
+}
+.asoose-swal-icon.swal2-question {
+  border-color: #E5A503 !important;
+  color: #E5A503 !important;
+}
+/* Fix success ring/line colours */
+.asoose-swal-icon.swal2-success [class^='swal2-success-line'] {
+  background-color: #22c55e !important;
+}
+.asoose-swal-icon.swal2-success .swal2-success-ring {
+  border-color: rgba(34, 197, 94, 0.28) !important;
+}
+
+/* ── Actions row ────────────────────────────────────────────────────────── */
+.asoose-swal-actions {
+  margin-top: 1.5rem !important;
+  gap: 0.625rem !important;
+  flex-wrap: wrap !important;
+}
+
+/* ── Confirm button ─────────────────────────────────────────────────────── */
+.asoose-swal-confirm {
+  border-radius: 0.75rem !important; /* rounded-xl */
+  font-weight: 700 !important;
+  font-size: 0.875rem !important;
+  padding: 0.625rem 1.375rem !important;
+  letter-spacing: 0.01em;
+  transition: background-color 0.15s, transform 0.1s !important;
+  box-shadow: 0 4px 14px rgba(229, 165, 3, 0.28) !important;
+}
+.asoose-swal-confirm:hover {
+  background-color: #cc9202 !important; /* BRAND_HOVER */
+}
+.asoose-swal-confirm:active {
+  transform: scale(0.97) !important;
+}
+
+/* ── Cancel button ──────────────────────────────────────────────────────── */
+.asoose-swal-cancel {
+  border-radius: 0.75rem !important;
+  font-weight: 600 !important;
+  font-size: 0.875rem !important;
+  padding: 0.625rem 1.375rem !important;
+  transition: background-color 0.15s, transform 0.1s !important;
+}
+.asoose-swal-cancel:active {
+  transform: scale(0.97) !important;
+}
+
+/* ── Close button (× in corner) ─────────────────────────────────────────── */
+.asoose-swal-close {
+  color: #9ca3af !important;
+  font-size: 1.5rem !important;
+}
+.asoose-swal-close:hover {
+  color: #E5A503 !important;
+}
+
+/* ── Entry / exit animations ────────────────────────────────────────────── */
+@keyframes asooseSwalEnter {
+  from {
+    opacity: 0;
+    transform: scale(0.92) translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+@keyframes asooseSwalLeave {
+  from {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.94) translateY(8px);
+  }
+}
+
+.asoose-swal-enter {
+  animation: asooseSwalEnter 0.22s cubic-bezier(0.34, 1.3, 0.64, 1) both !important;
+}
+.asoose-swal-leave {
+  animation: asooseSwalLeave 0.16s ease-in both !important;
+}
+
+/* ── Backdrop ───────────────────────────────────────────────────────────── */
+.swal2-backdrop-show {
+  background: rgba(0, 0, 0, 0.55) !important;
+  backdrop-filter: blur(4px) !important;
+}
+
+/* ── Scrollbar inside popup (if content is tall) ────────────────────────── */
+.asoose-swal-popup .swal2-html-container::-webkit-scrollbar {
+  width: 4px;
+}
+.asoose-swal-popup .swal2-html-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+.asoose-swal-popup .swal2-html-container::-webkit-scrollbar-thumb {
+  background: #E5A503;
+  border-radius: 9999px;
+}
+

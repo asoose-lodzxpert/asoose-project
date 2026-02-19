@@ -168,7 +168,11 @@ export function RideSelection() {
     }
 
     setIsSubmitting(true);
-    setRideStatus('searching');
+    // For CASH: transition to searching immediately (driver matching starts right away)
+    // For CARD: keep idle during API calls; transition to searching just before Paystack redirect
+    if (paymentMethod === 'CASH') {
+      setRideStatus('searching');
+    }
     setRideType(rideType);
 
     try {
@@ -227,6 +231,15 @@ export function RideSelection() {
       if (paymentMethod === 'CARD' && confirmResult?.status === 'AWAITING_PAYMENT') {
         try {
           const email = (session.user as any)?.email || '';
+
+          // Pass the frontend origin so the backend can redirect here after
+          // Paystack processes the payment. The backend appends /payment/callback
+          // to this URL, so we pass only the origin.
+          const frontendOrigin =
+            typeof window !== 'undefined'
+              ? window.location.origin
+              : process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001';
+
           const paymentRes = await paymentService.initiatePayment(
             {
               amount: selectedEstimate.estimatedFare,
@@ -235,20 +248,33 @@ export function RideSelection() {
               method: 'CARD',
               type: 'RIDE',
               rideId: response.ride.id,
+              // Tell the backend where to redirect the user after payment completes.
+              // Backend appends /payment/callback, so we pass just the origin.
+              callbackUrl: frontendOrigin,
             },
             session.accessToken,
           );
 
-          // Save ride context for when user returns from Paystack
+          if (!paymentRes.authorizationUrl) {
+            throw new Error('Paystack authorization URL not returned. Please try again.');
+          }
+
+          // Persist ride context so the callback page can restore state on return
           localStorage.setItem('pending_ride', 'true');
           localStorage.setItem('pending_ride_id', response.ride.id);
 
-          // Redirect to Paystack hosted checkout
+          // Transition to searching JUST before leaving so the UI is correct on return
+          setRideStatus('searching');
+
+          // Hard navigate to Paystack hosted checkout — user leaves the app here
           window.location.href = paymentRes.authorizationUrl;
           return; // Don't reset submitting — user is navigating away
         } catch (payErr: any) {
           console.error('Paystack init failed:', payErr);
           toast.error(payErr?.message || 'Failed to initialize payment. Please try again.');
+          // Clean up any partial localStorage state
+          localStorage.removeItem('pending_ride');
+          localStorage.removeItem('pending_ride_id');
           setRideStatus('idle');
           return;
         }

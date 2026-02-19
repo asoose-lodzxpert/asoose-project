@@ -1,9 +1,16 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { ChevronRight, Box, FileText, Truck, Layers, Info } from 'lucide-react';
 import { useDeliveryStore } from '@/store/useDeliveryStore';
 import { PACKAGE_TYPES } from '@/constants/packageTypes';
+import { deliverySwal } from '@/lib/swal-theme';
+
+// ─── Business Rules ────────────────────────────────────────────
+const WEIGHT_MIN_KG    = 0.1;
+const WEIGHT_MAX_KG    = 999;
+const VALUE_MIN_NGN    = 1;
+const VALUE_MAX_NGN    = 10_000_000;
 
 interface PackageFormProps {
   onContinue: () => void;
@@ -11,6 +18,10 @@ interface PackageFormProps {
 
 export default function PackageForm({ onContinue }: PackageFormProps) {
   const { packageInfo, setPackageInfo } = useDeliveryStore();
+
+  // Inline error state so users see feedback live after blurring or invalid submit
+  const [weightError, setWeightError]         = useState<string | null>(null);
+  const [declaredValueError, setDeclaredValueError] = useState<string | null>(null);
 
   const getIcon = (id: string) => {
     switch (id) {
@@ -22,15 +33,140 @@ export default function PackageForm({ onContinue }: PackageFormProps) {
     }
   };
 
+  // ─── Live input handler ─────────────────────────────────────────────────
   const handleNumberInput = (field: 'weightKg' | 'declaredValue', value: string) => {
     if (value === '') {
-      setPackageInfo({ [field]: '' });
+      setPackageInfo({ [field]: null });
+      if (field === 'weightKg')     setWeightError(null);
+      if (field === 'declaredValue') setDeclaredValueError(null);
       return;
     }
     const num = parseFloat(value);
-    if (!isNaN(num) && num >= 0) {
-      setPackageInfo({ [field]: num });
+    if (isNaN(num)) {
+      if (field === 'weightKg')     setWeightError('Must be a number');
+      if (field === 'declaredValue') setDeclaredValueError('Must be a number');
+      return;
     }
+    setPackageInfo({ [field]: num });
+    // Clear inline error while user is still typing valid characters
+    if (field === 'weightKg')     setWeightError(null);
+    if (field === 'declaredValue') setDeclaredValueError(null);
+  };
+
+  // ─── Blur-time inline validation ────────────────────────────────────────
+  const handleWeightBlur = () => {
+    const w = packageInfo.weightKg;
+    if (w === undefined || w === null) return; // optional field
+    const num = Number(w);
+    if (isNaN(num) || num <= 0) {
+      setWeightError(`Must be greater than 0 kg`);
+    } else if (num > WEIGHT_MAX_KG) {
+      setWeightError(`Maximum supported weight is ${WEIGHT_MAX_KG} kg`);
+    } else {
+      setWeightError(null);
+    }
+  };
+
+  const handleDeclaredValueBlur = () => {
+    const v = packageInfo.declaredValue;
+    if (v === undefined || v === null) return; // optional field
+    const num = Number(v);
+    if (isNaN(num) || num <= 0) {
+      setDeclaredValueError(`Must be greater than ₦0`);
+    } else if (num > VALUE_MAX_NGN) {
+      setDeclaredValueError(`Maximum declared value is ₦${VALUE_MAX_NGN.toLocaleString()}`);
+    } else {
+      setDeclaredValueError(null);
+    }
+  };
+
+  // ─── Pre-submit validation with SweetAlert2 ─────────────────────────────
+  const handleValidateAndContinue = async () => {
+    const swal = deliverySwal();
+
+    // ── Weight ──────────────────────────────────────────────────────────────
+    const rawWeight = packageInfo.weightKg;
+    if (rawWeight !== undefined && rawWeight !== null) {
+      const w = Number(rawWeight);
+      if (isNaN(w) || w <= 0) {
+        setWeightError(`Must be greater than ${WEIGHT_MIN_KG} kg`);
+        await swal.fire({
+          icon: 'error',
+          title: 'Invalid Package Weight',
+          html: `
+            <p>Weight must be a <strong>positive number greater than 0</strong>.</p>
+            <p class="mt-2 text-sm">
+              Enter the actual weight in kilograms, e.g. <strong>2.5</strong> for a 2.5&nbsp;kg parcel.
+            </p>
+            <p class="mt-2 text-sm">
+              Supported range: <strong>${WEIGHT_MIN_KG}&nbsp;kg &ndash; ${WEIGHT_MAX_KG}&nbsp;kg</strong>
+            </p>
+          `,
+          confirmButtonText: 'Fix Weight',
+        });
+        return;
+      }
+      if (w > WEIGHT_MAX_KG) {
+        setWeightError(`Max ${WEIGHT_MAX_KG} kg`);
+        await swal.fire({
+          icon: 'error',
+          title: 'Weight Exceeds Limit',
+          html: `
+            <p>We currently support packages up to <strong>${WEIGHT_MAX_KG}&nbsp;kg</strong>.</p>
+            <p class="mt-2 text-sm">
+              For heavier shipments please contact our logistics team directly.
+            </p>
+          `,
+          confirmButtonText: 'Fix Weight',
+        });
+        return;
+      }
+      // All good — clear any stale error
+      setWeightError(null);
+    }
+
+    // ── Declared Value ───────────────────────────────────────────────────────
+    const rawValue = packageInfo.declaredValue;
+    if (rawValue !== undefined && rawValue !== null) {
+      const val = Number(rawValue);
+      if (isNaN(val) || val <= 0) {
+        setDeclaredValueError('Must be greater than ₦0');
+        await swal.fire({
+          icon: 'error',
+          title: 'Invalid Declared Value',
+          html: `
+            <p>Declared item value must be a <strong>positive amount in Naira</strong>.</p>
+            <p class="mt-2 text-sm">
+              Enter the estimated market value of the item, e.g. <strong>₦5,000</strong>.
+            </p>
+            <p class="mt-2 text-sm">
+              Supported range: <strong>₦${VALUE_MIN_NGN.toLocaleString()} &ndash; ₦${VALUE_MAX_NGN.toLocaleString()}</strong>
+            </p>
+          `,
+          confirmButtonText: 'Fix Value',
+        });
+        return;
+      }
+      if (val > VALUE_MAX_NGN) {
+        setDeclaredValueError(`Max ₦${VALUE_MAX_NGN.toLocaleString()}`);
+        await swal.fire({
+          icon: 'warning',
+          title: 'Declared Value Too High',
+          html: `
+            <p>We currently accept declared values up to <strong>₦${VALUE_MAX_NGN.toLocaleString()}</strong>.</p>
+            <p class="mt-2 text-sm">
+              For high-value items above this limit, please contact our support team.
+            </p>
+          `,
+          confirmButtonText: 'Fix Value',
+        });
+        return;
+      }
+      setDeclaredValueError(null);
+    }
+
+    // ── All valid ────────────────────────────────────────────────────────────
+    onContinue();
   };
 
   return (
@@ -91,11 +227,20 @@ export default function PackageForm({ onContinue }: PackageFormProps) {
               type="number"
               min="0"
               placeholder="0.00"
-              // ✅ FIX: Use null coalescing (?? '') to ensure value is never undefined
               value={packageInfo.declaredValue ?? ''}
               onChange={(e) => handleNumberInput('declaredValue', e.target.value)}
-              className="w-full p-3 rounded-xl bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 text-sm focus:ring-2 focus:ring-yellow-500 outline-none transition-all"
+              onBlur={handleDeclaredValueBlur}
+              className={`w-full p-3 rounded-xl bg-white dark:bg-zinc-900 border text-sm focus:ring-2 focus:ring-yellow-500 outline-none transition-all ${
+                declaredValueError
+                  ? 'border-red-400 focus:ring-red-400'
+                  : 'border-gray-200 dark:border-zinc-700'
+              }`}
             />
+            {declaredValueError && (
+              <p className="text-[10px] text-red-500 mt-1 flex items-center gap-1">
+                <span>⚠</span> {declaredValueError}
+              </p>
+            )}
           </div>
 
           {/* Weight Input */}
@@ -107,11 +252,20 @@ export default function PackageForm({ onContinue }: PackageFormProps) {
               type="number"
               min="0"
               placeholder="e.g. 2.5"
-              // ✅ FIX: Use null coalescing (?? '') here as well
               value={packageInfo.weightKg ?? ''}
               onChange={(e) => handleNumberInput('weightKg', e.target.value)}
-              className="w-full p-3 rounded-xl bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 text-sm focus:ring-2 focus:ring-yellow-500 outline-none transition-all"
+              onBlur={handleWeightBlur}
+              className={`w-full p-3 rounded-xl bg-white dark:bg-zinc-900 border text-sm focus:ring-2 focus:ring-yellow-500 outline-none transition-all ${
+                weightError
+                  ? 'border-red-400 focus:ring-red-400'
+                  : 'border-gray-200 dark:border-zinc-700'
+              }`}
             />
+            {weightError && (
+              <p className="text-[10px] text-red-500 mt-1 flex items-center gap-1">
+                <span>⚠</span> {weightError}
+              </p>
+            )}
           </div>
         </div>
 
@@ -163,7 +317,7 @@ export default function PackageForm({ onContinue }: PackageFormProps) {
 
       {/* Action Button */}
       <button
-        onClick={onContinue}
+        onClick={handleValidateAndContinue}
         className="w-full py-4 bg-yellow-500 hover:bg-yellow-600 text-white font-black rounded-2xl shadow-lg shadow-yellow-100 dark:shadow-none flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
       >
         Calculate Price <ChevronRight size={18} />

@@ -159,6 +159,14 @@ export interface RideStatusEvent {
   rideId: string;
 }
 
+/** Emitted by the backend when ride matching starts after payment confirmation */
+export interface RideUpdateEvent {
+  type: 'FINDING_DRIVER' | string;
+  status?: string;
+  rideId: string;
+  label?: string;
+}
+
 export const subscribeToRideEvents = (
   callbacks: {
     onDriverFound?: (data: DriverFoundEvent) => void;
@@ -167,6 +175,7 @@ export const subscribeToRideEvents = (
     onTripStarted?: (data: RideStatusEvent) => void;
     onTripCompleted?: (data: RideStatusEvent) => void;
     onRideCancelled?: (data: RideStatusEvent) => void;
+    onRideUpdate?: (data: RideUpdateEvent) => void;
   },
 ) => {
   if (callbacks.onDriverFound) {
@@ -187,6 +196,9 @@ export const subscribeToRideEvents = (
   if (callbacks.onRideCancelled) {
     socketService.on('RIDE_CANCELLED', callbacks.onRideCancelled);
   }
+  if (callbacks.onRideUpdate) {
+    socketService.on('ride_update', callbacks.onRideUpdate);
+  }
 };
 
 export const unsubscribeFromRideEvents = () => {
@@ -196,6 +208,7 @@ export const unsubscribeFromRideEvents = () => {
   socketService.off('TRIP_STARTED');
   socketService.off('TRIP_COMPLETED');
   socketService.off('RIDE_CANCELLED');
+  socketService.off('ride_update');
 };
 
 // ============================================================================
