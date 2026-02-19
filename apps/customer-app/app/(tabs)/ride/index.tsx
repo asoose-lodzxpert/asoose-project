@@ -28,6 +28,7 @@ export default function RideBookingScreen() {
     dropoffLocation,
     selectedVehicleType,
     fareEstimate,
+    fareOptions,
     loading,
     error,
     setSelectedVehicleType,
@@ -211,6 +212,8 @@ export default function RideBookingScreen() {
         <VehicleTypeSelector
           selected={selectedVehicleType}
           onSelect={(type: VehicleType) => setSelectedVehicleType(type)}
+          fareOptions={fareOptions}
+          isFareLoading={estimating}
         />
 
         {/* Fare Estimate */}

@@ -12,6 +12,7 @@ import { Server, Socket } from 'socket.io';
 import { Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { RiderStateService } from '../matching/rider-state/rider-state.service';
+import { DriverStateService } from '../matching/driver-state/driver-state.service';
 
 // Explicit CORS configuration for Socket.IO
 @WebSocketGateway({
@@ -35,6 +36,7 @@ export class NotificationsGateway
   constructor(
     private jwtService: JwtService,
     private riderStateService: RiderStateService,
+    private driverStateService: DriverStateService,
   ) {}
 
   afterInit() {
@@ -64,6 +66,7 @@ export class NotificationsGateway
       const userId = payload.sub || payload.userId;
 
       client.data.userId = userId;
+      client.data.role = payload.role;
 
       // Track the user
       if (!this.activeUsers.has(userId)) {
@@ -119,6 +122,7 @@ export class NotificationsGateway
     @MessageBody() data: { lat: number; lng: number },
   ) {
     const riderId = client.data.userId;
+    const role: string = client.data.role ?? 'RIDER';
     if (!riderId) {
       this.logger.warn(`Location update from unauthenticated socket`);
       return { success: false, error: 'Not authenticated' };
@@ -130,13 +134,34 @@ export class NotificationsGateway
     }
 
     try {
-      await this.riderStateService.updateLocation(riderId, data.lat, data.lng);
+      if (role === 'DRIVER') {
+        this.logger.debug(
+          `[LOC] Driver ${riderId} → calling driverStateService.updateLocation [${data.lat}, ${data.lng}]`,
+        );
+        await this.driverStateService.updateLocation(
+          riderId,
+          data.lat,
+          data.lng,
+        );
+      } else {
+        this.logger.debug(
+          `[LOC] Rider ${riderId} → calling riderStateService.updateLocation [${data.lat}, ${data.lng}]`,
+        );
+        await this.riderStateService.updateLocation(
+          riderId,
+          data.lat,
+          data.lng,
+        );
+      }
       this.logger.debug(
-        `Location updated for rider ${riderId}: [${data.lat}, ${data.lng}]`,
+        `Location updated for ${role.toLowerCase()} ${riderId}: [${data.lat}, ${data.lng}]`,
       );
       return { success: true };
     } catch (error) {
-      this.logger.error(`Error updating location for rider ${riderId}`, error);
+      this.logger.error(
+        `Error updating location for ${role.toLowerCase()} ${riderId}`,
+        error,
+      );
       return { success: false, error: 'Failed to update location' };
     }
   }
@@ -151,6 +176,7 @@ export class NotificationsGateway
     data: { locations: Array<{ lat: number; lng: number; timestamp: number }> },
   ) {
     const riderId = client.data.userId;
+    const role: string = client.data.role ?? 'RIDER';
     if (!riderId) {
       return { success: false, error: 'Not authenticated' };
     }
@@ -169,13 +195,21 @@ export class NotificationsGateway
         typeof latest.lat === 'number' &&
         typeof latest.lng === 'number'
       ) {
-        await this.riderStateService.updateLocation(
-          riderId,
-          latest.lat,
-          latest.lng,
-        );
+        if (role === 'DRIVER') {
+          await this.driverStateService.updateLocation(
+            riderId,
+            latest.lat,
+            latest.lng,
+          );
+        } else {
+          await this.riderStateService.updateLocation(
+            riderId,
+            latest.lat,
+            latest.lng,
+          );
+        }
         this.logger.log(
-          `Batch location updated for rider ${riderId} (${data.locations.length} entries)`,
+          `Batch location updated for ${role.toLowerCase()} ${riderId} (${data.locations.length} entries)`,
         );
       }
 
@@ -195,7 +229,9 @@ export class NotificationsGateway
   @SubscribeMessage('joinAdminRoom')
   handleJoinAdminRoom(@ConnectedSocket() client: Socket) {
     client.join('admin_notifications');
-    this.logger.log(`Admin ${client.data.userId} joined admin_notifications room`);
+    this.logger.log(
+      `Admin ${client.data.userId} joined admin_notifications room`,
+    );
     return { event: 'joinedAdminRoom', room: 'admin_notifications' };
   }
 

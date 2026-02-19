@@ -181,6 +181,12 @@ if oldHexId ~= newHexId then
   redis.call('SADD', 'hex:' .. newHexId .. ':drivers', driverId)
   redis.call('INCR', 'hex:' .. newHexId .. ':count')
   return 1
+else
+  -- Same hex but self-heal: re-add if missing due to stale assignment cleanup failure
+  if redis.call('SISMEMBER', 'hex:' .. newHexId .. ':drivers', driverId) == 0 then
+    redis.call('SADD', 'hex:' .. newHexId .. ':drivers', driverId)
+    redis.call('INCR', 'hex:' .. newHexId .. ':count')
+  end
 end
 
 return 0

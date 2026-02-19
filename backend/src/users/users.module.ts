@@ -22,6 +22,7 @@ import { FcmModule } from 'src/libs/fcm/fcm.module';
 import { TripsModule } from './trips/trips.module';
 import { VendorModule } from 'src/vendor/vendor.module';
 import { QueueModule } from 'src/matching/queue/queue.module';
+import { FareModule } from '../fare/fare.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { QueueModule } from 'src/matching/queue/queue.module';
     forwardRef(() => TripsModule), // ✅ FIXED: Wrapped in forwardRef to break circular dependency
     VendorModule,
     QueueModule,
+    FareModule,
     BullModule.registerQueue({
       name: 'email',
     }),

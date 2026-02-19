@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, {
+  useState,
+  useEffect,
+  useMemo,
+  useRef,
+  useCallback,
+} from "react";
 import {
   View,
   StyleSheet,
@@ -30,7 +36,7 @@ import Toast from "react-native-toast-message";
 export default function CheckoutScreen() {
   const router = useRouter();
   const { user } = useAuth();
-  const { items, groups, total, clearCart } = useCart();
+  const { items, groups, total, subtotal, deliveryFee, clearCart } = useCart();
 
   // Theme Colors
   const primary = useThemeColor({}, "brandPrimary");
@@ -66,6 +72,23 @@ export default function CheckoutScreen() {
   const [isProcessing, setIsProcessing] = useState(false);
   const capturedAmount = useRef(0); // snapshot of total before cart is cleared
 
+  // Live fee quote state
+  type QuoteGroup = {
+    storeId: string;
+    deliveryFee: number;
+    serviceFee: number;
+    subtotal: number;
+  };
+  type QuoteResult = {
+    groups: QuoteGroup[];
+    totalDeliveryFee: number;
+    totalServiceFee: number;
+    grandTotal: number;
+  };
+  const [quoteResult, setQuoteResult] = useState<QuoteResult | null>(null);
+  const [isLoadingFee, setIsLoadingFee] = useState(false);
+  const quoteAbortRef = useRef<number>(0);
+
   const currencySymbol = groups[0]?.restaurant.currency ?? "₦";
 
   useEffect(() => {
@@ -90,6 +113,62 @@ export default function CheckoutScreen() {
     };
     loadAddresses();
   }, [user]);
+
+  // Fetch live quote from backend whenever address or cart changes
+  const fetchQuote = useCallback(
+    async (address: Address) => {
+      const requestId = ++quoteAbortRef.current;
+      setIsLoadingFee(true);
+      try {
+        const data = await request("users/cart/quote", {
+          method: "POST",
+          body: JSON.stringify({
+            addressId: address.id,
+            items: items.map((item) => ({ id: item.id, quantity: item.qty })),
+          }),
+        });
+        if (requestId !== quoteAbortRef.current) return;
+        const totalServiceFee = (data.groups ?? []).reduce(
+          (sum: number, g: any) => sum + (g.serviceFee ?? 0),
+          0,
+        );
+        setQuoteResult({
+          groups: (data.groups ?? []).map((g: any) => ({
+            storeId: g.storeId ?? g.restaurantId ?? "",
+            deliveryFee: g.deliveryFee ?? 0,
+            serviceFee: g.serviceFee ?? 0,
+            subtotal: g.subtotal ?? 0,
+          })),
+          totalDeliveryFee: data.totalDeliveryFee ?? 0,
+          totalServiceFee,
+          grandTotal: data.grandTotal ?? 0,
+        });
+      } catch (err: any) {
+        if (requestId === quoteAbortRef.current) {
+          console.error("Quote fetch failed:", err);
+        }
+      } finally {
+        if (requestId === quoteAbortRef.current) {
+          setIsLoadingFee(false);
+        }
+      }
+    },
+    [items],
+  );
+
+  useEffect(() => {
+    if (selectedAddress) {
+      fetchQuote(selectedAddress);
+    } else {
+      setQuoteResult(null);
+    }
+  }, [selectedAddress?.id, items.length]);
+
+  // Resolve totals: prefer live quote, fall back to cart-computed values
+  const resolvedDelivery = quoteResult?.totalDeliveryFee ?? deliveryFee;
+  const resolvedService =
+    quoteResult?.totalServiceFee ?? Math.round(subtotal * 0.05);
+  const resolvedGrandTotal = subtotal + resolvedDelivery + resolvedService;
 
   const handlePlaceOrder = async () => {
     if (!selectedAddress || !user) {
@@ -118,7 +197,7 @@ export default function CheckoutScreen() {
       setOrderId(trackingId);
 
       const paymentPayload = {
-        amount: total,
+        amount: resolvedGrandTotal,
         ...(isMultiVendor
           ? { orderGroupId: multiVendorGroupId }
           : { orderId: singleOrderId }),
@@ -175,35 +254,58 @@ export default function CheckoutScreen() {
             <Pressable
               style={[
                 styles.glassCard,
-                { backgroundColor: card, borderColor: border },
+                {
+                  backgroundColor: selectedAddress ? card : primary + "10",
+                  borderColor: selectedAddress ? border : primary,
+                  borderWidth: selectedAddress ? 1 : 1.5,
+                },
               ]}
               onPress={() => setShowAddressModal(true)}
             >
               <View
-                style={[styles.iconBox, { backgroundColor: primary + "15" }]}
+                style={[
+                  styles.iconBox,
+                  {
+                    backgroundColor: selectedAddress ? primary + "15" : primary,
+                  },
+                ]}
               >
                 <IconSymbol
                   name="mappin.and.ellipse"
                   size={20}
-                  color={primary}
+                  color={selectedAddress ? primary : "#fff"}
                 />
               </View>
               <View style={{ flex: 1 }}>
-                <ThemedText style={styles.addressLabel}>
-                  {selectedAddress?.label || "Select Address"}
+                <ThemedText
+                  style={[
+                    styles.addressLabel,
+                    !selectedAddress && { color: primary },
+                  ]}
+                >
+                  {selectedAddress?.label || "Add Delivery Address"}
                 </ThemedText>
                 <ThemedText
                   style={[styles.addressText, { color: textSecondary }]}
                   numberOfLines={1}
                 >
-                  {selectedAddress?.address || "Tap to add a delivery location"}
+                  {selectedAddress?.address || "Tap to select where to deliver"}
                 </ThemedText>
               </View>
-              <IconSymbol
-                name="chevron.right"
-                size={16}
-                color={textSecondary}
-              />
+              <View
+                style={[
+                  styles.chevronBox,
+                  {
+                    backgroundColor: selectedAddress ? "transparent" : primary,
+                  },
+                ]}
+              >
+                <IconSymbol
+                  name={selectedAddress ? "chevron.right" : "plus"}
+                  size={14}
+                  color={selectedAddress ? textSecondary : "#fff"}
+                />
+              </View>
             </Pressable>
           </View>
 
@@ -269,31 +371,91 @@ export default function CheckoutScreen() {
                     </View>
                   ))}
 
-                  {/* Specific Delivery Fee for this Restaurant */}
+                  {/* Per-store Delivery Fee */}
                   <View style={styles.feeRow}>
                     <ThemedText
                       style={[styles.feeLabel, { color: textSecondary }]}
                     >
                       Delivery Fee
                     </ThemedText>
-                    <ThemedText style={styles.feeAmount}>
-                      {group.deliveryFee > 0
-                        ? formatCurrency(group.deliveryFee, currencySymbol)
-                        : "FREE"}
-                    </ThemedText>
+                    {isLoadingFee ? (
+                      <ThemedText
+                        style={[styles.feeAmount, { color: textSecondary }]}
+                      >
+                        Calculating...
+                      </ThemedText>
+                    ) : (
+                      (() => {
+                        const qGroup = quoteResult?.groups.find(
+                          (qg) => qg.storeId === group.restaurant.id,
+                        );
+                        const fee = qGroup?.deliveryFee ?? group.deliveryFee;
+                        return (
+                          <ThemedText style={styles.feeAmount}>
+                            {fee > 0
+                              ? formatCurrency(fee, currencySymbol)
+                              : "FREE"}
+                          </ThemedText>
+                        );
+                      })()
+                    )}
                   </View>
                 </View>
               ))}
 
               {/* Final Calculations */}
               <View style={[styles.totalContainer, { borderTopColor: border }]}>
+                <View style={[styles.summaryRow, { marginBottom: 6 }]}>
+                  <ThemedText style={{ color: textSecondary, fontSize: 13 }}>
+                    Subtotal
+                  </ThemedText>
+                  <ThemedText style={{ fontSize: 13 }}>
+                    {formatCurrency(subtotal, currencySymbol)}
+                  </ThemedText>
+                </View>
+                <View style={[styles.summaryRow, { marginBottom: 6 }]}>
+                  <ThemedText style={{ color: textSecondary, fontSize: 13 }}>
+                    Delivery
+                  </ThemedText>
+                  {isLoadingFee ? (
+                    <ThemedText style={{ fontSize: 13, color: textSecondary }}>
+                      Calculating...
+                    </ThemedText>
+                  ) : (
+                    <ThemedText style={{ fontSize: 13 }}>
+                      {formatCurrency(resolvedDelivery, currencySymbol)}
+                    </ThemedText>
+                  )}
+                </View>
+                <View style={[styles.summaryRow, { marginBottom: 12 }]}>
+                  <ThemedText style={{ color: textSecondary, fontSize: 13 }}>
+                    Service Fee (5%)
+                  </ThemedText>
+                  {isLoadingFee ? (
+                    <ThemedText style={{ fontSize: 13, color: textSecondary }}>
+                      Calculating...
+                    </ThemedText>
+                  ) : (
+                    <ThemedText style={{ fontSize: 13 }}>
+                      {formatCurrency(resolvedService, currencySymbol)}
+                    </ThemedText>
+                  )}
+                </View>
                 <View style={styles.summaryRow}>
                   <ThemedText style={{ color: textSecondary, fontSize: 15 }}>
                     Total to pay
                   </ThemedText>
-                  <ThemedText style={styles.grandTotal}>
-                    {formatCurrency(total, currencySymbol)}
-                  </ThemedText>
+                  {isLoadingFee ? (
+                    <ThemedText
+                      style={[styles.grandTotal, { color: textSecondary }]}
+                    >
+                      ...
+                    </ThemedText>
+                  ) : (
+                    <ThemedText style={styles.grandTotal}>
+                      {formatCurrency(resolvedGrandTotal, currencySymbol)}
+                    </ThemedText>
+                  )}
                 </View>
               </View>
             </View>
@@ -310,20 +472,26 @@ export default function CheckoutScreen() {
           ]}
         >
           <Pressable
-            disabled={isProcessing || !selectedAddress}
+            disabled={isProcessing || !selectedAddress || isLoadingFee}
             onPress={handlePlaceOrder}
             style={[
               styles.payButton,
               { backgroundColor: primary },
-              (!selectedAddress || isProcessing) && styles.disabled,
+              (!selectedAddress || isProcessing || isLoadingFee) &&
+                styles.disabled,
             ]}
           >
             {isProcessing ? (
               <ActivityIndicator color="#fff" />
+            ) : isLoadingFee ? (
+              <View style={styles.payButtonContent}>
+                <ActivityIndicator color="#fff" size="small" />
+                <ThemedText style={styles.payText}>Calculating...</ThemedText>
+              </View>
             ) : (
               <View style={styles.payButtonContent}>
                 <ThemedText style={styles.payText}>
-                  Pay {formatCurrency(total, currencySymbol)}
+                  Pay {formatCurrency(resolvedGrandTotal, currencySymbol)}
                 </ThemedText>
                 <IconSymbol name="arrow.right" size={18} color="#fff" />
               </View>
@@ -354,7 +522,7 @@ export default function CheckoutScreen() {
           }}
           onCancel={() => setShowPaymentWebView(false)}
           onPaymentComplete={async () => {
-            capturedAmount.current = total; // capture before clearCart zeroes it
+            capturedAmount.current = resolvedGrandTotal; // capture before clearCart zeroes it
             orderCompleted.current = true;
             await clearCart();
           }}
@@ -414,6 +582,13 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
     gap: 16,
+  },
+  chevronBox: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
   },
   iconBox: {
     width: 44,

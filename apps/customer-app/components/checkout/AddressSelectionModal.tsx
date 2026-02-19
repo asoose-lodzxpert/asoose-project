@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   StyleSheet,
@@ -6,6 +6,7 @@ import {
   Pressable,
   ScrollView,
   ActivityIndicator,
+  Platform,
 } from "react-native";
 import { ThemedText } from "@/components/themed-text";
 import { IconSymbol } from "@/components/ui/icon-symbol";
@@ -29,8 +30,11 @@ export function AddressSelectionModal({
 }: AddressSelectionModalProps) {
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [loading, setLoading] = useState(false);
+  const [tentativeId, setTentativeId] = useState<string | undefined>(
+    selectedAddressId,
+  );
 
-  const accent = useThemeColor({}, "brandPrimary");
+  const primary = useThemeColor({}, "brandPrimary");
   const surface = useThemeColor({}, "surfaceBackground");
   const surfaceCard = useThemeColor({}, "surfaceCard");
   const surfaceSubtle = useThemeColor({}, "surfaceSubtle");
@@ -42,159 +46,243 @@ export function AddressSelectionModal({
 
   useEffect(() => {
     if (visible) {
+      setTentativeId(selectedAddressId);
       loadAddresses();
     }
   }, [visible]);
 
-  const loadAddresses = async () => {
+  const loadAddresses = useCallback(async () => {
     setLoading(true);
     try {
       const response = await request("users/addresses", { method: "GET" });
-      setAddresses(response || []);
-    } catch (error) {
-      console.error("Failed to load addresses:", error);
+      setAddresses(Array.isArray(response) ? response : []);
+    } catch {
+      // silently fail
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  const handleConfirm = () => {
+    const addr = addresses.find((a) => a.id === tentativeId);
+    if (addr) onSelect(addr);
+    onClose();
   };
+
+  const tentativeAddress = addresses.find((a) => a.id === tentativeId);
 
   return (
     <Modal
       visible={visible}
       animationType="slide"
       transparent
+      statusBarTranslucent
       onRequestClose={onClose}
     >
-      <View style={styles.modalOverlay}>
+      <View style={styles.overlay}>
+        {/* Backdrop */}
         <Pressable style={styles.backdrop} onPress={onClose} />
 
-        <View style={[styles.modalContent, { backgroundColor: surface }]}>
+        {/* Sheet */}
+        <View style={[styles.sheet, { backgroundColor: surface }]}>
+          {/* Drag handle */}
+          <View style={styles.handleRow}>
+            <View style={[styles.handle, { backgroundColor: borderColor }]} />
+          </View>
+
           {/* Header */}
           <View style={styles.header}>
-            <ThemedText type="subtitle">Select Delivery Address</ThemedText>
-            <Pressable onPress={onClose} style={styles.closeButton}>
-              <IconSymbol name="xmark" size={24} color={textPrimary} />
+            <View>
+              <ThemedText style={styles.title}>Delivery Address</ThemedText>
+              <ThemedText style={[styles.subtitle, { color: textSecondary }]}>
+                Where should we send your order?
+              </ThemedText>
+            </View>
+            <Pressable
+              onPress={onClose}
+              style={[styles.closeBtn, { backgroundColor: surfaceSubtle }]}
+              hitSlop={8}
+            >
+              <IconSymbol name="xmark" size={14} color={textPrimary} />
             </Pressable>
           </View>
 
-          {/* Content */}
+          {/* Body */}
           {loading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={accent} />
+            <View style={styles.center}>
+              <ActivityIndicator size="large" color={primary} />
+              <ThemedText
+                style={[styles.loadingText, { color: textSecondary }]}
+              >
+                Loading addresses...
+              </ThemedText>
             </View>
           ) : addresses.length === 0 ? (
             <View style={styles.emptyState}>
-              <IconSymbol name="location" size={48} color={borderColor} />
-              <ThemedText style={[styles.emptyText, { color: textSecondary }]}>
+              <View
+                style={[styles.emptyIcon, { backgroundColor: primary + "12" }]}
+              >
+                <IconSymbol name="location" size={36} color={primary} />
+              </View>
+              <ThemedText style={styles.emptyTitle}>
                 No saved addresses
               </ThemedText>
-              <Pressable
-                style={[styles.addButton, { backgroundColor: accent }]}
-                onPress={() => {
-                  onClose();
-                  // Navigate to add address screen
-                }}
+              <ThemedText
+                style={[styles.emptySubtitle, { color: textSecondary }]}
               >
-                <IconSymbol name="plus" size={20} color="#fff" />
-                <ThemedText style={styles.addButtonText}>
-                  Add New Address
-                </ThemedText>
-              </Pressable>
-            </View>
-          ) : (
-            <ScrollView style={styles.addressList}>
-              {addresses.map((address) => (
-                <Pressable
-                  key={address.id}
-                  style={[
-                    styles.addressItem,
-                    { backgroundColor: surfaceCard, borderColor },
-                    selectedAddressId === address.id && {
-                      borderColor: accent,
-                      borderWidth: 2,
-                    },
-                  ]}
-                  onPress={() => onSelect(address)}
-                >
-                  <View style={styles.addressContent}>
-                    <View
-                      style={[
-                        styles.iconContainer,
-                        {
-                          backgroundColor:
-                            selectedAddressId === address.id
-                              ? accent
-                              : surfaceSubtle,
-                        },
-                      ]}
-                    >
-                      <IconSymbol
-                        name="location.fill"
-                        size={20}
-                        color={
-                          selectedAddressId === address.id ? "#fff" : accent
-                        }
-                      />
-                    </View>
-
-                    <View style={{ flex: 1 }}>
-                      <View style={styles.labelRow}>
-                        <ThemedText style={styles.addressLabel}>
-                          {address.label}
-                        </ThemedText>
-                        {address.isDefault && (
-                          <View
-                            style={[
-                              styles.defaultBadge,
-                              { backgroundColor: surfaceSubtle },
-                            ]}
-                          >
-                            <ThemedText
-                              style={[
-                                styles.defaultText,
-                                { color: textSecondary },
-                              ]}
-                            >
-                              Default
-                            </ThemedText>
-                          </View>
-                        )}
-                      </View>
-                      <ThemedText
-                        style={[styles.addressText, { color: textSecondary }]}
-                        numberOfLines={2}
-                      >
-                        {address.address}
-                      </ThemedText>
-                    </View>
-
-                    {selectedAddressId === address.id && (
-                      <IconSymbol
-                        name="checkmark.circle.fill"
-                        size={24}
-                        color={accent}
-                      />
-                    )}
-                  </View>
-                </Pressable>
-              ))}
-
+                Add a delivery address to continue with your order
+              </ThemedText>
               <Pressable
-                style={[
-                  styles.addAddressButton,
-                  { backgroundColor: surfaceCard, borderColor },
-                ]}
+                style={[styles.addBtn, { backgroundColor: primary }]}
                 onPress={() => {
                   onClose();
                   router.push("/(settings)/addresses");
                 }}
               >
-                <IconSymbol name="plus.circle.fill" size={20} color={accent} />
-                <ThemedText style={[styles.addAddressText, { color: accent }]}>
+                <IconSymbol name="plus" size={18} color="#fff" />
+                <ThemedText style={styles.addBtnText}>
                   Add New Address
                 </ThemedText>
               </Pressable>
-            </ScrollView>
+            </View>
+          ) : (
+            <>
+              <ScrollView
+                style={styles.list}
+                contentContainerStyle={{ paddingBottom: 8 }}
+                showsVerticalScrollIndicator={false}
+              >
+                {addresses.map((addr) => {
+                  const isSelected = tentativeId === addr.id;
+                  return (
+                    <Pressable
+                      key={addr.id}
+                      style={[
+                        styles.addressCard,
+                        {
+                          backgroundColor: isSelected
+                            ? primary + "0D"
+                            : surfaceCard,
+                          borderColor: isSelected ? primary : borderColor,
+                          borderWidth: isSelected ? 2 : 1,
+                        },
+                      ]}
+                      onPress={() => setTentativeId(addr.id)}
+                    >
+                      {/* Icon */}
+                      <View
+                        style={[
+                          styles.addressIcon,
+                          {
+                            backgroundColor: isSelected
+                              ? primary
+                              : surfaceSubtle,
+                          },
+                        ]}
+                      >
+                        <IconSymbol
+                          name="location.fill"
+                          size={18}
+                          color={isSelected ? "#fff" : primary}
+                        />
+                      </View>
+
+                      {/* Text */}
+                      <View style={{ flex: 1, gap: 3 }}>
+                        <View style={styles.labelRow}>
+                          <ThemedText style={styles.addressLabel}>
+                            {addr.label}
+                          </ThemedText>
+                          {addr.isDefault && (
+                            <View
+                              style={[
+                                styles.defaultBadge,
+                                { backgroundColor: primary + "18" },
+                              ]}
+                            >
+                              <ThemedText
+                                style={[styles.defaultText, { color: primary }]}
+                              >
+                                Default
+                              </ThemedText>
+                            </View>
+                          )}
+                        </View>
+                        <ThemedText
+                          style={[
+                            styles.addressStreet,
+                            { color: textSecondary },
+                          ]}
+                          numberOfLines={2}
+                        >
+                          {addr.address}
+                        </ThemedText>
+                      </View>
+
+                      {/* Checkmark */}
+                      {isSelected && (
+                        <IconSymbol
+                          name="checkmark.circle.fill"
+                          size={22}
+                          color={primary}
+                        />
+                      )}
+                    </Pressable>
+                  );
+                })}
+
+                {/* Add new address row */}
+                <Pressable
+                  style={[
+                    styles.addAddressRow,
+                    { borderColor: primary + "50" },
+                  ]}
+                  onPress={() => {
+                    onClose();
+                    router.push("/(settings)/addresses");
+                  }}
+                >
+                  <IconSymbol
+                    name="plus.circle.fill"
+                    size={20}
+                    color={primary}
+                  />
+                  <ThemedText
+                    style={[styles.addAddressText, { color: primary }]}
+                  >
+                    Add New Address
+                  </ThemedText>
+                </Pressable>
+              </ScrollView>
+
+              {/* Confirm button */}
+              <View style={[styles.footer, { borderTopColor: borderColor }]}>
+                {tentativeAddress && (
+                  <ThemedText
+                    style={[styles.selectedPreview, { color: textSecondary }]}
+                    numberOfLines={1}
+                  >
+                    Delivering to: {tentativeAddress.label}
+                  </ThemedText>
+                )}
+                <Pressable
+                  style={[
+                    styles.confirmBtn,
+                    {
+                      backgroundColor: tentativeId ? primary : borderColor,
+                      opacity: tentativeId ? 1 : 0.5,
+                    },
+                  ]}
+                  onPress={handleConfirm}
+                  disabled={!tentativeId}
+                >
+                  <ThemedText style={styles.confirmBtnText}>
+                    Confirm Address
+                  </ThemedText>
+                  <IconSymbol name="checkmark" size={16} color="#fff" />
+                </Pressable>
+              </View>
+            </>
           )}
         </View>
       </View>
@@ -203,142 +291,182 @@ export function AddressSelectionModal({
 }
 
 const styles = StyleSheet.create({
-  modalOverlay: {
+  overlay: {
     flex: 1,
     justifyContent: "flex-end",
   },
-
   backdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    backgroundColor: "rgba(0,0,0,0.55)",
   },
-
-  modalContent: {
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    maxHeight: "80%",
-    paddingBottom: 24,
+  sheet: {
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    maxHeight: "82%",
+    paddingBottom: Platform.OS === "ios" ? 36 : 24,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 20,
+    elevation: 24,
   },
-
+  handleRow: {
+    alignItems: "center",
+    paddingTop: 12,
+    paddingBottom: 4,
+  },
+  handle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    opacity: 0.4,
+  },
   header: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     justifyContent: "space-between",
     paddingHorizontal: 20,
-    paddingTop: 20,
+    paddingTop: 12,
     paddingBottom: 16,
   },
-
-  closeButton: {
-    width: 40,
-    height: 40,
+  title: {
+    fontSize: 20,
+    fontWeight: "800",
+    marginBottom: 2,
+  },
+  subtitle: {
+    fontSize: 13,
+  },
+  closeBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
     justifyContent: "center",
-    alignItems: "center",
+    marginTop: 2,
   },
-
-  loadingContainer: {
-    padding: 40,
+  center: {
+    padding: 48,
     alignItems: "center",
+    gap: 12,
   },
-
+  loadingText: {
+    fontSize: 14,
+  },
   emptyState: {
     padding: 40,
     alignItems: "center",
-    gap: 12,
+    gap: 10,
   },
-
-  emptyText: {
-    fontSize: 15,
+  emptyIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 24,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 8,
   },
-
-  addButton: {
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    textAlign: "center",
+    lineHeight: 20,
+  },
+  addBtn: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    marginTop: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: 14,
+    marginTop: 12,
   },
-
-  addButtonText: {
+  addBtnText: {
     color: "#fff",
-    fontWeight: "600",
+    fontWeight: "700",
     fontSize: 15,
   },
-
-  addressList: {
-    paddingHorizontal: 20,
+  list: {
+    paddingHorizontal: 16,
   },
-
-  addressItem: {
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-
-  addressContent: {
+  addressCard: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
+    padding: 14,
+    borderRadius: 18,
+    marginBottom: 10,
   },
-
-  iconContainer: {
-    width: 44,
-    height: 44,
+  addressIcon: {
+    width: 42,
+    height: 42,
     borderRadius: 12,
-    justifyContent: "center",
     alignItems: "center",
+    justifyContent: "center",
   },
-
   labelRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    marginBottom: 6,
+    gap: 6,
   },
-
   addressLabel: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "700",
   },
-
   defaultBadge: {
-    paddingHorizontal: 8,
+    paddingHorizontal: 7,
     paddingVertical: 2,
     borderRadius: 6,
   },
-
   defaultText: {
-    fontSize: 11,
+    fontSize: 10,
+    fontWeight: "700",
+  },
+  addressStreet: {
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  addAddressRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderStyle: "dashed",
+    marginTop: 4,
+    marginBottom: 4,
+  },
+  addAddressText: {
+    fontSize: 14,
     fontWeight: "600",
   },
-
-  addressText: {
-    fontSize: 14,
-    lineHeight: 20,
+  footer: {
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    marginTop: 4,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    gap: 10,
   },
-
-  addAddressButton: {
+  selectedPreview: {
+    fontSize: 12,
+    textAlign: "center",
+  },
+  confirmBtn: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
     paddingVertical: 16,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderStyle: "dashed",
-    marginTop: 8,
+    borderRadius: 18,
   },
-
-  addAddressText: {
-    fontSize: 15,
-    fontWeight: "600",
+  confirmBtnText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "800",
   },
 });

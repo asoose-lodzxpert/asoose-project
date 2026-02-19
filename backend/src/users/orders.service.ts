@@ -13,6 +13,7 @@ import { Throttle } from '@nestjs/throttler';
 import * as crypto from 'crypto';
 import { PricingService } from './pricing.service';
 import { AddressesService } from './addresses.service';
+import { FareService } from '../fare/fare.service';
 import { NotificationFacade } from './notification.facade';
 import type { RedisClientType } from 'redis';
 import { InventoryService } from './inventory.service';
@@ -83,6 +84,7 @@ export class OrdersService {
     private vendorOrdersStreamService: VendorOrdersStreamService,
     private notificationsGateway: NotificationsGateway,
     private queueService: QueueService, // Injected for Durable Handoff
+    private fareService: FareService,
     @Inject('REDIS_CLIENT') private readonly redis: RedisClientType,
   ) {}
 
@@ -222,64 +224,91 @@ export class OrdersService {
         storeGroups.set(product.storeId, existing);
       });
 
-      const breakdown: Array<{
-        storeName: string;
+      // ── Compute subtotals per store ───────────────────────────────
+      type StoreEntry = {
         storeId: string;
-        items: any[];
+        storeName: string;
+        lat: number;
+        lng: number;
         subtotal: number;
-        deliveryFee: number;
-        serviceFee: number;
-        total: number;
-      }> = [];
+        enrichedItems: any[];
+      };
 
-      let grandTotal = 0;
-      let totalDeliveryFee = 0;
-
+      const storeEntries: StoreEntry[] = [];
       for (const [storeId, groupItems] of storeGroups) {
         const firstProduct = productMap.get(groupItems[0].id)!;
         const store = firstProduct.store;
-
-        const distance = this.pricingService.calculateDistance(
-          store.lat ?? 0,
-          store.lng ?? 0,
-          dropoffAddress.lat,
-          dropoffAddress.lng,
-        );
-
-        const deliveryFee = this.pricingService.calculateDeliveryFee(distance);
-
         let subtotal = 0;
         const enrichedItems = groupItems.map((item) => {
           const p = productMap.get(item.id)!;
           subtotal += p.price * item.quantity;
-          return {
-            ...item,
-            name: p.name,
-            price: p.price,
-          };
+          return { ...item, name: p.name, price: p.price };
         });
-
-        const serviceFee = this.pricingService.calculateServiceFee(subtotal);
-        const storeTotal = subtotal + deliveryFee + serviceFee;
-
-        breakdown.push({
+        storeEntries.push({
+          storeId,
           storeName: store.name,
-          storeId: store.id,
-          items: enrichedItems,
+          lat: store.lat ?? 0,
+          lng: store.lng ?? 0,
           subtotal,
+          enrichedItems,
+        });
+      }
+
+      // ── Route-optimized total delivery fee (FareService formula) ──
+      const storeCoords = storeEntries.map((s) => ({
+        storeId: s.storeId,
+        lat: s.lat,
+        lng: s.lng,
+      }));
+
+      const { sortedStoreIds, totalRouteKm } = this.optimizeRoute(
+        dropoffAddress.lat,
+        dropoffAddress.lng,
+        storeCoords,
+      );
+
+      const totalDeliveryFee = Math.round(
+        this.fareService.BaseDeliveryFare +
+          totalRouteKm * this.fareService.DeliveryPerKm,
+      );
+
+      const grandSubtotal = storeEntries.reduce(
+        (sum, s) => sum + s.subtotal,
+        0,
+      );
+
+      // ── Build breakdown in route order ────────────────────────────
+      const storeMap = new Map(storeEntries.map((s) => [s.storeId, s]));
+
+      const breakdown = sortedStoreIds.map((storeId) => {
+        const s = storeMap.get(storeId)!;
+
+        const deliveryFee =
+          grandSubtotal > 0
+            ? Math.round(totalDeliveryFee * (s.subtotal / grandSubtotal))
+            : Math.round(totalDeliveryFee / storeEntries.length);
+
+        const serviceFee = this.pricingService.calculateServiceFee(s.subtotal);
+        const total = s.subtotal + deliveryFee + serviceFee;
+
+        return {
+          storeName: s.storeName,
+          storeId: s.storeId,
+          items: s.enrichedItems,
+          subtotal: s.subtotal,
           deliveryFee,
           serviceFee,
-          total: storeTotal,
-        });
+          total,
+        };
+      });
 
-        grandTotal += storeTotal;
-        totalDeliveryFee += deliveryFee;
-      }
+      const grandTotal = breakdown.reduce((sum, b) => sum + b.total, 0);
 
       return {
         groups: breakdown,
         totalDeliveryFee,
         grandTotal,
+        totalRouteKm: parseFloat(totalRouteKm.toFixed(2)),
         currency: 'NGN',
       };
     } catch (error) {
@@ -661,6 +690,73 @@ export class OrdersService {
     }
   }
 
+  // ==================== HELPER: ROUTE OPTIMIZER ====================
+
+  /**
+   * Greedy nearest-neighbor route optimizer.
+   * Orders stores along a single path from the customer's location,
+   * minimising total rider travel distance.
+   *
+   * Route: customer → storeA → storeB → … → customer
+   * Returns stores sorted in visit order + total route distance in km.
+   */
+  private optimizeRoute(
+    customerLat: number,
+    customerLng: number,
+    stores: Array<{ storeId: string; lat: number; lng: number }>,
+  ): { sortedStoreIds: string[]; totalRouteKm: number } {
+    if (stores.length === 1) {
+      const d = this.pricingService.calculateDistance(
+        customerLat,
+        customerLng,
+        stores[0].lat,
+        stores[0].lng,
+      );
+      // single store: customer → store → customer
+      return { sortedStoreIds: [stores[0].storeId], totalRouteKm: d * 2 };
+    }
+
+    const unvisited = [...stores];
+    const visited: string[] = [];
+    let curLat = customerLat;
+    let curLng = customerLng;
+    let totalRouteKm = 0;
+
+    while (unvisited.length > 0) {
+      // Find nearest unvisited store from current position
+      let nearestIdx = 0;
+      let nearestDist = Infinity;
+      for (let i = 0; i < unvisited.length; i++) {
+        const d = this.pricingService.calculateDistance(
+          curLat,
+          curLng,
+          unvisited[i].lat,
+          unvisited[i].lng,
+        );
+        if (d < nearestDist) {
+          nearestDist = d;
+          nearestIdx = i;
+        }
+      }
+
+      const chosen = unvisited.splice(nearestIdx, 1)[0];
+      visited.push(chosen.storeId);
+      totalRouteKm += nearestDist;
+      curLat = chosen.lat;
+      curLng = chosen.lng;
+    }
+
+    // Final leg: last store → customer
+    totalRouteKm += this.pricingService.calculateDistance(
+      curLat,
+      curLng,
+      customerLat,
+      customerLng,
+    );
+
+    return { sortedStoreIds: visited, totalRouteKm };
+  }
+
   // ==================== HELPER: CONTEXT PREPARATION ====================
 
   private async prepareOrderContext(userId: string, dto: CreateOrderDto) {
@@ -698,15 +794,13 @@ export class OrdersService {
       storeGroups.set(p.storeId, existing);
     });
 
-    let calculatedGrandTotal = 0;
-
-    // Parallel Calculations & Address Resolution (OUTSIDE TX)
-    const preparedStores: PreparedStoreContext[] = await Promise.all(
-      Array.from(storeGroups.entries()).map(async ([storeId, groupItems]) => {
+    // ── Phase 1: Resolve pickup addresses & compute item totals in parallel ──
+    const storeEntries = Array.from(storeGroups.entries());
+    const resolvedStores = await Promise.all(
+      storeEntries.map(async ([storeId, groupItems]) => {
         const firstProduct = productMap.get(groupItems[0].id)!;
         const store = firstProduct.store;
 
-        // Resolve Address here to avoid DB lock contention later
         const pickupAddress =
           await this.addressesService.getOrCreateStoreAddress(
             store.vendorId,
@@ -715,14 +809,6 @@ export class OrdersService {
             store.lng || 0,
             this.prisma,
           );
-
-        const distance = this.pricingService.calculateDistance(
-          pickupAddress.lat,
-          pickupAddress.lng,
-          dropoffAddress.lat,
-          dropoffAddress.lng,
-        );
-        const deliveryFee = this.pricingService.calculateDeliveryFee(distance);
 
         let itemsTotal = 0;
         const orderItemsData = groupItems.map((item) => {
@@ -736,18 +822,11 @@ export class OrdersService {
           };
         });
 
-        const serviceFee = this.pricingService.calculateServiceFee(itemsTotal);
-        const finalTotal = itemsTotal + deliveryFee + serviceFee;
-        calculatedGrandTotal += finalTotal;
-
         return {
           storeId,
           store,
-          pickupAddressId: pickupAddress.id,
-          distance,
-          deliveryFee,
-          serviceFee,
-          finalTotal,
+          pickupAddress,
+          itemsTotal,
           orderItemsData,
           groupItems,
           emailItems: groupItems.map(
@@ -755,6 +834,97 @@ export class OrdersService {
           ),
         };
       }),
+    );
+
+    // ── Phase 2: Route-optimized delivery fee (FareService formula) ──
+    //
+    // Single store  → straight line: store → customer, fee = 700 + km × 400
+    // Multi-store   → one rider travels: customer → store_A → store_B → customer
+    //                 Total route km computed by greedy nearest-neighbor.
+    //                 Single fee on total route, split proportionally by subtotal.
+    const isSingleStore = resolvedStores.length === 1;
+    const storeCoords = resolvedStores.map((s) => ({
+      storeId: s.storeId,
+      lat: s.pickupAddress.lat,
+      lng: s.pickupAddress.lng,
+    }));
+
+    let totalRouteKm: number;
+    let sortedStoreIds: string[];
+
+    if (isSingleStore) {
+      const s = resolvedStores[0];
+      totalRouteKm = this.pricingService.calculateDistance(
+        s.pickupAddress.lat,
+        s.pickupAddress.lng,
+        dropoffAddress.lat,
+        dropoffAddress.lng,
+      );
+      sortedStoreIds = [s.storeId];
+    } else {
+      const route = this.optimizeRoute(
+        dropoffAddress.lat,
+        dropoffAddress.lng,
+        storeCoords,
+      );
+      totalRouteKm = route.totalRouteKm;
+      sortedStoreIds = route.sortedStoreIds;
+    }
+
+    // FareService delivery formula — matches the /fare/delivery endpoint exactly
+    const totalDeliveryFee = Math.round(
+      this.fareService.BaseDeliveryFare +
+        totalRouteKm * this.fareService.DeliveryPerKm,
+    );
+
+    // Sum of all item subtotals (used for proportional split)
+    const grandSubtotal = resolvedStores.reduce(
+      (sum, s) => sum + s.itemsTotal,
+      0,
+    );
+
+    // ── Phase 3: Build PreparedStoreContext in optimized route order ──
+    let calculatedGrandTotal = 0;
+
+    const storeMap = new Map(resolvedStores.map((s) => [s.storeId, s]));
+
+    const preparedStores: PreparedStoreContext[] = sortedStoreIds.map(
+      (storeId) => {
+        const s = storeMap.get(storeId)!;
+
+        // Proportional fee share: store's share of total delivery fee
+        const deliveryFee =
+          grandSubtotal > 0
+            ? Math.round(totalDeliveryFee * (s.itemsTotal / grandSubtotal))
+            : Math.round(totalDeliveryFee / resolvedStores.length);
+
+        // Point-to-point distance stored on Delivery record
+        const distance = this.pricingService.calculateDistance(
+          s.pickupAddress.lat,
+          s.pickupAddress.lng,
+          dropoffAddress.lat,
+          dropoffAddress.lng,
+        );
+
+        const serviceFee = this.pricingService.calculateServiceFee(
+          s.itemsTotal,
+        );
+        const finalTotal = s.itemsTotal + deliveryFee + serviceFee;
+        calculatedGrandTotal += finalTotal;
+
+        return {
+          storeId,
+          store: s.store,
+          pickupAddressId: s.pickupAddress.id,
+          distance,
+          deliveryFee,
+          serviceFee,
+          finalTotal,
+          orderItemsData: s.orderItemsData,
+          groupItems: s.groupItems,
+          emailItems: s.emailItems,
+        };
+      },
     );
 
     return { user, preparedStores, calculatedGrandTotal };

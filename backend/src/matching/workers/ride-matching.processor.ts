@@ -48,6 +48,8 @@ export class RideMatchingProcessor extends WorkerHost {
   private readonly MAX_RINGS = 5;
   private readonly MAX_ATTEMPTS = 20; // Max total driver attempts
   private readonly TIMEOUT_MS = 90000; // 90 seconds
+  private readonly MAX_MATCHING_RETRIES = 3; // Max full re-queued attempts before cancel
+  private readonly RETRY_DELAY_MS = 10_000; // 10s between retries
 
   constructor(
     private readonly redis: RedisService,
@@ -114,10 +116,12 @@ export class RideMatchingProcessor extends WorkerHost {
         // No driver found after all rings
         await this.handleNoDriverFound(
           rideId,
-          pickupLat,
-          pickupLng,
+          jobSummary,
           attempt,
           ride.customerId,
+          pickupHex,
+          pickupLat,
+          pickupLng,
         );
       }
     } catch (error) {
@@ -287,19 +291,99 @@ export class RideMatchingProcessor extends WorkerHost {
   }
 
   /**
-   * Handle case when no driver is found
+   * Dump full Redis state for every known driver — called when no match is found.
+   */
+  private async dumpDriverDiagnostics(
+    pickupHex: string,
+    pickupLat: number,
+    pickupLng: number,
+  ): Promise<void> {
+    try {
+      const keys = await this.redis.getClient().keys('driver:*:status');
+      if (keys.length === 0) {
+        this.logger.debug('[DIAG] No drivers found in Redis at all');
+        return;
+      }
+
+      this.logger.debug(
+        `[DIAG] ${keys.length} driver(s) in Redis. Pickup hex: ${pickupHex} [${pickupLat}, ${pickupLng}]`,
+      );
+
+      for (const key of keys) {
+        const driverId = key.split(':')[1];
+        const state = await this.redis.getDriverState(driverId);
+        if (!state) continue;
+
+        const distKm = state.location
+          ? this.geo
+              .calculateDistance(
+                pickupLat,
+                pickupLng,
+                state.location.lat,
+                state.location.lng,
+              )
+              .toFixed(2)
+          : 'unknown';
+
+        const inHexSet = state.hexId
+          ? (await this.redis.getDriversInHex(state.hexId)).includes(driverId)
+          : false;
+
+        this.logger.debug(
+          `[DIAG] Driver ${driverId}: ` +
+            `status=${state.status} ` +
+            `hex=${state.hexId ?? 'none'} ` +
+            `inHexSet=${inHexSet} ` +
+            `pendingJob=${state.pendingJobId ?? 'none'} ` +
+            `currentJob=${state.currentJobId ?? 'none'} ` +
+            `location=${state.location ? `[${state.location.lat}, ${state.location.lng}]` : 'none'} ` +
+            `distFromPickup=${distKm}km`,
+        );
+      }
+    } catch (err) {
+      this.logger.warn('[DIAG] Failed to dump driver diagnostics', err);
+    }
+  }
+
+  /**
+   * Handle case when no driver is found.
+   * Retries up to MAX_MATCHING_RETRIES times with a delay before cancelling.
    */
   private async handleNoDriverFound(
     rideId: string,
-    pickupLat: number,
-    pickupLng: number,
+    jobSummary: MatchRideJobData['job'],
     attempt: number,
     customerId?: string,
+    pickupHex?: string,
+    pickupLat?: number,
+    pickupLng?: number,
   ): Promise<void> {
     const attempts = await this.redis.incrementMatchingAttempts(rideId);
 
     this.logger.warn(
-      `No driver found for ride ${rideId} (attempt ${attempts})`,
+      `No driver found for ride ${rideId} (attempt ${attempts}/${this.MAX_MATCHING_RETRIES})`,
+    );
+
+    // Always dump full driver state so we can see exactly why no match happened
+    await this.dumpDriverDiagnostics(
+      pickupHex ?? 'unknown',
+      pickupLat ?? 0,
+      pickupLng ?? 0,
+    );
+    if (attempts < this.MAX_MATCHING_RETRIES) {
+      // Retry after a short delay to allow drivers to update position / come online
+      this.logger.log(
+        `Retrying ride matching for ${rideId} (attempt ${attempts + 1}) in ${this.RETRY_DELAY_MS}ms`,
+      );
+      await this.queue.enqueueRideMatching(
+        { job: jobSummary, attempt: attempts + 1 },
+        this.RETRY_DELAY_MS,
+      );
+      return;
+    }
+
+    this.logger.warn(
+      `Cancelling ride ${rideId} — no driver found after ${attempts} attempts`,
     );
 
     // Update ride status to CANCELLED

@@ -11,19 +11,17 @@ import {
   paymentService,
   InitiatePaymentPayload,
 } from "@/services/payment.service";
-import { PAYMENT_METHODS } from "../ride/constants/config";
+import { DEFAULT_PAYMENT_METHOD } from "../ride/constants/config";
 
 // Components
 import { Address } from "./types";
 import { AddAddressModal } from "@/app/main/components/checkout/addadressmodal";
 import { CartItemsList } from "@/app/main/components/checkout/cartitemslist";
 import { OrderSummary } from "@/app/main/components/checkout/ordersummary";
-import { AddressSection } from "@/app/main/components/checkout/addresssection";
+import { AddressPickerModal } from "@/app/main/components/checkout/address-picker-modal";
 
 // Constants
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
-const SERVICE_FEE_PERCENTAGE = 0.05;
-const BASE_DELIVERY_FEE = 1500;
 
 export default function CheckoutForm() {
   const router = useRouter();
@@ -38,9 +36,16 @@ export default function CheckoutForm() {
   const [isLoadingAddresses, setIsLoadingAddresses] = useState(true);
   const [isOnline, setIsOnline] = useState(true);
   const [showAddAddressModal, setShowAddAddressModal] = useState(false);
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<
-    (typeof PAYMENT_METHODS)[number] | null
-  >(null);
+  const [showAddressPicker, setShowAddressPicker] = useState(false);
+
+  // Live fee state fetched from backend
+  const [deliveryFee, setDeliveryFee] = useState<number | null>(null);
+  const [serviceFee, setServiceFee] = useState<number | null>(null);
+  const [isLoadingFee, setIsLoadingFee] = useState(false);
+  const quoteAbortRef = useRef<AbortController | null>(null);
+
+  // Paystack is the only payment method
+  const selectedPaymentMethod = DEFAULT_PAYMENT_METHOD;
 
   const {
     items: cartItems,
@@ -52,8 +57,63 @@ export default function CheckoutForm() {
   } = useCartStore();
 
   const cartTotal = getTotalPrice();
-  const estimatedDeliveryFee = BASE_DELIVERY_FEE;
-  const serviceFee = Math.round(cartTotal * SERVICE_FEE_PERCENTAGE);
+
+  // Fetch live quote from backend whenever address or cart changes
+  const fetchQuote = useCallback(
+    async (address: typeof selectedAddress) => {
+      if (!address || cartItems.length === 0) {
+        setDeliveryFee(null);
+        setServiceFee(null);
+        return;
+      }
+      const token = session?.accessToken;
+      if (!token) return;
+
+      quoteAbortRef.current?.abort();
+      quoteAbortRef.current = new AbortController();
+      setIsLoadingFee(true);
+
+      try {
+        const res = await fetch(`${API_URL}/users/cart/quote`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          signal: quoteAbortRef.current.signal,
+          body: JSON.stringify({
+            addressId: address.id,
+            items: cartItems.map((item) => ({
+              id: item.id,
+              quantity: item.quantity,
+            })),
+          }),
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          // data.totalDeliveryFee is the route-optimized total
+          // data.groups[*].serviceFee summed = total service fee
+          const totalServiceFee = (data.groups ?? []).reduce(
+            (sum: number, g: any) => sum + (g.serviceFee ?? 0),
+            0,
+          );
+          setDeliveryFee(data.totalDeliveryFee ?? null);
+          setServiceFee(totalServiceFee || null);
+        }
+      } catch (err: any) {
+        if (err.name !== "AbortError") {
+          // Silently fail — user sees fallback text
+          setDeliveryFee(null);
+          setServiceFee(null);
+        }
+      } finally {
+        setIsLoadingFee(false);
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [session?.accessToken, cartItems],
+  );
 
   useEffect(() => {
     useCartStore.persist.rehydrate();
@@ -119,6 +179,14 @@ export default function CheckoutForm() {
     }
   }, [status, fetchAddresses]);
 
+  // Fetch quote whenever address is selected or cart changes
+  useEffect(() => {
+    if (status === "authenticated") {
+      fetchQuote(selectedAddress);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedAddress?.id, cartItems.length, status]);
+
   useEffect(() => {
     if (mounted && cartItems.length === 0 && !isOrderCreated.current) {
       router.push("/");
@@ -162,7 +230,7 @@ export default function CheckoutForm() {
       localStorage.setItem("pending_checkout", "true");
       // For groups, we might need to handle differently in "orders/confirmed"
       // But for now, we just save the ID.
-      localStorage.setItem("last_order_id", id); 
+      localStorage.setItem("last_order_id", id);
 
       const paymentPayload: InitiatePaymentPayload = {
         amount: orderTotal,
@@ -214,7 +282,7 @@ export default function CheckoutForm() {
       return;
     }
     if (!selectedAddress || !selectedPaymentMethod) {
-      toast.error("Please select address and payment method");
+      toast.error("Please select a delivery address");
       return;
     }
     if (cartItems.length === 0) {
@@ -226,7 +294,7 @@ export default function CheckoutForm() {
     // The backend's createMultiOrder groups items itself.
     // However, if we are hitting 'createOrder' endpoint it might expect one.
     // We'll trust the payload construction handles it.
-    
+
     const token = session?.accessToken;
 
     if (!token) {
@@ -277,15 +345,19 @@ export default function CheckoutForm() {
 
         // Redirect based on whether it was a group or single
         if (data.orderGroupId) {
-           router.push("/main/orders");
+          router.push("/main/orders");
         } else {
-           router.push(`/main/orders/confirmed?id=${data.id}`);
+          router.push(`/main/orders/confirmed?id=${data.id}`);
         }
       } else {
         // FIX: Detect if response has orderGroupId
         if (data.orderGroupId) {
           // It's a multi-order
-          await processPayment(data.orderGroupId, data.grandTotal || data.total, true);
+          await processPayment(
+            data.orderGroupId,
+            data.grandTotal || data.total,
+            true,
+          );
         } else {
           // Single order
           await processPayment(data.id, data.total, false);
@@ -319,14 +391,61 @@ export default function CheckoutForm() {
 
       <main className="max-w-6xl mx-auto px-4 sm:px-6 pt-6 grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-6">
-          <AddressSection
-            addresses={addresses}
-            selectedAddress={selectedAddress}
-            isLoading={isLoadingAddresses}
-            onSelect={setSelectedAddress}
-            onAddNew={() => setShowAddAddressModal(true)}
-            isProcessing={isProcessing}
-          />
+          {/* Address trigger */}
+          <section className="bg-white dark:bg-[#151515] p-5 rounded-3xl border border-gray-100 dark:border-white/5 shadow-sm">
+            <h2 className="font-bold text-lg flex items-center gap-2 mb-4">
+              <span className="text-yellow-500">📍</span> Delivery Address
+            </h2>
+            {isLoadingAddresses ? (
+              <div className="p-4 flex items-center justify-center">
+                <Loader2 className="w-5 h-5 animate-spin text-yellow-500" />
+              </div>
+            ) : (
+              <button
+                onClick={() => setShowAddressPicker(true)}
+                disabled={isProcessing}
+                className={`w-full text-left p-4 rounded-2xl border flex items-center gap-3 transition-all ${
+                  selectedAddress
+                    ? "border-yellow-500 bg-yellow-50 dark:bg-yellow-500/10"
+                    : "border-dashed border-gray-300 dark:border-white/20 hover:border-yellow-500"
+                }`}
+              >
+                <div
+                  className={`p-2 rounded-full flex-shrink-0 ${
+                    selectedAddress
+                      ? "bg-yellow-500 text-black"
+                      : "bg-gray-100 dark:bg-white/10 text-gray-400"
+                  }`}
+                >
+                  <span className="text-base">📍</span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  {selectedAddress ? (
+                    <>
+                      <p className="font-bold text-sm">
+                        {selectedAddress.label || "Home"}
+                        {selectedAddress.isDefault && (
+                          <span className="ml-2 text-[10px] bg-gray-200 dark:bg-white/10 px-2 py-0.5 rounded-md font-normal">
+                            Default
+                          </span>
+                        )}
+                      </p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
+                        {selectedAddress.street}, {selectedAddress.city}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="font-bold text-sm text-gray-400">
+                      Select a delivery address
+                    </p>
+                  )}
+                </div>
+                <span className="text-gray-400 dark:text-gray-500 flex-shrink-0 text-sm font-medium">
+                  Change
+                </span>
+              </button>
+            )}
+          </section>
 
           <CartItemsList
             items={cartItems}
@@ -341,18 +460,26 @@ export default function CheckoutForm() {
           <div className="sticky top-24">
             <OrderSummary
               cartTotal={cartTotal}
-              deliveryFee={estimatedDeliveryFee}
+              deliveryFee={deliveryFee}
               serviceFee={serviceFee}
+              isLoadingFee={isLoadingFee}
               isProcessing={isProcessing}
               isDisabled={isProcessing || !selectedAddress || !isOnline}
               onPlaceOrder={handlePlaceOrder}
               retryCount={0}
-              selectedMethod={selectedPaymentMethod}
-              onSelectMethod={setSelectedPaymentMethod}
             />
           </div>
         </div>
       </main>
+
+      <AddressPickerModal
+        isOpen={showAddressPicker}
+        onClose={() => setShowAddressPicker(false)}
+        addresses={addresses}
+        selectedAddress={selectedAddress}
+        onSelect={setSelectedAddress}
+        onAddNew={() => setShowAddAddressModal(true)}
+      />
 
       <AddAddressModal
         isOpen={showAddAddressModal}

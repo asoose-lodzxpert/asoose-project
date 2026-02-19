@@ -58,10 +58,15 @@ export class FareService {
     // After 10pm (22:00), use 1000 NGN per km
     const perKm = hour >= 22 ? 1000 : this.RiderPerKm;
     const variableFare = Math.round(distanceKm * perKm);
-    const price = this.BaseRideFare + variableFare;
+    const economyPrice = this.BaseRideFare + variableFare;
+    const businessPrice = Math.round(economyPrice * 1.5);
+
+    const price = dto.vehicleType === 'BUSINESS' ? businessPrice : economyPrice;
 
     return {
       price,
+      economyPrice,
+      businessPrice,
       distance: {
         meters: distanceMeters,
         text: distanceText,

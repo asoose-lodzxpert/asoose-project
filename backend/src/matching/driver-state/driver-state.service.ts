@@ -85,10 +85,19 @@ export class DriverStateService {
      LOCATION UPDATES
   ============================================================ */
   async updateLocation(driverId: string, lat: number, lng: number) {
-    if (!this.geo.validateCoordinates(lat, lng)) return;
+    if (!this.geo.validateCoordinates(lat, lng)) {
+      this.logger.warn(
+        `[LOC] Driver ${driverId}: invalid coordinates [${lat}, ${lng}] — skipped`,
+      );
+      return;
+    }
 
     const hexId = this.geo.latLngToHex(lat, lng);
     const timestamp = Date.now();
+
+    this.logger.debug(
+      `[LOC] Driver ${driverId}: processing [${lat}, ${lng}] → hex ${hexId}`,
+    );
 
     const result = await this.redis
       .getClient()
@@ -102,9 +111,29 @@ export class DriverStateService {
         timestamp.toString(),
       );
 
-    if (result === -1) return;
+    if (result === -1) {
+      this.logger.warn(
+        `[LOC] Driver ${driverId}: SKIPPED — status is not ONLINE/ACTIVE (Lua returned -1)`,
+      );
+      return;
+    }
+
+    if (result === 0) {
+      this.logger.debug(
+        `[LOC] Driver ${driverId}: same hex ${hexId} or has pending job — location saved, hex-set unchanged`,
+      );
+    } else if (result === 1) {
+      this.logger.debug(
+        `[LOC] Driver ${driverId}: hex CHANGED → now in ${hexId} — hex-set updated`,
+      );
+    } else if (result === 2) {
+      this.logger.debug(
+        `[LOC] Driver ${driverId}: re-added to hex-set ${hexId} (self-heal)`,
+      );
+    }
 
     await this.redis.addDriverToGeoIndex(driverId, lat, lng);
+    this.logger.debug(`[LOC] Driver ${driverId}: geo-index updated`);
 
     this.eventBus.emitDriverLocationUpdated({
       driverId,

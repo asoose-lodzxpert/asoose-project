@@ -22,6 +22,8 @@ import React, {
 import { io, Socket } from "socket.io-client";
 import { useAuth } from "./AuthContext";
 
+type FareOptions = { economy: number; business: number };
+
 type RideContextType = {
   // State
   currentRide: Ride | null;
@@ -29,6 +31,7 @@ type RideContextType = {
   loading: boolean;
   error: string | null;
   fareEstimate: FareEstimate | null;
+  fareOptions: FareOptions | null;
   driverLocation: DriverLocation | null;
 
   // Booking flow
@@ -70,6 +73,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fareEstimate, setFareEstimate] = useState<FareEstimate | null>(null);
+  const [fareOptions, setFareOptions] = useState<FareOptions | null>(null);
   const [driverLocation, setDriverLocation] = useState<DriverLocation | null>(
     null,
   );
@@ -320,6 +324,23 @@ export function RideProvider({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
+  // Update fareEstimate totalFare when vehicle type changes (if fareOptions available)
+  useEffect(() => {
+    if (!fareOptions) return;
+    const totalFare =
+      selectedVehicleType === VehicleType.BUSINESS
+        ? fareOptions.business
+        : fareOptions.economy;
+    setFareEstimate((prev) =>
+      prev
+        ? {
+            ...prev,
+            fareBreakdown: { ...prev.fareBreakdown, totalFare },
+          }
+        : prev,
+    );
+  }, [selectedVehicleType, fareOptions]);
+
   // Estimate fare
   const estimateFare = useCallback(async () => {
     if (!pickupLocation || !dropoffLocation) {
@@ -340,6 +361,19 @@ export function RideProvider({ children }: { children: ReactNode }) {
       });
 
       // Map backend response to FareEstimate type
+      const options: FareOptions = {
+        economy: Number(response.economyPrice ?? response.price),
+        business: Number(
+          response.businessPrice ?? Math.round(Number(response.price) * 1.5),
+        ),
+      };
+      setFareOptions(options);
+
+      const totalFare =
+        selectedVehicleType === VehicleType.BUSINESS
+          ? options.business
+          : options.economy;
+
       const estimate: FareEstimate = {
         distanceKm: response.distance.meters / 1000,
         durationMin: response.eta.seconds / 60,
@@ -349,11 +383,11 @@ export function RideProvider({ children }: { children: ReactNode }) {
           timeFare: 0,
           platformFee: 0,
           driverFee: 0,
-          totalFare: Number(response.price),
+          totalFare,
         },
       };
 
-      if (__DEV__) console.log("Estimate:", estimate);
+      if (__DEV__) console.log("Estimate:", estimate, "Options:", options);
 
       setFareEstimate(estimate);
     } catch (err: any) {
@@ -471,6 +505,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
     setDropoffLocation(null);
     setSelectedVehicleType(VehicleType.ECONOMY);
     setFareEstimate(null);
+    setFareOptions(null);
     setError(null);
     setCurrentRide(null);
     setPageView("IDLE");
@@ -482,6 +517,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
     loading,
     error,
     fareEstimate,
+    fareOptions,
     driverLocation,
     pickupLocation,
     dropoffLocation,

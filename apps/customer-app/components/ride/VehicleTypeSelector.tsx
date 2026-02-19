@@ -3,6 +3,7 @@ import { ThemedText } from "@/components/themed-text";
 import { IconSymbol, IconSymbolName } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { VehicleType } from "@/types/ride";
+import { RideService } from "@/services/ride.service";
 
 type VehicleOption = {
   type: VehicleType;
@@ -32,14 +33,32 @@ const VEHICLE_OPTIONS: VehicleOption[] = [
 type Props = {
   selected: VehicleType;
   onSelect: (type: VehicleType) => void;
+  fareOptions?: { economy: number; business: number } | null;
+  isFareLoading?: boolean;
 };
 
-export function VehicleTypeSelector({ selected, onSelect }: Props) {
+export function VehicleTypeSelector({
+  selected,
+  onSelect,
+  fareOptions,
+  isFareLoading,
+}: Props) {
   const primary = useThemeColor({}, "brandPrimary");
   const card = useThemeColor({}, "surfaceCard");
   const border = useThemeColor({}, "borderDefault");
   const text = useThemeColor({}, "textPrimary");
   const textSecondary = useThemeColor({}, "textSecondary");
+  const subtle = useThemeColor({}, "surfaceSubtle");
+
+  const fareForType = (type: VehicleType): string => {
+    if (isFareLoading) return "...";
+    if (!fareOptions) return "";
+    const amount =
+      type === VehicleType.BUSINESS
+        ? fareOptions.business
+        : fareOptions.economy;
+    return RideService.formatCurrency(amount);
+  };
 
   return (
     <View style={styles.container}>
@@ -102,6 +121,30 @@ export function VehicleTypeSelector({ selected, onSelect }: Props) {
                 {vehicle.capacity}
               </ThemedText>
 
+              {(fareOptions || isFareLoading) && (
+                <View
+                  style={[
+                    styles.fareBadge,
+                    {
+                      backgroundColor: isSelected ? `${primary}20` : subtle,
+                    },
+                  ]}
+                >
+                  <ThemedText
+                    type="caption"
+                    style={[
+                      styles.fareText,
+                      {
+                        color: isSelected ? primary : textSecondary,
+                        fontWeight: "700",
+                      },
+                    ]}
+                  >
+                    {fareForType(vehicle.type)}
+                  </ThemedText>
+                </View>
+              )}
+
               {isSelected && (
                 <View style={[styles.checkmark, { backgroundColor: primary }]}>
                   <IconSymbol name="checkmark" size={12} color="white" />
@@ -153,6 +196,17 @@ const styles = StyleSheet.create({
   vehicleCapacity: {
     fontSize: 10,
     textAlign: "center",
+  },
+  fareBadge: {
+    marginTop: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    alignSelf: "stretch",
+    alignItems: "center",
+  },
+  fareText: {
+    fontSize: 13,
   },
   checkmark: {
     position: "absolute",

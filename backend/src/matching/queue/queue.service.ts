@@ -53,15 +53,18 @@ export class QueueService implements OnModuleInit {
   // RIDE MATCHING QUEUE
   // ========================================
 
-  async enqueueRideMatching(data: MatchRideJobData) {
+  async enqueueRideMatching(data: MatchRideJobData, delayMs = 0) {
     const job = await this.rideMatchingQueue.add(JOB_TYPES.MATCH_RIDE, data, {
       ...QUEUE_OPTIONS.rideMatching,
       jobId: `ride-${data.job.id}-attempt-${data.attempt}`,
       priority: this.calculatePriority(data.attempt),
+      ...(delayMs > 0 ? { delay: delayMs } : {}),
     });
 
     this.logger.log(
-      `Enqueued ride matching: ${data.job.id} (attempt ${data.attempt})`,
+      `Enqueued ride matching: ${data.job.id} (attempt ${data.attempt})${
+        delayMs > 0 ? ` [delayed ${delayMs}ms]` : ''
+      }`,
     );
     return job;
   }
