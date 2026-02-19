@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Package, Calendar, ArrowRight, Box } from "lucide-react";
 
 interface DeliveryCardProps {
@@ -18,7 +19,10 @@ export const DeliveryCard = ({
   recipient,
 }: DeliveryCardProps) => {
   return (
-    <div className="flex flex-col sm:flex-row gap-4 p-4 bg-white dark:bg-[#151515] rounded-2xl border border-gray-100 dark:border-white/5 hover:border-yellow-500/30 transition-all cursor-pointer group">
+    <Link
+      href={`/main/deliveries/${id}`}
+      className="flex flex-col sm:flex-row gap-4 p-4 bg-white dark:bg-[#151515] rounded-2xl border border-gray-100 dark:border-white/5 hover:border-yellow-500/30 transition-all cursor-pointer group"
+    >
       {/* Icon */}
       <div className="w-12 h-12 rounded-full bg-purple-50 dark:bg-purple-500/10 flex items-center justify-center shrink-0 text-purple-600 dark:text-purple-400">
         <Box className="w-6 h-6" />
@@ -63,6 +67,6 @@ export const DeliveryCard = ({
       <div className="hidden sm:flex items-center justify-center text-gray-300 group-hover:text-yellow-500 transition-colors">
         <ArrowRight className="w-5 h-5" />
       </div>
-    </div>
+    </Link>
   );
 };

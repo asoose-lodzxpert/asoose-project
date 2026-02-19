@@ -20,6 +20,7 @@ import {
   ChevronRight,
   Trash2,
   ShieldCheck,
+  ShieldAlert,
 } from "lucide-react";
 import { useSession, signOut } from "next-auth/react";
 
@@ -34,6 +35,7 @@ import { EditProfileModal } from "@/app/main/components/profile/EditProfileModal
 import { OrderCard } from "@/app/main/components/profile/OrderCard";
 import { RideCard } from "@/app/main/components/profile/ridecard";
 import { DeliveryCard } from "@/app/main/components/profile/deliverycard";
+import { DisputeCard } from "@/app/main/components/profile/DisputeCard";
 import BottomNav from "@/app/main/components/layout/BottomNav";
 import { EmptyState } from "@/app/main/components/profile/EmptyState";
 import {
@@ -60,6 +62,7 @@ export default function ProfilePage() {
   const [orders, setOrders] = useState<any[]>([]);
   const [rides, setRides] = useState<any[]>([]);
   const [deliveries, setDeliveries] = useState<any[]>([]);
+  const [disputes, setDisputes] = useState<any[]>([]);
   const [addresses, setAddresses] = useState<any[]>([]);
 
   // Use ref to track current tab for race condition prevention
@@ -141,6 +144,11 @@ export default function ProfilePage() {
             data = await fetchWithAuth("/users/deliveries", accessToken);
             if (activeTabRef.current === "deliveries")
               setDeliveries(data || []);
+            break;
+          case "disputes":
+            data = await fetchWithAuth("/super-admin/disputes/mine", accessToken);
+            if (activeTabRef.current === "disputes")
+              setDisputes(data?.data || []);
             break;
         }
       } catch (e) {
@@ -456,7 +464,45 @@ export default function ProfilePage() {
                   />
                 ) : (
                   deliveries.map((delivery) => (
-                    <DeliveryCard key={delivery.id} {...delivery} />
+                    <DeliveryCard
+                      key={delivery.id}
+                      id={delivery.id}
+                      status={delivery.status}
+                      date={new Date(delivery.createdAt).toLocaleDateString()}
+                      total={delivery.total ?? 0}
+                      description={delivery.description}
+                      recipient={delivery.recipient}
+                    />
+                  ))
+                )}
+              </div>
+            )}
+
+            {activeTab === "disputes" && (
+              <div className="space-y-4">
+                {disputes.length === 0 ? (
+                  <EmptyState
+                    icon={ShieldAlert}
+                    title="No disputes filed"
+                    desc="You haven't opened any disputes yet."
+                    actionLabel="Contact Support"
+                    actionLink="/main/support"
+                  />
+                ) : (
+                  disputes.map((dispute) => (
+                    <DisputeCard
+                      key={dispute.id}
+                      id={dispute.id}
+                      status={dispute.status}
+                      priority={dispute.priority}
+                      reason={dispute.reason}
+                      category={dispute.category}
+                      createdAt={dispute.createdAt}
+                      hoursOpen={dispute.hoursOpen ?? 0}
+                      orderId={dispute.orderId}
+                      rideId={dispute.rideId}
+                      deliveryId={dispute.deliveryId}
+                    />
                   ))
                 )}
               </div>

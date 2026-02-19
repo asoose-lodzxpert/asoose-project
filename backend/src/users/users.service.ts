@@ -136,14 +136,22 @@ export class UsersService {
         take: pageSize,
       });
 
-      return deliveries.map((d) => ({
-        id: d.id,
-        status: d.status,
-        total: d.deliveryFee,
-        createdAt: d.createdAt,
-        description: `Delivery to ${d.dropoffAddress.city}`,
-        recipient: d.recipientName,
-      }));
+      return deliveries.map((d) => {
+        // Build a meaningful destination label; city may be null when not parsed from the Maps API
+        const destination =
+          d.dropoffAddress?.city ||
+          d.dropoffAddress?.street?.split(',')[0] ||
+          'your destination';
+
+        return {
+          id: d.id,
+          status: d.status,
+          total: d.deliveryFee ?? 0,
+          createdAt: d.createdAt,
+          description: `Delivery to ${destination}`,
+          recipient: d.recipientName || 'Recipient',
+        };
+      });
     } catch (error) {
       this.logger.error(
         `Failed to fetch deliveries for user ${userId}`,
