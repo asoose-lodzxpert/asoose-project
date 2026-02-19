@@ -72,6 +72,13 @@ export default function LoginScreen() {
   useEffect(() => {
     if (response?.type === "success" && response.authentication) {
       handleGoogleSignIn(response.authentication.accessToken);
+    } else if (response?.type === "error") {
+      const errMsg =
+        (response.error as any)?.message ||
+        response.error?.code ||
+        "Google sign-in failed";
+      Toast.show({ type: "error", text1: errMsg });
+      if (__DEV__) console.error("Google OAuth error response:", response.error);
     }
   }, [response]);
 

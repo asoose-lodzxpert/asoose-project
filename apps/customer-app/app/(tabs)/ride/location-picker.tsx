@@ -23,6 +23,7 @@ import { useRide } from "@/context/RideContext";
 import { useLocation } from "@/context/LocationContext";
 import { useSendPackage } from "@/context/SendPackageContext";
 import { getAccessToken } from "@/services/auth.service";
+import Toast from "react-native-toast-message";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "";
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -107,7 +108,9 @@ export default function LocationPickerScreen() {
   const surface = useThemeColor({}, "surfaceBackground");
   const card = useThemeColor({}, "surfaceCard");
   const textSecondary = useThemeColor({}, "textSecondary");
+  const textPrimary = useThemeColor({}, "textPrimary");
   const success = useThemeColor({}, "statusSuccess");
+  const warning = useThemeColor({}, "statusPending");
 
   const [searchQuery, setSearchQuery] = useState("");
   const [searching, setSearching] = useState(false);
@@ -166,8 +169,10 @@ export default function LocationPickerScreen() {
   // ─── Map / Reverse Geocode ─────────────────────────────────────
   const reverseGeocode = useCallback(async (lat: number, lng: number) => {
     try {
+      const token = await getAccessToken().catch(() => null);
       const res = await fetch(
         `${API_URL}/maps/reverse-geocode?lat=${lat}&lng=${lng}`,
+        { headers: token ? { Authorization: `Bearer ${token}` } : {} },
       );
       const { address } = await res.json();
       setReverseAddress(address || "Selected point");
@@ -229,7 +234,12 @@ export default function LocationPickerScreen() {
             : place.title,
         });
       } catch {
-        confirmLocation({ latitude: 0, longitude: 0, address: place.title });
+        Toast.show({
+          type: "error",
+          text1: "Location not found",
+          text2:
+            "Could not get coordinates for this place. Please try another.",
+        });
       } finally {
         setSearching(false);
       }
@@ -267,7 +277,7 @@ export default function LocationPickerScreen() {
       <View style={[styles.header, { backgroundColor: surface }]}>
         <View style={styles.navRow}>
           <Pressable onPress={() => router.back()} style={styles.backBtn}>
-            <IconSymbol name="chevron.left" size={24} color="#000" />
+            <IconSymbol name="chevron.left" size={24} color={textPrimary} />
           </Pressable>
           <ThemedText style={styles.title}>
             {type === "pickup" ? "Set Pickup" : "Set Drop-off"}
@@ -332,7 +342,7 @@ export default function LocationPickerScreen() {
                 title={addr.label}
                 subtitle={addr.fullAddress}
                 icon="star.fill"
-                color="#F59E0B"
+                color={warning}
                 bg={card}
                 textSec={textSecondary}
                 onPress={() =>

@@ -76,6 +76,7 @@ export interface JobUpdatedEvent extends BaseJobEvent {
 export interface JobCancelledEvent extends BaseJobEvent {
   cancelledBy: 'customer' | 'driver' | 'system';
   driverId?: string;
+  customerId?: string; // present when cancelled by system (no driver found) so customer can be notified
   reason?: string;
 }
 

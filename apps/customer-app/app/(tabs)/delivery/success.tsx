@@ -20,12 +20,14 @@ export default function DeliverySuccessScreen() {
   const router = useRouter();
   const { resetDelivery } = useSendPackage();
 
+  // Theme colors from useThemeColor
   const primary = useThemeColor({}, "brandPrimary");
   const surface = useThemeColor({}, "surfaceBackground");
   const surfaceCard = useThemeColor({}, "surfaceCard");
   const border = useThemeColor({}, "borderDefault");
   const success = useThemeColor({}, "statusSuccess");
   const textSecondary = useThemeColor({}, "textSecondary");
+  const textOnPrimary = useThemeColor({}, "textOnPrimary");
 
   const price = Number(params.price) || 0;
   const etaMinutes = Number(params.etaMinutes) || 0;
@@ -84,7 +86,7 @@ export default function DeliverySuccessScreen() {
           style={[styles.iconBox, { transform: [{ scale: scaleAnim }] }]}
         >
           <View style={[styles.circle, { backgroundColor: success }]}>
-            <IconSymbol name="checkmark" size={32} color="#FFF" />
+            <IconSymbol name="checkmark" size={32} color={textOnPrimary} />
           </View>
         </Animated.View>
 
@@ -111,7 +113,7 @@ export default function DeliverySuccessScreen() {
               </ThemedText>
             </View>
 
-            <View style={styles.divider} />
+            <View style={[styles.divider, { backgroundColor: border }]} />
 
             <View style={styles.infoRow}>
               <ThemedText type="caption" style={{ color: textSecondary }}>
@@ -128,14 +130,18 @@ export default function DeliverySuccessScreen() {
           onPress={handleTrack}
           style={[styles.btn, { backgroundColor: primary }]}
         >
-          <ThemedText style={styles.btnText}>Track Order</ThemedText>
+          <ThemedText style={[styles.btnText, { color: textOnPrimary }]}>
+            Track Order
+          </ThemedText>
         </Pressable>
 
         <Pressable
           onPress={handleGoHome}
           style={[styles.btnSecondary, { borderColor: border }]}
         >
-          <ThemedText style={{ fontWeight: "600" }}>Done</ThemedText>
+          <ThemedText style={{ fontWeight: "600", color: primary }}>
+            Done
+          </ThemedText>
         </Pressable>
       </View>
     </ThemedView>
@@ -165,8 +171,6 @@ const styles = StyleSheet.create({
   price: { fontSize: 28, fontWeight: "800", marginTop: 4 },
   divider: {
     height: 1,
-    backgroundColor: "#000",
-    opacity: 0.05,
     marginBottom: 16,
   },
   infoRow: { flexDirection: "row", justifyContent: "space-between" },
@@ -178,7 +182,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  btnText: { color: "#FFF", fontWeight: "700", fontSize: 16 },
+  btnText: { fontWeight: "700", fontSize: 16 },
   btnSecondary: {
     height: 56,
     borderRadius: 16,

@@ -15,18 +15,16 @@ export class RiderDispatchListener {
   ) {}
 
   @OnEvent('job.assigned')
-  async handleJobAssignedEvent(payload: {
-    id: string;
-    jobType: 'RIDE' | 'DELIVERY';
-  }) {
+  async handleJobAssignedEvent(payload: { jobId: string; jobType: string }) {
     this.logger.log(
-      `Processing job.assigned event: ${payload.jobType} ${payload.id}`,
+      `Processing job.assigned event: ${payload.jobType} ${payload.jobId}`,
     );
 
-    if (payload.jobType === 'DELIVERY') {
-      await this.handleDeliveryAssignment(payload.id);
-    } else if (payload.jobType === 'RIDE') {
-      await this.handleRideAssignment(payload.id);
+    const type = payload.jobType?.toLowerCase();
+    if (type === 'delivery') {
+      await this.handleDeliveryAssignment(payload.jobId);
+    } else if (type === 'ride') {
+      await this.handleRideAssignment(payload.jobId);
     }
   }
 
@@ -129,17 +127,18 @@ export class RiderDispatchListener {
 
   @OnEvent('job.updated')
   async handleJobUpdatedEvent(payload: {
-    id: string;
-    jobType: 'RIDE' | 'DELIVERY';
+    jobId: string;
+    jobType: string;
     status: string;
   }) {
     this.logger.log(
-      `Processing job.updated event: ${payload.jobType} ${payload.id} -> ${payload.status}`,
+      `Processing job.updated event: ${payload.jobType} ${payload.jobId} -> ${payload.status}`,
     );
 
-    if (payload.jobType === 'DELIVERY') {
+    const type = payload.jobType?.toLowerCase();
+    if (type === 'delivery') {
       const delivery = await this.prisma.delivery.findUnique({
-        where: { id: payload.id },
+        where: { id: payload.jobId },
         include: {
           order: {
             include: {
@@ -160,12 +159,12 @@ export class RiderDispatchListener {
 
         this.notificationsGateway.emitJobUpdated(delivery.riderId, jobData);
         this.logger.log(
-          `Delivery ${payload.id} update sent to rider ${delivery.riderId}`,
+          `Delivery ${payload.jobId} update sent to rider ${delivery.riderId}`,
         );
       }
-    } else if (payload.jobType === 'RIDE') {
+    } else if (type === 'ride') {
       const ride = await this.prisma.ride.findUnique({
-        where: { id: payload.id },
+        where: { id: payload.jobId },
         include: {
           customer: true,
           pickupAddress: true,
@@ -182,7 +181,7 @@ export class RiderDispatchListener {
 
         this.notificationsGateway.emitJobUpdated(ride.riderId, jobData);
         this.logger.log(
-          `Ride ${payload.id} update sent to rider ${ride.riderId}`,
+          `Ride ${payload.jobId} update sent to rider ${ride.riderId}`,
         );
       }
     }
@@ -190,17 +189,18 @@ export class RiderDispatchListener {
 
   @OnEvent('job.cancelled')
   async handleJobCancelledEvent(payload: {
-    id: string;
-    jobType: 'RIDE' | 'DELIVERY';
+    jobId: string;
+    jobType: string;
     reason?: string;
   }) {
     this.logger.log(
-      `Processing job.cancelled event: ${payload.jobType} ${payload.id}`,
+      `Processing job.cancelled event: ${payload.jobType} ${payload.jobId}`,
     );
 
-    if (payload.jobType === 'DELIVERY') {
+    const type = payload.jobType?.toLowerCase();
+    if (type === 'delivery') {
       const delivery = await this.prisma.delivery.findUnique({
-        where: { id: payload.id },
+        where: { id: payload.jobId },
         select: { riderId: true, id: true },
       });
 
@@ -212,12 +212,12 @@ export class RiderDispatchListener {
 
         this.notificationsGateway.emitJobCancelled(delivery.riderId, jobData);
         this.logger.log(
-          `Delivery ${payload.id} cancellation sent to rider ${delivery.riderId}`,
+          `Delivery ${payload.jobId} cancellation sent to rider ${delivery.riderId}`,
         );
       }
-    } else if (payload.jobType === 'RIDE') {
+    } else if (type === 'ride') {
       const ride = await this.prisma.ride.findUnique({
-        where: { id: payload.id },
+        where: { id: payload.jobId },
         select: { riderId: true, id: true },
       });
 
@@ -229,7 +229,7 @@ export class RiderDispatchListener {
 
         this.notificationsGateway.emitJobCancelled(ride.riderId, jobData);
         this.logger.log(
-          `Ride ${payload.id} cancellation sent to rider ${ride.riderId}`,
+          `Ride ${payload.jobId} cancellation sent to rider ${ride.riderId}`,
         );
       }
     }

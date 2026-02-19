@@ -1,4 +1,4 @@
-import { IsString } from 'class-validator';
+import { IsString, IsOptional } from 'class-validator';
 
 export class RideFareDto {
   @IsString()
@@ -12,4 +12,8 @@ export class RideFareDto {
 
   @IsString()
   dropofflong: string;
+
+  @IsOptional()
+  @IsString()
+  vehicleType?: string;
 }

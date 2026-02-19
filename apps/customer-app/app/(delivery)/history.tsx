@@ -54,6 +54,12 @@ export default function DeliveryHistoryScreen() {
           PAGE_SIZE,
         );
 
+        if (__DEV__)
+          console.log(
+            `Fetched page ${targetPage} for tab ${targetTab}:`,
+            JSON.stringify(result, null, 2),
+          );
+
         // Only update state if this is still the most recent request
         if (currentFetchId === fetchId.current) {
           setData((prev) => (targetPage === 1 ? result : [...prev, ...result]));

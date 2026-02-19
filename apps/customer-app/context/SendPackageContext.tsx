@@ -118,8 +118,6 @@ export function SendPackageProvider({
     let mounted = true;
     fetchSavedAddresses()
       .then((res) => {
-        if (__DEV__)
-          console.log("[SendPackageContext] fetched addresses:", res);
         if (mounted) setSavedAddresses(res);
       })
       .catch(() => mounted && setSavedAddresses([]));

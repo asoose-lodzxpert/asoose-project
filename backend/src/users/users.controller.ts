@@ -124,7 +124,11 @@ export class UsersController {
 
   @Get('deliveries')
   async getMyDeliveries(@Request() req) {
-    return this.usersService.getUserDeliveries(req.user.id);
+    const userId = req.user.id;
+    const page = parseInt(req.query.page) || 1;
+    const pageSize = parseInt(req.query.pageSize) || 10;
+    const status = req.query.status as string | undefined;
+    return this.usersService.getUserDeliveries(userId, { page, pageSize, status });
   }
 
   @Get('deliveries/:id')

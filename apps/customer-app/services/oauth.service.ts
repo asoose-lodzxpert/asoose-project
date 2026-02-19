@@ -28,10 +28,13 @@ const API_BASE = (() => {
 const AUTH_BASE = `${API_BASE}/auth/user`;
 
 // Google OAuth Configuration
-const GOOGLE_CLIENT_ID_IOS = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_IOS || "";
+// Falling back to undefined (not "") so expo-auth-session knows to skip unset platforms
+const GOOGLE_CLIENT_ID_IOS =
+  process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_IOS || undefined;
 const GOOGLE_CLIENT_ID_ANDROID =
-  process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_ANDROID || "";
-const GOOGLE_CLIENT_ID_WEB = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_WEB || "";
+  process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_ANDROID || undefined;
+const GOOGLE_CLIENT_ID_WEB =
+  process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_WEB || undefined;
 
 type OAuthResponse = {
   user: {

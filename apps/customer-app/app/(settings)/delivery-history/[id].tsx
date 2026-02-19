@@ -43,6 +43,8 @@ export default function DeliveryDetailsScreen() {
     try {
       const data = await fetchDeliveryDetails(id as string);
       setDelivery(data);
+      if (__DEV__)
+        console.log("Fetched delivery details:", JSON.stringify(data, null, 2));
     } catch (e) {
       console.error(e);
     } finally {
@@ -83,7 +85,9 @@ export default function DeliveryDetailsScreen() {
           {delivery.status.replace("_", " ")}
         </ThemedText>
         <ThemedText style={styles.orderIdText}>
-          Order #{delivery.orderId.slice(-8).toUpperCase()}
+          {delivery && delivery.id
+            ? `Order #${delivery.id.slice(-8).toUpperCase()}`
+            : "Order #"}
         </ThemedText>
       </View>
     );

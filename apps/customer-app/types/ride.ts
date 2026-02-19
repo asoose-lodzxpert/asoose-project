@@ -117,6 +117,7 @@ export type RideEstimatePayload = {
   pickupLng: number;
   dropoffLat: number;
   dropoffLng: number;
+  vehicleType?: string;
 };
 
 export type ConfirmRidePayload = {

@@ -55,8 +55,18 @@ const RideContext = createContext<RideContextType | null>(null);
 
 export function RideProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
-  const [currentRide, setCurrentRide] = useState<Ride | null>(null);
-  const [pageView, setPageView] = useState<RidePageView>("IDLE");
+  const [currentRide, setCurrentRideState] = useState<Ride | null>(null);
+  const [pageView, setPageViewState] = useState<RidePageView>("IDLE");
+
+  // Wrap setters so refs stay in sync
+  const setCurrentRide = (ride: Ride | null) => {
+    currentRideRef.current = ride;
+    setCurrentRideState(ride);
+  };
+  const setPageView = (view: RidePageView) => {
+    pageViewRef.current = view;
+    setPageViewState(view);
+  };
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fareEstimate, setFareEstimate] = useState<FareEstimate | null>(null);
@@ -74,6 +84,9 @@ export function RideProvider({ children }: { children: ReactNode }) {
 
   const socketRef = useRef<Socket | null>(null);
   const pollingIntervalRef = useRef<number | null>(null);
+  // Refs mirror state so socket handlers / async callbacks always see the latest values
+  const currentRideRef = useRef<Ride | null>(null);
+  const pageViewRef = useRef<RidePageView>("IDLE");
 
   // Map backend status to page view
   const mapStatusToPageView = useCallback(
@@ -106,10 +119,39 @@ export function RideProvider({ children }: { children: ReactNode }) {
 
     try {
       const ride = await RideService.getCurrentRide();
+      if (__DEV__)
+        console.log("Refreshed current ride:", JSON.stringify(ride, null, 2));
+
+      // Guard: if we're in the middle of a new PAYMENT flow and the backend
+      // hasn't caught up yet (returns null or the old cancelled ride), don't
+      // wipe the newly created ride out of state.
+      const inPaymentFlow = pageViewRef.current === "PAYMENT";
+      const fetchedIsUseless =
+        !ride || (ride.status as RideStatus) === RideStatus.CANCELLED;
+      if (inPaymentFlow && fetchedIsUseless) {
+        if (__DEV__)
+          console.log(
+            "[refreshCurrentRide] Skipping update — in PAYMENT flow and backend returned no active ride",
+          );
+        return;
+      }
+
       setCurrentRide(ride);
 
       if (ride) {
-        setPageView(mapStatusToPageView(ride.status as RideStatus));
+        let resolvedPageView = mapStatusToPageView(ride.status as RideStatus);
+        // If ride is PENDING but payment is already COMPLETED (e.g. app was
+        // killed mid-flow), skip the payment screen and look for a driver.
+        const ridePayment = Array.isArray(ride.payment)
+          ? ride.payment[0]
+          : ride.payment;
+        if (
+          resolvedPageView === "PAYMENT" &&
+          ridePayment?.status === "COMPLETED"
+        ) {
+          resolvedPageView = "FINDING_DRIVER";
+        }
+        setPageView(resolvedPageView);
 
         // Fetch driver location if ride is active
         if (
@@ -126,6 +168,8 @@ export function RideProvider({ children }: { children: ReactNode }) {
           }
         }
       } else {
+        if (__DEV__) console.log("No active ride found");
+        setCurrentRide(null);
         setPageView("IDLE");
         setDriverLocation(null);
       }
@@ -222,6 +266,16 @@ export function RideProvider({ children }: { children: ReactNode }) {
     socket.on("RIDE_CANCELLED", (event: RideSocketEvent) => {
       if (__DEV__) console.log("[RideContext] Ride cancelled:", event);
       if (event.type === "RIDE_CANCELLED") {
+        // Only clear state if this event belongs to the ride we're currently tracking.
+        // A stale RIDE_CANCELLED for the previous ride must not wipe a newly created one.
+        if (event.rideId && event.rideId !== currentRideRef.current?.id) {
+          if (__DEV__)
+            console.log(
+              "[RideContext] RIDE_CANCELLED ignored — belongs to a different ride",
+              event.rideId,
+            );
+          return;
+        }
         setCurrentRide(null);
         setPageView("IDLE");
       }
@@ -258,6 +312,14 @@ export function RideProvider({ children }: { children: ReactNode }) {
     }
   }, [user?.id, initializeSocket]);
 
+  // Fetch current ride on mount so app resumes correctly after restart
+  useEffect(() => {
+    if (user?.id) {
+      refreshCurrentRide();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
+
   // Estimate fare
   const estimateFare = useCallback(async () => {
     if (!pickupLocation || !dropoffLocation) {
@@ -274,6 +336,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
         pickupLng: pickupLocation.longitude,
         dropoffLat: dropoffLocation.latitude,
         dropoffLng: dropoffLocation.longitude,
+        vehicleType: selectedVehicleType,
       });
 
       // Map backend response to FareEstimate type
@@ -383,10 +446,15 @@ export function RideProvider({ children }: { children: ReactNode }) {
 
       try {
         await RideService.cancelRide(currentRide.id, { reason });
+        // Inline reset to avoid stale closure on resetBooking dependency
         setCurrentRide(null);
         setPageView("IDLE");
         setDriverLocation(null);
-        resetBooking();
+        setPickupLocation(null);
+        setDropoffLocation(null);
+        setSelectedVehicleType(VehicleType.ECONOMY);
+        setFareEstimate(null);
+        setError(null);
       } catch (err: any) {
         setError(err?.message || "Failed to cancel ride");
         if (__DEV__) console.error("Cancel ride error:", err);
@@ -394,7 +462,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
         setLoading(false);
       }
     },
-    [currentRide],
+    [currentRide, setPickupLocation, setDropoffLocation],
   );
 
   // Reset booking state
@@ -404,6 +472,8 @@ export function RideProvider({ children }: { children: ReactNode }) {
     setSelectedVehicleType(VehicleType.ECONOMY);
     setFareEstimate(null);
     setError(null);
+    setCurrentRide(null);
+    setPageView("IDLE");
   }, []);
 
   const value: RideContextType = {

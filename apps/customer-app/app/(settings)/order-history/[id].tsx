@@ -1,806 +1,624 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
-  Animated,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
-  Share,
-  StyleProp,
   StyleSheet,
+  TextInput,
+  TouchableOpacity,
   View,
-  ViewStyle,
+  Dimensions,
 } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { IconSymbol } from "@/components/ui/icon-symbol";
-
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { fetchOrderById } from "@/services/order-history.service";
+import { createDispute } from "@/services/dispute.service";
+import Toast from "react-native-toast-message";
+
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 function formatCurrency(value: string | number | undefined | null) {
   const num = typeof value === "string" ? parseFloat(value) : Number(value);
-  if (isNaN(num)) return "0.00";
-  return num.toLocaleString("en-NG", {
-    style: "decimal",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
+  if (isNaN(num)) return "0";
+  return num.toLocaleString("en-NG");
 }
 
 export default function OrderDetailsScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
   const router = useRouter();
-  const Toast = require("react-native-toast-message");
 
-  /* -------- Theme Colors -------- */
   const brandPrimary = useThemeColor({}, "brandPrimary");
   const textColor = useThemeColor({}, "textPrimary");
-  const textSecondary = useThemeColor({}, "textSecondary");
+  const textSecondary = useThemeColor({}, "textMuted");
   const border = useThemeColor({}, "borderDefault");
   const surface = useThemeColor({}, "surfaceBackground");
+  const card = useThemeColor({}, "surfaceCard");
+  const subtle = useThemeColor({}, "surfaceSubtle");
+  const success = useThemeColor({}, "statusSuccess");
 
-  // Skeleton colors from theme
-  const surfaceSubtle = useThemeColor({}, "surfaceSubtle");
-  const borderSubtle = useThemeColor({}, "borderDefault");
-
-  /* -------- State -------- */
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [retryCount, setRetryCount] = useState(0);
-  const retryTimeoutRef = React.useRef<number | null>(null);
 
-  const hasShare = order?.status === "delivered";
+  // Dispute modal state
+  const [showDisputeModal, setShowDisputeModal] = useState(false);
+  const [disputeReason, setDisputeReason] = useState("");
+  const [disputeDescription, setDisputeDescription] = useState("");
+  const [submittingDispute, setSubmittingDispute] = useState(false);
 
-  /* -------- Data Loader with Auto-Retry -------- */
+  const DISPUTE_REASONS = [
+    "Missing Item",
+    "Wrong Item Delivered",
+    "Late Delivery",
+    "Item Quality Issue",
+    "Damaged Item",
+    "Other",
+  ];
 
-  const loadOrder = useCallback(
-    async (attempt = 0) => {
-      if (!id || typeof id !== "string") {
-        setOrder(null);
-        setError("Order not found");
-        setLoading(false);
-        return;
-      }
+  const loadOrder = useCallback(async () => {
+    if (!id) return;
+    try {
+      setLoading(true);
+      const data = await fetchOrderById(id);
+      setOrder(data);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [id]);
 
-      if (attempt === 0) {
-        setLoading(true);
-        setError(null);
-        setRetryCount(0);
-      }
-
-      try {
-        const data = await fetchOrderById(id);
-        setOrder(data);
-        setError(null);
-        setRetryCount(0);
-        setLoading(false);
-        setRefreshing(false);
-      } catch (e) {
-        const errorMessage = (e as Error)?.message || "Failed to load order";
-        const isNetworkError =
-          errorMessage.toLowerCase().includes("network") ||
-          errorMessage.toLowerCase().includes("fetch") ||
-          errorMessage.toLowerCase().includes("connection");
-
-        const maxRetries = isNetworkError ? 3 : 1;
-
-        if (attempt < maxRetries) {
-          const delay = Math.min(1000 * Math.pow(2, attempt), 5000);
-          setRetryCount(attempt + 1);
-
-          retryTimeoutRef.current = setTimeout(() => {
-            loadOrder(attempt + 1);
-          }, delay);
-        } else {
-          setOrder(null);
-          setError(errorMessage);
-          setLoading(false);
-          setRefreshing(false);
-          setRetryCount(0);
-        }
-      }
-    },
-    [id],
-  );
-
-  useEffect(() => {
-    return () => {
-      if (retryTimeoutRef.current) {
-        clearTimeout(retryTimeoutRef.current);
-      }
-    };
-  }, []);
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    loadOrder();
+  }, [loadOrder]);
 
   useEffect(() => {
     loadOrder();
   }, [loadOrder]);
 
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await loadOrder(0);
-  }, [loadOrder]);
-
-  const handleShare = useCallback(async () => {
-    if (!order) return;
-
-    const message = `Order ${order.id} has been delivered! Total: ₦${formatCurrency(
-      order.total,
-    )}`;
-
-    try {
-      await Share.share({ message });
-    } catch (error: any) {
-      Toast.show({ type: "error", text1: error.message || "Share failed" });
-    }
-  }, [order]);
-
-  /* ---------------- Skeleton Components ---------------- */
-
-  const SkeletonBlock = ({
-    height,
-    width = "100%",
-    style,
-  }: {
-    height: number;
-    width?: number | string;
-    style?: StyleProp<ViewStyle>;
-  }) => {
-    const pulse = useRef(new Animated.Value(0.3)).current;
-
-    useEffect(() => {
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(pulse, {
-            toValue: 0.7,
-            duration: 800,
-            useNativeDriver: true,
-          }),
-          Animated.timing(pulse, {
-            toValue: 0.3,
-            duration: 800,
-            useNativeDriver: true,
-          }),
-        ]),
-      ).start();
-    }, [pulse]);
-
-    const animatedStyle = {
-      height,
-      borderRadius: 8,
-      backgroundColor: surfaceSubtle,
-      opacity: pulse,
-      ...(typeof width === "number" && { width }),
-    };
-
-    return (
-      <Animated.View
-        style={[
-          animatedStyle,
-          typeof width === "string" && { width: width as any },
-          style,
-        ]}
-      />
-    );
-  };
-
-  const SkeletonInfo = () => (
-    <View style={styles.skeletonSection}>
-      <SkeletonBlock height={18} width={140} style={{ marginBottom: 16 }} />
-      <View style={{ gap: 12 }}>
-        {[1, 2, 3, 4].map((i) => (
-          <View key={i} style={styles.infoRow}>
-            <SkeletonBlock width={80} height={14} />
-            <SkeletonBlock width={120} height={14} />
-          </View>
-        ))}
-      </View>
-    </View>
-  );
-
-  const SkeletonTimeline = () => (
-    <View style={styles.skeletonSection}>
-      <SkeletonBlock height={18} width={140} style={{ marginBottom: 16 }} />
-
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: 8,
-          marginBottom: 20,
-        }}
-      >
-        {[1, 2, 3, 4].map((i) => (
-          <React.Fragment key={i}>
-            <SkeletonBlock
-              width={36}
-              height={36}
-              style={{ borderRadius: 18 }}
-            />
-            {i < 4 && <SkeletonBlock width={40} height={3} />}
-          </React.Fragment>
-        ))}
-      </View>
-
-      <View style={{ alignItems: "center", gap: 8 }}>
-        <SkeletonBlock width="60%" height={16} />
-        <SkeletonBlock width="80%" height={14} />
-        <SkeletonBlock width="50%" height={12} />
-      </View>
-    </View>
-  );
-
-  const SkeletonItems = () => (
-    <View style={styles.skeletonSection}>
-      <SkeletonBlock height={18} width={120} style={{ marginBottom: 16 }} />
-
-      <View style={{ gap: 16 }}>
-        {[1, 2, 3].map((i) => (
-          <View key={i} style={styles.itemRow}>
-            <View style={{ flex: 1, gap: 6 }}>
-              <SkeletonBlock width="70%" height={14} />
-              <SkeletonBlock width="30%" height={12} />
-            </View>
-            <SkeletonBlock width={70} height={14} />
-          </View>
-        ))}
-
-        <View
-          style={[styles.totalRow, { borderTopColor: border, marginTop: 8 }]}
-        >
-          <SkeletonBlock width={100} height={16} />
-          <SkeletonBlock width={80} height={18} />
-        </View>
-      </View>
-    </View>
-  );
-
-  const SkeletonPayment = () => (
-    <View style={styles.skeletonSection}>
-      <SkeletonBlock height={18} width={140} style={{ marginBottom: 16 }} />
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-        <SkeletonBlock width={40} height={40} style={{ borderRadius: 20 }} />
-        <View style={{ flex: 1, gap: 6 }}>
-          <SkeletonBlock width="50%" height={14} />
-          <SkeletonBlock width="30%" height={12} />
-        </View>
-      </View>
-    </View>
-  );
-
-  /* ---------------- Sections ---------------- */
-
   const renderTimeline = () => {
     if (!order?.timeline?.length) return null;
-
-    // Find the current active step by matching order status
-    const currentStepIndex = order.timeline.findIndex(
-      (step: any) => step.status === order.status,
-    );
-    const activeIndex =
-      currentStepIndex >= 0
-        ? currentStepIndex
-        : order.timeline.findIndex((step: any) => step.time);
-    const currentStep = order.timeline[activeIndex >= 0 ? activeIndex : 0];
-
-    // Map timeline icons to available IconSymbol names
-    const iconMap: Record<string, any> = {
-      default: "checkmark.circle",
-      kitchen: "fork.knife",
-      package: "shippingbox.fill",
-      rider: "car.fill",
-      delivered: "checkmark.circle.fill",
-    };
+    const currentStep = order.timeline[order.timeline.length - 1];
 
     return (
-      <View style={styles.timelineSection}>
-        <ThemedText style={[styles.sectionTitle, { color: textColor }]}>
-          Order Status
-        </ThemedText>
-        <View style={[styles.timelineDivider, { backgroundColor: border }]} />
-
-        {/* Horizontal Icon Timeline */}
-        <View style={styles.horizontalTimeline}>
-          {order.timeline.map((step: any, idx: number) => {
-            const isPassed = idx <= activeIndex;
-            const iconColor = isPassed ? brandPrimary : "#D1D5DB";
-            const lineColor = isPassed ? brandPrimary : "#E5E7EB";
-            const iconName = iconMap[step.icon] || step.icon || "clock";
-
-            return (
-              <React.Fragment key={idx}>
-                <View style={styles.timelineIconWrapper}>
-                  <View
-                    style={[
-                      styles.timelineIconCircle,
-                      { backgroundColor: iconColor },
-                    ]}
-                  >
-                    <IconSymbol name={iconName} size={16} color="#FFF" />
-                  </View>
-                </View>
-                {idx < order.timeline.length - 1 && (
-                  <View
-                    style={[
-                      styles.timelineConnector,
-                      { backgroundColor: lineColor },
-                    ]}
-                  />
-                )}
-              </React.Fragment>
-            );
-          })}
+      <View style={[styles.modernCard, { backgroundColor: card }]}>
+        <View style={styles.cardHeader}>
+          <View
+            style={[styles.statusIndicator, { backgroundColor: success }]}
+          />
+          <ThemedText style={styles.headerTitle}>ORDER STATUS</ThemedText>
         </View>
 
-        {/* Current Status Description */}
-        <View style={styles.currentStatusContainer}>
-          <ThemedText style={[styles.currentStatusLabel, { color: textColor }]}>
-            {currentStep.label}
-          </ThemedText>
-          <ThemedText
-            style={[styles.currentStatusDesc, { color: textSecondary }]}
-          >
-            {currentStep.description}
-          </ThemedText>
-          {currentStep.time && (
-            <ThemedText
-              style={[styles.currentStatusTime, { color: textSecondary }]}
-            >
-              {new Date(currentStep.time).toLocaleString()}
-            </ThemedText>
-          )}
+        <ThemedText style={styles.mainStatus}>{currentStep.label}</ThemedText>
+        <ThemedText style={[styles.statusDesc, { color: textSecondary }]}>
+          {currentStep.description}
+        </ThemedText>
+
+        <View style={styles.progressContainer}>
+          <View style={[styles.progressBar, { backgroundColor: border }]}>
+            <View
+              style={[
+                styles.progressFill,
+                { backgroundColor: brandPrimary, width: "25%" },
+              ]}
+            />
+          </View>
         </View>
       </View>
     );
   };
 
   const renderItems = () => {
-    if (!order?.items?.length) return null;
-
+    if (!order?.items) return null;
     return (
-      <View style={styles.itemsSection}>
-        <ThemedText style={[styles.sectionTitle, { color: textColor }]}>
-          Order Items
-        </ThemedText>
-        <View style={[styles.itemsDivider, { backgroundColor: border }]} />
-        <View style={styles.itemsList}>
-          {order.items.map((item: any) => (
-            <View
-              key={item.id}
-              style={[styles.itemRow, { borderBottomColor: border }]}
-            >
-              <View style={styles.itemInfo}>
-                <ThemedText style={[styles.itemName, { color: textColor }]}>
-                  {item.name}
-                </ThemedText>
-                <ThemedText style={[styles.itemQty, { color: textSecondary }]}>
-                  Qty: {item.quantity}
-                </ThemedText>
-              </View>
-              <ThemedText style={[styles.itemPrice, { color: textColor }]}>
-                ₦{formatCurrency(item.price)}
+      <View style={[styles.modernCard, { backgroundColor: card }]}>
+        <ThemedText style={styles.headerTitle}>YOUR ORDER</ThemedText>
+        {order.items.map((item: any, idx: number) => (
+          <View
+            key={item.id}
+            style={[styles.itemRow, idx === 0 && { marginTop: 12 }]}
+          >
+            <View style={[styles.qtyBox, { backgroundColor: subtle }]}>
+              <ThemedText style={[styles.qtyText, { color: brandPrimary }]}>
+                {item.quantity}
               </ThemedText>
             </View>
-          ))}
-          <View style={[styles.totalRow, { borderTopColor: border }]}>
-            <ThemedText style={[styles.totalLabel, { color: textColor }]}>
-              Total Amount
-            </ThemedText>
-            <ThemedText style={[styles.totalPrice, { color: brandPrimary }]}>
-              ₦{formatCurrency(order.total)}
+            <View style={{ flex: 1 }}>
+              <ThemedText style={styles.itemName}>{item.name}</ThemedText>
+              <ThemedText type="caption" style={{ color: textSecondary }}>
+                ₦{formatCurrency(item.price)} per unit
+              </ThemedText>
+            </View>
+            <ThemedText style={styles.itemTotal}>
+              ₦{formatCurrency(item.price * item.quantity)}
             </ThemedText>
           </View>
+        ))}
+
+        <View style={[styles.divider, { backgroundColor: border }]} />
+
+        <View style={styles.totalRow}>
+          <ThemedText style={styles.totalLabel}>Total Paid</ThemedText>
+          <ThemedText style={[styles.totalAmount, { color: textColor }]}>
+            ₦{formatCurrency(order.total)}
+          </ThemedText>
         </View>
       </View>
     );
   };
 
-  const renderPayment = () => {
-    if (!order?.paymentMethod) return null;
-
-    const paymentMethod = order.paymentMethod;
-    const paymentIcon =
-      paymentMethod === "Cash" ? "dollarsign.circle.fill" : "creditcard.fill";
-
+  const renderDeliveryInfo = () => {
+    if (!order || !order.addressDetails) return null;
     return (
-      <View style={styles.paymentSection}>
-        <ThemedText style={[styles.sectionTitle, { color: textColor }]}>
-          Payment Method
-        </ThemedText>
-        <View style={[styles.paymentDivider, { backgroundColor: border }]} />
-        <View style={styles.paymentContent}>
-          <View style={styles.paymentRow}>
-            <View style={styles.paymentIconWrapper}>
-              <IconSymbol name={paymentIcon} size={20} color={brandPrimary} />
-            </View>
-            <View style={styles.paymentInfo}>
-              <ThemedText style={[styles.paymentMethod, { color: textColor }]}>
-                {paymentMethod}
-              </ThemedText>
-              {order.paymentStatus && (
-                <ThemedText
-                  style={[styles.paymentStatus, { color: textSecondary }]}
-                >
-                  {order.paymentStatus}
-                </ThemedText>
-              )}
-            </View>
-          </View>
-        </View>
-      </View>
-    );
-  };
-
-  const renderInfo = () => {
-    if (!order) return null;
-
-    return (
-      <View style={styles.infoSection}>
-        <ThemedText style={[styles.sectionTitle, { color: textColor }]}>
-          Order Information
-        </ThemedText>
-        <View style={[styles.infoDivider, { backgroundColor: border }]} />
+      <View style={[styles.modernCard, { backgroundColor: card }]}>
         <View style={styles.infoGrid}>
-          <InfoRow
-            label="Order ID"
-            value={`#${order.id.slice(-8).toUpperCase()}`}
-          />
-          <InfoRow
-            label="Placed On"
-            value={new Date(order.createdAt).toLocaleDateString()}
-          />
-          <InfoRow
-            label="Time"
-            value={new Date(order.createdAt).toLocaleTimeString()}
-          />
-          {order.eta && <InfoRow label="ETA" value={order.eta} />}
-          {order.store?.name && (
-            <InfoRow label="Store" value={order.store.name} />
-          )}
-          {order.distance && (
-            <InfoRow label="Distance" value={`${order.distance} km`} />
-          )}
+          <View style={styles.gridBox}>
+            <IconSymbol name="bicycle" size={18} color={brandPrimary} />
+            <ThemedText style={styles.gridVal}>{order.distance}</ThemedText>
+            <ThemedText type="caption" style={{ color: textSecondary }}>
+              Distance
+            </ThemedText>
+          </View>
+          <View style={[styles.verticalDivider, { backgroundColor: border }]} />
+          <View style={styles.gridBox}>
+            <IconSymbol name="clock.fill" size={18} color={brandPrimary} />
+            <ThemedText style={styles.gridVal}>
+              {order.eta.split(" ")[0]}
+            </ThemedText>
+            <ThemedText type="caption" style={{ color: textSecondary }}>
+              Mins ETA
+            </ThemedText>
+          </View>
+        </View>
+
+        <View
+          style={[
+            styles.divider,
+            { backgroundColor: border, marginVertical: 20 },
+          ]}
+        />
+
+        <View style={styles.addressRow}>
+          <View style={[styles.iconCircle, { backgroundColor: surface }]}>
+            <IconSymbol
+              name="mappin.and.ellipse"
+              size={16}
+              color={brandPrimary}
+            />
+          </View>
+          <View style={{ flex: 1 }}>
+            <ThemedText
+              type="caption"
+              style={{ color: textSecondary, marginBottom: 2 }}
+            >
+              DELIVER TO
+            </ThemedText>
+            <ThemedText style={styles.addressText}>
+              {order.addressDetails.address}
+            </ThemedText>
+          </View>
         </View>
       </View>
     );
   };
 
-  /* ---------------- UI ---------------- */
-
-  const renderEmptyState = () => (
-    <ScrollView
-      contentContainerStyle={styles.errorContainer}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={onRefresh}
-          tintColor={brandPrimary}
-        />
-      }
-    >
-      <IconSymbol name="alert-circle" size={48} color={brandPrimary} />
-      <ThemedText style={styles.errorTitle}>Oops!</ThemedText>
-      <ThemedText style={styles.errorText}>
-        {error || "Order not available"}
-      </ThemedText>
-
-      <Pressable
-        style={[styles.retryButton, { borderColor: brandPrimary }]}
-        onPress={() => router.back()}
+  if (loading && !order) {
+    return (
+      <ThemedView
+        style={[
+          styles.container,
+          {
+            backgroundColor: surface,
+            alignItems: "center",
+            justifyContent: "center",
+          },
+        ]}
       >
-        <ThemedText style={[styles.retryButtonText, { color: brandPrimary }]}>
-          Go Back
-        </ThemedText>
-      </Pressable>
-    </ScrollView>
-  );
-
-  const renderContent = () => (
-    <ScrollView
-      showsVerticalScrollIndicator={false}
-      style={styles.scrollView}
-      contentContainerStyle={styles.scrollContent}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={onRefresh}
-          tintColor={brandPrimary}
-        />
-      }
-    >
-      <View style={styles.receiptContainer}>
-        {renderTimeline()}
-        {renderInfo()}
-        {renderItems()}
-        {renderPayment()}
-      </View>
-      <View style={styles.footerSpacer} />
-    </ScrollView>
-  );
+        <ActivityIndicator size="large" color={brandPrimary} />
+      </ThemedView>
+    );
+  }
 
   return (
     <ThemedView style={[styles.container, { backgroundColor: surface }]}>
-      {/* Header */}
-      <View
-        style={[
-          styles.header,
-          { borderBottomColor: border, backgroundColor: surface },
-        ]}
-      >
-        <Pressable onPress={() => router.back()} style={styles.backButton}>
-          <IconSymbol name="chevron.left" size={22} color={brandPrimary} />
+      <View style={styles.header}>
+        <Pressable onPress={() => router.back()} style={styles.backBtn}>
+          <IconSymbol name="arrow.left" size={20} color={textColor} />
         </Pressable>
-
-        <View style={styles.headerTitleContainer}>
-          <ThemedText type="subtitle" style={styles.headerTitle}>
-            Order Details
+        <View style={styles.headerCenter}>
+          <ThemedText style={styles.headerSub}>ORDER ID</ThemedText>
+          <ThemedText style={styles.headerId}>
+            #{order?.id?.slice(-6)?.toUpperCase() ?? "------"}
           </ThemedText>
         </View>
-
-        {hasShare && (
-          <Pressable style={styles.shareButton} onPress={handleShare}>
-            <IconSymbol name="share" size={20} color={brandPrimary} />
-          </Pressable>
-        )}
-
-        <View style={[styles.headerSpacer, { width: hasShare ? 0 : 32 }]} />
+        <View style={styles.backBtn} />
       </View>
 
-      {/* Body */}
-      {loading ? (
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={brandPrimary}
+          />
+        }
+      >
+        {renderTimeline()}
+        {renderDeliveryInfo()}
+        {renderItems()}
+
+        <Pressable
+          style={[styles.supportBtn, { borderColor: border }]}
+          onPress={() => setShowDisputeModal(true)}
         >
-          <View style={styles.receiptContainer}>
-            <SkeletonTimeline />
-            <SkeletonInfo />
-            <SkeletonItems />
-            <SkeletonPayment />
-          </View>
-          <View style={styles.footerSpacer} />
-        </ScrollView>
-      ) : error || !order ? (
-        renderEmptyState()
-      ) : (
-        renderContent()
-      )}
+          <ThemedText style={{ color: brandPrimary, fontWeight: "700" }}>
+            Need help with this order?
+          </ThemedText>
+        </Pressable>
+
+        {/* Dispute Modal */}
+        <Modal
+          visible={showDisputeModal}
+          animationType="slide"
+          transparent
+          onRequestClose={() => setShowDisputeModal(false)}
+        >
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
+            style={styles.modalOverlay}
+          >
+            <Pressable
+              style={StyleSheet.absoluteFill}
+              onPress={() => setShowDisputeModal(false)}
+            />
+            <View style={[styles.modalSheet, { backgroundColor: card }]}>
+              {/* Handle */}
+              <View style={[styles.modalHandle, { backgroundColor: border }]} />
+
+              {/* Header */}
+              <View style={styles.modalHeader}>
+                <ThemedText style={styles.modalTitle}>
+                  File a Dispute
+                </ThemedText>
+                <Pressable onPress={() => setShowDisputeModal(false)}>
+                  <IconSymbol name="xmark" size={20} color={textSecondary} />
+                </Pressable>
+              </View>
+
+              <ThemedText
+                style={[styles.modalSubtitle, { color: textSecondary }]}
+              >
+                Order #{order?.id?.slice(-6)?.toUpperCase()}
+              </ThemedText>
+
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+              >
+                {/* Reason chips */}
+                <ThemedText
+                  style={[styles.inputLabel, { color: textSecondary }]}
+                >
+                  REASON
+                </ThemedText>
+                <View style={styles.reasonGrid}>
+                  {DISPUTE_REASONS.map((r) => (
+                    <TouchableOpacity
+                      key={r}
+                      onPress={() => setDisputeReason(r)}
+                      style={[
+                        styles.reasonChip,
+                        {
+                          borderColor:
+                            disputeReason === r ? brandPrimary : border,
+                          backgroundColor:
+                            disputeReason === r
+                              ? brandPrimary + "18"
+                              : "transparent",
+                        },
+                      ]}
+                    >
+                      <ThemedText
+                        style={[
+                          styles.reasonChipText,
+                          {
+                            color:
+                              disputeReason === r
+                                ? brandPrimary
+                                : textSecondary,
+                            fontWeight: disputeReason === r ? "700" : "400",
+                          },
+                        ]}
+                      >
+                        {r}
+                      </ThemedText>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                {/* Description */}
+                <ThemedText
+                  style={[styles.inputLabel, { color: textSecondary }]}
+                >
+                  DESCRIBE THE ISSUE
+                </ThemedText>
+                <TextInput
+                  value={disputeDescription}
+                  onChangeText={setDisputeDescription}
+                  placeholder="Tell us exactly what went wrong…"
+                  placeholderTextColor={textSecondary}
+                  multiline
+                  numberOfLines={5}
+                  textAlignVertical="top"
+                  style={[
+                    styles.descriptionInput,
+                    {
+                      color: textColor,
+                      borderColor: border,
+                      backgroundColor: surface,
+                    },
+                  ]}
+                />
+
+                {/* Submit */}
+                <TouchableOpacity
+                  onPress={async () => {
+                    if (!disputeReason) {
+                      Toast.show({
+                        type: "error",
+                        text1: "Select a reason",
+                      });
+                      return;
+                    }
+                    if (disputeDescription.trim().length < 10) {
+                      Toast.show({
+                        type: "error",
+                        text1: "Description too short",
+                        text2: "Please describe the issue in more detail.",
+                      });
+                      return;
+                    }
+                    setSubmittingDispute(true);
+                    try {
+                      await createDispute({
+                        reason: disputeReason,
+                        description: disputeDescription.trim(),
+                        orderId: order?.id,
+                      });
+                      Toast.show({
+                        type: "success",
+                        text1: "Dispute filed",
+                        text2:
+                          "Our team will review and get back to you shortly.",
+                      });
+                      setShowDisputeModal(false);
+                      setDisputeReason("");
+                      setDisputeDescription("");
+                    } catch (err: any) {
+                      Toast.show({
+                        type: "error",
+                        text1: "Failed to file dispute",
+                        text2:
+                          err?.message ||
+                          "Please try again or contact support.",
+                      });
+                    } finally {
+                      setSubmittingDispute(false);
+                    }
+                  }}
+                  disabled={submittingDispute}
+                  style={[
+                    styles.submitBtn,
+                    {
+                      backgroundColor: brandPrimary,
+                      opacity: submittingDispute ? 0.6 : 1,
+                    },
+                  ]}
+                >
+                  {submittingDispute ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <ThemedText style={styles.submitBtnText}>
+                      Submit Dispute
+                    </ThemedText>
+                  )}
+                </TouchableOpacity>
+              </ScrollView>
+            </View>
+          </KeyboardAvoidingView>
+        </Modal>
+      </ScrollView>
     </ThemedView>
   );
 }
 
-/* ---------------- Small Components ---------------- */
-
-function InfoRow({ label, value }: { label: string; value: string }) {
-  const textColor = useThemeColor({}, "textPrimary");
-  const textSecondary = useThemeColor({}, "textSecondary");
-
-  return (
-    <View style={styles.infoRow}>
-      <ThemedText style={[styles.infoLabel, { color: textSecondary }]}>
-        {label}
-      </ThemedText>
-      <ThemedText style={[styles.infoValue, { color: textColor }]}>
-        {value}
-      </ThemedText>
-    </View>
-  );
-}
-
-/* ---------------- Styles ---------------- */
-
 const styles = StyleSheet.create({
   container: { flex: 1 },
-
   header: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-  },
-  backButton: { padding: 8, borderRadius: 12, marginRight: 12 },
-  headerTitleContainer: { flex: 1 },
-  headerTitle: { fontSize: 20, fontWeight: "600" },
-  shareButton: { padding: 8, borderRadius: 12, marginLeft: 12 },
-  headerSpacer: { width: 32 },
-
-  scrollView: { flex: 1 },
-  scrollContent: { paddingBottom: 24, alignItems: "center" },
-
-  receiptContainer: {
-    width: "100%",
-    maxWidth: 400,
-    borderRadius: 12,
-    overflow: "hidden",
-  },
-
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    paddingHorizontal: 24,
-    paddingTop: 20,
-    paddingBottom: 8,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
-
-  infoSection: {
-    paddingBottom: 8,
-  },
-  infoDivider: {
-    height: StyleSheet.hairlineWidth,
-    marginHorizontal: 24,
-    marginBottom: 16,
-  },
-  infoGrid: { paddingHorizontal: 24, gap: 10, paddingBottom: 8 },
-  infoRow: {
-    flexDirection: "row",
     justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 20,
+  },
+  headerCenter: { alignItems: "center" },
+  headerSub: { fontSize: 10, fontWeight: "800", opacity: 0.5 },
+  headerId: { fontSize: 14, fontWeight: "700" },
+  backBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: "center",
+    justifyContent: "center",
   },
-  infoLabel: { fontSize: 12, fontWeight: "500" },
-  infoValue: {
-    fontSize: 12,
-    fontWeight: "600",
-    textAlign: "right",
-    flexShrink: 1,
-  },
+  scrollContent: { padding: 20, gap: 16 },
 
-  timelineSection: {
-    paddingBottom: 12,
+  // Modern Card Component
+  modernCard: {
+    padding: 24,
+    borderRadius: 32,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.05,
+    shadowRadius: 20,
+    elevation: 5,
   },
-  timelineDivider: {
-    height: StyleSheet.hairlineWidth,
-    marginHorizontal: 24,
-    marginBottom: 16,
-  },
-  horizontalTimeline: {
+  cardHeader: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 24,
-    marginBottom: 16,
-  },
-  timelineIconWrapper: {
-    alignItems: "center",
-  },
-  timelineIconCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  timelineConnector: {
-    flex: 1,
-    height: 3,
-    marginHorizontal: 4,
-    borderRadius: 2,
-  },
-  currentStatusContainer: {
-    paddingHorizontal: 24,
-    paddingBottom: 8,
-    alignItems: "center",
-    gap: 4,
-  },
-  currentStatusLabel: {
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  currentStatusDesc: {
-    fontSize: 14,
-    textAlign: "center",
-  },
-  currentStatusTime: {
-    fontSize: 12,
-    marginTop: 2,
-  },
-
-  itemsSection: {
-    paddingBottom: 8,
-  },
-  itemsDivider: {
-    height: StyleSheet.hairlineWidth,
-    marginHorizontal: 24,
+    gap: 8,
     marginBottom: 12,
   },
-  itemsList: { paddingHorizontal: 24, gap: 0 },
-  itemRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 8,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  itemInfo: { flex: 1, gap: 2 },
-  itemName: { fontSize: 14, fontWeight: "600" },
-  itemQty: { fontSize: 12 },
-  itemPrice: {
-    fontSize: 14,
-    fontWeight: "600",
-    minWidth: 60,
-    textAlign: "right",
+  statusIndicator: { width: 8, height: 8, borderRadius: 4 },
+  headerTitle: {
+    fontSize: 10,
+    fontWeight: "800",
+    letterSpacing: 1,
+    opacity: 0.5,
   },
 
+  // Status Section
+  mainStatus: { fontSize: 28, fontWeight: "800", letterSpacing: -0.5 },
+  statusDesc: { fontSize: 14, marginTop: 4, lineHeight: 20 },
+  progressContainer: { marginTop: 24 },
+  progressBar: {
+    height: 6,
+    borderRadius: 3,
+    width: "100%",
+    overflow: "hidden",
+  },
+  progressFill: { height: "100%", borderRadius: 3 },
+
+  // Items Section
+  itemRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 16,
+    marginVertical: 10,
+  },
+  qtyBox: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  qtyText: { fontSize: 14, fontWeight: "800" },
+  itemName: { fontSize: 15, fontWeight: "600" },
+  itemTotal: { fontSize: 15, fontWeight: "700" },
+  divider: { height: 1, width: "100%", marginTop: 20, opacity: 0.5 },
   totalRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingTop: 12,
-    marginTop: 8,
-    borderTopWidth: 1,
-    paddingBottom: 8,
+    marginTop: 20,
   },
-  totalLabel: { fontSize: 16, fontWeight: "700" },
-  totalPrice: { fontSize: 18, fontWeight: "800" },
+  totalLabel: { fontSize: 16, fontWeight: "600", opacity: 0.6 },
+  totalAmount: { fontSize: 24, fontWeight: "800" },
 
-  paymentSection: {
-    paddingBottom: 12,
-  },
-  paymentDivider: {
-    height: StyleSheet.hairlineWidth,
-    marginHorizontal: 24,
-    marginBottom: 12,
-  },
-  paymentContent: {
-    paddingHorizontal: 24,
-  },
-  paymentRow: {
+  // Delivery Grid
+  infoGrid: {
     flexDirection: "row",
+    justifyContent: "space-around",
     alignItems: "center",
-    gap: 12,
   },
-  paymentIconWrapper: {
+  gridBox: { alignItems: "center", gap: 4 },
+  gridVal: { fontSize: 18, fontWeight: "800", marginTop: 4 },
+  verticalDivider: { width: 1, height: 40, opacity: 0.3 },
+  addressRow: { flexDirection: "row", gap: 16, alignItems: "center" },
+  iconCircle: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "#F3F4F6",
-    justifyContent: "center",
     alignItems: "center",
-  },
-  paymentInfo: {
-    flex: 1,
-    gap: 2,
-  },
-  paymentMethod: {
-    fontSize: 15,
-    fontWeight: "600",
-  },
-  paymentStatus: {
-    fontSize: 13,
-  },
-
-  errorContainer: {
-    flexGrow: 1,
     justifyContent: "center",
-    alignItems: "center",
-    padding: 24,
-    gap: 16,
   },
-  errorTitle: { fontSize: 24, fontWeight: "700", marginTop: 8 },
-  errorText: { fontSize: 16, textAlign: "center", marginBottom: 24 },
+  addressText: { fontSize: 14, fontWeight: "600", lineHeight: 20 },
 
-  retryButton: {
-    paddingHorizontal: 24,
-    paddingVertical: 12,
+  supportBtn: {
+    width: "100%",
+    padding: 20,
+    borderRadius: 20,
     borderWidth: 1,
-    borderRadius: 8,
+    alignItems: "center",
+    marginTop: 10,
+    marginBottom: 40,
   },
-  retryButtonText: { fontSize: 16, fontWeight: "600" },
 
-  footerSpacer: { height: 80 },
-
-  /* Skeleton */
-  skeletonSection: {
+  // Dispute Modal
+  modalOverlay: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(0,0,0,0.45)",
+  },
+  modalSheet: {
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
     paddingHorizontal: 24,
-    paddingVertical: 20,
-    gap: 8,
-    backgroundColor: "transparent",
+    paddingBottom: 40,
+    paddingTop: 12,
+    maxHeight: "90%",
   },
+  modalHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    alignSelf: "center",
+    marginBottom: 20,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 4,
+  },
+  modalTitle: { fontSize: 20, fontWeight: "800" },
+  modalSubtitle: { fontSize: 12, fontWeight: "600", marginBottom: 24 },
+  inputLabel: {
+    fontSize: 10,
+    fontWeight: "800",
+    letterSpacing: 0.8,
+    marginBottom: 10,
+  },
+  reasonGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 24,
+  },
+  reasonChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1.5,
+  },
+  reasonChipText: { fontSize: 13 },
+  descriptionInput: {
+    borderWidth: 1.5,
+    borderRadius: 16,
+    padding: 14,
+    fontSize: 14,
+    lineHeight: 22,
+    minHeight: 120,
+    marginBottom: 24,
+  },
+  submitBtn: {
+    paddingVertical: 16,
+    borderRadius: 16,
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  submitBtnText: { fontSize: 16, fontWeight: "800", color: "#fff" },
 });

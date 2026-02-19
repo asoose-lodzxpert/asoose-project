@@ -92,10 +92,19 @@ export default function RidePaymentScreen() {
     }
   };
 
-  const handlePaymentSuccess = () => {
+  const handlePaymentSuccess = async () => {
     setShowPaymentWebView(false);
     Toast.show({ type: "success", text1: "Payment successful!" });
-    confirmPayment(currentRide.id, "CARD");
+    try {
+      await confirmPayment(currentRide.id, "CARD");
+    } catch (err: any) {
+      Toast.show({
+        type: "error",
+        text1: "Failed to confirm payment",
+        text2: err?.message,
+      });
+      return;
+    }
     router.replace("/ride/tracking");
   };
 
@@ -127,7 +136,7 @@ export default function RidePaymentScreen() {
             {RideService.formatCurrency(currentRide.totalFare || 0)}
           </ThemedText>
 
-          <View style={styles.divider} />
+          <View style={[styles.divider, { backgroundColor: border }]} />
 
           <View style={styles.routeBox}>
             <View style={styles.routeItem}>
@@ -213,7 +222,6 @@ const styles = StyleSheet.create({
   divider: {
     height: 1,
     width: "100%",
-    backgroundColor: "rgba(0,0,0,0.05)",
     marginVertical: 20,
   },
   routeBox: { width: "100%", gap: 4 },

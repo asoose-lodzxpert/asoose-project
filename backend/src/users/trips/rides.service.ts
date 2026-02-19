@@ -118,9 +118,24 @@ export class RidesService {
       );
     }
 
+    // Only recover a ride that is still in a resumable (non-terminal) state.
+    // Without this filter the query returns CANCELLED / COMPLETED rides and
+    // incorrectly hands them back as a "cache hit", breaking the next booking.
     const existingRequest = await this.prisma.ride.findFirst({
-      where: { customerId: userId },
+      where: {
+        customerId: userId,
+        status: {
+          in: [
+            RideStatus.PENDING,
+            RideStatus.REQUESTED,
+            RideStatus.ACCEPTED,
+            RideStatus.ARRIVED,
+            RideStatus.IN_PROGRESS,
+          ],
+        },
+      },
       include: { pickupAddress: true, dropoffAddress: true, payment: true },
+      orderBy: { createdAt: 'desc' },
     });
 
     if (existingRequest) {
@@ -631,6 +646,7 @@ export class RidesService {
         pickupAddress: true,
         dropoffAddress: true,
         rider: { include: { vehicle: true } },
+        payment: true,
       },
       orderBy: { createdAt: 'desc' },
     });

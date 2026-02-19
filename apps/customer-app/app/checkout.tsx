@@ -89,13 +89,23 @@ export default function CheckoutScreen() {
       };
 
       const orderResponse = await createOrder(orderPayload);
-      const createdOrderId =
-        (orderResponse as any).orderGroupId || orderResponse.id;
-      setOrderId(createdOrderId);
+
+      // Multi-vendor response: { orderGroupId, orders, ... }
+      // Single-vendor response: plain Order { id, storeId, ... }
+      const multiVendorGroupId = (orderResponse as any).orderGroupId as
+        | string
+        | undefined;
+      const singleOrderId = (orderResponse as any).id as string | undefined;
+      const isMultiVendor = !!multiVendorGroupId;
+
+      const trackingId = multiVendorGroupId ?? singleOrderId!;
+      setOrderId(trackingId);
 
       const paymentPayload = {
         amount: total,
-        orderGroupId: createdOrderId,
+        ...(isMultiVendor
+          ? { orderGroupId: multiVendorGroupId }
+          : { orderId: singleOrderId }),
         type: "ORDER",
         callbackUrl: `https://asoose.com/payment/callback/paystack`,
       };
@@ -118,6 +128,8 @@ export default function CheckoutScreen() {
       setShowPaymentWebView(true);
     } catch (error) {
       Toast.show({ type: "error", text1: "Payment initialization failed" });
+      if (__DEV__)
+        console.error("Error during order/payment initialization:", error);
     } finally {
       setIsProcessing(false);
     }

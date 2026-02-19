@@ -68,7 +68,7 @@ export class RideMatchingProcessor extends WorkerHost {
       // Verify ride is still in REQUESTED status
       const ride = await this.prisma.ride.findUnique({
         where: { id: rideId },
-        select: { status: true, riderId: true },
+        select: { status: true, riderId: true, customerId: true },
       });
 
       if (!ride) {
@@ -112,7 +112,13 @@ export class RideMatchingProcessor extends WorkerHost {
         this.logger.log(`Driver found for ride ${rideId}`);
       } else {
         // No driver found after all rings
-        await this.handleNoDriverFound(rideId, pickupLat, pickupLng, attempt);
+        await this.handleNoDriverFound(
+          rideId,
+          pickupLat,
+          pickupLng,
+          attempt,
+          ride.customerId,
+        );
       }
     } catch (error) {
       this.logger.error(`Error matching ride ${rideId}:`, error);
@@ -288,6 +294,7 @@ export class RideMatchingProcessor extends WorkerHost {
     pickupLat: number,
     pickupLng: number,
     attempt: number,
+    customerId?: string,
   ): Promise<void> {
     const attempts = await this.redis.incrementMatchingAttempts(rideId);
 
@@ -306,12 +313,13 @@ export class RideMatchingProcessor extends WorkerHost {
       },
     });
 
-    // Emit job cancelled event
+    // Emit job cancelled event — include customerId so listeners can notify the customer
     this.eventBus.emitJobCancelled({
       jobId: rideId,
       jobType: 'ride',
       reason: 'No driver available',
       cancelledBy: 'system',
+      customerId,
       timestamp: Date.now(),
     });
   }

@@ -374,7 +374,7 @@ export class OrdersService {
       await this.completeIdempotency(redisKey, { orderId: order.id });
 
       // Async Notification (Safe)
-      this.handoffNotifications(order, context.preparedStores[0].emailItems);
+      // this.handoffNotifications(order, context.preparedStores[0].emailItems);
 
       return order;
     } catch (error) {

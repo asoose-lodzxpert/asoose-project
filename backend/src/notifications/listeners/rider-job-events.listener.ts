@@ -79,9 +79,36 @@ export class RiderJobEventsListener {
     const recipientId = payload.driverId || (payload as any).riderId;
 
     if (!recipientId) {
-      this.logger.warn(
-        `Job cancelled with no driver/rider ID: ${payload.jobId}`,
-      );
+      // No driver was assigned — this is a system cancellation (e.g. no driver found).
+      // Notify the customer directly so their app can clear the ride state.
+      if (payload.customerId) {
+        this.logger.log(
+          `No driver for ${payload.jobId} — notifying customer ${payload.customerId}`,
+        );
+        // NO_DRIVERS_FOUND → sets error message in customer app
+        this.gateway.server
+          .to(`user_${payload.customerId}`)
+          .emit('NO_DRIVERS_FOUND', {
+            type: 'NO_DRIVERS_FOUND',
+            rideId: payload.jobId,
+            reason: payload.reason || 'No drivers available',
+            timestamp: payload.timestamp,
+          });
+        // RIDE_CANCELLED → clears ride state in customer app
+        this.gateway.server
+          .to(`user_${payload.customerId}`)
+          .emit('RIDE_CANCELLED', {
+            type: 'RIDE_CANCELLED',
+            rideId: payload.jobId,
+            reason: payload.reason || 'No drivers available',
+            cancelledBy: payload.cancelledBy,
+            timestamp: payload.timestamp,
+          });
+      } else {
+        this.logger.warn(
+          `Job cancelled with no driver/rider ID: ${payload.jobId}`,
+        );
+      }
       return;
     }
 

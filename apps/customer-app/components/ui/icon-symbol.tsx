@@ -99,6 +99,7 @@ export type IconSymbolName =
   | "bag"
   | "package"
   | "arrow.clockwise"
+  | "arrow.counterclockwise"
   | "pizza"
   | "p.square"
   | "d.square"
@@ -274,6 +275,7 @@ export const MAPPING: Record<
   bag: "work",
   package: "inventory",
   "arrow.clockwise": "rotate-right",
+  "arrow.counterclockwise": "rotate-left",
   add: "add",
   pizza: "local-pizza",
   "p.square": "crop-square",

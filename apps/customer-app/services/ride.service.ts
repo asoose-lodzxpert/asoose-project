@@ -23,6 +23,7 @@ export class RideService {
       pickuplong: String(payload.pickupLng),
       dropofflat: String(payload.dropoffLat),
       dropofflong: String(payload.dropoffLng),
+      ...(payload.vehicleType ? { vehicleType: payload.vehicleType } : {}),
     };
     return post("fare/ride", dto);
   }

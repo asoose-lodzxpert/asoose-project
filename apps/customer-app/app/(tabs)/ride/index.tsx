@@ -5,7 +5,7 @@ import {
   Pressable,
   ActivityIndicator,
 } from "react-native";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "expo-router";
 import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
@@ -33,6 +33,7 @@ export default function RideBookingScreen() {
     setSelectedVehicleType,
     estimateFare,
     createRide,
+    resetBooking,
   } = useRide();
 
   const primary = useThemeColor({}, "brandPrimary");
@@ -44,17 +45,54 @@ export default function RideBookingScreen() {
 
   const [estimating, setEstimating] = useState(false);
 
+  const handleEstimate = useCallback(async () => {
+    setEstimating(true);
+    await estimateFare();
+    setEstimating(false);
+  }, [estimateFare]);
+
   // Check for active ride and redirect
   useEffect(() => {
+    if (__DEV__)
+      console.log("Current Ride:", JSON.stringify(currentRide, null, 2));
+
+    if (__DEV__) console.log("Page View:", pageView);
+
     if (currentRide && pageView !== "IDLE") {
-      // User has an active ride, redirect to appropriate screen
-      if (pageView === "PAYMENT") {
-        router.replace("/ride/payment");
-      } else {
+      // If ride is cancelled, do not redirect to payment/tracking
+      if (currentRide.status === "CANCELLED") {
+        Toast.show({
+          type: "error",
+          text1: "Ride cancelled",
+          text2: currentRide.cancellationReason || "No driver available",
+        });
+        // Reset ride state so user can book again
+        if (__DEV__) {
+          console.log("Resetting ride state due to cancellation");
+        }
+        resetBooking();
+        return;
+      }
+
+      // If payment is already completed but we're still on the PAYMENT pageView
+      // (e.g. app was killed right after payment before ride confirmation came
+      // back), skip payment and go straight to tracking.
+      const ridePayment = Array.isArray(currentRide.payment)
+        ? currentRide.payment[0]
+        : currentRide.payment;
+      const paymentCompleted = ridePayment?.status === "COMPLETED";
+      if (paymentCompleted && pageView === "PAYMENT") {
+        router.replace("/ride/tracking");
+        return;
+      }
+
+      // Only auto-redirect for non-PAYMENT states (tracking resume on app open).
+      // PAYMENT navigation is owned by handleBookRide to avoid double-navigation.
+      if (pageView !== "PAYMENT") {
         router.replace("/ride/tracking");
       }
     }
-  }, [currentRide, pageView, router]);
+  }, [currentRide, pageView, router, resetBooking]);
 
   // Auto-estimate when locations and vehicle are selected
   useEffect(() => {
@@ -66,13 +104,13 @@ export default function RideBookingScreen() {
     ) {
       handleEstimate();
     }
-  }, [pickupLocation, dropoffLocation, selectedVehicleType]);
-
-  const handleEstimate = async () => {
-    setEstimating(true);
-    await estimateFare();
-    setEstimating(false);
-  };
+  }, [
+    pickupLocation,
+    dropoffLocation,
+    selectedVehicleType,
+    handleEstimate,
+    fareEstimate,
+  ]);
 
   const handleBookRide = async () => {
     if (!pickupLocation || !dropoffLocation) {
@@ -89,6 +127,7 @@ export default function RideBookingScreen() {
     }
 
     const rideId = await createRide();
+
     if (rideId) {
       router.push("/ride/payment");
     }
@@ -105,8 +144,24 @@ export default function RideBookingScreen() {
     <ThemedView style={[styles.container, { backgroundColor: surface }]}>
       {/* Header */}
       <View style={styles.header}>
-        <ThemedText type="title">Book a Ride</ThemedText>
-        <ThemedText type="caption" style={{ color: textSecondary }}>
+        <View style={styles.headerRow}>
+          <ThemedText type="title">Book a Ride</ThemedText>
+          <Pressable
+            onPress={resetBooking}
+            style={styles.resetBtn}
+            accessibilityLabel="Reset booking"
+          >
+            <IconSymbol
+              name="arrow.counterclockwise"
+              size={20}
+              color={primary}
+            />
+          </Pressable>
+        </View>
+        <ThemedText
+          type="caption"
+          style={[styles.headerCaption, { color: textSecondary }]}
+        >
           Enter your journey details
         </ThemedText>
       </View>
@@ -219,6 +274,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 20,
     paddingBottom: 16,
+  },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  headerCaption: {
+    marginTop: 2,
+  },
+  resetBtn: {
+    marginLeft: 12,
+    padding: 8,
+    borderRadius: 20,
   },
   scrollView: {
     flex: 1,
