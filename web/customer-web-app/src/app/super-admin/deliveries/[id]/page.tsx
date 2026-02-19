@@ -26,6 +26,7 @@ import useSWR from "swr";
 import { fetcher } from "../../hooks/useSuperAdminFetch";
 import { DeliveryDetailsSkeleton } from "./skeleton";
 import { AssignRiderModal } from "../components/AssignRiderModal";
+import { UpdateStatusModal } from "../components/UpdateStatusModal";
 
 // --- Types ---
 interface DeliveryHistoryStep {
@@ -71,6 +72,7 @@ export default function DeliveryDetailPage() {
   const router = useRouter();
   const id = params?.id as string;
   const [showAssignModal, setShowAssignModal] = useState(false);
+  const [showUpdateStatusModal, setShowUpdateStatusModal] = useState(false);
 
   // ===========================================================================
   //  ✅ SWR DATA FETCHING
@@ -181,7 +183,9 @@ export default function DeliveryDetailPage() {
                 <span className="hidden sm:inline">Print Label</span>
                 <span className="sm:hidden">Print</span>
               </button>
-              <button className="flex-1 xl:flex-none justify-center px-4 py-2 bg-yellow-500 text-black rounded-lg text-sm font-bold hover:bg-yellow-400 transition-colors shadow-lg shadow-yellow-500/10">
+              <button
+                onClick={() => setShowUpdateStatusModal(true)}
+                className="flex-1 xl:flex-none justify-center px-4 py-2 bg-yellow-500 text-black rounded-lg text-sm font-bold hover:bg-yellow-400 transition-colors shadow-lg shadow-yellow-500/10">
                 Update Status
               </button>
             </div>
@@ -421,7 +425,7 @@ export default function DeliveryDetailPage() {
                           Vehicle
                         </span>
                         <span className="text-white font-bold block truncate">
-                          {delivery.courier.vehicle}
+                          {delivery.courier.vehicle || 'Not registered'}
                         </span>
                       </div>
                       <a
@@ -483,6 +487,16 @@ export default function DeliveryDetailPage() {
         <AssignRiderModal
           deliveryId={id}
           onClose={() => setShowAssignModal(false)}
+          onSuccess={() => mutate()}
+        />
+      )}
+
+      {/* Update Status Modal */}
+      {showUpdateStatusModal && (
+        <UpdateStatusModal
+          deliveryId={id}
+          currentStatus={delivery.status}
+          onClose={() => setShowUpdateStatusModal(false)}
           onSuccess={() => mutate()}
         />
       )}

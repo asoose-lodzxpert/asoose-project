@@ -66,6 +66,11 @@ export class NotificationsService {
     // Send real-time WebSocket notification
     this.notificationsGateway.sendToUser(data.userId, notification);
 
+    // Broadcast high-priority events to admin room
+    if (['ORDER', 'RIDE', 'DELIVERY'].includes(data.type?.toUpperCase())) {
+      this.notificationsGateway.sendToAdminRoom(notification);
+    }
+
     // Send push notification if user has token
     try {
       const user = await this.prisma.user.findUnique({
@@ -116,6 +121,11 @@ export class NotificationsService {
 
     // Send real-time WebSocket notification
     this.notificationsGateway.sendToVendor(data.vendorId, notification);
+
+    // Broadcast high-priority events to admin room
+    if (['ORDER', 'RIDE', 'DELIVERY'].includes(data.type?.toUpperCase())) {
+      this.notificationsGateway.sendToAdminRoom(notification);
+    }
 
     // Send push notification if vendor has token
     try {
@@ -174,6 +184,11 @@ export class NotificationsService {
 
     // Send real-time WebSocket notification
     this.notificationsGateway.sendToRider(data.riderId, notification);
+
+    // Broadcast high-priority events to admin room
+    if (['ORDER', 'RIDE', 'DELIVERY'].includes(data.type?.toUpperCase())) {
+      this.notificationsGateway.sendToAdminRoom(notification);
+    }
 
     // Send push notification if rider has token
     try {

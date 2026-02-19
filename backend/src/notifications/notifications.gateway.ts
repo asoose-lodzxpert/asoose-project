@@ -189,6 +189,21 @@ export class NotificationsGateway
     }
   }
 
+  /**
+   * Allow admin clients to join the system-wide admin notifications room
+   */
+  @SubscribeMessage('joinAdminRoom')
+  handleJoinAdminRoom(@ConnectedSocket() client: Socket) {
+    client.join('admin_notifications');
+    this.logger.log(`Admin ${client.data.userId} joined admin_notifications room`);
+    return { event: 'joinedAdminRoom', room: 'admin_notifications' };
+  }
+
+  /** Broadcast to all connected super-admin dashboard clients */
+  sendToAdminRoom(payload: any) {
+    this.server.to('admin_notifications').emit('admin_notification', payload);
+  }
+
   sendToUser(userId: string, payload: any) {
     this.server.to(`user_${userId}`).emit('notification', payload);
   }

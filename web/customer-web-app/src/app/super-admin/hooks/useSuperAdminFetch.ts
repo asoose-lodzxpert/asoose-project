@@ -113,13 +113,17 @@ export const fetcher = async <T = any>(
         const error: FetcherError = new Error(getErrorMessage(res.status));
         error.status = res.status;
 
-        // Include detailed error info only in development
-        if (process.env.NODE_ENV === "development") {
-          try {
-            error.info = await res.json();
-          } catch {
-            // Ignore JSON parse errors
+        // Always read the error body so callers can surface the backend message
+        try {
+          error.info = await res.json();
+          // Use the backend message as the error message when available
+          if (error.info?.message) {
+            error.message = Array.isArray(error.info.message)
+              ? error.info.message.join(', ')
+              : error.info.message;
           }
+        } catch {
+          // Ignore JSON parse errors
         }
 
         throw error;

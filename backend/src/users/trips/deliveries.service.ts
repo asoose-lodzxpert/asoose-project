@@ -287,6 +287,19 @@ export class DeliveriesService {
         distance: delivery.distanceKm,
         message: 'Delivery request created',
       };
+    }).then((result) => {
+      // Broadcast to admin room after transaction commits
+      this.notificationsGateway.sendToAdminRoom({
+        id: result.deliveryId,
+        type: 'DELIVERY',
+        category: 'DELIVERY_CREATED',
+        title: 'New Delivery Request',
+        message: `Delivery from ${result.delivery.recipientName || 'Customer'} — ₦${result.delivery.deliveryFee} (${result.delivery.distanceKm} km)`,
+        isRead: false,
+        createdAt: new Date().toISOString(),
+        metadata: { deliveryId: result.deliveryId },
+      });
+      return result;
     });
   }
 
