@@ -1,6 +1,7 @@
 import * as Location from "expo-location";
 import React, {
   forwardRef,
+  useCallback,
   useEffect,
   useImperativeHandle,
   useRef,
@@ -198,10 +199,41 @@ const DARK_MAP_STYLE = [
   },
 ];
 
+/** Extract LatLng from various address formats */
+function resolveCoords(addr: unknown): LatLng | null {
+  if (!addr || typeof addr !== "object") return null;
+  const a = addr as Record<string, unknown>;
+  const lat =
+    typeof a.latitude === "number"
+      ? a.latitude
+      : typeof a.lat === "number"
+        ? a.lat
+        : null;
+  const lng =
+    typeof a.longitude === "number"
+      ? a.longitude
+      : typeof a.lng === "number"
+        ? a.lng
+        : null;
+  if (lat === null || lng === null) return null;
+  return { latitude: lat, longitude: lng };
+}
+
 export type MapCanvasHandle = {
   animateToPickup: () => void;
   animateToDropoff: () => void;
+  animateToCurrentLocation: () => void;
 };
+
+/**
+ * Fixed zoom levels:
+ *   - FIXED_*       → normal following / centered view (~600–900 m span)
+ *   - ROUTE_VIEW_*  → slightly wider when showing route segment
+ */
+const FIXED_LATITUDE_DELTA = 0.008;
+const FIXED_LONGITUDE_DELTA = 0.008;
+const ROUTE_VIEW_LATITUDE_DELTA = 0.013;
+const ROUTE_VIEW_LONGITUDE_DELTA = 0.013;
 
 const MapCanvas = forwardRef<MapCanvasHandle>((_, ref) => {
   const mapRef = useRef<MapView>(null);
@@ -214,24 +246,36 @@ const MapCanvas = forwardRef<MapCanvasHandle>((_, ref) => {
   const [location, setLocation] = useState<Location.LocationObject | null>(
     null,
   );
-  const [routeCoords, setRouteCoords] = useState<LatLng[]>([]);
+  const [riderRouteCoords, setRiderRouteCoords] = useState<LatLng[]>([]);
+  const [plannedRouteCoords, setPlannedRouteCoords] = useState<LatLng[]>([]);
   const [distanceLeft, setDistanceLeft] = useState("");
   const [eta, setEta] = useState("");
   const [mapError, setMapError] = useState<string | null>(null);
   const [isMapReady, setIsMapReady] = useState(false);
 
-  // Select map style based on theme
+  const lastRouteFetchRef = useRef<number>(0);
+  const ROUTE_REFETCH_INTERVAL_MS = 20_000;
+
   const mapStyle = colorScheme === "dark" ? DARK_MAP_STYLE : LIGHT_MAP_STYLE;
 
-  // vehicleRef is not used for animated marker, so can be removed for now
+  const pickupCoords = activeJob
+    ? resolveCoords(activeJob.pickupAddress)
+    : null;
+  const dropoffCoords = activeJob
+    ? resolveCoords(activeJob.dropoffAddress)
+    : null;
 
-  /** Location tracking */
+  // ───────────────────────────────────────────────
+  //  Location tracking
+  // ───────────────────────────────────────────────
   useEffect(() => {
+    let sub: Location.LocationSubscription | null = null;
+
     (async () => {
       try {
-        const { status: permission } =
+        const { status: perm } =
           await Location.requestForegroundPermissionsAsync();
-        if (permission !== "granted") {
+        if (perm !== "granted") {
           setMapError("Location permission denied");
           return;
         }
@@ -240,111 +284,198 @@ const MapCanvas = forwardRef<MapCanvasHandle>((_, ref) => {
         setLocation(current);
         setMapError(null);
 
-        // Start watching position
-        const subscription = await Location.watchPositionAsync(
+        sub = await Location.watchPositionAsync(
           {
             accuracy: Location.Accuracy.High,
-            timeInterval: 3000,
-            distanceInterval: 5,
+            timeInterval: 5000,
+            distanceInterval: 10,
           },
-          (loc) => {
-            setLocation(loc);
-            mapRef.current?.animateToRegion(
-              {
-                latitude: loc.coords.latitude,
-                longitude: loc.coords.longitude,
-                latitudeDelta: 0.01,
-                longitudeDelta: 0.01,
-              },
-              800,
-            );
-          },
+          (loc) => setLocation(loc),
         );
-
-        // Return cleanup function
-        return () => {
-          subscription.remove();
-        };
-      } catch (error) {
-        setMapError(`Location error: ${error}`);
+      } catch (e) {
+        setMapError(`Location error: ${String(e)}`);
       }
     })();
+
+    return () => {
+      sub?.remove();
+    };
   }, []);
 
-  /** Route + ETA */
+  // ───────────────────────────────────────────────
+  //  Planned route: pickup → dropoff (once per job)
+  // ───────────────────────────────────────────────
   useEffect(() => {
-    async function fetchRoute() {
-      if (!location || !activeJob) return;
-
-      let destination: LatLng | null = null;
-      if (status === "en-route-pickup") {
-        destination = activeJob.pickupAddress?.coords || {
-          latitude: 6.5244,
-          longitude: 3.3792,
-        };
-      } else if (status === "en-route-dropoff") {
-        destination = activeJob.dropoffAddress?.coords || {
-          latitude: 6.4654,
-          longitude: 3.4064,
-        };
-      } else {
-        setRouteCoords([]);
-        setDistanceLeft("");
-        setEta("");
-        return;
-      }
-
-      if (!destination) return;
-      try {
-        const { coordinates, distance, duration, error } = await getDirections({
-          originLat: location.coords.latitude,
-          originLng: location.coords.longitude,
-          destLat: destination.latitude,
-          destLng: destination.longitude,
-        });
-
-        if (error) {
-          // ...existing code...
-          return;
-        }
-
-        setRouteCoords(coordinates);
-        setDistanceLeft(distance.text);
-        setEta(duration.text);
-      } catch (error) {
-        // ...existing code...
-      }
+    if (!pickupCoords || !dropoffCoords) {
+      setPlannedRouteCoords([]);
+      return;
     }
 
-    fetchRoute();
-  }, [location, status, activeJob]);
+    (async () => {
+      try {
+        const { coordinates, error } = await getDirections({
+          originLat: pickupCoords.latitude,
+          originLng: pickupCoords.longitude,
+          destLat: dropoffCoords.latitude,
+          destLng: dropoffCoords.longitude,
+        });
+        if (!error && coordinates?.length) {
+          setPlannedRouteCoords(coordinates);
+        }
+      } catch {}
+    })();
+  }, [activeJob?.id]);
 
-  /** Expose controls */
-  useImperativeHandle(ref, () => ({
-    animateToPickup() {
-      mapRef.current?.animateToRegion(
+  // ───────────────────────────────────────────────
+  //  Live route: rider → current destination
+  // ───────────────────────────────────────────────
+  const fetchRiderRoute = useCallback(async () => {
+    if (!location || !activeJob) {
+      setRiderRouteCoords([]);
+      return;
+    }
+
+    const now = Date.now();
+    if (now - lastRouteFetchRef.current < ROUTE_REFETCH_INTERVAL_MS) return;
+    lastRouteFetchRef.current = now;
+
+    let dest: LatLng | null = null;
+    if (status === "en-route-pickup") dest = pickupCoords;
+    else if (status === "en-route-dropoff") dest = dropoffCoords;
+
+    if (!dest) {
+      setRiderRouteCoords([]);
+      setDistanceLeft("");
+      setEta("");
+      return;
+    }
+
+    try {
+      const { coordinates, distance, duration, error } = await getDirections({
+        originLat: location.coords.latitude,
+        originLng: location.coords.longitude,
+        destLat: dest.latitude,
+        destLng: dest.longitude,
+      });
+
+      if (error || !coordinates?.length) return;
+
+      setRiderRouteCoords(coordinates);
+      setDistanceLeft(distance.text);
+      setEta(duration.text);
+    } catch {}
+  }, [location, status, activeJob, pickupCoords, dropoffCoords]);
+
+  useEffect(() => {
+    if (status === "en-route-pickup" || status === "en-route-dropoff") {
+      lastRouteFetchRef.current = 0; // force immediate fetch
+      fetchRiderRoute();
+    } else {
+      setRiderRouteCoords([]);
+      setDistanceLeft("");
+      setEta("");
+    }
+  }, [status, activeJob?.id, fetchRiderRoute]);
+
+  useEffect(() => {
+    if (status === "en-route-pickup" || status === "en-route-dropoff") {
+      fetchRiderRoute();
+    }
+  }, [location, fetchRiderRoute]);
+
+  // ───────────────────────────────────────────────
+  //  Fixed-zoom camera movement
+  // ───────────────────────────────────────────────
+  useEffect(() => {
+    if (!isMapReady || !location || !mapRef.current) return;
+
+    const isEnRoute =
+      status === "en-route-pickup" || status === "en-route-dropoff";
+
+    if (isEnRoute && riderRouteCoords.length > 0) {
+      // Show route context → center between rider & destination
+      const dest = status === "en-route-pickup" ? pickupCoords : dropoffCoords;
+      if (!dest) return;
+
+      const midLat = (location.coords.latitude + dest.latitude) / 2;
+      const midLng = (location.coords.longitude + dest.longitude) / 2;
+
+      mapRef.current.animateToRegion(
         {
-          latitude: 6.5244,
-          longitude: 3.3792,
-          latitudeDelta: 0.01,
-          longitudeDelta: 0.01,
+          latitude: midLat,
+          longitude: midLng,
+          latitudeDelta: ROUTE_VIEW_LATITUDE_DELTA,
+          longitudeDelta: ROUTE_VIEW_LONGITUDE_DELTA,
+        },
+        1200,
+      );
+    } else if (isEnRoute) {
+      // Following rider (no route yet) – tight zoom
+      mapRef.current.animateToRegion(
+        {
+          latitude: location.coords.latitude,
+          longitude: location.coords.longitude,
+          latitudeDelta: FIXED_LATITUDE_DELTA,
+          longitudeDelta: FIXED_LONGITUDE_DELTA,
         },
         800,
       );
-    },
-    animateToDropoff() {
-      mapRef.current?.animateToRegion(
+    }
+    // Note: when NOT en-route, we don't auto-move → lets user explore freely
+  }, [
+    location,
+    riderRouteCoords,
+    status,
+    isMapReady,
+    pickupCoords,
+    dropoffCoords,
+  ]);
+
+  // ───────────────────────────────────────────────
+  //  Exposed imperative methods
+  // ───────────────────────────────────────────────
+  useImperativeHandle(ref, () => ({
+    animateToPickup() {
+      if (!pickupCoords || !mapRef.current) return;
+      mapRef.current.animateToRegion(
         {
-          latitude: 6.4654,
-          longitude: 3.4064,
-          latitudeDelta: 0.01,
-          longitudeDelta: 0.01,
+          ...pickupCoords,
+          latitudeDelta: FIXED_LATITUDE_DELTA,
+          longitudeDelta: FIXED_LONGITUDE_DELTA,
+        },
+        1000,
+      );
+    },
+
+    animateToDropoff() {
+      if (!dropoffCoords || !mapRef.current) return;
+      mapRef.current.animateToRegion(
+        {
+          ...dropoffCoords,
+          latitudeDelta: FIXED_LATITUDE_DELTA,
+          longitudeDelta: FIXED_LONGITUDE_DELTA,
+        },
+        1000,
+      );
+    },
+
+    animateToCurrentLocation() {
+      if (!location || !mapRef.current) return;
+      mapRef.current.animateToRegion(
+        {
+          latitude: location.coords.latitude,
+          longitude: location.coords.longitude,
+          latitudeDelta: FIXED_LATITUDE_DELTA,
+          longitudeDelta: FIXED_LONGITUDE_DELTA,
         },
         800,
       );
     },
   }));
 
+  // ───────────────────────────────────────────────
+  //  Render
+  // ───────────────────────────────────────────────
   if (mapError) {
     return (
       <View
@@ -403,8 +534,8 @@ const MapCanvas = forwardRef<MapCanvasHandle>((_, ref) => {
         initialRegion={{
           latitude: location.coords.latitude,
           longitude: location.coords.longitude,
-          latitudeDelta: 0.02,
-          longitudeDelta: 0.02,
+          latitudeDelta: FIXED_LATITUDE_DELTA,
+          longitudeDelta: FIXED_LONGITUDE_DELTA,
         }}
         showsUserLocation={true}
         showsMyLocationButton={false}
@@ -414,7 +545,7 @@ const MapCanvas = forwardRef<MapCanvasHandle>((_, ref) => {
           setMapError(null);
         }}
       >
-        {/* Accuracy */}
+        {/* Accuracy circle */}
         <Circle
           center={{
             latitude: location.coords.latitude,
@@ -425,25 +556,33 @@ const MapCanvas = forwardRef<MapCanvasHandle>((_, ref) => {
           fillColor={`${primary}1A`}
         />
 
-        {/* Route */}
-        {routeCoords.length > 0 && (
+        {/* Live rider → destination route */}
+        {riderRouteCoords.length > 0 && (
           <Polyline
-            coordinates={routeCoords}
-            strokeColor={colorScheme === "dark" ? "#fff" : "#000"}
-            strokeWidth={4}
+            coordinates={riderRouteCoords}
+            strokeColor={primary}
+            strokeWidth={5}
+            lineDashPattern={[0]}
           />
         )}
 
-        {/* Pickup marker (Vendor or Ride origin) */}
-        {(status === "en-route-pickup" || status === "en-route-dropoff") &&
+        {/* Planned pickup → dropoff route (context) */}
+        {plannedRouteCoords.length > 0 &&
+          (status === "at-pickup" || status === "en-route-dropoff") && (
+            <Polyline
+              coordinates={plannedRouteCoords}
+              strokeColor={colorScheme === "dark" ? "#aaa" : "#999"}
+              strokeWidth={3}
+              lineDashPattern={[6, 6]}
+            />
+          )}
+
+        {/* Pickup marker */}
+        {pickupCoords &&
+          (status === "en-route-pickup" || status === "at-pickup") &&
           activeJob && (
             <Marker
-              coordinate={
-                activeJob.pickupAddress?.coords || {
-                  latitude: 6.5244,
-                  longitude: 3.3792,
-                }
-              }
+              coordinate={pickupCoords}
               title={
                 activeJob.jobType === "ride"
                   ? "Pickup Location"
@@ -458,30 +597,28 @@ const MapCanvas = forwardRef<MapCanvasHandle>((_, ref) => {
             </Marker>
           )}
 
-        {/* Dropoff marker (Customer or Ride destination) */}
-        {status === "en-route-dropoff" && activeJob && (
-          <Marker
-            coordinate={
-              activeJob.dropoffAddress?.coords || {
-                latitude: 6.4654,
-                longitude: 3.4064,
+        {/* Dropoff marker */}
+        {dropoffCoords &&
+          (status === "at-pickup" || status === "en-route-dropoff") &&
+          activeJob && (
+            <Marker
+              coordinate={dropoffCoords}
+              title={
+                activeJob.jobType === "ride"
+                  ? "Drop-off Location"
+                  : "Customer Location"
               }
-            }
-            title={
-              activeJob.jobType === "ride"
-                ? "Drop-off Location"
-                : "Customer Location"
-            }
-          >
-            <IconSymbol
-              name={activeJob.jobType === "ride" ? "car" : "home"}
-              size={28}
-              color={danger}
-            />
-          </Marker>
-        )}
+            >
+              <IconSymbol
+                name={activeJob.jobType === "ride" ? "car" : "house"}
+                size={28}
+                color={danger}
+              />
+            </Marker>
+          )}
       </MapView>
 
+      {/* ETA / distance overlay */}
       {distanceLeft && eta && activeJob && (
         <View
           style={[
@@ -521,8 +658,6 @@ const MapCanvas = forwardRef<MapCanvasHandle>((_, ref) => {
 MapCanvas.displayName = "MapCanvas";
 
 export default MapCanvas;
-
-/* ───────── styles ───────── */
 
 const styles = StyleSheet.create({
   overlay: {

@@ -166,6 +166,33 @@ export class RedisService {
   // RIDER STATE OPERATIONS
   // ========================================
 
+  async getInactiveRiders(
+    inactivityThreshold: number = REDIS_TTL.RIDER_INACTIVITY,
+  ): Promise<string[]> {
+    const keys = await this.redis.keys('rider:*:status');
+    const inactive: string[] = [];
+    const now = Date.now();
+    const thresholdMs = inactivityThreshold * 1000;
+
+    for (const key of keys) {
+      const riderId = key.split(':')[1];
+      const [status, lastSeen] = await Promise.all([
+        this.redis.get(REDIS_KEYS.RIDER_STATUS(riderId)),
+        this.redis.get(REDIS_KEYS.RIDER_LAST_SEEN(riderId)),
+      ]);
+
+      if (
+        status === RiderStatus.ONLINE &&
+        lastSeen &&
+        now - parseInt(lastSeen, 10) > thresholdMs
+      ) {
+        inactive.push(riderId);
+      }
+    }
+
+    return inactive;
+  }
+
   async getRiderState(riderId: string): Promise<RiderState | null> {
     const pipeline = this.redis.pipeline();
 

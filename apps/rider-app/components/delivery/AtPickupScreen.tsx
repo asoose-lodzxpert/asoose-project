@@ -1,153 +1,128 @@
-import { ThemedText } from "@/components/themed-text";
+﻿import { ThemedText } from "@/components/themed-text";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useJobs } from "@/context/JobContext";
 import { useThemeColor } from "@/hooks/use-theme-color";
-import React from "react";
+import { resolveAddress } from "@/utils/address";
+import CancelJobModal from "@/components/delivery/CancelJobModal";
+import React, { useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 
 export default function AtPickupScreen() {
-  const { activeJob, confirmPickup } = useJobs();
+  const { activeJob, confirmPickup, cancelJob } = useJobs();
   const primary = useThemeColor({}, "brandPrimary");
   const surface = useThemeColor({}, "surfaceBackground");
-  const cardBg = useThemeColor({}, "surfaceSubtle");
+  const subtle = useThemeColor({}, "surfaceSubtle");
+  const textPrimary = useThemeColor({}, "textPrimary");
+  const textMuted = useThemeColor({}, "textMuted");
+  const danger = useThemeColor({}, "statusError");
+
+  const [cancelVisible, setCancelVisible] = useState(false);
 
   if (!activeJob) return null;
   const isRide = activeJob.jobType === "ride";
+  const pickup = resolveAddress(activeJob.pickupAddress);
 
   return (
-    <View style={styles.container}>
-      <View style={[styles.bottomContainer, { backgroundColor: surface }]}>
-        <View style={styles.arrivedSection}>
-          <IconSymbol name="checkmark.circle.fill" size={48} color="#10B981" />
-          <ThemedText type="title" style={styles.arrivedTitle}>
-            {isRide ? "You’ve arrived at pickup" : "You’ve arrived at pickup"}
-          </ThemedText>
-          <ThemedText style={styles.arrivedSubtitle}>
-            {isRide
-              ? "Pick up your passenger"
-              : "Collect the order from the vendor"}
+    <>
+      <View style={[styles.sheet, { backgroundColor: surface }]}>
+        {/* Status */}
+        <View style={styles.statusRow}>
+          <IconSymbol name="checkmark.circle.fill" size={20} color="#10B981" />
+          <ThemedText style={styles.statusText}>
+            {isRide ? "Arrived at pickup" : "Arrived at pickup"}
           </ThemedText>
         </View>
 
-        <View style={[styles.vendorCard, { backgroundColor: cardBg }]}>
-          <View style={styles.vendorInfo}>
-            <IconSymbol
-              name={isRide ? "car" : "pizza"}
-              size={36}
-              color={primary}
-            />
-            <View style={{ flex: 1 }}>
-              <ThemedText type="defaultSemiBold">
-                {isRide
-                  ? activeJob.customerName
-                  : activeJob.pickupAddress?.name ||
-                    activeJob.pickupAddress?.label ||
-                    activeJob.customerName}
+        {/* Instruction */}
+        <ThemedText style={[styles.instruction, { color: textMuted }]}>
+          {isRide
+            ? "Pick up your passenger"
+            : "Collect the order from the vendor"}
+        </ThemedText>
+
+        {/* Address card */}
+        <View style={[styles.addressCard, { backgroundColor: subtle }]}>
+          <IconSymbol name="location.fill" size={15} color={primary} />
+          <View style={{ flex: 1 }}>
+            <ThemedText style={[styles.customerName, { color: textPrimary }]}>
+              {activeJob.customerName}
+            </ThemedText>
+            {pickup ? (
+              <ThemedText
+                style={[styles.addressText, { color: textMuted }]}
+                numberOfLines={2}
+              >
+                {pickup}
               </ThemedText>
-              <ThemedText style={styles.vendorAddress}>
-                {isRide
-                  ? activeJob.pickupAddress?.address ||
-                    activeJob.pickupAddress ||
-                    ""
-                  : activeJob.pickupAddress?.address ||
-                    activeJob.pickupAddress ||
-                    ""}
-              </ThemedText>
-            </View>
+            ) : null}
           </View>
-          <Pressable style={styles.callBtn}>
-            <IconSymbol name="phone" size={22} color={primary} />
+        </View>
+
+        {/* Actions */}
+        <View style={styles.actions}>
+          <Pressable
+            style={[styles.primaryBtn, { backgroundColor: primary }]}
+            onPress={confirmPickup}
+          >
+            <IconSymbol name="checkmark" size={16} color="#fff" />
+            <ThemedText style={styles.primaryBtnText}>
+              {isRide ? "Confirm pickup" : "Confirm pickup"}
+            </ThemedText>
+          </Pressable>
+          <Pressable
+            style={styles.cancelLink}
+            onPress={() => setCancelVisible(true)}
+          >
+            <ThemedText style={[styles.cancelText, { color: danger }]}>
+              Cancel job
+            </ThemedText>
           </Pressable>
         </View>
-
-        <Pressable
-          style={[styles.confirmBtn, { backgroundColor: primary }]}
-          onPress={confirmPickup}
-        >
-          <IconSymbol name="checkmark" size={20} color="#fff" />
-          <ThemedText style={styles.confirmText}>
-            {isRide ? "CONFIRM PICKUP" : "CONFIRM PICKUP"}
-          </ThemedText>
-        </Pressable>
       </View>
-    </View>
+
+      <CancelJobModal
+        visible={cancelVisible}
+        onClose={() => setCancelVisible(false)}
+        onConfirm={async (reason) => {
+          await cancelJob(activeJob.id, activeJob.jobType, reason);
+          setCancelVisible(false);
+        }}
+      />
+    </>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
+  sheet: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 18,
+    paddingTop: 18,
+    paddingBottom: 36,
+    gap: 12,
   },
-
-  bottomContainer: {
-    marginTop: "auto",
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
-    paddingTop: 24,
-    paddingHorizontal: 20,
-    paddingBottom: 40,
-    gap: 24,
-  },
-
-  arrivedSection: {
-    alignItems: "center",
-    gap: 6,
-  },
-
-  arrivedTitle: {
-    marginTop: 8,
-  },
-
-  arrivedSubtitle: {
-    color: "#666",
-    textAlign: "center",
-  },
-
-  vendorCard: {
+  statusRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  statusText: { fontSize: 15, fontWeight: "700" },
+  instruction: { fontSize: 13 },
+  addressCard: {
     flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: 18,
-    borderRadius: 20,
-    shadowColor: "#000",
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-
-  vendorInfo: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
-    flex: 1,
-  },
-
-  vendorAddress: {
-    color: "#666",
-    fontSize: 14,
-  },
-
-  callBtn: {
-    width: 52,
-    height: 52,
-    backgroundColor: "#F0FDF4",
-    borderRadius: 26,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-
-  confirmBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: "flex-start",
     gap: 10,
-    paddingVertical: 18,
-    borderRadius: 18,
+    padding: 14,
+    borderRadius: 14,
   },
-
-  confirmText: {
-    color: "#fff",
-    fontWeight: "700",
-    fontSize: 16,
+  customerName: { fontSize: 14, fontWeight: "600", marginBottom: 2 },
+  addressText: { fontSize: 13 },
+  actions: { gap: 8 },
+  primaryBtn: {
+    height: 50,
+    borderRadius: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
   },
+  primaryBtnText: { fontSize: 14, fontWeight: "600", color: "#fff" },
+  cancelLink: { alignItems: "center", paddingVertical: 8 },
+  cancelText: { fontSize: 13, fontWeight: "500" },
 });

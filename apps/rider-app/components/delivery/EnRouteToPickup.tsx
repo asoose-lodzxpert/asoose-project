@@ -1,11 +1,12 @@
-import { ThemedText } from "@/components/themed-text";
+﻿import { ThemedText } from "@/components/themed-text";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useJobs } from "@/context/JobContext";
 import { useThemeColor } from "@/hooks/use-theme-color";
+import { resolveAddress } from "@/utils/address";
+import CancelJobModal from "@/components/delivery/CancelJobModal";
 import * as Location from "expo-location";
 import React, { useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-
 import { getDirections, getDistanceMeters } from "@/services/maps";
 
 export default function EnRouteToPickup({
@@ -13,19 +14,22 @@ export default function EnRouteToPickup({
 }: {
   onAnimateToPickup?: () => void;
 }) {
-  const { activeJob, arriveAtPickup } = useJobs();
+  const { activeJob, arriveAtPickup, cancelJob } = useJobs();
 
   const primary = useThemeColor({}, "brandPrimary");
   const surface = useThemeColor({}, "surfaceBackground");
-  const cardBg = useThemeColor({}, "surfaceSubtle");
+  const subtle = useThemeColor({}, "surfaceSubtle");
+  const textPrimary = useThemeColor({}, "textPrimary");
+  const textMuted = useThemeColor({}, "textMuted");
+  const danger = useThemeColor({}, "statusError");
 
-  // const [riderLocation, setRiderLocation] = useState<Location.LocationObject | null>(null);
   const [distanceToPickup, setDistanceToPickup] = useState<number | null>(null);
   const [eta, setEta] = useState<string>("");
   const [currentStep, setCurrentStep] = useState<{
     text: string;
     maneuver?: string;
   } | null>(null);
+  const [cancelVisible, setCancelVisible] = useState(false);
 
   useEffect(() => {
     let subscription: Location.LocationSubscription | null = null;
@@ -34,254 +38,184 @@ export default function EnRouteToPickup({
     const startTracking = async () => {
       try {
         const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== "granted") {
-          // ...existing code...
-          return;
-        }
-
+        if (status !== "granted") return;
         if (!isMounted) return;
-
-        await Location.getCurrentPositionAsync({});
 
         subscription = await Location.watchPositionAsync(
           {
             accuracy: Location.Accuracy.High,
-            distanceInterval: 1,
-            timeInterval: 1000, // Improved: 1 second for real-time updates
+            distanceInterval: 10,
+            timeInterval: 3000,
           },
           async (newLoc) => {
             if (!isMounted || !activeJob) return;
-
-            // Validate GPS accuracy
-            if (newLoc.coords.accuracy && newLoc.coords.accuracy > 50) {
-              // ...existing code...
-              // Still update but with warning
-            }
-
             const pickupLat =
               activeJob.pickupAddress?.latitude ?? activeJob.pickupAddress?.lat;
             const pickupLng =
               activeJob.pickupAddress?.longitude ??
               activeJob.pickupAddress?.lng;
+            if (typeof pickupLat !== "number" || typeof pickupLng !== "number")
+              return;
 
-            if (
-              typeof pickupLat === "number" &&
-              typeof pickupLng === "number"
-            ) {
-              try {
-                const distData = await getDistanceMeters({
-                  originLat: newLoc.coords.latitude,
-                  originLng: newLoc.coords.longitude,
-                  destLat: pickupLat,
-                  destLng: pickupLng,
-                });
-                if (typeof distData.distance === "number" && isMounted) {
-                  setDistanceToPickup(distData.distance);
-                }
-              } catch (error) {
-                // ...existing code...
-                if (isMounted) setDistanceToPickup(null);
-              }
+            try {
+              const d = await getDistanceMeters({
+                originLat: newLoc.coords.latitude,
+                originLng: newLoc.coords.longitude,
+                destLat: pickupLat,
+                destLng: pickupLng,
+              });
+              if (typeof d.distance === "number" && isMounted)
+                setDistanceToPickup(d.distance);
+            } catch {}
 
-              try {
-                const data = await getDirections({
-                  originLat: newLoc.coords.latitude,
-                  originLng: newLoc.coords.longitude,
-                  destLat: pickupLat,
-                  destLng: pickupLng,
-                });
-                if (
-                  !data.error &&
-                  data.duration &&
-                  data.coordinates &&
-                  isMounted
-                ) {
-                  setEta(data.duration.text);
-                  let closestStep = null;
-                  let minDistance = Infinity;
-                  for (const coord of data.coordinates) {
-                    const stepDistData = await getDistanceMeters({
-                      originLat: newLoc.coords.latitude,
-                      originLng: newLoc.coords.longitude,
-                      destLat: coord.latitude,
-                      destLng: coord.longitude,
-                    });
-                    const dist =
-                      typeof stepDistData.distance === "number"
-                        ? stepDistData.distance
-                        : Infinity;
-                    if (dist < minDistance) {
-                      minDistance = dist;
-                      closestStep = coord;
-                    }
-                  }
-                  if (closestStep && isMounted) {
-                    setCurrentStep({
-                      text: `Continue to pickup`,
-                      maneuver: undefined,
-                    });
-                  }
-                }
-              } catch (err) {
-                // ...existing code...
-              }
-            }
+            try {
+              const data = await getDirections({
+                originLat: newLoc.coords.latitude,
+                originLng: newLoc.coords.longitude,
+                destLat: pickupLat,
+                destLng: pickupLng,
+              });
+              if (!data.error && data.duration && isMounted)
+                setEta(data.duration.text);
+            } catch {}
           },
         );
-      } catch (error) {
-        // ...existing code...
-      }
+      } catch {}
     };
 
     startTracking();
-
     return () => {
       isMounted = false;
-      if (subscription) {
-        subscription.remove();
-        subscription = null;
-      }
+      subscription?.remove();
     };
   }, [activeJob]);
 
   if (!activeJob) return null;
-  const isRide = activeJob.jobType === "ride";
 
-  const canArrive = distanceToPickup !== null && distanceToPickup <= 15.24;
-
-  const getManeuverIcon = (maneuver?: string) => {
-    switch (maneuver) {
-      case "turn-left":
-        return "arrow.left";
-      case "turn-right":
-        return "arrow.right";
-      case "uturn-left":
-      case "uturn-right":
-        return "arrow.clockwise";
-      default:
-        return "arrow.up";
-    }
-  };
+  const pickup = resolveAddress(activeJob.pickupAddress);
+  // const canArrive = distanceToPickup !== null && distanceToPickup <= 50;
+  const canArrive = true;
 
   return (
-    <View style={styles.container}>
-      <View style={[styles.bottomContainer, { backgroundColor: surface }]}>
-        <View style={[styles.vendorCard, { backgroundColor: cardBg }]}>
-          <View style={styles.vendorInfo}>
-            <IconSymbol
-              name={isRide ? "car" : "storefront"}
-              size={36}
-              color={primary}
-            />
-            <View style={{ flex: 1 }}>
-              <ThemedText type="defaultSemiBold">
-                {isRide
-                  ? activeJob.customerName
-                  : activeJob.pickupAddress?.name || "Pickup"}
+    <>
+      <View style={[styles.sheet, { backgroundColor: surface }]}>
+        {/* Step label */}
+        <View style={styles.stepRow}>
+          <View style={[styles.stepDot, { backgroundColor: primary }]} />
+          <ThemedText style={[styles.stepLabel, { color: primary }]}>
+            En route to pickup
+          </ThemedText>
+        </View>
+
+        {/* Address */}
+        <View style={[styles.addressCard, { backgroundColor: subtle }]}>
+          <IconSymbol name="location.fill" size={16} color={primary} />
+          <ThemedText
+            style={[styles.addressText, { color: textPrimary }]}
+            numberOfLines={2}
+          >
+            {pickup || "Pickup location"}
+          </ThemedText>
+        </View>
+
+        {/* ETA row */}
+        {(distanceToPickup !== null || eta) && (
+          <View style={styles.etaRow}>
+            {distanceToPickup !== null && (
+              <ThemedText style={[styles.etaText, { color: textMuted }]}>
+                {(distanceToPickup / 1000).toFixed(2)} km away
               </ThemedText>
-              <ThemedText style={{ color: "#666", fontSize: 14 }}>
-                {isRide
-                  ? activeJob.pickupAddress?.address || activeJob.pickupAddress
-                  : activeJob.pickupAddress?.address || activeJob.pickupAddress}
+            )}
+            {eta && distanceToPickup !== null && (
+              <ThemedText
+                style={[styles.etaSep, { color: textMuted }]}
+              ></ThemedText>
+            )}
+            {eta && (
+              <ThemedText style={[styles.etaText, { color: textMuted }]}>
+                {eta}
+              </ThemedText>
+            )}
+          </View>
+        )}
+
+        {/* Actions */}
+        <View style={styles.actions}>
+          {canArrive ? (
+            <Pressable
+              style={[styles.primaryBtn, { backgroundColor: primary }]}
+              onPress={async () => {
+                await arriveAtPickup();
+                onAnimateToPickup?.();
+              }}
+            >
+              <ThemedText style={styles.primaryBtnText}>
+                Arrived at pickup
+              </ThemedText>
+            </Pressable>
+          ) : (
+            <View
+              style={[styles.primaryBtn, { backgroundColor: primary + "60" }]}
+            >
+              <ThemedText style={styles.primaryBtnText}>
+                Arrived at pickup
               </ThemedText>
             </View>
-          </View>
-          <Pressable style={styles.callBtn}>
-            <IconSymbol name="phone" size={22} color={primary} />
-          </Pressable>
-        </View>
-
-        <View style={styles.row}>
-          {distanceToPickup !== null && (
-            <Text style={[styles.infoText, { marginRight: 16 }]}>
-              {(distanceToPickup / 1000).toFixed(2)} km
-            </Text>
           )}
-          {eta && <Text style={styles.infoText}>{eta}</Text>}
-        </View>
-
-        {currentStep && (
-          <View style={styles.currentStepContainer}>
-            <IconSymbol
-              name={getManeuverIcon(currentStep.maneuver)}
-              size={24}
-              color={primary}
-            />
-            <Text style={[styles.currentStepText, { color: primary }]}>
-              {currentStep.text}
-            </Text>
-          </View>
-        )}
-
-        {canArrive && (
           <Pressable
-            style={[styles.arrivedBtn, !canArrive && { opacity: 0.5 }]}
-            disabled={!canArrive}
-            onPress={async () => {
-              if (!canArrive) return;
-              await arriveAtPickup();
-              onAnimateToPickup?.();
-            }}
+            style={styles.cancelLink}
+            onPress={() => setCancelVisible(true)}
           >
-            <ThemedText style={styles.arrivedText}>
-              {isRide ? "ARRIVED AT PICKUP" : "ARRIVED AT PICKUP"}
+            <ThemedText style={[styles.cancelText, { color: danger }]}>
+              Cancel job
             </ThemedText>
           </Pressable>
-        )}
+        </View>
       </View>
-    </View>
+
+      <CancelJobModal
+        visible={cancelVisible}
+        onClose={() => setCancelVisible(false)}
+        onConfirm={async (reason) => {
+          await cancelJob(activeJob.id, activeJob.jobType, reason);
+          setCancelVisible(false);
+        }}
+      />
+    </>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  bottomContainer: {
-    marginTop: "auto",
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
-    paddingTop: 20,
-    paddingHorizontal: 20,
-    paddingBottom: 40,
-    gap: 20,
+  sheet: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 18,
+    paddingTop: 18,
+    paddingBottom: 36,
+    gap: 12,
   },
-  vendorCard: {
+  stepRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  stepDot: { width: 8, height: 8, borderRadius: 4 },
+  stepLabel: { fontSize: 13, fontWeight: "600", letterSpacing: 0.3 },
+  addressCard: {
     flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: 18,
-    borderRadius: 20,
-    shadowColor: "#000",
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 4,
+    alignItems: "flex-start",
+    gap: 10,
+    padding: 14,
+    borderRadius: 14,
   },
-  vendorInfo: { flexDirection: "row", alignItems: "center", gap: 14, flex: 1 },
-  callBtn: {
-    width: 52,
-    height: 52,
-    backgroundColor: "#F0FDF4",
-    borderRadius: 26,
+  addressText: { fontSize: 14, flex: 1 },
+  etaRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  etaText: { fontSize: 13 },
+  etaSep: { fontSize: 13 },
+  actions: { gap: 8 },
+  primaryBtn: {
+    height: 50,
+    borderRadius: 14,
+    alignItems: "center",
     justifyContent: "center",
-    alignItems: "center",
   },
-  row: { flexDirection: "row", alignItems: "center" },
-  infoText: { fontSize: 14, color: "#444" },
-  currentStepContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 8,
-  },
-  currentStepText: {
-    fontSize: 16,
-    fontWeight: "700",
-    marginLeft: 8,
-    flexShrink: 1,
-  },
-  arrivedBtn: {
-    backgroundColor: "#F3F4F6",
-    paddingVertical: 18,
-    borderRadius: 18,
-    alignItems: "center",
-  },
-  arrivedText: { color: "#374151", fontWeight: "600", fontSize: 16 },
+  primaryBtnText: { fontSize: 14, fontWeight: "600", color: "#fff" },
+  cancelLink: { alignItems: "center", paddingVertical: 8 },
+  cancelText: { fontSize: 13, fontWeight: "500" },
 });

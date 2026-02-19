@@ -14,7 +14,7 @@ export class WithdrawalController {
   constructor(private readonly withdrawalService: WithdrawalService) {}
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.RIDER)
+  @Roles(UserRole.RIDER, UserRole.DRIVER)
   @Get('info')
   async getWithdrawalInfo(@Req() req) {
     const { id } = req.user || {};
@@ -22,7 +22,7 @@ export class WithdrawalController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.RIDER)
+  @Roles(UserRole.RIDER, UserRole.DRIVER)
   @Post('request')
   async requestWithdrawal(
     @Req() req,
