@@ -9,12 +9,14 @@ interface VehicleCardProps {
   vehicle: any;
   riderId: string;
   onUpdate: () => void;
+  basePath?: string; // 'riders' | 'drivers' — defaults to 'riders'
 }
 
 export const VehicleCard = ({
   vehicle,
   riderId,
   onUpdate,
+  basePath = "riders",
 }: VehicleCardProps) => {
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -32,7 +34,7 @@ export const VehicleCard = ({
     try {
       // ✅ FIX: Use fetcher with a relative path.
       // This handles port 3001, /api/v1 prefix, and Auth tokens automatically.
-      await fetcher(`/super-admin/riders/${riderId}/vehicle`, {
+      await fetcher(`/super-admin/${basePath}/${riderId}/vehicle`, {
         method: "PATCH",
         body: JSON.stringify(form),
       });

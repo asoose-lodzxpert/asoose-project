@@ -8,7 +8,7 @@ import { MailModule } from 'src/mail/mail.module';
 import { ActivityLogService } from 'src/common/services/activity-log.services';
 import { AuthModule } from 'src/auth/auth.module';
 import { TransactionsModule } from '../transactions/transaction.module';
-import { MatchingRedisModule } from 'src/matching/redis/redis.module';
+import { MatchingModule } from 'src/matching/matching.module';
 
 @Module({
   imports: [
@@ -17,7 +17,7 @@ import { MatchingRedisModule } from 'src/matching/redis/redis.module';
     CoreRidersModule,
     AuthModule,
     TransactionsModule,
-    MatchingRedisModule,
+    MatchingModule,
   ],
   controllers: [RidersController, DriversController],
   providers: [RidersService, ActivityLogService],

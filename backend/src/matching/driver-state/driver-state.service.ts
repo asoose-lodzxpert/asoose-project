@@ -276,6 +276,10 @@ export class DriverStateService {
   /* ============================================================
      QUERIES
   ============================================================ */
+  async getState(driverId: string) {
+    return this.redis.getDriverState(driverId);
+  }
+
   async isDriverAvailable(driverId: string): Promise<boolean> {
     const state = await this.redis.getDriverState(driverId);
     if (!state) return false;

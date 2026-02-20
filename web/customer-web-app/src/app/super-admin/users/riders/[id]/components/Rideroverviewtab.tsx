@@ -25,9 +25,11 @@ const RiderMap = dynamic(() => import("./map"), {
 export const RiderOverviewTab = ({
   rider,
   onRefresh,
+  basePath = "riders",
 }: {
   rider: any;
   onRefresh: () => void;
+  basePath?: string;
 }) => {
   const perf = rider.performance || {
     acceptanceRate: 0,
@@ -53,7 +55,7 @@ export const RiderOverviewTab = ({
 
         // ✅ Use fetcher with a relative path.
         // This avoids /api duplication and automatically handles the port 3001 base URL.
-        const data = await fetcher(`/super-admin/riders/${rider.id}`);
+        const data = await fetcher(`/super-admin/${basePath}/${rider.id}`);
 
         if (data && data.currentLat && data.currentLng) {
           setPosition([data.currentLat, data.currentLng]);
@@ -151,6 +153,7 @@ export const RiderOverviewTab = ({
             vehicle={rider.vehicle}
             riderId={rider.id}
             onUpdate={onRefresh}
+            basePath={basePath}
           />
         </div>
       </div>

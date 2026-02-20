@@ -24,6 +24,7 @@ interface RiderSidebarProps {
   rider: any;
   onToggleStatus: () => void;
   onUpdate: (data: any) => Promise<void>;
+  basePath?: string; // 'riders' | 'drivers' — defaults to 'riders'
 }
 
 const API_URL =
@@ -33,6 +34,7 @@ export const RiderSidebar: React.FC<RiderSidebarProps> = ({
   rider,
   onToggleStatus,
   onUpdate,
+  basePath = "riders",
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -119,7 +121,7 @@ export const RiderSidebar: React.FC<RiderSidebarProps> = ({
 
         // ✅ 2. Send Request with Headers
         const res = await fetch(
-          `${API_URL}/super-admin/riders/${rider.id}/wallet`,
+          `${API_URL}/super-admin/${basePath}/${rider.id}/wallet`,
           {
             method: "POST",
             headers: {

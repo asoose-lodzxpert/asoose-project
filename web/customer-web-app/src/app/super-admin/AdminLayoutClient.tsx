@@ -240,6 +240,12 @@ export default function AdminLayoutClient({
                     Riders
                   </Link>
                   <Link
+                    href="/super-admin/users/drivers"
+                    className={`block px-4 py-2 text-sm rounded-lg transition-colors ${isActive("/super-admin/users/drivers") ? "text-yellow-500 font-bold bg-yellow-500/10" : "text-gray-400 hover:text-white"}`}
+                  >
+                    Drivers
+                  </Link>
+                  <Link
                     href="/super-admin/users/customers"
                     className={`block px-4 py-2 text-sm rounded-lg transition-colors ${isActive("/super-admin/users/customers") ? "text-yellow-500 font-bold bg-yellow-500/10" : "text-gray-400 hover:text-white"}`}
                   >

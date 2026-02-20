@@ -18,6 +18,8 @@ import { RiderAccountNotificationsService } from 'src/riders/notifications/rider
 import { TokenRevocationService } from 'src/auth/token-revocation.service';
 import { NotificationsGateway } from 'src/notifications/notifications.gateway';
 import { TransactionLedgerService } from 'src/super-admin/transactions/transaction-ledger.service';
+import { DriverStateService } from 'src/matching/driver-state/driver-state.service';
+import { RiderStateService } from 'src/matching/rider-state/rider-state.service';
 
 @Injectable()
 export class RidersService {
@@ -31,6 +33,8 @@ export class RidersService {
     private tokenRevocationService: TokenRevocationService,
     private notificationsGateway: NotificationsGateway,
     private transactionLedger: TransactionLedgerService,
+    private driverStateService: DriverStateService,
+    private riderStateService: RiderStateService,
   ) {}
 
   async findAll(params: {
@@ -58,6 +62,7 @@ export class RidersService {
       });
     }
 
+    const wantOnlineRider = status === 'ONLINE';
     if (status === 'PENDING') {
       filters.push({
         OR: [
@@ -65,8 +70,8 @@ export class RidersService {
           { documents: { some: { status: VerificationStatus.PENDING } } },
         ],
       });
-    } else if (status === 'ONLINE') {
-      filters.push({ status: UserStatus.ACTIVE, isOnline: true });
+    } else if (wantOnlineRider) {
+      filters.push({ status: UserStatus.ACTIVE }); // Fetch all ACTIVE, filter by Redis below
     } else if (status === 'SUSPENDED') {
       filters.push({ status: UserStatus.SUSPENDED });
     } else if (
@@ -81,11 +86,11 @@ export class RidersService {
       ...(filters.length ? { AND: filters } : {}),
     };
 
-    const [riders, total, stats] = await Promise.all([
+    const [allRiders, total, stats] = await Promise.all([
       this.prisma.rider.findMany({
         where,
-        skip,
-        take,
+        skip: wantOnlineRider ? 0 : skip,
+        take: wantOnlineRider ? 1000 : take,
         orderBy: { createdAt: 'desc' },
         include: {
           vehicle: { include: { documents: true } },
@@ -96,13 +101,39 @@ export class RidersService {
       this.getStats(),
     ]);
 
+    // Enrich with real online status from Redis
+    const riderRedisStates = await Promise.all(
+      allRiders.map((r) =>
+        this.riderStateService.getState(r.id).catch(() => null),
+      ),
+    );
+
+    let enrichedRiders = allRiders.map((rider, i) => ({
+      ...rider,
+      _redisState: riderRedisStates[i],
+    }));
+
+    if (wantOnlineRider) {
+      enrichedRiders = enrichedRiders.filter(
+        (r) => r._redisState?.status === 'ONLINE',
+      );
+    }
+
+    const paginatedRiders = wantOnlineRider
+      ? enrichedRiders.slice(skip, skip + take)
+      : enrichedRiders;
+
+    const onlineRiderTotal = wantOnlineRider ? enrichedRiders.length : total;
+
     return {
-      data: riders.map((rider) => this.mapToRiderDTO(rider)),
+      data: paginatedRiders.map((rider) =>
+        this.mapToRiderDTO(rider, rider._redisState),
+      ),
       meta: {
-        total,
+        total: onlineRiderTotal,
         page: Number(page),
         limit: take,
-        pages: Math.ceil(total / take),
+        pages: Math.ceil(onlineRiderTotal / take),
       },
       stats,
     };
@@ -133,8 +164,10 @@ export class RidersService {
       });
     }
 
-    if (status === 'ONLINE') {
-      filters.push({ status: UserStatus.ACTIVE, isOnline: true });
+    // For ONLINE filter: fetch all ACTIVE drivers and filter by Redis state
+    const wantOnline = status === 'ONLINE';
+    if (wantOnline) {
+      filters.push({ status: UserStatus.ACTIVE });
     } else if (status === 'SUSPENDED') {
       filters.push({ status: UserStatus.SUSPENDED });
     } else if (
@@ -149,11 +182,11 @@ export class RidersService {
       ...(filters.length ? { AND: filters } : {}),
     };
 
-    const [drivers, total] = await Promise.all([
+    const [allDrivers, total, driverStats] = await Promise.all([
       this.prisma.rider.findMany({
         where,
-        skip,
-        take,
+        skip: wantOnline ? 0 : skip,
+        take: wantOnline ? 1000 : take,
         orderBy: { createdAt: 'desc' },
         include: {
           vehicle: { include: { documents: true } },
@@ -161,16 +194,46 @@ export class RidersService {
         },
       }),
       this.prisma.rider.count({ where }),
+      this.getDriverStats(),
     ]);
 
+    // Enrich each driver with real online status from Redis
+    const redisStates = await Promise.all(
+      allDrivers.map((d) =>
+        this.driverStateService.getState(d.id).catch(() => null),
+      ),
+    );
+
+    let enrichedDrivers = allDrivers.map((driver, i) => ({
+      ...driver,
+      _redisState: redisStates[i],
+    }));
+
+    // If ONLINE filter was requested, apply it after Redis enrichment
+    if (wantOnline) {
+      enrichedDrivers = enrichedDrivers.filter(
+        (d) => d._redisState?.status === 'ONLINE',
+      );
+    }
+
+    // Apply pagination for ONLINE filter (was skipped above)
+    const paginatedDrivers = wantOnline
+      ? enrichedDrivers.slice(skip, skip + take)
+      : enrichedDrivers;
+
+    const onlineTotal = wantOnline ? enrichedDrivers.length : total;
+
     return {
-      data: drivers.map((driver) => this.mapToRiderDTO(driver)),
+      data: paginatedDrivers.map((driver) =>
+        this.mapToRiderDTO(driver, driver._redisState),
+      ),
       meta: {
-        total,
+        total: onlineTotal,
         page: Number(page),
         limit: take,
-        pages: Math.ceil(total / take),
+        pages: Math.ceil(onlineTotal / take),
       },
+      stats: driverStats,
     };
   }
 
@@ -185,6 +248,13 @@ export class RidersService {
     });
 
     if (!rider) throw new NotFoundException('Rider not found');
+
+    // Enrich with Redis state for accurate online/lastSeen
+    const redisState = await (
+      rider.role === 'DRIVER'
+        ? this.driverStateService.getState(id)
+        : this.riderStateService.getState(id)
+    ).catch(() => null);
 
     const rideStats = await this.prisma.ride.groupBy({
       by: ['status'],
@@ -234,15 +304,20 @@ export class RidersService {
       phone: rider.phone,
       image: rider.image || null,
       status:
-        rider.status === UserStatus.ACTIVE && rider.isOnline
+        redisState?.status === 'ONLINE'
           ? 'ONLINE'
-          : rider.status,
+          : rider.status === UserStatus.ACTIVE && rider.isOnline
+            ? 'ONLINE'
+            : rider.status,
+      isOnline: redisState?.status === 'ONLINE',
       verification: this.determineVerificationStatus(documents),
       rating: rider.rating,
       totalRides: rider.totalRides,
       walletBalance: rider.walletBalance,
       joinedAt: rider.createdAt,
-      lastSeen: rider.updatedAt,
+      lastSeen: redisState?.lastSeen
+        ? new Date(Number(redisState.lastSeen))
+        : rider.updatedAt,
       currentLat: rider.currentLat,
       currentLng: rider.currentLng,
       vehicle: rider.vehicle,
@@ -553,14 +628,28 @@ export class RidersService {
 
   // --- Helpers ---
 
-  private mapToRiderDTO(rider: any) {
+  private mapToRiderDTO(rider: any, redisState?: any) {
     const vehicle = rider.vehicle || {};
 
-    let status = rider.status;
-    if (rider.status === UserStatus.ACTIVE && rider.isOnline) status = 'ONLINE';
+    // Prefer Redis state for truthful online status
+    let status: string = rider.status;
+    if (redisState) {
+      if (redisState.status === 'ONLINE') {
+        status = 'ONLINE';
+      } else if (rider.status === UserStatus.ACTIVE) {
+        status = 'ACTIVE'; // online in Prisma but offline in Redis — treat as ACTIVE
+      }
+    } else if (rider.status === UserStatus.ACTIVE && rider.isOnline) {
+      // Fallback to Prisma field when Redis is unavailable
+      status = 'ONLINE';
+    }
 
     const documents = rider.documents || [];
     const hasPendingDocs = documents.some((d: any) => d.status === 'PENDING');
+
+    const lastSeen: Date | null = redisState?.lastSeen
+      ? new Date(Number(redisState.lastSeen))
+      : null;
 
     return {
       id: rider.id,
@@ -568,6 +657,8 @@ export class RidersService {
       email: rider.email,
       plateNumber: vehicle.plateNumber || 'N/A',
       status,
+      isOnline: status === 'ONLINE',
+      lastSeen,
       verification: hasPendingDocs ? 'PENDING' : 'VERIFIED',
       rating: rider.rating || 0,
       walletBalance: rider.walletBalance || 0,
@@ -595,6 +686,20 @@ export class RidersService {
     ]);
 
     return { total, online, suspended, pending };
+  }
+
+  private async getDriverStats() {
+    const [total, active, suspended] = await Promise.all([
+      this.prisma.rider.count({ where: { role: UserRole.DRIVER } }),
+      this.prisma.rider.count({
+        where: { role: UserRole.DRIVER, status: UserStatus.ACTIVE },
+      }),
+      this.prisma.rider.count({
+        where: { role: UserRole.DRIVER, status: UserStatus.SUSPENDED },
+      }),
+    ]);
+
+    return { total, active, suspended };
   }
 
   async sendMessageToRider(riderId: string, message: string, adminId: string) {

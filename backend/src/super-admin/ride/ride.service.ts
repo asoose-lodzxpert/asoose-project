@@ -462,8 +462,13 @@ export class RidesService {
     }
 
     // 3. Validate Rider Eligibility
+    if (rider.role !== 'DRIVER') {
+      throw new BadRequestException(
+        'Selected user is not a ride-hailing driver. Only DRIVER-role users can be assigned to rides.',
+      );
+    }
     if (rider.status !== 'ACTIVE') {
-      throw new BadRequestException('Rider account is not ACTIVE.');
+      throw new BadRequestException('Driver account is not ACTIVE.');
     }
     // Note: We allow offline assignment in emergencies, but warn in UI.
     // Strict enforcement can be toggled here.

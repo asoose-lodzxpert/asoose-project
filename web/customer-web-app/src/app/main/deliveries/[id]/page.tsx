@@ -66,14 +66,26 @@ const TIMELINE_STEPS: {
     label: "Searching",
     sub: "Finding an available rider",
   },
-  { status: "ASSIGNED", label: "Rider Assigned", sub: "Rider is heading to pickup" },
-  { status: "PICKED_UP", label: "Picked Up", sub: "Package collected from sender" },
+  {
+    status: "ASSIGNED",
+    label: "Rider Assigned",
+    sub: "Rider is heading to pickup",
+  },
+  {
+    status: "PICKED_UP",
+    label: "Picked Up",
+    sub: "Package collected from sender",
+  },
   {
     status: "IN_TRANSIT",
     label: "In Transit",
     sub: "En route to recipient",
   },
-  { status: "DELIVERED", label: "Delivered", sub: "Package delivered successfully" },
+  {
+    status: "DELIVERED",
+    label: "Delivered",
+    sub: "Package delivered successfully",
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -90,8 +102,7 @@ const isBeyond = (current: DeliveryStatus, step: DeliveryStatus) =>
 const STATUS_CHIP: Record<string, string> = {
   DELIVERED:
     "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400",
-  CANCELLED:
-    "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400",
+  CANCELLED: "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400",
   IN_TRANSIT:
     "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400",
   PICKED_UP:
@@ -159,7 +170,8 @@ function DeliveryTimeline({
       <div className="space-y-6">
         {TIMELINE_STEPS.map((step) => {
           const done = isBeyond(status, step.status);
-          const active = STATUS_ORDER[statusRank(status)] === step.status ||
+          const active =
+            STATUS_ORDER[statusRank(status)] === step.status ||
             (step.status === "ASSIGNED" && status === "ACCEPTED");
           const ts = timestamps[step.status];
 
@@ -269,7 +281,7 @@ export default function DeliveryDetailPage() {
   const { data: disputeData, mutate: mutateDispute } = useSWR(
     disputeCheckKey,
     fetcher,
-    { revalidateOnFocus: true, dedupingInterval: 5000 }
+    { revalidateOnFocus: true, dedupingInterval: 5000 },
   );
 
   const { canReport, isExpired, hasDispute } = useMemo(() => {
@@ -318,8 +330,7 @@ export default function DeliveryDetailPage() {
           Delivery not found
         </h3>
         <p className="text-sm text-gray-500 dark:text-gray-400 mb-6 max-w-xs mx-auto">
-          {error?.message ||
-            "We couldn't locate this delivery record."}
+          {error?.message || "We couldn't locate this delivery record."}
         </p>
         <Link
           href="/main/profile"
@@ -367,7 +378,17 @@ export default function DeliveryDetailPage() {
             <ChevronLeft className="w-5 h-5" />
           </button>
           <div className="flex-1">
-            <h1 className="text-lg font-bold">Delivery Details</h1>
+            <div className="flex items-center gap-3">
+              <h1 className="text-lg font-bold">Delivery Details</h1>{" "}
+              {delivery?.deliveryOtp &&
+                !["DELIVERED", "CANCELLED"].includes(status) && (
+                  <span className="flex items-center gap-1.5 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-500/30 rounded-lg px-2.5 py-1">
+                    <span className="font-black tracking-[0.15em] text-yellow-600 dark:text-yellow-400 font-mono text-sm">
+                      Code: {delivery.deliveryOtp}
+                    </span>
+                  </span>
+                )}
+            </div>
             <p className="text-xs text-gray-500 dark:text-gray-400 font-mono">
               #{delivery.id.split("-")[0].toUpperCase()}
             </p>
@@ -381,7 +402,6 @@ export default function DeliveryDetailPage() {
       </div>
 
       <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
-
         {/* Timeline */}
         <div className="bg-white dark:bg-[#151515] rounded-3xl p-6 border border-gray-100 dark:border-white/5 shadow-sm">
           <h2 className="text-base font-bold mb-6 flex items-center gap-2">
@@ -589,7 +609,8 @@ export default function DeliveryDetailPage() {
                 <div className="flex items-start gap-3">
                   <Flag className="w-4 h-4 text-yellow-600 dark:text-yellow-400 shrink-0 mt-0.5" />
                   <p className="text-sm text-yellow-700 dark:text-yellow-400 font-medium">
-                    You've already submitted a dispute for this delivery. Our team is reviewing it.
+                    You've already submitted a dispute for this delivery. Our
+                    team is reviewing it.
                   </p>
                 </div>
                 {disputeData?.dispute?.id && (
@@ -606,7 +627,8 @@ export default function DeliveryDetailPage() {
             {canReport && (
               <>
                 <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-                  Had a problem with this delivery? You can report an issue within 7 days of delivery.
+                  Had a problem with this delivery? You can report an issue
+                  within 7 days of delivery.
                 </p>
                 <button
                   onClick={() => setIsDisputeModalOpen(true)}

@@ -222,6 +222,10 @@ export class RiderStateService {
   // ========================================
   // QUERY
   // ========================================
+  async getState(riderId: string) {
+    return this.redis.getRiderState(riderId);
+  }
+
   async isRiderAvailable(riderId: string): Promise<boolean> {
     const state = await this.redis.getRiderState(riderId);
     if (!state) return false;
