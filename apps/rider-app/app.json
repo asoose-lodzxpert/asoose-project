@@ -18,7 +18,10 @@
         "ITSAppUsesNonExemptEncryption": false
       }
     },
-    "platforms": ["ios", "android"],
+    "platforms": [
+      "ios",
+      "android"
+    ],
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#0A0A0A",
@@ -96,9 +99,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "990d22a4-4537-482c-ab95-6b5197fb8484"
+        "projectId": "21470b69-c153-4845-aaac-0436aae439b8"
       }
     },
-    "owner": "enoch-dev"
+    "owner": "wyteshadow"
   }
 }

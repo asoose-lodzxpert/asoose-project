@@ -23,6 +23,7 @@ import {
   ShieldCheck,
   Image,
   Activity,
+  MapPin,
 } from "lucide-react";
 import { signOut } from "next-auth/react";
 import useSWR from "swr";
@@ -69,6 +70,12 @@ export default function AdminLayoutClient({
   const hasAccess = (allowedRoles: AdminRole[]) => allowedRoles.includes(role);
 
   const menuItems = [
+    {
+      name: "Live Map",
+      icon: MapPin,
+      href: "/super-admin/maps",
+      allowed: ["ADMIN", "SUPER_ADMIN", "ADMIN_MANAGER", "ADMIN_SUPPORT"],
+    },
     {
       name: "Activity Logs",
       icon: Activity,

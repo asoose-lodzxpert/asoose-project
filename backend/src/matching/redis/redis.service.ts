@@ -409,4 +409,70 @@ export class RedisService {
       return false;
     }
   }
+
+  // ========================================
+  // BULK SCAN — LIVE MAP
+  // ========================================
+
+  /** Returns all driver states that have a known location (for the live map) */
+  async getAllDriverStatesWithLocation(): Promise<DriverState[]> {
+    const keys = await this.redis.keys('driver:*:status');
+    if (!keys.length) return [];
+
+    const ids = keys.map((k) => k.split(':')[1]);
+    const states = await Promise.all(
+      ids.map((id) => this.getDriverState(id).catch(() => null)),
+    );
+
+    return states.filter(
+      (s): s is DriverState => s !== null && s.location !== null,
+    );
+  }
+
+  /** Returns all rider states that have a known location (for the live map) */
+  async getAllRiderStatesWithLocation(): Promise<RiderState[]> {
+    const keys = await this.redis.keys('rider:*:status');
+    if (!keys.length) return [];
+
+    const ids = keys.map((k) => k.split(':')[1]);
+    const states = await Promise.all(
+      ids.map((id) => this.getRiderState(id).catch(() => null)),
+    );
+
+    return states.filter(
+      (s): s is RiderState => s !== null && s.location !== null,
+    );
+  }
+
+  /**
+   * Returns ALL driver states from Redis (online AND offline).
+   * Location key is preserved on offline so last known coords are available.
+   */
+  async getAllDriverStates(): Promise<DriverState[]> {
+    const keys = await this.redis.keys('driver:*:status');
+    if (!keys.length) return [];
+
+    const ids = keys.map((k) => k.split(':')[1]);
+    const states = await Promise.all(
+      ids.map((id) => this.getDriverState(id).catch(() => null)),
+    );
+
+    return states.filter((s): s is DriverState => s !== null);
+  }
+
+  /**
+   * Returns ALL rider states from Redis (online AND offline).
+   * Location key is preserved on offline so last known coords are available.
+   */
+  async getAllRiderStates(): Promise<RiderState[]> {
+    const keys = await this.redis.keys('rider:*:status');
+    if (!keys.length) return [];
+
+    const ids = keys.map((k) => k.split(':')[1]);
+    const states = await Promise.all(
+      ids.map((id) => this.getRiderState(id).catch(() => null)),
+    );
+
+    return states.filter((s): s is RiderState => s !== null);
+  }
 }
