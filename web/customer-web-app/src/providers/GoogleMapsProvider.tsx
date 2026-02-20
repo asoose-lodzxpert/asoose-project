@@ -1,10 +1,11 @@
-'use client';
+"use client";
 
-import { createContext, useContext, ReactNode } from 'react';
-import { useJsApiLoader } from '@react-google-maps/api';
+import { createContext, useContext, ReactNode } from "react";
+import { useJsApiLoader } from "@react-google-maps/api";
 
 // 1. Define libraries outside the component to guarantee referential stability (Prevents re-render loops)
-const LIBRARIES: ("places" | "geometry")[] = ['places', 'geometry'];
+// Note: 'places' library is NOT loaded here — autocomplete/geocoding go through the backend.
+const LIBRARIES: "geometry"[] = ["geometry"];
 
 interface GoogleMapsContextType {
   isLoaded: boolean;
@@ -19,10 +20,10 @@ const GoogleMapsContext = createContext<GoogleMapsContextType>({
 export function GoogleMapsProvider({ children }: { children: ReactNode }) {
   // 2. The SINGLE global loader call
   const { isLoaded, loadError } = useJsApiLoader({
-    id: 'google-map-script',
+    id: "google-map-script",
     googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!,
     libraries: LIBRARIES,
-    language: 'en', // Optional: Lock language to prevent hydration mismatches
+    language: "en", // Optional: Lock language to prevent hydration mismatches
   });
 
   if (loadError) {

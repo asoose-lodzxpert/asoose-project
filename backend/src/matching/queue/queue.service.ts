@@ -73,7 +73,7 @@ export class QueueService implements OnModuleInit {
   // DELIVERY MATCHING QUEUE
   // ========================================
 
-  async enqueueDeliveryMatching(data: MatchDeliveryJobData) {
+  async enqueueDeliveryMatching(data: MatchDeliveryJobData, delayMs = 0) {
     const job = await this.deliveryMatchingQueue.add(
       JOB_TYPES.MATCH_DELIVERY,
       data,
@@ -81,11 +81,14 @@ export class QueueService implements OnModuleInit {
         ...QUEUE_OPTIONS.deliveryMatching,
         jobId: `delivery-${data.job.id}-attempt-${data.attempt}`,
         priority: this.calculatePriority(data.attempt),
+        ...(delayMs > 0 ? { delay: delayMs } : {}),
       },
     );
 
     this.logger.log(
-      `Enqueued delivery matching: ${data.job.id} (attempt ${data.attempt})`,
+      `Enqueued delivery matching: ${data.job.id} (attempt ${data.attempt})${
+        delayMs > 0 ? ` [delayed ${delayMs}ms]` : ''
+      }`,
     );
     return job;
   }

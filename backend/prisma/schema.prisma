@@ -928,6 +928,12 @@ model Delivery {
   deliveryFee Float
   distanceKm  Float?
 
+  // Multi-stop (grouped order) support
+  // stops = [{orderId, storeName, pickupAddressId, pickupAddress, status: 'PENDING'|'PICKED_UP'}]
+  stops             Json?
+  currentStopIndex  Int  @default(0)
+  orderGroupId      String?
+
   // Timestamps
   assignedAt  DateTime?
   pickedUpAt  DateTime?

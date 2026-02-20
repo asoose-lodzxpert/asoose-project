@@ -1,0 +1,163 @@
+<html>
+  <head>
+    <meta charset='utf-8' />
+    <style>
+      body {
+        font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+        background-color: #f6f6f6;
+        margin: 0;
+        padding: 0;
+      }
+      .container {
+        max-width: 600px;
+        margin: 20px auto;
+        background-color: #ffffff;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+      }
+      .header {
+        background-color: #000000;
+        color: #ffffff;
+        padding: 28px 30px;
+        text-align: center;
+      }
+      .header h1 {
+        margin: 0;
+        font-size: 22px;
+        font-weight: 800;
+        letter-spacing: -0.5px;
+      }
+      .header p {
+        margin: 6px 0 0;
+        font-size: 13px;
+        color: #aaaaaa;
+      }
+      .content {
+        padding: 32px 30px;
+        color: #333333;
+        line-height: 1.6;
+      }
+      .otp-box {
+        background: linear-gradient(135deg, #facc15, #f59e0b);
+        border-radius: 16px;
+        padding: 30px;
+        text-align: center;
+        margin: 28px 0;
+      }
+      .otp-label {
+        font-size: 11px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        color: rgba(0, 0, 0, 0.5);
+        margin-bottom: 10px;
+      }
+      .otp-code {
+        font-size: 48px;
+        font-weight: 900;
+        letter-spacing: 12px;
+        color: #000000;
+        font-family: 'Courier New', monospace;
+        text-align: center;
+      }
+      .otp-hint {
+        font-size: 12px;
+        color: rgba(0, 0, 0, 0.55);
+        margin-top: 10px;
+      }
+      .info-box {
+        background-color: #f9f9f9;
+        border-radius: 10px;
+        padding: 16px 20px;
+        border: 1px solid #eeeeee;
+        margin: 20px 0;
+      }
+      .info-row {
+        display: flex;
+        justify-content: space-between;
+        font-size: 14px;
+        padding: 6px 0;
+        border-bottom: 1px solid #eeeeee;
+      }
+      .info-row:last-child {
+        border-bottom: none;
+      }
+      .info-label {
+        color: #888888;
+      }
+      .info-value {
+        font-weight: 700;
+        color: #111111;
+      }
+      .footer {
+        background-color: #f6f6f6;
+        padding: 20px;
+        text-align: center;
+        font-size: 11px;
+        color: #999999;
+      }
+      .warning {
+        background-color: #fef3c7;
+        border-left: 4px solid #f59e0b;
+        padding: 12px 16px;
+        border-radius: 6px;
+        font-size: 13px;
+        color: #92400e;
+        margin-top: 20px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class='container'>
+      <div class='header'>
+        <h1>🚚 Your Delivery OTP</h1>
+        <p>Share this code with the rider to confirm delivery</p>
+      </div>
+      <div class='content'>
+        <p>Hi <strong>{{name}}</strong>,</p>
+        <p>Your order is on its way! When the rider arrives, share the 6-digit
+          OTP below to confirm you've received your delivery.</p>
+
+        <div class='otp-box'>
+          <div class='otp-label'>Delivery Verification Code</div>
+          <div class='otp-code'>{{otp}}</div>
+          <div class='otp-hint'>Do not share this code until the rider is at
+            your door</div>
+        </div>
+
+        <div class='info-box'>
+          {{#if orderId}}
+            <div class='info-row'>
+              <span class='info-label'>Order Reference</span>
+              <span class='info-value'>#{{orderId}}</span>
+            </div>
+          {{/if}}
+          {{#if storeName}}
+            <div class='info-row'>
+              <span class='info-label'>From</span>
+              <span class='info-value'>{{storeName}}</span>
+            </div>
+          {{/if}}
+          <div class='info-row'>
+            <span class='info-label'>Deliver to</span>
+            <span class='info-value'>{{address}}</span>
+          </div>
+        </div>
+
+        <div class='warning'>
+          ⚠️
+          <strong>Security tip:</strong>
+          Only share this OTP with the rider when they are at your location.
+          Never share it via phone or chat.
+        </div>
+      </div>
+      <div class='footer'>
+        <p>&copy; 2026 ASOOSE. All rights reserved.</p>
+        <p>Have a question?
+          <a href='mailto:support@asoose.com' style='color: #FACC15;'>Contact
+            Support</a></p>
+      </div>
+    </div>
+  </body>
+</html>

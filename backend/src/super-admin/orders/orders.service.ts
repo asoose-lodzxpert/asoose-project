@@ -400,6 +400,7 @@ export class OrdersService {
     return {
       id: order.id,
       groupId: order.orderGroupId, // Expose Group ID
+      deliveryId: order.delivery?.id ?? null, // Expose Delivery ID for rider assignment
       serviceType: this.mapStoreTypeToService(order.store.type),
       status: order.status,
       dispute,

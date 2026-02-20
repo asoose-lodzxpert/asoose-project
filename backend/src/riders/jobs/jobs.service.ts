@@ -6,50 +6,235 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RideStatus, DeliveryStatus } from '@prisma/client';
+import { AppLogger } from 'src/libs/logger/app-logger.service';
+import { TransactionLedgerService } from 'src/super-admin/transactions/transaction-ledger.service';
+
+/** Maps a Prisma DeliveryStatus to the rider-app's JobStatus string */
+function deliveryStatusToJobStatus(status: DeliveryStatus): string {
+  switch (status) {
+    case DeliveryStatus.ASSIGNED:
+    case DeliveryStatus.REQUESTED:
+      return 'incoming-job';
+    case DeliveryStatus.ACCEPTED:
+      return 'en-route-pickup';
+    case DeliveryStatus.PICKED_UP:
+      return 'en-route-dropoff';
+    default:
+      return 'online-waiting';
+  }
+}
+
+/** Maps a Prisma RideStatus to the rider-app's JobStatus string */
+function rideStatusToJobStatus(status: RideStatus): string {
+  switch (status) {
+    case RideStatus.REQUESTED:
+      return 'incoming-job';
+    case RideStatus.ACCEPTED:
+      return 'en-route-pickup';
+    case RideStatus.ARRIVED:
+      return 'at-pickup';
+    case RideStatus.IN_PROGRESS:
+      return 'en-route-dropoff';
+    default:
+      return 'online-waiting';
+  }
+}
 
 @Injectable()
 export class JobsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly logger: AppLogger,
+    private readonly transactionLedger: TransactionLedgerService,
+  ) {}
+
+  /**
+   * Returns the currently active job (delivery or ride) for a rider / driver.
+   */
+  async getActiveJob(riderId: string, role: 'RIDER' | 'DRIVER') {
+    this.logger.debug(`getActiveJob called - riderId=${riderId}, role=${role}`);
+
+    if (role === 'RIDER') {
+      this.logger.debug(`Checking for active delivery - rider ${riderId}`);
+
+      const activeStatuses: DeliveryStatus[] = [
+        DeliveryStatus.ASSIGNED,
+        DeliveryStatus.ACCEPTED,
+        DeliveryStatus.PICKED_UP,
+        DeliveryStatus.IN_TRANSIT,
+      ];
+
+      const delivery = await this.prisma.delivery.findFirst({
+        where: {
+          riderId,
+          status: { in: activeStatuses },
+        },
+        include: {
+          customer: { select: { name: true, phone: true } },
+          pickupAddress: true,
+          dropoffAddress: true,
+          order: { include: { store: { include: { vendor: true } } } },
+        },
+        orderBy: { assignedAt: 'desc' },
+      });
+
+      if (!delivery) {
+        this.logger.debug(`No active delivery found for rider ${riderId}`);
+        return null;
+      }
+
+      this.logger.debug(
+        `Active delivery found - id=${delivery.id}, status=${delivery.status}`,
+      );
+
+      this.logger.debug(JSON.stringify(delivery, null, 2));
+
+      const stops = (delivery as any).stops as any[] | null;
+      const isMultiStop = stops && stops.length > 1;
+
+      const result = {
+        id: delivery.id,
+        jobType: 'delivery' as const,
+        status: deliveryStatusToJobStatus(delivery.status),
+        customerName: isMultiStop
+          ? `${stops!.length} Stores`
+          : (delivery as any).order?.store?.name ||
+            delivery.customer?.name ||
+            'Store',
+        customerPhone: delivery.customer?.phone ?? delivery.recipientPhone,
+        pickupContactPhone:
+          delivery.pickupAddress?.phone ||
+          (delivery as any).order?.store?.vendor?.phone ||
+          delivery.customer?.phone ||
+          undefined,
+        dropoffContactPhone: delivery.recipientPhone || undefined,
+        recipientName: delivery.recipientName || undefined,
+        pickupAddress: delivery.pickupAddress,
+        dropoffAddress: delivery.dropoffAddress,
+        earnings: delivery.deliveryFee,
+        // Never expose the OTP to the rider — just signal that one is required
+        requiresOtp: !!delivery.deliveryOtp,
+        packageDetails: delivery.packageDetails ?? undefined,
+        distanceKm: delivery.distanceKm ?? undefined,
+        assignedAt: delivery.assignedAt ?? undefined,
+        pickedUpAt: delivery.pickedUpAt ?? undefined,
+        stops: stops ?? null,
+        currentStopIndex: (delivery as any).currentStopIndex ?? 0,
+        orderGroupId: (delivery as any).orderGroupId ?? null,
+      };
+
+      this.logger.debug(`Returning delivery job ${delivery.id}`);
+      return result;
+    }
+
+    if (role === 'DRIVER') {
+      this.logger.debug(`Checking for active ride - driver ${riderId}`);
+
+      const activeStatuses: RideStatus[] = [
+        RideStatus.REQUESTED,
+        RideStatus.ACCEPTED,
+        RideStatus.ARRIVED,
+        RideStatus.IN_PROGRESS,
+      ];
+
+      const ride = await this.prisma.ride.findFirst({
+        where: {
+          riderId,
+          status: { in: activeStatuses },
+        },
+        include: {
+          customer: { select: { name: true, phone: true } },
+          pickupAddress: true,
+          dropoffAddress: true,
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      if (!ride) {
+        this.logger.debug(`No active ride found for driver ${riderId}`);
+        return null;
+      }
+
+      this.logger.debug(
+        `Active ride found - id=${ride.id}, status=${ride.status}`,
+      );
+
+      const result = {
+        id: ride.id,
+        jobType: 'ride' as const,
+        status: rideStatusToJobStatus(ride.status as RideStatus),
+        customerName: ride.customer?.name ?? 'Customer',
+        customerPhone: ride.customer?.phone ?? undefined,
+        pickupAddress: ride.pickupAddress,
+        dropoffAddress: ride.dropoffAddress,
+        earnings: ride.totalFare ?? ride.baseFare ?? 0,
+        startOtp: ride.startOtp ?? undefined,
+        distanceKm: ride.distanceKm ?? undefined,
+      };
+
+      this.logger.debug(`Returning ride job ${ride.id}`);
+      return result;
+    }
+
+    this.logger.warn(
+      `getActiveJob - invalid role: ${role} for riderId ${riderId}`,
+    );
+    return null;
+  }
 
   /**
    * Rider accepts a job (delivery or ride).
-   * - delivery: ASSIGNED → ACCEPTED
-   * - ride: REQUESTED or ASSIGNED → ACCEPTED (riderId set if not already)
    */
   async acceptJob(
     riderId: string,
     jobId: string,
     jobType: 'ride' | 'delivery',
   ) {
+    this.logger.debug(
+      `acceptJob - type=${jobType}, id=${jobId}, rider=${riderId}`,
+    );
+
     if (jobType === 'delivery') {
       const delivery = await this.prisma.delivery.findUnique({
         where: { id: jobId },
       });
 
-      if (!delivery) throw new NotFoundException('Delivery not found');
+      if (!delivery) {
+        this.logger.warn(`acceptJob - delivery not found: ${jobId}`);
+        throw new NotFoundException('Delivery not found');
+      }
 
       if (delivery.riderId && delivery.riderId !== riderId) {
+        this.logger.warn(
+          `Forbidden - delivery ${jobId} assigned to ${delivery.riderId}, requested by ${riderId}`,
+        );
         throw new ForbiddenException(
           'This job is assigned to a different rider',
         );
       }
 
-      const acceptableStatuses: DeliveryStatus[] = [
+      const acceptable: DeliveryStatus[] = [
         DeliveryStatus.ASSIGNED,
         DeliveryStatus.REQUESTED,
       ];
-
-      if (!acceptableStatuses.includes(delivery.status)) {
+      if (!acceptable.includes(delivery.status)) {
+        this.logger.warn(
+          `Invalid state - cannot accept delivery ${jobId} in status ${delivery.status}`,
+        );
         throw new BadRequestException(
           `Cannot accept delivery in status ${delivery.status}`,
         );
       }
 
+      this.logger.debug(
+        `Updating delivery ${jobId} → ACCEPTED, rider=${riderId}`,
+      );
+
       return this.prisma.delivery.update({
         where: { id: jobId },
         data: {
           status: DeliveryStatus.ACCEPTED,
-          riderId, // ensure riderId is set (handles both assigned and re-accept)
+          riderId,
         },
         include: {
           pickupAddress: true,
@@ -59,34 +244,38 @@ export class JobsService {
     }
 
     if (jobType === 'ride') {
-      // For matching-pipeline rides: riderId is null, status is REQUESTED
-      // For admin-assigned rides: riderId is already set, status may be ASSIGNED
       const ride = await this.prisma.ride.findUnique({
         where: { id: jobId },
         include: { rider: { include: { vehicle: true } } },
       });
 
-      if (!ride) throw new NotFoundException('Ride not found');
+      if (!ride) {
+        this.logger.warn(`acceptJob - ride not found: ${jobId}`);
+        throw new NotFoundException('Ride not found');
+      }
 
-      // If assigned to a specific rider, enforce it
       if (ride.riderId && ride.riderId !== riderId) {
+        this.logger.warn(
+          `Forbidden - ride ${jobId} assigned to ${ride.riderId}, requested by ${riderId}`,
+        );
         throw new ForbiddenException(
           'This ride is assigned to a different rider',
         );
       }
 
-      const acceptableStatuses: RideStatus[] = [
-        RideStatus.REQUESTED,
-        // ASSIGNED is not a standard RideStatus in Prisma but guard just in case
-      ];
-
-      if (!acceptableStatuses.includes(ride.status as RideStatus)) {
+      const acceptable: RideStatus[] = [RideStatus.REQUESTED];
+      if (!acceptable.includes(ride.status as RideStatus)) {
+        this.logger.warn(
+          `Invalid state - cannot accept ride ${jobId} in status ${ride.status}`,
+        );
         throw new BadRequestException(
           `Cannot accept ride in status ${ride.status}`,
         );
       }
 
-      const result = await this.prisma.ride.updateMany({
+      this.logger.debug(`Accepting ride ${jobId} → ACCEPTED, rider=${riderId}`);
+
+      const updateResult = await this.prisma.ride.updateMany({
         where: {
           id: jobId,
           status: { in: [RideStatus.REQUESTED] },
@@ -98,7 +287,10 @@ export class JobsService {
         },
       });
 
-      if (result.count === 0) {
+      if (updateResult.count === 0) {
+        this.logger.warn(
+          `Race condition - ride ${jobId} no longer available for accept`,
+        );
         throw new BadRequestException('Ride already accepted or unavailable');
       }
 
@@ -108,44 +300,59 @@ export class JobsService {
       });
     }
 
+    this.logger.error(`acceptJob - unknown jobType: ${jobType}`);
     throw new BadRequestException(`Unknown jobType: ${jobType}`);
   }
 
   /**
-   * Rider declines a job (delivery or ride).
-   * - delivery: revert to REQUESTED, clear riderId
-   * - ride: no DB change needed; matching pipeline handles re-queuing via Redis declined list
+   * Rider declines a job.
    */
   async declineJob(
     riderId: string,
     jobId: string,
     jobType: 'ride' | 'delivery',
   ) {
+    this.logger.debug(
+      `declineJob - type=${jobType}, id=${jobId}, rider=${riderId}`,
+    );
+
     if (jobType === 'delivery') {
       const delivery = await this.prisma.delivery.findUnique({
         where: { id: jobId },
       });
 
-      if (!delivery) throw new NotFoundException('Delivery not found');
+      if (!delivery) {
+        this.logger.warn(`declineJob - delivery not found: ${jobId}`);
+        throw new NotFoundException('Delivery not found');
+      }
 
       if (delivery.riderId && delivery.riderId !== riderId) {
+        this.logger.warn(
+          `Forbidden decline - delivery ${jobId} belongs to ${delivery.riderId}`,
+        );
         throw new ForbiddenException(
           'This job is assigned to a different rider',
         );
       }
 
-      const declineableStatuses: DeliveryStatus[] = [
+      const declineable: DeliveryStatus[] = [
         DeliveryStatus.ASSIGNED,
         DeliveryStatus.REQUESTED,
       ];
 
-      if (!declineableStatuses.includes(delivery.status)) {
+      if (!declineable.includes(delivery.status)) {
+        this.logger.warn(
+          `Invalid state - cannot decline delivery ${jobId} in ${delivery.status}`,
+        );
         throw new BadRequestException(
           `Cannot decline delivery in status ${delivery.status}`,
         );
       }
 
-      // Clear the rider assignment and revert to REQUESTED so it can be reassigned
+      this.logger.debug(
+        `Declining delivery ${jobId} → REQUESTED, clearing rider assignment`,
+      );
+
       return this.prisma.delivery.update({
         where: { id: jobId },
         data: {
@@ -157,32 +364,495 @@ export class JobsService {
     }
 
     if (jobType === 'ride') {
-      // For rides: decline is handled client-side via Redis and the matching pipeline.
-      // We just return success — the matching worker reads the Redis declined list.
       const ride = await this.prisma.ride.findUnique({
         where: { id: jobId },
         select: { id: true, status: true, riderId: true },
       });
 
-      if (!ride) throw new NotFoundException('Ride not found');
+      if (!ride) {
+        this.logger.warn(`declineJob - ride not found: ${jobId}`);
+        throw new NotFoundException('Ride not found');
+      }
 
-      // Rider can only decline rides in REQUESTED state
       if (ride.status !== RideStatus.REQUESTED) {
+        this.logger.warn(
+          `Invalid state - cannot decline ride ${jobId} in status ${ride.status}`,
+        );
         throw new BadRequestException(
           `Cannot decline ride in status ${ride.status}`,
         );
       }
 
+      this.logger.debug(
+        `Ride ${jobId} declined by ${riderId} - handled via Redis matching pipeline`,
+      );
+
       return { success: true, message: 'Ride declined' };
     }
 
+    this.logger.error(`declineJob - unknown jobType: ${jobType}`);
     throw new BadRequestException(`Unknown jobType: ${jobType}`);
   }
 
   /**
-   * Rider cancels an active job with a reason.
-   * - delivery: moves to CANCELLED, records reason
-   * - ride: moves to CANCELLED, records reason
+   * Rider arrived at pickup location.
+   */
+  async arriveAtPickup(
+    riderId: string,
+    jobId: string,
+    jobType: 'ride' | 'delivery',
+  ) {
+    this.logger.debug(
+      `arriveAtPickup - type=${jobType}, id=${jobId}, rider=${riderId}`,
+    );
+
+    if (jobType === 'delivery') {
+      const delivery = await this.prisma.delivery.findUnique({
+        where: { id: jobId },
+        include: { pickupAddress: true, dropoffAddress: true },
+      });
+
+      if (!delivery) {
+        this.logger.warn(`arriveAtPickup - delivery not found: ${jobId}`);
+        throw new NotFoundException('Delivery not found');
+      }
+
+      if (delivery.riderId !== riderId) {
+        this.logger.warn(
+          `Forbidden - delivery ${jobId} belongs to ${delivery.riderId}, not ${riderId}`,
+        );
+        throw new ForbiddenException('Not your delivery');
+      }
+
+      this.logger.debug(
+        `Delivery rider arrived at pickup - ${jobId} (UI state only)`,
+      );
+
+      const stops = (delivery as any).stops as any[] | null;
+      const currentStopIndex = (delivery as any).currentStopIndex ?? 0;
+      const currentStop = stops?.[currentStopIndex] ?? null;
+
+      return {
+        id: delivery.id,
+        status: delivery.status,
+        pickupAddress: delivery.pickupAddress,
+        stops,
+        currentStopIndex,
+        currentStop,
+      };
+    }
+
+    if (jobType === 'ride') {
+      const ride = await this.prisma.ride.findUnique({
+        where: { id: jobId },
+        select: { id: true, status: true, riderId: true },
+      });
+
+      if (!ride) {
+        this.logger.warn(`arriveAtPickup - ride not found: ${jobId}`);
+        throw new NotFoundException('Ride not found');
+      }
+
+      if (ride.riderId !== riderId) {
+        this.logger.warn(
+          `Forbidden - ride ${jobId} belongs to ${ride.riderId}, not ${riderId}`,
+        );
+        throw new ForbiddenException('Not your ride');
+      }
+
+      if (ride.status !== RideStatus.ACCEPTED) {
+        this.logger.warn(
+          `Invalid state - cannot arrive at pickup for ride ${jobId} in ${ride.status}`,
+        );
+        throw new BadRequestException(
+          `Cannot arrive at pickup for ride in status ${ride.status}`,
+        );
+      }
+
+      this.logger.debug(`Updating ride ${jobId} → ARRIVED`);
+
+      return this.prisma.ride.update({
+        where: { id: jobId },
+        data: { status: RideStatus.ARRIVED },
+      });
+    }
+
+    this.logger.error(`arriveAtPickup - unknown jobType: ${jobType}`);
+    throw new BadRequestException(`Unknown jobType: ${jobType}`);
+  }
+
+  /**
+   * Rider confirms pickup.
+   */
+  async confirmPickup(
+    riderId: string,
+    jobId: string,
+    jobType: 'ride' | 'delivery',
+  ) {
+    this.logger.debug(
+      `confirmPickup - type=${jobType}, id=${jobId}, rider=${riderId}`,
+    );
+
+    if (jobType === 'delivery') {
+      const delivery = await this.prisma.delivery.findUnique({
+        where: { id: jobId },
+      });
+
+      if (!delivery) {
+        this.logger.warn(`confirmPickup - delivery not found: ${jobId}`);
+        throw new NotFoundException('Delivery not found');
+      }
+
+      if (delivery.riderId !== riderId) {
+        this.logger.warn(
+          `Forbidden - delivery ${jobId} belongs to ${delivery.riderId}, not ${riderId}`,
+        );
+        throw new ForbiddenException('Not your delivery');
+      }
+
+      if (delivery.status !== DeliveryStatus.ACCEPTED) {
+        this.logger.warn(
+          `Invalid state - cannot confirm pickup for delivery ${jobId} in ${delivery.status}`,
+        );
+        throw new BadRequestException(
+          `Cannot confirm pickup in status ${delivery.status}`,
+        );
+      }
+
+      const stops = (delivery as any).stops as any[] | null;
+      const currentStopIndex = (delivery as any).currentStopIndex ?? 0;
+
+      if (stops && stops.length > 1) {
+        this.logger.debug(
+          `Multi-stop delivery ${jobId} - confirming pickup at stop ${currentStopIndex + 1}/${stops.length}`,
+        );
+
+        const newStops = stops.map((s: any, i: number) =>
+          i === currentStopIndex ? { ...s, status: 'PICKED_UP' } : s,
+        );
+
+        const nextIndex = currentStopIndex + 1;
+        const allDone = nextIndex >= stops.length;
+
+        if (allDone) {
+          this.logger.debug(
+            `Multi-stop delivery ${jobId} - all stops picked up → PICKED_UP`,
+          );
+          await this.prisma.delivery.update({
+            where: { id: jobId },
+            data: {
+              stops: newStops,
+              status: DeliveryStatus.PICKED_UP,
+              pickedUpAt: new Date(),
+            } as any,
+          });
+          return { nextStop: null, nextStopIndex: null, isComplete: true };
+        } else {
+          this.logger.debug(
+            `Multi-stop delivery ${jobId} - advancing to stop ${nextIndex + 1}`,
+          );
+          const nextStop = stops[nextIndex];
+          const nextPickupAddress = nextStop.pickupAddressId
+            ? await this.prisma.address.findUnique({
+                where: { id: nextStop.pickupAddressId },
+              })
+            : null;
+
+          await this.prisma.delivery.update({
+            where: { id: jobId },
+            data: {
+              stops: newStops,
+              currentStopIndex: nextIndex,
+            } as any,
+          });
+
+          return {
+            nextStop: { ...nextStop, pickupAddress: nextPickupAddress },
+            nextStopIndex: nextIndex,
+            isComplete: false,
+          };
+        }
+      }
+
+      // Single-stop
+      this.logger.debug(`Single-stop delivery ${jobId} → PICKED_UP`);
+      await this.prisma.delivery.update({
+        where: { id: jobId },
+        data: { status: DeliveryStatus.PICKED_UP, pickedUpAt: new Date() },
+      });
+
+      return { nextStop: null, nextStopIndex: null, isComplete: true };
+    }
+
+    if (jobType === 'ride') {
+      const ride = await this.prisma.ride.findUnique({
+        where: { id: jobId },
+        select: { id: true, status: true, riderId: true },
+      });
+
+      if (!ride) {
+        this.logger.warn(`confirmPickup - ride not found: ${jobId}`);
+        throw new NotFoundException('Ride not found');
+      }
+
+      if (ride.riderId !== riderId) {
+        this.logger.warn(
+          `Forbidden - ride ${jobId} belongs to ${ride.riderId}, not ${riderId}`,
+        );
+        throw new ForbiddenException('Not your ride');
+      }
+
+      if (ride.status !== RideStatus.ARRIVED) {
+        this.logger.warn(
+          `Invalid state - cannot confirm pickup for ride ${jobId} in ${ride.status}`,
+        );
+        throw new BadRequestException(
+          `Cannot confirm pickup for ride in status ${ride.status}`,
+        );
+      }
+
+      this.logger.debug(`Updating ride ${jobId} → IN_PROGRESS`);
+
+      return this.prisma.ride.update({
+        where: { id: jobId },
+        data: { status: RideStatus.IN_PROGRESS, startedAt: new Date() } as any,
+      });
+    }
+
+    this.logger.error(`confirmPickup - unknown jobType: ${jobType}`);
+    throw new BadRequestException(`Unknown jobType: ${jobType}`);
+  }
+
+  /**
+   * Rider arrived at dropoff (mostly UI trigger).
+   */
+  async arriveAtDropoff(
+    riderId: string,
+    jobId: string,
+    jobType: 'ride' | 'delivery',
+  ) {
+    this.logger.debug(
+      `arriveAtDropoff - type=${jobType}, id=${jobId}, rider=${riderId}`,
+    );
+
+    if (jobType === 'delivery') {
+      const delivery = await this.prisma.delivery.findUnique({
+        where: { id: jobId },
+        include: { dropoffAddress: true },
+      });
+
+      if (!delivery) {
+        this.logger.warn(`arriveAtDropoff - delivery not found: ${jobId}`);
+        throw new NotFoundException('Delivery not found');
+      }
+
+      if (delivery.riderId !== riderId) {
+        this.logger.warn(
+          `Forbidden - delivery ${jobId} belongs to ${delivery.riderId}, not ${riderId}`,
+        );
+        throw new ForbiddenException('Not your delivery');
+      }
+
+      this.logger.debug(
+        `Delivery rider arrived at dropoff - ${jobId} (UI state)`,
+      );
+
+      return {
+        id: delivery.id,
+        status: delivery.status,
+        dropoffAddress: delivery.dropoffAddress,
+        requiresOtp: !!(delivery as any).deliveryOtp,
+      };
+    }
+
+    if (jobType === 'ride') {
+      const ride = await this.prisma.ride.findUnique({
+        where: { id: jobId },
+        select: { id: true, status: true, riderId: true },
+      });
+
+      if (!ride) {
+        this.logger.warn(`arriveAtDropoff - ride not found: ${jobId}`);
+        throw new NotFoundException('Ride not found');
+      }
+
+      if (ride.riderId !== riderId) {
+        this.logger.warn(
+          `Forbidden - ride ${jobId} belongs to ${ride.riderId}, not ${riderId}`,
+        );
+        throw new ForbiddenException('Not your ride');
+      }
+
+      this.logger.debug(
+        `Ride ${jobId} rider arrived at dropoff (no status change)`,
+      );
+
+      return { id: ride.id, status: ride.status };
+    }
+
+    this.logger.error(`arriveAtDropoff - unknown jobType: ${jobType}`);
+    throw new BadRequestException(`Unknown jobType: ${jobType}`);
+  }
+
+  /**
+   * Rider completes the job.
+   */
+  async completeJob(
+    riderId: string,
+    jobId: string,
+    jobType: 'ride' | 'delivery',
+    payload?: any,
+  ) {
+    this.logger.debug(
+      `completeJob - type=${jobType}, id=${jobId}, rider=${riderId}`,
+    );
+
+    if (jobType === 'delivery') {
+      const delivery = await this.prisma.delivery.findUnique({
+        where: { id: jobId },
+        select: {
+          id: true,
+          status: true,
+          riderId: true,
+          deliveryOtp: true,
+          deliveryFee: true,
+        },
+      });
+
+      if (!delivery) {
+        this.logger.warn(`completeJob - delivery not found: ${jobId}`);
+        throw new NotFoundException('Delivery not found');
+      }
+
+      if (delivery.riderId !== riderId) {
+        this.logger.warn(
+          `Forbidden - delivery ${jobId} belongs to ${delivery.riderId}, not ${riderId}`,
+        );
+        throw new ForbiddenException('Not your delivery');
+      }
+
+      if (delivery.status !== DeliveryStatus.PICKED_UP) {
+        this.logger.warn(
+          `Invalid state - cannot complete delivery ${jobId} in ${delivery.status}`,
+        );
+        throw new BadRequestException(
+          `Cannot complete delivery in status ${delivery.status}`,
+        );
+      }
+
+      // OTP check — if delivery was created with an OTP, the rider must provide it
+      if (delivery.deliveryOtp) {
+        const providedOtp = payload?.otp as string | undefined;
+        if (!providedOtp) {
+          throw new BadRequestException(
+            'A delivery OTP is required to complete this delivery.',
+          );
+        }
+        if (providedOtp.trim() !== delivery.deliveryOtp.trim()) {
+          throw new BadRequestException('Incorrect delivery OTP.');
+        }
+      }
+
+      this.logger.debug(`Completing delivery ${jobId} → DELIVERED`);
+
+      const updatedDelivery = await this.prisma.delivery.update({
+        where: { id: jobId },
+        data: {
+          status: DeliveryStatus.DELIVERED,
+          deliveredAt: new Date(),
+          deliveryProof: payload?.proof ?? null,
+        },
+      });
+
+      // Credit rider wallet with delivery earnings
+      try {
+        await this.transactionLedger.recordDeliveryEarnings({
+          id: jobId,
+          riderId: delivery.riderId!,
+          deliveryFee: delivery.deliveryFee ?? 0,
+        });
+        this.logger.debug(
+          `Delivery earnings credited - riderId=${delivery.riderId}, amount=${delivery.deliveryFee}`,
+        );
+      } catch (err) {
+        this.logger.error(
+          `Failed to credit delivery earnings for job ${jobId}: ${err?.message}`,
+          err?.stack,
+        );
+      }
+
+      return updatedDelivery;
+    }
+
+    if (jobType === 'ride') {
+      const ride = await this.prisma.ride.findUnique({
+        where: { id: jobId },
+        select: { id: true, status: true, riderId: true },
+      });
+
+      if (!ride) {
+        this.logger.warn(`completeJob - ride not found: ${jobId}`);
+        throw new NotFoundException('Ride not found');
+      }
+
+      if (ride.riderId !== riderId) {
+        this.logger.warn(
+          `Forbidden - ride ${jobId} belongs to ${ride.riderId}, not ${riderId}`,
+        );
+        throw new ForbiddenException('Not your ride');
+      }
+
+      if (ride.status !== RideStatus.IN_PROGRESS) {
+        this.logger.warn(
+          `Invalid state - cannot complete ride ${jobId} in ${ride.status}`,
+        );
+        throw new BadRequestException(
+          `Cannot complete ride in status ${ride.status}`,
+        );
+      }
+
+      this.logger.debug(`Completing ride ${jobId} → COMPLETED`);
+
+      return this.prisma.ride.update({
+        where: { id: jobId },
+        data: {
+          status: RideStatus.COMPLETED,
+          completedAt: new Date(),
+        } as any,
+      });
+    }
+
+    this.logger.error(`completeJob - unknown jobType: ${jobType}`);
+    throw new BadRequestException(`Unknown jobType: ${jobType}`);
+  }
+
+  /**
+   * Pre-verifies a delivery OTP before the rider calls completeJob.
+   * Returns { valid: true } on match, throws BadRequestException on mismatch.
+   */
+  async verifyDeliveryOtp(riderId: string, jobId: string, otp: string) {
+    const delivery = await this.prisma.delivery.findUnique({
+      where: { id: jobId },
+      select: { id: true, riderId: true, deliveryOtp: true },
+    });
+
+    if (!delivery) throw new NotFoundException('Delivery not found');
+    if (delivery.riderId !== riderId)
+      throw new ForbiddenException('Not your delivery');
+
+    if (!delivery.deliveryOtp) {
+      // No OTP required for this delivery — treat as valid
+      return { valid: true, requiresOtp: false };
+    }
+
+    const isValid = otp.trim() === delivery.deliveryOtp.trim();
+    if (!isValid) throw new BadRequestException('Incorrect delivery OTP.');
+
+    return { valid: true, requiresOtp: true };
+  }
+
+  /**
+   * Rider cancels an active job with reason.
    */
   async cancelJob(
     riderId: string,
@@ -190,14 +860,24 @@ export class JobsService {
     jobType: 'ride' | 'delivery',
     reason: string,
   ) {
+    this.logger.debug(
+      `cancelJob - type=${jobType}, id=${jobId}, rider=${riderId}, reason=${reason}`,
+    );
+
     if (jobType === 'delivery') {
       const delivery = await this.prisma.delivery.findUnique({
         where: { id: jobId },
       });
 
-      if (!delivery) throw new NotFoundException('Delivery not found');
+      if (!delivery) {
+        this.logger.warn(`cancelJob - delivery not found: ${jobId}`);
+        throw new NotFoundException('Delivery not found');
+      }
 
       if (delivery.riderId !== riderId) {
+        this.logger.warn(
+          `Forbidden cancel - delivery ${jobId} belongs to ${delivery.riderId}`,
+        );
         throw new ForbiddenException('You are not assigned to this delivery');
       }
 
@@ -208,10 +888,15 @@ export class JobsService {
       ];
 
       if (!cancellable.includes(delivery.status)) {
+        this.logger.warn(
+          `Invalid state - cannot cancel delivery ${jobId} in ${delivery.status}`,
+        );
         throw new BadRequestException(
           `Cannot cancel delivery in status ${delivery.status}`,
         );
       }
+
+      this.logger.debug(`Cancelling delivery ${jobId} → CANCELLED`);
 
       return this.prisma.delivery.update({
         where: { id: jobId },
@@ -228,9 +913,15 @@ export class JobsService {
         select: { id: true, status: true, riderId: true },
       });
 
-      if (!ride) throw new NotFoundException('Ride not found');
+      if (!ride) {
+        this.logger.warn(`cancelJob - ride not found: ${jobId}`);
+        throw new NotFoundException('Ride not found');
+      }
 
       if (ride.riderId !== riderId) {
+        this.logger.warn(
+          `Forbidden cancel - ride ${jobId} belongs to ${ride.riderId}`,
+        );
         throw new ForbiddenException('You are not assigned to this ride');
       }
 
@@ -241,10 +932,17 @@ export class JobsService {
       ];
 
       if (!cancellable.includes(ride.status as RideStatus)) {
+        this.logger.warn(
+          `Invalid state - cannot cancel ride ${jobId} in ${ride.status}`,
+        );
         throw new BadRequestException(
           `Cannot cancel ride in status ${ride.status}`,
         );
       }
+
+      this.logger.debug(
+        `Cancelling ride ${jobId} → CANCELLED, reason: ${reason}`,
+      );
 
       return this.prisma.ride.update({
         where: { id: jobId },
@@ -258,6 +956,7 @@ export class JobsService {
       });
     }
 
+    this.logger.error(`cancelJob - unknown jobType: ${jobType}`);
     throw new BadRequestException(`Unknown jobType: ${jobType}`);
   }
 }

@@ -14,6 +14,7 @@ import { InventoryService } from './inventory.service';
 import { NotificationFacade } from './notification.facade';
 import { CommonModule } from '../common/common.module';
 import { UserAccountNotificationsService } from './notifications/user-account-notifications.service';
+import { IdempotencyService } from './idempotency.service';
 
 // Modules
 import { RedisModule } from 'src/redis/redis.module';
@@ -50,12 +51,14 @@ import { FareModule } from '../fare/fare.module';
     InventoryService,
     NotificationFacade,
     UserAccountNotificationsService,
+    IdempotencyService,
   ],
   exports: [
     UsersService,
     AddressesService,
     NotificationFacade,
     UserAccountNotificationsService,
+    IdempotencyService,
   ],
 })
 export class UsersModule {}

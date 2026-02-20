@@ -130,12 +130,12 @@ export default function ProfilePage() {
       try {
         let data;
         switch (tab) {
-        case "orders":
-  data = await fetchWithAuth("/users/orders", accessToken);
-  if (activeTabRef.current === "orders") {
-    setOrders(data?.data || []); 
-  }
-  break;
+          case "orders":
+            data = await fetchWithAuth("/users/orders", accessToken);
+            if (activeTabRef.current === "orders") {
+              setOrders(data?.data || []);
+            }
+            break;
           case "rides":
             data = await fetchWithAuth("/users/rides", accessToken);
             if (activeTabRef.current === "rides") setRides(data || []);
@@ -146,7 +146,10 @@ export default function ProfilePage() {
               setDeliveries(data || []);
             break;
           case "disputes":
-            data = await fetchWithAuth("/super-admin/disputes/mine", accessToken);
+            data = await fetchWithAuth(
+              "/super-admin/disputes/mine",
+              accessToken,
+            );
             if (activeTabRef.current === "disputes")
               setDisputes(data?.data || []);
             break;
@@ -423,12 +426,15 @@ export default function ProfilePage() {
                     >
                       <OrderCard
                         id={order.id.slice(0, 8).toUpperCase()}
+                        type={order.type ?? "ORDER"}
                         status={order.status}
                         date={new Date(order.createdAt).toLocaleDateString()}
-                        total={`₦${order.total.toLocaleString()}`}
-                        items={order.items.map(
+                        total={`₦${Number(order.total).toLocaleString()}`}
+                        items={order.items?.map(
                           (i: any) => `${i.quantity}x ${i.name}`,
                         )}
+                        stores={order.stores}
+                        orderCount={order.orderCount}
                       />
                     </Link>
                   ))

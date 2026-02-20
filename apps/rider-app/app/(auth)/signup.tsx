@@ -94,22 +94,42 @@ export default function SignupScreen() {
       setError("Vehicle type is required");
       return false;
     }
-    if (!form.make.trim()) {
-      setError("Vehicle make/brand is required");
+
+    const needsVehicleDetails =
+      form.vehicleType === "motorcycle" || form.vehicleType === "car";
+
+    if (needsVehicleDetails) {
+      if (!form.make.trim()) {
+        setError("Vehicle make/brand is required");
+        return false;
+      }
+      if (!form.model.trim()) {
+        setError("Vehicle model is required");
+        return false;
+      }
+      if (!form.plateNumber.trim()) {
+        setError("Plate number is required");
+        return false;
+      }
+      if (!form.documents.driverLicense) {
+        setError("Driver's licence is required");
+        return false;
+      }
+      if (!form.documents.vehicleInsurance) {
+        setError("Vehicle insurance certificate is required");
+        return false;
+      }
+      if (!form.documents.vehicleRegistration) {
+        setError("Vehicle licence / particulars is required");
+        return false;
+      }
+    }
+
+    if (!form.documents.idCard) {
+      setError("Government-issued ID is required");
       return false;
     }
-    if (!form.model.trim()) {
-      setError("Vehicle model is required");
-      return false;
-    }
-    if (!form.plateNumber.trim()) {
-      setError("Plate number is required");
-      return false;
-    }
-    if (!form.documents.driverLicense) {
-      setError("Driver's license is required");
-      return false;
-    }
+
     return true;
   }
 

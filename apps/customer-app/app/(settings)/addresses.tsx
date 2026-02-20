@@ -92,9 +92,15 @@ export default function AddressesScreen() {
   const openAddFlow = (label: string = "") => {
     setSelectedAddress({
       id: "",
+      userId: "",
+      vendorId: null,
+      phone: null,
       label: label,
-      address: "",
-      coordinates: { lat: "", lng: "" },
+      street: "",
+      city: "",
+      state: "",
+      lat: 0,
+      lng: 0,
       isDefault: false,
     });
     setAddressInput("");
@@ -103,7 +109,7 @@ export default function AddressesScreen() {
   };
 
   const handleSave = async () => {
-    if (!selectedAddress?.label || !selectedAddress?.address) {
+    if (!selectedAddress?.label || !selectedAddress?.street) {
       return Toast.show({
         type: "info",
         text1: "Name required",
@@ -112,13 +118,7 @@ export default function AddressesScreen() {
     }
     setSaving(true);
     try {
-      await saveAddressService({
-        ...selectedAddress,
-        coordinates: {
-          lat: parseFloat(selectedAddress.coordinates.lat).toString(),
-          lng: parseFloat(selectedAddress.coordinates.lng).toString(),
-        },
-      });
+      await saveAddressService(selectedAddress);
       await loadAddresses();
       setStep(null);
       setSelectedAddress(null);
@@ -149,11 +149,9 @@ export default function AddressesScreen() {
       prev
         ? {
             ...prev,
-            address: loc.address,
-            coordinates: {
-              lat: loc.latitude.toString(),
-              lng: loc.longitude.toString(),
-            },
+            street: loc.address,
+            lat: loc.latitude,
+            lng: loc.longitude,
           }
         : prev,
     );
@@ -195,7 +193,7 @@ export default function AddressesScreen() {
         primary={primary}
         onEdit={(addr) => {
           setSelectedAddress(addr);
-          setAddressInput(addr.address);
+          setAddressInput(addr.street);
           setStep("label");
         }}
         onDelete={(id) => {

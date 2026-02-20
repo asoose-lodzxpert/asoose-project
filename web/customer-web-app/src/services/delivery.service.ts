@@ -47,6 +47,9 @@ export interface Delivery {
     address?: string; // UsersService might return this composite string
   };
   
+  // OTP
+  deliveryOtp?: string;
+
   // Timestamps
   createdAt: string;
   pickedUpAt?: string;

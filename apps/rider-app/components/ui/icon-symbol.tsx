@@ -125,11 +125,13 @@ export type IconSymbolName =
   | "list.clipboard.fill"
   | "directions-walk"
   | "motorcycle"
-  | "bicycle";
+  | "bicycle"
+  | "directions-bus";
 
 const MAPPING: Record<IconSymbolName, keyof typeof MaterialIcons.glyphMap> = {
   // Vehicle/transport icons
   "directions-walk": "directions-walk",
+  "directions-bus": "directions-bus",
   motorcycle: "motorcycle",
   bicycle: "directions-bike",
   "house.fill": "home",

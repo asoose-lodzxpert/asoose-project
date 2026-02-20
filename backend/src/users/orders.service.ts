@@ -23,7 +23,7 @@ import { QueueService } from '../matching/queue/queue.service';
 // ==================== CONSTANTS ====================
 
 const ORDER_STATUS = { PENDING: 'PENDING' } as const;
-const DELIVERY_STATUS = { REQUESTED: 'REQUESTED' } as const;
+const DELIVERY_STATUS = { REQUESTED: 'REQUESTED', PENDING: 'PENDING' } as const;
 
 const IDEMPOTENCY_PREFIX = 'idemp:order:';
 
@@ -382,15 +382,16 @@ export class OrdersService {
                   customerId: userId,
                   pickupAddressId: prep.pickupAddressId,
                   dropoffAddressId: data.addressId,
-                  status: DELIVERY_STATUS.REQUESTED,
+                  status: DELIVERY_STATUS.PENDING,
                   deliveryFee: prep.deliveryFee,
                   distanceKm: parseFloat(prep.distance.toFixed(2)),
                   recipientName: context.user.name,
                   recipientPhone: context.user.phone || 'N/A',
+                  deliveryOtp: String(crypto.randomInt(100000, 999999)),
                 },
               },
             },
-            include: { user: true, store: true },
+            include: { user: true, store: true, delivery: true },
           });
         },
         {
@@ -402,21 +403,8 @@ export class OrdersService {
       // 4. Durable Handoff
       await this.completeIdempotency(redisKey, { orderId: order.id });
 
-      // Async Notification (Safe)
-      this.handoffNotifications(order, context.preparedStores[0].emailItems);
-
-      // ✅ Broadcast new order to admin dashboard in real-time
-      this.notificationsGateway.sendToAdminRoom({
-        id: order.id,
-        type: 'ORDER',
-        category: 'ORDER_CREATED',
-        title: 'New Order Placed',
-        message: `₦${order.total} order from ${order.user?.name || 'Customer'} at ${order.store?.name}`,
-        isRead: false,
-        createdAt: new Date().toISOString(),
-        metadata: { orderId: order.id },
-        recipientName: order.user?.name || '—',
-      });
+      // NOTE: Notifications are intentionally deferred to the payment webhook.
+      // They fire only after payment is confirmed, not at order creation.
 
       return order;
     } catch (error) {
@@ -453,7 +441,7 @@ export class OrdersService {
 
       // 2. Phase 1: Preparation (Parallel I/O, No Locks)
       // Resolves addresses, prices, and groups items BEFORE opening DB transaction
-      const { user, preparedStores, calculatedGrandTotal } =
+      const { user, preparedStores, calculatedGrandTotal, totalRouteKm } =
         await this.prepareOrderContext(userId, dto);
 
       // 3. Phase 2: Execution (Strict Transaction)
@@ -476,7 +464,7 @@ export class OrdersService {
               // 1. Atomic Stock Decrement (The Guard)
               await this.atomicStockDecrement(tx, prep.groupItems);
 
-              // 2. Create Order
+              // 2. Create Order (no inline delivery for group orders)
               return tx.order.create({
                 data: {
                   userId,
@@ -485,25 +473,42 @@ export class OrdersService {
                   total: prep.finalTotal,
                   status: ORDER_STATUS.PENDING,
                   items: { create: prep.orderItemsData },
-                  delivery: {
-                    create: {
-                      customerId: userId,
-                      pickupAddressId: prep.pickupAddressId,
-                      dropoffAddressId: dto.addressId,
-                      status: DELIVERY_STATUS.REQUESTED,
-                      deliveryFee: prep.deliveryFee,
-                      distanceKm: parseFloat(prep.distance.toFixed(2)),
-                      recipientName: user.name,
-                      recipientPhone: user.phone || 'N/A',
-                    },
-                  },
                 },
                 include: { store: { include: { vendor: true } }, user: true },
               });
             }),
           );
 
-          return { group: orderGroup, orders };
+          // C. Create ONE group delivery with stops for multi-store orders
+          const deliveryOtp = String(crypto.randomInt(100000, 999999));
+          const totalDeliveryFee = preparedStores.reduce(
+            (sum, p) => sum + p.deliveryFee,
+            0,
+          );
+          const stops = preparedStores.map((prep, idx) => ({
+            orderId: orders[idx].id,
+            storeName: prep.store.name,
+            pickupAddressId: prep.pickupAddressId,
+            status: 'PENDING',
+          }));
+          const groupDelivery = await tx.delivery.create({
+            data: {
+              customerId: userId,
+              orderGroupId: orderGroup.id,
+              pickupAddressId: preparedStores[0].pickupAddressId,
+              dropoffAddressId: dto.addressId,
+              status: DELIVERY_STATUS.PENDING,
+              deliveryFee: totalDeliveryFee,
+              distanceKm: parseFloat(totalRouteKm.toFixed(2)),
+              recipientName: user.name,
+              recipientPhone: user.phone || 'N/A',
+              deliveryOtp,
+              stops,
+              currentStopIndex: 0,
+            } as any,
+          });
+
+          return { group: orderGroup, orders, groupDelivery };
         },
         {
           timeout: DB_TIMEOUT_MS, // 20s
@@ -515,6 +520,7 @@ export class OrdersService {
       const responsePayload = {
         message: 'Orders placed successfully',
         orderGroupId: result.group.id,
+        deliveryId: result.groupDelivery.id,
         orders: result.orders,
         totalCount: result.orders.length,
         grandTotal: result.group.totalAmount,
@@ -522,23 +528,8 @@ export class OrdersService {
 
       await this.completeIdempotency(redisKey, responsePayload);
 
-      // Async Notification Handoff
-      this.handoffMultiNotifications(result.orders, preparedStores);
-
-      // ✅ Broadcast each order to admin dashboard in real-time
-      result.orders.forEach((order) => {
-        this.notificationsGateway.sendToAdminRoom({
-          id: order.id,
-          type: 'ORDER',
-          category: 'ORDER_CREATED',
-          title: 'New Order Placed',
-          message: `₦${order.total} order from ${order.user?.name || 'Customer'} at ${order.store?.name}`,
-          isRead: false,
-          createdAt: new Date().toISOString(),
-          metadata: { orderId: order.id },
-          recipientName: order.user?.name || '—',
-        });
-      });
+      // NOTE: Notifications are intentionally deferred to the payment webhook.
+      // They fire only after payment is confirmed, not at order creation.
 
       return responsePayload;
     } catch (error) {
@@ -557,47 +548,116 @@ export class OrdersService {
     try {
       const page = opts?.page || 1;
       const pageSize = opts?.pageSize || 10;
+      const statusFilter = opts?.status as OrderStatus | undefined;
 
-      // ✅ FIX 1: Use Prisma's native input type, not a custom interface
-      const where: Prisma.OrderWhereInput = { userId };
+      const orderInclude = {
+        items: { select: { quantity: true, nameSnap: true } },
+        store: { select: { name: true, logo: true } },
+      };
 
-      if (opts?.status) {
-        // ✅ FIX 2: Cast the string to the correct Enum type
-        where.status = opts.status as OrderStatus;
-      }
-
-      const [orders, total] = await this.prisma.$transaction([
+      // 1. Standalone orders (no group) — apply status filter directly
+      const [standaloneOrders, groups] = await Promise.all([
         this.prisma.order.findMany({
-          where,
+          where: {
+            userId,
+            orderGroupId: null,
+            ...(statusFilter && { status: statusFilter }),
+          },
+          orderBy: { createdAt: 'desc' },
+          include: orderInclude,
+        }),
+        // 2. OrderGroups — fetch all; we'll filter by status in-memory if needed
+        this.prisma.orderGroup.findMany({
+          where: { userId },
           orderBy: { createdAt: 'desc' },
           include: {
-            items: { select: { quantity: true, nameSnap: true } },
-            store: { select: { name: true, logo: true } },
+            orders: { include: orderInclude },
           },
-          skip: (page - 1) * pageSize,
-          take: pageSize,
         }),
-        this.prisma.order.count({ where }),
       ]);
 
-      return {
-        data: orders.map((order) => ({
-          id: order.id,
-          status: order.status,
-          total: order.total,
-          createdAt: order.createdAt,
-          // ✅ TypeScript now knows 'store' exists because the query is valid
-          storeName: order.store?.name,
-          storeLogo: order.store?.logo,
-          items: order.items?.map((i) => ({
+      // Derive a representative status for a group (earliest active status wins)
+      const STATUS_PRIORITY = [
+        'PENDING',
+        'CONFIRMED',
+        'PREPARING',
+        'READY',
+        'DISPATCHED',
+        'DELIVERED',
+        'CANCELLED',
+        'REJECTED',
+      ];
+      const deriveGroupStatus = (orders: any[]): string => {
+        const statuses = orders.map((o) => o.status as string);
+        for (const s of STATUS_PRIORITY) {
+          if (statuses.includes(s)) return s;
+        }
+        return statuses[0] || 'PENDING';
+      };
+
+      // Filter groups by status if requested (include group if any sub-order matches)
+      const filteredGroups = statusFilter
+        ? groups.filter((g) => g.orders.some((o) => o.status === statusFilter))
+        : groups;
+
+      // 3. Map to a unified list
+      const groupItems = filteredGroups.map((g) => ({
+        type: 'GROUP' as const,
+        id: g.id,
+        status: deriveGroupStatus(g.orders),
+        total: g.totalAmount,
+        createdAt: g.createdAt.toISOString(),
+        orderCount: g.orders.length,
+        stores: [
+          ...new Set(g.orders.map((o) => o.store?.name).filter(Boolean)),
+        ] as string[],
+        orders: g.orders.map((o) => ({
+          id: o.id,
+          status: o.status,
+          total: o.total,
+          storeName: o.store?.name,
+          storeLogo: o.store?.logo,
+          items: o.items.map((i) => ({
             name: i.nameSnap,
             quantity: i.quantity,
           })),
         })),
+        // Flat item list for display
+        items: g.orders.flatMap((o) =>
+          o.items.map((i) => ({ name: i.nameSnap, quantity: i.quantity })),
+        ),
+      }));
+
+      const singleItems = standaloneOrders.map((order) => ({
+        type: 'ORDER' as const,
+        id: order.id,
+        status: order.status as string,
+        total: order.total,
+        createdAt: order.createdAt.toISOString(),
+        storeName: order.store?.name,
+        storeLogo: order.store?.logo,
+        items: order.items.map((i) => ({
+          name: i.nameSnap,
+          quantity: i.quantity,
+        })),
+      }));
+
+      // 4. Merge, sort by date, paginate in-memory
+      const merged = [...groupItems, ...singleItems].sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      );
+
+      const total = merged.length;
+      const start = (page - 1) * pageSize;
+      const data = merged.slice(start, start + pageSize);
+
+      return {
+        data,
         total,
         page,
         pageSize,
-        hasMore: page * pageSize < total,
+        hasMore: start + pageSize < total,
       };
     } catch (error: any) {
       this.logger.error(
@@ -611,80 +671,229 @@ export class OrdersService {
   /**
    * Get detailed information about a specific order
    */
-  async getOrderDetails(userId: string, orderId: string) {
+  async getOrderDetails(userId: string, id: string) {
     try {
-      const order = await this.prisma.order.findFirst({
-        where: { id: orderId, userId: userId },
-        include: {
-          items: true,
-          delivery: {
-            include: {
-              dropoffAddress: true,
-              rider: {
-                select: {
-                  name: true,
-                  phone: true,
-                  image: true,
-                  vehicle: {
-                    select: { model: true, color: true, plateNumber: true },
-                  },
+      const orderInclude = {
+        items: true,
+        delivery: {
+          include: {
+            dropoffAddress: true,
+            rider: {
+              select: {
+                name: true,
+                phone: true,
+                image: true,
+                vehicle: {
+                  select: { model: true, color: true, plateNumber: true },
                 },
               },
             },
           },
-          store: {
-            select: {
-              name: true,
-              lat: true,
-              lng: true,
-              vendor: { select: { phone: true } },
-            },
+        },
+        store: {
+          select: {
+            name: true,
+            logo: true,
+            lat: true,
+            lng: true,
+            vendor: { select: { phone: true } },
           },
-          disputes: { select: { id: true, status: true } },
+        },
+        payment: {
+          select: {
+            id: true,
+            status: true,
+            method: true,
+            amount: true,
+            gateway: true,
+            paidAt: true,
+            reference: true,
+          },
+        },
+        disputes: { select: { id: true, status: true } },
+      };
+
+      const paymentSelect = {
+        id: true,
+        status: true,
+        method: true,
+        amount: true,
+        gateway: true,
+        paidAt: true,
+        reference: true,
+      };
+
+      // 1. Try single order first
+      const order = await this.prisma.order.findFirst({
+        where: { id, userId },
+        include: orderInclude,
+      });
+
+      if (order) {
+        const timeline = this.buildOrderTimeline(order);
+        // Resolve payment: may be on the order directly or on its group
+        let payment = order.payment;
+        if (!payment && order.orderGroupId) {
+          const grp = await this.prisma.orderGroup.findUnique({
+            where: { id: order.orderGroupId },
+            include: { payment: { select: paymentSelect } },
+          });
+          payment = grp?.payment ?? null;
+        }
+
+        return {
+          type: 'ORDER' as const,
+          id: order.id,
+          groupId: order.orderGroupId ?? null,
+          status: order.status,
+          total: order.total,
+          createdAt: order.createdAt,
+          deliveredAt: order.deliveredAt,
+          eta: this.calculateOrderETA(order),
+          distance: order.delivery?.distanceKm
+            ? `${order.delivery.distanceKm} km`
+            : null,
+          timeline,
+          rider: this.formatRiderInfo(order.delivery?.rider),
+          dispute: order.disputes?.[0] ?? null,
+          items: order.items.map((item) => ({
+            id: item.id,
+            name: item.nameSnap,
+            price: item.price,
+            quantity: item.quantity,
+          })),
+          addressDetails: order.delivery?.dropoffAddress
+            ? {
+                address: order.delivery.dropoffAddress.street,
+                city: order.delivery.dropoffAddress.city,
+              }
+            : null,
+          store: {
+            name: order.store?.name,
+            logo: order.store?.logo,
+            phone: order.store?.vendor?.phone,
+            location: { lat: order.store?.lat, lng: order.store?.lng },
+          },
+          payment: payment
+            ? {
+                status: payment.status,
+                method: payment.method ?? payment.gateway,
+                amount: payment.amount,
+                paidAt: payment.paidAt,
+                reference: payment.reference,
+              }
+            : null,
+          deliveryOtp: ['DELIVERED', 'CANCELLED'].includes(order.status)
+            ? undefined
+            : (order.delivery?.deliveryOtp ?? null),
+        };
+      }
+
+      // 2. Try OrderGroup
+      const group = await this.prisma.orderGroup.findFirst({
+        where: { id, userId },
+        include: {
+          orders: {
+            include: orderInclude,
+          },
+          payment: { select: paymentSelect },
         },
       });
 
-      if (!order) {
+      if (!group) {
         throw new NotFoundException('Order not found');
       }
 
-      const timeline = this.buildOrderTimeline(order);
+      // Fetch the single group delivery
+      const groupDelivery = await this.prisma.delivery.findFirst({
+        where: { orderGroupId: group.id },
+        include: {
+          dropoffAddress: true,
+          rider: {
+            select: {
+              name: true,
+              phone: true,
+              image: true,
+              vehicle: {
+                select: { model: true, color: true, plateNumber: true },
+              },
+            },
+          },
+        },
+      });
+
+      // Derive group-level status (earliest active status)
+      const STATUS_PRIORITY = [
+        'PENDING',
+        'CONFIRMED',
+        'PREPARING',
+        'READY',
+        'DISPATCHED',
+        'DELIVERED',
+        'CANCELLED',
+        'REJECTED',
+      ];
+      const statuses = group.orders.map((o) => o.status as string);
+      const groupStatus =
+        STATUS_PRIORITY.find((s) => statuses.includes(s)) ??
+        statuses[0] ??
+        'PENDING';
 
       return {
-        id: order.id,
-        status: order.status,
-        total: order.total,
-        createdAt: order.createdAt,
-        deliveredAt: order.deliveredAt,
-        eta: this.calculateOrderETA(order),
-        distance: order.delivery?.distanceKm
-          ? `${order.delivery.distanceKm} km`
-          : null,
-        timeline: timeline,
-        rider: this.formatRiderInfo(order.delivery?.rider),
-        dispute: order.disputes[0] || null,
-        items: order.items.map((item) => ({
-          id: item.id,
-          name: item.nameSnap,
-          price: item.price,
-          quantity: item.quantity,
-        })),
-        addressDetails: order.delivery?.dropoffAddress
+        type: 'GROUP' as const,
+        id: group.id,
+        status: groupStatus,
+        total: group.totalAmount,
+        createdAt: group.createdAt,
+        payment: group.payment
           ? {
-              address: order.delivery.dropoffAddress.street,
-              city: order.delivery.dropoffAddress.city,
+              status: group.payment.status,
+              method: group.payment.method ?? group.payment.gateway,
+              amount: group.payment.amount,
+              paidAt: group.payment.paidAt,
+              reference: group.payment.reference,
             }
           : null,
-        store: {
-          name: order.store?.name,
-          phone: order.store?.vendor?.phone,
-          location: { lat: order.store?.lat, lng: order.store?.lng },
-        },
+        deliveryOtp: ['DELIVERED', 'CANCELLED'].includes(groupStatus)
+          ? undefined
+          : (groupDelivery?.deliveryOtp ?? null),
+        delivery: groupDelivery
+          ? {
+              status: groupDelivery.status,
+              distanceKm: groupDelivery.distanceKm,
+              stops: groupDelivery.stops,
+              rider: this.formatRiderInfo(groupDelivery.rider),
+              address: groupDelivery.dropoffAddress
+                ? {
+                    address: groupDelivery.dropoffAddress.street,
+                    city: groupDelivery.dropoffAddress.city,
+                  }
+                : null,
+            }
+          : null,
+        orders: group.orders.map((o) => ({
+          id: o.id,
+          status: o.status,
+          total: o.total,
+          store: {
+            name: o.store?.name,
+            logo: o.store?.logo,
+            phone: o.store?.vendor?.phone,
+          },
+          items: o.items.map((item) => ({
+            id: item.id,
+            name: item.nameSnap,
+            price: item.price,
+            quantity: item.quantity,
+          })),
+          // Delivery is now group-level (see top-level `delivery` field)
+          delivery: null,
+          timeline: this.buildOrderTimeline(o),
+          dispute: o.disputes?.[0] ?? null,
+        })),
       };
     } catch (error) {
-      if (error instanceof NotFoundException) {
-        throw error;
-      }
+      if (error instanceof NotFoundException) throw error;
       this.logger.error('Failed to retrieve order details', error);
       throw new BadRequestException('Failed to retrieve order details');
     }
@@ -883,7 +1092,6 @@ export class OrdersService {
       0,
     );
 
-    // ── Phase 3: Build PreparedStoreContext in optimized route order ──
     let calculatedGrandTotal = 0;
 
     const storeMap = new Map(resolvedStores.map((s) => [s.storeId, s]));
@@ -892,13 +1100,11 @@ export class OrdersService {
       (storeId) => {
         const s = storeMap.get(storeId)!;
 
-        // Proportional fee share: store's share of total delivery fee
         const deliveryFee =
           grandSubtotal > 0
             ? Math.round(totalDeliveryFee * (s.itemsTotal / grandSubtotal))
             : Math.round(totalDeliveryFee / resolvedStores.length);
 
-        // Point-to-point distance stored on Delivery record
         const distance = this.pricingService.calculateDistance(
           s.pickupAddress.lat,
           s.pickupAddress.lng,
@@ -927,7 +1133,13 @@ export class OrdersService {
       },
     );
 
-    return { user, preparedStores, calculatedGrandTotal };
+    return {
+      user,
+      preparedStores,
+      calculatedGrandTotal,
+      totalRouteKm,
+      dropoffAddress,
+    };
   }
 
   // ==================== HELPER: ATOMIC STOCK ====================
@@ -961,119 +1173,6 @@ export class OrdersService {
         );
       }
     }
-  }
-
-  // ==================== HELPER: NOTIFICATIONS (DURABLE) ====================
-
-  private async handoffNotifications(order: any, emailItems: string[]) {
-    try {
-      // 1. Push to Durable Queue (Reliability)
-      await this.queueService.enqueueOrderNotification({
-        orderId: order.id,
-        userId: order.userId,
-        type: 'SINGLE_ORDER',
-      });
-
-      // 2. Optimistic Updates (Speed)
-      const context: OrderNotificationContext = {
-        storeOwnerId: order.store.vendorId,
-        storeName: order.store.name,
-        storeOwnerEmail: order.store.vendor?.email,
-        customerEmail: order.user.email,
-        customerName: order.user.name,
-      };
-
-      this.sendOrderNotifications(order, context, emailItems as any).catch(
-        (e) => this.logger.error(`Optimistic notification failed`, e),
-      );
-    } catch (e) {
-      this.logger.error(
-        `Failed to enqueue notification for order ${order.id}`,
-        e,
-      );
-    }
-  }
-
-  private async handoffMultiNotifications(
-    orders: any[],
-    prepared: PreparedStoreContext[],
-  ) {
-    try {
-      // Bulk Enqueue
-      const jobs = orders.map((o) => ({
-        name: 'order.notifications',
-        data: { orderId: o.id, userId: o.userId, type: 'MULTI_ORDER' },
-      }));
-
-      await this.queueService.enqueueOrderNotificationBulk(jobs);
-
-      // Optimistic UI updates
-      orders.forEach((order, idx) => {
-        const prep = prepared[idx];
-        const context: OrderNotificationContext = {
-          storeOwnerId: prep.store.vendorId,
-          storeName: prep.store.name,
-          storeOwnerEmail: prep.store.vendor?.email,
-          customerEmail: order.user.email,
-          customerName: order.user.name,
-        };
-        this.sendOrderNotifications(
-          order,
-          context,
-          prep.emailItems as any,
-        ).catch((e) =>
-          this.logger.error(`Optimistic multi-notification failed`, e),
-        );
-      });
-    } catch (e) {
-      this.logger.error(`Failed to enqueue multi-order notifications`, e);
-    }
-  }
-
-  private async sendOrderNotifications(
-    order: any,
-    context: OrderNotificationContext,
-    items: any[],
-  ) {
-    await Promise.all([
-      this.vendorOrdersStreamService.emitNewOrder(
-        order.storeId,
-        order.id,
-        {
-          id: order.id,
-          status: order.status,
-          total: order.total,
-          customerName: context.customerName,
-          customerEmail: context.customerEmail,
-          storeName: context.storeName,
-          itemCount: items.length,
-          createdAt: order.createdAt,
-        },
-        context.storeOwnerId,
-      ),
-      this.notificationFacade.sendOrderNotifications(
-        order.userId,
-        context.storeOwnerId,
-        order.id,
-        context.storeName,
-        order.total,
-        context.customerEmail,
-        context.storeOwnerEmail,
-        items,
-      ),
-      this.notificationsGateway.sendOrderUpdate(order.id, {
-        status: order.status,
-        total: order.total,
-        timeline: [
-          {
-            status: 'PLACED',
-            label: 'Order Placed',
-            time: order.createdAt.toISOString(),
-            icon: 'default',
-          },
-        ],
-      }),
-    ]);
   }
 
   // ==================== HELPER: IDEMPOTENCY & VALIDATION ====================

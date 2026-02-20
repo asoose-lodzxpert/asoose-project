@@ -139,6 +139,13 @@ export class MapsService {
     coordinates: Array<{ latitude: number; longitude: number }>;
     distance: { text: string; value: number };
     duration: { text: string; value: number };
+    steps?: Array<{
+      instruction: string;
+      distance: { text: string; value: number };
+      duration: { text: string; value: number };
+      endLocation: { latitude: number; longitude: number };
+      maneuver?: string;
+    }>;
     error?: string;
   }> {
     if (!originLat || !originLng || !destLat || !destLng) {
@@ -173,10 +180,29 @@ export class MapsService {
           longitude: lng,
         }));
 
+      const steps = (route.legs[0].steps || []).map((step: any) => ({
+        instruction: step.html_instructions
+          .replace(/<b>/g, '')
+          .replace(/<\/b>/g, '')
+          .replace(/<div[^>]*>/g, ' ')
+          .replace(/<\/div>/g, '')
+          .replace(/<[^>]+>/g, '')
+          .replace(/\s+/g, ' ')
+          .trim(),
+        distance: step.distance,
+        duration: step.duration,
+        endLocation: {
+          latitude: step.end_location.lat,
+          longitude: step.end_location.lng,
+        },
+        maneuver: step.maneuver || undefined,
+      }));
+
       return {
         coordinates: points,
         distance: route.legs[0].distance,
         duration: route.legs[0].duration,
+        steps,
       };
     } catch (error) {
       this.appLogger.error('Error fetching directions', error?.stack, {

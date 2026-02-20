@@ -51,7 +51,7 @@ export default function DriverSelectorModal({
   // This tells TypeScript that 'data' will have a 'data' property containing the array
   const { data, isLoading } = useSWR<RidersApiResponse>(
     isOpen
-      ? `/super-admin/riders?status=ONLINE&limit=50&search=${search}`
+      ? `/super-admin/drivers?status=ONLINE&limit=50&search=${search}`
       : null,
     fetcher,
   );

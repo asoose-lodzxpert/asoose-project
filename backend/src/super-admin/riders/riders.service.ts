@@ -7,6 +7,7 @@ import {
 import { PrismaService } from 'src/prisma/prisma.service';
 import {
   UserStatus,
+  UserRole,
   VerificationStatus,
   RideStatus,
   Prisma,
@@ -14,6 +15,9 @@ import {
 import { EmailProducer } from 'src/mail/email.producer';
 import { ActivityLogService } from 'src/common/services/activity-log.services';
 import { RiderAccountNotificationsService } from 'src/riders/notifications/rider-account-notifications.service';
+import { TokenRevocationService } from 'src/auth/token-revocation.service';
+import { NotificationsGateway } from 'src/notifications/notifications.gateway';
+import { TransactionLedgerService } from 'src/super-admin/transactions/transaction-ledger.service';
 
 @Injectable()
 export class RidersService {
@@ -24,6 +28,9 @@ export class RidersService {
     private emailProducer: EmailProducer,
     private logService: ActivityLogService,
     private riderNotificationsService: RiderAccountNotificationsService,
+    private tokenRevocationService: TokenRevocationService,
+    private notificationsGateway: NotificationsGateway,
+    private transactionLedger: TransactionLedgerService,
   ) {}
 
   async findAll(params: {
@@ -69,9 +76,10 @@ export class RidersService {
       filters.push({ status: status as UserStatus });
     }
 
-    const where: Prisma.RiderWhereInput = filters.length
-      ? { AND: filters }
-      : {};
+    const where: Prisma.RiderWhereInput = {
+      role: UserRole.RIDER, // Only return RIDER-role users, not DRIVERs
+      ...(filters.length ? { AND: filters } : {}),
+    };
 
     const [riders, total, stats] = await Promise.all([
       this.prisma.rider.findMany({
@@ -97,6 +105,72 @@ export class RidersService {
         pages: Math.ceil(total / take),
       },
       stats,
+    };
+  }
+
+  async findAllDrivers(params: {
+    page: number;
+    limit: number;
+    search?: string;
+    status?: string;
+  }) {
+    const { page, limit, search, status } = params;
+    const take = Number(limit);
+    const skip = (Number(page) - 1) * take;
+
+    const filters: Prisma.RiderWhereInput[] = [];
+
+    if (search) {
+      filters.push({
+        OR: [
+          { name: { contains: search, mode: 'insensitive' } },
+          { email: { contains: search, mode: 'insensitive' } },
+          { phone: { contains: search, mode: 'insensitive' } },
+          {
+            vehicle: { plateNumber: { contains: search, mode: 'insensitive' } },
+          },
+        ],
+      });
+    }
+
+    if (status === 'ONLINE') {
+      filters.push({ status: UserStatus.ACTIVE, isOnline: true });
+    } else if (status === 'SUSPENDED') {
+      filters.push({ status: UserStatus.SUSPENDED });
+    } else if (
+      status &&
+      Object.values(UserStatus).includes(status as UserStatus)
+    ) {
+      filters.push({ status: status as UserStatus });
+    }
+
+    const where: Prisma.RiderWhereInput = {
+      role: UserRole.DRIVER, // Only return DRIVER-role users, not delivery RIDERs
+      ...(filters.length ? { AND: filters } : {}),
+    };
+
+    const [drivers, total] = await Promise.all([
+      this.prisma.rider.findMany({
+        where,
+        skip,
+        take,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          vehicle: { include: { documents: true } },
+          documents: true,
+        },
+      }),
+      this.prisma.rider.count({ where }),
+    ]);
+
+    return {
+      data: drivers.map((driver) => this.mapToRiderDTO(driver)),
+      meta: {
+        total,
+        page: Number(page),
+        limit: take,
+        pages: Math.ceil(total / take),
+      },
     };
   }
 
@@ -185,8 +259,8 @@ export class RidersService {
     const rider = await this.prisma.rider.findUnique({ where: { id } });
     if (!rider) throw new NotFoundException('Rider not found');
 
-    return this.prisma.$transaction(async (tx) => {
-      const updatedRider = await tx.rider.update({
+    const updatedRider = await this.prisma.$transaction(async (tx) => {
+      const result = await tx.rider.update({
         where: { id },
         data: { status },
       });
@@ -210,10 +284,20 @@ export class RidersService {
         });
       }
 
-      return updatedRider;
+      return result;
     });
 
-    // Notify rider of status change (after transaction completes)
+    // Revoke sessions on ban/suspend, clear revocation on reinstatement
+    if (status === 'BANNED' || status === 'SUSPENDED') {
+      await this.tokenRevocationService.revokeUser(id);
+      this.notificationsGateway.server
+        .to(`user_${id}`)
+        .emit('force_logout', { reason: status.toLowerCase() });
+    } else if (status === 'ACTIVE') {
+      await this.tokenRevocationService.clearRevocation(id);
+    }
+
+    // Notify rider of status change
     try {
       if (['ACTIVE', 'SUSPENDED', 'BANNED', 'INACTIVE'].includes(status)) {
         const reason =
@@ -235,6 +319,8 @@ export class RidersService {
         `Failed to notify rider of status change: ${error.message}`,
       );
     }
+
+    return updatedRider;
   }
 
   async verifyDocument(
@@ -353,6 +439,7 @@ export class RidersService {
     type: 'CREDIT' | 'DEBIT',
     amount: number,
     reason: string,
+    adminId: string,
   ) {
     const rider = await this.prisma.rider.findUnique({ where: { id: userId } });
 
@@ -367,18 +454,28 @@ export class RidersService {
         data: { walletBalance: newBalance },
       });
 
-      // Using tx.activityLog or service if injected. Since we injected service, using that.
-      // However, for consistency with transaction, ideally we'd pass TX, but service doesn't support it yet.
-      // We will log after transaction or use the existing log logic if acceptable.
-      // Original code used tx.activityLog.create. We'll stick to that pattern if this service method is meant to use the DB transaction directly,
-      // OR we use the service. Since the prompt focused on adding missing logs, we'll keep this one as is or update it to use the service if preferred.
-      // The instruction was "rewrite the modified function... with the implementation".
-      // I'll update it to use the consistent logService pattern if possible, but the original used tx directly.
-      // For safety, I will keep the transaction-safe logging here as implemented originally, but updated to ensure consistency.
+      // Create ledger transaction record for auditability
+      await tx.transaction.create({
+        data: {
+          type: 'ADJUSTMENT',
+          amount,
+          entityType: 'RIDER',
+          entityId: rider.id,
+          description: reason,
+          status: 'COMPLETED',
+          balanceBefore: rider.walletBalance,
+          balanceAfter: newBalance,
+          metadata: {
+            adjustedBy: adminId,
+            adjustmentType: type,
+            reason,
+          },
+        },
+      });
 
       await tx.activityLog.create({
         data: {
-          userId: 'SYSTEM', // Should ideally be adminId if passed
+          userId: adminId,
           action: `WALLET_${type}`,
           target: rider.id,
           metadata: {
@@ -619,6 +716,12 @@ export class RidersService {
 
     // 3. (Optional) Trigger Socket Event to Force Logout on Device
     // this.socketGateway.server.to(`rider_${riderId}`).emit('force_logout');
+
+    // Revoke all active sessions + force socket disconnect
+    await this.tokenRevocationService.revokeUser(riderId);
+    this.notificationsGateway.server
+      .to(`user_${riderId}`)
+      .emit('force_logout', { reason: action.toLowerCase() });
 
     return { success: true, message: `Rider has been ${action}ED.` };
   }

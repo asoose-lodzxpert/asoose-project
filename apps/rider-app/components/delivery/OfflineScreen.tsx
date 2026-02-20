@@ -12,8 +12,8 @@ import {
   StyleSheet,
   View,
   Platform,
-  SafeAreaView,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function OfflineScreen() {
   const { goOnline } = useJobs();
@@ -181,8 +181,8 @@ const styles = StyleSheet.create({
   masterContainer: {
     flex: 1,
     paddingHorizontal: 24,
-    paddingTop: Platform.OS === "ios" ? 10 : 20,
-    paddingBottom: 20,
+    paddingTop: 5,
+    paddingBottom: 5,
     justifyContent: "space-between",
   },
   header: {

@@ -7,6 +7,7 @@ import {
   ATOMIC_ASSIGN_DELIVERY,
   ATOMIC_DECLINE_DELIVERY,
   ATOMIC_COMPLETE_DELIVERY,
+  ATOMIC_UPDATE_RIDER_LOCATION,
 } from '../redis/lua-scripts';
 
 export type RiderStatus = 'ONLINE' | 'OFFLINE';
@@ -47,16 +48,19 @@ export class RiderStateService {
     const hexId = this.geo.latLngToHex(lat, lng);
     const timestamp = Date.now();
 
-    // Set status in Redis
-    await this.redis.getClient().set(`rider:${riderId}:status`, 'ONLINE');
-    await this.redis
-      .getClient()
-      .set(`rider:${riderId}:location`, JSON.stringify({ lat, lng }));
+    // Set status, location, hex and add to hex-set atomically
+    const client = this.redis.getClient();
+    await client.set(`rider:${riderId}:status`, 'ONLINE');
+    await client.set(`rider:${riderId}:location`, JSON.stringify({ lat, lng }));
+    await client.set(`rider:${riderId}:hex`, hexId);
+    await client.sadd(`hex:${hexId}:riders`, riderId);
     await this.redis.updateLastSeen(riderId);
     await this.redis.addRiderToGeoIndex(riderId, lat, lng);
 
     this.eventBus.emit('rider.online', { riderId, lat, lng, hexId, timestamp });
-    this.logger.log(`Rider online: ${riderId} at [${lat}, ${lng}]`);
+    this.logger.log(
+      `Rider online: ${riderId} at [${lat}, ${lng}] hex=${hexId}`,
+    );
   }
 
   async setOffline(riderId: string, reason?: string): Promise<void> {
@@ -77,9 +81,35 @@ export class RiderStateService {
     const hexId = this.geo.latLngToHex(lat, lng);
     const timestamp = Date.now();
 
-    await this.redis
+    const result = await this.redis
       .getClient()
-      .set(`rider:${riderId}:location`, JSON.stringify({ lat, lng }));
+      .eval(
+        ATOMIC_UPDATE_RIDER_LOCATION,
+        0,
+        riderId,
+        lat.toString(),
+        lng.toString(),
+        hexId,
+        timestamp.toString(),
+      );
+
+    if (result === -1) {
+      this.logger.warn(
+        `[LOC] Rider ${riderId}: SKIPPED — status is not ONLINE (Lua returned -1)`,
+      );
+      return;
+    }
+
+    if (result === 1) {
+      this.logger.debug(
+        `[LOC] Rider ${riderId}: hex CHANGED → now in ${hexId} — hex-set updated`,
+      );
+    } else if (result === 2) {
+      this.logger.warn(
+        `[LOC] Rider ${riderId}: SELF-HEALED — was missing from hex-set ${hexId}, re-added`,
+      );
+    }
+
     await this.redis.addRiderToGeoIndex(riderId, lat, lng);
 
     this.eventBus.emit('rider.location.updated', {
@@ -89,7 +119,9 @@ export class RiderStateService {
       hexId,
       timestamp,
     });
-    this.logger.debug(`Rider location updated: ${riderId} -> [${lat}, ${lng}]`);
+    this.logger.debug(
+      `Rider location updated: ${riderId} -> [${lat}, ${lng}] hex=${hexId}`,
+    );
   }
 
   // ========================================

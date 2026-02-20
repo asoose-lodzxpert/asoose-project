@@ -97,12 +97,15 @@ export class RidersController {
   async adjustWallet(
     @Param('id') id: string,
     @Body() body: { type: 'CREDIT' | 'DEBIT'; amount: number; reason: string },
+    @Req() req: any,
   ) {
+    const adminId = req.user?.id || req.user?.userId || 'SYSTEM';
     return this.ridersService.adjustWallet(
       id,
       body.type,
       body.amount,
       body.reason,
+      adminId,
     );
   }
 

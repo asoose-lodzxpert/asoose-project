@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import {
   ArrowLeft,
   Ban,
@@ -11,8 +11,6 @@ import {
   Clock,
   Star,
   CreditCard,
-  CheckCircle,
-  MapPin,
   RefreshCw,
   UserPlus,
   UserMinus,
@@ -23,6 +21,7 @@ import { getSession } from "next-auth/react";
 import { fetcher } from "../../hooks/useSuperAdminFetch";
 import RideDetailSkeleton from "./skeleton";
 import DriverSelectorModal from "./component/DriverSelectorModal";
+import ForceStatusModal from "./component/ForceStatusModal";
 
 // Matches Backend DTO
 interface RideDetail {
@@ -69,12 +68,12 @@ interface RideDetail {
 
 export default function RideDetailPage() {
   const params = useParams();
-  const router = useRouter();
   const id = params?.id as string;
 
   // State for Modals & Loading
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
   const [isRetrying, setIsRetrying] = useState(false);
+  const [isForceStatusOpen, setIsForceStatusOpen] = useState(false);
 
   // Data Fetching
   const {
@@ -231,6 +230,47 @@ export default function RideDetailPage() {
     }
   };
 
+  // Force Status Override (Super Admin)
+  const handleForceStatus = async (status: string, reason: string) => {
+    try {
+      const token = await getAuthToken();
+      const res = await fetch(
+        `${API_URL}/super-admin/rides/${id}/force-status`,
+        {
+          method: "PATCH",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ status, reason }),
+        },
+      );
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Status override failed");
+
+      Swal.fire({
+        title: "Updated",
+        text: `Ride status changed to ${status}`,
+        icon: "success",
+        background: "#1E293B",
+        color: "#fff",
+        timer: 1500,
+        showConfirmButton: false,
+      });
+      setIsForceStatusOpen(false);
+      mutate();
+    } catch (err: any) {
+      Swal.fire({
+        title: "Error",
+        text: err.message,
+        icon: "error",
+        background: "#1E293B",
+        color: "#fff",
+      });
+    }
+  };
+
   // Cancel Ride
   const handleCancelRide = async () => {
     const result = await Swal.fire({
@@ -368,6 +408,14 @@ export default function RideDetailPage() {
                 <Ban className="w-4 h-4" /> Cancel
               </button>
             )}
+
+            {/* Force Status Override (Always visible to Super Admin) */}
+            <button
+              onClick={() => setIsForceStatusOpen(true)}
+              className="px-3 py-2 bg-yellow-500/10 text-yellow-500 border border-yellow-500/20 rounded-lg hover:bg-yellow-500 hover:text-black transition-colors flex items-center gap-2 font-bold text-sm"
+            >
+              <RefreshCw className="w-4 h-4" /> Force Status
+            </button>
           </div>
         </div>
 
@@ -541,11 +589,16 @@ export default function RideDetailPage() {
                   </div>
                 </>
               ) : (
-                <div className="text-center py-6 bg-[#0F172A] rounded-xl border border-dashed border-gray-700">
-                  <Loader2 className="w-6 h-6 text-yellow-500 animate-spin mx-auto mb-2" />
-                  <p className="text-gray-400 text-sm">
-                    Searching for driver...
+                <div className="text-center py-6 bg-[#0F172A] rounded-xl border border-dashed border-gray-700 space-y-3">
+                  <p className="text-gray-500 text-xs font-bold uppercase">
+                    No Driver Assigned
                   </p>
+                  <button
+                    onClick={() => setIsAssignModalOpen(true)}
+                    className="w-full py-2 bg-purple-500/10 text-purple-400 border border-purple-500/20 rounded-lg text-xs font-bold uppercase hover:bg-purple-500 hover:text-white transition-all"
+                  >
+                    Assign Driver
+                  </button>
                 </div>
               )}
             </div>
@@ -621,6 +674,16 @@ export default function RideDetailPage() {
         onClose={() => setIsAssignModalOpen(false)}
         onAssign={handleManualAssign}
       />
+
+      {/* Force Status Modal */}
+      {ride && (
+        <ForceStatusModal
+          isOpen={isForceStatusOpen}
+          currentStatus={ride.status}
+          onClose={() => setIsForceStatusOpen(false)}
+          onConfirm={handleForceStatus}
+        />
+      )}
     </div>
   );
 }

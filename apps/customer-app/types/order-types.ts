@@ -9,19 +9,29 @@ export enum OrderStatus {
   REJECTED = "REJECTED",
 }
 
+export type SubOrder = {
+  id: string;
+  status: OrderStatus;
+  total: number;
+  storeName?: string;
+  storeLogo?: string | null;
+  items: Array<{ name: string; quantity: number }>;
+};
+
 export type Order = {
+  type: "ORDER" | "GROUP";
   id: string;
   status: OrderStatus;
   createdAt: string;
-  updatedAt: string;
+  updatedAt?: string;
   total: number;
-  items: Array<{
-    id: string;
-    name: string;
-    price: number;
-    qty: number;
-    image?: string;
-  }>;
+  // Single order fields
   storeName?: string;
+  storeLogo?: string | null;
+  // Group order fields
+  orderCount?: number;
+  stores?: string[];
+  orders?: SubOrder[];
+  items: Array<{ name: string; quantity: number }>;
   [key: string]: any;
 };

@@ -8,6 +8,7 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { TripsModule } from '../users/trips/trips.module';
 import { TransactionsModule } from '../super-admin/transactions/transaction.module';
+import { EmailQueue } from '../queue/email.queue';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { TransactionsModule } from '../super-admin/transactions/transaction.modu
     forwardRef(() => TripsModule), // Existing forwardRef
     // FIX: Wrap TransactionsModule with forwardRef
     forwardRef(() => TransactionsModule),
+    EmailQueue,
   ],
   controllers: [PaymentController],
   providers: [

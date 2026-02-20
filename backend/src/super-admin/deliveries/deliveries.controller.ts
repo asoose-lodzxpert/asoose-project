@@ -65,4 +65,19 @@ export class DeliveriesController {
     const adminId = req.user.id || req.user.sub;
     return this.deliveriesService.assignRider(id, riderId, adminId);
   }
+
+  /**
+   * Assign one rider to all deliveries belonging to an OrderGroup.
+   * POST /super-admin/deliveries/groups/:groupId/assign-rider
+   */
+  @Post('groups/:groupId/assign-rider')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN_MANAGER)
+  assignRiderToGroup(
+    @Param('groupId') groupId: string,
+    @Body('riderId') riderId: string,
+    @Req() req: any,
+  ) {
+    const adminId = req.user.id || req.user.sub;
+    return this.deliveriesService.assignRiderToGroup(groupId, riderId, adminId);
+  }
 }

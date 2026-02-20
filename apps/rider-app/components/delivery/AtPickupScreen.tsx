@@ -1,128 +1,181 @@
-﻿import { ThemedText } from "@/components/themed-text";
+﻿import React, { useState } from "react";
+import { Linking, Pressable, StyleSheet, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { ThemedText } from "@/components/themed-text";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useJobs } from "@/context/JobContext";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { resolveAddress } from "@/utils/address";
 import CancelJobModal from "@/components/delivery/CancelJobModal";
-import React, { useState } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
 
 export default function AtPickupScreen() {
   const { activeJob, confirmPickup, cancelJob } = useJobs();
-  const primary = useThemeColor({}, "brandPrimary");
-  const surface = useThemeColor({}, "surfaceBackground");
-  const subtle = useThemeColor({}, "surfaceSubtle");
-  const textPrimary = useThemeColor({}, "textPrimary");
-  const textMuted = useThemeColor({}, "textMuted");
-  const danger = useThemeColor({}, "statusError");
-
+  const { bottom } = useSafeAreaInsets();
   const [cancelVisible, setCancelVisible] = useState(false);
 
+  const colors = {
+    bg: useThemeColor({}, "surfaceBackground"),
+    card: useThemeColor({}, "surfaceCard"),
+    border: useThemeColor({}, "borderDefault"),
+    primary: useThemeColor({}, "brandPrimary"),
+    text: useThemeColor({}, "textPrimary"),
+    muted: useThemeColor({}, "textMuted"),
+    danger: useThemeColor({}, "statusError"),
+    success: useThemeColor({}, "statusSuccess"),
+    onPrimary: useThemeColor({}, "textOnPrimary"),
+  };
+
   if (!activeJob) return null;
+
   const isRide = activeJob.jobType === "ride";
   const pickup = resolveAddress(activeJob.pickupAddress);
+  const isMultiStop = !isRide && (activeJob.stops?.length ?? 0) > 1;
+  const currentStopIndex = activeJob.currentStopIndex ?? 0;
+  const storeName =
+    activeJob.stops?.[currentStopIndex]?.storeName ?? activeJob.customerName;
+
+  const btnLabel = isRide
+    ? "Confirm Pickup"
+    : isMultiStop && currentStopIndex < (activeJob.stops?.length ?? 1) - 1
+      ? "Collected — Next Stop"
+      : "Confirm Pickup";
 
   return (
-    <>
-      <View style={[styles.sheet, { backgroundColor: surface }]}>
-        {/* Status */}
-        <View style={styles.statusRow}>
-          <IconSymbol name="checkmark.circle.fill" size={20} color="#10B981" />
+    <View
+      style={[
+        styles.wrapper,
+        { backgroundColor: colors.bg, paddingBottom: bottom + 16 },
+      ]}
+    >
+      <View style={styles.header}>
+        <View style={styles.statusGroup}>
+          <View style={[styles.dot, { backgroundColor: colors.success }]} />
           <ThemedText style={styles.statusText}>
-            {isRide ? "Arrived at pickup" : "Arrived at pickup"}
+            {isMultiStop
+              ? `Stop ${currentStopIndex + 1}/${activeJob.stops?.length}`
+              : "At Pickup"}
+          </ThemedText>
+        </View>
+        <ThemedText style={[styles.instruction, { color: colors.muted }]}>
+          {isRide ? "Ready for passenger" : "Collect order"}
+        </ThemedText>
+      </View>
+
+      <View
+        style={[
+          styles.card,
+          { backgroundColor: colors.card, borderColor: colors.border },
+        ]}
+      >
+        <View style={styles.cardContent}>
+          <ThemedText style={[styles.label, { color: colors.muted }]}>
+            {isRide ? "PICKUP LOCATION" : "VENDOR"}
+          </ThemedText>
+          <ThemedText style={styles.name}>{storeName}</ThemedText>
+          <ThemedText
+            numberOfLines={1}
+            style={[styles.address, { color: colors.muted }]}
+          >
+            {pickup}
           </ThemedText>
         </View>
 
-        {/* Instruction */}
-        <ThemedText style={[styles.instruction, { color: textMuted }]}>
-          {isRide
-            ? "Pick up your passenger"
-            : "Collect the order from the vendor"}
-        </ThemedText>
-
-        {/* Address card */}
-        <View style={[styles.addressCard, { backgroundColor: subtle }]}>
-          <IconSymbol name="location.fill" size={15} color={primary} />
-          <View style={{ flex: 1 }}>
-            <ThemedText style={[styles.customerName, { color: textPrimary }]}>
-              {activeJob.customerName}
-            </ThemedText>
-            {pickup ? (
-              <ThemedText
-                style={[styles.addressText, { color: textMuted }]}
-                numberOfLines={2}
-              >
-                {pickup}
-              </ThemedText>
-            ) : null}
-          </View>
-        </View>
-
-        {/* Actions */}
-        <View style={styles.actions}>
+        {activeJob.pickupContactPhone && (
           <Pressable
-            style={[styles.primaryBtn, { backgroundColor: primary }]}
-            onPress={confirmPickup}
+            onPress={() =>
+              Linking.openURL(`tel:${activeJob.pickupContactPhone}`)
+            }
+            style={styles.callBtn}
           >
-            <IconSymbol name="checkmark" size={16} color="#fff" />
-            <ThemedText style={styles.primaryBtnText}>
-              {isRide ? "Confirm pickup" : "Confirm pickup"}
-            </ThemedText>
+            <IconSymbol name="phone" size={18} color={colors.primary} />
           </Pressable>
-          <Pressable
-            style={styles.cancelLink}
-            onPress={() => setCancelVisible(true)}
-          >
-            <ThemedText style={[styles.cancelText, { color: danger }]}>
-              Cancel job
-            </ThemedText>
-          </Pressable>
-        </View>
+        )}
+      </View>
+
+      <View style={styles.footer}>
+        <Pressable
+          onPress={confirmPickup}
+          style={({ pressed }) => [
+            styles.mainBtn,
+            { backgroundColor: colors.primary, opacity: pressed ? 0.9 : 1 },
+          ]}
+        >
+          <ThemedText style={[styles.btnText, { color: colors.onPrimary }]}>
+            {btnLabel.toUpperCase()}
+          </ThemedText>
+        </Pressable>
+
+        <Pressable
+          onPress={() => setCancelVisible(true)}
+          style={styles.cancelBtn}
+        >
+          <ThemedText style={[styles.cancelText, { color: colors.danger }]}>
+            Cancel Job
+          </ThemedText>
+        </Pressable>
       </View>
 
       <CancelJobModal
         visible={cancelVisible}
         onClose={() => setCancelVisible(false)}
-        onConfirm={async (reason) => {
-          await cancelJob(activeJob.id, activeJob.jobType, reason);
+        onConfirm={async (r) => {
+          await cancelJob(activeJob.id, activeJob.jobType, r);
           setCancelVisible(false);
         }}
       />
-    </>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  sheet: {
+  wrapper: {
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    paddingHorizontal: 18,
-    paddingTop: 18,
-    paddingBottom: 36,
-    gap: 12,
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    gap: 16,
   },
-  statusRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  statusText: { fontSize: 15, fontWeight: "700" },
-  instruction: { fontSize: 13 },
-  addressCard: {
+  header: {
     flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 10,
-    padding: 14,
-    borderRadius: 14,
+    justifyContent: "space-between",
+    alignItems: "center",
   },
-  customerName: { fontSize: 14, fontWeight: "600", marginBottom: 2 },
-  addressText: { fontSize: 13 },
-  actions: { gap: 8 },
-  primaryBtn: {
-    height: 50,
-    borderRadius: 14,
+  statusGroup: { flexDirection: "row", alignItems: "center", gap: 6 },
+  dot: { width: 8, height: 8, borderRadius: 4 },
+  statusText: {
+    fontSize: 12,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  instruction: { fontSize: 12, fontWeight: "500" },
+  card: {
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 16,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
   },
-  primaryBtnText: { fontSize: 14, fontWeight: "600", color: "#fff" },
-  cancelLink: { alignItems: "center", paddingVertical: 8 },
-  cancelText: { fontSize: 13, fontWeight: "500" },
+  cardContent: { flex: 1, gap: 2 },
+  label: { fontSize: 10, fontWeight: "700", letterSpacing: 0.5 },
+  name: { fontSize: 16, fontWeight: "700" },
+  address: { fontSize: 13 },
+  callBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#8881",
+  },
+  footer: { gap: 12 },
+  mainBtn: {
+    height: 60,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  btnText: { fontSize: 14, fontWeight: "800", letterSpacing: 1 },
+  cancelBtn: { alignItems: "center" },
+  cancelText: { fontSize: 13, fontWeight: "600" },
 });

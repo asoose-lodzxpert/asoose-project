@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Image,
   Pressable,
+  Text,
 } from "react-native";
 import { RelativePathString, useRouter } from "expo-router";
 import { ThemedInput } from "@/components/ThemedInput";
@@ -17,6 +18,7 @@ import { CategoryFilter } from "@/components/store/CategoryFilter";
 import { ThemedView } from "@/components/themed-view";
 import { VendorCard } from "@/components/home/VendorCard";
 import { useThemeColor } from "@/hooks/use-theme-color";
+import { useCart } from "@/context/CartContext";
 import { searchMarketplace } from "@/services/search.service";
 import type { SearchResult, SearchFilters } from "@/types/marketplace";
 import type { Product } from "@/types/store-types";
@@ -36,6 +38,8 @@ export default function SearchScreen() {
     products: [],
   });
   const [error, setError] = useState<string | null>(null);
+
+  const { items, addItem, increaseQty, decreaseQty } = useCart();
 
   const textColor = useThemeColor({}, "textPrimary");
   const mutedColor = useThemeColor({}, "textMuted");
@@ -131,51 +135,109 @@ export default function SearchScreen() {
     </View>
   );
 
-  // Product card
-  const renderProduct = ({ item }: { item: Product }) => (
-    <Pressable
-      style={[styles.resultCard, { backgroundColor: cardBg }]}
-      onPress={() => router.push(`/product/${item.id}` as RelativePathString)}
-    >
-      <View style={{ flexDirection: "row", alignItems: "center" }}>
-        <View>
+  // Product card with inline cart controls
+  const renderProduct = ({ item }: { item: Product }) => {
+    const p = item as any; // backend returns extra fields: store.id, store.name
+    const cartItem = items.find((i) => i.id === item.id);
+    const vendorId: string = p.store?.id ?? "";
+
+    const handleAdd = async () => {
+      await addItem({
+        id: item.id,
+        name: item.name,
+        image: item.images?.[0] ?? null,
+        price: item.price,
+        qty: 1,
+        vendorId,
+        description: item.description,
+      });
+    };
+
+    return (
+      <Pressable
+        style={[styles.resultCard, { backgroundColor: cardBg }]}
+        onPress={() => router.push(`/product/${item.id}` as RelativePathString)}
+      >
+        <View style={{ flexDirection: "row", alignItems: "center" }}>
+          {/* Thumbnail */}
           <View style={styles.resultImageWrap}>
             <View style={styles.resultImageBorder}>
-              <View style={styles.resultImageShadow}>
-                {item.images && item.images[0] ? (
-                  <Image
-                    source={{ uri: item.images[0] }}
-                    style={styles.resultImage}
-                    resizeMode="cover"
-                  />
-                ) : (
-                  <View
-                    style={[styles.resultImage, { backgroundColor: "#eee" }]}
-                  />
-                )}
-              </View>
+              {item.images && item.images[0] ? (
+                <Image
+                  source={{ uri: item.images[0] }}
+                  style={styles.resultImage}
+                  resizeMode="cover"
+                />
+              ) : (
+                <View
+                  style={[styles.resultImage, { backgroundColor: "#eee" }]}
+                />
+              )}
             </View>
           </View>
+
+          {/* Info */}
+          <View style={{ marginLeft: 12, flex: 1 }}>
+            <ThemedText style={{ fontWeight: "bold", fontSize: 15 }}>
+              {item.name}
+            </ThemedText>
+            <ThemedText
+              style={{ color: mutedColor, fontSize: 12 }}
+              numberOfLines={1}
+            >
+              {item.category?.name || "Uncategorized"}
+              {p.store?.name ? `  ·  ${p.store.name}` : ""}
+            </ThemedText>
+            <ThemedText
+              style={{ color: primary, fontWeight: "bold", marginTop: 2 }}
+            >
+              ₦{item.price.toLocaleString()}
+            </ThemedText>
+          </View>
+
+          {/* Cart controls */}
+          {cartItem ? (
+            <View style={styles.qtyRow}>
+              <TouchableOpacity
+                style={[styles.qtyBtn, { backgroundColor: primary }]}
+                onPress={(e) => {
+                  e.stopPropagation();
+                  decreaseQty(item.id);
+                }}
+                hitSlop={8}
+              >
+                <Text style={styles.qtyBtnText}>−</Text>
+              </TouchableOpacity>
+              <Text style={[styles.qtyCount, { color: textColor }]}>
+                {cartItem.qty}
+              </Text>
+              <TouchableOpacity
+                style={[styles.qtyBtn, { backgroundColor: primary }]}
+                onPress={(e) => {
+                  e.stopPropagation();
+                  increaseQty(item.id);
+                }}
+                hitSlop={8}
+              >
+                <Text style={styles.qtyBtnText}>+</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={[styles.addBtn, { backgroundColor: primary }]}
+              onPress={(e) => {
+                e.stopPropagation();
+                handleAdd();
+              }}
+              hitSlop={8}
+            >
+              <Text style={styles.addBtnText}>+</Text>
+            </TouchableOpacity>
+          )}
         </View>
-        <View style={{ marginLeft: 12, flex: 1 }}>
-          <ThemedText style={{ fontWeight: "bold", fontSize: 16 }}>
-            {item.name}
-          </ThemedText>
-          <ThemedText style={{ color: mutedColor, fontSize: 13 }}>
-            {item.description}
-          </ThemedText>
-          <ThemedText style={{ color: mutedColor, fontSize: 13 }}>
-            {item.category?.name || "Uncategorized"}
-          </ThemedText>
-          <ThemedText
-            style={{ color: primary, fontWeight: "bold", marginTop: 4 }}
-          >
-            ₦{item.price.toLocaleString()}
-          </ThemedText>
-        </View>
-      </View>
-    </Pressable>
-  );
+      </Pressable>
+    );
+  };
 
   const renderStore = ({ item }: { item: Vendor }) => (
     <View style={{ marginBottom: 12 }}>
@@ -343,11 +405,49 @@ const styles = StyleSheet.create({
   },
   resultImageWrap: { marginRight: 0 },
   resultImageBorder: { borderRadius: 8, overflow: "hidden" },
-  resultImageShadow: {},
   resultImage: {
     width: 60,
     height: 60,
     borderRadius: 8,
+  },
+  addBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    marginLeft: 8,
+  },
+  addBtnText: {
+    color: "#fff",
+    fontSize: 20,
+    lineHeight: 22,
+    fontWeight: "700",
+  },
+  qtyRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginLeft: 8,
+    gap: 4,
+  },
+  qtyBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  qtyBtnText: {
+    color: "#fff",
+    fontSize: 18,
+    lineHeight: 20,
+    fontWeight: "700",
+  },
+  qtyCount: {
+    minWidth: 22,
+    textAlign: "center",
+    fontWeight: "700",
+    fontSize: 15,
   },
   resultsText: { fontWeight: "bold", fontSize: 16, marginBottom: 12 },
   modalOverlay: {

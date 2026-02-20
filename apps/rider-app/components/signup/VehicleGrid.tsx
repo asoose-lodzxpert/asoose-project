@@ -34,11 +34,6 @@ const VEHICLES = [
     image: require("@/assets/images/motorcycle.png"),
   },
   { key: "car", label: "Car", image: require("@/assets/images/car.png") },
-  {
-    key: "walking",
-    label: "Walking",
-    image: require("@/assets/images/walking.png"),
-  },
 ];
 
 const styles = StyleSheet.create({

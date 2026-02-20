@@ -1,16 +1,10 @@
 import React from "react";
-import {
-  Modal,
-  View,
-  ScrollView,
-  StyleSheet,
-  Pressable,
-  SafeAreaView,
-} from "react-native";
+import { Modal, View, ScrollView, StyleSheet, Pressable } from "react-native";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 interface LocationDisclosureModalProps {
   visible: boolean;

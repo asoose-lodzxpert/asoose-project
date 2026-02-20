@@ -52,18 +52,30 @@ import { LogsModule } from './logs/logs.module';
     ScheduleModule.forRoot(),
 
     // ---------- MongoDB (optional — used only for error-log storage) ----------
-    MongooseModule.forRoot(
-      process.env.MONGODB_URI || 'mongodb://localhost:27017/asoose',
-      {
-        // Don't block server startup if MongoDB is unavailable
-        lazyConnection: true,
-        // Fail fast instead of retrying forever
-        serverSelectionTimeoutMS: 5_000,
-        connectTimeoutMS: 5_000,
-        retryAttempts: 2,
-        retryDelay: 1_000,
-      },
-    ),
+    MongooseModule.forRootAsync({
+      useFactory: () => ({
+        uri: process.env.MONGODB_URI || 'mongodb://localhost:27017/asoose',
+        serverSelectionTimeoutMS: 3_000,
+        connectTimeoutMS: 3_000,
+        socketTimeoutMS: 5_000,
+        retryWrites: false,
+        // connectionFactory goes here (inside useFactory's return), not at async opts level
+        connectionFactory: (connection: any) => {
+          connection.on('error', (err: Error) => {
+            console.warn(
+              '[MongoDB] Connection error (non-fatal — logs unavailable):',
+              err.message,
+            );
+          });
+          connection.on('disconnected', () => {
+            console.warn(
+              '[MongoDB] Disconnected — log writes will be skipped.',
+            );
+          });
+          return connection;
+        },
+      }),
+    }),
 
     // ---------- Rate Limiting ----------
     ThrottlerModule.forRoot([

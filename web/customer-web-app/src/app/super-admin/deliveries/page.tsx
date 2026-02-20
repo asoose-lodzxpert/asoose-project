@@ -31,14 +31,22 @@ import { fetcher } from "../hooks/useSuperAdminFetch";
 // --- Types ---
 interface Delivery {
   id: string;
+  orderGroupId?: string | null;
   type: string;
   sender: string;
   recipient: string;
   driver: string;
+  riderId?: string | null;
   status: string;
   pickup: string;
   dropoff: string;
-  eta?: string; // ✅ FIX: Made optional to handle missing data
+  eta?: string;
+  isFragile?: boolean;
+  isPerishable?: boolean;
+  containsLiquid?: boolean;
+  weightKg?: number | null;
+  packageDetails?: string | null;
+  orderItems?: string[];
 }
 
 interface ApiResponse {
@@ -103,6 +111,7 @@ export default function DeliveriesPage() {
   const [rowSelection, setRowSelection] = useState({});
   const [filterOpen, setFilterOpen] = useState(false);
   const [assignDeliveryId, setAssignDeliveryId] = useState<string | null>(null);
+  const [assignGroupId, setAssignGroupId] = useState<string | null>(null);
 
   // Filter State
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
@@ -142,6 +151,24 @@ export default function DeliveriesPage() {
 
   const deliveries = apiResponse?.data || [];
   const total = apiResponse?.meta?.total || 0;
+
+  // Group deliveries by orderGroupId
+  const groupMap = useMemo(() => {
+    const map = new Map<string, Delivery[]>();
+    deliveries.forEach((d) => {
+      if (d.orderGroupId) {
+        const arr = map.get(d.orderGroupId) ?? [];
+        arr.push(d);
+        map.set(d.orderGroupId, arr);
+      }
+    });
+    return map;
+  }, [deliveries]);
+
+  const standaloneDeliveries = useMemo(
+    () => deliveries.filter((d) => !d.orderGroupId),
+    [deliveries],
+  );
 
   // ===========================================================================
   //  HANDLERS
@@ -422,12 +449,120 @@ export default function DeliveriesPage() {
             </div>
           )}
 
+          {/* Group Orders Section */}
+          {groupMap.size > 0 && viewMode === "list" && (
+            <div className="space-y-3">
+              <h2 className="text-white font-bold text-sm uppercase tracking-wide flex items-center gap-2">
+                <Package className="w-4 h-4 text-yellow-500" />
+                Group Orders ({groupMap.size})
+              </h2>
+              {Array.from(groupMap.entries()).map(([groupId, items]) => {
+                const lead = items[0];
+                const allAssigned = items.every((d) => d.riderId);
+                return (
+                  <div
+                    key={groupId}
+                    className="bg-[#1E293B] border border-yellow-500/20 rounded-xl p-4 space-y-3"
+                  >
+                    {/* Group Header */}
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-yellow-500 font-bold text-xs font-mono">
+                          GROUP · {groupId.substring(0, 10)}...
+                        </p>
+                        <p className="text-gray-400 text-xs mt-0.5">
+                          {items.length} deliveries · Drop-off:{" "}
+                          <span className="text-white">{lead.dropoff}</span>
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`px-2 py-1 rounded text-[10px] font-bold uppercase border ${
+                            allAssigned
+                              ? "bg-green-500/10 text-green-400 border-green-500/20"
+                              : "bg-yellow-500/10 text-yellow-500 border-yellow-500/20"
+                          }`}
+                        >
+                          {allAssigned ? "Assigned" : "Unassigned"}
+                        </span>
+                        <button
+                          onClick={() => setAssignGroupId(groupId)}
+                          className="flex items-center gap-1 px-3 py-1.5 bg-yellow-500 text-black text-xs font-bold rounded-lg hover:bg-yellow-400 transition-colors"
+                        >
+                          <UserPlus className="w-3 h-3" />
+                          Assign Rider
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Sub-deliveries */}
+                    <div className="space-y-1.5">
+                      {items.map((d) => (
+                        <div
+                          key={d.id}
+                          className="flex items-center justify-between bg-[#0F172A] rounded-lg px-3 py-2"
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <Package className="w-3.5 h-3.5 text-orange-400 flex-shrink-0" />
+                            <div className="min-w-0">
+                              <p className="text-white text-xs font-mono truncate">
+                                {d.id.substring(0, 12)}...
+                              </p>
+                              <p className="text-gray-500 text-[10px] truncate">
+                                From: {d.pickup}
+                              </p>
+                              {d.orderItems && d.orderItems.length > 0 && (
+                                <p className="text-gray-600 text-[10px] truncate">
+                                  {d.orderItems.length === 1
+                                    ? d.orderItems[0]
+                                    : `${d.orderItems[0]} + ${d.orderItems.length - 1} more`}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            {d.isFragile && (
+                              <span className="text-[10px] text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded">
+                                ⚠ Fragile
+                              </span>
+                            )}
+                            {d.isPerishable && (
+                              <span className="text-[10px] text-green-400 bg-green-500/10 px-1.5 py-0.5 rounded">
+                                🌡 Perishable
+                              </span>
+                            )}
+                            {d.containsLiquid && (
+                              <span className="text-[10px] text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded">
+                                💧 Liquid
+                              </span>
+                            )}
+                            <span
+                              className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${getStatusColor(d.status)}`}
+                            >
+                              {d.status}
+                            </span>
+                            <Link
+                              href={`/super-admin/deliveries/${d.id}`}
+                              className="p-1 hover:bg-blue-500/10 rounded text-gray-500 hover:text-blue-400 transition-colors"
+                            >
+                              <Eye className="w-3 h-3" />
+                            </Link>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
           {/* Main Content Area */}
           {viewMode === "list" ? (
             <div className="bg-[#1E293B] border border-gray-800 rounded-xl overflow-hidden min-h-[400px]">
               <DataTable
                 columns={columns}
-                data={deliveries}
+                data={standaloneDeliveries}
                 pagination={pagination}
                 onPaginationChange={setPagination}
                 pageCount={Math.ceil(total / pagination.pageSize)}
@@ -442,11 +577,20 @@ export default function DeliveriesPage() {
         </div>
       </div>
 
-      {/* Assign Rider Modal */}
+      {/* Assign Rider Modal — single delivery */}
       {assignDeliveryId && (
         <AssignRiderModal
           deliveryId={assignDeliveryId}
           onClose={() => setAssignDeliveryId(null)}
+          onSuccess={() => mutate()}
+        />
+      )}
+
+      {/* Assign Rider Modal — order group */}
+      {assignGroupId && (
+        <AssignRiderModal
+          groupId={assignGroupId}
+          onClose={() => setAssignGroupId(null)}
           onSuccess={() => mutate()}
         />
       )}

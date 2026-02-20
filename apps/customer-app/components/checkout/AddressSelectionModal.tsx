@@ -55,6 +55,7 @@ export function AddressSelectionModal({
     setLoading(true);
     try {
       const response = await request("users/addresses", { method: "GET" });
+      if (__DEV__) console.log("Addresses:", JSON.stringify(response, null, 2));
       setAddresses(Array.isArray(response) ? response : []);
     } catch {
       // silently fail
@@ -215,7 +216,7 @@ export function AddressSelectionModal({
                           ]}
                           numberOfLines={2}
                         >
-                          {addr.address}
+                          {addr.street}
                         </ThemedText>
                       </View>
 

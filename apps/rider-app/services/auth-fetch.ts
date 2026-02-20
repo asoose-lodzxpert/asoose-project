@@ -60,9 +60,11 @@ export async function fetchWithAuth(url: string, options: RequestInit = {}) {
 }
 
 export async function fetchCurrentUser() {
-  return await fetchWithAuth(
+  const response = await fetchWithAuth(
     `${process.env.EXPO_PUBLIC_API_URL}/rider/profile/me`,
   );
+  // Backend returns { user: {...} } — unwrap so callers get the flat user object
+  return response?.user ?? response;
 }
 
 export async function fetchWithAuthMultipart(url: string, formData: FormData) {

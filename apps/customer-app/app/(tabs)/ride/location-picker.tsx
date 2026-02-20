@@ -300,6 +300,7 @@ export default function LocationPickerScreen() {
             value={searchQuery}
             onChangeText={setSearchQuery}
             autoCorrect={false}
+            style={[styles.input, { color: textPrimary }]}
           />
           {(searching || confirming) && (
             <ActivityIndicator size="small" color={primary} />

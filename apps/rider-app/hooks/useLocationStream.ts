@@ -1,17 +1,32 @@
-import { useEffect, useState } from "react";
-import { locationStreamService } from "@/services/location-stream.service";
+import { useEffect, useRef, useState } from "react";
+import {
+  locationStreamService,
+  setRoleGetter,
+} from "@/services/location-stream.service";
 import { AppState, AppStateStatus } from "react-native";
 
 interface UseLocationStreamOptions {
   enabled: boolean; // Whether the rider is active/online
+  role?: string; // 'RIDER' or 'DRIVER' — included in every location update
 }
 
-export function useLocationStream({ enabled }: UseLocationStreamOptions) {
+export function useLocationStream({ enabled, role }: UseLocationStreamOptions) {
   const [status, setStatus] = useState({
     isActive: false,
     isConnected: false,
     queueSize: 0,
   });
+
+  // Keep a ref so the getter closure always reads the latest role without re-registering
+  const roleRef = useRef(role ?? "RIDER");
+  useEffect(() => {
+    roleRef.current = role ?? "RIDER";
+  }, [role]);
+
+  // Register the getter once — it reads roleRef.current at call time
+  useEffect(() => {
+    setRoleGetter(() => roleRef.current);
+  }, []);
 
   useEffect(() => {
     if (enabled) {

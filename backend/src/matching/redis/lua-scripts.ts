@@ -53,7 +53,8 @@ redis.call('SETEX', pendingKey, ttl, tripId)
 redis.call('SETEX', lockKey, ttl, '1')
 
 redis.call('SREM', hexDriversKey, driverId)
-if redis.call('GET', hexCountKey) then
+local assignCnt = tonumber(redis.call('GET', hexCountKey)) or 0
+if assignCnt > 0 then
   redis.call('DECR', hexCountKey)
 end
 
@@ -168,24 +169,29 @@ if status ~= 'ONLINE' then
   return 0
 end
 
-if redis.call('GET', pendingRideKey) or redis.call('GET', pendingDeliveryKey) then
-  return 0
-end
+local hasPending = redis.call('GET', pendingRideKey) or redis.call('GET', pendingDeliveryKey)
 
 if oldHexId ~= newHexId then
   if oldHexId then
     redis.call('SREM', 'hex:' .. oldHexId .. ':drivers', driverId)
-    redis.call('DECR', 'hex:' .. oldHexId .. ':count')
+    local oldCnt = tonumber(redis.call('GET', 'hex:' .. oldHexId .. ':count')) or 0
+    if oldCnt > 0 then
+      redis.call('DECR', 'hex:' .. oldHexId .. ':count')
+    end
   end
-
-  redis.call('SADD', 'hex:' .. newHexId .. ':drivers', driverId)
-  redis.call('INCR', 'hex:' .. newHexId .. ':count')
+  if not hasPending then
+    redis.call('SADD', 'hex:' .. newHexId .. ':drivers', driverId)
+    redis.call('INCR', 'hex:' .. newHexId .. ':count')
+  end
   return 1
-else
-  -- Same hex but self-heal: re-add if missing due to stale assignment cleanup failure
+end
+
+-- Same hex: self-heal if driver is missing from the set and has no active pending job
+if not hasPending then
   if redis.call('SISMEMBER', 'hex:' .. newHexId .. ':drivers', driverId) == 0 then
     redis.call('SADD', 'hex:' .. newHexId .. ':drivers', driverId)
     redis.call('INCR', 'hex:' .. newHexId .. ':count')
+    return 2
   end
 end
 
@@ -207,7 +213,10 @@ end
 local hexId = redis.call('GET', hexKey)
 if hexId then
   redis.call('SREM', 'hex:' .. hexId .. ':drivers', driverId)
-  redis.call('DECR', 'hex:' .. hexId .. ':count')
+  local offlineCnt = tonumber(redis.call('GET', 'hex:' .. hexId .. ':count')) or 0
+  if offlineCnt > 0 then
+    redis.call('DECR', 'hex:' .. hexId .. ':count')
+  end
 end
 
 redis.call('DEL',
@@ -333,4 +342,62 @@ redis.call('SET', statusKey, 'ONLINE')
 redis.call('SADD', hexRidersKey, riderId)
 
 return 1
+`;
+
+/**
+ * Atomically updates a rider's location, hex key, and hex-set membership.
+ * Mirrors ATOMIC_UPDATE_LOCATION but uses rider:* keys and hex:*:riders sets.
+ *
+ * Returns:
+ *  -1 — rider status is not ONLINE (update skipped)
+ *   0 — same hex, already in set (no change needed)
+ *   1 — hex changed, sets updated
+ *   2 — same hex, self-healed (was missing from hex-set)
+ */
+export const ATOMIC_UPDATE_RIDER_LOCATION = `
+local riderId    = ARGV[1]
+local lat        = ARGV[2]
+local lng        = ARGV[3]
+local newHexId   = ARGV[4]
+local timestamp  = ARGV[5]
+
+local statusKey          = 'rider:' .. riderId .. ':status'
+local hexKey             = 'rider:' .. riderId .. ':hex'
+local lastSeenKey        = 'rider:' .. riderId .. ':lastSeen'
+local locationKey        = 'rider:' .. riderId .. ':location'
+local pendingDeliveryKey = 'rider:' .. riderId .. ':pendingDelivery'
+local currentDeliveryKey = 'rider:' .. riderId .. ':currentDelivery'
+
+local status = redis.call('GET', statusKey)
+if status ~= 'ONLINE' then
+  return -1
+end
+
+redis.call('SET', locationKey, '{"lat":'..lat..',"lng":'..lng..'}')
+redis.call('SET', lastSeenKey, timestamp)
+
+local oldHexId = redis.call('GET', hexKey)
+redis.call('SET', hexKey, newHexId)
+
+local hasPending = redis.call('GET', pendingDeliveryKey) or redis.call('GET', currentDeliveryKey)
+
+if oldHexId ~= newHexId then
+  if oldHexId then
+    redis.call('SREM', 'hex:' .. oldHexId .. ':riders', riderId)
+  end
+  if not hasPending then
+    redis.call('SADD', 'hex:' .. newHexId .. ':riders', riderId)
+  end
+  return 1
+end
+
+-- Same hex: self-heal if rider is missing from the set and has no active job
+if not hasPending then
+  if redis.call('SISMEMBER', 'hex:' .. newHexId .. ':riders', riderId) == 0 then
+    redis.call('SADD', 'hex:' .. newHexId .. ':riders', riderId)
+    return 2
+  end
+end
+
+return 0
 `;

@@ -50,4 +50,20 @@ export class RidesController {
     const adminId = req.user.id || req.user.sub;
     return this.ridesService.manualAssignDriver(id, riderId, adminId);
   }
+
+  @Patch(':id/force-status')
+  @Roles('SUPER_ADMIN', 'ADMIN_MANAGER')
+  async forceStatus(
+    @Param('id') id: string,
+    @Body() body: { status: string; reason?: string },
+    @Req() req: any,
+  ) {
+    const adminId = req.user.id || req.user.sub;
+    return this.ridesService.forceStatus(
+      id,
+      body.status as any,
+      adminId,
+      body.reason,
+    );
+  }
 }

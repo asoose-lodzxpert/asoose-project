@@ -48,7 +48,7 @@ export class RideMatchingProcessor extends WorkerHost {
   private readonly MAX_RINGS = 5;
   private readonly MAX_ATTEMPTS = 20; // Max total driver attempts
   private readonly TIMEOUT_MS = 90000; // 90 seconds
-  private readonly MAX_MATCHING_RETRIES = 3; // Max full re-queued attempts before cancel
+  private readonly MAX_MATCHING_RETRIES = 5; // Max full re-queued attempts before cancel
   private readonly RETRY_DELAY_MS = 10_000; // 10s between retries
 
   constructor(

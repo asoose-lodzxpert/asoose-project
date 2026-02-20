@@ -27,8 +27,7 @@ interface RiderSidebarProps {
 }
 
 const API_URL =
-  (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001") +
-  (process.env.NEXT_PUBLIC_API_URL?.endsWith("/api") ? "" : "/api");
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1";
 
 export const RiderSidebar: React.FC<RiderSidebarProps> = ({
   rider,

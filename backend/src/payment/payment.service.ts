@@ -7,11 +7,14 @@ import {
   forwardRef,
   Optional,
 } from '@nestjs/common';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 import { PrismaService } from '../prisma/prisma.service';
 import { PaystackService } from './paystack.service';
 import { FlutterwaveService } from './flutterwave.service';
 import { MonnifyService } from './monnify.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationsGateway } from '../notifications/notifications.gateway';
 import { TripsService } from '../users/trips/trips.service';
 import { TransactionLedgerService } from '../super-admin/transactions/transaction-ledger.service';
 import { Prisma, PaymentStatus, OrderStatus } from '@prisma/client';
@@ -44,7 +47,9 @@ export class PaymentService {
     private flutterwaveService: FlutterwaveService,
     private monnifyService: MonnifyService,
     private notificationsService: NotificationsService,
+    private notificationsGateway: NotificationsGateway,
     private ledger: TransactionLedgerService,
+    @InjectQueue('email') private emailQueue: Queue,
     @Optional()
     @Inject(forwardRef(() => TripsService))
     private tripsService?: TripsService,
@@ -503,7 +508,9 @@ export class PaymentService {
           },
           include: {
             order: { include: { user: true, store: true, delivery: true } },
-            orderGroup: { include: { orders: { include: { store: true } } } },
+            orderGroup: {
+              include: { orders: { include: { store: true, user: true } } },
+            },
             ride: { include: { customer: true } },
           },
         });
@@ -581,9 +588,19 @@ export class PaymentService {
               );
             }
           } else if (payment.rideId && payment.ride) {
-            // C. Ride
-            const ride = payment.ride;
-            if (ride.riderId) {
+            // C. Ride — re-fetch current status inside the transaction to guard
+            // against delayed webhooks arriving after the ride was cancelled.
+            const currentRide = await tx.ride.findUnique({
+              where: { id: payment.rideId },
+              select: { status: true, riderId: true, customerId: true },
+            });
+
+            if (currentRide?.status === 'CANCELLED') {
+              this.logger.warn(
+                `Webhook payment ${verification.reference} arrived for CANCELLED ride ${payment.rideId} — skipping earnings credit`,
+              );
+            } else if (currentRide?.riderId) {
+              const ride = payment.ride;
               const platformFeeRate = 0.2;
 
               await this.ledger.recordPayment(
@@ -601,7 +618,7 @@ export class PaymentService {
               await this.ledger.recordRideEarnings(
                 {
                   id: payment.rideId,
-                  riderId: ride.riderId,
+                  riderId: currentRide.riderId,
                   totalFare: payment.amount,
                   platformFee: payment.amount * platformFeeRate,
                   driverFee: payment.amount,
@@ -666,8 +683,15 @@ export class PaymentService {
     // === ATOMIC TRANSACTION END ===
 
     // =========================================================
-    // 👇 MATCHING LOGIC — case-insensitive type comparison
+    // 👇 MATCHING & NOTIFICATION LOGIC — only runs on confirmed payment
     // =========================================================
+    if (finalStatus !== PaymentStatus.COMPLETED) {
+      this.logger.log(
+        `Payment ${verification.reference} status is ${finalStatus} — skipping notifications and matching`,
+      );
+      return;
+    }
+
     const meta = payment.metadata as any;
     const metaType = meta?.type?.toUpperCase?.();
     if (metaType) {
@@ -690,17 +714,132 @@ export class PaymentService {
           });
         }
       } else if (metaType === 'ORDER') {
-        // E-commerce order delivery
-        if (result.order?.delivery?.id) {
-          await this.startDeliveryMatching(result.order.delivery.id);
-          // Notify customer and vendor
-          await this.sendMatchingNotifications({
-            type: 'order',
-            orderId: result.order.id,
-            deliveryId: result.order.delivery.id,
-            customerId: result.order.userId,
-            vendorId: result.order.store?.vendorId,
+        // Multi-vendor order group
+        if (payment.orderGroupId && result.orderGroup?.orders) {
+          for (const order of result.orderGroup.orders) {
+            const orderUser = (order as any).user;
+            // Notify vendor of new confirmed order
+            if (order.store?.vendorId) {
+              await this.notificationsService.createForVendor({
+                vendorId: order.store.vendorId,
+                title: 'New Order Received',
+                message: `Order #${order.id.slice(-6)} has been confirmed. Please start preparing.`,
+                type: 'ORDER',
+                category: 'ORDER_CREATED',
+                metadata: { orderId: order.id },
+              });
+            }
+            // Broadcast to admin dashboard
+            this.notificationsGateway.sendToAdminRoom({
+              id: order.id,
+              type: 'ORDER',
+              category: 'ORDER_CREATED',
+              title: 'New Order Placed',
+              message: `₦${order.total} order from ${orderUser?.name || 'Customer'} at ${order.store?.name}`,
+              isRead: false,
+              createdAt: new Date().toISOString(),
+              metadata: {
+                orderId: order.id,
+                orderGroupId: payment.orderGroupId,
+              },
+              recipientName: orderUser?.name || '—',
+            });
+          }
+          // Notify customer once for the whole group
+          await this.notificationsService.create({
+            userId: result.orderGroup.userId,
+            title: 'Orders Confirmed',
+            message: `Your ${result.orderGroup.orders.length} orders have been confirmed and stores are being notified.`,
+            type: 'ORDER',
+            category: 'ORDER_CREATED',
+            metadata: { orderGroupId: payment.orderGroupId },
           });
+
+          // Start delivery matching for the single group delivery
+          try {
+            const groupDelivery = await this.prisma.delivery.findFirst({
+              where: { orderGroupId: payment.orderGroupId },
+              include: {
+                customer: { select: { email: true, name: true } },
+                dropoffAddress: { select: { street: true, city: true } },
+              },
+            });
+            if (groupDelivery) {
+              await this.startDeliveryMatching(groupDelivery.id);
+              // Send OTP email to customer
+              if (groupDelivery.customer?.email && groupDelivery.deliveryOtp) {
+                await this.sendDeliveryOtpEmail({
+                  email: groupDelivery.customer.email,
+                  name: groupDelivery.customer.name ?? 'Customer',
+                  otp: groupDelivery.deliveryOtp,
+                  address: groupDelivery.dropoffAddress
+                    ? `${groupDelivery.dropoffAddress.street}, ${groupDelivery.dropoffAddress.city}`
+                    : undefined,
+                });
+              }
+            }
+          } catch (err) {
+            this.logger.error('Group delivery matching/OTP email failed', err);
+          }
+        } else if (result.order?.delivery?.id) {
+          // Single order — notify vendor
+          if (result.order.store?.vendorId) {
+            await this.notificationsService.createForVendor({
+              vendorId: result.order.store.vendorId,
+              title: 'New Order Received',
+              message: `Order #${result.order.id.slice(-6)} has been confirmed. Please start preparing.`,
+              type: 'ORDER',
+              category: 'ORDER_CREATED',
+              metadata: { orderId: result.order.id },
+            });
+          }
+          // Notify customer
+          await this.notificationsService.create({
+            userId: result.order.userId,
+            title: 'Order Confirmed',
+            message: `Your order from ${result.order.store?.name} has been confirmed.`,
+            type: 'ORDER',
+            category: 'ORDER_CREATED',
+            metadata: { orderId: result.order.id },
+          });
+          // Broadcast to admin dashboard
+          this.notificationsGateway.sendToAdminRoom({
+            id: result.order.id,
+            type: 'ORDER',
+            category: 'ORDER_CREATED',
+            title: 'New Order Placed',
+            message: `₦${result.order.total} order from ${result.order.user?.name || 'Customer'} at ${result.order.store?.name}`,
+            isRead: false,
+            createdAt: new Date().toISOString(),
+            metadata: { orderId: result.order.id },
+            recipientName: result.order.user?.name || '—',
+          });
+          // Start delivery matching
+          await this.startDeliveryMatching(result.order.delivery.id);
+
+          // Send OTP email to customer
+          try {
+            const delivery = await this.prisma.delivery.findUnique({
+              where: { id: result.order.delivery.id },
+              include: {
+                customer: { select: { email: true, name: true } },
+                dropoffAddress: { select: { street: true, city: true } },
+              },
+            });
+            if (delivery?.customer?.email && delivery.deliveryOtp) {
+              await this.sendDeliveryOtpEmail({
+                email: delivery.customer.email,
+                name: delivery.customer.name ?? 'Customer',
+                otp: delivery.deliveryOtp,
+                storeName: result.order.store?.name,
+                address: delivery.dropoffAddress
+                  ? `${delivery.dropoffAddress.street}, ${delivery.dropoffAddress.city}`
+                  : undefined,
+              });
+            }
+          } catch (err) {
+            this.logger.error('Single-order OTP email failed', err);
+          }
         }
       } else if (metaType === 'DELIVERY') {
         // Direct delivery: admin manually assigns riders — no auto-matching
@@ -718,6 +857,38 @@ export class PaymentService {
     }
 
     await this.sendPaymentNotifications(result);
+  }
+
+  // Send delivery OTP email to customer
+  private async sendDeliveryOtpEmail(params: {
+    email: string;
+    name: string;
+    otp: string;
+    orderId?: string;
+    storeName?: string;
+    address?: string;
+  }) {
+    try {
+      await this.emailQueue.add(
+        'send-email',
+        {
+          to: params.email,
+          subject: 'Your Delivery OTP – Share with your rider',
+          template: 'delivery-otp',
+          context: {
+            name: params.name,
+            otp: params.otp,
+            orderId: params.orderId,
+            storeName: params.storeName,
+            address: params.address,
+          },
+        },
+        { attempts: 3, removeOnComplete: true },
+      );
+      this.logger.log(`Delivery OTP email queued for ${params.email}`);
+    } catch (err) {
+      this.logger.error('Failed to queue delivery OTP email', err);
+    }
   }
 
   // Send notifications to involved parties after matching

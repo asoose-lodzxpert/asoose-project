@@ -1,6 +1,11 @@
 export type SignupStep = 1 | 2 | 3 | 4;
 
-export type VehicleType = "bicycle" | "motorcycle" | "car" | "walking" | null;
+export type VehicleType =
+  | "bicycle"
+  | "motorcycle"
+  | "car"
+  | "public_transport"
+  | null;
 
 export type UserRole = "RIDER" | "DRIVER";
 

@@ -44,7 +44,7 @@ export function AddressCard({
           {address.label}
         </ThemedText>
         <ThemedText numberOfLines={1} style={styles.addressLine}>
-          {address.address}
+          {address.street}
         </ThemedText>
       </View>
 

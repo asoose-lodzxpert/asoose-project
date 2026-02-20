@@ -30,6 +30,7 @@ import { fetcher } from "./hooks/useSuperAdminFetch";
 import { NotificationResponse } from "./notifications/types";
 
 type AdminRole =
+  | "ADMIN"
   | "SUPER_ADMIN"
   | "ADMIN_MANAGER"
   | "ADMIN_SUPPORT"
@@ -72,70 +73,71 @@ export default function AdminLayoutClient({
       name: "Activity Logs",
       icon: Activity,
       href: "/super-admin/activity-logs",
-      allowed: ["SUPER_ADMIN"],
+      allowed: ["ADMIN", "SUPER_ADMIN"],
     },
     {
       name: "Orders",
       icon: ShoppingCart,
       href: "/super-admin/orders",
-      allowed: ["SUPER_ADMIN", "ADMIN_MANAGER", "ADMIN_SUPPORT"],
+      allowed: ["ADMIN", "SUPER_ADMIN", "ADMIN_MANAGER", "ADMIN_SUPPORT"],
     },
     {
       name: "Rides",
       icon: Car,
       href: "/super-admin/rides",
-      allowed: ["SUPER_ADMIN", "ADMIN_MANAGER", "ADMIN_SUPPORT"],
+      allowed: ["ADMIN", "SUPER_ADMIN", "ADMIN_MANAGER", "ADMIN_SUPPORT"],
     },
     {
       name: "Deliveries",
       icon: Truck,
       href: "/super-admin/deliveries",
-      allowed: ["SUPER_ADMIN", "ADMIN_MANAGER", "ADMIN_SUPPORT"],
+      allowed: ["ADMIN", "SUPER_ADMIN", "ADMIN_MANAGER", "ADMIN_SUPPORT"],
     },
     {
       name: "Verification",
       icon: ShieldCheck,
       href: "/super-admin/verification",
-      allowed: ["SUPER_ADMIN", "ADMIN_MANAGER", "ADMIN_SUPPORT"],
+      allowed: ["ADMIN", "SUPER_ADMIN", "ADMIN_MANAGER", "ADMIN_SUPPORT"],
     },
     {
       name: "Transactions",
       icon: CreditCard,
       href: "/super-admin/transactions",
-      allowed: ["SUPER_ADMIN", "ADMIN_FINANCE"],
+      allowed: ["ADMIN", "SUPER_ADMIN", "ADMIN_FINANCE"],
     },
     {
       name: "Payouts",
       icon: Banknote,
       href: "/super-admin/payouts",
-      allowed: ["SUPER_ADMIN", "ADMIN_FINANCE"],
+      allowed: ["ADMIN", "SUPER_ADMIN", "ADMIN_FINANCE"],
     },
     {
       name: "Disputes",
       icon: AlertTriangle,
       href: "/super-admin/disputes",
-      allowed: ["SUPER_ADMIN", "ADMIN_SUPPORT"],
+      allowed: ["ADMIN", "SUPER_ADMIN", "ADMIN_SUPPORT"],
     },
     {
       name: "Banners",
       icon: Image,
       href: "/super-admin/banners",
-      allowed: ["SUPER_ADMIN", "ADMIN_MANAGER"],
+      allowed: ["ADMIN", "SUPER_ADMIN", "ADMIN_MANAGER"],
     },
     {
       name: "Reports",
       icon: FileText,
       href: "/super-admin/reports",
-      allowed: ["SUPER_ADMIN", "ADMIN_FINANCE", "ADMIN_MANAGER"],
+      allowed: ["ADMIN", "SUPER_ADMIN", "ADMIN_FINANCE", "ADMIN_MANAGER"],
     },
   ];
 
   const canViewUsers = hasAccess([
+    "ADMIN",
     "SUPER_ADMIN",
     "ADMIN_MANAGER",
     "ADMIN_SUPPORT",
   ]);
-  const canViewSettings = hasAccess(["SUPER_ADMIN"]);
+  const canViewSettings = hasAccess(["ADMIN", "SUPER_ADMIN"]);
 
   const handleLogout = async () => {
     try {
@@ -164,8 +166,8 @@ export default function AdminLayoutClient({
         {/* Sidebar Header */}
         <div className="p-6 border-b border-gray-800 flex items-center gap-3 shrink-0">
           <div className="w-8 h-8 bg-yellow-500 rounded-lg flex items-center justify-center text-black font-black">
-            {role === "SUPER_ADMIN"
-              ? "SA"
+            {role === "SUPER_ADMIN" || role === "ADMIN"
+              ? "AD"
               : role === "ADMIN_FINANCE"
                 ? "FN"
                 : role === "ADMIN_SUPPORT"

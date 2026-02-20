@@ -13,6 +13,7 @@ import { RiderAuthController } from './rider-auth.controller';
 import { RiderAuthService } from './rider-auth.service';
 import { AuthService } from './auth.service';
 import { MailModule } from 'src/mail/mail.module';
+import { TokenRevocationService } from './token-revocation.service';
 
 @Module({
   imports: [
@@ -45,6 +46,7 @@ import { MailModule } from 'src/mail/mail.module';
     JwtAuthGuard,
     VendorAuthService,
     RiderAuthService,
+    TokenRevocationService,
   ],
   exports: [
     AuthService,
@@ -54,6 +56,7 @@ import { MailModule } from 'src/mail/mail.module';
     RiderAuthService,
     PassportModule,
     JwtModule,
+    TokenRevocationService,
   ],
 })
 export class AuthModule {}

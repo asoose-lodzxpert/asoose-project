@@ -64,9 +64,9 @@ export async function getProfileStats(): Promise<ProfileStats> {
     );
 
     return {
-      totalDeliveries: earningsData.deliveries || 0,
+      totalDeliveries: earningsData.rides || 0,
       hoursOnline: earningsData.hoursOnline || 0,
-      thisWeekDeliveries: earningsData.deliveries || 0,
+      thisWeekDeliveries: earningsData.rides || 0,
       rating: earningsData.rating || 5.0,
     };
   } catch (error) {

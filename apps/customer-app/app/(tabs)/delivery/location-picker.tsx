@@ -285,7 +285,7 @@ export default function LocationPickerScreen() {
         <View style={[styles.searchBar, { backgroundColor: card }]}>
           <IconSymbol name="magnifyingglass" size={20} color={textSecondary} />
           <TextInput
-            style={styles.input}
+            style={[styles.input, { color: textPrimary }]}
             placeholder="Search or select saved..."
             placeholderTextColor={textSecondary}
             value={searchQuery}

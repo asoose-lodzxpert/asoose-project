@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { X, MapPin, Loader2 } from "lucide-react";
+import { LocationInput } from "@/components/shared/LocationInput";
 
 interface AddAddressModalProps {
   isOpen: boolean;
@@ -19,45 +20,38 @@ export const AddAddressModal = ({
     street: "",
     city: "",
     state: "",
-    zipCode: "",
-    country: "Nigeria",
     isDefault: false,
   });
+  // Coordinates captured from the debounced place search
+  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(
+    null,
+  );
 
   if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!coords) {
+      // Require a place to be selected so we have real coords
+      alert("Please select an address from the suggestions.");
+      return;
+    }
     setLoading(true);
     try {
-      // ✅ FIX: Construct a payload that matches Backend DTO exactly
       const payload = {
         street: formData.street,
         city: formData.city,
         state: formData.state,
         isDefault: formData.isDefault,
-
-        // 📍 MAIDUGURI COORDINATES
-        // Hardcoded for now to pass backend validation.
-        // In a future update, these should come from a map picker.
-        lat: 11.8311,
-        lng: 13.151,
-
-        // ❌ REMOVED: zipCode & country (The backend rejects these)
+        lat: coords.lat,
+        lng: coords.lng,
       };
 
       await onSave(payload);
 
       onClose();
-      // Reset form
-      setFormData({
-        street: "",
-        city: "",
-        state: "",
-        zipCode: "",
-        country: "Nigeria",
-        isDefault: false,
-      });
+      setFormData({ street: "", city: "", state: "", isDefault: false });
+      setCoords(null);
     } catch (error) {
       console.error("Form submission error:", error);
     } finally {
@@ -84,20 +78,32 @@ export const AddAddressModal = ({
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          {/* Street — debounced place search via backend */}
           <div>
             <label className="text-xs font-bold text-gray-500 uppercase">
-              Street Address
+              Search Address
             </label>
-            <input
-              required
-              type="text"
-              placeholder="123 Main St"
-              className="w-full mt-1 p-3 bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:border-yellow-500 transition-colors"
-              value={formData.street}
-              onChange={(e) =>
-                setFormData({ ...formData, street: e.target.value })
-              }
-            />
+            <div className="mt-1">
+              <LocationInput
+                value={formData.street}
+                onValueChange={(val) => {
+                  setFormData((f) => ({ ...f, street: val }));
+                  // Clear coords when user starts typing again
+                  setCoords(null);
+                }}
+                onLocationSelect={(loc, address) => {
+                  setCoords({ lat: loc.lat, lng: loc.lng });
+                  setFormData((f) => ({ ...f, street: address }));
+                }}
+                placeholder="Search street, area or landmark…"
+                showGeolocation
+              />
+            </div>
+            {coords && (
+              <p className="text-xs text-green-600 dark:text-green-400 mt-1 flex items-center gap-1">
+                <MapPin className="w-3 h-3" /> Location pinned
+              </p>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -106,7 +112,6 @@ export const AddAddressModal = ({
                 City
               </label>
               <input
-                required
                 type="text"
                 placeholder="Lagos"
                 className="w-full mt-1 p-3 bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:border-yellow-500 transition-colors"
@@ -121,44 +126,12 @@ export const AddAddressModal = ({
                 State
               </label>
               <input
-                required
                 type="text"
                 placeholder="Lagos"
                 className="w-full mt-1 p-3 bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:border-yellow-500 transition-colors"
                 value={formData.state}
                 onChange={(e) =>
                   setFormData({ ...formData, state: e.target.value })
-                }
-              />
-            </div>
-          </div>
-
-          {/* NOTE: We keep these inputs for User Experience, but we don't send them to backend because backend rejects them */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-xs font-bold text-gray-500 uppercase">
-                Zip Code
-              </label>
-              <input
-                type="text"
-                placeholder="100001"
-                className="w-full mt-1 p-3 bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:border-yellow-500 transition-colors"
-                value={formData.zipCode}
-                onChange={(e) =>
-                  setFormData({ ...formData, zipCode: e.target.value })
-                }
-              />
-            </div>
-            <div>
-              <label className="text-xs font-bold text-gray-500 uppercase">
-                Country
-              </label>
-              <input
-                type="text"
-                className="w-full mt-1 p-3 bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:border-yellow-500 transition-colors"
-                value={formData.country}
-                onChange={(e) =>
-                  setFormData({ ...formData, country: e.target.value })
                 }
               />
             </div>
@@ -181,8 +154,8 @@ export const AddAddressModal = ({
 
           <button
             type="submit"
-            disabled={loading}
-            className="w-full mt-4 bg-black dark:bg-white text-white dark:text-black py-4 rounded-xl font-bold shadow-lg hover:shadow-xl active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+            disabled={loading || !coords}
+            className="w-full mt-4 bg-black dark:bg-white text-white dark:text-black py-4 rounded-xl font-bold shadow-lg hover:shadow-xl active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? (
               <Loader2 className="w-5 h-5 animate-spin" />

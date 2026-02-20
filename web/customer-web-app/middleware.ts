@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
 
 const ADMIN_ROLES = [
+  "ADMIN",
   "SUPER_ADMIN",
   "ADMIN_MANAGER",
   "ADMIN_SUPPORT",

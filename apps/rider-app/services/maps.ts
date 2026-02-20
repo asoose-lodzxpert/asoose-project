@@ -1,10 +1,19 @@
 import { fetchWithAuth } from "@/services/auth-fetch";
 const EXPO_PUBLIC_API_URL = process.env.EXPO_PUBLIC_API_URL;
 
+export interface NavigationStep {
+  instruction: string;
+  distance: { text: string; value: number };
+  duration: { text: string; value: number };
+  endLocation: { latitude: number; longitude: number };
+  maneuver?: string;
+}
+
 export interface DirectionsResponse {
   coordinates: { latitude: number; longitude: number }[];
   distance: { text: string; value: number };
   duration: { text: string; value: number };
+  steps?: NavigationStep[];
   error?: string;
 }
 

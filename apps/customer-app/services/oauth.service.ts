@@ -4,6 +4,7 @@ import {
 } from "@/constants/static-config";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as AppleAuthentication from "expo-apple-authentication";
+import * as AuthSession from "expo-auth-session";
 import * as Google from "expo-auth-session/providers/google";
 import { Platform } from "react-native";
 
@@ -92,6 +93,15 @@ async function httpRequest({
  * `isConfigured` is false when no client IDs are set — use it to hide the button.
  */
 export function useGoogleSignIn() {
+  // Explicit redirect URI so Google knows exactly where to redirect back.
+  // On native builds this resolves to the custom scheme (asoose-app://).
+  // On Expo Go it resolves to the Expo proxy (https://auth.expo.io/...).
+  // The URI must be registered in Google Cloud Console → Authorized redirect URIs.
+  const redirectUri = AuthSession.makeRedirectUri({
+    scheme: "asoose-app",
+    path: "auth",
+  });
+
   // expo-auth-session throws if the platform-specific clientId is undefined.
   // Always pass a non-undefined value; use isConfigured to disable the button
   // when the real credentials are absent.
@@ -99,6 +109,7 @@ export function useGoogleSignIn() {
     androidClientId: GOOGLE_CLIENT_ID_ANDROID ?? PLACEHOLDER,
     iosClientId: GOOGLE_CLIENT_ID_IOS ?? PLACEHOLDER,
     webClientId: GOOGLE_CLIENT_ID_WEB ?? PLACEHOLDER,
+    redirectUri,
   });
 
   return {
@@ -106,6 +117,7 @@ export function useGoogleSignIn() {
     response: isGoogleConfigured ? response : null,
     promptAsync: isGoogleConfigured ? promptAsync : async () => null,
     isConfigured: isGoogleConfigured,
+    redirectUri, // expose so devs can register exact URI in Google Console
   };
 }
 

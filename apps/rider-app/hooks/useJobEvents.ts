@@ -12,6 +12,7 @@ interface UseJobEventsOptions {
   onJobCancelled?: (jobId: string) => void;
   onError?: (error: Error) => void;
   onConnectionStatusChange?: (status: ConnectionStatus) => void;
+  onForceLogout?: (reason?: string) => void;
   enabled?: boolean;
 }
 
@@ -22,6 +23,7 @@ export function useJobEvents(options: UseJobEventsOptions) {
     onJobCancelled,
     onError,
     onConnectionStatusChange,
+    onForceLogout,
     enabled = true,
   } = options;
   const serviceRef = useRef<JobEventsService | null>(null);
@@ -44,6 +46,7 @@ export function useJobEvents(options: UseJobEventsOptions) {
         onJobCancelled,
         onError,
         onConnectionStatusChange,
+        onForceLogout,
       });
     }
   }, [
@@ -52,6 +55,7 @@ export function useJobEvents(options: UseJobEventsOptions) {
     onJobCancelled,
     onError,
     onConnectionStatusChange,
+    onForceLogout,
   ]);
 
   const connect = useCallback(() => {

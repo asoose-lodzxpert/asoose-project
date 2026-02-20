@@ -34,11 +34,11 @@ export function StepAccountDetails({ data, onChange }: Props) {
         onChange={(v) => onChange("bank", v as string)}
         placeholder="Select bank"
         containerStyle={{ marginTop: 20 }}
-        label="Bank name"
+        label="Choose your bank"
       />
 
       {/* Account number */}
-      <Field label="Account number">
+      <Field label="Enter your 10-digit account number">
         <ThemedInput
           placeholder="0123456789"
           value={data.accountNumber}
@@ -63,7 +63,7 @@ export function StepAccountDetails({ data, onChange }: Props) {
       </Field>
 
       {/* Account name */}
-      <Field label="Account name">
+      <Field label="Enter your account name">
         <ThemedInput
           placeholder="e.g. John Doe"
           value={data.accountName}

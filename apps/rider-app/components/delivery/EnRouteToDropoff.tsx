@@ -1,13 +1,15 @@
-﻿import { ThemedText } from "@/components/themed-text";
+﻿import React, { useEffect, useState } from "react";
+import { Linking, Platform, Pressable, StyleSheet, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import * as Location from "expo-location";
+
+import { ThemedText } from "@/components/themed-text";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useJobs } from "@/context/JobContext";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { resolveAddress } from "@/utils/address";
-import CancelJobModal from "@/components/delivery/CancelJobModal";
 import { getDirections, getDistanceMeters } from "@/services/maps";
-import * as Location from "expo-location";
-import React, { useEffect, useState } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import CancelJobModal from "@/components/delivery/CancelJobModal";
 
 export default function EnRouteToDropoff({
   onAnimateToDropoff,
@@ -15,209 +17,208 @@ export default function EnRouteToDropoff({
   onAnimateToDropoff?: () => void;
 }) {
   const { activeJob, arriveAtDropoff, cancelJob } = useJobs();
+  const { bottom } = useSafeAreaInsets();
 
-  const primary = useThemeColor({}, "brandPrimary");
-  const surface = useThemeColor({}, "surfaceBackground");
-  const subtle = useThemeColor({}, "surfaceSubtle");
-  const textPrimary = useThemeColor({}, "textPrimary");
-  const textMuted = useThemeColor({}, "textMuted");
-  const danger = useThemeColor({}, "statusError");
+  const colors = {
+    bg: useThemeColor({}, "surfaceBackground"),
+    card: useThemeColor({}, "surfaceCard"),
+    border: useThemeColor({}, "borderDefault"),
+    text: useThemeColor({}, "textPrimary"),
+    muted: useThemeColor({}, "textMuted"),
+    danger: useThemeColor({}, "statusError"),
+  };
 
-  const [distanceToCustomer, setDistanceToCustomer] = useState<number | null>(
-    null,
-  );
+  const [distance, setDistance] = useState<number | null>(null);
   const [eta, setEta] = useState("");
   const [cancelVisible, setCancelVisible] = useState(false);
 
   useEffect(() => {
-    let subscription: Location.LocationSubscription | null = null;
-    let isMounted = true;
+    let sub: Location.LocationSubscription | null = null;
+    if (!activeJob) return;
 
-    const startTracking = async () => {
-      try {
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== "granted") return;
-        if (!isMounted) return;
+    (async () => {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") return;
 
-        subscription = await Location.watchPositionAsync(
-          {
-            accuracy: Location.Accuracy.High,
-            distanceInterval: 10,
-            timeInterval: 3000,
-          },
-          async (loc) => {
-            if (!isMounted || !activeJob) return;
-            const dropoffLat =
-              activeJob.dropoffAddress?.latitude ??
-              activeJob.dropoffAddress?.lat;
-            const dropoffLng =
-              activeJob.dropoffAddress?.longitude ??
-              activeJob.dropoffAddress?.lng;
-            if (
-              typeof dropoffLat !== "number" ||
-              typeof dropoffLng !== "number"
-            )
-              return;
+      sub = await Location.watchPositionAsync(
+        { accuracy: Location.Accuracy.High, distanceInterval: 10 },
+        async (loc) => {
+          const lat =
+            activeJob.dropoffAddress?.latitude ?? activeJob.dropoffAddress?.lat;
+          const lng =
+            activeJob.dropoffAddress?.longitude ??
+            activeJob.dropoffAddress?.lng;
+          if (typeof lat !== "number") return;
 
-            try {
-              const d = await getDistanceMeters({
-                originLat: loc.coords.latitude,
-                originLng: loc.coords.longitude,
-                destLat: dropoffLat,
-                destLng: dropoffLng,
-              });
-              if (typeof d.distance === "number" && isMounted)
-                setDistanceToCustomer(d.distance);
-            } catch {}
+          const [dRes, dirRes] = await Promise.allSettled([
+            getDistanceMeters({
+              originLat: loc.coords.latitude,
+              originLng: loc.coords.longitude,
+              destLat: lat,
+              destLng: lng,
+            }),
+            getDirections({
+              originLat: loc.coords.latitude,
+              originLng: loc.coords.longitude,
+              destLat: lat,
+              destLng: lng,
+            }),
+          ]);
 
-            try {
-              const data = await getDirections({
-                originLat: loc.coords.latitude,
-                originLng: loc.coords.longitude,
-                destLat: dropoffLat,
-                destLng: dropoffLng,
-              });
-              if (!data.error && data.duration && isMounted)
-                setEta(data.duration.text);
-            } catch {}
-          },
-        );
-      } catch {}
-    };
-
-    startTracking();
-    return () => {
-      isMounted = false;
-      subscription?.remove();
-    };
+          if (dRes.status === "fulfilled") setDistance(dRes.value.distance);
+          if (dirRes.status === "fulfilled" && !dirRes.value.error)
+            setEta(dirRes.value.duration.text);
+        },
+      );
+    })();
+    return () => sub?.remove();
   }, [activeJob]);
 
   if (!activeJob) return null;
 
+  const canArrive = __DEV__ || (distance !== null && distance <= 50);
   const dropoff = resolveAddress(activeJob.dropoffAddress);
-  const canArrive = true;
-  // const canArrive = distanceToCustomer !== null && distanceToCustomer <= 50;
 
   return (
-    <>
-      <View style={[styles.sheet, { backgroundColor: surface }]}>
-        {/* Step label */}
-        <View style={styles.stepRow}>
-          <View style={[styles.stepDot, { backgroundColor: danger }]} />
-          <ThemedText style={[styles.stepLabel, { color: danger }]}>
-            En route to drop-off
-          </ThemedText>
+    <View
+      style={[
+        styles.wrapper,
+        { backgroundColor: colors.bg, paddingBottom: bottom + 16 },
+      ]}
+    >
+      <View style={styles.header}>
+        <View style={styles.statusGroup}>
+          <View style={[styles.dot, { backgroundColor: colors.danger }]} />
+          <ThemedText style={styles.statusText}>En Route</ThemedText>
         </View>
+        <ThemedText style={[styles.etaText, { color: colors.muted }]}>
+          {distance ? `${(distance / 1000).toFixed(1)}km` : ""}{" "}
+          {eta && `• ${eta}`}
+        </ThemedText>
+      </View>
 
-        {/* Address */}
-        <View style={[styles.addressCard, { backgroundColor: subtle }]}>
-          <IconSymbol name="location.fill" size={16} color={danger} />
+      <View
+        style={[
+          styles.card,
+          { backgroundColor: colors.card, borderColor: colors.border },
+        ]}
+      >
+        <View style={styles.cardContent}>
+          <ThemedText style={[styles.label, { color: colors.muted }]}>
+            {activeJob.jobType === "ride" ? "PASSENGER" : "RECIPIENT"}
+          </ThemedText>
+          <ThemedText style={styles.name}>
+            {activeJob.recipientName || activeJob.customerName}
+          </ThemedText>
           <ThemedText
-            style={[styles.addressText, { color: textPrimary }]}
-            numberOfLines={2}
+            numberOfLines={1}
+            style={[styles.address, { color: colors.muted }]}
           >
-            {dropoff || "Drop-off location"}
+            {dropoff}
           </ThemedText>
         </View>
 
-        {/* ETA row */}
-        {(distanceToCustomer !== null || eta) && (
-          <View style={styles.etaRow}>
-            {distanceToCustomer !== null && (
-              <ThemedText style={[styles.etaText, { color: textMuted }]}>
-                {(distanceToCustomer / 1000).toFixed(2)} km away
-              </ThemedText>
-            )}
-            {eta && distanceToCustomer !== null && (
-              <ThemedText
-                style={[styles.etaSep, { color: textMuted }]}
-              ></ThemedText>
-            )}
-            {eta && (
-              <ThemedText style={[styles.etaText, { color: textMuted }]}>
-                {eta}
-              </ThemedText>
-            )}
-          </View>
-        )}
-
-        {/* Actions */}
-        <View style={styles.actions}>
-          {canArrive ? (
-            <Pressable
-              style={[styles.primaryBtn, { backgroundColor: danger }]}
-              onPress={async () => {
-                await arriveAtDropoff();
-                onAnimateToDropoff?.();
-              }}
-            >
-              <ThemedText style={styles.primaryBtnText}>
-                Arrived at drop-off
-              </ThemedText>
-            </Pressable>
-          ) : (
-            <View
-              style={[styles.primaryBtn, { backgroundColor: danger + "60" }]}
-            >
-              <ThemedText style={styles.primaryBtnText}>
-                Arrived at drop-off
-              </ThemedText>
-            </View>
-          )}
+        {activeJob.dropoffContactPhone && (
           <Pressable
-            style={styles.cancelLink}
-            onPress={() => setCancelVisible(true)}
+            onPress={() =>
+              Linking.openURL(`tel:${activeJob.dropoffContactPhone}`)
+            }
+            style={styles.callBtn}
           >
-            <ThemedText style={[styles.cancelText, { color: danger }]}>
-              Cancel job
-            </ThemedText>
+            <IconSymbol name="phone" size={18} color={colors.danger} />
           </Pressable>
-        </View>
+        )}
+      </View>
+
+      <View style={styles.footer}>
+        <Pressable
+          disabled={!canArrive}
+          onPress={async () => {
+            await arriveAtDropoff();
+            onAnimateToDropoff?.();
+          }}
+          style={({ pressed }) => [
+            styles.mainBtn,
+            {
+              backgroundColor: colors.danger,
+              opacity: !canArrive ? 0.4 : pressed ? 0.9 : 1,
+            },
+          ]}
+        >
+          <ThemedText style={styles.btnText}>ARRIVE AT DROP-OFF</ThemedText>
+        </Pressable>
+
+        <Pressable
+          onPress={() => setCancelVisible(true)}
+          style={styles.cancelBtn}
+        >
+          <ThemedText style={[styles.cancelText, { color: colors.muted }]}>
+            Cancel Job
+          </ThemedText>
+        </Pressable>
       </View>
 
       <CancelJobModal
         visible={cancelVisible}
         onClose={() => setCancelVisible(false)}
-        onConfirm={async (reason) => {
-          await cancelJob(activeJob.id, activeJob.jobType, reason);
+        onConfirm={async (r) => {
+          await cancelJob(activeJob.id, activeJob.jobType, r);
           setCancelVisible(false);
         }}
       />
-    </>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  sheet: {
+  wrapper: {
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    paddingHorizontal: 18,
-    paddingTop: 18,
-    paddingBottom: 36,
-    gap: 12,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    gap: 16,
   },
-  stepRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  stepDot: { width: 8, height: 8, borderRadius: 4 },
-  stepLabel: { fontSize: 13, fontWeight: "600", letterSpacing: 0.3 },
-  addressCard: {
+  header: {
     flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 10,
-    padding: 14,
-    borderRadius: 14,
+    justifyContent: "space-between",
+    alignItems: "center",
   },
-  addressText: { fontSize: 14, flex: 1 },
-  etaRow: { flexDirection: "row", alignItems: "center", gap: 6 },
-  etaText: { fontSize: 13 },
-  etaSep: { fontSize: 13 },
-  actions: { gap: 8 },
-  primaryBtn: {
-    height: 50,
-    borderRadius: 14,
+  statusGroup: { flexDirection: "row", alignItems: "center", gap: 6 },
+  dot: { width: 6, height: 6, borderRadius: 3 },
+  statusText: {
+    fontSize: 12,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  etaText: { fontSize: 12, fontWeight: "600" },
+  card: {
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 16,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  cardContent: { flex: 1, gap: 2 },
+  label: { fontSize: 10, fontWeight: "700", letterSpacing: 0.5 },
+  name: { fontSize: 16, fontWeight: "700" },
+  address: { fontSize: 13 },
+  callBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#f0f0f020",
+  },
+  footer: { gap: 12 },
+  mainBtn: {
+    height: 60,
+    borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
   },
-  primaryBtnText: { fontSize: 14, fontWeight: "600", color: "#fff" },
-  cancelLink: { alignItems: "center", paddingVertical: 8 },
+  btnText: { color: "#FFF", fontSize: 14, fontWeight: "800", letterSpacing: 1 },
+  cancelBtn: { alignItems: "center" },
   cancelText: { fontSize: 13, fontWeight: "500" },
 });

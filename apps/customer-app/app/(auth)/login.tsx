@@ -65,29 +65,40 @@ export default function LoginScreen() {
   const [appleAvailable, setAppleAvailable] = useState(false);
   const [oauthLoading, setOauthLoading] = useState(false);
   const [biometricLoading, setBiometricLoading] = useState(false);
+
   const handleBiometricLogin = async () => {
     setBiometricLoading(true);
     try {
       await biometricLogin();
       router.replace({ pathname: "/(tabs)/home" });
     } catch (err: any) {
-      Toast.show({
-        type: "error",
-        text1: err?.message || "Biometric login failed",
-      });
+      // Only show error if it's not a user cancellation
+      if (err?.message !== "User cancelled") {
+        Toast.show({
+          type: "error",
+          text1: err?.message || "Biometric login failed",
+        });
+      }
     } finally {
       setBiometricLoading(false);
     }
   };
 
+  // Check availability and trigger auto-prompt on mount
   useEffect(() => {
     (async () => {
       const enabled = await isBiometricEnabled();
       setBiometricEnabled(enabled);
+
       const available = await isAppleSignInAvailable();
       setAppleAvailable(available);
+
+      // Auto-trigger biometric prompt if enabled
+      if (enabled) {
+        handleBiometricLogin();
+      }
     })();
-  }, [isBiometricEnabled]);
+  }, []);
 
   useEffect(() => {
     if (response?.type === "success" && response.authentication) {
@@ -209,24 +220,43 @@ export default function LoginScreen() {
 
             {error && <ThemedText style={styles.errorText}>{error}</ThemedText>}
 
-            <Pressable
-              style={[
-                styles.primaryButton,
-                { backgroundColor: primary, opacity: loading ? 0.8 : 1 },
-              ]}
-              onPress={handleLogin}
-              disabled={loading}
-            >
-              {loading ? (
-                <ActivityIndicator color={textOnPrimary} />
-              ) : (
-                <ThemedText
-                  style={[styles.buttonText, { color: textOnPrimary }]}
+            <View style={styles.actionRow}>
+              <Pressable
+                style={[
+                  styles.primaryButton,
+                  { backgroundColor: primary, opacity: loading ? 0.8 : 1 },
+                ]}
+                onPress={handleLogin}
+                disabled={loading}
+              >
+                {loading ? (
+                  <ActivityIndicator color={textOnPrimary} />
+                ) : (
+                  <ThemedText
+                    style={[styles.buttonText, { color: textOnPrimary }]}
+                  >
+                    Sign In
+                  </ThemedText>
+                )}
+              </Pressable>
+
+              {biometricEnabled && (
+                <Pressable
+                  style={[
+                    styles.biometricSideButton,
+                    { borderColor: border, backgroundColor: surface },
+                  ]}
+                  onPress={handleBiometricLogin}
+                  disabled={biometricLoading}
                 >
-                  Sign In
-                </ThemedText>
+                  {biometricLoading ? (
+                    <ActivityIndicator color={primary} />
+                  ) : (
+                    <IconSymbol name="faceid" size={28} color={primary} />
+                  )}
+                </Pressable>
               )}
-            </Pressable>
+            </View>
           </View>
 
           <View style={styles.footerArea}>
@@ -258,22 +288,6 @@ export default function LoginScreen() {
                   disabled={oauthLoading}
                 >
                   <IconSymbol name="apple.logo" size={22} color={textColor} />
-                </Pressable>
-              )}
-              {biometricEnabled && (
-                <Pressable
-                  style={[
-                    styles.socialCircle,
-                    { borderColor: primary, backgroundColor: primary + "08" },
-                  ]}
-                  onPress={handleBiometricLogin}
-                  disabled={biometricLoading}
-                >
-                  {biometricLoading ? (
-                    <ActivityIndicator color={primary} />
-                  ) : (
-                    <IconSymbol name="faceid" size={24} color={primary} />
-                  )}
                 </Pressable>
               )}
             </View>
@@ -338,12 +352,26 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     textAlign: "center",
   },
+  actionRow: {
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 12,
+    alignItems: "center",
+  },
   primaryButton: {
+    flex: 1,
     height: 60,
     borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 12,
+  },
+  biometricSideButton: {
+    width: 60,
+    height: 60,
+    borderRadius: 20,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
   },
   buttonText: { fontSize: 17, fontWeight: "700" },
 

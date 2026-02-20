@@ -28,7 +28,9 @@ export function LocationPickerModal() {
   } = useLocation();
   const primary = useThemeColor({}, "brandPrimary");
   const card = useThemeColor({}, "surfaceCard");
+  const textPrimary = useThemeColor({}, "textPrimary");
   const textSecondary = useThemeColor({}, "textSecondary");
+  const textMuted = useThemeColor({}, "textMuted");
   const success = useThemeColor({}, "statusSuccess");
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -135,7 +137,11 @@ export function LocationPickerModal() {
   const showEmpty = searchQuery && !searching && predictions.length === 0;
 
   return (
-    <Modal visible={pickerVisible} animationType="slide">
+    <Modal
+      visible={pickerVisible}
+      animationType="slide"
+      onRequestClose={closePicker}
+    >
       <ThemedView style={{ flex: 1 }}>
         {/* Header */}
         <View style={styles.header}>
@@ -149,7 +155,7 @@ export function LocationPickerModal() {
         <View style={[styles.searchBar, { backgroundColor: card }]}>
           <IconSymbol name="magnifyingglass" size={20} color={textSecondary} />
           <TextInput
-            style={styles.input}
+            style={[styles.input, { color: textPrimary }]}
             placeholder="Search for a place..."
             placeholderTextColor={textSecondary}
             value={searchQuery}
@@ -167,7 +173,7 @@ export function LocationPickerModal() {
           {/* Current Location */}
           {showCurrent && (
             <Pressable
-              style={styles.locationItem}
+              style={[styles.locationItem, { backgroundColor: card }]}
               onPress={() =>
                 confirmLocation({
                   latitude: location.coords?.latitude ?? 0,
@@ -207,7 +213,7 @@ export function LocationPickerModal() {
           {predictions.map((place) => (
             <Pressable
               key={place.id}
-              style={styles.locationItem}
+              style={[styles.locationItem, { backgroundColor: card }]}
               onPress={() => handleSelectPrediction(place)}
             >
               <View
@@ -314,7 +320,9 @@ export function LocationPickerModal() {
                   style={[styles.confirmOverlay, { backgroundColor: card }]}
                 >
                   <View style={{ flex: 1 }}>
-                    <ThemedText style={styles.overlayLabel}>
+                    <ThemedText
+                      style={[styles.overlayLabel, { color: textMuted }]}
+                    >
                       SELECTED LOCATION
                     </ThemedText>
                     <ThemedText style={styles.overlayAddress} numberOfLines={2}>
@@ -378,7 +386,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     borderRadius: 16,
     marginBottom: 8,
-    backgroundColor: "#fff",
   },
   iconContainer: {
     width: 48,
@@ -418,7 +425,6 @@ const styles = StyleSheet.create({
   overlayLabel: {
     fontSize: 12,
     fontWeight: "700",
-    color: "#666",
     textTransform: "uppercase",
   },
   overlayAddress: { fontSize: 15.5, fontWeight: "600", marginTop: 4 },

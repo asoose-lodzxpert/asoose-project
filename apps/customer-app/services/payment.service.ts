@@ -1,7 +1,6 @@
 import { request } from "@/lib/authFetch";
 import type { PaymentMethod, BankAccount, InAppTx } from "@/types/payment";
 
-// Map frontend payment method to backend enums
 const gatewayMap: Record<PaymentMethod, string> = {
   transfer: "MONNIFY",
   paystack: "PAYSTACK",
@@ -16,7 +15,6 @@ const methodMap: Record<PaymentMethod, string> = {
   flutterwave: "CARD",
 };
 
-// All payment functions now require a user object for identity fields
 type UserIdentity = { email: string; name: string; phone?: string };
 
 export async function initiatePayment(

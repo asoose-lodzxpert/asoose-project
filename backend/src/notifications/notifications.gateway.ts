@@ -9,10 +9,18 @@ import {
   ConnectedSocket,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { Logger } from '@nestjs/common';
+import { Inject, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { RiderStateService } from '../matching/rider-state/rider-state.service';
 import { DriverStateService } from '../matching/driver-state/driver-state.service';
+import { TokenRevocationService } from '../auth/token-revocation.service';
+import { MATCHING_REDIS_CLIENT } from '../matching/redis/redis.module';
+import Redis from 'ioredis';
+
+// Per-socket minimum interval between location updates (ms)
+const LOCATION_RATE_LIMIT_MS = 800;
+// TTL for active job room tracking in Redis (4 hours)
+const ACTIVE_ROOM_TTL_SECONDS = 4 * 60 * 60;
 
 // Explicit CORS configuration for Socket.IO
 @WebSocketGateway({
@@ -37,6 +45,8 @@ export class NotificationsGateway
     private jwtService: JwtService,
     private riderStateService: RiderStateService,
     private driverStateService: DriverStateService,
+    private tokenRevocationService: TokenRevocationService,
+    @Inject(MATCHING_REDIS_CLIENT) private readonly matchingRedis: Redis,
   ) {}
 
   afterInit() {
@@ -65,6 +75,16 @@ export class NotificationsGateway
 
       const userId = payload.sub || payload.userId;
 
+      // ── Token revocation check ──────────────────────────────────────
+      const isRevoked = await this.tokenRevocationService.isUserRevoked(userId);
+      if (isRevoked) {
+        this.logger.warn(
+          `Rejected revoked user ${userId} (Socket: ${client.id})`,
+        );
+        client.disconnect();
+        return;
+      }
+
       client.data.userId = userId;
       client.data.role = payload.role;
 
@@ -76,6 +96,17 @@ export class NotificationsGateway
 
       // Join a room specific to this user
       client.join(`user_${userId}`);
+
+      // ── Auto-rejoin active job room on reconnect ─────────────────────
+      const activeJobId = await this.matchingRedis.get(
+        `socket:${userId}:activeRoom`,
+      );
+      if (activeJobId) {
+        client.join(`order_${activeJobId}`);
+        this.logger.log(
+          `Auto-rejoined ${userId} to room order_${activeJobId} on reconnect`,
+        );
+      }
 
       this.logger.log(`Client connected: ${userId} (Socket: ${client.id})`);
     } catch (err) {
@@ -101,14 +132,26 @@ export class NotificationsGateway
    * Allow clients to join a specific order room for tracking
    */
   @SubscribeMessage('joinOrderRoom')
-  handleJoinOrderRoom(
+  async handleJoinOrderRoom(
     @ConnectedSocket() client: Socket,
     @MessageBody() data: { orderId: string },
   ) {
     if (data && data.orderId) {
       const roomName = `order_${data.orderId}`;
       client.join(roomName);
-      this.logger.log(`User ${client.data.userId} joined room: ${roomName}`);
+
+      // Persist the active job room so reconnects auto-rejoin
+      const userId = client.data.userId;
+      if (userId) {
+        await this.matchingRedis.set(
+          `socket:${userId}:activeRoom`,
+          data.orderId,
+          'EX',
+          ACTIVE_ROOM_TTL_SECONDS,
+        );
+      }
+
+      this.logger.log(`User ${userId} joined room: ${roomName}`);
       return { event: 'joinedRoom', room: roomName };
     }
   }
@@ -119,14 +162,32 @@ export class NotificationsGateway
   @SubscribeMessage('rider_location_update')
   async handleRiderLocationUpdate(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: { lat: number; lng: number },
+    @MessageBody() data: { lat: number; lng: number; role?: string },
   ) {
     const riderId = client.data.userId;
-    const role: string = client.data.role ?? 'RIDER';
+    this.logger.debug(
+      `Received location update from socket ${client.id} for user ${riderId} with data: ${JSON.stringify(data)} and native role ${client.data.role}`,
+    );
+    // JWT-derived role (client.data.role) is authoritative; payload role is only a hint when JWT role is absent
+    const role: string = client.data.role || data?.role || 'RIDER';
     if (!riderId) {
       this.logger.warn(`Location update from unauthenticated socket`);
       return { success: false, error: 'Not authenticated' };
     }
+
+    this.logger.debug(
+      `Received location update from rider ${riderId}: [${data.lat}, ${data.lng}] with role ${role}`,
+    );
+
+    // ── Per-socket rate limit ─────────────────────────────────────
+    const now = Date.now();
+    if (
+      client.data.lastLocationMs &&
+      now - client.data.lastLocationMs < LOCATION_RATE_LIMIT_MS
+    ) {
+      return { success: false, error: 'rate_limited' };
+    }
+    client.data.lastLocationMs = now;
 
     if (!data || typeof data.lat !== 'number' || typeof data.lng !== 'number') {
       this.logger.warn(`Invalid location data from ${riderId}`);
@@ -173,10 +234,13 @@ export class NotificationsGateway
   async handleRiderLocationBatch(
     @ConnectedSocket() client: Socket,
     @MessageBody()
-    data: { locations: Array<{ lat: number; lng: number; timestamp: number }> },
+    data: {
+      locations: Array<{ lat: number; lng: number; timestamp: number }>;
+      role?: string;
+    },
   ) {
     const riderId = client.data.userId;
-    const role: string = client.data.role ?? 'RIDER';
+    const role: string = client.data.role || data?.role || 'RIDER';
     if (!riderId) {
       return { success: false, error: 'Not authenticated' };
     }
@@ -279,8 +343,22 @@ export class NotificationsGateway
   /**
    * Join a rider to an order/ride room for real-time updates
    */
-  joinJobRoom(riderId: string, jobId: string) {
-    // Find all sockets for this rider and join them to the room
+  async joinJobRoom(riderId: string, jobId: string): Promise<void> {
+    // Persist so reconnects auto-rejoin — non-fatal if Redis is unavailable
+    try {
+      await this.matchingRedis.set(
+        `socket:${riderId}:activeRoom`,
+        jobId,
+        'EX',
+        ACTIVE_ROOM_TTL_SECONDS,
+      );
+    } catch (err) {
+      this.logger.warn(
+        `joinJobRoom: failed to persist room for ${riderId}: ${err?.message}`,
+      );
+    }
+
+    // Find all current sockets for this rider and join them to the room
     const userSockets = this.activeUsers.get(riderId);
     if (userSockets) {
       userSockets.forEach((socketId) => {
@@ -290,6 +368,15 @@ export class NotificationsGateway
           this.logger.log(`Rider ${riderId} joined room: order_${jobId}`);
         }
       });
+    }
+  }
+
+  /** Clear the active job room key when a job completes or is cancelled */
+  async leaveJobRoom(riderId: string): Promise<void> {
+    try {
+      await this.matchingRedis.del(`socket:${riderId}:activeRoom`);
+    } catch {
+      // non-fatal
     }
   }
 

@@ -23,7 +23,7 @@ export default function NotFound() {
 
       {/* Simplified Action */}
       <Link
-        href="/home"
+        href="/main/store"
         className="group flex items-center gap-3 text-yellow-500 hover:text-white transition-colors duration-300"
       >
         <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" />

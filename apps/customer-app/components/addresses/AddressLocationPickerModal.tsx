@@ -52,7 +52,10 @@ export function AddressLocationPickerModal({
 }: AddressLocationPickerModalProps) {
   const primary = useThemeColor({}, "brandPrimary");
   const card = useThemeColor({}, "surfaceCard");
+  const textPrimary = useThemeColor({}, "textPrimary");
   const textSecondary = useThemeColor({}, "textSecondary");
+  const textMuted = useThemeColor({}, "textMuted");
+  const textOnPrimary = useThemeColor({}, "textOnPrimary");
   const border = useThemeColor({}, "borderDefault");
   const background = useThemeColor({}, "surfaceBackground");
 
@@ -141,6 +144,7 @@ export function AddressLocationPickerModal({
       visible={visible}
       animationType="slide"
       presentationStyle="pageSheet"
+      onRequestClose={step === "label" ? () => setStep("search") : onClose}
     >
       <ThemedView style={styles.container}>
         {/* Header */}
@@ -171,7 +175,7 @@ export function AddressLocationPickerModal({
                 color={textSecondary}
               />
               <TextInput
-                style={styles.input}
+                style={[styles.input, { color: textPrimary }]}
                 placeholder="Find a street or building..."
                 value={searchQuery}
                 onChangeText={setSearchQuery}
@@ -224,11 +228,12 @@ export function AddressLocationPickerModal({
             <TextInput
               style={[
                 styles.labelInput,
-                { backgroundColor: card, color: primary },
+                { backgroundColor: card, color: textPrimary },
               ]}
               value={labelValue}
               onChangeText={onLabelChange}
               placeholder="Address Label"
+              placeholderTextColor={textSecondary}
               autoFocus
             />
             <Pressable
@@ -241,16 +246,24 @@ export function AddressLocationPickerModal({
               disabled={saving || !labelValue}
             >
               {saving ? (
-                <ActivityIndicator color="#fff" />
+                <ActivityIndicator color={textOnPrimary} />
               ) : (
-                <ThemedText style={styles.saveBtnText}>Save Address</ThemedText>
+                <ThemedText
+                  style={[styles.saveBtnText, { color: textOnPrimary }]}
+                >
+                  Save Address
+                </ThemedText>
               )}
             </Pressable>
           </View>
         )}
 
         {/* Floating Map View */}
-        <Modal visible={mapVisible} animationType="fade">
+        <Modal
+          visible={mapVisible}
+          animationType="fade"
+          onRequestClose={() => setMapVisible(false)}
+        >
           <View style={{ flex: 1 }}>
             <MapView
               ref={mapRef}
@@ -268,14 +281,14 @@ export function AddressLocationPickerModal({
             </MapView>
 
             <Pressable
-              style={styles.mapBack}
+              style={[styles.mapBack, { backgroundColor: card }]}
               onPress={() => setMapVisible(false)}
             >
-              <IconSymbol name="arrow.left" size={20} color="#000" />
+              <IconSymbol name="arrow.left" size={20} color={textPrimary} />
             </Pressable>
 
             {selectedLocation && (
-              <View style={styles.mapConfirmCard}>
+              <View style={[styles.mapConfirmCard, { backgroundColor: card }]}>
                 <ThemedText numberOfLines={1} style={styles.mapAddressText}>
                   {reverseAddress}
                 </ThemedText>
@@ -288,7 +301,9 @@ export function AddressLocationPickerModal({
                     })
                   }
                 >
-                  <ThemedText style={{ color: "#fff", fontWeight: "700" }}>
+                  <ThemedText
+                    style={{ color: textOnPrimary, fontWeight: "700" }}
+                  >
                     Confirm
                   </ThemedText>
                 </Pressable>
@@ -350,12 +365,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  saveBtnText: { color: "#fff", fontWeight: "700", fontSize: 16 },
+  saveBtnText: { fontWeight: "700", fontSize: 16 },
   mapBack: {
     position: "absolute",
     top: 50,
     left: 20,
-    backgroundColor: "#fff",
     width: 40,
     height: 40,
     borderRadius: 20,
@@ -368,7 +382,6 @@ const styles = StyleSheet.create({
     bottom: 40,
     left: 20,
     right: 20,
-    backgroundColor: "#fff",
     padding: 16,
     borderRadius: 20,
     flexDirection: "row",

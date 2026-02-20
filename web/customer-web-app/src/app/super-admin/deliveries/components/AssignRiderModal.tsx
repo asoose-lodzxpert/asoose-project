@@ -22,13 +22,15 @@ interface RiderApiResponse {
 }
 
 interface AssignRiderModalProps {
-  deliveryId: string;
+  deliveryId?: string;
+  groupId?: string;
   onClose: () => void;
   onSuccess: () => void;
 }
 
 export function AssignRiderModal({
   deliveryId,
+  groupId,
   onClose,
   onSuccess,
 }: AssignRiderModalProps) {
@@ -53,7 +55,10 @@ export function AssignRiderModal({
     if (!selectedRiderId) return;
     setAssigning(true);
     try {
-      await fetcher(`/super-admin/deliveries/${deliveryId}/assign-rider`, {
+      const endpoint = groupId
+        ? `/super-admin/deliveries/groups/${groupId}/assign-rider`
+        : `/super-admin/deliveries/${deliveryId}/assign-rider`;
+      await fetcher(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ riderId: selectedRiderId }),
@@ -83,7 +88,9 @@ export function AssignRiderModal({
           <div>
             <h2 className="text-white font-bold text-lg">Assign Rider</h2>
             <p className="text-gray-400 text-xs mt-0.5">
-              Select an active rider for this delivery
+              {groupId
+                ? "Assign one rider to all deliveries in this group"
+                : "Select an active rider for this delivery"}
             </p>
           </div>
           <button

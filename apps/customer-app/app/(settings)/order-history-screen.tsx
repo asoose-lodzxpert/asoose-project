@@ -5,7 +5,11 @@ import {
   Animated,
   Easing,
   Platform,
- View, StyleSheet, Pressable, FlatList } from "react-native";
+  View,
+  StyleSheet,
+  Pressable,
+  FlatList,
+} from "react-native";
 import { SkeletonCard } from "@/components/ui/Skeleton";
 import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
@@ -19,6 +23,28 @@ const ORDER_STATUS_OPTIONS = Object.values(OrderStatus).map((status) => ({
   label: status.charAt(0) + status.slice(1).toLowerCase(),
   value: status,
 }));
+
+function getStatusColor(
+  status: OrderStatus,
+  colors: {
+    success: string;
+    error: string;
+    pending: string;
+    primary: string;
+  },
+): string {
+  switch (status) {
+    case OrderStatus.DELIVERED:
+      return colors.success;
+    case OrderStatus.CANCELLED:
+    case OrderStatus.REJECTED:
+      return colors.error;
+    case OrderStatus.PENDING:
+      return colors.pending;
+    default:
+      return colors.primary;
+  }
+}
 
 export default function OrderHistoryScreen() {
   const [status, setStatus] = useState<OrderStatus | undefined>(undefined);
@@ -38,7 +64,17 @@ export default function OrderHistoryScreen() {
   const cardBg = useThemeColor({}, "surfaceCard");
   const border = useThemeColor({}, "borderDefault");
   const skeletonColor = useThemeColor({}, "surfaceSubtle");
+  const statusSuccess = useThemeColor({}, "statusSuccess");
+  const statusError = useThemeColor({}, "statusError");
+  const statusPending = useThemeColor({}, "statusPending");
   const router = useRouter();
+
+  const statusColors = {
+    success: statusSuccess,
+    error: statusError,
+    pending: statusPending,
+    primary: brandPrimary,
+  };
 
   const loadOrders = useCallback(
     async (reset = false) => {
@@ -53,6 +89,8 @@ export default function OrderHistoryScreen() {
         });
         if (reset) {
           setOrders(res.data);
+          if (__DEV__)
+            console.log("Fetched orders:", JSON.stringify(res.data, null, 2));
         } else {
           setOrders((prev) => [...prev, ...res.data]);
         }
@@ -87,10 +125,12 @@ export default function OrderHistoryScreen() {
     setRefreshing(false);
   };
 
-  const renderItem = ({ item: order }: { item: Order }) => (
-    <>
+  const renderItem = ({ item: order }: { item: Order }) => {
+    const statusColor = getStatusColor(order.status, statusColors);
+    const isGroup = order.type === "GROUP";
+
+    return (
       <Pressable
-        key={order.id}
         style={[
           styles.orderCard,
           { backgroundColor: cardBg, borderColor: border },
@@ -100,46 +140,69 @@ export default function OrderHistoryScreen() {
         }
       >
         <View style={styles.cardHeader}>
-          <View style={styles.orderIdContainer}>
-            <IconSymbol name="shopping-bag" size={18} color={brandPrimary} />
-            <ThemedText style={[styles.orderId, { color: textColor }]}>
-              Order #{order.id.slice(-6)}
+          <View
+            style={{
+              flex: 1,
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 8,
+            }}
+          >
+            <ThemedText
+              style={[styles.orderId, { color: textColor }]}
+              numberOfLines={1}
+            >
+              {isGroup ? "Multi-Store Order" : `Order #${order.id.slice(-6)}`}
             </ThemedText>
+            {isGroup && (
+              <View
+                style={[
+                  styles.statusBadge,
+                  { backgroundColor: brandPrimary + "22" },
+                ]}
+              >
+                <ThemedText
+                  style={[styles.statusText, { color: brandPrimary }]}
+                >
+                  {order.orderCount} stores
+                </ThemedText>
+              </View>
+            )}
           </View>
-
           <View
             style={[
               styles.statusBadge,
-              { backgroundColor: brandPrimary + "22" },
+              { backgroundColor: statusColor + "22" },
             ]}
           >
-            <ThemedText style={[styles.statusText, { color: brandPrimary }]}>
+            <ThemedText style={[styles.statusText, { color: statusColor }]}>
               {order.status}
             </ThemedText>
           </View>
         </View>
 
-        <View style={styles.cardDetailsRowSmall}>
-          <ThemedText style={[styles.detailLabel, { color: textSecondary }]}>
-            Total:
-          </ThemedText>
-          <ThemedText style={[styles.detailValue, { color: textColor }]}>
-            ₦{order.total.toFixed(2)}
-          </ThemedText>
-        </View>
+        <ThemedText
+          style={[styles.storeText, { color: textSecondary }]}
+          numberOfLines={1}
+        >
+          {isGroup ? order.stores?.join(" · ") : order.storeName}
+        </ThemedText>
 
-        <View style={styles.cardDetailsRowSmall}>
-          <ThemedText style={[styles.detailLabel, { color: textSecondary }]}>
-            Date:
+        <View style={styles.cardFooter}>
+          <ThemedText style={[styles.totalText, { color: textColor }]}>
+            ₦{order.total.toLocaleString("en-NG", { minimumFractionDigits: 2 })}
           </ThemedText>
-          <ThemedText style={[styles.detailValue, { color: textSecondary }]}>
-            {new Date(order.createdAt).toLocaleString()}
+          <ThemedText style={[styles.dateText, { color: textSecondary }]}>
+            {new Date(order.createdAt).toLocaleDateString("en-NG", {
+              day: "numeric",
+              month: "short",
+              year: "numeric",
+            })}
           </ThemedText>
         </View>
       </Pressable>
-      <View style={[styles.separator, { backgroundColor: border }]} />
-    </>
-  );
+    );
+  };
 
   const renderSkeleton = () => {
     const skeletons = Array.from({ length: 5 });
@@ -445,34 +508,28 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "600",
   },
-  cardDetailsRowSmall: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 4,
-  },
-  cardDetailsRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 2,
-  },
-  detailLabel: {
-    fontSize: 13,
-    marginRight: 4,
-    fontWeight: "400",
-  },
-  detailValue: {
-    fontSize: 13,
-    fontWeight: "600",
-  },
   orderId: {
     fontWeight: "bold",
     fontSize: 15,
-    marginBottom: 2,
+    flexShrink: 1,
   },
-  separator: {
-    height: 1,
-    marginVertical: 10,
-    marginHorizontal: 24,
+  storeText: {
+    fontSize: 13,
+    marginTop: 4,
+    marginBottom: 8,
+  },
+  cardFooter: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 8,
+  },
+  totalText: {
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  dateText: {
+    fontSize: 12,
   },
   skeletonLine: {
     height: 16,

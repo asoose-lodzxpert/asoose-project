@@ -14,6 +14,8 @@ export type JobEventCallbacks = {
   onJobCancelled?: (jobId: string) => void;
   onError?: (error: Error) => void;
   onConnectionStatusChange?: (status: ConnectionStatus) => void;
+  /** Called when the server forces a logout (e.g. account banned/suspended) */
+  onForceLogout?: (reason?: string) => void;
 };
 
 export class JobEventsService {
@@ -112,10 +114,12 @@ export class JobEventsService {
 
     // Listen for job.assigned event
     this.socket.on("job.assigned", (data: any) => {
+      if (__DEV__)
+        console.log(
+          "Received job.assigned event:",
+          JSON.stringify(data, null, 2),
+        );
       try {
-        // ...existing code...
-
-        // Map backend event to IncomingJobOffer format
         const job: IncomingJobOffer = {
           id: data.id,
           jobType: data.jobType,
@@ -124,6 +128,21 @@ export class JobEventsService {
           dropoffAddress: data.dropoffAddress || "",
           earnings: data.estimatedEarnings || data.earnings || 0,
           distanceKm: data.distance || data.distanceKm,
+
+          packageDetails: data.packageDetails,
+          pickupContactPhone: data.pickupContactPhone,
+          dropoffContactPhone: data.dropoffContactPhone,
+          recipientName: data.recipientName,
+          orderItems: data.orderItems,
+          isFragile: data.isFragile,
+          isPerishable: data.isPerishable,
+          containsLiquid: data.containsLiquid,
+          weightKg: data.weightKg,
+          stops: data.stops,
+          storeCount: data.storeCount,
+          currentStopIndex: data.currentStopIndex,
+          // assignedByAdmin: data.assignedByAdmin,
+          // estimatedEarnings: data.estimatedEarnings,
         };
 
         if (this.callbacks?.onJobAssigned) {
@@ -168,6 +187,16 @@ export class JobEventsService {
           );
         }
       }
+    });
+
+    // Handle forced logout (account banned / suspended by admin)
+    this.socket.on("force_logout", (data: any) => {
+      const reason = data?.reason as string | undefined;
+      if (this.callbacks?.onForceLogout) {
+        this.callbacks.onForceLogout(reason);
+      }
+      // Disconnect socket immediately
+      this.disconnect();
     });
   }
 
@@ -232,9 +261,9 @@ export class JobEventsService {
   /**
    * Send location update via the shared socket
    */
-  sendLocationUpdate(lat: number, lng: number): boolean {
+  sendLocationUpdate(lat: number, lng: number, role?: string): boolean {
     if (this.socket && this.connectionStatus === "connected") {
-      this.socket.emit("rider_location_update", { lat, lng });
+      this.socket.emit("rider_location_update", { lat, lng, role });
       return true;
     }
     return false;
@@ -245,9 +274,10 @@ export class JobEventsService {
    */
   sendLocationBatch(
     locations: Array<{ lat: number; lng: number; timestamp: number }>,
+    role?: string,
   ): boolean {
     if (this.socket && this.connectionStatus === "connected") {
-      this.socket.emit("rider_location_batch", { locations });
+      this.socket.emit("rider_location_batch", { locations, role });
       return true;
     }
     return false;

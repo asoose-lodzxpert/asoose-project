@@ -29,12 +29,15 @@ export const selectPlace = async (placeId: string): Promise<Address | null> => {
 
     return {
       id: Date.now().toString(),
+      userId: "",
+      vendorId: null,
+      phone: null,
       label: "Other",
-      address: response.address,
-      coordinates: {
-        lat: response.lat.toString(),
-        lng: response.lng.toString(),
-      },
+      street: response.address,
+      city: "",
+      state: "",
+      lat: Number(response.lat),
+      lng: Number(response.lng),
       isDefault: false,
     };
   } catch (error) {

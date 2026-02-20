@@ -32,6 +32,8 @@ export class DeliveryMatchingProcessor extends WorkerHost {
   private readonly MAX_RINGS = 5;
   private readonly MAX_ATTEMPTS = 20;
   private readonly TIMEOUT_MS = 90000; // 90 seconds
+  private readonly MAX_MATCHING_RETRIES = 5; // Max full re-queued attempts before cancel
+  private readonly RETRY_DELAY_MS = 10_000; // 10s between retries
 
   constructor(
     private readonly redis: RedisService,
@@ -103,6 +105,8 @@ export class DeliveryMatchingProcessor extends WorkerHost {
       } else {
         await this.handleNoDriverFound(
           deliveryId,
+          jobSummary,
+          attempt,
           delivery.orderId ?? undefined,
         );
       }
@@ -260,12 +264,29 @@ export class DeliveryMatchingProcessor extends WorkerHost {
 
   private async handleNoDriverFound(
     deliveryId: string,
+    jobSummary: MatchDeliveryJobData['job'],
+    attempt: number,
     orderId: string | undefined,
   ): Promise<void> {
     const attempts = await this.redis.incrementMatchingAttempts(deliveryId);
 
     this.logger.warn(
-      `❌ No driver found for delivery ${deliveryId} (attempt ${attempts})`,
+      `❌ No driver found for delivery ${deliveryId} (attempt ${attempts}/${this.MAX_MATCHING_RETRIES})`,
+    );
+
+    if (attempts < this.MAX_MATCHING_RETRIES) {
+      this.logger.log(
+        `Retrying delivery matching for ${deliveryId} (attempt ${attempts + 1}) in ${this.RETRY_DELAY_MS}ms`,
+      );
+      await this.queue.enqueueDeliveryMatching(
+        { job: jobSummary, attempt: attempts + 1 },
+        this.RETRY_DELAY_MS,
+      );
+      return;
+    }
+
+    this.logger.warn(
+      `Cancelling delivery ${deliveryId} — no driver found after ${attempts} attempts`,
     );
 
     // Update delivery status
@@ -282,6 +303,13 @@ export class DeliveryMatchingProcessor extends WorkerHost {
       });
     }
 
-    // Optionally emit a generic event or log here if needed
+    // Emit cancellation event so customers are notified via socket
+    this.eventBus.emitJobCancelled({
+      jobId: deliveryId,
+      jobType: 'delivery',
+      reason: 'No driver available',
+      cancelledBy: 'system',
+      timestamp: Date.now(),
+    });
   }
 }

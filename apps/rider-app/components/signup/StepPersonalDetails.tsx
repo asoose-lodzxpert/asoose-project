@@ -94,7 +94,7 @@ export function StepPersonalDetails({ data, onChange }: Props) {
       </Field>
 
       {/* Full name */}
-      <Field label="Full name">
+      <Field label="Enter your full name">
         <ThemedInput
           placeholder="John Doe"
           value={data.fullName}
@@ -104,7 +104,7 @@ export function StepPersonalDetails({ data, onChange }: Props) {
       </Field>
 
       {/* Email */}
-      <Field label="Email address">
+      <Field label="Enter your email address">
         <ThemedInput
           placeholder="john@example.com"
           value={data.email}
@@ -116,7 +116,7 @@ export function StepPersonalDetails({ data, onChange }: Props) {
       </Field>
 
       {/* Password */}
-      <Field label="Password">
+      <Field label="Create a password">
         <ThemedInput
           placeholder="Minimum 8 characters"
           value={data.password}
@@ -136,7 +136,7 @@ export function StepPersonalDetails({ data, onChange }: Props) {
       </Field>
 
       {/* Confirm Password */}
-      <Field label="Confirm password">
+      <Field label="Confirm your password">
         <ThemedInput
           placeholder="Re-enter your password"
           value={data.confirmPassword}
@@ -158,7 +158,7 @@ export function StepPersonalDetails({ data, onChange }: Props) {
       </Field>
 
       {/* Address */}
-      <Field label="Address">
+      <Field label="Enter your home address">
         <ThemedInput
           placeholder="Street address"
           value={data.address}
@@ -167,7 +167,7 @@ export function StepPersonalDetails({ data, onChange }: Props) {
       </Field>
 
       {/* Phone */}
-      <Field label="Phone number">
+      <Field label="Enter your phone number">
         <View style={styles.row}>
           <CustomDropdown
             data={COUNTRY_CODES}
@@ -188,7 +188,7 @@ export function StepPersonalDetails({ data, onChange }: Props) {
       </Field>
 
       <DatePicker
-        label="Date of birth"
+        label="Select your date of birth"
         value={data.dob}
         onChange={(d) => onChange("dob", d.toISOString())}
         maximumDate={get18YearsAgo()}
@@ -205,7 +205,7 @@ export function StepPersonalDetails({ data, onChange }: Props) {
         onChange={(v) => onChange("language", v as string)}
         placeholder="Select language"
         containerStyle={{ flex: 2, marginTop: 20 }}
-        label="Preferred language"
+        label="Choose your preferred language"
       />
 
       {/* State */}
@@ -219,7 +219,7 @@ export function StepPersonalDetails({ data, onChange }: Props) {
         }}
         placeholder="Select state"
         containerStyle={{ flex: 2, marginTop: 20 }}
-        label="State"
+        label="Choose your state"
       />
 
       {/* City */}
@@ -229,7 +229,7 @@ export function StepPersonalDetails({ data, onChange }: Props) {
         onChange={(v) => onChange("city", v as string)}
         placeholder="Select city"
         containerStyle={{ flex: 2, marginTop: 20 }}
-        label="City / Region"
+        label="Choose your city / region"
       />
 
       {/* Security tip */}

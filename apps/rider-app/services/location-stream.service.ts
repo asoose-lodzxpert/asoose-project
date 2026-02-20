@@ -6,6 +6,17 @@ const LOCATION_QUEUE_KEY = "rider_location_queue";
 const LOCATION_UPDATE_INTERVAL = 5000; // 5 seconds
 const MAX_QUEUE_SIZE = 100;
 
+/**
+ * Module-level getter injected from useLocationStream / JobContext.
+ * Returns the current authenticated user's role ('RIDER' | 'DRIVER').
+ * Falls back to 'RIDER' until a real getter is registered.
+ */
+let getRoleFn: () => string = () => "RIDER";
+
+export function setRoleGetter(fn: () => string) {
+  getRoleFn = fn;
+}
+
 interface QueuedLocation {
   lat: number;
   lng: number;
@@ -24,6 +35,13 @@ export class LocationStreamService {
    */
   setJobEventsService(service: JobEventsService) {
     this.jobEventsService = service;
+  }
+
+  /**
+   * Set the role to include in location updates (RIDER or DRIVER)
+   */
+  setRole(role: string) {
+    setRoleGetter(() => role);
   }
 
   /**
@@ -125,7 +143,11 @@ export class LocationStreamService {
     };
 
     if (this.jobEventsService && this.jobEventsService.isConnected()) {
-      const sent = this.jobEventsService.sendLocationUpdate(lat, lng);
+      const sent = this.jobEventsService.sendLocationUpdate(
+        lat,
+        lng,
+        getRoleFn(),
+      );
       if (!sent) {
         this.queueLocation(locationData);
       }
@@ -157,7 +179,10 @@ export class LocationStreamService {
       return;
     }
 
-    const sent = this.jobEventsService.sendLocationBatch(this.locationQueue);
+    const sent = this.jobEventsService.sendLocationBatch(
+      this.locationQueue,
+      getRoleFn(),
+    );
     if (sent) {
       this.locationQueue = [];
       await this.saveQueue();

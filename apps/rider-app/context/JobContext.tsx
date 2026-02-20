@@ -12,6 +12,7 @@ import React, {
 } from "react";
 import Toast from "react-native-toast-message";
 import { useLocationStream } from "@/hooks/useLocationStream";
+import { useAuth } from "@/context/AuthContext";
 
 interface JobsContextState {
   status: JobStatus;
@@ -43,43 +44,45 @@ export const JobsProvider = ({ children }: { children: ReactNode }) => {
   const [status, setStatus] = useState<JobStatus>("offline");
   const [isOnline, setIsOnline] = useState(false);
   const [incomingJob, setIncomingJob] = useState<IncomingJobOffer | null>(null);
+  const { logout, user } = useAuth();
   const [activeJob, setActiveJob] = useState<CurrentJob | null>(null);
   const [connectionStatus, setConnectionStatus] =
     useState<ConnectionStatus>("disconnected");
 
   // Memoize callbacks to prevent re-renders
   const handleJobAssigned = useCallback((job: IncomingJobOffer) => {
+    if (__DEV__) console.log("Job assigned:", JSON.stringify(job, null, 2));
     setIncomingJob(job);
     setStatus("incoming-job");
     Toast.show({ type: "info", text1: "New Job", text2: job.customerName });
   }, []);
 
   const handleJobUpdated = useCallback((jobId: string, newStatus: string) => {
+    // Update the job object in state — updater must be pure (no setState calls inside)
     setActiveJob((prevActiveJob) => {
       if (prevActiveJob && prevActiveJob.id === jobId) {
-        setStatus(newStatus as JobStatus);
         return { ...prevActiveJob, status: newStatus };
       }
       return prevActiveJob;
     });
+    // Update the UI status OUTSIDE the updater — socket events are per-rider so the
+    // job always matches; calling setStatus inside the updater violates React rules.
+    setStatus(newStatus as JobStatus);
   }, []);
 
   const handleJobCancelled = useCallback((jobId: string) => {
+    // Updater functions must be pure — no setState or Toast calls inside them
     setActiveJob((prevActiveJob) => {
-      if (prevActiveJob && prevActiveJob.id === jobId) {
-        setStatus("online-waiting");
-        Toast.show({ type: "error", text1: "Job Cancelled" });
-        return null;
-      }
+      if (prevActiveJob && prevActiveJob.id === jobId) return null;
       return prevActiveJob;
     });
     setIncomingJob((prevIncomingJob) => {
-      if (prevIncomingJob && prevIncomingJob.id === jobId) {
-        setStatus("online-waiting");
-        return null;
-      }
+      if (prevIncomingJob && prevIncomingJob.id === jobId) return null;
       return prevIncomingJob;
     });
+    // Side effects go outside the updaters
+    setStatus("online-waiting");
+    Toast.show({ type: "error", text1: "Job Cancelled" });
   }, []);
 
   const handleConnectionStatusChange = useCallback(
@@ -107,16 +110,38 @@ export const JobsProvider = ({ children }: { children: ReactNode }) => {
 
   // IMPORTANT: Initialize job events BEFORE location stream
   // The location stream service needs the JobEventsService to be set first
+  const handleForceLogout = useCallback(
+    (reason?: string) => {
+      Toast.show({
+        type: "error",
+        text1: "Account Suspended",
+        text2:
+          reason === "banned"
+            ? "Your account has been permanently banned."
+            : "Your account has been suspended. Contact support.",
+        visibilityTime: 6000,
+        position: "top",
+        topOffset: 40,
+      });
+      logout();
+    },
+    [logout],
+  );
+
   const { reconnect, joinOrderRoom } = useJobEvents({
     enabled: isOnline,
     onJobAssigned: handleJobAssigned,
     onJobUpdated: handleJobUpdated,
     onJobCancelled: handleJobCancelled,
     onConnectionStatusChange: handleConnectionStatusChange,
+    onForceLogout: handleForceLogout,
   });
 
   // Start location streaming when rider is online (after JobEventsService is set)
-  const locationStreamStatus = useLocationStream({ enabled: isOnline });
+  const locationStreamStatus = useLocationStream({
+    enabled: isOnline,
+    role: user?.role ?? "RIDER",
+  });
 
   /**
    * After going online OR completing/cancelling a job, check whether the backend
@@ -129,6 +154,9 @@ export const JobsProvider = ({ children }: { children: ReactNode }) => {
   const checkAndRestoreActiveJob = useCallback(async () => {
     try {
       const job = await jobsService.getActiveJob();
+
+      if (__DEV__ && job) console.log("Job found:", job);
+
       if (!job || job.status === "online-waiting") return;
 
       if (job.status === "incoming-job") {
@@ -176,13 +204,20 @@ export const JobsProvider = ({ children }: { children: ReactNode }) => {
     try {
       const coords = await getCurrentCoords();
       if (!coords) throw new Error("Location unavailable");
+
+      if (activeJob) {
+        throw new Error("Complete active job first");
+      }
       await jobsService.goOffline(coords);
       setIsOnline(false);
       setStatus("offline");
       setActiveJob(null);
       setIncomingJob(null);
-    } catch (error) {
-      Toast.show({ type: "error", text1: "Failed to go offline" });
+    } catch (error: any) {
+      Toast.show({
+        type: "error",
+        text1: error.message ?? "Failed to go offline",
+      });
     }
   };
 
@@ -290,8 +325,37 @@ export const JobsProvider = ({ children }: { children: ReactNode }) => {
     const previousStatus = status;
 
     try {
-      setStatus("en-route-dropoff");
-      await jobsService.confirmPickup(activeJob.id, activeJob.jobType);
+      const result = await jobsService.confirmPickup(
+        activeJob.id,
+        activeJob.jobType,
+      );
+
+      // Multi-stop delivery: more stores to pick up from
+      if (activeJob.jobType === "delivery" && result?.nextStop) {
+        setActiveJob((prev) =>
+          prev
+            ? {
+                ...prev,
+                currentStopIndex: result.nextStopIndex,
+                pickupAddress: result.nextStop.pickupAddress,
+              }
+            : null,
+        );
+        setStatus("en-route-pickup");
+        const stopNum = (result.nextStopIndex ?? 0) + 1;
+        const total = activeJob.stops?.length ?? stopNum;
+        Toast.show({
+          type: "info",
+          text1: `Head to stop ${stopNum} of ${total}`,
+          text2: result.nextStop.storeName ?? "Next store",
+          visibilityTime: 5000,
+          position: "top",
+          topOffset: 40,
+        });
+      } else {
+        // Single-stop or all stops done → head to customer
+        setStatus("en-route-dropoff");
+      }
     } catch (error: any) {
       setStatus(previousStatus);
       Toast.show({

@@ -289,7 +289,7 @@ export default function CheckoutScreen() {
                   style={[styles.addressText, { color: textSecondary }]}
                   numberOfLines={1}
                 >
-                  {selectedAddress?.address || "Tap to select where to deliver"}
+                  {selectedAddress?.street || "Tap to select where to deliver"}
                 </ThemedText>
               </View>
               <View
@@ -319,7 +319,7 @@ export default function CheckoutScreen() {
               ]}
             >
               <View style={[styles.iconBox, { backgroundColor: "#011b3315" }]}>
-                <IconSymbol name="creditcard.fill" size={20} color="#011b33" />
+                <IconSymbol name="creditcard.fill" size={20} color={primary} />
               </View>
               <View style={{ flex: 1 }}>
                 <ThemedText style={styles.addressLabel}>Paystack</ThemedText>

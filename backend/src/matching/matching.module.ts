@@ -27,6 +27,9 @@ import { DriverInactivityProcessor } from './workers/driver-inactivity.processor
 import { RiderInactivityProcessor } from './workers/rider-inactivity.processor';
 import { AssignmentTimeoutProcessor } from './workers/assignment-timeout.processor';
 
+// Startup
+import { StartupReconciliationService } from './startup-reconciliation.service';
+
 // Prisma
 import { PrismaModule } from '../prisma/prisma.module';
 
@@ -57,6 +60,9 @@ import { PrismaModule } from '../prisma/prisma.module';
     DriverInactivityProcessor,
     RiderInactivityProcessor,
     AssignmentTimeoutProcessor,
+
+    // Startup
+    StartupReconciliationService,
   ],
   exports: [
     // RedisService,

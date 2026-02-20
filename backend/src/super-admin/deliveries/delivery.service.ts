@@ -8,6 +8,7 @@ import { DeliveryFilterDto } from './dto/delivery-filter.dto';
 import { Prisma, DeliveryStatus } from '@prisma/client';
 import { TransactionLedgerService } from '../transactions/transaction-ledger.service';
 import { NotificationsGateway } from '../../notifications/notifications.gateway';
+import { AppLogger } from 'src/libs/logger/app-logger.service'; // ← added
 
 @Injectable()
 export class DeliveriesService {
@@ -15,9 +16,12 @@ export class DeliveriesService {
     private prisma: PrismaService,
     private ledgerService: TransactionLedgerService,
     private notificationsGateway: NotificationsGateway,
+    private readonly logger: AppLogger, // ← added
   ) {}
 
   async findAll(params: DeliveryFilterDto) {
+    this.logger.debug(`findAll deliveries - params: ${JSON.stringify(params)}`);
+
     const { status, riderId, from, to, page = 1, limit = 10 } = params;
     const skip = (page - 1) * limit;
 
@@ -33,6 +37,10 @@ export class DeliveriesService {
       };
     }
 
+    this.logger.debug(
+      `Executing findMany + count with where: ${JSON.stringify(where)}`,
+    );
+
     const [data, total] = await Promise.all([
       this.prisma.delivery.findMany({
         where,
@@ -40,13 +48,11 @@ export class DeliveriesService {
         take: limit,
         include: {
           order: {
-            select: {
-              id: true,
-              status: true,
-              store: { select: { name: true } }, // Fetch Store Name for Sender
+            include: {
+              store: { select: { name: true } },
+              items: { include: { product: { select: { name: true } } } },
             },
           },
-          // ✅ FIX: Select name/phone directly from Rider (no user relation)
           rider: {
             select: {
               id: true,
@@ -55,7 +61,6 @@ export class DeliveriesService {
             },
           },
           customer: { select: { name: true, phone: true } },
-          // ✅ FIX: Include Addresses so route info displays
           pickupAddress: true,
           dropoffAddress: true,
         },
@@ -64,7 +69,8 @@ export class DeliveriesService {
       this.prisma.delivery.count({ where }),
     ]);
 
-    // Transform data before returning
+    this.logger.debug(`Found ${data.length} deliveries (total: ${total})`);
+
     const transformedData = data.map((d) => this.transformForList(d));
 
     return {
@@ -79,6 +85,8 @@ export class DeliveriesService {
   }
 
   async findOne(id: string) {
+    this.logger.debug(`findOne delivery - id: ${id}`);
+
     const delivery = await this.prisma.delivery.findUnique({
       where: { id },
       include: {
@@ -94,7 +102,6 @@ export class DeliveriesService {
             },
           },
         },
-        // ✅ FIX: Include vehicle for Rider details
         rider: {
           include: {
             vehicle: true,
@@ -105,12 +112,19 @@ export class DeliveriesService {
       },
     });
 
-    if (!delivery) throw new NotFoundException(`Delivery #${id} not found`);
+    if (!delivery) {
+      this.logger.warn(`Delivery not found: ${id}`);
+      throw new NotFoundException(`Delivery #${id} not found`);
+    }
+
+    this.logger.debug(`Delivery found: ${id} - status=${delivery.status}`);
 
     return this.transformForDetail(delivery);
   }
 
   async completeDelivery(id: string) {
+    this.logger.debug(`completeDelivery - id: ${id}`);
+
     const delivery = await this.prisma.delivery.findUnique({
       where: { id },
       include: {
@@ -124,16 +138,23 @@ export class DeliveriesService {
       },
     });
 
-    if (!delivery) throw new NotFoundException('Delivery not found');
+    if (!delivery) {
+      this.logger.warn(`completeDelivery - not found: ${id}`);
+      throw new NotFoundException('Delivery not found');
+    }
+
     if (delivery.status === 'DELIVERED') {
+      this.logger.warn(`completeDelivery - already delivered: ${id}`);
       throw new BadRequestException('Delivery already completed');
     }
     if (!delivery.rider) {
+      this.logger.warn(`completeDelivery - no rider assigned: ${id}`);
       throw new BadRequestException('Delivery has no assigned rider');
     }
 
+    this.logger.debug(`Starting transaction to complete delivery ${id}`);
+
     return this.prisma.$transaction(async (tx) => {
-      // 1. Update delivery status
       const updatedDelivery = await tx.delivery.update({
         where: { id },
         data: {
@@ -142,10 +163,12 @@ export class DeliveriesService {
         },
       });
 
-      // 2. Record delivery earnings in ledger
       const deliveryFee = delivery.deliveryFee || 0;
 
       if (deliveryFee > 0 && delivery.rider) {
+        this.logger.debug(
+          `Recording delivery earnings for rider ${delivery.rider.id} - fee: ${deliveryFee}`,
+        );
         await this.ledgerService.recordDeliveryEarnings({
           id: delivery.id,
           riderId: delivery.rider.id,
@@ -153,8 +176,8 @@ export class DeliveriesService {
         });
       }
 
-      // 3. If this delivery is part of an order, complete the order too
       if (delivery.orderId && delivery.order) {
+        this.logger.debug(`Completing associated order ${delivery.orderId}`);
         await tx.order.update({
           where: { id: delivery.orderId },
           data: {
@@ -167,6 +190,9 @@ export class DeliveriesService {
           delivery.order.payment &&
           delivery.order.payment.status === 'COMPLETED'
         ) {
+          this.logger.debug(
+            `Recording payment & commission for order ${delivery.orderId}`,
+          );
           await this.ledgerService.recordPayment({
             id: delivery.order.payment.id,
             amount: delivery.order.payment.amount,
@@ -192,7 +218,7 @@ export class DeliveriesService {
         }
       }
 
-      // 4. Log activity
+      this.logger.debug(`Logging DELIVERY_COMPLETED activity for ${id}`);
       await tx.activityLog.create({
         data: {
           userId: 'SYSTEM',
@@ -206,15 +232,16 @@ export class DeliveriesService {
         },
       });
 
+      this.logger.debug(`Delivery ${id} completed successfully`);
       return updatedDelivery;
     });
   }
 
-  async updateStatus(
-    id: string,
-    status: DeliveryStatus,
-    adminId: string,
-  ) {
+  async updateStatus(id: string, status: DeliveryStatus, adminId: string) {
+    this.logger.debug(
+      `updateStatus - id: ${id}, new status: ${status}, admin: ${adminId}`,
+    );
+
     const delivery = await this.prisma.delivery.findUnique({
       where: { id },
       include: {
@@ -228,17 +255,26 @@ export class DeliveriesService {
       },
     });
 
-    if (!delivery) throw new NotFoundException('Delivery not found');
+    if (!delivery) {
+      this.logger.warn(`updateStatus - delivery not found: ${id}`);
+      throw new NotFoundException('Delivery not found');
+    }
 
     if (delivery.status === DeliveryStatus.DELIVERED) {
-      throw new BadRequestException('Cannot change status of a completed delivery');
+      this.logger.warn(`Cannot update completed delivery: ${id}`);
+      throw new BadRequestException(
+        'Cannot change status of a completed delivery',
+      );
     }
     if (delivery.status === DeliveryStatus.CANCELLED) {
-      throw new BadRequestException('Cannot change status of a cancelled delivery');
+      this.logger.warn(`Cannot update cancelled delivery: ${id}`);
+      throw new BadRequestException(
+        'Cannot change status of a cancelled delivery',
+      );
     }
 
-    // For DELIVERED: run the full earnings/ledger flow in a transaction
     if (status === DeliveryStatus.DELIVERED) {
+      this.logger.debug(`Full completion flow triggered for delivery ${id}`);
       return this.prisma.$transaction(async (tx) => {
         const updatedDelivery = await tx.delivery.update({
           where: { id },
@@ -272,7 +308,9 @@ export class DeliveriesService {
 
             const order = await tx.order.findUnique({
               where: { id: delivery.orderId },
-              include: { store: { select: { id: true, commissionRate: true } } },
+              include: {
+                store: { select: { id: true, commissionRate: true } },
+              },
             });
             if (order?.store) {
               await this.ledgerService.recordOrderCommission({
@@ -303,16 +341,19 @@ export class DeliveriesService {
       });
     }
 
-    // All other status transitions
+    // Normal status update
     const extraData: any = {};
     if (status === DeliveryStatus.PICKED_UP) extraData.pickedUpAt = new Date();
     if (status === DeliveryStatus.ASSIGNED) extraData.assignedAt = new Date();
+
+    this.logger.debug(`Updating delivery ${id} → ${status}`);
 
     const updated = await this.prisma.delivery.update({
       where: { id },
       data: { status, ...extraData },
     });
 
+    this.logger.debug(`Logging status change: ${delivery.status} → ${status}`);
     await this.prisma.activityLog.create({
       data: {
         userId: adminId,
@@ -329,19 +370,32 @@ export class DeliveriesService {
   }
 
   async assignRider(deliveryId: string, riderId: string, adminId: string) {
+    this.logger.debug(
+      `assignRider - delivery: ${deliveryId}, rider: ${riderId}, admin: ${adminId}`,
+    );
+
     const delivery = await this.prisma.delivery.findUnique({
       where: { id: deliveryId },
     });
-    if (!delivery) throw new NotFoundException('Delivery not found');
+    if (!delivery) {
+      this.logger.warn(`assignRider - delivery not found: ${deliveryId}`);
+      throw new NotFoundException('Delivery not found');
+    }
 
     const rider = await this.prisma.rider.findUnique({
       where: { id: riderId },
     });
-    if (!rider) throw new NotFoundException('Rider not found');
+    if (!rider) {
+      this.logger.warn(`assignRider - rider not found: ${riderId}`);
+      throw new NotFoundException('Rider not found');
+    }
 
     if (rider.status !== 'ACTIVE') {
+      this.logger.warn(`Rider ${riderId} is not active`);
       throw new BadRequestException('Rider is not active');
     }
+
+    this.logger.debug(`Assigning rider ${riderId} to delivery ${deliveryId}`);
 
     const updated = await this.prisma.delivery.update({
       where: { id: deliveryId },
@@ -355,8 +409,11 @@ export class DeliveriesService {
         customer: { select: { name: true, phone: true } },
         pickupAddress: true,
         dropoffAddress: true,
+        order: { include: { store: { include: { vendor: true } } } },
       },
     });
+
+    this.logger.debug(JSON.stringify(updated, null, 2));
 
     await this.prisma.activityLog.create({
       data: {
@@ -367,37 +424,165 @@ export class DeliveriesService {
       },
     });
 
-    // Emit job.assigned socket event to the rider so they receive the job offer
     try {
+      this.logger.debug(`Emitting job.assigned socket to rider ${riderId}`);
       this.notificationsGateway.emitJobAssigned(riderId, {
         id: updated.id,
         jobType: 'delivery',
-        customerName: updated.customer?.name || 'Customer',
-        pickupAddress: {
-          street: updated.pickupAddress?.street,
-          lat: updated.pickupAddress?.lat,
-          lng: updated.pickupAddress?.lng,
-        },
-        dropoffAddress: {
-          street: updated.dropoffAddress?.street,
-          lat: updated.dropoffAddress?.lat,
-          lng: updated.dropoffAddress?.lng,
-        },
+        customerName:
+          (updated as any).order?.store?.name ||
+          updated.customer?.name ||
+          'Store',
+        pickupAddress: updated.pickupAddress,
+        dropoffAddress: updated.dropoffAddress,
         earnings: updated.deliveryFee,
         estimatedEarnings: updated.deliveryFee,
         distanceKm: updated.distanceKm ?? 0,
         packageDetails: updated.packageDetails ?? undefined,
+        pickupContactPhone:
+          updated.pickupAddress?.phone ||
+          (updated as any).order?.store?.vendor?.phone ||
+          updated.customer?.phone ||
+          null,
+        dropoffContactPhone: (updated as any).recipientPhone || null,
+        recipientName: (updated as any).recipientName || null,
+        requiresOtp: !!(updated as any).deliveryOtp,
         assignedByAdmin: true,
       });
     } catch (e) {
-      // Non-fatal — delivery is already assigned in DB; socket failure shouldn't rollback
-      console.error(`Failed to emit job.assigned to rider ${riderId}:`, e);
+      this.logger.error(`Failed to emit job.assigned to rider ${riderId}`, e);
     }
 
     return updated;
   }
 
+  async assignRiderToGroup(
+    orderGroupId: string,
+    riderId: string,
+    adminId: string,
+  ) {
+    this.logger.debug(
+      `assignRiderToGroup - group: ${orderGroupId}, rider: ${riderId}`,
+    );
+
+    const rider = await this.prisma.rider.findUnique({
+      where: { id: riderId },
+    });
+    if (!rider) throw new NotFoundException('Rider not found');
+    if (rider.status !== 'ACTIVE')
+      throw new BadRequestException('Rider is not active');
+
+    const groupDeliveries = await this.prisma.delivery.findMany({
+      where: { orderGroupId } as any,
+      include: {
+        order: {
+          include: {
+            store: { include: { vendor: true } },
+            items: { include: { product: true } },
+          },
+        },
+        customer: { select: { name: true, phone: true } },
+        pickupAddress: true,
+        dropoffAddress: true,
+      },
+    });
+
+    if (groupDeliveries.length === 0) {
+      this.logger.warn(`No deliveries found in group ${orderGroupId}`);
+      throw new NotFoundException(
+        `No deliveries found for group ${orderGroupId}`,
+      );
+    }
+
+    this.logger.debug(
+      `Assigning rider ${riderId} to ${groupDeliveries.length} deliveries in group ${orderGroupId}`,
+    );
+
+    const stops = groupDeliveries.map((d) => ({
+      orderId: d.orderId,
+      storeName: d.order?.store?.name || 'Store',
+      pickupAddressId: d.pickupAddressId,
+      pickupAddress: d.pickupAddress,
+      status: 'PENDING',
+    }));
+
+    const leadDelivery = groupDeliveries[0];
+    const dropoffAddress = leadDelivery.dropoffAddress;
+
+    await this.prisma.$transaction(
+      groupDeliveries.map((d) =>
+        this.prisma.delivery.update({
+          where: { id: d.id },
+          data: {
+            riderId,
+            status: DeliveryStatus.ASSIGNED,
+            assignedAt: new Date(),
+            ...(d.id === leadDelivery.id ? { stops, currentStopIndex: 0 } : {}),
+          } as any,
+        }),
+      ),
+    );
+
+    await this.prisma.activityLog.create({
+      data: {
+        userId: adminId,
+        action: 'RIDER_ASSIGNED_TO_GROUP',
+        target: orderGroupId,
+        metadata: {
+          riderId,
+          riderName: rider.name,
+          deliveryCount: groupDeliveries.length,
+        },
+      },
+    });
+
+    try {
+      this.logger.debug(
+        `Emitting multi-stop job assignment to rider ${riderId}`,
+      );
+      this.notificationsGateway.emitJobAssigned(riderId, {
+        id: leadDelivery.id,
+        jobType: 'delivery',
+        customerName: `${groupDeliveries.length} Stores`,
+        pickupAddress: leadDelivery.pickupAddress,
+        dropoffAddress,
+        earnings: groupDeliveries.reduce((s, d) => s + (d.deliveryFee || 0), 0),
+        estimatedEarnings: groupDeliveries.reduce(
+          (s, d) => s + (d.deliveryFee || 0),
+          0,
+        ),
+        pickupContactPhone:
+          leadDelivery.pickupAddress?.phone ||
+          (leadDelivery as any).order?.store?.vendor?.phone ||
+          null,
+        dropoffContactPhone: (leadDelivery as any).recipientPhone || null,
+        recipientName: (leadDelivery as any).recipientName || null,
+        stops,
+        storeCount: stops.length,
+        currentStopIndex: 0,
+        orderGroupId,
+        requiresOtp: !!(leadDelivery as any).deliveryOtp,
+        assignedByAdmin: true,
+      });
+    } catch (e) {
+      this.logger.error(
+        `Failed to emit group job.assigned to rider ${riderId}`,
+        e,
+      );
+    }
+
+    return {
+      success: true,
+      deliveryCount: groupDeliveries.length,
+      leadDeliveryId: leadDelivery.id,
+    };
+  }
+
   async remove(id: string, adminUserId?: string, reason?: string) {
+    this.logger.debug(
+      `remove (cancel) delivery ${id} - reason: ${reason || 'none'}`,
+    );
+
     const delivery = await this.prisma.delivery.findUnique({
       where: { id },
       include: {
@@ -410,9 +595,13 @@ export class DeliveriesService {
       },
     });
 
-    if (!delivery) throw new NotFoundException('Delivery not found');
+    if (!delivery) {
+      this.logger.warn(`remove - delivery not found: ${id}`);
+      throw new NotFoundException('Delivery not found');
+    }
 
     if (delivery.status === 'DELIVERED') {
+      this.logger.warn(`Cannot cancel completed delivery: ${id}`);
       throw new BadRequestException('Cannot delete a completed delivery');
     }
 
@@ -461,10 +650,16 @@ export class DeliveriesService {
           },
         },
       });
+
+      this.logger.debug(`Delivery ${id} cancelled successfully`);
     });
   }
 
   async refundDelivery(id: string, refundAmount?: number, reason?: string) {
+    this.logger.debug(
+      `refundDelivery - id: ${id}, amount: ${refundAmount || 'full'}`,
+    );
+
     const delivery = await this.prisma.delivery.findUnique({
       where: { id },
       include: {
@@ -531,10 +726,15 @@ export class DeliveriesService {
           },
         },
       });
+
+      this.logger.debug(
+        `Refund processed for delivery ${id} - amount: ${amountToRefund}`,
+      );
     });
   }
 
-  // --- Transformation Helpers ---
+  // Transformation helpers remain unchanged — usually no logging needed here
+  // You can add .debug() if you want visibility into data shape issues
 
   private inferType(weight: number, isFragile: boolean): string {
     if (weight > 50) return 'Freight';
@@ -543,14 +743,26 @@ export class DeliveriesService {
     return 'Parcel';
   }
 
-  // ✅ FIX: Access rider fields directly (no user relation)
+  private formatAddress = (addr: any): string => {
+    if (!addr) return 'N/A';
+    const parts = [addr.street, addr.city, addr.state].filter(
+      (p) => p && p.trim() && p.trim().toLowerCase() !== 'unknown',
+    );
+    return parts.length > 0 ? parts.join(', ') : addr.label || 'N/A';
+  };
+
   private transformForList = (d: any) => {
+    const orderItems: string[] = (d.order?.items ?? []).map(
+      (i: any) => i.product?.name || 'Item',
+    );
     return {
       id: d.id,
+      orderGroupId: (d as any).orderGroupId ?? null,
       type: this.inferType(d.weightKg || 0, d.isFragile),
       sender: d.order?.store?.name || d.customer?.name || '—',
       recipient: d.recipientName || '—',
-      driver: d.rider?.name || '-', // Direct access
+      driver: d.rider?.name || '-',
+      riderId: d.rider?.id ?? null,
       status:
         d.status === 'PICKED_UP'
           ? 'In Transit'
@@ -559,9 +771,16 @@ export class DeliveriesService {
             : d.status === 'REQUESTED'
               ? 'Pending Pickup'
               : d.status.charAt(0) + d.status.slice(1).toLowerCase(),
-      pickup: d.pickupAddress?.city || d.pickupAddress?.street || 'N/A',
-      dropoff: d.dropoffAddress?.city || d.dropoffAddress?.street || 'N/A',
+      pickup: this.formatAddress(d.pickupAddress),
+      dropoff: this.formatAddress(d.dropoffAddress),
       eta: d.deliveredAt ? 'Delivered' : 'Est. 2 hrs',
+      // Package flags shown to admin & rider
+      isFragile: d.isFragile ?? false,
+      isPerishable: d.isPerishable ?? false,
+      containsLiquid: d.containsLiquid ?? false,
+      weightKg: d.weightKg ?? null,
+      packageDetails: d.packageDetails ?? null,
+      orderItems,
     };
   };
 
@@ -593,14 +812,16 @@ export class DeliveriesService {
           }
         : {
             name: d.customer.name,
-            address: d.pickupAddress?.street || 'N/A',
+            address: d.pickupAddress
+              ? this.formatAddress(d.pickupAddress)
+              : 'N/A',
             phone: d.customer.phone,
           },
 
       recipient: {
         name: d.recipientName,
         address: d.dropoffAddress
-          ? `${d.dropoffAddress.street}, ${d.dropoffAddress.city}`
+          ? this.formatAddress(d.dropoffAddress)
           : 'N/A',
         phone: d.recipientPhone,
         instructions: 'N/A',
@@ -633,13 +854,15 @@ export class DeliveriesService {
         },
         {
           status: 'Picked Up',
-          loc: d.pickupAddress?.street || 'Pickup',
+          loc: d.pickupAddress ? this.formatAddress(d.pickupAddress) : 'Pickup',
           time: d.pickedUpAt,
           done: !!d.pickedUpAt,
         },
         {
           status: 'Delivered',
-          loc: d.dropoffAddress?.street || 'Dropoff',
+          loc: d.dropoffAddress
+            ? this.formatAddress(d.dropoffAddress)
+            : 'Dropoff',
           time: d.deliveredAt,
           done: !!d.deliveredAt,
         },

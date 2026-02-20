@@ -120,15 +120,15 @@ export class DriverStateService {
 
     if (result === 0) {
       this.logger.debug(
-        `[LOC] Driver ${driverId}: same hex ${hexId} or has pending job — location saved, hex-set unchanged`,
+        `[LOC] Driver ${driverId}: same hex ${hexId}, already in hex-set (or has pending job — not self-healed)`,
       );
     } else if (result === 1) {
       this.logger.debug(
         `[LOC] Driver ${driverId}: hex CHANGED → now in ${hexId} — hex-set updated`,
       );
     } else if (result === 2) {
-      this.logger.debug(
-        `[LOC] Driver ${driverId}: re-added to hex-set ${hexId} (self-heal)`,
+      this.logger.warn(
+        `[LOC] Driver ${driverId}: SELF-HEALED — was missing from hex-set ${hexId}, re-added`,
       );
     }
 

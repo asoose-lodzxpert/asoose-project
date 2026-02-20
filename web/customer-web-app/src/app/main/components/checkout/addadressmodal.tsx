@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useState } from "react";
-import { X, MapPin, Loader2, Phone } from "lucide-react"; // Added Phone icon
-import { toast } from "react-toastify";
+import { X, MapPin, Loader2 } from "lucide-react";
+import { LocationInput } from "@/components/shared/LocationInput";
 
 interface AddAddressModalProps {
   isOpen: boolean;
@@ -15,55 +15,53 @@ export const AddAddressModal = ({
   onClose,
   onSave,
 }: AddAddressModalProps) => {
-  // ✅ ADDED: 'phone' to state
   const [formData, setFormData] = useState({
     street: "",
     city: "",
     phone: "",
     label: "Home",
-    state: "Maiduguri",
+    state: "Lagos",
   });
+  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(
+    null,
+  );
   const [isLocating, setIsLocating] = useState(false);
 
   if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // ✅ ADDED: Validation for phone
     if (!formData.street || !formData.city || !formData.phone) {
-      toast.error("Please fill in street, city, and phone number");
+      alert("Please fill in address, city, and phone number");
+      return;
+    }
+    if (!coords) {
+      alert(
+        "Please select an address from the suggestions to pin your location.",
+      );
       return;
     }
 
     setIsLocating(true);
-
     try {
-      // Mock Coordinates (Aligning with Profile Page Logic)
-      const MAIDUGURI_COORDS = {
-        lat: 11.8311,
-        lng: 13.151,
-      };
-
-      await new Promise((resolve) => setTimeout(resolve, 800));
-
       await onSave({
         ...formData,
-        lat: MAIDUGURI_COORDS.lat,
-        lng: MAIDUGURI_COORDS.lng,
+        lat: coords.lat,
+        lng: coords.lng,
       });
 
-      // Reset form
       setFormData({
         street: "",
         city: "",
         phone: "",
         label: "Home",
-        state: "Maiduguri",
+        state: "Lagos",
       });
+      setCoords(null);
       onClose();
     } catch (error: any) {
       console.error("Address save error:", error);
-      toast.error("Failed to save address. Please try again.");
+      alert("Failed to save address. Please try again.");
     } finally {
       setIsLocating(false);
     }
@@ -103,40 +101,46 @@ export const AddAddressModal = ({
             </div>
           </div>
 
+          {/* Debounced address search — calls backend, no excess queries */}
           <div>
             <label className="block text-sm font-medium mb-1">
-              Street Address
+              Search Address
             </label>
-            <input
-              type="text"
-              required
-              className="w-full p-3 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 focus:border-yellow-500 outline-none transition-colors"
-              placeholder="e.g. 123 Lagos Street"
+            <LocationInput
               value={formData.street}
-              onChange={(e) =>
-                setFormData({ ...formData, street: e.target.value })
-              }
+              onValueChange={(val) => {
+                setFormData((f) => ({ ...f, street: val }));
+                setCoords(null);
+              }}
+              onLocationSelect={(loc, address) => {
+                setCoords({ lat: loc.lat, lng: loc.lng });
+                setFormData((f) => ({ ...f, street: address }));
+              }}
+              placeholder="Search street, area or landmark…"
+              showGeolocation
             />
+            {coords && (
+              <p className="text-xs text-green-600 dark:text-green-400 mt-1 flex items-center gap-1">
+                <MapPin className="w-3 h-3" /> Location pinned
+              </p>
+            )}
           </div>
 
-          {/* ✅ ADDED: Phone Input Field */}
+          {/* Contact Phone */}
           <div>
             <label className="block text-sm font-medium mb-1">
               Contact Phone
             </label>
-            <div className="relative">
-              <input
-                type="tel"
-                required
-                className="w-full p-3 pl-10 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 focus:border-yellow-500 outline-none transition-colors"
-                placeholder="e.g. 08012345678"
-                value={formData.phone}
-                onChange={(e) =>
-                  setFormData({ ...formData, phone: e.target.value })
-                }
-              />
-              <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            </div>
+            <input
+              type="tel"
+              required
+              className="w-full p-3 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 focus:border-yellow-500 outline-none transition-colors"
+              placeholder="e.g. 08012345678"
+              value={formData.phone}
+              onChange={(e) =>
+                setFormData({ ...formData, phone: e.target.value })
+              }
+            />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -156,9 +160,11 @@ export const AddAddressModal = ({
               <label className="block text-sm font-medium mb-1">State</label>
               <input
                 type="text"
-                disabled
-                className="w-full p-3 rounded-xl bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-500 cursor-not-allowed"
+                className="w-full p-3 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 focus:border-yellow-500 outline-none"
                 value={formData.state}
+                onChange={(e) =>
+                  setFormData({ ...formData, state: e.target.value })
+                }
               />
             </div>
           </div>
@@ -166,13 +172,13 @@ export const AddAddressModal = ({
           <div className="pt-4">
             <button
               type="submit"
-              disabled={isLocating}
+              disabled={isLocating || !coords}
               className="w-full py-4 bg-yellow-500 text-black font-bold rounded-xl shadow-lg hover:bg-yellow-400 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
             >
               {isLocating ? (
                 <>
                   <Loader2 className="w-5 h-5 animate-spin" />
-                  Verifying Location...
+                  Saving…
                 </>
               ) : (
                 <>
@@ -181,9 +187,6 @@ export const AddAddressModal = ({
                 </>
               )}
             </button>
-            <p className="text-xs text-center mt-3 text-gray-500">
-              Address location is pinned to Maiduguri for service validation.
-            </p>
           </div>
         </form>
       </div>

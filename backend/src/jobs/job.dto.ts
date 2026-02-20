@@ -7,6 +7,10 @@ export interface JobSummaryDto {
   dropoffAddress: any;
   customerName: string;
   customerPhone?: string;
+  /** Phone number of the pickup contact (vendor for deliveries, customer for rides) */
+  pickupContactPhone?: string;
+  /** Phone number of the dropoff contact (recipient for deliveries) */
+  dropoffContactPhone?: string;
   earnings: number;
   distanceKm?: number;
   durationMin?: number;
@@ -61,6 +65,8 @@ export function rideToJobSummary(ride: any): JobSummaryDto {
     dropoffAddress: ride.dropoffAddress,
     customerName: ride.customer?.name || 'Unknown',
     customerPhone: ride.customer?.phone,
+    pickupContactPhone: ride.customer?.phone || undefined,
+    dropoffContactPhone: undefined,
     earnings: ride.totalFare || 0,
     distanceKm: ride.distanceKm,
     durationMin: ride.durationMin,
@@ -78,6 +84,11 @@ export function deliveryToJobSummary(delivery: any): JobSummaryDto {
     dropoffAddress: delivery.dropoffAddress,
     customerName: delivery.customer?.name || 'Unknown',
     customerPhone: delivery.customer?.phone,
+    pickupContactPhone:
+      delivery.pickupAddress?.phone ||
+      delivery.order?.store?.vendor?.phone ||
+      undefined,
+    dropoffContactPhone: delivery.recipientPhone || undefined,
     earnings: delivery.deliveryFee || 0,
     distanceKm: delivery.distanceKm,
     packageDetails: delivery.packageDetails,

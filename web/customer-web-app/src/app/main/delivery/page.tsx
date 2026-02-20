@@ -1,48 +1,48 @@
-'use client';
+"use client";
 
-import { useEffect, useState, useMemo, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
-import { 
-  ChevronRight, 
-  Loader2, 
-  AlertCircle, 
-  RefreshCw, 
-  CreditCard, 
+import { useEffect, useState, useMemo, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import {
+  ChevronRight,
+  Loader2,
+  AlertCircle,
+  RefreshCw,
+  CreditCard,
   CheckCircle2,
   MapPin,
   User,
-  Phone
-} from 'lucide-react';
-import { toast } from 'react-toastify';
-import { deliverySwal } from '@/lib/swal-theme';
-import { useSession } from 'next-auth/react';
-import BottomNav from '../components/layout/BottomNav';
-import { useDeliveryStore } from '@/store/useDeliveryStore';
-import { LocationInput } from '@/components/shared/LocationInput';
-import DeliveryProgressUI from './components/DeliveryProgressUi';
-import PackageForm from './components/PackageForm'; // ✅ Imported new component
-import { ReviewModal } from '@/store/ReviewModal';
-import { paymentService } from '@/services/payment.service';
-import { DeliveryService } from '@/services/delivery.service';
-import { socketService } from '@/services/socket.service';
+  Phone,
+} from "lucide-react";
+import { toast } from "react-toastify";
+import { deliverySwal } from "@/lib/swal-theme";
+import { useSession } from "next-auth/react";
+import BottomNav from "../components/layout/BottomNav";
+import { useDeliveryStore } from "@/store/useDeliveryStore";
+import { LocationInput } from "@/components/shared/LocationInput";
+import DeliveryProgressUI from "./components/DeliveryProgressUi";
+import PackageForm from "./components/PackageForm"; // ✅ Imported new component
+import { ReviewModal } from "@/store/ReviewModal";
+import { paymentService } from "@/services/payment.service";
+import { DeliveryService } from "@/services/delivery.service";
+import { socketService } from "@/services/socket.service";
 
 // CONSTANTS & TYPES
 // Stage names aligned with backend DeliveryStatus enum where applicable.
 // ⚠️  Backend statuses ACCEPTED and IN_TRANSIT must be present here so the
 //     redirect guard and socket handler can transition correctly.
 const DeliveryStage = {
-  IDLE: 'IDLE',
-  CONFIGURING: 'CONFIGURING',
-  PROCESSING_ADDRESS: 'Processing_Address',
-  CALCULATING_FEE: 'Calculating_Fee',
-  REVIEW_PAYMENT: 'REVIEW_PAYMENT',
-  PAYMENT_PENDING: 'Payment_Pending',
-  REQUESTED: 'REQUESTED',       // Backend: REQUESTED (finding courier)
-  ASSIGNED: 'ASSIGNED',         // Backend: ASSIGNED (courier matched)
-  ACCEPTED: 'ACCEPTED',         // Backend: ACCEPTED (rider confirmed acceptance)
-  PICKED_UP: 'PICKED_UP',       // Backend: PICKED_UP
-  IN_TRANSIT: 'IN_TRANSIT',     // Backend: IN_TRANSIT (en route)
-  DELIVERED: 'DELIVERED',       // Backend: DELIVERED (final)
+  IDLE: "IDLE",
+  CONFIGURING: "CONFIGURING",
+  PROCESSING_ADDRESS: "Processing_Address",
+  CALCULATING_FEE: "Calculating_Fee",
+  REVIEW_PAYMENT: "REVIEW_PAYMENT",
+  PAYMENT_PENDING: "Payment_Pending",
+  REQUESTED: "REQUESTED", // Backend: REQUESTED (finding courier)
+  ASSIGNED: "ASSIGNED", // Backend: ASSIGNED (courier matched)
+  ACCEPTED: "ACCEPTED", // Backend: ACCEPTED (rider confirmed acceptance)
+  PICKED_UP: "PICKED_UP", // Backend: PICKED_UP
+  IN_TRANSIT: "IN_TRANSIT", // Backend: IN_TRANSIT (en route)
+  DELIVERED: "DELIVERED", // Backend: DELIVERED (final)
 } as const;
 
 const PHONE_REGEX = /^(\+234|0)[789][01]\d{8}$/;
@@ -69,7 +69,7 @@ interface SessionWithToken {
 // UTILITIES
 
 const normalizePhoneNumber = (phone: string): string => {
-  let cleaned = phone.replace(/[\s-]/g, '');
+  let cleaned = phone.replace(/[\s-]/g, "");
   if (cleaned.startsWith("+234")) {
     cleaned = "0" + cleaned.slice(4);
   } else if (cleaned.startsWith("234")) {
@@ -98,7 +98,7 @@ const getAuthToken = (session: any): string | null => {
 };
 
 const sanitizeInput = (input: string, maxLength: number = 255): string => {
-  return input ? input.trim().slice(0, maxLength) : '';
+  return input ? input.trim().slice(0, maxLength) : "";
 };
 
 // MAIN COMPONENT
@@ -118,6 +118,7 @@ export default function DeliveryPage() {
     setAddressIds,
     setCalculatedFee,
     calculatedFee,
+    resetDelivery,
   } = useDeliveryStore();
 
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
@@ -145,15 +146,16 @@ export default function DeliveryPage() {
   // RECOVERY LOGIC
   const handlePaymentSuccess = useCallback(
     (id?: string) => {
-      localStorage.removeItem(PENDING_DELIVERY_KEY);
-      setStage(DeliveryStage.REQUESTED);
-      toast.success("Payment confirmed!");
+      // Capture the target ID before resetting the store (which clears activeDeliveryId)
       const targetId = id || activeDeliveryId;
+      localStorage.removeItem(PENDING_DELIVERY_KEY);
+      resetDelivery();
+      toast.success("Payment confirmed!");
       if (targetId) {
         router.push(`/main/delivery/${targetId}`);
       }
     },
-    [activeDeliveryId, router, setStage],
+    [activeDeliveryId, resetDelivery, router],
   );
 
   // ─── Payment Recovery ────────────────────────────────────────────────────
@@ -165,7 +167,7 @@ export default function DeliveryPage() {
   // directly inside the async body, which is always fresh at call time.
   useEffect(() => {
     const recoverState = async () => {
-      if (status === 'loading') return;
+      if (status === "loading") return;
 
       const storedData = localStorage.getItem(PENDING_DELIVERY_KEY);
       if (!storedData) return;
@@ -173,7 +175,7 @@ export default function DeliveryPage() {
       const token = getAuthToken(session);
 
       try {
-        const { id, reference, gateway = 'PAYSTACK' } = JSON.parse(storedData);
+        const { id, reference, gateway = "PAYSTACK" } = JSON.parse(storedData);
         if (!id || !reference) {
           localStorage.removeItem(PENDING_DELIVERY_KEY);
           return;
@@ -214,7 +216,7 @@ export default function DeliveryPage() {
           handlePaymentSuccess(id);
         }
       } catch (e) {
-        console.error('Failed to recover pending delivery state', e);
+        console.error("Failed to recover pending delivery state", e);
         localStorage.removeItem(PENDING_DELIVERY_KEY);
       }
     };
@@ -228,19 +230,19 @@ export default function DeliveryPage() {
   const handleSocketUpdate = useCallback(
     (data: any) => {
       // Map backend ACCEPTED (rider confirmed) → ASSIGNED (same UI step)
-      if (data.status === 'ASSIGNED' || data.status === 'ACCEPTED') {
+      if (data.status === "ASSIGNED" || data.status === "ACCEPTED") {
         useDeliveryStore.setState({
           courierInfo: data.rider,
           stage: DeliveryStage.ASSIGNED,
         });
-        toast.info('Courier found! They are on their way.');
-      } else if (data.status === 'PICKED_UP') {
+        toast.info("Courier found! They are on their way.");
+      } else if (data.status === "PICKED_UP") {
         setStage(DeliveryStage.PICKED_UP);
-        toast.info('Package picked up.');
-      } else if (data.status === 'IN_TRANSIT') {
+        toast.info("Package picked up.");
+      } else if (data.status === "IN_TRANSIT") {
         // IN_TRANSIT is a valid backend status – redirect to detail tracking
         setStage(DeliveryStage.IN_TRANSIT);
-      } else if (data.status === 'DELIVERED') {
+      } else if (data.status === "DELIVERED") {
         setStage(DeliveryStage.DELIVERED);
       }
     },
@@ -260,9 +262,9 @@ export default function DeliveryPage() {
       if (data.deliveryId === activeDeliveryId) handleSocketUpdate(data);
     };
 
-    socketService.on('delivery_update', handler);
+    socketService.on("delivery_update", handler);
     return () => {
-      socketService.off('delivery_update', handler);
+      socketService.off("delivery_update", handler);
     };
   }, [activeDeliveryId, session, handleSocketUpdate]);
 
@@ -281,44 +283,44 @@ export default function DeliveryPage() {
 
     if (!pickupPos) {
       await swal.fire({
-        icon: 'warning',
-        title: 'Pickup Location Required',
+        icon: "warning",
+        title: "Pickup Location Required",
         html: `
           <p>Please <strong>select a pickup location</strong> from the autocomplete suggestions.</p>
           <p class="mt-2 text-sm">Start typing an address and choose one of the options that appear — this ensures we get exact coordinates.</p>
         `,
-        confirmButtonText: 'Set Pickup',
+        confirmButtonText: "Set Pickup",
       });
       return;
     }
     if (!dropoffPos) {
       await swal.fire({
-        icon: 'warning',
-        title: 'Delivery Address Required',
+        icon: "warning",
+        title: "Delivery Address Required",
         html: `
           <p>Please <strong>select a delivery address</strong> from the autocomplete suggestions.</p>
           <p class="mt-2 text-sm">Start typing an address and choose one of the options that appear — this ensures we get exact coordinates.</p>
         `,
-        confirmButtonText: 'Set Address',
+        confirmButtonText: "Set Address",
       });
       return;
     }
     if (!packageInfo.recipientName || !packageInfo.recipientName.trim()) {
       await swal.fire({
-        icon: 'warning',
-        title: 'Recipient Name Required',
+        icon: "warning",
+        title: "Recipient Name Required",
         html: `
           <p>Please enter the <strong>full name</strong> of the person receiving the package.</p>
           <p class="mt-2 text-sm">This is used by the courier to identify the recipient on delivery.</p>
         `,
-        confirmButtonText: 'Enter Name',
+        confirmButtonText: "Enter Name",
       });
       return;
     }
     if (!packageInfo.recipientPhone) {
       await swal.fire({
-        icon: 'warning',
-        title: 'Phone Number Required',
+        icon: "warning",
+        title: "Phone Number Required",
         html: `
           <p>Please enter the <strong>recipient's Nigerian phone number</strong>.</p>
           <p class="mt-2 text-sm">Accepted formats:</p>
@@ -327,14 +329,14 @@ export default function DeliveryPage() {
             <li><strong>+2348012345678</strong> (international format)</li>
           </ul>
         `,
-        confirmButtonText: 'Enter Phone',
+        confirmButtonText: "Enter Phone",
       });
       return;
     }
     if (phoneError) {
       await swal.fire({
-        icon: 'error',
-        title: 'Invalid Phone Number',
+        icon: "error",
+        title: "Invalid Phone Number",
         html: `
           <p>The phone number you entered is <strong>not a valid Nigerian number</strong>.</p>
           <p class="mt-2 text-sm">Accepted formats:</p>
@@ -344,7 +346,7 @@ export default function DeliveryPage() {
           </ul>
           <p class="mt-2 text-xs" style="color:#ef4444">${phoneError}</p>
         `,
-        confirmButtonText: 'Fix Number',
+        confirmButtonText: "Fix Number",
       });
       return;
     }
@@ -364,7 +366,7 @@ export default function DeliveryPage() {
       // Omitting it causes a DB constraint violation on every delivery attempt.
       const pickupRes = await DeliveryService.saveAddress(
         {
-          label: 'Pickup Location',
+          label: "Pickup Location",
           street: sanitizeInput(packageInfo.pickupAddress),
           lat: pickupPos.lat,
           lng: pickupPos.lng,
@@ -374,7 +376,7 @@ export default function DeliveryPage() {
 
       const dropoffRes = await DeliveryService.saveAddress(
         {
-          label: 'Delivery Address',
+          label: "Delivery Address",
           street: sanitizeInput(packageInfo.destinationAddress),
           lat: dropoffPos.lat,
           lng: dropoffPos.lng,
@@ -386,29 +388,36 @@ export default function DeliveryPage() {
       setStage(DeliveryStage.CALCULATING_FEE);
 
       // Use user-provided exact weight if available, else fallback to package type logic
-      const finalWeight = typeof packageInfo.weightKg === 'number' && packageInfo.weightKg > 0 
-        ? packageInfo.weightKg 
-        : 2.5; // Default fallback
+      const finalWeight =
+        typeof packageInfo.weightKg === "number" && packageInfo.weightKg > 0
+          ? packageInfo.weightKg
+          : 2.5; // Default fallback
 
-      const deliveryRes = await DeliveryService.createDelivery({
-        pickupAddressId: pickupRes.id,
-        dropoffAddressId: dropoffRes.id,
-        recipientName: sanitizeInput(packageInfo.recipientName),
-        recipientPhone: normalizePhoneNumber(packageInfo.recipientPhone),
-        // Avoid a trailing dash ("Document - ") when instructions are empty.
-        packageDetails: sanitizeInput(
-          packageInfo.instructions
-            ? `${packageInfo.type} - ${packageInfo.instructions}`
-            : packageInfo.type
-        ),
-        
-        // Optional Metadata Fields
-        weightKg: finalWeight,
-        declaredValue: typeof packageInfo.declaredValue === 'number' ? packageInfo.declaredValue : undefined,
-        fragile: packageInfo.isFragile,
-        perishable: packageInfo.isPerishable,
-        containsLiquid: packageInfo.containsLiquid
-      }, token);
+      const deliveryRes = await DeliveryService.createDelivery(
+        {
+          pickupAddressId: pickupRes.id,
+          dropoffAddressId: dropoffRes.id,
+          recipientName: sanitizeInput(packageInfo.recipientName),
+          recipientPhone: normalizePhoneNumber(packageInfo.recipientPhone),
+          // Avoid a trailing dash ("Document - ") when instructions are empty.
+          packageDetails: sanitizeInput(
+            packageInfo.instructions
+              ? `${packageInfo.type} - ${packageInfo.instructions}`
+              : packageInfo.type,
+          ),
+
+          // Optional Metadata Fields
+          weightKg: finalWeight,
+          declaredValue:
+            typeof packageInfo.declaredValue === "number"
+              ? packageInfo.declaredValue
+              : undefined,
+          fragile: packageInfo.isFragile,
+          perishable: packageInfo.isPerishable,
+          containsLiquid: packageInfo.containsLiquid,
+        },
+        token,
+      );
 
       if (deliveryRes?.delivery?.id) {
         useDeliveryStore.setState({
@@ -446,8 +455,7 @@ export default function DeliveryPage() {
       // Without this, the backend falls back to process.env.FRONTEND_URL which
       // may be unset or wrong. NEXT_PUBLIC_APP_URL must be this app's port (3001),
       // NOT the backend port (3000).
-      const appUrl =
-        process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3001";
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3001";
       // Send just the base URL — the backend GET /callback/paystack handler
       // appends "/payment/callback" itself before redirecting the browser.
       const frontendCallbackUrl = appUrl;
@@ -481,7 +489,7 @@ export default function DeliveryPage() {
           JSON.stringify({
             id: activeDeliveryId,
             reference: paymentRes.reference,
-            gateway: 'PAYSTACK',
+            gateway: "PAYSTACK",
           }),
         );
         window.location.href = paymentRes.authorizationUrl;
@@ -499,10 +507,10 @@ export default function DeliveryPage() {
     if (activeDeliveryId) {
       const token = getAuthToken(session);
       // Read stored gateway so verification uses the correct payment provider
-      let gateway = 'PAYSTACK';
+      let gateway = "PAYSTACK";
       try {
         const stored = localStorage.getItem(PENDING_DELIVERY_KEY);
-        if (stored) gateway = JSON.parse(stored).gateway || 'PAYSTACK';
+        if (stored) gateway = JSON.parse(stored).gateway || "PAYSTACK";
       } catch (_) {}
 
       const storedRef = localStorage.getItem(PENDING_DELIVERY_KEY);
@@ -528,7 +536,7 @@ export default function DeliveryPage() {
         token || undefined,
       );
       if (success) handlePaymentSuccess();
-      else toast.info('Payment not yet confirmed. We are still checking...');
+      else toast.info("Payment not yet confirmed. We are still checking...");
     }
   }, [activeDeliveryId, handlePaymentSuccess, session]);
 
@@ -610,7 +618,10 @@ export default function DeliveryPage() {
               <CheckCircle2 className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
               <p className="text-sm text-blue-700 dark:text-blue-300">
                 Vehicle assigned automatically based on package weight (
-                {typeof packageInfo.weightKg === 'number' ? `${packageInfo.weightKg}kg` : packageInfo.weight}).
+                {typeof packageInfo.weightKg === "number"
+                  ? `${packageInfo.weightKg}kg`
+                  : packageInfo.weight}
+                ).
               </p>
             </div>
 
@@ -676,7 +687,9 @@ export default function DeliveryPage() {
                     </label>
                     <LocationInput
                       value={packageInfo.pickupAddress}
-                      onValueChange={(v) => setPackageInfo({ pickupAddress: v })}
+                      onValueChange={(v) =>
+                        setPackageInfo({ pickupAddress: v })
+                      }
                       onLocationSelect={(location, address) => {
                         setLocations(location, undefined);
                         setPackageInfo({ pickupAddress: address });
@@ -685,7 +698,7 @@ export default function DeliveryPage() {
                       showGeolocation
                     />
                   </div>
-                  
+
                   {/* Delivery Address */}
                   <div className="border-b border-zinc-200 dark:border-zinc-800 pb-2">
                     <label className="text-sm font-medium mb-2 flex items-center gap-2 text-zinc-500">
@@ -694,7 +707,9 @@ export default function DeliveryPage() {
                     </label>
                     <LocationInput
                       value={packageInfo.destinationAddress}
-                      onValueChange={(v) => setPackageInfo({ destinationAddress: v })}
+                      onValueChange={(v) =>
+                        setPackageInfo({ destinationAddress: v })
+                      }
                       onLocationSelect={(location, address) => {
                         setLocations(undefined, location);
                         setPackageInfo({ destinationAddress: address });

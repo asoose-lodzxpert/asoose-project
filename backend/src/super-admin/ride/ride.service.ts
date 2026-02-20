@@ -505,4 +505,37 @@ export class RidesService {
 
     return { success: true, message: 'Driver assigned successfully' };
   }
+
+  // 🔧 6. Force Status Override (Super Admin Only)
+  async forceStatus(
+    id: string,
+    status: RideStatus,
+    adminId: string,
+    reason?: string,
+  ) {
+    const ride = await this.prisma.ride.findUnique({ where: { id } });
+    if (!ride) throw new NotFoundException(`Ride #${id} not found`);
+
+    const previousStatus = ride.status;
+
+    await this.prisma.ride.update({
+      where: { id },
+      data: { status },
+    });
+
+    await this.prisma.activityLog.create({
+      data: {
+        userId: adminId || 'SUPER_ADMIN',
+        action: 'RIDE_STATUS_OVERRIDE',
+        target: id,
+        metadata: {
+          previousStatus,
+          newStatus: status,
+          reason: reason || 'Manual override by Super Admin',
+        },
+      },
+    });
+
+    return { success: true, previousStatus, newStatus: status };
+  }
 }
