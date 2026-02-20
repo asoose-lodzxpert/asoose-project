@@ -79,8 +79,12 @@ function makeDriverIcon(
 ): google.maps.Icon {
   // Online: blue. Offline: dimmed gray-blue. Gold ring when on a job.
   const fill = isOffline
-    ? isSelected ? "#4B6A8A" : "#2d4a6a"
-    : isSelected ? "#60a5fa" : "#3b82f6";
+    ? isSelected
+      ? "#4B6A8A"
+      : "#2d4a6a"
+    : isSelected
+      ? "#60a5fa"
+      : "#3b82f6";
   const ring = isOffline ? "#4B5563" : isOnJob ? "#eab308" : "#ffffff";
   const opacity = isOffline ? "0.55" : "1";
   const innerFill = isOffline ? "#6B7280" : "#ffffff";
@@ -89,7 +93,7 @@ function makeDriverIcon(
   const r = isOffline ? 11 : 14;
   const svg = `
     <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg" opacity="${opacity}">
-      <circle cx="${half}" cy="${half}" r="${r}" fill="${fill}" stroke="${ring}" stroke-width="2.5" stroke-dasharray="${isOffline ? '3 2' : 'none'}"/>
+      <circle cx="${half}" cy="${half}" r="${r}" fill="${fill}" stroke="${ring}" stroke-width="2.5" stroke-dasharray="${isOffline ? "3 2" : "none"}"/>
       <circle cx="${half}" cy="${half}" r="4" fill="${innerFill}"/>
     </svg>`;
   return {
@@ -106,8 +110,12 @@ function makeRiderIcon(
 ): google.maps.Icon {
   // Online: dark. Offline: dimmed. Gold ring when on a job.
   const fill = isOffline
-    ? isSelected ? "#374151" : "#1F2937"
-    : isSelected ? "#4B5563" : "#111827";
+    ? isSelected
+      ? "#374151"
+      : "#1F2937"
+    : isSelected
+      ? "#4B5563"
+      : "#111827";
   const ring = isOffline ? "#374151" : isOnJob ? "#eab308" : "#ffffff";
   const opacity = isOffline ? "0.55" : "1";
   const innerFill = isOffline ? "#4B5563" : "#9CA3AF";
@@ -116,7 +124,7 @@ function makeRiderIcon(
   const r = isOffline ? 11 : 14;
   const svg = `
     <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg" opacity="${opacity}">
-      <circle cx="${half}" cy="${half}" r="${r}" fill="${fill}" stroke="${ring}" stroke-width="2.5" stroke-dasharray="${isOffline ? '3 2' : 'none'}"/>
+      <circle cx="${half}" cy="${half}" r="${r}" fill="${fill}" stroke="${ring}" stroke-width="2.5" stroke-dasharray="${isOffline ? "3 2" : "none"}"/>
       <circle cx="${half}" cy="${half}" r="4" fill="${innerFill}"/>
     </svg>`;
   return {
@@ -259,11 +267,12 @@ export default function LiveMapCanvas({ users, onMarkerClick }: Props) {
                 <span
                   style={{
                     color:
-                      hoveredUser.status === "ONLINE" || hoveredUser.status === "ACTIVE"
+                      hoveredUser.status === "ONLINE" ||
+                      hoveredUser.status === "ACTIVE"
                         ? "#4ade80"
                         : hoveredUser.status === "OFFLINE"
-                        ? "#6b7280"
-                        : "#eab308",
+                          ? "#6b7280"
+                          : "#eab308",
                     fontWeight: 700,
                   }}
                 >
