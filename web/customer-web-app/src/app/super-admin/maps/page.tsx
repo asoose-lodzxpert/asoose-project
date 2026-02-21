@@ -97,7 +97,7 @@ function UserDetailPanel({
           <div className="relative">
             <div
               className={`w-14 h-14 rounded-full flex items-center justify-center text-xl font-bold overflow-hidden border-2 ${
-                isDriver ? "border-blue-500" : "border-gray-600"
+                isDriver ? "border-blue-500" : "border-red-500"
               } bg-slate-700`}
             >
               {user.image ? (
@@ -134,7 +134,7 @@ function UserDetailPanel({
             className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border flex items-center gap-1 ${
               isDriver
                 ? "bg-blue-500/10 text-blue-400 border-blue-500/20"
-                : "bg-gray-500/10 text-gray-400 border-gray-500/20"
+                : "bg-red-500/10 text-red-400 border-red-500/20"
             }`}
           >
             {isDriver ? (
@@ -332,7 +332,7 @@ export default function LiveMapPage() {
               </span>
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded-full bg-gray-900 border-2 border-white shadow" />
+              <span className="w-3 h-3 rounded-full bg-red-500 border-2 border-white shadow" />
               <span className="text-[10px] text-gray-400 font-bold uppercase">
                 Rider
               </span>
@@ -361,7 +361,7 @@ export default function LiveMapPage() {
             <Pill
               label="Riders"
               count={riders.length}
-              color="bg-gray-500/10 text-gray-300 border-gray-500/20"
+              color="bg-red-500/10 text-red-400 border-red-500/20"
             />
             <Pill
               label="Online"

@@ -586,8 +586,13 @@ export class RidesService {
         );
       }
 
+      // driverFee may not be set on older rides — calculate from totalFare if missing
+      const totalFare = Number(ride.totalFare) || 0;
+      const platformFee =
+        Number(ride.platformFee) || Math.round(totalFare * 0.2);
+      const computedDriverFee = Math.max(0, totalFare - platformFee);
       const earning = this.common.round(
-        Math.max(0, Number(ride.driverFee) || 0),
+        Math.max(0, Number(ride.driverFee) || computedDriverFee),
       );
 
       await tx.ride.update({

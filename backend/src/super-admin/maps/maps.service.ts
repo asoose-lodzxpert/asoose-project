@@ -1,6 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { RedisService } from 'src/matching/redis/redis.service';
+import {
+  DriverState,
+  RiderState,
+} from 'src/matching/redis/redis-keys.constants';
 import { UserRole } from '@prisma/client';
 
 export interface LiveMapUser {
@@ -46,35 +50,73 @@ export class MapsService {
           vehicle: { select: { plateNumber: true } },
         },
       }),
-      this.redis.getAllDriverStates().catch(() => []),
-      this.redis.getAllRiderStates().catch(() => []),
+      this.redis.getAllDriverStates().catch((): DriverState[] => []),
+      this.redis.getAllRiderStates().catch((): RiderState[] => []),
     ]);
 
     // 2. Build lookup maps keyed by user id
-    const driverStateMap = new Map(driverStates.map((s) => [s.id, s]));
-    const riderStateMap = new Map(riderStates.map((s) => [s.id, s]));
+    const driverStateMap = new Map<string, DriverState>(
+      driverStates.map((s): [string, DriverState] => [s.id, s]),
+    );
+    const riderStateMap = new Map<string, RiderState>(
+      riderStates.map((s): [string, RiderState] => [s.id, s]),
+    );
 
-    // 3. Build result — only include users where we have coordinates
+    // 3. Build result — only include users where we have coordinates.
+    //
+    // IMPORTANT: A single person can hold both RIDER and DRIVER roles and uses
+    // the same app. Location is emitted under whichever role they are currently
+    // active as — which may differ from their Prisma `role` column. We therefore
+    // check BOTH Redis state maps for every user and pick the state that has a
+    // location, preferring the most-recently-seen one when both have coordinates.
     const result: LiveMapUser[] = [];
 
     for (const db of dbUsers) {
-      const isDriver = db.role === UserRole.DRIVER;
-      const state = isDriver
-        ? driverStateMap.get(db.id)
-        : riderStateMap.get(db.id);
+      const prismaIsDriver = db.role === UserRole.DRIVER;
 
-      // Skip if no last known location is available
+      const driverState = driverStateMap.get(db.id);
+      const riderState = riderStateMap.get(db.id);
+
+      // Resolve which state to use: prefer the one with a location; if both
+      // have one, use the more recently updated.
+      let state: DriverState | RiderState | undefined =
+        driverState ?? riderState;
+      let effectiveRole: 'DRIVER' | 'RIDER' = prismaIsDriver
+        ? 'DRIVER'
+        : 'RIDER';
+
+      if (driverState?.location && riderState?.location) {
+        // Both have coords — use the freshest heartbeat
+        if ((riderState.lastSeen ?? 0) > (driverState.lastSeen ?? 0)) {
+          state = riderState;
+          effectiveRole = 'RIDER';
+        } else {
+          state = driverState;
+          effectiveRole = 'DRIVER';
+        }
+      } else if (driverState?.location) {
+        state = driverState;
+        effectiveRole = 'DRIVER';
+      } else if (riderState?.location) {
+        state = riderState;
+        effectiveRole = 'RIDER';
+      }
+
+      // Skip if no last known location is available in either map
       if (!state?.location) continue;
 
-      const loc = state.location as { lat: number; lng: number };
+      // state.location is guaranteed non-null here after the guard above
+      const loc = state.location as NonNullable<DriverState['location']>;
 
       result.push({
         id: db.id,
-        name: db.name ?? (isDriver ? 'Unknown Driver' : 'Unknown Rider'),
+        name:
+          db.name ??
+          (effectiveRole === 'DRIVER' ? 'Unknown Driver' : 'Unknown Rider'),
         image: db.image ?? null,
         phone: db.phone ?? null,
         plateNumber: db.vehicle?.plateNumber ?? null,
-        role: isDriver ? 'DRIVER' : 'RIDER',
+        role: effectiveRole,
         // Default to OFFLINE for anyone not in Redis
         status: state.status ?? 'OFFLINE',
         lastSeen: state.lastSeen ?? 0,

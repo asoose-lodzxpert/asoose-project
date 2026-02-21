@@ -7,8 +7,8 @@ import {
   HandleAssignmentTimeoutJobData,
 } from '../queue/queue.constants';
 import { DriverStateService } from '../driver-state/driver-state.service';
+import { RiderStateService } from '../rider-state/rider-state.service';
 import { QueueService } from '../queue/queue.service';
-// Removed TripType import; job type is now in JobSummaryDto
 import {
   MatchRideJobData,
   MatchDeliveryJobData,
@@ -29,6 +29,7 @@ export class AssignmentTimeoutProcessor extends WorkerHost {
 
   constructor(
     private readonly driverState: DriverStateService,
+    private readonly riderState: RiderStateService,
     private readonly queue: QueueService,
     private readonly prisma: PrismaService,
   ) {
@@ -66,12 +67,29 @@ export class AssignmentTimeoutProcessor extends WorkerHost {
         const delivery = await this.prisma.delivery.findUnique({
           where: { id: jobId },
         });
-        driverId = delivery?.riderId ?? undefined;
-        // DriverStateService only supports ride jobs, so skip for delivery
-
-        this.logger.warn(
-          `Assignment timeout for delivery ${jobId} (riderId: ${driverId}) not handled in DriverStateService.`,
-        );
+        const riderId = delivery?.riderId ?? undefined;
+        if (!riderId) {
+          this.logger.warn(
+            `No riderId found for delivery ${jobId}, skipping rider state cleanup.`,
+          );
+        } else {
+          try {
+            // Clear pendingDelivery from rider Redis state so the rider can receive new jobs
+            await this.riderState.declineJob(
+              riderId,
+              { jobId, jobType: 'delivery' },
+              'timeout',
+            );
+            this.logger.log(
+              `Cleared pending delivery ${jobId} from rider ${riderId} after timeout`,
+            );
+          } catch (e) {
+            // Non-fatal: Redis state may already be cleared (e.g. rider went offline)
+            this.logger.warn(
+              `Could not clear delivery timeout state for rider ${riderId}: ${e?.message}`,
+            );
+          }
+        }
       }
 
       // Re-enqueue matching job to find another driver

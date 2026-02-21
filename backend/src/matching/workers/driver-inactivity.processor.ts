@@ -46,6 +46,26 @@ export class DriverInactivityProcessor extends WorkerHost {
     this.logger.debug('🔍 Checking driver inactivity...');
 
     try {
+      // Log every driver currently tracked in Redis
+      const allDriverStates = await this.redis.getAllDriverStates();
+      if (allDriverStates.length === 0) {
+        this.logger.debug('No drivers found in Redis');
+      } else {
+        this.logger.debug(
+          `📋 All drivers in Redis (${allDriverStates.length}):`,
+        );
+        for (const s of allDriverStates) {
+          const age = s.lastSeen
+            ? Math.round((Date.now() - s.lastSeen) / 1000)
+            : null;
+          this.logger.debug(
+            `  • ${s.id} | status=${s.status} | lastSeen=${
+              age !== null ? `${age}s ago` : 'never'
+            } | job=${s.currentJobId ?? 'none'}`,
+          );
+        }
+      }
+
       // Get all inactive drivers
       const inactiveDriverIds = await this.redis.getInactiveDrivers(
         this.INACTIVITY_THRESHOLD,

@@ -11,8 +11,8 @@ import { GeoService } from '../geo/geo.service';
 import { EventBusService } from '../events/event-bus.service';
 import { QueueService } from '../queue/queue.service';
 import { PrismaService } from '../../prisma/prisma.service';
-import { ATOMIC_LOCK_DRIVER } from '../redis/lua-scripts';
-import { REDIS_TTL, JobType } from '../redis/redis-keys.constants';
+import { ATOMIC_ASSIGN_DELIVERY } from '../redis/lua-scripts';
+import { REDIS_TTL } from '../redis/redis-keys.constants';
 
 /**
  * Delivery Matching Worker
@@ -136,13 +136,14 @@ export class DeliveryMatchingProcessor extends WorkerHost {
     for (let ringIndex = 0; ringIndex < rings.length; ringIndex++) {
       const ring = rings[ringIndex];
       for (const hexId of ring) {
-        const driverIds = await this.redis.getDriversInHex(hexId);
-        if (driverIds.length === 0) continue;
-        const candidateIds = driverIds.filter(
+        // Delivery uses the RIDER hex set (hex:{id}:riders), not the driver set
+        const riderIds = await this.redis.getRidersInHex(hexId);
+        if (riderIds.length === 0) continue;
+        const candidateIds = riderIds.filter(
           (id) => !excludeDriverIds.includes(id),
         );
         if (candidateIds.length === 0) continue;
-        const candidates = await this.getDriverLocations(candidateIds);
+        const candidates = await this.getRiderLocations(candidateIds);
         const sorted = this.geo.sortByDistance(
           pickupLat,
           pickupLng,
@@ -179,7 +180,7 @@ export class DeliveryMatchingProcessor extends WorkerHost {
 
   private async attemptAssignment(
     deliveryId: string,
-    driverId: string,
+    riderId: string,
     hexId: string,
     pickupLat: number,
     pickupLng: number,
@@ -191,22 +192,20 @@ export class DeliveryMatchingProcessor extends WorkerHost {
     recipientName: string,
     recipientPhone: string,
   ): Promise<boolean> {
+    // Use ATOMIC_ASSIGN_DELIVERY — operates on rider:* keys and hex:*:riders sets
     const result = await this.redis
       .getClient()
       .eval(
-        ATOMIC_LOCK_DRIVER,
+        ATOMIC_ASSIGN_DELIVERY,
         0,
-        driverId,
-        JobType.DELIVERY,
+        riderId,
         deliveryId,
         hexId,
         REDIS_TTL.PENDING_ASSIGNMENT.toString(),
       );
 
     if (result === 1) {
-      this.logger.log(
-        `🔒 Locked driver ${driverId} for delivery ${deliveryId}`,
-      );
+      this.logger.log(`🔒 Locked rider ${riderId} for delivery ${deliveryId}`);
 
       // Schedule timeout using job-centric payload
       await this.queue.scheduleAssignmentTimeout(
@@ -227,11 +226,11 @@ export class DeliveryMatchingProcessor extends WorkerHost {
         this.TIMEOUT_MS,
       );
 
-      // Emit job.assigned event for socket notification
+      // Emit job.assigned event — driverId field carries the riderId for socket routing
       this.eventBus.emitJobAssigned({
         jobId: deliveryId,
         jobType: 'delivery',
-        driverId,
+        driverId: riderId,
         customerId: recipientName,
         timestamp: Date.now(),
         expiresAt: Date.now() + this.TIMEOUT_MS,
@@ -243,16 +242,17 @@ export class DeliveryMatchingProcessor extends WorkerHost {
     return false;
   }
 
-  private async getDriverLocations(
-    driverIds: string[],
+  /** Read rider locations from rider:* Redis namespace (delivery workers only) */
+  private async getRiderLocations(
+    riderIds: string[],
   ): Promise<Array<{ id: string; lat: number; lng: number }>> {
     const locations: Array<{ id: string; lat: number; lng: number }> = [];
 
-    for (const driverId of driverIds) {
-      const state = await this.redis.getDriverState(driverId);
+    for (const riderId of riderIds) {
+      const state = await this.redis.getRiderState(riderId);
       if (state?.location) {
         locations.push({
-          id: driverId,
+          id: riderId,
           lat: state.location.lat,
           lng: state.location.lng,
         });

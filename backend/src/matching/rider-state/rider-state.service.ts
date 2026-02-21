@@ -54,13 +54,39 @@ export class RiderStateService {
     await client.set(`rider:${riderId}:location`, JSON.stringify({ lat, lng }));
     await client.set(`rider:${riderId}:hex`, hexId);
     await client.sadd(`hex:${hexId}:riders`, riderId);
-    await this.redis.updateLastSeen(riderId);
+    await this.redis.updateRiderLastSeen(riderId);
     await this.redis.addRiderToGeoIndex(riderId, lat, lng);
 
     this.eventBus.emit('rider.online', { riderId, lat, lng, hexId, timestamp });
     this.logger.log(
       `Rider online: ${riderId} at [${lat}, ${lng}] hex=${hexId}`,
     );
+  }
+
+  /**
+   * Restore spatial state on server restart WITHOUT resetting lastSeen.
+   * If no socket heartbeat follows within the inactivity window the
+   * RiderInactivityProcessor will evict this rider to OFFLINE automatically.
+   */
+  async restoreOnline(
+    riderId: string,
+    lat: number,
+    lng: number,
+  ): Promise<void> {
+    if (!this.geo.validateCoordinates(lat, lng))
+      throw new Error('Invalid coordinates');
+    if (!this.geo.isWithinServiceArea(lat, lng))
+      throw new Error('Outside service area');
+
+    const hexId = this.geo.latLngToHex(lat, lng);
+    const client = this.redis.getClient();
+
+    await client.set(`rider:${riderId}:status`, 'ONLINE');
+    await client.set(`rider:${riderId}:location`, JSON.stringify({ lat, lng }));
+    await client.set(`rider:${riderId}:hex`, hexId);
+    await client.sadd(`hex:${hexId}:riders`, riderId);
+    // Deliberately NO updateRiderLastSeen — inactivity processor evicts stale entries
+    await this.redis.addRiderToGeoIndex(riderId, lat, lng);
   }
 
   async setOffline(riderId: string, reason?: string): Promise<void> {
@@ -158,7 +184,6 @@ export class RiderStateService {
         ATOMIC_DECLINE_DELIVERY,
         0,
         riderId,
-        JobType.DELIVERY,
         job.jobId,
         state.hexId,
         REDIS_TTL.DECLINED_DRIVERS.toString(),

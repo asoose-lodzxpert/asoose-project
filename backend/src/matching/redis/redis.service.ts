@@ -79,11 +79,13 @@ export class RedisService {
       location,
     ] = results.map((r) => r[1]);
 
-    if (!status || !role) return null;
+    if (!status) return null;
 
     return {
       id: driverId,
-      role: role as DriverRole,
+      // Fall back to 'DRIVER' if the role key was not written by an older
+      // version of ATOMIC_SET_ONLINE (pre-fix). New clients always write it.
+      role: (role ?? 'DRIVER') as DriverRole,
       status: status as DriverStatus,
       hexId: hexId as string | null,
       lastSeen: lastSeen ? parseInt(lastSeen as string, 10) : 0,
@@ -107,6 +109,14 @@ export class RedisService {
   async updateLastSeen(driverId: string): Promise<void> {
     await this.redis.set(
       REDIS_KEYS.DRIVER_LAST_SEEN(driverId),
+      Date.now().toString(),
+    );
+  }
+
+  /** Separate lastSeen updater for the RIDER (delivery) namespace. */
+  async updateRiderLastSeen(riderId: string): Promise<void> {
+    await this.redis.set(
+      REDIS_KEYS.RIDER_LAST_SEEN(riderId),
       Date.now().toString(),
     );
   }
@@ -157,6 +167,11 @@ export class RedisService {
     return this.redis.smembers(REDIS_KEYS.HEX_AVAILABLE_DRIVERS(hexId));
   }
 
+  /** Get all available riders (delivery) in a hex */
+  async getRidersInHex(hexId: string): Promise<string[]> {
+    return this.redis.smembers(REDIS_KEYS.HEX_AVAILABLE_RIDERS(hexId));
+  }
+
   async getHexDriverCount(hexId: string): Promise<number> {
     const count = await this.redis.get(REDIS_KEYS.HEX_DRIVER_COUNT(hexId));
     return count ? parseInt(count, 10) : 0;
@@ -181,11 +196,15 @@ export class RedisService {
         this.redis.get(REDIS_KEYS.RIDER_LAST_SEEN(riderId)),
       ]);
 
-      if (
-        status === RiderStatus.ONLINE &&
-        lastSeen &&
-        now - parseInt(lastSeen, 10) > thresholdMs
-      ) {
+      if (status !== RiderStatus.ONLINE) continue;
+
+      if (!lastSeen) {
+        // Ghost: ONLINE with no lastSeen — evict immediately
+        inactive.push(riderId);
+        continue;
+      }
+
+      if (now - parseInt(lastSeen, 10) > thresholdMs) {
         inactive.push(riderId);
       }
     }
@@ -206,30 +225,22 @@ export class RedisService {
     const results = await pipeline.exec();
     if (!results) return null;
 
-    const [
-      status,
-      hexId,
-      lastSeen,
-      currentJobId,
-      currentJobType,
-      pendingJobId,
-      pendingJobType,
-      role,
-      location,
-    ] = results.map((r) => r[1]);
+    const [status, hexId, lastSeen, currentJobId, pendingJobId, location] =
+      results.map((r) => r[1]);
 
-    if (!status || !role) return null;
+    // status is the only required field; role key does not exist for riders
+    if (!status) return null;
 
     return {
       id: riderId,
       status: status as RiderStatus,
-      role: role as DriverRole, // or RiderRole if defined separately
+      role: 'RIDER' as DriverRole,
       hexId: hexId as string | null,
       lastSeen: lastSeen ? parseInt(lastSeen as string, 10) : 0,
       currentJobId: currentJobId as string | null,
-      currentJobType: currentJobType as JobType | null,
+      currentJobType: currentJobId ? JobType.DELIVERY : null,
       pendingJobId: pendingJobId as string | null,
-      pendingJobType: pendingJobType as JobType | null,
+      pendingJobType: pendingJobId ? JobType.DELIVERY : null,
       location: location ? JSON.parse(location as string) : null,
     };
   }

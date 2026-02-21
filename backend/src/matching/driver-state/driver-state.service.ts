@@ -66,6 +66,35 @@ export class DriverStateService {
     this.eventBus.emitDriverOnline({ driverId, lat, lng, hexId, timestamp });
   }
 
+  /**
+   * Restore spatial state on server restart WITHOUT resetting lastSeen.
+   * If no socket heartbeat follows within the inactivity window the
+   * DriverInactivityProcessor will evict this driver to OFFLINE automatically.
+   */
+  async restoreOnline(
+    driverId: string,
+    lat: number,
+    lng: number,
+  ): Promise<void> {
+    if (!this.geo.validateCoordinates(lat, lng))
+      throw new Error('Invalid coordinates');
+    if (!this.geo.isWithinServiceArea(lat, lng))
+      throw new Error('Outside service area');
+
+    const hexId = this.geo.latLngToHex(lat, lng);
+
+    const result = await this.redis
+      .getClient()
+      .eval(ATOMIC_SET_ONLINE, 0, driverId, hexId);
+    if (result !== 1) return;
+
+    await this.redis
+      .getClient()
+      .set(`driver:${driverId}:location`, JSON.stringify({ lat, lng }));
+    // Deliberately NO updateLastSeen — inactivity processor evicts stale entries
+    await this.redis.addDriverToGeoIndex(driverId, lat, lng);
+  }
+
   async setOffline(driverId: string, reason?: string): Promise<void> {
     const result = await this.redis
       .getClient()

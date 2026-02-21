@@ -2,12 +2,14 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { RideFilterDto } from './dto/ride-filter.dto';
 import { Prisma, RideStatus } from '@prisma/client';
 import { TransactionLedgerService } from '../transactions/transaction-ledger.service';
 import { TripsService } from 'src/users/trips/trips.service';
+import { NotificationsGateway } from 'src/notifications/notifications.gateway';
 // ✅ Type-safe query fragments for performance
 const rideListInclude = {
   include: {
@@ -46,10 +48,13 @@ type RideWithDetailRelations = Prisma.RideGetPayload<typeof rideDetailInclude>;
 
 @Injectable()
 export class RidesService {
+  private readonly logger = new Logger(RidesService.name);
+
   constructor(
     private prisma: PrismaService,
     private ledgerService: TransactionLedgerService,
     private tripsService: TripsService,
+    private readonly notificationsGateway: NotificationsGateway,
   ) {}
 
   // 📋 1. List All Rides (Paginated & Filtered)
@@ -499,13 +504,67 @@ export class RidesService {
       },
     });
 
-    // 6. Notify Rider (Best Effort)
+    // 6. Emit socket events — driver gets the job offer, customer gets driver info
     try {
-      // Assuming TripsService has a way to notify via Socket
-      // If not, we rely on the rider app polling or generic notification service
-      // this.notificationsService.notifyRider(riderId, 'New Ride Assigned by Support');
+      const fullRide = await this.prisma.ride.findUnique({
+        where: { id: rideId },
+        include: {
+          rider: { include: { vehicle: true } },
+          customer: { select: { id: true, name: true } },
+          pickupAddress: {
+            select: { street: true, city: true, lat: true, lng: true },
+          },
+          dropoffAddress: { select: { street: true, city: true } },
+        },
+      });
+
+      if (fullRide?.rider) {
+        const pickupText = fullRide.pickupAddress
+          ? `${fullRide.pickupAddress.street}, ${fullRide.pickupAddress.city}`
+          : 'Pickup location';
+        const dropoffText = fullRide.dropoffAddress
+          ? `${fullRide.dropoffAddress.street}, ${fullRide.dropoffAddress.city}`
+          : 'Dropoff location';
+
+        // Notify driver: job assigned (shows ride offer card in app)
+        this.notificationsGateway.server
+          .to(`user_${riderId}`)
+          .emit('job.assigned', {
+            id: rideId,
+            jobType: 'ride',
+            customerName: fullRide.customer?.name || 'Customer',
+            pickupAddress: pickupText,
+            dropoffAddress: dropoffText,
+            estimatedEarnings:
+              fullRide.totalFare ?? fullRide.estimatedFare ?? 0,
+            distance: fullRide.distanceKm ?? null,
+            assignedByAdmin: true,
+            timestamp: Date.now(),
+          });
+
+        // Notify customer: driver found
+        this.notificationsGateway.server
+          .to(`user_${fullRide.customerId}`)
+          .emit('DRIVER_FOUND', {
+            type: 'DRIVER_FOUND',
+            metadata: {
+              rideId,
+              driver: {
+                id: fullRide.rider.id,
+                name: fullRide.rider.name,
+                phone: fullRide.rider.phone,
+                vehicle: fullRide.rider.vehicle ?? null,
+              },
+            },
+          });
+
+        this.logger.log(
+          `Manual assignment sockets emitted — driver: ${riderId}, customer: ${fullRide.customerId}`,
+        );
+      }
     } catch (e) {
-      // Ignore notification errors
+      // Non-fatal — DB is already updated
+      this.logger.error('Socket emit failed after manual assignment', e);
     }
 
     return { success: true, message: 'Driver assigned successfully' };

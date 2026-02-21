@@ -250,11 +250,13 @@ local driverId = ARGV[1]
 local hexId = ARGV[2]
 
 local statusKey = 'driver:' .. driverId .. ':status'
+local roleKey   = 'driver:' .. driverId .. ':role'
 local hexKey = 'driver:' .. driverId .. ':hex'
 local hexDriversKey = 'hex:' .. hexId .. ':drivers'
 local hexCountKey = 'hex:' .. hexId .. ':count'
 
 redis.call('SET', statusKey, 'ONLINE')
+redis.call('SET', roleKey, 'DRIVER')
 redis.call('SET', hexKey, hexId)
 
 if redis.call('SISMEMBER', hexDriversKey, driverId) == 0 then

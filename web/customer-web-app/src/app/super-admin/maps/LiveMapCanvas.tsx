@@ -9,7 +9,13 @@
  * Click → calls onMarkerClick to open the detail sidebar
  */
 
-import React, { useCallback, useRef, useState, useMemo } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useMemo,
+} from "react";
 import { GoogleMap, Marker, InfoWindow } from "@react-google-maps/api";
 import { useGoogleMaps } from "@/providers/GoogleMapsProvider";
 import { Loader2 } from "lucide-react";
@@ -108,17 +114,17 @@ function makeRiderIcon(
   isOnJob: boolean,
   isOffline: boolean,
 ): google.maps.Icon {
-  // Online: dark. Offline: dimmed. Gold ring when on a job.
+  // Online: red. Offline: dimmed red. Gold ring when on a job.
   const fill = isOffline
     ? isSelected
-      ? "#374151"
-      : "#1F2937"
+      ? "#7f1d1d"
+      : "#5a1212"
     : isSelected
-      ? "#4B5563"
-      : "#111827";
-  const ring = isOffline ? "#374151" : isOnJob ? "#eab308" : "#ffffff";
+      ? "#f87171"
+      : "#ef4444";
+  const ring = isOffline ? "#7f1d1d" : isOnJob ? "#eab308" : "#ffffff";
   const opacity = isOffline ? "0.55" : "1";
-  const innerFill = isOffline ? "#4B5563" : "#9CA3AF";
+  const innerFill = isOffline ? "#b91c1c" : "#ffffff";
   const size = isOffline ? 30 : 36;
   const half = size / 2;
   const r = isOffline ? 11 : 14;
@@ -157,16 +163,22 @@ export default function LiveMapCanvas({ users, onMarkerClick }: Props) {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
+  // Track whether we've done the initial fit — never auto-fit again after that
+  const hasFitRef = useRef(false);
+
   const onMapLoad = useCallback((map: google.maps.Map) => {
     mapRef.current = map;
   }, []);
 
-  // Auto-fit bounds when users change
-  const handleIdle = useCallback(() => {
-    if (!mapRef.current || !users.length) return;
+  // Fit to all markers exactly once — when the map is ready AND users are loaded
+  useEffect(() => {
+    if (hasFitRef.current) return; // already fitted once
+    if (!mapRef.current) return; // map not ready yet
+    if (!users.length) return; // no users yet
     const bounds = new google.maps.LatLngBounds();
     users.forEach((u) => bounds.extend({ lat: u.lat, lng: u.lng }));
     mapRef.current.fitBounds(bounds, 60);
+    hasFitRef.current = true;
   }, [users]);
 
   const hoveredUser = useMemo(
@@ -193,7 +205,6 @@ export default function LiveMapCanvas({ users, onMarkerClick }: Props) {
         zoom={13}
         options={MAP_OPTIONS}
         onLoad={onMapLoad}
-        onIdle={users.length ? handleIdle : undefined}
         onClick={() => {
           setHoveredId(null);
           setSelectedId(null);
@@ -245,7 +256,7 @@ export default function LiveMapCanvas({ users, onMarkerClick }: Props) {
                 fontSize: "11px",
                 lineHeight: "1.7",
                 minWidth: "160px",
-                border: `2px solid ${hoveredUser.role === "DRIVER" ? "#3b82f6" : "#374151"}`,
+                border: `2px solid ${hoveredUser.role === "DRIVER" ? "#3b82f6" : "#ef4444"}`,
               }}
             >
               <div
@@ -257,7 +268,7 @@ export default function LiveMapCanvas({ users, onMarkerClick }: Props) {
                 <span
                   style={{
                     color:
-                      hoveredUser.role === "DRIVER" ? "#60a5fa" : "#9ca3af",
+                      hoveredUser.role === "DRIVER" ? "#60a5fa" : "#f87171",
                     fontWeight: 700,
                   }}
                 >

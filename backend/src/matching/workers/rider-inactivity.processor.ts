@@ -48,6 +48,24 @@ export class RiderInactivityProcessor extends WorkerHost {
     this.logger.debug('🔍 Checking rider inactivity...');
 
     try {
+      // Log every rider currently tracked in Redis
+      const allRiderStates = await this.redis.getAllRiderStates();
+      if (allRiderStates.length === 0) {
+        this.logger.debug('No riders found in Redis');
+      } else {
+        this.logger.debug(`📋 All riders in Redis (${allRiderStates.length}):`);
+        for (const s of allRiderStates) {
+          const age = s.lastSeen
+            ? Math.round((Date.now() - s.lastSeen) / 1000)
+            : null;
+          this.logger.debug(
+            `  • ${s.id} | status=${s.status} | lastSeen=${
+              age !== null ? `${age}s ago` : 'never'
+            } | job=${s.currentJobId ?? 'none'}`,
+          );
+        }
+      }
+
       const inactiveRiderIds = await this.redis.getInactiveRiders(
         this.INACTIVITY_THRESHOLD,
       );

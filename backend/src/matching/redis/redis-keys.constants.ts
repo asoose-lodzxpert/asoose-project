@@ -85,6 +85,9 @@ export const REDIS_KEYS = {
    */
   HEX_AVAILABLE_DRIVERS: (hexId: string) => `hex:${hexId}:drivers`,
 
+  /** Available riders (delivery) in a hex — ONLINE, no active/pending delivery */
+  HEX_AVAILABLE_RIDERS: (hexId: string) => `hex:${hexId}:riders`,
+
   /** Global geospatial index for fallback queries */
   DRIVERS_GEO_INDEX: 'drivers:geo',
 
