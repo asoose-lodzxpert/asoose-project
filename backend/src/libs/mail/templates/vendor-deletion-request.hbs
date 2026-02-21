@@ -1,106 +1,75 @@
+<!DOCTYPE html>
 <html>
-  <head>
-    <meta charset='utf-8' />
-    <meta name='viewport' content='width=device-width, initial-scale=1.0' />
-    <title>Account Deletion Request</title>
-  </head>
-  <body
-    style='margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;'
-  >
-    <table
-      width='100%'
-      cellpadding='0'
-      cellspacing='0'
-      style='background-color: #f4f4f4; padding: 20px;'
-    >
-      <tr>
-        <td align='center'>
-          <table
-            width='600'
-            cellpadding='0'
-            cellspacing='0'
-            style='background-color: #ffffff; border-radius: 8px; overflow: hidden;'
-          >
-            <!-- Header -->
-            <tr>
-              <td
-                style='background-color: #EF4444; padding: 30px; text-align: center;'
-              >
-                <h1 style='color: #ffffff; margin: 0; font-size: 28px;'>⚠️
-                  Account Deletion Request</h1>
-              </td>
-            </tr>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Account Deletion Request</title>
+</head>
+<body style="margin:0;padding:0;background-color:#ffffff;font-family:Arial,Helvetica,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#ffffff;">
+    <tr>
+      <td style="padding:20px 24px 16px 24px;">
+        <span style="font-size:15px;font-weight:700;color:#000000;letter-spacing:-0.2px;">Asoose</span>
+      </td>
+    </tr>
 
-            <!-- Content -->
-            <tr>
-              <td style='padding: 40px 30px;'>
-                <p
-                  style='color: #333333; font-size: 16px; line-height: 1.6; margin-bottom: 20px;'
-                >
-                  Hi
-                  {{vendorName}},
-                </p>
+    <tr>
+      <td style="padding:0 24px;">
+        <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td height="1" style="background-color:#e5e7eb;font-size:0;line-height:0;">&nbsp;</td></tr></table>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:20px 24px 16px 24px;">
+        <p style="margin:0;font-size:15px;font-weight:700;color:#111111;">Account Deletion Request Received</p>
+      </td>
+    </tr>
 
-                <p
-                  style='color: #333333; font-size: 16px; line-height: 1.6; margin-bottom: 30px;'
-                >
-                  We've received your request to delete your vendor account.
-                  We're sorry to see you go!
-                </p>
+    <tr>
+      <td style="padding:0 24px;">
+        <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td height="1" style="background-color:#e5e7eb;font-size:0;line-height:0;">&nbsp;</td></tr></table>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:16px 24px;">
+        <p style="margin:0;font-size:14px;color:#374151;line-height:1.6;">Hi {{vendorName}},</p>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:16px 24px;">
+        <p style="margin:0;font-size:14px;color:#374151;line-height:1.6;">We have received your request to delete your vendor account. Your account will be permanently deleted within <strong>7 days</strong> unless you cancel this request.</p>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:0 24px 16px 24px;">
+        <table width="100%" cellpadding="0" cellspacing="0" border="0">
+          <tr><td style="padding:8px 0;font-size:13px;color:#374151;border-bottom:1px solid #f3f4f6;">All store data will be permanently removed.</td></tr>
+          <tr><td style="padding:8px 0;font-size:13px;color:#374151;border-bottom:1px solid #f3f4f6;">Active orders will be completed before deletion.</td></tr>
+          <tr><td style="padding:8px 0;font-size:13px;color:#374151;border-bottom:1px solid #f3f4f6;">Pending payouts will be processed.</td></tr>
+          <tr><td style="padding:8px 0;font-size:13px;color:#374151;">This action cannot be undone.</td></tr>
+        </table>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:16px 24px;">
+        <p style="margin:0;font-size:14px;color:#374151;line-height:1.6;">If you changed your mind, contact support before the 7-day window closes.</p>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:20px 24px 16px 24px;">
+        <a href="{{supportUrl}}" style="display:inline-block;padding:10px 20px;background-color:#E5A503;color:#ffffff;font-size:13px;font-weight:600;text-decoration:none;">Contact Support</a>
+      </td>
+    </tr>
 
-                <div
-                  style='background-color: #FEF2F2; border-left: 4px solid #EF4444; padding: 20px; margin-bottom: 30px; border-radius: 4px;'
-                >
-                  <p
-                    style='color: #991B1B; font-size: 14px; margin: 0 0 15px 0; line-height: 1.6;'
-                  >
-                    <strong>Important:</strong>
-                    Your account will be permanently deleted within 7 days
-                    unless you cancel this request.
-                  </p>
-                  <ul
-                    style='color: #991B1B; font-size: 14px; margin: 0; padding-left: 20px; line-height: 1.8;'
-                  >
-                    <li>All your store data will be removed</li>
-                    <li>Active orders will be completed first</li>
-                    <li>Pending payouts will be processed</li>
-                    <li>This action cannot be undone</li>
-                  </ul>
-                </div>
-
-                <p
-                  style='color: #666666; font-size: 14px; line-height: 1.6; margin-bottom: 30px;'
-                >
-                  If you didn't request this or changed your mind, please
-                  contact our support team immediately to cancel the deletion.
-                </p>
-
-                <div style='text-align: center;'>
-                  <a
-                    href='{{supportUrl}}'
-                    style='background-color: #E5A503; color: #ffffff; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-size: 16px;'
-                  >
-                    Contact Support
-                  </a>
-                </div>
-              </td>
-            </tr>
-
-            <!-- Footer -->
-            <tr>
-              <td
-                style='background-color: #f8f9fa; padding: 20px 30px; text-align: center; border-top: 1px solid #e0e0e0;'
-              >
-                <p style='color: #999999; font-size: 12px; margin: 0;'>
-                  ©
-                  {{year}}
-                  Asoose. All rights reserved.
-                </p>
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-    </table>
-  </body>
+    <tr>
+      <td style="padding:0 24px;">
+        <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td height="1" style="background-color:#e5e7eb;font-size:0;line-height:0;">&nbsp;</td></tr></table>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:16px 24px;">
+        <p style="margin:0;font-size:12px;color:#9ca3af;line-height:1.5;">&copy; {{year}} Asoose. All rights reserved.</p>
+      </td>
+    </tr>
+  </table>
+</body>
 </html>

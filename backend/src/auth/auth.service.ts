@@ -3,7 +3,11 @@ import {
   UnauthorizedException,
   ConflictException,
   BadRequestException,
+  HttpException,
+  InternalServerErrorException,
+  Logger,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -21,6 +25,7 @@ import * as bcrypt from 'bcryptjs';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
@@ -150,10 +155,22 @@ export class AuthService {
         },
       };
     } catch (error) {
-      if (error instanceof ConflictException) {
+      if (error instanceof HttpException) {
         throw error;
       }
-      throw new ConflictException('Registration failed');
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        const field = (error.meta?.target as string[])?.join(', ') ?? 'field';
+        throw new ConflictException(
+          `An account with this ${field} already exists`,
+        );
+      }
+      this.logger.error('Registration error', error);
+      throw new InternalServerErrorException(
+        'Registration failed. Please try again.',
+      );
     }
   }
 

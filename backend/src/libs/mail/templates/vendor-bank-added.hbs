@@ -1,116 +1,78 @@
+<!DOCTYPE html>
 <html>
-  <head>
-    <meta charset='utf-8' />
-    <meta name='viewport' content='width=device-width, initial-scale=1.0' />
-    <title>Bank Account Added</title>
-  </head>
-  <body
-    style='margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;'
-  >
-    <table
-      width='100%'
-      cellpadding='0'
-      cellspacing='0'
-      style='background-color: #f4f4f4; padding: 20px;'
-    >
-      <tr>
-        <td align='center'>
-          <table
-            width='600'
-            cellpadding='0'
-            cellspacing='0'
-            style='background-color: #ffffff; border-radius: 8px; overflow: hidden;'
-          >
-            <!-- Header -->
-            <tr>
-              <td
-                style='background-color: #10B981; padding: 30px; text-align: center;'
-              >
-                <h1 style='color: #ffffff; margin: 0; font-size: 28px;'>🏦 Bank
-                  Account Added</h1>
-              </td>
-            </tr>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bank Account Added</title>
+</head>
+<body style="margin:0;padding:0;background-color:#ffffff;font-family:Arial,Helvetica,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#ffffff;">
+    <tr>
+      <td style="padding:20px 24px 16px 24px;">
+        <span style="font-size:15px;font-weight:700;color:#000000;letter-spacing:-0.2px;">Asoose</span>
+      </td>
+    </tr>
 
-            <!-- Content -->
-            <tr>
-              <td style='padding: 40px 30px;'>
-                <p
-                  style='color: #333333; font-size: 16px; line-height: 1.6; margin-bottom: 20px;'
-                >
-                  Hi
-                  {{vendorName}},
-                </p>
+    <tr>
+      <td style="padding:0 24px;">
+        <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td height="1" style="background-color:#e5e7eb;font-size:0;line-height:0;">&nbsp;</td></tr></table>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:20px 24px 16px 24px;">
+        <p style="margin:0;font-size:15px;font-weight:700;color:#111111;">Bank Account Added</p>
+      </td>
+    </tr>
 
-                <p
-                  style='color: #333333; font-size: 16px; line-height: 1.6; margin-bottom: 30px;'
-                >
-                  A new bank account has been successfully added to your vendor
-                  profile.
-                </p>
+    <tr>
+      <td style="padding:0 24px;">
+        <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td height="1" style="background-color:#e5e7eb;font-size:0;line-height:0;">&nbsp;</td></tr></table>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:16px 24px;">
+        <p style="margin:0;font-size:14px;color:#374151;line-height:1.6;">Hi {{vendorName}}, a new bank account has been added to your vendor profile.</p>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:16px 24px 0 24px;">
+        <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td style="padding:10px 0;font-size:13px;color:#6b7280;border-bottom:1px solid #f3f4f6;width:150px;vertical-align:top;">Bank</td>
+          <td style="padding:10px 0;font-size:13px;color:#111111;border-bottom:1px solid #f3f4f6;">{{bankName}}</td>
+        </tr>
+        <tr>
+          <td style="padding:10px 0;font-size:13px;color:#6b7280;border-bottom:1px solid #f3f4f6;width:150px;vertical-align:top;">Account Number</td>
+          <td style="padding:10px 0;font-size:13px;color:#111111;border-bottom:1px solid #f3f4f6;">{{maskedAccount}}</td>
+        </tr>
+        <tr>
+          <td style="padding:10px 0;font-size:13px;color:#6b7280;border-bottom:1px solid #f3f4f6;width:150px;vertical-align:top;">Added On</td>
+          <td style="padding:10px 0;font-size:13px;color:#111111;border-bottom:1px solid #f3f4f6;">{{timestamp}}</td>
+        </tr>
+        </table>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:16px 24px;">
+        <p style="margin:0;font-size:14px;color:#374151;line-height:1.6;">If you did not add this account, contact support immediately.</p>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:20px 24px 16px 24px;">
+        <a href="{{bankAccountUrl}}" style="display:inline-block;padding:10px 20px;background-color:#E5A503;color:#ffffff;font-size:13px;font-weight:600;text-decoration:none;">View Bank Accounts</a>
+      </td>
+    </tr>
 
-                <!-- Bank Details Box -->
-                <div
-                  style='background-color: #f8f9fa; border-left: 4px solid #10B981; padding: 20px; margin-bottom: 30px;'
-                >
-                  <table width='100%' cellpadding='5' cellspacing='0'>
-                    <tr>
-                      <td
-                        style='color: #666666; font-size: 14px; width: 150px;'
-                      ><strong>Bank Name:</strong></td>
-                      <td
-                        style='color: #333333; font-size: 14px;'
-                      >{{bankName}}</td>
-                    </tr>
-                    <tr>
-                      <td style='color: #666666; font-size: 14px;'><strong
-                        >Account Number:</strong></td>
-                      <td
-                        style='color: #333333; font-size: 14px;'
-                      >{{maskedAccount}}</td>
-                    </tr>
-                    <tr>
-                      <td style='color: #666666; font-size: 14px;'><strong>Added
-                          On:</strong></td>
-                      <td
-                        style='color: #333333; font-size: 14px;'
-                      >{{timestamp}}</td>
-                    </tr>
-                  </table>
-                </div>
-
-                <p
-                  style='color: #666666; font-size: 14px; line-height: 1.6; margin-bottom: 30px;'
-                >
-                  You can now use this account for withdrawals. If you didn't
-                  add this bank account, please contact support immediately.
-                </p>
-
-                <div style='text-align: center;'>
-                  <a
-                    href='{{bankAccountUrl}}'
-                    style='background-color: #E5A503; color: #ffffff; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-size: 16px;'
-                  >
-                    View Bank Accounts
-                  </a>
-                </div>
-              </td>
-            </tr>
-
-            <!-- Footer -->
-            <tr>
-              <td
-                style='background-color: #f8f9fa; padding: 20px 30px; text-align: center; border-top: 1px solid #e0e0e0;'
-              >
-                <p style='color: #999999; font-size: 12px; margin: 0;'>
-                  ©
-                  {{year}}
-                  Asoose. All rights reserved.
-                </p>
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-    </table>
-  </body>
+    <tr>
+      <td style="padding:0 24px;">
+        <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td height="1" style="background-color:#e5e7eb;font-size:0;line-height:0;">&nbsp;</td></tr></table>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:16px 24px;">
+        <p style="margin:0;font-size:12px;color:#9ca3af;line-height:1.5;">&copy; {{year}} Asoose. All rights reserved.</p>
+      </td>
+    </tr>
+  </table>
+</body>
 </html>

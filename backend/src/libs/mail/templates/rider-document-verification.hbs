@@ -1,132 +1,84 @@
+<!DOCTYPE html>
 <html>
-  <head>
-    <meta charset='utf-8' />
-    <meta name='viewport' content='width=device-width, initial-scale=1.0' />
-    <title>Document Verification Result</title>
-  </head>
-  <body
-    style='margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;'
-  >
-    <table
-      width='100%'
-      cellpadding='0'
-      cellspacing='0'
-      style='background-color: #f4f4f4; padding: 20px;'
-    >
-      <tr>
-        <td align='center'>
-          <table
-            width='600'
-            cellpadding='0'
-            cellspacing='0'
-            style='background-color: #ffffff; border-radius: 8px; overflow: hidden;'
-          >
-            <!-- Header -->
-            <tr>
-              <td
-                style='background-color: #E5A503; padding: 30px; text-align: center;'
-              >
-                <h1 style='color: #ffffff; margin: 0; font-size: 24px;'>Document
-                  Verification Update</h1>
-              </td>
-            </tr>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Document Verification Update</title>
+</head>
+<body style="margin:0;padding:0;background-color:#ffffff;font-family:Arial,Helvetica,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#ffffff;">
+    <tr>
+      <td style="padding:20px 24px 16px 24px;">
+        <span style="font-size:15px;font-weight:700;color:#000000;letter-spacing:-0.2px;">Asoose</span>
+      </td>
+    </tr>
 
-            <!-- Content -->
-            <tr>
-              <td style='padding: 40px 30px;'>
-                <p
-                  style='color: #333333; font-size: 16px; line-height: 1.6; margin-bottom: 20px;'
-                >
-                  Dear
-                  {{riderName}},
-                </p>
+    <tr>
+      <td style="padding:0 24px;">
+        <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td height="1" style="background-color:#e5e7eb;font-size:0;line-height:0;">&nbsp;</td></tr></table>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:20px 24px 16px 24px;">
+        <p style="margin:0;font-size:15px;font-weight:700;color:#111111;">Document Verification Update</p>
+      </td>
+    </tr>
 
-                <p
-                  style='color: #333333; font-size: 16px; line-height: 1.6; margin-bottom: 20px;'
-                >
-                  Your
-                  {{documentType}}
-                  document has been reviewed by our verification team.
-                </p>
+    <tr>
+      <td style="padding:0 24px;">
+        <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td height="1" style="background-color:#e5e7eb;font-size:0;line-height:0;">&nbsp;</td></tr></table>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:16px 24px;">
+        <p style="margin:0;font-size:14px;color:#374151;line-height:1.6;">Dear {{riderName}}, your document has been reviewed by our verification team.</p>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:16px 24px 0 24px;">
+        <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td style="padding:10px 0;font-size:13px;color:#6b7280;border-bottom:1px solid #f3f4f6;width:150px;vertical-align:top;">Document Type</td>
+          <td style="padding:10px 0;font-size:13px;color:#111111;border-bottom:1px solid #f3f4f6;">{{documentType}}</td>
+        </tr>
+        <tr>
+          <td style="padding:10px 0;font-size:13px;color:#6b7280;border-bottom:1px solid #f3f4f6;width:150px;vertical-align:top;">Status</td>
+          <td style="padding:10px 0;font-size:13px;color:#111111;border-bottom:1px solid #f3f4f6;">{{#if isVerified}}Verified{{else if isRejected}}Rejected{{else}}Pending{{/if}}</td>
+        </tr>
+        </table>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:0 24px 16px 24px;">
+        {{#if isRejected}}
+    <tr>
+      <td style="padding:16px 24px 0 24px;">
+        <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td style="padding:10px 0;font-size:13px;color:#6b7280;border-bottom:1px solid #f3f4f6;width:150px;vertical-align:top;">Rejection Reason</td>
+          <td style="padding:10px 0;font-size:13px;color:#111111;border-bottom:1px solid #f3f4f6;">{{rejectionReason}}</td>
+        </tr>
+        </table>
+      </td>
+    </tr>
+        <p style="margin:12px 0 0 0;font-size:14px;color:#374151;line-height:1.6;">Please resubmit your document addressing the concerns above. Ensure the document is legible and complete.</p>
+        {{/if}}
+        {{#if isVerified}}
+        <p style="margin:0;font-size:14px;color:#374151;line-height:1.6;">Your document has been verified. Your profile is now fully verified on the platform.</p>
+        {{/if}}
+      </td>
+    </tr>
 
-                <div
-                  style='background-color: #f9f9f9; padding: 20px; border-left: 4px solid #E5A503; margin-bottom: 20px;'
-                >
-                  <p
-                    style='color: #333333; font-size: 15px; margin: 0 0 10px 0;'
-                  >
-                    <strong>Document Type:</strong>
-                    {{documentType}}
-                  </p>
-                  <p style='color: #333333; font-size: 15px; margin: 0;'>
-                    <strong>Status:</strong>
-                    {{#if isVerified}}
-                      <span style='color: #2e7d32;'>Verified</span>
-                    {{else if isRejected}}
-                      <span style='color: #d32f2f;'>Rejected</span>
-                    {{else}}
-                      <span style='color: #f57c00;'>Pending</span>
-                    {{/if}}
-                  </p>
-                </div>
-
-                {{#if isRejected}}
-                  <p
-                    style='color: #666666; font-size: 14px; line-height: 1.6; margin-bottom: 20px;'
-                  >
-                    <strong>Reason for Rejection:</strong>
-                  </p>
-                  <p
-                    style='color: #333333; font-size: 15px; line-height: 1.6; margin-bottom: 20px;'
-                  >
-                    {{rejectionReason}}
-                  </p>
-
-                  <p
-                    style='color: #666666; font-size: 14px; line-height: 1.6; margin-bottom: 20px;'
-                  >
-                    Please resubmit your document addressing the concerns
-                    mentioned above. Clear, legible documents will help expedite
-                    the verification process.
-                  </p>
-                {{/if}}
-
-                {{#if isVerified}}
-                  <p
-                    style='color: #2e7d32; font-size: 14px; line-height: 1.6; margin-bottom: 20px;'
-                  >
-                    Congratulations! Your document has been verified. You are
-                    now fully verified on our platform.
-                  </p>
-                {{/if}}
-
-                <p
-                  style='color: #333333; font-size: 16px; line-height: 1.6; margin-bottom: 30px;'
-                >
-                  Best regards,
-                  <br />
-                  The Asoose Support Team
-                </p>
-              </td>
-            </tr>
-
-            <!-- Footer -->
-            <tr>
-              <td
-                style='background-color: #f4f4f4; padding: 20px; text-align: center; border-top: 1px solid #e0e0e0;'
-              >
-                <p style='color: #999999; font-size: 12px; margin: 0;'>
-                  This is an automated notification. Please do not reply to this
-                  email.
-                </p>
-                <p style='color: #999999; font-size: 12px; margin: 5px 0 0 0;'>
-                  Asoose Platform
-                </p>
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-    </table>
-  </body>
+    <tr>
+      <td style="padding:0 24px;">
+        <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td height="1" style="background-color:#e5e7eb;font-size:0;line-height:0;">&nbsp;</td></tr></table>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:16px 24px;">
+        <p style="margin:0;font-size:12px;color:#9ca3af;line-height:1.5;">This is an automated notification. Do not reply to this email. &mdash; Asoose Platform</p>
+      </td>
+    </tr>
+  </table>
+</body>
 </html>
