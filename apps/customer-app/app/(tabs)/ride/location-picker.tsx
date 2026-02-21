@@ -24,8 +24,7 @@ import { useLocation } from "@/context/LocationContext";
 import { useSendPackage } from "@/context/SendPackageContext";
 import { getAccessToken } from "@/services/auth.service";
 import Toast from "react-native-toast-message";
-
-const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "";
+import { API_BASE as API_URL } from "@/constants/static-config";
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get("window");
 const MODAL_MAP_HEIGHT = SCREEN_HEIGHT * 0.78; // leaves space for header & buttons
 

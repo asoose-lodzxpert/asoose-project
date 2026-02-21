@@ -1,13 +1,13 @@
 import { request } from "@/lib/authFetch";
 import { Address } from "@/types/address";
 
-const GOOGLE_MAPS_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
+import { GOOGLE_MAPS_API_KEY, API_BASE } from "@/constants/static-config";
 
 export const fetchSuggestions = async (input: string): Promise<any[]> => {
   if (!input) return [];
   try {
     // Use backend endpoint for autocomplete
-    let url = `${process.env.EXPO_PUBLIC_API_URL}/maps/places-autocomplete?query=${encodeURIComponent(input)}`;
+    let url = `${API_BASE}/maps/places-autocomplete?query=${encodeURIComponent(input)}`;
     const response = await fetch(url);
     const data = await response.json();
     return Array.isArray(data) ? data : [];

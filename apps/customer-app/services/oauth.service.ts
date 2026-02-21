@@ -1,52 +1,17 @@
 import {
   AUTH_ACCESS_TOKEN_KEY,
   AUTH_REFRESH_TOKEN_KEY,
+  AUTH_BASE,
+  GOOGLE_WEB_CLIENT_ID,
+  GOOGLE_CLIENT_ID_IOS,
 } from "@/constants/static-config";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as AppleAuthentication from "expo-apple-authentication";
-import * as AuthSession from "expo-auth-session";
-import * as Google from "expo-auth-session/providers/google";
 import { Platform } from "react-native";
-
-const API_BASE = (() => {
-  const url = process.env.EXPO_PUBLIC_API_URL;
-  if (!url) {
-    if (process.env.NODE_ENV === "production") {
-      throw new Error(
-        "EXPO_PUBLIC_API_URL is required in production. Please set it via EAS secrets or environment variables.",
-      );
-    }
-
-    // In development, you may fallback or warn
-    console.warn(
-      "EXPO_PUBLIC_API_URL is not set. Using default development URL.",
-    );
-    return "https://asoose.com/api/v1";
-  }
-  return url.replace(/\/+$/, "").replace(/\/$/, "");
-})();
-
-const AUTH_BASE = `${API_BASE}/auth/user`;
-
-// Google OAuth Configuration
-// Falling back to undefined (not "") so expo-auth-session knows to skip unset platforms
-const GOOGLE_CLIENT_ID_IOS =
-  process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_IOS || undefined;
-const GOOGLE_CLIENT_ID_ANDROID =
-  process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_ANDROID || undefined;
-const GOOGLE_CLIENT_ID_WEB =
-  process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_WEB || undefined;
-
-// True only when at least the current platform has a real client ID
-const isGoogleConfigured = !!(
-  GOOGLE_CLIENT_ID_WEB ||
-  GOOGLE_CLIENT_ID_ANDROID ||
-  GOOGLE_CLIENT_ID_IOS
-);
-
-// Placeholder used so expo-auth-session hook never throws during init.
-// The button is disabled via `isConfigured: false` when this is active.
-const PLACEHOLDER = "not-configured";
+import {
+  GoogleSignin,
+  statusCodes,
+} from "@react-native-google-signin/google-signin";
 
 type OAuthResponse = {
   user: {
@@ -88,79 +53,56 @@ async function httpRequest({
 }
 
 /**
- * Initialize Google Sign-In
- * Returns a request object and promptAsync function.
- * `isConfigured` is false when no client IDs are set — use it to hide the button.
+ * Configure native Google Sign-In. Call once on app mount (idempotent).
  */
-export function useGoogleSignIn() {
-  // Explicit redirect URI so Google knows exactly where to redirect back.
-  // On native builds this resolves to the custom scheme (asoose-app://).
-  // On Expo Go it resolves to the Expo proxy (https://auth.expo.io/...).
-  // The URI must be registered in Google Cloud Console → Authorized redirect URIs.
-  const redirectUri = AuthSession.makeRedirectUri({
-    scheme: "asoose-app",
-    path: "auth",
+export function configureGoogleSignIn() {
+  GoogleSignin.configure({
+    webClientId: GOOGLE_WEB_CLIENT_ID,
+    iosClientId: GOOGLE_CLIENT_ID_IOS,
+    scopes: ["profile", "email"],
   });
-
-  // expo-auth-session throws if the platform-specific clientId is undefined.
-  // Always pass a non-undefined value; use isConfigured to disable the button
-  // when the real credentials are absent.
-  const [request, response, promptAsync] = Google.useAuthRequest({
-    androidClientId: GOOGLE_CLIENT_ID_ANDROID ?? PLACEHOLDER,
-    iosClientId: GOOGLE_CLIENT_ID_IOS ?? PLACEHOLDER,
-    webClientId: GOOGLE_CLIENT_ID_WEB ?? PLACEHOLDER,
-    redirectUri,
-  });
-
-  return {
-    request: isGoogleConfigured ? request : null,
-    response: isGoogleConfigured ? response : null,
-    promptAsync: isGoogleConfigured ? promptAsync : async () => null,
-    isConfigured: isGoogleConfigured,
-    redirectUri, // expose so devs can register exact URI in Google Console
-  };
 }
 
 /**
- * Handle Google OAuth authentication with backend
+ * Trigger native Google Sign-In and authenticate with backend.
  */
-export async function authenticateWithGoogle(
-  accessToken: string,
-): Promise<OAuthResponse> {
+export async function signInWithGoogle(): Promise<OAuthResponse> {
   try {
-    // Fetch user info from Google
-    const userInfoResponse = await fetch(
-      "https://www.googleapis.com/userinfo/v2/me",
-      {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      },
-    );
+    await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+    const result = await GoogleSignin.signIn();
 
-    if (!userInfoResponse.ok) {
-      throw new Error("Failed to fetch Google user info");
+    if (result.type === "cancelled") {
+      throw new Error("Google Sign-In was cancelled");
     }
 
-    const googleUser = await userInfoResponse.json();
+    const { user } = result.data;
 
-    // Send to backend
     const response = await httpRequest({
       path: "oauth/google",
       body: {
-        email: googleUser.email,
-        googleId: googleUser.id,
-        firstName: googleUser.given_name,
-        lastName: googleUser.family_name,
-        profilePicture: googleUser.picture,
+        email: user.email,
+        googleId: user.id,
+        firstName: user.givenName || "",
+        lastName: user.familyName || "",
+        profilePicture: user.photo || undefined,
       },
     });
 
-    // Store tokens
     await AsyncStorage.setItem(AUTH_ACCESS_TOKEN_KEY, response.access_token);
     await AsyncStorage.setItem(AUTH_REFRESH_TOKEN_KEY, response.refresh_token);
 
     return response;
-  } catch (error) {
-    if (__DEV__) console.error("Google OAuth error:", error);
+  } catch (error: any) {
+    if (error.code === statusCodes.SIGN_IN_CANCELLED) {
+      throw new Error("Google Sign-In was cancelled");
+    }
+    if (error.code === statusCodes.IN_PROGRESS) {
+      throw new Error("Sign-In is already in progress");
+    }
+    if (error.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
+      throw new Error("Google Play Services not available");
+    }
+    if (__DEV__) console.error("Google Sign-In error:", error);
     throw error;
   }
 }
@@ -189,7 +131,6 @@ export async function authenticateWithApple(): Promise<OAuthResponse> {
       ],
     });
 
-    // Send to backend
     const response = await httpRequest({
       path: "oauth/apple",
       body: {
@@ -201,7 +142,6 @@ export async function authenticateWithApple(): Promise<OAuthResponse> {
       },
     });
 
-    // Store tokens
     await AsyncStorage.setItem(AUTH_ACCESS_TOKEN_KEY, response.access_token);
     await AsyncStorage.setItem(AUTH_REFRESH_TOKEN_KEY, response.refresh_token);
 

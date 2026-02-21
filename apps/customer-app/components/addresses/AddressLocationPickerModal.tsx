@@ -5,6 +5,7 @@ import React, {
   useMemo,
   useEffect,
 } from "react";
+import { API_BASE as API_URL } from "@/constants/static-config";
 import {
   Modal,
   Pressable,
@@ -66,7 +67,6 @@ export function AddressLocationPickerModal({
   const [reverseAddress, setReverseAddress] = useState("");
 
   const mapRef = useRef<MapView>(null);
-  const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "";
 
   const coords = useMemo(() => initialCoords || undefined, [initialCoords]);
   const { results: predictions, loading: searching } = useAddressSearch(

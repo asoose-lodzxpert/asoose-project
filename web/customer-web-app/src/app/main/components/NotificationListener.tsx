@@ -4,10 +4,14 @@ import { useEffect, useRef } from "react";
 import { io, Socket } from "socket.io-client";
 import { toast } from "react-toastify";
 import { useSession } from "next-auth/react";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
 
 export const NotificationListener = () => {
   const { data: session } = useSession();
   const socketRef = useRef<Socket | null>(null);
+
+  // FCM web push notifications (background + foreground)
+  usePushNotifications();
 
   useEffect(() => {
     // 1. Only connect if user is logged in

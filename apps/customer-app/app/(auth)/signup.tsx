@@ -11,15 +11,12 @@ import {
   ScrollView,
 } from "react-native";
 import { router } from "expo-router";
-import * as WebBrowser from "expo-web-browser";
 import {
-  useGoogleSignIn,
-  authenticateWithGoogle,
+  configureGoogleSignIn,
+  signInWithGoogle,
   authenticateWithApple,
   isAppleSignInAvailable,
 } from "@/services/oauth.service";
-
-WebBrowser.maybeCompleteAuthSession();
 
 import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
@@ -63,12 +60,6 @@ export default function Signup() {
   const [loading, setLoading] = useState(false);
 
   // OAuth state
-  const {
-    request,
-    response,
-    promptAsync,
-    isConfigured: googleConfigured,
-  } = useGoogleSignIn();
   const [appleAvailable, setAppleAvailable] = useState(false);
   const [oauthLoading, setOauthLoading] = useState(false);
 
@@ -86,33 +77,22 @@ export default function Signup() {
       const available = await isAppleSignInAvailable();
       setAppleAvailable(available);
     })();
+    configureGoogleSignIn();
   }, []);
 
-  useEffect(() => {
-    if (response?.type === "success" && response.authentication) {
-      handleGoogleSignIn(response.authentication.accessToken);
-    } else if (response?.type === "error") {
-      const errMsg =
-        (response.error as any)?.message ||
-        response.error?.code ||
-        "Google sign-in failed";
-      Toast.show({ type: "error", text1: errMsg });
-      if (__DEV__)
-        console.error("Google OAuth error response:", response.error);
-    }
-  }, [response]);
-
-  const handleGoogleSignIn = async (accessToken: string) => {
+  const handleGoogleSignIn = async () => {
     setOauthLoading(true);
     try {
-      await authenticateWithGoogle(accessToken);
+      await signInWithGoogle();
       Toast.show({ type: "success", text1: "Account created!" });
       router.replace("/(tabs)/home");
     } catch (err: any) {
-      Toast.show({
-        type: "error",
-        text1: err.message || "Google sign-in failed",
-      });
+      if (err?.message !== "Google Sign-In was cancelled") {
+        Toast.show({
+          type: "error",
+          text1: err.message || "Google sign-in failed",
+        });
+      }
     } finally {
       setOauthLoading(false);
     }
@@ -338,30 +318,26 @@ export default function Signup() {
               </View>
 
               <View style={styles.socialRow}>
-                {googleConfigured && (
-                  <Pressable
-                    style={[
-                      styles.socialButton,
-                      { backgroundColor: surfaceSubtle },
-                    ]}
-                    onPress={() => promptAsync()}
-                    disabled={oauthLoading}
-                  >
-                    {oauthLoading ? (
-                      <ActivityIndicator size="small" color={primary} />
-                    ) : (
-                      <>
-                        <Image
-                          source={require("@/assets/images/icons8-google-48.png")}
-                          style={styles.socialIcon}
-                        />
-                        <ThemedText style={styles.socialText}>
-                          Google
-                        </ThemedText>
-                      </>
-                    )}
-                  </Pressable>
-                )}
+                <Pressable
+                  style={[
+                    styles.socialButton,
+                    { backgroundColor: surfaceSubtle },
+                  ]}
+                  onPress={handleGoogleSignIn}
+                  disabled={oauthLoading}
+                >
+                  {oauthLoading ? (
+                    <ActivityIndicator size="small" color={primary} />
+                  ) : (
+                    <>
+                      <Image
+                        source={require("@/assets/images/icons8-google-48.png")}
+                        style={styles.socialIcon}
+                      />
+                      <ThemedText style={styles.socialText}>Google</ThemedText>
+                    </>
+                  )}
+                </Pressable>
 
                 {appleAvailable && (
                   <Pressable

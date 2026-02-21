@@ -179,7 +179,8 @@ export type IconSymbolName =
   | "tray.fill"
   | "checkmark.shield.fill"
   | "info.circle.fill"
-  | "bell.slash";
+  | "bell.slash"
+  | "fingerprint";
 
 export const MAPPING: Record<
   IconSymbolName,
@@ -361,6 +362,7 @@ export const MAPPING: Record<
   faceid: "face",
   cross: "close",
   bicycle: "directions-bike",
+  fingerprint: "fingerprint",
 };
 
 interface IconSymbolProps {

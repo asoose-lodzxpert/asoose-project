@@ -1,27 +1,11 @@
 import {
   AUTH_ACCESS_TOKEN_KEY,
   AUTH_REFRESH_TOKEN_KEY,
+  API_BASE,
+  AUTH_BASE,
+  UNIVERSAL_AUTH_BASE,
 } from "@/constants/static-config";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-
-const API_BASE = (() => {
-  const url = process.env.EXPO_PUBLIC_API_URL;
-  if (!url) {
-    if (process.env.NODE_ENV === "production") {
-      throw new Error(
-        "EXPO_PUBLIC_API_URL is required in production. Please set it via EAS secrets or environment variables.",
-      );
-    }
-    // In development, you may fallback or warn
-    console.warn(
-      "EXPO_PUBLIC_API_URL is not set. Using default development URL.",
-    );
-    return "https://asoose.com/api/v1";
-  }
-  return url.replace(/\/+$/, "").replace(/\/$/, "");
-})();
-const AUTH_BASE = `${API_BASE}/auth/user`;
-const UNIVERSAL_AUTH_BASE = `${API_BASE}/auth`;
 
 type SignupPayload = {
   name: string;

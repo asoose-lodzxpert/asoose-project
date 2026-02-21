@@ -9,7 +9,7 @@
     "lint": "eslint",
     "test:payouts": "playwright test tests/super-admin/payout-concurrency.spec.ts",
     "test": "jest",
-  "test:watch": "jest --watch"
+    "test:watch": "jest --watch"
   },
   "dependencies": {
     "@auth/core": "^0.34.3",
@@ -22,6 +22,7 @@
     "bcryptjs": "^3.0.3",
     "cookies-next": "^6.1.1",
     "date-fns": "^4.1.0",
+    "firebase": "^12.9.0",
     "install": "^0.13.0",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.561.0",

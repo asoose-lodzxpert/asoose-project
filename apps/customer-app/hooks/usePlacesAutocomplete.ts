@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { API_BASE } from "@/constants/static-config";
 
 export function usePlacesAutocomplete(query: string, location?: string) {
   const [results, setResults] = useState<any[]>([]);
@@ -15,7 +16,7 @@ export function usePlacesAutocomplete(query: string, location?: string) {
       setLoading(true);
       try {
         // Use backend endpoint for autocomplete
-        let url = `${process.env.EXPO_PUBLIC_API_URL}/maps/places-autocomplete?query=${encodeURIComponent(query)}`;
+        let url = `${API_BASE}/maps/places-autocomplete?query=${encodeURIComponent(query)}`;
         if (location) {
           url += `&location=${location}`;
         }

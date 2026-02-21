@@ -503,11 +503,10 @@ export class AuthService {
 
   async savePushToken(userId: string, token: string, platform: string) {
     try {
-      // Update user with push token
       await this.prisma.user.update({
         where: { id: userId },
         data: {
-          expoPushToken: token,
+          fcmToken: token,
         },
       });
 
@@ -519,11 +518,10 @@ export class AuthService {
 
   async removePushToken(userId: string) {
     try {
-      // Clear push token
       await this.prisma.user.update({
         where: { id: userId },
         data: {
-          expoPushToken: null,
+          fcmToken: null,
         },
       });
 

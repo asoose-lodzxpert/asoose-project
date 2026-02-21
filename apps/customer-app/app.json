@@ -111,7 +111,13 @@
           "mode": "production"
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.520199690549-s90js4cdaf1hhmbestsmddtc5lf3nnse"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

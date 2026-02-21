@@ -1,11 +1,7 @@
 import * as Notifications from "expo-notifications";
 import { getAccessToken } from "./auth.service";
 
-const API_BASE = (
-  process.env.EXPO_PUBLIC_API_URL || "https://asoose.com/api/v1"
-)
-  .replace(/\/+$/, "")
-  .replace(/\/$/, "");
+import { API_BASE } from "@/constants/static-config";
 
 export async function getExpoPushToken(): Promise<string | null> {
   try {

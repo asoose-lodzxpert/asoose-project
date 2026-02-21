@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   StyleSheet,
@@ -8,17 +8,16 @@ import {
   Platform,
   ActivityIndicator,
   ScrollView,
+  Animated,
+  Easing,
 } from "react-native";
 import { RelativePathString, useRouter } from "expo-router";
-import * as WebBrowser from "expo-web-browser";
 import {
-  useGoogleSignIn,
-  authenticateWithGoogle,
+  configureGoogleSignIn,
+  signInWithGoogle,
   authenticateWithApple,
   isAppleSignInAvailable,
 } from "@/services/oauth.service";
-
-WebBrowser.maybeCompleteAuthSession();
 
 import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
@@ -56,77 +55,114 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
 
   const [biometricEnabled, setBiometricEnabled] = useState(false);
-  const {
-    request,
-    response,
-    promptAsync,
-    isConfigured: googleConfigured,
-  } = useGoogleSignIn();
+
   const [appleAvailable, setAppleAvailable] = useState(false);
-  const [oauthLoading, setOauthLoading] = useState(false);
-  const [biometricLoading, setBiometricLoading] = useState(false);
 
-  const handleBiometricLogin = async () => {
-    setBiometricLoading(true);
-    try {
-      await biometricLogin();
-      router.replace({ pathname: "/(tabs)/home" });
-    } catch (err: any) {
-      // Only show error if it's not a user cancellation
-      if (err?.message !== "User cancelled") {
-        Toast.show({
-          type: "error",
-          text1: err?.message || "Biometric login failed",
-        });
-      }
-    } finally {
-      setBiometricLoading(false);
-    }
-  };
+  /* =========================
+     Animation Setup
+  ========================== */
 
-  // Check availability and trigger auto-prompt on mount
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const translateAnim = useRef(new Animated.Value(20)).current;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+
   useEffect(() => {
-    (async () => {
-      const enabled = await isBiometricEnabled();
-      setBiometricEnabled(enabled);
-
-      const available = await isAppleSignInAvailable();
-      setAppleAvailable(available);
-
-      // Auto-trigger biometric prompt if enabled
-      if (enabled) {
-        handleBiometricLogin();
-      }
-    })();
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+      Animated.timing(translateAnim, {
+        toValue: 0,
+        duration: 500,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: true,
+      }),
+    ]).start();
   }, []);
 
   useEffect(() => {
-    if (response?.type === "success" && response.authentication) {
-      handleGoogleSignIn(response.authentication.accessToken);
+    if (loading) {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, {
+            toValue: 1.1,
+            duration: 600,
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 1,
+            duration: 600,
+            useNativeDriver: true,
+          }),
+        ]),
+      ).start();
     }
-  }, [response]);
+  }, [loading]);
+
+  /* =========================
+     Biometric Auto Prompt
+  ========================== */
+
+  useEffect(() => {
+    let mounted = true;
+
+    (async () => {
+      const enabled = await isBiometricEnabled();
+      const available = await isAppleSignInAvailable();
+
+      if (!mounted) return;
+
+      setBiometricEnabled(enabled);
+      setAppleAvailable(available);
+
+      if (enabled) {
+        setTimeout(() => {
+          handleBiometricLogin();
+        }, 500);
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    configureGoogleSignIn();
+  }, []);
+
+  /* =========================
+     Handlers
+  ========================== */
 
   const handleLogin = async () => {
     if (!identifier || !password) {
       setError("Please enter your credentials");
       return;
     }
+
     setLoading(true);
     setError(null);
+
     try {
       await login({ email: identifier, password });
+
       if (biometricAvailable && biometricEnrolled && !biometricEnabled) {
         const confirmed = await showConfirm({
-          title: "Enable Face/Touch ID",
-          message: "Would you like to use Biometrics for your next sign-in?",
+          title: "Enable Biometrics",
+          message: "Use fingerprint for faster sign in next time?",
           confirmLabel: "Enable",
           cancelLabel: "Skip",
         });
+
         if (confirmed) {
           await enableBiometrics(identifier, password);
           setBiometricEnabled(true);
         }
       }
+
       router.replace({ pathname: "/(tabs)/home" });
     } catch (err: any) {
       setError(err.message || "Invalid credentials");
@@ -135,79 +171,116 @@ export default function LoginScreen() {
     }
   };
 
-  const handleGoogleSignIn = async (token: string) => {
-    setOauthLoading(true);
+  const handleBiometricLogin = async () => {
+    setLoading(true);
     try {
-      await authenticateWithGoogle(token);
+      await biometricLogin();
       router.replace({ pathname: "/(tabs)/home" });
     } catch (err: any) {
-      Toast.show({ type: "error", text1: "Google login failed" });
+      if (err?.message !== "User cancelled") {
+        Toast.show({
+          type: "error",
+          text1: err?.message || "Biometric login failed",
+        });
+      }
     } finally {
-      setOauthLoading(false);
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    setLoading(true);
+    try {
+      await signInWithGoogle();
+      router.replace({ pathname: "/(tabs)/home" });
+    } catch (err: any) {
+      if (err?.message !== "Google Sign-In was cancelled") {
+        Toast.show({
+          type: "error",
+          text1: err?.message || "Google login failed",
+        });
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAppleSignIn = async () => {
+    setLoading(true);
+    try {
+      await authenticateWithApple();
+      router.replace({ pathname: "/(tabs)/home" });
+    } catch (err: any) {
+      if (err?.message !== "Apple Sign-In was cancelled") {
+        Toast.show({
+          type: "error",
+          text1: err?.message || "Apple login failed",
+        });
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <ThemedView style={[styles.container, { backgroundColor: surface }]}>
+      {/* Pulsing Overlay */}
+      {loading && (
+        <View style={styles.overlay}>
+          <Animated.View
+            style={[
+              styles.overlayCard,
+              {
+                transform: [{ scale: pulseAnim }],
+                backgroundColor: primary,
+              },
+            ]}
+          >
+            <ActivityIndicator size="large" color="#fff" />
+            <ThemedText style={{ color: "#fff", marginTop: 12 }}>
+              Signing you in...
+            </ThemedText>
+          </Animated.View>
+        </View>
+      )}
+
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={{ flex: 1 }}
       >
         <ScrollView
           contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
         >
-          <View style={styles.headerArea}>
-            <ThemedText style={styles.title}>Sign In</ThemedText>
-            <ThemedText style={[styles.subtitle, { color: textMuted }]}>
-              Enter your details to access your account
-            </ThemedText>
-          </View>
-
-          <View style={styles.formArea}>
-            <View style={styles.inputGroup}>
-              <ThemedText style={styles.label}>Email Address</ThemedText>
-              <ThemedInput
-                placeholder="hello@example.com"
-                value={identifier}
-                onChangeText={(v) => {
-                  setIdentifier(v);
-                  setError(null);
-                }}
-                autoCapitalize="none"
-                autoComplete="email"
-                keyboardType="email-address"
-                editable={!loading}
-              />
+          <Animated.View
+            style={{
+              opacity: fadeAnim,
+              transform: [{ translateY: translateAnim }],
+            }}
+          >
+            <View style={styles.headerArea}>
+              <ThemedText style={styles.title}>Sign In</ThemedText>
+              <ThemedText style={[styles.subtitle, { color: textMuted }]}>
+                Access your account securely
+              </ThemedText>
             </View>
 
-            <View style={styles.inputGroup}>
-              <View style={styles.labelRow}>
-                <ThemedText style={styles.label}>Password</ThemedText>
-                <Pressable
-                  onPress={() =>
-                    router.push(
-                      "/(auth)/forgot-password/" as RelativePathString,
-                    )
-                  }
-                >
-                  <ThemedText style={[styles.forgotText, { color: primary }]}>
-                    Forgot?
-                  </ThemedText>
-                </Pressable>
-              </View>
+            <View style={styles.formArea}>
               <ThemedInput
-                placeholder="••••••••"
+                placeholder="Email"
+                value={identifier}
+                onChangeText={setIdentifier}
+                autoCapitalize="none"
+              />
+
+              <ThemedInput
+                placeholder="Password"
                 value={password}
-                onChangeText={(v) => {
-                  setPassword(v);
-                  setError(null);
-                }}
+                onChangeText={setPassword}
                 secureTextEntry={secure}
-                editable={!loading}
                 iconRight={
-                  <Pressable onPress={() => setSecure(!secure)} hitSlop={12}>
+                  <Pressable onPress={() => setSecure(!secure)}>
                     <IconSymbol
                       name={secure ? "eye.slash" : "eye"}
                       size={20}
@@ -216,94 +289,85 @@ export default function LoginScreen() {
                   </Pressable>
                 }
               />
-            </View>
 
-            {error && <ThemedText style={styles.errorText}>{error}</ThemedText>}
+              {error && (
+                <ThemedText style={styles.errorText}>{error}</ThemedText>
+              )}
 
-            <View style={styles.actionRow}>
-              <Pressable
-                style={[
-                  styles.primaryButton,
-                  { backgroundColor: primary, opacity: loading ? 0.8 : 1 },
-                ]}
-                onPress={handleLogin}
-                disabled={loading}
-              >
-                {loading ? (
-                  <ActivityIndicator color={textOnPrimary} />
-                ) : (
+              <View style={styles.actionRow}>
+                <Pressable
+                  style={[styles.primaryButton, { backgroundColor: primary }]}
+                  onPress={handleLogin}
+                >
                   <ThemedText
                     style={[styles.buttonText, { color: textOnPrimary }]}
                   >
                     Sign In
                   </ThemedText>
+                </Pressable>
+
+                {biometricEnabled && (
+                  <Pressable
+                    style={[
+                      styles.biometricButton,
+                      { backgroundColor: primary },
+                    ]}
+                    onPress={handleBiometricLogin}
+                  >
+                    <IconSymbol
+                      name="fingerprint"
+                      size={22}
+                      color={textOnPrimary}
+                    />
+                  </Pressable>
                 )}
-              </Pressable>
+              </View>
 
-              {biometricEnabled && (
-                <Pressable
-                  style={[
-                    styles.biometricSideButton,
-                    { borderColor: border, backgroundColor: surface },
-                  ]}
-                  onPress={handleBiometricLogin}
-                  disabled={biometricLoading}
-                >
-                  {biometricLoading ? (
-                    <ActivityIndicator color={primary} />
-                  ) : (
-                    <IconSymbol name="faceid" size={28} color={primary} />
-                  )}
-                </Pressable>
-              )}
-            </View>
-          </View>
-
-          <View style={styles.footerArea}>
-            <View style={styles.dividerRow}>
-              <View style={[styles.line, { backgroundColor: border }]} />
-              <ThemedText style={[styles.dividerText, { color: textMuted }]}>
-                OR SIGN IN WITH
-              </ThemedText>
-              <View style={[styles.line, { backgroundColor: border }]} />
-            </View>
-
-            <View style={styles.socialRow}>
-              {googleConfigured && (
-                <Pressable
-                  style={[styles.socialCircle, { borderColor: border }]}
-                  onPress={() => promptAsync()}
-                  disabled={oauthLoading}
-                >
-                  <Image
-                    source={require("@/assets/images/icons8-google-48.png")}
-                    style={styles.socialIcon}
-                  />
-                </Pressable>
-              )}
-              {appleAvailable && (
-                <Pressable
-                  style={[styles.socialCircle, { borderColor: border }]}
-                  onPress={authenticateWithApple}
-                  disabled={oauthLoading}
-                >
-                  <IconSymbol name="apple.logo" size={22} color={textColor} />
-                </Pressable>
-              )}
-            </View>
-
-            <View style={styles.signupPrompt}>
-              <ThemedText style={{ color: textMuted }}>
-                New to the app?
-              </ThemedText>
-              <Pressable onPress={() => router.push("/(auth)/signup")}>
-                <ThemedText style={{ color: primary, fontWeight: "700" }}>
-                  {" "}
-                  Create Account
+              {/* ── Social divider ── */}
+              <View style={styles.dividerRow}>
+                <View
+                  style={[styles.dividerLine, { backgroundColor: border }]}
+                />
+                <ThemedText style={[styles.dividerText, { color: textMuted }]}>
+                  or continue with
                 </ThemedText>
-              </Pressable>
+                <View
+                  style={[styles.dividerLine, { backgroundColor: border }]}
+                />
+              </View>
+
+              {/* ── Social buttons ── */}
+              <View style={styles.socialRow}>
+                <Pressable
+                  style={[styles.socialButton, { borderColor: border }]}
+                  onPress={handleGoogleSignIn}
+                  disabled={loading}
+                >
+                  <IconSymbol name="google.logo" size={20} color={textColor} />
+                  <ThemedText
+                    style={[styles.socialButtonText, { color: textColor }]}
+                  >
+                    Google
+                  </ThemedText>
+                </Pressable>
+
+                {appleAvailable && (
+                  <Pressable
+                    style={[styles.socialButton, { borderColor: border }]}
+                    onPress={handleAppleSignIn}
+                    disabled={loading}
+                  >
+                    <IconSymbol name="apple.logo" size={20} color={textColor} />
+                    <ThemedText
+                      style={[styles.socialButtonText, { color: textColor }]}
+                    >
+                      Apple
+                    </ThemedText>
+                  </Pressable>
+                )}
+              </View>
             </View>
-          </View>
+          </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
     </ThemedView>
@@ -312,98 +376,115 @@ export default function LoginScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+
   scrollContent: {
     flexGrow: 1,
     paddingHorizontal: 28,
-    paddingTop: Platform.OS === "ios" ? 80 : 50,
+    paddingTop: Platform.OS === "ios" ? 70 : 50,
     paddingBottom: 40,
   },
+
   headerArea: {
-    marginBottom: 48,
+    marginBottom: 40,
   },
-  title: { fontSize: 36, fontWeight: "800", letterSpacing: -1 },
-  subtitle: { fontSize: 16, marginTop: 8, lineHeight: 22 },
+
+  title: {
+    fontSize: 34,
+    fontWeight: "800",
+  },
+
+  subtitle: {
+    fontSize: 15,
+    marginTop: 8,
+  },
 
   formArea: {
-    gap: 24,
+    gap: 18,
   },
-  inputGroup: {
-    gap: 8,
-  },
-  labelRow: {
+
+  actionRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
+    marginTop: 10,
+  },
+
+  primaryButton: {
+    flex: 1,
+    height: 56,
+    borderTopLeftRadius: 16,
+    borderBottomLeftRadius: 16,
     alignItems: "center",
+    justifyContent: "center",
   },
-  label: {
-    fontSize: 13,
+
+  biometricButton: {
+    width: 64,
+    height: 56,
+    borderTopRightRadius: 16,
+    borderBottomRightRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  buttonText: {
+    fontSize: 16,
     fontWeight: "700",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-    opacity: 0.7,
   },
-  forgotText: {
-    fontSize: 13,
-    fontWeight: "700",
-  },
+
   errorText: {
     color: "#DC2626",
     fontSize: 14,
-    fontWeight: "600",
     textAlign: "center",
   },
-  actionRow: {
-    flexDirection: "row",
-    gap: 12,
-    marginTop: 12,
-    alignItems: "center",
-  },
-  primaryButton: {
-    flex: 1,
-    height: 60,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  biometricSideButton: {
-    width: 60,
-    height: 60,
-    borderRadius: 20,
-    borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  buttonText: { fontSize: 17, fontWeight: "700" },
 
-  footerArea: {
-    marginTop: 48,
-    gap: 32,
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 10,
   },
+
+  overlayCard: {
+    paddingHorizontal: 32,
+    paddingVertical: 28,
+    borderRadius: 20,
+    alignItems: "center",
+  },
+
   dividerRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    marginTop: 4,
   },
-  line: { flex: 1, height: 1, opacity: 0.5 },
-  dividerText: { fontSize: 11, fontWeight: "800", letterSpacing: 1 },
+
+  dividerLine: {
+    flex: 1,
+    height: StyleSheet.hairlineWidth,
+  },
+
+  dividerText: {
+    marginHorizontal: 12,
+    fontSize: 13,
+  },
 
   socialRow: {
     flexDirection: "row",
-    justifyContent: "center",
-    gap: 20,
+    gap: 12,
   },
-  socialCircle: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    borderWidth: 1,
+
+  socialButton: {
+    flex: 1,
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
+    gap: 8,
+    height: 50,
+    borderRadius: 14,
+    borderWidth: 1,
   },
-  socialIcon: { width: 24, height: 24 },
-  signupPrompt: {
-    flexDirection: "row",
-    justifyContent: "center",
-    marginTop: 12,
+
+  socialButtonText: {
+    fontSize: 15,
+    fontWeight: "600",
   },
 });

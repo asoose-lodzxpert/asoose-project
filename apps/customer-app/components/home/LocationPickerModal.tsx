@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef, useMemo } from "react";
-const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "";
+import { API_BASE as API_URL } from "@/constants/static-config";
 import {
   Modal,
   Pressable,

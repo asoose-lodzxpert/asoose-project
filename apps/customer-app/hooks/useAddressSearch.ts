@@ -2,7 +2,7 @@ import axios from "axios";
 import { useEffect, useRef, useState } from "react";
 import { getAccessToken } from "@/services/auth.service";
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL;
+import { API_BASE as API_URL } from "@/constants/static-config";
 
 export function useAddressSearch(
   query: string,
