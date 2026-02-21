@@ -21,9 +21,9 @@ export function GoogleMapsProvider({ children }: { children: ReactNode }) {
   // 2. The SINGLE global loader call
   const { isLoaded, loadError } = useJsApiLoader({
     id: "google-map-script",
-    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!,
+    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY!,
     libraries: LIBRARIES,
-    language: "en", // Optional: Lock language to prevent hydration mismatches
+    language: "en",
   });
 
   if (loadError) {
