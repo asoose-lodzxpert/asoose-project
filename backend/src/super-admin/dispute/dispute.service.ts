@@ -343,8 +343,10 @@ export class DisputesService {
     const isAdmin = (
       [
         UserRole.SUPER_ADMIN,
+        UserRole.ADMIN,
         UserRole.ADMIN_MANAGER,
         UserRole.ADMIN_SUPPORT,
+        UserRole.ADMIN_FINANCE,
       ] as UserRole[]
     ).includes(role as UserRole);
 

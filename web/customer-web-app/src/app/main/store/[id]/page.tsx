@@ -16,7 +16,7 @@ import Swal from "sweetalert2";
 import { getSession } from "next-auth/react"; // ✅ Import NextAuth
 import { ProductModal, ModifierGroup } from "@/store/ProductModal";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1";
 const POPULAR_ITEMS_COUNT = 6;
 
 interface Product {
@@ -96,10 +96,14 @@ export default function StorePage() {
       setMenuItems(data.products || []);
       setReviews(data.reviews || []);
 
-      if (loading) {
-        const defaultTab = data.type === "RESTAURANT" ? "Popular" : "All";
-        setActiveTab(defaultTab);
-      }
+      // Set default tab on first load based on store type
+      setActiveTab((prev) =>
+        prev === "All" || prev === "Popular"
+          ? data.type === "RESTAURANT"
+            ? "Popular"
+            : "All"
+          : prev,
+      );
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "An unexpected error occurred",
@@ -107,7 +111,7 @@ export default function StorePage() {
     } finally {
       setLoading(false);
     }
-  }, [slugOrId, loading]);
+  }, [slugOrId]);
 
   useEffect(() => {
     if (slugOrId) fetchStoreData();
@@ -157,7 +161,7 @@ export default function StorePage() {
   const handleReviewSubmit = async (
     rating: number,
     comment: string,
-    orderId?: string,
+    _orderId?: string, // reserved for future backend support
   ) => {
     // ✅ Get NextAuth Session
     const session = await getSession();
@@ -175,7 +179,6 @@ export default function StorePage() {
         storeId: store?.id,
         rating,
         comment: comment.trim(),
-        orderId,
       }),
     });
 

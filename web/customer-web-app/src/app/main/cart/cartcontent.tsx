@@ -164,7 +164,7 @@ export default function Cartcontent() {
             Looks like you haven't added anything to your cart yet.
           </p>
           <Link
-            href="/home"
+            href="/main/store"
             className="mt-4 px-6 py-3 bg-yellow-500 text-black font-bold rounded-xl shadow-lg hover:bg-yellow-400 transition-colors"
           >
             Start Shopping

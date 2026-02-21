@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import {
   Store,
   ChevronRight,
@@ -185,6 +185,7 @@ function useStoreData(query: string | null) {
 // --- MAIN PAGE COMPONENT ---
 export default function StorePage() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const query = searchParams.get("q")?.trim() || null;
 
   // Data
@@ -442,7 +443,13 @@ export default function StorePage() {
                 </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 animate-in slide-in-from-bottom-4 duration-500 delay-100">
                   {searchResults.products.map((product) => (
-                    <ProductCard key={product.id} {...product} />
+                    <ProductCard
+                      key={product.id}
+                      {...product}
+                      onClick={() =>
+                        router.push(`/main/store/${product.storeId}`)
+                      }
+                    />
                   ))}
                 </div>
               </div>

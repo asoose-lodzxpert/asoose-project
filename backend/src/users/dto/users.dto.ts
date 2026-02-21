@@ -63,6 +63,14 @@ export class OrderItemDto {
   @Min(1, { message: 'Quantity must be at least 1' })
   @Max(100, { message: 'Quantity cannot exceed 100' })
   quantity: number;
+
+  /**
+   * IDs of selected Modifier records.
+   * Prices are re-fetched from DB — client-supplied prices are never trusted.
+   */
+  @IsArray()
+  @IsOptional()
+  modifierIds?: string[];
 }
 
 /**

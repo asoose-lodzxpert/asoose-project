@@ -78,11 +78,16 @@ export class AddressesService {
 
     this.logger.log(`[createAddressFromData] Step 2: sanitize city/state`);
     const t2 = Date.now();
-    const sanitizedCity = data.city
-      ? this.sanitizeString(data.city)
+    // Reject common placeholder strings sent by old clients ('Unknown', 'N/A', blank)
+    // so they never reach the DB. Fall back to known-good Maiduguri / Borno defaults.
+    const PLACEHOLDER = new Set(['unknown', 'n/a', '']);
+    const isPlaceholder = (v?: string) =>
+      !v || PLACEHOLDER.has(v.trim().toLowerCase());
+    const sanitizedCity = !isPlaceholder(data.city)
+      ? this.sanitizeString(data.city!)
       : 'Maiduguri';
-    const sanitizedState = data.state
-      ? this.sanitizeString(data.state)
+    const sanitizedState = !isPlaceholder(data.state)
+      ? this.sanitizeString(data.state!)
       : 'Borno';
     this.logger.log(
       `[createAddressFromData] Step 2 done (${Date.now() - t2}ms)`,

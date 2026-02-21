@@ -68,8 +68,10 @@ export async function middleware(req: NextRequest) {
     isLoggedIn &&
     (url.pathname === "/sign-in" || url.pathname === "/sign-up")
   ) {
-    // FIX: Dynamically redirect based on the user's role instead of hardcoding /main/store
-    const target = isAdmin ? "/super-admin" : "/main/store";
+    // Redirect admins to their dashboard, regular users to the store.
+    // NOTE: "/super-admin" (no trailing path) has no page.tsx — always target
+    // the canonical entry point "/super-admin/dashboard" to avoid a 404.
+    const target = isAdmin ? "/super-admin/dashboard" : "/main/store";
     return NextResponse.redirect(new URL(target, req.url));
   }
 

@@ -290,7 +290,7 @@ export class MarketplaceService {
         name: p.name,
         price: p.price,
         image: p.images[0] || null, // Use first image from array
-        description: p.slug,
+        description: p.description,
         category: { name: p.category.name },
         modifierGroups: p.modifierGroups.map((g) => ({
           id: g.id,

@@ -19,6 +19,8 @@ import DisputeTimeline from "./component/DisputeTimeline";
 import ResolutionModal from "./component/ResolutionModal";
 import ImageLightbox from "./component/ImageLightbox";
 
+const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1").replace(/\/$/, "");
+
 // Extended Interface for Multi-Vendor Data & Payment Context
 interface DisputeDetail extends BaseDisputeDetail {
   effectivePayment?: {
@@ -77,7 +79,6 @@ export default function DisputeDetailPage({
     try {
       const session = await getSession();
       const authToken = (session as any)?.accessToken;
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
       const res = await fetch(
         `${API_URL}/super-admin/disputes/${disputeId}/messages`,
@@ -107,7 +108,6 @@ export default function DisputeDetailPage({
     try {
       const session = await getSession();
       const authToken = (session as any)?.accessToken;
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
       await fetch(`${API_URL}/super-admin/disputes/${disputeId}/priority`, {
         method: "PATCH",
@@ -136,7 +136,6 @@ export default function DisputeDetailPage({
     try {
       const session = await getSession();
       const authToken = (session as any)?.accessToken;
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
       const isReject = modalType === "REJECT";
       const endpoint = `${API_URL}/super-admin/disputes/${disputeId}/${

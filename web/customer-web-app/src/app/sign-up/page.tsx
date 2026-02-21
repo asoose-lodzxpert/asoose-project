@@ -150,7 +150,25 @@ const SignUpPage = () => {
         return;
       }
 
-      router.push("/main/store");
+      // Read the freshly-created session to determine the user's role.
+      // In the current flow /auth/user/register always creates a CUSTOMER,
+      // but this guard future-proofs the signup flow: if the backend ever
+      // assigns an admin role at registration time, the redirect is correct.
+      const ADMIN_ROLES = new Set([
+        "ADMIN",
+        "SUPER_ADMIN",
+        "ADMIN_MANAGER",
+        "ADMIN_SUPPORT",
+        "ADMIN_FINANCE",
+      ]);
+      const { getSession } = await import("next-auth/react");
+      const session = await getSession();
+      const role = session?.user?.role as string | undefined;
+      const destination = role && ADMIN_ROLES.has(role)
+        ? "/super-admin/dashboard"
+        : "/main/store";
+
+      router.push(destination);
     } catch (err: any) {
       setApiError(err.message || "Registration failed");
     } finally {
@@ -161,7 +179,9 @@ const SignUpPage = () => {
   const handleGoogleSignUp = async () => {
     try {
       setIsLoading(true);
-      await signIn("google", { callbackUrl: "/main/store" });
+      // Use /auth/callback so the server reads the session role and routes
+      // admins to /super-admin/dashboard and regular users to /main/store.
+      await signIn("google", { callbackUrl: "/auth/callback" });
     } catch (err: any) {
       setApiError(err.message || "Google sign-up failed");
       setIsLoading(false);

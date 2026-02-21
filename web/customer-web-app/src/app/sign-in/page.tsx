@@ -65,8 +65,10 @@ const SignIn = () => {
   const handleGoogleSignIn = async () => {
     try {
       setIsLoading(true);
+      // Use /auth/callback so the server reads the session role and routes
+      // admins to /super-admin/dashboard and regular users to /main/store.
       await signIn("google", {
-        callbackUrl: "/main/store",
+        callbackUrl: "/auth/callback",
       });
     } catch (err: any) {
       setError(err.message || "Google sign-in failed");

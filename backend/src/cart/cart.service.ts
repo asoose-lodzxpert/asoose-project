@@ -30,6 +30,11 @@ export class CartService {
         storeId: true,
         status: true,
         stock: true,
+        modifierGroups: {
+          include: {
+            modifiers: { select: { id: true, price: true } },
+          },
+        },
       },
     });
 
@@ -39,16 +44,65 @@ export class CartService {
     if (product.stock < dto.quantity)
       throw new BadRequestException('Insufficient stock');
 
-    // 2. Define Redis Key for User Cart
+    // 2. Validate & price modifiers from the DB (never trust client pricing)
+    const selectedModifierIds = dto.modifierIds ?? [];
+    let modifierPriceAddon = 0;
+
+    for (const group of product.modifierGroups) {
+      const selectedInGroup = group.modifiers.filter((m) =>
+        selectedModifierIds.includes(m.id),
+      );
+
+      // Enforce minSelect (required groups)
+      if (selectedInGroup.length < group.minSelect) {
+        throw new BadRequestException(
+          `Modifier group "${group.name}" requires at least ${group.minSelect} selection(s)`,
+        );
+      }
+
+      // Enforce maxSelect
+      if (selectedInGroup.length > group.maxSelect) {
+        throw new BadRequestException(
+          `Modifier group "${group.name}" allows at most ${group.maxSelect} selection(s)`,
+        );
+      }
+
+      // Accumulate modifier prices from DB — client price is never used
+      modifierPriceAddon += selectedInGroup.reduce(
+        (sum, m) => sum + m.price,
+        0,
+      );
+    }
+
+    // Validate that every supplied modifierId actually belongs to this product
+    const allProductModifierIds = product.modifierGroups.flatMap((g) =>
+      g.modifiers.map((m) => m.id),
+    );
+    const invalidIds = selectedModifierIds.filter(
+      (id) => !allProductModifierIds.includes(id),
+    );
+    if (invalidIds.length > 0) {
+      throw new BadRequestException(
+        `Invalid modifier IDs for this product: ${invalidIds.join(', ')}`,
+      );
+    }
+
+    // 3. DB-authoritative unit price (base + modifiers)
+    const unitPrice = product.price + modifierPriceAddon;
+
+    // 4. Define Redis Key for User Cart
     const cartKey = `cart:${userId}`;
 
-    // 3. Fetch Existing Cart (if any)
+    // 5. Fetch Existing Cart (if any)
     const existingCartRaw = await this.redis.get(cartKey);
     const cart = existingCartRaw ? JSON.parse(existingCartRaw) : { items: [] };
 
-    // 4. Update Logic (Merge or Add)
+    // 6. Update Logic — treat the same product with different modifiers as distinct items
+    const modifierKey = selectedModifierIds.slice().sort().join(',');
     const existingItemIndex = cart.items.findIndex(
-      (i: any) => i.productId === dto.productId,
+      (i: any) =>
+        i.productId === dto.productId &&
+        (i.modifierIds ?? []).slice().sort().join(',') === modifierKey,
     );
 
     if (existingItemIndex > -1) {
@@ -57,12 +111,13 @@ export class CartService {
       cart.items.push({
         productId: dto.productId,
         quantity: dto.quantity,
-        price: product.price, // Snapshot price for security
+        price: unitPrice, // DB-authoritative: base + modifier add-ons
         storeId: product.storeId,
+        modifierIds: selectedModifierIds,
       });
     }
 
-    // 5. Persist to Redis (TTL 7 days)
+    // 7. Persist to Redis (TTL 7 days)
     await this.redis.set(cartKey, JSON.stringify(cart), {
       EX: 60 * 60 * 24 * 7,
     });

@@ -33,7 +33,7 @@ export const CartItemsList = ({
 
       <div className="space-y-6">
         {items.map((item) => (
-          <div key={item.id} className="flex items-center justify-between">
+          <div key={item.lineId ?? item.id} className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               {/* Controls */}
               <div className="flex flex-col items-center bg-gray-50 dark:bg-white/5 rounded-lg">
@@ -50,7 +50,7 @@ export const CartItemsList = ({
                   {item.quantity}
                 </span>
                 <button
-                  onClick={() => !isProcessing && onDecrease(item.id)}
+                  onClick={() => !isProcessing && onDecrease(item.lineId ?? item.id)}
                   className="p-1 hover:bg-gray-200 dark:hover:bg-white/10 rounded-b-lg text-red-500"
                   disabled={isProcessing}
                 >
@@ -87,7 +87,7 @@ export const CartItemsList = ({
                 ₦{(item.price * item.quantity).toLocaleString()}
               </p>
               <button
-                onClick={() => !isProcessing && onRemove(item.id)}
+                onClick={() => !isProcessing && onRemove(item.lineId ?? item.id)}
                 className="p-2 text-gray-400 hover:text-red-500 transition-colors"
                 disabled={isProcessing}
               >

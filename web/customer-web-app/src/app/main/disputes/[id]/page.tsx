@@ -338,7 +338,7 @@ export default function DisputeDetailPage() {
         )}
 
         {/* Resolution / rejection note */}
-        {(dispute.status === "RESOLVED" || dispute.status === "REJECTED") && dispute.resolutionNote && (
+        {(dispute.status === "RESOLVED" || dispute.status === "REJECTED") && (dispute.resolution || dispute.resolutionNote) && (
           <div
             className={`rounded-3xl p-5 border shadow-sm ${
               dispute.status === "RESOLVED"
@@ -357,7 +357,7 @@ export default function DisputeDetailPage() {
               </p>
             </div>
             <p className={`text-sm leading-relaxed ${dispute.status === "RESOLVED" ? "text-green-800 dark:text-green-300" : "text-red-800 dark:text-red-300"}`}>
-              {dispute.resolutionNote}
+              {dispute.resolution ?? dispute.resolutionNote}
             </p>
           </div>
         )}
@@ -386,7 +386,7 @@ export default function DisputeDetailPage() {
             Conversation
           </h2>
 
-          {dispute.messages?.length === 0 ? (
+          {(!dispute.messages || dispute.messages.length === 0) ? (
             <div className="text-center py-8">
               <MessageSquare className="w-8 h-8 text-gray-200 dark:text-white/10 mx-auto mb-2" />
               <p className="text-sm text-gray-400">No messages yet.</p>
@@ -396,7 +396,7 @@ export default function DisputeDetailPage() {
             </div>
           ) : (
             <div className="space-y-4">
-              {dispute.messages.map((msg: any) => (
+              {(dispute.messages ?? []).map((msg: any) => (
                 <MessageBubble key={msg.id} message={msg} currentUserId={currentUserId} />
               ))}
             </div>

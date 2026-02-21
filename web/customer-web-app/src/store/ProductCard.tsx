@@ -37,7 +37,15 @@ export const ProductCard = ({
   const handleQuickAdd = async (e: React.MouseEvent) => {
     e.stopPropagation();
 
-    // 1. Frontend Security Gate
+    // If the parent provided an onClick handler (e.g., to open a ProductModal),
+    // delegate to it so modifier groups with required selections can be satisfied.
+    // This prevents bypassing backend modifier validation.
+    if (onClick) {
+      onClick();
+      return;
+    }
+
+    // 1. Frontend Security Gate (no modal path — direct add only for modifier-free products)
     if (status !== "authenticated") {
       toast.info("Please log in to add items to your cart", {
         position: "bottom-center",
