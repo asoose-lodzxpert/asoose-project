@@ -1,4 +1,3 @@
-// Import enums from shared location
 import type {
   PaymentGateway,
   PaymentStatus,
@@ -8,7 +7,6 @@ import type {
   RecipientType,
 } from '../enums/payment.enums';
 
-// Re-export enums for backward compatibility
 export {
   PaymentGateway,
   PaymentStatus,
@@ -22,12 +20,25 @@ export interface PaymentInitResponse {
   reference: string;
   authorizationUrl?: string;
   accessCode?: string;
-  transactionId?: string; // ✅ FIX: Added missing property
+  transactionId?: string;
   accountNumber?: string;
   bankName?: string;
   accountName?: string;
   amount: number;
   expiresAt?: Date;
+}
+
+export interface CardAuthorization {
+  authorizationCode: string;
+  last4: string;
+  brand: string;
+  expiryMonth: string;
+  expiryYear: string;
+  bin?: string;
+  bank?: string;
+  cardType?: string;
+  accountName?: string;
+  reusable: boolean;
 }
 
 export interface VerifyPaymentResponse {
@@ -38,6 +49,8 @@ export interface VerifyPaymentResponse {
   gateway: PaymentGateway;
   metadata?: any;
   paidAt?: Date;
+  cardAuthorization?: CardAuthorization;
+  customerEmail?: string;
 }
 
 export interface DisbursementResponse {

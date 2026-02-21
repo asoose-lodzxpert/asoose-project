@@ -257,9 +257,25 @@ export class UsersController {
     );
   }
 
+  /**
+   * POST users/wallet/requery
+   * Triggers a background Paystack requery for the user's DVA.
+   * Use this when a customer reports a missing balance after a bank transfer.
+   * Rate-limited by Paystack to once per 10 minutes per account number.
+   */
+  @Post('wallet/requery')
+  async requeryWallet(@Request() req) {
+    return this.usersService.requeryWallet(req.user.id);
+  }
+
   @Get('payment/cards')
   async getSavedCards(@Request() req) {
     return this.usersService.getSavedCards(req.user.id);
+  }
+
+  @Patch('payment/cards/:id/default')
+  async setDefaultCard(@Request() req, @Param('id') cardId: string) {
+    return this.usersService.setDefaultCard(req.user.id, cardId);
   }
 
   @Delete('payment/cards/:id')

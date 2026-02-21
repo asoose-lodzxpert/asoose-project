@@ -1,10 +1,14 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   View,
   StyleSheet,
   Pressable,
   ScrollView,
   RefreshControl,
+  Modal,
+  FlatList,
+  ActivityIndicator,
+  Clipboard,
 } from "react-native";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { ThemedView } from "@/components/themed-view";
@@ -16,19 +20,264 @@ import { get, request } from "@/lib/authFetch";
 import { useConfirm } from "@/components/ui/ConfirmDialogProvider";
 import Toast from "react-native-toast-message";
 
+// ── Types ─────────────────────────────────────────────────────────────────────
+
 type SavedCard = {
   id: string;
   last4: string;
   brand: string;
-  expiryMonth: number;
-  expiryYear: number;
-  isDefault?: boolean;
+  expiryMonth: string;
+  expiryYear: string;
+  bank?: string;
+  cardType?: string;
+  isDefault: boolean;
 };
 
-type WalletBalance = {
+type WalletInfo = {
   balance: number;
   currency: string;
+  balanceHidden: boolean;
+  hasWallet: boolean;
+  accountNumber: string | null;
+  bankName: string | null;
 };
+
+type TxRecord = {
+  id: string;
+  amount: number;
+  type: string;
+  status: string;
+  reference: string;
+  date: string;
+};
+
+type TxMeta = {
+  total: number;
+  page: number;
+  limit: number;
+  pages: number;
+};
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+const brandLabel = (b: string) => {
+  const map: Record<string, string> = {
+    visa: "Visa",
+    mastercard: "Mastercard",
+    amex: "Amex",
+    verve: "Verve",
+  };
+  return map[b?.toLowerCase()] ?? b ?? "Card";
+};
+
+const brandColor = (b: string, fallback: string) => {
+  if (b?.toLowerCase() === "visa") return "#1A1F71";
+  if (b?.toLowerCase() === "mastercard") return "#EB001B";
+  if (b?.toLowerCase() === "verve") return "#00A550";
+  return fallback;
+};
+
+const txStatusColors = (
+  s: string,
+  success: string,
+  error: string,
+  warning: string,
+) => {
+  const up = s?.toUpperCase();
+  if (["PAID", "COMPLETED", "SUCCESS"].includes(up))
+    return { bg: success + "22", text: success };
+  if (["FAILED", "REVERSED"].includes(up))
+    return { bg: error + "22", text: error };
+  return { bg: warning + "22", text: warning };
+};
+
+const isCredit = (type: string) =>
+  type === "Wallet Top-up" || type?.toLowerCase().includes("topup");
+
+// ── Transaction History Modal ─────────────────────────────────────────────────
+
+function TxHistoryModal({
+  visible,
+  onClose,
+}: {
+  visible: boolean;
+  onClose: () => void;
+}) {
+  const primary = useThemeColor({}, "brandPrimary");
+  const bg = useThemeColor({}, "surfaceBackground");
+  const border = useThemeColor({}, "borderDefault");
+  const textPrimary = useThemeColor({}, "textPrimary");
+  const textSecondary = useThemeColor({}, "textSecondary");
+  const success = useThemeColor({}, "statusSuccess");
+  const error = useThemeColor({}, "statusError");
+  const warning = useThemeColor({}, "statusPending");
+
+  const [rows, setRows] = useState<TxRecord[]>([]);
+  const [meta, setMeta] = useState<TxMeta>({
+    total: 0,
+    page: 1,
+    limit: 10,
+    pages: 1,
+  });
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [paging, setPaging] = useState(false);
+  const pageRef = useRef(1);
+  const loadingRef = useRef(false);
+
+  const fetchPage = useCallback(async (page: number, replace = false) => {
+    if (loadingRef.current) return;
+    loadingRef.current = true;
+    if (page === 1) setInitialLoading(true);
+    else setPaging(true);
+    try {
+      const res = (await get(`users/wallet/history?page=${page}&limit=10`)) as {
+        data: TxRecord[];
+        meta: TxMeta;
+      };
+      setRows((prev) => (replace ? res.data : [...prev, ...res.data]));
+      setMeta(res.meta);
+      pageRef.current = page;
+    } catch {
+      Toast.show({
+        text1: "Failed to load history",
+        type: "error",
+        position: "top",
+        topOffset: 40,
+      });
+    } finally {
+      setInitialLoading(false);
+      setPaging(false);
+      loadingRef.current = false;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (visible) {
+      setRows([]);
+      pageRef.current = 1;
+      fetchPage(1, true);
+    }
+  }, [visible, fetchPage]);
+
+  const loadMore = () => {
+    if (!loadingRef.current && pageRef.current < meta.pages) {
+      fetchPage(pageRef.current + 1);
+    }
+  };
+
+  const renderItem = ({ item }: { item: TxRecord }) => {
+    const credit = isCredit(item.type);
+    const sc = txStatusColors(item.status, success, error, warning);
+    return (
+      <View style={[styles.txRow, { borderBottomColor: border }]}>
+        <View
+          style={[
+            styles.txIcon,
+            { backgroundColor: (credit ? success : primary) + "18" },
+          ]}
+        >
+          <IconSymbol
+            name={credit ? "arrow.down.left" : "arrow.up.right"}
+            size={16}
+            color={credit ? success : primary}
+          />
+        </View>
+        <View style={styles.txInfo}>
+          <ThemedText style={styles.txType}>{item.type}</ThemedText>
+          <ThemedText style={[styles.txDate, { color: textSecondary }]}>
+            {new Date(item.date).toLocaleDateString("en-NG", {
+              day: "numeric",
+              month: "short",
+              year: "numeric",
+            })}
+          </ThemedText>
+        </View>
+        <View style={styles.txRight}>
+          <ThemedText
+            style={[styles.txAmount, { color: credit ? success : textPrimary }]}
+          >
+            {credit ? "+" : "\u2212"}₦
+            {Number(item.amount).toLocaleString("en-NG")}
+          </ThemedText>
+          <View style={[styles.txBadge, { backgroundColor: sc.bg }]}>
+            <ThemedText style={[styles.txBadgeText, { color: sc.text }]}>
+              {item.status}
+            </ThemedText>
+          </View>
+        </View>
+      </View>
+    );
+  };
+
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={onClose}
+    >
+      <ThemedView style={[styles.modalContainer, { backgroundColor: bg }]}>
+        <View style={[styles.modalHeader, { borderBottomColor: border }]}>
+          <ThemedText style={styles.modalTitle}>Transaction History</ThemedText>
+          <Pressable onPress={onClose} hitSlop={10} style={styles.modalClose}>
+            <IconSymbol name="xmark" size={20} color={textPrimary} />
+          </Pressable>
+        </View>
+
+        {initialLoading ? (
+          <View style={styles.txLoadingWrap}>
+            {Array.from({ length: 6 }).map((_, i) => (
+              <View key={i} style={styles.txSkeletonRow}>
+                <Skeleton width={36} height={36} borderRadius={18} />
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Skeleton
+                    width="55%"
+                    height={13}
+                    style={{ marginBottom: 6 }}
+                  />
+                  <Skeleton width="35%" height={11} />
+                </View>
+                <Skeleton width="22%" height={13} />
+              </View>
+            ))}
+          </View>
+        ) : rows.length === 0 ? (
+          <View style={styles.txEmpty}>
+            <IconSymbol name="clock" size={48} color={textSecondary} />
+            <ThemedText style={[styles.txEmptyText, { color: textSecondary }]}>
+              No transactions yet
+            </ThemedText>
+          </View>
+        ) : (
+          <FlatList
+            data={rows}
+            keyExtractor={(item) => item.id}
+            renderItem={renderItem}
+            onEndReached={loadMore}
+            onEndReachedThreshold={0.3}
+            contentContainerStyle={{ paddingBottom: 40 }}
+            ListHeaderComponent={
+              <ThemedText
+                style={[styles.txTotalLabel, { color: textSecondary }]}
+              >
+                {meta.total} transaction{meta.total !== 1 ? "s" : ""}
+              </ThemedText>
+            }
+            ListFooterComponent={
+              paging ? (
+                <View style={styles.txFooter}>
+                  <ActivityIndicator size="small" color={primary} />
+                </View>
+              ) : null
+            }
+          />
+        )}
+      </ThemedView>
+    </Modal>
+  );
+}
+
+// ── Main Screen ───────────────────────────────────────────────────────────────
 
 export default function PaymentMethodsScreen() {
   const router = useRouter();
@@ -37,105 +286,165 @@ export default function PaymentMethodsScreen() {
   const card = useThemeColor({}, "surfaceCard");
   const textPrimary = useThemeColor({}, "textPrimary");
   const textSecondary = useThemeColor({}, "textSecondary");
-  const accentGreen = useThemeColor({}, "statusSuccess");
-  const accentRed = useThemeColor({}, "statusError");
+  const success = useThemeColor({}, "statusSuccess");
+  const error = useThemeColor({}, "statusError");
   const showConfirm = useConfirm();
 
   const [cards, setCards] = useState<SavedCard[]>([]);
-  const [wallet, setWallet] = useState<WalletBalance | null>(null);
+  const [wallet, setWallet] = useState<WalletInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [provisioning, setProvisioning] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [historyVisible, setHistoryVisible] = useState(false);
 
-  const loadPaymentMethods = useCallback(async (silent = false) => {
+  const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
-    setError(null);
     try {
-      // Note: Backend endpoints for user wallet/cards may not exist yet
-      // Using fallback empty data until backend implements these endpoints
-      try {
-        const cardsData = await get("users/payment/cards");
-        setCards(Array.isArray(cardsData) ? cardsData : []);
-      } catch (err) {
-        // Cards endpoint may not exist, default to empty
-        setCards([]);
-      }
-
-      try {
-        const walletData = await get("users/wallet");
-        setWallet(walletData);
-      } catch (err) {
-        // Wallet endpoint may not exist, default to null
-        setWallet(null);
-      }
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Failed to load payment methods";
-      setError(message);
-      setCards([]);
-      setWallet(null);
+      const [walletRes, cardsRes] = await Promise.allSettled([
+        get("users/wallet"),
+        get("users/payment/cards"),
+      ]);
+      if (walletRes.status === "fulfilled")
+        setWallet(walletRes.value as WalletInfo);
+      if (cardsRes.status === "fulfilled")
+        setCards(
+          Array.isArray(cardsRes.value) ? (cardsRes.value as SavedCard[]) : [],
+        );
     } finally {
       if (!silent) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    loadPaymentMethods();
-  }, [loadPaymentMethods]);
+    load();
+  }, [load]);
 
-  const handleRefresh = useCallback(async () => {
+  const handleRefresh = async () => {
     setRefreshing(true);
-    await loadPaymentMethods(true);
+    await load(true);
     setRefreshing(false);
-  }, [loadPaymentMethods]);
+  };
 
-  const handleDeleteCard = async (cardId: string) => {
-    const ok = await showConfirm({
-      title: "Remove Card",
-      message: "Are you sure you want to remove this payment card?",
-      icon: "alert-circle",
-      variant: "danger",
-      confirmLabel: "Remove",
-    });
-
-    if (!ok) return;
-
+  const handleProvision = async () => {
+    setProvisioning(true);
     try {
-      // Note: Backend endpoint may not exist yet
-      try {
-        await request(`users/payment/cards/${cardId}`, { method: "DELETE" });
-      } catch (err) {
-        // If endpoint doesn't exist, just show message
-        throw new Error("Card management not yet available on backend");
-      }
-      setCards((prev) => prev.filter((c) => c.id !== cardId));
-    } catch (err) {
+      const res = (await request("users/wallet/provision", {
+        method: "POST",
+      })) as any;
+      setWallet((prev) => ({
+        balance: prev?.balance ?? 0,
+        currency: prev?.currency ?? "NGN",
+        balanceHidden: prev?.balanceHidden ?? false,
+        hasWallet: true,
+        accountNumber: res.accountNumber ?? null,
+        bankName: res.bankName ?? null,
+      }));
       Toast.show({
-        text1: err instanceof Error ? err.message : "Failed to remove card",
+        text1: "Wallet created!",
+        type: "success",
+        position: "top",
+        topOffset: 40,
+      });
+    } catch (e: any) {
+      Toast.show({
+        text1: e?.message ?? "Failed to create wallet",
         type: "error",
+        position: "top",
+        topOffset: 40,
+      });
+    } finally {
+      setProvisioning(false);
+    }
+  };
+
+  const handleCopy = (text: string) => {
+    Clipboard.setString(text);
+    setCopied(true);
+    Toast.show({
+      text1: "Copied!",
+      type: "success",
+      position: "top",
+      topOffset: 40,
+    });
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleSetDefault = async (cardId: string) => {
+    try {
+      await request(`users/payment/cards/${cardId}/default`, {
+        method: "PATCH",
+      });
+      setCards((prev) =>
+        prev.map((c) => ({ ...c, isDefault: c.id === cardId })),
+      );
+      Toast.show({
+        text1: "Default card updated",
+        type: "success",
+        position: "top",
+        topOffset: 40,
+      });
+    } catch {
+      Toast.show({
+        text1: "Failed to update default card",
+        type: "error",
+        position: "top",
+        topOffset: 40,
       });
     }
   };
 
-  const formatCardBrand = (brand: string) => {
-    const brands: Record<string, string> = {
-      visa: "Visa",
-      mastercard: "Mastercard",
-      amex: "American Express",
-      discover: "Discover",
-    };
-    return brands[brand.toLowerCase()] || brand;
+  const handleDeleteCard = async (cardId: string) => {
+    const ok = await showConfirm({
+      title: "Remove Card",
+      message: "Remove this saved card?",
+      icon: "alert-circle",
+      variant: "danger",
+      confirmLabel: "Remove",
+    });
+    if (!ok) return;
+    try {
+      await request(`users/payment/cards/${cardId}`, { method: "DELETE" });
+      setCards((prev) => prev.filter((c) => c.id !== cardId));
+      Toast.show({
+        text1: "Card removed",
+        type: "success",
+        position: "top",
+        topOffset: 40,
+      });
+    } catch {
+      Toast.show({
+        text1: "Failed to remove card",
+        type: "error",
+        position: "top",
+        topOffset: 40,
+      });
+    }
   };
 
   return (
     <ThemedView style={styles.container}>
+      {/* Header */}
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backBtn}>
-          <IconSymbol name="chevron.left" size={22} color={primary} />
+        {/* Far-left: transaction history */}
+        <Pressable
+          onPress={() => setHistoryVisible(true)}
+          style={styles.historyBtn}
+          hitSlop={10}
+        >
+          <IconSymbol name="clock.arrow.circlepath" size={22} color={primary} />
         </Pressable>
-        <ThemedText type="title" style={styles.headerTitle}>
-          Payment Methods
-        </ThemedText>
+
+        <ThemedText style={styles.headerTitle}>Payment Methods</ThemedText>
+
+        {/* Far-right: close */}
+        <Pressable
+          onPress={() => router.back()}
+          hitSlop={10}
+          style={styles.closeBtn}
+        >
+          <IconSymbol name="xmark" size={20} color={textPrimary} />
+        </Pressable>
       </View>
 
       <ScrollView
@@ -150,16 +459,16 @@ export default function PaymentMethodsScreen() {
           />
         }
       >
-        {loading && !refreshing ? (
-          <View style={styles.scrollContent}>
+        {loading ? (
+          <>
             <View
               style={[
                 styles.section,
                 { backgroundColor: card, borderColor: border },
               ]}
             >
-              <Skeleton width="40%" height={18} style={{ marginBottom: 16 }} />
-              <Skeleton width="100%" height={80} borderRadius={12} />
+              <Skeleton width="40%" height={16} style={{ marginBottom: 16 }} />
+              <Skeleton width="100%" height={90} borderRadius={12} />
             </View>
             <View
               style={[
@@ -167,228 +476,337 @@ export default function PaymentMethodsScreen() {
                 { backgroundColor: card, borderColor: border },
               ]}
             >
-              <Skeleton width="40%" height={18} style={{ marginBottom: 16 }} />
-              {Array.from({ length: 3 }).map((_, i) => (
-                <View key={i} style={{ marginBottom: 12 }}>
-                  <Skeleton width="100%" height={60} borderRadius={8} />
-                </View>
+              <Skeleton width="35%" height={16} style={{ marginBottom: 16 }} />
+              {[0, 1].map((i) => (
+                <Skeleton
+                  key={i}
+                  width="100%"
+                  height={58}
+                  borderRadius={8}
+                  style={{ marginBottom: 10 }}
+                />
               ))}
             </View>
-          </View>
-        ) : error ? (
-          <View style={styles.errorContainer}>
-            <IconSymbol
-              name="exclamationmark.triangle"
-              size={48}
-              color={accentRed}
-            />
-            <ThemedText style={[styles.errorText, { color: accentRed }]}>
-              {error}
-            </ThemedText>
-            <Pressable
-              style={[styles.retryBtn, { backgroundColor: primary }]}
-              onPress={() => loadPaymentMethods()}
-            >
-              <ThemedText style={styles.retryText}>Try Again</ThemedText>
-            </Pressable>
-          </View>
+          </>
         ) : (
           <>
-            {/* Wallet Section */}
-            {wallet && (
-              <View
-                style={[
-                  styles.section,
-                  { backgroundColor: card, borderColor: border },
-                ]}
-              >
-                <ThemedText type="subtitle" style={styles.sectionTitle}>
-                  Wallet
-                </ThemedText>
-                <View style={styles.walletCard}>
-                  <View style={styles.walletInfo}>
-                    <IconSymbol name="wallet" size={24} color={accentGreen} />
-                    <View style={styles.walletDetails}>
-                      <ThemedText
-                        type="caption"
-                        style={{ color: textSecondary }}
-                      >
-                        Available Balance
-                      </ThemedText>
-                      <ThemedText type="subtitle" style={styles.walletAmount}>
-                        {wallet.currency} {wallet.balance.toLocaleString()}
-                      </ThemedText>
-                    </View>
-                  </View>
-                  <Pressable
-                    style={[styles.topUpBtn, { backgroundColor: primary }]}
-                    onPress={() => {
-                      Toast.show({
-                        text1: "Top up feature coming soon!",
-                        type: "info",
-                      });
-                    }}
-                  >
-                    <ThemedText style={styles.topUpText}>Top Up</ThemedText>
-                  </Pressable>
-                </View>
-              </View>
-            )}
-
-            {/* Saved Cards Section */}
+            {/* ── Wallet ─────────────────────────────────────────────── */}
             <View
               style={[
                 styles.section,
                 { backgroundColor: card, borderColor: border },
               ]}
             >
-              <ThemedText type="subtitle" style={styles.sectionTitle}>
-                Saved Cards
-              </ThemedText>
+              <ThemedText style={styles.sectionTitle}>Wallet</ThemedText>
 
-              {cards.length === 0 ? (
-                <View style={styles.emptyState}>
-                  <IconSymbol
-                    name="creditcard"
-                    size={48}
-                    color={textSecondary}
-                  />
+              {/* Balance */}
+              <View style={styles.walletBalanceRow}>
+                <View
+                  style={[
+                    styles.walletIconWrap,
+                    { backgroundColor: primary + "18" },
+                  ]}
+                >
+                  <IconSymbol name="wallet.pass" size={22} color={primary} />
+                </View>
+                <View style={{ flex: 1, marginLeft: 12 }}>
                   <ThemedText
-                    type="caption"
-                    style={[styles.emptyText, { color: textSecondary }]}
+                    style={[styles.walletLabel, { color: textSecondary }]}
                   >
-                    No saved cards yet
+                    Available Balance
+                  </ThemedText>
+                  <ThemedText style={styles.walletAmount}>
+                    ₦
+                    {Number(wallet?.balance ?? 0).toLocaleString("en-NG", {
+                      minimumFractionDigits: 2,
+                    })}
+                  </ThemedText>
+                </View>
+              </View>
+
+              {/* DVA top-up info or provision CTA */}
+              {wallet?.hasWallet && wallet.accountNumber ? (
+                <View
+                  style={[
+                    styles.dvaCard,
+                    {
+                      backgroundColor: primary + "0D",
+                      borderColor: primary + "30",
+                    },
+                  ]}
+                >
+                  <ThemedText style={[styles.dvaTitle, { color: primary }]}>
+                    Fund via bank transfer
+                  </ThemedText>
+                  <View style={styles.dvaRow}>
+                    <ThemedText
+                      style={[styles.dvaLabel, { color: textSecondary }]}
+                    >
+                      Bank
+                    </ThemedText>
+                    <ThemedText style={styles.dvaValue}>
+                      {wallet.bankName}
+                    </ThemedText>
+                  </View>
+                  <View style={[styles.dvaRow, { marginTop: 6 }]}>
+                    <ThemedText
+                      style={[styles.dvaLabel, { color: textSecondary }]}
+                    >
+                      Account No.
+                    </ThemedText>
+                    <View style={styles.dvaAccRow}>
+                      <ThemedText
+                        style={[styles.dvaAccNum, { color: primary }]}
+                      >
+                        {wallet.accountNumber}
+                      </ThemedText>
+                      <Pressable
+                        onPress={() => handleCopy(wallet.accountNumber!)}
+                        hitSlop={8}
+                      >
+                        <IconSymbol
+                          name={copied ? "checkmark" : "doc.on.doc"}
+                          size={16}
+                          color={copied ? success : primary}
+                        />
+                      </Pressable>
+                    </View>
+                  </View>
+                  <ThemedText
+                    style={[styles.dvaNota, { color: textSecondary }]}
+                  >
+                    Transfers reflect instantly · NGN only
                   </ThemedText>
                 </View>
               ) : (
-                cards.map((cardItem, index) => (
+                <Pressable
+                  onPress={handleProvision}
+                  disabled={provisioning}
+                  style={[
+                    styles.provisionBtn,
+                    {
+                      backgroundColor: primary,
+                      opacity: provisioning ? 0.7 : 1,
+                    },
+                  ]}
+                >
+                  {provisioning ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <IconSymbol name="plus" size={16} color="#fff" />
+                  )}
+                  <ThemedText style={styles.provisionText}>
+                    {provisioning ? "Creating wallet…" : "Create Wallet"}
+                  </ThemedText>
+                </Pressable>
+              )}
+            </View>
+
+            {/* ── Saved Cards ────────────────────────────────────────── */}
+            <View
+              style={[
+                styles.section,
+                { backgroundColor: card, borderColor: border },
+              ]}
+            >
+              <ThemedText style={styles.sectionTitle}>Saved Cards</ThemedText>
+
+              {cards.length === 0 ? (
+                <View style={styles.emptyCards}>
+                  <IconSymbol
+                    name="creditcard"
+                    size={40}
+                    color={textSecondary}
+                  />
+                  <ThemedText
+                    style={[styles.emptyText, { color: textSecondary }]}
+                  >
+                    Cards are saved automatically after your first successful
+                    payment
+                  </ThemedText>
+                </View>
+              ) : (
+                cards.map((c, idx) => (
                   <View
-                    key={cardItem.id}
+                    key={c.id}
                     style={[
-                      styles.cardItem,
-                      index < cards.length - 1 && {
-                        borderBottomWidth: 1,
-                        borderBottomColor: border,
+                      styles.cardRow,
+                      idx > 0 && {
+                        borderTopWidth: StyleSheet.hairlineWidth,
+                        borderTopColor: border,
                       },
                     ]}
                   >
-                    <View style={styles.cardInfo}>
-                      <IconSymbol name="creditcard" size={24} color={primary} />
-                      <View style={styles.cardDetails}>
-                        <ThemedText style={styles.cardBrand}>
-                          {formatCardBrand(cardItem.brand)} ••••{" "}
-                          {cardItem.last4}
-                        </ThemedText>
-                        <ThemedText
-                          type="caption"
-                          style={{ color: textSecondary }}
-                        >
-                          Expires {cardItem.expiryMonth}/{cardItem.expiryYear}
-                        </ThemedText>
-                      </View>
+                    {/* Brand badge */}
+                    <View
+                      style={[
+                        styles.brandBadge,
+                        {
+                          backgroundColor: brandColor(c.brand, primary) + "18",
+                        },
+                      ]}
+                    >
+                      <ThemedText
+                        style={[
+                          styles.brandText,
+                          { color: brandColor(c.brand, primary) },
+                        ]}
+                      >
+                        {brandLabel(c.brand)}
+                      </ThemedText>
                     </View>
+
+                    <View style={styles.cardInfo}>
+                      <ThemedText style={styles.cardNumber}>
+                        •••• {c.last4}
+                      </ThemedText>
+                      <ThemedText
+                        style={[styles.cardExpiry, { color: textSecondary }]}
+                      >
+                        {c.bank ? `${c.bank} · ` : ""}Exp {c.expiryMonth}/
+                        {c.expiryYear}
+                      </ThemedText>
+                    </View>
+
                     <View style={styles.cardActions}>
-                      {cardItem.isDefault && (
+                      {c.isDefault ? (
                         <View
                           style={[
                             styles.defaultBadge,
-                            { backgroundColor: accentGreen + "22" },
+                            { backgroundColor: success + "22" },
                           ]}
                         >
                           <ThemedText
-                            type="caption"
-                            style={[styles.defaultText, { color: accentGreen }]}
+                            style={[styles.defaultText, { color: success }]}
                           >
                             Default
                           </ThemedText>
                         </View>
+                      ) : (
+                        <Pressable
+                          onPress={() => handleSetDefault(c.id)}
+                          style={[
+                            styles.setDefaultBtn,
+                            { borderColor: border },
+                          ]}
+                        >
+                          <ThemedText
+                            style={[
+                              styles.setDefaultText,
+                              { color: textSecondary },
+                            ]}
+                          >
+                            Set default
+                          </ThemedText>
+                        </Pressable>
                       )}
                       <Pressable
-                        onPress={() => handleDeleteCard(cardItem.id)}
-                        style={styles.deleteBtn}
+                        onPress={() => handleDeleteCard(c.id)}
+                        hitSlop={8}
                       >
-                        <IconSymbol name="trash" size={18} color={accentRed} />
+                        <IconSymbol name="trash" size={16} color={error} />
                       </Pressable>
                     </View>
                   </View>
                 ))
               )}
 
-              <Pressable
-                style={[styles.addCardBtn, { borderColor: border }]}
-                onPress={() => {
-                  Toast.show({
-                    text1: "Add card feature coming soon!",
-                    type: "info",
-                  });
-                }}
+              <View
+                style={[styles.cardNote, { backgroundColor: border + "50" }]}
               >
-                <IconSymbol name="plus" size={18} color={primary} />
-                <ThemedText style={[styles.addCardText, { color: primary }]}>
-                  Add New Card
+                <IconSymbol name="lock.fill" size={13} color={textSecondary} />
+                <ThemedText
+                  style={[styles.cardNoteText, { color: textSecondary }]}
+                >
+                  Cards are tokenized by Paystack. Your full card number is
+                  never stored.
                 </ThemedText>
-              </Pressable>
+              </View>
             </View>
 
-            {/* Payment Options Section */}
+            {/* ── Accepted Payment Methods ───────────────────────────── */}
             <View
               style={[
                 styles.section,
                 { backgroundColor: card, borderColor: border },
               ]}
             >
-              <ThemedText type="subtitle" style={styles.sectionTitle}>
-                Other Payment Options
+              <ThemedText style={styles.sectionTitle}>
+                Accepted Payment Methods
               </ThemedText>
 
-              <View style={styles.optionItem}>
-                <View style={styles.optionInfo}>
-                  <IconSymbol name="banknote" size={24} color={primary} />
-                  <View style={styles.optionDetails}>
-                    <ThemedText style={styles.optionLabel}>Cash</ThemedText>
-                    <ThemedText type="caption" style={{ color: textSecondary }}>
-                      Pay with cash on delivery/arrival
+              {[
+                {
+                  icon: "banknote",
+                  label: "Cash",
+                  sub: "Pay with cash on delivery or arrival",
+                },
+                {
+                  icon: "creditcard",
+                  label: "Card via Paystack",
+                  sub: "Visa, Mastercard, Verve — securely tokenized",
+                },
+                {
+                  icon: "wallet.pass",
+                  label: "Asoose Wallet",
+                  sub: "Fund your wallet via bank transfer",
+                },
+              ].map((opt, i) => (
+                <View
+                  key={opt.label}
+                  style={[
+                    styles.optRow,
+                    i > 0 && {
+                      borderTopWidth: StyleSheet.hairlineWidth,
+                      borderTopColor: border,
+                    },
+                  ]}
+                >
+                  <View
+                    style={[
+                      styles.optIconWrap,
+                      { backgroundColor: primary + "18" },
+                    ]}
+                  >
+                    <IconSymbol
+                      name={opt.icon as any}
+                      size={18}
+                      color={primary}
+                    />
+                  </View>
+                  <View style={styles.optInfo}>
+                    <ThemedText style={styles.optLabel}>{opt.label}</ThemedText>
+                    <ThemedText
+                      style={[styles.optSub, { color: textSecondary }]}
+                    >
+                      {opt.sub}
                     </ThemedText>
                   </View>
+                  <IconSymbol
+                    name="checkmark.circle.fill"
+                    size={20}
+                    color={success}
+                  />
                 </View>
-                <IconSymbol
-                  name="checkmark.circle.fill"
-                  size={24}
-                  color={accentGreen}
-                />
-              </View>
-
-              <View
-                style={[
-                  styles.optionItem,
-                  { borderTopWidth: 1, borderTopColor: border },
-                ]}
-              >
-                <View style={styles.optionInfo}>
-                  <IconSymbol name="creditcard" size={24} color={primary} />
-                  <View style={styles.optionDetails}>
-                    <ThemedText style={styles.optionLabel}>Paystack</ThemedText>
-                    <ThemedText type="caption" style={{ color: textSecondary }}>
-                      Secure card payment gateway
-                    </ThemedText>
-                  </View>
-                </View>
-                <IconSymbol
-                  name="checkmark.circle.fill"
-                  size={24}
-                  color={accentGreen}
-                />
-              </View>
+              ))}
             </View>
           </>
         )}
       </ScrollView>
+
+      <TxHistoryModal
+        visible={historyVisible}
+        onClose={() => setHistoryVisible(false)}
+      />
     </ThemedView>
   );
 }
 
+// ── Styles ────────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
   container: { flex: 1 },
+
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -396,162 +814,177 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     paddingHorizontal: 16,
   },
-  backBtn: { marginRight: 12, padding: 4 },
-  headerTitle: { fontSize: 20, fontWeight: "700" },
-  scrollContent: { paddingBottom: 32 },
-
-  loadingContainer: {
+  historyBtn: { padding: 4, marginRight: 8 },
+  headerTitle: {
     flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingTop: 80,
-  },
-  loadingText: {
-    marginTop: 12,
-  },
-
-  errorContainer: {
-    alignItems: "center",
-    justifyContent: "center",
-    paddingTop: 80,
-    paddingHorizontal: 32,
-  },
-  errorText: {
-    marginTop: 16,
+    fontSize: 20,
+    fontWeight: "700",
     textAlign: "center",
-    fontSize: 15,
   },
-  retryBtn: {
-    marginTop: 24,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  retryText: {
-    color: "#fff",
-    fontWeight: "600",
-  },
+  closeBtn: { padding: 4 },
+
+  scrollContent: { paddingBottom: 40 },
 
   section: {
     marginTop: 16,
     marginHorizontal: 16,
-    borderRadius: 12,
+    borderRadius: 16,
     borderWidth: 1,
     padding: 16,
   },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    marginBottom: 12,
-  },
+  sectionTitle: { fontSize: 15, fontWeight: "700", marginBottom: 14 },
 
-  walletCard: {
+  // Wallet
+  walletBalanceRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  walletIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  walletLabel: { fontSize: 12, marginBottom: 2 },
+  walletAmount: { fontSize: 24, fontWeight: "800" },
+
+  dvaCard: { borderRadius: 12, borderWidth: 1, padding: 14 },
+  dvaTitle: { fontSize: 12, fontWeight: "700", marginBottom: 8 },
+  dvaRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
-  walletInfo: {
-    flexDirection: "row",
-    alignItems: "center",
-    flex: 1,
-  },
-  walletDetails: {
-    marginLeft: 12,
-  },
-  walletAmount: {
-    fontSize: 18,
-    fontWeight: "700",
-    marginTop: 2,
-  },
-  topUpBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  topUpText: {
-    color: "#fff",
-    fontWeight: "600",
-    fontSize: 14,
-  },
+  dvaLabel: { fontSize: 13 },
+  dvaValue: { fontSize: 13, fontWeight: "600" },
+  dvaAccRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  dvaAccNum: { fontSize: 20, fontWeight: "800", letterSpacing: 2 },
+  dvaNota: { fontSize: 11, marginTop: 8 },
 
-  cardItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 12,
-  },
-  cardInfo: {
-    flexDirection: "row",
-    alignItems: "center",
-    flex: 1,
-  },
-  cardDetails: {
-    marginLeft: 12,
-    flex: 1,
-  },
-  cardBrand: {
-    fontSize: 15,
-    fontWeight: "600",
-  },
-  cardActions: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  defaultBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-  },
-  defaultText: {
-    fontSize: 12,
-    fontWeight: "600",
-  },
-  deleteBtn: {
-    padding: 8,
-  },
-
-  emptyState: {
-    alignItems: "center",
-    paddingVertical: 32,
-  },
-  emptyText: {
-    marginTop: 12,
-  },
-
-  addCardBtn: {
+  provisionBtn: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 1,
-    borderStyle: "dashed",
-    borderRadius: 8,
+    gap: 8,
     paddingVertical: 14,
-    marginTop: 12,
+    borderRadius: 12,
   },
-  addCardText: {
-    marginLeft: 8,
-    fontSize: 15,
-    fontWeight: "600",
+  provisionText: { color: "#fff", fontWeight: "700", fontSize: 15 },
+
+  // Cards
+  emptyCards: { alignItems: "center", paddingVertical: 28, gap: 10 },
+  emptyText: {
+    textAlign: "center",
+    fontSize: 13,
+    lineHeight: 18,
+    maxWidth: 240,
   },
 
-  optionItem: {
+  cardRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 14,
+    gap: 10,
+  },
+  brandBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    minWidth: 60,
+    alignItems: "center",
+  },
+  brandText: { fontSize: 11, fontWeight: "700" },
+  cardInfo: { flex: 1 },
+  cardNumber: { fontSize: 15, fontWeight: "700" },
+  cardExpiry: { fontSize: 12, marginTop: 1 },
+  cardActions: { flexDirection: "row", alignItems: "center", gap: 8 },
+  defaultBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
+  defaultText: { fontSize: 11, fontWeight: "700" },
+  setDefaultBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  setDefaultText: { fontSize: 11 },
+
+  cardNote: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 6,
+    borderRadius: 8,
+    padding: 10,
+    marginTop: 12,
+  },
+  cardNoteText: { flex: 1, fontSize: 12, lineHeight: 16 },
+
+  // Accepted methods
+  optRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    gap: 12,
+  },
+  optIconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  optInfo: { flex: 1 },
+  optLabel: { fontSize: 14, fontWeight: "600" },
+  optSub: { fontSize: 12, marginTop: 1 },
+
+  // Modal
+  modalContainer: { flex: 1 },
+  modalHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingVertical: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
   },
-  optionInfo: {
+  modalTitle: { fontSize: 18, fontWeight: "700" },
+  modalClose: { padding: 4 },
+
+  txLoadingWrap: { padding: 20, gap: 16 },
+  txSkeletonRow: { flexDirection: "row", alignItems: "center" },
+
+  txEmpty: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingTop: 80,
+    gap: 12,
+  },
+  txEmptyText: { fontSize: 15 },
+
+  txTotalLabel: { fontSize: 12, margin: 16, marginBottom: 4 },
+
+  txRow: {
     flexDirection: "row",
     alignItems: "center",
-    flex: 1,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    gap: 12,
   },
-  optionDetails: {
-    marginLeft: 12,
-    flex: 1,
+  txIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  optionLabel: {
-    fontSize: 15,
-    fontWeight: "600",
-  },
+  txInfo: { flex: 1 },
+  txType: { fontSize: 14, fontWeight: "600" },
+  txDate: { fontSize: 12, marginTop: 2 },
+  txRight: { alignItems: "flex-end", gap: 4 },
+  txAmount: { fontSize: 14, fontWeight: "700" },
+  txBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
+  txBadgeText: { fontSize: 10, fontWeight: "700" },
+  txFooter: { paddingVertical: 20, alignItems: "center" },
 });

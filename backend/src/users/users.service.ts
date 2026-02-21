@@ -417,30 +417,25 @@ export class UsersService {
     const [firstName, ...rest] = (user.name ?? 'Customer').trim().split(' ');
     const lastName = rest.join(' ') || firstName;
 
-    const { virtualAccount } =
-      await this.paystackAccount.provisionCustomerWalletAccount({
-        email: user.email,
-        firstName,
-        lastName,
-        phone: user.phone ?? undefined,
-      });
-
-    // Persist DVA details to User record
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: {
-        dedicatedVirtualAccountNumber: virtualAccount.accountNumber,
-        dedicatedVirtualAccountBank: virtualAccount.bankName,
-      },
+    // Use the single-step assign endpoint (recommended by Paystack).
+    // Account details arrive asynchronously via the
+    // `dedicatedaccount.assign.success` webhook which updates our DB.
+    await this.paystackAccount.assignDedicatedAccount({
+      email: user.email,
+      firstName,
+      lastName,
+      phone: user.phone ?? undefined,
     });
 
     return {
-      message: 'Wallet provisioned successfully',
-      accountNumber: virtualAccount.accountNumber,
-      bankName: virtualAccount.bankName,
+      message:
+        'Wallet creation initiated. Your account number will be ready shortly.',
+      accountNumber: null,
+      bankName: null,
       balance: user.walletBalance,
       balanceHidden: user.walletBalanceHidden,
-      hasWallet: true,
+      hasWallet: false,
+      pending: true,
     };
   }
 
@@ -450,6 +445,39 @@ export class UsersService {
       data: { walletBalanceHidden: hidden },
     });
     return { balanceHidden: hidden };
+  }
+
+  /**
+   * Triggers a Paystack DVA requery for the user's dedicated virtual account.
+   * Call this when a customer reports their balance hasn't been updated after
+   * a bank transfer.  Paystack rate-limits to once per 10 minutes.
+   */
+  async requeryWallet(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        dedicatedVirtualAccountNumber: true,
+        dedicatedVirtualAccountBank: true,
+      },
+    });
+
+    if (!user) throw new NotFoundException('User not found');
+
+    if (!user.dedicatedVirtualAccountNumber) {
+      throw new BadRequestException(
+        'No wallet account found. Please create a wallet first.',
+      );
+    }
+
+    await this.paystackAccount.requeryDVA(
+      user.dedicatedVirtualAccountNumber,
+      user.dedicatedVirtualAccountBank ?? undefined,
+    );
+
+    return {
+      message:
+        'Requery initiated. Any pending transfers will reflect in your balance shortly.',
+    };
   }
 
   async getWalletHistory(userId: string, page = 1, limit = 10) {
@@ -542,10 +570,45 @@ export class UsersService {
   }
 
   async getSavedCards(userId: string) {
-    return [];
+    const cards = await this.prisma.savedCard.findMany({
+      where: { userId },
+      orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }],
+      select: {
+        id: true,
+        last4: true,
+        brand: true,
+        expiryMonth: true,
+        expiryYear: true,
+        bank: true,
+        cardType: true,
+        isDefault: true,
+        createdAt: true,
+      },
+    });
+    return cards;
+  }
+
+  async setDefaultCard(userId: string, cardId: string) {
+    // Clear existing default, set new one
+    await this.prisma.$transaction([
+      this.prisma.savedCard.updateMany({
+        where: { userId },
+        data: { isDefault: false },
+      }),
+      this.prisma.savedCard.updateMany({
+        where: { id: cardId, userId },
+        data: { isDefault: true },
+      }),
+    ]);
+    return { success: true };
   }
 
   async deleteSavedCard(userId: string, cardId: string) {
-    return { success: true, message: 'Card deleted successfully' };
+    const existing = await this.prisma.savedCard.findFirst({
+      where: { id: cardId, userId },
+    });
+    if (!existing) throw new NotFoundException('Card not found');
+    await this.prisma.savedCard.delete({ where: { id: cardId } });
+    return { success: true, message: 'Card removed' };
   }
 }

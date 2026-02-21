@@ -237,6 +237,9 @@ model User {
   dedicatedVirtualAccountNumber String? @map("dedicated_virtual_account_number")       // DVA account number
   dedicatedVirtualAccountBank  String? @map("dedicated_virtual_account_bank")         // DVA bank name
 
+  // Saved payment cards (Paystack tokenization)
+  savedCards SavedCard[]
+
   @@index([email])
   @@index([googleId])
   @@index([appleId])
@@ -851,6 +854,30 @@ model Payment {
   @@index([reference])
   @@index([gateway, status])
   @@index([status, createdAt(sort: Desc), amount])
+}
+
+// Saved card tokenization (Paystack authorization codes stored server-side)
+model SavedCard {
+  id                String   @id @default(uuid())
+  userId            String
+  authorizationCode String   // Paystack authorization_code (encrypted at app layer)
+  last4             String
+  brand             String   // visa, mastercard, etc.
+  expiryMonth       String
+  expiryYear        String
+  bin               String?
+  bank              String?
+  cardType          String?
+  accountName       String?
+  isDefault         Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, last4, expiryYear, expiryMonth])
+  @@index([userId])
+  @@map("saved_cards")
 }
 
 //// =====================

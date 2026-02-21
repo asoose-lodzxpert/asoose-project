@@ -7,6 +7,7 @@ import {
   VerifyPaymentResponse,
   DisbursementResponse,
   RefundResponse,
+  CardAuthorization,
 } from './interfaces/payment.interface';
 
 @Injectable()
@@ -78,6 +79,27 @@ export class PaystackService {
 
       const data = response.data.data;
 
+      // Extract card authorization if present (card payments only)
+      let cardAuthorization: CardAuthorization | undefined;
+      if (
+        data.authorization?.authorization_code &&
+        data.authorization?.reusable
+      ) {
+        const auth = data.authorization;
+        cardAuthorization = {
+          authorizationCode: auth.authorization_code,
+          last4: auth.last4,
+          brand: auth.brand,
+          expiryMonth: auth.exp_month,
+          expiryYear: auth.exp_year,
+          bin: auth.bin,
+          bank: auth.bank,
+          cardType: auth.card_type,
+          accountName: auth.account_name,
+          reusable: auth.reusable,
+        };
+      }
+
       return {
         success: data.status === 'success',
         reference: data.reference,
@@ -86,6 +108,8 @@ export class PaystackService {
         gateway: PaymentGateway.PAYSTACK,
         metadata: data.metadata,
         paidAt: data.paid_at ? new Date(data.paid_at) : undefined,
+        cardAuthorization,
+        customerEmail: data.customer?.email,
       };
     } catch (error) {
       this.logger.error(

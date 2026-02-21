@@ -55,6 +55,22 @@ export interface CreateVirtualAccountParams {
   preferredBank?: string;
 }
 
+/**
+ * Params for the single-step DVA assignment endpoint.
+ * Paystack creates or fetches the customer and assigns a DVA in one call.
+ * The `assigndedicatedaccount.success` (or `dedicatedaccount.assign.success`)
+ * webhook is sent asynchronously when provisioning completes.
+ */
+export interface AssignDedicatedAccountParams {
+  email: string;
+  firstName: string;
+  lastName: string;
+  phone?: string;
+  /** Override the default DVA bank slug */
+  preferredBank?: string;
+  country?: string;
+}
+
 export interface CreateSubaccountParams {
   businessName: string;
   /** Bank code e.g. '057' for Zenith */
@@ -293,6 +309,118 @@ export class PaystackAccountService {
     });
 
     return { customer, virtualAccount };
+  }
+
+  /**
+   * Single-step DVA assignment — Paystack creates (or reuses) a customer and
+   * immediately assigns a Dedicated Virtual Account.
+   *
+   * This is the recommended flow per Paystack docs.  The response is PENDING;
+   * the actual account details arrive via the
+   * `dedicatedaccount.assign.success` webhook.
+   *
+   * @returns `{ message, status }` — provisioning is async, account number
+   *  arrives via webhook.
+   */
+  async assignDedicatedAccount(
+    params: AssignDedicatedAccountParams,
+  ): Promise<{ message: string; status: string }> {
+    try {
+      const res = await this.http.post('/dedicated_account/assign', {
+        email: params.email,
+        first_name: params.firstName,
+        last_name: params.lastName,
+        phone: params.phone,
+        preferred_bank: params.preferredBank ?? this.dvaBank,
+        country: params.country ?? 'NG',
+      });
+
+      const data = res.data as any;
+      this.logger.log(
+        `DVA assign request submitted for ${params.email}: ${JSON.stringify(data)}`,
+      );
+
+      return {
+        message:
+          data.message ??
+          'DVA assignment submitted. Account details will arrive via webhook.',
+        status: 'pending',
+      };
+    } catch (error) {
+      const msg: string = error.response?.data?.message || error.message;
+      this.logger.error(
+        `Failed to submit DVA assign for ${params.email}: ${msg}`,
+      );
+
+      if (msg.toLowerCase().includes('not available')) {
+        throw new Error(
+          'Dedicated Virtual Accounts are not enabled on this Paystack account. ' +
+            'Go to Paystack Dashboard → Settings → Preferences → Enable "Dedicated NUBAN". ' +
+            'In test mode use bank slug "test-bank"; set PAYSTACK_DVA_BANK env var for production.',
+        );
+      }
+
+      throw new Error(`Could not assign dedicated virtual account: ${msg}`);
+    }
+  }
+
+  /**
+   * Triggers a background requery of a customer's DVA to surface any pending
+   * transfers that haven't triggered a webhook yet.  Paystack rate-limits this
+   * to once per 10 minutes per account number.
+   *
+   * @param accountNumber  The DVA account number (e.g. "9930000902")
+   * @param providerSlug   Bank slug (e.g. "wema-bank", "test-bank")
+   * @param date           Optional date filter "YYYY-MM-DD"
+   */
+  async requeryDVA(
+    accountNumber: string,
+    providerSlug?: string,
+    date?: string,
+  ): Promise<{ message: string }> {
+    try {
+      const res = await this.http.get('/dedicated_account/requery', {
+        params: {
+          account_number: accountNumber,
+          provider_slug: providerSlug ?? this.dvaBank,
+          ...(date ? { date } : {}),
+        },
+      });
+      return { message: res.data?.message ?? 'Requery initiated' };
+    } catch (error) {
+      const msg: string = error.response?.data?.message || error.message;
+      this.logger.warn(`DVA requery failed for ${accountNumber}: ${msg}`);
+      throw new Error(`Could not requery DVA: ${msg}`);
+    }
+  }
+
+  /**
+   * Fetches a Paystack customer by code or email, returning their DVA details.
+   * Useful for reconciling account numbers received via webhook.
+   */
+  async fetchCustomerByCode(
+    customerCode: string,
+  ): Promise<{
+    customerCode: string;
+    email: string;
+    dedicatedAccount?: any;
+  } | null> {
+    try {
+      const res = await this.http.get(`/customer/${customerCode}`);
+      const data = res.data.data as any;
+      return {
+        customerCode: data.customer_code,
+        email: data.email,
+        dedicatedAccount: data.dedicated_account ?? null,
+      };
+    } catch (error) {
+      if (error.response?.status === 404) return null;
+      const msg = error.response?.data?.message || error.message;
+      this.logger.error(
+        `fetchCustomerByCode failed for ${customerCode}: ${msg}`,
+      );
+      throw new Error(`Could not fetch Paystack customer: ${msg}`);
+    }
   }
 
   // ─────────────────────────────────────────────────────────────────────────
