@@ -6,7 +6,8 @@ import { getFirebaseMessaging, getToken, onMessage } from "@/lib/firebase";
 import { toast } from "react-toastify";
 
 const VAPID_KEY = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY!;
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1";
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1";
 
 /**
  * Builds the service-worker URL with Firebase config embedded as query params
@@ -18,7 +19,8 @@ function buildSwUrl(): string {
     authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN ?? "",
     projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ?? "",
     storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET ?? "",
-    messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID ?? "",
+    messagingSenderId:
+      process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID ?? "",
     appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID ?? "",
   });
   return `/firebase-messaging-sw.js?${params.toString()}`;
@@ -27,7 +29,10 @@ function buildSwUrl(): string {
 /**
  * Registers the FCM token with the backend.
  */
-async function registerToken(token: string, accessToken: string): Promise<void> {
+async function registerToken(
+  token: string,
+  accessToken: string,
+): Promise<void> {
   await fetch(`${API_URL}/auth/user/push-token`, {
     method: "POST",
     headers: {
@@ -65,7 +70,9 @@ export function usePushNotifications() {
     if (status !== "authenticated" || !session?.user) return;
     if (typeof window === "undefined" || !("Notification" in window)) return;
     if (!process.env.NEXT_PUBLIC_FIREBASE_API_KEY) {
-      console.warn("[Push] Firebase env vars not configured — skipping push setup.");
+      console.warn(
+        "[Push] Firebase env vars not configured — skipping push setup.",
+      );
       return;
     }
 
@@ -114,9 +121,9 @@ export function usePushNotifications() {
             </div>,
             {
               icon: <span>🔔</span>,
-              position: "top-right",
+              position: "bottom-right",
               theme: isDark ? "dark" : "light",
-            }
+            },
           );
         });
       } catch (err) {
