@@ -38,7 +38,10 @@
       },
       "usesAppleSignIn": true
     },
-    "platforms": ["ios", "android"],
+    "platforms": [
+      "ios",
+      "android"
+    ],
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
@@ -126,9 +129,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "96eb2069-3bed-40fc-8bf8-d8a7a75d4a62"
+        "projectId": "ef6ca88c-cd96-406a-9b8a-6238c0a08fc8"
       }
     },
-    "owner": "enoch-dev"
+    "owner": "wyteshadow"
   }
 }
