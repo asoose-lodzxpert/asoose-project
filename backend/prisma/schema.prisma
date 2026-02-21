@@ -228,6 +228,15 @@ model User {
   // Notification Preferences
   notificationsPreferences Json? // Stores notification preferences
 
+  // Wallet
+  walletBalance                Float   @default(0) @map("wallet_balance")
+  walletBalanceHidden          Boolean @default(false) @map("wallet_balance_hidden")   // Cross-device balance visibility toggle
+
+  // Paystack — wallet top-up via Dedicated Virtual Account
+  paystackCustomerCode         String? @unique @map("paystack_customer_code")          // From POST /customer
+  dedicatedVirtualAccountNumber String? @map("dedicated_virtual_account_number")       // DVA account number
+  dedicatedVirtualAccountBank  String? @map("dedicated_virtual_account_bank")         // DVA bank name
+
   @@index([email])
   @@index([googleId])
   @@index([appleId])
@@ -539,6 +548,7 @@ model Store {
   vendorPayouts    VendorPayout[]
   openingHours     OpeningHour[]
   bankAccount      BankAccount?
+  paystackSubaccountCode String? @map("paystack_subaccount_code") // For split-payment settlements
   storeLogs        StoreLog[]
 
   
@@ -584,7 +594,6 @@ model BankAccount {
 
   // Payment Gateway Recipient Codes (for disbursements)
   paystackRecipientCode    String?
-  flutterwaveRecipientCode String?
 
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt

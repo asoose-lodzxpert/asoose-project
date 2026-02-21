@@ -84,7 +84,8 @@ export class PaymentController {
     // Use the raw request body (exact bytes) for HMAC signature verification.
     // JSON.stringify(req.body) is unreliable because key ordering or whitespace
     // differences can cause signature mismatches.
-    const rawBodyString = req.rawBody?.toString('utf8') ?? JSON.stringify(req.body);
+    const rawBodyString =
+      req.rawBody?.toString('utf8') ?? JSON.stringify(req.body);
     const payload = req.body;
     await this.paymentService.handleWebhook(
       PaymentGateway.PAYSTACK,
@@ -92,47 +93,6 @@ export class PaymentController {
       signature,
       rawBodyString,
     );
-    return { status: 'success' };
-  }
-
-  @Post('webhook/flutterwave')
-  @HttpCode(HttpStatus.OK)
-  async flutterwaveWebhook(
-    @Req() req: RawBodyRequest<Request>,
-    @Headers('verif-hash') signature: string,
-  ) {
-    const payload = req.body;
-    await this.paymentService.handleWebhook(
-      PaymentGateway.FLUTTERWAVE,
-      payload,
-      signature,
-    );
-    return { status: 'success' };
-  }
-
-  @Post('webhook/monnify/transaction')
-  @HttpCode(HttpStatus.OK)
-  async monnifyTransactionWebhook(
-    @Req() req: RawBodyRequest<Request>,
-    @Headers('monnify-signature') signature: string,
-  ) {
-    const payload = req.body;
-    await this.paymentService.handleWebhook(
-      PaymentGateway.MONNIFY,
-      payload,
-      signature,
-    );
-    return { status: 'success' };
-  }
-
-  @Post('webhook/monnify/refund')
-  @HttpCode(HttpStatus.OK)
-  async monnifyRefundWebhook(
-    @Req() req: RawBodyRequest<Request>,
-    @Headers('monnify-signature') signature: string,
-  ) {
-    const payload = req.body;
-    await this.paymentService.handleMonnifyRefundWebhook(payload, signature);
     return { status: 'success' };
   }
 
@@ -169,68 +129,6 @@ export class PaymentController {
       );
     } catch (error) {
       this.logger.error(`Paystack callback failed for ${reference}`, error);
-      return res.redirect(
-        `${frontendUrl}/payment/callback?reference=${reference}&status=failed`,
-      );
-    }
-  }
-
-  @Get('webhook/flutterwave/callback')
-  async flutterwaveCallback(
-    @Query('tx_ref') reference: string,
-    @Query('transaction_id') transactionId: string,
-    @Res() res: Response,
-  ) {
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
-
-    try {
-      const idToVerify = transactionId || reference;
-      const verification = await this.paymentService.verifyPayment(
-        idToVerify,
-        PaymentGateway.FLUTTERWAVE,
-      );
-
-      let callbackUrl = verification.meta?.callbackUrl;
-
-      if (!callbackUrl || callbackUrl.includes('localhost:3000')) {
-        callbackUrl = frontendUrl;
-      }
-
-      const status = verification.success ? 'success' : 'failed';
-      const redirectUrl = `${callbackUrl}/payment/callback?reference=${verification.reference}&status=${status}`;
-      return res.redirect(redirectUrl);
-    } catch (error) {
-      this.logger.error(`Flutterwave callback failed for ${reference}`, error);
-      return res.redirect(
-        `${frontendUrl}/payment/callback?reference=${reference}&status=failed`,
-      );
-    }
-  }
-
-  @Get('webhook/monnify/callback')
-  async monnifyCallback(
-    @Query('paymentReference') reference: string,
-    @Res() res: Response,
-  ) {
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
-
-    try {
-      const verification = await this.paymentService.verifyPayment(
-        reference,
-        PaymentGateway.MONNIFY,
-      );
-
-      let callbackUrl = verification.meta?.callbackUrl;
-
-      if (!callbackUrl || callbackUrl.includes('localhost:3000')) {
-        callbackUrl = frontendUrl;
-      }
-
-      const status = verification.success ? 'success' : 'failed';
-      const redirectUrl = `${callbackUrl}/payment/callback?reference=${reference}&status=${status}`;
-      return res.redirect(redirectUrl);
-    } catch (error) {
-      this.logger.error(`Monnify callback failed for ${reference}`, error);
       return res.redirect(
         `${frontendUrl}/payment/callback?reference=${reference}&status=failed`,
       );

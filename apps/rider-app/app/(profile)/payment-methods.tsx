@@ -18,10 +18,14 @@ import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { ThemedInput } from "@/components/ThemedInput";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { CustomDropdown } from "@/components/CustomDropdown";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import {
   getBankAccount,
+  getBanks,
+  verifyAccountNumber,
   updateBankAccount,
+  type Bank,
 } from "@/services/bank-account.service";
 import type { BankAccount } from "@/types/bank-account";
 
@@ -43,13 +47,19 @@ export default function PaymentMethodsScreen() {
   const [editing, setEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [banks, setBanks] = useState<Bank[]>([]);
+  const [isVerifying, setIsVerifying] = useState(false);
 
   const fetchBankAccount = useCallback(async () => {
     try {
       if (!refreshing) setLoading(true);
-      const account = await getBankAccount();
+      const [account, bankList] = await Promise.all([
+        getBankAccount(),
+        getBanks(),
+      ]);
       setBankAccount(account);
       setTempAccount(account);
+      setBanks(bankList);
     } catch {
       Toast.show({ type: "error", text1: "Failed to load account" });
     } finally {
@@ -100,8 +110,8 @@ export default function PaymentMethodsScreen() {
   const validateFields = () => {
     const newErrors: Record<string, string> = {};
 
-    if (!tempAccount?.bankName?.trim()) {
-      newErrors.bankName = "Bank name is required";
+    if (!tempAccount?.bankCode?.trim()) {
+      newErrors.bankCode = "Please select a bank";
     }
 
     if (!tempAccount?.accountNumber?.trim()) {
@@ -113,7 +123,8 @@ export default function PaymentMethodsScreen() {
     }
 
     if (!tempAccount?.accountName?.trim()) {
-      newErrors.accountName = "Account name is required";
+      newErrors.accountName =
+        "Account name is required — enter account number to auto-fill";
     }
 
     setErrors(newErrors);
@@ -274,32 +285,36 @@ export default function PaymentMethodsScreen() {
           ) : editing ? (
             <View style={styles.formContainer}>
               <View style={styles.inputGap}>
-                <ThemedText type="defaultSemiBold">Bank Name</ThemedText>
-                <ThemedInput
-                  value={tempAccount?.bankName || ""}
-                  onChangeText={(v) => {
+                <ThemedText type="defaultSemiBold">Bank</ThemedText>
+                <CustomDropdown
+                  data={banks.map((b) => ({ label: b.name, value: b.code }))}
+                  value={tempAccount?.bankCode || null}
+                  placeholder="Select your bank"
+                  onChange={(code) => {
+                    const selected = banks.find((b) => b.code === code);
                     setTempAccount(
                       (p) =>
                         ({
                           ...(p || {}),
-                          bankName: v,
+                          bankCode: String(code),
+                          bankName: selected?.name || "",
+                          accountName: "",
                         }) as BankAccount,
                     );
-                    if (errors.bankName) {
+                    if (errors.bankCode) {
                       setErrors((prev) => {
                         const next = { ...prev };
-                        delete next.bankName;
+                        delete next.bankCode;
                         return next;
                       });
                     }
                   }}
-                  placeholder="Enter bank name"
                 />
-                {errors.bankName && (
+                {errors.bankCode && (
                   <ThemedText
                     style={{ color: statusError, fontSize: 12, marginTop: 4 }}
                   >
-                    {errors.bankName}
+                    {errors.bankCode}
                   </ThemedText>
                 )}
               </View>
@@ -308,13 +323,14 @@ export default function PaymentMethodsScreen() {
                 <ThemedText type="defaultSemiBold">Account Number</ThemedText>
                 <ThemedInput
                   value={tempAccount?.accountNumber || ""}
-                  onChangeText={(v) => {
+                  onChangeText={async (v) => {
                     const numOnly = v.replace(/[^0-9]/g, "").slice(0, 10);
                     setTempAccount(
                       (p) =>
                         ({
                           ...(p || {}),
                           accountNumber: numOnly,
+                          accountName: "",
                         }) as BankAccount,
                     );
                     if (errors.accountNumber) {
@@ -323,6 +339,37 @@ export default function PaymentMethodsScreen() {
                         delete next.accountNumber;
                         return next;
                       });
+                    }
+                    // Auto-verify when 10 digits entered and bank selected
+                    if (numOnly.length === 10 && tempAccount?.bankCode) {
+                      setIsVerifying(true);
+                      try {
+                        const result = await verifyAccountNumber(
+                          tempAccount.bankCode,
+                          numOnly,
+                        );
+                        setTempAccount(
+                          (p) =>
+                            ({
+                              ...(p || {}),
+                              accountNumber: numOnly,
+                              accountName: result.accountName,
+                            }) as BankAccount,
+                        );
+                        setErrors((prev) => {
+                          const next = { ...prev };
+                          delete next.accountName;
+                          return next;
+                        });
+                      } catch {
+                        Toast.show({
+                          type: "error",
+                          text1: "Could not verify account",
+                          text2: "Check the number or try again",
+                        });
+                      } finally {
+                        setIsVerifying(false);
+                      }
                     }
                   }}
                   keyboardType="number-pad"
@@ -336,38 +383,35 @@ export default function PaymentMethodsScreen() {
                     {errors.accountNumber}
                   </ThemedText>
                 )}
-                {tempAccount?.accountNumber && !errors.accountNumber && (
+                {isVerifying && (
                   <ThemedText
-                    style={{ color: "#10B981", fontSize: 12, marginTop: 4 }}
+                    style={{ color: textSecondary, fontSize: 12, marginTop: 4 }}
                   >
-                    ✓ {tempAccount.accountNumber.length}/10 digits
+                    Verifying account...
                   </ThemedText>
                 )}
+                {!isVerifying &&
+                  tempAccount?.accountNumber &&
+                  !errors.accountNumber && (
+                    <ThemedText
+                      style={{ color: "#10B981", fontSize: 12, marginTop: 4 }}
+                    >
+                      ✓ {tempAccount.accountNumber.length}/10 digits
+                    </ThemedText>
+                  )}
               </View>
 
               <View style={styles.inputGap}>
                 <ThemedText type="defaultSemiBold">Account Name</ThemedText>
                 <ThemedInput
                   value={tempAccount?.accountName || ""}
-                  onChangeText={(v) => {
-                    setTempAccount(
-                      (p) =>
-                        ({
-                          ...(p || {}),
-                          accountName: v,
-                        }) as BankAccount,
-                    );
-                    if (errors.accountName) {
-                      setErrors((prev) => {
-                        const next = { ...prev };
-                        delete next.accountName;
-                        return next;
-                      });
-                    }
-                  }}
-                  placeholder="Enter account name"
-                  returnKeyType="done"
-                  onSubmitEditing={saveChanges}
+                  placeholder={
+                    isVerifying
+                      ? "Verifying..."
+                      : "Auto-filled after verification"
+                  }
+                  editable={false}
+                  style={{ opacity: 0.7 }}
                 />
                 {errors.accountName && (
                   <ThemedText
@@ -376,6 +420,13 @@ export default function PaymentMethodsScreen() {
                     {errors.accountName}
                   </ThemedText>
                 )}
+                {tempAccount?.accountName ? (
+                  <ThemedText
+                    style={{ color: "#10B981", fontSize: 12, marginTop: 4 }}
+                  >
+                    ✓ Account verified
+                  </ThemedText>
+                ) : null}
               </View>
 
               <Pressable

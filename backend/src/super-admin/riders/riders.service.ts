@@ -20,6 +20,8 @@ import { NotificationsGateway } from 'src/notifications/notifications.gateway';
 import { TransactionLedgerService } from 'src/super-admin/transactions/transaction-ledger.service';
 import { DriverStateService } from 'src/matching/driver-state/driver-state.service';
 import { RiderStateService } from 'src/matching/rider-state/rider-state.service';
+import { PaystackService } from 'src/payment/paystack.service';
+import { PaystackAccountService } from 'src/payment/paystack-account.service';
 
 @Injectable()
 export class RidersService {
@@ -35,6 +37,8 @@ export class RidersService {
     private transactionLedger: TransactionLedgerService,
     private driverStateService: DriverStateService,
     private riderStateService: RiderStateService,
+    private readonly paystackService: PaystackService,
+    private readonly paystackAccountService: PaystackAccountService,
   ) {}
 
   async findAll(params: {
@@ -606,21 +610,64 @@ export class RidersService {
   ) {
     const payout = await this.prisma.riderPayout.findUnique({
       where: { id: payoutId },
+      include: {
+        rider: {
+          include: { bankAccount: true },
+        },
+      },
     });
     if (!payout) throw new NotFoundException('Payout not found');
 
     if (status === 'FAILED') {
+      // Refund wallet on admin rejection
       await this.prisma.rider.update({
         where: { id: payout.riderId },
         data: { walletBalance: { increment: payout.amount } },
       });
+
+      return this.prisma.riderPayout.update({
+        where: { id: payoutId },
+        data: { status: 'FAILED', processedAt: new Date() },
+      });
     }
+
+    // --- status === 'PAID': trigger Paystack transfer ---
+    const bankAccount = payout.rider?.bankAccount;
+    if (!bankAccount) {
+      throw new BadRequestException(
+        'Rider has no bank account configured for payout',
+      );
+    }
+
+    // Ensure we have a Paystack recipient code (create on-the-fly if missing)
+    let recipientCode = bankAccount.paystackRecipientCode;
+    if (!recipientCode) {
+      const recipient =
+        await this.paystackAccountService.createRiderTransferRecipient({
+          name: bankAccount.accountName,
+          accountNumber: bankAccount.accountNumber,
+          bankCode: bankAccount.bankCode,
+        });
+      recipientCode = recipient.recipientCode;
+      await this.prisma.bankAccount.update({
+        where: { id: bankAccount.id },
+        data: { paystackRecipientCode: recipientCode },
+      });
+    }
+
+    const transferRef = reference ?? `payout-${payoutId}-${Date.now()}`;
+    const transfer = await this.paystackService.initiateTransfer(
+      payout.amount,
+      recipientCode,
+      transferRef,
+      'Rider payout disbursement',
+    );
 
     return this.prisma.riderPayout.update({
       where: { id: payoutId },
       data: {
-        status,
-        reference,
+        status: transfer.success ? 'PAID' : 'FAILED',
+        reference: transfer.transferCode ?? transferRef,
         processedAt: new Date(),
       },
     });

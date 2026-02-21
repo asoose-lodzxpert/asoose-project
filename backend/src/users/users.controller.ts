@@ -10,6 +10,7 @@ import {
   Headers,
   Patch,
   Delete,
+  Query,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { UsersService } from './users.service';
@@ -128,7 +129,11 @@ export class UsersController {
     const page = parseInt(req.query.page) || 1;
     const pageSize = parseInt(req.query.pageSize) || 10;
     const status = req.query.status as string | undefined;
-    return this.usersService.getUserDeliveries(userId, { page, pageSize, status });
+    return this.usersService.getUserDeliveries(userId, {
+      page,
+      pageSize,
+      status,
+    });
   }
 
   @Get('deliveries/:id')
@@ -227,6 +232,29 @@ export class UsersController {
   @Get('wallet')
   async getWalletBalance(@Request() req) {
     return this.usersService.getWalletBalance(req.user.id);
+  }
+
+  @Post('wallet/provision')
+  async provisionWallet(@Request() req) {
+    return this.usersService.provisionWallet(req.user.id);
+  }
+
+  @Patch('wallet/visibility')
+  async setWalletVisibility(@Request() req, @Body() body: { hidden: boolean }) {
+    return this.usersService.setWalletVisibility(req.user.id, body.hidden);
+  }
+
+  @Get('wallet/history')
+  async getWalletHistory(
+    @Request() req,
+    @Query('page') page = '1',
+    @Query('limit') limit = '10',
+  ) {
+    return this.usersService.getWalletHistory(
+      req.user.id,
+      Number(page),
+      Number(limit),
+    );
   }
 
   @Get('payment/cards')

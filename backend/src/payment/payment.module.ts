@@ -2,8 +2,7 @@ import { Module, forwardRef } from '@nestjs/common';
 import { PaymentController } from './payment.controller';
 import { PaymentService } from './payment.service';
 import { PaystackService } from './paystack.service';
-import { FlutterwaveService } from './flutterwave.service';
-import { MonnifyService } from './monnify.service';
+import { PaystackAccountService } from './paystack-account.service';
 import { PrismaModule } from '../prisma/prisma.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { TripsModule } from '../users/trips/trips.module';
@@ -20,12 +19,7 @@ import { EmailQueue } from '../queue/email.queue';
     EmailQueue,
   ],
   controllers: [PaymentController],
-  providers: [
-    PaymentService,
-    PaystackService,
-    FlutterwaveService,
-    MonnifyService,
-  ],
-  exports: [PaymentService],
+  providers: [PaymentService, PaystackService, PaystackAccountService],
+  exports: [PaymentService, PaystackService, PaystackAccountService],
 })
 export class PaymentModule {}

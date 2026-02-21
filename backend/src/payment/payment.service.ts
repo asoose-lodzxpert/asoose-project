@@ -11,8 +11,6 @@ import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { PrismaService } from '../prisma/prisma.service';
 import { PaystackService } from './paystack.service';
-import { FlutterwaveService } from './flutterwave.service';
-import { MonnifyService } from './monnify.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { NotificationsGateway } from '../notifications/notifications.gateway';
 import { TripsService } from '../users/trips/trips.service';
@@ -44,8 +42,6 @@ export class PaymentService {
   constructor(
     private prisma: PrismaService,
     private paystackService: PaystackService,
-    private flutterwaveService: FlutterwaveService,
-    private monnifyService: MonnifyService,
     private notificationsService: NotificationsService,
     private notificationsGateway: NotificationsGateway,
     private ledger: TransactionLedgerService,
@@ -240,32 +236,6 @@ export class PaymentService {
           );
           break;
 
-        case PaymentGateway.FLUTTERWAVE:
-          response = await this.flutterwaveService.initializePayment(
-            amount,
-            dto.email,
-            reference,
-            dto.customerName || 'Customer',
-            dto.phoneNumber ?? undefined,
-            metadata,
-          );
-          break;
-
-        case PaymentGateway.MONNIFY:
-          if (dto.method !== PaymentMethod.BANK_TRANSFER) {
-            throw new BadRequestException(
-              'Monnify only supports bank transfer',
-            );
-          }
-          response = await this.monnifyService.initializeBankTransfer(
-            amount,
-            dto.email,
-            reference,
-            dto.customerName || 'Customer',
-            dto.metadata,
-          );
-          break;
-
         default:
           throw new BadRequestException('Invalid payment gateway');
       }
@@ -302,12 +272,6 @@ export class PaymentService {
       switch (gateway) {
         case PaymentGateway.PAYSTACK:
           verification = await this.paystackService.verifyPayment(reference);
-          break;
-        case PaymentGateway.FLUTTERWAVE:
-          verification = await this.flutterwaveService.verifyPayment(reference);
-          break;
-        case PaymentGateway.MONNIFY:
-          verification = await this.monnifyService.verifyPayment(reference);
           break;
         default:
           throw new BadRequestException('Invalid payment gateway');
@@ -362,18 +326,6 @@ export class PaymentService {
           signature,
         );
         break;
-      case PaymentGateway.FLUTTERWAVE:
-        isValid = this.flutterwaveService.verifyWebhookSignature(
-          payload,
-          signature,
-        );
-        break;
-      case PaymentGateway.MONNIFY:
-        isValid = this.monnifyService.verifyWebhookSignature(
-          payload,
-          signature,
-        );
-        break;
     }
 
     if (!isValid) {
@@ -400,22 +352,6 @@ export class PaymentService {
         status = payload.data.status;
         amount = payload.data.amount / 100;
         paidAt = new Date(payload.data.paid_at);
-        break;
-
-      case PaymentGateway.FLUTTERWAVE:
-        if (payload.event !== 'charge.completed') return;
-        reference = payload.data.tx_ref;
-        status = payload.data.status;
-        amount = payload.data.amount;
-        paidAt = new Date(payload.data.created_at);
-        break;
-
-      case PaymentGateway.MONNIFY:
-        if (payload.eventType !== 'SUCCESSFUL_TRANSACTION') return;
-        reference = payload.eventData.paymentReference;
-        status = 'SUCCESS';
-        amount = payload.eventData.amountPaid;
-        paidAt = new Date(payload.eventData.paidOn);
         break;
     }
 
@@ -1168,28 +1104,6 @@ export class PaymentService {
           );
           break;
 
-        case PaymentGateway.FLUTTERWAVE:
-          disbursement = await this.flutterwaveService.initiateTransfer(
-            dto.amount,
-            bankAccount.accountNumber,
-            bankAccount.bankCode,
-            bankAccount.accountName,
-            reference,
-            dto.reason,
-          );
-          break;
-
-        case PaymentGateway.MONNIFY:
-          disbursement = await this.monnifyService.initiateTransfer(
-            dto.amount,
-            bankAccount.accountNumber,
-            bankAccount.bankCode,
-            bankAccount.accountName,
-            reference,
-            dto.reason,
-          );
-          break;
-
         default:
           throw new BadRequestException(
             `Unsupported payment gateway: ${dto.gateway}`,
@@ -1266,16 +1180,6 @@ export class PaymentService {
             refundAmount,
           );
           break;
-        case PaymentGateway.FLUTTERWAVE:
-          if (!payment.authorizationUrl)
-            throw new BadRequestException('Transaction ID missing');
-          refund = await this.flutterwaveService.initiateRefund(
-            payment.accessCode || payment.reference,
-            refundAmount,
-          );
-          break;
-        case PaymentGateway.MONNIFY:
-          throw new BadRequestException('Monnify API refunds not supported');
         default:
           throw new BadRequestException(
             'Refunds not supported for this gateway',
@@ -1329,63 +1233,6 @@ export class PaymentService {
       return refund;
     } catch (error) {
       this.logger.error('Refund failed:', error);
-      throw error;
-    }
-  }
-
-  async handleMonnifyRefundWebhook(
-    payload: any,
-    signature: string,
-  ): Promise<void> {
-    const isValid = this.monnifyService.verifyWebhookSignature(
-      payload,
-      signature,
-    );
-    if (!isValid) throw new BadRequestException('Invalid webhook signature');
-
-    const { eventType, eventData } = payload;
-    if (eventType !== 'SUCCESSFUL_REFUND') return;
-
-    try {
-      const payment = await this.prisma.payment.findUnique({
-        where: { reference: eventData.transactionReference },
-        include: { order: { include: { user: true } } },
-      });
-
-      if (!payment) return;
-
-      await this.prisma.payment.update({
-        where: { id: payment.id },
-        data: {
-          status: PaymentStatus.REFUNDED,
-          metadata: {
-            ...(payment.metadata as object),
-            refund: {
-              refundReference: eventData.refundReference,
-              refundAmount: eventData.refundAmount,
-              refundStatus: eventData.refundStatus,
-              completedOn: eventData.completedOn,
-            },
-          },
-        },
-      });
-
-      if (payment.order?.userId) {
-        await this.notificationsService.create({
-          userId: payment.order.userId,
-          title: 'Refund Processed',
-          message: `Refund of ₦${eventData.refundAmount.toLocaleString()} processed successfully.`,
-          type: 'REFUND_SUCCESS',
-          metadata: {
-            orderId: payment.orderId,
-            reference: payment.reference,
-            refundReference: eventData.refundReference,
-            refundAmount: eventData.refundAmount,
-          },
-        });
-      }
-    } catch (error) {
-      this.logger.error('Error processing Monnify refund webhook:', error);
       throw error;
     }
   }

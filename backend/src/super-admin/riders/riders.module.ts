@@ -9,6 +9,7 @@ import { ActivityLogService } from 'src/common/services/activity-log.services';
 import { AuthModule } from 'src/auth/auth.module';
 import { TransactionsModule } from '../transactions/transaction.module';
 import { MatchingModule } from 'src/matching/matching.module';
+import { PaymentModule } from 'src/payment/payment.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { MatchingModule } from 'src/matching/matching.module';
     AuthModule,
     TransactionsModule,
     MatchingModule,
+    PaymentModule,
   ],
   controllers: [RidersController, DriversController],
   providers: [RidersService, ActivityLogService],

@@ -24,6 +24,7 @@ import { TripsModule } from './trips/trips.module';
 import { VendorModule } from 'src/vendor/vendor.module';
 import { QueueModule } from 'src/matching/queue/queue.module';
 import { FareModule } from '../fare/fare.module';
+import { PaystackAccountService } from '../payment/paystack-account.service';
 
 @Module({
   imports: [
@@ -52,6 +53,7 @@ import { FareModule } from '../fare/fare.module';
     NotificationFacade,
     UserAccountNotificationsService,
     IdempotencyService,
+    PaystackAccountService,
   ],
   exports: [
     UsersService,

@@ -535,14 +535,12 @@ export class RidesService {
             customerName: fullRide.customer?.name || 'Customer',
             pickupAddress: pickupText,
             dropoffAddress: dropoffText,
-            estimatedEarnings:
-              fullRide.totalFare ?? fullRide.estimatedFare ?? 0,
+            estimatedEarnings: fullRide.totalFare ?? 0,
             distance: fullRide.distanceKm ?? null,
             assignedByAdmin: true,
             timestamp: Date.now(),
           });
 
-        // Notify customer: driver found
         this.notificationsGateway.server
           .to(`user_${fullRide.customerId}`)
           .emit('DRIVER_FOUND', {

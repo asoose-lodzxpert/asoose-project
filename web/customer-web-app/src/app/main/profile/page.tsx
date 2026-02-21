@@ -7,7 +7,7 @@ import React, {
   useMemo,
   useRef,
 } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "react-toastify";
 import Swal from "sweetalert2";
 import Link from "next/link";
@@ -38,6 +38,7 @@ import { DeliveryCard } from "@/app/main/components/profile/deliverycard";
 import { DisputeCard } from "@/app/main/components/profile/DisputeCard";
 import BottomNav from "@/app/main/components/layout/BottomNav";
 import { EmptyState } from "@/app/main/components/profile/EmptyState";
+import { WalletTab } from "@/app/main/components/profile/WalletTab";
 import {
   ProfileSkeleton,
   ContentSkeleton,
@@ -47,13 +48,45 @@ const API_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1";
 
 export default function ProfilePage() {
+  return (
+    <React.Suspense fallback={null}>
+      <ProfilePageContent />
+    </React.Suspense>
+  );
+}
+
+function ProfilePageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { data: session, status } = useSession();
+
+  const VALID_TABS: ProfileTab[] = [
+    "orders",
+    "rides",
+    "deliveries",
+    "disputes",
+    "wallet",
+    "addresses",
+    "settings",
+  ];
+  const tabFromUrl = searchParams.get("tab") as ProfileTab | null;
+  const initialTab: ProfileTab =
+    tabFromUrl && VALID_TABS.includes(tabFromUrl) ? tabFromUrl : "orders";
 
   const [isPageLoading, setIsPageLoading] = useState(true);
   const [isTabLoading, setIsTabLoading] = useState(false);
   const [token, setToken] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<ProfileTab>("orders");
+  const [activeTab, setActiveTabState] = useState<ProfileTab>(initialTab);
+
+  const setActiveTab = React.useCallback(
+    (tab: ProfileTab) => {
+      setActiveTabState(tab);
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("tab", tab);
+      router.replace(`?${params.toString()}`, { scroll: false });
+    },
+    [router, searchParams],
+  );
 
   const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
@@ -235,7 +268,12 @@ export default function ProfilePage() {
   }, [session, status, router]);
 
   useEffect(() => {
-    if (token && activeTab !== "addresses" && activeTab !== "settings") {
+    if (
+      token &&
+      activeTab !== "addresses" &&
+      activeTab !== "settings" &&
+      activeTab !== "wallet"
+    ) {
       fetchTabData(activeTab, token);
     }
   }, [activeTab, token, fetchTabData]);
@@ -512,6 +550,10 @@ export default function ProfilePage() {
                   ))
                 )}
               </div>
+            )}
+
+            {activeTab === "wallet" && token && (
+              <WalletTab token={token} apiUrl={API_URL} />
             )}
 
             {activeTab === "addresses" && (

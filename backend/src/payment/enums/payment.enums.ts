@@ -6,8 +6,6 @@ export { PrismaPaymentStatus as PaymentStatus };
 // Gateway enum remains standalone as it's not in DB
 export enum PaymentGateway {
   PAYSTACK = 'PAYSTACK',
-  FLUTTERWAVE = 'FLUTTERWAVE',
-  MONNIFY = 'MONNIFY',
 }
 
 // Ensure these match your DB or map strictly

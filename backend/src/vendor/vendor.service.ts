@@ -5,7 +5,8 @@ import {
 } from '@nestjs/common';
 import { AppLogger } from '../libs/logger/app-logger.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { NubanService } from '../libs/nuban/nuban.service';
+import { PaystackAccountService } from '../payment/paystack-account.service';
+import { PaystackService } from '../payment/paystack.service';
 import { VendorSecurityNotificationsService } from './notifications/vendor-security-notifications.service';
 import { TransactionLedgerService } from '../super-admin/transactions/transaction-ledger.service';
 import { UserRole } from '../common/enums/user-role.enum';
@@ -14,7 +15,8 @@ import { UserRole } from '../common/enums/user-role.enum';
 export class VendorService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly nubanService: NubanService,
+    private readonly paystackAccount: PaystackAccountService,
+    private readonly paystackService: PaystackService,
     private readonly securityNotifications: VendorSecurityNotificationsService,
     private readonly appLogger: AppLogger,
     private readonly ledger: TransactionLedgerService,
@@ -233,8 +235,10 @@ export class VendorService {
       select: {
         id: true,
         bankName: true,
+        bankCode: true,
         accountNumber: true,
         accountName: true,
+        paystackRecipientCode: true,
       },
     });
 
@@ -253,32 +257,29 @@ export class VendorService {
         bankCode: true,
         accountNumber: true,
         accountName: true,
+        paystackRecipientCode: true,
       },
     });
 
     return bankAccount;
   }
 
-  // Get all Nigerian banks
+  // Get all Nigerian banks from Paystack
   async getBanks() {
-    const banks = await this.prisma.bank.findMany({
-      where: { isActive: true },
-      select: {
-        id: true,
-        name: true,
-        code: true,
-      },
-      orderBy: { name: 'asc' },
-    });
-    return banks;
+    const banks = await this.paystackAccount.listBanks('nigeria');
+    // Map to { id, name, code } shape expected by mobile clients
+    return banks.map((b) => ({ id: b.code, name: b.name, code: b.code }));
   }
 
-  // Verify account number using NUBAN API
+  // Verify account number via Paystack
   async verifyAccountNumber(bankCode: string, accountNumber: string) {
-    return await this.nubanService.verifyAccountNumber(bankCode, accountNumber);
+    return await this.paystackAccount.resolveAccountNumber(
+      accountNumber,
+      bankCode,
+    );
   }
 
-  // Save (create or update) bank account
+  // Save (create or update) bank account — verifies via Paystack and stores recipient + subaccount codes
   async saveBankAccount(
     vendorId: string,
     data: {
@@ -291,77 +292,164 @@ export class VendorService {
     const store = await this.prisma.store.findUnique({ where: { vendorId } });
     if (!store) throw new Error('Store not found');
 
-    // Check if bank account already exists
+    // 1. Verify account with Paystack to get canonical account name
+    let resolvedName = data.accountName;
+    try {
+      const resolved = await this.paystackAccount.resolveAccountNumber(
+        data.accountNumber,
+        data.bankCode,
+      );
+      resolvedName = resolved.accountName;
+    } catch {
+      // Non-fatal: use supplied name if Paystack resolve fails
+      if (!resolvedName) {
+        throw new BadRequestException(
+          'Could not verify account number. Please check the account number and bank code.',
+        );
+      }
+    }
+
+    // 2. Create / refresh Paystack transfer recipient
+    let paystackRecipientCode: string | null = null;
+    try {
+      const recipient =
+        await this.paystackAccount.createVendorTransferRecipient({
+          name: resolvedName,
+          accountNumber: data.accountNumber,
+          bankCode: data.bankCode,
+          description: `Vendor payout — ${store.name}`,
+        });
+      paystackRecipientCode = recipient.recipientCode;
+    } catch {
+      /* persist account even if Paystack is temporarily unavailable */
+    }
+
+    // 3. Create / refresh Paystack subaccount for split-payment settlement
+    //    Vendor gets (100 − platformCommission)% of each order
+    const vendorPercentage = Math.max(0, 100 - (store.commissionRate ?? 10));
+    let paystackSubaccountCode: string | null =
+      store.paystackSubaccountCode ?? null;
+    try {
+      if (paystackSubaccountCode) {
+        // Update the existing subaccount with new bank details if needed
+        const updated = await this.paystackAccount.updateVendorSubaccount(
+          paystackSubaccountCode,
+          {
+            bankCode: data.bankCode,
+            accountNumber: data.accountNumber,
+            percentageCharge: vendorPercentage,
+          },
+        );
+        paystackSubaccountCode = updated.subaccountCode;
+      } else {
+        const sub = await this.paystackAccount.createVendorSubaccount({
+          businessName: store.name,
+          bankCode: data.bankCode,
+          accountNumber: data.accountNumber,
+          percentageCharge: vendorPercentage,
+          description: `Asoose vendor — ${store.name}`,
+        });
+        paystackSubaccountCode = sub.subaccountCode;
+      }
+    } catch {
+      /* non-fatal */
+    }
+
+    if (paystackSubaccountCode) {
+      await this.prisma.store.update({
+        where: { id: store.id },
+        data: { paystackSubaccountCode },
+      });
+    }
+
     const existing = await this.prisma.bankAccount.findUnique({
       where: { storeId: store.id },
     });
 
+    const bankData = {
+      bankName: data.bankName,
+      bankCode: data.bankCode,
+      accountNumber: data.accountNumber,
+      accountName: resolvedName,
+      ...(paystackRecipientCode && { paystackRecipientCode }),
+    };
+
+    const select = {
+      bankName: true,
+      bankCode: true,
+      accountNumber: true,
+      accountName: true,
+      paystackRecipientCode: true,
+    } as const;
+
     if (existing) {
-      // Update existing
-      return await this.prisma.bankAccount.update({
+      const saved = await this.prisma.bankAccount.update({
         where: { storeId: store.id },
-        data: {
-          bankName: data.bankName,
-          bankCode: data.bankCode,
-          accountNumber: data.accountNumber,
-          accountName: data.accountName,
-        },
-        select: {
-          bankName: true,
-          bankCode: true,
-          accountNumber: true,
-          accountName: true,
-        },
-      });
-    } else {
-      // Create new
-      const newBankAccount = await this.prisma.bankAccount.create({
-        data: {
-          storeId: store.id,
-          bankName: data.bankName,
-          bankCode: data.bankCode,
-          accountNumber: data.accountNumber,
-          accountName: data.accountName,
-        },
-        select: {
-          bankName: true,
-          bankCode: true,
-          accountNumber: true,
-          accountName: true,
-        },
+        data: bankData,
+        select,
       });
 
-      // Send notification for new bank account
+      // Notify vendor of update
       try {
         const vendor = await this.prisma.vendor.findUnique({
           where: { id: vendorId },
         });
         if (vendor) {
-          await this.securityNotifications.notifyBankAccountAdded(
+          await this.securityNotifications.notifyBankAccountUpdated(
             vendor.id,
             vendor.email,
             vendor.name,
-            data.bankName,
-            data.accountNumber,
+            saved.bankName,
+            saved.accountNumber,
           );
         }
       } catch (error) {
         this.appLogger.error(
-          'Failed to send bank account notification',
+          'Failed to send bank account update notification',
           error?.stack,
           { error },
         );
       }
 
-      return newBankAccount;
+      return saved;
     }
+
+    const newBankAccount = await this.prisma.bankAccount.create({
+      data: { storeId: store.id, ...bankData },
+      select,
+    });
+
+    // Notify vendor of new account
+    try {
+      const vendor = await this.prisma.vendor.findUnique({
+        where: { id: vendorId },
+      });
+      if (vendor) {
+        await this.securityNotifications.notifyBankAccountAdded(
+          vendor.id,
+          vendor.email,
+          vendor.name,
+          data.bankName,
+          data.accountNumber,
+        );
+      }
+    } catch (error) {
+      this.appLogger.error(
+        'Failed to send bank account notification',
+        error?.stack,
+        { error },
+      );
+    }
+
+    return newBankAccount;
   }
 
-  // Update bank account
+  // Update bank account (partial update — re-verifies and refreshes Paystack codes)
   async updateBankAccount(
     vendorId: string,
     data: {
       bankName?: string;
+      bankCode?: string;
       accountNumber?: string;
       accountName?: string;
     },
@@ -369,26 +457,65 @@ export class VendorService {
     const store = await this.prisma.store.findUnique({ where: { vendorId } });
     if (!store) throw new Error('Store not found');
 
-    const bankAccount = await this.prisma.bankAccount.findUnique({
+    const existing = await this.prisma.bankAccount.findUnique({
       where: { storeId: store.id },
     });
+    if (!existing) throw new Error('Bank account not found');
 
-    if (!bankAccount) {
-      throw new Error('Bank account not found');
+    const bankCode = data.bankCode || existing.bankCode;
+    const accountNumber = data.accountNumber || existing.accountNumber;
+
+    // Re-verify if account or bank changed
+    let accountName = data.accountName || existing.accountName;
+    if (data.accountNumber || data.bankCode) {
+      try {
+        const resolved = await this.paystackAccount.resolveAccountNumber(
+          accountNumber,
+          bankCode,
+        );
+        accountName = resolved.accountName;
+      } catch {
+        /* use existing if resolve fails */
+      }
     }
+
+    // Refresh transfer recipient
+    let paystackRecipientCode = existing.paystackRecipientCode;
+    if (data.accountNumber || data.bankCode) {
+      try {
+        const recipient =
+          await this.paystackAccount.createVendorTransferRecipient({
+            name: accountName,
+            accountNumber,
+            bankCode,
+          });
+        paystackRecipientCode = recipient.recipientCode;
+      } catch {
+        /* non-fatal */
+      }
+    }
+
+    const select = {
+      bankName: true,
+      bankCode: true,
+      accountNumber: true,
+      accountName: true,
+      paystackRecipientCode: true,
+    } as const;
 
     const updated = await this.prisma.bankAccount.update({
       where: { storeId: store.id },
-      data,
-      select: {
-        bankName: true,
-        bankCode: true,
-        accountNumber: true,
-        accountName: true,
+      data: {
+        ...(data.bankName && { bankName: data.bankName }),
+        bankCode,
+        accountNumber,
+        accountName,
+        ...(paystackRecipientCode && { paystackRecipientCode }),
       },
+      select,
     });
 
-    // Send notification for bank account update
+    // Notify
     try {
       const vendor = await this.prisma.vendor.findUnique({
         where: { id: vendorId },
@@ -575,6 +702,54 @@ export class VendorService {
       );
       throw new BadRequestException(
         'Failed to process withdrawal request. Please try again.',
+      );
+    }
+
+    // 5. Initiate Paystack transfer
+    try {
+      let recipientCode = bankAccount.paystackRecipientCode;
+
+      // Create recipient on-the-fly if not already stored
+      if (!recipientCode) {
+        const recipient =
+          await this.paystackAccount.createVendorTransferRecipient({
+            name: bankAccount.accountName,
+            accountNumber: bankAccount.accountNumber,
+            bankCode: bankAccount.bankCode,
+          });
+        recipientCode = recipient.recipientCode;
+        await this.prisma.bankAccount.update({
+          where: { id: bankAccount.id },
+          data: { paystackRecipientCode: recipientCode },
+        });
+      }
+
+      const transferRef = `vendor-payout-${withdrawal.id}-${Date.now()}`;
+      const transfer = await this.paystackService.initiateTransfer(
+        netAmount,
+        recipientCode,
+        transferRef,
+        'Vendor payout withdrawal',
+      );
+
+      await this.prisma.vendorPayout.update({
+        where: { id: withdrawal.id },
+        data: {
+          reference: transfer.transferCode ?? transferRef,
+          status: transfer.success ? 'APPROVED' : 'PENDING',
+        },
+      });
+
+      this.appLogger.log(`[DEV] Paystack transfer initiated`, {
+        transferCode: transfer.transferCode,
+        status: transfer.status,
+      });
+    } catch (error) {
+      // Transfer failure is non-fatal: payout record stays PENDING for admin follow-up
+      this.appLogger.error(
+        '[DEV] Paystack transfer initiation failed for vendor withdrawal',
+        error?.stack,
+        { error, message: error?.message },
       );
     }
 

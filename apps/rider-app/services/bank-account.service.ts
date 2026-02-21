@@ -3,6 +3,37 @@ import { fetchWithAuth } from "./auth-fetch";
 
 const EXPO_PUBLIC_API_URL = process.env.EXPO_PUBLIC_API_URL;
 
+export interface Bank {
+  id: string;
+  name: string;
+  code: string;
+}
+
+export async function getBanks(): Promise<Bank[]> {
+  try {
+    const response = await fetchWithAuth(
+      `${EXPO_PUBLIC_API_URL}/rider/bank/banks`,
+      { method: "GET" },
+    );
+    return Array.isArray(response) ? response : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function verifyAccountNumber(
+  bankCode: string,
+  accountNumber: string,
+): Promise<{ accountName: string; accountNumber: string }> {
+  return await fetchWithAuth(
+    `${EXPO_PUBLIC_API_URL}/rider/bank/verify-account`,
+    {
+      method: "POST",
+      body: JSON.stringify({ bankCode, accountNumber }),
+    },
+  );
+}
+
 export async function getBankAccount(): Promise<BankAccount | null> {
   try {
     const response = await fetchWithAuth(

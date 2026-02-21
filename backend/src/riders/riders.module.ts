@@ -26,6 +26,7 @@ import { MatchingModule } from '../matching/matching.module';
 
 import { TransactionsModule } from '../super-admin/transactions/transaction.module';
 import { MailModule } from '../mail/mail.module';
+import { PaystackAccountService } from '../payment/paystack-account.service';
 
 import { RiderAccountNotificationsService } from './notifications/rider-account-notifications.service';
 import { CommonModule } from '../common/common.module';
@@ -64,6 +65,7 @@ import { CommonModule } from '../common/common.module';
     RidersStreamService,
     RiderAccountNotificationsService,
     JobsService,
+    PaystackAccountService,
   ],
   exports: [
     ProfileService,

@@ -8,6 +8,8 @@ import { JwtModule } from '@nestjs/jwt';
 import { MailModule } from '../mail/mail.module';
 import { OtpModule } from '../auth/otp.module';
 import { NubanService } from '../libs/nuban/nuban.service';
+import { PaystackAccountService } from '../payment/paystack-account.service';
+import { PaystackService } from '../payment/paystack.service';
 import { ModuleRef } from '@nestjs/core';
 
 // Products
@@ -63,7 +65,9 @@ import { CommonModule } from '../common/common.module';
     VendorAccountNotificationsService,
     VendorService,
     VendorAuthService,
-    NubanService,
+    NubanService, // kept for any remaining usages
+    PaystackAccountService,
+    PaystackService,
 
     ActivityLogService,
     StoresService,

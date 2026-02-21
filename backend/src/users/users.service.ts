@@ -16,6 +16,7 @@ import {
   CreateEmergencyContactDto,
   UpdateEmergencyContactDto,
 } from './dto/emergency-contact.dto';
+import { PaystackAccountService } from '../payment/paystack-account.service';
 
 @Injectable()
 export class UsersService {
@@ -25,6 +26,7 @@ export class UsersService {
     private prisma: PrismaService,
     private ordersService: OrdersService,
     private addressesService: AddressesService,
+    private readonly paystackAccount: PaystackAccountService,
   ) {}
 
   // ==================================================================
@@ -359,7 +361,184 @@ export class UsersService {
   }
 
   async getWalletBalance(userId: string) {
-    return { balance: 0, currency: '₦' };
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        walletBalance: true,
+        walletBalanceHidden: true,
+        dedicatedVirtualAccountNumber: true,
+        dedicatedVirtualAccountBank: true,
+        paystackCustomerCode: true,
+      },
+    });
+
+    if (!user) throw new NotFoundException('User not found');
+
+    return {
+      balance: user.walletBalance,
+      currency: '₦',
+      balanceHidden: user.walletBalanceHidden,
+      hasWallet: !!user.dedicatedVirtualAccountNumber,
+      accountNumber: user.dedicatedVirtualAccountNumber ?? null,
+      bankName: user.dedicatedVirtualAccountBank ?? null,
+    };
+  }
+
+  async provisionWallet(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        phone: true,
+        dedicatedVirtualAccountNumber: true,
+        dedicatedVirtualAccountBank: true,
+        walletBalance: true,
+        walletBalanceHidden: true,
+      },
+    });
+
+    if (!user) throw new NotFoundException('User not found');
+
+    // Return existing wallet without re-provisioning
+    if (user.dedicatedVirtualAccountNumber) {
+      return {
+        message: 'Wallet already provisioned',
+        accountNumber: user.dedicatedVirtualAccountNumber,
+        bankName: user.dedicatedVirtualAccountBank,
+        balance: user.walletBalance,
+        balanceHidden: user.walletBalanceHidden,
+        hasWallet: true,
+      };
+    }
+
+    // Split name into first/last
+    const [firstName, ...rest] = (user.name ?? 'Customer').trim().split(' ');
+    const lastName = rest.join(' ') || firstName;
+
+    const { virtualAccount } =
+      await this.paystackAccount.provisionCustomerWalletAccount({
+        email: user.email,
+        firstName,
+        lastName,
+        phone: user.phone ?? undefined,
+      });
+
+    // Persist DVA details to User record
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        dedicatedVirtualAccountNumber: virtualAccount.accountNumber,
+        dedicatedVirtualAccountBank: virtualAccount.bankName,
+      },
+    });
+
+    return {
+      message: 'Wallet provisioned successfully',
+      accountNumber: virtualAccount.accountNumber,
+      bankName: virtualAccount.bankName,
+      balance: user.walletBalance,
+      balanceHidden: user.walletBalanceHidden,
+      hasWallet: true,
+    };
+  }
+
+  async setWalletVisibility(userId: string, hidden: boolean) {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { walletBalanceHidden: hidden },
+    });
+    return { balanceHidden: hidden };
+  }
+
+  async getWalletHistory(userId: string, page = 1, limit = 10) {
+    // 1. Get user's Paystack customer code for DVA top-up lookup
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { paystackCustomerCode: true },
+    });
+
+    // 2. Fetch local DB payments (orders, rides, deliveries) — no limit so we can merge
+    const dbPayments = await this.prisma.payment.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        amount: true,
+        method: true,
+        status: true,
+        reference: true,
+        createdAt: true,
+        paidAt: true,
+        orderId: true,
+        rideId: true,
+        deliveryId: true,
+      },
+    });
+
+    const dbRows = dbPayments.map((p) => ({
+      id: p.id,
+      amount: p.amount,
+      method: p.method as string,
+      status: p.status as string,
+      reference: p.reference,
+      type: p.orderId
+        ? 'Order Payment'
+        : p.rideId
+          ? 'Ride Payment'
+          : p.deliveryId
+            ? 'Delivery Payment'
+            : 'Wallet Top-up',
+      date: (p.paidAt ?? p.createdAt).toISOString(),
+    }));
+
+    // 3. Fetch Paystack DVA top-ups (only if customer has a Paystack profile)
+    let paystackRows: typeof dbRows = [];
+    if (user?.paystackCustomerCode) {
+      const dvaTopups = await this.paystackAccount.listCustomerDVATopups(
+        user.paystackCustomerCode,
+        1, // always fetch first page (50 results) — DVA top-ups are infrequent
+        50,
+      );
+
+      // Build a set of references already in DB to avoid duplicates
+      const knownRefs = new Set(dbRows.map((r) => r.reference));
+
+      paystackRows = dvaTopups
+        .filter((tx) => !knownRefs.has(tx.reference))
+        .map((tx) => ({
+          id: tx.reference, // use reference as id (no local DB id)
+          amount: tx.amount / 100, // kobo → naira
+          method: 'dedicated_nuban',
+          status:
+            tx.status.toUpperCase() === 'SUCCESS'
+              ? 'PAID'
+              : tx.status.toUpperCase(),
+          reference: tx.reference,
+          type: 'Wallet Top-up',
+          date: tx.paidAt ?? tx.createdAt,
+        }));
+    }
+
+    // 4. Merge, sort by date desc, paginate
+    const all = [...dbRows, ...paystackRows].sort(
+      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+    );
+
+    const total = all.length;
+    const skip = (page - 1) * limit;
+    const data = all.slice(skip, skip + limit);
+
+    return {
+      data,
+      meta: {
+        total,
+        page,
+        limit,
+        pages: Math.ceil(total / limit) || 1,
+      },
+    };
   }
 
   async getSavedCards(userId: string) {

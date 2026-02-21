@@ -1,4 +1,12 @@
-import { Controller, Get, Patch, Body, Req, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Patch,
+  Post,
+  Body,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { RolesGuard } from '../../auth/roles.guards';
 import { Roles } from '../../auth/roles.decorator';
@@ -12,6 +20,25 @@ import { UpdateBankAccountDto } from '../dto/update-bank-account.dto';
 })
 export class BankController {
   constructor(private readonly bankService: BankService) {}
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.RIDER, UserRole.DRIVER)
+  @Get('banks')
+  async getBanks() {
+    return this.bankService.getBanks();
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.RIDER, UserRole.DRIVER)
+  @Post('verify-account')
+  async verifyAccountNumber(
+    @Body() body: { bankCode: string; accountNumber: string },
+  ) {
+    return this.bankService.verifyAccountNumber(
+      body.bankCode,
+      body.accountNumber,
+    );
+  }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.RIDER, UserRole.DRIVER)
