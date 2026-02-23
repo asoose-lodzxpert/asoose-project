@@ -207,7 +207,7 @@ export const LocationBlock: React.FC<Props> = ({
       {/* ── Location info card ─────────────────────────────────────── */}
       <View style={[styles.infoCard, { backgroundColor: card, borderColor: border }]}>
         <View style={styles.infoRow}>
-          <IconSymbol name="mappin.circle.fill" size={16} color={primary} />
+          <IconSymbol name="location.fill" size={16} color={primary} />
           <View style={{ flex: 1 }}>
             <ThemedText style={[styles.infoLabel, { color: textMuted }]}>
               Address
