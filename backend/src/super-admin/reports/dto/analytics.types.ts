@@ -21,3 +21,12 @@ export class GetAnalyticsDto {
   @IsDateString()
   endDate?: string;
 }
+
+
+
+// ==============================================================
+// EXAMPLE API CLIENT FOR FRONTEND (optional utility)
+// ==============================================================
+
+// src/lib/api/reports.api.ts (Frontend utility)
+

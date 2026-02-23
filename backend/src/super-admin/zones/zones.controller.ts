@@ -8,10 +8,9 @@ import {
   Delete,
   UseGuards,
   Query,
-} from '@nestjs/common';
+  } from '@nestjs/common';
 import { ZonesService } from './zones.service';
 import { CreateZoneDto, UpdateZoneDto } from './dto/create-zone.dto';
-// Adjust these import paths to match your project structure
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard'; // Adjust path
 import { Roles } from 'src/auth/roles.decorator';
 import { RolesGuard } from 'src/auth/roles.guards';
