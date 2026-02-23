@@ -2,14 +2,12 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
-  Logger,
 } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { RideFilterDto } from './dto/ride-filter.dto';
 import { Prisma, RideStatus } from '@prisma/client';
 import { TransactionLedgerService } from '../transactions/transaction-ledger.service';
 import { TripsService } from 'src/users/trips/trips.service';
-import { NotificationsGateway } from 'src/notifications/notifications.gateway';
 // ✅ Type-safe query fragments for performance
 const rideListInclude = {
   include: {
@@ -48,13 +46,10 @@ type RideWithDetailRelations = Prisma.RideGetPayload<typeof rideDetailInclude>;
 
 @Injectable()
 export class RidesService {
-  private readonly logger = new Logger(RidesService.name);
-
   constructor(
     private prisma: PrismaService,
     private ledgerService: TransactionLedgerService,
     private tripsService: TripsService,
-    private readonly notificationsGateway: NotificationsGateway,
   ) {}
 
   // 📋 1. List All Rides (Paginated & Filtered)
@@ -206,7 +201,6 @@ export class RidesService {
       include: {
         payment: true,
         customer: { select: { id: true } },
-        rider: { select: { id: true } },
       },
     });
 
@@ -218,7 +212,7 @@ export class RidesService {
       );
     }
 
-    await this.prisma.$transaction(async (tx) => {
+    return this.prisma.$transaction(async (tx) => {
       // 1. Cancel the ride
       await tx.ride.update({
         where: { id },
@@ -260,37 +254,6 @@ export class RidesService {
         },
       });
     });
-
-    // 4. Notify customer via socket — update their app in real time
-    try {
-      this.notificationsGateway.server
-        .to(`user_${ride.customer.id}`)
-        .emit('RIDE_CANCELLED', {
-          type: 'RIDE_CANCELLED',
-          rideId: id,
-          reason: reason || 'Cancelled by Support',
-          cancelledBy: 'system',
-          timestamp: Date.now(),
-        });
-
-      // 5. Notify rider (if one was assigned) so their job clears too
-      if (ride.rider?.id) {
-        this.notificationsGateway.server
-          .to(`user_${ride.rider.id}`)
-          .emit('job.cancelled', {
-            id,
-            jobType: 'ride',
-            cancelledBy: 'system',
-            reason: reason || 'Cancelled by Support',
-            timestamp: Date.now(),
-          });
-      }
-    } catch (err) {
-      this.logger.error(
-        `Socket notification failed for cancelled ride ${id}`,
-        err,
-      );
-    }
   }
 
   // 💰 5. Process Ride Refund (Partial or Full)
@@ -481,35 +444,24 @@ export class RidesService {
     const ride = await this.prisma.ride.findUnique({ where: { id: rideId } });
     if (!ride) throw new NotFoundException('Ride not found');
 
-    const rider = await this.prisma.rider.findUnique({
-      where: { id: riderId },
-    });
+    const rider = await this.prisma.rider.findUnique({ where: { id: riderId } });
     if (!rider) throw new NotFoundException('Rider not found');
 
     // 2. Validate Ride State
     if (ride.riderId) {
-      throw new BadRequestException(
-        'Ride already has a driver. Unassign first.',
-      );
+      throw new BadRequestException('Ride already has a driver. Unassign first.');
     }
     if (['COMPLETED', 'CANCELLED', 'EXPIRED'].includes(ride.status)) {
-      throw new BadRequestException(
-        `Cannot assign driver to ${ride.status} ride.`,
-      );
+      throw new BadRequestException(`Cannot assign driver to ${ride.status} ride.`);
     }
 
     // 3. Validate Rider Eligibility
-    if (rider.role !== 'DRIVER') {
-      throw new BadRequestException(
-        'Selected user is not a ride-hailing driver. Only DRIVER-role users can be assigned to rides.',
-      );
-    }
     if (rider.status !== 'ACTIVE') {
-      throw new BadRequestException('Driver account is not ACTIVE.');
+      throw new BadRequestException('Rider account is not ACTIVE.');
     }
-    // Note: We allow offline assignment in emergencies, but warn in UI.
+    // Note: We allow offline assignment in emergencies, but warn in UI. 
     // Strict enforcement can be toggled here.
-
+    
     // 4. Perform Assignment
     // We update the DB directly, then trigger notifications via TripsService if possible
     await this.prisma.ride.update({
@@ -518,7 +470,7 @@ export class RidesService {
         riderId: riderId,
         status: 'ACCEPTED', // Move to Accepted state
         acceptedAt: new Date(),
-      },
+      }
     });
 
     // 5. Audit Log
@@ -531,105 +483,23 @@ export class RidesService {
         metadata: {
           rideId,
           riderId,
-          previousStatus: ride.status,
-        },
-      },
+          previousStatus: ride.status
+        }
+      }
     });
 
-    // 6. Emit socket events — driver gets the job offer, customer gets driver info
+    // 6. Notify Rider (Best Effort)
     try {
-      const fullRide = await this.prisma.ride.findUnique({
-        where: { id: rideId },
-        include: {
-          rider: { include: { vehicle: true } },
-          customer: { select: { id: true, name: true } },
-          pickupAddress: {
-            select: { street: true, city: true, lat: true, lng: true },
-          },
-          dropoffAddress: { select: { street: true, city: true } },
-        },
-      });
-
-      if (fullRide?.rider) {
-        const pickupText = fullRide.pickupAddress
-          ? `${fullRide.pickupAddress.street}, ${fullRide.pickupAddress.city}`
-          : 'Pickup location';
-        const dropoffText = fullRide.dropoffAddress
-          ? `${fullRide.dropoffAddress.street}, ${fullRide.dropoffAddress.city}`
-          : 'Dropoff location';
-
-        // Notify driver: job assigned (shows ride offer card in app)
-        this.notificationsGateway.server
-          .to(`user_${riderId}`)
-          .emit('job.assigned', {
-            id: rideId,
-            jobType: 'ride',
-            customerName: fullRide.customer?.name || 'Customer',
-            pickupAddress: pickupText,
-            dropoffAddress: dropoffText,
-            estimatedEarnings: fullRide.totalFare ?? 0,
-            distance: fullRide.distanceKm ?? null,
-            assignedByAdmin: true,
-            timestamp: Date.now(),
-          });
-
-        this.notificationsGateway.server
-          .to(`user_${fullRide.customerId}`)
-          .emit('DRIVER_FOUND', {
-            type: 'DRIVER_FOUND',
-            metadata: {
-              rideId,
-              driver: {
-                id: fullRide.rider.id,
-                name: fullRide.rider.name,
-                phone: fullRide.rider.phone,
-                vehicle: fullRide.rider.vehicle ?? null,
-              },
-            },
-          });
-
-        this.logger.log(
-          `Manual assignment sockets emitted — driver: ${riderId}, customer: ${fullRide.customerId}`,
-        );
-      }
+        // Assuming TripsService has a way to notify via Socket
+        // If not, we rely on the rider app polling or generic notification service
+        // this.notificationsService.notifyRider(riderId, 'New Ride Assigned by Support');
     } catch (e) {
-      // Non-fatal — DB is already updated
-      this.logger.error('Socket emit failed after manual assignment', e);
+        // Ignore notification errors
     }
 
     return { success: true, message: 'Driver assigned successfully' };
   }
 
-  // 🔧 6. Force Status Override (Super Admin Only)
-  async forceStatus(
-    id: string,
-    status: RideStatus,
-    adminId: string,
-    reason?: string,
-  ) {
-    const ride = await this.prisma.ride.findUnique({ where: { id } });
-    if (!ride) throw new NotFoundException(`Ride #${id} not found`);
+ 
 
-    const previousStatus = ride.status;
-
-    await this.prisma.ride.update({
-      where: { id },
-      data: { status },
-    });
-
-    await this.prisma.activityLog.create({
-      data: {
-        userId: adminId || 'SUPER_ADMIN',
-        action: 'RIDE_STATUS_OVERRIDE',
-        target: id,
-        metadata: {
-          previousStatus,
-          newStatus: status,
-          reason: reason || 'Manual override by Super Admin',
-        },
-      },
-    });
-
-    return { success: true, previousStatus, newStatus: status };
-  }
 }

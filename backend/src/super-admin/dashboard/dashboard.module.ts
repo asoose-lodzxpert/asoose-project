@@ -4,17 +4,16 @@ import { DashboardController } from './dashboard.controller';
 import { DashboardService } from './dashboard.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { DisputesModule } from '../dispute/dispute.module';
-import { VendorModule } from '../vendors/vendor.module';
+import { VendorModule } from '../vendors/vendor.module'; 
 
 @Module({
   imports: [
     CacheModule.register({
-      ttl: 300000,
-      max: 100,
+      ttl: 300000, 
+      max: 100, 
     }),
-    // ✅ FIX: Add them to imports
     DisputesModule,
-    VendorModule,
+    VendorModule, 
   ],
   controllers: [DashboardController],
   providers: [DashboardService, PrismaService],
