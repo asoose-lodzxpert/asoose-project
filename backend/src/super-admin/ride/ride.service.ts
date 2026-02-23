@@ -444,24 +444,30 @@ export class RidesService {
     const ride = await this.prisma.ride.findUnique({ where: { id: rideId } });
     if (!ride) throw new NotFoundException('Ride not found');
 
-    const rider = await this.prisma.rider.findUnique({ where: { id: riderId } });
+    const rider = await this.prisma.rider.findUnique({
+      where: { id: riderId },
+    });
     if (!rider) throw new NotFoundException('Rider not found');
 
     // 2. Validate Ride State
     if (ride.riderId) {
-      throw new BadRequestException('Ride already has a driver. Unassign first.');
+      throw new BadRequestException(
+        'Ride already has a driver. Unassign first.',
+      );
     }
     if (['COMPLETED', 'CANCELLED', 'EXPIRED'].includes(ride.status)) {
-      throw new BadRequestException(`Cannot assign driver to ${ride.status} ride.`);
+      throw new BadRequestException(
+        `Cannot assign driver to ${ride.status} ride.`,
+      );
     }
 
     // 3. Validate Rider Eligibility
     if (rider.status !== 'ACTIVE') {
       throw new BadRequestException('Rider account is not ACTIVE.');
     }
-    // Note: We allow offline assignment in emergencies, but warn in UI. 
+    // Note: We allow offline assignment in emergencies, but warn in UI.
     // Strict enforcement can be toggled here.
-    
+
     // 4. Perform Assignment
     // We update the DB directly, then trigger notifications via TripsService if possible
     await this.prisma.ride.update({
@@ -470,7 +476,7 @@ export class RidesService {
         riderId: riderId,
         status: 'ACCEPTED', // Move to Accepted state
         acceptedAt: new Date(),
-      }
+      },
     });
 
     // 5. Audit Log
@@ -483,23 +489,58 @@ export class RidesService {
         metadata: {
           rideId,
           riderId,
-          previousStatus: ride.status
-        }
-      }
+          previousStatus: ride.status,
+        },
+      },
     });
 
     // 6. Notify Rider (Best Effort)
     try {
-        // Assuming TripsService has a way to notify via Socket
-        // If not, we rely on the rider app polling or generic notification service
-        // this.notificationsService.notifyRider(riderId, 'New Ride Assigned by Support');
+      // Assuming TripsService has a way to notify via Socket
+      // If not, we rely on the rider app polling or generic notification service
+      // this.notificationsService.notifyRider(riderId, 'New Ride Assigned by Support');
     } catch (e) {
-        // Ignore notification errors
+      // Ignore notification errors
     }
 
     return { success: true, message: 'Driver assigned successfully' };
   }
 
- 
+  async forceStatus(
+    rideId: string,
+    newStatus: string,
+    adminId: string,
+    reason?: string,
+  ) {
+    const ride = await this.prisma.ride.findUnique({ where: { id: rideId } });
+    if (!ride) throw new NotFoundException('Ride not found');
 
+    const now = new Date();
+    const updatedRide = await this.prisma.ride.update({
+      where: { id: rideId },
+      data: {
+        status: newStatus as any,
+        ...(newStatus === 'COMPLETED' && { completedAt: now }),
+        ...(newStatus === 'CANCELLED' && { cancelledAt: now }),
+        ...(newStatus === 'ACCEPTED' && { acceptedAt: now }),
+        ...(newStatus === 'IN_PROGRESS' && { startedAt: now }),
+        ...(['PENDING', 'REQUESTED'].includes(newStatus) && {
+          completedAt: null,
+          cancelledAt: null,
+        }),
+      },
+    });
+
+    await this.prisma.activityLog.create({
+      data: {
+        userId: adminId,
+        action: 'RIDE_FORCE_STATUS',
+        target: rideId,
+        details: `Force status change from ${ride.status} to ${newStatus}${reason ? `. Reason: ${reason}` : ''}`,
+        metadata: { oldStatus: ride.status, newStatus, reason },
+      },
+    });
+
+    return updatedRide;
+  }
 }

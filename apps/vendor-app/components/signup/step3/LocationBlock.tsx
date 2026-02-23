@@ -1,85 +1,4 @@
-import { ThemedText } from "@/components/themed-text";
-import { IconSymbol } from "@/components/ui/icon-symbol";
-import { useThemeColor } from "@/hooks/use-theme-color";
-import {
-  isWithinServiceBounds,
-  getServiceAreaNames,
-  DEFAULT_MAP_CENTER,
-} from "@/constants/service-bounds";
-import Toast from "react-native-toast-message";
-import React, { useEffect, useState } from "react";
-import {
-  ActivityIndicator,
-  Modal,
-  Pressable,
-  StyleSheet,
-  View,
-} from "react-native";
-import MapView, { Marker, Region } from "react-native-maps";
-
-interface Props {
-  mapRef?: React.RefObject<MapView | null>;
-  primary: string;
-  location?: { lat: number; lng: number };
-  onUseCurrent: () => Promise<void>;
-  onPick: (v: { lat: number; lng: number }) => void;
-  disabled?: boolean;
-  loading?: boolean;
-}
-
-export const LocationBlock: React.FC<Props> = ({
-  mapRef,
-  primary,
-  location,
-  onUseCurrent,
-  onPick,
-  disabled,
-  loading = false,
-}) => {
-  const [fullMapVisible, setFullMapVisible] = useState(false);
-  const [tempLocation, setTempLocation] = useState<{
-    lat: number;
-    lng: number;
-  } | null>(null);
-  const [mapReady, setMapReady] = useState(false);
-
-  const textOnPrimary = useThemeColor({}, "textOnPrimary");
-  const brandPrimary = useThemeColor({}, "brandPrimary");
-
-  const safeLat = location?.lat ?? DEFAULT_MAP_CENTER.latitude;
-  const safeLng = location?.lng ?? DEFAULT_MAP_CENTER.longitude;
-
-  const region: Region = {
-    latitude: safeLat,
-    longitude: safeLng,
-    latitudeDelta: 0.01,
-    longitudeDelta: 0.01,
-  };
-
-  const modalRegion: Region = {
-    latitude: tempLocation?.lat ?? safeLat,
-    longitude: tempLocation?.lng ?? safeLng,
-    latitudeDelta: 0.05,
-    longitudeDelta: 0.05,
-  };
-
-  const handleUseCurrent = async () => {
-    if (loading || disabled) return;
-    await onUseCurrent();
-  };
-
-  const openFullMap = () => {
-    if (disabled) return;
-    setTempLocation(location ?? { lat: safeLat, lng: safeLng });
-    setFullMapVisible(true);
-  };
-
-  const confirmFullMapLocation = () => {
-    if (tempLocation) onPick(tempLocation);
-    setFullMapVisible(false);
-  };
-
-import { ThemedText } from "@/components/themed-text";
+﻿import { ThemedText } from "@/components/themed-text";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import {
@@ -138,7 +57,37 @@ export const LocationBlock: React.FC<Props> = ({
   const safeLat = location?.lat ?? DEFAULT_MAP_CENTER.latitude;
   const safeLng = location?.lng ?? DEFAULT_MAP_CENTER.longitude;
 
-  // Reverse-geocode whenever the coordinates change
+  const region: Region = {
+    latitude: safeLat,
+    longitude: safeLng,
+    latitudeDelta: 0.01,
+    longitudeDelta: 0.01,
+  };
+
+  const modalRegion: Region = {
+    latitude: tempLocation?.lat ?? safeLat,
+    longitude: tempLocation?.lng ?? safeLng,
+    latitudeDelta: 0.05,
+    longitudeDelta: 0.05,
+  };
+
+  const handleUseCurrent = async () => {
+    if (loading || disabled) return;
+    await onUseCurrent();
+  };
+
+  const openFullMap = () => {
+    if (disabled) return;
+    setTempLocation(location ?? { lat: safeLat, lng: safeLng });
+    setFullMapVisible(true);
+  };
+
+  const confirmFullMapLocation = () => {
+    if (tempLocation) onPick(tempLocation);
+    setFullMapVisible(false);
+  };
+
+  // Reverse-geocode whenever the saved coordinates change
   useEffect(() => {
     if (!location?.lat || !location?.lng) {
       setResolvedAddress("");
@@ -171,41 +120,16 @@ export const LocationBlock: React.FC<Props> = ({
     };
   }, [location?.lat, location?.lng]);
 
-  const region: Region = {
-    latitude: safeLat,
-    longitude: safeLng,
-    latitudeDelta: 0.01,
-    longitudeDelta: 0.01,
-  };
-
-  const modalRegion: Region = {
-    latitude: tempLocation?.lat ?? safeLat,
-    longitude: tempLocation?.lng ?? safeLng,
-    latitudeDelta: 0.05,
-    longitudeDelta: 0.05,
-  };
-
-  const handleUseCurrent = async () => {
-    if (loading || disabled) return;
-    await onUseCurrent();
-  };
-
-  const openFullMap = () => {
-    if (disabled) return;
-    setTempLocation(location ?? { lat: safeLat, lng: safeLng });
-    setFullMapVisible(true);
-  };
-
-  const confirmFullMapLocation = () => {
-    if (tempLocation) onPick(tempLocation);
-    setFullMapVisible(false);
-  };
-
   return (
     <View style={styles.container}>
-
-      {/* ── Location info card ─────────────────────────────────────── */}
-      <View style={[styles.infoCard, { backgroundColor: card, borderColor: border }]}>
+      {/* â”€â”€ Location info card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      <View
+        style={[
+          styles.infoCard,
+          { backgroundColor: card, borderColor: border },
+        ]}
+      >
+        {/* Address row */}
         <View style={styles.infoRow}>
           <IconSymbol name="location.fill" size={16} color={primary} />
           <View style={{ flex: 1 }}>
@@ -213,10 +137,18 @@ export const LocationBlock: React.FC<Props> = ({
               Address
             </ThemedText>
             {geocoding ? (
-              <ActivityIndicator size="small" color={textSecondary} style={{ alignSelf: "flex-start", marginTop: 2 }} />
+              <ActivityIndicator
+                size="small"
+                color={textSecondary}
+                style={{ alignSelf: "flex-start", marginTop: 2 }}
+              />
             ) : (
-              <ThemedText style={[styles.infoValue, { color: textSecondary }]} numberOfLines={2}>
-                {resolvedAddress || (location ? "Resolving address…" : "No location set")}
+              <ThemedText
+                style={[styles.infoValue, { color: textSecondary }]}
+                numberOfLines={2}
+              >
+                {resolvedAddress ||
+                  (location ? "Resolving addressâ€¦" : "No location set")}
               </ThemedText>
             )}
           </View>
@@ -224,24 +156,29 @@ export const LocationBlock: React.FC<Props> = ({
 
         <View style={[styles.divider, { backgroundColor: border }]} />
 
+        {/* Coordinates row */}
         <View style={styles.coordsRow}>
           <View style={styles.coordItem}>
-            <ThemedText style={[styles.infoLabel, { color: textMuted }]}>Latitude</ThemedText>
+            <ThemedText style={[styles.infoLabel, { color: textMuted }]}>
+              Latitude
+            </ThemedText>
             <ThemedText style={[styles.coordValue, { color: textSecondary }]}>
-              {location ? location.lat.toFixed(6) : "—"}
+              {location ? location.lat.toFixed(6) : "â€”"}
             </ThemedText>
           </View>
           <View style={[styles.coordSep, { backgroundColor: border }]} />
           <View style={styles.coordItem}>
-            <ThemedText style={[styles.infoLabel, { color: textMuted }]}>Longitude</ThemedText>
+            <ThemedText style={[styles.infoLabel, { color: textMuted }]}>
+              Longitude
+            </ThemedText>
             <ThemedText style={[styles.coordValue, { color: textSecondary }]}>
-              {location ? location.lng.toFixed(6) : "—"}
+              {location ? location.lng.toFixed(6) : "â€”"}
             </ThemedText>
           </View>
         </View>
       </View>
 
-      {/* ── Action buttons ─────────────────────────────────────────── */}
+      {/* â”€â”€ Action buttons â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <View style={styles.actions}>
         <Pressable
           style={[styles.row, (loading || disabled) && styles.disabled]}
@@ -264,11 +201,11 @@ export const LocationBlock: React.FC<Props> = ({
           disabled={disabled}
         >
           <IconSymbol name="map.fill" size={18} color={primary} />
-          <ThemedText>View full map</ThemedText>
+          <ThemedText>Pick on map</ThemedText>
         </Pressable>
       </View>
 
-      {/* Small inline map */}
+      {/* â”€â”€ Small inline map â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       {!disabled && (
         <MapView
           ref={mapRef}
@@ -301,7 +238,7 @@ export const LocationBlock: React.FC<Props> = ({
         </MapView>
       )}
 
-      {/* Full screen map modal */}
+      {/* â”€â”€ Full-screen map modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <Modal visible={fullMapVisible} animationType="slide">
         <View style={styles.fullMapContainer}>
           <MapView
@@ -399,7 +336,6 @@ const styles = StyleSheet.create({
   },
   coordValue: {
     fontSize: 13,
-    fontVariant: ["tabular-nums"],
   },
   actions: {
     gap: 4,
@@ -417,7 +353,7 @@ const styles = StyleSheet.create({
     width: "100%",
     height: 220,
     borderRadius: 12,
-    marginTop: 8,
+    marginTop: 4,
   },
   fullMapContainer: {
     flex: 1,
