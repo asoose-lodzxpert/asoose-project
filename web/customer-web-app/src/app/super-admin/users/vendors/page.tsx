@@ -522,7 +522,7 @@ export default function VendorManagementPage() {
               </button>
               <button
                 onClick={() => setIsManualOnboardOpen(true)}
-                className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-500 text-sm font-bold shadow-lg shadow-green-600/20"
+                className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-500 text-sm font-bold "
                 title="Manually onboard a vendor as Active & Verified"
               >
                 <UserCheck className="w-4 h-4" />
