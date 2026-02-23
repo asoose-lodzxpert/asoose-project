@@ -22,6 +22,8 @@ interface NotificationProps {
 /** Resolve a deep-link path from the notification metadata */
 function resolveDetailLink(type: string, metadata?: Record<string, any>): string | null {
   if (!metadata) return null;
+  // Dispute notifications always link to the dispute page
+  if (metadata.disputeId) return `/super-admin/disputes/${metadata.disputeId}`;
   if (type === "ORDER"    && metadata.orderId)    return `/super-admin/orders/${metadata.orderId}`;
   if (type === "DELIVERY" && metadata.deliveryId) return `/super-admin/deliveries/${metadata.deliveryId}`;
   if (type === "RIDE"     && metadata.rideId)     return `/super-admin/rides/${metadata.rideId}`;

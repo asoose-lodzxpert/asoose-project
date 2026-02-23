@@ -8,6 +8,12 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+export interface ModifierGroupRef {
+  id: string;
+  minSelect: number;
+  maxSelect: number;
+}
+
 export interface ProductProps {
   id: string;
   name: string;
@@ -16,6 +22,8 @@ export interface ProductProps {
   image?: string;
   storeId: string;
   storeName?: string;
+  /** Modifier groups passed through so the card can gate direct-add for required-modifier products. */
+  modifierGroups?: ModifierGroupRef[];
   onClick?: () => void;
 }
 
@@ -27,6 +35,7 @@ export const ProductCard = ({
   image,
   storeId,
   storeName,
+  modifierGroups,
   onClick,
 }: ProductProps) => {
   const addItem = useCartStore((state) => state.addItem);
@@ -34,12 +43,28 @@ export const ProductCard = ({
   const router = useRouter();
   const [loading, setLoading] = useState(false);
 
+  /** True when ONE OR MORE modifier groups require a selection (minSelect > 0). */
+  const hasRequiredModifiers = (modifierGroups ?? []).some(
+    (g) => g.minSelect > 0,
+  );
+
   const handleQuickAdd = async (e: React.MouseEvent) => {
     e.stopPropagation();
 
     // Delegate to modal opener if available, to ensure modifier selections are collected.
     if (onClick) {
       onClick();
+      return;
+    }
+
+    // Block direct-add for products that require modifier selections.
+    // Without a modal, we cannot collect the required modifierIds and the
+    // backend will reject the request (minSelect enforcement).
+    if (hasRequiredModifiers) {
+      toast.info("Please tap the item to choose your options", {
+        position: "bottom-center",
+        autoClose: 3000,
+      });
       return;
     }
 
@@ -65,6 +90,7 @@ export const ProductCard = ({
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
+            "ngrok-skip-browser-warning": "true",
           },
           body: JSON.stringify({ productId: id, quantity: 1 }),
         },
@@ -75,8 +101,11 @@ export const ProductCard = ({
           router.push("/sign-in");
           throw new Error("Session expired");
         }
-        const errorData = await res.json();
-        throw new Error(errorData.message || "Failed to add to cart");
+        const errorData = await res.json().catch(() => ({}));
+        const rawMsg = errorData.message;
+        throw new Error(
+          Array.isArray(rawMsg) ? rawMsg.join("; ") : rawMsg || "Failed to add to cart"
+        );
       }
 
       addItem({

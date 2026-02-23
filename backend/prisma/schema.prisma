@@ -1177,6 +1177,11 @@ model Banner {
   isActive    Boolean  @default(true)
   priority    Int      @default(0)
   createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([isActive])
+  @@index([type])
+  @@index([priority(sort: Desc)])
 }
 
 model Bank {

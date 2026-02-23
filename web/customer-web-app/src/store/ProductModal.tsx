@@ -7,6 +7,8 @@ import { toast } from "react-toastify";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 
+const CART_URL = `${(process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1").replace(/\/$/, "")}/cart/add`;
+
 // --- Types must match what is passed from the page ---
 export interface Modifier {
   id: string;
@@ -127,41 +129,46 @@ export const ProductModal = ({
       const token =
         (session as any)?.accessToken || (session as any)?.user?.accessToken;
 
-      // Flatten all selected modifier IDs across all groups
-      const modifierIds = Object.values(selectedModifiers).flat();
+      // Flatten all selected modifier IDs across all groups into a single array.
+      // Backend expects `modifierIds: string[]` — an array of Modifier record UUIDs.
+      const modifierIds: string[] = Object.values(selectedModifiers).flat();
 
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/cart/add`,
-        {
+      const res = await fetch(CART_URL, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
+            // Required for ngrok tunnels in development (prevents HTML warning page intercept)
+            "ngrok-skip-browser-warning": "true",
           },
           body: JSON.stringify({
             productId: product.id,
-            quantity: quantity,
-            // Send modifier selections — backend validates, prices, and persists them
-            modifierIds: modifierIds.length > 0 ? modifierIds : undefined,
+            quantity,
+            // Only include modifierIds when present — backend treats absence as "no modifiers".
+            ...(modifierIds.length > 0 && { modifierIds }),
           }),
-        },
-      );
+        });
 
       if (!res.ok) {
         if (res.status === 401) {
           router.push("/sign-in");
-          throw new Error("Session expired");
+          throw new Error("Session expired. Please sign in again.");
         }
-        const errorData = await res.json();
-        throw new Error(errorData.message || "Failed to add to cart");
+        const errorData = await res.json().catch(() => ({}));
+        // NestJS ValidationPipe may return { message: string } or { message: string[] }
+        const rawMsg = errorData.message;
+        const msg = Array.isArray(rawMsg)
+          ? rawMsg.join("; ")
+          : rawMsg || "Failed to add to cart";
+        throw new Error(msg);
       }
 
-      // 3. Success: Update Local Store
-      // The price stored here is for display only — the backend is the authoritative source.
+      // Success: sync local cart store for immediate UI update.
+      // Price stored here is display-only — the backend is the authoritative pricing source.
       addItem({
         id: product.id,
         name: product.name,
-        price: totalPrice / quantity, // Display price: base + client-calculated modifier add-ons
+        price: totalPrice / quantity, // display price: base + client-calculated modifier add-ons
         quantity,
         restaurantId: storeId,
         image: product.image,

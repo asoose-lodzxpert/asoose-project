@@ -11,9 +11,16 @@ import {
   ValidationPipe,
   Patch,
   Req,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { StoresService } from './vendors.service';
-import { CreateVendorDto, VendorQueryDto } from './dto/vendor.dto';
+import {
+  CreateVendorDto,
+  ManualOnboardVendorDto,
+  VendorQueryDto,
+} from './dto/vendor.dto';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { RolesGuard } from '../../auth/roles.guards';
 import { Roles } from '../../auth/roles.decorator';
@@ -27,6 +34,15 @@ import { UserRole } from '../../common/enums/user-role.enum';
 @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
 export class VendorsController {
   constructor(private readonly storesService: StoresService) {}
+
+  /** GET /api/v1/super-admin/vendors/categories
+   *  Returns all product categories. Accessible to SUPER_ADMIN and ADMIN.
+   *  Must be declared BEFORE `:id` routes to avoid route collision.
+   */
+  @Get('categories')
+  async getCategories() {
+    return this.storesService.getAllCategories();
+  }
 
   @Get()
   @UsePipes(new ValidationPipe({ transform: true }))
@@ -43,6 +59,18 @@ export class VendorsController {
   @UsePipes(new ValidationPipe({ whitelist: true }))
   async createVendor(@Body() dto: CreateVendorDto) {
     return this.storesService.create(dto);
+  }
+
+  /**
+   * Manually onboards a vendor directly as ACTIVE + VERIFIED.
+   * Bypasses the normal PENDING review flow. SUPER_ADMIN only.
+   */
+  @Post('onboard')
+  @Roles(UserRole.SUPER_ADMIN)
+  @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
+  async manualOnboard(@Body() dto: ManualOnboardVendorDto, @Req() req) {
+    const adminId = req.user.id || req.user.userId;
+    return this.storesService.manualOnboard(dto, adminId);
   }
 
   @Get(':id/performance')
@@ -64,6 +92,33 @@ export class VendorsController {
   @Get(':id/products')
   getProducts(@Param('id') id: string) {
     return this.storesService.getVendorProducts(id);
+  }
+
+  /**
+   * Admin adds a product to a specific vendor's store.
+   * Accepts multipart/form-data with an optional image file.
+   */
+  @Post(':id/products')
+  @UseInterceptors(FileInterceptor('image'))
+  async adminCreateProduct(
+    @Param('id') storeId: string,
+    @Body() body: any,
+    @Req() req,
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
+    const adminId = req.user.id || req.user.userId;
+    return this.storesService.adminCreateProduct(
+      storeId,
+      {
+        name: body.name,
+        description: body.description,
+        price: Number(body.price),
+        stock: body.stock != null ? Number(body.stock) : 0,
+        categoryId: body.categoryId,
+      },
+      adminId,
+      file,
+    );
   }
 
   @Get(':id/documents')

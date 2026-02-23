@@ -19,6 +19,7 @@ import {
 import Link from "next/link";
 import useSWR from "swr";
 import { useSession } from "next-auth/react";
+import { toast } from "react-toastify";
 
 import { OrderTimeline } from "@/app/main/components/order/OrderTimeline";
 import ReportDisputeModal from "../component/reportDisputeModal";
@@ -410,7 +411,13 @@ export default function OrderDetailsPage() {
         }}
         referenceId={disputeSubId ?? orderId}
         type="ORDER"
-        onSuccess={() => mutate()}
+        onSuccess={() => {
+          toast.success(
+            "Dispute created successfully. You can view it in the Dispute tab of your profile.",
+            { autoClose: 4000 }
+          );
+          mutate();
+        }}
       />
     </div>
   );

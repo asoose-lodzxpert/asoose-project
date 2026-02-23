@@ -192,7 +192,7 @@ export default function CheckoutForm() {
 
   useEffect(() => {
     if (mounted && cartItems.length === 0 && !isOrderCreated.current) {
-      router.push("/");
+      router.push("/main/store");
     }
   }, [mounted, cartItems, router]);
 

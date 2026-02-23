@@ -27,6 +27,7 @@ import HealthScoreCard from "./components/healthcard";
 import ProductsTabContent from "./components/productstabcontent";
 import PayoutsTabContent from "./components/payoutstabcontent";
 import DocumentsTab from "@/app/super-admin/component/documentstab";
+import AddProductModal from "./components/addproductmodal";
 import { Currency } from "@/app/main/components/Currency";
 
 // --- Types ---
@@ -192,6 +193,7 @@ export default function VendorDetailPage() {
   const [activeTab, setActiveTab] = useState("Order History");
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isAddProductOpen, setIsAddProductOpen] = useState(false);
 
   // Per-tab pagination
   const [docsPage, setDocsPage] = useState(1);
@@ -635,6 +637,7 @@ export default function VendorDetailPage() {
               products={products || []}
               onToggleBan={toggleProductBan}
               isLoading={isProductsLoading}
+              onAddProduct={() => setIsAddProductOpen(true)}
             />
           )}
 
@@ -728,6 +731,17 @@ export default function VendorDetailPage() {
             ))}
         </div>
       </div>
+
+      <AddProductModal
+        isOpen={isAddProductOpen}
+        storeId={vendor?.id || ""}
+        storeName={vendor?.name}
+        onClose={() => setIsAddProductOpen(false)}
+        onSuccess={() => {
+          setIsAddProductOpen(false);
+          mutateProducts();
+        }}
+      />
     </div>
   );
 }

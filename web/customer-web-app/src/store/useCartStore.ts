@@ -17,9 +17,12 @@ export function computeLineId(productId: string, modifierIds?: string[]): string
   return `${productId}_${modifierIds.slice().sort().join(',')}`;
 }
 
+/** Callers pass everything except `lineId` — the store computes it internally from id + modifierIds. */
+export type AddItemPayload = Omit<CartItem, 'lineId'>;
+
 interface CartState {
   items: CartItem[];
-  addItem: (item: CartItem) => void;
+  addItem: (item: AddItemPayload) => void;
   decreaseItem: (itemId: string) => void;
   removeItem: (itemId: string) => void;
   clearCart: () => void;
@@ -33,7 +36,7 @@ export const useCartStore = create<CartState>()(
     (set, get) => ({
       items: [],
 
-      addItem: (newItem) => {
+      addItem: (newItem: AddItemPayload) => {
         const lineId = computeLineId(newItem.id, newItem.modifierIds);
         const itemWithLineId: CartItem = { ...newItem, lineId };
         const currentItems = get().items;

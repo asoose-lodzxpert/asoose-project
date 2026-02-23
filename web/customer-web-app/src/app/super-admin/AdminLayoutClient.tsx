@@ -28,7 +28,6 @@ import {
 import { signOut } from "next-auth/react";
 import useSWR from "swr";
 import { fetcher } from "./hooks/useSuperAdminFetch";
-import { NotificationResponse } from "./notifications/types";
 
 type AdminRole =
   | "ADMIN"
@@ -56,9 +55,9 @@ export default function AdminLayoutClient({
 
   const role = userRole as AdminRole;
 
-  // 1. Fetch notifications
-  const { data: notificationsData } = useSWR<NotificationResponse>(
-    "/notifications",
+  // 1. Fetch unread count from the dedicated lightweight endpoint
+  const { data: unreadData } = useSWR<{ count: number }>(
+    "/super-admin/notifications/unread-count",
     fetcher,
     {
       refreshInterval: 30000,
@@ -66,7 +65,7 @@ export default function AdminLayoutClient({
     },
   );
 
-  const hasUnread = notificationsData?.data?.some((n) => !n.isRead) ?? false;
+  const hasUnread = (unreadData?.count ?? 0) > 0;
   const hasAccess = (allowedRoles: AdminRole[]) => allowedRoles.includes(role);
 
   const menuItems = [
