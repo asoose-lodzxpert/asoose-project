@@ -18,6 +18,7 @@ async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     // Required for Paystack (and other gateway) webhook HMAC signature verification.
     // Provides req.rawBody as the exact byte-perfect request body before JSON parsing.
+    // Provides req.rawBody as the exact byte-perfect request body before JSON parsing.
     rawBody: true,
   });
 
