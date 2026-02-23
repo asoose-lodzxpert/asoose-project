@@ -41,7 +41,12 @@ export class MarketplaceService {
 
     for (const type of verticalTypes) {
       const stores = await this.prisma.store.findMany({
-        where: { type, status: 'ACTIVE', verification: 'VERIFIED' },
+        where: {
+          type,
+          status: 'ACTIVE',
+          verification: 'VERIFIED',
+          products: { some: { status: 'ACTIVE' } },
+        },
         take: 10,
         orderBy: { rating: 'desc' },
         select: {
@@ -106,6 +111,7 @@ export class MarketplaceService {
     const where: Prisma.StoreWhereInput = {
       status: StoreStatus.ACTIVE, // Use the Enum instead of a string
       verification: VerificationStatus.VERIFIED, // Use the Enum instead of a string
+      products: { some: { status: 'ACTIVE' } },
       ...(type ? { type: this.mapSlugToType(type) } : {}),
     };
 
@@ -162,6 +168,7 @@ export class MarketplaceService {
         type: this.mapSlugToType(verticalId),
         status: 'ACTIVE',
         verification: 'VERIFIED', // Ensure we only show verified stores
+        products: { some: { status: 'ACTIVE' } },
       },
       orderBy: orderBy,
       take: 20,
@@ -222,6 +229,7 @@ export class MarketplaceService {
       where: {
         status: 'ACTIVE',
         verification: 'VERIFIED',
+        products: { some: { status: 'ACTIVE' } },
         name: { contains: query, mode: 'insensitive' },
       },
       take: 10,

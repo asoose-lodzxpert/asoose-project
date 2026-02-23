@@ -30,7 +30,8 @@
         "NSCameraUsageDescription": "This app requires camera access to take photos and scan documents.",
         "NSPhotoLibraryUsageDescription": "This app requires access to your photo library to select images.",
         "NSLocationWhenInUseUsageDescription": "Location is used to provide location-based services.",
-        "NSUserNotificationUsageDescription": "Notifications are used to keep you updated about your account and activity."
+        "NSUserNotificationUsageDescription": "Notifications are used to keep you updated about your account and activity.",
+        "ITSAppUsesNonExemptEncryption": false
       },
       "bundleIdentifier": "com.asoose.app",
       "config": {

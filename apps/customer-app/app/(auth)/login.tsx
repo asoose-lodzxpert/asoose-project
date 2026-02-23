@@ -11,31 +11,29 @@ import {
   Animated,
   Easing,
 } from "react-native";
-import { RelativePathString, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
+import Toast from "react-native-toast-message";
+
+// Services & Context
 import {
   configureGoogleSignIn,
   signInWithGoogle,
   authenticateWithApple,
   isAppleSignInAvailable,
 } from "@/services/oauth.service";
+import { useAuth } from "@/context/AuthContext";
+import { useConfirm } from "@/components/ui/ConfirmDialogProvider";
+import { useThemeColor } from "@/hooks/use-theme-color";
 
+// UI Components
 import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedInput } from "@/components/ThemedInput";
 import { IconSymbol } from "@/components/ui/icon-symbol";
-import { useThemeColor } from "@/hooks/use-theme-color";
-import { useAuth } from "@/context/AuthContext";
-import { useConfirm } from "@/components/ui/ConfirmDialogProvider";
-import Toast from "react-native-toast-message";
 
 export default function LoginScreen() {
-  const primary = useThemeColor({}, "brandPrimary");
-  const surface = useThemeColor({}, "surfaceBackground");
-  const textMuted = useThemeColor({}, "textMuted");
-  const border = useThemeColor({}, "borderDefault");
-  const textOnPrimary = useThemeColor({}, "textOnPrimary");
-  const textColor = useThemeColor({}, "textPrimary");
-
+  const router = useRouter();
+  const showConfirm = useConfirm();
   const {
     login,
     biometricLogin,
@@ -45,96 +43,60 @@ export default function LoginScreen() {
     isBiometricEnabled,
   } = useAuth();
 
-  const router = useRouter();
-  const showConfirm = useConfirm();
+  // Theme Colors
+  const primary = useThemeColor({}, "brandPrimary");
+  const surface = useThemeColor({}, "surfaceBackground");
+  const textMuted = useThemeColor({}, "textMuted");
+  const border = useThemeColor({}, "borderDefault");
+  const textOnPrimary = useThemeColor({}, "textOnPrimary");
+  const cardBg = useThemeColor({}, "surfaceCard"); // Or similar secondary surface color
 
+  // State
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [secure, setSecure] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-
   const [biometricEnabled, setBiometricEnabled] = useState(false);
-
   const [appleAvailable, setAppleAvailable] = useState(false);
 
-  /* =========================
-     Animation Setup
-  ========================== */
-
+  // Entrance Animations
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const translateAnim = useRef(new Animated.Value(20)).current;
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-
-  useEffect(() => {
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 500,
-        useNativeDriver: true,
-      }),
-      Animated.timing(translateAnim, {
-        toValue: 0,
-        duration: 500,
-        easing: Easing.out(Easing.ease),
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, []);
-
-  useEffect(() => {
-    if (loading) {
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(pulseAnim, {
-            toValue: 1.1,
-            duration: 600,
-            useNativeDriver: true,
-          }),
-          Animated.timing(pulseAnim, {
-            toValue: 1,
-            duration: 600,
-            useNativeDriver: true,
-          }),
-        ]),
-      ).start();
-    }
-  }, [loading]);
-
-  /* =========================
-     Biometric Auto Prompt
-  ========================== */
-
-  useEffect(() => {
-    let mounted = true;
-
-    (async () => {
-      const enabled = await isBiometricEnabled();
-      const available = await isAppleSignInAvailable();
-
-      if (!mounted) return;
-
-      setBiometricEnabled(enabled);
-      setAppleAvailable(available);
-
-      if (enabled) {
-        setTimeout(() => {
-          handleBiometricLogin();
-        }, 500);
-      }
-    })();
-
-    return () => {
-      mounted = false;
-    };
-  }, []);
+  const slideAnim = useRef(new Animated.Value(30)).current;
 
   useEffect(() => {
     configureGoogleSignIn();
+
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 800,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 800,
+        easing: Easing.out(Easing.back(1.5)),
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    (async () => {
+      const [isBioEnabled, isAppleAvail] = await Promise.all([
+        isBiometricEnabled(),
+        isAppleSignInAvailable(),
+      ]);
+      setBiometricEnabled(isBioEnabled);
+      setAppleAvailable(isAppleAvail);
+
+      if (isBioEnabled) {
+        setTimeout(handleBiometricLogin, 600);
+      }
+    })();
   }, []);
 
   /* =========================
-     Handlers
+      Function Handlers
   ========================== */
 
   const handleLogin = async () => {
@@ -142,28 +104,25 @@ export default function LoginScreen() {
       setError("Please enter your credentials");
       return;
     }
-
     setLoading(true);
     setError(null);
-
     try {
       await login({ email: identifier, password });
 
+      // Post-login check for biometric setup
       if (biometricAvailable && biometricEnrolled && !biometricEnabled) {
         const confirmed = await showConfirm({
-          title: "Enable Biometrics",
-          message: "Use fingerprint for faster sign in next time?",
-          confirmLabel: "Enable",
-          cancelLabel: "Skip",
+          title: "Fast Login",
+          message: "Would you like to enable biometrics for your next visit?",
+          confirmLabel: "Yes, enable",
+          cancelLabel: "Maybe later",
         });
-
         if (confirmed) {
           await enableBiometrics(identifier, password);
           setBiometricEnabled(true);
         }
       }
-
-      router.replace({ pathname: "/(tabs)/home" });
+      router.replace("/(tabs)/home");
     } catch (err: any) {
       setError(err.message || "Invalid credentials");
     } finally {
@@ -175,12 +134,12 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       await biometricLogin();
-      router.replace({ pathname: "/(tabs)/home" });
+      router.replace("/(tabs)/home");
     } catch (err: any) {
       if (err?.message !== "User cancelled") {
         Toast.show({
           type: "error",
-          text1: err?.message || "Biometric login failed",
+          text1: err?.message || "Biometric failed",
         });
       }
     } finally {
@@ -192,13 +151,10 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       await signInWithGoogle();
-      router.replace({ pathname: "/(tabs)/home" });
+      router.replace("/(tabs)/home");
     } catch (err: any) {
       if (err?.message !== "Google Sign-In was cancelled") {
-        Toast.show({
-          type: "error",
-          text1: err?.message || "Google login failed",
-        });
+        Toast.show({ type: "error", text1: "Google login failed" });
       }
     } finally {
       setLoading(false);
@@ -209,13 +165,10 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       await authenticateWithApple();
-      router.replace({ pathname: "/(tabs)/home" });
+      router.replace("/(tabs)/home");
     } catch (err: any) {
       if (err?.message !== "Apple Sign-In was cancelled") {
-        Toast.show({
-          type: "error",
-          text1: err?.message || "Apple login failed",
-        });
+        Toast.show({ type: "error", text1: "Apple login failed" });
       }
     } finally {
       setLoading(false);
@@ -224,23 +177,15 @@ export default function LoginScreen() {
 
   return (
     <ThemedView style={[styles.container, { backgroundColor: surface }]}>
-      {/* Pulsing Overlay */}
+      {/* Better Loading Overlay (No Expo Blur) */}
       {loading && (
-        <View style={styles.overlay}>
-          <Animated.View
-            style={[
-              styles.overlayCard,
-              {
-                transform: [{ scale: pulseAnim }],
-                backgroundColor: primary,
-              },
-            ]}
+        <View style={styles.loadingOverlay}>
+          <View
+            style={[styles.loadingCard, { backgroundColor: cardBg || surface }]}
           >
-            <ActivityIndicator size="large" color="#fff" />
-            <ThemedText style={{ color: "#fff", marginTop: 12 }}>
-              Signing you in...
-            </ThemedText>
-          </Animated.View>
+            <ActivityIndicator size="large" color={primary} />
+            <ThemedText style={styles.loadingText}>Please wait...</ThemedText>
+          </View>
         </View>
       )}
 
@@ -254,21 +199,32 @@ export default function LoginScreen() {
           showsVerticalScrollIndicator={false}
         >
           <Animated.View
-            style={{
-              opacity: fadeAnim,
-              transform: [{ translateY: translateAnim }],
-            }}
+            style={[
+              styles.centeredWrapper,
+              { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
+            ]}
           >
-            <View style={styles.headerArea}>
+            {/* Header Section */}
+            <View style={styles.header}>
+              <View
+                style={[styles.brandIcon, { backgroundColor: primary + "10" }]}
+              >
+                <IconSymbol
+                  name="person.crop.circle.fill"
+                  size={48}
+                  color={primary}
+                />
+              </View>
               <ThemedText style={styles.title}>Sign In</ThemedText>
               <ThemedText style={[styles.subtitle, { color: textMuted }]}>
-                Access your account securely
+                Welcome back! Please enter your details.
               </ThemedText>
             </View>
 
-            <View style={styles.formArea}>
+            {/* Form Section */}
+            <View style={styles.form}>
               <ThemedInput
-                placeholder="Email"
+                placeholder="Email Address"
                 value={identifier}
                 onChangeText={setIdentifier}
                 autoCapitalize="none"
@@ -280,7 +236,7 @@ export default function LoginScreen() {
                 onChangeText={setPassword}
                 secureTextEntry={secure}
                 iconRight={
-                  <Pressable onPress={() => setSecure(!secure)}>
+                  <Pressable onPress={() => setSecure(!secure)} hitSlop={10}>
                     <IconSymbol
                       name={secure ? "eye.slash" : "eye"}
                       size={20}
@@ -294,10 +250,11 @@ export default function LoginScreen() {
                 <ThemedText style={styles.errorText}>{error}</ThemedText>
               )}
 
-              <View style={styles.actionRow}>
+              <View style={styles.buttonRow}>
                 <Pressable
-                  style={[styles.primaryButton, { backgroundColor: primary }]}
+                  style={[styles.loginButton, { backgroundColor: primary }]}
                   onPress={handleLogin}
+                  disabled={loading}
                 >
                   <ThemedText
                     style={[styles.buttonText, { color: textOnPrimary }]}
@@ -308,65 +265,61 @@ export default function LoginScreen() {
 
                 {biometricEnabled && (
                   <Pressable
-                    style={[
-                      styles.biometricButton,
-                      { backgroundColor: primary },
-                    ]}
+                    style={[styles.bioIconButton, { borderColor: border }]}
                     onPress={handleBiometricLogin}
                   >
-                    <IconSymbol
-                      name="fingerprint"
-                      size={22}
-                      color={textOnPrimary}
-                    />
+                    <IconSymbol name="faceid" size={28} color={primary} />
                   </Pressable>
                 )}
               </View>
 
-              {/* ── Social divider ── */}
-              <View style={styles.dividerRow}>
-                <View
-                  style={[styles.dividerLine, { backgroundColor: border }]}
-                />
+              {/* Centered Divider */}
+              <View style={styles.dividerContainer}>
+                <View style={[styles.line, { backgroundColor: border }]} />
                 <ThemedText style={[styles.dividerText, { color: textMuted }]}>
-                  or continue with
+                  OR
                 </ThemedText>
-                <View
-                  style={[styles.dividerLine, { backgroundColor: border }]}
-                />
+                <View style={[styles.line, { backgroundColor: border }]} />
               </View>
 
-              {/* ── Social buttons ── */}
-              <View style={styles.socialRow}>
+              {/* Rounded Social Icons */}
+              <View style={styles.socialContainer}>
                 <Pressable
-                  style={[styles.socialButton, { borderColor: border }]}
+                  style={[styles.socialCircle, { borderColor: border }]}
                   onPress={handleGoogleSignIn}
-                  disabled={loading}
                 >
-                  <IconSymbol name="google.logo" size={20} color={textColor} />
-                  <ThemedText
-                    style={[styles.socialButtonText, { color: textColor }]}
-                  >
-                    Google
-                  </ThemedText>
+                  <Image
+                    source={require("@/assets/images/icons8-google-48.png")}
+                    style={styles.logoImage}
+                  />
                 </Pressable>
 
                 {appleAvailable && (
                   <Pressable
-                    style={[styles.socialButton, { borderColor: border }]}
+                    style={[styles.socialCircle, { borderColor: border }]}
                     onPress={handleAppleSignIn}
-                    disabled={loading}
                   >
-                    <IconSymbol name="apple.logo" size={20} color={textColor} />
-                    <ThemedText
-                      style={[styles.socialButtonText, { color: textColor }]}
-                    >
-                      Apple
-                    </ThemedText>
+                    <Image
+                      source={require("@/assets/images/icons8-google-48.png")}
+                      style={styles.logoImage}
+                    />
                   </Pressable>
                 )}
               </View>
             </View>
+
+            {/* Centered Footer */}
+            <Pressable
+              style={styles.footer}
+              onPress={() => router.push("/signup")}
+            >
+              <ThemedText style={{ color: textMuted }}>
+                New here?{" "}
+                <ThemedText style={{ color: primary, fontWeight: "700" }}>
+                  Create an account
+                </ThemedText>
+              </ThemedText>
+            </Pressable>
           </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -376,115 +329,132 @@ export default function LoginScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-
   scrollContent: {
     flexGrow: 1,
-    paddingHorizontal: 28,
-    paddingTop: Platform.OS === "ios" ? 70 : 50,
-    paddingBottom: 40,
+    justifyContent: "center", // Vertical center
+    padding: 32,
   },
-
-  headerArea: {
-    marginBottom: 40,
+  centeredWrapper: {
+    width: "100%",
+    maxWidth: 420,
+    alignSelf: "center",
   },
-
+  header: {
+    alignItems: "center",
+    marginBottom: 32,
+  },
+  brandIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 16,
+  },
   title: {
-    fontSize: 34,
+    fontSize: 30,
     fontWeight: "800",
+    letterSpacing: -0.5,
   },
-
   subtitle: {
     fontSize: 15,
+    marginTop: 6,
+    textAlign: "center",
+  },
+  form: {
+    gap: 16,
+  },
+  buttonRow: {
+    flexDirection: "row",
+    gap: 12,
     marginTop: 8,
   },
-
-  formArea: {
-    gap: 18,
-  },
-
-  actionRow: {
-    flexDirection: "row",
-    marginTop: 10,
-  },
-
-  primaryButton: {
+  loginButton: {
     flex: 1,
-    height: 56,
-    borderTopLeftRadius: 16,
-    borderBottomLeftRadius: 16,
+    height: 58,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  bioIconButton: {
+    width: 58,
+    height: 58,
+    borderRadius: 18,
+    borderWidth: 1.5,
     alignItems: "center",
     justifyContent: "center",
   },
-
-  biometricButton: {
-    width: 64,
-    height: 56,
-    borderTopRightRadius: 16,
-    borderBottomRightRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
   buttonText: {
     fontSize: 16,
     fontWeight: "700",
   },
-
   errorText: {
-    color: "#DC2626",
-    fontSize: 14,
+    color: "#F43F5E",
     textAlign: "center",
+    fontSize: 14,
+    fontWeight: "500",
   },
-
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.45)",
-    justifyContent: "center",
-    alignItems: "center",
-    zIndex: 10,
-  },
-
-  overlayCard: {
-    paddingHorizontal: 32,
-    paddingVertical: 28,
-    borderRadius: 20,
-    alignItems: "center",
-  },
-
-  dividerRow: {
+  dividerContainer: {
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 4,
+    marginVertical: 12,
   },
-
-  dividerLine: {
+  line: {
     flex: 1,
-    height: StyleSheet.hairlineWidth,
+    height: 1.5,
+    opacity: 0.5,
   },
-
   dividerText: {
-    marginHorizontal: 12,
-    fontSize: 13,
+    marginHorizontal: 16,
+    fontSize: 12,
+    fontWeight: "800",
+    opacity: 0.6,
   },
-
-  socialRow: {
+  socialContainer: {
     flexDirection: "row",
-    gap: 12,
-  },
-
-  socialButton: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
     justifyContent: "center",
-    gap: 8,
-    height: 50,
-    borderRadius: 14,
-    borderWidth: 1,
+    gap: 24,
   },
-
-  socialButtonText: {
-    fontSize: 15,
-    fontWeight: "600",
+  socialCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    borderWidth: 1.5,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "transparent",
+  },
+  logoImage: {
+    width: 28,
+    height: 28,
+    resizeMode: "contain",
+  },
+  footer: {
+    marginTop: 32,
+    alignItems: "center",
+  },
+  // Loading Components
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    zIndex: 100,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingCard: {
+    padding: 32,
+    borderRadius: 24,
+    alignItems: "center",
+    width: 180,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontWeight: "700",
+    fontSize: 14,
   },
 });
