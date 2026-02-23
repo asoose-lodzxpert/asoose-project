@@ -61,6 +61,7 @@ async function bootstrap() {
         'Origin',
         'Idempotency-Key',
         'x-idempotency-key',
+        'ngrok-skip-browser-warning',
       ],
     });
   } else {
@@ -91,6 +92,7 @@ async function bootstrap() {
         'Origin',
         'Idempotency-Key',
         'x-idempotency-key',
+        'ngrok-skip-browser-warning',
       ],
       exposedHeaders: ['X-Total-Count', 'X-Page-Number'],
       maxAge: 86400,

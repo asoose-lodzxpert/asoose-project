@@ -30,6 +30,7 @@ import { getSession } from "next-auth/react";
 import { fetcher } from "../../hooks/useSuperAdminFetch";
 import VendorManagementPageSkeleton from "./component/skeleton";
 import AddVendorModal from "./component/addvendorModal";
+import ManualOnboardModal from "./component/manualOnboardModal";
 import { FilterSelect } from "./component/filterSelect";
 import { StatCard } from "./component/statcard";
 
@@ -75,6 +76,7 @@ export default function VendorManagementPage() {
   const [showFilters, setShowFilters] = useState(false);
   const [isProcessingBulk, setIsProcessingBulk] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isManualOnboardOpen, setIsManualOnboardOpen] = useState(false);
 
   const [pagination, setPagination] = useState<PaginationState>({
     pageIndex: 0,
@@ -519,6 +521,15 @@ export default function VendorManagementPage() {
                 <span className="hidden md:inline">Export</span>
               </button>
               <button
+                onClick={() => setIsManualOnboardOpen(true)}
+                className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-500 text-sm font-bold shadow-lg shadow-green-600/20"
+                title="Manually onboard a vendor as Active & Verified"
+              >
+                <UserCheck className="w-4 h-4" />
+                <span className="hidden md:inline">Manual Onboard</span>
+                <span className="inline md:hidden">Onboard</span>
+              </button>
+              <button
                 onClick={() => setIsAddModalOpen(true)}
                 className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-yellow-500 text-black rounded-lg hover:bg-yellow-400 text-sm font-bold shadow-lg shadow-yellow-500/20"
               >
@@ -713,6 +724,12 @@ export default function VendorManagementPage() {
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
         onVendorAdded={mutate}
+      />
+
+      <ManualOnboardModal
+        isOpen={isManualOnboardOpen}
+        onClose={() => setIsManualOnboardOpen(false)}
+        onSuccess={mutate}
       />
     </div>
   );

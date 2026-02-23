@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   Logger,
@@ -16,10 +17,15 @@ import {
   UserStatus,
   StoreType,
 } from '@prisma/client';
-import { CreateVendorDto, VendorQueryDto } from './dto/vendor.dto';
+import {
+  CreateVendorDto,
+  ManualOnboardVendorDto,
+  VendorQueryDto,
+} from './dto/vendor.dto';
 import { EmailProducer } from '../../mail/email.producer';
 import { ActivityLogService } from 'src/common/services/activity-log.services';
 import { VendorAccountNotificationsService } from 'src/vendor/notifications/vendor-account-notifications.service';
+import { StorageService } from 'src/storage/storage.service';
 
 @Injectable()
 export class StoresService {
@@ -30,7 +36,16 @@ export class StoresService {
     private emailProducer: EmailProducer,
     private logService: ActivityLogService,
     private vendorNotificationsService: VendorAccountNotificationsService,
+    private storageService: StorageService,
   ) {}
+
+  /** Returns all product categories, ordered alphabetically. */
+  async getAllCategories() {
+    return this.prisma.category.findMany({
+      orderBy: { name: 'asc' },
+      select: { id: true, name: true },
+    });
+  }
 
   async findAll(query: VendorQueryDto) {
     const {
@@ -190,6 +205,126 @@ export class StoresService {
       id: result.store.id,
       name: result.store.name,
       message: 'Vendor created successfully',
+    };
+  }
+
+  /**
+   * Manually onboards a vendor as ACTIVE + VERIFIED, skipping the PENDING review flow.
+   * Optionally creates initial products in the same transaction.
+   */
+  async manualOnboard(dto: ManualOnboardVendorDto, adminId: string) {
+    const existingEmail = await this.prisma.vendor.findUnique({
+      where: { email: dto.email },
+    });
+    if (existingEmail) throw new ConflictException('Email already in use');
+
+    const existingSlug = await this.prisma.store.findUnique({
+      where: { slug: dto.slug },
+    });
+    if (existingSlug) throw new ConflictException('Store slug already exists');
+
+    const rawPassword =
+      'Asoose@' + Math.random().toString(36).slice(-8).toUpperCase() + '1!';
+    const hashedPassword = await bcrypt.hash(rawPassword, 10);
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      // Store.vendorId references the Vendor model, not User.
+      // Create a Vendor record with sensible defaults for required fields.
+      const vendor = await tx.vendor.create({
+        data: {
+          email: dto.email,
+          name: dto.name,
+          phone: dto.phone || 'N/A',
+          countryCode: 'NG',
+          businessType: dto.type,
+          employees: '1-10',
+          password: hashedPassword,
+          status: UserStatus.ACTIVE,
+        },
+      });
+
+      const store = await tx.store.create({
+        data: {
+          name: dto.storeName,
+          slug: dto.slug,
+          vendorId: vendor.id,
+          description: `Store for ${dto.storeName}`,
+          address: dto.address,
+          status: StoreStatus.ACTIVE,
+          verification: VerificationStatus.VERIFIED,
+          type: dto.type,
+        },
+      });
+
+      let productsCreated = 0;
+      if (dto.initialProducts && dto.initialProducts.length > 0) {
+        for (const p of dto.initialProducts) {
+          const productSlug =
+            p.name
+              .toLowerCase()
+              .trim()
+              .replace(/[^\w\s-]/g, '')
+              .replace(/[\s_-]+/g, '-')
+              .replace(/^-+|-+$/g, '') +
+            '-' +
+            Math.random().toString(36).substring(2, 6);
+
+          await tx.product.create({
+            data: {
+              name: p.name,
+              slug: productSlug,
+              price: p.price,
+              description: p.description,
+              storeId: store.id,
+              categoryId: p.categoryId,
+              stock: p.stock ?? 0,
+              status: ProductStatus.ACTIVE,
+            },
+          });
+          productsCreated++;
+        }
+      }
+
+      return { vendor, store, productsCreated };
+    });
+
+    await this.logService.record({
+      userId: adminId,
+      action: 'MANUAL_ONBOARD_VENDOR',
+      target: result.store.name,
+      details: `Super Admin manually onboarded vendor ${result.store.name} as ACTIVE/VERIFIED with ${result.productsCreated} initial product(s)`,
+      metadata: {
+        storeId: result.store.id,
+        vendorId: result.vendor.id,
+        productsCreated: result.productsCreated,
+      },
+    });
+
+    // Fire-and-forget: notify vendor of account creation + send credentials
+    this.emailProducer
+      .sendVendorAccountCreated(dto.email, dto.name, dto.storeName)
+      .catch((err: any) =>
+        this.logger.warn(`Welcome email failed: ${err.message}`),
+      );
+
+    this.emailProducer
+      .sendVendorMessage(
+        dto.email,
+        `Your ${dto.storeName} Store Credentials`,
+        `Hello ${dto.name},\n\nYour vendor store "${dto.storeName}" has been set up and is now ACTIVE.\n\nLogin Email: ${dto.email}\nTemporary Password: ${rawPassword}\n\nPlease log in and change your password immediately.\n\nTeam Asoose`,
+      )
+      .catch((err: any) =>
+        this.logger.warn(`Credentials email failed: ${err.message}`),
+      );
+
+    return {
+      id: result.store.id,
+      name: result.store.name,
+      slug: result.store.slug,
+      status: result.store.status,
+      verification: result.store.verification,
+      productsCreated: result.productsCreated,
+      message: `Vendor manually onboarded successfully with ${result.productsCreated} product(s)`,
     };
   }
 
@@ -394,6 +529,80 @@ export class StoresService {
       })),
 
       payouts: store.vendorPayouts,
+    };
+  }
+
+  /**
+   * Admin creates a product for any vendor's store, bypassing ownership checks.
+   * Accepts an optional uploaded image file; falls back to images[] in dto.
+   */
+  async adminCreateProduct(
+    storeId: string,
+    dto: {
+      name: string;
+      description?: string;
+      price: number;
+      stock?: number;
+      categoryId: string;
+    },
+    adminId: string,
+    file?: Express.Multer.File,
+  ) {
+    const store = await this.prisma.store.findUnique({ where: { id: storeId } });
+    if (!store) throw new NotFoundException('Store not found');
+
+    if (!dto.name?.trim()) throw new BadRequestException('Product name is required');
+    if (!dto.categoryId) throw new BadRequestException('Category is required');
+    if (dto.price == null || isNaN(Number(dto.price)) || Number(dto.price) < 0)
+      throw new BadRequestException('Price must be a non-negative number');
+
+    // Upload image if provided
+    let images: string[] = [];
+    if (file) {
+      const upload = await this.storageService.uploadFile(file);
+      images = [upload.url];
+    }
+
+    // Generate unique slug
+    const baseSlug = dto.name
+      .toLowerCase()
+      .trim()
+      .replace(/[^\w\s-]/g, '')
+      .replace(/[\s_-]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+    const slug = `${baseSlug}-${Date.now()}`;
+
+    const product = await this.prisma.product.create({
+      data: {
+        name: dto.name.trim(),
+        slug,
+        description: dto.description?.trim(),
+        price: Number(dto.price),
+        stock: dto.stock != null ? Number(dto.stock) : 0,
+        images,
+        storeId,
+        categoryId: dto.categoryId,
+        status: ProductStatus.ACTIVE,
+      },
+      include: { category: { select: { name: true } } },
+    });
+
+    await this.logService.record({
+      userId: adminId,
+      action: 'ADMIN_CREATE_PRODUCT',
+      target: product.name,
+      details: `Admin added product "${product.name}" to store ${store.name}`,
+      metadata: { productId: product.id, storeId },
+    });
+
+    return {
+      id: product.id,
+      name: product.name,
+      price: product.price,
+      image: product.images?.[0] || null,
+      category: (product as any).category?.name || 'Uncategorized',
+      status: product.status,
+      stock: product.stock,
     };
   }
 

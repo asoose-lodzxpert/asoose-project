@@ -4,11 +4,17 @@ import {
   IsNumber,
   IsOptional,
   IsString,
-  IsUrl,
   IsEnum,
   IsArray,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
+import { PartialType } from '@nestjs/swagger';
+
+export enum BannerType {
+  PROMO = 'PROMO',
+  AD = 'AD',
+  INFO = 'INFO',
+}
 
 export class CreateBannerDto {
   @IsString()
@@ -23,6 +29,10 @@ export class CreateBannerDto {
   @IsOptional()
   buttonText?: string;
 
+  /**
+   * Accepts both relative paths (e.g. "/main/store") and absolute URLs.
+   * @IsUrl() is intentionally NOT used here.
+   */
   @IsString()
   @IsOptional()
   link?: string;
@@ -31,9 +41,9 @@ export class CreateBannerDto {
   @IsOptional()
   image?: string;
 
-  @IsString()
+  @IsEnum(BannerType)
   @IsOptional()
-  type?: string;
+  type?: BannerType;
 
   @IsNumber()
   @IsOptional()
@@ -46,7 +56,8 @@ export class CreateBannerDto {
   isActive?: boolean;
 }
 
-export class UpdateBannerDto extends CreateBannerDto {}
+/** PartialType makes every field optional for PATCH requests */
+export class UpdateBannerDto extends PartialType(CreateBannerDto) {}
 
 export class ReorderBannersDto {
   @IsArray()

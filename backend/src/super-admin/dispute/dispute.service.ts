@@ -132,6 +132,37 @@ export class DisputesService {
       },
     });
 
+    // Notify admins — fire-and-forget (do not block the response on notification failure)
+    const notifType = dto.orderId ? 'ORDER' : dto.rideId ? 'RIDE' : 'DELIVERY';
+    const notifCategory = dto.orderId
+      ? 'ORDER_DISPUTE_CREATED'
+      : dto.rideId
+        ? 'RIDE_DISPUTE_CREATED'
+        : 'DELIVERY_DISPUTE_CREATED';
+    const referenceId = dto.orderId ?? dto.rideId ?? dto.deliveryId;
+
+    this.notificationsService
+      .createForAdmin({
+        title: `New ${notifType.charAt(0) + notifType.slice(1).toLowerCase()} Dispute`,
+        message: `A new dispute has been filed: "${dto.reason}". Priority: ${priority}.`,
+        type: notifType,
+        category: notifCategory,
+        metadata: {
+          disputeId: dispute.id,
+          referenceId,
+          referenceType: notifType,
+          // Include the type-specific key so NotificationCard deep-links work
+          ...(dto.orderId    ? { orderId: dto.orderId }       : {}),
+          ...(dto.rideId     ? { rideId: dto.rideId }         : {}),
+          ...(dto.deliveryId ? { deliveryId: dto.deliveryId } : {}),
+          priority,
+          reason: dto.reason,
+        },
+      })
+      .catch((err) =>
+        this.logger.error('Failed to create admin dispute notification', err),
+      );
+
     return dispute;
   }
 

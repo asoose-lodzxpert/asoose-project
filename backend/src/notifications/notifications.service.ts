@@ -223,6 +223,35 @@ export class NotificationsService {
   }
 
   /**
+   * Create a system-level notification for admin consumption.
+   * No userId / vendorId / riderId — these appear in the super-admin
+   * notification feed which queries only by `type`.
+   */
+  async createForAdmin(data: {
+    title: string;
+    message: string;
+    type: string;
+    category?: string;
+    metadata?: any;
+  }) {
+    const notification = await this.prisma.notification.create({
+      data: {
+        title: data.title,
+        message: data.message,
+        type: data.type,
+        category: data.category,
+        metadata: data.metadata || {},
+        isRead: false,
+      },
+    });
+
+    // Broadcast to all connected admin WebSocket clients
+    this.notificationsGateway.sendToAdminRoom(notification);
+
+    return notification;
+  }
+
+  /**
    * Get notifications for a user (customer)
    */
   async getUserNotifications(userId: string, page = 1) {

@@ -195,7 +195,10 @@ export default function DeliveryDetailsPage() {
           referenceId={delivery.id}
           type="DELIVERY"
           onSuccess={() =>
-            toast.info("Our support team will review your report shortly.")
+            toast.success(
+              "Dispute created successfully. You can view it in the Dispute tab of your profile.",
+              { autoClose: 4000 }
+            )
           }
         />
       )}

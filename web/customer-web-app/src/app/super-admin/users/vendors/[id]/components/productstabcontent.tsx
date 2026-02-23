@@ -6,6 +6,7 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
+  Plus,
 } from "lucide-react";
 import { Currency } from "@/app/main/components/Currency";
 
@@ -23,12 +24,14 @@ interface ProductsTabProps {
   products: Product[];
   isLoading?: boolean;
   onToggleBan: (id: string, status: string) => void;
+  onAddProduct?: () => void;
 }
 
 export default function ProductsTabContent({
   products,
   onToggleBan,
   isLoading = false,
+  onAddProduct,
 }: ProductsTabProps) {
   const [search, setSearch] = useState("");
 
@@ -69,23 +72,36 @@ export default function ProductsTabContent({
           {products?.length || 0})
         </h3>
 
-        {/* Search Input */}
-        <div className="relative w-full md:w-64">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-          <input
-            type="text"
-            placeholder="Search products..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            disabled={isLoading}
-            className="w-full bg-[#0F172A] border border-gray-800 rounded-lg pl-10 pr-8 py-2 text-sm text-gray-200 focus:outline-none focus:border-blue-500/50 transition-colors disabled:opacity-50"
-          />
-          {search && (
+        <div className="flex items-center gap-3 w-full md:w-auto">
+          {/* Search Input */}
+          <div className="relative flex-1 md:w-64">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+            <input
+              type="text"
+              placeholder="Search products..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              disabled={isLoading}
+              className="w-full bg-[#0F172A] border border-gray-800 rounded-lg pl-10 pr-8 py-2 text-sm text-gray-200 focus:outline-none focus:border-blue-500/50 transition-colors disabled:opacity-50"
+            />
+            {search && (
+              <button
+                onClick={() => setSearch("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+
+          {/* Add Product Button */}
+          {onAddProduct && (
             <button
-              onClick={() => setSearch("")}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white"
+              onClick={onAddProduct}
+              className="flex items-center gap-1.5 px-3 py-2 bg-yellow-500 hover:bg-yellow-400 text-black text-sm font-bold rounded-lg transition-colors shrink-0"
             >
-              <X className="w-3 h-3" />
+              <Plus className="w-4 h-4" />
+              Add Product
             </button>
           )}
         </div>

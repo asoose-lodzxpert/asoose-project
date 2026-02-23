@@ -15,8 +15,12 @@ import Swal from "sweetalert2";
 import ImageUpload from "@/app/main/components/ImageUpload";
 import { fetcher } from "../hooks/useSuperAdminFetch";
 
+const BACKEND_URL = (
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1"
+).replace(/\/$/, "");
+
 // 1. Define strict interfaces for type safety
-type BannerType = "PROMO" | "AD";
+type BannerType = "PROMO" | "AD" | "INFO";
 
 interface Banner {
   id: string;
@@ -38,8 +42,9 @@ const bannerSchema = z.object({
   title: z.string().min(1, "Title is required"),
   subtitle: z.string().min(1, "Subtitle is required"),
   buttonText: z.string().min(1, "Button text is required"),
-  link: z.string().url("Must be a valid URL"),
-  type: z.enum(["PROMO", "AD"]),
+  // Accepts both relative paths ("/main/store") and absolute URLs
+  link: z.string().min(1, "Link is required"),
+  type: z.enum(["PROMO", "AD", "INFO"]),
   priority: z.number().int().min(0).max(100),
   image: z.string().min(1, "Banner image is required"),
   isActive: z.boolean(),
@@ -48,18 +53,21 @@ const bannerSchema = z.object({
 type BannerFormValues = z.infer<typeof bannerSchema>;
 
 /**
- * Helper to handle mutations (POST/PATCH/DELETE) with NextAuth session logic
+ * Helper to handle mutations (POST/PATCH/DELETE) with NextAuth session logic.
+ * Pass `arg.path` to override the SWR key URL (needed for PATCH/DELETE with :id).
  */
 async function mutationFetcher(
   url: string,
-  { arg }: { arg: { method: string; body?: any } },
+  { arg }: { arg: { method: string; body?: any; path?: string } },
 ) {
   const session = await getSession();
   const token = (session as any)?.accessToken;
 
   if (!token) throw new Error("Authentication required");
 
-  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}${url}`, {
+  const finalPath = arg.path ?? url;
+
+  const res = await fetch(`${BACKEND_URL}${finalPath}`, {
     method: arg.method,
     headers: {
       Authorization: `Bearer ${token}`,
@@ -97,7 +105,7 @@ export default function BannerManagement() {
     resolver: zodResolver(bannerSchema),
     defaultValues: {
       buttonText: "Order Now",
-      link: "https://",
+      link: "/main/store",
       type: "PROMO",
       priority: 0,
       isActive: true,
@@ -114,7 +122,8 @@ export default function BannerManagement() {
       if (editingId) {
         await mutationTrigger({
           method: "PATCH",
-          body: { ...data, id: editingId },
+          path: `/super-admin/banners/${editingId}`,
+          body: data,
         } as any);
         toast.success("Banner updated successfully!");
       } else {
@@ -149,7 +158,7 @@ export default function BannerManagement() {
       title: "",
       subtitle: "",
       buttonText: "Order Now",
-      link: "https://",
+      link: "/main/store",
       type: "PROMO",
       priority: 0,
       image: "",
@@ -181,7 +190,7 @@ export default function BannerManagement() {
         if (!token) throw new Error("Authentication required");
 
         const res = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/super-admin/banners/${id}`,
+          `${BACKEND_URL}/super-admin/banners/${id}`,
           {
             method: "DELETE",
             headers: { Authorization: `Bearer ${token}` },
@@ -263,6 +272,7 @@ export default function BannerManagement() {
               >
                 <option value="PROMO">Promotion</option>
                 <option value="AD">Ad</option>
+                <option value="INFO">Info</option>
               </select>
               <div>
                 <input
@@ -340,7 +350,7 @@ export default function BannerManagement() {
 
       {/* List Section */}
       <div>
-        <h2 className="text-2xl font-bold mb-6">Active Banners</h2>
+        <h2 className="text-2xl font-bold mb-6">All Banners</h2>
         <div className="space-y-4 overflow-y-auto max-h-[700px] pr-2 custom-scrollbar">
           {loadingList ? (
             <div className="flex justify-center p-12">
