@@ -124,9 +124,11 @@ export const ProductModal = ({
 
     try {
       // 2. Backend Enforcement (Critical)
-      // Sync with server session to ensure stock and validity
       const token =
         (session as any)?.accessToken || (session as any)?.user?.accessToken;
+
+      // Flatten all selected modifier IDs across all groups
+      const modifierIds = Object.values(selectedModifiers).flat();
 
       const res = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/cart/add`,
@@ -139,6 +141,8 @@ export const ProductModal = ({
           body: JSON.stringify({
             productId: product.id,
             quantity: quantity,
+            // Send modifier selections — backend validates, prices, and persists them
+            modifierIds: modifierIds.length > 0 ? modifierIds : undefined,
           }),
         },
       );
@@ -153,14 +157,15 @@ export const ProductModal = ({
       }
 
       // 3. Success: Update Local Store
-      // We pass the calculated unit price (base + modifiers) to the local store
+      // The price stored here is for display only — the backend is the authoritative source.
       addItem({
         id: product.id,
         name: product.name,
-        price: totalPrice / quantity, // Unit price including modifiers
+        price: totalPrice / quantity, // Display price: base + client-calculated modifier add-ons
         quantity,
         restaurantId: storeId,
         image: product.image,
+        modifierIds: modifierIds.length > 0 ? modifierIds : undefined,
       });
 
       onClose();

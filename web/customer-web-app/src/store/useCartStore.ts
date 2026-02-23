@@ -3,23 +3,26 @@ import { persist, createJSONStorage } from "zustand/middleware";
 
 export interface CartItem {
   id: string;
+  lineId: string;
   name: string;
   price: number;
   quantity: number;
-  restaurantId: string; // Used by backend for order splitting
+  restaurantId: string;
   image?: string | null;
+  modifierIds?: string[];
+}
+
+export function computeLineId(productId: string, modifierIds?: string[]): string {
+  if (!modifierIds || modifierIds.length === 0) return productId;
+  return `${productId}_${modifierIds.slice().sort().join(',')}`;
 }
 
 interface CartState {
   items: CartItem[];
-  
-  // ACTIONS
   addItem: (item: CartItem) => void;
   decreaseItem: (itemId: string) => void;
   removeItem: (itemId: string) => void;
   clearCart: () => void;
-
-  // SELECTORS
   getTotalPrice: () => number;
   getTotalItems: () => number;
   getItemsByStore: () => Record<string, CartItem[]>;
@@ -30,64 +33,56 @@ export const useCartStore = create<CartState>()(
     (set, get) => ({
       items: [],
 
-      /**
-       * Multi-store implementation:
-       * Removed the SweetAlert/Validation logic that blocked items from different vendors.
-       */
       addItem: (newItem) => {
+        const lineId = computeLineId(newItem.id, newItem.modifierIds);
+        const itemWithLineId: CartItem = { ...newItem, lineId };
         const currentItems = get().items;
-        const existingItem = currentItems.find((i) => i.id === newItem.id);
+        const existingItem = currentItems.find((i) => i.lineId === lineId);
 
         if (existingItem) {
           set({
             items: currentItems.map((i) =>
-              i.id === newItem.id
+              i.lineId === lineId
                 ? { ...i, quantity: i.quantity + newItem.quantity }
                 : i
             ),
           });
         } else {
-          set({
-            items: [...currentItems, newItem],
-          });
+          set({ items: [...currentItems, itemWithLineId] });
         }
       },
 
-      decreaseItem: (itemId) => {
+      decreaseItem: (lineId) => {
         const currentItems = get().items;
-        const existingItem = currentItems.find((i) => i.id === itemId);
+        const existingItem = currentItems.find(
+          (i) => (i.lineId ?? i.id) === lineId
+        );
 
         if (existingItem && existingItem.quantity > 1) {
           set({
             items: currentItems.map((i) =>
-              i.id === itemId ? { ...i, quantity: i.quantity - 1 } : i
+              (i.lineId ?? i.id) === lineId ? { ...i, quantity: i.quantity - 1 } : i
             ),
           });
         } else {
-          get().removeItem(itemId);
+          get().removeItem(lineId);
         }
       },
 
-      removeItem: (itemId) => {
+      removeItem: (lineId) => {
         set({
-          items: get().items.filter((i) => i.id !== itemId),
+          items: get().items.filter((i) => (i.lineId ?? i.id) !== lineId),
         });
-      },
+      },                             // ← was followed by a rogue `});` and `},` here
 
       clearCart: () => set({ items: [] }),
 
       getTotalPrice: () =>
-        get().items.reduce(
-          (total, item) => total + item.price * item.quantity,
-          0
-        ),
+        get().items.reduce((total, item) => total + item.price * item.quantity, 0),
 
       getTotalItems: () =>
         get().items.reduce((total, item) => total + item.quantity, 0),
 
-      /**
-       * Useful helper for UI grouping in the Cart/Checkout pages
-       */
       getItemsByStore: () => {
         return get().items.reduce((acc, item) => {
           if (!acc[item.restaurantId]) {

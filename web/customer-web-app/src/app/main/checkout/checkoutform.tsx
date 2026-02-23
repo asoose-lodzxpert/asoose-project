@@ -86,6 +86,9 @@ export default function CheckoutForm() {
             items: cartItems.map((item) => ({
               id: item.id,
               quantity: item.quantity,
+              ...(item.modifierIds && item.modifierIds.length > 0
+                ? { modifierIds: item.modifierIds }
+                : {}),
             })),
           }),
         });
@@ -312,6 +315,10 @@ export default function CheckoutForm() {
         items: cartItems.map((item) => ({
           id: item.id,
           quantity: item.quantity,
+          // Forward modifier selections so the backend can price and persist them correctly
+          ...(item.modifierIds && item.modifierIds.length > 0
+            ? { modifierIds: item.modifierIds }
+            : {}),
         })),
       };
 

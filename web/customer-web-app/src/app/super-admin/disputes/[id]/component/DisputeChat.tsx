@@ -33,12 +33,12 @@ export default function DisputeChat({
       </h2>
 
       <div className="space-y-6 mb-6 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
-        {messages.length === 0 ? (
+        {(!messages || messages.length === 0) ? (
           <div className="text-center py-10 text-gray-500 italic">
             No messages yet.
           </div>
         ) : (
-          messages.map((msg) => {
+          (messages ?? []).map((msg) => {
             const isMe = ["SUPER_ADMIN", "ADMIN"].includes(msg.sender.role);
             return (
               <div

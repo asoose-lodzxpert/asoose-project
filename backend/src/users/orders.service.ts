@@ -203,7 +203,12 @@ export class OrdersService {
       const productIds = items.map((i) => i.id);
       const products = await this.prisma.product.findMany({
         where: { id: { in: productIds } },
-        include: { store: true },
+        include: {
+          store: true,
+          modifierGroups: {
+            include: { modifiers: { select: { id: true, price: true } } },
+          },
+        },
       });
 
       if (products.length !== items.length) {
@@ -241,8 +246,20 @@ export class OrdersService {
         let subtotal = 0;
         const enrichedItems = groupItems.map((item) => {
           const p = productMap.get(item.id)!;
-          subtotal += p.price * item.quantity;
-          return { ...item, name: p.name, price: p.price };
+          // Include modifier add-on prices from DB
+          const allModifiers = (p as any).modifierGroups?.flatMap(
+            (g: any) => g.modifiers,
+          ) ?? [];
+          const modifierAddon = (item.modifierIds ?? []).reduce(
+            (sum: number, modId: string) => {
+              const mod = allModifiers.find((m: any) => m.id === modId);
+              return sum + (mod?.price ?? 0);
+            },
+            0,
+          );
+          const unitPrice = p.price + modifierAddon;
+          subtotal += unitPrice * item.quantity;
+          return { ...item, name: p.name, price: unitPrice };
         });
         storeEntries.push({
           storeId,
@@ -986,7 +1003,12 @@ export class OrdersService {
     const productIds = dto.items.map((i) => i.id);
     const products = await this.prisma.product.findMany({
       where: { id: { in: productIds } },
-      include: { store: { include: { vendor: true } } },
+      include: {
+        store: { include: { vendor: true } },
+        modifierGroups: {
+          include: { modifiers: { select: { id: true, price: true } } },
+        },
+      },
     });
 
     if (products.length !== dto.items.length)
@@ -1022,12 +1044,39 @@ export class OrdersService {
         let itemsTotal = 0;
         const orderItemsData = groupItems.map((item) => {
           const p = productMap.get(item.id)!;
-          itemsTotal += p.price * item.quantity;
+
+          // Resolve modifier prices from DB — never trust the client-supplied price
+          const allModifiers = (p as any).modifierGroups?.flatMap(
+            (g: any) => g.modifiers,
+          ) ?? [];
+          const selectedModifierIds = item.modifierIds ?? [];
+          const selectedModifiers = allModifiers.filter((m: any) =>
+            selectedModifierIds.includes(m.id),
+          );
+          const modifierAddon = selectedModifiers.reduce(
+            (sum: number, m: any) => sum + m.price,
+            0,
+          );
+          const unitPrice = p.price + modifierAddon;
+
+          itemsTotal += unitPrice * item.quantity;
+
           return {
             productId: p.id,
             nameSnap: this.addressesService.sanitizeString(p.name),
-            price: p.price,
+            price: unitPrice, // DB-authoritative price including modifiers
             quantity: item.quantity,
+            selectedOptions: selectedModifierIds.length > 0
+              ? { modifierIds: selectedModifierIds }
+              : undefined,
+            // Create OrderItemModifier join records
+            modifiers: selectedModifierIds.length > 0
+              ? {
+                  create: selectedModifierIds.map((modifierId) => ({
+                    modifierId,
+                  })),
+                }
+              : undefined,
           };
         });
 

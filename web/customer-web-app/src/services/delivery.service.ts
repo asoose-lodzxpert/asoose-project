@@ -98,8 +98,10 @@ export class DeliveryService {
 
   /**
    * Save an address for the delivery.
-   * NOTE: The Address Prisma model requires `label`, `street`, `city`, and `state` as
-   * non-nullable String fields. All four must be sent to avoid a DB constraint violation.
+   * `label`, `street`, `lat`, and `lng` are required.
+   * `city` and `state` are optional — when omitted the backend defaults to
+   * 'Maiduguri' / 'Borno'. Never pass placeholder strings like 'Unknown' here;
+   * they are stored verbatim and would surface as "Unknown Unknown" in the UI.
    */
   static async saveAddress(data: {
     label: string;   // REQUIRED by Prisma schema (non-nullable String)
@@ -109,14 +111,16 @@ export class DeliveryService {
     lat: number;
     lng: number;
   }, token?: string) {
+    // city & state are @IsOptional() in the backend DTO — omit them rather than
+    // sending the sentinel string 'Unknown', which would be stored verbatim in the DB
+    // and cause "Unknown Unknown" to render on the Delivery Details page.
+    // The backend's createAddressFromData() falls back to 'Maiduguri' / 'Borno'
+    // when these fields are absent, which is a far safer default.
     const payload: Record<string, unknown> = {
       label: data.label,
       street: data.street,
-      // Provide sensible defaults so the DB constraint is never violated.
-      // The backend's geo-resolution layer may override these with accurate values,
-      // but they MUST be present in the DTO to pass server-side validation.
-      city: data.city || 'Unknown',
-      state: data.state || 'Unknown',
+      ...(data.city ? { city: data.city } : {}),
+      ...(data.state ? { state: data.state } : {}),
       lat: data.lat,
       lng: data.lng,
     };

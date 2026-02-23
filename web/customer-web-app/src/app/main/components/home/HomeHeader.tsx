@@ -51,7 +51,6 @@ export const HomeHeader = () => {
   const showBranding = [
     "/main/ride",
     "/main/delivery",
-    "/main/cart",
     "/main/orders",
     "/main/checkout",
     "/main/notifications",

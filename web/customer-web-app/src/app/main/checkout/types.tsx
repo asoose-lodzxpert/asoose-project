@@ -11,11 +11,13 @@ export interface Address {
 
 export interface CartItem {
   id: string;
+  lineId: string;
   name: string;
   price: number;
   quantity: number;
   image?: string | null;
   restaurantId: string;
+  modifierIds?: string[];
 }
 
 export interface OrderPayload {

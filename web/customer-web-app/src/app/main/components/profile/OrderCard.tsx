@@ -2,10 +2,13 @@ import { Package, ChevronRight, Clock, CheckCircle } from "lucide-react";
 
 interface OrderProps {
   id: string;
+  type?: string;
   status: "DELIVERED" | "PROCESSING" | "CANCELLED";
   date: string;
   total: string;
   items: string[];
+  stores?: any;
+  orderCount?: any;
 }
 
 export const OrderCard = ({ id, status, date, total, items }: OrderProps) => {

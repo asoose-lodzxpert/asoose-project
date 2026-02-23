@@ -139,9 +139,16 @@ export class UsersService {
       });
 
       return deliveries.map((d) => {
-        // Build a meaningful destination label; city may be null when not parsed from the Maps API
+        // Build a meaningful destination label.
+        // Guard against cities stored as placeholder strings ('Unknown', 'N/A') by
+        // old clients — treat them as absent and fall through to the street fragment.
+        const PLACEHOLDER = new Set(['unknown', 'n/a']);
+        const cityRaw = d.dropoffAddress?.city;
+        const cityOk =
+          cityRaw &&
+          !PLACEHOLDER.has(cityRaw.trim().toLowerCase());
         const destination =
-          d.dropoffAddress?.city ||
+          (cityOk ? cityRaw : null) ||
           d.dropoffAddress?.street?.split(',')[0] ||
           'your destination';
 
@@ -176,10 +183,15 @@ export class UsersService {
 
       if (!delivery) throw new NotFoundException('Delivery not found');
 
+      // Strip placeholder values (stored by old clients as 'Unknown' / 'N/A')
+      // so they are not shown in the formatted address string.
+      const PLACEHOLDER = new Set(['unknown', 'n/a']);
+      const isReal = (v: unknown): v is string =>
+        typeof v === 'string' &&
+        v.trim().length > 0 &&
+        !PLACEHOLDER.has(v.trim().toLowerCase());
       const formatAddress = (addr: any) =>
-        addr
-          ? [addr.street, addr.city, addr.state].filter(Boolean).join(', ')
-          : '';
+        addr ? [addr.street, addr.city, addr.state].filter(isReal).join(', ') : '';
 
       return {
         ...delivery,
