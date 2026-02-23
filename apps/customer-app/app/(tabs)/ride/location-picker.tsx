@@ -25,6 +25,11 @@ import { useSendPackage } from "@/context/SendPackageContext";
 import { getAccessToken } from "@/services/auth.service";
 import Toast from "react-native-toast-message";
 import { API_BASE as API_URL } from "@/constants/static-config";
+import {
+  isWithinServiceBounds,
+  getServiceAreaNames,
+  DEFAULT_MAP_CENTER,
+} from "@/constants/service-bounds";
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get("window");
 const MODAL_MAP_HEIGHT = SCREEN_HEIGHT * 0.78; // leaves space for header & buttons
 
@@ -187,6 +192,16 @@ export default function LocationPickerScreen() {
     (e: any) => {
       Keyboard.dismiss();
       const { coordinate } = e.nativeEvent;
+      if (!isWithinServiceBounds(coordinate.latitude, coordinate.longitude)) {
+        Toast.show({
+          type: "error",
+          text1: "Outside service area",
+          text2: `Please pick a location within ${getServiceAreaNames()}`,
+          position: "top",
+          topOffset: 40,
+        });
+        return;
+      }
       const loc = {
         latitude: coordinate.latitude,
         longitude: coordinate.longitude,
@@ -205,6 +220,16 @@ export default function LocationPickerScreen() {
   // ─── Confirm & Navigation ──────────────────────────────────────
   const confirmLocation = useCallback(
     (loc: Location) => {
+      if (!isWithinServiceBounds(loc.latitude, loc.longitude)) {
+        Toast.show({
+          type: "error",
+          text1: "Outside service area",
+          text2: `We currently serve: ${getServiceAreaNames()}`,
+          position: "top",
+          topOffset: 40,
+        });
+        return;
+      }
       if (type === "pickup") setPickupLocation(loc);
       else setDropoffLocation(loc);
       router.back();
@@ -446,10 +471,14 @@ export default function LocationPickerScreen() {
               provider={PROVIDER_GOOGLE}
               style={StyleSheet.absoluteFill}
               initialRegion={{
-                latitude: currentLocation?.coords?.latitude ?? 6.5244,
-                longitude: currentLocation?.coords?.longitude ?? 3.3792,
-                latitudeDelta: 0.07,
-                longitudeDelta: 0.07,
+                latitude:
+                  currentLocation?.coords?.latitude ??
+                  DEFAULT_MAP_CENTER.latitude,
+                longitude:
+                  currentLocation?.coords?.longitude ??
+                  DEFAULT_MAP_CENTER.longitude,
+                latitudeDelta: DEFAULT_MAP_CENTER.latitudeDelta,
+                longitudeDelta: DEFAULT_MAP_CENTER.longitudeDelta,
               }}
               onPress={handleMapPress}
               showsUserLocation

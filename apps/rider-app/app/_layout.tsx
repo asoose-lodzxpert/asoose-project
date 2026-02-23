@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { Stack } from "expo-router";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import Toast from "react-native-toast-message";
@@ -8,6 +8,7 @@ import { JobsProvider } from "@/context/JobContext";
 import { NotificationProvider } from "@/context/NotificationContext";
 import { NotificationPreferencesProvider } from "@/context/NotificationPreferencesContext";
 import { toastConfig } from "@/components/ThemedToast";
+import { loadServiceBounds } from "@/constants/service-bounds";
 
 const ONBOARDING_KEY = "asoose_rider_onboarded";
 
@@ -38,6 +39,10 @@ function AuthDependentProviders({ children }: { children: React.ReactNode }) {
 }
 
 export default function RootLayout() {
+  useEffect(() => {
+    loadServiceBounds();
+  }, []);
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <AuthProvider>

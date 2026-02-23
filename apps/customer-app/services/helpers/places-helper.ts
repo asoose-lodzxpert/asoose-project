@@ -2,12 +2,14 @@ import { request } from "@/lib/authFetch";
 import { Address } from "@/types/address";
 
 import { GOOGLE_MAPS_API_KEY, API_BASE } from "@/constants/static-config";
+import { DEFAULT_MAP_CENTER } from "@/constants/service-bounds";
 
 export const fetchSuggestions = async (input: string): Promise<any[]> => {
   if (!input) return [];
   try {
-    // Use backend endpoint for autocomplete
-    let url = `${API_BASE}/maps/places-autocomplete?query=${encodeURIComponent(input)}`;
+    // Use backend endpoint for autocomplete, biased towards the service area
+    const bias = `${DEFAULT_MAP_CENTER.latitude},${DEFAULT_MAP_CENTER.longitude}`;
+    let url = `${API_BASE}/maps/places-autocomplete?query=${encodeURIComponent(input)}&location=${encodeURIComponent(bias)}`;
     const response = await fetch(url);
     const data = await response.json();
     return Array.isArray(data) ? data : [];

@@ -1,5 +1,6 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { AppLogger } from '../libs/logger/app-logger.service';
+import { PrismaService } from '../prisma/prisma.service';
 import axios from 'axios';
 import * as polyline from '@mapbox/polyline';
 
@@ -7,7 +8,10 @@ import * as polyline from '@mapbox/polyline';
 export class MapsService {
   private readonly apiKey: string;
 
-  constructor(private readonly appLogger: AppLogger) {
+  constructor(
+    private readonly appLogger: AppLogger,
+    private readonly prisma: PrismaService,
+  ) {
     this.apiKey = process.env.GOOGLE_MAPS_API_KEY!;
   }
 
@@ -215,6 +219,80 @@ export class MapsService {
         duration: { text: '', value: 0 },
       };
     }
+  }
+
+  /**
+   * Returns active service zone bounds derived from the ServiceZone DB table.
+   * Computes bounding boxes from polygon vertices and a combined default center.
+   * Called by the public GET /maps/service-bounds endpoint (consumed by mobile apps).
+   */
+  async getServiceBounds(): Promise<{
+    bounds: Array<{
+      name: string;
+      minLat: number;
+      maxLat: number;
+      minLng: number;
+      maxLng: number;
+      center: { lat: number; lng: number };
+    }>;
+    defaultCenter: {
+      latitude: number;
+      longitude: number;
+      latitudeDelta: number;
+      longitudeDelta: number;
+    };
+  }> {
+    const zones = await this.prisma.serviceZone.findMany({
+      where: { isActive: true },
+      select: { name: true, coordinates: true },
+    });
+
+    const bounds = zones.map((zone) => {
+      const coords = zone.coordinates as Array<{ lat: number; lng: number }>;
+      const lats = coords.map((c) => c.lat);
+      const lngs = coords.map((c) => c.lng);
+      const minLat = Math.min(...lats);
+      const maxLat = Math.max(...lats);
+      const minLng = Math.min(...lngs);
+      const maxLng = Math.max(...lngs);
+      return {
+        name: zone.name,
+        minLat,
+        maxLat,
+        minLng,
+        maxLng,
+        center: { lat: (minLat + maxLat) / 2, lng: (minLng + maxLng) / 2 },
+      };
+    });
+
+    // Fall back to Maiduguri if no zones are configured in DB yet
+    if (bounds.length === 0) {
+      bounds.push({
+        name: 'Maiduguri',
+        minLat: 11.7,
+        maxLat: 11.95,
+        minLng: 13.0,
+        maxLng: 13.3,
+        center: { lat: 11.825, lng: 13.15 },
+      });
+    }
+
+    const allLats = bounds.flatMap((b) => [b.minLat, b.maxLat]);
+    const allLngs = bounds.flatMap((b) => [b.minLng, b.maxLng]);
+    const globalMinLat = Math.min(...allLats);
+    const globalMaxLat = Math.max(...allLats);
+    const globalMinLng = Math.min(...allLngs);
+    const globalMaxLng = Math.max(...allLngs);
+
+    return {
+      bounds,
+      defaultCenter: {
+        latitude: (globalMinLat + globalMaxLat) / 2,
+        longitude: (globalMinLng + globalMaxLng) / 2,
+        latitudeDelta: Math.max(globalMaxLat - globalMinLat, 0.18),
+        longitudeDelta: Math.max(globalMaxLng - globalMinLng, 0.18),
+      },
+    };
   }
 
   /**

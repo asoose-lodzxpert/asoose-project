@@ -1,6 +1,12 @@
 import React, { useState, useCallback, useRef, useMemo } from "react";
 import { API_BASE as API_URL } from "@/constants/static-config";
 import {
+  isWithinServiceBounds,
+  getServiceAreaNames,
+  DEFAULT_MAP_CENTER,
+} from "@/constants/service-bounds";
+import Toast from "react-native-toast-message";
+import {
   Modal,
   Pressable,
   StyleSheet,
@@ -72,6 +78,16 @@ export function LocationPickerModal() {
     (e: any) => {
       Keyboard.dismiss();
       const { coordinate } = e.nativeEvent;
+      if (!isWithinServiceBounds(coordinate.latitude, coordinate.longitude)) {
+        Toast.show({
+          type: "error",
+          text1: "Outside service area",
+          text2: `Please pick a location within ${getServiceAreaNames()}`,
+          position: "top",
+          topOffset: 40,
+        });
+        return;
+      }
       setSelectedLocation({
         latitude: coordinate.latitude,
         longitude: coordinate.longitude,
@@ -125,7 +141,14 @@ export function LocationPickerModal() {
             : place.title,
         });
       } catch {
-        confirmLocation({ latitude: 0, longitude: 0, address: place.title });
+        Toast.show({
+          type: "error",
+          text1: "Location not found",
+          text2:
+            "Could not get coordinates for this place. Please try another.",
+          position: "top",
+          topOffset: 40,
+        });
       }
     },
     [confirmLocation],
@@ -296,10 +319,12 @@ export function LocationPickerModal() {
                 provider={PROVIDER_GOOGLE}
                 style={StyleSheet.absoluteFill}
                 initialRegion={{
-                  latitude: location?.coords?.latitude ?? 6.5244,
-                  longitude: location?.coords?.longitude ?? 3.3792,
-                  latitudeDelta: 0.07,
-                  longitudeDelta: 0.07,
+                  latitude:
+                    location?.coords?.latitude ?? DEFAULT_MAP_CENTER.latitude,
+                  longitude:
+                    location?.coords?.longitude ?? DEFAULT_MAP_CENTER.longitude,
+                  latitudeDelta: DEFAULT_MAP_CENTER.latitudeDelta,
+                  longitudeDelta: DEFAULT_MAP_CENTER.longitudeDelta,
                 }}
                 onPress={handleMapPress}
                 showsUserLocation

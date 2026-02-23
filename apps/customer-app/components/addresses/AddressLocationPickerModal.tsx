@@ -7,6 +7,12 @@ import React, {
 } from "react";
 import { API_BASE as API_URL } from "@/constants/static-config";
 import {
+  isWithinServiceBounds,
+  getServiceAreaNames,
+  DEFAULT_MAP_CENTER,
+} from "@/constants/service-bounds";
+import Toast from "react-native-toast-message";
+import {
   Modal,
   Pressable,
   StyleSheet,
@@ -97,6 +103,16 @@ export function AddressLocationPickerModal({
 
   const handleMapPress = (e: any) => {
     const { coordinate } = e.nativeEvent;
+    if (!isWithinServiceBounds(coordinate.latitude, coordinate.longitude)) {
+      Toast.show({
+        type: "error",
+        text1: "Outside service area",
+        text2: `Please pick a location within ${getServiceAreaNames()}`,
+        position: "top",
+        topOffset: 40,
+      });
+      return;
+    }
     setSelectedLocation({ ...coordinate });
     reverseGeocode(coordinate.latitude, coordinate.longitude);
     mapRef.current?.animateToRegion(
@@ -123,6 +139,16 @@ export function AddressLocationPickerModal({
     try {
       const res = await fetch(`${API_URL}/maps/geocode?placeId=${place.id}`);
       const { lat, lng } = await res.json();
+      if (!isWithinServiceBounds(lat, lng)) {
+        Toast.show({
+          type: "error",
+          text1: "Outside service area",
+          text2: `We currently serve: ${getServiceAreaNames()}`,
+          position: "top",
+          topOffset: 40,
+        });
+        return;
+      }
       handleConfirmLocation({
         latitude: lat,
         longitude: lng,
@@ -131,10 +157,12 @@ export function AddressLocationPickerModal({
           : place.title,
       });
     } catch (e) {
-      handleConfirmLocation({
-        latitude: 0,
-        longitude: 0,
-        address: place.title,
+      Toast.show({
+        type: "error",
+        text1: "Location not found",
+        text2: "Could not get coordinates for this place. Please try another.",
+        position: "top",
+        topOffset: 40,
       });
     }
   };
@@ -271,10 +299,10 @@ export function AddressLocationPickerModal({
               style={StyleSheet.absoluteFill}
               onPress={handleMapPress}
               initialRegion={{
-                latitude: coords?.latitude || 6.5244,
-                longitude: coords?.longitude || 3.3792,
-                latitudeDelta: 0.05,
-                longitudeDelta: 0.05,
+                latitude: coords?.latitude || DEFAULT_MAP_CENTER.latitude,
+                longitude: coords?.longitude || DEFAULT_MAP_CENTER.longitude,
+                latitudeDelta: DEFAULT_MAP_CENTER.latitudeDelta,
+                longitudeDelta: DEFAULT_MAP_CENTER.longitudeDelta,
               }}
             >
               {selectedLocation && <Marker coordinate={selectedLocation} />}

@@ -1,5 +1,6 @@
 import { getBusinessDetails } from "@/services/business-details.service";
 import { updateStoreDetails } from "@/services/business.service";
+import { DEFAULT_MAP_CENTER } from "@/constants/service-bounds";
 import * as Location from "expo-location";
 import { useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
@@ -60,7 +61,10 @@ export default function EditStoreDetailsScreen() {
           storeDescription: details.step3.storeDescription || "",
           storeLogoUri: details.step3.storeLogoUri || "",
           storeBannerUri: details.step3.storeBannerUri || "",
-          location: details.step3.location || { lat: 6.5244, lng: 3.3792 },
+          location: details.step3.location || {
+            lat: DEFAULT_MAP_CENTER.latitude,
+            lng: DEFAULT_MAP_CENTER.longitude,
+          },
           openHours: details.step3.openHours || {},
         });
         setOpenHours(details.step3.openHours || {});

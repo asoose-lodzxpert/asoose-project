@@ -17,6 +17,16 @@ export class MapsController {
   constructor(private readonly mapsService: MapsService) {}
 
   /**
+   * Public endpoint — no auth required.
+   * Returns active service zone bounding boxes so mobile apps can validate
+   * locations on the frontend before sending them to the API.
+   */
+  @Get('service-bounds')
+  async getServiceBounds() {
+    return this.mapsService.getServiceBounds();
+  }
+
+  /**
    * 🔒 SECURED AUTOCOMPLETE ENDPOINTS
    * These endpoints are now protected with:
    * - JWT Authentication (requires logged-in user)

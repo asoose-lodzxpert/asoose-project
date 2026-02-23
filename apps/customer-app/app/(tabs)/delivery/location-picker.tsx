@@ -25,6 +25,12 @@ import type { Address, LocationPoint } from "@/types/delivery";
 import { useLocation } from "@/context/LocationContext";
 import { getAccessToken } from "@/services/auth.service";
 import { API_BASE as API_URL } from "@/constants/static-config";
+import {
+  isWithinServiceBounds,
+  getServiceAreaNames,
+  DEFAULT_MAP_CENTER,
+} from "@/constants/service-bounds";
+import Toast from "react-native-toast-message";
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get("window");
 const MODAL_MAP_HEIGHT = SCREEN_HEIGHT * 0.78;
 
@@ -179,6 +185,16 @@ export default function LocationPickerScreen() {
     (e: any) => {
       Keyboard.dismiss();
       const { coordinate } = e.nativeEvent;
+      if (!isWithinServiceBounds(coordinate.latitude, coordinate.longitude)) {
+        Toast.show({
+          type: "error",
+          text1: "Outside service area",
+          text2: `Please pick a location within ${getServiceAreaNames()}`,
+          position: "top",
+          topOffset: 40,
+        });
+        return;
+      }
       const loc = {
         latitude: coordinate.latitude,
         longitude: coordinate.longitude,
@@ -197,6 +213,16 @@ export default function LocationPickerScreen() {
   // Convert Location to Address and wrap in LocationPoint
   const confirmLocation = useCallback(
     (loc: Location) => {
+      if (!isWithinServiceBounds(loc.latitude, loc.longitude)) {
+        Toast.show({
+          type: "error",
+          text1: "Outside service area",
+          text2: `We currently serve: ${getServiceAreaNames()}`,
+          position: "top",
+          topOffset: 40,
+        });
+        return;
+      }
       const address: Address = {
         id: "",
         label: "",
@@ -235,7 +261,14 @@ export default function LocationPickerScreen() {
             : place.title,
         });
       } catch {
-        confirmLocation({ latitude: 0, longitude: 0, address: place.title });
+        Toast.show({
+          type: "error",
+          text1: "Location not found",
+          text2:
+            "Could not get coordinates for this place. Please try another.",
+          position: "top",
+          topOffset: 40,
+        });
       } finally {
         setSearching(false);
       }
@@ -245,6 +278,16 @@ export default function LocationPickerScreen() {
 
   const handleSelectSaved = (addr: any) => {
     // addr is Address type from context
+    if (!isWithinServiceBounds(addr.coords.latitude, addr.coords.longitude)) {
+      Toast.show({
+        type: "error",
+        text1: "Outside service area",
+        text2: `This address is outside our service area (${getServiceAreaNames()})`,
+        position: "top",
+        topOffset: 40,
+      });
+      return;
+    }
     const payload: LocationPoint = { address: addr };
     if (type === "pickup") setPickup(payload);
     else setDropoff(payload);
@@ -419,10 +462,14 @@ export default function LocationPickerScreen() {
               provider={PROVIDER_GOOGLE}
               style={StyleSheet.absoluteFill}
               initialRegion={{
-                latitude: currentLocation?.coords?.latitude ?? 6.5244,
-                longitude: currentLocation?.coords?.longitude ?? 3.3792,
-                latitudeDelta: 0.07,
-                longitudeDelta: 0.07,
+                latitude:
+                  currentLocation?.coords?.latitude ??
+                  DEFAULT_MAP_CENTER.latitude,
+                longitude:
+                  currentLocation?.coords?.longitude ??
+                  DEFAULT_MAP_CENTER.longitude,
+                latitudeDelta: DEFAULT_MAP_CENTER.latitudeDelta,
+                longitudeDelta: DEFAULT_MAP_CENTER.longitudeDelta,
               }}
               onPress={handleMapPress}
               showsUserLocation

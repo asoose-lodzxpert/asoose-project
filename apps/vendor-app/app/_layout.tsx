@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { Stack } from "expo-router";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import Toast from "react-native-toast-message";
@@ -10,6 +10,7 @@ import { AuthProvider } from "@/context/AuthContext";
 import { NotificationProvider } from "@/context/NotificationContext";
 import { NotificationPreferencesProvider } from "@/context/NotificationPreferencesContext";
 import { BalanceProvider } from "@/context/BalanceContext";
+import { loadServiceBounds } from "@/constants/service-bounds";
 
 /**
  * RootNavigator now ALWAYS renders all routes.
@@ -46,6 +47,11 @@ function RootNavigator() {
  * RootLayout handles top-level providers
  */
 export default function RootLayout() {
+  // Fetch service bounds from backend once at startup
+  useEffect(() => {
+    loadServiceBounds();
+  }, []);
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ErrorBoundary>

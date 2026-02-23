@@ -1,5 +1,5 @@
 import { Stack } from "expo-router";
-import React from "react";
+import React, { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import Toast from "react-native-toast-message";
 
@@ -15,6 +15,7 @@ import { SendPackageProvider } from "@/context/SendPackageContext";
 import { NotificationProvider } from "@/context/PushNotificationContext";
 import { NotificationPreferencesProvider } from "@/context/NotificationPreferencesContext";
 import { toastConfig } from "@/components/ui/ThemedToast";
+import { loadServiceBounds } from "@/constants/service-bounds";
 
 /**
  * RootNavigator now ALWAYS renders all routes.
@@ -68,6 +69,12 @@ function AuthDependentProviders({ children }: { children: React.ReactNode }) {
 }
 
 export default function RootLayout() {
+  // Fetch service bounds from the backend once on startup.
+  // Falls back to hardcoded Maiduguri bounds if offline.
+  useEffect(() => {
+    loadServiceBounds();
+  }, []);
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ConfirmProvider>
