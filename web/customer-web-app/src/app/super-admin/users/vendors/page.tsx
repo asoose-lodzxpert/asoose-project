@@ -529,14 +529,14 @@ export default function VendorManagementPage() {
                 <span className="hidden md:inline">Manual Onboard</span>
                 <span className="inline md:hidden">Onboard</span>
               </button>
-              <button
+              {/* <button
                 onClick={() => setIsAddModalOpen(true)}
                 className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-yellow-500 text-black rounded-lg hover:bg-yellow-400 text-sm font-bold shadow-lg shadow-yellow-500/20"
               >
                 <Plus className="w-4 h-4" />
                 <span className="hidden md:inline">Add Vendor</span>
                 <span className="inline md:hidden">Add</span>
-              </button>
+              </button> */}
             </div>
           </div>
 
