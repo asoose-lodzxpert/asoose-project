@@ -14,12 +14,27 @@ import {
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 
-// --- ENUMS for Validation ---
+// --- ENUMS for Validation ----
 export enum VendorCategory {
   RESTAURANT = 'RESTAURANT',
   GROCERY = 'GROCERY',
   PHARMACY = 'PHARMACY',
   MARKET = 'MARKET',
+  FASHION = 'FASHION',
+  ELECTRONICS = 'ELECTRONICS',
+  FURNITURE = 'FURNITURE',
+  BEAUTY = 'BEAUTY',
+  HEALTH = 'HEALTH',
+  EDUCATION = 'EDUCATION',
+  SERVICES = 'SERVICES',
+  AUTOMOTIVE = 'AUTOMOTIVE',
+  TRAVEL = 'TRAVEL',
+  ENTERTAINMENT = 'ENTERTAINMENT',
+  RETAIL = 'RETAIL',
+  ONLINE = 'ONLINE',
+  MANUFACTURING = 'MANUFACTURING',
+  LOGISTICS = 'LOGISTICS',
+  OTHER = 'OTHER',
 }
 
 export enum StoreStatus {
