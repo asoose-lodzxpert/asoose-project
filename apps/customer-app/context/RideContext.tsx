@@ -270,9 +270,11 @@ export function RideProvider({ children }: { children: ReactNode }) {
     socket.on("RIDE_CANCELLED", (event: RideSocketEvent) => {
       if (__DEV__) console.log("[RideContext] Ride cancelled:", event);
       if (event.type === "RIDE_CANCELLED") {
-        // Only clear state if this event belongs to the ride we're currently tracking.
-        // A stale RIDE_CANCELLED for the previous ride must not wipe a newly created one.
-        if (event.rideId && event.rideId !== currentRideRef.current?.id) {
+        // Only ignore if the event explicitly belongs to a DIFFERENT ride
+        // (i.e. both ids are present and don't match).
+        // If currentRide is null there's nothing to compare — still clear.
+        const currentId = currentRideRef.current?.id;
+        if (event.rideId && currentId && event.rideId !== currentId) {
           if (__DEV__)
             console.log(
               "[RideContext] RIDE_CANCELLED ignored — belongs to a different ride",
@@ -282,6 +284,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
         }
         setCurrentRide(null);
         setPageView("IDLE");
+        setDriverLocation(null);
       }
     });
 

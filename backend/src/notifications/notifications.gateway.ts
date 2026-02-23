@@ -308,6 +308,16 @@ export class NotificationsGateway
     this.server.to(`user_${userId}`).emit('notification', payload);
   }
 
+  /**
+   * Emit a new dispute message to all parties in the dispute.
+   * Each userId in `participantIds` will receive the event on their personal room.
+   */
+  emitDisputeMessage(participantIds: string[], message: any) {
+    for (const uid of participantIds) {
+      this.server.to(`user_${uid}`).emit('dispute:message', message);
+    }
+  }
+
   sendToVendor(vendorId: string, payload: any) {
     this.server.to(`user_${vendorId}`).emit('notification', payload);
   }

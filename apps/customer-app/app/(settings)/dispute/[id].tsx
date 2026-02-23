@@ -14,6 +14,7 @@ import { ThemedView } from "@/components/themed-view";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { Dispute, getDisputeById } from "@/services/dispute.service";
+import DisputeChatModal from "@/components/DisputeChatModal";
 
 const STATUS_COLORS: Record<string, string> = {
   OPEN: "#F59E0B",
@@ -54,6 +55,7 @@ export default function DisputeDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [chatOpen, setChatOpen] = useState(false);
 
   const load = useCallback(
     async (silent = false) => {
@@ -157,7 +159,12 @@ export default function DisputeDetailScreen() {
           <IconSymbol name="chevron.left" size={24} color={primary} />
         </Pressable>
         <ThemedText style={styles.headerTitle}>Dispute Details</ThemedText>
-        <View style={styles.backBtn} />
+        <Pressable
+          style={[styles.chatBtn, { backgroundColor: primary + "18" }]}
+          onPress={() => setChatOpen(true)}
+        >
+          <IconSymbol name="chat" size={20} color={primary} />
+        </Pressable>
       </View>
 
       <ScrollView
@@ -291,6 +298,11 @@ export default function DisputeDetailScreen() {
           </ThemedText>
         </View>
       </ScrollView>
+
+      <DisputeChatModal
+        disputeId={chatOpen ? id : null}
+        onClose={() => setChatOpen(false)}
+      />
     </ThemedView>
   );
 }
@@ -305,6 +317,13 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   backBtn: { width: 36 },
+  chatBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   headerTitle: { fontSize: 18, fontWeight: "700" },
 
   centered: {

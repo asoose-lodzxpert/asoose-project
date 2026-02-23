@@ -95,7 +95,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
             return;
           } else {
-            // For transient errors (e.g., network), do not clear tokens, just set loading false
+            // For transient errors (e.g., network), still restore the stored user
+            // (the cached token may still be valid for API calls)
+            const cachedUser = await AsyncStorage.getItem(AUTH_USER_KEY);
+            if (cachedUser && isMounted) setUser(JSON.parse(cachedUser));
             if (isMounted) setLoading(false);
             return;
           }

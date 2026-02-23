@@ -123,5 +123,22 @@ export class RiderJobEventsListener {
       reason: payload.reason,
       timestamp: payload.timestamp,
     });
+
+    // If the system cancelled a job that had a driver AND we know the customer,
+    // notify the customer too so their app clears the ride state.
+    if (payload.cancelledBy === 'system' && payload.customerId) {
+      this.logger.log(
+        `System cancel with driver — also notifying customer ${payload.customerId} for ride ${payload.jobId}`,
+      );
+      this.gateway.server
+        .to(`user_${payload.customerId}`)
+        .emit('RIDE_CANCELLED', {
+          type: 'RIDE_CANCELLED',
+          rideId: payload.jobId,
+          reason: payload.reason || 'Cancelled by system',
+          cancelledBy: 'system',
+          timestamp: payload.timestamp,
+        });
+    }
   }
 }

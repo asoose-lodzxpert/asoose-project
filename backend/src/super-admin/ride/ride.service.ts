@@ -206,6 +206,7 @@ export class RidesService {
       include: {
         payment: true,
         customer: { select: { id: true } },
+        rider: { select: { id: true } },
       },
     });
 
@@ -217,7 +218,7 @@ export class RidesService {
       );
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    await this.prisma.$transaction(async (tx) => {
       // 1. Cancel the ride
       await tx.ride.update({
         where: { id },
@@ -259,6 +260,37 @@ export class RidesService {
         },
       });
     });
+
+    // 4. Notify customer via socket — update their app in real time
+    try {
+      this.notificationsGateway.server
+        .to(`user_${ride.customer.id}`)
+        .emit('RIDE_CANCELLED', {
+          type: 'RIDE_CANCELLED',
+          rideId: id,
+          reason: reason || 'Cancelled by Support',
+          cancelledBy: 'system',
+          timestamp: Date.now(),
+        });
+
+      // 5. Notify rider (if one was assigned) so their job clears too
+      if (ride.rider?.id) {
+        this.notificationsGateway.server
+          .to(`user_${ride.rider.id}`)
+          .emit('job.cancelled', {
+            id,
+            jobType: 'ride',
+            cancelledBy: 'system',
+            reason: reason || 'Cancelled by Support',
+            timestamp: Date.now(),
+          });
+      }
+    } catch (err) {
+      this.logger.error(
+        `Socket notification failed for cancelled ride ${id}`,
+        err,
+      );
+    }
   }
 
   // 💰 5. Process Ride Refund (Partial or Full)

@@ -17,6 +17,7 @@ import { AddMessageDto } from './dto/add-message.dto';
 import { PaymentService } from 'src/payment/payment.service';
 import { DisputePriority } from '@prisma/client';
 import { NotificationsService } from 'src/notifications/notifications.service';
+import { NotificationsGateway } from 'src/notifications/notifications.gateway';
 import {
   ResolveDisputeDto,
   ResolutionAction,
@@ -34,6 +35,7 @@ export class DisputesService {
     @Inject(forwardRef(() => PaymentService))
     private paymentService: PaymentService,
     private notificationsService: NotificationsService,
+    private notificationsGateway: NotificationsGateway,
   ) {}
 
   // ==================== CREATE DISPUTE ====================
@@ -865,7 +867,7 @@ export class DisputesService {
     if (!canMessage)
       throw new ForbiddenException('You cannot add messages to this dispute');
 
-    return this.prisma.disputeMessage.create({
+    const created = await this.prisma.disputeMessage.create({
       data: {
         disputeId: id,
         senderId: userId,
@@ -876,6 +878,20 @@ export class DisputesService {
         sender: { select: { id: true, name: true, role: true, image: true } },
       },
     });
+
+    // Broadcast to all dispute participants in real-time
+    const participantIds = [
+      dispute.openedByUserId,
+      dispute.targetUserId,
+    ].filter((uid): uid is string => !!uid && uid !== userId);
+    // Always include the sender so their other devices also update
+    participantIds.push(userId);
+    this.notificationsGateway.emitDisputeMessage(participantIds, {
+      disputeId: id,
+      message: created,
+    });
+
+    return created;
   }
 
   // ==================== ADD ADMIN NOTE ====================

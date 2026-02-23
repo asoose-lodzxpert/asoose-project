@@ -3,8 +3,6 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { RideStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { QueueService } from '../../matching/queue/queue.service';
-// Remove TRIPS_CONFIG import if not used elsewhere
-import { TRIPS_CONFIG } from './trips.common.service';
 import { rideToJobSummary } from 'src/jobs/job.dto';
 
 @Injectable()
@@ -18,40 +16,57 @@ export class RidesCleanupService {
 
   @Cron(CronExpression.EVERY_MINUTE)
   async recoverStuckRequestedRides() {
-    const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000);
+    try {
+      const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000);
 
-    const stuckRides = await this.prisma.ride.findMany({
-      where: {
-        status: RideStatus.REQUESTED,
-        updatedAt: { lt: twoMinutesAgo },
-      },
-      include: {
-        pickupAddress: true,
-        dropoffAddress: true,
-      },
-      take: 50,
-    });
+      const stuckRides = await this.prisma.ride.findMany({
+        where: {
+          status: RideStatus.REQUESTED,
+          updatedAt: { lt: twoMinutesAgo },
+        },
+        include: {
+          pickupAddress: true,
+          dropoffAddress: true,
+        },
+        take: 50,
+      });
 
-    if (stuckRides.length === 0) return;
+      if (stuckRides.length === 0) return;
 
-    this.logger.warn(
-      `Found ${stuckRides.length} stuck rides. Initiating recovery...`,
-    );
+      this.logger.warn(
+        `Found ${stuckRides.length} stuck rides. Initiating recovery...`,
+      );
 
-    for (const ride of stuckRides) {
-      try {
-        this.logger.log(`Recovering ride ${ride.id}`);
+      for (const ride of stuckRides) {
+        try {
+          this.logger.log(`Recovering ride ${ride.id}`);
 
-        const job = rideToJobSummary(ride);
-        await this.queue.enqueueRideMatching({ job, attempt: 1 });
+          const job = rideToJobSummary(ride);
+          await this.queue.enqueueRideMatching({ job, attempt: 1 });
 
-        // Touch the ride to prevent immediate re-processing
-        await this.prisma.ride.update({
-          where: { id: ride.id },
-          data: { updatedAt: new Date() },
-        });
-      } catch (error) {
-        this.logger.error(`Failed to recover ride ${ride.id}`, error);
+          // Touch the ride to prevent immediate re-processing
+          await this.prisma.ride.update({
+            where: { id: ride.id },
+            data: { updatedAt: new Date() },
+          });
+        } catch (error) {
+          this.logger.error(`Failed to recover ride ${ride.id}`, error);
+        }
+      }
+    } catch (error: any) {
+      // P1017 = "Server has closed the connection" — transient DB drop.
+      // Re-connect so the next cron tick succeeds instead of staying broken.
+      if (error?.code === 'P1017') {
+        this.logger.warn(
+          'DB connection was closed (P1017) during cleanup — reconnecting...',
+        );
+        try {
+          await this.prisma.$connect();
+        } catch (connectErr) {
+          this.logger.error('Failed to reconnect to DB', connectErr);
+        }
+      } else {
+        this.logger.error('recoverStuckRequestedRides failed', error);
       }
     }
   }

@@ -113,9 +113,33 @@ export default function EmergencyContactsScreen() {
         <View
           style={[styles.card, { backgroundColor: card, borderColor: border }]}
         >
-          <Skeleton />
-          <Skeleton />
-          <Skeleton />
+          {/* Card header */}
+          <View style={styles.cardHeader}>
+            <View style={styles.cardHeaderLeft}>
+              <Skeleton width={20} height={20} borderRadius={4} />
+              <Skeleton width={130} height={16} style={{ marginLeft: 8 }} />
+            </View>
+            <Skeleton width={36} height={14} />
+          </View>
+
+          {/* Primary contact block */}
+          <View style={[styles.contactBlock, { borderTopColor: border }]}>
+            <Skeleton width={120} height={14} style={{ marginBottom: 16 }} />
+            <Skeleton width={60} height={12} style={{ marginBottom: 6 }} />
+            <Skeleton
+              height={44}
+              borderRadius={10}
+              style={{ marginBottom: 12 }}
+            />
+            <Skeleton width={90} height={12} style={{ marginBottom: 6 }} />
+            <Skeleton
+              height={44}
+              borderRadius={10}
+              style={{ marginBottom: 12 }}
+            />
+            <Skeleton width={80} height={12} style={{ marginBottom: 6 }} />
+            <Skeleton height={44} borderRadius={10} />
+          </View>
         </View>
       </ThemedView>
     );
@@ -258,8 +282,28 @@ function Header({ title, onBack }: { title: string; onBack: () => void }) {
   );
 }
 
-function Skeleton() {
-  return <View style={styles.skeleton} />;
+function Skeleton({
+  width,
+  height = 18,
+  borderRadius = 6,
+  style,
+}: {
+  width?: number | string;
+  height?: number;
+  borderRadius?: number;
+  style?: object;
+}) {
+  const skeletonBg = useThemeColor({}, "surfaceSubtle");
+  return (
+    <View
+      style={[
+        styles.skeleton,
+        { height, borderRadius, backgroundColor: skeletonBg },
+        width !== undefined ? { width } : { width: "100%" },
+        style,
+      ]}
+    />
+  );
 }
 
 /* ------------------ Styles ------------------ */
@@ -360,9 +404,6 @@ const styles = StyleSheet.create({
   },
 
   skeleton: {
-    height: 18,
-    borderRadius: 6,
-    backgroundColor: "#E6E6E6",
-    marginBottom: 12,
+    opacity: 0.5,
   },
 });

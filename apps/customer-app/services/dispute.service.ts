@@ -33,6 +33,29 @@ export interface DisputeListResponse {
   total: number;
 }
 
+export interface DisputeMessageSender {
+  id: string;
+  name: string;
+  role: string;
+  image?: string | null;
+}
+
+export interface DisputeMessage {
+  id: string;
+  disputeId: string;
+  senderId: string;
+  message: string;
+  isInternal: boolean;
+  createdAt: string;
+  sender: DisputeMessageSender;
+}
+
+export interface DisputeDetail extends Dispute {
+  messages: DisputeMessage[];
+  canAddMessage: boolean;
+  openedByUserId?: string;
+}
+
 export async function createDispute(
   payload: CreateDisputePayload,
 ): Promise<Dispute> {
@@ -53,9 +76,22 @@ export async function getMyDisputes(params?: {
   return get(`/super-admin/disputes/mine${qs}`);
 }
 
+/** Fetch a single dispute by ID (includes messages) */
+export async function getDisputeDetail(id: string): Promise<DisputeDetail> {
+  return get(`/super-admin/disputes/${id}`);
+}
+
 /** Fetch a single dispute by ID */
 export async function getDisputeById(id: string): Promise<Dispute> {
   return get(`/super-admin/disputes/${id}`);
+}
+
+/** Send a chat message in a dispute */
+export async function sendDisputeMessage(
+  disputeId: string,
+  message: string,
+): Promise<DisputeMessage> {
+  return post(`/super-admin/disputes/${disputeId}/messages`, { message });
 }
 
 /** Check if there is an existing dispute for a specific order/ride/delivery */

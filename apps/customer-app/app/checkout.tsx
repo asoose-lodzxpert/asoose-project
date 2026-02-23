@@ -171,8 +171,15 @@ export default function CheckoutScreen() {
   const resolvedGrandTotal = subtotal + resolvedDelivery + resolvedService;
 
   const handlePlaceOrder = async () => {
-    if (!selectedAddress || !user) {
-      Toast.show({ type: "info", text1: "Please select an address" });
+    if (!selectedAddress) {
+      Toast.show({ type: "info", text1: "Please select a delivery address" });
+      return;
+    }
+    if (!user) {
+      Toast.show({
+        type: "error",
+        text1: "Session expired. Please restart the app.",
+      });
       return;
     }
     setIsProcessing(true);
@@ -472,12 +479,12 @@ export default function CheckoutScreen() {
           ]}
         >
           <Pressable
-            disabled={isProcessing || !selectedAddress || isLoadingFee}
+            disabled={isProcessing || !selectedAddress || !user || isLoadingFee}
             onPress={handlePlaceOrder}
             style={[
               styles.payButton,
               { backgroundColor: primary },
-              (!selectedAddress || isProcessing || isLoadingFee) &&
+              (!selectedAddress || !user || isProcessing || isLoadingFee) &&
                 styles.disabled,
             ]}
           >

@@ -64,13 +64,11 @@ export function AddressSelectionModal({
     }
   }, []);
 
-  const handleConfirm = () => {
-    const addr = addresses.find((a) => a.id === tentativeId);
-    if (addr) onSelect(addr);
+  const handleSelect = (addr: Address) => {
+    setTentativeId(addr.id);
+    onSelect(addr);
     onClose();
   };
-
-  const tentativeAddress = addresses.find((a) => a.id === tentativeId);
 
   return (
     <Modal
@@ -168,7 +166,7 @@ export function AddressSelectionModal({
                           borderWidth: isSelected ? 2 : 1,
                         },
                       ]}
-                      onPress={() => setTentativeId(addr.id)}
+                      onPress={() => handleSelect(addr)}
                     >
                       {/* Icon */}
                       <View
@@ -255,34 +253,6 @@ export function AddressSelectionModal({
                   </ThemedText>
                 </Pressable>
               </ScrollView>
-
-              {/* Confirm button */}
-              <View style={[styles.footer, { borderTopColor: borderColor }]}>
-                {tentativeAddress && (
-                  <ThemedText
-                    style={[styles.selectedPreview, { color: textSecondary }]}
-                    numberOfLines={1}
-                  >
-                    Delivering to: {tentativeAddress.label}
-                  </ThemedText>
-                )}
-                <Pressable
-                  style={[
-                    styles.confirmBtn,
-                    {
-                      backgroundColor: tentativeId ? primary : borderColor,
-                      opacity: tentativeId ? 1 : 0.5,
-                    },
-                  ]}
-                  onPress={handleConfirm}
-                  disabled={!tentativeId}
-                >
-                  <ThemedText style={styles.confirmBtnText}>
-                    Confirm Address
-                  </ThemedText>
-                  <IconSymbol name="checkmark" size={16} color="#fff" />
-                </Pressable>
-              </View>
             </>
           )}
         </View>

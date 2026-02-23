@@ -75,12 +75,12 @@ function DisputeCard({
       <ThemedText style={styles.reason} numberOfLines={1}>
         {dispute.reason}
       </ThemedText>
-      <ThemedText
+      {/* <ThemedText
         style={[styles.description, { color: textSecondary }]}
         numberOfLines={2}
       >
         {dispute.description}
-      </ThemedText>
+      </ThemedText> */}
 
       {dispute.relatedAmount && Number(dispute.relatedAmount) > 0 && (
         <ThemedText style={[styles.amount, { color: muted }]}>
