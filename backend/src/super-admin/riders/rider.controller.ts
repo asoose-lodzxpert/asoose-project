@@ -18,10 +18,7 @@ import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { RolesGuard } from '../../auth/roles.guards';
 import { Roles } from '../../auth/roles.decorator';
 
-@Controller({
-  path: 'super-admin/riders',
-  version: '1',
-})
+@Controller({ path: 'super-admin/riders', version: '1' })
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class RidersController {
   constructor(private readonly ridersService: RidersService) {}
@@ -90,7 +87,7 @@ export class RidersController {
     return this.ridersService.update(id, body);
   }
 
-  // 💰 FINANCE: Wallet & Payouts
+  // FINANCE: Wallet & Payouts
   // Strictly Finance Officer & Super Admin
   @Post(':id/wallet')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN_FINANCE)
@@ -99,7 +96,8 @@ export class RidersController {
     @Body() body: { type: 'CREDIT' | 'DEBIT'; amount: number; reason: string },
     @Req() req: any,
   ) {
-    const adminId = req.user?.id || req.user?.userId || 'SYSTEM';
+    // admin id
+    const adminId = req.user?.id || req.user?.userId;
     return this.ridersService.adjustWallet(
       id,
       body.type,
