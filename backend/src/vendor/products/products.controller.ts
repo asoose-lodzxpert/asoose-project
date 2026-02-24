@@ -19,7 +19,10 @@ import { RolesGuard } from '../../auth/roles.guards';
 import { Roles } from '../../auth/roles.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { CreateProductDto, UpdateProductDto } from '../dto/product.dto';
+import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 
+@ApiTags('Vendor / Products')
+@ApiBearerAuth()
 @Controller({
   path: 'vendor/products',
   version: '1',
@@ -32,6 +35,7 @@ export class VendorProductsController {
   constructor(private readonly productsService: VendorProductsService) {}
 
   // 1. GET CATEGORIES (Placed FIRST to avoid ID collision)
+  @ApiOperation({ summary: 'Get all product categories' })
   @Get('categories')
   @UseInterceptors(CacheInterceptor)
   @CacheTTL(300) // Cache for 5 minutes (categories don't change often)
@@ -40,6 +44,9 @@ export class VendorProductsController {
   }
 
   // 2. GET ALL PRODUCTS
+  @ApiOperation({
+    summary: 'Get all products for a store (requires storeId query param)',
+  })
   @Get()
   @UseInterceptors(CacheInterceptor)
   @CacheTTL(60) // Cache for 1 minute
@@ -54,6 +61,7 @@ export class VendorProductsController {
   }
 
   // 3. GET ONE PRODUCT
+  @ApiOperation({ summary: 'Get a single product by ID' })
   @Get(':id')
   @UseInterceptors(CacheInterceptor)
   @CacheTTL(120) // Cache for 2 minutes
@@ -63,6 +71,7 @@ export class VendorProductsController {
   }
 
   // 4. CREATE
+  @ApiOperation({ summary: 'Create a new product' })
   @Post()
   async create(@Request() req, @Body() createProductDto: CreateProductDto) {
     const userId = req.user.id;
@@ -70,6 +79,7 @@ export class VendorProductsController {
   }
 
   // 5. UPDATE
+  @ApiOperation({ summary: 'Update a product by ID' })
   @Patch(':id')
   async update(
     @Request() req,
@@ -81,6 +91,7 @@ export class VendorProductsController {
   }
 
   // 6. DELETE
+  @ApiOperation({ summary: 'Delete a product by ID' })
   @Delete(':id')
   async remove(@Request() req, @Param('id') id: string) {
     const userId = req.user.id;

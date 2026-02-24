@@ -13,7 +13,10 @@ import { Roles } from '../../auth/roles.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { BankService } from './bank.service';
 import { UpdateBankAccountDto } from '../dto/update-bank-account.dto';
+import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 
+@ApiTags('Rider / Bank')
+@ApiBearerAuth()
 @Controller({
   path: 'rider/bank',
   version: '1',
@@ -21,6 +24,7 @@ import { UpdateBankAccountDto } from '../dto/update-bank-account.dto';
 export class BankController {
   constructor(private readonly bankService: BankService) {}
 
+  @ApiOperation({ summary: 'Get list of supported banks' })
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.RIDER, UserRole.DRIVER)
   @Get('banks')
@@ -28,6 +32,7 @@ export class BankController {
     return this.bankService.getBanks();
   }
 
+  @ApiOperation({ summary: 'Verify a bank account number via Paystack' })
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.RIDER, UserRole.DRIVER)
   @Post('verify-account')
@@ -40,6 +45,7 @@ export class BankController {
     );
   }
 
+  @ApiOperation({ summary: 'Get saved bank account for rider' })
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.RIDER, UserRole.DRIVER)
   @Get('account')
@@ -48,6 +54,7 @@ export class BankController {
     return this.bankService.getBankAccount(id);
   }
 
+  @ApiOperation({ summary: 'Update rider bank account details' })
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.RIDER, UserRole.DRIVER)
   @Patch('account')

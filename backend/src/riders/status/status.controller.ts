@@ -13,7 +13,10 @@ import { Roles } from '../../auth/roles.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { StatusService } from './status.service';
 import { UpdateRiderStatusDto } from '../dto/update-status.dto';
+import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 
+@ApiTags('Rider / Status')
+@ApiBearerAuth()
 @Controller({
   path: 'rider/status',
   version: '1',
@@ -21,6 +24,9 @@ import { UpdateRiderStatusDto } from '../dto/update-status.dto';
 export class StatusController {
   constructor(private readonly statusService: StatusService) {}
 
+  @ApiOperation({
+    summary: 'Set rider status to online and broadcast location',
+  })
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.RIDER, UserRole.DRIVER)
   @Post('online')
@@ -32,6 +38,7 @@ export class StatusController {
     return this.statusService.goOnline(id, role, coords);
   }
 
+  @ApiOperation({ summary: 'Set rider status to offline' })
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.RIDER, UserRole.DRIVER)
   @Post('offline')
@@ -40,6 +47,7 @@ export class StatusController {
     return this.statusService.goOffline(id, role);
   }
 
+  @ApiOperation({ summary: 'Update online status and/or current coordinates' })
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.RIDER, UserRole.DRIVER)
   @Patch('update')
@@ -48,6 +56,7 @@ export class StatusController {
     return this.statusService.updateRiderStatus(id, dto);
   }
 
+  @ApiOperation({ summary: 'Get current realtime status of the rider' })
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.RIDER, UserRole.DRIVER)
   @Get('me')

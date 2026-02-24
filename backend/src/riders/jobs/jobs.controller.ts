@@ -12,7 +12,10 @@ import { RolesGuard } from '../../auth/roles.guards';
 import { Roles } from '../../auth/roles.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { JobsService } from './jobs.service';
+import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 
+@ApiTags('Rider / Jobs')
+@ApiBearerAuth()
 @Controller({
   path: 'rider/jobs',
   version: '1',
@@ -20,11 +23,9 @@ import { JobsService } from './jobs.service';
 export class JobsController {
   constructor(private readonly jobsService: JobsService) {}
 
-  /**
-   * GET /rider/jobs/active
-   * Returns the currently assigned/active job for the authenticated rider or driver.
-   * Used by the rider app to restore UI state after app restart or reconnect.
-   */
+  @ApiOperation({
+    summary: 'Get currently active job for rider (ride or delivery)',
+  })
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.RIDER, UserRole.DRIVER)
   @Get('active')
@@ -33,6 +34,7 @@ export class JobsController {
     return this.jobsService.getActiveJob(riderId, role);
   }
 
+  @ApiOperation({ summary: 'Accept an incoming job offer' })
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.RIDER, UserRole.DRIVER)
   @Post(':id/accept')
@@ -45,6 +47,7 @@ export class JobsController {
     return this.jobsService.acceptJob(riderId, jobId, jobType);
   }
 
+  @ApiOperation({ summary: 'Decline an incoming job offer' })
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.RIDER, UserRole.DRIVER)
   @Post(':id/decline')
@@ -57,6 +60,7 @@ export class JobsController {
     return this.jobsService.declineJob(riderId, jobId, jobType);
   }
 
+  @ApiOperation({ summary: 'Cancel an accepted job with a reason' })
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.RIDER, UserRole.DRIVER)
   @Post(':id/cancel')
@@ -70,6 +74,7 @@ export class JobsController {
     return this.jobsService.cancelJob(riderId, jobId, jobType, reason);
   }
 
+  @ApiOperation({ summary: 'Signal arrival at pickup location' })
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.RIDER, UserRole.DRIVER)
   @Post(':id/arrive-pickup')
@@ -82,6 +87,9 @@ export class JobsController {
     return this.jobsService.arriveAtPickup(riderId, jobId, jobType);
   }
 
+  @ApiOperation({
+    summary: 'Confirm passenger/parcel pickup (optionally with OTP)',
+  })
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.RIDER, UserRole.DRIVER)
   @Post(':id/confirm-pickup')
@@ -97,6 +105,7 @@ export class JobsController {
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.RIDER, UserRole.DRIVER)
+  @ApiOperation({ summary: 'Signal arrival at dropoff location' })
   @Post(':id/arrive-dropoff')
   async arriveAtDropoff(
     @Req() req,
@@ -107,6 +116,7 @@ export class JobsController {
     return this.jobsService.arriveAtDropoff(riderId, jobId, jobType);
   }
 
+  @ApiOperation({ summary: 'Verify delivery OTP provided by recipient' })
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.RIDER, UserRole.DRIVER)
   @Post(':id/verify-otp')
@@ -119,6 +129,7 @@ export class JobsController {
     return this.jobsService.verifyDeliveryOtp(riderId, jobId, otp);
   }
 
+  @ApiOperation({ summary: 'Mark a job as complete' })
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.RIDER, UserRole.DRIVER)
   @Post(':id/complete')

@@ -20,7 +20,10 @@ import {
   CreateEmergencyContactDto,
   UpdateEmergencyContactDto,
 } from './dto/emergency-contact.dto';
+import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 
+@ApiTags('Users')
+@ApiBearerAuth()
 @Controller({
   path: 'users',
   version: '1',
@@ -32,6 +35,7 @@ export class UsersController {
     private readonly ordersService: OrdersService, // Inject OrdersService
   ) {}
 
+  @ApiOperation({ summary: 'Get current user profile' })
   @Get('profile')
   async getProfile(@Request() req) {
     return this.usersService.getUserProfile(req.user.id);
@@ -42,12 +46,16 @@ export class UsersController {
   // ==================================================================
 
   // [NEW] Canonical Pricing Endpoint (Fixes Delivery Fee Shock)
+  @ApiOperation({
+    summary: 'Get delivery and price breakdown for cart before placing order',
+  })
   @Post('cart/quote')
   async getCartQuote(@Request() req, @Body() dto: CreateOrderDto) {
     // This calls the unified pricing logic we added to OrdersService
     return this.ordersService.calculateOrderBreakdown(req.user.id, dto);
   }
 
+  @ApiOperation({ summary: 'Create a new order (single or multi-vendor)' })
   @Post('orders')
   async createOrder(
     @Request() req,
@@ -77,6 +85,9 @@ export class UsersController {
     }
   }
 
+  @ApiOperation({
+    summary: 'Get current user orders with optional status filter',
+  })
   @Get('orders')
   async getMyOrders(@Request() req) {
     const userId = req.user.id;
@@ -87,6 +98,7 @@ export class UsersController {
     return this.ordersService.getUserOrders(userId, { page, pageSize, status });
   }
 
+  @ApiOperation({ summary: 'Get details of a specific order' })
   @Get('orders/:id')
   async getOrderDetails(@Request() req, @Param('id') orderId: string) {
     const userId = req.user.id;
@@ -104,16 +116,19 @@ export class UsersController {
   // ADDRESS ENDPOINTS
   // ==================================================================
 
+  @ApiOperation({ summary: 'Get all saved addresses for current user' })
   @Get('addresses')
   async getMyAddresses(@Request() req) {
     return this.usersService.getUserAddresses(req.user.id);
   }
 
+  @ApiOperation({ summary: 'Add a new address' })
   @Post('addresses')
   async addAddress(@Request() req, @Body() body: CreateAddressDto) {
     return this.usersService.addUserAddress(req.user.id, body);
   }
 
+  @ApiOperation({ summary: 'Delete a saved address' })
   @Delete('addresses/:id')
   async deleteAddress(@Request() req, @Param('id') addressId: string) {
     return this.usersService.deleteUserAddress(req.user.id, addressId);
@@ -123,6 +138,7 @@ export class UsersController {
   // DELIVERY & RIDE ENDPOINTS
   // ==================================================================
 
+  @ApiOperation({ summary: 'Get user deliveries with optional status filter' })
   @Get('deliveries')
   async getMyDeliveries(@Request() req) {
     const userId = req.user.id;
@@ -136,6 +152,7 @@ export class UsersController {
     });
   }
 
+  @ApiOperation({ summary: 'Get details of a specific delivery' })
   @Get('deliveries/:id')
   async getDeliveryDetails(@Request() req, @Param('id') id: string) {
     const delivery = await this.usersService.getDeliveryDetails(
@@ -146,11 +163,13 @@ export class UsersController {
     return delivery;
   }
 
+  @ApiOperation({ summary: 'Get user ride history' })
   @Get('rides')
   async getMyRides(@Request() req) {
     return this.usersService.getUserRides(req.user.id);
   }
 
+  @ApiOperation({ summary: 'Get details of a specific ride' })
   @Get('rides/:id')
   async getRideDetails(@Request() req, @Param('id') id: string) {
     const ride = await this.usersService.getRideDetails(req.user.id, id);
@@ -162,6 +181,7 @@ export class UsersController {
   // PROFILE MANAGEMENT
   // ==================================================================
 
+  @ApiOperation({ summary: 'Update user profile name/phone' })
   @Patch('profile')
   async updateProfile(
     @Request() req,
@@ -170,11 +190,13 @@ export class UsersController {
     return this.usersService.updateUserProfile(req.user.id, body);
   }
 
+  @ApiOperation({ summary: 'Soft-delete current user profile' })
   @Delete('profile')
   async deleteProfile(@Request() req) {
     return this.usersService.softDeleteUser(req.user.id);
   }
 
+  @ApiOperation({ summary: 'Permanently delete account' })
   @Delete('delete-account')
   async deleteAccount(@Request() req) {
     return this.usersService.softDeleteUser(req.user.id);
@@ -184,11 +206,13 @@ export class UsersController {
   // EMERGENCY CONTACT ENDPOINTS
   // ==================================================================
 
+  @ApiOperation({ summary: 'Get emergency contacts for current user' })
   @Get('emergency-contacts')
   async getEmergencyContacts(@Request() req) {
     return this.usersService.getEmergencyContacts(req.user.id);
   }
 
+  @ApiOperation({ summary: 'Add a new emergency contact' })
   @Post('emergency-contacts')
   async addEmergencyContact(
     @Request() req,
@@ -197,6 +221,7 @@ export class UsersController {
     return this.usersService.addEmergencyContact(req.user.id, body);
   }
 
+  @ApiOperation({ summary: 'Update an emergency contact' })
   @Patch('emergency-contacts/:id')
   async updateEmergencyContact(
     @Request() req,
@@ -206,6 +231,7 @@ export class UsersController {
     return this.usersService.upsertEmergencyContact(req.user.id, id, body);
   }
 
+  @ApiOperation({ summary: 'Delete an emergency contact' })
   @Delete('emergency-contacts/:id')
   async deleteEmergencyContact(@Request() req, @Param('id') id: string) {
     return this.usersService.deleteEmergencyContact(req.user.id, id);
@@ -215,11 +241,13 @@ export class UsersController {
   // SETTINGS & CONFIG
   // ==================================================================
 
+  @ApiOperation({ summary: 'Get push notification configuration' })
   @Get('notification-config')
   async getNotificationConfig(@Request() req) {
     return this.usersService.getNotificationConfig(req.user.id);
   }
 
+  @ApiOperation({ summary: 'Update push notification configuration' })
   @Patch('notification-config')
   async updateNotificationConfig(@Request() req, @Body() body: any) {
     return this.usersService.updateNotificationConfig(req.user.id, body);
@@ -229,21 +257,27 @@ export class UsersController {
   // WALLET & PAYMENT METHODS ENDPOINTS
   // ==================================================================
 
+  @ApiOperation({ summary: 'Get wallet balance and DVA details' })
   @Get('wallet')
   async getWalletBalance(@Request() req) {
     return this.usersService.getWalletBalance(req.user.id);
   }
 
+  @ApiOperation({
+    summary: 'Provision a dedicated virtual account (DVA) for wallet top-up',
+  })
   @Post('wallet/provision')
   async provisionWallet(@Request() req) {
     return this.usersService.provisionWallet(req.user.id);
   }
 
+  @ApiOperation({ summary: 'Show or hide wallet balance on UI' })
   @Patch('wallet/visibility')
   async setWalletVisibility(@Request() req, @Body() body: { hidden: boolean }) {
     return this.usersService.setWalletVisibility(req.user.id, body.hidden);
   }
 
+  @ApiOperation({ summary: 'Get wallet transaction history (paginated)' })
   @Get('wallet/history')
   async getWalletHistory(
     @Request() req,
@@ -263,21 +297,25 @@ export class UsersController {
    * Use this when a customer reports a missing balance after a bank transfer.
    * Rate-limited by Paystack to once per 10 minutes per account number.
    */
+  @ApiOperation({ summary: 'Trigger Paystack requery for missing DVA balance' })
   @Post('wallet/requery')
   async requeryWallet(@Request() req) {
     return this.usersService.requeryWallet(req.user.id);
   }
 
+  @ApiOperation({ summary: 'Get saved payment cards' })
   @Get('payment/cards')
   async getSavedCards(@Request() req) {
     return this.usersService.getSavedCards(req.user.id);
   }
 
+  @ApiOperation({ summary: 'Set a card as the default payment method' })
   @Patch('payment/cards/:id/default')
   async setDefaultCard(@Request() req, @Param('id') cardId: string) {
     return this.usersService.setDefaultCard(req.user.id, cardId);
   }
 
+  @ApiOperation({ summary: 'Delete a saved payment card' })
   @Delete('payment/cards/:id')
   async deleteSavedCard(@Request() req, @Param('id') cardId: string) {
     return this.usersService.deleteSavedCard(req.user.id, cardId);

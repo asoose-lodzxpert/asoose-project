@@ -14,7 +14,10 @@ import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { RolesGuard } from '../../auth/roles.guards';
 import { Roles } from '../../auth/roles.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
+import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 
+@ApiTags('Vendor / Notifications')
+@ApiBearerAuth()
 @Controller({
   path: 'vendor/notifications',
   version: '1',
@@ -26,6 +29,10 @@ export class VendorNotificationsController {
     private readonly notificationsService: VendorNotificationsService,
   ) {}
 
+  @ApiOperation({
+    summary:
+      'Get vendor notifications with optional type/read filters (paginated)',
+  })
   @Get()
   @UseInterceptors(CacheInterceptor)
   @CacheTTL(30) // Cache for 30 seconds
@@ -46,6 +53,7 @@ export class VendorNotificationsController {
     );
   }
 
+  @ApiOperation({ summary: 'Get count of unread notifications' })
   @Get('unread-count')
   @UseInterceptors(CacheInterceptor)
   @CacheTTL(15) // Cache for 15 seconds
@@ -54,12 +62,14 @@ export class VendorNotificationsController {
     return this.notificationsService.getUnreadCount(vendorId);
   }
 
+  @ApiOperation({ summary: 'Mark a single notification as read' })
   @Patch(':id/read')
   async markAsRead(@Request() req, @Param('id') id: string) {
     const vendorId = req.user.id;
     return this.notificationsService.markAsRead(vendorId, id);
   }
 
+  @ApiOperation({ summary: 'Mark all notifications as read' })
   @Patch('read-all')
   async markAllAsRead(@Request() req) {
     const vendorId = req.user.id;

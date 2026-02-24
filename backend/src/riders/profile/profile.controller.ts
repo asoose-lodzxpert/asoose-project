@@ -18,7 +18,15 @@ import { ProfileService } from './profile.service';
 import { StorageService } from '../../storage/storage.service';
 import { UpdatePersonalInfoDto } from '../dto/update-personal-info.dto';
 import { FileInterceptor } from '@nestjs/platform-express';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiConsumes,
+} from '@nestjs/swagger';
 
+@ApiTags('Rider / Profile')
+@ApiBearerAuth()
 @Controller({
   path: 'rider/profile',
   version: '1',
@@ -29,6 +37,7 @@ export class ProfileController {
     private readonly storageService: StorageService,
   ) {}
 
+  @ApiOperation({ summary: 'Update rider profile fields' })
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.RIDER, UserRole.DRIVER)
   @Patch('me')
@@ -37,6 +46,7 @@ export class ProfileController {
     return this.profileService.updatePersonalInfo(id, updates);
   }
 
+  @ApiOperation({ summary: 'Get full rider profile' })
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.RIDER, UserRole.DRIVER)
   @Get('me')
@@ -45,6 +55,7 @@ export class ProfileController {
     return this.profileService.getRiderProfile(id);
   }
 
+  @ApiOperation({ summary: 'Get rider personal info (name, DOB, address)' })
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.RIDER, UserRole.DRIVER)
   @Get('personal-info')
@@ -53,6 +64,7 @@ export class ProfileController {
     return this.profileService.getPersonalInfo(id);
   }
 
+  @ApiOperation({ summary: 'Update rider personal info' })
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.RIDER, UserRole.DRIVER)
   @Patch('personal-info')
@@ -64,6 +76,8 @@ export class ProfileController {
     return this.profileService.updatePersonalInfo(id, updateData);
   }
 
+  @ApiOperation({ summary: 'Upload rider profile image' })
+  @ApiConsumes('multipart/form-data')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.RIDER, UserRole.DRIVER)
   @Post('upload-profile-image')

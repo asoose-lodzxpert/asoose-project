@@ -5,7 +5,10 @@ import { Roles } from '../../auth/roles.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { WithdrawalService } from './withdrawal.service';
 import { CreateWithdrawalDto } from '../dto/create-withdrawal.dto';
+import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 
+@ApiTags('Rider / Withdrawal')
+@ApiBearerAuth()
 @Controller({
   path: 'rider/withdrawal',
   version: '1',
@@ -13,6 +16,9 @@ import { CreateWithdrawalDto } from '../dto/create-withdrawal.dto';
 export class WithdrawalController {
   constructor(private readonly withdrawalService: WithdrawalService) {}
 
+  @ApiOperation({
+    summary: 'Get rider wallet and bank account info for withdrawal',
+  })
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.RIDER, UserRole.DRIVER)
   @Get('info')
@@ -21,6 +27,7 @@ export class WithdrawalController {
     return this.withdrawalService.getWithdrawalInfo(id);
   }
 
+  @ApiOperation({ summary: 'Request a wallet withdrawal to bank account' })
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.RIDER, UserRole.DRIVER)
   @Post('request')

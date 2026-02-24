@@ -13,24 +13,24 @@ Legend: ✅ Done | ⬜ Pending | 🔸 Partial (some decorators already exist)
 
 | Status | File                                 |
 | ------ | ------------------------------------ |
-| ⬜     | `src/auth/auth.controller.ts`        |
-| ⬜     | `src/auth/rider-auth.controller.ts`  |
-| ⬜     | `src/auth/vendor-auth.controller.ts` |
+| ✅     | `src/auth/auth.controller.ts`        |
+| ✅     | `src/auth/rider-auth.controller.ts`  |
+| ✅     | `src/auth/vendor-auth.controller.ts` |
 
 ### DTOs
 
 | Status | File                                  |
 | ------ | ------------------------------------- |
-| ⬜     | `src/auth/dto/create-user.dto.ts`     |
-| ⬜     | `src/auth/dto/create-vendor.dto.ts`   |
-| ⬜     | `src/auth/dto/create-rider.dto.ts`    |
-| ⬜     | `src/auth/dto/create-driver.dto.ts`   |
-| ⬜     | `src/auth/dto/login-vendor.dto.ts`    |
-| ⬜     | `src/auth/dto/forgot-password.dto.ts` |
-| ⬜     | `src/auth/dto/reset-password.dto.ts`  |
-| ⬜     | `src/auth/dto/update-profile.dto.ts`  |
-| ⬜     | `src/auth/dto/google-oauth.dto.ts`    |
-| ⬜     | `src/auth/dto/apple-oauth.dto.ts`     |
+| ✅     | `src/auth/dto/create-user.dto.ts`     |
+| ✅     | `src/auth/dto/create-vendor.dto.ts`   |
+| ✅     | `src/auth/dto/create-rider.dto.ts`    |
+| ✅     | `src/auth/dto/create-driver.dto.ts`   |
+| ✅     | `src/auth/dto/login-vendor.dto.ts`    |
+| ✅     | `src/auth/dto/forgot-password.dto.ts` |
+| ✅     | `src/auth/dto/reset-password.dto.ts`  |
+| ✅     | `src/auth/dto/update-profile.dto.ts`  |
+| ✅     | `src/auth/dto/google-oauth.dto.ts`    |
+| ✅     | `src/auth/dto/apple-oauth.dto.ts`     |
 
 ---
 
@@ -40,16 +40,16 @@ Legend: ✅ Done | ⬜ Pending | 🔸 Partial (some decorators already exist)
 
 | Status | File                                  |
 | ------ | ------------------------------------- |
-| ⬜     | `src/users/users.controller.ts`       |
-| ⬜     | `src/users/trips/trips.controller.ts` |
+| ✅     | `src/users/users.controller.ts`       |
+| ✅     | `src/users/trips/trips.controller.ts` |
 
 ### DTOs
 
-| Status | File                                                                  |
-| ------ | --------------------------------------------------------------------- |
-| ⬜     | `src/users/dto/users.dto.ts`                                          |
-| ⬜     | `src/users/dto/emergency-contact.dto.ts`                              |
-| 🔸     | `src/users/trips/dto/trip.dto.ts` _(has @ApiProperty but incomplete)_ |
+| Status | File                                     |
+| ------ | ---------------------------------------- |
+| ✅     | `src/users/dto/users.dto.ts`             |
+| ✅     | `src/users/dto/emergency-contact.dto.ts` |
+| ✅     | `src/users/trips/dto/trip.dto.ts`        |
 
 ---
 
@@ -59,26 +59,26 @@ Legend: ✅ Done | ⬜ Pending | 🔸 Partial (some decorators already exist)
 
 | Status | File                                                 |
 | ------ | ---------------------------------------------------- |
-| ⬜     | `src/riders/profile/profile.controller.ts`           |
-| ⬜     | `src/riders/status/status.controller.ts`             |
-| ⬜     | `src/riders/bank/bank.controller.ts`                 |
-| ⬜     | `src/riders/withdrawal/withdrawal.controller.ts`     |
-| ⬜     | `src/riders/order/order.controller.ts`               |
-| ⬜     | `src/riders/jobs/jobs.controller.ts`                 |
-| ⬜     | `src/riders/notification/notification.controller.ts` |
-| ⬜     | `src/riders/rider-notifications.controller.ts`       |
+| ✅     | `src/riders/profile/profile.controller.ts`           |
+| ✅     | `src/riders/status/status.controller.ts`             |
+| ✅     | `src/riders/bank/bank.controller.ts`                 |
+| ✅     | `src/riders/withdrawal/withdrawal.controller.ts`     |
+| ✅     | `src/riders/order/order.controller.ts`               |
+| ✅     | `src/riders/jobs/jobs.controller.ts`                 |
+| ✅     | `src/riders/notification/notification.controller.ts` |
+| ✅     | `src/riders/rider-notifications.controller.ts`       |
 
 ### DTOs
 
 | Status | File                                                 |
 | ------ | ---------------------------------------------------- |
-| ⬜     | `src/riders/dto/update-personal-info.dto.ts`         |
-| ⬜     | `src/riders/dto/update-status.dto.ts`                |
-| ⬜     | `src/riders/dto/update-bank-account.dto.ts`          |
-| ⬜     | `src/riders/dto/create-withdrawal.dto.ts`            |
-| ⬜     | `src/riders/dto/accept-delivery.dto.ts`              |
-| ⬜     | `src/riders/dto/complete-delivery.dto.ts`            |
-| ⬜     | `src/riders/dto/update-notification-settings.dto.ts` |
+| ✅     | `src/riders/dto/update-personal-info.dto.ts`         |
+| ✅     | `src/riders/dto/update-status.dto.ts`                |
+| ✅     | `src/riders/dto/update-bank-account.dto.ts`          |
+| ✅     | `src/riders/dto/create-withdrawal.dto.ts`            |
+| ✅     | `src/riders/dto/accept-delivery.dto.ts`              |
+| ✅     | `src/riders/dto/complete-delivery.dto.ts`            |
+| ✅     | `src/riders/dto/update-notification-settings.dto.ts` |
 
 ---
 
@@ -88,16 +88,16 @@ Legend: ✅ Done | ⬜ Pending | 🔸 Partial (some decorators already exist)
 
 | Status | File                                                          |
 | ------ | ------------------------------------------------------------- |
-| ⬜     | `src/vendor/vendor.controller.ts`                             |
-| ⬜     | `src/vendor/products/products.controller.ts`                  |
-| ⬜     | `src/vendor/orders/vendor-orders.controller.ts`               |
-| ⬜     | `src/vendor/notifications/vendor-notifications.controller.ts` |
+| ✅     | `src/vendor/vendor.controller.ts`                             |
+| ✅     | `src/vendor/products/products.controller.ts`                  |
+| ✅     | `src/vendor/orders/vendor-orders.controller.ts`               |
+| ✅     | `src/vendor/notifications/vendor-notifications.controller.ts` |
 
 ### DTOs
 
 | Status | File                            |
 | ------ | ------------------------------- |
-| ⬜     | `src/vendor/dto/product.dto.ts` |
+| ✅     | `src/vendor/dto/product.dto.ts` |
 
 ---
 
@@ -335,9 +335,9 @@ Legend: ✅ Done | ⬜ Pending | 🔸 Partial (some decorators already exist)
 | Category      | Controllers | DTOs   |
 | ------------- | ----------- | ------ |
 | Auth          | 3           | 10     |
-| Users         | 2           | 3      |
-| Riders        | 8           | 7      |
-| Vendor        | 4           | 1      |
+| Users ✅      | 2           | 3      |
+| Riders ✅     | 8           | 7      |
+| Vendor ✅     | 4           | 1      |
 | Marketplace   | 1           | 1      |
 | Fare          | 1           | 2      |
 | Payment       | 1           | 1      |

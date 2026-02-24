@@ -62,16 +62,25 @@ export class RequestRideDto {
   @IsEnum(VehicleType)
   vehicleType: VehicleType;
 
+  @ApiProperty({
+    example: 1500,
+    description: 'Agreed fare amount in kobo/smallest currency unit',
+  })
   @IsNumber()
   @IsPositive()
   fare: number;
 
+  @ApiProperty({ example: 5.2, description: 'Trip distance in kilometres' })
   @IsNumber()
   @IsPositive()
   @Min(0.1)
   @Max(10000)
   distanceKm: number;
 
+  @ApiProperty({
+    example: 12,
+    description: 'Estimated trip duration in minutes',
+  })
   @IsNumber()
   @IsPositive()
   @Min(1)

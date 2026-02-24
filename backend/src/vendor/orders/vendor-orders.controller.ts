@@ -18,7 +18,10 @@ import { UserRole } from '../../common/enums/user-role.enum';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { RolesGuard } from 'src/auth/roles.guards';
 import { Roles } from 'src/auth/roles.decorator';
+import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 
+@ApiTags('Vendor / Orders')
+@ApiBearerAuth()
 @Controller({
   path: 'vendor/orders',
   version: '1',
@@ -39,6 +42,7 @@ export class VendorOrdersController {
    * - New orders are created for their store
    * - Order statuses change
    */
+  @ApiOperation({ summary: 'SSE stream for real-time order notifications' })
   @Sse('stream')
   streamOrders(@Request() req): Observable<MessageEvent> {
     const vendorId = req.user.id;
@@ -58,6 +62,10 @@ export class VendorOrdersController {
     return this.streamService.getOrderStream(storeId);
   }
 
+  @ApiOperation({
+    summary:
+      'Get all orders for vendor store with optional status filter (paginated)',
+  })
   @Get()
   async findAll(
     @Request() req,
@@ -74,12 +82,14 @@ export class VendorOrdersController {
     );
   }
 
+  @ApiOperation({ summary: 'Accept an incoming order' })
   @Patch(':id/accept')
   async accept(@Request() req, @Param('id') id: string) {
     const vendorId = req.user.id;
     return this.ordersService.acceptOrder(vendorId, id);
   }
 
+  @ApiOperation({ summary: 'Decline an order with a reason' })
   @Patch(':id/decline')
   async decline(
     @Request() req,
@@ -94,12 +104,14 @@ export class VendorOrdersController {
     );
   }
 
+  @ApiOperation({ summary: 'Mark order as being prepared' })
   @Patch(':id/preparing')
   async preparing(@Request() req, @Param('id') id: string) {
     const vendorId = req.user.id;
     return this.ordersService.startPreparing(vendorId, id);
   }
 
+  @ApiOperation({ summary: 'Mark order as ready for pickup/dispatch' })
   @Patch(':id/ready')
   async markReady(@Request() req, @Param('id') id: string) {
     const vendorId = req.user.id;

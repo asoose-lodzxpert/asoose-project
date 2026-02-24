@@ -16,7 +16,10 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guards';
 import { Roles } from '../auth/roles.decorator';
 import { UserRole } from '../common/enums/user-role.enum';
+import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 
+@ApiTags('Vendor / Dashboard')
+@ApiBearerAuth()
 @Controller({
   path: 'vendor/dashboard',
   version: '1',
@@ -28,6 +31,7 @@ export class VendorController {
     private readonly vendorAuthService: VendorAuthService,
   ) {}
 
+  @ApiOperation({ summary: 'Get authenticated vendor profile' })
   @Get('me')
   @Roles(UserRole.VENDOR)
   @UseInterceptors(CacheInterceptor)
@@ -37,6 +41,7 @@ export class VendorController {
     return await this.vendorAuthService.getPublicVendorDetails(id);
   }
 
+  @ApiOperation({ summary: 'Update vendor store profile image' })
   @Patch('update-image')
   @Roles(UserRole.VENDOR)
   async updateProfileImage(
@@ -50,6 +55,7 @@ export class VendorController {
     );
   }
 
+  @ApiOperation({ summary: 'Get public store details (name, logo, address)' })
   @Get('public')
   @Roles(UserRole.VENDOR)
   @UseInterceptors(CacheInterceptor)
@@ -58,6 +64,7 @@ export class VendorController {
     return this.vendorService.getStorePublicDetails(req.user.id);
   }
 
+  @ApiOperation({ summary: 'Get vendor wallet balance' })
   @Get('balance')
   @Roles(UserRole.VENDOR)
   @UseInterceptors(CacheInterceptor)
@@ -66,6 +73,9 @@ export class VendorController {
     return this.vendorService.getStoreBalance(req.user.id);
   }
 
+  @ApiOperation({
+    summary: 'Get vendor account status (ACTIVE, PENDING, SUSPENDED)',
+  })
   @Get('status')
   @Roles(UserRole.VENDOR)
   @UseInterceptors(CacheInterceptor)
@@ -74,6 +84,9 @@ export class VendorController {
     return this.vendorService.getVendorStatus(req.user.id);
   }
 
+  @ApiOperation({
+    summary: 'Get whether the store is currently accepting orders',
+  })
   @Get('active-status')
   @Roles(UserRole.VENDOR)
   @UseInterceptors(CacheInterceptor)
@@ -82,6 +95,9 @@ export class VendorController {
     return this.vendorService.getVendorActiveStatus(req.user.id);
   }
 
+  @ApiOperation({
+    summary: 'Get store sales metrics (total orders, revenue, etc.)',
+  })
   @Get('metrics')
   @Roles(UserRole.VENDOR)
   @UseInterceptors(CacheInterceptor)
@@ -90,6 +106,7 @@ export class VendorController {
     return this.vendorService.getStoreMetrics(req.user.id);
   }
 
+  @ApiOperation({ summary: 'Check if store is currently online' })
   @Get('is-online')
   @Roles(UserRole.VENDOR)
   @UseInterceptors(CacheInterceptor)
@@ -98,18 +115,21 @@ export class VendorController {
     return this.vendorService.isStoreOnline(req.user.id);
   }
 
+  @ApiOperation({ summary: 'Toggle store between online and offline' })
   @Post('toggle-online')
   @Roles(UserRole.VENDOR)
   toggleOnline(@Req() req) {
     return this.vendorService.toggleStoreOnline(req.user.id);
   }
 
+  @ApiOperation({ summary: 'Get all orders for this vendor store' })
   @Get('orders')
   @Roles(UserRole.VENDOR)
   getOrders(@Req() req) {
     return this.vendorService.getStoreOrders(req.user.id);
   }
 
+  @ApiOperation({ summary: 'Get all saved bank accounts for vendor' })
   @Get('bank-accounts')
   @Roles(UserRole.VENDOR)
   @UseInterceptors(CacheInterceptor)
@@ -118,6 +138,7 @@ export class VendorController {
     return this.vendorService.getBankAccounts(req.user.id);
   }
 
+  @ApiOperation({ summary: 'Get list of supported banks' })
   @Get('banks')
   @Roles(UserRole.VENDOR)
   @UseInterceptors(CacheInterceptor)
@@ -126,6 +147,7 @@ export class VendorController {
     return this.vendorService.getBanks();
   }
 
+  @ApiOperation({ summary: 'Verify a bank account number via Paystack' })
   @Post('verify-account')
   @Roles(UserRole.VENDOR)
   verifyAccountNumber(
@@ -137,6 +159,7 @@ export class VendorController {
     );
   }
 
+  @ApiOperation({ summary: 'Get saved bank account for vendor' })
   @Get('bank-account')
   @Roles(UserRole.VENDOR)
   @UseInterceptors(CacheInterceptor)
@@ -145,6 +168,7 @@ export class VendorController {
     return this.vendorService.getBankAccount(req.user.id);
   }
 
+  @ApiOperation({ summary: 'Save a new bank account for payouts' })
   @Post('bank-account')
   @Roles(UserRole.VENDOR)
   saveBankAccount(
@@ -160,6 +184,7 @@ export class VendorController {
     return this.vendorService.saveBankAccount(req.user.id, body);
   }
 
+  @ApiOperation({ summary: 'Update existing bank account details' })
   @Patch('bank-account')
   @Roles(UserRole.VENDOR)
   updateBankAccount(
@@ -174,12 +199,14 @@ export class VendorController {
     return this.vendorService.updateBankAccount(req.user.id, body);
   }
 
+  @ApiOperation({ summary: 'Delete saved bank account' })
   @Delete('bank-account')
   @Roles(UserRole.VENDOR)
   deleteBankAccount(@Req() req) {
     return this.vendorService.deleteBankAccount(req.user.id);
   }
 
+  @ApiOperation({ summary: 'Get vendor withdrawal history' })
   @Get('withdrawals')
   @Roles(UserRole.VENDOR)
   @UseInterceptors(CacheInterceptor)
@@ -188,6 +215,7 @@ export class VendorController {
     return this.vendorService.getWithdrawals(req.user.id);
   }
 
+  @ApiOperation({ summary: 'Request a payout withdrawal' })
   @Post('withdrawals')
   @Roles(UserRole.VENDOR)
   createWithdrawal(
@@ -197,6 +225,7 @@ export class VendorController {
     return this.vendorService.createWithdrawal(req.user.id, body);
   }
 
+  @ApiOperation({ summary: 'Submit account deletion request with reasons' })
   @Post('account/deletion-request')
   @Roles(UserRole.VENDOR)
   requestAccountDeletion(
@@ -206,6 +235,7 @@ export class VendorController {
     return this.vendorService.requestAccountDeletion(req.user.id, body);
   }
 
+  @ApiOperation({ summary: 'Check status of pending account deletion request' })
   @Get('account/deletion-status')
   @Roles(UserRole.VENDOR)
   getAccountDeletionStatus(@Req() req) {

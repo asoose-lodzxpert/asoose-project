@@ -5,7 +5,10 @@ import { Roles } from '../../auth/roles.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { NotificationService } from './notification.service';
 import { UpdateNotificationSettingsDto } from '../dto/update-notification-settings.dto';
+import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 
+@ApiTags('Rider / Notification Settings')
+@ApiBearerAuth()
 @Controller({
   path: 'rider/notification',
   version: '1',
@@ -13,6 +16,7 @@ import { UpdateNotificationSettingsDto } from '../dto/update-notification-settin
 export class NotificationController {
   constructor(private readonly notificationService: NotificationService) {}
 
+  @ApiOperation({ summary: 'Get rider push notification settings' })
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.RIDER, UserRole.DRIVER)
   @Get('settings')
@@ -21,6 +25,7 @@ export class NotificationController {
     return this.notificationService.getNotificationSettings(id);
   }
 
+  @ApiOperation({ summary: 'Update rider push notification settings' })
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.RIDER, UserRole.DRIVER)
   @Patch('settings')

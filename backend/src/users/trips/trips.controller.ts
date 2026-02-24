@@ -21,7 +21,10 @@ import {
   VehicleType,
 } from './dto/trip.dto';
 import { DeliveriesService } from './deliveries.service';
+import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 
+@ApiTags('Trips')
+@ApiBearerAuth()
 @Controller({
   path: 'trips',
   version: '1',
@@ -37,21 +40,27 @@ export class TripsController {
   // RIDES — Static routes MUST come before :id
   // =============================================
 
+  @ApiOperation({ summary: 'Get available vehicle types' })
   @Get('vehicle-types')
   getVehicleTypes() {
     return Object.values(VehicleType);
   }
 
+  @ApiOperation({ summary: 'Get fare estimate for a ride' })
   @Post('rides/estimate')
   async getRideEstimate(@Body() dto: RideEstimateDto) {
     return this.tripsService.getRideEstimate(dto);
   }
 
+  @ApiOperation({ summary: 'Get currently active ride for user' })
   @Get('rides/current')
   async getCurrentRide(@Request() req) {
     return this.tripsService.getCurrentRide(req.user.id);
   }
 
+  @ApiOperation({
+    summary: 'Request a new ride (requires idempotency key header)',
+  })
   @Post('rides/request')
   async requestRide(
     @Request() req,
@@ -69,6 +78,7 @@ export class TripsController {
    * Get all user's rides
    * GET /trips/rides?status=REQUESTED&page=1&limit=10
    */
+  @ApiOperation({ summary: 'Get all rides for current user' })
   @Get('rides')
   async getUserRides(
     @Request() req,
@@ -88,6 +98,7 @@ export class TripsController {
 
   // Parameterized routes AFTER static routes
 
+  @ApiOperation({ summary: 'Confirm a ride and set payment method' })
   @Post('rides/:id/confirm')
   async confirmRide(
     @Request() req,
@@ -101,6 +112,7 @@ export class TripsController {
    * Get specific ride by ID
    * GET /trips/rides/:id
    */
+  @ApiOperation({ summary: 'Get a specific ride by ID' })
   @Get('rides/:id')
   async getRideById(@Request() req, @Param('id') rideId: string) {
     return this.tripsService.getRideById(req.user.id, rideId);
@@ -110,6 +122,7 @@ export class TripsController {
    * Get Driver Location for a specific ride
    * GET /trips/rides/:id/driver-location
    */
+  @ApiOperation({ summary: "Get driver's live location for a ride" })
   @Get('rides/:id/driver-location')
   async getDriverLocation(@Request() req, @Param('id') rideId: string) {
     return this.tripsService.getDriverLocation(req.user.id, rideId);
@@ -119,6 +132,7 @@ export class TripsController {
    * Cancel a ride
    * PATCH /trips/rides/:id/cancel
    */
+  @ApiOperation({ summary: 'Cancel a ride' })
   @Patch('rides/:id/cancel')
   async cancelRide(
     @Request() req,
@@ -132,15 +146,22 @@ export class TripsController {
    * Rate a ride driver
    * POST /trips/rides/:id/rate
    */
+  @ApiOperation({ summary: 'Rate a completed ride' })
   @Post('rides/:id/rate')
   async rateRide(
     @Request() req,
     @Param('id') rideId: string,
     @Body() body: { rating: number; comment?: string },
   ) {
-    return this.tripsService.rateRide(req.user.id, rideId, body.rating, body.comment);
+    return this.tripsService.rateRide(
+      req.user.id,
+      rideId,
+      body.rating,
+      body.comment,
+    );
   }
 
+  @ApiOperation({ summary: 'Mark driver as arrived at pickup' })
   @Patch('rides/:id/arrived')
   async driverArrived(@Request() req, @Param('id') rideId: string) {
     return this.tripsService.driverArrived(rideId, req.user.id);
@@ -150,6 +171,7 @@ export class TripsController {
   // DELIVERIES
   // =============================================
 
+  @ApiOperation({ summary: 'Request a new parcel delivery' })
   @Post('deliveries/request')
   async requestDelivery(
     @Request() req,
@@ -159,16 +181,19 @@ export class TripsController {
     return this.deliveryService.requestDelivery(req.user.id, dto);
   }
 
+  @ApiOperation({ summary: 'Get all deliveries for current user' })
   @Get('deliveries')
   async getUserDeliveries(@Request() req, @Query('status') status?: string) {
     return this.tripsService.getUserDeliveries(req.user.id, status);
   }
 
+  @ApiOperation({ summary: 'Get a specific delivery by ID' })
   @Get('deliveries/:id')
   async getDeliveryById(@Request() req, @Param('id') deliveryId: string) {
     return this.tripsService.getDeliveryById(req.user.id, deliveryId);
   }
 
+  @ApiOperation({ summary: 'Cancel a delivery' })
   @Patch('deliveries/:id/cancel')
   async cancelDelivery(
     @Request() req,
