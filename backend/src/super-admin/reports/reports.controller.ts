@@ -16,7 +16,10 @@ import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { RolesGuard } from '../../auth/roles.guards';
 import { Roles } from '../../auth/roles.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
+import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 
+@ApiTags('Super-Admin / Reports')
+@ApiBearerAuth()
 @Controller({
   path: '/super-admin/reports',
   version: '1',
@@ -26,6 +29,7 @@ import { UserRole } from '../../common/enums/user-role.enum';
 export class AnalyticsController {
   constructor(private readonly analyticsService: AnalyticsService) {}
 
+  @ApiOperation({ summary: 'Full analytics report for N days (default 30)' })
   @Get('analytics')
   @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @HttpCode(HttpStatus.OK)
@@ -37,6 +41,7 @@ export class AnalyticsController {
     return this.analyticsService.getAnalyticsReport(days);
   }
 
+  @ApiOperation({ summary: 'Overview and average rating for N days' })
   @Get('overview')
   @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @HttpCode(HttpStatus.OK)
@@ -49,6 +54,7 @@ export class AnalyticsController {
     return { overview: report.overview, avgRating: report.avgRating };
   }
 
+  @ApiOperation({ summary: 'Revenue breakdown and daily volume for N days' })
   @Get('revenue')
   @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @HttpCode(HttpStatus.OK)
@@ -65,6 +71,7 @@ export class AnalyticsController {
     };
   }
 
+  @ApiOperation({ summary: 'User and revenue growth metrics (last 30 days)' })
   @Get('growth')
   @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @HttpCode(HttpStatus.OK)
@@ -73,6 +80,7 @@ export class AnalyticsController {
     return { growth: report.growth };
   }
 
+  @ApiOperation({ summary: 'Top N vendors by revenue for the given period' })
   @Get('top-vendors')
   @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @HttpCode(HttpStatus.OK)
@@ -86,6 +94,7 @@ export class AnalyticsController {
     return { vendors: report.topVendors.slice(0, limit) };
   }
 
+  @ApiOperation({ summary: 'Rating distribution and platform average' })
   @Get('ratings')
   @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @HttpCode(HttpStatus.OK)
@@ -94,6 +103,7 @@ export class AnalyticsController {
     return { distribution: report.ratings, average: report.avgRating };
   }
 
+  @ApiOperation({ summary: 'Export analytics report as CSV download' })
   @Get('export')
   @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @HttpCode(HttpStatus.OK)

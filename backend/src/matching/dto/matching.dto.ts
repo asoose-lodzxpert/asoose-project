@@ -60,6 +60,7 @@ export class RequestDeliveryDto {
   @IsOptional()
   @IsUUID()
   orderId?: string;
+  string;
 
   @ApiProperty({ description: 'Pickup address ID' })
   @IsNotEmpty()

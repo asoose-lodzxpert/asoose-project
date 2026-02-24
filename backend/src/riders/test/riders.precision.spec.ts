@@ -1,4 +1,4 @@
-import { RidersService } from '../riders.service';
+import { OrderService } from '../order/order.service';
 
 // Mock Prisma
 const mockPrisma = {
@@ -7,10 +7,10 @@ const mockPrisma = {
 };
 
 describe('Monetary Precision', () => {
-  let service: RidersService;
+  let service: OrderService;
 
   beforeEach(() => {
-    service = new RidersService(mockPrisma as any, {} as any);
+    service = new OrderService(mockPrisma as any);
   });
 
   it('should handle floating point arithmetic safely', async () => {

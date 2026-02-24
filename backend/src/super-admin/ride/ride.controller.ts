@@ -15,7 +15,10 @@ import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { RolesGuard } from '../../auth/roles.guards';
 import { Roles } from '../../auth/roles.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
+import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 
+@ApiTags('Super-Admin / Rides')
+@ApiBearerAuth()
 @Controller({
   path: 'super-admin/rides',
   version: '1',
@@ -25,21 +28,25 @@ import { UserRole } from '../../common/enums/user-role.enum';
 export class RidesController {
   constructor(private readonly ridesService: RidesService) {}
 
+  @ApiOperation({ summary: 'List all rides with optional filters' })
   @Get()
   findAll(@Query() query: RideFilterDto) {
     return this.ridesService.findAll(query);
   }
 
+  @ApiOperation({ summary: 'Get ride details by ID' })
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.ridesService.findOne(id);
   }
 
+  @ApiOperation({ summary: 'Cancel a ride' })
   @Patch(':id/cancel')
   cancel(@Param('id') id: string) {
     return this.ridesService.cancel(id);
   }
 
+  @ApiOperation({ summary: 'Manually assign a driver to a ride' })
   @Post(':id/assign')
   @Roles('SUPER_ADMIN', 'ADMIN_MANAGER') // Higher privilege
   async assignDriver(
@@ -51,6 +58,7 @@ export class RidesController {
     return this.ridesService.manualAssignDriver(id, riderId, adminId);
   }
 
+  @ApiOperation({ summary: 'Force-update a ride status' })
   @Patch(':id/force-status')
   @Roles('SUPER_ADMIN', 'ADMIN_MANAGER')
   async forceStatus(

@@ -14,7 +14,10 @@ import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { RolesGuard } from '../../auth/roles.guards';
 import { Roles } from '../../auth/roles.decorator';
 import { VerifyDocumentDto } from './dto/verify-document.dto';
+import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 
+@ApiTags('Super-Admin / Verification')
+@ApiBearerAuth()
 @Controller({
   path: 'super-admin/verification',
   version: '1',
@@ -24,6 +27,9 @@ import { VerifyDocumentDto } from './dto/verify-document.dto';
 export class VerificationController {
   constructor(private readonly verificationService: VerificationService) {}
 
+  @ApiOperation({
+    summary: 'Get pending verifications (vendors or riders) with filters',
+  })
   @Get()
   async getPending(
     @Query('type') type: string,
@@ -39,6 +45,7 @@ export class VerificationController {
     });
   }
 
+  @ApiOperation({ summary: 'Approve or reject a verification submission' })
   @Patch(':type/:id/decision')
   async handleDecision(
     @Param('id') id: string,
@@ -56,6 +63,7 @@ export class VerificationController {
       body.commissionRate,
     );
   }
+  @ApiOperation({ summary: 'Get verification details by ID' })
   @Get(':id')
   async findOne(@Param('id') id: string) {
     return this.verificationService.getVerificationById(id);

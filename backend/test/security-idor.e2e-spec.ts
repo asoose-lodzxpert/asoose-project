@@ -1,17 +1,17 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { RidersService } from '../src/riders/riders.service';
+import { WithdrawalService } from '../src/riders/withdrawal/withdrawal.service';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { CreateWithdrawalDto } from '../src/riders/dto/create-withdrawal.dto';
 
 describe('Security: IDOR Checks', () => {
-  let ridersService: RidersService;
+  let ridersService: WithdrawalService;
   let prisma: PrismaService;
 
   beforeAll(async () => {
     const module: TestingModule = await Test.createTestingModule({
       imports: [],
       providers: [
-        RidersService,
+        WithdrawalService,
         PrismaService,
         // Mock dependencies required by RidersService to avoid errors during instantiation
         {
@@ -27,7 +27,7 @@ describe('Security: IDOR Checks', () => {
     }).compile();
 
     // 👇 This was missing in the previous snippet
-    ridersService = module.get<RidersService>(RidersService);
+    ridersService = module.get<WithdrawalService>(WithdrawalService);
     prisma = module.get<PrismaService>(PrismaService);
   });
 

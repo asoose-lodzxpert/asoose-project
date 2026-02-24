@@ -1,7 +1,9 @@
 import { Controller, Post, Body } from '@nestjs/common';
 import { EmailProducer } from '../mail/email.producer';
 import { SupportInquiryDto } from './dto/support-inquiry.dto';
+import { ApiTags, ApiOperation } from '@nestjs/swagger';
 
+@ApiTags('Support')
 @Controller({
   path: 'support',
   version: '1',
@@ -9,6 +11,7 @@ import { SupportInquiryDto } from './dto/support-inquiry.dto';
 export class SupportController {
   constructor(private readonly emailProducer: EmailProducer) {}
 
+  @ApiOperation({ summary: 'Submit a support inquiry (sends email to admin)' })
   @Post('inquiry')
   async handleInquiry(@Body() dto: SupportInquiryDto) {
     // We reuse the existing vendor message logic to notify admin

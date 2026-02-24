@@ -14,7 +14,10 @@ import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { RolesGuard } from 'src/auth/roles.guards';
 import { Roles } from 'src/auth/roles.decorator';
 import { UserRole } from 'src/common/enums/user-role.enum';
+import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 
+@ApiTags('Super-Admin / Admins')
+@ApiBearerAuth()
 @Controller({
   path: 'super-admin/admins',
   version: '1',
@@ -23,18 +26,21 @@ import { UserRole } from 'src/common/enums/user-role.enum';
 export class AdminsController {
   constructor(private readonly adminsService: AdminsService) {}
 
+  @ApiOperation({ summary: 'Create a new admin account' })
   @Post()
   @Roles(UserRole.SUPER_ADMIN)
   create(@Body() createAdminDto: CreateAdminDto, @Req() req) {
     return this.adminsService.create(createAdminDto, req.user.id);
   }
 
+  @ApiOperation({ summary: 'List all admin accounts' })
   @Get()
   @Roles(UserRole.SUPER_ADMIN)
   findAll() {
     return this.adminsService.findAll();
   }
 
+  @ApiOperation({ summary: 'Delete an admin account' })
   @Delete(':id')
   @Roles(UserRole.SUPER_ADMIN)
   remove(@Param('id') id: string, @Req() req) {

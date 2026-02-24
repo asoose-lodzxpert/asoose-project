@@ -12,7 +12,9 @@ import { GetCartSummaryDto } from './dto/cart-summary.dto';
 import { AddToCartDto } from './dto/add-to-cart.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import type { Request } from 'express';
+import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 
+@ApiTags('Cart')
 @Controller({
   path: 'cart',
   version: '1',
@@ -24,6 +26,8 @@ export class CartController {
    * Secure Endpoint: Add Item to Cart
    * Requires JWT Authentication
    */
+  @ApiOperation({ summary: 'Add an item to authenticated user cart' })
+  @ApiBearerAuth()
   @Post('add')
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
@@ -45,6 +49,9 @@ export class CartController {
    * Public/Shared Endpoint: Calculate Cart Summary
    * Used for displaying totals and fees (stateless calculation)
    */
+  @ApiOperation({
+    summary: 'Calculate cart totals and fees (stateless, no auth required)',
+  })
   @Post('summary')
   @HttpCode(HttpStatus.OK)
   async getCartSummary(@Body() dto: GetCartSummaryDto) {

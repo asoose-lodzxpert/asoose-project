@@ -15,7 +15,14 @@ import {
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { StorageService } from './storage.service';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiConsumes,
+} from '@nestjs/swagger';
 
+@ApiTags('Storage')
 @Controller({
   path: 'storage',
   version: '1',
@@ -23,6 +30,8 @@ import { StorageService } from './storage.service';
 export class StorageController {
   constructor(private readonly storageService: StorageService) {}
 
+  @ApiOperation({ summary: 'Admin: list all files in storage bucket' })
+  @ApiBearerAuth()
   @Post('list')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
@@ -31,6 +40,9 @@ export class StorageController {
     return { files };
   }
 
+  @ApiOperation({ summary: 'Upload a single file (PDF, JPG, PNG, max 5MB)' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBearerAuth()
   @Post('upload')
   @UseGuards(JwtAuthGuard)
   @UseInterceptors(FileInterceptor('file'))
@@ -62,6 +74,10 @@ export class StorageController {
     return { url: result.url };
   }
 
+  @ApiOperation({
+    summary: 'Upload a single file without authentication (public)',
+  })
+  @ApiConsumes('multipart/form-data')
   @Post('upload-public')
   @UseInterceptors(FileInterceptor('file'))
   async uploadPublicFile(@UploadedFile() file: Express.Multer.File) {
@@ -92,6 +108,11 @@ export class StorageController {
     return { url: result.url };
   }
 
+  @ApiOperation({
+    summary: 'Upload up to 10 files at once (max 5MB each, auth required)',
+  })
+  @ApiConsumes('multipart/form-data')
+  @ApiBearerAuth()
   @Post('upload-bulk')
   @UseGuards(JwtAuthGuard)
   @UseInterceptors(FilesInterceptor('files', 10)) // Max 10 files
@@ -172,6 +193,8 @@ export class StorageController {
     return { url: result.url };
   }
 
+  @ApiOperation({ summary: 'Delete a file by URL (auth required)' })
+  @ApiBearerAuth()
   @Delete('delete')
   @UseGuards(JwtAuthGuard)
   async deleteFile(@Body() body: { url: string }) {

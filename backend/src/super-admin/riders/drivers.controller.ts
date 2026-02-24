@@ -17,11 +17,14 @@ import { UserRole } from '../../common/enums/user-role.enum';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { RolesGuard } from '../../auth/roles.guards';
 import { Roles } from '../../auth/roles.decorator';
+import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 
 /**
  * Exposes DRIVER-role riders (ride-hailing drivers) separately from
  * RIDER-role users (delivery riders) at /super-admin/drivers
  */
+@ApiTags('Super-Admin / Drivers')
+@ApiBearerAuth()
 @Controller({
   path: 'super-admin/drivers',
   version: '1',
@@ -30,6 +33,9 @@ import { Roles } from '../../auth/roles.decorator';
 export class DriversController {
   constructor(private readonly ridersService: RidersService) {}
 
+  @ApiOperation({
+    summary: 'List all ride-hailing drivers with optional filters',
+  })
   @Get()
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN_MANAGER, UserRole.ADMIN_SUPPORT)
   async findAll(
@@ -41,12 +47,14 @@ export class DriversController {
     return this.ridersService.findAllDrivers({ search, page, limit, status });
   }
 
+  @ApiOperation({ summary: 'Get driver details by ID' })
   @Get(':id')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN_MANAGER, UserRole.ADMIN_SUPPORT)
   async findOne(@Param('id') id: string) {
     return this.ridersService.findOne(id);
   }
 
+  @ApiOperation({ summary: 'Update driver account status' })
   @Patch(':id/status')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN_MANAGER)
   async updateStatus(
@@ -58,6 +66,7 @@ export class DriversController {
     return this.ridersService.updateStatus(id, status, adminId);
   }
 
+  @ApiOperation({ summary: 'Verify or reject a driver document' })
   @Patch(':id/documents/:docId')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN_MANAGER)
   async verifyDocument(
@@ -70,12 +79,14 @@ export class DriversController {
     return this.ridersService.verifyDocument(riderId, docId, status, adminId);
   }
 
+  @ApiOperation({ summary: "Get driver's ride history" })
   @Get(':id/rides')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN_MANAGER, UserRole.ADMIN_SUPPORT)
   async getRides(@Param('id') id: string) {
     return this.ridersService.getRiderRides(id);
   }
 
+  @ApiOperation({ summary: 'Override last known location of a driver' })
   @Patch(':id/location')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN_MANAGER)
   async updateLocation(
@@ -85,6 +96,7 @@ export class DriversController {
     return this.ridersService.updateLocation(id, body.lat, body.lng);
   }
 
+  @ApiOperation({ summary: 'Update driver name/phone/email' })
   @Patch(':id')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN_MANAGER)
   async update(
@@ -94,6 +106,7 @@ export class DriversController {
     return this.ridersService.update(id, body);
   }
 
+  @ApiOperation({ summary: 'Credit or debit a driver wallet balance' })
   @Post(':id/wallet')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN_FINANCE)
   async adjustWallet(
@@ -111,6 +124,7 @@ export class DriversController {
     );
   }
 
+  @ApiOperation({ summary: 'Request a payout for a driver' })
   @Post(':id/payouts')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN_FINANCE)
   async createPayout(
@@ -120,6 +134,7 @@ export class DriversController {
     return this.ridersService.requestPayout(id, body.amount);
   }
 
+  @ApiOperation({ summary: 'Process (approve/fail) a driver payout' })
   @Patch(':id/payouts/:payoutId')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN_FINANCE)
   async processPayout(
@@ -133,12 +148,14 @@ export class DriversController {
     );
   }
 
+  @ApiOperation({ summary: "List a driver's payout records" })
   @Get(':id/payouts')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN_FINANCE)
   async getDriverPayouts(@Param('id') id: string) {
     return this.ridersService.getRiderPayouts(id);
   }
 
+  @ApiOperation({ summary: 'Delete a driver account (SUPER_ADMIN only)' })
   @Delete(':id')
   @Roles(UserRole.SUPER_ADMIN)
   async remove(@Param('id') id: string, @Req() req: any) {
@@ -146,6 +163,7 @@ export class DriversController {
     return this.ridersService.remove(id, adminId);
   }
 
+  @ApiOperation({ summary: 'Send a direct message to a driver' })
   @Post(':id/message')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN_MANAGER)
   async messageDriver(
@@ -157,6 +175,7 @@ export class DriversController {
     return this.ridersService.sendMessageToRider(id, message, adminId);
   }
 
+  @ApiOperation({ summary: "Update a driver's vehicle details" })
   @Patch(':id/vehicle')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN_MANAGER)
   async updateVehicle(
@@ -175,6 +194,7 @@ export class DriversController {
     return this.ridersService.updateVehicle(id, body, adminId);
   }
 
+  @ApiOperation({ summary: 'Suspend or ban a driver (kill-switch)' })
   @Post(':id/kill-switch')
   @Roles(UserRole.SUPER_ADMIN)
   async killSwitch(

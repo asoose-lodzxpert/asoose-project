@@ -16,7 +16,10 @@ import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { RolesGuard } from '../../auth/roles.guards';
 import { Roles } from '../../auth/roles.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
+import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 
+@ApiTags('Super-Admin / Deliveries')
+@ApiBearerAuth()
 @Controller({
   path: 'super-admin/deliveries',
   version: '1',
@@ -25,12 +28,14 @@ import { UserRole } from '../../common/enums/user-role.enum';
 export class DeliveriesController {
   constructor(private readonly deliveriesService: DeliveriesService) {}
 
+  @ApiOperation({ summary: 'List all deliveries with filters' })
   @Get()
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN_MANAGER, UserRole.ADMIN_SUPPORT)
   findAll(@Query() query: DeliveryFilterDto) {
     return this.deliveriesService.findAll(query);
   }
 
+  @ApiOperation({ summary: 'Get delivery details by ID' })
   @Get(':id')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN_MANAGER, UserRole.ADMIN_SUPPORT)
   findOne(@Param('id') id: string) {
@@ -38,12 +43,14 @@ export class DeliveriesController {
   }
 
   // 🔒 Cancel/Delete: Manager Only
+  @ApiOperation({ summary: 'Cancel / delete a delivery' })
   @Delete(':id')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN_MANAGER)
   remove(@Param('id') id: string) {
     return this.deliveriesService.remove(id);
   }
 
+  @ApiOperation({ summary: 'Force-update delivery status' })
   @Patch(':id/status')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN_MANAGER)
   updateStatus(
@@ -55,6 +62,7 @@ export class DeliveriesController {
     return this.deliveriesService.updateStatus(id, status as any, adminId);
   }
 
+  @ApiOperation({ summary: 'Manually assign a rider to a delivery' })
   @Post(':id/assign-rider')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN_MANAGER)
   assignRider(
@@ -70,6 +78,9 @@ export class DeliveriesController {
    * Assign one rider to all deliveries belonging to an OrderGroup.
    * POST /super-admin/deliveries/groups/:groupId/assign-rider
    */
+  @ApiOperation({
+    summary: 'Assign one rider to all deliveries in an order group',
+  })
   @Post('groups/:groupId/assign-rider')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN_MANAGER)
   assignRiderToGroup(

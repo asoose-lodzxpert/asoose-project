@@ -15,6 +15,10 @@ import { RolesGuard } from '../../auth/roles.guards';
 import { Roles } from '../../auth/roles.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { AdjustWalletDto } from './dto/adjust-wallet.dto';
+import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
+
+@ApiTags('Super-Admin / Transactions')
+@ApiBearerAuth()
 @Controller({
   path: 'super-admin/transactions',
   version: '1',
@@ -24,16 +28,21 @@ import { AdjustWalletDto } from './dto/adjust-wallet.dto';
 export class TransactionsController {
   constructor(private readonly transactionsService: TransactionsService) {}
 
+  @ApiOperation({ summary: 'List all transactions with filters' })
   @Get()
   findAll(@Query() query: TransactionFilterDto) {
     return this.transactionsService.findAll(query);
   }
 
+  @ApiOperation({ summary: 'Get transaction details by ID' })
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.transactionsService.findOne(id);
   }
 
+  @ApiOperation({
+    summary: 'Credit or debit a user wallet balance (SUPER_ADMIN only)',
+  })
   @Post('adjust-wallet')
   @Roles(UserRole.SUPER_ADMIN)
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -41,6 +50,7 @@ export class TransactionsController {
     return this.transactionsService.adjustWallet(dto, req.user.id);
   }
 
+  @ApiOperation({ summary: 'Manually verify a transaction payment' })
   @Post(':id/verify')
   @Roles('SUPER_ADMIN', 'ADMIN_FINANCE', 'ADMIN_SUPPORT') // ✅ Permission Guard
   async verifyPayment(@Param('id') id: string, @Req() req: any) {

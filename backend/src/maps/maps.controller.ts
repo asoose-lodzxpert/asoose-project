@@ -8,7 +8,9 @@ import {
 import { Throttle } from '@nestjs/throttler';
 import { MapsService } from './maps.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 
+@ApiTags('Maps')
 @Controller({
   path: 'maps',
   version: '1',
@@ -21,6 +23,9 @@ export class MapsController {
    * Returns active service zone bounding boxes so mobile apps can validate
    * locations on the frontend before sending them to the API.
    */
+  @ApiOperation({
+    summary: 'Get active service zone bounding boxes (public, no auth)',
+  })
   @Get('service-bounds')
   async getServiceBounds() {
     return this.mapsService.getServiceBounds();
@@ -35,6 +40,10 @@ export class MapsController {
    * - Geographic bias to Nigeria only
    */
 
+  @ApiOperation({
+    summary: 'Search addresses with autocomplete (rate-limited)',
+  })
+  @ApiBearerAuth()
   @Get('address-search')
   @UseGuards(JwtAuthGuard)
   @Throttle({ default: { limit: 20, ttl: 60 * 1000 } }) // 20 requests per minute
@@ -49,6 +58,8 @@ export class MapsController {
     return this.mapsService.searchAddress(query.trim(), latitude, longitude);
   }
 
+  @ApiOperation({ summary: 'Google Places autocomplete (rate-limited)' })
+  @ApiBearerAuth()
   @Get('places-autocomplete')
   @UseGuards(JwtAuthGuard)
   @Throttle({ default: { limit: 20, ttl: 60 * 1000 } }) // 20 requests per minute
@@ -62,6 +73,7 @@ export class MapsController {
     return this.mapsService.placesAutocomplete(query.trim(), location);
   }
 
+  @ApiOperation({ summary: 'Geocode a Google Place ID to lat/lng' })
   @Get('geocode')
   async geocode(@Query('placeId') placeId: string) {
     if (!placeId) {
@@ -70,6 +82,7 @@ export class MapsController {
     return this.mapsService.geocodePlace(placeId);
   }
 
+  @ApiOperation({ summary: 'Reverse geocode lat/lng to address' })
   @Get('reverse-geocode')
   async reverseGeocode(@Query('lat') lat: string, @Query('lng') lng: string) {
     if (!lat || !lng) {
@@ -88,6 +101,7 @@ export class MapsController {
     return this.mapsService.reverseGeocode(parsedLat, parsedLng);
   }
 
+  @ApiOperation({ summary: 'Get driving directions between two coordinates' })
   @Get('directions')
   async getDirections(
     @Query('originLat') originLat: string,
@@ -107,6 +121,9 @@ export class MapsController {
     );
   }
 
+  @ApiOperation({
+    summary: 'Generate a static map image URL with markers/path',
+  })
   @Get('static-map')
   async getStaticMap(
     @Query('markers') markers: string,

@@ -9,7 +9,9 @@ import {
 } from '@nestjs/common';
 import { LogsService } from './logs.service';
 import { CreateErrorLogDto } from './dto/create-error-log.dto';
+import { ApiTags, ApiOperation } from '@nestjs/swagger';
 
+@ApiTags('Logs')
 @Controller({
   path: 'logs',
   version: '1',
@@ -17,6 +19,7 @@ import { CreateErrorLogDto } from './dto/create-error-log.dto';
 export class LogsController {
   constructor(private readonly logsService: LogsService) {}
 
+  @ApiOperation({ summary: 'Log a client-side error from mobile/web app' })
   @Post('error')
   @HttpCode(HttpStatus.CREATED)
   @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))

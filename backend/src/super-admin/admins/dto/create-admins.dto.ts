@@ -5,6 +5,7 @@ import {
   IsEnum,
   MinLength,
 } from 'class-validator';
+import { ApiProperty } from '@nestjs/swagger';
 
 export enum AdminRole {
   ADMIN_MANAGER = 'ADMIN_MANAGER', // Operations
@@ -14,18 +15,22 @@ export enum AdminRole {
 }
 
 export class CreateAdminDto {
+  @ApiProperty({ example: 'manager@asoose.com' })
   @IsEmail()
   @IsNotEmpty()
   email: string;
 
+  @ApiProperty({ example: 'Chidi Okeke' })
   @IsString()
   @IsNotEmpty()
   name: string;
 
+  @ApiProperty({ example: 'SecurePass123', minLength: 8 })
   @IsString()
   @MinLength(8, { message: 'Password must be at least 8 characters' })
   password: string;
 
+  @ApiProperty({ enum: AdminRole, example: AdminRole.ADMIN_MANAGER })
   @IsEnum(AdminRole, { message: 'Invalid admin role' })
   role: AdminRole;
 }

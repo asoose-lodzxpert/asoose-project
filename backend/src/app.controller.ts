@@ -4,7 +4,9 @@ import { PrismaService } from './prisma/prisma.service';
 import type { RedisClientType } from 'redis';
 import type { Response } from 'express';
 import { Public } from './auth/decorators/public.decorator';
+import { ApiTags, ApiOperation } from '@nestjs/swagger';
 
+@ApiTags('System')
 @Controller({
   path: '',
   version: '1',
@@ -16,11 +18,13 @@ export class AppController {
     @Inject('REDIS_CLIENT') private readonly redisClient: RedisClientType,
   ) {}
 
+  @ApiOperation({ summary: 'Root endpoint' })
   @Get()
   getHello() {
     return this.appService.getHello();
   }
 
+  @ApiOperation({ summary: 'Full health check (DB + Redis status)' })
   @Public()
   @Get('health')
   async health(): Promise<{
@@ -63,6 +67,9 @@ export class AppController {
    * Always returns 200 as long as the Node.js process is running.
    * Used by Docker/Railway to decide whether to RESTART the container.
    */
+  @ApiOperation({
+    summary: 'Liveness probe — returns 200 when process is alive',
+  })
   @Public()
   @Get('health/live')
   liveness() {
@@ -75,6 +82,10 @@ export class AppController {
    * Used by load balancers to decide whether to ROUTE traffic here.
    * A DB hiccup removes this instance from rotation without restarting it.
    */
+  @ApiOperation({
+    summary:
+      'Readiness probe — returns 200 only when DB and Redis are reachable',
+  })
   @Public()
   @Get('health/ready')
   async readiness(@Res() res: Response) {
@@ -112,6 +123,7 @@ export class AppController {
   }
 
   // ✅ THE FIX: Public access + Consistent Path + Correct Response Key
+  @ApiOperation({ summary: 'Get current maintenance mode status (public)' })
   @Public()
   @Get('settings/maintenance-mode')
   async getMaintenanceMode() {

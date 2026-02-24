@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { RidersService } from '../src/riders/riders.service';
+import { WithdrawalService } from '../src/riders/withdrawal/withdrawal.service';
 import { PaymentService } from '../src/payment/payment.service';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { TransactionLedgerService } from '../src/super-admin/transactions/transaction-ledger.service';
@@ -7,7 +7,7 @@ import { CreateWithdrawalDto } from '../src/riders/dto/create-withdrawal.dto';
 import { StoreType } from '@prisma/client';
 
 describe('Financial Integrity & Critical Paths', () => {
-  let ridersService: RidersService;
+  let ridersService: WithdrawalService;
   let paymentService: PaymentService;
   let prisma: PrismaService;
   let ledgerService: TransactionLedgerService;
@@ -21,7 +21,7 @@ describe('Financial Integrity & Critical Paths', () => {
     const module: TestingModule = await Test.createTestingModule({
       imports: [],
       providers: [
-        RidersService,
+        WithdrawalService,
         PaymentService,
         PrismaService,
         TransactionLedgerService,
@@ -40,7 +40,7 @@ describe('Financial Integrity & Critical Paths', () => {
       ],
     }).compile();
 
-    ridersService = module.get<RidersService>(RidersService);
+    ridersService = module.get<WithdrawalService>(WithdrawalService);
     paymentService = module.get<PaymentService>(PaymentService);
     prisma = module.get<PrismaService>(PrismaService);
     ledgerService = module.get<TransactionLedgerService>(

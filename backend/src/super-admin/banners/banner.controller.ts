@@ -23,7 +23,15 @@ import {
   ReorderBannersDto,
 } from './dto/create-banner.dto';
 import { UserRole } from 'src/common/enums/user-role.enum';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiConsumes,
+} from '@nestjs/swagger';
 
+@ApiTags('Super-Admin / Banners')
+@ApiBearerAuth()
 @Controller({
   path: 'super-admin/banners',
   version: '1',
@@ -33,16 +41,20 @@ import { UserRole } from 'src/common/enums/user-role.enum';
 export class BannersController {
   constructor(private readonly bannersService: BannersService) {}
 
+  @ApiOperation({ summary: 'List all banners' })
   @Get()
   findAll() {
     return this.bannersService.findAll();
   }
 
+  @ApiOperation({ summary: 'Get a single banner by ID' })
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.bannersService.findOne(id);
   }
 
+  @ApiOperation({ summary: 'Create a new banner (with optional image upload)' })
+  @ApiConsumes('multipart/form-data')
   @Post()
   @UseInterceptors(FileInterceptor('image')) // Intercept 'image' field
   @HttpCode(HttpStatus.CREATED)
@@ -53,12 +65,17 @@ export class BannersController {
     return this.bannersService.create(createBannerDto, file);
   }
 
+  @ApiOperation({
+    summary: 'Reorder banners by providing an ordered array of IDs',
+  })
   @Post('reorder')
   @HttpCode(HttpStatus.OK)
   reorder(@Body() reorderDto: ReorderBannersDto) {
     return this.bannersService.reorder(reorderDto.ids);
   }
 
+  @ApiOperation({ summary: 'Update a banner (with optional new image)' })
+  @ApiConsumes('multipart/form-data')
   @Patch(':id')
   @UseInterceptors(FileInterceptor('image'))
   update(
@@ -69,6 +86,7 @@ export class BannersController {
     return this.bannersService.update(id, updateBannerDto, file);
   }
 
+  @ApiOperation({ summary: 'Delete a banner' })
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   remove(@Param('id') id: string) {

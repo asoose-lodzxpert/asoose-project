@@ -8,17 +8,20 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CartItemDto {
+  @ApiProperty({ example: 'clx-product-uuid' })
   @IsString()
   @IsNotEmpty()
   productId: string;
 
+  @ApiProperty({ example: 2, minimum: 1 })
   @IsInt()
   @Min(1)
   quantity: number;
 
-  // Optional: Array of Modifier IDs if your frontend supports selecting them
+  @ApiPropertyOptional({ example: ['clx-modifier-uuid'], type: [String] })
   @IsArray()
   @IsOptional()
   @IsString({ each: true })
@@ -26,6 +29,7 @@ export class CartItemDto {
 }
 
 export class GetCartSummaryDto {
+  @ApiProperty({ type: [CartItemDto] })
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => CartItemDto)

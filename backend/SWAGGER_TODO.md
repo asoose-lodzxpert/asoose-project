@@ -107,13 +107,13 @@ Legend: ✅ Done | ⬜ Pending | 🔸 Partial (some decorators already exist)
 
 | Status | File                                        |
 | ------ | ------------------------------------------- |
-| ⬜     | `src/marketplace/marketplace.controller.ts` |
+| ✅     | `src/marketplace/marketplace.controller.ts` |
 
 ### DTOs
 
 | Status | File                                       |
 | ------ | ------------------------------------------ |
-| ⬜     | `src/marketplace/dto/create-review.dto.ts` |
+| ✅     | `src/marketplace/dto/create-review.dto.ts` |
 
 ---
 
@@ -123,14 +123,14 @@ Legend: ✅ Done | ⬜ Pending | 🔸 Partial (some decorators already exist)
 
 | Status | File                          |
 | ------ | ----------------------------- |
-| ⬜     | `src/fare/fare.controller.ts` |
+| ✅     | `src/fare/fare.controller.ts` |
 
 ### DTOs
 
 | Status | File                                |
 | ------ | ----------------------------------- |
-| ⬜     | `src/fare/dto/ride-fare-dto.ts`     |
-| ⬜     | `src/fare/dto/delivery-fare-dto.ts` |
+| ✅     | `src/fare/dto/ride-fare-dto.ts`     |
+| ✅     | `src/fare/dto/delivery-fare-dto.ts` |
 
 ---
 
@@ -140,13 +140,13 @@ Legend: ✅ Done | ⬜ Pending | 🔸 Partial (some decorators already exist)
 
 | Status | File                                |
 | ------ | ----------------------------------- |
-| ⬜     | `src/payment/payment.controller.ts` |
+| ✅     | `src/payment/payment.controller.ts` |
 
 ### DTOs
 
 | Status | File                             |
 | ------ | -------------------------------- |
-| ⬜     | `src/payment/dto/payment.dto.ts` |
+| ✅     | `src/payment/dto/payment.dto.ts` |
 
 ---
 
@@ -156,14 +156,14 @@ Legend: ✅ Done | ⬜ Pending | 🔸 Partial (some decorators already exist)
 
 | Status | File                          |
 | ------ | ----------------------------- |
-| ⬜     | `src/cart/cart.controller.ts` |
+| ✅     | `src/cart/cart.controller.ts` |
 
 ### DTOs
 
 | Status | File                               |
 | ------ | ---------------------------------- |
-| ⬜     | `src/cart/dto/add-to-cart.dto.ts`  |
-| ⬜     | `src/cart/dto/cart-summary.dto.ts` |
+| ✅     | `src/cart/dto/add-to-cart.dto.ts`  |
+| ✅     | `src/cart/dto/cart-summary.dto.ts` |
 
 ---
 
@@ -173,7 +173,7 @@ Legend: ✅ Done | ⬜ Pending | 🔸 Partial (some decorators already exist)
 
 | Status | File                                            |
 | ------ | ----------------------------------------------- |
-| ⬜     | `src/notifications/notifications.controller.ts` |
+| ✅     | `src/notifications/notifications.controller.ts` |
 
 ---
 
@@ -183,14 +183,14 @@ Legend: ✅ Done | ⬜ Pending | 🔸 Partial (some decorators already exist)
 
 | Status | File                          |
 | ------ | ----------------------------- |
-| ⬜     | `src/maps/maps.controller.ts` |
+| ✅     | `src/maps/maps.controller.ts` |
 
 ### DTOs
 
 | Status | File                                 |
 | ------ | ------------------------------------ |
-| ⬜     | `src/maps/dto/address-search.dto.ts` |
-| ⬜     | `src/maps/dto/directions.dto.ts`     |
+| ✅     | `src/maps/dto/address-search.dto.ts` |
+| ✅     | `src/maps/dto/directions.dto.ts`     |
 
 ---
 
@@ -200,7 +200,7 @@ Legend: ✅ Done | ⬜ Pending | 🔸 Partial (some decorators already exist)
 
 | Status | File                                    |
 | ------ | --------------------------------------- |
-| ⬜     | `src/products/categories.controller.ts` |
+| ✅     | `src/products/categories.controller.ts` |
 
 ---
 
@@ -210,13 +210,13 @@ Legend: ✅ Done | ⬜ Pending | 🔸 Partial (some decorators already exist)
 
 | Status | File                                |
 | ------ | ----------------------------------- |
-| ⬜     | `src/support/support.controller.ts` |
+| ✅     | `src/support/support.controller.ts` |
 
 ### DTOs
 
 | Status | File                                     |
 | ------ | ---------------------------------------- |
-| ⬜     | `src/support/dto/support-inquiry.dto.ts` |
+| ✅     | `src/support/dto/support-inquiry.dto.ts` |
 
 ---
 
@@ -226,7 +226,7 @@ Legend: ✅ Done | ⬜ Pending | 🔸 Partial (some decorators already exist)
 
 | Status | File                                |
 | ------ | ----------------------------------- |
-| ⬜     | `src/storage/storage.controller.ts` |
+| ✅     | `src/storage/storage.controller.ts` |
 
 ---
 
@@ -236,13 +236,13 @@ Legend: ✅ Done | ⬜ Pending | 🔸 Partial (some decorators already exist)
 
 | Status | File                          |
 | ------ | ----------------------------- |
-| ⬜     | `src/logs/logs.controller.ts` |
+| ✅     | `src/logs/logs.controller.ts` |
 
 ### DTOs
 
 | Status | File                                   |
 | ------ | -------------------------------------- |
-| ⬜     | `src/logs/dto/create-error-log.dto.ts` |
+| ✅     | `src/logs/dto/create-error-log.dto.ts` |
 
 ---
 
@@ -262,7 +262,7 @@ Legend: ✅ Done | ⬜ Pending | 🔸 Partial (some decorators already exist)
 
 | Status | File                               |
 | ------ | ---------------------------------- |
-| ⬜     | `src/matching/dto/matching.dto.ts` |
+| ✅     | `src/matching/dto/matching.dto.ts` |
 
 ---
 
@@ -270,54 +270,54 @@ Legend: ✅ Done | ⬜ Pending | 🔸 Partial (some decorators already exist)
 
 ### Controllers
 
-| Status | File                                                                  |
-| ------ | --------------------------------------------------------------------- |
-| ⬜     | `src/super-admin/admins/admins.controller.ts`                         |
-| ⬜     | `src/super-admin/banners/banner.controller.ts`                        |
-| ⬜     | `src/super-admin/customers/customers.controller.ts`                   |
-| ⬜     | `src/super-admin/dashboard/dashboard.controller.ts`                   |
-| ⬜     | `src/super-admin/deliveries/deliveries.controller.ts`                 |
-| 🔸     | `src/super-admin/dispute/dispute.controller.ts` _(has @ApiTags only)_ |
-| ⬜     | `src/super-admin/maps/maps.controller.ts`                             |
-| ⬜     | `src/super-admin/notifications/notifications.controller.ts`           |
-| ⬜     | `src/super-admin/orders/orders.controller.ts`                         |
-| ⬜     | `src/super-admin/payouts/payouts.controller.ts`                       |
-| ⬜     | `src/super-admin/reports/reports.controller.ts`                       |
-| ⬜     | `src/super-admin/ride/ride.controller.ts`                             |
-| ⬜     | `src/super-admin/riders/rider.controller.ts`                          |
-| ⬜     | `src/super-admin/riders/drivers.controller.ts`                        |
-| ⬜     | `src/super-admin/settings/settings.controller.ts`                     |
-| ⬜     | `src/super-admin/transactions/transaction.controller.ts`              |
-| ⬜     | `src/super-admin/vendors/vendor.controller.ts`                        |
-| ⬜     | `src/super-admin/vendors/activity.controller.ts`                      |
-| ⬜     | `src/super-admin/vendors/documents.controller.ts`                     |
-| ⬜     | `src/super-admin/vendors/orders.controller.ts`                        |
-| ⬜     | `src/super-admin/vendors/reviews.controller.ts`                       |
-| ⬜     | `src/super-admin/verification/verification.controller.ts`             |
-| ⬜     | `src/super-admin/zones/zones.controller.ts`                           |
-| ⬜     | `src/super-admin/activity-logs/activity-log.controller.ts`            |
+| Status | File                                                        |
+| ------ | ----------------------------------------------------------- |
+| ✅     | `src/super-admin/admins/admins.controller.ts`               |
+| ✅     | `src/super-admin/banners/banner.controller.ts`              |
+| ✅     | `src/super-admin/customers/customers.controller.ts`         |
+| ✅     | `src/super-admin/dashboard/dashboard.controller.ts`         |
+| ✅     | `src/super-admin/deliveries/deliveries.controller.ts`       |
+| ✅     | `src/super-admin/dispute/dispute.controller.ts`             |
+| ✅     | `src/super-admin/maps/maps.controller.ts`                   |
+| ✅     | `src/super-admin/notifications/notifications.controller.ts` |
+| ✅     | `src/super-admin/orders/orders.controller.ts`               |
+| ✅     | `src/super-admin/payouts/payouts.controller.ts`             |
+| ✅     | `src/super-admin/reports/reports.controller.ts`             |
+| ✅     | `src/super-admin/ride/ride.controller.ts`                   |
+| ✅     | `src/super-admin/riders/rider.controller.ts`                |
+| ✅     | `src/super-admin/riders/drivers.controller.ts`              |
+| ✅     | `src/super-admin/settings/settings.controller.ts`           |
+| ✅     | `src/super-admin/transactions/transaction.controller.ts`    |
+| ✅     | `src/super-admin/vendors/vendor.controller.ts`              |
+| ✅     | `src/super-admin/vendors/activity.controller.ts`            |
+| ✅     | `src/super-admin/vendors/documents.controller.ts`           |
+| ✅     | `src/super-admin/vendors/orders.controller.ts`              |
+| ✅     | `src/super-admin/vendors/reviews.controller.ts`             |
+| ✅     | `src/super-admin/verification/verification.controller.ts`   |
+| ✅     | `src/super-admin/zones/zones.controller.ts`                 |
+| ✅     | `src/super-admin/activity-logs/activity-log.controller.ts`  |
 
 ### DTOs
 
-| Status | File                                                                       |
-| ------ | -------------------------------------------------------------------------- |
-| ⬜     | `src/super-admin/admins/dto/create-admins.dto.ts`                          |
-| ⬜     | `src/super-admin/banners/dto/create-banner.dto.ts`                         |
-| ⬜     | `src/super-admin/deliveries/dto/delivery-filter.dto.ts`                    |
-| ⬜     | `src/super-admin/dispute/dto/create-dispute.dto.ts`                        |
-| ⬜     | `src/super-admin/dispute/dto/add-message.dto.ts`                           |
-| ⬜     | `src/super-admin/dispute/dto/filter-disputes.dto.ts`                       |
-| 🔸     | `src/super-admin/dispute/dto/resolve-dispute.dto.ts` _(has @ApiProperty)_  |
-| ⬜     | `src/super-admin/dispute/dto/update-priority.dto.ts`                       |
-| ⬜     | `src/super-admin/orders/dto/order-filter.dto.ts`                           |
-| 🔸     | `src/super-admin/reports/dto/get-analytics.dto.ts` _(has @ApiProperty)_    |
-| 🔸     | `src/super-admin/reports/dto/export-analytics.dto.ts` _(has @ApiProperty)_ |
-| ⬜     | `src/super-admin/ride/dto/ride-filter.dto.ts`                              |
-| ⬜     | `src/super-admin/transactions/dto/transaction-filter.dto.ts`               |
-| ⬜     | `src/super-admin/transactions/dto/adjust-wallet.dto.ts`                    |
-| ⬜     | `src/super-admin/vendors/dto/vendor.dto.ts`                                |
-| ⬜     | `src/super-admin/verification/dto/verify-document.dto.ts`                  |
-| ⬜     | `src/super-admin/zones/dto/create-zone.dto.ts`                             |
+| Status | File                                                         |
+| ------ | ------------------------------------------------------------ |
+| ✅     | `src/super-admin/admins/dto/create-admins.dto.ts`            |
+| ✅     | `src/super-admin/banners/dto/create-banner.dto.ts`           |
+| ✅     | `src/super-admin/deliveries/dto/delivery-filter.dto.ts`      |
+| ✅     | `src/super-admin/dispute/dto/create-dispute.dto.ts`          |
+| ✅     | `src/super-admin/dispute/dto/add-message.dto.ts`             |
+| ✅     | `src/super-admin/dispute/dto/filter-disputes.dto.ts`         |
+| ✅     | `src/super-admin/dispute/dto/resolve-dispute.dto.ts`         |
+| ✅     | `src/super-admin/dispute/dto/update-priority.dto.ts`         |
+| ✅     | `src/super-admin/orders/dto/order-filter.dto.ts`             |
+| ✅     | `src/super-admin/reports/dto/get-analytics.dto.ts`           |
+| ✅     | `src/super-admin/reports/dto/export-analytics.dto.ts`        |
+| ✅     | `src/super-admin/ride/dto/ride-filter.dto.ts`                |
+| ✅     | `src/super-admin/transactions/dto/transaction-filter.dto.ts` |
+| ✅     | `src/super-admin/transactions/dto/adjust-wallet.dto.ts`      |
+| ✅     | `src/super-admin/vendors/dto/vendor.dto.ts`                  |
+| ✅     | `src/super-admin/verification/dto/verify-document.dto.ts`    |
+| ✅     | `src/super-admin/zones/dto/create-zone.dto.ts`               |
 
 ---
 
@@ -325,34 +325,34 @@ Legend: ✅ Done | ⬜ Pending | 🔸 Partial (some decorators already exist)
 
 | Status | File                                 | Note             |
 | ------ | ------------------------------------ | ---------------- |
-| ⬜     | `src/app.controller.ts`              | health endpoints |
-| ⬜     | `src/system/bullboard.controller.ts` | admin only       |
+| ✅     | `src/app.controller.ts`              | health endpoints |
+| ✅     | `src/system/bullboard.controller.ts` | admin only       |
 
 ---
 
 ## Summary
 
-| Category      | Controllers | DTOs   |
-| ------------- | ----------- | ------ |
-| Auth          | 3           | 10     |
-| Users ✅      | 2           | 3      |
-| Riders ✅     | 8           | 7      |
-| Vendor ✅     | 4           | 1      |
-| Marketplace   | 1           | 1      |
-| Fare          | 1           | 2      |
-| Payment       | 1           | 1      |
-| Cart          | 1           | 2      |
-| Notifications | 1           | —      |
-| Maps          | 1           | 2      |
-| Products      | 1           | —      |
-| Support       | 1           | 1      |
-| Storage       | 1           | —      |
-| Logs          | 1           | 1      |
-| Jobs          | 1           | —      |
-| Matching      | —           | 1      |
-| Super-Admin   | 24          | 17     |
-| App/System    | 2           | —      |
-| **Total**     | **54**      | **49** |
+| Category      | Controllers | DTOs   | Status |
+| ------------- | ----------- | ------ | ------ |
+| Auth          | 3           | 10     | ✅     |
+| Users         | 2           | 3      | ✅     |
+| Riders        | 8           | 7      | ✅     |
+| Vendor        | 4           | 1      | ✅     |
+| Marketplace   | 1           | 1      | ✅     |
+| Fare          | 1           | 2      | ✅     |
+| Payment       | 1           | 1      | ✅     |
+| Cart          | 1           | 2      | ✅     |
+| Notifications | 1           | —      | ✅     |
+| Maps          | 1           | 2      | ✅     |
+| Products      | 1           | —      | ✅     |
+| Support       | 1           | 1      | ✅     |
+| Storage       | 1           | —      | ✅     |
+| Logs          | 1           | 1      | ✅     |
+| Jobs          | 1           | —      | ✅     |
+| Matching      | —           | 1      | ✅     |
+| Super-Admin   | 24          | 17     | ✅     |
+| App/System    | 2           | —      | ✅     |
+| **Total**     | **54**      | **49** | ✅     |
 
 ---
 

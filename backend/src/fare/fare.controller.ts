@@ -4,7 +4,10 @@ import { DeliveryFareDto } from './dto/delivery-fare-dto';
 import { RideFareDto } from './dto/ride-fare-dto';
 import { FareService } from './fare.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 
+@ApiTags('Fare')
+@ApiBearerAuth()
 @Controller({
   path: 'fare',
   version: '1',
@@ -12,6 +15,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 export class FareConntroller {
   constructor(private readonly fareService: FareService) {}
 
+  @ApiOperation({ summary: 'Calculate fare estimate for a ride' })
   @UseGuards(JwtAuthGuard)
   @Throttle({ default: { limit: 30, ttl: 60_000 } })
   @Post('ride')
@@ -19,6 +23,7 @@ export class FareConntroller {
     return this.fareService.getRideFare(dto);
   }
 
+  @ApiOperation({ summary: 'Calculate fare estimate for a parcel delivery' })
   @UseGuards(JwtAuthGuard)
   @Throttle({ default: { limit: 30, ttl: 60_000 } })
   @Post('delivery')

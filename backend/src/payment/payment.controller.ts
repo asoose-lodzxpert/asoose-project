@@ -28,7 +28,9 @@ import { Roles } from '../auth/roles.decorator';
 import { PaymentGateway, PaymentStatus } from './interfaces/payment.interface'; // ✅ Added PaymentStatus import
 import { UserRole } from '../common/enums/user-role.enum';
 import type { Request, Response } from 'express';
+import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 
+@ApiTags('Payment')
 @Controller({
   path: 'payment',
   version: '1',
@@ -38,6 +40,8 @@ export class PaymentController {
 
   constructor(private readonly paymentService: PaymentService) {}
 
+  @ApiOperation({ summary: 'Initialize a Paystack payment transaction' })
+  @ApiBearerAuth()
   @Post('initialize')
   @UseGuards(JwtAuthGuard)
   async initiatePayment(
@@ -67,6 +71,8 @@ export class PaymentController {
     }
   }
 
+  @ApiOperation({ summary: 'Verify a payment transaction by reference' })
+  @ApiBearerAuth()
   @Get('verify')
   @UseGuards(JwtAuthGuard)
   async verifyPayment(@Query() query: VerifyPaymentDto) {
@@ -75,6 +81,7 @@ export class PaymentController {
 
   // WEBHOOK HANDLERS
 
+  @ApiOperation({ summary: 'Paystack webhook receiver (HMAC-verified)' })
   @Post('webhook/paystack')
   @HttpCode(HttpStatus.OK)
   async paystackWebhook(
@@ -98,6 +105,9 @@ export class PaymentController {
 
   // USER CALLBACK HANDLERS
 
+  @ApiOperation({
+    summary: 'Paystack browser redirect callback (redirects to frontend)',
+  })
   @Get('callback/paystack')
   async paystackCallback(
     @Query('reference') reference: string,
@@ -137,6 +147,8 @@ export class PaymentController {
 
   // ADMIN ACTIONS
 
+  @ApiOperation({ summary: 'Admin: disburse a payment to a recipient' })
+  @ApiBearerAuth()
   @Post('admin/disburse')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
@@ -147,6 +159,8 @@ export class PaymentController {
     return this.paymentService.disbursePayment(dto, req.user.userId);
   }
 
+  @ApiOperation({ summary: 'Admin: process a payment refund' })
+  @ApiBearerAuth()
   @Post('admin/refund')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
