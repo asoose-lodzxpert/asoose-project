@@ -18,8 +18,6 @@ export const AddAddressModal = ({
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     street: "",
-    city: "",
-    state: "",
     isDefault: false,
   });
   // Coordinates captured from the debounced place search
@@ -40,8 +38,6 @@ export const AddAddressModal = ({
     try {
       const payload = {
         street: formData.street,
-        city: formData.city,
-        state: formData.state,
         isDefault: formData.isDefault,
         lat: coords.lat,
         lng: coords.lng,
@@ -50,7 +46,7 @@ export const AddAddressModal = ({
       await onSave(payload);
 
       onClose();
-      setFormData({ street: "", city: "", state: "", isDefault: false });
+      setFormData({ street: "", isDefault: false });
       setCoords(null);
     } catch (error) {
       console.error("Form submission error:", error);
@@ -104,37 +100,6 @@ export const AddAddressModal = ({
                 <MapPin className="w-3 h-3" /> Location pinned
               </p>
             )}
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-xs font-bold text-gray-500 uppercase">
-                City
-              </label>
-              <input
-                type="text"
-                placeholder="Lagos"
-                className="w-full mt-1 p-3 bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:border-yellow-500 transition-colors"
-                value={formData.city}
-                onChange={(e) =>
-                  setFormData({ ...formData, city: e.target.value })
-                }
-              />
-            </div>
-            <div>
-              <label className="text-xs font-bold text-gray-500 uppercase">
-                State
-              </label>
-              <input
-                type="text"
-                placeholder="Lagos"
-                className="w-full mt-1 p-3 bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none focus:border-yellow-500 transition-colors"
-                value={formData.state}
-                onChange={(e) =>
-                  setFormData({ ...formData, state: e.target.value })
-                }
-              />
-            </div>
           </div>
 
           <div className="flex items-center gap-3 pt-2">

@@ -121,7 +121,7 @@ export function AddressPickerModal({
                       )}
                     </div>
                     <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
-                      {addr.street}, {addr.city}
+                      {addr.city ? `${addr.street}, ${addr.city}` : addr.street}
                     </p>
                   </div>
                   {isSelected && (

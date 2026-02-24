@@ -255,6 +255,8 @@ export class StoresService {
           vendorId: vendor.id,
           description: `Store for ${dto.storeName}`,
           address: dto.address,
+          lat: dto.lat,
+          lng: dto.lng,
           status: StoreStatus.ACTIVE,
           verification: VerificationStatus.VERIFIED,
           type: dto.type,
@@ -357,6 +359,8 @@ export class StoresService {
         name: dto.storeName || undefined,
         slug: newSlug,
         address: dto.address || undefined,
+        lat: dto.lat !== undefined ? Number(dto.lat) : undefined,
+        lng: dto.lng !== undefined ? Number(dto.lng) : undefined,
         status: dto.status || undefined,
         commissionRate:
           dto.commissionRate !== undefined
@@ -390,6 +394,8 @@ export class StoresService {
       name: updatedStore.name,
       slug: updatedStore.slug,
       address: updatedStore.address,
+      lat: updatedStore.lat,
+      lng: updatedStore.lng,
       ownerName: updatedStore.vendor?.name,
       phone: updatedStore.vendor?.phone,
       email: updatedStore.vendor?.email,

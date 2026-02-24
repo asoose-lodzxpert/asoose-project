@@ -194,6 +194,7 @@ export default function VendorDetailPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isAddProductOpen, setIsAddProductOpen] = useState(false);
+  const [addressCoords, setAddressCoords] = useState<{ lat: number; lng: number } | null>(null);
 
   // Per-tab pagination
   const [docsPage, setDocsPage] = useState(1);
@@ -299,6 +300,21 @@ export default function VendorDetailPage() {
   //  HANDLERS
   // ===========================================================================
 
+  const handleCancel = () => {
+    if (vendor) {
+      setFormData({
+        storeName: vendor.name,
+        ownerName: vendor.ownerName || "",
+        phone: vendor.phone || "",
+        address: vendor.address || "",
+        email: vendor.email,
+        commissionRate: vendor.commissionRate ?? 20,
+      });
+    }
+    setAddressCoords(null);
+    setIsEditing(false);
+  };
+
   const handleSave = async () => {
     if (!validateEmail(formData.email)) {
       Swal.fire({
@@ -310,14 +326,31 @@ export default function VendorDetailPage() {
       return;
     }
 
+    // Enforce geocoded address: if the address text was changed, coords must be pinned
+    const originalAddress = vendor?.address || "";
+    if (formData.address !== originalAddress && addressCoords === null) {
+      Swal.fire({
+        icon: "warning",
+        title: "Address Not Geocoded",
+        text: "Please select an address from the autocomplete suggestions to pin its coordinates.",
+        background: "#1E293B",
+        color: "#fff",
+      });
+      return;
+    }
+
     setIsSaving(true);
     try {
       await fetcher(`/super-admin/vendors/${vendor?.id}`, {
         method: "PATCH",
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          ...formData,
+          ...(addressCoords ? { lat: addressCoords.lat, lng: addressCoords.lng } : {}),
+        }),
       });
 
       mutateVendor();
+      setAddressCoords(null);
       setIsEditing(false);
       Swal.fire({
         icon: "success",
@@ -521,6 +554,7 @@ export default function VendorDetailPage() {
         isSaving={isSaving}
         onEdit={() => setIsEditing(true)}
         onSave={handleSave}
+        onCancel={handleCancel}
         onBack={() => router.back()}
         onMessage={handleMessageVendor}
       />
@@ -573,6 +607,11 @@ export default function VendorDetailPage() {
             onFormChange={(data) =>
               setFormData((prev) => ({ ...prev, ...data }))
             }
+            addressCoords={addressCoords}
+            onAddressChange={(text, coords) => {
+              setFormData((prev) => ({ ...prev, address: text }));
+              setAddressCoords(coords);
+            }}
           />
         </div>
 

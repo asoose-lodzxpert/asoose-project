@@ -73,7 +73,7 @@ export const AddressSection = ({
                       )}
                     </div>
                     <p className="text-sm text-gray-500 dark:text-gray-400">
-                      {addr.street}, {addr.city}
+                      {addr.city ? `${addr.street}, ${addr.city}` : addr.street}
                     </p>
                   </div>
                   {selectedAddress?.id === addr.id && (

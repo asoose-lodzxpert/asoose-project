@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import Swal from "sweetalert2";
 import { getSession } from "next-auth/react";
+import { LocationInput } from "@/components/shared/LocationInput";
 
 interface ManualOnboardModalProps {
   isOpen: boolean;
@@ -40,8 +41,11 @@ export default function ManualOnboardModal({
     email: "",
     phone: "",
     type: "RESTAURANT",
-    address: "",
   });
+
+  // Geocoded address state — only set when the user picks from autocomplete
+  const [addressText, setAddressText] = useState("");
+  const [addressCoords, setAddressCoords] = useState<{ lat: number; lng: number } | null>(null);
 
   // Lock body scroll when open
   useEffect(() => {
@@ -60,8 +64,9 @@ export default function ManualOnboardModal({
         email: "",
         phone: "",
         type: "RESTAURANT",
-        address: "",
       });
+      setAddressText("");
+      setAddressCoords(null);
     }
   }, [isOpen]);
 
@@ -127,7 +132,9 @@ export default function ManualOnboardModal({
         phone: vendorForm.phone.trim() || undefined,
         slug,
         type: vendorForm.type,
-        address: vendorForm.address.trim() || undefined,
+        address: addressText.trim() || undefined,
+        lat: addressCoords?.lat,
+        lng: addressCoords?.lng,
       };
 
       const res = await fetch(`${API_URL}/super-admin/vendors/onboard`, {
@@ -341,22 +348,28 @@ export default function ManualOnboardModal({
                 {/* Address */}
                 <div className="space-y-2.5">
                   <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider">
-                    Address <span className="text-slate-500 font-normal">(optional)</span>
+                    Store Address <span className="text-slate-500 font-normal">(optional)</span>
                   </label>
-                  <div className="relative group">
-                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-emerald-500 to-teal-500 rounded-l-lg opacity-0 group-focus-within:opacity-100 transition-opacity duration-200" />
-                    <MapPin className="absolute left-3.5 top-3 w-4 h-4 text-slate-500 group-focus-within:text-emerald-400 transition-colors duration-200" />
-                    <input
-                      type="text"
-                      name="address"
-                      value={vendorForm.address}
-                      onChange={handleVendorChange}
-                      onFocus={() => setFocusedField("address")}
-                      onBlur={() => setFocusedField(null)}
-                      placeholder="123 Main St, Lagos"
-                      className="w-full bg-slate-800/50 border border-slate-600/50 rounded-lg pl-12 pr-4 py-3 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-emerald-500/50 focus:ring-2 focus:ring-emerald-500/20 transition-all duration-200"
-                    />
-                  </div>
+                  <LocationInput
+                    value={addressText}
+                    onValueChange={(val) => {
+                      setAddressText(val);
+                      // Clear coords if the user edits the text after selecting
+                      setAddressCoords(null);
+                    }}
+                    onLocationSelect={(loc, address) => {
+                      setAddressCoords({ lat: loc.lat, lng: loc.lng });
+                      setAddressText(address);
+                    }}
+                    placeholder="Search street, area or landmark…"
+                    showGeolocation
+                    className="[&_input]:bg-slate-800/50 [&_input]:border-slate-600/50 [&_input]:text-white [&_input]:placeholder-slate-500 [&_input]:rounded-lg [&_ul]:bg-slate-800 [&_ul]:border-slate-700"
+                  />
+                  {addressCoords && (
+                    <p className="text-xs text-emerald-400 flex items-center gap-1 mt-1">
+                      <MapPin className="w-3 h-3" /> Location pinned
+                    </p>
+                  )}
                 </div>
               </div>
             </div>

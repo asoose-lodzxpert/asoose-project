@@ -2,7 +2,7 @@ export interface Address {
   id: string;
   label?: string;
   street: string;
-  city: string;
+  city?: string;
   state?: string;
   isDefault: boolean;
   lat: number; // Added lat

@@ -559,7 +559,9 @@ export default function CheckoutForm() {
                         )}
                       </p>
                       <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
-                        {selectedAddress.street}, {selectedAddress.city}
+                        {selectedAddress.city
+                          ? `${selectedAddress.street}, ${selectedAddress.city}`
+                          : selectedAddress.street}
                       </p>
                     </>
                   ) : (

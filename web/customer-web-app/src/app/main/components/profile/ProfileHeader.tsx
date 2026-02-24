@@ -52,7 +52,9 @@ export const ProfileHeader = ({
               <div className="flex items-center gap-1.5 mt-3 text-sm text-gray-600 dark:text-zinc-400">
                 <MapPin className="w-3.5 h-3.5" />
                 <span>
-                  {defaultAddr.street}, {defaultAddr.city}
+                  {defaultAddr.city
+                    ? `${defaultAddr.street}, ${defaultAddr.city}`
+                    : defaultAddr.street}
                 </span>
               </div>
             )}
