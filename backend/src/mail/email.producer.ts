@@ -98,6 +98,7 @@ export class EmailProducer {
     email: string,
     vendorName: string,
     storeName: string,
+    temporaryPassword?: string,
   ) {
     await this.emailQueue.add(
       'vendor-account-created',
@@ -105,7 +106,9 @@ export class EmailProducer {
         email,
         vendorName,
         storeName,
-        dashboardUrl: `${process.env.VENDOR_APP_URL || 'https://vendor.asoose.com'}/dashboard`,
+        temporaryPassword: temporaryPassword ?? null,
+        loginEmail: email,
+        dashboardUrl: `${process.env.VENDOR_APP_URL || 'https://vendor.asoose.com'}/login`,
         year: new Date().getFullYear(),
       },
       { attempts: 3, removeOnComplete: true },

@@ -213,8 +213,11 @@ export class StoresService {
    * Optionally creates initial products in the same transaction.
    */
   async manualOnboard(dto: ManualOnboardVendorDto, adminId: string) {
+    // Normalize email the same way loginVendor does, so lookup always matches
+    const normalizedEmail = dto.email.toLowerCase().trim();
+
     const existingEmail = await this.prisma.vendor.findUnique({
-      where: { email: dto.email },
+      where: { email: normalizedEmail },
     });
     if (existingEmail) throw new ConflictException('Email already in use');
 
@@ -224,7 +227,9 @@ export class StoresService {
     if (existingSlug) throw new ConflictException('Store slug already exists');
 
     const rawPassword =
-      'Asoose@' + Math.random().toString(36).slice(-8).toUpperCase() + '1!';
+      'Asoose@' +
+      crypto.randomBytes(6).toString('hex').toUpperCase() +
+      '1!';
     const hashedPassword = await bcrypt.hash(rawPassword, 10);
 
     const result = await this.prisma.$transaction(async (tx) => {
@@ -232,7 +237,7 @@ export class StoresService {
       // Create a Vendor record with sensible defaults for required fields.
       const vendor = await tx.vendor.create({
         data: {
-          email: dto.email,
+          email: normalizedEmail,
           name: dto.name,
           phone: dto.phone || 'N/A',
           countryCode: 'NG',
@@ -300,18 +305,13 @@ export class StoresService {
       },
     });
 
-    // Fire-and-forget: notify vendor of account creation + send credentials
+    // Fire-and-forget: send a single branded credentials email
     this.emailProducer
-      .sendVendorAccountCreated(dto.email, dto.name, dto.storeName)
-      .catch((err: any) =>
-        this.logger.warn(`Welcome email failed: ${err.message}`),
-      );
-
-    this.emailProducer
-      .sendVendorMessage(
-        dto.email,
-        `Your ${dto.storeName} Store Credentials`,
-        `Hello ${dto.name},\n\nYour vendor store "${dto.storeName}" has been set up and is now ACTIVE.\n\nLogin Email: ${dto.email}\nTemporary Password: ${rawPassword}\n\nPlease log in and change your password immediately.\n\nTeam Asoose`,
+      .sendVendorAccountCreated(
+        normalizedEmail,
+        dto.name,
+        dto.storeName,
+        rawPassword,
       )
       .catch((err: any) =>
         this.logger.warn(`Credentials email failed: ${err.message}`),

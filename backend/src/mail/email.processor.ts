@@ -366,6 +366,8 @@ export class EmailProcessor extends WorkerHost {
       email: string;
       vendorName: string;
       storeName: string;
+      temporaryPassword: string;
+      loginEmail: string;
       dashboardUrl: string;
       year: number;
     }>,
@@ -377,6 +379,8 @@ export class EmailProcessor extends WorkerHost {
       context: {
         vendorName: job.data.vendorName,
         storeName: job.data.storeName,
+        temporaryPassword: job.data.temporaryPassword,
+        loginEmail: job.data.loginEmail,
         dashboardUrl: job.data.dashboardUrl,
         year: job.data.year,
       },
