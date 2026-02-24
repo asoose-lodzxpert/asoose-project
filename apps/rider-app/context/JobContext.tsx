@@ -31,7 +31,7 @@ interface JobsContextState {
   declineJob(jobId: string, jobType: JobType): Promise<void>;
   cancelJob(jobId: string, jobType: JobType, reason: string): Promise<void>;
   arriveAtPickup(): Promise<void>;
-  confirmPickup(): Promise<void>;
+  confirmPickup(otp?: string): Promise<void>;
   arriveAtDropoff(): Promise<void>;
   completeJob(payload?: any): Promise<void>;
   resetJob(): void;
@@ -319,7 +319,7 @@ export const JobsProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const confirmPickup = async () => {
+  const confirmPickup = async (otp?: string) => {
     if (!activeJob) return;
 
     const previousStatus = status;
@@ -328,6 +328,7 @@ export const JobsProvider = ({ children }: { children: ReactNode }) => {
       const result = await jobsService.confirmPickup(
         activeJob.id,
         activeJob.jobType,
+        otp,
       );
 
       // Multi-stop delivery: more stores to pick up from

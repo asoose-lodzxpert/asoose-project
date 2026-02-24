@@ -37,7 +37,7 @@ export default function ForgotPasswordOtpScreen() {
 
   useEffect(() => {
     if (!email) {
-      router.replace("/(auth)/forgot-password/reset");
+      router.replace("/(auth)/forgot-password" as Href);
     }
   }, [email, router]);
 

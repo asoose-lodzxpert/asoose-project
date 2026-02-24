@@ -82,14 +82,14 @@ export const jobsService = {
     );
   },
 
-  async confirmPickup(jobId: string, jobType: JobType) {
+  async confirmPickup(jobId: string, jobType: JobType, otp?: string) {
     return retryWithBackoff(
       async () => {
         const response = await fetchWithAuth(
           `${EXPO_PUBLIC_API_URL}/rider/jobs/${jobId}/confirm-pickup`,
           {
             method: "POST",
-            body: JSON.stringify({ jobType }),
+            body: JSON.stringify({ jobType, ...(otp ? { otp } : {}) }),
           },
         );
         return response;

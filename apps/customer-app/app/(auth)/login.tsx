@@ -250,6 +250,18 @@ export default function LoginScreen() {
                 <ThemedText style={styles.errorText}>{error}</ThemedText>
               )}
 
+              <Pressable
+                style={styles.forgotPasswordLink}
+                onPress={() => router.push("/(auth)/forgot-password")}
+                disabled={loading}
+              >
+                <ThemedText
+                  style={{ color: primary, fontWeight: "600", fontSize: 14 }}
+                >
+                  Forgot password?
+                </ThemedText>
+              </Pressable>
+
               <View style={styles.buttonRow}>
                 <Pressable
                   style={[styles.loginButton, { backgroundColor: primary }]}
@@ -437,6 +449,10 @@ const styles = StyleSheet.create({
   footer: {
     marginTop: 32,
     alignItems: "center",
+  },
+  forgotPasswordLink: {
+    alignSelf: "flex-end",
+    paddingVertical: 2,
   },
   // Loading Components
   loadingOverlay: {

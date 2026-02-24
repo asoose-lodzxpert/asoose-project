@@ -423,7 +423,7 @@ export class EmailProcessor extends WorkerHost {
     await this.mailer.sendMail({
       to: job.data.email,
       subject: '🔑 Password Reset Request',
-      template: 'vendor-password-reset',
+      template: './vendor-password-reset',
       context: {
         vendorName: job.data.vendorName,
         resetCode: job.data.resetCode,

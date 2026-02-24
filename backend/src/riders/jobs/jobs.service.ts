@@ -488,6 +488,7 @@ export class JobsService {
     riderId: string,
     jobId: string,
     jobType: 'ride' | 'delivery',
+    otp?: string,
   ) {
     this.logger.debug(
       `confirmPickup - type=${jobType}, id=${jobId}, rider=${riderId}`,
@@ -587,7 +588,7 @@ export class JobsService {
     if (jobType === 'ride') {
       const ride = await this.prisma.ride.findUnique({
         where: { id: jobId },
-        select: { id: true, status: true, riderId: true },
+        select: { id: true, status: true, riderId: true, startOtp: true },
       });
 
       if (!ride) {
@@ -609,6 +610,16 @@ export class JobsService {
         throw new BadRequestException(
           `Cannot confirm pickup for ride in status ${ride.status}`,
         );
+      }
+
+      // Verify OTP if one is stored for this ride
+      if (ride.startOtp) {
+        if (!otp || otp.trim() !== ride.startOtp.trim()) {
+          this.logger.warn(`OTP mismatch for ride ${jobId} - provided: ${otp}`);
+          throw new BadRequestException(
+            'Invalid OTP. Ask the passenger to check the code on their screen.',
+          );
+        }
       }
 
       this.logger.debug(`Updating ride ${jobId} → IN_PROGRESS`);

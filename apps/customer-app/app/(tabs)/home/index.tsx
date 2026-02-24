@@ -68,14 +68,12 @@ export default function HomeScreen() {
   const {
     banners,
     bannersLoading,
-    bannersError,
     refreshBanners,
     verticals,
     verticalsLoading,
     verticalsError,
     refreshVerticals,
     stores,
-    storesError,
     initialStoreLoading,
     storeLoading,
     hasMore,
@@ -157,24 +155,7 @@ export default function HomeScreen() {
           <>
             <PromotionsCarousel data={promotions} />
 
-            {bannersError && banners.length === 0 ? (
-              <View
-                style={{
-                  marginVertical: 12,
-                  padding: 16,
-                  borderRadius: 8,
-                  backgroundColor: "#F3F4F6",
-                  alignItems: "center",
-                }}
-              >
-                <ThemedText style={{ marginBottom: 8, fontWeight: "bold" }}>
-                  Unable to load promotions.
-                </ThemedText>
-                <ThemedText style={{ marginBottom: 8 }}>
-                  Please pull down to refresh.
-                </ThemedText>
-              </View>
-            ) : null}
+            {/* Banner errors are intentionally hidden from the user */}
 
             {verticalsError && verticals.length === 0 ? (
               <View
@@ -240,7 +221,7 @@ export default function HomeScreen() {
           !initialStoreLoading && !storeLoading ? (
             <View style={{ paddingVertical: 40 }}>
               <ThemedText style={{ textAlign: "center" }}>
-                {storesError || "No stores available yet."}
+                {"No stores available yet."}
               </ThemedText>
             </View>
           ) : null

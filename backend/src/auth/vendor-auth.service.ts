@@ -3,6 +3,7 @@ import {
   Inject,
   UnauthorizedException,
   NotFoundException,
+  InternalServerErrorException,
   forwardRef,
   Logger,
 } from '@nestjs/common';
@@ -298,12 +299,13 @@ export class VendorAuthService {
       this.appLogger.log(`Password reset OTP sent to ${normalizedEmail}`);
     } catch (error) {
       this.appLogger.error(
-        `Failed to send password reset email to ${normalizedEmail}`,
+        `Failed to queue password reset email to ${normalizedEmail}`,
         error?.stack,
         { error },
       );
-      // Don't throw error to user - for security reasons
-      // Just log it and continue
+      throw new InternalServerErrorException(
+        'Failed to send password reset email. Please try again.',
+      );
     }
   }
 

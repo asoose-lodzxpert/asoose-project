@@ -89,9 +89,10 @@ export class JobsController {
     @Req() req,
     @Param('id') jobId: string,
     @Body('jobType') jobType: 'ride' | 'delivery',
+    @Body('otp') otp?: string,
   ) {
     const { id: riderId } = req.user || {};
-    return this.jobsService.confirmPickup(riderId, jobId, jobType);
+    return this.jobsService.confirmPickup(riderId, jobId, jobType, otp);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)

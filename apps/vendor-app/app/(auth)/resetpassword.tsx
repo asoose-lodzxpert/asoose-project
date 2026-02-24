@@ -89,7 +89,27 @@ export default function ResetPasswordScreen() {
 
   const handleNextEmail = async () => {
     if (!email) return Toast.show({ type: "error", text1: "Enter email" });
-    setStep(2);
+    setLoading(true);
+    try {
+      await sendVendorOtp(email);
+      const newResendCount = 1;
+      setResendCount(newResendCount);
+      const now = Date.now();
+      await SecureStore.setItemAsync(LAST_SENT_KEY, now.toString());
+      await SecureStore.setItemAsync(
+        RESEND_COUNT_KEY,
+        newResendCount.toString(),
+      );
+      setCooldown(30);
+      setStep(2);
+    } catch (err) {
+      Toast.show({
+        type: "error",
+        text1: "Failed to send OTP. Please try again.",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleNextOtp = async () => {

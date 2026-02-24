@@ -3,5 +3,7 @@ export const resolveAddress = (addr: unknown): string => {
   if (!addr) return "";
   if (typeof addr === "string") return addr;
   const a = addr as Record<string, unknown>;
-  return String(a.address ?? a.street ?? a.label ?? a.name ?? "");
+  const raw = String(a.address ?? a.street ?? a.label ?? a.name ?? "");
+  // Guard against legacy 'Unknown' values persisted in old records
+  return raw.toLowerCase() === "unknown" ? "" : raw;
 };

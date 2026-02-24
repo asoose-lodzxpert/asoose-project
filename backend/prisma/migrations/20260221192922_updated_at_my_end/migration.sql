@@ -6,20 +6,20 @@
 
 */
 -- AlterTable
-ALTER TABLE "BankAccount" DROP COLUMN "flutterwaveRecipientCode";
+ALTER TABLE "BankAccount" DROP COLUMN IF EXISTS "flutterwaveRecipientCode";
 
 -- AlterTable
-ALTER TABLE "Store" ADD COLUMN     "paystack_subaccount_code" TEXT;
+ALTER TABLE "Store" ADD COLUMN IF NOT EXISTS "paystack_subaccount_code" TEXT;
 
 -- AlterTable
-ALTER TABLE "User" ADD COLUMN     "dedicated_virtual_account_bank" TEXT,
-ADD COLUMN     "dedicated_virtual_account_number" TEXT,
-ADD COLUMN     "paystack_customer_code" TEXT,
-ADD COLUMN     "wallet_balance" DOUBLE PRECISION NOT NULL DEFAULT 0,
-ADD COLUMN     "wallet_balance_hidden" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "dedicated_virtual_account_bank" TEXT;
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "dedicated_virtual_account_number" TEXT;
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "paystack_customer_code" TEXT;
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "wallet_balance" DOUBLE PRECISION NOT NULL DEFAULT 0;
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "wallet_balance_hidden" BOOLEAN NOT NULL DEFAULT false;
 
 -- CreateTable
-CREATE TABLE "saved_cards" (
+CREATE TABLE IF NOT EXISTS "saved_cards" (
     "id" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
     "authorizationCode" TEXT NOT NULL,
@@ -39,13 +39,19 @@ CREATE TABLE "saved_cards" (
 );
 
 -- CreateIndex
-CREATE INDEX "saved_cards_userId_idx" ON "saved_cards"("userId");
+CREATE INDEX IF NOT EXISTS "saved_cards_userId_idx" ON "saved_cards"("userId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "saved_cards_userId_last4_expiryYear_expiryMonth_key" ON "saved_cards"("userId", "last4", "expiryYear", "expiryMonth");
+CREATE UNIQUE INDEX IF NOT EXISTS "saved_cards_userId_last4_expiryYear_expiryMonth_key" ON "saved_cards"("userId", "last4", "expiryYear", "expiryMonth");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "User_paystack_customer_code_key" ON "User"("paystack_customer_code");
+CREATE UNIQUE INDEX IF NOT EXISTS "User_paystack_customer_code_key" ON "User"("paystack_customer_code");
 
--- AddForeignKey
-ALTER TABLE "saved_cards" ADD CONSTRAINT "saved_cards_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+-- AddForeignKey (idempotent)
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'saved_cards_userId_fkey'
+  ) THEN
+    ALTER TABLE "saved_cards" ADD CONSTRAINT "saved_cards_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+  END IF;
+END $$;
