@@ -57,8 +57,8 @@ describe('DeliveryMatchingProcessor', () => {
           provide: RedisService,
           useValue: {
             getDeclinedDrivers: jest.fn(),
-            getDriversInHex: jest.fn(),
-            getDriverState: jest.fn(),
+            getRidersInHex: jest.fn(),
+            getRiderState: jest.fn(),
             incrementMatchingAttempts: jest.fn(),
             getClient: jest.fn(() => ({
               eval: jest.fn(),
@@ -78,12 +78,14 @@ describe('DeliveryMatchingProcessor', () => {
           provide: EventBusService,
           useValue: {
             emitJobCancelled: jest.fn(),
+            emitJobAssigned: jest.fn(),
           },
         },
         {
           provide: QueueService,
           useValue: {
             scheduleAssignmentTimeout: jest.fn(),
+            enqueueDeliveryMatching: jest.fn(),
           },
         },
         {
@@ -141,7 +143,12 @@ describe('DeliveryMatchingProcessor', () => {
 
       expect(prismaService.delivery.findUnique).toHaveBeenCalledWith({
         where: { id: mockDeliveryId },
-        select: { status: true, riderId: true },
+        select: {
+          status: true,
+          riderId: true,
+          customerId: true,
+          orderId: true,
+        },
       });
       expect(geoService.latLngToHex).not.toHaveBeenCalled();
     });
@@ -210,10 +217,10 @@ describe('DeliveryMatchingProcessor', () => {
       geoService.getHexRings.mockReturnValue([[mockHexId]]);
 
       // Mock riders in hex
-      redisService.getDriversInHex.mockResolvedValue([mockRiderId]);
+      redisService.getRidersInHex.mockResolvedValue([mockRiderId]);
 
       // Mock rider location
-      redisService.getDriverState.mockResolvedValue(
+      redisService.getRiderState.mockResolvedValue(
         createMockDriverState(mockRiderId, 6.5245, 3.3793, mockHexId),
       );
 
@@ -284,13 +291,13 @@ describe('DeliveryMatchingProcessor', () => {
       geoService.getHexRings.mockReturnValue([[mockHexId]]);
 
       // Mock riders in hex including declined one
-      redisService.getDriversInHex.mockResolvedValue([
+      redisService.getRidersInHex.mockResolvedValue([
         declinedRiderId,
         mockRiderId,
       ]);
 
       // Mock rider locations
-      redisService.getDriverState
+      redisService.getRiderState
         .mockResolvedValueOnce(
           createMockDriverState(declinedRiderId, 6.5246, 3.3794, mockHexId),
         )
@@ -344,10 +351,10 @@ describe('DeliveryMatchingProcessor', () => {
       redisService.getDeclinedDrivers.mockResolvedValue([]);
       geoService.latLngToHex.mockReturnValue(mockHexId);
       geoService.getHexRings.mockReturnValue([[mockHexId]]);
-      redisService.getDriversInHex.mockResolvedValue([rider1, rider2]);
+      redisService.getRidersInHex.mockResolvedValue([rider1, rider2]);
 
       // Mock both riders online
-      redisService.getDriverState
+      redisService.getRiderState
         .mockResolvedValueOnce(
           createMockDriverState(rider1, 6.5245, 3.3793, mockHexId),
         )
@@ -410,8 +417,9 @@ describe('DeliveryMatchingProcessor', () => {
         ['hex-ring2-1', 'hex-ring2-2'],
       ]);
 
-      redisService.getDriversInHex.mockResolvedValue([]);
-      redisService.incrementMatchingAttempts.mockResolvedValue(1);
+      redisService.getRidersInHex.mockResolvedValue([]);
+      // Return MAX_MATCHING_RETRIES (5) so the cancel branch is taken instead of re-queuing
+      redisService.incrementMatchingAttempts.mockResolvedValue(5);
 
       (prismaService.delivery.update as jest.Mock).mockResolvedValue({} as any);
 
@@ -452,9 +460,9 @@ describe('DeliveryMatchingProcessor', () => {
       redisService.getDeclinedDrivers.mockResolvedValue([]);
       geoService.latLngToHex.mockReturnValue(mockHexId);
       geoService.getHexRings.mockReturnValue([[mockHexId]]);
-      redisService.getDriversInHex.mockResolvedValue([mockRiderId]);
+      redisService.getRidersInHex.mockResolvedValue([mockRiderId]);
 
-      redisService.getDriverState.mockResolvedValue(
+      redisService.getRiderState.mockResolvedValue(
         createMockDriverState(mockRiderId, 6.5245, 3.3793, mockHexId),
       );
 
@@ -513,14 +521,14 @@ describe('DeliveryMatchingProcessor', () => {
       geoService.getHexRings.mockReturnValue([ring0, ring1, ring2]);
 
       // No riders in ring 0 and ring 1, rider found in ring 2
-      redisService.getDriversInHex
+      redisService.getRidersInHex
         .mockResolvedValueOnce([]) // ring 0
         .mockResolvedValueOnce([]) // ring 1, hex 1
         .mockResolvedValueOnce([]) // ring 1, hex 2
         .mockResolvedValueOnce([]) // ring 1, hex 3
         .mockResolvedValueOnce([mockRiderId]); // ring 2, hex 1
 
-      redisService.getDriverState.mockResolvedValue(
+      redisService.getRiderState.mockResolvedValue(
         createMockDriverState(mockRiderId, 6.525, 3.38, 'hex-2-1'),
       );
 
@@ -533,8 +541,8 @@ describe('DeliveryMatchingProcessor', () => {
 
       await processor.process(job);
 
-      // Verify getDriversInHex was called for multiple hexes
-      expect(redisService.getDriversInHex).toHaveBeenCalledTimes(5);
+      // Verify getRidersInHex was called for multiple hexes
+      expect(redisService.getRidersInHex).toHaveBeenCalledTimes(5);
 
       // Verify assignment was successful
       expect(queueService.scheduleAssignmentTimeout).toHaveBeenCalled();
@@ -570,7 +578,7 @@ describe('DeliveryMatchingProcessor', () => {
 
       // Create 25 riders (more than MAX_ATTEMPTS = 20)
       const manyRiders = Array.from({ length: 25 }, (_, i) => `rider-${i}`);
-      redisService.getDriversInHex.mockResolvedValue(manyRiders);
+      redisService.getRidersInHex.mockResolvedValue(manyRiders);
 
       // Mock all riders with locations
       const locations = manyRiders.map((id, i) => ({
@@ -581,7 +589,7 @@ describe('DeliveryMatchingProcessor', () => {
       }));
 
       manyRiders.forEach((id) => {
-        redisService.getDriverState.mockResolvedValueOnce(
+        redisService.getRiderState.mockResolvedValueOnce(
           createMockDriverState(id, 6.5245, 3.3793, mockHexId),
         );
       });
@@ -592,7 +600,8 @@ describe('DeliveryMatchingProcessor', () => {
       const mockEval = jest.fn().mockResolvedValue(0);
       redisService.getClient.mockReturnValue({ eval: mockEval } as any);
 
-      redisService.incrementMatchingAttempts.mockResolvedValue(1);
+      // Return MAX_MATCHING_RETRIES (5) so the cancel branch is taken
+      redisService.incrementMatchingAttempts.mockResolvedValue(5);
       (prismaService.delivery.update as jest.Mock).mockResolvedValue({} as any);
 
       await processor.process(job);

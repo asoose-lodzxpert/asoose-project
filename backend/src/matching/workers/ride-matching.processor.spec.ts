@@ -77,12 +77,14 @@ describe('RideMatchingProcessor', () => {
           provide: EventBusService,
           useValue: {
             emitJobCancelled: jest.fn(),
+            emitJobAssigned: jest.fn(),
           },
         },
         {
           provide: QueueService,
           useValue: {
             scheduleAssignmentTimeout: jest.fn(),
+            enqueueRideMatching: jest.fn(),
           },
         },
         {
@@ -133,7 +135,7 @@ describe('RideMatchingProcessor', () => {
 
       expect(prismaService.ride.findUnique).toHaveBeenCalledWith({
         where: { id: mockRideId },
-        select: { status: true, riderId: true },
+        select: { status: true, riderId: true, customerId: true },
       });
       expect(geoService.latLngToHex).not.toHaveBeenCalled();
     });
@@ -390,7 +392,8 @@ describe('RideMatchingProcessor', () => {
       ]);
 
       redisService.getDriversInHex.mockResolvedValue([]);
-      redisService.incrementMatchingAttempts.mockResolvedValue(1);
+      // Return MAX_MATCHING_RETRIES (5) so the cancel branch is taken instead of re-queuing
+      redisService.incrementMatchingAttempts.mockResolvedValue(5);
 
       (prismaService.ride.update as jest.Mock).mockResolvedValue({} as any);
 
@@ -527,7 +530,8 @@ describe('RideMatchingProcessor', () => {
       const mockEval = jest.fn().mockResolvedValue(0);
       redisService.getClient.mockReturnValue({ eval: mockEval } as any);
 
-      redisService.incrementMatchingAttempts.mockResolvedValue(1);
+      // Return MAX_MATCHING_RETRIES (5) so the cancel branch is taken
+      redisService.incrementMatchingAttempts.mockResolvedValue(5);
       (prismaService.ride.update as jest.Mock).mockResolvedValue({} as any);
 
       await processor.process(job);

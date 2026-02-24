@@ -5,10 +5,21 @@ import { PaymentService } from 'src/payment/payment.service';
 import { BadRequestException } from '@nestjs/common';
 import { PayoutStatus } from '@prisma/client';
 import { TransactionLedgerService } from 'src/super-admin/transactions/transaction-ledger.service';
+import { ActivityLogService } from 'src/common/services/activity-log.services';
+import { AdminNotificationsService } from 'src/admin/notifications/admin-notifications.service';
 const mockPrisma = {
   $transaction: jest.fn((callback) => callback(mockPrisma)), // Mock automatic transaction execution
   vendorPayout: { findUnique: jest.fn(), update: jest.fn() },
   riderPayout: { findUnique: jest.fn(), update: jest.fn() },
+  bankAccount: {
+    findUnique: jest
+      .fn()
+      .mockResolvedValue({
+        accountNumber: '0123456789',
+        bankCode: '058',
+        accountName: 'Test Vendor',
+      }),
+  },
 };
 
 const mockPaymentService = {
@@ -18,6 +29,7 @@ const mockPaymentService = {
 const mockLedger = {
   recordVendorPayout: jest.fn(),
   recordRiderPayout: jest.fn(),
+  finalizePayout: jest.fn(),
 };
 
 describe('PayoutsService', () => {
@@ -30,6 +42,14 @@ describe('PayoutsService', () => {
         { provide: PrismaService, useValue: mockPrisma },
         { provide: PaymentService, useValue: mockPaymentService },
         { provide: TransactionLedgerService, useValue: mockLedger },
+        {
+          provide: ActivityLogService,
+          useValue: { log: jest.fn(), record: jest.fn() },
+        },
+        {
+          provide: AdminNotificationsService,
+          useValue: { notify: jest.fn(), sendPayoutNotification: jest.fn() },
+        },
       ],
     }).compile();
 
@@ -46,6 +66,7 @@ describe('PayoutsService', () => {
       amount: 5000,
       status: PayoutStatus.PENDING,
       store: { vendorId: 'vendor-1' },
+      bankAccountId: 'bank-acc-1',
     };
 
     it('should successfully approve a pending payout', async () => {
@@ -73,11 +94,9 @@ describe('PayoutsService', () => {
       );
 
       // 3. Assert Ledger Record
-      expect(mockLedger.recordVendorPayout).toHaveBeenCalledWith(
-        expect.objectContaining({
-          id: payoutId,
-          status: 'PAID',
-        }),
+      expect(mockLedger.finalizePayout).toHaveBeenCalledWith(
+        payoutId,
+        'COMPLETED',
       );
     });
 
@@ -104,14 +123,16 @@ describe('PayoutsService', () => {
         status: 'Insufficient Funds',
       });
 
-      await expect(
-        service.approvePayout(payoutId, 'VENDOR', adminId),
-      ).rejects.toThrow(
-        BadRequestException, // "Bank Transfer Failed"
-      );
+      // Service marks as FAILED and returns gracefully (does not throw)
+      const result = await service.approvePayout(payoutId, 'VENDOR', adminId);
+      expect(result).toMatchObject({ status: 'FAILED' });
 
       // Ensure we NEVER updated the status to PAID
-      expect(mockPrisma.vendorPayout.update).not.toHaveBeenCalled();
+      expect(mockPrisma.vendorPayout.update).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ status: PayoutStatus.PAID }),
+        }),
+      );
       expect(mockLedger.recordVendorPayout).not.toHaveBeenCalled();
     });
   });
