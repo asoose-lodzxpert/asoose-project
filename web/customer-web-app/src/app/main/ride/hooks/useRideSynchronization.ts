@@ -32,6 +32,7 @@ export function useRideSynchronization() {
   const setDriver = useRideStore((state) => state.setDriver);
   const setTripSummary = useRideStore((state) => state.setTripSummary);
   const setRideType = useRideStore((state) => state.setRideType);
+  const setStartOtp = useRideStore((state) => state.setStartOtp);
 
   const statusMap: Record<RideStatus, RideStage> = {
     // PENDING = ride created but payment not yet confirmed — do NOT show "finding driver"
@@ -105,6 +106,16 @@ export function useRideSynchronization() {
           });
         }
 
+        // Restore OTP (for ACCEPTED/ARRIVED — customer needs to show driver)
+        if (
+          (mappedStatus === 'confirmed' || mappedStatus === 'arrived') &&
+          backendRide.startOtp
+        ) {
+          setStartOtp(backendRide.startOtp);
+        } else if (mappedStatus === 'in-progress' || mappedStatus === 'finished') {
+          setStartOtp(null); // Clear once trip has started
+        }
+
         // Restore driver if assigned
         if (activeRide.driver) {
           setDriver({
@@ -147,6 +158,7 @@ export function useRideSynchronization() {
       setDropoffAddress,
       setDriver,
       setTripSummary,
+      setStartOtp,
     ],
   );
 

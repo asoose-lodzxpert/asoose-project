@@ -30,6 +30,7 @@ export function RideSelection() {
   const clearPickupLocation = useRideStore((state) => state.clearPickupLocation);
   const clearDropoffLocation = useRideStore((state) => state.clearDropoffLocation);
   const clearAllLocations = useRideStore((state) => state.clearAllLocations);
+  const setStartOtp = useRideStore((state) => state.setStartOtp);
 
   // --- Global Address Setters ---
   const setPickupAddressStore = useRideStore((state) => state.setPickupAddress);
@@ -219,6 +220,8 @@ export function RideSelection() {
         idempotencyKey
       );
       if (setRideId) setRideId(response.ride.id);
+      // Store OTP so it can be shown to the driver when they arrive
+      if ((response.ride as any).startOtp) setStartOtp((response.ride as any).startOtp);
 
       // 2. Confirm ride with chosen payment method
       const confirmResult = await RideService.confirmRide(

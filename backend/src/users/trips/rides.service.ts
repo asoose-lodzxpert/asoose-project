@@ -28,14 +28,12 @@ import {
   VehicleType,
 } from './dto/trip.dto';
 import { TripsCommonService, TRIPS_CONFIG } from './trips.common.service';
-import * as bcrypt from 'bcrypt';
 import { randomUUID } from 'crypto';
 import { rideToJobSummary } from '../../jobs/job.dto';
 
 @Injectable()
 export class RidesService {
   private readonly logger = new Logger(RidesService.name);
-  private readonly SALT_ROUNDS = 10;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -262,8 +260,8 @@ export class RidesService {
             street: this.common.sanitizeText(securePickup.address),
             lat: securePickup.lat,
             lng: securePickup.lng,
-            city: 'Unknown',
-            state: 'Unknown',
+            city: '',
+            state: '',
           },
         });
 
@@ -274,8 +272,8 @@ export class RidesService {
             street: this.common.sanitizeText(secureDropoff.address),
             lat: secureDropoff.lat,
             lng: secureDropoff.lng,
-            city: 'Unknown',
-            state: 'Unknown',
+            city: '',
+            state: '',
           },
         });
 
@@ -324,9 +322,8 @@ export class RidesService {
 
         const finalFare = this.common.round(fare);
 
-        // 7. Generate & hash OTP
+        // 7. Generate OTP (stored as plaintext so customer can view it)
         const rawOtp = this.geo.generateOTP(TRIPS_CONFIG.OTP_LENGTH);
-        const hashedOtp = await bcrypt.hash(rawOtp, this.SALT_ROUNDS);
 
         // 8. Create Ride
         const ride = await tx.ride.create({
@@ -339,7 +336,7 @@ export class RidesService {
             distanceKm,
             durationMin,
             totalFare: finalFare,
-            startOtp: hashedOtp,
+            startOtp: rawOtp,
             surgeMultiplier: 1.0,
           },
           include: { pickupAddress: true, dropoffAddress: true },
@@ -361,7 +358,7 @@ export class RidesService {
         });
 
         return {
-          ride: { ...ride, startOtp: undefined },
+          ride,
           fare: finalFare,
           payment,
           message: 'Ride created. Please confirm to find a driver.',
@@ -525,11 +522,10 @@ export class RidesService {
     if (!ride) throw new NotFoundException('Ride not found');
     if (ride.riderId !== riderId)
       throw new ForbiddenException('Unauthorized driver');
-    if (ride.status !== RideStatus.ACCEPTED)
+    if (ride.status !== RideStatus.ACCEPTED && ride.status !== RideStatus.ARRIVED)
       throw new BadRequestException('Ride not ready to start');
 
-    const isMatch = await bcrypt.compare(otp, ride.startOtp || '');
-    if (!isMatch) {
+    if (!ride.startOtp || otp.trim() !== ride.startOtp.trim()) {
       throw new BadRequestException('Invalid OTP');
     }
 
@@ -700,6 +696,7 @@ export class RidesService {
             RideStatus.PENDING,
             RideStatus.REQUESTED,
             RideStatus.ACCEPTED,
+            RideStatus.ARRIVED,
             RideStatus.IN_PROGRESS,
           ],
         },
@@ -711,6 +708,7 @@ export class RidesService {
         payment: true,
       },
       orderBy: { createdAt: 'desc' },
+      // startOtp IS returned here so customer can display it to the driver
     });
   }
 
@@ -728,7 +726,8 @@ export class RidesService {
       throw new NotFoundException('Ride not found');
     if (ride.rider)
       ride.rider.phone = this.common.maskPhoneNumber(ride.rider.phone);
-    return { ...ride, startOtp: undefined };
+    // Return startOtp so customer can show it to driver when trip starts
+    return ride;
   }
 
   async getUserRides(userId: string, status?: string, page = 1, limit = 20) {

@@ -35,8 +35,10 @@ function constructAddressText(
   city?: string,
   state?: string
 ): string {
-  // Build array of non-empty parts
-  const parts = [street, city, state].filter((p): p is string => Boolean(p));
+  // Filter empty, nullish, or placeholder strings (legacy 'Unknown' records)
+  const parts = [street, city, state].filter(
+    (p): p is string => Boolean(p) && p.toLowerCase() !== 'unknown'
+  );
   
   // Return constructed address or fallback
   return parts.length > 0 ? parts.join(', ') : 'Pinned Location';

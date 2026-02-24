@@ -48,6 +48,7 @@ interface RideState {
   rating: number | null;
   feedback: string;
   isConfiguring: 'pickup' | 'dropoff' | null;
+  startOtp: string | null;
 
   // --- Setters ---
   setRideId: (id: string | null) => void;
@@ -78,6 +79,7 @@ interface RideState {
   setRating: (rating: number | null) => void;
   setFeedback: (feedback: string) => void;
   setIsConfiguring: (isConfiguring: 'pickup' | 'dropoff' | null) => void;
+  setStartOtp: (otp: string | null) => void;
   
   // --- Clearing Actions ---
   clearPickupLocation: () => void;
@@ -110,6 +112,7 @@ const initialState = {
   rating: null,
   feedback: '',
   isConfiguring: null,
+  startOtp: null,
 };
 
 export const useRideStore = create<RideState>()(
@@ -140,6 +143,7 @@ export const useRideStore = create<RideState>()(
       setRating: (rating) => set({ rating: rating }),
       setFeedback: (feedback) => set({ feedback: feedback }),
       setIsConfiguring: (isConfiguring) => set({ isConfiguring: isConfiguring }),
+      setStartOtp: (otp) => set({ startOtp: otp }),
       
       // --- Clear Actions ---
       clearPickupLocation: () =>
@@ -196,6 +200,7 @@ export const useRideStore = create<RideState>()(
         dropoffAddress: state.dropoffAddress, // Persist
         rideStatus: state.rideStatus,
         rideType: state.rideType,
+        startOtp: state.startOtp,
         driverLocation: state.driverLocation,
         driverHeading: state.driverHeading,
         driver: state.driver,

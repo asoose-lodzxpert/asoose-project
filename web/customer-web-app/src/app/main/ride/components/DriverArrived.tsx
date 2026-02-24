@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { useRideStore } from "../store/ride";
-import { Phone, MessageSquare, MapPin, Navigation } from "lucide-react";
+import { Phone, MessageSquare, MapPin, Navigation, KeyRound } from "lucide-react";
 
 export function DriverArrived() {
   const driver = useRideStore(s => s.driver);
   const rideStatus = useRideStore(s => s.rideStatus);
   const driverLocation = useRideStore(s => s.driverLocation);
   const pickupLocation = useRideStore(s => s.pickupLocation);
+  const startOtp = useRideStore(s => s.startOtp);
   
   // ETA calculation — local state (not in Zustand)
   const [distanceKm, setDistanceKm] = useState<number | null>(null);
@@ -82,6 +83,22 @@ export function DriverArrived() {
                 {driver.vehicle.model} • <span className="font-mono bg-zinc-200 dark:bg-zinc-700 px-1.5 py-0.5 rounded text-xs text-zinc-700 dark:text-zinc-300">{driver.vehicle.licensePlate}</span>
             </p>
           </div>
+        </div>
+      )}
+
+      {/* OTP — show to driver to verify and start the trip */}
+      {startOtp && (
+        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-xl p-4 mb-6 text-center">
+          <div className="flex items-center justify-center gap-2 mb-1">
+            <KeyRound size={15} className="text-amber-600 dark:text-amber-400" />
+            <p className="text-xs font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider">
+              Trip Code — Share with driver
+            </p>
+          </div>
+          <p className="text-3xl font-black font-mono tracking-widest text-amber-800 dark:text-amber-200">
+            {startOtp}
+          </p>
+          <p className="text-xs text-amber-500 mt-1">Driver enters this to start the trip</p>
         </div>
       )}
 
