@@ -181,3 +181,24 @@
   border-radius: 9999px;
 }
 
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Ride page — custom utilities not covered by Tailwind config
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Indeterminate progress bar animation (FindingDriver loading bar) */
+@keyframes indeterminateBar {
+  0%   { transform: translateX(-100%); }
+  50%  { transform: translateX(0%); }
+  100% { transform: translateX(100%); }
+}
+
+.animate-indeterminate-bar {
+  animation: indeterminateBar 1.6s ease-in-out infinite;
+  width: 40% !important; /* override w-1/3 so the sweep looks correct */
+}
+
+/* iOS safe-area padding for bottom navigation */
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 8px);
+}

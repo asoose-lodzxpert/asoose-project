@@ -6,6 +6,7 @@ import { Navigation, MapPin, Share2, ShieldAlert } from 'lucide-react';
 
 export function TripInProgress() {
   const rideType = useRideStore((state) => state.rideType);
+  const rideId = useRideStore((state) => state.rideId);
   const dropoffAddress = useRideStore((state) => state.dropoffAddress);
   const dropoffLocation = useRideStore((state) => state.dropoffLocation);
   const driverLocation = useRideStore((state) => state.driverLocation);
@@ -72,7 +73,7 @@ export function TripInProgress() {
   }
 
   return (
-    <div className="absolute bottom-6 left-6 right-6 md:left-auto md:right-6 md:w-96 bg-white dark:bg-zinc-900 shadow-2xl z-30 p-6 rounded-2xl border border-zinc-100 dark:border-zinc-800 animate-in slide-in-from-bottom-5">
+    <div className="absolute bottom-20 md:bottom-6 left-6 right-6 md:left-auto md:right-6 md:w-96 bg-white dark:bg-zinc-900 shadow-2xl z-30 p-6 rounded-2xl border border-zinc-100 dark:border-zinc-800 animate-in slide-in-from-bottom-5">
       
       {/* Header with Pulse */}
       <div className="flex items-center gap-4 mb-6">
@@ -119,10 +120,40 @@ export function TripInProgress() {
 
       {/* Safety Actions */}
       <div className="grid grid-cols-2 gap-3">
-        <button className="flex items-center justify-center gap-2 py-3 rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors font-bold text-sm text-zinc-700 dark:text-zinc-200">
+        <button
+          onClick={() => {
+            const text = `I'm in a ride and need help. Ride ID: ${rideId ?? 'unknown'}`;
+            if (navigator.share) {
+              navigator.share({
+                title: 'Share My Trip',
+                text,
+                url: window.location.href,
+              }).catch(() => {}); // User dismissed share sheet — not an error
+            } else {
+              navigator.clipboard?.writeText(`${text}\n${window.location.href}`);
+            }
+          }}
+          className="flex items-center justify-center gap-2 py-3 rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors font-bold text-sm text-zinc-700 dark:text-zinc-200">
           <Share2 size={18} /> Share Trip
         </button>
-        <button className="flex items-center justify-center gap-2 py-3 rounded-xl bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors font-bold text-sm text-red-600 dark:text-red-400">
+        <button
+          onClick={() => {
+            // Primary: try the web Share API so the user can pick their emergency contact
+            const emergencyText = `🚨 SOS – I need help! I'm in a ride.\nRide ID: ${rideId ?? 'unknown'}\nTracking: ${window.location.href}`;
+            if (navigator.share) {
+              navigator.share({
+                title: '🚨 SOS — Need Help',
+                text: emergencyText,
+              }).catch(() => {
+                // Fallback: open emergency call
+                window.location.href = 'tel:112';
+              });
+            } else {
+              // Direct fallback: open emergency call
+              window.location.href = 'tel:112';
+            }
+          }}
+          className="flex items-center justify-center gap-2 py-3 rounded-xl bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors font-bold text-sm text-red-600 dark:text-red-400">
           <ShieldAlert size={18} /> SOS
         </button>
       </div>

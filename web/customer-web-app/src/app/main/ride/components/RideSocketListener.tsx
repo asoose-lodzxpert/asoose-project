@@ -36,18 +36,6 @@ export function RideSocketListener() {
     console.log(`📡 Initializing Socket Listener for Ride: ${rideId}`);
     receivedSocketLocation.current = false;
 
-    // Also subscribe to ride_update (FINDING_DRIVER emitted by backend on confirm)
-    const handleRideUpdate = (data: any) => {
-      if (data?.rideId && data.rideId !== rideId) return;
-      if (
-        data?.type === "FINDING_DRIVER" ||
-        data?.status === "FINDING_DRIVER"
-      ) {
-        setRideStatus("searching");
-      }
-    };
-    socketService.on("ride_update", handleRideUpdate);
-
     subscribeToRideEvents({
       // 0. Ride Matching Started — emitted by backend when CARD payment is confirmed
       //    and the ride transitions from PENDING → REQUESTED.
@@ -180,7 +168,6 @@ export function RideSocketListener() {
     // Cleanup on unmount or rideId change
     return () => {
       console.log(`🔌 Disconnecting Socket Listener for Ride: ${rideId}`);
-      socketService.off("ride_update", handleRideUpdate);
       unsubscribeFromRideEvents();
     };
   }, [

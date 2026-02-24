@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useCartStore } from "@/store/useCartStore";
 import { useSession } from "next-auth/react";
-import { WifiOff, Loader2 } from "lucide-react";
+import { WifiOff, Loader2, Phone } from "lucide-react";
 import Swal from "sweetalert2";
 import { toast } from "react-toastify";
 import {
@@ -37,6 +37,12 @@ export default function CheckoutForm() {
   const [isOnline, setIsOnline] = useState(true);
   const [showAddAddressModal, setShowAddAddressModal] = useState(false);
   const [showAddressPicker, setShowAddressPicker] = useState(false);
+
+  // Phone number state – prefilled from user profile, required for checkout
+  const [phone, setPhone] = useState("");
+  const [phoneError, setPhoneError] = useState("");
+  const [isLoadingProfile, setIsLoadingProfile] = useState(true);
+  const profilePhoneRef = useRef<string>(""); // track the phone already saved on the backend
 
   // Live fee state fetched from backend
   const [deliveryFee, setDeliveryFee] = useState<number | null>(null);
@@ -118,6 +124,17 @@ export default function CheckoutForm() {
     [session?.accessToken, cartItems],
   );
 
+  /** Validates a phone number – accepts E.164 (+XXXXXXXXXXX) or local formats */
+  const validatePhone = (value: string): string => {
+    const trimmed = value.trim();
+    if (!trimmed) return "Phone number is required to place an order";
+    // Accept E.164 (+countryCode digits) or at least 7 digits (local)
+    if (!/^\+?[0-9]{7,15}$/.test(trimmed.replace(/\s+/g, ""))) {
+      return "Enter a valid phone number (e.g. +2348012345678)";
+    }
+    return "";
+  };
+
   useEffect(() => {
     useCartStore.persist.rehydrate();
     setMounted(true);
@@ -135,6 +152,31 @@ export default function CheckoutForm() {
       setIsProcessing(false);
     };
   }, []);
+
+  /** Fetches the user profile to prefill phone number */
+  const fetchProfile = useCallback(async () => {
+    if (status !== "authenticated") {
+      if (status === "unauthenticated") setIsLoadingProfile(false);
+      return;
+    }
+    const token = session?.accessToken;
+    if (!token) { setIsLoadingProfile(false); return; }
+    try {
+      const res = await fetch(`${API_URL}/users/profile`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const saved = data.phone || "";
+        profilePhoneRef.current = saved;
+        setPhone(saved);
+      }
+    } catch {
+      // Non-fatal — user can still enter phone manually
+    } finally {
+      setIsLoadingProfile(false);
+    }
+  }, [session?.accessToken, status]);
 
   const fetchAddresses = useCallback(async () => {
     if (status !== "authenticated") {
@@ -179,8 +221,12 @@ export default function CheckoutForm() {
   useEffect(() => {
     if (status === "authenticated") {
       fetchAddresses();
+      fetchProfile();
     }
-  }, [status, fetchAddresses]);
+    if (status === "unauthenticated") {
+      setIsLoadingProfile(false);
+    }
+  }, [status, fetchAddresses, fetchProfile]);
 
   // Fetch quote whenever address is selected or cart changes
   useEffect(() => {
@@ -293,6 +339,14 @@ export default function CheckoutForm() {
       return;
     }
 
+    // Validate phone
+    const phoneValidationError = validatePhone(phone);
+    if (phoneValidationError) {
+      setPhoneError(phoneValidationError);
+      toast.error(phoneValidationError);
+      return;
+    }
+
     // FIX: Don't force restaurantId if multi-vendor.
     // The backend's createMultiOrder groups items itself.
     // However, if we are hitting 'createOrder' endpoint it might expect one.
@@ -308,6 +362,30 @@ export default function CheckoutForm() {
     setIsProcessing(true);
 
     try {
+      // Persist phone to user profile if it was added or changed
+      const normalizedPhone = phone.trim();
+      if (normalizedPhone !== profilePhoneRef.current) {
+        if (token) {
+          const profileRes = await fetch(`${API_URL}/users/profile`, {
+            method: "PATCH",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              name: session?.user?.name || "",
+              phone: normalizedPhone,
+            }),
+          });
+          if (profileRes.ok) {
+            profilePhoneRef.current = normalizedPhone;
+          } else {
+            const err = await profileRes.json().catch(() => ({}));
+            throw new Error(err?.message || "Failed to save phone number");
+          }
+        }
+      }
+
       const idempotencyKey = crypto.randomUUID();
       const payload = {
         addressId: selectedAddress.id,
@@ -338,7 +416,7 @@ export default function CheckoutForm() {
       isOrderCreated.current = true;
       clearCart();
 
-      if (selectedPaymentMethod.type === "CASH") {
+      if ((selectedPaymentMethod.type as "CARD" | "BANK_TRANSFER" | "CASH") === "CASH") {
         localStorage.removeItem("pending_checkout");
         localStorage.removeItem("last_order_id");
 
@@ -398,6 +476,49 @@ export default function CheckoutForm() {
 
       <main className="max-w-6xl mx-auto px-4 sm:px-6 pt-6 grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-6">
+          {/* Phone Number */}
+          <section className="bg-white dark:bg-[#151515] p-5 rounded-3xl border border-gray-100 dark:border-white/5 shadow-sm">
+            <h2 className="font-bold text-lg flex items-center gap-2 mb-4">
+              <Phone className="w-5 h-5 text-yellow-500" /> Contact Number
+            </h2>
+            {isLoadingProfile ? (
+              <div className="p-4 flex items-center justify-center">
+                <Loader2 className="w-5 h-5 animate-spin text-yellow-500" />
+              </div>
+            ) : (
+              <div className="space-y-1">
+                <input
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => {
+                    setPhone(e.target.value);
+                    if (phoneError) setPhoneError(validatePhone(e.target.value));
+                  }}
+                  onBlur={() => setPhoneError(validatePhone(phone))}
+                  placeholder="+2348012345678"
+                  disabled={isProcessing}
+                  className={`w-full px-4 py-3 rounded-2xl border text-sm bg-transparent outline-none transition-all
+                    ${
+                      phoneError
+                        ? "border-red-400 dark:border-red-500 focus:border-red-500"
+                        : phone && !validatePhone(phone)
+                          ? "border-yellow-500 bg-yellow-50 dark:bg-yellow-500/10"
+                          : "border-gray-200 dark:border-white/10 focus:border-yellow-500"
+                    }
+                  `}
+                />
+                {phoneError && (
+                  <p className="text-red-500 text-xs mt-1">{phoneError}</p>
+                )}
+                {!phone && !phoneError && (
+                  <p className="text-gray-400 dark:text-gray-500 text-xs mt-1">
+                    Required — we use this to contact you about your delivery.
+                  </p>
+                )}
+              </div>
+            )}
+          </section>
+
           {/* Address trigger */}
           <section className="bg-white dark:bg-[#151515] p-5 rounded-3xl border border-gray-100 dark:border-white/5 shadow-sm">
             <h2 className="font-bold text-lg flex items-center gap-2 mb-4">
@@ -471,7 +592,7 @@ export default function CheckoutForm() {
               serviceFee={serviceFee}
               isLoadingFee={isLoadingFee}
               isProcessing={isProcessing}
-              isDisabled={isProcessing || !selectedAddress || !isOnline}
+              isDisabled={isProcessing || !selectedAddress || !isOnline || !!validatePhone(phone)}
               onPlaceOrder={handlePlaceOrder}
               retryCount={0}
             />

@@ -37,7 +37,7 @@ function constructAddressText(
 ): string {
   // Filter empty, nullish, or placeholder strings (legacy 'Unknown' records)
   const parts = [street, city, state].filter(
-    (p): p is string => Boolean(p) && p.toLowerCase() !== 'unknown'
+    (p): p is string => Boolean(p) && p?.toLowerCase() !== 'unknown'
   );
   
   // Return constructed address or fallback
@@ -206,6 +206,7 @@ export function mapRideToViewModel(backendRide: BackendRide): RideViewModel {
 
       // Metadata
       ...(backendRide.paymentStatus && { paymentStatus: backendRide.paymentStatus }),
+      ...(backendRide.payment?.method && { paymentMethod: backendRide.payment.method }),
       ...(backendRide.cancellationReason && {
         cancellationReason: backendRide.cancellationReason,
       }),

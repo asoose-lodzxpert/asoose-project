@@ -105,6 +105,9 @@ export interface RideViewModel {
   
   /** Ride payment status (PAID, PENDING, FAILED) */
   paymentStatus?: string;
+
+  /** Payment method used (CASH, CARD, BANK_TRANSFER, etc.) */
+  paymentMethod?: string;
   
   /** Cancellation reason (if cancelled) */
   cancellationReason?: string;

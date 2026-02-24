@@ -439,7 +439,10 @@ export default function RideDetailsPage() {
             <div className="min-w-0 flex-1">
               <p className="text-sm font-bold">
                 Paid via{' '}
-                {ride.paymentStatus === 'PAID' || ride.paymentStatus === 'COMPLETED'
+                {ride.paymentMethod
+                  ? ride.paymentMethod.charAt(0).toUpperCase() +
+                    ride.paymentMethod.slice(1).toLowerCase()
+                  : ride.paymentStatus === 'PAID' || ride.paymentStatus === 'COMPLETED'
                   ? 'Card'
                   : 'Cash'}
               </p>

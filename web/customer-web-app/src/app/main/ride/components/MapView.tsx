@@ -138,7 +138,7 @@ export function MapView() {
   };
 
   if (loadError) {
-    return <div className="flex items-center justify-center h-screen bg-zinc-900 text-white">Error loading maps. Check API Key.</div>;
+    return <div className="flex items-center justify-center h-full bg-zinc-900 text-white">Error loading maps. Check API Key.</div>;
   }
 
   return isLoaded ? (
@@ -161,5 +161,5 @@ export function MapView() {
         />
       )}
     </GoogleMap>
-  ) : <div className="flex items-center justify-center h-screen bg-zinc-900 text-white">Loading Map...</div>
+  ) : <div className="flex items-center justify-center h-full bg-zinc-900 text-white">Loading Map...</div>
 }

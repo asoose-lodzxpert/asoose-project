@@ -56,10 +56,12 @@ export function useRideSynchronization() {
 
         if (!backendRide) {
           // No active ride on the backend — always reset to idle so stale persisted
-          // statuses (searching, confirmed, arrived, in-progress, finished) don't
-          // leave the UI stuck on an active-ride screen after the ride ends.
+          // statuses (searching, confirmed, arrived, in-progress) don't leave the UI
+          // stuck on an active-ride screen after the ride ends.
+          // IMPORTANT: exclude 'finished' — the rating modal lives in that stage and
+          // getCurrentRide() returns null for completed rides, which would destroy it.
           const currentStatus = useRideStore.getState().rideStatus;
-          if (currentStatus !== "idle" && currentStatus !== "configuring") {
+          if (currentStatus !== "idle" && currentStatus !== "configuring" && currentStatus !== "finished") {
             console.log(
               `🔄 No active ride on backend (local: ${currentStatus}). Resetting to idle.`,
             );

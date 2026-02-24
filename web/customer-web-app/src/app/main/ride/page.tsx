@@ -46,7 +46,11 @@ export default function Home() {
 
   return (
     <GlobalErrorBoundary>
-      <div className="relative flex flex-row h-[calc(100vh-64px-56px)] w-full overflow-hidden">
+      {/* h-[calc(100dvh-64px)]: dvh = dynamic viewport height (fixes iOS Safari 100vh bug).
+           BottomNav is `fixed` so it doesn't participate in document flow — no need to
+           subtract its height here. On mobile the BottomNav overlaps the page; floating
+           panels use bottom-20 to clear it. */}
+      <div className="relative flex flex-row h-[calc(100dvh-64px)] w-full overflow-hidden">
         {/* --- Invisible logic-only components --- */}
         <UserLocationTracker />
         <MapCameraManager />
