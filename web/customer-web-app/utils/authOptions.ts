@@ -62,30 +62,40 @@ export const authOptions: NextAuthOptions = {
     maxAge: 7 * 24 * 60 * 60, // 7 days
   },
   callbacks: {
-    // 1. ADD THIS: Handle Google OAuth Token Exchange
+    // Handle Google OAuth Token Exchange
     async signIn({ user, account, profile }) {
       if (account?.provider === "google") {
+        // Use a private server-side URL when available (avoids going through
+        // the public internet in containerised deployments); fall back to the
+        // public NEXT_PUBLIC_API_URL which is baked in at build time.
+        const apiUrl =
+          process.env.INTERNAL_API_URL ||
+          process.env.NEXT_PUBLIC_API_URL ||
+          "http://localhost:3000/api/v1";
+
         try {
           const googleProfile = profile as any;
-          const res = await fetch(
-            `${process.env.NEXT_PUBLIC_API_URL}/auth/user/oauth/google`,
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                email: user.email,
-                googleId: account.providerAccountId,
-                firstName:
-                  googleProfile?.given_name || user.name?.split(" ")[0],
-                lastName:
-                  googleProfile?.family_name ||
-                  user.name?.split(" ").slice(1).join(" "),
-                profilePicture: user.image,
-              }),
-            },
-          );
+          const res = await fetch(`${apiUrl}/auth/user/oauth/google`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              email: user.email,
+              googleId: account.providerAccountId,
+              firstName:
+                googleProfile?.given_name || user.name?.split(" ")[0],
+              lastName:
+                googleProfile?.family_name ||
+                user.name?.split(" ").slice(1).join(" "),
+              profilePicture: user.image,
+            }),
+          });
 
-          const data = await res.json();
+          let data: any = {};
+          try {
+            data = await res.json();
+          } catch {
+            // Body not parseable — treat as generic failure
+          }
 
           if (res.ok && data.access_token) {
             // Mutate the user object so it is available in the 'jwt' callback
@@ -94,10 +104,26 @@ export const authOptions: NextAuthOptions = {
             (user as any).accessToken = data.access_token;
             return true;
           }
-          return false; // Deny sign in if backend exchange fails
+
+          // Surface structured error codes for the sign-in page to display
+          if (res.status === 401) {
+            // Suspended / Banned
+            return "/sign-in?error=AccountSuspended";
+          }
+
+          if (res.status === 409) {
+            // Should no longer happen after auto-link fix, but kept as a safety net
+            return "/sign-in?error=OAuthEmailConflict";
+          }
+
+          console.error(
+            `[OAuth] Backend responded with ${res.status}:`,
+            JSON.stringify(data),
+          );
+          return "/sign-in?error=OAuthFailed";
         } catch (error) {
-          console.error("OAuth sign-in error:", error);
-          return false;
+          console.error("[OAuth] Network/fetch error:", error);
+          return "/sign-in?error=OAuthFailed";
         }
       }
       return true;

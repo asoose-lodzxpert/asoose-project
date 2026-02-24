@@ -949,6 +949,10 @@ model Delivery {
   pickupProof   String?
   deliveryProof String?
 
+  // Sender Info
+  senderName     String?
+  senderPhone    String?
+
   // Package Info
   packageDetails String?
   recipientName  String

@@ -5,7 +5,7 @@
   - A unique constraint covering the columns `[paystack_customer_code]` on the table `User` will be added. If there are existing duplicate values, this will fail.
 
 */
--- AlterTable
+-- AlterTable (idempotent: column may already be dropped by a prior migration)
 ALTER TABLE "BankAccount" DROP COLUMN IF EXISTS "flutterwaveRecipientCode";
 
 -- AlterTable
@@ -18,7 +18,7 @@ ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "paystack_customer_code" TEXT;
 ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "wallet_balance" DOUBLE PRECISION NOT NULL DEFAULT 0;
 ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "wallet_balance_hidden" BOOLEAN NOT NULL DEFAULT false;
 
--- CreateTable
+-- CreateTable (idempotent)
 CREATE TABLE IF NOT EXISTS "saved_cards" (
     "id" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
@@ -38,13 +38,13 @@ CREATE TABLE IF NOT EXISTS "saved_cards" (
     CONSTRAINT "saved_cards_pkey" PRIMARY KEY ("id")
 );
 
--- CreateIndex
+-- CreateIndex (idempotent)
 CREATE INDEX IF NOT EXISTS "saved_cards_userId_idx" ON "saved_cards"("userId");
 
--- CreateIndex
+-- CreateIndex (idempotent)
 CREATE UNIQUE INDEX IF NOT EXISTS "saved_cards_userId_last4_expiryYear_expiryMonth_key" ON "saved_cards"("userId", "last4", "expiryYear", "expiryMonth");
 
--- CreateIndex
+-- CreateIndex (idempotent)
 CREATE UNIQUE INDEX IF NOT EXISTS "User_paystack_customer_code_key" ON "User"("paystack_customer_code");
 
 -- AddForeignKey (idempotent)

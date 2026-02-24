@@ -1,3 +1,13 @@
+/**
+ * ⚠️  DEAD CODE — This file is NOT used by the application.
+ *
+ * The active NextAuth configuration lives at:
+ *   utils/authOptions.ts   ← authOptions object used everywhere
+ *   src/app/api/auth/[...nextauth]/route.ts  ← the actual route handler
+ *
+ * Keeping this file only as a reference.  Do not edit it expecting the
+ * changes to take effect; edit utils/authOptions.ts instead.
+ */
 import NextAuth from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import CredentialsProvider from "next-auth/providers/credentials";
