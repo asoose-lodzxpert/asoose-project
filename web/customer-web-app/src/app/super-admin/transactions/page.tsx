@@ -57,7 +57,7 @@ interface TransactionsApiResponse {
 }
 
 // Helper to ensure Naira display even if backend hardcodes dollar signs
-const formatNairaString = (amountStr: string) => amountStr.replace("$", "₦");
+const formatNairaString = (amountStr: string) => amountStr.replaceAll("$", "₦");
 
 const StatsCard = ({
   title,

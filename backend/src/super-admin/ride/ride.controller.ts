@@ -66,4 +66,18 @@ export class RidesController {
       body.reason,
     );
   }
+
+  @Post(':id/retry-matching')
+  @Roles('SUPER_ADMIN', 'ADMIN_MANAGER')
+  async retryMatching(@Param('id') id: string, @Req() req: any) {
+    const adminId = req.user.id || req.user.sub;
+    return this.ridesService.retryMatching(id, adminId);
+  }
+
+  @Post(':id/unassign')
+  @Roles('SUPER_ADMIN', 'ADMIN_MANAGER')
+  async unassignDriver(@Param('id') id: string, @Req() req: any) {
+    const adminId = req.user.id || req.user.sub;
+    return this.ridesService.unassignDriver(id, adminId);
+  }
 }

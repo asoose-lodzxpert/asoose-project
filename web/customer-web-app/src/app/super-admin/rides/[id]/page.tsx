@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import Swal from "sweetalert2";
 import useSWR from "swr";
-import { getSession } from "next-auth/react";
+import { getSession, useSession } from "next-auth/react";
 import { fetcher } from "../../hooks/useSuperAdminFetch";
 import RideDetailSkeleton from "./skeleton";
 import DriverSelectorModal from "./component/DriverSelectorModal";
@@ -73,6 +73,10 @@ export default function RideDetailPage() {
   // State for Modals & Loading
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
   const [isRetrying, setIsRetrying] = useState(false);
+  const { data: authSession } = useSession();
+  const canAssign = ["SUPER_ADMIN", "ADMIN_MANAGER"].includes(
+    (authSession as any)?.user?.role ?? "",
+  );
   const [isForceStatusOpen, setIsForceStatusOpen] = useState(false);
 
   // Data Fetching
@@ -380,7 +384,7 @@ export default function RideDetailPage() {
             )}
 
             {/* Feature 2: Manual Assign (Only if Active, No Driver) */}
-            {isActive && !ride.driver && (
+            {isActive && !ride.driver && canAssign && (
               <button
                 onClick={() => setIsAssignModalOpen(true)}
                 className="px-3 py-2 bg-purple-500/10 text-purple-500 border border-purple-500/20 rounded-lg hover:bg-purple-500 hover:text-white transition-colors flex items-center gap-2 font-bold text-sm"
@@ -593,12 +597,14 @@ export default function RideDetailPage() {
                   <p className="text-gray-500 text-xs font-bold uppercase">
                     No Driver Assigned
                   </p>
+                  {canAssign && (
                   <button
                     onClick={() => setIsAssignModalOpen(true)}
                     className="w-full py-2 bg-purple-500/10 text-purple-400 border border-purple-500/20 rounded-lg text-xs font-bold uppercase hover:bg-purple-500 hover:text-white transition-all"
                   >
                     Assign Driver
                   </button>
+                  )}
                 </div>
               )}
             </div>

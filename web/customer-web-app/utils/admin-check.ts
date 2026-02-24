@@ -1,6 +1,7 @@
 import { getServerSession } from "next-auth"; // <--- v4 Import
 import { authOptions } from "./authOptions";
 const ADMIN_ROLES = [
+  "ADMIN",
   "SUPER_ADMIN",
   "ADMIN_MANAGER",
   "ADMIN_SUPPORT",

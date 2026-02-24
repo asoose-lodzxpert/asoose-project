@@ -514,6 +514,9 @@ export default function SuperAdminDashboard() {
               <UserCheck className="w-4 h-4" /> Active Users:{" "}
               {stats.find((s) => s.label === "Active Users")?.value || "N/A"}
             </div>
+            <div className="px-4 py-2 bg-yellow-500/10 border border-yellow-500/20 rounded-lg flex items-center gap-2 text-yellow-500/70 text-xs italic">
+              Status indicators are static placeholders — connect a health endpoint for live data.
+            </div>
           </div>
 
           {/* Alerts Table */}

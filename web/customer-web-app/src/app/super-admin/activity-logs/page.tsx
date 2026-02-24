@@ -39,9 +39,11 @@ interface ActivityLogsResponse {
 export default function ActivityLogsPage() {
   const [selectedLog, setSelectedLog] = useState<ActivityLog | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [page, setPage] = useState(1);
+  const limit = 25;
 
-  const { data, isLoading } = useSWR<ActivityLogsResponse>(
-    "/super-admin/activity-logs",
+  const { data, isLoading, error } = useSWR<ActivityLogsResponse>(
+    `/super-admin/activity-logs?page=${page}&limit=${limit}`,
     fetcher,
   );
 
@@ -119,6 +121,18 @@ export default function ActivityLogsPage() {
     return <ActivityLogSkeleton />;
   }
 
+  if (error) {
+    return (
+      <div className="p-4 md:p-6 bg-[#0F172A] min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <Activity className="w-10 h-10 text-red-500 mx-auto mb-3 opacity-60" />
+          <p className="text-red-400 font-bold">Failed to load activity logs</p>
+          <p className="text-gray-500 text-sm mt-1">Please refresh the page to try again.</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-4 md:p-6 bg-[#0F172A] min-h-screen pb-24">
       <header className="mb-6">
@@ -136,7 +150,30 @@ export default function ActivityLogsPage() {
         <DataTable data={data?.logs || []} columns={columns} />
       </div>
 
-      {/* Mobile View: Card List */}
+      {/* Pagination Controls */}
+      {data?.meta && data.meta.lastPage > 1 && (
+        <div className="flex items-center justify-between mt-4">
+          <p className="text-gray-500 text-sm">
+            Page {data.meta.page} of {data.meta.lastPage} &mdash; {data.meta.total} total
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page <= 1}
+              className="px-3 py-1.5 text-sm bg-[#1E293B] border border-gray-700 text-gray-300 rounded-lg hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              Previous
+            </button>
+            <button
+              onClick={() => setPage((p) => Math.min(data.meta.lastPage, p + 1))}
+              disabled={page >= data.meta.lastPage}
+              className="px-3 py-1.5 text-sm bg-[#1E293B] border border-gray-700 text-gray-300 rounded-lg hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
       <div className="md:hidden space-y-4">
         {data?.logs && data.logs.length > 0 ? (
           data.logs.map((log) => (

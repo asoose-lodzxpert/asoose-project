@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import useSWR from "swr";
 import {
@@ -64,6 +64,27 @@ export default function GlobalSearchPage() {
   const q = searchParams.get("q") || "";
   const router = useRouter();
 
+  // Local input state with 300ms debounce to URL
+  const [inputValue, setInputValue] = useState(q);
+
+  // Sync input when URL changes externally
+  useEffect(() => {
+    setInputValue(q);
+  }, [q]);
+
+  // Debounce: push new URL 300ms after user stops typing
+  useEffect(() => {
+    if (inputValue === q) return;
+    const t = setTimeout(() => {
+      router.push(
+        inputValue
+          ? `/super-admin/search?q=${encodeURIComponent(inputValue)}`
+          : "/super-admin/search",
+      );
+    }, 300);
+    return () => clearTimeout(t);
+  }, [inputValue]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // --- 2. Corrected API Endpoints (Removed '/users' prefix) ---
 
   // Vendors: Backend mapped to 'super-admin/vendors'
@@ -109,9 +130,24 @@ export default function GlobalSearchPage() {
 
   if (!q) {
     return (
-      <div className="min-h-[60vh] flex flex-col items-center justify-center text-gray-500">
+      <div className="min-h-[60vh] flex flex-col items-center justify-center text-gray-500 px-4">
         <Search className="w-16 h-16 mb-4 opacity-20" />
-        <p className="text-lg">Enter a keyword to search globally.</p>
+        <p className="text-lg mb-6">Enter a keyword to search globally.</p>
+        <input
+          type="text"
+          autoFocus
+          value={inputValue}
+          onChange={(e) => setInputValue(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && inputValue.trim()) {
+              router.push(
+                `/super-admin/search?q=${encodeURIComponent(inputValue.trim())}`,
+              );
+            }
+          }}
+          placeholder="Search users, orders, rides…"
+          className="w-full max-w-md px-4 py-3 bg-[#1E293B] border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-yellow-500 transition-colors text-sm"
+        />
       </div>
     );
   }
@@ -124,6 +160,24 @@ export default function GlobalSearchPage() {
           Showing results for{" "}
           <span className="text-yellow-500 font-mono">"{q}"</span>
         </p>
+        {/* Search input — debounced, supports Enter key */}
+        <div className="relative mt-4 max-w-lg">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
+          <input
+            type="text"
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && inputValue.trim()) {
+                router.push(
+                  `/super-admin/search?q=${encodeURIComponent(inputValue.trim())}`,
+                );
+              }
+            }}
+            placeholder="Refine search…"
+            className="w-full pl-9 pr-4 py-2.5 bg-[#1E293B] border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-yellow-500 transition-colors text-sm"
+          />
+        </div>
       </div>
 
       {isLoading ? (

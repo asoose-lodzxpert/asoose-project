@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, ServiceUnavailableException } from '@nestjs/common';
 import { AppLogger } from '../libs/logger/app-logger.service';
 import { PrismaService } from '../prisma/prisma.service';
 import axios from 'axios';
@@ -113,25 +113,46 @@ export class MapsService {
   ): Promise<{ lat: number; lng: number; address: string; placeId: string }> {
     const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${this.apiKey}`;
 
+    let res: any;
     try {
-      const res = await axios.get(url);
-      if (res.data.results && res.data.results.length > 0) {
-        const result = res.data.results[0]; // Snaps to nearest known road/address
-        return {
-          lat: result.geometry.location.lat,
-          lng: result.geometry.location.lng,
-          address: result.formatted_address,
-          placeId: result.place_id,
-        };
-      }
-      throw new Error('No address found for these coordinates');
-    } catch (error) {
-      this.appLogger.error('Error reverse geocoding', error?.stack, {
+      res = await axios.get(url);
+    } catch (networkError) {
+      this.appLogger.error('Network error calling Google Geocoding API', networkError?.stack, { lat, lng });
+      throw new ServiceUnavailableException('Geocoding service temporarily unavailable. Please try again.');
+    }
+
+    const status: string = res.data?.status;
+
+    // Success — return the best result
+    if (status === 'OK' && res.data.results?.length > 0) {
+      const result = res.data.results[0];
+      return {
+        lat: result.geometry.location.lat,
+        lng: result.geometry.location.lng,
+        address: result.formatted_address,
+        placeId: result.place_id,
+      };
+    }
+
+    // No address found for this coordinate (e.g. middle of a field, API restriction)
+    // Return a graceful fallback so the user's coordinates are still usable.
+    if (status === 'ZERO_RESULTS' || status === 'NOT_FOUND') {
+      this.appLogger.warn('Google Geocoding returned no results — returning coordinate fallback', { lat, lng, status });
+      return {
         lat,
         lng,
-      });
-      throw new BadRequestException('Unroutable location coordinates.');
+        address: `${lat.toFixed(5)}, ${lng.toFixed(5)}`,
+        placeId: '',
+      };
     }
+
+    // API-level errors (REQUEST_DENIED, INVALID_REQUEST, OVER_QUERY_LIMIT, etc.)
+    this.appLogger.error('Google Geocoding API error', undefined, { lat, lng, status, error_message: res.data?.error_message });
+    throw new ServiceUnavailableException(
+      status === 'OVER_QUERY_LIMIT'
+        ? 'Geocoding quota exceeded. Please try again shortly.'
+        : 'Geocoding service error. Please try again or enter your address manually.',
+    );
   }
 
   async getDirections(

@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { toast } from "react-toastify";
 import useSWR from "swr";
 import { fetcher } from "../../hooks/useSuperAdminFetch";
@@ -143,6 +144,8 @@ export default function OrderDetailsPage() {
   const params = useParams();
   const id = params?.id as string;
   const [showAssignModal, setShowAssignModal] = useState(false);
+  const { data: session } = useSession();
+  const isSuperAdmin = (session as any)?.user?.role === "SUPER_ADMIN";
 
   const {
     data: order,
@@ -521,6 +524,7 @@ export default function OrderDetailsPage() {
             orderId={order.id}
             currentStatus={order.status}
             onUpdate={() => mutate()}
+            isSuperAdmin={isSuperAdmin}
           />
         </div>
       </div>

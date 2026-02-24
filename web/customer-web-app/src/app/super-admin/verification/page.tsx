@@ -7,8 +7,6 @@ import {
   Eye, Search, RefreshCw, FileText, 
   AlertTriangle, Truck, Store, ChevronRight
 } from 'lucide-react';
-import { ToastContainer } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
 
 import { fetcher } from '../hooks/useSuperAdminFetch';
 import { DataTable } from '@/app/super-admin/component/datatable';
@@ -225,8 +223,6 @@ export default function VerificationPage() {
 
   return (
     <div className="min-h-screen bg-[#0F172A] p-3 sm:p-4 md:p-6 lg:p-8 space-y-4 md:space-y-6">
-      <ToastContainer theme="dark" position="bottom-right" />
-
       {/* Header */}
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 md:gap-6">
         <div>

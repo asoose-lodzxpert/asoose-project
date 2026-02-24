@@ -38,6 +38,7 @@ const profileSchema = z.object({
 
 const passwordSchema = z
   .object({
+    currentPassword: z.string().min(1, "Please enter your current password"),
     newPassword: z
       .string()
       .min(8, "Password must be at least 8 characters")
@@ -50,6 +51,10 @@ const passwordSchema = z
   .refine((data) => data.newPassword === data.confirmPassword, {
     message: "Passwords do not match",
     path: ["confirmPassword"],
+  })
+  .refine((data) => data.currentPassword !== data.newPassword, {
+    message: "New password must differ from current password",
+    path: ["newPassword"],
   });
 
 type ProfileValues = z.infer<typeof profileSchema>;
@@ -77,7 +82,7 @@ export default function AdminProfilePage() {
 
   const passwordForm = useForm<PasswordValues>({
     resolver: zodResolver(passwordSchema),
-    defaultValues: { newPassword: "", confirmPassword: "" },
+    defaultValues: { currentPassword: "", newPassword: "", confirmPassword: "" },
   });
 
   // Sync data when loaded
@@ -142,7 +147,8 @@ export default function AdminProfilePage() {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          password: values.newPassword,
+          currentPassword: values.currentPassword,
+          newPassword: values.newPassword,
           confirmPassword: values.confirmPassword,
         }),
       });
@@ -326,6 +332,23 @@ export default function AdminProfilePage() {
               onSubmit={passwordForm.handleSubmit(onUpdatePassword)}
               className="p-8 space-y-6"
             >
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">
+                  Current Password
+                </label>
+                <input
+                  type="password"
+                  {...passwordForm.register("currentPassword")}
+                  className="w-full bg-[#0F172A] border border-gray-700 rounded-2xl p-4 text-white text-sm focus:ring-2 focus:ring-red-500/20 outline-none transition-all"
+                  placeholder="Enter your current password"
+                />
+                {passwordForm.formState.errors.currentPassword && (
+                  <p className="text-red-500 text-[10px] font-bold ml-1">
+                    {passwordForm.formState.errors.currentPassword.message}
+                  </p>
+                )}
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">
@@ -346,7 +369,7 @@ export default function AdminProfilePage() {
 
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">
-                    Confirm Password
+                    Confirm New Password
                   </label>
                   <input
                     type="password"

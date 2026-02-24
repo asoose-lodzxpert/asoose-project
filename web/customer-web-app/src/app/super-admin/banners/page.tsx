@@ -36,6 +36,11 @@ interface Banner {
 
 const BUCKET_NAME =
   process.env.NEXT_PUBLIC_STORAGE_BUCKET || "marketplace_assets";
+if (!process.env.NEXT_PUBLIC_STORAGE_BUCKET) {
+  console.warn(
+    "[Banners] NEXT_PUBLIC_STORAGE_BUCKET not set — using fallback 'marketplace_assets'",
+  );
+}
 
 // 2. Form Schema
 const bannerSchema = z.object({
@@ -184,24 +189,7 @@ export default function BannerManagement() {
 
     if (result.isConfirmed) {
       try {
-        const session = await getSession();
-        const token = (session as any)?.accessToken;
-
-        if (!token) throw new Error("Authentication required");
-
-        const res = await fetch(
-          `${BACKEND_URL}/super-admin/banners/${id}`,
-          {
-            method: "DELETE",
-            headers: { Authorization: `Bearer ${token}` },
-          },
-        );
-
-        if (!res.ok) {
-          const error = await res.json();
-          throw new Error(error.message || "Delete failed");
-        }
-
+        await fetcher(`/super-admin/banners/${id}`, { method: "DELETE" });
         toast.success("Banner deleted");
         refreshBanners();
       } catch (err: any) {

@@ -242,10 +242,11 @@ export class DisputesService {
     status?: string;
     priority?: string;
     search?: string;
+    category?: string;
     userId?: string;
     role?: string;
   }) {
-    const { skip, take, status, priority, search, userId, role } = params;
+    const { skip, take, status, priority, search, category, userId, role } = params;
 
     const skipInt = skip ? Number(skip) : 0;
     const takeInt = take ? Number(take) : 10;
@@ -271,6 +272,20 @@ export class DisputesService {
 
     if (!isAdmin && userId) {
       whereClause.openedByUserId = userId;
+    }
+
+    if (category && category !== 'All') {
+      if (category === 'Order') {
+        whereClause.orderId = { not: null };
+      } else if (category === 'Ride') {
+        whereClause.rideId = { not: null };
+      } else if (category === 'Delivery') {
+        whereClause.deliveryId = { not: null };
+      } else if (category === 'General') {
+        whereClause.orderId = null;
+        whereClause.rideId = null;
+        whereClause.deliveryId = null;
+      }
     }
 
     if (search) {

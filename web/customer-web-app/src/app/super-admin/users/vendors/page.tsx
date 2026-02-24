@@ -26,7 +26,6 @@ import {
 } from "@tanstack/react-table";
 import Swal from "sweetalert2";
 import useSWR from "swr";
-import { getSession } from "next-auth/react";
 import { fetcher } from "../../hooks/useSuperAdminFetch";
 import VendorManagementPageSkeleton from "./component/skeleton";
 import AddVendorModal from "./component/addvendorModal";
@@ -57,6 +56,13 @@ interface VendorsApiResponse {
   };
 }
 
+interface VendorStats {
+  total: number;
+  pending: number;
+  active: number;
+  rejected: number;
+}
+
 function useDebounce<T>(value: T, delay: number): T {
   const [debouncedValue, setDebouncedValue] = useState(value);
   useEffect(() => {
@@ -70,9 +76,8 @@ const columnHelper = createColumnHelper<Vendor>();
 
 export default function VendorManagementPage() {
   const router = useRouter();
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
-  const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({});
+  const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({});;
   const [showFilters, setShowFilters] = useState(false);
   const [isProcessingBulk, setIsProcessingBulk] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -92,15 +97,6 @@ export default function VendorManagementPage() {
   useEffect(() => {
     setPagination((prev) => ({ ...prev, pageIndex: 0 }));
   }, [debouncedSearch, statusFilter, categoryFilter, verificationFilter]);
-
-  const getAuthHeader = async () => {
-    const session = await getSession();
-    const token = (session as any)?.accessToken;
-    return {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token || ""}`,
-    };
-  };
 
   const queryString = useMemo(() => {
     const params = new URLSearchParams({
@@ -151,28 +147,11 @@ export default function VendorManagementPage() {
     totalPages: 0,
   };
 
-  const { data: statsResponse } = useSWR<VendorsApiResponse>(
-    `/super-admin/vendors?limit=1000`,
+  const { data: stats } = useSWR<VendorStats>(
+    `/super-admin/vendors/stats`,
     fetcher,
     { revalidateOnFocus: false },
   );
-
-  // ✅ FIX: Filter 'SUSPENDED' from stats to ensure counts are accurate
-  const stats = useMemo(() => {
-    const rawVendors = statsResponse?.data || [];
-    const allVendors = rawVendors.filter(
-      (v) => v.status !== "SUSPENDED" && !v.slug?.includes("-deleted-"),
-    );
-
-    return {
-      total: allVendors.length,
-      pending: allVendors.filter((v) => v.verification === "PENDING").length,
-      active: allVendors.filter((v) => v.status === "ACTIVE").length,
-      rejected: allVendors.filter(
-        (v) => v.status === "REJECTED" || v.status === "DISABLED",
-      ).length,
-    };
-  }, [statsResponse]);
 
   const handleClearFilters = () => {
     setSearchQuery("");
@@ -208,14 +187,7 @@ export default function VendorManagementPage() {
 
     if (result.isConfirmed) {
       try {
-        const headers = await getAuthHeader();
-        const res = await fetch(`${API_URL}/super-admin/vendors/${id}`, {
-          method: "DELETE",
-          headers,
-        });
-
-        if (!res.ok) throw new Error("Failed");
-
+        await fetcher(`/super-admin/vendors/${id}`, { method: "DELETE" });
         mutate();
         Swal.fire({
           title: "Deleted!",
@@ -253,23 +225,18 @@ export default function VendorManagementPage() {
     if (result.isConfirmed) {
       setIsProcessingBulk(true);
       try {
-        const headers = await getAuthHeader();
         const requests = selectedIds.map((id) => {
-          const url = `${API_URL}/super-admin/vendors/${id}`;
+          const path = `/super-admin/vendors/${id}`;
           if (action === "approve") {
-            return fetch(url, {
+            return fetcher(path, {
               method: "PATCH",
-              headers,
               body: JSON.stringify({
                 status: "ACTIVE",
                 verification: "VERIFIED",
               }),
             });
           } else {
-            return fetch(url, {
-              method: "DELETE",
-              headers,
-            });
+            return fetcher(path, { method: "DELETE" });
           }
         });
 
@@ -312,11 +279,9 @@ export default function VendorManagementPage() {
 
   const handleExport = async () => {
     try {
-      const headers = await getAuthHeader();
-      const res = await fetch(`${API_URL}/super-admin/vendors?limit=10000`, {
-        headers,
-      });
-      const allData: VendorsApiResponse = await res.json();
+      const allData: VendorsApiResponse = await fetcher(
+        `/super-admin/vendors?limit=10000`,
+      );
 
       const csv = [
         [
@@ -543,7 +508,7 @@ export default function VendorManagementPage() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 cursor-pointer">
             <StatCard
               title="Total Vendors"
-              count={stats.total}
+              count={stats?.total ?? 0}
               color="text-white"
               onClick={() => handleQuickFilter("ALL")}
               active={
@@ -552,7 +517,7 @@ export default function VendorManagementPage() {
             />
             <StatCard
               title="Pending Review"
-              count={stats.pending}
+              count={stats?.pending ?? 0}
               color="text-yellow-500"
               icon={<AlertCircle className="w-4 h-4 text-yellow-500" />}
               onClick={() => handleQuickFilter("PENDING")}
@@ -560,7 +525,7 @@ export default function VendorManagementPage() {
             />
             <StatCard
               title="Active & Verified"
-              count={stats.active}
+              count={stats?.active ?? 0}
               color="text-green-500"
               icon={<CheckCircle className="w-4 h-4 text-green-500" />}
               onClick={() => handleQuickFilter("ACTIVE")}
@@ -568,7 +533,7 @@ export default function VendorManagementPage() {
             />
             <StatCard
               title="Suspended/Rejected"
-              count={stats.rejected}
+              count={stats?.rejected ?? 0}
               color="text-red-500"
               onClick={() => handleQuickFilter("REJECTED")}
               active={statusFilter === "REJECTED"}

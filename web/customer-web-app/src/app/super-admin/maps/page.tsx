@@ -289,6 +289,7 @@ export default function LiveMapPage() {
   const {
     data: users,
     isLoading,
+    error,
     mutate,
     isValidating,
   } = useSWR<LiveMapUser[]>("/super-admin/maps/live", fetcher, {
@@ -392,6 +393,14 @@ export default function LiveMapPage() {
           </button>
         </div>
       </div>
+
+      {/* Error banner */}
+      {error && !isLoading && (
+        <div className="shrink-0 flex items-center gap-2 px-5 py-2 bg-red-500/10 border-b border-red-500/30 text-red-400 text-xs font-bold">
+          <WifiOff className="w-4 h-4 shrink-0" />
+          Failed to load fleet data — showing last known positions. Auto-retrying…
+        </div>
+      )}
 
       {/* Body: sidebar + map */}
       <div className="flex flex-1 overflow-hidden">

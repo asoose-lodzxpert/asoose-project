@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import useSWR from "swr";
 import {
@@ -116,7 +116,13 @@ export default function DeliveriesPage() {
   // Filter State
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchTerm), 500);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
   const [dateRange, setDateRange] = useState({ from: "", to: "" });
 
   // ===========================================================================
@@ -130,13 +136,13 @@ export default function DeliveriesPage() {
       limit: pagination.pageSize.toString(),
     });
 
-    if (searchTerm) params.append("search", searchTerm);
+    if (debouncedSearch) params.append("search", debouncedSearch);
     if (statusFilter !== "All") params.append("status", statusFilter);
     if (dateRange.from) params.append("from", dateRange.from);
     if (dateRange.to) params.append("to", dateRange.to);
 
     return params.toString();
-  }, [pagination, searchTerm, statusFilter, dateRange]);
+  }, [pagination, debouncedSearch, statusFilter, dateRange]);
 
   const {
     data: apiResponse,
@@ -184,9 +190,13 @@ export default function DeliveriesPage() {
   // ✅ FIX: Updated signature to allow undefined eta and added safety check
   const isLate = (eta: string | undefined, status: string) => {
     if (status === "Delivered" || status === "Cancelled") return false;
-    // Safety check: if eta is missing, we can't check 'includes'
     if (!eta) return false;
-    return eta.includes("Late") || Math.random() > 0.8;
+    // Check the backend-supplied eta string for an explicit "Late" marker
+    if (eta.includes("Late")) return true;
+    // Parse ISO dates: if the backend provides an ISO timestamp, compare to now
+    const etaDate = new Date(eta);
+    if (!isNaN(etaDate.getTime())) return etaDate < new Date();
+    return false;
   };
 
   const getStatusColor = (status: string) => {

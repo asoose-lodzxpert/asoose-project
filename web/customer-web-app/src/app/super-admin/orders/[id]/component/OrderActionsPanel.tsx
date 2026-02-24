@@ -1,19 +1,21 @@
 "use client";
 
 import React from "react";
-import { AlertTriangle, XCircle, CheckCircle, RefreshCcw } from "lucide-react";
+import { AlertTriangle, XCircle, CheckCircle, RefreshCcw, Lock } from "lucide-react";
 import Swal from "sweetalert2";
 import { fetcher } from "@/app/super-admin/hooks/useSuperAdminFetch";
 interface OrderActionsPanelProps {
   orderId: string;
   currentStatus: string;
   onUpdate: () => void; // Function to refresh page data
+  isSuperAdmin?: boolean;
 }
 
 export default function OrderActionsPanel({
   orderId,
   currentStatus,
   onUpdate,
+  isSuperAdmin = false,
 }: OrderActionsPanelProps) {
   const handleOverride = async (newStatus: string) => {
     // 1. Force the Admin to give a reason
@@ -70,7 +72,13 @@ export default function OrderActionsPanel({
         <h3 className="font-bold">Operational Overrides (Danger Zone)</h3>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+      {!isSuperAdmin ? (
+        <div className="flex items-center gap-3 py-4 px-3 bg-gray-800/40 border border-gray-700 rounded-lg text-gray-500">
+          <Lock className="w-5 h-5 shrink-0" />
+          <p className="text-sm">Override actions are restricted to Super Admins only.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         {/* Force Cancel */}
         {currentStatus !== "CANCELLED" && (
           <button
@@ -99,6 +107,7 @@ export default function OrderActionsPanel({
           <RefreshCcw className="w-4 h-4" /> Reset to Pending
         </button>
       </div>
+      )}
 
       <p className="text-xs text-gray-500 mt-3 text-center">
         * All actions are recorded in the system audit log.

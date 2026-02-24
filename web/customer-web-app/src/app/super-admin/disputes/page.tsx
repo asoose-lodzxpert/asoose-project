@@ -53,10 +53,11 @@ export default function DisputesPage() {
 
     if (statusFilter !== "All") params.append("status", statusFilter);
     if (priorityFilter !== "All") params.append("priority", priorityFilter);
+    if (categoryFilter !== "All") params.append("category", categoryFilter);
     if (searchTerm) params.append("search", searchTerm);
 
     return params.toString();
-  }, [pagination, statusFilter, priorityFilter, searchTerm]);
+  }, [pagination, statusFilter, priorityFilter, categoryFilter, searchTerm]);
 
   // 3. Fetch Disputes List
   const {
@@ -111,12 +112,6 @@ export default function DisputesPage() {
       };
     });
   }, [disputesData]);
-
-  const filteredDisputes = useMemo(() => {
-    return mappedDisputes.filter(
-      (d) => categoryFilter === "All" || d.category === categoryFilter,
-    );
-  }, [categoryFilter, mappedDisputes]);
 
   const total = disputesData?.total || 0;
   const isLoading = statsLoading || disputesLoading;
@@ -218,7 +213,7 @@ export default function DisputesPage() {
         />
         
         <div className="bg-[#1E293B] border border-gray-800 rounded-xl overflow-hidden min-h-[400px]">
-          {filteredDisputes.length === 0 && !isLoading ? (
+          {mappedDisputes.length === 0 && !isLoading ? (
             <div className="flex flex-col items-center justify-center h-[400px] text-center p-6">
               <div className="bg-gray-800 p-4 rounded-full mb-4">
                 <FileText className="w-8 h-8 text-gray-500" />
@@ -248,7 +243,7 @@ export default function DisputesPage() {
               </div>
 
               <DataTable
-                data={filteredDisputes}
+                data={mappedDisputes}
                 columns={disputeColumns}
                 rowSelection={rowSelection}
                 onRowSelectionChange={setRowSelection}

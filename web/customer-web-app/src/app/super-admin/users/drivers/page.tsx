@@ -294,9 +294,48 @@ export default function DriversPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-[#0F172A] p-6 flex items-center justify-center">
-        <div className="text-gray-500 text-sm animate-pulse">
-          Loading drivers...
+      <div className="min-h-screen bg-[#0F172A] p-4 md:p-6 pb-20 animate-pulse">
+        <div className="max-w-7xl mx-auto space-y-6">
+          {/* Header skeleton */}
+          <div className="flex justify-between items-center">
+            <div className="space-y-2">
+              <div className="h-7 w-48 bg-gray-800 rounded" />
+              <div className="h-4 w-72 bg-gray-800 rounded" />
+            </div>
+            <div className="h-9 w-28 bg-gray-800 rounded-lg" />
+          </div>
+          {/* Stats skeleton */}
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="bg-[#1E293B] border border-gray-800 rounded-xl p-4 space-y-3">
+                <div className="h-4 w-24 bg-gray-700 rounded" />
+                <div className="h-8 w-16 bg-gray-700 rounded" />
+              </div>
+            ))}
+          </div>
+          {/* Filters skeleton */}
+          <div className="bg-[#1E293B] border border-gray-800 rounded-xl p-4 flex gap-3">
+            <div className="flex-1 h-10 bg-gray-700 rounded-lg" />
+            <div className="h-10 w-32 bg-gray-700 rounded-lg" />
+            <div className="h-10 w-32 bg-gray-700 rounded-lg" />
+          </div>
+          {/* Table skeleton */}
+          <div className="bg-[#1E293B] border border-gray-800 rounded-xl overflow-hidden">
+            <div className="h-12 bg-gray-700/50 border-b border-gray-800" />
+            {[...Array(8)].map((_, i) => (
+              <div key={i} className="flex items-center gap-4 p-4 border-b border-gray-800">
+                <div className="h-8 w-8 rounded-full bg-gray-700" />
+                <div className="flex-1 space-y-1.5">
+                  <div className="h-3 w-36 bg-gray-700 rounded" />
+                  <div className="h-3 w-24 bg-gray-700 rounded" />
+                </div>
+                <div className="h-6 w-16 bg-gray-700 rounded-full" />
+                <div className="h-6 w-20 bg-gray-700 rounded-full" />
+                <div className="hidden md:block h-3 w-24 bg-gray-700 rounded" />
+                <div className="h-8 w-20 bg-gray-700 rounded-lg" />
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     );

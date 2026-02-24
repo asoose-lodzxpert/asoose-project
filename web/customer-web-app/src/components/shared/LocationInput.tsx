@@ -103,6 +103,10 @@ export function LocationInput({
     setGeoError(null);
     justSelectedRef.current = true;
 
+    // Hoist coordinates so they remain accessible in the catch block
+    // even when reverseGeocode itself throws.
+    let resolvedCoords: { lat: number; lng: number } | null = null;
+
     try {
       const coords = await requestGeolocation();
       try {
@@ -120,6 +124,8 @@ export function LocationInput({
       }
 
       const { lat, lng } = coords;
+      resolvedCoords = { lat, lng };
+
       const result = await reverseGeocode(lat, lng);
       onValueChange(result.address);
       setSuggestions([]);
@@ -128,12 +134,26 @@ export function LocationInput({
       toast.success("Location detected successfully");
     } catch (error: any) {
       const msg = formatGeolocationError(error);
-      setGeoError(msg);
-      toast.error(msg);
       console.warn(
         "Geolocation error (handled):",
         error?.code || error?.message || error,
       );
+
+      if (resolvedCoords) {
+        // GPS succeeded but address lookup failed — still save the coordinates
+        // with a coordinate-based fallback label so the field is usable.
+        const fallbackAddress = `${resolvedCoords.lat.toFixed(5)}, ${resolvedCoords.lng.toFixed(5)}`;
+        onValueChange(fallbackAddress);
+        setSuggestions([]);
+        setShowDropdown(false);
+        onLocationSelect(resolvedCoords, fallbackAddress);
+        setGeoError("Address lookup failed — coordinates saved. You may type an address to refine.");
+        toast.info("Location pinned. Address lookup unavailable — you can type your address instead.");
+      } else {
+        // GPS itself failed — no coordinates to fall back on
+        setGeoError(msg);
+        toast.error(msg);
+      }
     } finally {
       setIsGeolocating(false);
       setTimeout(() => {

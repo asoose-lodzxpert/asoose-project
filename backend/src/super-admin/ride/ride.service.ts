@@ -506,6 +506,78 @@ export class RidesService {
     return { success: true, message: 'Driver assigned successfully' };
   }
 
+  // 🔄 Retry Matching — clears rider, returns ride to SEARCHING so the matching engine tries again
+  async retryMatching(rideId: string, adminId: string) {
+    const ride = await this.prisma.ride.findUnique({ where: { id: rideId } });
+    if (!ride) throw new NotFoundException(`Ride #${rideId} not found`);
+
+    if (['COMPLETED', 'CANCELLED', 'EXPIRED'].includes(ride.status)) {
+      throw new BadRequestException(
+        `Cannot retry matching for a ${ride.status} ride.`,
+      );
+    }
+
+    await this.prisma.ride.update({
+      where: { id: rideId },
+      data: {
+        riderId: null,
+        status: 'SEARCHING',
+        acceptedAt: null,
+      },
+    });
+
+    await this.prisma.activityLog.create({
+      data: {
+        userId: adminId,
+        action: 'RIDE_RETRY_MATCHING',
+        target: rideId,
+        details: 'Admin triggered retry matching — ride returned to SEARCHING',
+        metadata: { previousStatus: ride.status, previousRiderId: ride.riderId },
+      },
+    });
+
+    return { success: true, message: 'Ride returned to matching queue' };
+  }
+
+  // ❌ Unassign Driver — removes current driver and returns ride to SEARCHING
+  async unassignDriver(rideId: string, adminId: string) {
+    const ride = await this.prisma.ride.findUnique({ where: { id: rideId } });
+    if (!ride) throw new NotFoundException(`Ride #${rideId} not found`);
+
+    if (!ride.riderId) {
+      throw new BadRequestException('Ride has no assigned driver to unassign.');
+    }
+
+    if (['COMPLETED', 'CANCELLED', 'IN_PROGRESS'].includes(ride.status)) {
+      throw new BadRequestException(
+        `Cannot unassign driver from a ${ride.status} ride.`,
+      );
+    }
+
+    const previousRiderId = ride.riderId;
+
+    await this.prisma.ride.update({
+      where: { id: rideId },
+      data: {
+        riderId: null,
+        status: 'SEARCHING',
+        acceptedAt: null,
+      },
+    });
+
+    await this.prisma.activityLog.create({
+      data: {
+        userId: adminId,
+        action: 'DRIVER_UNASSIGNED',
+        target: rideId,
+        details: `Admin unassigned driver ${previousRiderId} — ride returned to SEARCHING`,
+        metadata: { previousRiderId, previousStatus: ride.status },
+      },
+    });
+
+    return { success: true, message: 'Driver unassigned. Ride returned to queue.' };
+  }
+
   async forceStatus(
     rideId: string,
     newStatus: string,

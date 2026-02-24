@@ -47,6 +47,26 @@ export class StoresService {
     });
   }
 
+  /** Returns aggregate stats for the vendors dashboard (excludes SUSPENDED/soft-deleted). */
+  async getStats() {
+    const [total, pending, active, closed] = await Promise.all([
+      this.prisma.store.count({
+        where: { status: { not: StoreStatus.SUSPENDED }, slug: { not: { contains: '-deleted-' } } },
+      }),
+      this.prisma.store.count({
+        where: { status: { not: StoreStatus.SUSPENDED }, verification: VerificationStatus.PENDING, slug: { not: { contains: '-deleted-' } } },
+      }),
+      this.prisma.store.count({
+        where: { status: StoreStatus.ACTIVE, slug: { not: { contains: '-deleted-' } } },
+      }),
+      this.prisma.store.count({
+        where: { status: StoreStatus.CLOSED_PERMANENTLY, slug: { not: { contains: '-deleted-' } } },
+      }),
+    ]);
+
+    return { total, pending, active, rejected: closed };
+  }
+
   async findAll(query: VendorQueryDto) {
     const {
       search,

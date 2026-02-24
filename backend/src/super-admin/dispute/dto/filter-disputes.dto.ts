@@ -23,4 +23,8 @@ export class FilterDisputesDto {
   @IsOptional()
   @IsString()
   priority?: string;
+
+  @IsOptional()
+  @IsString()
+  category?: string;
 }

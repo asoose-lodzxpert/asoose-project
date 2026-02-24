@@ -50,6 +50,11 @@ export class VendorsController {
     return this.storesService.findAll(query);
   }
 
+  @Get('stats')
+  async getStats() {
+    return this.storesService.getStats();
+  }
+
   @Get(':id')
   async getStore(@Param('id') id: string) {
     return this.storesService.findOne(id);

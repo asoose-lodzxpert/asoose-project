@@ -3,6 +3,7 @@
 import React from "react";
 import useSWR from "swr";
 import { fetcher } from "../hooks/useSuperAdminFetch"; // ← adjust path if needed
+import Swal from "sweetalert2";
 import {
   Eye,
   Check,
@@ -566,6 +567,21 @@ export default function PayoutsManagement() {
   };
 
   const handleApprove = async (p: Payout) => {
+    const confirm = await Swal.fire({
+      title: "Approve Payout?",
+      text: `Approve ${p.payoutType.toLowerCase()} payout of ₦${p.amount.toLocaleString()} for ${p.payoutType === "VENDOR" ? (p as any).vendor?.name ?? "vendor" : (p as any).rider?.name ?? "rider"}?`,
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonColor: "#22c55e",
+      cancelButtonColor: "#1E293B",
+      confirmButtonText: "Yes, Approve",
+      background: "#0F172A",
+      color: "#fff",
+      customClass: { popup: "rounded-xl border border-gray-800" },
+    });
+
+    if (!confirm.isConfirmed) return;
+
     const key = `${p.id}-approve`;
     setLoadingIds((prev) => ({ ...prev, [key]: true }));
 

@@ -55,9 +55,14 @@ export default function AdminLayoutClient({
 
   const role = userRole as AdminRole;
 
-  // 1. Fetch unread count from the dedicated lightweight endpoint
+  // 1. Fetch unread count — backend restricts this endpoint to SUPER_ADMIN and ADMIN only.
+  // Passing null as the key disables SWR for other roles (no 403 storms).
+  const notifCountKey =
+    role === "SUPER_ADMIN" || role === "ADMIN"
+      ? "/super-admin/notifications/unread-count"
+      : null;
   const { data: unreadData } = useSWR<{ count: number }>(
-    "/super-admin/notifications/unread-count",
+    notifCountKey,
     fetcher,
     {
       refreshInterval: 30000,
