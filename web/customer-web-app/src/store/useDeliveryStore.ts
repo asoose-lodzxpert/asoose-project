@@ -26,6 +26,8 @@ interface PackageInfo {
   instructions: string;
   recipientName: string;
   recipientPhone: string;
+  senderName: string;
+  senderPhone: string;
   pickupAddress: string;
   destinationAddress: string;
 
@@ -71,6 +73,8 @@ const initialPackageInfo: PackageInfo = {
   instructions: '',
   recipientName: '',
   recipientPhone: '',
+  senderName: '',
+  senderPhone: '',
   pickupAddress: '',
   destinationAddress: '',
   

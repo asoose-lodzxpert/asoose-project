@@ -123,6 +123,7 @@ export default function DeliveryPage() {
 
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
   const [phoneError, setPhoneError] = useState<string | null>(null);
+  const [senderPhoneError, setSenderPhoneError] = useState<string | null>(null);
   const [apiError, setApiError] = useState<boolean>(false);
   const { data: session, status } = useSession();
 
@@ -277,6 +278,19 @@ export default function DeliveryPage() {
     [setPackageInfo],
   );
 
+  const handleSenderPhoneChange = useCallback(
+    (value: string) => {
+      setPackageInfo({ senderPhone: value });
+      if (!value) {
+        setSenderPhoneError(null);
+        return;
+      }
+      const validation = validatePhoneNumber(value);
+      setSenderPhoneError(validation.error);
+    },
+    [setPackageInfo],
+  );
+
   // ✅ Updated Logic: Initialize Delivery with Metadata
   const handleInitializeDelivery = async () => {
     const swal = deliverySwal();
@@ -302,6 +316,39 @@ export default function DeliveryPage() {
           <p class="mt-2 text-sm">Start typing an address and choose one of the options that appear — this ensures we get exact coordinates.</p>
         `,
         confirmButtonText: "Set Address",
+      });
+      return;
+    }
+    if (!packageInfo.senderPhone) {
+      await swal.fire({
+        icon: "warning",
+        title: "Your Phone Number Required",
+        html: `
+          <p>Please enter <strong>your phone number</strong> so the courier can contact you at pickup.</p>
+          <p class="mt-2 text-sm">Accepted formats:</p>
+          <ul class="text-sm mt-1 list-disc list-inside">
+            <li><strong>08012345678</strong> (local format)</li>
+            <li><strong>+2348012345678</strong> (international format)</li>
+          </ul>
+        `,
+        confirmButtonText: "Enter Phone",
+      });
+      return;
+    }
+    if (senderPhoneError) {
+      await swal.fire({
+        icon: "error",
+        title: "Invalid Sender Phone Number",
+        html: `
+          <p>Your phone number is <strong>not a valid Nigerian number</strong>.</p>
+          <p class="mt-2 text-sm">Accepted formats:</p>
+          <ul class="text-sm mt-1 list-disc list-inside">
+            <li><strong>080, 081, 090, 091, 070, 071</strong> prefixes — 11 digits total</li>
+            <li>e.g. <strong>08012345678</strong> or <strong>+2348012345678</strong></li>
+          </ul>
+          <p class="mt-2 text-xs" style="color:#ef4444">${senderPhoneError}</p>
+        `,
+        confirmButtonText: "Fix Number",
       });
       return;
     }
@@ -399,6 +446,10 @@ export default function DeliveryPage() {
           dropoffAddressId: dropoffRes.id,
           recipientName: sanitizeInput(packageInfo.recipientName),
           recipientPhone: normalizePhoneNumber(packageInfo.recipientPhone),
+          senderName: packageInfo.senderName.trim() || undefined,
+          senderPhone: packageInfo.senderPhone
+            ? normalizePhoneNumber(packageInfo.senderPhone)
+            : undefined,
           // Avoid a trailing dash ("Document - ") when instructions are empty.
           packageDetails: sanitizeInput(
             packageInfo.instructions
@@ -721,6 +772,32 @@ export default function DeliveryPage() {
               </section>
 
               <section>
+                <h3 className="text-lg font-semibold mb-1 dark:text-white">
+                  Sender Information
+                </h3>
+                <p className="text-xs text-zinc-400 mb-4">
+                  Your details — the courier will contact you at pickup.
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <DetailInput
+                    label="Your Name (optional)"
+                    icon={User}
+                    placeholder="Your full name"
+                    value={packageInfo.senderName}
+                    onChange={(v) => setPackageInfo({ senderName: v })}
+                  />
+                  <DetailInput
+                    label="Your Phone Number"
+                    icon={Phone}
+                    placeholder="08012345678"
+                    value={packageInfo.senderPhone}
+                    onChange={handleSenderPhoneChange}
+                    error={senderPhoneError}
+                  />
+                </div>
+              </section>
+
+              <section>
                 <h3 className="text-lg font-semibold mb-4 dark:text-white">
                   Recipient Information
                 </h3>
@@ -733,7 +810,7 @@ export default function DeliveryPage() {
                     onChange={(v) => setPackageInfo({ recipientName: v })}
                   />
                   <DetailInput
-                    label="Contact Number"
+                    label="Recipient Phone Number"
                     icon={Phone}
                     placeholder="08012345678"
                     value={packageInfo.recipientPhone}

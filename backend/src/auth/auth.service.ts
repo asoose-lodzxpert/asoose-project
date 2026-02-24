@@ -188,32 +188,57 @@ export class AuthService {
         });
 
         if (existingEmailUser) {
-          // Email exists but no googleId - this is a password-based account
-          // Don't auto-link for security - require email verification first
-          throw new ConflictException(
-            'An account with this email already exists. Please sign in with your password or reset it.',
+          // Auto-link: Google has already verified ownership of this email address,
+          // so it is safe to link the Google ID to the existing account.
+          // This prevents the "Access Denied" wall for users who signed up with
+          // email/password and then try "Continue with Google" using the same address.
+          if (existingEmailUser.status === 'SUSPENDED') {
+            throw new UnauthorizedException('Account is suspended');
+          }
+          if (existingEmailUser.status === 'BANNED') {
+            throw new UnauthorizedException('Account is banned');
+          }
+
+          user = await this.prisma.user.update({
+            where: { id: existingEmailUser.id },
+            data: {
+              googleId: dto.googleId,
+              // Fill profile picture only if not already set
+              image: existingEmailUser.image || dto.profilePicture || undefined,
+            },
+          });
+          this.logger.log(
+            `Auto-linked Google ID to existing account: ${dto.email}`,
           );
+        } else {
+          // Create new user with Google auth
+          const fullName =
+            [dto.firstName, dto.lastName].filter(Boolean).join(' ').trim() ||
+            dto.email.split('@')[0];
+
+          user = await this.prisma.user.create({
+            data: {
+              email: dto.email,
+              googleId: dto.googleId,
+              password: '', // Empty password for OAuth-only users
+              name: fullName,
+              image: dto.profilePicture,
+              role: 'CUSTOMER',
+              verificationStatus: 'VERIFIED', // OAuth users are pre-verified
+              status: 'ACTIVE',
+            },
+          });
+        }
+      } else {
+        // User found by googleId — enforce status before issuing tokens
+        if (user.status === 'SUSPENDED') {
+          throw new UnauthorizedException('Account is suspended');
+        }
+        if (user.status === 'BANNED') {
+          throw new UnauthorizedException('Account is banned');
         }
 
-        // Create new user with Google auth
-        const fullName =
-          [dto.firstName, dto.lastName].filter(Boolean).join(' ').trim() ||
-          dto.email.split('@')[0];
-
-        user = await this.prisma.user.create({
-          data: {
-            email: dto.email,
-            googleId: dto.googleId,
-            password: '', // Empty password for OAuth-only users
-            name: fullName,
-            image: dto.profilePicture,
-            role: 'CUSTOMER',
-            verificationStatus: 'VERIFIED', // OAuth users are pre-verified
-            status: 'ACTIVE',
-          },
-        });
-      } else {
-        // User found by googleId - update profile picture if needed
+        // Update profile picture if not already set
         if (!user.image && dto.profilePicture) {
           user = await this.prisma.user.update({
             where: { id: user.id },
@@ -251,10 +276,14 @@ export class AuthService {
         },
       };
     } catch (error) {
-      if (error instanceof ConflictException) {
+      if (
+        error instanceof ConflictException ||
+        error instanceof UnauthorizedException
+      ) {
         throw error;
       }
-      throw new ConflictException('OAuth authentication failed');
+      this.logger.error('Google OAuth error', error);
+      throw new InternalServerErrorException('OAuth authentication failed');
     }
   }
 

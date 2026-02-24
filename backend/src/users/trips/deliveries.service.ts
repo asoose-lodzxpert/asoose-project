@@ -271,6 +271,10 @@ export class DeliveriesService {
             distanceKm: this.common.round(distanceKm),
             recipientName: this.common.sanitizeText(dto.recipientName),
             recipientPhone: dto.recipientPhone,
+            senderName: dto.senderName
+              ? this.common.sanitizeText(dto.senderName)
+              : undefined,
+            senderPhone: dto.senderPhone ?? undefined,
             packageDetails: this.common.sanitizeText(dto.packageDetails),
             deliveryOtp,
 

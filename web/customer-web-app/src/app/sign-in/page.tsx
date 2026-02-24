@@ -1,12 +1,33 @@
 "use client";
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 
-const SignIn = () => {
+/** Maps NextAuth error codes (and our custom ones) to user-facing messages. */
+const OAUTH_ERROR_MESSAGES: Record<string, string> = {
+  AccessDenied:
+    "Google sign-in was denied. If you previously signed up with email and password, please use that to sign in.",
+  OAuthEmailConflict:
+    "This Google account's email is already registered. Please sign in with your email and password.",
+  AccountSuspended:
+    "Your account has been suspended. Please contact support.",
+  OAuthFailed:
+    "Google sign-in failed. Please try again or use email and password.",
+  OAuthCallback:
+    "There was a problem completing Google sign-in. Please try again.",
+  OAuthSignin:
+    "Could not start Google sign-in. Please try again.",
+  Callback:
+    "An error occurred during sign-in. Please try again.",
+  Verification:
+    "Could not verify your sign-in. Please try again.",
+};
+
+function SignInForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
@@ -14,6 +35,13 @@ const SignIn = () => {
     email: "",
     password: "",
   });
+
+  // Read the ?error= query param that NextAuth appends on OAuth failure
+  const oauthError = searchParams.get("error");
+  const oauthErrorMessage = oauthError
+    ? OAUTH_ERROR_MESSAGES[oauthError] ??
+      "An unexpected sign-in error occurred. Please try again."
+    : null;
 
   const handleLogin = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -90,6 +118,14 @@ const SignIn = () => {
         </div>
 
         <div className="space-y-4">
+          {/* OAuth error from URL (e.g. ?error=AccessDenied) */}
+          {oauthErrorMessage && (
+            <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg dark:bg-red-900/10 dark:text-red-400 dark:border-red-900/20">
+              {oauthErrorMessage}
+            </div>
+          )}
+
+          {/* Credentials error from form submission */}
           {error && (
             <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg dark:bg-red-900/10 dark:text-red-400 dark:border-red-900/20">
               {error}
@@ -218,6 +254,16 @@ const SignIn = () => {
       </div>
     </div>
   );
-};
+}
+
+/**
+ * Wrap in Suspense so that useSearchParams() works correctly in Next.js 14
+ * without opting the entire route out of static generation.
+ */
+const SignIn = () => (
+  <Suspense fallback={null}>
+    <SignInForm />
+  </Suspense>
+);
 
 export default SignIn;

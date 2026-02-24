@@ -86,7 +86,8 @@ export class DeliveryService {
     recipientPhone: string;
     packageDetails: string;
     weightKg: number;
-    // ✅ FIX: Added optional fields to match usage in DeliveryPage
+    senderName?: string;
+    senderPhone?: string;
     declaredValue?: number;
     fragile?: boolean;
     perishable?: boolean;
