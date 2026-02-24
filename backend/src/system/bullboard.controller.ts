@@ -1,4 +1,4 @@
-import { Controller, Get, Req, Res } from '@nestjs/common';
+import { Controller, Get, Logger, Req, Res, UseGuards } from '@nestjs/common';
 import { createBullBoard } from '@bull-board/api';
 import { ExpressAdapter } from '@bull-board/express';
 import { BullMQAdapter } from '@bull-board/api/bullMQAdapter';
@@ -7,13 +7,20 @@ import { Queue } from 'bullmq';
 import type { Request, Response } from 'express';
 
 import { QUEUE_NAMES } from '../matching/queue/queue.constants';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../auth/roles.guards';
+import { Roles } from '../auth/roles.decorator';
+import { UserRole } from '../common/enums/user-role.enum';
 
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(UserRole.SUPER_ADMIN)
 @Controller({
   path: 'system/queues',
   version: '1',
 })
 export class BullBoardController {
   private static serverAdapter: ExpressAdapter;
+  private readonly logger = new Logger(BullBoardController.name);
 
   constructor(
     @InjectQueue(QUEUE_NAMES.RIDE_MATCHING)
@@ -59,7 +66,7 @@ export class BullBoardController {
       }
       res.status(500).send('Bull Board not initialized');
     } catch (error: any) {
-      console.error('Bull Board error:', error);
+      this.logger.error('Bull Board error', error?.stack);
       res.status(500).send(`Bull Board error: ${error?.message}`);
     }
   }
@@ -73,7 +80,7 @@ export class BullBoardController {
       }
       res.status(500).send('Bull Board not initialized');
     } catch (error: any) {
-      console.error('Bull Board error:', error);
+      this.logger.error('Bull Board error', error?.stack);
       res.status(500).send(`Bull Board error: ${error?.message}`);
     }
   }
@@ -87,7 +94,7 @@ export class BullBoardController {
       }
       res.status(500).send('Bull Board not initialized');
     } catch (error: any) {
-      console.error('Bull Board error:', error);
+      this.logger.error('Bull Board error', error?.stack);
       res.status(500).send(`Bull Board error: ${error?.message}`);
     }
   }

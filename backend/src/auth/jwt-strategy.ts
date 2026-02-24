@@ -37,6 +37,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
       secretOrKey: jwtSecret,
+      audience: 'asoose-app',
+      issuer: 'asoose-api',
     });
   }
 
@@ -59,11 +61,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         throw new UnauthorizedException('Invalid credentials');
       }
 
-      // It's okay to allow the rider even if status is BANNED or SUSPENDED;
-      // the frontend will inform the rider appropriately.
-      // if (rider.status === 'BANNED' || rider.status === 'SUSPENDED') {
-      //   throw new UnauthorizedException('Invalid credentials');
-      // }
+      if (rider.status === 'BANNED' || rider.status === 'SUSPENDED') {
+        throw new UnauthorizedException('Account has been suspended or banned');
+      }
 
       if (rider.role !== role) {
         throw new UnauthorizedException('Role mismatch');
@@ -89,11 +89,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         throw new UnauthorizedException('Invalid credentials');
       }
 
-      // It's okay to allow the vendor even if status is BANNED or SUSPENDED;
-      // the frontend will inform the vendor appropriately.
-      // if (vendor.status === 'BANNED' || vendor.status === 'SUSPENDED') {
-      //   throw new UnauthorizedException('Invalid credentials');
-      // }
+      if (vendor.status === 'BANNED' || vendor.status === 'SUSPENDED') {
+        throw new UnauthorizedException('Account has been suspended or banned');
+      }
 
       return {
         id: vendor.id,

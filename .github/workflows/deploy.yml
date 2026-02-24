@@ -128,7 +128,26 @@ jobs:
             devenochphilip/asoose-backend:latest
             devenochphilip/asoose-backend:${{ github.sha }}
 
-      # 6. Install Railway CLI
+      # 6. Run Prisma migrations before deploying new image
+      # This ensures schema changes are applied before any instance runs the new code.
+      - name: Setup Node.js for migrations
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "yarn"
+
+      - name: Install dependencies for migrations
+        run: yarn install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: yarn workspace backend prisma generate
+
+      - name: Deploy database migrations
+        run: yarn workspace backend prisma migrate deploy
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      # 7. Install Railway CLI
       - name: Install Railway CLI
         run: npm install -g @railway/cli
 

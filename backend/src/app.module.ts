@@ -1,7 +1,8 @@
 import { BullModule } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
+import { appLogger } from './libs/logger/logger';
+import { AppConfigModule } from './config/config.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { MongooseModule } from '@nestjs/mongoose';
 import { ScheduleModule } from '@nestjs/schedule';
@@ -27,11 +28,12 @@ import { SuperAdminModule } from './super-admin/super-admin.module';
 import { UsersModule } from './users/users.module';
 import { VendorModule } from './vendor/vendor.module';
 import { LogsModule } from './logs/logs.module';
+import { FareModule } from './fare/fare.module';
 
 @Module({
   imports: [
     // ---------- Global Config ----------
-    ConfigModule.forRoot({ isGlobal: true }),
+    AppConfigModule,
 
     // ---------- BullMQ / Redis ----------
     BullModule.forRoot({
@@ -62,14 +64,15 @@ import { LogsModule } from './logs/logs.module';
         // connectionFactory goes here (inside useFactory's return), not at async opts level
         connectionFactory: (connection: any) => {
           connection.on('error', (err: Error) => {
-            console.warn(
-              '[MongoDB] Connection error (non-fatal — logs unavailable):',
-              err.message,
+            appLogger.warn(
+              '[MongoDB] Connection error (non-fatal): ' + err.message,
+              { context: 'MongoDB' },
             );
           });
           connection.on('disconnected', () => {
-            console.warn(
+            appLogger.warn(
               '[MongoDB] Disconnected — log writes will be skipped.',
+              { context: 'MongoDB' },
             );
           });
           return connection;
@@ -80,8 +83,8 @@ import { LogsModule } from './logs/logs.module';
     // ---------- Rate Limiting ----------
     ThrottlerModule.forRoot([
       {
-        ttl: 60000,
-        limit: 20,
+        ttl: 60_000,
+        limit: 300, // 300 req/min globally; auth endpoints use stricter @Throttle() overrides
       },
     ]),
 
@@ -103,7 +106,7 @@ import { LogsModule } from './logs/logs.module';
     SuperAdminModule,
     UsersModule,
     VendorModule,
-    require('./fare/fare.module').FareModule,
+    FareModule,
   ],
   controllers: [AppController],
   providers: [

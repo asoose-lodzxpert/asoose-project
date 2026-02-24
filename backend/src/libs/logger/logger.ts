@@ -4,7 +4,7 @@ import * as winston from 'winston';
 const isProd = process.env.NODE_ENV === 'production';
 
 export const appLogger = WinstonModule.createLogger({
-  level: isProd ? 'error' : 'debug',
+  level: isProd ? 'warn' : 'debug',
   format: isProd
     ? winston.format.combine(
         winston.format.timestamp(),

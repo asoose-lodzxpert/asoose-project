@@ -1,8 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
 export class OrderService {
+  private readonly logger = new Logger(OrderService.name);
   constructor(private readonly prisma: PrismaService) {}
 
   async getWalletBalance(riderId: string) {
@@ -200,7 +201,9 @@ export class OrderService {
       }));
     } else {
       // Unknown role, log error and return empty jobs
-      console.error(`Unknown rider role for riderId ${riderId}:`, rider.role);
+      this.logger.error(
+        `Unknown rider role for riderId ${riderId}: ${rider.role}`,
+      );
       jobs = [];
     }
     const total = jobs.length;

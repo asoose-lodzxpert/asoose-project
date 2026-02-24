@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { CreateVendorDto } from './dto/create-vendor.dto';
@@ -29,6 +30,7 @@ export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
+    private readonly configService: ConfigService,
     private readonly otpService: OtpService,
     private readonly emailProducer: EmailProducer,
   ) {}
@@ -334,8 +336,10 @@ export class AuthService {
   // Universal refresh token logic
   async refresh(refreshToken: string) {
     try {
-      // Verify refresh token
-      const payload = this.jwtService.verify(refreshToken);
+      // Verify refresh token using the dedicated refresh secret
+      const payload = this.jwtService.verify(refreshToken, {
+        secret: this.configService.getOrThrow<string>('JWT_REFRESH_SECRET'),
+      });
       // Optionally: check user existence/status
       const user = await this.prisma.user.findUnique({
         where: { id: payload.sub },

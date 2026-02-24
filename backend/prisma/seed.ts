@@ -1,6 +1,6 @@
 import dotenv from 'dotenv';
 import { PrismaClient, UserRole, UserStatus } from '@prisma/client';
-import * as bcrypt from 'bcrypt';
+import * as bcrypt from 'bcryptjs';
 import { seedAdmin } from './admin-seed';
 import { seedBanks } from './08-bank';
 import { seedServiceZones } from './09-service-zones';

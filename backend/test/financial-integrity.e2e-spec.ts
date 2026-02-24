@@ -12,6 +12,11 @@ describe('Financial Integrity & Critical Paths', () => {
   let prisma: PrismaService;
   let ledgerService: TransactionLedgerService;
 
+  // Track created record IDs for guaranteed cleanup
+  const createdRiderIds: string[] = [];
+  const createdUserIds: string[] = [];
+  const createdVendorIds: string[] = [];
+
   beforeAll(async () => {
     const module: TestingModule = await Test.createTestingModule({
       imports: [],
@@ -47,6 +52,7 @@ describe('Financial Integrity & Critical Paths', () => {
     it('should prevent double-spending when multiple withdrawals happen simultaneously', async () => {
       // 1. Setup: Create a rider with correct fields
       const rider = await prisma.rider.create({
+        // tracked for afterAll cleanup
         data: {
           name: 'Race Condition Tester',
           email: `race-${Date.now()}@test.com`,
@@ -66,6 +72,7 @@ describe('Financial Integrity & Critical Paths', () => {
         },
         include: { bankAccount: true },
       });
+      createdRiderIds.push(rider.id);
 
       const withdrawalDto: CreateWithdrawalDto = {
         amount: 5000,
@@ -110,6 +117,7 @@ describe('Financial Integrity & Critical Paths', () => {
       const user = await prisma.user.create({
         data: {
           email: `ledger-test-${Date.now()}@test.com`,
+          // tracked for afterAll cleanup
           name: 'Ledger Tester',
           phone: `+23490${Date.now()}`,
           password: 'hashed_password',
@@ -118,6 +126,7 @@ describe('Financial Integrity & Critical Paths', () => {
           verificationStatus: 'VERIFIED',
         },
       });
+      createdUserIds.push(user.id);
 
       const vendor = await prisma.vendor.create({
         data: {
@@ -142,6 +151,7 @@ describe('Financial Integrity & Critical Paths', () => {
         },
         include: { store: true },
       });
+      createdVendorIds.push(vendor.id);
 
       // Ensure store was created before accessing it
       if (!vendor.store) throw new Error('Store creation failed');
@@ -205,5 +215,28 @@ describe('Financial Integrity & Critical Paths', () => {
         );
       }
     });
+  });
+
+  afterAll(async () => {
+    // Clean up all records created during tests in dependency order
+    await prisma.payment.deleteMany({
+      where: { userId: { in: createdUserIds } },
+    });
+    await prisma.orderItem.deleteMany({
+      where: { order: { userId: { in: createdUserIds } } },
+    });
+    await prisma.order.deleteMany({
+      where: { userId: { in: createdUserIds } },
+    });
+    await prisma.riderPayout.deleteMany({
+      where: { riderId: { in: createdRiderIds } },
+    });
+    await prisma.rider.deleteMany({ where: { id: { in: createdRiderIds } } });
+    await prisma.store.deleteMany({
+      where: { vendorId: { in: createdVendorIds } },
+    });
+    await prisma.vendor.deleteMany({ where: { id: { in: createdVendorIds } } });
+    await prisma.user.deleteMany({ where: { id: { in: createdUserIds } } });
+    await prisma.$disconnect();
   });
 });

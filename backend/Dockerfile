@@ -39,13 +39,19 @@ RUN groupadd -r nodejs && useradd -r -g nodejs -m -d /home/nodejs nodejs
 ENV NPM_CONFIG_CACHE=/home/nodejs/.npm
 ENV NODE_ENV=production
 
-# Copy built backend and Prisma client
+# Copy workspace manifests and lockfile for a clean production-only install.
+# This excludes Jest, ESLint, TypeScript, @types/*, ts-morph and all other devDeps.
+COPY --from=builder /app/package.json /app/yarn.lock ./
+COPY --from=builder /app/packages ./packages
+COPY --from=builder /app/backend/package.json ./backend/package.json
+RUN yarn install --frozen-lockfile --production --ignore-scripts && yarn cache clean
+
+# Copy built backend artifacts
 COPY --from=builder /app/backend/dist ./dist
 COPY --from=builder /app/backend/prisma ./prisma
 COPY --from=builder /app/backend/package.json ./package.json
-COPY --from=builder /app/node_modules ./node_modules
 
-# Regenerate Prisma Client in the runtime container to ensure proper bindings
+# Regenerate Prisma Client in the runtime container to ensure proper binary bindings
 RUN npx prisma generate --schema=./prisma/schema.prisma
 
 # Create uploads directory
@@ -56,10 +62,12 @@ USER nodejs
 
 EXPOSE 3000
 
-# Healthcheck for Docker
+# Healthcheck for Docker — uses liveness probe (always 200 if process is alive).
+# Readiness (/health/ready) is used by the load balancer, not Docker restart logic.
 HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:3000/health', r => process.exit(r.statusCode === 200 ? 0 : 1))"
+  CMD node -e "require('http').get('http://localhost:3000/api/v1/health/live', r => process.exit(r.statusCode === 200 ? 0 : 1))"
 
-# Run migrations and start server
+# Migrations are run as a pre-deploy CI step (see .github/workflows/deploy.yml).
+# The container only starts the server — no migration race on rolling deploys.
 ENTRYPOINT ["dumb-init", "--"]
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/src/main.js"]
+CMD ["node", "dist/src/main.js"]

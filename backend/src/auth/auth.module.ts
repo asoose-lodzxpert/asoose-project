@@ -21,10 +21,12 @@ import { TokenRevocationService } from './token-revocation.service';
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
-        secret:
-          configService.get<string>('JWT_SECRET') ||
-          'your-secret-key-change-in-production',
-        signOptions: { expiresIn: '7d' },
+        secret: configService.getOrThrow<string>('JWT_SECRET'),
+        signOptions: {
+          expiresIn: '7d',
+          audience: 'asoose-app',
+          issuer: 'asoose-api',
+        },
       }),
       inject: [ConfigService],
     }),

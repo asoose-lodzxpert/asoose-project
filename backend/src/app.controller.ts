@@ -1,7 +1,8 @@
-import { Controller, Get, Inject } from '@nestjs/common';
+import { Controller, Get, HttpStatus, Inject, Res } from '@nestjs/common';
 import { AppService } from './app.service';
 import { PrismaService } from './prisma/prisma.service';
 import type { RedisClientType } from 'redis';
+import type { Response } from 'express';
 import { Public } from './auth/decorators/public.decorator';
 
 @Controller({
@@ -20,7 +21,7 @@ export class AppController {
     return this.appService.getHello();
   }
 
-  @Public() // Health checks should generally be public
+  @Public()
   @Get('health')
   async health(): Promise<{
     backend: string;
@@ -55,6 +56,59 @@ export class AppController {
       database: dbStatus,
       redis: redisStatus,
     };
+  }
+
+  /**
+   * Liveness probe — answers: "Is the process alive?"
+   * Always returns 200 as long as the Node.js process is running.
+   * Used by Docker/Railway to decide whether to RESTART the container.
+   */
+  @Public()
+  @Get('health/live')
+  liveness() {
+    return { status: 'ok' };
+  }
+
+  /**
+   * Readiness probe — answers: "Can this instance serve traffic?"
+   * Returns 200 only when DB and Redis are reachable.
+   * Used by load balancers to decide whether to ROUTE traffic here.
+   * A DB hiccup removes this instance from rotation without restarting it.
+   */
+  @Public()
+  @Get('health/ready')
+  async readiness(@Res() res: Response) {
+    let dbStatus = 'ok';
+    let redisStatus = 'ok';
+
+    try {
+      await Promise.race([
+        this.prisma.$queryRaw`SELECT 1`,
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('DB timeout')), 2000),
+        ),
+      ]);
+    } catch (e) {
+      dbStatus = 'error';
+    }
+
+    const redisTestKey = 'health:ready';
+    try {
+      await this.redisClient.set(redisTestKey, '1', { EX: 5 });
+      const value = await this.redisClient.get(redisTestKey);
+      if (value !== '1') redisStatus = 'error';
+    } catch (e) {
+      redisStatus = 'error';
+    }
+
+    const isReady = dbStatus === 'ok' && redisStatus === 'ok';
+    return res
+      .status(isReady ? HttpStatus.OK : HttpStatus.SERVICE_UNAVAILABLE)
+      .json({
+        status: isReady ? 'ok' : 'unavailable',
+        database: dbStatus,
+        redis: redisStatus,
+      });
   }
 
   // ✅ THE FIX: Public access + Consistent Path + Correct Response Key
