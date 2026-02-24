@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useEffect } from "react";
+import Image from "next/image";
 import { X, Minus, Plus, Loader2 } from "lucide-react";
 import { useCartStore } from "@/store/useCartStore";
 import { toast } from "react-toastify";
@@ -45,6 +46,7 @@ export const ProductModal = ({
   onClose,
 }: ProductModalProps) => {
   const [quantity, setQuantity] = useState(1);
+  const [imgError, setImgError] = useState(false);
   const [selectedModifiers, setSelectedModifiers] = useState<
     Record<string, string[]>
   >({});
@@ -59,6 +61,7 @@ export const ProductModal = ({
     if (product) {
       setQuantity(1);
       setSelectedModifiers({});
+      setImgError(false);
     }
   }, [product]);
 
@@ -196,23 +199,35 @@ export const ProductModal = ({
       <div className="relative bg-white dark:bg-[#1a1a1a] w-full max-w-lg max-h-[85vh] rounded-3xl overflow-hidden flex flex-col shadow-2xl animate-in zoom-in-95 duration-200">
         {/* Scrollable Body */}
         <div className="flex-1 overflow-y-auto custom-scrollbar">
-          {/* Header Image */}
-          <div className="relative h-56 bg-gray-100 dark:bg-white/5 group">
+          {/* Header Image - IMPROVED */}
+          <div className="relative h-56 bg-gradient-to-br from-gray-100 to-gray-200 dark:from-slate-800 dark:to-slate-900 overflow-hidden">
             <button
               onClick={onClose}
-              className="absolute top-4 right-4 z-10 w-8 h-8 bg-black/50 text-white rounded-full flex items-center justify-center hover:bg-black/70 transition"
+              className="absolute top-4 right-4 z-10 w-8 h-8 bg-black/50 hover:bg-black/70 text-white rounded-full flex items-center justify-center transition-colors"
+              aria-label="Close modal"
             >
               <X className="w-5 h-5" />
             </button>
-            {product.image ? (
-              <img
+            
+            {product.image?.startsWith('http') && !imgError ? (
+              <Image
                 src={product.image}
                 alt={product.name}
+                width={512}
+                height={224}
                 className="w-full h-full object-cover"
+                placeholder="blur"
+                blurDataURL="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTEyIiBoZWlnaHQ9IjIyNCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZTJlOGYwIi8+PC9zdmc+"
+                onError={() => setImgError(true)}
+                quality={85}
+                priority={false}
               />
             ) : (
-              <div className="w-full h-full flex items-center justify-center text-4xl">
-                🍽️
+              <div className="w-full h-full flex flex-col items-center justify-center gap-2">
+                <span className="text-5xl">🍽️</span>
+                <span className="text-xs text-gray-400 dark:text-gray-500">
+                  {imgError ? "Image unavailable" : "No image"}
+                </span>
               </div>
             )}
           </div>

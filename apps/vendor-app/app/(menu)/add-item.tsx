@@ -193,13 +193,39 @@ export default function AddEditItemScreen() {
 
     setSaving(true);
     try {
+      // Separate already-uploaded (HTTP) images from newly-picked (file://) ones
+      const newImages = images.filter((i) => i.isNew);
+      const existingImages = images.filter((i) => !i.isNew);
+
+      // Upload new images to S3 first and obtain HTTPS URLs
+      let uploadedUrls: string[] = [];
+      if (newImages.length > 0) {
+        setUploadingImages(true);
+        uploadedUrls = await uploadBulk(
+          newImages.map((img, index) => ({
+            uri: img.uri,
+            name:
+              img.uri.split("/").pop() ||
+              `product-${Date.now()}-${index}.jpg`,
+            type: "image/jpeg",
+          })),
+        );
+        setUploadingImages(false);
+      }
+
+      // Combine existing HTTPS URLs with newly-uploaded ones
+      const finalImages = [
+        ...existingImages.map((i) => i.uri),
+        ...uploadedUrls,
+      ];
+
       const payload = {
         name,
         description,
         price: Number(price),
         categoryId,
         stock: Number(stock) || 0,
-        images: images.map((i) => i.uri),
+        images: finalImages,
         modifierGroups: modifierGroups.map((g) => ({
           ...g,
           minSelect: Number(g.minSelect),
@@ -222,6 +248,7 @@ export default function AddEditItemScreen() {
       Toast.show({ type: "error", text1: e.message });
     } finally {
       setSaving(false);
+      setUploadingImages(false);
     }
   };
 
@@ -518,7 +545,7 @@ export default function AddEditItemScreen() {
             onPress={handleSave}
             disabled={saving || uploadingImages}
           >
-            {saving ? (
+            {saving || uploadingImages ? (
               <ActivityIndicator color={textOnPrimary} />
             ) : (
               <ThemedText style={{ color: textOnPrimary, fontWeight: "700" }}>

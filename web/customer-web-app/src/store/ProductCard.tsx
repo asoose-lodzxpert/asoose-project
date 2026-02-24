@@ -135,7 +135,7 @@ export const ProductCard = ({
       className="bg-white dark:bg-[#151515] p-3 rounded-2xl border border-gray-100 dark:border-white/5 shadow-sm flex gap-4 hover:border-yellow-500/30 transition-colors group cursor-pointer"
     >
       <div className="w-24 h-24 sm:w-28 sm:h-28 bg-gray-100 dark:bg-white/5 rounded-xl flex-shrink-0 overflow-hidden relative">
-        {image ? (
+        {image?.startsWith('http') ? (
           <Image
             src={image}
             alt={name}

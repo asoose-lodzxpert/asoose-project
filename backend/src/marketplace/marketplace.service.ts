@@ -297,7 +297,9 @@ export class MarketplaceService {
         id: p.id,
         name: p.name,
         price: p.price,
-        image: p.images[0] || null, // Use first image from array
+        // Return the first valid HTTPS URL — filter out device-local file:// URIs
+        // that may have been stored by older vendor app versions without a proper upload step
+        image: p.images.find((url) => url?.startsWith('http')) ?? null,
         description: p.description,
         category: { name: p.category.name },
         modifierGroups: p.modifierGroups.map((g) => ({
