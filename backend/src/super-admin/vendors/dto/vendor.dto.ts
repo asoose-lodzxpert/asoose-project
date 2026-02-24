@@ -156,6 +156,14 @@ export class ManualOnboardVendorDto {
   address?: string;
 
   @IsOptional()
+  @IsNumber()
+  lat?: number;
+
+  @IsOptional()
+  @IsNumber()
+  lng?: number;
+
+  @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => InitialProductDto)

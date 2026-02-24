@@ -8,12 +8,15 @@ import {
   Calendar,
   Clock,
 } from "lucide-react";
+import { LocationInput } from "@/components/shared/LocationInput";
 
 interface BusinessInfoCardProps {
   vendor: any;
   formData: any;
   isEditing: boolean;
   onFormChange: (data: any) => void;
+  addressCoords: { lat: number; lng: number } | null;
+  onAddressChange: (text: string, coords: { lat: number; lng: number } | null) => void;
 }
 
 const BusinessInfoCard = ({
@@ -21,6 +24,8 @@ const BusinessInfoCard = ({
   formData,
   isEditing,
   onFormChange,
+  addressCoords,
+  onAddressChange,
 }: BusinessInfoCardProps) => {
   const formatDate = (date: string) =>
     date
@@ -108,15 +113,28 @@ const BusinessInfoCard = ({
           <div className="flex items-start gap-3 text-sm text-gray-300">
             <MapPin className="w-4 h-4 text-gray-500 shrink-0 mt-0.5" />
             {isEditing ? (
-              <textarea
-                value={formData.address || ""}
-                onChange={(e) =>
-                  onFormChange({ ...formData, address: e.target.value })
-                }
-                className="bg-[#1E293B] border border-gray-700 text-white text-xs rounded px-2 py-1 w-full focus:border-yellow-500 focus:outline-none resize-none"
-                placeholder="Address"
-                rows={2}
-              />
+              <div className="flex-1">
+                <LocationInput
+                  value={formData.address || ""}
+                  onValueChange={(text) => onAddressChange(text, null)}
+                  onLocationSelect={(loc, address) =>
+                    onAddressChange(address, { lat: loc.lat, lng: loc.lng })
+                  }
+                  placeholder="Search vendor address…"
+                  showGeolocation
+                  className="[&_input]:bg-slate-800/50 [&_input]:border-gray-700 [&_input]:text-white [&_input]:text-xs [&_input]:py-1"
+                />
+                {addressCoords && (
+                  <div className="mt-1 flex items-center gap-1 text-emerald-400 text-[10px] font-medium">
+                    <MapPin className="w-3 h-3" /> Location pinned
+                  </div>
+                )}
+                {!addressCoords && formData.address && (
+                  <p className="mt-1 text-[10px] text-yellow-500">
+                    Select a suggestion to pin coordinates.
+                  </p>
+                )}
+              </div>
             ) : (
               <span className="leading-tight">
                 {vendor.address || "No address set"}

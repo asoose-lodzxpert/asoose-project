@@ -210,7 +210,7 @@ export const CustomerSidebar: React.FC<CustomerSidebarProps> = ({
                     {addr.label}
                   </p>
                   <p className="text-sm text-gray-400 leading-tight">
-                    {addr.street}, {addr.city}
+                    {addr.city ? `${addr.street}, ${addr.city}` : addr.street}
                   </p>
                 </div>
               </div>

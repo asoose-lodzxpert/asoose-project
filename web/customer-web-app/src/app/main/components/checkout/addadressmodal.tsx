@@ -17,10 +17,8 @@ export const AddAddressModal = ({
 }: AddAddressModalProps) => {
   const [formData, setFormData] = useState({
     street: "",
-    city: "",
     phone: "",
     label: "Home",
-    state: "Lagos",
   });
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(
     null,
@@ -31,8 +29,8 @@ export const AddAddressModal = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.street || !formData.city || !formData.phone) {
-      alert("Please fill in address, city, and phone number");
+    if (!formData.street || !formData.phone) {
+      alert("Please select an address and enter a phone number");
       return;
     }
     if (!coords) {
@@ -45,18 +43,14 @@ export const AddAddressModal = ({
     setIsLocating(true);
     try {
       await onSave({
-        ...formData,
+        street: formData.street,
+        phone: formData.phone,
+        label: formData.label,
         lat: coords.lat,
         lng: coords.lng,
       });
 
-      setFormData({
-        street: "",
-        city: "",
-        phone: "",
-        label: "Home",
-        state: "Lagos",
-      });
+      setFormData({ street: "", phone: "", label: "Home" });
       setCoords(null);
       onClose();
     } catch (error: any) {
@@ -141,32 +135,6 @@ export const AddAddressModal = ({
                 setFormData({ ...formData, phone: e.target.value })
               }
             />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">City</label>
-              <input
-                type="text"
-                required
-                className="w-full p-3 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 focus:border-yellow-500 outline-none"
-                value={formData.city}
-                onChange={(e) =>
-                  setFormData({ ...formData, city: e.target.value })
-                }
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">State</label>
-              <input
-                type="text"
-                className="w-full p-3 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 focus:border-yellow-500 outline-none"
-                value={formData.state}
-                onChange={(e) =>
-                  setFormData({ ...formData, state: e.target.value })
-                }
-              />
-            </div>
           </div>
 
           <div className="pt-4">

@@ -1,13 +1,14 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   ArrowLeft,
   MessageSquare,
-  UserCheck,
   Edit,
   Save,
   Loader2,
+  MoreVertical,
+  X,
+  Zap,
 } from "lucide-react";
-import { useRouter } from "next/navigation";
 
 interface VendorHeaderProps {
   name: string;
@@ -16,6 +17,7 @@ interface VendorHeaderProps {
   isSaving: boolean;
   onEdit: () => void;
   onSave: () => void;
+  onCancel: () => void;
   onBack: () => void;
   onMessage: () => void;
 }
@@ -27,61 +29,156 @@ export default function VendorHeader({
   isSaving,
   onEdit,
   onSave,
+  onCancel,
   onBack,
   onMessage,
 }: VendorHeaderProps) {
+  const [showMenu, setShowMenu] = useState(false);
+
+  const isActive = status === "ACTIVE";
+
+  const statusConfig = {
+    ACTIVE: {
+      bg: "bg-gradient-to-r from-emerald-500/10 to-teal-500/10",
+      border: "border-emerald-500/30",
+      text: "text-emerald-300",
+      dot: "bg-emerald-500",
+      label: "Active",
+    },
+    PENDING: {
+      bg: "bg-gradient-to-r from-amber-500/10 to-yellow-500/10",
+      border: "border-amber-500/30",
+      text: "text-amber-300",
+      dot: "bg-amber-500",
+      label: "Pending",
+    },
+    INACTIVE: {
+      bg: "bg-gradient-to-r from-slate-500/10 to-gray-500/10",
+      border: "border-slate-500/30",
+      text: "text-slate-300",
+      dot: "bg-slate-500",
+      label: "Inactive",
+    },
+  };
+
+  const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.INACTIVE;
+
   return (
-    <div className="sticky top-0 z-20 bg-[#0F172A]/95 backdrop-blur-md border-b border-gray-800 py-4 -mx-4 px-4 md:-mx-6 md:px-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-      <div className="w-full md:w-auto">
-        <button
-          onClick={onBack}
-          className="text-gray-400 hover:text-white flex items-center gap-1 text-sm mb-1 transition-colors"
-        >
-          <ArrowLeft className="w-4 h-4" /> Back to List
-        </button>
-        <div className="flex items-center gap-3 flex-wrap">
-          <h1 className="text-xl md:text-2xl font-bold text-white truncate max-w-[250px] md:max-w-none">
-            {name}
-          </h1>
-          <span
-            className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border whitespace-nowrap ${status === "ACTIVE" ? "bg-green-500/20 text-green-500 border-green-500/20" : "bg-yellow-500/20 text-yellow-500 border-yellow-500/20"}`}
+    <div className="sticky top-0 z-40 bg-gradient-to-b from-slate-900 via-slate-900/95 to-slate-900/80 backdrop-blur-xl border-b border-slate-700/50 py-4 -mx-4 px-4 md:-mx-6 md:px-6">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        
+        {/* Left Section: Back Button & Title */}
+        <div className="flex items-start gap-3 flex-1 min-w-0">
+          <button
+            onClick={onBack}
+            className="mt-1 p-1.5 text-slate-400 hover:text-white hover:bg-slate-800/50 rounded-lg transition-all duration-200 flex-shrink-0"
+            title="Back to vendors list"
           >
-            {status}
-          </span>
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+
+          <div className="flex-1 min-w-0">
+            <h1 className="text-2xl md:text-3xl font-bold text-white truncate leading-tight">
+              {name}
+            </h1>
+            <p className="text-sm text-slate-400 mt-1">Vendor Details</p>
+          </div>
         </div>
-      </div>
 
-      <div className="flex gap-2 flex-wrap w-full md:w-auto">
-        <button
-          onClick={onMessage}
-          className="flex-1 md:flex-none justify-center p-2 border border-gray-700 rounded-lg text-gray-300 hover:text-white hover:bg-gray-800 flex items-center"
-          title="Message Vendor"
-        >
-          <MessageSquare className="w-4 h-4" />
-          <span className="md:hidden ml-2 text-sm font-medium">Message</span>
-        </button>
+        {/* Right Section: Status & Actions */}
+        <div className="flex items-center gap-3 flex-wrap">
+          
+          {/* Status Badge */}
+          <div
+            className={`${config.bg} ${config.border} border rounded-lg px-3 py-2 flex items-center gap-2 backdrop-blur-sm`}
+          >
+            <span className={`w-2 h-2 rounded-full ${config.dot} animate-pulse`}></span>
+            <span className={`${config.text} text-sm font-semibold tracking-wide uppercase`}>
+              {config.label}
+            </span>
+          </div>
 
-        {isEditing ? (
-          <button
-            onClick={onSave}
-            disabled={isSaving}
-            className="flex-1 md:flex-none justify-center flex items-center gap-2 px-4 py-2 bg-green-600 text-white font-bold rounded-lg hover:bg-green-500 text-sm disabled:opacity-50"
-          >
-            {isSaving ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Save className="w-4 h-4" />
-            )}{" "}
-            Save
-          </button>
-        ) : (
-          <button
-            onClick={onEdit}
-            className="flex-1 md:flex-none justify-center flex items-center gap-2 px-4 py-2 bg-yellow-500 text-black font-bold rounded-lg hover:bg-yellow-400 text-sm"
-          >
-            <Edit className="w-4 h-4" /> Edit
-          </button>
-        )}
+          {/* Action Buttons */}
+          {isEditing ? (
+            <div className="flex gap-2">
+              <button
+                onClick={onCancel}
+                disabled={isSaving}
+                className="px-4 py-2 text-slate-300 hover:text-white hover:bg-slate-700/50 rounded-lg transition-all duration-200 font-medium text-sm disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={onSave}
+                disabled={isSaving}
+                className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold text-sm rounded-lg transition-all duration-200 flex items-center gap-2 disabled:opacity-50 shadow-lg shadow-emerald-600/20 hover:shadow-emerald-600/40"
+              >
+                {isSaving ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4" />
+                    Save
+                  </>
+                )}
+              </button>
+            </div>
+          ) : (
+            <div className="flex gap-2">
+              {/* Message Button */}
+              <button
+                onClick={onMessage}
+                className="px-4 py-2 text-slate-300 hover:text-white hover:bg-slate-700/50 rounded-lg transition-all duration-200 flex items-center gap-2 font-medium text-sm hidden sm:flex"
+                title="Message vendor"
+              >
+                <MessageSquare className="w-4 h-4" />
+                Message
+              </button>
+
+              {/* Edit Button */}
+              <button
+                onClick={onEdit}
+                className="px-4 py-2 bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-400 hover:to-amber-400 text-slate-900 font-semibold text-sm rounded-lg transition-all duration-200 flex items-center gap-2 shadow-lg shadow-yellow-500/20 hover:shadow-yellow-500/40"
+              >
+                <Edit className="w-4 h-4" />
+                Edit
+              </button>
+
+              {/* Mobile Menu Button */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowMenu(!showMenu)}
+                  className="p-2 text-slate-400 hover:text-white hover:bg-slate-700/50 rounded-lg transition-all duration-200 sm:hidden"
+                >
+                  {showMenu ? (
+                    <X className="w-5 h-5" />
+                  ) : (
+                    <MoreVertical className="w-5 h-5" />
+                  )}
+                </button>
+
+                {/* Mobile Menu Dropdown */}
+                {showMenu && (
+                  <div className="absolute right-0 mt-2 w-48 bg-slate-800/95 backdrop-blur-xl border border-slate-700 rounded-lg shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                    <button
+                      onClick={() => {
+                        onMessage();
+                        setShowMenu(false);
+                      }}
+                      className="w-full px-4 py-3 text-slate-300 hover:text-white hover:bg-slate-700/50 transition-colors text-left text-sm flex items-center gap-3 font-medium border-b border-slate-700/50"
+                    >
+                      <MessageSquare className="w-4 h-4" />
+                      Send Message
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
