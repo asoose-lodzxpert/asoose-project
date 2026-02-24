@@ -17,7 +17,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { StoresService } from './vendors.service';
 import {
-  CreateVendorDto,
+  AdminCreateVendorDto,
   ManualOnboardVendorDto,
   VendorQueryDto,
 } from './dto/vendor.dto';
@@ -75,7 +75,7 @@ export class VendorsController {
   @ApiOperation({ summary: 'Create a new vendor account' })
   @Post()
   @UsePipes(new ValidationPipe({ whitelist: true }))
-  async createVendor(@Body() dto: CreateVendorDto) {
+  async createVendor(@Body() dto: AdminCreateVendorDto) {
     return this.storesService.create(dto);
   }
 

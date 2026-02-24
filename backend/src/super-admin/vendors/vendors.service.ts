@@ -18,7 +18,7 @@ import {
   StoreType,
 } from '@prisma/client';
 import {
-  CreateVendorDto,
+  AdminCreateVendorDto,
   ManualOnboardVendorDto,
   VendorQueryDto,
 } from './dto/vendor.dto';
@@ -51,16 +51,29 @@ export class StoresService {
   async getStats() {
     const [total, pending, active, closed] = await Promise.all([
       this.prisma.store.count({
-        where: { status: { not: StoreStatus.SUSPENDED }, slug: { not: { contains: '-deleted-' } } },
+        where: {
+          status: { not: StoreStatus.SUSPENDED },
+          slug: { not: { contains: '-deleted-' } },
+        },
       }),
       this.prisma.store.count({
-        where: { status: { not: StoreStatus.SUSPENDED }, verification: VerificationStatus.PENDING, slug: { not: { contains: '-deleted-' } } },
+        where: {
+          status: { not: StoreStatus.SUSPENDED },
+          verification: VerificationStatus.PENDING,
+          slug: { not: { contains: '-deleted-' } },
+        },
       }),
       this.prisma.store.count({
-        where: { status: StoreStatus.ACTIVE, slug: { not: { contains: '-deleted-' } } },
+        where: {
+          status: StoreStatus.ACTIVE,
+          slug: { not: { contains: '-deleted-' } },
+        },
       }),
       this.prisma.store.count({
-        where: { status: StoreStatus.CLOSED_PERMANENTLY, slug: { not: { contains: '-deleted-' } } },
+        where: {
+          status: StoreStatus.CLOSED_PERMANENTLY,
+          slug: { not: { contains: '-deleted-' } },
+        },
       }),
     ]);
 
@@ -178,7 +191,7 @@ export class StoresService {
     }
   }
 
-  async create(dto: CreateVendorDto) {
+  async create(dto: AdminCreateVendorDto) {
     const existingEmail = await this.prisma.user.findUnique({
       where: { email: dto.email },
     });
@@ -247,9 +260,7 @@ export class StoresService {
     if (existingSlug) throw new ConflictException('Store slug already exists');
 
     const rawPassword =
-      'Asoose@' +
-      crypto.randomBytes(6).toString('hex').toUpperCase() +
-      '1!';
+      'Asoose@' + crypto.randomBytes(6).toString('hex').toUpperCase() + '1!';
     const hashedPassword = await bcrypt.hash(rawPassword, 10);
 
     const result = await this.prisma.$transaction(async (tx) => {
@@ -574,10 +585,13 @@ export class StoresService {
     adminId: string,
     file?: Express.Multer.File,
   ) {
-    const store = await this.prisma.store.findUnique({ where: { id: storeId } });
+    const store = await this.prisma.store.findUnique({
+      where: { id: storeId },
+    });
     if (!store) throw new NotFoundException('Store not found');
 
-    if (!dto.name?.trim()) throw new BadRequestException('Product name is required');
+    if (!dto.name?.trim())
+      throw new BadRequestException('Product name is required');
     if (!dto.categoryId) throw new BadRequestException('Category is required');
     if (dto.price == null || isNaN(Number(dto.price)) || Number(dto.price) < 0)
       throw new BadRequestException('Price must be a non-negative number');

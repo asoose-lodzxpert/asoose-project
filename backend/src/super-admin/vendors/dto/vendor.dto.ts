@@ -45,8 +45,8 @@ export enum StoreStatus {
   CLOSED_PERMANENTLY = 'CLOSED_PERMANENTLY',
 }
 
-// --- CREATE VENDOR DTO ---
-export class CreateVendorDto {
+// --- CREATE VENDOR DTO (Admin-created, bypasses self-registration flow) ---
+export class AdminCreateVendorDto {
   @ApiProperty({ example: 'vendor@example.com' })
   @IsEmail()
   @IsNotEmpty()
