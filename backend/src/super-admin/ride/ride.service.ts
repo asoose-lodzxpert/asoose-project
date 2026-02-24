@@ -521,7 +521,7 @@ export class RidesService {
       where: { id: rideId },
       data: {
         riderId: null,
-        status: 'SEARCHING',
+        status: 'REQUESTED',
         acceptedAt: null,
       },
     });
@@ -531,7 +531,7 @@ export class RidesService {
         userId: adminId,
         action: 'RIDE_RETRY_MATCHING',
         target: rideId,
-        details: 'Admin triggered retry matching — ride returned to SEARCHING',
+        details: 'Admin triggered retry matching — ride returned to REQUESTED',
         metadata: { previousStatus: ride.status, previousRiderId: ride.riderId },
       },
     });
@@ -560,7 +560,7 @@ export class RidesService {
       where: { id: rideId },
       data: {
         riderId: null,
-        status: 'SEARCHING',
+        status: 'REQUESTED',
         acceptedAt: null,
       },
     });
@@ -570,7 +570,7 @@ export class RidesService {
         userId: adminId,
         action: 'DRIVER_UNASSIGNED',
         target: rideId,
-        details: `Admin unassigned driver ${previousRiderId} — ride returned to SEARCHING`,
+        details: `Admin unassigned driver ${previousRiderId} — ride returned to REQUESTED`,
         metadata: { previousRiderId, previousStatus: ride.status },
       },
     });
