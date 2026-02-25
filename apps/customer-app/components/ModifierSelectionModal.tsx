@@ -141,6 +141,7 @@ export const ModifierSelectionModal: React.FC<ModifierSelectionModalProps> = ({
             styles.modalView,
             {
               backgroundColor: secondary,
+              minHeight: SCREEN_HEIGHT * 0.45,
               maxHeight: SCREEN_HEIGHT * 0.85,
             },
           ]}
@@ -291,6 +292,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 5,
+    // Flex column so the ScrollView fills space between the sticky header and footer
+    flexDirection: "column",
+    overflow: "hidden",
   },
   header: {
     flexDirection: "row",
@@ -299,6 +303,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 12,
     borderBottomWidth: 1,
+    flexShrink: 0,
   },
   closeBtn: {
     padding: 8,
@@ -306,7 +311,9 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: 16,
     paddingVertical: 12,
-    flex: 1,
+    // flexGrow fills available space; flexShrink allows compression when near maxHeight
+    flexGrow: 1,
+    flexShrink: 1,
   },
   modifierGroup: {
     marginBottom: 20,
@@ -349,6 +356,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    flexShrink: 0,
   },
   actions: {
     flexDirection: "row",

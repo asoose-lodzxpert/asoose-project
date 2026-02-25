@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, ServiceUnavailableException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { AppLogger } from '../libs/logger/app-logger.service';
 import { PrismaService } from '../prisma/prisma.service';
 import axios from 'axios';
@@ -81,26 +81,52 @@ export class MapsService {
       throw new BadRequestException('Place ID is required');
     }
 
-    const url = `https://maps.googleapis.com/maps/api/geocode/json?place_id=${placeId}&key=${this.apiKey}`;
+    const url = `https://maps.googleapis.com/maps/api/geocode/json?place_id=${encodeURIComponent(placeId)}&key=${this.apiKey}`;
 
+    // Separate network errors from API-level errors so we can surface the real status
+    let res: any;
     try {
-      const res = await axios.get(url);
-      if (res.data.results && res.data.results.length > 0) {
-        const result = res.data.results[0];
-        return {
-          lat: result.geometry.location.lat,
-          lng: result.geometry.location.lng,
-          address: result.formatted_address,
-        };
-      }
-      throw new Error('No results found for place ID');
-    } catch (error) {
-      this.appLogger.error('Error geocoding place', error?.stack, {
-        error,
-        placeId,
-      });
-      throw new BadRequestException('Failed to geocode place');
+      res = await axios.get(url);
+    } catch (networkError: any) {
+      this.appLogger.error('Network error calling Google Geocoding API', networkError?.stack, { placeId });
+      throw new ServiceUnavailableException('Geocoding service temporarily unavailable. Please try again.');
     }
+
+    const status: string = res.data?.status;
+
+    if (status === 'OK' && res.data.results?.length > 0) {
+      const result = res.data.results[0];
+      return {
+        lat: result.geometry.location.lat,
+        lng: result.geometry.location.lng,
+        address: result.formatted_address,
+      };
+    }
+
+    // Log the actual Google status so it is visible in production logs
+    this.appLogger.error('Google Geocoding API non-OK status', undefined, {
+      placeId,
+      status,
+      error_message: res.data?.error_message ?? '(none)',
+    });
+
+    if (status === 'ZERO_RESULTS' || status === 'NOT_FOUND') {
+      throw new NotFoundException('No location found for this place. Please search again and select a result from the list.');
+    }
+
+    if (status === 'REQUEST_DENIED') {
+      throw new ServiceUnavailableException('Geocoding service configuration error. Please contact support.');
+    }
+
+    if (status === 'OVER_QUERY_LIMIT') {
+      throw new ServiceUnavailableException('Geocoding quota exceeded. Please try again shortly.');
+    }
+
+    if (status === 'INVALID_REQUEST') {
+      throw new BadRequestException('Invalid Place ID. Please search again and select a valid location.');
+    }
+
+    throw new ServiceUnavailableException('Geocoding service error. Please try again or enter your address manually.');
   }
 
   /**
