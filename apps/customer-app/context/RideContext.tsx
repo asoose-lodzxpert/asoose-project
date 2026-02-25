@@ -19,6 +19,7 @@ import React, {
   useRef,
   useState,
 } from "react";
+import { Alert } from "react-native";
 import { io, Socket } from "socket.io-client";
 import { useAuth } from "./AuthContext";
 
@@ -49,6 +50,8 @@ type RideContextType = {
   cancelRide: (reason?: string) => Promise<void>;
   refreshCurrentRide: () => Promise<void>;
   resetBooking: () => void;
+  /** Fully clears all ride state (ride, driver, route, fare, status). */
+  resetRideState: () => void;
 
   // WebSocket
   socketConnected: boolean;
@@ -94,22 +97,27 @@ export function RideProvider({ children }: { children: ReactNode }) {
 
   // Map backend status to page view
   const mapStatusToPageView = useCallback(
-    (status: RideStatus): RidePageView => {
+    (status: RideStatus | string): RidePageView => {
       switch (status) {
-        case RideStatus.PENDING:
-          return "PAYMENT";
         case RideStatus.REQUESTED:
+        case RideStatus.SEARCHING_DRIVER:
           return "FINDING_DRIVER";
-        case RideStatus.ACCEPTED:
+        case RideStatus.DRIVER_ACCEPTED:
+          return "AWAITING_PAYMENT";
+        case RideStatus.PAID:
           return "DRIVER_ASSIGNED";
+        // Legacy mappings
+        case RideStatus.ACCEPTED:
         case RideStatus.ARRIVED:
-          return "DRIVER_ARRIVED";
+          return "DRIVER_ASSIGNED";
         case RideStatus.IN_PROGRESS:
           return "IN_PROGRESS";
         case RideStatus.COMPLETED:
           return "COMPLETED";
+        case RideStatus.CANCELLED_BY_USER:
+        case RideStatus.CANCELLED_BY_DRIVER:
         case RideStatus.CANCELLED:
-          return "IDLE";
+        case RideStatus.PENDING:
         default:
           return "IDLE";
       }
@@ -126,16 +134,20 @@ export function RideProvider({ children }: { children: ReactNode }) {
       if (__DEV__)
         console.log("Refreshed current ride:", JSON.stringify(ride, null, 2));
 
-      // Guard: if we're in the middle of a new PAYMENT flow and the backend
-      // hasn't caught up yet (returns null or the old cancelled ride), don't
-      // wipe the newly created ride out of state.
-      const inPaymentFlow = pageViewRef.current === "PAYMENT";
+      // Guard: if we're actively finding a driver and the backend hasn’t
+      // caught up yet (returns null), don’t wipe the UI state.
+      const inActiveSearch =
+        pageViewRef.current === "FINDING_DRIVER" ||
+        pageViewRef.current === "AWAITING_PAYMENT";
       const fetchedIsUseless =
-        !ride || (ride.status as RideStatus) === RideStatus.CANCELLED;
-      if (inPaymentFlow && fetchedIsUseless) {
+        !ride ||
+        (ride.status as string) === "CANCELLED_BY_USER" ||
+        (ride.status as string) === "CANCELLED_BY_DRIVER" ||
+        (ride.status as RideStatus) === RideStatus.CANCELLED;
+      if (inActiveSearch && fetchedIsUseless) {
         if (__DEV__)
           console.log(
-            "[refreshCurrentRide] Skipping update — in PAYMENT flow and backend returned no active ride",
+            "[refreshCurrentRide] Skipping update — in active search and backend returned no active ride",
           );
         return;
       }
@@ -143,26 +155,17 @@ export function RideProvider({ children }: { children: ReactNode }) {
       setCurrentRide(ride);
 
       if (ride) {
-        let resolvedPageView = mapStatusToPageView(ride.status as RideStatus);
-        // If ride is PENDING but payment is already COMPLETED (e.g. app was
-        // killed mid-flow), skip the payment screen and look for a driver.
-        const ridePayment = Array.isArray(ride.payment)
-          ? ride.payment[0]
-          : ride.payment;
-        if (
-          resolvedPageView === "PAYMENT" &&
-          ridePayment?.status === "COMPLETED"
-        ) {
-          resolvedPageView = "FINDING_DRIVER";
-        }
+        const resolvedPageView = mapStatusToPageView(ride.status as RideStatus);
         setPageView(resolvedPageView);
 
-        // Fetch driver location if ride is active
+        // Fetch driver location if driver is on the way or trip is active
         if (
           ride.riderId &&
-          (ride.status === RideStatus.ACCEPTED ||
-            ride.status === RideStatus.ARRIVED ||
-            ride.status === RideStatus.IN_PROGRESS)
+          (["DRIVER_ACCEPTED", "PAID", "IN_PROGRESS"].includes(
+            ride.status as string,
+          ) ||
+            ride.status === RideStatus.ACCEPTED ||
+            ride.status === RideStatus.ARRIVED)
         ) {
           try {
             const location = await RideService.getDriverLocation(ride.id);
@@ -226,8 +229,25 @@ export function RideProvider({ children }: { children: ReactNode }) {
     });
 
     socket.on("DRIVER_FOUND", (event: RideSocketEvent) => {
-      if (__DEV__) console.log("[RideContext] Driver found:", event);
+      if (__DEV__) console.log("[RideContext] Driver found (legacy):", event);
       if (event.type === "DRIVER_FOUND") {
+        refreshCurrentRide();
+        setPageView("AWAITING_PAYMENT");
+      }
+    });
+
+    socket.on("DRIVER_ACCEPTED", (event: RideSocketEvent) => {
+      if (__DEV__) console.log("[RideContext] Driver accepted:", event);
+      if (event.type === "DRIVER_ACCEPTED") {
+        // Update current ride with driver info then show payment screen
+        refreshCurrentRide();
+        setPageView("AWAITING_PAYMENT");
+      }
+    });
+
+    socket.on("PAYMENT_CONFIRMED", (event: RideSocketEvent) => {
+      if (__DEV__) console.log("[RideContext] Payment confirmed:", event);
+      if (event.type === "PAYMENT_CONFIRMED") {
         refreshCurrentRide();
         setPageView("DRIVER_ASSIGNED");
       }
@@ -235,9 +255,9 @@ export function RideProvider({ children }: { children: ReactNode }) {
 
     socket.on("DRIVER_ARRIVED", (event: RideSocketEvent) => {
       if (__DEV__) console.log("[RideContext] Driver arrived:", event);
+      // ARRIVED is no longer a state change — just a notification. Keep driver_assigned view.
       if (event.type === "DRIVER_ARRIVED") {
         refreshCurrentRide();
-        setPageView("DRIVER_ARRIVED");
       }
     });
 
@@ -282,9 +302,30 @@ export function RideProvider({ children }: { children: ReactNode }) {
             );
           return;
         }
+
+        // Clear all ride state
         setCurrentRide(null);
         setPageView("IDLE");
         setDriverLocation(null);
+        setFareEstimate(null);
+        setFareOptions(null);
+        setError(null);
+
+        // Show alert only when driver or system cancelled — not when the user
+        // cancelled themselves (they already know).
+        const cancelledBy = (event as any).cancelledBy as string | undefined;
+        const reason = (event as any).reason as string | undefined;
+        if (cancelledBy !== "CUSTOMER") {
+          const title =
+            cancelledBy === "DRIVER" ? "Driver Cancelled" : "Ride Cancelled";
+          const message =
+            reason && reason.trim()
+              ? reason
+              : cancelledBy === "DRIVER"
+                ? "Your driver has cancelled the ride. Please book a new ride."
+                : "Your ride was cancelled. Please try again.";
+          Alert.alert(title, message, [{ text: "OK" }]);
+        }
       }
     });
 
@@ -429,7 +470,8 @@ export function RideProvider({ children }: { children: ReactNode }) {
         });
 
         setCurrentRide(response.ride);
-        setPageView("PAYMENT");
+        // Matching starts immediately after request — go directly to finding-driver
+        setPageView("FINDING_DRIVER");
         return response.ride.id;
       } catch (err: any) {
         if (err?.message?.includes("active ride")) {
@@ -453,7 +495,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
     ],
   );
 
-  // Confirm payment
+  // Confirm payment (called after DRIVER_ACCEPTED — transitions ride to PAID)
   const confirmPayment = useCallback(
     async (rideId: string, method: "CASH" | "CARD") => {
       setLoading(true);
@@ -461,8 +503,9 @@ export function RideProvider({ children }: { children: ReactNode }) {
 
       try {
         await RideService.confirmRide(rideId, method);
+        // Optimistically set DRIVER_ASSIGNED; socket PAYMENT_CONFIRMED will also fire
+        setPageView("DRIVER_ASSIGNED");
         await refreshCurrentRide();
-        setPageView("FINDING_DRIVER");
       } catch (err: any) {
         setError(err?.message || "Failed to confirm payment");
         if (__DEV__) console.error("Confirm payment error:", err);
@@ -481,8 +524,14 @@ export function RideProvider({ children }: { children: ReactNode }) {
       setLoading(true);
       setError(null);
 
+      // Require a non-empty reason — fall back to a default so the API never
+      // rejects with a 400 on existing callers that pass nothing.
+      const resolvedReason = reason?.trim() || "Cancelled by customer";
+
       try {
-        await RideService.cancelRide(currentRide.id, { reason });
+        await RideService.cancelRide(currentRide.id, {
+          reason: resolvedReason,
+        });
         // Inline reset to avoid stale closure on resetBooking dependency
         setCurrentRide(null);
         setPageView("IDLE");
@@ -491,6 +540,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
         setDropoffLocation(null);
         setSelectedVehicleType(VehicleType.ECONOMY);
         setFareEstimate(null);
+        setFareOptions(null);
         setError(null);
       } catch (err: any) {
         setError(err?.message || "Failed to cancel ride");
@@ -514,6 +564,23 @@ export function RideProvider({ children }: { children: ReactNode }) {
     setPageView("IDLE");
   }, []);
 
+  /**
+   * Full ride state reset — clears ride, driver, route data, fare and status.
+   * Use this when a ride ends (completed / cancelled) to guarantee no stale
+   * data leaks into the next booking flow.
+   */
+  const resetRideState = useCallback(() => {
+    setCurrentRide(null);
+    setPageView("IDLE");
+    setDriverLocation(null);
+    setFareEstimate(null);
+    setFareOptions(null);
+    setPickupLocation(null);
+    setDropoffLocation(null);
+    setSelectedVehicleType(VehicleType.ECONOMY);
+    setError(null);
+  }, []);
+
   const value: RideContextType = {
     currentRide,
     pageView,
@@ -534,6 +601,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
     cancelRide,
     refreshCurrentRide,
     resetBooking,
+    resetRideState,
     socketConnected,
   };
 

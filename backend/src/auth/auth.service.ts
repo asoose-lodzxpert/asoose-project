@@ -5,6 +5,7 @@ import {
   BadRequestException,
   HttpException,
   InternalServerErrorException,
+  NotFoundException,
   Logger,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
@@ -22,7 +23,13 @@ import { GoogleOAuthDto } from './dto/google-oauth.dto';
 import { AppleOAuthDto } from './dto/apple-oauth.dto';
 import { OtpService } from './otp.service';
 import { EmailProducer } from '../mail/email.producer';
-import * as bcrypt from 'bcryptjs';
+import { TokenRevocationService } from './token-revocation.service';
+import {
+  hashPassword,
+  verifyPassword,
+  upgradeNeeded,
+} from './password-hash.util';
+import { randomUUID } from 'crypto';
 
 @Injectable()
 export class AuthService {
@@ -33,7 +40,19 @@ export class AuthService {
     private readonly configService: ConfigService,
     private readonly otpService: OtpService,
     private readonly emailProducer: EmailProducer,
+    private readonly tokenRevocation: TokenRevocationService,
   ) {}
+
+  /** Signs a refresh token embedding a unique JTI for individual revocation. */
+  private signRefreshToken(
+    payload: Record<string, unknown>,
+    expiresIn = '30d',
+  ): string {
+    return this.jwtService.sign(
+      { ...payload, jti: randomUUID() },
+      { expiresIn: expiresIn as any },
+    );
+  }
   // User
   async loginUser(body: { email: string; password: string }) {
     try {
@@ -53,13 +72,31 @@ export class AuthService {
         );
       }
 
-      // Verify password
-      const isPasswordValid = await bcrypt.compare(
+      // Verify password — handles both legacy bcrypt hashes and Argon2id hashes
+      const isPasswordValid = await verifyPassword(
         body.password,
         user.password,
       );
       if (!isPasswordValid) {
         throw new UnauthorizedException('Invalid email or password');
+      }
+
+      // Transparent bcrypt → Argon2id upgrade on first successful login after
+      // the migration.  Runs in the background so it never delays the response.
+      if (upgradeNeeded(user.password)) {
+        hashPassword(body.password)
+          .then((newHash) =>
+            this.prisma.user.update({
+              where: { id: user.id },
+              data: { password: newHash },
+            }),
+          )
+          .catch(() => {
+            // Non-critical: the next login will retry the upgrade
+            this.logger.warn(
+              `Hash upgrade scheduled for next login (userId=${user.id})`,
+            );
+          });
       }
 
       // Generate JWT access and refresh tokens
@@ -69,7 +106,7 @@ export class AuthService {
         role: user.role,
       };
       const access_token = this.jwtService.sign(payload);
-      const refresh_token = this.jwtService.sign(payload, { expiresIn: '30d' });
+      const refresh_token = this.signRefreshToken(payload);
 
       // Split name into firstName and lastName for response
       const nameParts = user.name.split(' ');
@@ -111,8 +148,8 @@ export class AuthService {
         throw new ConflictException('User with this email already exists');
       }
 
-      // Hash password
-      const hashedPassword = await bcrypt.hash(dto.password, 10);
+      // Hash password with Argon2id for all new registrations
+      const hashedPassword = await hashPassword(dto.password);
 
       // Create user
       const user = await this.prisma.user.create({
@@ -134,7 +171,7 @@ export class AuthService {
         role: user.role,
       };
       const access_token = this.jwtService.sign(payload);
-      const refresh_token = this.jwtService.sign(payload, { expiresIn: '30d' });
+      const refresh_token = this.signRefreshToken(payload);
 
       // Split name back for response
       const nameParts = user.name.split(' ');
@@ -258,7 +295,7 @@ export class AuthService {
         role: user.role,
       };
       const access_token = this.jwtService.sign(payload);
-      const refresh_token = this.jwtService.sign(payload, { expiresIn: '30d' });
+      const refresh_token = this.signRefreshToken(payload);
 
       // Split name into firstName and lastName for response
       const nameParts = user.name.split(' ');
@@ -335,7 +372,7 @@ export class AuthService {
         role: user.role,
       };
       const access_token = this.jwtService.sign(payload);
-      const refresh_token = this.jwtService.sign(payload, { expiresIn: '30d' });
+      const refresh_token = this.signRefreshToken(payload);
 
       // Split name into firstName and lastName for response
       const nameParts = user.name.split(' ');
@@ -369,6 +406,16 @@ export class AuthService {
       const payload = this.jwtService.verify(refreshToken, {
         secret: this.configService.getOrThrow<string>('JWT_REFRESH_SECRET'),
       });
+
+      // Reject if the specific JTI has been revoked (user logged out)
+      if (payload.jti) {
+        const revoked = await this.tokenRevocation.isRefreshTokenRevoked(
+          payload.jti,
+        );
+        if (revoked)
+          throw new UnauthorizedException('Refresh token has been revoked');
+      }
+
       // Optionally: check user existence/status
       const user = await this.prisma.user.findUnique({
         where: { id: payload.sub },
@@ -387,6 +434,24 @@ export class AuthService {
     } catch (error) {
       throw new UnauthorizedException('Invalid or expired refresh token');
     }
+  }
+
+  /** Invalidates the supplied refresh token's JTI so it cannot be used again. */
+  async logout(refreshToken: string): Promise<{ message: string }> {
+    try {
+      const decoded = this.jwtService.decode(refreshToken) as Record<
+        string,
+        any
+      > | null;
+      if (decoded?.jti) {
+        const now = Math.floor(Date.now() / 1000);
+        const ttl = decoded.exp ? decoded.exp - now : 30 * 24 * 60 * 60;
+        await this.tokenRevocation.revokeRefreshToken(decoded.jti, ttl);
+      }
+    } catch {
+      // Ignore decode errors — we still return success to the client
+    }
+    return { message: 'Logged out successfully' };
   }
 
   async forgotUserPassword(dto: ForgotPasswordDto) {
@@ -444,8 +509,8 @@ export class AuthService {
         await this.otpService.clearOtp(`password-reset:${dto.email}`);
       }
 
-      // Hash new password
-      const hashedPassword = await bcrypt.hash(dto.newPassword, 10);
+      // Hash new password with Argon2id
+      const hashedPassword = await hashPassword(dto.newPassword);
 
       // Update password
       await this.prisma.user.update({
@@ -496,9 +561,9 @@ export class AuthService {
         updateData.image = dto.image;
       }
 
-      // Update password if provided
+      // Update password if provided — always use Argon2id for new hashes
       if (dto.password) {
-        updateData.password = await bcrypt.hash(dto.password, 10);
+        updateData.password = await hashPassword(dto.password);
       }
 
       // Update user
@@ -561,6 +626,157 @@ export class AuthService {
       return { success: true, message: 'Push token removed' };
     } catch (error) {
       throw new ConflictException('Failed to remove push token');
+    }
+  }
+
+  // ─── Account Linking ────────────────────────────────────────────────────────
+
+  async getLinkedAccounts(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { googleId: true, appleId: true },
+    });
+    if (!user) throw new NotFoundException('User not found');
+    return {
+      google: !!user.googleId,
+      apple: !!user.appleId,
+    };
+  }
+
+  async linkGoogleAccount(userId: string, dto: GoogleOAuthDto) {
+    try {
+      const user = await this.prisma.user.findUnique({ where: { id: userId } });
+      if (!user) throw new NotFoundException('User not found');
+      if (user.googleId) {
+        throw new ConflictException('Google account is already linked');
+      }
+
+      // Make sure the googleId isn't taken by another account
+      const existing = await this.prisma.user.findUnique({
+        where: { googleId: dto.googleId },
+      });
+      if (existing && existing.id !== userId) {
+        throw new ConflictException(
+          'This Google account is linked to a different user',
+        );
+      }
+
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: {
+          googleId: dto.googleId,
+          image: user.image || dto.profilePicture || undefined,
+        },
+      });
+
+      return { success: true, message: 'Google account linked successfully' };
+    } catch (error) {
+      if (
+        error instanceof ConflictException ||
+        error instanceof NotFoundException
+      ) {
+        throw error;
+      }
+      this.logger.error('Link Google account error', error);
+      throw new InternalServerErrorException('Failed to link Google account');
+    }
+  }
+
+  async unlinkGoogleAccount(userId: string) {
+    try {
+      const user = await this.prisma.user.findUnique({ where: { id: userId } });
+      if (!user) throw new NotFoundException('User not found');
+      if (!user.googleId) {
+        throw new ConflictException('No Google account is linked');
+      }
+      // Ensure the user has another way to sign in
+      if (!user.appleId && (!user.password || user.password === '')) {
+        throw new BadRequestException(
+          'Cannot unlink: no other sign-in method available. Set a password first.',
+        );
+      }
+
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: { googleId: null },
+      });
+
+      return { success: true, message: 'Google account unlinked' };
+    } catch (error) {
+      if (
+        error instanceof ConflictException ||
+        error instanceof NotFoundException ||
+        error instanceof BadRequestException
+      ) {
+        throw error;
+      }
+      throw new InternalServerErrorException('Failed to unlink Google account');
+    }
+  }
+
+  async linkAppleAccount(userId: string, dto: AppleOAuthDto) {
+    try {
+      const user = await this.prisma.user.findUnique({ where: { id: userId } });
+      if (!user) throw new NotFoundException('User not found');
+      if (user.appleId) {
+        throw new ConflictException('Apple account is already linked');
+      }
+
+      const existing = await this.prisma.user.findUnique({
+        where: { appleId: dto.appleId },
+      });
+      if (existing && existing.id !== userId) {
+        throw new ConflictException(
+          'This Apple account is linked to a different user',
+        );
+      }
+
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: { appleId: dto.appleId },
+      });
+
+      return { success: true, message: 'Apple account linked successfully' };
+    } catch (error) {
+      if (
+        error instanceof ConflictException ||
+        error instanceof NotFoundException
+      ) {
+        throw error;
+      }
+      this.logger.error('Link Apple account error', error);
+      throw new InternalServerErrorException('Failed to link Apple account');
+    }
+  }
+
+  async unlinkAppleAccount(userId: string) {
+    try {
+      const user = await this.prisma.user.findUnique({ where: { id: userId } });
+      if (!user) throw new NotFoundException('User not found');
+      if (!user.appleId) {
+        throw new ConflictException('No Apple account is linked');
+      }
+      if (!user.googleId && (!user.password || user.password === '')) {
+        throw new BadRequestException(
+          'Cannot unlink: no other sign-in method available. Set a password first.',
+        );
+      }
+
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: { appleId: null },
+      });
+
+      return { success: true, message: 'Apple account unlinked' };
+    } catch (error) {
+      if (
+        error instanceof ConflictException ||
+        error instanceof NotFoundException ||
+        error instanceof BadRequestException
+      ) {
+        throw error;
+      }
+      throw new InternalServerErrorException('Failed to unlink Apple account');
     }
   }
 }

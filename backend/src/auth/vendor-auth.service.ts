@@ -16,7 +16,13 @@ import { ResetPasswordDto } from './dto/reset-password.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import type { RedisClientType } from 'redis';
 import { OtpService } from './otp.service';
-import * as bcrypt from 'bcryptjs';
+import {
+  hashPassword,
+  verifyPassword,
+  upgradeNeeded,
+} from './password-hash.util';
+import { TokenRevocationService } from './token-revocation.service';
+import { randomUUID } from 'crypto';
 
 @Injectable()
 export class VendorAuthService {
@@ -29,7 +35,18 @@ export class VendorAuthService {
     @Inject('REDIS_CLIENT') private readonly redisClient: RedisClientType,
     private readonly emailProducer: EmailProducer,
     private readonly appLogger: AppLogger,
+    private readonly tokenRevocation: TokenRevocationService,
   ) {}
+
+  private signRefreshToken(
+    payload: Record<string, unknown>,
+    expiresIn = '7d',
+  ): string {
+    return this.jwtService.sign(
+      { ...payload, jti: randomUUID() },
+      { expiresIn: expiresIn as any },
+    );
+  }
 
   // Lazy injection to avoid circular dependency
   setSecurityNotificationsService(service: any) {
@@ -69,7 +86,8 @@ export class VendorAuthService {
       );
     }
 
-    const isPasswordValid = await bcrypt.compare(
+    // Verify password — handles both legacy bcrypt hashes and Argon2id hashes
+    const isPasswordValid = await verifyPassword(
       body.password,
       vendor.password,
     );
@@ -80,10 +98,27 @@ export class VendorAuthService {
       );
     }
 
+    // Transparent bcrypt → Argon2id upgrade on first successful login after migration
+    if (upgradeNeeded(vendor.password)) {
+      hashPassword(body.password)
+        .then((newHash) =>
+          this.prisma.vendor.update({
+            where: { id: vendor.id },
+            data: { password: newHash },
+          }),
+        )
+        .catch(() => {
+          // Non-critical: the next login will retry the upgrade
+          this.appLogger.warn(
+            `Hash upgrade scheduled for next login (vendorId=${vendor.id})`,
+          );
+        });
+    }
+
     const payload = { sub: vendor.id, role: 'VENDOR', email: vendor.email };
 
     const accessToken = this.jwtService.sign(payload, { expiresIn: '15m' });
-    const refreshToken = this.jwtService.sign(payload, { expiresIn: '7d' });
+    const refreshToken = this.signRefreshToken(payload);
 
     // Send login notification
     if (this.securityNotificationsService) {
@@ -141,7 +176,8 @@ export class VendorAuthService {
       );
     }
 
-    const hashedPassword = await bcrypt.hash(dto.password, 10);
+    // Hash with Argon2id for all new vendor registrations
+    const hashedPassword = await hashPassword(dto.password);
 
     const vendor = await this.prisma.vendor.create({
       data: {
@@ -327,7 +363,7 @@ export class VendorAuthService {
       );
     }
 
-    const hashedPassword = await bcrypt.hash(dto.newPassword, 10);
+    const hashedPassword = await hashPassword(dto.newPassword);
 
     await this.otpService.clearOtp(`reset:${normalizedEmail}`);
 
@@ -384,7 +420,7 @@ export class VendorAuthService {
       throw new NotFoundException('No account found with this email address.');
     }
 
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    const hashedPassword = await hashPassword(newPassword);
 
     await this.otpService.clearOtp(`reset:${normalizedEmail}`);
 
@@ -453,6 +489,14 @@ export class VendorAuthService {
     try {
       const payload = this.jwtService.verify(refreshToken);
 
+      if (payload.jti) {
+        const revoked = await this.tokenRevocation.isRefreshTokenRevoked(
+          payload.jti,
+        );
+        if (revoked)
+          throw new UnauthorizedException('Refresh token has been revoked');
+      }
+
       if (!payload?.sub || payload.role !== 'VENDOR') {
         throw new UnauthorizedException();
       }
@@ -476,6 +520,24 @@ export class VendorAuthService {
     } catch {
       throw new UnauthorizedException('Invalid or expired refresh token');
     }
+  }
+
+  /** Invalidates the supplied refresh token JTI on vendor logout. */
+  async logoutVendor(refreshToken: string): Promise<{ message: string }> {
+    try {
+      const decoded = this.jwtService.decode(refreshToken) as Record<
+        string,
+        any
+      > | null;
+      if (decoded?.jti) {
+        const now = Math.floor(Date.now() / 1000);
+        const ttl = decoded.exp ? decoded.exp - now : 7 * 24 * 60 * 60;
+        await this.tokenRevocation.revokeRefreshToken(decoded.jti, ttl);
+      }
+    } catch {
+      /* ignore */
+    }
+    return { message: 'Logged out successfully' };
   }
 
   // ---------------- PUBLIC PROFILE ----------------

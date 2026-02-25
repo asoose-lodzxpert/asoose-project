@@ -10,7 +10,12 @@ import {
   Delete,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiResponse,
+} from '@nestjs/swagger';
 import { VendorAuthService } from './vendor-auth.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guards';
@@ -31,6 +36,8 @@ export class VendorAuthController {
 
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get current vendor profile' })
+  @ApiResponse({ status: 200, description: 'Vendor profile returned' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   @Post('me')
   @UseGuards(JwtAuthGuard)
   @Roles(UserRole.VENDOR)
@@ -40,6 +47,8 @@ export class VendorAuthController {
   }
 
   @ApiOperation({ summary: 'Login as a vendor' })
+  @ApiResponse({ status: 200, description: 'Access + refresh tokens returned' })
+  @ApiResponse({ status: 401, description: 'Invalid email or password' })
   @Post('login')
   @Throttle({ default: { limit: 10, ttl: 60 * 1000 } }) // 10 requests per minute
   login(@Body() dto: LoginVendorDto) {
@@ -47,6 +56,8 @@ export class VendorAuthController {
   }
 
   @ApiOperation({ summary: 'Register a new vendor account' })
+  @ApiResponse({ status: 201, description: 'Vendor account created' })
+  @ApiResponse({ status: 409, description: 'Email already in use' })
   @Post('register')
   @Throttle({ default: { limit: 5, ttl: 60 * 60 * 1000 } }) // 5 requests per hour
   register(@Body() dto: CreateVendorDto) {
@@ -56,6 +67,7 @@ export class VendorAuthController {
   // ---------- Signup Email Verification OTP ----------
 
   @ApiOperation({ summary: 'Send OTP for email verification during signup' })
+  @ApiResponse({ status: 200, description: 'OTP sent to email' })
   @Post('send-signup-otp')
   @Throttle({ default: { limit: 5, ttl: 60 * 60 * 1000 } }) // 5 requests per hour
   sendSignupOtp(@Body() body: { email: string }) {
@@ -63,6 +75,8 @@ export class VendorAuthController {
   }
 
   @ApiOperation({ summary: 'Verify OTP for email verification during signup' })
+  @ApiResponse({ status: 200, description: 'Email verified' })
+  @ApiResponse({ status: 400, description: 'Invalid or expired OTP' })
   @Post('verify-signup-otp')
   async verifySignupOtp(@Body() body: { email: string; otp: string }) {
     return await this.vendorAuthService.verifySignupOtp(body.email, body.otp);
@@ -71,6 +85,10 @@ export class VendorAuthController {
   // ---------- Password Reset OTP ----------
 
   @ApiOperation({ summary: 'Send OTP for password reset' })
+  @ApiResponse({
+    status: 200,
+    description: 'OTP sent (always 200 to prevent user enumeration)',
+  })
   @Post('send-otp')
   @Throttle({ default: { limit: 5, ttl: 60 * 60 * 1000 } }) // 5 requests per hour
   sendOtp(@Body() body: { email: string }) {
@@ -78,12 +96,16 @@ export class VendorAuthController {
   }
 
   @ApiOperation({ summary: 'Verify OTP for password reset' })
+  @ApiResponse({ status: 200, description: 'OTP is valid' })
+  @ApiResponse({ status: 400, description: 'Invalid or expired OTP' })
   @Post('verify-otp')
   async verifyOtp(@Body() body: { email: string; otp: string }) {
     return await this.vendorAuthService.verifyOtp(body.email, body.otp);
   }
 
   @ApiOperation({ summary: 'Reset vendor password using OTP' })
+  @ApiResponse({ status: 200, description: 'Password reset successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid OTP or weak password' })
   @Post('reset-password')
   @Throttle({ default: { limit: 5, ttl: 60 * 60 * 1000 } }) // 5 requests per hour
   resetPassword(@Body() dto: ResetPasswordDto & { otp: string }) {
@@ -92,6 +114,8 @@ export class VendorAuthController {
 
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update vendor profile' })
+  @ApiResponse({ status: 200, description: 'Profile updated' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   @Patch('profile')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.VENDOR)
@@ -100,13 +124,30 @@ export class VendorAuthController {
   }
 
   @ApiOperation({ summary: 'Refresh vendor access token' })
+  @ApiResponse({
+    status: 200,
+    description: 'New access + refresh token pair returned',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Refresh token missing, expired, or revoked',
+  })
   @Post('refresh')
   async refreshToken(@Body() body: { refreshToken: string }) {
     return await this.vendorAuthService.refreshVendorToken(body.refreshToken);
   }
 
+  @ApiOperation({ summary: 'Logout and invalidate the supplied refresh token' })
+  @ApiResponse({ status: 200, description: 'Refresh token revoked' })
+  @Post('logout')
+  async logout(@Body() body: { refreshToken?: string }) {
+    return await this.vendorAuthService.logoutVendor(body.refreshToken ?? '');
+  }
+
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get vendor notification preferences' })
+  @ApiResponse({ status: 200, description: 'Preferences returned' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   @UseGuards(JwtAuthGuard)
   @Roles(UserRole.VENDOR)
   @Get('notifications-preferences')
@@ -117,6 +158,8 @@ export class VendorAuthController {
 
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update vendor notification preferences' })
+  @ApiResponse({ status: 200, description: 'Preferences updated' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   @UseGuards(JwtAuthGuard)
   @Roles(UserRole.VENDOR)
   @Put('notifications-preferences')
@@ -127,6 +170,8 @@ export class VendorAuthController {
 
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update vendor business information' })
+  @ApiResponse({ status: 200, description: 'Business info updated' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   @UseGuards(JwtAuthGuard)
   @Roles(UserRole.VENDOR)
   @Put('business-info')
@@ -139,6 +184,8 @@ export class VendorAuthController {
   @Roles(UserRole.VENDOR)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update vendor business documents' })
+  @ApiResponse({ status: 200, description: 'Documents updated' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   @Put('business-documents')
   async updateBusinessDocuments(@Req() req, @Body() body) {
     const { id } = req.user || {};
@@ -147,6 +194,8 @@ export class VendorAuthController {
 
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update vendor store details' })
+  @ApiResponse({ status: 200, description: 'Store details updated' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   @UseGuards(JwtAuthGuard)
   @Roles(UserRole.VENDOR)
   @Put('store-details')
@@ -157,6 +206,8 @@ export class VendorAuthController {
 
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get vendor business details' })
+  @ApiResponse({ status: 200, description: 'Business details returned' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   @UseGuards(JwtAuthGuard)
   @Roles(UserRole.VENDOR)
   @Get('business-details')
@@ -167,6 +218,8 @@ export class VendorAuthController {
 
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Send OTP to change password (authenticated)' })
+  @ApiResponse({ status: 200, description: 'OTP sent to registered email' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   @UseGuards(JwtAuthGuard)
   @Post('send-change-password-otp')
   async sendChangePasswordOtp(@Req() req) {
@@ -176,6 +229,9 @@ export class VendorAuthController {
 
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Verify OTP for password change' })
+  @ApiResponse({ status: 200, description: 'OTP verified' })
+  @ApiResponse({ status: 400, description: 'Invalid or expired OTP' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   @UseGuards(JwtAuthGuard)
   @Post('verify-change-password-otp')
   async verifyChangePasswordOtp(@Req() req, @Body() body: { otp: string }) {
@@ -186,6 +242,9 @@ export class VendorAuthController {
 
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Change vendor password with OTP' })
+  @ApiResponse({ status: 200, description: 'Password changed successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid OTP or weak password' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   @UseGuards(JwtAuthGuard)
   @Post('change-password')
   async changePassword(
@@ -202,6 +261,8 @@ export class VendorAuthController {
 
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Save push notification token' })
+  @ApiResponse({ status: 200, description: 'Push token saved' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   @UseGuards(JwtAuthGuard)
   @Post('push-token')
   async savePushToken(
@@ -214,6 +275,8 @@ export class VendorAuthController {
 
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Remove push notification token' })
+  @ApiResponse({ status: 200, description: 'Push token removed' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   @UseGuards(JwtAuthGuard)
   @Delete('push-token')
   async removePushToken(@Req() req) {

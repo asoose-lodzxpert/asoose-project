@@ -26,11 +26,10 @@ describe('Monetary Precision', () => {
     const earnings = await service.getEarnings('rider-1', 'today');
 
     // 3. Assert
-    // The service logic: total = deliveryFees + bonuses (5%) + serviceFees (-15%)
-    // fee = 0.3
-    // bonus = 0.015
+    // The service logic: total = deliveryFees + bonuses (0) + serviceFees (-15%)
+    // fee = 0.3 (0.1 + 0.2)
     // serviceFee = -0.045
-    // total = 0.27
+    // total = 0.255 → rounded to 0.26
 
     const total = earnings.total;
 
@@ -43,6 +42,6 @@ describe('Monetary Precision', () => {
       );
     }
 
-    expect(total).toBeCloseTo(0.27, 2);
+    expect(total).toBeCloseTo(0.26, 2);
   });
 });

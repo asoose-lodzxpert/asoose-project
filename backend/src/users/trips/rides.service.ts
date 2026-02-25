@@ -164,12 +164,12 @@ export class RidesService {
         idempotencyKey,
         status: {
           in: [
-            RideStatus.PENDING,
             RideStatus.REQUESTED,
-            RideStatus.ACCEPTED,
-            RideStatus.ARRIVED,
+            RideStatus.SEARCHING_DRIVER,
+            RideStatus.DRIVER_ACCEPTED,
+            RideStatus.PAID,
             RideStatus.IN_PROGRESS,
-          ],
+          ] as RideStatus[],
         },
       },
       include: { pickupAddress: true, dropoffAddress: true, payment: true },
@@ -193,23 +193,18 @@ export class RidesService {
       throw new BadRequestException('Invalid vehicle type requested.');
     }
 
-    // 2. Resolve addresses + check for an active ride in parallel.
-    //    All three are independent — running them sequentially wasted ~2-8 s
-    //    on every request due to back-to-back Google Maps round-trips.
-    const [securePickup, secureDropoff, activeRide] = await Promise.all([
-      this.common.resolveSecureLocation(dto.pickupLocation),
-      this.common.resolveSecureLocation(dto.dropoffLocation),
-      this.prisma.ride.findFirst({
-        where: {
-          customerId: userId,
-          status: {
-            in: [
-              RideStatus.REQUESTED,
-              RideStatus.ACCEPTED,
-              RideStatus.IN_PROGRESS,
-              RideStatus.ARRIVED,
-            ],
-          },
+    // 3. Prevent duplicate active rides
+    const activeRide = await this.prisma.ride.findFirst({
+      where: {
+        customerId: userId,
+        status: {
+          in: [
+            RideStatus.REQUESTED,
+            RideStatus.SEARCHING_DRIVER,
+            RideStatus.DRIVER_ACCEPTED,
+            RideStatus.PAID,
+            RideStatus.IN_PROGRESS,
+          ] as RideStatus[],
         },
       }),
     ]);
@@ -218,157 +213,140 @@ export class RidesService {
       throw new ConflictException('You already have an active ride request');
     }
 
-    // 4. Cleanup expired PENDING rides
-    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+    return this.prisma
+      .$transaction(
+        async (tx) => {
+          // 5. Create trusted addresses
+          const pickupAddress = await tx.address.create({
+            data: {
+              userId,
+              label: 'Pickup',
+              street: this.common.sanitizeText(securePickup.address),
+              lat: securePickup.lat,
+              lng: securePickup.lng,
+              city: '',
+              state: '',
+            },
+          });
 
-    await this.prisma.ride.updateMany({
-      where: {
-        customerId: userId,
-        status: RideStatus.PENDING,
-        createdAt: { lt: fiveMinutesAgo },
-      },
-      data: {
-        status: RideStatus.CANCELLED,
-        cancellationReason: 'Expired payment intent',
-        cancelledBy: 'SYSTEM',
-        cancelledAt: new Date(),
-      },
-    });
+          const dropoffAddress = await tx.address.create({
+            data: {
+              userId,
+              label: 'Dropoff',
+              street: this.common.sanitizeText(secureDropoff.address),
+              lat: secureDropoff.lat,
+              lng: secureDropoff.lng,
+              city: '',
+              state: '',
+            },
+          });
 
-    await this.prisma.ride.updateMany({
-      where: {
-        customerId: userId,
-        status: RideStatus.PENDING,
-      },
-      data: {
-        status: RideStatus.CANCELLED,
-        cancellationReason: 'Overwritten by new request',
-        cancelledBy: 'SYSTEM',
-        cancelledAt: new Date(),
-      },
-    });
+          // 6. Extract client-provided values
+          const { fare, distanceKm, durationMin } = dto;
 
-    // ── Pre-transaction validation (pure compute — keep outside the tx so it
-    //    doesn't eat into the limited transaction window) ──────────────────────
+          // Basic validation
+          if (fare <= 0 || distanceKm <= 0 || durationMin <= 0) {
+            throw new BadRequestException('Invalid trip values provided.');
+          }
 
-    // 5a. Extract & validate client-provided values
-    const { fare, distanceKm, durationMin } = dto;
+          // Hard caps to prevent abuse
+          const MAX_FARE = 1_000_000;
+          const MAX_DISTANCE = 10000;
+          const MAX_DURATION = 10000;
 
-    if (fare <= 0 || distanceKm <= 0 || durationMin <= 0) {
-      throw new BadRequestException('Invalid trip values provided.');
-    }
+          if (fare > MAX_FARE) {
+            throw new BadRequestException('Fare exceeds allowed limit.');
+          }
 
-    const MAX_FARE = 1_000_000;
-    const MAX_DISTANCE = 10000;
-    const MAX_DURATION = 10000;
+          if (distanceKm > MAX_DISTANCE) {
+            throw new BadRequestException('Distance exceeds allowed limit.');
+          }
 
-    if (fare > MAX_FARE) throw new BadRequestException('Fare exceeds allowed limit.');
-    if (distanceKm > MAX_DISTANCE) throw new BadRequestException('Distance exceeds allowed limit.');
-    if (durationMin > MAX_DURATION) throw new BadRequestException('Duration exceeds allowed limit.');
+          if (durationMin > MAX_DURATION) {
+            throw new BadRequestException('Duration exceeds allowed limit.');
+          }
 
-    // 5b. Anti-tampering distance check — uses resolved coords, no DB needed
-    const serverDistance = this.geo.calculateDistance(
-      securePickup.lat,
-      securePickup.lng,
-      secureDropoff.lat,
-      secureDropoff.lng,
-    );
+          // 🔐 Optional Anti-Tampering Check (Recommended)
+          const serverDistance = this.geo.calculateDistance(
+            pickupAddress.lat,
+            pickupAddress.lng,
+            dropoffAddress.lat,
+            dropoffAddress.lng,
+          );
 
-    this.logger.log(`Server calculated distance: ${serverDistance} km`);
-    this.logger.log(`Client provided distance: ${distanceKm} km`);
+          this.logger.log(`Server calculated distance: ${serverDistance} km`);
+          this.logger.log(`Client provided distance: ${distanceKm} km`);
 
-    if (Math.abs(serverDistance - distanceKm) > 1) {
-      throw new BadRequestException('Trip distance mismatch detected.');
-    }
+          const distanceDifference = Math.abs(serverDistance - distanceKm);
 
-    const finalFare = this.common.round(fare);
+          // Allow tolerance (e.g., 1km difference)
+          if (distanceDifference > 1) {
+            throw new BadRequestException('Trip distance mismatch detected.');
+          }
 
-    // 5c. Generate OTP before the transaction — pure compute, no I/O
-    const rawOtp = this.geo.generateOTP(TRIPS_CONFIG.OTP_LENGTH);
-    const secureReference = `REF-${randomUUID()}`;
+          const finalFare = this.common.round(fare);
 
-    // ── Transaction: only DB writes remain — minimises time window ───────────
-    return this.prisma.$transaction(
-      async (tx) => {
-        // 6. Create trusted addresses
-        const pickupAddress = await tx.address.create({
-          data: {
-            userId,
-            label: 'Pickup',
-            street: this.common.sanitizeText(securePickup.address),
-            lat: securePickup.lat,
-            lng: securePickup.lng,
-            city: '',
-            state: '',
-          },
+          // 7. Generate OTP (stored as plaintext so customer can view it)
+          const rawOtp = this.geo.generateOTP(TRIPS_CONFIG.OTP_LENGTH);
+
+          // 8. Create Ride at REQUESTED and start matching immediately
+          const ride = await tx.ride.create({
+            data: {
+              customerId: userId,
+              pickupAddressId: pickupAddress.id,
+              dropoffAddressId: dropoffAddress.id,
+              status: RideStatus.REQUESTED,
+              idempotencyKey,
+              distanceKm,
+              durationMin,
+              totalFare: finalFare,
+              startOtp: rawOtp,
+              surgeMultiplier: 1.0,
+            },
+            include: { pickupAddress: true, dropoffAddress: true },
+          });
+
+          // 9. Create Payment (PENDING until driver accepted + customer confirms)
+          const secureReference = `REF-${randomUUID()}`;
+
+          const payment = await tx.payment.create({
+            data: {
+              userId,
+              rideId: ride.id,
+              amount: finalFare,
+              status: PaymentStatus.PENDING,
+              method: PaymentMethod.CASH,
+              reference: secureReference,
+              gateway: 'SYSTEM',
+            },
+          });
+
+          return {
+            ride,
+            fare: finalFare,
+            payment,
+            message: 'Ride requested. Searching for a driver.',
+          };
+        },
+        { isolationLevel: 'Serializable' },
+      )
+      .then(async (result) => {
+        // Start matching outside transaction so it is non-blocking
+        this.triggerMatchingSideEffects(result.ride.id, userId).catch((err) => {
+          this.logger.error(
+            `Failed to trigger matching for ride ${result.ride.id}`,
+            err,
+          );
         });
-
-        const dropoffAddress = await tx.address.create({
-          data: {
-            userId,
-            label: 'Dropoff',
-            street: this.common.sanitizeText(secureDropoff.address),
-            lat: secureDropoff.lat,
-            lng: secureDropoff.lng,
-            city: '',
-            state: '',
-          },
-        });
-
-        // 7. Create Ride (validation, distance check & OTP already computed before
-        //    opening this transaction to keep its window as short as possible)
-        const ride = await tx.ride.create({
-          data: {
-            customerId: userId,
-            pickupAddressId: pickupAddress.id,
-            dropoffAddressId: dropoffAddress.id,
-            status: RideStatus.PENDING,
-            idempotencyKey,
-            distanceKm,
-            durationMin,
-            totalFare: finalFare,
-            startOtp: rawOtp,
-            surgeMultiplier: 1.0,
-          },
-          include: { pickupAddress: true, dropoffAddress: true },
-        });
-
-        // 9. Create Payment
-        const secureReference = `REF-${randomUUID()}`;
-
-        const payment = await tx.payment.create({
-          data: {
-            userId,
-            rideId: ride.id,
-            amount: finalFare,
-            status: PaymentStatus.PENDING,
-            method: PaymentMethod.CASH,
-            reference: secureReference,
-            gateway: 'SYSTEM',
-          },
-        });
-
-        return {
-          ride,
-          fare: finalFare,
-          payment,
-          message: 'Ride created. Please confirm to find a driver.',
-        };
-      },
-      {
-        // Serializable prevents a race between concurrent requests for the same
-        // user, but adds overhead. The idempotency-key check + PENDING cleanup
-        // above already handle most races, so ReadCommitted is a safe fallback
-        // if P2028 resurfaces at higher load.
-        isolationLevel: 'Serializable',
-        // Raise the timeout well above the default 5 s. The transaction now
-        // contains only 4 DB writes (address×2, ride, payment) — plenty of
-        // headroom even on a cold connection.
-        timeout: 15000,
-      },
-    );
+        return result;
+      });
   }
 
+  /**
+   * confirmRide is now the PAYMENT step: called by the customer AFTER the driver
+   * has accepted (DRIVER_ACCEPTED) to confirm payment and transition to PAID.
+   * The driver cannot start the trip until the ride is PAID.
+   */
   async confirmRide(userId: string, rideId: string, paymentMethod: string) {
     const methodEnum =
       paymentMethod.toUpperCase() === 'CASH'
@@ -376,56 +354,69 @@ export class RidesService {
         : PaymentMethod.CARD;
 
     return this.prisma.$transaction(async (tx) => {
-      const ride = await tx.ride.findUnique({ where: { id: rideId } });
+      const ride = await tx.ride.findUnique({
+        where: { id: rideId },
+        include: { rider: { include: { vehicle: true } } },
+      });
 
       if (!ride || ride.customerId !== userId) {
         throw new NotFoundException('Ride not found');
       }
-      if (ride.status !== RideStatus.PENDING) {
-        if (ride.status === RideStatus.REQUESTED)
-          return { status: 'CONFIRMED', rideId };
+
+      // Allow idempotency: already PAID
+      if ((ride.status as string) === 'PAID') {
+        return { status: 'PAID', rideId };
+      }
+
+      if ((ride.status as string) !== 'DRIVER_ACCEPTED') {
         throw new BadRequestException(
-          `Ride cannot be confirmed in state ${ride.status}`,
+          `Cannot confirm payment for ride in state ${ride.status}`,
         );
       }
 
-      // Update payment method — always keep PENDING until real payment is confirmed
+      // Update payment record
       await tx.payment.updateMany({
-        where: { rideId: rideId },
-        data: {
-          method: methodEnum,
-          status: PaymentStatus.PENDING,
-        },
+        where: { rideId },
+        data: { method: methodEnum, status: PaymentStatus.COMPLETED },
       });
 
-      // CARD: ride stays PENDING — wait for Paystack payment before matching
-      if (methodEnum === PaymentMethod.CARD) {
-        return { status: 'AWAITING_PAYMENT', rideId };
-      }
-
-      // CASH: transition to REQUESTED and start driver matching immediately
+      // Transition ride to PAID
       await tx.ride.update({
         where: { id: rideId },
-        data: { status: RideStatus.REQUESTED },
+        data: { status: 'PAID' as any },
       });
 
-      // ✅ Broadcast new ride request to admin dashboard
-      this.notificationsGateway.sendToAdminRoom({
-        id: rideId,
-        type: 'RIDE',
-        category: 'RIDE_REQUESTED',
-        title: 'New Ride Request',
-        message: `A ride (${rideId.substring(0, 8)}…) has been confirmed and is awaiting a driver`,
-        isRead: false,
-        createdAt: new Date().toISOString(),
-        metadata: { rideId },
-      });
+      // Notify customer
+      try {
+        this.notificationsGateway.server
+          .to(`user_${userId}`)
+          .emit('PAYMENT_CONFIRMED', {
+            type: 'PAYMENT_CONFIRMED',
+            rideId,
+            message:
+              'Payment confirmed. Your driver will start the trip shortly.',
+          });
+      } catch (e) {
+        this.logger.error('Socket error confirmRide (PAYMENT_CONFIRMED)', e);
+      }
 
-      this.triggerMatchingSideEffects(rideId, userId).catch((err) => {
-        this.logger.error(`Failed to trigger matching for ride ${rideId}`, err);
-      });
+      // Notify driver that payment is confirmed and they may start
+      if (ride.riderId) {
+        try {
+          this.notificationsGateway.server
+            .to(`rider_${ride.riderId}`)
+            .emit('PAYMENT_CONFIRMED', {
+              type: 'PAYMENT_CONFIRMED',
+              rideId,
+              message: 'Customer has paid. You may now start the trip.',
+            });
+        } catch (e) {
+          this.logger.error('Socket error confirmRide driver notify', e);
+        }
+      }
 
-      return { status: 'CONFIRMED', rideId };
+      await this.common.logActivity(userId, 'RIDE_PAID', { rideId });
+      return { status: 'PAID', rideId };
     });
   }
 
@@ -436,14 +427,32 @@ export class RidesService {
     });
     if (!ride) return;
 
+    // Transition to SEARCHING_DRIVER
+    await this.prisma.ride.update({
+      where: { id: rideId },
+      data: { status: 'SEARCHING_DRIVER' as any },
+    });
+
+    // Broadcast to admin dashboard
+    this.notificationsGateway.sendToAdminRoom({
+      id: rideId,
+      type: 'RIDE',
+      category: 'RIDE_REQUESTED',
+      title: 'New Ride Request',
+      message: `A ride (${rideId.substring(0, 8)}…) is now searching for a driver`,
+      isRead: false,
+      createdAt: new Date().toISOString(),
+      metadata: { rideId },
+    });
+
     try {
       this.notificationsGateway.server
         .to(`user_${userId}`)
         .emit('ride_update', {
-          type: 'FINDING_DRIVER',
-          status: 'FINDING_DRIVER',
+          type: 'SEARCHING_DRIVER',
+          status: 'SEARCHING_DRIVER',
           rideId: ride.id,
-          label: 'Finding a Driver',
+          label: 'Searching for a Driver',
         });
     } catch (e) {
       this.logger.error(`Socket emit failed for ride ${rideId}`, e);
@@ -458,14 +467,15 @@ export class RidesService {
   async acceptRide(rideId: string, riderId: string) {
     if (!riderId) throw new ForbiddenException('Rider identity missing');
 
+    // Accept from SEARCHING_DRIVER state → DRIVER_ACCEPTED
     const result = await this.prisma.ride.updateMany({
       where: {
         id: rideId,
-        status: RideStatus.REQUESTED,
+        status: 'SEARCHING_DRIVER' as any,
         riderId: null,
       },
       data: {
-        status: RideStatus.ACCEPTED,
+        status: 'DRIVER_ACCEPTED' as any,
         riderId: riderId,
         acceptedAt: new Date(),
       },
@@ -484,19 +494,20 @@ export class RidesService {
       throw new InternalServerErrorException('Rider link failed');
 
     try {
+      // Notify customer that a driver accepted — they must now pay
       this.notificationsGateway.server
         .to(`user_${ride.customerId}`)
-        .emit('DRIVER_FOUND', {
-          type: 'DRIVER_FOUND',
-          metadata: {
-            rideId: ride.id,
-            driver: {
-              name: ride.rider.name,
-              phone: this.common.maskPhoneNumber(ride.rider.phone),
-              vehicle: ride.rider.vehicle,
-              id: ride.rider.id,
-            },
+        .emit('DRIVER_ACCEPTED', {
+          type: 'DRIVER_ACCEPTED',
+          rideId: ride.id,
+          driver: {
+            name: ride.rider.name,
+            phone: this.common.maskPhoneNumber(ride.rider.phone),
+            vehicle: ride.rider.vehicle,
+            id: ride.rider.id,
           },
+          message:
+            'A driver accepted your ride. Please confirm your payment to proceed.',
         });
     } catch (e) {
       this.logger.error('Socket error during acceptRide', e);
@@ -523,8 +534,10 @@ export class RidesService {
     if (!ride) throw new NotFoundException('Ride not found');
     if (ride.riderId !== riderId)
       throw new ForbiddenException('Unauthorized driver');
-    if (ride.status !== RideStatus.ACCEPTED && ride.status !== RideStatus.ARRIVED)
-      throw new BadRequestException('Ride not ready to start');
+    if ((ride.status as string) !== 'PAID')
+      throw new BadRequestException(
+        'Ride is not ready to start — customer payment required',
+      );
 
     if (!ride.startOtp || otp.trim() !== ride.startOtp.trim()) {
       throw new BadRequestException('Invalid OTP');
@@ -652,34 +665,65 @@ export class RidesService {
   async cancelRide(userId: string, rideId: string, dto: CancelTripDto) {
     const reason = this.common.sanitizeText(dto.reason);
 
-    const result = await this.prisma.ride.updateMany({
-      where: {
-        id: rideId,
-        customerId: userId,
-        status: {
-          notIn: [
-            RideStatus.COMPLETED,
-            RideStatus.CANCELLED,
-            RideStatus.IN_PROGRESS,
-          ],
-        },
-      },
+    // Only cancellable if not already terminal or in progress
+    const cancellableStatuses = [
+      'REQUESTED',
+      'SEARCHING_DRIVER',
+      'DRIVER_ACCEPTED',
+      'PAID',
+    ] as string[];
+
+    // Fetch current ride first so we can get the riderId and validate ownership
+    const existingRide = await this.prisma.ride.findUnique({
+      where: { id: rideId },
+      select: { id: true, customerId: true, riderId: true, status: true },
+    });
+
+    if (!existingRide) {
+      throw new NotFoundException('Ride not found');
+    }
+    if (existingRide.customerId !== userId) {
+      throw new ForbiddenException('You do not own this ride');
+    }
+    if (!cancellableStatuses.includes(existingRide.status as string)) {
+      throw new BadRequestException(
+        `Cannot cancel a ride in '${existingRide.status}' status`,
+      );
+    }
+
+    await this.prisma.ride.update({
+      where: { id: rideId },
       data: {
-        status: RideStatus.CANCELLED,
+        status: 'CANCELLED_BY_USER' as any,
         cancelledBy: 'CUSTOMER',
         cancellationReason: reason,
         cancelledAt: new Date(),
       },
     });
 
-    if (result.count === 0) {
-      throw new BadRequestException('Cannot cancel ride in current status');
-    }
+    // Shared event payload for all sockets
+    const cancelPayload = {
+      type: 'RIDE_CANCELLED',
+      rideId,
+      cancelledBy: 'CUSTOMER',
+      reason,
+    };
 
     try {
+      // Notify the customer
       this.notificationsGateway.server
         .to(`user_${userId}`)
-        .emit('RIDE_CANCELLED', { type: 'RIDE_CANCELLED', rideId });
+        .emit('RIDE_CANCELLED', cancelPayload);
+
+      // If a driver was already assigned, notify them too
+      if (existingRide.riderId) {
+        this.notificationsGateway.server
+          .to(`rider_${existingRide.riderId}`)
+          .emit('RIDE_CANCELLED', cancelPayload);
+        this.logger.log(
+          `[cancelRide] Notified driver ${existingRide.riderId} of customer cancellation`,
+        );
+      }
     } catch (e) {
       this.logger.error('Socket error cancelRide', e);
     }
@@ -694,12 +738,12 @@ export class RidesService {
         customerId: userId,
         status: {
           in: [
-            RideStatus.PENDING,
-            RideStatus.REQUESTED,
-            RideStatus.ACCEPTED,
-            RideStatus.ARRIVED,
-            RideStatus.IN_PROGRESS,
-          ],
+            'REQUESTED',
+            'SEARCHING_DRIVER',
+            'DRIVER_ACCEPTED',
+            'PAID',
+            'IN_PROGRESS',
+          ] as any[],
         },
       },
       include: {
@@ -782,6 +826,11 @@ export class RidesService {
     };
   }
 
+  /**
+   * driverArrived — kept for legacy clients but no longer changes status
+   * since the ARRIVED state has been removed from the active flow.
+   * The driver can notify the customer via socket without a state transition.
+   */
   async driverArrived(rideId: string, riderId: string) {
     const ride = await this.prisma.ride.findUnique({
       where: { id: rideId },
@@ -792,16 +841,13 @@ export class RidesService {
     if (ride.riderId !== riderId)
       throw new ForbiddenException('Unauthorized driver');
 
-    if (ride.status !== RideStatus.ACCEPTED) {
+    // Only valid from DRIVER_ACCEPTED or PAID (no state change)
+    const validStatuses: string[] = ['DRIVER_ACCEPTED', 'PAID'];
+    if (!validStatuses.includes(ride.status as string)) {
       throw new BadRequestException(
-        `Cannot mark arrived from status ${ride.status}`,
+        `Cannot notify arrival from status ${ride.status}`,
       );
     }
-
-    await this.prisma.ride.update({
-      where: { id: rideId },
-      data: { status: RideStatus.ARRIVED },
-    });
 
     try {
       this.notificationsGateway.server
@@ -818,7 +864,20 @@ export class RidesService {
     }
 
     await this.common.logActivity(riderId, 'DRIVER_ARRIVED', { rideId });
-    return { success: true, message: 'Driver arrival confirmed' };
+    return { success: true, message: 'Customer notified of driver arrival' };
+  }
+
+  /**
+   * reviewRide — post-trip review (replaces rateRide for new flow).
+   * Can only be submitted for COMPLETED rides.
+   */
+  async reviewRide(
+    userId: string,
+    rideId: string,
+    rating: number,
+    comment?: string,
+  ) {
+    return this.rateRide(userId, rideId, rating, comment);
   }
 
   /**
@@ -885,7 +944,7 @@ export class RidesService {
       where: {
         riderId: driverId,
         status: {
-          in: [RideStatus.ACCEPTED, RideStatus.ARRIVED, RideStatus.IN_PROGRESS],
+          in: ['DRIVER_ACCEPTED', 'PAID', 'IN_PROGRESS'] as any[],
         },
       },
       include: {
@@ -899,7 +958,7 @@ export class RidesService {
     return this.prisma.ride.findMany({
       where: {
         riderId: driverId,
-        status: RideStatus.REQUESTED,
+        status: 'SEARCHING_DRIVER' as any,
       },
       include: {
         pickupAddress: true,

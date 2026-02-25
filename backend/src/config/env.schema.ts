@@ -60,6 +60,7 @@ export const envSchema = z.object({
   AWS_ACCESS_KEY_ID: z.string().optional(),
   AWS_SECRET_ACCESS_KEY: z.string().optional(),
   AWS_REGION: z.string().optional(),
+  AWS_S3_PUBLIC_URL: z.string().url().optional(),
 
   // Cloudinary
   CLOUDINARY_CLOUD_NAME: z.string().optional(),
@@ -79,6 +80,11 @@ export const envSchema = z.object({
     .string()
     .default('http://localhost:3001,http://localhost:19006'),
   CORS_CREDENTIALS: z.string().default('true'),
+
+  // ----------------
+  // MongoDB (optional — used only for error-log storage)
+  // ----------------
+  MONGODB_URI: z.string().optional(),
 
   // ----------------
   // Frontend URLs
@@ -113,7 +119,7 @@ export const envSchema = z.object({
   // ----------------
   // Maps API
   // ----------------
-  GOOGLE_MAPS_API_KEY: z.string().optional(),
+  GOOGLE_MAPS_API_KEY: z.string().min(1, 'GOOGLE_MAPS_API_KEY is required'),
 
   // ----------------
   // Push Notifications (Firebase Cloud Messaging)
@@ -131,13 +137,17 @@ export const envSchema = z.object({
   // ----------------
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('debug'),
   LOG_FORMAT: z.enum(['json', 'simple']).default('json'),
+  LOGTAIL_TOKEN: z.string().optional(),
 
   // ----------------
-  // Bull Queue
+  // Observability
   // ----------------
-  QUEUE_HOST: z.string().optional(),
-  QUEUE_PORT: z.coerce.number().optional(),
-  QUEUE_PASSWORD: z.string().optional(),
+  SWAGGER_ENABLED: z.enum(['true', 'false']).default('false'),
+  METRICS_ALLOWED_IPS: z.string().optional(),
+
+  // ----------------
+  // Bull Queue (Redis connection — QUEUE_* keys removed; BullModule uses REDIS_* vars)
+  // ----------------
 
   // ----------------
   // Health Check

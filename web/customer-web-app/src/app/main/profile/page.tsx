@@ -39,6 +39,7 @@ import { DisputeCard } from "@/app/main/components/profile/DisputeCard";
 import BottomNav from "@/app/main/components/layout/BottomNav";
 import { EmptyState } from "@/app/main/components/profile/EmptyState";
 import { WalletTab } from "@/app/main/components/profile/WalletTab";
+import { LinkedAccountsSection } from "@/app/main/components/profile/LinkedAccountsSection";
 import {
   ProfileSkeleton,
   ContentSkeleton,
@@ -587,6 +588,15 @@ function ProfilePageContent() {
                       <span>Edit Profile Details</span>
                       <ChevronRight className="w-4 h-4 text-gray-400" />
                     </button>
+                  </div>
+                </div>
+
+                <div className="bg-white dark:bg-[#151515] rounded-3xl border border-gray-100 dark:border-white/5 overflow-hidden">
+                  <div className="p-4 border-b border-gray-100 dark:border-white/5 bg-gray-50/50 dark:bg-white/5 font-bold flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4" /> Linked Accounts
+                  </div>
+                  <div className="p-4">
+                    <LinkedAccountsSection />
                   </div>
                 </div>
 

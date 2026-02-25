@@ -19,6 +19,7 @@ import {
   CancelTripDto,
   RideEstimateDto,
   VehicleType,
+  ReviewRideDto,
 } from './dto/trip.dto';
 import { DeliveriesService } from './deliveries.service';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
@@ -98,7 +99,10 @@ export class TripsController {
 
   // Parameterized routes AFTER static routes
 
-  @ApiOperation({ summary: 'Confirm a ride and set payment method' })
+  @ApiOperation({
+    summary:
+      'Confirm payment for a ride (call after driver accepts to pay and unlock trip start)',
+  })
   @Post('rides/:id/confirm')
   async confirmRide(
     @Request() req,
@@ -158,6 +162,25 @@ export class TripsController {
       rideId,
       body.rating,
       body.comment,
+    );
+  }
+
+  /**
+   * Review a completed ride (alias of rate that also accepts a comment)
+   * POST /trips/rides/:id/review
+   */
+  @ApiOperation({ summary: 'Submit a review for a completed ride' })
+  @Post('rides/:id/review')
+  async reviewRide(
+    @Request() req,
+    @Param('id') rideId: string,
+    @Body() dto: ReviewRideDto,
+  ) {
+    return this.tripsService.reviewRide(
+      req.user.id,
+      rideId,
+      dto.rating,
+      dto.comment,
     );
   }
 

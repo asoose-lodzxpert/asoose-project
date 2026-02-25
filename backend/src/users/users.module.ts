@@ -15,6 +15,7 @@ import { NotificationFacade } from './notification.facade';
 import { CommonModule } from '../common/common.module';
 import { UserAccountNotificationsService } from './notifications/user-account-notifications.service';
 import { IdempotencyService } from './idempotency.service';
+import { OrderReadyListenerService } from './order-ready-listener.service';
 
 // Modules
 import { RedisModule } from 'src/redis/redis.module';
@@ -34,7 +35,7 @@ import { PaystackAccountService } from '../payment/paystack-account.service';
     RedisModule,
     NotificationsModule,
     FcmModule,
-    forwardRef(() => TripsModule), // ✅ FIXED: Wrapped in forwardRef to break circular dependency
+    forwardRef(() => TripsModule),
     VendorModule,
     QueueModule,
     FareModule,
@@ -54,6 +55,7 @@ import { PaystackAccountService } from '../payment/paystack-account.service';
     UserAccountNotificationsService,
     IdempotencyService,
     PaystackAccountService,
+    OrderReadyListenerService,
   ],
   exports: [
     UsersService,

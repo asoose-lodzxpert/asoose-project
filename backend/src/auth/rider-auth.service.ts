@@ -6,13 +6,19 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import * as bcrypt from 'bcryptjs';
+import {
+  hashPassword,
+  verifyPassword,
+  upgradeNeeded,
+} from './password-hash.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateRiderDto } from './dto/create-rider.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { OtpService } from './otp.service';
 import { EmailProducer } from '../mail/email.producer';
+import { TokenRevocationService } from './token-revocation.service';
+import { randomUUID } from 'crypto';
 
 @Injectable()
 export class RiderAuthService {
@@ -21,11 +27,23 @@ export class RiderAuthService {
     private jwtService: JwtService,
     private otpService: OtpService,
     private emailProducer: EmailProducer,
+    private tokenRevocation: TokenRevocationService,
   ) {}
+
+  private signRefreshToken(
+    payload: Record<string, unknown>,
+    expiresIn = '30d',
+  ): string {
+    return this.jwtService.sign(
+      { ...payload, jti: randomUUID() },
+      { expiresIn: expiresIn as any },
+    );
+  }
 
   // ============== REGISTRATION ==============
   async registerRider(dto: CreateRiderDto) {
-    const hashedPassword = await bcrypt.hash(dto.password, 10);
+    // Hash with Argon2id for all new rider registrations
+    const hashedPassword = await hashPassword(dto.password);
 
     // Check if email already exists
     const existingRider = await this.prisma.rider.findUnique({
@@ -140,9 +158,24 @@ export class RiderAuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    const isPasswordValid = await bcrypt.compare(body.password, rider.password);
+    // Verify password — handles both legacy bcrypt hashes and Argon2id hashes
+    const isPasswordValid = await verifyPassword(body.password, rider.password);
     if (!isPasswordValid) {
       throw new UnauthorizedException('Invalid credentials');
+    }
+
+    // Transparent bcrypt → Argon2id upgrade on first successful login after migration
+    if (upgradeNeeded(rider.password)) {
+      hashPassword(body.password)
+        .then((newHash) =>
+          this.prisma.rider.update({
+            where: { id: rider.id },
+            data: { password: newHash },
+          }),
+        )
+        .catch(() => {
+          // Non-critical: the next login will retry the upgrade
+        });
     }
 
     if (rider.status === 'BANNED' || rider.status === 'SUSPENDED') {
@@ -153,7 +186,7 @@ export class RiderAuthService {
 
     const payload = { sub: rider.id, email: rider.email, role: rider.role };
     const accessToken = this.jwtService.sign(payload);
-    const refreshToken = this.jwtService.sign(payload, { expiresIn: '30d' });
+    const refreshToken = this.signRefreshToken(payload);
 
     return {
       user: {
@@ -234,7 +267,7 @@ export class RiderAuthService {
       throw new NotFoundException('Rider not found');
     }
 
-    const hashedPassword = await bcrypt.hash(dto.newPassword, 10);
+    const hashedPassword = await hashPassword(dto.newPassword);
     await this.prisma.rider.update({
       where: { email: dto.email },
       data: { password: hashedPassword },
@@ -251,7 +284,7 @@ export class RiderAuthService {
       throw new BadRequestException('Invalid or expired OTP');
     }
 
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    const hashedPassword = await hashPassword(newPassword);
     await this.prisma.rider.update({
       where: { email },
       data: { password: hashedPassword },
@@ -281,6 +314,13 @@ export class RiderAuthService {
   async refreshRiderToken(refreshToken: string) {
     try {
       const payload = this.jwtService.verify(refreshToken);
+      if (payload.jti) {
+        const revoked = await this.tokenRevocation.isRefreshTokenRevoked(
+          payload.jti,
+        );
+        if (revoked)
+          throw new UnauthorizedException('Refresh token has been revoked');
+      }
       const rider = await this.prisma.rider.findUnique({
         where: { id: payload.sub || payload.id },
       });
@@ -300,6 +340,24 @@ export class RiderAuthService {
     } catch (error) {
       throw new UnauthorizedException('Invalid refresh token');
     }
+  }
+
+  /** Invalidates the supplied refresh token JTI on logout. */
+  async logoutRider(refreshToken: string): Promise<{ message: string }> {
+    try {
+      const decoded = this.jwtService.decode(refreshToken) as Record<
+        string,
+        any
+      > | null;
+      if (decoded?.jti) {
+        const now = Math.floor(Date.now() / 1000);
+        const ttl = decoded.exp ? decoded.exp - now : 30 * 24 * 60 * 60;
+        await this.tokenRevocation.revokeRefreshToken(decoded.jti, ttl);
+      }
+    } catch {
+      /* ignore */
+    }
+    return { message: 'Logged out successfully' };
   }
 
   // ============== NOTIFICATIONS PREFERENCES ==============

@@ -47,9 +47,8 @@ export interface ProductDetails {
   modifierGroups: Array<{
     id: string;
     name: string;
-    required: boolean;
-    minSelection: number;
-    maxSelection: number;
+    minSelect: number;
+    maxSelect: number;
     modifiers: Array<{
       id: string;
       name: string;

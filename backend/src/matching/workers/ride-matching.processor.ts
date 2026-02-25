@@ -386,11 +386,11 @@ export class RideMatchingProcessor extends WorkerHost {
       `Cancelling ride ${rideId} — no driver found after ${attempts} attempts`,
     );
 
-    // Update ride status to CANCELLED
+    // Update ride status to CANCELLED_BY_USER (system-triggered, no driver found)
     await this.prisma.ride.update({
       where: { id: rideId },
       data: {
-        status: 'CANCELLED',
+        status: 'CANCELLED_BY_USER',
         cancellationReason: 'No driver available',
         cancelledBy: 'SYSTEM',
         cancelledAt: new Date(),

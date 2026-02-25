@@ -24,6 +24,7 @@ import {
   Dimensions,
 } from "react-native";
 import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
+import { useMapStyle } from "@/hooks/useMapStyle";
 import { ThemedText } from "@/components/themed-text";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
@@ -73,6 +74,7 @@ export function AddressLocationPickerModal({
   const [reverseAddress, setReverseAddress] = useState("");
 
   const mapRef = useRef<MapView>(null);
+  const mapStyle = useMapStyle();
 
   const coords = useMemo(() => initialCoords || undefined, [initialCoords]);
   const { results: predictions, loading: searching } = useAddressSearch(
@@ -297,6 +299,7 @@ export function AddressLocationPickerModal({
               ref={mapRef}
               provider={PROVIDER_GOOGLE}
               style={StyleSheet.absoluteFill}
+              customMapStyle={mapStyle}
               onPress={handleMapPress}
               initialRegion={{
                 latitude: coords?.latitude || DEFAULT_MAP_CENTER.latitude,

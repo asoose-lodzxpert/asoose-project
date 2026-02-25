@@ -84,13 +84,20 @@ enum OrderStatus {
 }
 
 enum RideStatus {
-  PENDING      // Payment not yet confirmed
-  REQUESTED    // Payment confirmed, searching for driver
-  ACCEPTED     // Driver accepted
-  ARRIVED
-  IN_PROGRESS  // Trip started
-  COMPLETED    // Trip completed
-  CANCELLED    // Trip cancelled
+  // ── Legacy values (kept for historical records) ──
+  PENDING             // Legacy: payment not yet confirmed
+  ACCEPTED            // Legacy: driver accepted
+  ARRIVED             // Legacy: driver arrived at pickup
+  CANCELLED           // Legacy: trip cancelled (generic)
+  // ── Active flow ──
+  REQUESTED           // Customer submitted ride request; matching starts immediately
+  SEARCHING_DRIVER    // System is actively searching for a driver
+  DRIVER_ACCEPTED     // Driver accepted the ride; customer must now pay
+  PAID                // Customer confirmed payment; driver may start trip
+  IN_PROGRESS         // Trip in progress
+  COMPLETED           // Trip completed
+  CANCELLED_BY_USER   // Customer cancelled the ride
+  CANCELLED_BY_DRIVER // Driver cancelled the ride
 }
 
 enum DeliveryStatus {

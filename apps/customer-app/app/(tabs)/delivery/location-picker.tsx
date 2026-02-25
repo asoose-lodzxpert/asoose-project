@@ -16,6 +16,7 @@ import {
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
+import { useMapStyle } from "@/hooks/useMapStyle";
 import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
 import { IconSymbol, IconSymbolName } from "@/components/ui/icon-symbol";
@@ -127,6 +128,7 @@ export default function LocationPickerScreen() {
   const [confirming, setConfirming] = useState(false);
 
   const mapRef = useRef<MapView>(null);
+  const mapStyle = useMapStyle();
   const searchTimeout = useRef<number | null>(null);
 
   const searchPlaces = useCallback(
@@ -461,6 +463,7 @@ export default function LocationPickerScreen() {
               ref={mapRef}
               provider={PROVIDER_GOOGLE}
               style={StyleSheet.absoluteFill}
+              customMapStyle={mapStyle}
               initialRegion={{
                 latitude:
                   currentLocation?.coords?.latitude ??

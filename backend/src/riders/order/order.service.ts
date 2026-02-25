@@ -82,7 +82,7 @@ export class OrderService {
       hoursOnline = totalRides * 0.75;
     }
     return {
-      total: rideFees + bonuses + serviceFees,
+      total: parseFloat((rideFees + bonuses + serviceFees).toFixed(2)),
       rides: totalRides,
       avgPerRide,
       hoursOnline,

@@ -377,7 +377,9 @@ export class PaymentStatusService {
             metadata: { orderGroupId: payment.orderGroupId },
           });
 
-          // Start delivery matching for the single group delivery
+          // Send delivery OTP email to customer now that payment is confirmed.
+          // Rider matching is deferred: it fires via the 'order.ready' event
+          // once ALL vendors in this group have marked their orders as READY.
           try {
             const groupDelivery = await this.prisma.delivery.findFirst({
               where: { orderGroupId: payment.orderGroupId },
@@ -387,7 +389,6 @@ export class PaymentStatusService {
               },
             });
             if (groupDelivery) {
-              await this.startDeliveryMatching(groupDelivery.id);
               // Send OTP email to customer
               if (groupDelivery.customer?.email && groupDelivery.deliveryOtp) {
                 await this.sendDeliveryOtpEmail({
@@ -401,7 +402,7 @@ export class PaymentStatusService {
               }
             }
           } catch (err) {
-            this.logger.error('Group delivery matching/OTP email failed', err);
+            this.logger.error('Group delivery OTP email failed', err);
           }
         } else if (result.order?.delivery?.id) {
           // Single order — notify vendor
@@ -436,10 +437,10 @@ export class PaymentStatusService {
             metadata: { orderId: result.order.id },
             recipientName: result.order.user?.name || '—',
           });
-          // Start delivery matching
-          await this.startDeliveryMatching(result.order.delivery.id);
+          // Rider matching is deferred: it fires via the 'order.ready' event
+          // once the vendor marks this order as READY (PATCH /orders/:id/ready).
 
-          // Send OTP email to customer
+          // Send OTP email to customer now that payment is confirmed
           try {
             const delivery = await this.prisma.delivery.findUnique({
               where: { id: result.order.delivery.id },

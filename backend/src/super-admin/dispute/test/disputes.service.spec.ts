@@ -3,6 +3,8 @@ import { DisputesService } from '../dispute.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { PaymentService } from 'src/payment/payment.service';
 import { TransactionLedgerService } from 'src/super-admin/transactions/transaction-ledger.service';
+import { NotificationsService } from 'src/notifications/notifications.service';
+import { NotificationsGateway } from 'src/notifications/notifications.gateway';
 import { BadRequestException } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
 
@@ -14,9 +16,10 @@ const mockPrisma = {
     count: jest.fn(),
   },
   $transaction: jest.fn((cb) => cb(mockPrisma)),
-  transaction: { create: jest.fn() },
+  transaction: { create: jest.fn(), updateMany: jest.fn() },
   store: { findUnique: jest.fn(), update: jest.fn() },
   payment: { update: jest.fn() },
+  activityLog: { create: jest.fn() },
 };
 
 const mockPaymentService = {
@@ -35,6 +38,18 @@ describe('DisputesService', () => {
         { provide: PrismaService, useValue: mockPrisma },
         { provide: PaymentService, useValue: mockPaymentService },
         { provide: TransactionLedgerService, useValue: mockLedger },
+        {
+          provide: NotificationsService,
+          useValue: {
+            sendNotification: jest.fn(),
+            sendPushNotification: jest.fn(),
+            sendToUser: jest.fn().mockResolvedValue(undefined),
+          },
+        },
+        {
+          provide: NotificationsGateway,
+          useValue: { sendToUser: jest.fn(), sendToRoom: jest.fn() },
+        },
       ],
     }).compile();
 
@@ -53,7 +68,7 @@ describe('DisputesService', () => {
       orderId: 'order-123',
       openedByUserId: 'user-1',
       createdAt: new Date(),
-      payment: { id: 'pay-123', amount: 1000, reference: 'ref_123' },
+      payment: { id: 'pay-123', amount: 1000, reference: 'REF-test-123' },
       order: { id: 'order-123', total: 1000, storeId: 'store-1' },
     };
 

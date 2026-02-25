@@ -206,7 +206,14 @@ export class RidesService {
 
     if (!ride) throw new NotFoundException(`Ride #${id} not found`);
 
-    if (['COMPLETED', 'CANCELLED'].includes(ride.status)) {
+    if (
+      [
+        'COMPLETED',
+        'CANCELLED',
+        'CANCELLED_BY_USER',
+        'CANCELLED_BY_DRIVER',
+      ].includes(ride.status)
+    ) {
       throw new BadRequestException(
         `Cannot cancel ride with status: ${ride.status}`,
       );
@@ -455,7 +462,15 @@ export class RidesService {
         'Ride already has a driver. Unassign first.',
       );
     }
-    if (['COMPLETED', 'CANCELLED', 'EXPIRED'].includes(ride.status)) {
+    if (
+      [
+        'COMPLETED',
+        'CANCELLED',
+        'CANCELLED_BY_USER',
+        'CANCELLED_BY_DRIVER',
+        'EXPIRED',
+      ].includes(ride.status)
+    ) {
       throw new BadRequestException(
         `Cannot assign driver to ${ride.status} ride.`,
       );
@@ -511,7 +526,15 @@ export class RidesService {
     const ride = await this.prisma.ride.findUnique({ where: { id: rideId } });
     if (!ride) throw new NotFoundException(`Ride #${rideId} not found`);
 
-    if (['COMPLETED', 'CANCELLED', 'EXPIRED'].includes(ride.status)) {
+    if (
+      [
+        'COMPLETED',
+        'CANCELLED',
+        'CANCELLED_BY_USER',
+        'CANCELLED_BY_DRIVER',
+        'EXPIRED',
+      ].includes(ride.status)
+    ) {
       throw new BadRequestException(
         `Cannot retry matching for a ${ride.status} ride.`,
       );
@@ -521,7 +544,7 @@ export class RidesService {
       where: { id: rideId },
       data: {
         riderId: null,
-        status: 'REQUESTED',
+        status: 'SEARCHING_DRIVER',
         acceptedAt: null,
       },
     });
@@ -531,8 +554,12 @@ export class RidesService {
         userId: adminId,
         action: 'RIDE_RETRY_MATCHING',
         target: rideId,
-        details: 'Admin triggered retry matching — ride returned to REQUESTED',
-        metadata: { previousStatus: ride.status, previousRiderId: ride.riderId },
+        details:
+          'Admin triggered retry matching — ride returned to SEARCHING_DRIVER',
+        metadata: {
+          previousStatus: ride.status,
+          previousRiderId: ride.riderId,
+        },
       },
     });
 
@@ -548,7 +575,15 @@ export class RidesService {
       throw new BadRequestException('Ride has no assigned driver to unassign.');
     }
 
-    if (['COMPLETED', 'CANCELLED', 'IN_PROGRESS'].includes(ride.status)) {
+    if (
+      [
+        'COMPLETED',
+        'CANCELLED',
+        'CANCELLED_BY_USER',
+        'CANCELLED_BY_DRIVER',
+        'IN_PROGRESS',
+      ].includes(ride.status)
+    ) {
       throw new BadRequestException(
         `Cannot unassign driver from a ${ride.status} ride.`,
       );
@@ -575,7 +610,10 @@ export class RidesService {
       },
     });
 
-    return { success: true, message: 'Driver unassigned. Ride returned to queue.' };
+    return {
+      success: true,
+      message: 'Driver unassigned. Ride returned to queue.',
+    };
   }
 
   async forceStatus(

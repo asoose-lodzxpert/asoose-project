@@ -141,6 +141,38 @@ export default function CartScreen() {
                     {item.price.toLocaleString()}
                   </ThemedText>
 
+                  {/* Modifier selections */}
+                  {item.modifierGroups && item.modifierGroups.length > 0 && (
+                    <View style={styles.modifiersWrap}>
+                      {item.modifierGroups.map(
+                        (group: any) =>
+                          group.selectedModifiers?.length > 0 && (
+                            <View key={group.id} style={styles.modifierRow}>
+                              <ThemedText
+                                style={[
+                                  styles.modifierGroupLabel,
+                                  { color: textMuted },
+                                ]}
+                              >
+                                {group.name}:
+                              </ThemedText>
+                              <ThemedText
+                                style={[
+                                  styles.modifierValues,
+                                  { color: textSub },
+                                ]}
+                                numberOfLines={2}
+                              >
+                                {group.selectedModifiers
+                                  .map((m: any) => m.name)
+                                  .join(", ")}
+                              </ThemedText>
+                            </View>
+                          ),
+                      )}
+                    </View>
+                  )}
+
                   <View style={styles.itemFooter}>
                     {/* Remove */}
                     <Pressable
@@ -345,6 +377,27 @@ const styles = StyleSheet.create({
   itemInfo: { flex: 1 },
   itemName: { fontSize: 14, lineHeight: 20, fontWeight: "500" },
   itemPrice: { fontSize: 16, fontWeight: "700", marginTop: 4 },
+
+  // Modifier summary
+  modifiersWrap: {
+    marginTop: 6,
+    gap: 3,
+  },
+  modifierRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 3,
+  },
+  modifierGroupLabel: {
+    fontSize: 11,
+    fontWeight: "600",
+  },
+  modifierValues: {
+    fontSize: 11,
+    flex: 1,
+    lineHeight: 16,
+  },
+
   itemFooter: {
     flexDirection: "row",
     alignItems: "center",

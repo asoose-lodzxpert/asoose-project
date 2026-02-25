@@ -22,6 +22,52 @@ import {
   ApiConsumes,
 } from '@nestjs/swagger';
 
+// ─── Allowed MIME types + their magic-byte signatures ──────────────────────
+const ALLOWED_TYPES = [
+  'application/pdf',
+  'image/jpeg',
+  'image/png',
+  'image/jpg',
+] as const;
+
+/**
+ * Validate a file using BOTH the client-supplied mimetype AND the actual
+ * magic bytes read from the buffer.  The mimetype check alone is fully
+ * spoofable by any client that sets a custom Content-Type.
+ *
+ * `file-type` is ESM-only so we dynamic-import it.
+ */
+async function assertSafeMimeType(file: Express.Multer.File): Promise<void> {
+  if (!ALLOWED_TYPES.includes(file.mimetype as any)) {
+    throw new BadRequestException(
+      'Invalid file type. Only PDF, JPG, and PNG are allowed',
+    );
+  }
+
+  // Magic-byte inspection — catches files renamed to a different extension
+  const { fileTypeFromBuffer } = await import('file-type');
+  const detected = await fileTypeFromBuffer(file.buffer);
+
+  // `detected` is undefined for plain-text / unrecognised formats
+  if (!detected || !ALLOWED_TYPES.includes(detected.mime as any)) {
+    throw new BadRequestException(
+      `File content does not match declared type (detected: ${detected?.mime ?? 'unknown'})`,
+    );
+  }
+
+  // Final guard: declared type must agree with detected type
+  // (e.g. client says image/png but file is actually a JPEG)
+  const declaredNorm =
+    file.mimetype === 'image/jpg' ? 'image/jpeg' : file.mimetype;
+  const detectedNorm =
+    detected.mime === 'image/jpg' ? 'image/jpeg' : detected.mime;
+  if (declaredNorm !== detectedNorm) {
+    throw new BadRequestException(
+      `Declared MIME type (${file.mimetype}) does not match file content (${detected.mime})`,
+    );
+  }
+}
+
 @ApiTags('Storage')
 @Controller({
   path: 'storage',
@@ -57,18 +103,8 @@ export class StorageController {
       throw new BadRequestException('File size exceeds 5MB limit');
     }
 
-    // Validate file type
-    const allowedTypes = [
-      'application/pdf',
-      'image/jpeg',
-      'image/png',
-      'image/jpg',
-    ];
-    if (!allowedTypes.includes(file.mimetype)) {
-      throw new BadRequestException(
-        'Invalid file type. Only PDF, JPG, and PNG are allowed',
-      );
-    }
+    // Validate file type — checks both client-supplied mimetype AND magic bytes
+    await assertSafeMimeType(file);
 
     const result = await this.storageService.uploadFile(file);
     return { url: result.url };
@@ -91,18 +127,8 @@ export class StorageController {
       throw new BadRequestException('File size exceeds 5MB limit');
     }
 
-    // Validate file type
-    const allowedTypes = [
-      'application/pdf',
-      'image/jpeg',
-      'image/png',
-      'image/jpg',
-    ];
-    if (!allowedTypes.includes(file.mimetype)) {
-      throw new BadRequestException(
-        'Invalid file type. Only PDF, JPG, and PNG are allowed',
-      );
-    }
+    // Validate file type — checks both client-supplied mimetype AND magic bytes
+    await assertSafeMimeType(file);
 
     const result = await this.storageService.uploadFile(file);
     return { url: result.url };
@@ -123,31 +149,29 @@ export class StorageController {
 
     // Validate file size and type for each file
     const MAX_SIZE = 5 * 1024 * 1024;
-    const allowedTypes = [
-      'application/pdf',
-      'image/jpeg',
-      'image/png',
-      'image/jpg',
-    ];
 
     const validFiles: Express.Multer.File[] = [];
     const errors: { index: number; message: string }[] = [];
 
-    files.forEach((file, index) => {
+    for (const [index, file] of files.entries()) {
       if (file.size > MAX_SIZE) {
         errors.push({
           index,
           message: `File ${file.originalname} exceeds 5MB limit`,
         });
-      } else if (!allowedTypes.includes(file.mimetype)) {
-        errors.push({
-          index,
-          message: `File ${file.originalname} has invalid type`,
-        });
       } else {
-        validFiles.push(file);
+        try {
+          // Magic-byte + mimetype check for each file
+          await assertSafeMimeType(file);
+          validFiles.push(file);
+        } catch {
+          errors.push({
+            index,
+            message: `File ${file.originalname} has invalid or mismatched type`,
+          });
+        }
       }
-    });
+    }
 
     // Upload all valid files
     const results = await this.storageService.uploadBulk(validFiles);
@@ -176,18 +200,8 @@ export class StorageController {
       throw new BadRequestException('File size exceeds 5MB limit');
     }
 
-    // Validate file type - only documents for signup
-    const allowedTypes = [
-      'application/pdf',
-      'image/jpeg',
-      'image/png',
-      'image/jpg',
-    ];
-    if (!allowedTypes.includes(file.mimetype)) {
-      throw new BadRequestException(
-        'Invalid file type. Only PDF, JPG, and PNG are allowed',
-      );
-    }
+    // Validate file type — checks both client-supplied mimetype AND magic bytes
+    await assertSafeMimeType(file);
 
     const result = await this.storageService.uploadFile(file);
     return { url: result.url };

@@ -2,15 +2,16 @@
 
 ## 🚨 Critical
 
-1. **In-memory ThrottlerModule** — rate limits not shared across instances/restarts. Wire `ThrottlerStorageRedisService` (already in `dependencies`) in `app.module.ts`.
-2. **`/storage/upload-public` is unauthenticated** — any anonymous user can upload to S3. Remove the endpoint; use presigned S3 URLs instead. (`storage.controller.ts`)
-3. **File type validation uses `mimetype` only** — client-supplied, fully spoofable. Add `file-type` package for magic byte inspection. (`storage.controller.ts`)
-4. **Redis default port is `6389` (typo)** — should be `6379`. If `REDIS_PORT` env var is absent, connection silently fails. (`redis.module.ts`, line 22)
-5. **`CorrelationMiddleware` and `HttpLoggingInterceptor` are never registered** — dead code. No correlation IDs in logs, no HTTP request/response logging in production. Register both in `main.ts`.
-6. **Only 11 unit spec files** — `AuthService`, `PaymentService`, `WithdrawalService`, `RidesService` have zero isolated unit tests. Write them.
-7. **`LOG_LEVEL` env var is ignored** — Winston logger hardcodes `'warn'` in prod regardless. Use `process.env.LOG_LEVEL` as the level. (`libs/logger/logger.ts`)
-8. **No Prometheus `/metrics` endpoint** — zero visibility into request rates, error rates, or latency. Add `prom-client` or `@willsoto/nestjs-prometheus`.
-9. **`noImplicitAny: false` + 344 `as any` usages** — TypeScript safety is disabled. Enable `strict: true` in `tsconfig.json` and eliminate `any` usages incrementally.
+<!-- 1. **In-memory ThrottlerModule** — rate limits not shared across instances/restarts. Wire `ThrottlerStorageRedisService` (already in `dependencies`) in `app.module.ts`. -->
+   <!-- 2. **`/storage/upload-public` is unauthenticated** — any anonymous user can upload to S3. Remove the endpoint; use presigned S3 URLs instead. (`storage.controller.ts`) -->
+   <!-- 2. **File type validation uses `mimetype` only** — client-supplied, fully spoofable. Add `file-type` package for magic byte inspection. (`storage.controller.ts`) -->
+   <!-- 3. **Redis default port is `6389` (typo)** — should be `6379`. If `REDIS_PORT` env var is absent, connection silently fails. (`redis.module.ts`, line 22) -->
+<!-- 2. **`CorrelationMiddleware` and `HttpLoggingInterceptor` are never registered** — dead code. No correlation IDs in logs, no HTTP request/response logging in production. Register both in `main.ts`. -->
+
+3. **Only 11 unit spec files** — `AuthService`, `PaymentService`, `WithdrawalService`, `RidesService` have zero isolated unit tests. Write them.
+   <!-- 4. **`LOG_LEVEL` env var is ignored** — Winston logger hardcodes `'warn'` in prod regardless. Use `process.env.LOG_LEVEL` as the level. (`libs/logger/logger.ts`) -->
+   <!-- 4. **No Prometheus `/metrics` endpoint** — zero visibility into request rates, error rates, or latency. Add `prom-client` or `@willsoto/nestjs-prometheus`. -->
+   <!-- 9. **`noImplicitAny: false` + 344 `as any` usages** — TypeScript safety is disabled. Enable `strict: true` in `tsconfig.json` and eliminate `any` usages incrementally. -->
 
 ---
 

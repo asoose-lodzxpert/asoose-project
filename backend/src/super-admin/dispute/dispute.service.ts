@@ -154,8 +154,8 @@ export class DisputesService {
           referenceId,
           referenceType: notifType,
           // Include the type-specific key so NotificationCard deep-links work
-          ...(dto.orderId    ? { orderId: dto.orderId }       : {}),
-          ...(dto.rideId     ? { rideId: dto.rideId }         : {}),
+          ...(dto.orderId ? { orderId: dto.orderId } : {}),
+          ...(dto.rideId ? { rideId: dto.rideId } : {}),
           ...(dto.deliveryId ? { deliveryId: dto.deliveryId } : {}),
           priority,
           reason: dto.reason,
@@ -246,7 +246,8 @@ export class DisputesService {
     userId?: string;
     role?: string;
   }) {
-    const { skip, take, status, priority, search, category, userId, role } = params;
+    const { skip, take, status, priority, search, category, userId, role } =
+      params;
 
     const skipInt = skip ? Number(skip) : 0;
     const takeInt = take ? Number(take) : 10;
@@ -547,6 +548,22 @@ export class DisputesService {
       throw new BadRequestException(
         'No valid payment reference found for refund.',
       );
+
+    // Pre-flight balance check for vendor wallet refunds
+    if (
+      dto.refundSource === RefundSource.VENDOR_WALLET &&
+      dispute.order?.storeId
+    ) {
+      const store = await this.prisma.store.findUnique({
+        where: { id: dispute.order.storeId },
+        select: { walletBalance: true },
+      });
+      if ((store?.walletBalance || 0) < refundAmount) {
+        throw new BadRequestException(
+          'Vendor has insufficient wallet balance for this refund',
+        );
+      }
+    }
 
     const idempotencyKey = `refund_${dispute.id}_${randomUUID()}`;
 

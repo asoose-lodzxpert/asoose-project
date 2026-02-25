@@ -128,6 +128,16 @@ export const JobsProvider = ({ children }: { children: ReactNode }) => {
     [logout],
   );
 
+  const handlePaymentConfirmed = useCallback((rideId: string) => {
+    // Customer paid — notify the driver they can now start the trip
+    Toast.show({
+      type: "success",
+      text1: "Payment Confirmed",
+      text2: "Customer has paid. You may now start the trip.",
+      visibilityTime: 5000,
+    });
+  }, []);
+
   const { reconnect, joinOrderRoom } = useJobEvents({
     enabled: isOnline,
     onJobAssigned: handleJobAssigned,
@@ -135,6 +145,7 @@ export const JobsProvider = ({ children }: { children: ReactNode }) => {
     onJobCancelled: handleJobCancelled,
     onConnectionStatusChange: handleConnectionStatusChange,
     onForceLogout: handleForceLogout,
+    onPaymentConfirmed: handlePaymentConfirmed,
   });
 
   // Start location streaming when rider is online (after JobEventsService is set)

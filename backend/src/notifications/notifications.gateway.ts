@@ -16,6 +16,8 @@ import { DriverStateService } from '../matching/driver-state/driver-state.servic
 import { TokenRevocationService } from '../auth/token-revocation.service';
 import { MATCHING_REDIS_CLIENT } from '../matching/redis/redis.module';
 import Redis from 'ioredis';
+import { createAdapter } from '@socket.io/redis-adapter';
+import type { RedisClientType } from 'redis';
 
 // Per-socket minimum interval between location updates (ms)
 const LOCATION_RATE_LIMIT_MS = 800;
@@ -47,10 +49,21 @@ export class NotificationsGateway
     private driverStateService: DriverStateService,
     private tokenRevocationService: TokenRevocationService,
     @Inject(MATCHING_REDIS_CLIENT) private readonly matchingRedis: Redis,
+    @Inject('REDIS_CLIENT') private readonly redisClient: RedisClientType,
   ) {}
 
   afterInit() {
-    this.logger.log('WebSocket Gateway Initialized');
+    // Wire the Redis pub/sub adapter so Socket.IO events are broadcast across
+    // all horizontally-scaled instances. Two separate clients are required by
+    // the adapter: one for publishing, one for subscribing.
+    const pubClient = (this.redisClient as any).duplicate
+      ? (this.redisClient as any).duplicate()
+      : this.redisClient;
+    const subClient = (pubClient as any).duplicate
+      ? (pubClient as any).duplicate()
+      : pubClient;
+    this.server.adapter(createAdapter(pubClient, subClient));
+    this.logger.log('WebSocket Gateway Initialized with Redis adapter');
   }
 
   async handleConnection(client: Socket) {

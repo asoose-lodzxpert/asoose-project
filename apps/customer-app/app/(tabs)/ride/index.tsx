@@ -60,14 +60,18 @@ export default function RideBookingScreen() {
     if (__DEV__) console.log("Page View:", pageView);
 
     if (currentRide && pageView !== "IDLE") {
-      // If ride is cancelled, do not redirect to payment/tracking
-      if (currentRide.status === "CANCELLED") {
+      // If ride is cancelled by user or driver (or legacy CANCELLED), reset so user can book again
+      const cancelledStatuses = [
+        "CANCELLED",
+        "CANCELLED_BY_USER",
+        "CANCELLED_BY_DRIVER",
+      ];
+      if (cancelledStatuses.includes(currentRide.status)) {
         Toast.show({
           type: "error",
           text1: "Ride cancelled",
           text2: currentRide.cancellationReason || "No driver available",
         });
-        // Reset ride state so user can book again
         if (__DEV__) {
           console.log("Resetting ride state due to cancellation");
         }
@@ -75,23 +79,9 @@ export default function RideBookingScreen() {
         return;
       }
 
-      // If payment is already completed but we're still on the PAYMENT pageView
-      // (e.g. app was killed right after payment before ride confirmation came
-      // back), skip payment and go straight to tracking.
-      const ridePayment = Array.isArray(currentRide.payment)
-        ? currentRide.payment[0]
-        : currentRide.payment;
-      const paymentCompleted = ridePayment?.status === "COMPLETED";
-      if (paymentCompleted && pageView === "PAYMENT") {
-        router.replace("/ride/tracking");
-        return;
-      }
-
-      // Only auto-redirect for non-PAYMENT states (tracking resume on app open).
-      // PAYMENT navigation is owned by handleBookRide to avoid double-navigation.
-      if (pageView !== "PAYMENT") {
-        router.replace("/ride/tracking");
-      }
+      // All active ride states (FINDING_DRIVER, AWAITING_PAYMENT, DRIVER_ASSIGNED, IN_PROGRESS)
+      // are handled within the tracking screen.
+      router.replace("/ride/tracking");
     }
   }, [currentRide, pageView, router, resetBooking]);
 

@@ -21,7 +21,9 @@ export class RidesCleanupService {
 
       const stuckRides = await this.prisma.ride.findMany({
         where: {
-          status: RideStatus.REQUESTED,
+          // Recover rides stuck in SEARCHING_DRIVER state (new flow)
+          // Also recover REQUESTED (legacy) as a safety net
+          status: { in: ['SEARCHING_DRIVER', 'REQUESTED'] as any[] },
           updatedAt: { lt: twoMinutesAgo },
         },
         include: {

@@ -131,10 +131,28 @@ export class RideEstimateDto {
 }
 
 export class CancelTripDto {
-  @ApiPropertyOptional({ description: 'Cancellation reason' })
+  @ApiProperty({ description: 'Cancellation reason (required)' })
+  @IsNotEmpty()
+  @IsString()
+  reason: string;
+}
+
+export class ReviewRideDto {
+  @ApiProperty({
+    description: 'Rating from 1 to 5',
+    minimum: 1,
+    maximum: 5,
+    example: 5,
+  })
+  @IsNumber()
+  @Min(1)
+  @Max(5)
+  rating: number;
+
+  @ApiPropertyOptional({ description: 'Optional review comment' })
   @IsOptional()
   @IsString()
-  reason?: string;
+  comment?: string;
 }
 
 export class RequestDeliveryDto {

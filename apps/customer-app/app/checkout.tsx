@@ -187,7 +187,14 @@ export default function CheckoutScreen() {
     try {
       const orderPayload = {
         addressId: selectedAddress.id,
-        items: items.map((item) => ({ id: item.id, quantity: item.qty })),
+        items: items.map((item) => ({
+          id: item.id,
+          quantity: item.qty,
+          // Flatten all selected modifier IDs — backend re-prices from DB
+          modifierIds: item.modifierGroups?.flatMap((g) =>
+            g.selectedModifiers.map((m) => m.id),
+          ),
+        })),
       };
 
       const orderResponse = await createOrder(orderPayload);

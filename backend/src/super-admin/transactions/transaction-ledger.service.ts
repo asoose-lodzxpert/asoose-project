@@ -421,13 +421,58 @@ export class TransactionLedgerService {
         });
       }
 
-      // ... Rest of legacy logic kept for safety/fallback ...
       if (payout.status === 'PAID') {
         await client.transaction.updateMany({
           where: { vendorPayoutId: payout.id, type: 'PAYOUT_REQUESTED' },
           data: { status: 'COMPLETED' },
         });
-        // ...
+
+        await client.transaction.create({
+          data: {
+            type: 'COMMISSION_DEDUCTED',
+            amount: commission,
+            entityType: 'PLATFORM',
+            entityId: payout.storeId,
+            vendorPayoutId: payout.id,
+            description: `Commission deducted (${commissionRate}%)`,
+            status: 'COMPLETED',
+            balanceBefore: currentBalance,
+            balanceAfter: currentBalance - commission,
+            metadata: {
+              reference: payout.reference,
+              commissionRate,
+              commission,
+              netPayout,
+            },
+          },
+        });
+
+        await client.transaction.create({
+          data: {
+            type: 'PAYOUT_COMPLETED',
+            amount: netPayout,
+            entityType: 'STORE',
+            entityId: payout.storeId,
+            vendorPayoutId: payout.id,
+            description: `Payout completed (net after ${commissionRate}% commission)`,
+            status: 'COMPLETED',
+            balanceBefore: currentBalance,
+            balanceAfter: currentBalance - payout.amount,
+            metadata: {
+              reference: payout.reference,
+              commissionRate,
+              commission,
+              netPayout,
+            },
+          },
+        });
+
+        await client.store.update({
+          where: { id: payout.storeId },
+          data: { walletBalance: { decrement: payout.amount } },
+        });
+
+        return;
       }
     }, tx);
   }

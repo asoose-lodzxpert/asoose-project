@@ -17,6 +17,8 @@ import { getSession } from "next-auth/react"; // ✅ Import NextAuth
 import { ProductModal, ModifierGroup } from "@/store/ProductModal";
 import { ApiService } from "@/services/api.service";
 
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1";
 const POPULAR_ITEMS_COUNT = 6;
 
 interface Product {
@@ -25,6 +27,8 @@ interface Product {
   price: number;
   category: { name: string };
   image?: string;
+  /** Backend may return singular `image` or plural `images[]` — both are normalised to `image` at fetch time */
+  images?: string[];
   description: string;
   modifierGroups: ModifierGroup[];
 }
