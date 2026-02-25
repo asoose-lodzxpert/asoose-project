@@ -205,7 +205,7 @@ export default function SettingsScreen() {
           </Pressable>
 
           <Pressable
-            style={styles.rowLast}
+            style={[styles.row, { borderBottomColor: border }]}
             onPress={() => router.push("/(settings)/addresses")}
           >
             <View
@@ -216,6 +216,22 @@ export default function SettingsScreen() {
             <View style={styles.rowTextWrap}>
               <ThemedText style={styles.rowLabel}>Addresses</ThemedText>
               <ThemedText type="caption">Home, Work, Others</ThemedText>
+            </View>
+            <IconSymbol name="chevron.right" size={18} color={muted} />
+          </Pressable>
+
+          <Pressable
+            style={styles.rowLast}
+            onPress={() => router.push("/(settings)/linked-accounts")}
+          >
+            <View
+              style={[styles.iconBox, { backgroundColor: accentGreen + "15" }]}
+            >
+              <IconSymbol name="link" size={18} color={accentGreen} />
+            </View>
+            <View style={styles.rowTextWrap}>
+              <ThemedText style={styles.rowLabel}>Linked Accounts</ThemedText>
+              <ThemedText type="caption">Google, Apple Sign-In</ThemedText>
             </View>
             <IconSymbol name="chevron.right" size={18} color={muted} />
           </Pressable>

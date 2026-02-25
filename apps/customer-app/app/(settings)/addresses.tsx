@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Keyboard,
@@ -8,7 +8,6 @@ import {
   View,
   ScrollView,
 } from "react-native";
-import MapView, { Marker } from "react-native-maps";
 import { useRouter } from "expo-router";
 import Toast from "react-native-toast-message";
 
@@ -31,7 +30,6 @@ import {
 } from "@/services/helpers/places-helper";
 import { Address } from "@/types/address";
 import { AddressLocationPickerModal } from "@/components/addresses/AddressLocationPickerModal";
-import { set } from "zod";
 
 export default function AddressesScreen() {
   const router = useRouter();
@@ -55,8 +53,7 @@ export default function AddressesScreen() {
     address: string;
   } | null>(null);
 
-  const mapRef = useRef<MapView>(null);
-  const debounceRef = useRef<any>(null);
+  const debounceRef = React.useRef<any>(null);
 
   const loadAddresses = useCallback(async () => {
     try {

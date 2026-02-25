@@ -1,12 +1,14 @@
 import { BullModule } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
+import { ConfigService } from '@nestjs/config';
 import { appLogger } from './libs/logger/logger';
 import { AppConfigModule } from './config/config.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { MongooseModule } from '@nestjs/mongoose';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis';
 
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -29,6 +31,8 @@ import { UsersModule } from './users/users.module';
 import { VendorModule } from './vendor/vendor.module';
 import { LogsModule } from './logs/logs.module';
 import { FareModule } from './fare/fare.module';
+import { LoggerModule } from './libs/logger/logger.module';
+import { MetricsModule } from './metrics/metrics.module';
 
 @Module({
   imports: [
@@ -36,17 +40,20 @@ import { FareModule } from './fare/fare.module';
     AppConfigModule,
 
     // ---------- BullMQ / Redis ----------
-    BullModule.forRoot({
-      connection: {
-        host: process.env.REDIS_HOST || 'localhost',
-        port: Number(process.env.REDIS_PORT) || 6379,
-        username: process.env.REDIS_USERNAME || undefined,
-        password: process.env.REDIS_PASSWORD || undefined,
-        ...(process.env.REDIS_TLS === 'true' && {
-          tls: { servername: process.env.REDIS_HOST },
-        }),
-        maxRetriesPerRequest: null,
-      },
+    BullModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (cs: ConfigService) => ({
+        connection: {
+          host: cs.get<string>('REDIS_HOST', 'localhost'),
+          port: cs.get<number>('REDIS_PORT', 6379),
+          username: cs.get<string>('REDIS_USERNAME') || undefined,
+          password: cs.get<string>('REDIS_PASSWORD') || undefined,
+          ...(cs.get<string>('REDIS_TLS') === 'true' && {
+            tls: { servername: cs.get<string>('REDIS_HOST') },
+          }),
+          maxRetriesPerRequest: null,
+        },
+      }),
     }),
 
     // ---------- Scheduling & Events ----------
@@ -55,8 +62,9 @@ import { FareModule } from './fare/fare.module';
 
     // ---------- MongoDB (optional — used only for error-log storage) ----------
     MongooseModule.forRootAsync({
-      useFactory: () => ({
-        uri: process.env.MONGODB_URI || 'mongodb://localhost:27017/asoose',
+      inject: [ConfigService],
+      useFactory: (cs: ConfigService) => ({
+        uri: cs.get<string>('MONGODB_URI', 'mongodb://localhost:27017/asoose'),
         serverSelectionTimeoutMS: 3_000,
         connectTimeoutMS: 3_000,
         socketTimeoutMS: 5_000,
@@ -81,14 +89,31 @@ import { FareModule } from './fare/fare.module';
     }),
 
     // ---------- Rate Limiting ----------
-    ThrottlerModule.forRoot([
-      {
-        ttl: 60_000,
-        limit: 300, // 300 req/min globally; auth endpoints use stricter @Throttle() overrides
-      },
-    ]),
+    // ThrottlerStorageRedisService shares counters across instances and survives restarts.
+    ThrottlerModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (cs: ConfigService) => ({
+        throttlers: [
+          {
+            ttl: 60_000,
+            limit: 300, // 300 req/min globally; auth endpoints use stricter @Throttle() overrides
+          },
+        ],
+        storage: new ThrottlerStorageRedisService({
+          host: cs.get<string>('REDIS_HOST', 'localhost'),
+          port: cs.get<number>('REDIS_PORT', 6379),
+          username: cs.get<string>('REDIS_USERNAME') || undefined,
+          password: cs.get<string>('REDIS_PASSWORD') || undefined,
+          ...(cs.get<string>('REDIS_TLS') === 'true' && {
+            tls: { servername: cs.get<string>('REDIS_HOST') },
+          }),
+        }),
+      }),
+    }),
 
     // ---------- App Modules ----------
+    LoggerModule,
+    MetricsModule,
     AuthModule,
     CartModule,
     FcmModule,

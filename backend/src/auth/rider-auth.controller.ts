@@ -10,7 +10,12 @@ import {
   Delete,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiResponse,
+} from '@nestjs/swagger';
 import { RiderAuthService } from './rider-auth.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guards';
@@ -30,6 +35,8 @@ export class RiderAuthController {
 
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get current rider profile' })
+  @ApiResponse({ status: 200, description: 'Rider profile returned' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   @Post('me')
   @UseGuards(JwtAuthGuard)
   async getMe(@Req() req) {
@@ -39,6 +46,8 @@ export class RiderAuthController {
   }
 
   @ApiOperation({ summary: 'Login as a rider' })
+  @ApiResponse({ status: 200, description: 'Access + refresh tokens returned' })
+  @ApiResponse({ status: 401, description: 'Invalid email or password' })
   @Post('login')
   @Throttle({ default: { limit: 10, ttl: 60 * 1000 } }) // 10 requests per minute
   login(@Body() body) {
@@ -46,6 +55,8 @@ export class RiderAuthController {
   }
 
   @ApiOperation({ summary: 'Register a new rider account' })
+  @ApiResponse({ status: 201, description: 'Rider account created' })
+  @ApiResponse({ status: 409, description: 'Email already in use' })
   @Post('register')
   @Throttle({ default: { limit: 5, ttl: 60 * 60 * 1000 } }) // 5 requests per hour
   register(@Body() dto: CreateRiderDto) {
@@ -53,6 +64,10 @@ export class RiderAuthController {
   }
 
   @ApiOperation({ summary: 'Send OTP for password reset' })
+  @ApiResponse({
+    status: 200,
+    description: 'OTP sent (always 200 to prevent user enumeration)',
+  })
   @Post('send-otp')
   @Throttle({ default: { limit: 3, ttl: 60 * 60 * 1000 } }) // 3 requests per hour
   sendOtp(@Body() body: { email: string }) {
@@ -60,12 +75,16 @@ export class RiderAuthController {
   }
 
   @ApiOperation({ summary: 'Verify OTP for password reset' })
+  @ApiResponse({ status: 200, description: 'OTP is valid' })
+  @ApiResponse({ status: 400, description: 'OTP is invalid or expired' })
   @Post('verify-otp')
   async verifyOtp(@Body() body: { email: string; otp: string }) {
     return await this.riderAuthService.verifyOtp(body.email, body.otp);
   }
 
   @ApiOperation({ summary: 'Reset rider password using OTP' })
+  @ApiResponse({ status: 200, description: 'Password reset successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid OTP or weak password' })
   @Post('reset-password')
   @Throttle({ default: { limit: 5, ttl: 60 * 60 * 1000 } }) // 5 requests per hour
   resetPassword(@Body() dto: ResetPasswordDto & { otp: string }) {
@@ -75,6 +94,8 @@ export class RiderAuthController {
 
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update rider profile' })
+  @ApiResponse({ status: 200, description: 'Profile updated' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   @Patch('profile')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.RIDER)
@@ -83,13 +104,30 @@ export class RiderAuthController {
   }
 
   @ApiOperation({ summary: 'Refresh rider access token' })
+  @ApiResponse({
+    status: 200,
+    description: 'New access + refresh token pair returned',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Refresh token missing, expired, or revoked',
+  })
   @Post('refresh')
   async refreshToken(@Body() body: { refreshToken: string }) {
     return await this.riderAuthService.refreshRiderToken(body.refreshToken);
   }
 
+  @ApiOperation({ summary: 'Logout and invalidate the supplied refresh token' })
+  @ApiResponse({ status: 200, description: 'Refresh token revoked' })
+  @Post('logout')
+  async logout(@Body() body: { refreshToken?: string }) {
+    return await this.riderAuthService.logoutRider(body.refreshToken ?? '');
+  }
+
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get rider notification preferences' })
+  @ApiResponse({ status: 200, description: 'Preferences returned' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   @UseGuards(JwtAuthGuard)
   @Get('notifications-preferences')
   async getNotificationsPreferences(@Req() req) {
@@ -99,6 +137,8 @@ export class RiderAuthController {
 
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update rider notification preferences' })
+  @ApiResponse({ status: 200, description: 'Preferences updated' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   @UseGuards(JwtAuthGuard)
   @Put('notifications-preferences')
   async updateNotificationsPreferences(@Req() req, @Body() body) {
@@ -108,6 +148,8 @@ export class RiderAuthController {
 
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update rider vehicle details' })
+  @ApiResponse({ status: 200, description: 'Vehicle details updated' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   @UseGuards(JwtAuthGuard)
   @Put('vehicle-details')
   async updateVehicleDetails(@Req() req, @Body() body) {
@@ -117,6 +159,8 @@ export class RiderAuthController {
 
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update rider documents' })
+  @ApiResponse({ status: 200, description: 'Documents updated' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   @UseGuards(JwtAuthGuard)
   @Put('documents')
   async updateDocuments(@Req() req, @Body() body) {
@@ -126,6 +170,8 @@ export class RiderAuthController {
 
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get full rider details' })
+  @ApiResponse({ status: 200, description: 'Full rider details returned' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   @UseGuards(JwtAuthGuard)
   @Get('details')
   async getRiderDetails(@Req() req) {
@@ -135,6 +181,8 @@ export class RiderAuthController {
 
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Send OTP to change password (authenticated)' })
+  @ApiResponse({ status: 200, description: 'OTP sent to registered email' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   @UseGuards(JwtAuthGuard)
   @Post('send-change-password-otp')
   async sendChangePasswordOtp(@Req() req) {
@@ -144,6 +192,9 @@ export class RiderAuthController {
 
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Verify OTP for password change' })
+  @ApiResponse({ status: 200, description: 'OTP verified' })
+  @ApiResponse({ status: 400, description: 'Invalid or expired OTP' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   @UseGuards(JwtAuthGuard)
   @Post('verify-change-password-otp')
   async verifyChangePasswordOtp(@Req() req, @Body() body: { otp: string }) {
@@ -154,6 +205,9 @@ export class RiderAuthController {
 
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Change rider password with OTP' })
+  @ApiResponse({ status: 200, description: 'Password changed successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid OTP or weak password' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   @UseGuards(JwtAuthGuard)
   @Post('change-password')
   async changePassword(
@@ -170,6 +224,8 @@ export class RiderAuthController {
 
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Save push notification token' })
+  @ApiResponse({ status: 200, description: 'Push token saved' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   @UseGuards(JwtAuthGuard)
   @Post('push-token')
   async savePushToken(
@@ -182,6 +238,8 @@ export class RiderAuthController {
 
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Remove push notification token' })
+  @ApiResponse({ status: 200, description: 'Push token removed' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   @UseGuards(JwtAuthGuard)
   @Delete('push-token')
   async deletePushToken(@Req() req) {

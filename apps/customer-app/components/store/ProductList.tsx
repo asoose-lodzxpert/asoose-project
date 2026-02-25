@@ -1,11 +1,6 @@
 import React from "react";
-import {
-  View,
-  Image,
-  TouchableOpacity,
-  StyleSheet,
-  FlatList,
-} from "react-native";
+import { View, TouchableOpacity, StyleSheet, FlatList } from "react-native";
+import { Image } from "expo-image";
 import { ThemedText } from "@/components/themed-text";
 import { Product } from "@/types/store-types";
 import { useThemeColor } from "@/hooks/use-theme-color";
@@ -53,7 +48,12 @@ export function ProductList({
         onPress={() => handleProductPress(item)}
         style={[styles.menuCard, { backgroundColor: cardBg }]}
       >
-        <Image source={{ uri: imageUri }} style={styles.menuImage} />
+        <Image
+          source={{ uri: imageUri }}
+          style={styles.menuImage}
+          contentFit="cover"
+          transition={200}
+        />
         <View style={styles.cardContent}>
           <ThemedText
             style={[styles.menuTitle, { color: text }]}

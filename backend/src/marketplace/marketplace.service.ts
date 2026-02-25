@@ -297,9 +297,9 @@ export class MarketplaceService {
         id: p.id,
         name: p.name,
         price: p.price,
-        // Return the first valid HTTPS URL — filter out device-local file:// URIs
+        // Return all valid HTTPS URLs — filter out device-local file:// URIs
         // that may have been stored by older vendor app versions without a proper upload step
-        image: p.images.find((url) => url?.startsWith('http')) ?? null,
+        images: p.images.filter((url) => url?.startsWith('http')),
         description: p.description,
         category: { name: p.category.name },
         modifierGroups: p.modifierGroups.map((g) => ({
@@ -434,11 +434,16 @@ export class MarketplaceService {
       return null;
     }
 
+    // Resolve S3 object keys → signed/CDN URLs; filter out any nulls
+    const resolvedImages = (
+      await Promise.all(product.images.map((k) => this.resolveImage(k)))
+    ).filter((url): url is string => !!url);
+
     return {
       ...product,
       images:
-        product.images.length > 0
-          ? product.images
+        resolvedImages.length > 0
+          ? resolvedImages
           : ['https://via.placeholder.com/400'],
     };
   }

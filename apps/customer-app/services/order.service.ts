@@ -7,6 +7,7 @@ export type CreateOrderPayload = {
   items: {
     id: string; // product id
     quantity: number;
+    modifierIds?: string[]; // Flat list of selected modifier IDs; prices re-fetched server-side
   }[];
 };
 

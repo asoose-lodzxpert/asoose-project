@@ -3,13 +3,13 @@ import React, { useCallback, useEffect, useState } from "react";
 import {
   Dimensions,
   DimensionValue,
-  Image,
   Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
   View,
 } from "react-native";
+import { Image } from "expo-image";
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -29,6 +29,10 @@ import {
   fetchProductById,
   ProductDetails,
 } from "@/services/marketplace.service";
+import {
+  ModifierSelectionModal,
+  type ModifierGroup,
+} from "@/components/ModifierSelectionModal";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -51,6 +55,7 @@ export default function ProductDetailsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
+  const [showModifierModal, setShowModifierModal] = useState(false);
   const retryTimeoutRef = React.useRef<number | null>(null);
 
   const {
@@ -118,7 +123,17 @@ export default function ProductDetailsScreen() {
     await loadProduct();
   }, [loadProduct]);
 
-  const handleAddToCart = async () => {
+  const handleAddToCart = () => {
+    if (!product) return;
+    // If the product has modifier groups, show the selection modal instead
+    if (product.modifierGroups && product.modifierGroups.length > 0) {
+      setShowModifierModal(true);
+      return;
+    }
+    handleDirectAddToCart();
+  };
+
+  const handleDirectAddToCart = async () => {
     if (!product) return;
     try {
       await addItem({
@@ -137,6 +152,46 @@ export default function ProductDetailsScreen() {
         text1: "Added to cart",
         text2: `${quantity} item(s) of ${product.name} added.`,
       });
+    } catch (e) {
+      Toast.show({
+        type: "error",
+        text1: "Error",
+        text2: "Could not add to cart. Please try again.",
+      });
+    }
+  };
+
+  const handleModifierConfirm = async (selectedGroups: {
+    [groupId: string]: string[];
+  }) => {
+    if (!product) return;
+    try {
+      const modifierGroups = (product.modifierGroups || []).map((group) => {
+        const selectedModifierIds = selectedGroups[group.id] || [];
+        const selectedModifiers = group.modifiers
+          .filter((m) => selectedModifierIds.includes(m.id))
+          .map((m) => ({ id: m.id, name: m.name, price: m.price }));
+        return { id: group.id, name: group.name, selectedModifiers };
+      });
+
+      await addItem({
+        id: product.id,
+        name: product.name,
+        image: product.images?.[0],
+        price: product.price,
+        qty: quantity,
+        vendorId: product.store.id,
+        description: product.description || "",
+        available: product.available,
+        modifierGroups,
+      });
+
+      Toast.show({
+        type: "success",
+        text1: "Added to cart",
+        text2: `${product.name} added with your selections.`,
+      });
+      setShowModifierModal(false);
     } catch (e) {
       Toast.show({
         type: "error",
@@ -352,7 +407,8 @@ export default function ProductDetailsScreen() {
             <Image
               source={{ uri: product.images[0] }}
               style={styles.productImage}
-              resizeMode="cover"
+              contentFit="cover"
+              transition={200}
             />
           ) : (
             <View
@@ -438,6 +494,17 @@ export default function ProductDetailsScreen() {
         </View>
       )}
       <Toast />
+      {product && (
+        <ModifierSelectionModal
+          visible={showModifierModal}
+          modifierGroups={product.modifierGroups as unknown as ModifierGroup[]}
+          basePrice={product.price}
+          quantity={quantity}
+          productName={product.name}
+          onConfirm={handleModifierConfirm}
+          onCancel={() => setShowModifierModal(false)}
+        />
+      )}
     </ThemedView>
   );
 }

@@ -1,7 +1,7 @@
 import { Test } from '@nestjs/testing';
 import { PaymentController } from '../payment.controller';
 import { PaymentService } from '../payment.service';
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, Logger } from '@nestjs/common';
 import { PaymentGateway } from '../interfaces/payment.interface';
 
 describe('Payment Security & Reliability', () => {
@@ -49,6 +49,9 @@ describe('Payment Security & Reliability', () => {
 
   describe('Gateway Reliability', () => {
     it('should handle Gateway Timeouts (504) without leaving system in unknown state', async () => {
+      // Suppress the intentional logger.error fired by the controller's catch block
+      const logSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation();
+
       // In a real integration test, we would use nock/msw to simulate the timeout
       // Here we simulate the Service throwing a timeout error
       mockPaymentService.initiatePayment.mockRejectedValue(
@@ -68,6 +71,9 @@ describe('Payment Security & Reliability', () => {
         expect(e.message).not.toBe('Gateway Timeout 504'); // Should be wrapped or handled
         // If it throws the raw error, it means no reconciliation logic exists for ambiguous states
       }
+
+      logSpy.restore?.();
+      logSpy.mockRestore();
     });
   });
 });

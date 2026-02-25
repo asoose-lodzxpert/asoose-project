@@ -17,6 +17,7 @@ import {
   Keyboard,
 } from "react-native";
 import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
+import { useMapStyle } from "@/hooks/useMapStyle";
 import { useLocation } from "@/context/LocationContext";
 import { useAddressSearch } from "@/hooks/useAddressSearch";
 import { ThemedText } from "@/components/themed-text";
@@ -59,6 +60,7 @@ export function LocationPickerModal() {
   const [reverseAddress, setReverseAddress] = useState("");
   const [confirming, setConfirming] = useState(false);
   const mapRef = useRef<MapView>(null);
+  const mapStyle = useMapStyle();
   // Removed manual search logic, now using useAddressSearch
 
   // Reverse geocode for map modal
@@ -318,6 +320,7 @@ export function LocationPickerModal() {
                 ref={mapRef}
                 provider={PROVIDER_GOOGLE}
                 style={StyleSheet.absoluteFill}
+                customMapStyle={mapStyle}
                 initialRegion={{
                   latitude:
                     location?.coords?.latitude ?? DEFAULT_MAP_CENTER.latitude,

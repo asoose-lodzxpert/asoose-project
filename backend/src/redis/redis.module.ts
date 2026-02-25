@@ -1,26 +1,26 @@
 import { Global, Module, OnApplicationShutdown } from '@nestjs/common';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AppLogger } from '../libs/logger/app-logger.service';
 import { createClient, RedisClientType } from 'redis';
-import * as dotenv from 'dotenv';
-
-dotenv.config();
 
 let redisClient: RedisClientType | null = null;
 
 @Global()
 @Module({
+  imports: [ConfigModule],
   providers: [
     {
       provide: 'REDIS_CLIENT',
-      useFactory: async (): Promise<RedisClientType> => {
+      inject: [ConfigService],
+      useFactory: async (cs: ConfigService): Promise<RedisClientType> => {
         if (!redisClient) {
           redisClient = createClient({
-            username: process.env.REDIS_USERNAME,
-            password: process.env.REDIS_PASSWORD,
+            username: cs.get<string>('REDIS_USERNAME'),
+            password: cs.get<string>('REDIS_PASSWORD'),
             socket: {
-              host: process.env.REDIS_HOST,
-              port: Number(process.env.REDIS_PORT) || 6389,
-              ...(process.env.REDIS_TLS === 'true' && {
+              host: cs.get<string>('REDIS_HOST', 'localhost'),
+              port: cs.get<number>('REDIS_PORT', 6379),
+              ...(cs.get<string>('REDIS_TLS') === 'true' && {
                 tls: true,
               }),
             },

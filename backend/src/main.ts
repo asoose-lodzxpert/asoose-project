@@ -2,6 +2,10 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { appLogger } from './libs/logger/logger';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
+import { CorrelationMiddleware } from './libs/logger/correlation.middleware';
+import { HttpLoggingInterceptor } from './libs/logger/http-logging.interceptor';
+import { AppLogger } from './libs/logger/app-logger.service';
+import { HttpMetricsInterceptor } from './metrics/http-metrics.interceptor';
 import helmet from 'helmet';
 import compression from 'compression';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
@@ -9,6 +13,7 @@ import {
   ValidationPipe,
   VersioningType,
   BadRequestException,
+  RequestMethod,
 } from '@nestjs/common';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'path';
@@ -28,7 +33,16 @@ async function bootstrap() {
   app.use(helmet());
   app.use(compression());
 
-  app.setGlobalPrefix('api');
+  // Attach correlation ID to every request/response (reads x-correlation-id
+  // header if present, otherwise generates a UUID). Must be registered before
+  // any interceptors so req.correlationId is always set.
+  const correlationMiddleware = new CorrelationMiddleware();
+  app.use(correlationMiddleware.use.bind(correlationMiddleware));
+
+  // Exclude /metrics so Prometheus scrapers can reach it without the 'api' prefix.
+  app.setGlobalPrefix('api', {
+    exclude: [{ path: 'metrics', method: RequestMethod.GET }],
+  });
   app.enableVersioning({
     type: VersioningType.URI,
     defaultVersion: '1',
@@ -38,7 +52,33 @@ async function bootstrap() {
     prefix: '/uploads',
   });
 
+  // NOTE: The static asset route above is kept for local development only.
+  // In production all files must be stored in S3; this route will serve nothing
+  // meaningful in an ephemeral container and can be removed once S3 is the
+  // exclusive storage backend.
+
   app.useGlobalFilters(new HttpExceptionFilter());
+  app.useGlobalInterceptors(
+    new HttpLoggingInterceptor(app.get(AppLogger)),
+    app.get(HttpMetricsInterceptor),
+  );
+
+  // Restrict /metrics to internal scrapers only in production.
+  // Set METRICS_ALLOWED_IPS (comma-separated) to lock it down.
+  app.use('/metrics', (req: any, res: any, next: any) => {
+    if (process.env.NODE_ENV !== 'production') return next();
+    const allowedIps = (process.env.METRICS_ALLOWED_IPS || '')
+      .split(',')
+      .map((ip) => ip.trim())
+      .filter(Boolean);
+    if (allowedIps.length === 0) return next(); // no restriction configured
+    const clientIp: string =
+      (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ??
+      req.ip ??
+      '';
+    if (allowedIps.includes(clientIp)) return next();
+    return res.status(403).json({ message: 'Forbidden' });
+  });
   app.useGlobalPipes(
     new ValidationPipe({
       transform: true,
@@ -170,7 +210,7 @@ async function bootstrap() {
     });
   }
 
-  if (process.env.NODE_ENV !== 'production') {
+  if (process.env.SWAGGER_ENABLED === 'true') {
     const swaggerConfig = new DocumentBuilder()
       .setTitle('Asoose API')
       .setDescription('Asoose platform API documentation')

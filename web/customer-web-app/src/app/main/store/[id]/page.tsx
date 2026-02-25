@@ -16,7 +16,8 @@ import Swal from "sweetalert2";
 import { getSession } from "next-auth/react"; // ✅ Import NextAuth
 import { ProductModal, ModifierGroup } from "@/store/ProductModal";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1";
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1";
 const POPULAR_ITEMS_COUNT = 6;
 
 interface Product {
@@ -25,6 +26,8 @@ interface Product {
   price: number;
   category: { name: string };
   image?: string;
+  /** Backend may return singular `image` or plural `images[]` — both are normalised to `image` at fetch time */
+  images?: string[];
   description: string;
   modifierGroups: ModifierGroup[];
 }
@@ -92,6 +95,15 @@ export default function StorePage() {
       }
 
       const data: Store = await res.json();
+      // Normalise products: backend returns `images[]` (plural) when the
+      // image pipeline is applied; map to the singular `image` that
+      // ProductCard / ProductModal expect.
+      if (data.products) {
+        data.products = data.products.map((p: any) => ({
+          ...p,
+          image: p.image ?? p.images?.[0] ?? undefined,
+        }));
+      }
       setStore(data);
       setMenuItems(data.products || []);
       setReviews(data.reviews || []);

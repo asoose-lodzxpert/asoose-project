@@ -50,4 +50,28 @@ export class TokenRevocationService {
     await this.redis.del(`revoked:user:${userId}`);
     this.logger.log(`Cleared revocation for user ${userId}`);
   }
+
+  // ─── Refresh Token JTI Blocklist ─────────────────────────────────────────
+
+  /**
+   * Add a refresh token's JTI to the blocklist.
+   * @param jti  The `jti` claim from the refresh token payload.
+   * @param ttlSeconds  How long to keep the entry — set to the token's remaining lifetime.
+   */
+  async revokeRefreshToken(jti: string, ttlSeconds: number): Promise<void> {
+    if (ttlSeconds <= 0) return; // already expired — nothing to block
+    await this.redis.set(`revoked:rt:${jti}`, '1', { EX: ttlSeconds });
+    this.logger.debug(
+      `Blocklisted refresh token JTI ${jti} (TTL ${ttlSeconds}s)`,
+    );
+  }
+
+  /**
+   * Returns true if the given refresh token JTI has been revoked (i.e. the
+   * user has logged out or the token has been rotated away).
+   */
+  async isRefreshTokenRevoked(jti: string): Promise<boolean> {
+    const val = await this.redis.get(`revoked:rt:${jti}`);
+    return val === '1';
+  }
 }

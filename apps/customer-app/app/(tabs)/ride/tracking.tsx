@@ -6,7 +6,6 @@ import {
   ActivityIndicator,
   Dimensions,
   Platform,
-  useColorScheme,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useState, useEffect, useCallback, useRef } from "react";
@@ -23,6 +22,7 @@ import { DriverInfoCard } from "@/components/ride/DriverInfoCard";
 import { OTPDisplay } from "@/components/ride/OTPDisplay";
 import { RideService } from "@/services/ride.service";
 import { get } from "@/lib/authFetch";
+import { useMapStyle } from "@/hooks/useMapStyle";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -229,7 +229,8 @@ export default function RideTrackingScreen() {
     refreshCurrentRide,
     socketConnected,
   } = useRide();
-  const colorScheme = useColorScheme();
+
+  const mapStyle = useMapStyle();
 
   const primary = useThemeColor({}, "brandPrimary");
   const surface = useThemeColor({}, "surfaceBackground");
@@ -252,7 +253,7 @@ export default function RideTrackingScreen() {
   >([]);
 
   const mapRef = useRef<MapView>(null);
-  const mapStyle = colorScheme === "dark" ? DARK_MAP_STYLE : LIGHT_MAP_STYLE;
+  // mapStyle comes from useMapStyle() declared above
 
   // Location tracking
   useEffect(() => {
