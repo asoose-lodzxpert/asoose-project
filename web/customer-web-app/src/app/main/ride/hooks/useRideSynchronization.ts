@@ -45,11 +45,18 @@ export function useRideSynchronization() {
     // state separately via the /payment/callback route + localStorage keys.
     PENDING: "idle",
     REQUESTED: "searching",
+    SEARCHING_DRIVER: "searching",
+    DRIVER_ASSIGNED: "searching",
+    DRIVER_ACCEPTED: paymentConfirmed ? "confirmed" : "awaiting-payment",
     ACCEPTED: paymentConfirmed ? "confirmed" : "awaiting-payment",
+    PAID: "confirmed",
     ARRIVED: "arrived",
     IN_PROGRESS: "in-progress",
     COMPLETED: "finished",
     CANCELLED: "idle",
+    CANCELLED_BY_USER: "idle",
+    CANCELLED_BY_DRIVER: "idle",
+    CANCELLED_BY_SYSTEM: "idle",
   };
 
   /**

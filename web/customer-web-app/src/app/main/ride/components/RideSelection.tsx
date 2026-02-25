@@ -228,15 +228,8 @@ export function RideSelection() {
       // Store OTP so it can be shown to the driver when they arrive
       if ((response.ride as any).startOtp) setStartOtp((response.ride as any).startOtp);
 
-      // 2. Confirm ride — always use CASH to start driver matching immediately.
-      //    Payment method selection happens AFTER a driver is assigned.
-      await RideService.confirmRide(
-        response.ride.id,
-        'CASH',
-        session.accessToken
-      );
-
-      // Driver matching is now active — show the searching screen.
+      // Driver matching begins on the backend after createRide.
+      // confirmRide is called later from PostDriverPayment after DRIVER_FOUND.
       setRideStatus('searching');
     } catch (error: any) {
       const norm = normalizeApiError(error);

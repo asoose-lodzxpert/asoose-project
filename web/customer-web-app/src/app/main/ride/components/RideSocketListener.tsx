@@ -162,6 +162,7 @@ export function RideSocketListener() {
         try {
           if (data.rideId !== rideId) return;
 
+          setRideId(null);
           setRideStatus("idle");
           toast.error("Ride was cancelled.");
         } catch (error) {

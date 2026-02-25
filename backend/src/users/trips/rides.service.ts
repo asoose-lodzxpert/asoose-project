@@ -738,6 +738,7 @@ export class RidesService {
           in: [
             'REQUESTED',
             'SEARCHING_DRIVER',
+            'DRIVER_ASSIGNED',
             'DRIVER_ACCEPTED',
             'PAID',
             'IN_PROGRESS',

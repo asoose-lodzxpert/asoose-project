@@ -38,7 +38,7 @@ export class DriverLocationListener {
             metadata: {
               lat: payload.lat,
               lng: payload.lng,
-              heading: (payload as any).heading || 0, // Handle optional property
+              heading: payload.heading ?? 0,
               rideId: activeRideId,
             },
           });

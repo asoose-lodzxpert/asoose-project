@@ -22,10 +22,30 @@ const STATUS_MAP: Record<RideStatus, StatusDisplay> = {
     badge: 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200',
     icon: 'clock',
   },
+  SEARCHING_DRIVER: {
+    label: 'Searching for Driver',
+    badge: 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200',
+    icon: 'clock',
+  },
+  DRIVER_ASSIGNED: {
+    label: 'Driver Assigned',
+    badge: 'bg-cyan-100 dark:bg-cyan-900 text-cyan-800 dark:text-cyan-200',
+    icon: 'car',
+  },
+  DRIVER_ACCEPTED: {
+    label: 'Driver Accepted',
+    badge: 'bg-cyan-100 dark:bg-cyan-900 text-cyan-800 dark:text-cyan-200',
+    icon: 'car',
+  },
   ACCEPTED: {
     label: 'Driver Arriving',
     badge: 'bg-cyan-100 dark:bg-cyan-900 text-cyan-800 dark:text-cyan-200',
     icon: 'car',
+  },
+  PAID: {
+    label: 'Payment Confirmed',
+    badge: 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200',
+    icon: 'check',
   },
   ARRIVED: {
     label: 'Driver Arrived',
@@ -44,6 +64,21 @@ const STATUS_MAP: Record<RideStatus, StatusDisplay> = {
   },
   CANCELLED: {
     label: 'Cancelled',
+    badge: 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200',
+    icon: 'x',
+  },
+  CANCELLED_BY_USER: {
+    label: 'Cancelled by You',
+    badge: 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200',
+    icon: 'x',
+  },
+  CANCELLED_BY_DRIVER: {
+    label: 'Cancelled by Driver',
+    badge: 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200',
+    icon: 'x',
+  },
+  CANCELLED_BY_SYSTEM: {
+    label: 'Auto-cancelled',
     badge: 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200',
     icon: 'x',
   },

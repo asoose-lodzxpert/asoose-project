@@ -72,4 +72,67 @@ export class RidesCleanupService {
       }
     }
   }
+
+  /**
+   * Cancel rides that have been stuck in a non-terminal state for more than 30 minutes.
+   * These are truly abandoned rides that the recovery cron couldn't fix.
+   */
+  @Cron(CronExpression.EVERY_5_MINUTES)
+  async cancelAbandonedRides() {
+    try {
+      const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
+
+      const abandonedRides = await this.prisma.ride.findMany({
+        where: {
+          status: {
+            in: [
+              'REQUESTED',
+              'SEARCHING_DRIVER',
+              'DRIVER_ASSIGNED',
+              'DRIVER_ACCEPTED',
+              'PAID',
+            ] as any[],
+          },
+          updatedAt: { lt: thirtyMinutesAgo },
+        },
+        take: 100,
+      });
+
+      if (abandonedRides.length === 0) return;
+
+      this.logger.warn(
+        `Cancelling ${abandonedRides.length} abandoned rides (stuck > 30 min)`,
+      );
+
+      for (const ride of abandonedRides) {
+        try {
+          await this.prisma.ride.update({
+            where: { id: ride.id },
+            data: { status: 'CANCELLED_BY_SYSTEM' as any },
+          });
+          this.logger.log(
+            `Auto-cancelled abandoned ride ${ride.id} (was ${ride.status})`,
+          );
+        } catch (error) {
+          this.logger.error(
+            `Failed to cancel abandoned ride ${ride.id}`,
+            error,
+          );
+        }
+      }
+    } catch (error: any) {
+      if (error?.code === 'P1017') {
+        this.logger.warn(
+          'DB connection closed (P1017) during abandoned-ride cleanup — reconnecting...',
+        );
+        try {
+          await this.prisma.$connect();
+        } catch (connectErr) {
+          this.logger.error('Failed to reconnect to DB', connectErr);
+        }
+      } else {
+        this.logger.error('cancelAbandonedRides failed', error);
+      }
+    }
+  }
 }

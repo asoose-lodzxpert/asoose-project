@@ -15,11 +15,18 @@
 export type RideStatus = 
   | 'PENDING' 
   | 'REQUESTED' 
+  | 'SEARCHING_DRIVER'
+  | 'DRIVER_ASSIGNED'
+  | 'DRIVER_ACCEPTED'
   | 'ACCEPTED' 
+  | 'PAID'
   | 'ARRIVED' 
   | 'IN_PROGRESS' 
   | 'COMPLETED' 
-  | 'CANCELLED';
+  | 'CANCELLED'
+  | 'CANCELLED_BY_USER'
+  | 'CANCELLED_BY_DRIVER'
+  | 'CANCELLED_BY_SYSTEM';
 
 export interface AddressView {
   /** Constructed string: "${street}, ${city}, ${state}" */
