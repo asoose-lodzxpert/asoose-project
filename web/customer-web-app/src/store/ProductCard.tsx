@@ -7,6 +7,7 @@ import Image from "next/image";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { ApiService } from "@/services/api.service";
 
 export interface ModifierGroupRef {
   id: string;
@@ -83,33 +84,15 @@ export const ProductCard = ({
     setLoading(true);
 
     try {
-      // 2. Backend Enforcement (Critical)
+      // 2. Backend Enforcement (Critical) — ApiService handles 401 redirect automatically
       const token = (session as any)?.accessToken || (session as any)?.user?.accessToken;
-      
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/cart/add`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`,
-          "ngrok-skip-browser-warning": "true",
-        },
-        body: JSON.stringify({
-          productId: id,
-          quantity: 1,
-        }),
-      });
 
-      if (!res.ok) {
-        if (res.status === 401) {
-            router.push("/sign-in");
-            throw new Error("Session expired");
-        }
-        const errorData = await res.json().catch(() => ({}));
-        const rawMsg = errorData.message;
-        throw new Error(
-          Array.isArray(rawMsg) ? rawMsg.join("; ") : rawMsg || "Failed to add to cart"
-        );
-      }
+      await ApiService.post(
+        '/cart/add',
+        { productId: id, quantity: 1 },
+        token,
+        { headers: { "ngrok-skip-browser-warning": "true" } },
+      );
 
       // 3. Success: Update Local Store (Optimistic or Sync)
       addItem({

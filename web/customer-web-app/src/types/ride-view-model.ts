@@ -111,6 +111,9 @@ export interface RideViewModel {
   
   /** Cancellation reason (if cancelled) */
   cancellationReason?: string;
+
+  /** Vehicle type for this ride (ECONOMY | BUSINESS) */
+  vehicleType?: string;
 }
 
 /**
@@ -162,6 +165,9 @@ export interface BackendRide {
   // Trip data
   distanceKm?: number;
   durationMin?: number;
+
+  /** Vehicle type requested (ECONOMY | BUSINESS) */
+  vehicleType?: string;
   
   // Timestamps
   acceptedAt?: string;
@@ -195,7 +201,7 @@ export interface BackendRide {
     reference?: string;
   };
   paymentStatus?: string;
-  
+
   // Security
   startOtp?: string;
   cancellationReason?: string;

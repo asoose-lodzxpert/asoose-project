@@ -7,5 +7,6 @@ export interface GeolocationCoordinates {
 
 export function validateGeolocationCoordinates(coords: unknown): asserts coords is GeolocationCoordinates {
   if (!coords || typeof coords !== 'object') throw new Error('Coordinates must be an object');
-  if (typeof coords.lat !== 'number' || typeof coords.lng !== 'number') throw new Error('lat/lng must be numbers');
+  const c = coords as Record<string, unknown>;
+  if (typeof c.lat !== 'number' || typeof c.lng !== 'number') throw new Error('lat/lng must be numbers');
 }

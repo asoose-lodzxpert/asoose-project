@@ -43,6 +43,7 @@ import {
   ProfileSkeleton,
   ContentSkeleton,
 } from "@/app/main/components/profile/skeleton";
+import { ApiService } from "@/services/api.service";
 
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1";
@@ -118,38 +119,27 @@ function ProfilePageContent() {
         : "Good Evening";
   };
 
-  // Enhanced fetch with 401 handling
+  // Enhanced fetch with 401 handling — delegates to ApiService (centralised timeout, error normalisation, 401 redirect)
   const fetchWithAuth = useCallback(
     async (path: string, accessToken: string, options: RequestInit = {}) => {
       try {
-        const res = await fetch(`${API_URL}${path}`, {
-          ...options,
-          headers: {
-            ...options.headers,
-            Authorization: `Bearer ${accessToken}`,
-          },
-        });
-
-        if (res.status === 401) {
-          await signOut({ callbackUrl: "/sign-in" });
-          throw new Error("Session expired");
+        const method = (options.method || "GET").toUpperCase();
+        const data = options.body ? JSON.parse(options.body as string) : undefined;
+        switch (method) {
+          case "POST":   return await ApiService.post<any>(path, data, accessToken);
+          case "PATCH":  return await ApiService.patch<any>(path, data, accessToken);
+          case "PUT":    return await ApiService.put<any>(path, data, accessToken);
+          case "DELETE": return await ApiService.delete<any>(path, accessToken);
+          default:       return await ApiService.get<any>(path, accessToken);
         }
-
-        if (!res.ok) {
-          const errorData = await res.json().catch(() => ({}));
-          throw new Error(errorData.message || `HTTP ${res.status}`);
-        }
-
-        return await res.json();
       } catch (e: any) {
-        console.error(`Fetch error for ${path}`, e);
-
-        // Don't show toast for session expiry (already redirecting)
-        if (e.message !== "Session expired") {
+        console.error(`Fetch error for ${path}`, e?.message ?? e);
+        // ApiService already redirects on 401; suppress toast for session errors
+        const isSessionError = e?.status === 401 || e?.type === "unauthorized";
+        if (!isSessionError) {
           const resource = path.split("/").pop();
-          toast.error(e.message || `Failed to load ${resource}`);
+          toast.error(e?.message || `Failed to load ${resource}`);
         }
-
         throw e;
       }
     },

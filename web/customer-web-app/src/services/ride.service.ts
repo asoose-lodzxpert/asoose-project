@@ -141,6 +141,9 @@ export class RideService {
       token,
       {
         headers: { "x-idempotency-key": idempotencyKey },
+        // This endpoint resolves two Google Maps geocoding calls + DB writes.
+        // Give it 30 s before surfacing a timeout error to the user.
+        timeoutMs: 30_000,
       },
     );
   }

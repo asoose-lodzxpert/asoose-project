@@ -15,8 +15,8 @@ import { StoreDetailSkeleton } from "./skeleton";
 import Swal from "sweetalert2";
 import { getSession } from "next-auth/react"; // ✅ Import NextAuth
 import { ProductModal, ModifierGroup } from "@/store/ProductModal";
+import { ApiService } from "@/services/api.service";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1";
 const POPULAR_ITEMS_COUNT = 6;
 
 interface Product {
@@ -84,14 +84,7 @@ export default function StorePage() {
   const fetchStoreData = useCallback(async () => {
     try {
       setError(null);
-      const res = await fetch(`${API_URL}/marketplace/vendor/${slugOrId}`);
-
-      if (!res.ok) {
-        if (res.status === 404) throw new Error("Store not found");
-        throw new Error("Failed to load store data");
-      }
-
-      const data: Store = await res.json();
+      const data = await ApiService.get<Store>(`/marketplace/vendor/${slugOrId}`);
       setStore(data);
       setMenuItems(data.products || []);
       setReviews(data.reviews || []);
@@ -146,11 +139,7 @@ export default function StorePage() {
         const session = await getSession();
         const token = (session as any)?.accessToken;
 
-        const res = await fetch(`${API_URL}/marketplace/reviews/${store.id}`, {
-          method: "DELETE",
-          headers: { Authorization: `Bearer ${token}` }, // ✅ Use NextAuth Token
-        });
-        if (!res.ok) throw new Error("Failed to delete");
+        await ApiService.delete(`/marketplace/reviews/${store.id}`, token);
         fetchStoreData();
       } catch (err) {
         console.error(err);
@@ -169,20 +158,11 @@ export default function StorePage() {
 
     if (!token) throw new Error("Not logged in");
 
-    const res = await fetch(`${API_URL}/marketplace/reviews`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`, // ✅ Use NextAuth Token
-      },
-      body: JSON.stringify({
-        storeId: store?.id,
-        rating,
-        comment: comment.trim(),
-      }),
-    });
-
-    if (!res.ok) throw new Error("Failed to submit review");
+    await ApiService.post(
+      '/marketplace/reviews',
+      { storeId: store?.id, rating, comment: comment.trim() },
+      token,
+    );
     fetchStoreData();
   };
 

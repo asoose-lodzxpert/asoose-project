@@ -12,7 +12,44 @@ interface CustomUser {
   image?: string;
 }
 
+// ---------------------------------------------------------------------------
+// Resolve the server-side API base URL.
+// Preference order:
+//   1. INTERNAL_API_URL  — private network URL (container-to-container)
+//   2. NEXT_PUBLIC_API_URL — public URL (always present, baked in at build)
+//   3. hard-coded fallback for local dev
+// ---------------------------------------------------------------------------
+const SERVER_API_URL =
+  process.env.INTERNAL_API_URL ||
+  process.env.NEXT_PUBLIC_API_URL ||
+  "http://localhost:3000/api/v1";
+
+// ---------------------------------------------------------------------------
+// Log the exact OAuth redirect_uri this instance will advertise to Google.
+// This runs once when the module is imported (i.e. on server startup).
+// Secrets are never printed — only the public NEXTAUTH_URL is logged.
+// ---------------------------------------------------------------------------
+const _nextAuthUrl = (process.env.NEXTAUTH_URL ?? "").replace(/\/$/, "");
+const _effectiveRedirectUri = _nextAuthUrl
+  ? `${_nextAuthUrl}/api/auth/callback/google`
+  : "(NEXTAUTH_URL is not set — redirect_uri will be wrong!)";
+
+console.log(
+  `[authOptions] Google OAuth redirect_uri: ${_effectiveRedirectUri}`,
+);
+
 export const authOptions: NextAuthOptions = {
+  // ---------------------------------------------------------------------------
+  // Reverse-proxy note (next-auth v4):
+  // Unlike v5, v4 has no "trustHost" flag.  Instead, next-auth v4 derives the
+  // redirect_uri entirely from NEXTAUTH_URL.  Behind Vercel / Railway / Nginx:
+  //   • Set NEXTAUTH_URL to the public HTTPS URL of this app.
+  //   • Optionally set NEXTAUTH_URL_INTERNAL if the server needs a different
+  //     URL for internal callbacks (e.g. container-to-container).
+  // Do NOT set NEXTAUTH_URL to an internal/http URL — that value is what Google
+  // receives as the redirect_uri and it must match Google Cloud Console exactly.
+  // ---------------------------------------------------------------------------
+
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
@@ -29,7 +66,7 @@ export const authOptions: NextAuthOptions = {
 
         try {
           const res = await fetch(
-            `${process.env.NEXT_PUBLIC_API_URL}/auth/user/login`,
+            `${SERVER_API_URL}/auth/user/login`,
             {
               method: "POST",
               body: JSON.stringify(credentials),
@@ -65,13 +102,8 @@ export const authOptions: NextAuthOptions = {
     // Handle Google OAuth Token Exchange
     async signIn({ user, account, profile }) {
       if (account?.provider === "google") {
-        // Use a private server-side URL when available (avoids going through
-        // the public internet in containerised deployments); fall back to the
-        // public NEXT_PUBLIC_API_URL which is baked in at build time.
-        const apiUrl =
-          process.env.INTERNAL_API_URL ||
-          process.env.NEXT_PUBLIC_API_URL ||
-          "http://localhost:3000/api/v1";
+        // SERVER_API_URL resolves INTERNAL_API_URL → NEXT_PUBLIC_API_URL → fallback
+        const apiUrl = SERVER_API_URL;
 
         try {
           const googleProfile = profile as any;

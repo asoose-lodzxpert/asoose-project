@@ -7,6 +7,7 @@ import { DriverArrived } from './DriverArrived';
 import { TripInProgress } from './TripInProgress';
 import { RatingModal } from './RatingModal';
 import { LocationSelector } from './LocationSelector';
+import { PostDriverPayment } from './PostDriverPayment';
 import { useReverseGeocoding } from '../hooks/useReverseGeocoding'; // Import Hook
 
 export function RideController() {
@@ -26,6 +27,8 @@ export function RideController() {
   switch (rideStatus) {
     case 'searching':
       return <FindingDriver />;
+    case 'awaiting-payment': // Driver assigned — user selects payment method
+      return <PostDriverPayment />;
     case 'confirmed': // Driver on way
     case 'arrived':   // Driver waiting
       return <DriverArrived />;

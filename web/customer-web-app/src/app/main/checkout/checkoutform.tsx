@@ -21,7 +21,7 @@ import { OrderSummary } from "@/app/main/components/checkout/ordersummary";
 import { AddressPickerModal } from "@/app/main/components/checkout/address-picker-modal";
 
 // Constants
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1";
 
 export default function CheckoutForm() {
   const router = useRouter();

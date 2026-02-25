@@ -9,16 +9,16 @@ import { TripInProgress } from './TripInProgress';
 import { RatingModal } from './RatingModal';
 
 export function RideInterface() {
-  const { rideStage } = useRideStore();
+  const rideStatus = useRideStore((state) => state.rideStatus);
 
-  switch (rideStage) {
-    case 'findingDriver':
+  switch (rideStatus) {
+    case 'searching':
       return <FindingDriver />;
-    case 'driverArrived':
+    case 'arrived':
       return <DriverArrived />;
-    case 'inProgress':
+    case 'in-progress':
       return <TripInProgress />;
-    case 'complete':
+    case 'finished':
       return <RatingModal />;
     case 'idle':
     default:

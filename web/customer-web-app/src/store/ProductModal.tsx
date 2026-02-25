@@ -7,8 +7,7 @@ import { useCartStore } from "@/store/useCartStore";
 import { toast } from "react-toastify";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-
-const CART_URL = `${(process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1").replace(/\/$/, "")}/cart/add`;
+import { ApiService } from "@/services/api.service";
 
 // --- Types must match what is passed from the page ---
 export interface Modifier {
@@ -128,7 +127,7 @@ export const ProductModal = ({
     setIsSubmitting(true);
 
     try {
-      // 2. Backend Enforcement (Critical)
+      // 2. Backend Enforcement (Critical) — ApiService handles 401 redirect automatically
       const token =
         (session as any)?.accessToken || (session as any)?.user?.accessToken;
 
@@ -136,35 +135,17 @@ export const ProductModal = ({
       // Backend expects `modifierIds: string[]` — an array of Modifier record UUIDs.
       const modifierIds: string[] = Object.values(selectedModifiers).flat();
 
-      const res = await fetch(CART_URL, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-            // Required for ngrok tunnels in development (prevents HTML warning page intercept)
-            "ngrok-skip-browser-warning": "true",
-          },
-          body: JSON.stringify({
-            productId: product.id,
-            quantity,
-            // Only include modifierIds when present — backend treats absence as "no modifiers".
-            ...(modifierIds.length > 0 && { modifierIds }),
-          }),
-        });
-
-      if (!res.ok) {
-        if (res.status === 401) {
-          router.push("/sign-in");
-          throw new Error("Session expired. Please sign in again.");
-        }
-        const errorData = await res.json().catch(() => ({}));
-        // NestJS ValidationPipe may return { message: string } or { message: string[] }
-        const rawMsg = errorData.message;
-        const msg = Array.isArray(rawMsg)
-          ? rawMsg.join("; ")
-          : rawMsg || "Failed to add to cart";
-        throw new Error(msg);
-      }
+      await ApiService.post(
+        '/cart/add',
+        {
+          productId: product.id,
+          quantity,
+          // Only include modifierIds when present — backend treats absence as "no modifiers".
+          ...(modifierIds.length > 0 && { modifierIds }),
+        },
+        token,
+        { headers: { "ngrok-skip-browser-warning": "true" } },
+      );
 
       // Success: sync local cart store for immediate UI update.
       // Price stored here is display-only — the backend is the authoritative pricing source.
@@ -231,7 +212,7 @@ export const ProductModal = ({
               </div>
             )}
           </div>
-
+            
           <div className="p-6 space-y-6">
             <div>
               <h2 className="text-2xl font-black leading-tight mb-2 text-gray-900 dark:text-white">

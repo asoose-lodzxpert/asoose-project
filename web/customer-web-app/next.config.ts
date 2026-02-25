@@ -1,6 +1,15 @@
 /** @type {import('next').NextConfig} */
 
 // ---------------------------------------------------------------------------
+// Runtime environment validation — runs when the Next.js server process starts.
+// In production, this will throw and abort startup if critical OAuth env vars
+// (NEXTAUTH_URL, GOOGLE_CLIENT_ID, NEXTAUTH_SECRET) are missing or malformed.
+// In development, it prints warnings only.
+// ---------------------------------------------------------------------------
+import { assertValidEnv } from "./utils/validateEnv";
+assertValidEnv();
+
+// ---------------------------------------------------------------------------
 // Content-Security-Policy
 // Allows Google Maps JS API scripts, tiles, and XHR while blocking XSS vectors.
 // Keep 'unsafe-eval' only because @react-google-maps/api requires it in dev;

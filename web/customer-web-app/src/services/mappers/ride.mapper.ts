@@ -207,6 +207,7 @@ export function mapRideToViewModel(backendRide: BackendRide): RideViewModel {
       // Metadata
       ...(backendRide.paymentStatus && { paymentStatus: backendRide.paymentStatus }),
       ...(backendRide.payment?.method && { paymentMethod: backendRide.payment.method }),
+      ...(backendRide.vehicleType && { vehicleType: backendRide.vehicleType }),
       ...(backendRide.cancellationReason && {
         cancellationReason: backendRide.cancellationReason,
       }),

@@ -167,6 +167,15 @@ export interface RideUpdateEvent {
   label?: string;
 }
 
+/** Emitted when no drivers are available in the area */
+export interface NoDriversFoundEvent {
+  type: 'NO_DRIVERS_FOUND';
+  metadata: {
+    rideId: string;
+    message: string;
+  };
+}
+
 export const subscribeToRideEvents = (
   callbacks: {
     onDriverFound?: (data: DriverFoundEvent) => void;
@@ -176,6 +185,7 @@ export const subscribeToRideEvents = (
     onTripCompleted?: (data: RideStatusEvent) => void;
     onRideCancelled?: (data: RideStatusEvent) => void;
     onRideUpdate?: (data: RideUpdateEvent) => void;
+    onNoDriversFound?: (data: NoDriversFoundEvent) => void;
   },
 ) => {
   if (callbacks.onDriverFound) {
@@ -199,6 +209,9 @@ export const subscribeToRideEvents = (
   if (callbacks.onRideUpdate) {
     socketService.on('ride_update', callbacks.onRideUpdate);
   }
+  if (callbacks.onNoDriversFound) {
+    socketService.on('NO_DRIVERS_FOUND', callbacks.onNoDriversFound);
+  }
 };
 
 export const unsubscribeFromRideEvents = () => {
@@ -209,6 +222,7 @@ export const unsubscribeFromRideEvents = () => {
   socketService.off('TRIP_COMPLETED');
   socketService.off('RIDE_CANCELLED');
   socketService.off('ride_update');
+  socketService.off('NO_DRIVERS_FOUND');
 };
 
 // ============================================================================

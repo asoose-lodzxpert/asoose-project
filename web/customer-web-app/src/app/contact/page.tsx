@@ -54,7 +54,7 @@ export default function ContactPage() {
 
     try {
       const apiUrl =
-        process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/v1/api";
+        process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1";
       const response = await fetch(`${apiUrl}/support/inquiry`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },

@@ -54,11 +54,15 @@ export class ApiService {
 
   static async request<T>(
     endpoint: string,
-    options: RequestInit = {},
+    options: RequestInit & { timeoutMs?: number } = {},
     token?: string,
   ): Promise<T> {
     const headers = await this.getHeaders(token);
     const url = `${API_URL}${endpoint}`;
+
+    // Use caller-supplied timeout, or fall back to the global default
+    const { timeoutMs: callerTimeout, ...fetchOptions } = options;
+    const effectiveTimeout = callerTimeout ?? this.REQUEST_TIMEOUT_MS;
 
     // --- Timeout handling ---
     // If the caller already supplied a signal (e.g. for manual abort) we chain
@@ -66,11 +70,11 @@ export class ApiService {
     const timeoutController = new AbortController();
     const timeoutId = setTimeout(
       () => timeoutController.abort(),
-      this.REQUEST_TIMEOUT_MS,
+      effectiveTimeout,
     );
 
     // Combine caller signal + timeout signal
-    const callerSignal = options.signal;
+    const callerSignal = fetchOptions.signal;
     const combinedSignal = callerSignal
       ? anySignal([callerSignal, timeoutController.signal])
       : timeoutController.signal;
@@ -78,11 +82,11 @@ export class ApiService {
     let response: Response;
     try {
       response = await fetch(url, {
-        ...options,
+        ...fetchOptions,
         signal: combinedSignal,
         headers: {
           ...headers,
-          ...options.headers,
+          ...fetchOptions.headers,
         },
       });
     } catch (networkError: any) {
@@ -95,7 +99,7 @@ export class ApiService {
 
       // Timeout
       if (timeoutController.signal.aborted) {
-        console.error(`ApiService: Request timed out after ${this.REQUEST_TIMEOUT_MS}ms — ${options.method ?? "GET"} ${url}`);
+        console.error(`ApiService: Request timed out after ${effectiveTimeout}ms — ${fetchOptions.method ?? "GET"} ${url}`);
         throw {
           status: 0,
           message: "Request timed out. The server took too long to respond.",
@@ -164,14 +168,14 @@ export class ApiService {
     endpoint: string,
     data?: any,
     token?: string,
-    options?: RequestInit // ✅ Added options to accept signal
+    options?: RequestInit & { timeoutMs?: number } // supports custom timeout
   ): Promise<T> {
     return this.request<T>(
       endpoint,
       {
         method: "POST",
         body: data ? JSON.stringify(data) : undefined,
-        ...options, // ✅ Pass options down
+        ...options, // ✅ Pass options down (includes timeoutMs if provided)
       },
       token,
     );

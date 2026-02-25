@@ -13,6 +13,7 @@ const POLL_INTERVAL_MS = 15_000;
 /** Ride stages that indicate an active ride worth polling for */
 const ACTIVE_STAGES: RideStage[] = [
   "searching",
+  "awaiting-payment",
   "confirmed",
   "arrived",
   "in-progress",
@@ -33,12 +34,18 @@ export function useRideSynchronization() {
   const setTripSummary = useRideStore((state) => state.setTripSummary);
   const setRideType = useRideStore((state) => state.setRideType);
   const setStartOtp = useRideStore((state) => state.setStartOtp);
+  const paymentConfirmed = useRideStore((state) => state.paymentConfirmed);
 
+  // Build statusMap with a dynamic ACCEPTED mapping:
+  // - 'awaiting-payment' when the user hasn't selected their payment method yet
+  // - 'confirmed'        once paymentConfirmed flag is set (user chose cash/card)
   const statusMap: Record<RideStatus, RideStage> = {
-    // PENDING = ride created but payment not yet confirmed — do NOT show "finding driver"
+    // PENDING = ride created but payment not yet confirmed.
+    // Map to "idle" so users can retry. Card-payment callback handles this
+    // state separately via the /payment/callback route + localStorage keys.
     PENDING: "idle",
     REQUESTED: "searching",
-    ACCEPTED: "confirmed",
+    ACCEPTED: paymentConfirmed ? "confirmed" : "awaiting-payment",
     ARRIVED: "arrived",
     IN_PROGRESS: "in-progress",
     COMPLETED: "finished",
@@ -118,6 +125,18 @@ export function useRideSynchronization() {
           setStartOtp(null); // Clear once trip has started
         }
 
+        // Restore vehicle/ride type from backend (ECONOMY | BUSINESS)
+        // This ensures TripInProgress / DriverArrived labels survive page refresh.
+        if (backendRide.vehicleType) {
+          const normalised = backendRide.vehicleType.toLowerCase() as 'economy' | 'business';
+          if (normalised === 'economy' || normalised === 'business') {
+            const state = useRideStore.getState();
+            if (state.rideType !== normalised) {
+              setRideType(normalised);
+            }
+          }
+        }
+
         // Restore driver if assigned
         if (activeRide.driver) {
           setDriver({
@@ -172,11 +191,12 @@ export function useRideSynchronization() {
     syncRideState(session.accessToken);
   }, [session, syncRideState]);
 
+  // Stable selector — used in the polling effect dependency array
+  const rideStatus = useRideStore((state) => state.rideStatus);
+
   // --- Periodic polling as socket backup ---
   useEffect(() => {
     if (!session?.accessToken) return;
-
-    const rideStatus = useRideStore.getState().rideStatus;
 
     // Only poll during active ride stages
     if (!ACTIVE_STAGES.includes(rideStatus)) return;
@@ -191,7 +211,7 @@ export function useRideSynchronization() {
     }, POLL_INTERVAL_MS);
 
     return () => clearInterval(interval);
-  }, [session, syncRideState, useRideStore((state) => state.rideStatus)]);
+  }, [session, syncRideState, rideStatus]);
 
   // --- Re-sync when tab regains focus (user switches back) ---
   useEffect(() => {

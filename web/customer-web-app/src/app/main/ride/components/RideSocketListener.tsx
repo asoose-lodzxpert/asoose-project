@@ -8,6 +8,7 @@ import {
   subscribeToRideEvents,
   unsubscribeFromRideEvents,
   socketService,
+  type NoDriversFoundEvent,
 } from "@/services/socket.service";
 import { RideService } from "@/services/ride.service";
 
@@ -19,6 +20,7 @@ export function RideSocketListener() {
 
   const rideId = useRideStore((state) => state.rideId);
   const rideStatus = useRideStore((state) => state.rideStatus);
+  const setRideId = useRideStore((state) => state.setRideId);
   const setDriver = useRideStore((state) => state.setDriver);
   const setRideStatus = useRideStore((state) => state.setRideStatus);
   const setDriverLocation = useRideStore((state) => state.setDriverLocation);
@@ -73,8 +75,11 @@ export function RideSocketListener() {
             rating: 5.0, // Backend doesn't send rating in this event
             phone: driver.phone,
           });
-          setRideStatus("confirmed");
-          toast.success(`Driver found! ${driver.name} is on the way.`);
+          // Transition to awaiting-payment so the user selects their payment method
+          // BEFORE the ride proceeds. The PostDriverPayment component will move
+          // to 'confirmed' after the user confirms their payment choice.
+          setRideStatus("awaiting-payment");
+          toast.success(`Driver found! Select how you'd like to pay.`);
         } catch (error) {
           console.error("Socket error (onDriverFound):", error);
           toast.error("Error processing driver assignment.");
@@ -163,6 +168,26 @@ export function RideSocketListener() {
           console.error("Socket error (onRideCancelled):", error);
         }
       },
+
+      // 7. No Drivers Found — backend exhausted all matching attempts and auto-cancelled
+      onNoDriversFound: (data: NoDriversFoundEvent) => {
+        try {
+          // Guard: only process if it belongs to the current ride
+          if (data.metadata?.rideId && data.metadata.rideId !== rideId) return;
+
+          console.log('[RideSocketListener] NO_DRIVERS_FOUND for ride:', rideId);
+          // Reset to idle so the user can book again
+          setRideStatus('idle');
+          setRideId(null);
+          toast.error(
+            data.metadata?.message ||
+              'No drivers available in your area. Please try again.',
+            { autoClose: 6000 },
+          );
+        } catch (error) {
+          console.error('Socket error (onNoDriversFound):', error);
+        }
+      },
     });
 
     // Cleanup on unmount or rideId change
@@ -172,6 +197,7 @@ export function RideSocketListener() {
     };
   }, [
     rideId,
+    setRideId,
     setDriver,
     setRideStatus,
     setDriverLocation,

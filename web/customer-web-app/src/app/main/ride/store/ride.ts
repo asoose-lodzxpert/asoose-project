@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 
-export type RideStage = 'idle' | 'configuring' | 'searching' | 'confirmed' | 'arrived' | 'in-progress' | 'finished';
+export type RideStage = 'idle' | 'configuring' | 'searching' | 'awaiting-payment' | 'confirmed' | 'arrived' | 'in-progress' | 'finished';
 export type RideType = 'economy' | 'business';
 
 interface RideState {
@@ -23,6 +23,12 @@ interface RideState {
   watchId: number | null;
   isFollowingDriver: boolean;
   routePolyline: string | null;
+
+  // --- Payment Confirmation (set after user selects payment on post-match screen) ---
+  paymentConfirmed: boolean;
+
+  // --- Locked fare shown on the post-match payment screen ---
+  lockedEstimate: { fare: number; distance: number; duration: number } | null;
 
   // --- Ride Lifecycle ---
   rideStatus: RideStage;
@@ -79,6 +85,8 @@ interface RideState {
   setRating: (rating: number | null) => void;
   setFeedback: (feedback: string) => void;
   setIsConfiguring: (isConfiguring: 'pickup' | 'dropoff' | null) => void;
+  setPaymentConfirmed: (confirmed: boolean) => void;
+  setLockedEstimate: (estimate: { fare: number; distance: number; duration: number } | null) => void;
   setStartOtp: (otp: string | null) => void;
   
   // --- Clearing Actions ---
@@ -103,6 +111,8 @@ const initialState = {
   watchId: null,
   isFollowingDriver: true,
   routePolyline: null,
+  paymentConfirmed: false,
+  lockedEstimate: null as { fare: number; distance: number; duration: number } | null,
   rideStatus: 'idle' as RideStage,
   rideType: null as RideType | null,
   driverLocation: null,
@@ -143,6 +153,8 @@ export const useRideStore = create<RideState>()(
       setRating: (rating) => set({ rating: rating }),
       setFeedback: (feedback) => set({ feedback: feedback }),
       setIsConfiguring: (isConfiguring) => set({ isConfiguring: isConfiguring }),
+      setPaymentConfirmed: (confirmed) => set({ paymentConfirmed: confirmed }),
+      setLockedEstimate: (estimate) => set({ lockedEstimate: estimate }),
       setStartOtp: (otp) => set({ startOtp: otp }),
       
       // --- Clear Actions ---
@@ -163,7 +175,7 @@ export const useRideStore = create<RideState>()(
         }),
       
       clearAllLocations: () =>
-        set((state) => ({
+        set({
           pickupLocation: null,
           pickupAddress: null,
           dropoffLocation: null,
@@ -176,10 +188,12 @@ export const useRideStore = create<RideState>()(
           tripSummary: null,
           driverLocation: null,
           geolocationError: null,
-          watchId: state.watchId ? null : state.watchId,
+          watchId: null,
           isFollowingDriver: false,
+          paymentConfirmed: false,
+          lockedEstimate: null,
           rideId: null,
-        })),
+        }),
       
       resetRide: () =>
         set((state) => ({
@@ -200,6 +214,8 @@ export const useRideStore = create<RideState>()(
         dropoffAddress: state.dropoffAddress, // Persist
         rideStatus: state.rideStatus,
         rideType: state.rideType,
+        paymentConfirmed: state.paymentConfirmed,
+        lockedEstimate: state.lockedEstimate,
         startOtp: state.startOtp,
         driverLocation: state.driverLocation,
         driverHeading: state.driverHeading,

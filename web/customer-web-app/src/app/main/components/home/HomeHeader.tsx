@@ -19,8 +19,7 @@ import {
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useSession } from "next-auth/react";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+import { ApiService } from "@/services/api.service";
 
 const sanitizeInput = (input: string): string => {
   return input.replace(/[<>]/g, "").trim().slice(0, 100);
@@ -81,17 +80,13 @@ export const HomeHeader = () => {
           return;
         }
 
-        const [addressRes, notifRes] = await Promise.all([
-          fetch(`${API_URL}/users/addresses`, {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
-          fetch(`${API_URL}/notifications`, {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
+        const [addressResult, notifResult] = await Promise.allSettled([
+          ApiService.get<any[]>('/users/addresses', token),
+          ApiService.get<any>('/notifications', token),
         ]);
 
-        if (addressRes.ok) {
-          const addresses = await addressRes.json();
+        if (addressResult.status === 'fulfilled') {
+          const addresses = addressResult.value;
           if (addresses && addresses.length > 0) {
             const active =
               addresses.find((a: any) => a.isDefault) || addresses[0];
@@ -104,12 +99,11 @@ export const HomeHeader = () => {
           }
         }
 
-        if (notifRes.ok) {
-          const response = await notifRes.json();
+        if (notifResult.status === 'fulfilled') {
+          const response = notifResult.value;
           const notificationsList = Array.isArray(response)
             ? response
-            : response.data || [];
-
+            : response?.data || [];
           const unread = notificationsList.filter((n: any) => !n.isRead).length;
           setUnreadCount(unread);
         }

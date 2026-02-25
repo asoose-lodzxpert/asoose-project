@@ -188,33 +188,31 @@ export class RidesService {
       };
     }
 
-    // 1. Securely resolve addresses (DO NOT trust raw client coords)
-    const securePickup = await this.common.resolveSecureLocation(
-      dto.pickupLocation,
-    );
-    const secureDropoff = await this.common.resolveSecureLocation(
-      dto.dropoffLocation,
-    );
-
-    // 2. Validate Vehicle Type
+    // 1. Validate Vehicle Type synchronously before any I/O
     if (!Object.values(VehicleType).includes(dto.vehicleType)) {
       throw new BadRequestException('Invalid vehicle type requested.');
     }
 
-    // 3. Prevent duplicate active rides
-    const activeRide = await this.prisma.ride.findFirst({
-      where: {
-        customerId: userId,
-        status: {
-          in: [
-            RideStatus.REQUESTED,
-            RideStatus.ACCEPTED,
-            RideStatus.IN_PROGRESS,
-            RideStatus.ARRIVED,
-          ],
+    // 2. Resolve addresses + check for an active ride in parallel.
+    //    All three are independent — running them sequentially wasted ~2-8 s
+    //    on every request due to back-to-back Google Maps round-trips.
+    const [securePickup, secureDropoff, activeRide] = await Promise.all([
+      this.common.resolveSecureLocation(dto.pickupLocation),
+      this.common.resolveSecureLocation(dto.dropoffLocation),
+      this.prisma.ride.findFirst({
+        where: {
+          customerId: userId,
+          status: {
+            in: [
+              RideStatus.REQUESTED,
+              RideStatus.ACCEPTED,
+              RideStatus.IN_PROGRESS,
+              RideStatus.ARRIVED,
+            ],
+          },
         },
-      },
-    });
+      }),
+    ]);
 
     if (activeRide) {
       throw new ConflictException('You already have an active ride request');
@@ -250,9 +248,49 @@ export class RidesService {
       },
     });
 
+    // ── Pre-transaction validation (pure compute — keep outside the tx so it
+    //    doesn't eat into the limited transaction window) ──────────────────────
+
+    // 5a. Extract & validate client-provided values
+    const { fare, distanceKm, durationMin } = dto;
+
+    if (fare <= 0 || distanceKm <= 0 || durationMin <= 0) {
+      throw new BadRequestException('Invalid trip values provided.');
+    }
+
+    const MAX_FARE = 1_000_000;
+    const MAX_DISTANCE = 10000;
+    const MAX_DURATION = 10000;
+
+    if (fare > MAX_FARE) throw new BadRequestException('Fare exceeds allowed limit.');
+    if (distanceKm > MAX_DISTANCE) throw new BadRequestException('Distance exceeds allowed limit.');
+    if (durationMin > MAX_DURATION) throw new BadRequestException('Duration exceeds allowed limit.');
+
+    // 5b. Anti-tampering distance check — uses resolved coords, no DB needed
+    const serverDistance = this.geo.calculateDistance(
+      securePickup.lat,
+      securePickup.lng,
+      secureDropoff.lat,
+      secureDropoff.lng,
+    );
+
+    this.logger.log(`Server calculated distance: ${serverDistance} km`);
+    this.logger.log(`Client provided distance: ${distanceKm} km`);
+
+    if (Math.abs(serverDistance - distanceKm) > 1) {
+      throw new BadRequestException('Trip distance mismatch detected.');
+    }
+
+    const finalFare = this.common.round(fare);
+
+    // 5c. Generate OTP before the transaction — pure compute, no I/O
+    const rawOtp = this.geo.generateOTP(TRIPS_CONFIG.OTP_LENGTH);
+    const secureReference = `REF-${randomUUID()}`;
+
+    // ── Transaction: only DB writes remain — minimises time window ───────────
     return this.prisma.$transaction(
       async (tx) => {
-        // 5. Create trusted addresses
+        // 6. Create trusted addresses
         const pickupAddress = await tx.address.create({
           data: {
             userId,
@@ -277,55 +315,8 @@ export class RidesService {
           },
         });
 
-        // 6. Extract client-provided values
-        const { fare, distanceKm, durationMin } = dto;
-
-        // Basic validation
-        if (fare <= 0 || distanceKm <= 0 || durationMin <= 0) {
-          throw new BadRequestException('Invalid trip values provided.');
-        }
-
-        // Hard caps to prevent abuse
-        const MAX_FARE = 1_000_000;
-        const MAX_DISTANCE = 10000;
-        const MAX_DURATION = 10000;
-
-        if (fare > MAX_FARE) {
-          throw new BadRequestException('Fare exceeds allowed limit.');
-        }
-
-        if (distanceKm > MAX_DISTANCE) {
-          throw new BadRequestException('Distance exceeds allowed limit.');
-        }
-
-        if (durationMin > MAX_DURATION) {
-          throw new BadRequestException('Duration exceeds allowed limit.');
-        }
-
-        // 🔐 Optional Anti-Tampering Check (Recommended)
-        const serverDistance = this.geo.calculateDistance(
-          pickupAddress.lat,
-          pickupAddress.lng,
-          dropoffAddress.lat,
-          dropoffAddress.lng,
-        );
-
-        this.logger.log(`Server calculated distance: ${serverDistance} km`);
-        this.logger.log(`Client provided distance: ${distanceKm} km`);
-
-        const distanceDifference = Math.abs(serverDistance - distanceKm);
-
-        // Allow tolerance (e.g., 1km difference)
-        if (distanceDifference > 1) {
-          throw new BadRequestException('Trip distance mismatch detected.');
-        }
-
-        const finalFare = this.common.round(fare);
-
-        // 7. Generate OTP (stored as plaintext so customer can view it)
-        const rawOtp = this.geo.generateOTP(TRIPS_CONFIG.OTP_LENGTH);
-
-        // 8. Create Ride
+        // 7. Create Ride (validation, distance check & OTP already computed before
+        //    opening this transaction to keep its window as short as possible)
         const ride = await tx.ride.create({
           data: {
             customerId: userId,
@@ -364,7 +355,17 @@ export class RidesService {
           message: 'Ride created. Please confirm to find a driver.',
         };
       },
-      { isolationLevel: 'Serializable' },
+      {
+        // Serializable prevents a race between concurrent requests for the same
+        // user, but adds overhead. The idempotency-key check + PENDING cleanup
+        // above already handle most races, so ReadCommitted is a safe fallback
+        // if P2028 resurfaces at higher load.
+        isolationLevel: 'Serializable',
+        // Raise the timeout well above the default 5 s. The transaction now
+        // contains only 4 DB writes (address×2, ride, payment) — plenty of
+        // headroom even on a cold connection.
+        timeout: 15000,
+      },
     );
   }
 

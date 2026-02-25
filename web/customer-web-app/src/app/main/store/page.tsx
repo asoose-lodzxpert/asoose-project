@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useSearchParams, useRouter } from "next/navigation";
+import { ApiService } from "@/services/api.service";
 import {
   Store,
   ChevronRight,
@@ -37,8 +38,6 @@ import { StoreSkeleton } from "./skeleton";
 
 // --- CONFIG & TYPES ---
 
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1";
 const CACHE_DURATION = 5 * 60 * 1000;
 
 interface BannerData {
@@ -124,9 +123,7 @@ function useStoreData(query: string | null) {
       const endpoint = q
         ? `/marketplace/search?q=${encodeURIComponent(q)}`
         : `/marketplace/home`;
-      const res = await fetch(`${API_URL}${endpoint}`);
-      if (!res.ok) throw new Error("Fetch failed");
-      const json = await res.json();
+      const json = await ApiService.get<any>(endpoint);
 
       let processedData;
 

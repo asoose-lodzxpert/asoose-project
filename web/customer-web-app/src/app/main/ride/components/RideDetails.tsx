@@ -41,7 +41,12 @@ export function RideDetails() {
               type="text"
               placeholder="Enter pickup location"
               className="w-full p-2 mt-2 rounded-md border border-gray-300"
-              onChange={(e) => setPickupLocation(e.target.value)}
+              onChange={(e) => {
+                // Note: This is placeholder scaffolding. In production the map
+                // sets locations via setPickupLocation({ lat, lng }).
+                // Text input is kept for dev convenience only; not wired up.
+                void e.target.value;
+              }}
             />
           </div>
         )}
@@ -53,7 +58,11 @@ export function RideDetails() {
               type="text"
               placeholder="Enter dropoff location"
               className="w-full p-2 mt-2 rounded-md border border-gray-300"
-              onChange={(e) => setDropoffLocation(e.target.value)}
+              onChange={(e) => {
+                // Note: This is placeholder scaffolding. In production the map
+                // sets locations via setDropoffLocation({ lat, lng }).
+                void e.target.value;
+              }}
             />
           </div>
         )}

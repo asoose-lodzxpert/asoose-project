@@ -57,6 +57,15 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(new URL("/maintenance", req.url));
   }
 
+  // Main App Protection — all /main/* routes require authentication
+  if (url.pathname.startsWith("/main")) {
+    if (!isLoggedIn) {
+      const redirectUrl = new URL("/sign-in", req.url);
+      redirectUrl.searchParams.set("callbackUrl", url.pathname);
+      return NextResponse.redirect(redirectUrl);
+    }
+  }
+
   // Admin Route Protection
   if (url.pathname.startsWith("/super-admin")) {
     if (!isLoggedIn) return NextResponse.redirect(new URL("/sign-in", req.url));

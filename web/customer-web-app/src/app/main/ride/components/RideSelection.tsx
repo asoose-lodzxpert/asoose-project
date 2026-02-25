@@ -12,9 +12,8 @@ import { validateFareEstimatePayload } from "@/services/validate-fare-estimate-p
 import { LocationAutocompleteInput } from "./LocationAutocompleteInput";
 import { useDebounce } from "../hooks/useDebounce";
 import { SidebarSection, SidebarDivider } from "./Sidebar";
-import { PrimaryButton, SecondaryButton, Text, DangerButton } from "@/components/ui";
-import { X, RotateCcw, Banknote, CreditCard } from "lucide-react";
-import { paymentService } from "@/services/payment.service";
+import { PrimaryButton, SecondaryButton, Text } from "@/components/ui";
+import { X, RotateCcw, Loader2 } from "lucide-react";
 
 export function RideSelection() {
   const { data: session } = useSession();
@@ -31,6 +30,8 @@ export function RideSelection() {
   const clearDropoffLocation = useRideStore((state) => state.clearDropoffLocation);
   const clearAllLocations = useRideStore((state) => state.clearAllLocations);
   const setStartOtp = useRideStore((state) => state.setStartOtp);
+  const setLockedEstimate = useRideStore((state) => state.setLockedEstimate);
+  const setPaymentConfirmed = useRideStore((state) => state.setPaymentConfirmed);
 
   // --- Global Address Setters ---
   const setPickupAddressStore = useRideStore((state) => state.setPickupAddress);
@@ -50,6 +51,11 @@ export function RideSelection() {
   const [isCalculating, setIsCalculating] = useState(false);
   const [estimateError, setEstimateError] = useState<string | null>(null);
   const [estimates, setEstimates] = useState<Record<string, PriceEstimate> | null>(null);
+  // Fare confirmation: set when user selects a ride type, cleared on cancel or location change
+  const [pendingBooking, setPendingBooking] = useState<{
+    rideType: 'economy' | 'business';
+    estimate: PriceEstimate;
+  } | null>(null);
 
   // --- AbortControllers for Request Cancellation ---
   const routeAbortControllerRef = useRef<AbortController | null>(null);
@@ -57,6 +63,11 @@ export function RideSelection() {
 
   const debouncedPickup = useDebounce(pickupLocation, 500);
   const debouncedDropoff = useDebounce(dropoffLocation, 500);
+
+  // Clear pending confirmation whenever locations change (stale fare protection)
+  useEffect(() => {
+    setPendingBooking(null);
+  }, [debouncedPickup, debouncedDropoff]);
 
   // --- 1. Effect: Calculate Route Visuals (The Blue Line) ---
   useEffect(() => {
@@ -154,11 +165,8 @@ export function RideSelection() {
   }, [debouncedPickup, debouncedDropoff, session?.accessToken]);
 
 
-  // --- Payment Method State ---
-  const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'CARD'>('CASH');
-
-  // --- Booking Handler ---
-  const handleRideRequest = async (rideType: 'economy' | 'business') => {
+  // --- Booking Handler (called only after the user confirms on the confirmation panel) ---
+  const handleRideRequest = async (rideType: 'economy' | 'business', lockedEstimate: PriceEstimate) => {
     if (!pickupLocation || !dropoffLocation) {
       toast.error("Please select both pickup and dropoff locations");
       return;
@@ -169,25 +177,21 @@ export function RideSelection() {
     }
 
     setIsSubmitting(true);
-    // For CASH: transition to searching immediately (driver matching starts right away)
-    // For CARD: keep idle during API calls; transition to searching just before Paystack redirect
-    if (paymentMethod === 'CASH') {
-      setRideStatus('searching');
-    }
     setRideType(rideType);
+    // Store the locked fare so the post-match payment screen can display it
+    setLockedEstimate({
+      fare: lockedEstimate.estimatedFare,
+      distance: lockedEstimate.distance,
+      duration: lockedEstimate.duration,
+    });
+    // Reset any previous payment confirmation flag for this new booking
+    setPaymentConfirmed(false);
 
     try {
-      // Get the selected estimate for fare/distance/duration
       const vehicleKey = rideType.toUpperCase();
-      const selectedEstimate = estimates?.[vehicleKey];
-      if (!selectedEstimate) {
-        toast.error("Fare estimate not available. Please wait for calculation.");
-        setIsSubmitting(false);
-        setRideStatus('idle');
-        return;
-      }
+      // Use the locked estimate from the confirmation screen — prevents stale fare surprises
+      const selectedEstimate = lockedEstimate;
 
-      const idempotencyKey = crypto.randomUUID();
       const payload = buildCreateRidePayload({
         pickupLocation: {
           addressText: pickupAddress || "Pinned Location",
@@ -204,6 +208,7 @@ export function RideSelection() {
         distanceKm: selectedEstimate.distance,
         durationMin: selectedEstimate.duration,
       });
+
       try {
         validateCreateRidePayload(payload);
       } catch (validationError) {
@@ -213,7 +218,7 @@ export function RideSelection() {
         return;
       }
 
-      // 1. Create ride (PENDING ride + PENDING payment)
+      const idempotencyKey = crypto.randomUUID();
       const response = await RideService.createRide(
         payload,
         session.accessToken,
@@ -223,67 +228,16 @@ export function RideSelection() {
       // Store OTP so it can be shown to the driver when they arrive
       if ((response.ride as any).startOtp) setStartOtp((response.ride as any).startOtp);
 
-      // 2. Confirm ride with chosen payment method
-      const confirmResult = await RideService.confirmRide(
+      // 2. Confirm ride — always use CASH to start driver matching immediately.
+      //    Payment method selection happens AFTER a driver is assigned.
+      await RideService.confirmRide(
         response.ride.id,
-        paymentMethod,
+        'CASH',
         session.accessToken
       );
 
-      // 3. CARD → initiate Paystack payment and redirect
-      if (paymentMethod === 'CARD' && confirmResult?.status === 'AWAITING_PAYMENT') {
-        try {
-          const email = (session.user as any)?.email || '';
-
-          // Pass the frontend origin so the backend can redirect here after
-          // Paystack processes the payment. The backend appends /payment/callback
-          // to this URL, so we pass only the origin.
-          const frontendOrigin =
-            typeof window !== 'undefined'
-              ? window.location.origin
-              : process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001';
-
-          const paymentRes = await paymentService.initiatePayment(
-            {
-              amount: selectedEstimate.estimatedFare,
-              email,
-              gateway: 'PAYSTACK',
-              method: 'CARD',
-              type: 'RIDE',
-              rideId: response.ride.id,
-              // Tell the backend where to redirect the user after payment completes.
-              // Backend appends /payment/callback, so we pass just the origin.
-              callbackUrl: frontendOrigin,
-            },
-            session.accessToken,
-          );
-
-          if (!paymentRes.authorizationUrl) {
-            throw new Error('Paystack authorization URL not returned. Please try again.');
-          }
-
-          // Persist ride context so the callback page can restore state on return
-          localStorage.setItem('pending_ride', 'true');
-          localStorage.setItem('pending_ride_id', response.ride.id);
-
-          // Transition to searching JUST before leaving so the UI is correct on return
-          setRideStatus('searching');
-
-          // Hard navigate to Paystack hosted checkout — user leaves the app here
-          window.location.href = paymentRes.authorizationUrl;
-          return; // Don't reset submitting — user is navigating away
-        } catch (payErr: any) {
-          console.error('Paystack init failed:', payErr);
-          toast.error(payErr?.message || 'Failed to initialize payment. Please try again.');
-          // Clean up any partial localStorage state
-          localStorage.removeItem('pending_ride');
-          localStorage.removeItem('pending_ride_id');
-          setRideStatus('idle');
-          return;
-        }
-      }
-
-      // CASH flow — ride is now REQUESTED, driver matching in progress
+      // Driver matching is now active — show the searching screen.
+      setRideStatus('searching');
     } catch (error: any) {
       const norm = normalizeApiError(error);
       console.error("Booking failed:", JSON.stringify(norm, null, 2));
@@ -301,6 +255,17 @@ export function RideSelection() {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  // --- Show the confirmation panel for the selected ride type ---
+  const handleSelectRide = (rideType: 'economy' | 'business') => {
+    const vehicleKey = rideType.toUpperCase();
+    const estimate = estimates?.[vehicleKey];
+    if (!estimate) {
+      toast.error("Fare estimate not available. Please wait for calculation.");
+      return;
+    }
+    setPendingBooking({ rideType, estimate });
   };
 
   const formatMoney = (amount: number) => 
@@ -443,87 +408,114 @@ export function RideSelection() {
             </SidebarSection>
           )}
 
-          {/* Estimates loaded — show payment method & ride types */}
+          {/* Estimates loaded — show confirmation panel OR payment method + ride selection */}
           {estimates && (
             <>
-              {/* Payment Method Selector */}
-              <SidebarSection title="Payment">
-                <div className="grid grid-cols-2 gap-3 w-full">
-                  <button
-                    type="button"
-                    onClick={() => setPaymentMethod('CASH')}
-                    disabled={isSubmitting}
-                    className={`flex items-center justify-center gap-2 p-3 rounded-xl border transition-all ${
-                      paymentMethod === 'CASH'
-                        ? 'border-yellow-500 bg-yellow-50 dark:bg-yellow-500/10 ring-1 ring-yellow-500'
-                        : 'border-gray-200 dark:border-white/10 hover:border-yellow-500/50'
-                    }`}
-                  >
-                    <Banknote size={18} className={paymentMethod === 'CASH' ? 'text-yellow-600' : 'text-gray-500 dark:text-gray-400'} />
-                    <Text size="sm" weight={paymentMethod === 'CASH' ? 'semibold' : 'normal'}>Cash</Text>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPaymentMethod('CARD')}
-                    disabled={isSubmitting}
-                    className={`flex items-center justify-center gap-2 p-3 rounded-xl border transition-all ${
-                      paymentMethod === 'CARD'
-                        ? 'border-yellow-500 bg-yellow-50 dark:bg-yellow-500/10 ring-1 ring-yellow-500'
-                        : 'border-gray-200 dark:border-white/10 hover:border-yellow-500/50'
-                    }`}
-                  >
-                    <CreditCard size={18} className={paymentMethod === 'CARD' ? 'text-yellow-600' : 'text-gray-500 dark:text-gray-400'} />
-                    <Text size="sm" weight={paymentMethod === 'CARD' ? 'semibold' : 'normal'}>Card</Text>
-                  </button>
-                </div>
-              </SidebarSection>
+              {pendingBooking ? (
+                /* ── Fare Confirmation Panel ──────────────────────────── */
+                <SidebarSection title="Confirm Booking">
+                  {/* Route summary */}
+                  <div className="w-full space-y-2 bg-gray-50 dark:bg-white/5 rounded-xl p-3">
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">From</p>
+                      <p className="text-sm font-semibold text-gray-900 dark:text-white truncate mt-0.5">
+                        {pickupAddress || 'Pickup location'}
+                      </p>
+                    </div>
+                    <div className="border-t border-gray-200 dark:border-white/10 pt-2">
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">To</p>
+                      <p className="text-sm font-semibold text-gray-900 dark:text-white truncate mt-0.5">
+                        {dropoffAddress || 'Dropoff location'}
+                      </p>
+                    </div>
+                  </div>
 
-              <SidebarDivider />
+                  {/* Fare details */}
+                  <div className="w-full bg-yellow-50 dark:bg-yellow-500/10 border border-yellow-200 dark:border-yellow-500/20 rounded-xl p-3 space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold uppercase tracking-wide text-yellow-700 dark:text-yellow-400">
+                        {pendingBooking.rideType}
+                      </span>
+                      <span className="text-xl font-black text-gray-900 dark:text-white">
+                        {formatMoney(pendingBooking.estimate.estimatedFare)}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      {pendingBooking.estimate.distance.toFixed(1)} km &middot; {formatDuration(pendingBooking.estimate.duration)} &middot; Pay after driver is assigned
+                    </p>
+                  </div>
 
-              {/* Ride Type Selection */}
-              <SidebarSection title="Select Ride">
-              <div className="grid grid-cols-2 gap-3 w-full">
-                {/* Economy Button */}
-                <SecondaryButton 
-                  onClick={() => handleRideRequest('economy')} 
-                  disabled={isSubmitting || isCalculating}
-                  className="h-20 flex flex-col items-center justify-center"
-                >
-                  {isCalculating ? (
-                    <Text size="xs" variant="secondary">Calculating...</Text>
-                  ) : (
-                    <>
-                      <Text size="sm" weight="semibold">Economy</Text>
-                      {estimates?.['ECONOMY'] && (
-                        <Text size="xs" variant="secondary" className="mt-1">
-                          {formatDuration(estimates['ECONOMY'].duration)} • {formatMoney(estimates['ECONOMY'].estimatedFare)}
-                        </Text>
+                  <p className="text-xs text-amber-600 dark:text-amber-500 font-medium w-full">
+                    ✓ Confirmed fare — you will not be charged more than this amount.
+                  </p>
+
+                  {/* Action buttons */}
+                  <div className="grid grid-cols-2 gap-3 w-full">
+                    <SecondaryButton
+                      onClick={() => setPendingBooking(null)}
+                      disabled={isSubmitting}
+                    >
+                      ← Change
+                    </SecondaryButton>
+                    <PrimaryButton
+                      onClick={() => handleRideRequest(pendingBooking.rideType, pendingBooking.estimate)}
+                      disabled={isSubmitting}
+                    >
+                      {isSubmitting ? (
+                        <span className="flex items-center justify-center gap-2">
+                          <Loader2 size={14} className="animate-spin" />
+                          Booking...
+                        </span>
+                      ) : 'Confirm & Book'}
+                    </PrimaryButton>
+                  </div>
+                </SidebarSection>
+              ) : (
+                /* ── Ride Type Selection ─────────────────────────────── */
+                <SidebarSection title="Select Ride">
+                  <div className="grid grid-cols-2 gap-3 w-full">
+                    {/* Economy Button */}
+                    <SecondaryButton
+                      onClick={() => handleSelectRide('economy')}
+                      disabled={isSubmitting || isCalculating}
+                      className="h-20 flex flex-col items-center justify-center"
+                    >
+                      {isCalculating ? (
+                        <Text size="xs" variant="secondary">Calculating...</Text>
+                      ) : (
+                        <>
+                          <Text size="sm" weight="semibold">Economy</Text>
+                          {estimates?.['ECONOMY'] && (
+                            <Text size="xs" variant="secondary" className="mt-1">
+                              {formatDuration(estimates['ECONOMY'].duration)} &bull; {formatMoney(estimates['ECONOMY'].estimatedFare)}
+                            </Text>
+                          )}
+                        </>
                       )}
-                    </>
-                  )}
-                </SecondaryButton>
+                    </SecondaryButton>
 
-                {/* Business Button */}
-                <PrimaryButton 
-                  onClick={() => handleRideRequest('business')} 
-                  disabled={isSubmitting || isCalculating}
-                  className="h-20 flex flex-col items-center justify-center"
-                >
-                  {isCalculating ? (
-                    <Text size="xs" className="text-white">Calculating...</Text>
-                  ) : (
-                    <>
-                      <Text size="sm" weight="semibold" className="text-white">Business</Text>
-                      {estimates?.['BUSINESS'] && (
-                        <Text size="xs" className="mt-1 text-white/80">
-                          {formatDuration(estimates['BUSINESS'].duration)} • {formatMoney(estimates['BUSINESS'].estimatedFare)}
-                        </Text>
+                    {/* Business Button */}
+                    <PrimaryButton
+                      onClick={() => handleSelectRide('business')}
+                      disabled={isSubmitting || isCalculating}
+                      className="h-20 flex flex-col items-center justify-center"
+                    >
+                      {isCalculating ? (
+                        <Text size="xs" className="text-white">Calculating...</Text>
+                      ) : (
+                        <>
+                          <Text size="sm" weight="semibold" className="text-white">Business</Text>
+                          {estimates?.['BUSINESS'] && (
+                            <Text size="xs" className="mt-1 text-white/80">
+                              {formatDuration(estimates['BUSINESS'].duration)} &bull; {formatMoney(estimates['BUSINESS'].estimatedFare)}
+                            </Text>
+                          )}
+                        </>
                       )}
-                    </>
-                  )}
-                </PrimaryButton>
-              </div>
-            </SidebarSection>
+                    </PrimaryButton>
+                  </div>
+                </SidebarSection>
+              )}
             </>
           )}
         </>

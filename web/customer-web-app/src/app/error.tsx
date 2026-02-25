@@ -46,7 +46,7 @@ export default function Error({
         </button>
 
         <Link
-          href="/super-admin/dashboard"
+          href="/main/store"
           className="flex items-center gap-2 px-6 py-3 bg-gray-100 dark:bg-white/5 text-gray-700 dark:text-gray-300 rounded-xl font-bold text-sm hover:bg-gray-200 dark:hover:bg-white/10 transition-all"
         >
           <Home className="w-4 h-4" />
