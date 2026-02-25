@@ -162,8 +162,10 @@ enum TransactionType {
   VENDOR_EARNING        // Store receives net amount
   RIDER_EARNING         // Rider receives ride/delivery fee
   PAYOUT_REQUESTED      // Vendor/Rider requests withdrawal
+  PAYOUT_APPROVED       // Admin approved the payout — awaiting bank transfer
   PAYOUT_COMPLETED      // Bank transfer successful
-  PAYOUT_FAILED         // Bank transfer failed
+  PAYOUT_FAILED         // Bank transfer failed / admin rejected
+  PAYOUT_GATEWAY_ERROR  // Payment gateway error during disbursement (payout left as APPROVED for manual review)
   REFUND_ISSUED         // Customer refunded
   ADJUSTMENT            // Manual admin adjustment
   WALLET_TOPUP          // Direct wallet addition

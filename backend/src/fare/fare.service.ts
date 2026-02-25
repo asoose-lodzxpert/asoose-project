@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { RideFareDto } from './dto/ride-fare-dto';
 import { DeliveryFareDto } from './dto/delivery-fare-dto';
 import { GeoService } from '../matching/geo/geo.service';
+import { PrismaService } from '../prisma/prisma.service';
 
 type DistanceResult = {
   distanceMeters: number;
@@ -13,52 +14,71 @@ type DistanceResult = {
 @Injectable()
 export class FareService {
   private readonly logger = new Logger(FareService.name);
-  constructor(private readonly geoService: GeoService) {}
 
-  // Total fare = Base fare + (Distance × per km rate)
-  // Ride fare constants
-  readonly BaseRideFare = 1000;
-  readonly RiderPerKm = 700;
+  constructor(
+    private readonly geoService: GeoService,
+    private readonly prisma: PrismaService,
+  ) {}
 
-  // Delivery fare constants
-  readonly BaseDeliveryFare = 700;
-  readonly DeliveryPerKm = 400;
+  // ── Hardcoded fallback constants (used when DB setting is not found) ─────────
+  // Ride
+  readonly DefaultBaseRideFare = 1000;
+  readonly DefaultRiderPerKm = 700;
+  // Delivery
+  readonly DefaultBaseDeliveryFare = 700;
+  readonly DefaultDeliveryPerKm = 400;
 
   /**
-   * Returns an object with price (number), distance (meters + text) and eta (seconds + text)
+   * Reads a numeric system setting from the DB.
+   * Falls back to the provided default if the key is missing or not a number.
+   */
+  private async getSetting(key: string, fallback: number): Promise<number> {
+    try {
+      const setting = await this.prisma.systemSetting.findUnique({
+        where: { key },
+      });
+      if (setting?.value) {
+        const parsed = parseFloat(setting.value);
+        if (!isNaN(parsed) && parsed > 0) return parsed;
+      }
+    } catch (err) {
+      this.logger.warn(`Could not read setting "${key}", using default ${fallback}`, err);
+    }
+    return fallback;
+  }
+
+  /**
+   * Returns an object with price (number), distance (meters + text) and eta (seconds + text).
+   * Fare constants are read from admin-set system settings with hardcoded defaults as fallback.
    */
   async getRideFare(dto: RideFareDto) {
     const { pickuplat, pickuplong, dropofflat, dropofflong } = dto;
 
-    // Use backend geo service for distance calculation
+    // Load admin-configured fare rates (or fall back to hardcoded defaults)
+    const [baseRideFare, riderPerKm] = await Promise.all([
+      this.getSetting('ride_base_fare', this.DefaultBaseRideFare),
+      this.getSetting('ride_per_km', this.DefaultRiderPerKm),
+    ]);
+
     const lat1 = Number(pickuplat);
     const lng1 = Number(pickuplong);
     const lat2 = Number(dropofflat);
     const lng2 = Number(dropofflong);
-    const distanceKm = this.geoService.calculateDistance(
-      lat1,
-      lng1,
-      lat2,
-      lng2,
-    );
+    const distanceKm = this.geoService.calculateDistance(lat1, lng1, lat2, lng2);
     const distanceMeters = Math.round(distanceKm * 1000);
 
-    // No ETA calculation (could be added if needed)
-    const durationSeconds = Math.round(distanceKm * 180); // rough estimate: 3 min/km
+    const durationSeconds = Math.round(distanceKm * 180); // ~3 min/km
     const durationText = `${Math.round(durationSeconds / 60)} min`;
     const distanceText = `${distanceKm.toFixed(2)} km`;
 
-    // Get current time in Africa/Lagos
+    // After 10 PM (Africa/Lagos) apply a night surcharge of ₦1,000/km
     const now = new Date();
-    const lagosTime = new Date(
-      now.toLocaleString('en-US', { timeZone: 'Africa/Lagos' }),
-    );
+    const lagosTime = new Date(now.toLocaleString('en-US', { timeZone: 'Africa/Lagos' }));
     const hour = lagosTime.getHours();
+    const perKm = hour >= 22 ? 1000 : riderPerKm;
 
-    // After 10pm (22:00), use 1000 NGN per km
-    const perKm = hour >= 22 ? 1000 : this.RiderPerKm;
     const variableFare = Math.round(distanceKm * perKm);
-    const economyPrice = this.BaseRideFare + variableFare;
+    const economyPrice = baseRideFare + variableFare;
     const businessPrice = Math.round(economyPrice * 1.5);
 
     const price = dto.vehicleType === 'BUSINESS' ? businessPrice : economyPrice;
@@ -67,50 +87,48 @@ export class FareService {
       price,
       economyPrice,
       businessPrice,
-      distance: {
-        meters: distanceMeters,
-        text: distanceText,
-      },
-      eta: {
-        seconds: durationSeconds,
-        text: durationText,
-      },
+      distance: { meters: distanceMeters, text: distanceText },
+      eta: { seconds: durationSeconds, text: durationText },
     };
   }
 
   async getDeliveryFare(dto: DeliveryFareDto) {
     const { pickuplat, pickuplong, dropofflat, dropofflong } = dto;
 
-    // Use backend geo service for distance calculation
+    // Load admin-configured delivery fare rates (or fall back to hardcoded defaults)
+    const [baseDeliveryFare, deliveryPerKm] = await Promise.all([
+      this.getSetting('delivery_base_fare', this.DefaultBaseDeliveryFare),
+      this.getSetting('delivery_per_km', this.DefaultDeliveryPerKm),
+    ]);
+
     const lat1 = Number(pickuplat);
     const lng1 = Number(pickuplong);
     const lat2 = Number(dropofflat);
     const lng2 = Number(dropofflong);
-    const distanceKm = this.geoService.calculateDistance(
-      lat1,
-      lng1,
-      lat2,
-      lng2,
-    );
+    const distanceKm = this.geoService.calculateDistance(lat1, lng1, lat2, lng2);
     const distanceMeters = Math.round(distanceKm * 1000);
 
     const durationSeconds = Math.round(distanceKm * 180);
     const durationText = `${Math.round(durationSeconds / 60)} min`;
     const distanceText = `${distanceKm.toFixed(2)} km`;
 
-    const variableFare = Math.round(distanceKm * this.DeliveryPerKm);
-    const price = this.BaseDeliveryFare + variableFare;
+    const variableFare = Math.round(distanceKm * deliveryPerKm);
+    const price = baseDeliveryFare + variableFare;
 
     return {
       price,
-      distance: {
-        meters: distanceMeters,
-        text: distanceText,
-      },
-      eta: {
-        seconds: durationSeconds,
-        text: durationText,
-      },
+      distance: { meters: distanceMeters, text: distanceText },
+      eta: { seconds: durationSeconds, text: durationText },
     };
   }
+
+  // ── Convenience accessors (used by OrdersService / rides.service) ────────────
+  // These remain synchronous by returning the hardcoded defaults.
+  // Code that builds total order fares in OrdersService uses these directly;
+  // for truly live values use getSetting() inside an async context.
+  get BaseRideFare() { return this.DefaultBaseRideFare; }
+  get RiderPerKm() { return this.DefaultRiderPerKm; }
+  get BaseDeliveryFare() { return this.DefaultBaseDeliveryFare; }
+  get DeliveryPerKm() { return this.DefaultDeliveryPerKm; }
 }
+

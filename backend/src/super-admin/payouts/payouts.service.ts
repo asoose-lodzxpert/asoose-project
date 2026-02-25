@@ -114,6 +114,11 @@ export class PayoutsService {
     type: 'VENDOR' | 'RIDER',
     adminId: string,
   ) {
+    // Guard: type must be a recognized value
+    if (type !== 'VENDOR' && type !== 'RIDER') {
+      throw new BadRequestException(`Invalid payout type: ${type}.`);
+    }
+
     // ====================================================
     // STEP 1: LOCK & VALIDATE (Database Transaction 1)
     // ====================================================
@@ -161,6 +166,9 @@ export class PayoutsService {
         });
       }
 
+      // 4. Record PAYOUT_APPROVED event in the ledger (same tx — fully atomic)
+      await this.ledger.recordPayoutApproved(payoutId, type, p.amount, adminId, tx);
+
       return { payout: p, bankDetails };
     });
 
@@ -205,6 +213,8 @@ export class PayoutsService {
     } catch (error) {
       this.logger.error(`Transfer Failed for ${payoutId}`, error);
       // DO NOT auto-revert to PENDING. Leave as APPROVED for manual review.
+      // Record a PAYOUT_GATEWAY_ERROR ledger entry so auditors can see the failure event.
+      await this.ledger.recordGatewayError(payoutId, type, adminId, error?.message ?? 'Unknown gateway error');
       throw new BadRequestException('Payment Gateway Error. Check logs.');
     }
 
@@ -227,8 +237,8 @@ export class PayoutsService {
           });
         }
 
-        // 2. Ledger: Mark COMPLETED (No new debit)
-        await this.ledger.finalizePayout(payoutId, 'COMPLETED');
+        // 2. Ledger: Mark COMPLETED (same tx — atomic with status update)
+        await this.ledger.finalizePayout(payoutId, 'COMPLETED', tx);
       });
 
       // 3. Log Activity
@@ -276,8 +286,8 @@ export class PayoutsService {
           });
         }
 
-        // 2. Ledger: REFUND the wallet (Credit back)
-        await this.ledger.finalizePayout(payoutId, 'FAILED');
+        // 2. Ledger: REFUND the wallet (same tx — atomic with status update)
+        await this.ledger.finalizePayout(payoutId, 'FAILED', tx);
       });
 
       return { status: 'FAILED', reason: transferResult.message };
@@ -290,17 +300,45 @@ export class PayoutsService {
     reason: string,
     adminId: string,
   ) {
-    const updateData = {
-      status: PayoutStatus.REJECTED,
-      rejectionReason: reason,
-      processedAt: new Date(),
-    };
+    // Guard: type must be a recognized value
+    if (type !== 'VENDOR' && type !== 'RIDER') {
+      throw new BadRequestException(`Invalid payout type: ${type}.`);
+    }
 
-    // 1. Perform Transaction (Update DB + Refund Ledger)
+    // Guard: reason is mandatory
+    if (!reason?.trim()) {
+      throw new BadRequestException('Rejection reason is required.');
+    }
+
+    const trimmedReason = reason.trim();
+
+    // 1. Perform Transaction (Validate + Update DB + Refund Ledger)
     const result = await this.prisma.$transaction(async (tx) => {
-      let payout;
+      // Fetch and validate the payout BEFORE updating
+      const existing =
+        type === 'VENDOR'
+          ? await tx.vendorPayout.findUnique({ where: { id } })
+          : await tx.riderPayout.findUnique({ where: { id } });
+
+      if (!existing) {
+        throw new NotFoundException('Payout record not found.');
+      }
+
+      // Status guard: only PENDING payouts may be rejected
+      if (existing.status !== PayoutStatus.PENDING) {
+        throw new BadRequestException(
+          `Cannot reject a payout with status: ${existing.status}. Only PENDING payouts can be rejected.`,
+        );
+      }
+
+      const updateData = {
+        status: PayoutStatus.REJECTED,
+        rejectionReason: trimmedReason,
+        processedAt: new Date(),
+      };
 
       // Update Status
+      let payout;
       if (type === 'VENDOR') {
         payout = await tx.vendorPayout.update({
           where: { id },
@@ -313,8 +351,8 @@ export class PayoutsService {
         });
       }
 
-      // Refund the wallet
-      await this.ledger.finalizePayout(id, 'FAILED');
+      // Refund the wallet (same tx — atomic with status update)
+      await this.ledger.finalizePayout(id, 'FAILED', tx);
 
       return payout;
     });
@@ -324,8 +362,8 @@ export class PayoutsService {
       userId: adminId,
       action: 'PAYOUT_REJECTED',
       target: id,
-      details: `Rejected ${type} payout. Reason: ${reason}`,
-      metadata: { payoutId: id, type, reason },
+      details: `Rejected ${type} payout. Reason: ${trimmedReason}`,
+      metadata: { payoutId: id, type, reason: trimmedReason },
     });
 
     return result;

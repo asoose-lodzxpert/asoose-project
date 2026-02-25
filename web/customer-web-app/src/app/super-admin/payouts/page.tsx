@@ -558,7 +558,9 @@ export default function PayoutsManagement() {
     return `/super-admin/payouts${qs ? "?" + qs : ""}`;
   }, [filterStatus, filterType, filterFrom, filterTo]);
 
-  const { data, mutate, isLoading } = useSWR<Payout[]>(swrKey, fetcher);
+  const { data, mutate, isLoading } = useSWR<Payout[]>(swrKey, fetcher, {
+    refreshInterval: 30_000, // re-poll every 30 s so concurrent admins stay in sync
+  });
   const payouts = data ?? [];
 
   const showToast = (msg: string, kind: "success" | "error") => {
@@ -567,9 +569,15 @@ export default function PayoutsManagement() {
   };
 
   const handleApprove = async (p: Payout) => {
+    // Resolve the correct display name based on type and shape of the Payout object
+    const recipientDisplay =
+      p.payoutType === "VENDOR"
+        ? p.store?.vendor?.name ?? p.store?.name ?? "vendor"
+        : p.rider?.name ?? "rider";
+
     const confirm = await Swal.fire({
       title: "Approve Payout?",
-      text: `Approve ${p.payoutType.toLowerCase()} payout of ₦${p.amount.toLocaleString()} for ${p.payoutType === "VENDOR" ? (p as any).vendor?.name ?? "vendor" : (p as any).rider?.name ?? "rider"}?`,
+      text: `Approve ${p.payoutType.toLowerCase()} payout of ${fmt(p.amount)} for ${recipientDisplay}?`,
       icon: "question",
       showCancelButton: true,
       confirmButtonColor: "#22c55e",
@@ -619,10 +627,11 @@ export default function PayoutsManagement() {
     }
   };
 
-  const pendingCount = payouts.filter((p) => p.status === "PENDING").length;
-  const totalPending = payouts
-    .filter((p) => p.status === "PENDING")
-    .reduce((s, p) => s + p.amount, 0);
+  const pendingPayouts = payouts.filter((p) => p.status === "PENDING");
+  const pendingCount = pendingPayouts.length;
+  const totalPending = pendingPayouts.reduce((s, p) => s + p.amount, 0);
+  // Show pending summary only when viewing all statuses — otherwise it's misleading
+  const showPendingSummary = filterStatus === "ALL";
 
   if (isLoading && !data) return <PayoutsSkeleton />;
 
@@ -665,10 +674,23 @@ export default function PayoutsManagement() {
             Payout Management
           </h1>
           <p className="text-slate-400 mt-2 text-sm sm:text-base">
-            {pendingCount} pending · Total pending:{" "}
-            <span className="text-white font-semibold">
-              {fmt(totalPending)}
-            </span>
+            {showPendingSummary ? (
+              <>
+                {pendingCount} pending · Total pending:{" "}
+                <span className="text-white font-semibold">
+                  {fmt(totalPending)}
+                </span>
+              </>
+            ) : (
+              <>
+                Showing{" "}
+                <span className="text-white font-semibold">
+                  {filterStatus}
+                </span>{" "}
+                payouts · {payouts.length} result
+                {payouts.length !== 1 ? "s" : ""}
+              </>
+            )}
           </p>
         </div>
 

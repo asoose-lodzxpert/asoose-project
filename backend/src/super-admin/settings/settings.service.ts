@@ -75,7 +75,15 @@ export class SettingsService {
    * Helper to assign categories to new settings if they don't exist yet.
    */
   private inferCategory(key: string): string {
-    if (key.includes('fare') || key.includes('cost') || key.includes('radius'))
+    if (
+      key.includes('fare') ||
+      key.includes('cost') ||
+      key.includes('radius') ||
+      key.includes('per_km') ||
+      key.includes('base_fare') ||
+      key.includes('ride_') ||
+      key.includes('delivery_')
+    )
       return 'Logistics';
     if (key.includes('commission') || key.includes('withdrawal'))
       return 'Financials';
@@ -88,8 +96,18 @@ export class SettingsService {
   async seedDefaults() {
     const defaults = [
       { key: 'maintenance_mode', value: 'false', category: 'General' },
-      { key: 'global_commission', value: '10', category: 'Financials' },
       { key: 'support_phone', value: '+234 800 000 0000', category: 'General' },
+      // Financials
+      { key: 'global_commission', value: '10', category: 'Financials' },
+      { key: 'min_withdrawal', value: '5000', category: 'Financials' },
+      // Logistics – Ride pricing
+      { key: 'ride_base_fare', value: '1000', category: 'Logistics' },
+      { key: 'ride_per_km', value: '700', category: 'Logistics' },
+      // Logistics – Delivery pricing
+      { key: 'delivery_base_fare', value: '700', category: 'Logistics' },
+      { key: 'delivery_per_km', value: '400', category: 'Logistics' },
+      // Logistics – Operations
+      { key: 'search_radius', value: '10', category: 'Logistics' },
     ];
 
     for (const d of defaults) {

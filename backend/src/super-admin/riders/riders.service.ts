@@ -590,20 +590,25 @@ export class RidersService {
       throw new BadRequestException('Insufficient funds');
     }
 
-    return this.prisma.$transaction(async (tx) => {
-      await tx.rider.update({
-        where: { id: rider.id },
-        data: { walletBalance: { decrement: amount } },
-      });
-
-      return tx.riderPayout.create({
-        data: {
-          riderId: rider.id,
-          amount,
-          status: 'PENDING',
-        },
-      });
+    // Create the payout record first (PENDING, no wallet debit yet)
+    const payout = await this.prisma.riderPayout.create({
+      data: {
+        riderId: rider.id,
+        amount,
+        status: 'PENDING',
+      },
     });
+
+    // Debit wallet + create ledger entry atomically via the ledger service.
+    // This is the ONLY place the wallet is debited for this payout lifecycle.
+    await this.transactionLedger.recordPayoutRequest(
+      rider.id,
+      UserRole.RIDER,
+      amount,
+      payout.id,
+    );
+
+    return payout;
   }
 
   async processPayout(
@@ -622,11 +627,9 @@ export class RidersService {
     if (!payout) throw new NotFoundException('Payout not found');
 
     if (status === 'FAILED') {
-      // Refund wallet on admin rejection
-      await this.prisma.rider.update({
-        where: { id: payout.riderId },
-        data: { walletBalance: { increment: payout.amount } },
-      });
+      // Refund wallet via ledger — this credits the wallet AND creates the PAYOUT_FAILED
+      // ledger entry atomically, so the refund is always auditable.
+      await this.transactionLedger.finalizePayout(payoutId, 'FAILED');
 
       return this.prisma.riderPayout.update({
         where: { id: payoutId },
@@ -666,7 +669,7 @@ export class RidersService {
       'Rider payout disbursement',
     );
 
-    return this.prisma.riderPayout.update({
+    const updatedPayout = await this.prisma.riderPayout.update({
       where: { id: payoutId },
       data: {
         status: transfer.success ? 'PAID' : 'FAILED',
@@ -674,6 +677,15 @@ export class RidersService {
         processedAt: new Date(),
       },
     });
+
+    // Finalize in the ledger — marks the PAYOUT_REQUESTED entry as COMPLETED
+    // (or FAILED + refunds the wallet if the transfer failed).
+    await this.transactionLedger.finalizePayout(
+      payoutId,
+      transfer.success ? 'COMPLETED' : 'FAILED',
+    );
+
+    return updatedPayout;
   }
 
   // --- Helpers ---

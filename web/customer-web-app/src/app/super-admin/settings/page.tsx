@@ -96,25 +96,47 @@ const SETTING_DEFINITIONS: SystemSettingDef[] = [
     type: "currency",
     defaultValue: 5000,
   },
+  // ── Ride Pricing ────────────────────────────────────────────────────────────
   {
     category: "Logistics",
-    key: "base_fare_bike",
-    label: "Bike Base Fare",
+    key: "ride_base_fare",
+    label: "Ride Base Fare (₦)",
     type: "currency",
-    defaultValue: 500,
+    description: "Fixed starting fare charged on every ride",
+    defaultValue: 1000,
   },
   {
     category: "Logistics",
-    key: "cost_per_km",
-    label: "Cost Per KM",
+    key: "ride_per_km",
+    label: "Ride Rate Per KM (₦)",
     type: "currency",
-    defaultValue: 100,
+    description: "Per-kilometre charge for rides (after 10 PM rate: ₦1,000/km)",
+    defaultValue: 700,
   },
+  // ── Delivery Pricing ─────────────────────────────────────────────────────────
+  {
+    category: "Logistics",
+    key: "delivery_base_fare",
+    label: "Delivery Base Fare (₦)",
+    type: "currency",
+    description: "Fixed starting fare charged on every delivery",
+    defaultValue: 700,
+  },
+  {
+    category: "Logistics",
+    key: "delivery_per_km",
+    label: "Delivery Rate Per KM (₦)",
+    type: "currency",
+    description: "Per-kilometre charge for parcel deliveries",
+    defaultValue: 400,
+  },
+  // ── Operations ───────────────────────────────────────────────────────────────
   {
     category: "Logistics",
     key: "search_radius",
     label: "Driver Search Radius (KM)",
     type: "input",
+    description: "Radius to search for nearby drivers when a ride is requested",
     defaultValue: 10,
   },
 ];

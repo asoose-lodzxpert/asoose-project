@@ -88,6 +88,7 @@ export class VerificationService {
    * 1.2 Multi-Step Decision Flow
    * FIX: Captures updated store object to avoid the null-reference error on findUnique
    * UPDATE: Added Activity Logging for auditing verification actions
+   * UPDATE: On APPROVE, commissionRate falls back to global_commission system setting
    */
   async handleDecision(
     id: string,
@@ -110,6 +111,24 @@ export class VerificationService {
         : action === 'REJECT'
           ? UserStatus.SUSPENDED
           : UserStatus.PENDING;
+
+    // Resolve the commission rate to apply on approval.
+    // Priority: explicit admin input → global_commission system setting → hardcoded default (10%).
+    let resolvedCommissionRate = commissionRate;
+    if (action === 'APPROVE' && resolvedCommissionRate === undefined) {
+      try {
+        const setting = await this.prisma.systemSetting.findUnique({
+          where: { key: 'global_commission' },
+        });
+        if (setting?.value) {
+          const parsed = parseFloat(setting.value);
+          if (!isNaN(parsed)) resolvedCommissionRate = parsed;
+        }
+      } catch (err) {
+        this.logger.warn('Could not read global_commission setting, using default 10%', err);
+      }
+      if (resolvedCommissionRate === undefined) resolvedCommissionRate = 10;
+    }
 
     // 1. Perform the database update transaction
     const result = await this.prisma.$transaction(async (tx) => {
@@ -138,8 +157,9 @@ export class VerificationService {
               verification: vStatus,
               status:
                 action === 'APPROVE' ? StoreStatus.ACTIVE : StoreStatus.PENDING,
-              ...(action === 'APPROVE' && commissionRate !== undefined
-                ? { commissionRate }
+              // Apply resolved commission rate (global default or admin override)
+              ...(action === 'APPROVE' && resolvedCommissionRate !== undefined
+                ? { commissionRate: resolvedCommissionRate }
                 : {}),
             },
           });
@@ -157,10 +177,16 @@ export class VerificationService {
 
         return vendor;
       } else {
-        // Update Rider Account
+        // Update Rider Account + set their commission rate on approval
         const rider = await tx.rider.update({
           where: { id },
-          data: { status: uStatus },
+          data: {
+            status: uStatus,
+            // Apply resolved commission rate (global default or admin override)
+            ...(action === 'APPROVE' && resolvedCommissionRate !== undefined
+              ? { commissionRate: resolvedCommissionRate }
+              : {}),
+          },
         });
 
         // Update all Rider documents to match decision

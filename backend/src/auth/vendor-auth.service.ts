@@ -179,6 +179,20 @@ export class VendorAuthService {
     // Hash with Argon2id for all new vendor registrations
     const hashedPassword = await hashPassword(dto.password);
 
+    // Resolve commission rate from global system setting (fallback: 10%)
+    let storeCommissionRate = 10;
+    try {
+      const setting = await this.prisma.systemSetting.findUnique({
+        where: { key: 'global_commission' },
+      });
+      if (setting?.value) {
+        const parsed = parseFloat(setting.value);
+        if (!isNaN(parsed)) storeCommissionRate = parsed;
+      }
+    } catch {
+      // Non-critical: registration can still succeed with the default rate
+    }
+
     const vendor = await this.prisma.vendor.create({
       data: {
         name: dto.name,
@@ -206,6 +220,7 @@ export class VendorAuthService {
             lng: dto.location?.lng,
             openHours: dto.openHours,
             status: 'PENDING',
+            commissionRate: storeCommissionRate,
           },
         },
       },

@@ -1,6 +1,6 @@
 import { PrismaService } from '../../prisma/prisma.service';
 import { Injectable } from '@nestjs/common';
-import { Prisma, UserRole } from '@prisma/client';
+import { Prisma, UserRole, TransactionType } from '@prisma/client';
 
 /**
  * Transaction Ledger Helper
@@ -93,14 +93,30 @@ export class TransactionLedgerService {
     payoutId: string,
   ) {
     return this.prisma.$transaction(async (tx) => {
-      // 1. Create Ledger Entry (Audit Trail)
+      // 1. Fetch current wallet balance for accurate ledger snapshot
+      let balanceBefore = 0;
+      if (userRole === UserRole.RIDER) {
+        const rider = await tx.rider.findUnique({
+          where: { id: userId },
+          select: { walletBalance: true },
+        });
+        balanceBefore = rider?.walletBalance ?? 0;
+      } else {
+        const store = await tx.store.findFirst({
+          where: { vendorId: userId },
+          select: { walletBalance: true },
+        });
+        balanceBefore = store?.walletBalance ?? 0;
+      }
+      const balanceAfter = balanceBefore - amount;
+
+      // 2. Create Ledger Entry (Audit Trail)
       const transaction = await tx.transaction.create({
         data: {
           amount: amount,
           type: 'PAYOUT_REQUESTED',
           status: 'PENDING',
           description: `Withdrawal Request (Funds Locked)`,
-          // FIXED: Removed 'reference' property as it doesn't exist on Transaction model
 
           // Map to the correct entity columns based on role
           ...(userRole === UserRole.RIDER
@@ -114,12 +130,12 @@ export class TransactionLedgerService {
                 entityId: userId,
                 vendorPayoutId: payoutId,
               }),
-          balanceBefore: 0, // In a full implementation, fetch current balance first for accuracy
-          balanceAfter: 0,
+          balanceBefore,
+          balanceAfter,
         },
       });
 
-      // 2. DEBIT the Wallet (The ONLY Debit action in the lifecycle)
+      // 3. DEBIT the Wallet (The ONLY Debit action in the lifecycle)
       if (userRole === UserRole.RIDER) {
         await tx.rider.update({
           where: { id: userId },
@@ -143,7 +159,19 @@ export class TransactionLedgerService {
    * ACTION: Updates Status ONLY. DOES NOT DEBIT AGAIN.
    * On Failure/Rejection, it refunds the wallet.
    */
-  async finalizePayout(payoutId: string, status: 'COMPLETED' | 'FAILED') {
+  /**
+   * Finalizes a payout after admin approval/rejection or a gateway result.
+   *
+   * @param externalTx - Pass the caller's Prisma transaction client to make
+   *   the ledger write and the payout status update fully atomic. If omitted,
+   *   the method opens its own transaction — but this breaks atomicity when the
+   *   caller is already inside a $transaction block.
+   */
+  async finalizePayout(
+    payoutId: string,
+    status: 'COMPLETED' | 'FAILED',
+    externalTx?: Prisma.TransactionClient,
+  ) {
     return this.withTransaction(async (client) => {
       // Common WHERE clause using OR to find by either ID type
       const whereClause: Prisma.TransactionWhereInput = {
@@ -152,62 +180,137 @@ export class TransactionLedgerService {
       };
 
       if (status === 'COMPLETED') {
-        // SUCCESS: Just mark the ledger as COMPLETED.
-        // Money was already debited at request time, so we do nothing to the wallet here.
+        // SUCCESS: Mark the PAYOUT_REQUESTED entry as COMPLETED.
+        // Wallet was already debited at request time — no further debit here.
         await client.transaction.updateMany({
           where: whereClause,
           data: { status: 'COMPLETED', description: 'Withdrawal Successful' },
         });
       } else {
-        // FAILED: Mark as FAILED and REFUND the wallet.
+        // FAILED/REJECTED: Refund the wallet and mark ledger as FAILED.
 
-        // 1. Find the original transaction to get the amount and user ID
+        // 1. Find the original PAYOUT_REQUESTED entry (required for refund amount + entity)
         const originalTx = await client.transaction.findFirst({
           where: whereClause,
         });
 
-        if (originalTx) {
-          // 2. Mark original request as FAILED in ledger
-          await client.transaction.update({
-            where: { id: originalTx.id },
-            data: {
-              status: 'FAILED',
-              description: 'Withdrawal Failed - Refunded',
-            },
+        if (!originalTx) {
+          // Hard fail — we cannot refund without knowing the amount and entity.
+          // A silent skip here would silently lose money.
+          throw new Error(
+            `finalizePayout: No PAYOUT_REQUESTED ledger entry found for payout ${payoutId}. ` +
+              `Wallet refund aborted. Manual review required.`,
+          );
+        }
+
+        // 2. Mark original request as FAILED in ledger
+        await client.transaction.update({
+          where: { id: originalTx.id },
+          data: {
+            status: 'FAILED',
+            description: 'Withdrawal Failed - Funds Returned to Wallet',
+          },
+        });
+
+        // 3. Credit (refund) the wallet
+        if (originalTx.entityType === 'RIDER' && originalTx.entityId) {
+          await client.rider.update({
+            where: { id: originalTx.entityId },
+            data: { walletBalance: { increment: originalTx.amount } },
           });
-
-          // 3. REFUND (Credit) the wallet
-          if (originalTx.entityType === 'RIDER' && originalTx.entityId) {
-            await client.rider.update({
-              where: { id: originalTx.entityId },
-              data: { walletBalance: { increment: originalTx.amount } },
-            });
-          } else if (originalTx.entityType === 'STORE' && originalTx.entityId) {
-            await client.store.update({
-              where: { id: originalTx.entityId },
-              data: { walletBalance: { increment: originalTx.amount } },
-            });
-          }
-
-          // 4. Create a Refund Ledger Entry for strict audit trail
-          await client.transaction.create({
-            data: {
-              type: 'PAYOUT_FAILED',
-              amount: originalTx.amount,
-              entityType: originalTx.entityType,
-              entityId: originalTx.entityId,
-              riderPayoutId: originalTx.riderPayoutId,
-              vendorPayoutId: originalTx.vendorPayoutId,
-              // FIXED: Removed 'reference' property
-              description: 'Refund for failed payout',
-              status: 'COMPLETED',
-              balanceBefore: 0,
-              balanceAfter: 0,
-            },
+        } else if (originalTx.entityType === 'STORE' && originalTx.entityId) {
+          await client.store.update({
+            where: { id: originalTx.entityId },
+            data: { walletBalance: { increment: originalTx.amount } },
           });
         }
+
+        // 4. Create a PAYOUT_FAILED credit entry for strict audit trail
+        await client.transaction.create({
+          data: {
+            type: 'PAYOUT_FAILED',
+            amount: originalTx.amount,
+            entityType: originalTx.entityType,
+            entityId: originalTx.entityId,
+            riderPayoutId: originalTx.riderPayoutId,
+            vendorPayoutId: originalTx.vendorPayoutId,
+            description: 'Wallet refund for failed/rejected payout',
+            status: 'COMPLETED',
+            balanceBefore: 0,
+            balanceAfter: 0,
+          },
+        });
       }
-    });
+    }, externalTx);
+  }
+
+  /**
+   * Records that an admin approved a payout (PENDING → APPROVED status transition).
+   * Call this inside the same $transaction block that updates the payout status so
+   * both writes commit or roll back together.
+   */
+  async recordPayoutApproved(
+    payoutId: string,
+    type: 'VENDOR' | 'RIDER',
+    amount: number,
+    adminId: string,
+    externalTx?: Prisma.TransactionClient,
+  ) {
+    return this.withTransaction(async (client) => {
+      await client.transaction.create({
+        data: {
+          type: TransactionType.PAYOUT_APPROVED,
+          amount,
+          entityType: type === 'VENDOR' ? 'STORE' : 'RIDER',
+          ...(type === 'VENDOR'
+            ? { vendorPayoutId: payoutId }
+            : { riderPayoutId: payoutId }),
+          description: 'Payout approved by admin — awaiting bank transfer',
+          status: 'COMPLETED',
+          processedBy: adminId,
+          balanceBefore: 0,
+          balanceAfter: 0,
+          metadata: { approvedBy: adminId, payoutId },
+        },
+      });
+    }, externalTx);
+  }
+
+  /**
+   * Records a payment-gateway error that occurred during payout disbursement.
+   * Best-effort: never throws, so a logging failure never blocks the caller's
+   * error response to the admin.
+   */
+  async recordGatewayError(
+    payoutId: string,
+    type: 'VENDOR' | 'RIDER',
+    adminId: string,
+    errorMessage: string,
+  ) {
+    try {
+      await this.prisma.transaction.create({
+        data: {
+          type: TransactionType.PAYOUT_GATEWAY_ERROR,
+          amount: 0,
+          entityType: type === 'VENDOR' ? 'STORE' : 'RIDER',
+          ...(type === 'VENDOR'
+            ? { vendorPayoutId: payoutId }
+            : { riderPayoutId: payoutId }),
+          description: 'Payment gateway error during payout disbursement',
+          status: 'FAILED',
+          processedBy: adminId,
+          balanceBefore: 0,
+          balanceAfter: 0,
+          metadata: {
+            payoutId,
+            errorMessage,
+            requiresManualReview: true,
+          },
+        },
+      });
+    } catch (e) {
+      // Intentional no-op: logging must never throw and block the API response.
+    }
   }
 
   /**
@@ -489,7 +592,92 @@ export class TransactionLedgerService {
     tx?: Prisma.TransactionClient,
   ) {
     return this.withTransaction(async (client) => {
-      // ... legacy implementation ...
+      const rider = await client.rider.findUnique({
+        where: { id: payout.riderId },
+        select: { walletBalance: true, commissionRate: true },
+      });
+
+      const currentBalance = rider?.walletBalance || 0;
+      const commissionRate =
+        payout.commissionRate ?? rider?.commissionRate ?? 10;
+      const commission = payout.amount * (commissionRate / 100);
+      const netPayout = payout.amount - commission;
+
+      if (payout.status === 'PENDING') {
+        return client.transaction.create({
+          data: {
+            type: 'PAYOUT_REQUESTED',
+            amount: payout.amount,
+            entityType: 'RIDER',
+            entityId: payout.riderId,
+            riderPayoutId: payout.id,
+            description: `Payout requested (${commissionRate}% commission will be deducted)`,
+            status: 'PENDING',
+            balanceBefore: currentBalance,
+            balanceAfter: currentBalance,
+            metadata: {
+              reference: payout.reference,
+              commissionRate,
+              commission,
+              netPayout,
+            },
+          },
+        });
+      }
+
+      if (payout.status === 'PAID') {
+        await client.transaction.updateMany({
+          where: { riderPayoutId: payout.id, type: 'PAYOUT_REQUESTED' },
+          data: { status: 'COMPLETED' },
+        });
+
+        await client.transaction.create({
+          data: {
+            type: 'COMMISSION_DEDUCTED',
+            amount: commission,
+            entityType: 'PLATFORM',
+            entityId: payout.riderId,
+            riderPayoutId: payout.id,
+            description: `Commission deducted (${commissionRate}%)`,
+            status: 'COMPLETED',
+            balanceBefore: currentBalance,
+            balanceAfter: currentBalance - commission,
+            metadata: {
+              reference: payout.reference,
+              commissionRate,
+              commission,
+              netPayout,
+            },
+          },
+        });
+
+        await client.transaction.create({
+          data: {
+            type: 'PAYOUT_COMPLETED',
+            amount: netPayout,
+            entityType: 'RIDER',
+            entityId: payout.riderId,
+            riderPayoutId: payout.id,
+            description: `Payout completed (net after ${commissionRate}% commission)`,
+            status: 'COMPLETED',
+            balanceBefore: currentBalance,
+            balanceAfter: currentBalance - payout.amount,
+            metadata: {
+              reference: payout.reference,
+              commissionRate,
+              commission,
+              netPayout,
+            },
+          },
+        });
+
+        await client.rider.update({
+          where: { id: payout.riderId },
+          data: { walletBalance: { decrement: payout.amount } },
+        });
+
+        return;
+      }
     }, tx);
   }
 

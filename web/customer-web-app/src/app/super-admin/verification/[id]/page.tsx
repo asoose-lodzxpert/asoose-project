@@ -63,7 +63,7 @@ export default function VerificationDetailPage() {
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [rejectionNote, setRejectionNote] = useState("");
-  const [commissionRate, setCommissionRate] = useState<number>(20);
+  const [commissionRate, setCommissionRate] = useState<number | null>(null);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
   const {
@@ -74,6 +74,21 @@ export default function VerificationDetailPage() {
     id ? `/super-admin/verification/${id}` : null,
     fetcher,
   );
+
+  // Seed the commission rate from global system setting
+  const { data: allSettings } = useSWR<Array<{ key: string; value: string }>>(
+    "/super-admin/settings",
+    fetcher,
+  );
+  const globalCommission = allSettings?.find(
+    (s) => s.key === "global_commission",
+  )?.value;
+  const defaultCommission = globalCommission ? Number(globalCommission) : 10;
+
+  // Once we know the global default, seed commissionRate (only once)
+  React.useEffect(() => {
+    if (commissionRate === null) setCommissionRate(defaultCommission);
+  }, [defaultCommission]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const isVendor = entity?.store !== undefined;
   const entityType = isVendor ? "vendor" : "rider";
@@ -110,7 +125,8 @@ export default function VerificationDetailPage() {
         body: JSON.stringify({
           action,
           note: rejectionNote,
-          ...(action === "APPROVE" && isVendor ? { commissionRate } : {}),
+          // Always send commissionRate on APPROVE — applies to both riders and vendors
+          ...(action === "APPROVE" ? { commissionRate: commissionRate ?? defaultCommission } : {}),
         }),
       });
 
@@ -303,29 +319,28 @@ export default function VerificationDetailPage() {
                 onChange={(e) => setRejectionNote(e.target.value)}
               />
 
-              {isVendor && (
-                <div className="mb-4">
-                  <label className="block text-xs text-gray-400 font-bold uppercase tracking-wider mb-2">
-                    Commission Rate (%)
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="number"
-                      min={0}
-                      max={100}
-                      step={0.5}
-                      value={commissionRate}
-                      onChange={(e) =>
-                        setCommissionRate(Number(e.target.value))
-                      }
-                      className="w-32 bg-[#0F172A] border border-gray-700 rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-yellow-500 transition-colors"
-                    />
-                    <span className="text-gray-500 text-sm">
-                      Applied on approval
-                    </span>
-                  </div>
+              {/* Commission rate — shown for both riders and vendors */}
+              <div className="mb-4">
+                <label className="block text-xs text-gray-400 font-bold uppercase tracking-wider mb-2">
+                  Commission Rate (%) — {isVendor ? "applied to store" : "platform cut from rides"}
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    step={0.5}
+                    value={commissionRate ?? defaultCommission}
+                    onChange={(e) =>
+                      setCommissionRate(Number(e.target.value))
+                    }
+                    className="w-32 bg-[#0F172A] border border-gray-700 rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-yellow-500 transition-colors"
+                  />
+                  <span className="text-gray-500 text-xs">
+                    Global default: <span className="text-yellow-400 font-bold">{defaultCommission}%</span>
+                  </span>
                 </div>
-              )}
+              </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <button
@@ -366,22 +381,26 @@ export default function VerificationDetailPage() {
           value={rejectionNote}
           onChange={(e) => setRejectionNote(e.target.value)}
         />
-        {isVendor && (
-          <div className="mb-3">
-            <label className="block text-xs text-gray-400 font-bold uppercase tracking-wider mb-1.5">
-              Commission Rate (%)
-            </label>
+        {/* Commission rate — shown for both riders and vendors */}
+        <div className="mb-3">
+          <label className="block text-xs text-gray-400 font-bold uppercase tracking-wider mb-1.5">
+            Commission Rate (%) — {isVendor ? "store" : "rider"}
+          </label>
+          <div className="flex items-center gap-2">
             <input
               type="number"
               min={0}
               max={100}
               step={0.5}
-              value={commissionRate}
+              value={commissionRate ?? defaultCommission}
               onChange={(e) => setCommissionRate(Number(e.target.value))}
-              className="w-full bg-[#1E293B] border border-gray-700 rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-yellow-500"
+              className="flex-1 bg-[#1E293B] border border-gray-700 rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-yellow-500"
             />
+            <span className="text-gray-500 text-[10px] shrink-0">
+              Global: <span className="text-yellow-400 font-bold">{defaultCommission}%</span>
+            </span>
           </div>
-        )}
+        </div>
         <div className="grid grid-cols-2 gap-3">
           <button
             onClick={() => submitDecision("REJECT")}

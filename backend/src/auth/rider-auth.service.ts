@@ -54,6 +54,20 @@ export class RiderAuthService {
       throw new ConflictException('Email already registered');
     }
 
+    // Resolve commission rate from global system setting (fallback: 10%)
+    let commissionRate = 10;
+    try {
+      const setting = await this.prisma.systemSetting.findUnique({
+        where: { key: 'global_commission' },
+      });
+      if (setting?.value) {
+        const parsed = parseFloat(setting.value);
+        if (!isNaN(parsed)) commissionRate = parsed;
+      }
+    } catch {
+      // Non-critical: registration can still succeed with the default rate
+    }
+
     const rider = await this.prisma.rider.create({
       data: {
         name: dto.name,
@@ -63,6 +77,7 @@ export class RiderAuthService {
         role: dto.role,
         password: hashedPassword,
         image: dto.image,
+        commissionRate,
         currentLat: dto.location?.lat,
         currentLng: dto.location?.lng,
 
