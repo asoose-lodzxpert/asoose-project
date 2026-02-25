@@ -71,13 +71,21 @@ export class NotificationsService {
       this.notificationsGateway.sendToAdminRoom(notification);
     }
 
-    // Send push notification if user has token
+    // Send push notification to all available channels for this user
     try {
       const user = await this.prisma.user.findUnique({
         where: { id: data.userId },
-        select: { fcmToken: true },
+        select: { fcmToken: true, expoPushToken: true },
       });
 
+      if (user?.expoPushToken) {
+        await this.expoPushService.sendToDevice(
+          user.expoPushToken,
+          data.title,
+          data.message,
+          data.metadata,
+        );
+      }
       if (user?.fcmToken) {
         await this.fcmService.sendToDevice(
           user.fcmToken,
@@ -197,6 +205,7 @@ export class NotificationsService {
         select: { expoPushToken: true, fcmToken: true },
       });
 
+      // Send to both expo and FCM channels if both are present
       if (rider?.expoPushToken) {
         await this.expoPushService.sendToDevice(
           rider.expoPushToken,
@@ -204,7 +213,8 @@ export class NotificationsService {
           data.message,
           data.metadata,
         );
-      } else if (rider?.fcmToken) {
+      }
+      if (rider?.fcmToken) {
         await this.fcmService.sendToDevice(
           rider.fcmToken,
           data.title,

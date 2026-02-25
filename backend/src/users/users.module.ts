@@ -21,6 +21,7 @@ import { OrderReadyListenerService } from './order-ready-listener.service';
 import { RedisModule } from 'src/redis/redis.module';
 import { NotificationsModule } from 'src/notifications/notifications.module';
 import { FcmModule } from 'src/libs/fcm/fcm.module';
+import { ExpoModule } from 'src/libs/expo/expo.module';
 import { TripsModule } from './trips/trips.module';
 import { VendorModule } from 'src/vendor/vendor.module';
 import { QueueModule } from 'src/matching/queue/queue.module';
@@ -35,6 +36,7 @@ import { PaystackAccountService } from '../payment/paystack-account.service';
     RedisModule,
     NotificationsModule,
     FcmModule,
+    ExpoModule,
     forwardRef(() => TripsModule),
     VendorModule,
     QueueModule,

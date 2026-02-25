@@ -4,6 +4,7 @@ import { NotificationsGateway } from '../notifications/notifications.gateway';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { FcmService } from '../libs/fcm/fcm.service';
+import { ExpoPushService } from '../libs/expo/expo-push.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -15,6 +16,7 @@ export class NotificationFacade {
     private readonly notificationsGateway: NotificationsGateway,
     @InjectQueue('email') private emailQueue: Queue,
     private readonly fcmService: FcmService,
+    private readonly expoPushService: ExpoPushService,
     private readonly prisma: PrismaService,
   ) {}
 
@@ -75,34 +77,39 @@ export class NotificationFacade {
         metadata,
       });
 
-      // 3. FCM Push Notification (Fetch token from correct table)
+      // 3. Push Notification — send to all available channels (Expo + FCM)
+      let expoToken: string | null | undefined = null;
       let fcmToken: string | null | undefined = null;
 
       if (role === 'VENDOR') {
         const vendor = await this.prisma.vendor.findUnique({
           where: { id: recipientId },
-          select: { fcmToken: true },
+          select: { fcmToken: true, expoPushToken: true },
         });
+        expoToken = vendor?.expoPushToken;
         fcmToken = vendor?.fcmToken;
       } else if (role === 'RIDER') {
         const rider = await this.prisma.rider.findUnique({
           where: { id: recipientId },
-          select: { fcmToken: true },
+          select: { fcmToken: true, expoPushToken: true },
         });
+        expoToken = rider?.expoPushToken;
         fcmToken = rider?.fcmToken;
       } else {
         const user = await this.prisma.user.findUnique({
           where: { id: recipientId },
-          select: { fcmToken: true },
+          select: { fcmToken: true, expoPushToken: true },
         });
+        expoToken = user?.expoPushToken;
         fcmToken = user?.fcmToken;
       }
 
+      const pushMeta = { ...metadata, notificationId: notification.id };
+      if (expoToken) {
+        await this.expoPushService.sendToDevice(expoToken, title, message, pushMeta);
+      }
       if (fcmToken) {
-        await this.fcmService.sendToDevice(fcmToken, title, message, {
-          ...metadata,
-          notificationId: notification.id,
-        });
+        await this.fcmService.sendToDevice(fcmToken, title, message, pushMeta);
       }
 
       return notification;
@@ -228,6 +235,15 @@ export class NotificationFacade {
         return;
       }
 
+      // Send to both Expo and FCM channels if both are available
+      if (rider.expoPushToken) {
+        await this.expoPushService.sendToDevice(
+          rider.expoPushToken,
+          title,
+          message,
+          metadata,
+        );
+      }
       if (rider.fcmToken) {
         await this.fcmService.sendToDevice(
           rider.fcmToken,

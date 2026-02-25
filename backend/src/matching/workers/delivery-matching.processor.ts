@@ -90,6 +90,7 @@ export class DeliveryMatchingProcessor extends WorkerHost {
       // Search in rings
       const driverFound = await this.searchInRings(
         deliveryId,
+        delivery.customerId ?? '',
         pickupHex,
         pickupLat,
         pickupLng,
@@ -122,6 +123,7 @@ export class DeliveryMatchingProcessor extends WorkerHost {
 
   private async searchInRings(
     deliveryId: string,
+    customerId: string,
     centerHex: string,
     pickupLat: number,
     pickupLng: number,
@@ -161,6 +163,7 @@ export class DeliveryMatchingProcessor extends WorkerHost {
           }
           const assigned = await this.attemptAssignment(
             deliveryId,
+            customerId,
             driver.id,
             hexId,
             pickupLat,
@@ -186,6 +189,7 @@ export class DeliveryMatchingProcessor extends WorkerHost {
 
   private async attemptAssignment(
     deliveryId: string,
+    customerId: string,
     riderId: string,
     hexId: string,
     pickupLat: number,
@@ -214,6 +218,16 @@ export class DeliveryMatchingProcessor extends WorkerHost {
     if (result === 1) {
       this.logger.log(`🔒 Locked rider ${riderId} for delivery ${deliveryId}`);
 
+      // Write reverse mapping so cancellations can find and release the locked rider
+      // before they accept (while riderId is still null in the DB).
+      await this.redis
+        .getClient()
+        .setex(
+          `delivery:${deliveryId}:pendingRider`,
+          REDIS_TTL.PENDING_ASSIGNMENT,
+          riderId,
+        );
+
       // Schedule timeout using job-centric payload
       await this.queue.scheduleAssignmentTimeout(
         {
@@ -240,7 +254,7 @@ export class DeliveryMatchingProcessor extends WorkerHost {
         jobId: deliveryId,
         jobType: 'delivery',
         driverId: riderId,
-        customerId: recipientName,
+        customerId: customerId,
         timestamp: Date.now(),
         expiresAt: Date.now() + this.TIMEOUT_MS,
       });

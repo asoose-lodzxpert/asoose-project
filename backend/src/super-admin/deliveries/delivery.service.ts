@@ -8,7 +8,15 @@ import { DeliveryFilterDto } from './dto/delivery-filter.dto';
 import { Prisma, DeliveryStatus } from '@prisma/client';
 import { TransactionLedgerService } from '../transactions/transaction-ledger.service';
 import { NotificationsGateway } from '../../notifications/notifications.gateway';
+import { NotificationsService } from '../../notifications/notifications.service';
 import { AppLogger } from 'src/libs/logger/app-logger.service'; // ← added
+
+/** Delivery statuses that can never receive a new rider assignment */
+const TERMINAL_DELIVERY_STATUSES: DeliveryStatus[] = [
+  DeliveryStatus.DELIVERED,
+  DeliveryStatus.CANCELLED,
+  DeliveryStatus.FAILED,
+];
 
 @Injectable()
 export class DeliveriesService {
@@ -16,6 +24,7 @@ export class DeliveriesService {
     private prisma: PrismaService,
     private ledgerService: TransactionLedgerService,
     private notificationsGateway: NotificationsGateway,
+    private notificationsService: NotificationsService,
     private readonly logger: AppLogger, // ← added
   ) {}
 
@@ -395,6 +404,20 @@ export class DeliveriesService {
       throw new BadRequestException('Rider is not active');
     }
 
+    // Guard: prevent double-assignment
+    if (delivery.riderId) {
+      throw new BadRequestException(
+        'Delivery already has a rider. Unassign first.',
+      );
+    }
+
+    // Guard: prevent assignment to terminal deliveries
+    if (TERMINAL_DELIVERY_STATUSES.includes(delivery.status as DeliveryStatus)) {
+      throw new BadRequestException(
+        `Cannot assign a rider to a ${delivery.status} delivery.`,
+      );
+    }
+
     this.logger.debug(`Assigning rider ${riderId} to delivery ${deliveryId}`);
 
     const updated = await this.prisma.delivery.update({
@@ -451,6 +474,28 @@ export class DeliveriesService {
       });
     } catch (e) {
       this.logger.error(`Failed to emit job.assigned to rider ${riderId}`, e);
+    }
+
+    // Notify customer (push + in-app) — no dedicated socket event on delivery side
+    if (updated.customerId) {
+      try {
+        const storeName =
+          (updated as any).order?.store?.name ||
+          updated.customer?.name ||
+          'the store';
+        await this.notificationsService.create({
+          userId: updated.customerId,
+          title: 'Rider On The Way',
+          message: `A rider has been assigned to pick up your order from ${storeName}.`,
+          type: 'DELIVERY',
+          metadata: { deliveryId: updated.id, type: 'RIDER_ASSIGNED' },
+        });
+      } catch (e) {
+        this.logger.error(
+          `Failed to notify customer ${updated.customerId} for delivery ${deliveryId}`,
+          e,
+        );
+      }
     }
 
     return updated;
