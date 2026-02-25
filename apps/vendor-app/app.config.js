@@ -40,7 +40,11 @@ module.exports = ({ config }) => {
     },
     extra: {
       ...config.extra,
-      expoProjectId: "f144011b-bf0a-4ba1-9cdf-b89dd47a1a2b",
+      // Store under the canonical Expo path so Constants.expoConfig.extra.eas.projectId resolves correctly.
+      eas: {
+        ...(config.extra?.eas ?? {}),
+        projectId: "f144011b-bf0a-4ba1-9cdf-b89dd47a1a2b",
+      },
     },
   };
 };

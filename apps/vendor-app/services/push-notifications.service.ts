@@ -120,7 +120,9 @@ export async function registerForPushNotificationsAsync(): Promise<
         Constants?.expoConfig?.extra?.eas?.projectId ??
         Constants?.easConfig?.projectId;
       if (!projectId) {
-        throw new Error("Expo projectId missing in production build");
+        throw new Error(
+          "Expo projectId not found. Check extra.eas.projectId in app.json",
+        );
       }
       token = (
         await Notifications.getExpoPushTokenAsync({
