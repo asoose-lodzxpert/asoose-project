@@ -12,6 +12,9 @@ export const REDIS_CLIENT = 'REDIS_CLIENT';
 export const REDIS_KEYS = {
   /** Customer ID for a given ride/job */
   RIDE_CUSTOMER: (rideId: string) => `ride:${rideId}:customer`,
+
+  /** Pending driver ID locked for a ride (set during matching, before driver accepts) */
+  RIDE_PENDING_DRIVER: (rideId: string) => `ride:${rideId}:pendingDriver`,
   // ========================================
   // DRIVER STATE (SOURCE OF TRUTH)
   // ========================================
@@ -95,9 +98,9 @@ export const REDIS_KEYS = {
   // ASSIGNMENT LOCKS (ATOMICITY GUARANTEES)
   // ========================================
 
-  /** Lock a driver for a specific job (TTL enforced) */
-  LOCK_JOB_DRIVER: (jobId: string, driverId: string) =>
-    `lock:job:${jobId}:driver:${driverId}`,
+  /** Lock a driver for a specific job (TTL enforced) — matches Lua key format */
+  LOCK_JOB_DRIVER: (jobType: string, jobId: string, driverId: string) =>
+    `lock:${jobType}:${jobId}:driver:${driverId}`,
 
   /** Global job lock to prevent concurrent matching */
   LOCK_JOB: (jobId: string) => `lock:job:${jobId}`,
@@ -109,11 +112,31 @@ export const REDIS_KEYS = {
   /** Track matching attempts per job */
   MATCHING_ATTEMPTS: (jobId: string) => `matching:${jobId}:attempts`,
 
-  /** Drivers who declined this job */
-  DECLINED_DRIVERS: (jobId: string) => `matching:${jobId}:declined`,
+  /** Drivers who declined this job — jobType must be 'ride' or 'delivery' to
+   *  match the Lua-written key format: matching:{type}:{id}:declined */
+  DECLINED_DRIVERS: (jobType: string, jobId: string) =>
+    `matching:${jobType}:${jobId}:declined`,
 
   /** Matching state snapshot */
   MATCHING_STATE: (jobId: string) => `matching:${jobId}:state`,
+
+  // ========================================
+  // ACTIVE DRIVER / RIDER SETS  (BUG-6 fix)
+  // ========================================
+
+  /** SET of all currently ONLINE/ACTIVE driver IDs — maintained in TypeScript
+   *  alongside Lua scripts so we can avoid O(N) KEYS scans. */
+  DRIVERS_ACTIVE_SET: 'drivers:active',
+
+  /** SET of all currently ONLINE/ACTIVE rider IDs */
+  RIDERS_ACTIVE_SET: 'riders:active',
+
+  /** Inactivity ping timestamp key for a driver (TTL = grace period) */
+  DRIVER_INACTIVITY_PING: (driverId: string) =>
+    `driver:${driverId}:inactivityPing`,
+
+  /** Inactivity ping timestamp key for a rider (TTL = grace period) */
+  RIDER_INACTIVITY_PING: (riderId: string) => `rider:${riderId}:inactivityPing`,
 
   // ========================================
   // ANALYTICS & MONITORING

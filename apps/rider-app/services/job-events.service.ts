@@ -2,6 +2,35 @@ import { IncomingJobOffer } from "@/types/job";
 import { getAccessToken } from "./auth";
 import { io, Socket } from "socket.io-client";
 
+/**
+ * Maps a backend JobStatus string (from job.updated events) to a frontend JobStatus.
+ * Backend values: 'requested' | 'assignment_requested' | 'assigned' | 'accepted' |
+ *                 'declined' | 'timeout' | 'started' | 'completed' | 'no_driver_found'
+ * Frontend values: 'incoming-job' | 'en-route-pickup' | 'at-pickup' |
+ *                  'en-route-dropoff' | 'confirm-job' | 'online-waiting'
+ */
+function mapJobUpdatedStatus(status: string): string {
+  const map: Record<string, string> = {
+    requested: "incoming-job",
+    assignment_requested: "incoming-job",
+    assigned: "incoming-job",
+    accepted: "en-route-pickup",
+    started: "en-route-dropoff",
+    completed: "online-waiting",
+    declined: "online-waiting",
+    timeout: "online-waiting",
+    no_driver_found: "online-waiting",
+    // Pass-through for already-mapped frontend statuses
+    "incoming-job": "incoming-job",
+    "en-route-pickup": "en-route-pickup",
+    "at-pickup": "at-pickup",
+    "en-route-dropoff": "en-route-dropoff",
+    "confirm-job": "confirm-job",
+    "online-waiting": "online-waiting",
+  };
+  return map[status] ?? "online-waiting";
+}
+
 export type ConnectionStatus =
   | "connected"
   | "disconnected"
@@ -77,8 +106,8 @@ export class JobEventsService {
         transports: ["websocket"],
         reconnection: true,
         reconnectionDelay: 2000,
-        reconnectionDelayMax: 10000,
-        reconnectionAttempts: this.maxReconnectAttempts,
+        reconnectionDelayMax: 30000,
+        reconnectionAttempts: Infinity,
       });
 
       this.setupEventListeners();
@@ -126,11 +155,14 @@ export class JobEventsService {
           id: data.id,
           jobType: data.jobType,
           customerName: data.customerName || "Customer",
+          customerPhone: data.customerPhone,
           pickupAddress: data.pickupAddress || "",
           dropoffAddress: data.dropoffAddress || "",
-          earnings: data.estimatedEarnings || data.earnings || 0,
-          distanceKm: data.distance || data.distanceKm,
-
+          earnings: data.earnings || data.estimatedEarnings || 0,
+          distanceKm: data.distanceKm || data.distance,
+          durationMin: data.durationMin,
+          startOtp: data.startOtp,
+          deliveryOtp: data.deliveryOtp,
           packageDetails: data.packageDetails,
           pickupContactPhone: data.pickupContactPhone,
           dropoffContactPhone: data.dropoffContactPhone,
@@ -143,8 +175,6 @@ export class JobEventsService {
           stops: data.stops,
           storeCount: data.storeCount,
           currentStopIndex: data.currentStopIndex,
-          // assignedByAdmin: data.assignedByAdmin,
-          // estimatedEarnings: data.estimatedEarnings,
         };
 
         if (this.callbacks?.onJobAssigned) {
@@ -163,8 +193,9 @@ export class JobEventsService {
     this.socket.on("job.updated", (data: any) => {
       try {
         // ...existing code...
+        const mappedStatus = mapJobUpdatedStatus(data.status);
         if (this.callbacks?.onJobUpdated) {
-          this.callbacks.onJobUpdated(data.id, data.status);
+          this.callbacks.onJobUpdated(data.id, mappedStatus);
         }
       } catch (error) {
         // ...existing code...

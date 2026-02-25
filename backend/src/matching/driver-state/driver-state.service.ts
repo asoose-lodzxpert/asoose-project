@@ -62,6 +62,7 @@ export class DriverStateService {
       .set(`driver:${driverId}:location`, JSON.stringify({ lat, lng }));
     await this.redis.updateLastSeen(driverId);
     await this.redis.addDriverToGeoIndex(driverId, lat, lng);
+    await this.redis.addToDriverActiveSet(driverId); // BUG-6
 
     this.eventBus.emitDriverOnline({ driverId, lat, lng, hexId, timestamp });
   }
@@ -93,6 +94,7 @@ export class DriverStateService {
       .set(`driver:${driverId}:location`, JSON.stringify({ lat, lng }));
     // Deliberately NO updateLastSeen — inactivity processor evicts stale entries
     await this.redis.addDriverToGeoIndex(driverId, lat, lng);
+    await this.redis.addToDriverActiveSet(driverId); // BUG-6
   }
 
   async setOffline(driverId: string, reason?: string): Promise<void> {
@@ -102,6 +104,7 @@ export class DriverStateService {
     if (result === 0) throw new Error('Active job prevents offline');
 
     await this.redis.removeDriverFromGeoIndex(driverId);
+    await this.redis.removeFromDriverActiveSet(driverId); // BUG-6
 
     this.eventBus.emitDriverOffline({
       driverId,
@@ -303,8 +306,70 @@ export class DriverStateService {
   }
 
   /* ============================================================
+     CANCEL / RELEASE
+  ============================================================ */
+
+  /**
+   * Release a driver back to ONLINE after a ride is cancelled
+   * (by the driver OR the customer while a driver is assigned).
+   *
+   * Uses the same ATOMIC_COMPLETE_TRIP Lua script to reset status → ONLINE
+   * and re-add the driver to their hex set, WITHOUT emitting a 'completed'
+   * job event so metrics are not skewed.
+   */
+  async releaseDriver(driverId: string, rideId: string): Promise<void> {
+    const state = await this.redis.getDriverState(driverId);
+    if (!state) {
+      this.logger.warn(
+        `[RELEASE] Driver ${driverId} has no Redis state — skipping Redis cleanup`,
+      );
+      return;
+    }
+
+    const hexId = state.hexId ?? '';
+
+    const result = await this.redis
+      .getClient()
+      .eval(ATOMIC_COMPLETE_TRIP, 0, driverId, JobType.RIDE, rideId, hexId);
+
+    if (result === 0) {
+      // Redis state already diverged (e.g. timeout processor already cleaned up).
+      // Force-reset status so they can receive new matching jobs.
+      this.logger.warn(
+        `[RELEASE] ATOMIC_COMPLETE_TRIP returned 0 for driver ${driverId} / ride ${rideId} — forcing status to ONLINE`,
+      );
+      await this.redis.setDriverStatus(driverId, DriverStatus.ONLINE);
+    }
+
+    this.logger.log(
+      `[RELEASE] Driver ${driverId} released from cancelled ride ${rideId}`,
+    );
+
+    // Emit driver.available so any active listeners can react (e.g. live map)
+    this.eventBus.emitDriverAvailable({
+      driverId,
+      hexId,
+      lat: state.location?.lat ?? 0,
+      lng: state.location?.lng ?? 0,
+      reason: 'job_cancelled',
+      timestamp: Date.now(),
+    });
+  }
+
+  /* ============================================================
      QUERIES
   ============================================================ */
+
+  /**
+   * Looks up which driver is currently locked/pending for a ride
+   * (written by the matching processor immediately after ATOMIC_LOCK_DRIVER).
+   * Returns null if no driver has been locked yet.
+   */
+  async getPendingDriverForRide(rideId: string): Promise<string | null> {
+    const key = `ride:${rideId}:pendingDriver`;
+    return this.redis.getClient().get(key);
+  }
+
   async getState(driverId: string) {
     return this.redis.getDriverState(driverId);
   }

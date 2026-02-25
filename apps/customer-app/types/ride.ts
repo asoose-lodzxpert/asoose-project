@@ -8,6 +8,7 @@ export enum RideStatus {
   COMPLETED = "COMPLETED", // Trip completed
   CANCELLED_BY_USER = "CANCELLED_BY_USER", // Customer cancelled
   CANCELLED_BY_DRIVER = "CANCELLED_BY_DRIVER", // Driver cancelled
+  CANCELLED_BY_SYSTEM = "CANCELLED_BY_SYSTEM", // System cancelled (no driver available)
   // ── Legacy (retained for backward compatibility) ──
   PENDING = "PENDING",
   ACCEPTED = "ACCEPTED",
@@ -202,11 +203,9 @@ export type RideSocketEvent =
       type: "DRIVER_LOCATION_UPDATE";
       metadata: {
         rideId: string;
-        location: {
-          lat: number;
-          lng: number;
-          heading: number;
-        };
+        lat: number;
+        lng: number;
+        heading: number;
       };
     }
   | {

@@ -17,7 +17,6 @@ import { TokenRevocationService } from '../auth/token-revocation.service';
 import { MATCHING_REDIS_CLIENT } from '../matching/redis/redis.module';
 import Redis from 'ioredis';
 import { createAdapter } from '@socket.io/redis-adapter';
-import type { RedisClientType } from 'redis';
 
 // Per-socket minimum interval between location updates (ms)
 const LOCATION_RATE_LIMIT_MS = 800;
@@ -49,21 +48,29 @@ export class NotificationsGateway
     private driverStateService: DriverStateService,
     private tokenRevocationService: TokenRevocationService,
     @Inject(MATCHING_REDIS_CLIENT) private readonly matchingRedis: Redis,
-    @Inject('REDIS_CLIENT') private readonly redisClient: RedisClientType,
   ) {}
 
   afterInit() {
     // Wire the Redis pub/sub adapter so Socket.IO events are broadcast across
-    // all horizontally-scaled instances. Two separate clients are required by
-    // the adapter: one for publishing, one for subscribing.
-    const pubClient = (this.redisClient as any).duplicate
-      ? (this.redisClient as any).duplicate()
-      : this.redisClient;
-    const subClient = (pubClient as any).duplicate
-      ? (pubClient as any).duplicate()
-      : pubClient;
-    this.server.adapter(createAdapter(pubClient, subClient));
-    this.logger.log('WebSocket Gateway Initialized with Redis adapter');
+    // all horizontally-scaled instances. We use the ioredis matching client
+    // (already connected) and duplicate it — ioredis.duplicate() returns a
+    // pre-configured but NOT yet connected client which the adapter connects
+    // automatically when it subscribes. This avoids the redis-v4 issue where
+    // duplicate() clients must be manually .connect()-ed before use.
+    try {
+      const pubClient = this.matchingRedis.duplicate();
+      const subClient = this.matchingRedis.duplicate();
+      this.server.adapter(createAdapter(pubClient, subClient));
+      this.logger.log(
+        'WebSocket Gateway Initialized with Redis adapter (ioredis)',
+      );
+    } catch (err) {
+      this.logger.warn(
+        'WebSocket Redis adapter setup failed — falling back to in-memory adapter. ' +
+          'This is safe for single-instance deployments but will NOT work with multiple nodes.',
+        err,
+      );
+    }
   }
 
   async handleConnection(client: Socket) {
@@ -142,31 +149,49 @@ export class NotificationsGateway
   }
 
   /**
-   * Allow clients to join a specific order room for tracking
+   * Allow clients to join a specific order room for tracking.
+   * Role-based: admins are always allowed; drivers/riders are allowed only when the
+   * requested orderId matches their Redis-persisted active room; customers are allowed
+   * (events in the room are benign delivery status updates).
    */
   @SubscribeMessage('joinOrderRoom')
   async handleJoinOrderRoom(
     @ConnectedSocket() client: Socket,
     @MessageBody() data: { orderId: string },
   ) {
-    if (data && data.orderId) {
-      const roomName = `order_${data.orderId}`;
-      client.join(roomName);
+    if (!data?.orderId) return { error: 'orderId required' };
 
-      // Persist the active job room so reconnects auto-rejoin
-      const userId = client.data.userId;
-      if (userId) {
-        await this.matchingRedis.set(
-          `socket:${userId}:activeRoom`,
-          data.orderId,
-          'EX',
-          ACTIVE_ROOM_TTL_SECONDS,
+    const userId = client.data.userId;
+    const role: string = client.data.role ?? '';
+
+    // Admins can join any room
+    if (role !== 'SUPER_ADMIN' && role !== 'CUSTOMER') {
+      // Drivers / Riders: only allow if the requested room matches their active job
+      const activeJobId = await this.matchingRedis
+        .get(`socket:${userId}:activeRoom`)
+        .catch(() => null);
+      if (activeJobId !== data.orderId) {
+        this.logger.warn(
+          `Unauthorized joinOrderRoom by ${userId} (role=${role}) for order ${data.orderId}`,
         );
+        return { error: 'unauthorized' };
       }
-
-      this.logger.log(`User ${userId} joined room: ${roomName}`);
-      return { event: 'joinedRoom', room: roomName };
     }
+    const roomName = `order_${data.orderId}`;
+    client.join(roomName);
+
+    // Persist the active job room so reconnects auto-rejoin
+    if (userId) {
+      await this.matchingRedis.set(
+        `socket:${userId}:activeRoom`,
+        data.orderId,
+        'EX',
+        ACTIVE_ROOM_TTL_SECONDS,
+      );
+    }
+
+    this.logger.log(`User ${userId} joined room: ${roomName}`);
+    return { event: 'joinedRoom', room: roomName };
   }
 
   /**
@@ -301,10 +326,18 @@ export class NotificationsGateway
   }
 
   /**
-   * Allow admin clients to join the system-wide admin notifications room
+   * Allow admin clients to join the system-wide admin notifications room.
+   * Only SUPER_ADMIN sockets are permitted.
    */
   @SubscribeMessage('joinAdminRoom')
   handleJoinAdminRoom(@ConnectedSocket() client: Socket) {
+    const role: string = client.data.role ?? '';
+    if (role !== 'SUPER_ADMIN') {
+      this.logger.warn(
+        `Unauthorized joinAdminRoom attempt by ${client.data.userId} (role=${role})`,
+      );
+      return { error: 'unauthorized' };
+    }
     client.join('admin_notifications');
     this.logger.log(
       `Admin ${client.data.userId} joined admin_notifications room`,
@@ -381,17 +414,10 @@ export class NotificationsGateway
       );
     }
 
-    // Find all current sockets for this rider and join them to the room
-    const userSockets = this.activeUsers.get(riderId);
-    if (userSockets) {
-      userSockets.forEach((socketId) => {
-        const socket = this.server.sockets.sockets.get(socketId);
-        if (socket) {
-          socket.join(`order_${jobId}`);
-          this.logger.log(`Rider ${riderId} joined room: order_${jobId}`);
-        }
-      });
-    }
+    // Adapter-aware room join: works across all horizontally-scaled instances
+    // server.in() routes through the Redis pub/sub adapter unlike the in-memory activeUsers map.
+    this.server.in(`user_${riderId}`).socketsJoin(`order_${jobId}`);
+    this.logger.log(`Rider ${riderId} joined room: order_${jobId}`);
   }
 
   /** Clear the active job room key when a job completes or is cancelled */
@@ -404,13 +430,10 @@ export class NotificationsGateway
   }
 
   /**
-   * Emit real-time order updates to anyone tracking this order
+   * Emit real-time order updates to anyone tracking this order.
+   * Only broadcasts to the specific `order_{orderId}` room — NOT globally.
    */
   sendOrderUpdate(orderId: string, payload: any) {
-    // 1. Emit to the specific event listener expected by frontend hooks
-    this.server.emit(`order_update_${orderId}`, payload);
-
-    // 2. Also emit to the standard room for scalability
     this.server.to(`order_${orderId}`).emit('order_update', payload);
   }
 

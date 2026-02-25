@@ -360,77 +360,80 @@ export default function DisputeChatModal({ disputeId, onClose }: Props) {
       presentationStyle="pageSheet"
       onRequestClose={onClose}
     >
-      <ThemedView style={[styles.container, { backgroundColor: surface }]}>
-        {/* ── Header ── */}
-        <View style={[styles.header, { borderBottomColor: border }]}>
-          <Pressable style={styles.closeBtn} onPress={onClose} hitSlop={8}>
-            <IconSymbol name="xmark" size={20} color={muted} />
-          </Pressable>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
+      >
+        <ThemedView style={[styles.container, { backgroundColor: surface }]}>
+          {/* ── Header ── */}
+          <View style={[styles.header, { borderBottomColor: border }]}>
+            <Pressable style={styles.closeBtn} onPress={onClose} hitSlop={8}>
+              <IconSymbol name="xmark" size={20} color={muted} />
+            </Pressable>
 
-          <View style={styles.headerCenter}>
-            <ThemedText style={styles.headerTitle} numberOfLines={1}>
-              Dispute #{disputeId?.slice(-8).toUpperCase()}
-            </ThemedText>
-            {dispute && (
+            <View style={styles.headerCenter}>
+              <ThemedText style={styles.headerTitle} numberOfLines={1}>
+                Dispute #{disputeId?.slice(-8).toUpperCase()}
+              </ThemedText>
+              {dispute && (
+                <View
+                  style={[
+                    styles.statusPill,
+                    { backgroundColor: statusColor + "20" },
+                  ]}
+                >
+                  <ThemedText
+                    style={[styles.statusText, { color: statusColor }]}
+                  >
+                    {dispute.status.replace("_", " ")}
+                  </ThemedText>
+                </View>
+              )}
+            </View>
+
+            {/* Online indicator */}
+            <View style={styles.connIndicator}>
               <View
                 style={[
-                  styles.statusPill,
-                  { backgroundColor: statusColor + "20" },
+                  styles.connDot,
+                  { backgroundColor: connected ? "#10B981" : "#6B7280" },
                 ]}
-              >
-                <ThemedText style={[styles.statusText, { color: statusColor }]}>
-                  {dispute.status.replace("_", " ")}
-                </ThemedText>
-              </View>
-            )}
-          </View>
-
-          {/* Online indicator */}
-          <View style={styles.connIndicator}>
-            <View
-              style={[
-                styles.connDot,
-                { backgroundColor: connected ? "#10B981" : "#6B7280" },
-              ]}
-            />
-          </View>
-        </View>
-
-        {/* ── Messages ── */}
-        {loading ? (
-          <View style={styles.centered}>
-            <ActivityIndicator size="large" color={primary} />
-          </View>
-        ) : (
-          <FlatList
-            ref={listRef}
-            data={messages}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={styles.listContent}
-            showsVerticalScrollIndicator={false}
-            ListEmptyComponent={
-              <View style={styles.empty}>
-                <IconSymbol name="chat" size={40} color={muted} />
-                <ThemedText style={[styles.emptyText, { color: muted }]}>
-                  No messages yet. Start the conversation.
-                </ThemedText>
-              </View>
-            }
-            renderItem={({ item }) => (
-              <MessageBubble
-                msg={item}
-                isMe={item.sender.role === "CUSTOMER"}
               />
-            )}
-          />
-        )}
+            </View>
+          </View>
 
-        {/* ── Input ── */}
-        {canSend && !loading && (
-          <KeyboardAvoidingView
-            behavior={Platform.OS === "ios" ? "padding" : "height"}
-            keyboardVerticalOffset={Platform.OS === "ios" ? 40 : 0}
-          >
+          {/* ── Messages ── */}
+          {loading ? (
+            <View style={styles.centered}>
+              <ActivityIndicator size="large" color={primary} />
+            </View>
+          ) : (
+            <FlatList
+              ref={listRef}
+              data={messages}
+              keyExtractor={(item) => item.id}
+              contentContainerStyle={styles.listContent}
+              showsVerticalScrollIndicator={false}
+              ListEmptyComponent={
+                <View style={styles.empty}>
+                  <IconSymbol name="chat" size={40} color={muted} />
+                  <ThemedText style={[styles.emptyText, { color: muted }]}>
+                    No messages yet. Start the conversation.
+                  </ThemedText>
+                </View>
+              }
+              renderItem={({ item }) => (
+                <MessageBubble
+                  msg={item}
+                  isMe={item.sender.role === "CUSTOMER"}
+                />
+              )}
+            />
+          )}
+
+          {/* ── Input ── */}
+          {canSend && !loading && (
             <View
               style={[
                 styles.inputBar,
@@ -473,25 +476,25 @@ export default function DisputeChatModal({ disputeId, onClose }: Props) {
                 )}
               </Pressable>
             </View>
-          </KeyboardAvoidingView>
-        )}
+          )}
 
-        {/* Closed state notice */}
-        {!canSend && !loading && dispute && (
-          <View
-            style={[
-              styles.closedBar,
-              { backgroundColor: subtle, borderTopColor: border },
-            ]}
-          >
-            <IconSymbol name="lock.fill" size={14} color={muted} />
-            <ThemedText style={[styles.closedText, { color: muted }]}>
-              This dispute is {dispute.status.toLowerCase()} — no new messages
-              can be added.
-            </ThemedText>
-          </View>
-        )}
-      </ThemedView>
+          {/* Closed state notice */}
+          {!canSend && !loading && dispute && (
+            <View
+              style={[
+                styles.closedBar,
+                { backgroundColor: subtle, borderTopColor: border },
+              ]}
+            >
+              <IconSymbol name="lock.fill" size={14} color={muted} />
+              <ThemedText style={[styles.closedText, { color: muted }]}>
+                This dispute is {dispute.status.toLowerCase()} — no new messages
+                can be added.
+              </ThemedText>
+            </View>
+          )}
+        </ThemedView>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

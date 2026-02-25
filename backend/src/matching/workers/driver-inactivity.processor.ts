@@ -9,7 +9,11 @@ import {
 import { RedisService } from '../redis/redis.service';
 import { EventBusService } from '../events/event-bus.service';
 import { REDIS_TTL, DriverStatus } from '../redis/redis-keys.constants';
-import { ATOMIC_SET_OFFLINE } from '../redis/lua-scripts';
+import { REDIS_KEYS } from '../redis/redis-keys.constants';
+import {
+  ATOMIC_SET_OFFLINE,
+  ATOMIC_SET_RIDER_OFFLINE,
+} from '../redis/lua-scripts'; // BUG-4 fix
 
 /**
  * Driver Inactivity Monitor Worker
@@ -31,7 +35,9 @@ export class DriverInactivityProcessor extends WorkerHost {
   private readonly INACTIVITY_THRESHOLD = REDIS_TTL.DRIVER_INACTIVITY; // 120 seconds
   private readonly GRACE_PERIOD = 30; // 30 seconds grace period after ping
 
-  private inactiveDriversLastCheck = new Map<string, number>();
+  // BUG-11 fix: removed in-memory inactiveDriversLastCheck Map.
+  // Grace-period state is now stored in Redis (key: driver:{id}:inactivityPing)
+  // so it survives multi-instance deployments.
 
   constructor(
     private readonly redis: RedisService,
@@ -82,15 +88,8 @@ export class DriverInactivityProcessor extends WorkerHost {
         await this.handleInactiveDriver(driverId, now);
       }
 
-      // Clean up drivers who came back online
-      for (const [
-        driverId,
-        timestamp,
-      ] of this.inactiveDriversLastCheck.entries()) {
-        if (!inactiveDriverIds.includes(driverId)) {
-          this.inactiveDriversLastCheck.delete(driverId);
-        }
-      }
+      // Clean up ping keys for drivers that came back online
+      // (With Redis-backed keys, TTL handles expiry automatically — no manual cleanup needed here)
     } catch (error) {
       this.logger.error('Error checking driver inactivity:', error);
       throw error;
@@ -101,9 +100,12 @@ export class DriverInactivityProcessor extends WorkerHost {
     driverId: string,
     now: number,
   ): Promise<void> {
-    const lastCheckTime = this.inactiveDriversLastCheck.get(driverId);
+    // BUG-11 fix: use Redis key instead of in-memory Map so grace period
+    // state is shared across multiple backend instances.
+    const pingKey = REDIS_KEYS.DRIVER_INACTIVITY_PING(driverId);
+    const lastPingTs = await this.redis.getClient().get(pingKey);
 
-    if (!lastCheckTime) {
+    if (!lastPingTs) {
       // First time detecting this driver as inactive
       // Send ping event and give grace period
       this.logger.warn(`🔔 Pinging inactive driver ${driverId}`);
@@ -116,10 +118,13 @@ export class DriverInactivityProcessor extends WorkerHost {
         timestamp: now,
       });
 
-      this.inactiveDriversLastCheck.set(driverId, now);
+      // Store ping timestamp with TTL = grace period
+      await this.redis
+        .getClient()
+        .set(pingKey, now.toString(), 'EX', this.GRACE_PERIOD * 2);
     } else {
       // Driver was inactive in last check too
-      const timeSinceLastCheck = (now - lastCheckTime) / 1000; // seconds
+      const timeSinceLastCheck = (now - parseInt(lastPingTs, 10)) / 1000; // seconds
 
       if (timeSinceLastCheck >= this.GRACE_PERIOD) {
         // Grace period expired - mark driver as OFFLINE
@@ -129,7 +134,7 @@ export class DriverInactivityProcessor extends WorkerHost {
 
         await this.setDriverOfflineForInactivity(driverId);
 
-        this.inactiveDriversLastCheck.delete(driverId);
+        await this.redis.getClient().del(pingKey); // clean up ping key
       }
     }
   }
@@ -168,6 +173,7 @@ export class DriverInactivityProcessor extends WorkerHost {
     if (result !== 1) return;
 
     await this.redis.removeDriverFromGeoIndex(driverId);
+    await this.redis.removeFromDriverActiveSet(driverId); // BUG-6 fix: remove from active set on inactivity eviction
 
     if (this.eventBus.emitDriverMarkedInactive) {
       this.eventBus.emitDriverMarkedInactive({
@@ -189,18 +195,16 @@ export class DriverInactivityProcessor extends WorkerHost {
     const state = await this.redis.getRiderState(riderId);
     if (!state) return;
 
-    // Execute atomic offline script for rider
-    if (!global.ATOMIC_SET_RIDER_OFFLINE) {
-      this.logger.warn('ATOMIC_SET_RIDER_OFFLINE script not implemented');
-    } else {
-      const result = await this.redis
-        .getClient()
-        .eval(global.ATOMIC_SET_RIDER_OFFLINE, 0, riderId);
-      if (result !== 1) {
-        this.logger.warn(`Failed to mark rider ${riderId} offline in Redis`);
-        return;
-      }
+    // BUG-4 fix: use imported ATOMIC_SET_RIDER_OFFLINE constant (was global.ATOMIC_SET_RIDER_OFFLINE which is always undefined)
+    const result = await this.redis
+      .getClient()
+      .eval(ATOMIC_SET_RIDER_OFFLINE, 0, riderId);
+    if (result !== 1) {
+      this.logger.warn(`Failed to mark rider ${riderId} offline in Redis`);
+      return;
     }
+
+    await this.redis.removeFromRiderActiveSet(riderId); // BUG-6 fix
 
     if (this.eventBus.emitRiderMarkedInactive) {
       this.eventBus.emitRiderMarkedInactive({

@@ -2,12 +2,14 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { RideFilterDto } from './dto/ride-filter.dto';
 import { Prisma, RideStatus } from '@prisma/client';
 import { TransactionLedgerService } from '../transactions/transaction-ledger.service';
 import { TripsService } from 'src/users/trips/trips.service';
+import { NotificationsGateway } from 'src/notifications/notifications.gateway';
 // ✅ Type-safe query fragments for performance
 const rideListInclude = {
   include: {
@@ -46,10 +48,13 @@ type RideWithDetailRelations = Prisma.RideGetPayload<typeof rideDetailInclude>;
 
 @Injectable()
 export class RidesService {
+  private readonly logger = new Logger(RidesService.name);
+
   constructor(
     private prisma: PrismaService,
     private ledgerService: TransactionLedgerService,
     private tripsService: TripsService,
+    private notificationsGateway: NotificationsGateway,
   ) {}
 
   // 📋 1. List All Rides (Paginated & Filtered)
@@ -483,14 +488,19 @@ export class RidesService {
     // Note: We allow offline assignment in emergencies, but warn in UI.
     // Strict enforcement can be toggled here.
 
-    // 4. Perform Assignment
-    // We update the DB directly, then trigger notifications via TripsService if possible
-    await this.prisma.ride.update({
+    // 4. Perform Assignment — fetch full ride data needed for socket payload
+    const updatedRide = await this.prisma.ride.update({
       where: { id: rideId },
       data: {
         riderId: riderId,
-        status: 'ACCEPTED', // Move to Accepted state
+        status: 'DRIVER_ASSIGNED' as any, // Driver manually assigned by admin
         acceptedAt: new Date(),
+      },
+      include: {
+        pickupAddress: true,
+        dropoffAddress: true,
+        customer: { select: { id: true, name: true, phone: true } },
+        rider: { include: { vehicle: true } },
       },
     });
 
@@ -509,13 +519,54 @@ export class RidesService {
       },
     });
 
-    // 6. Notify Rider (Best Effort)
+    // 6. Notify Driver and Customer via WebSocket (Best Effort)
     try {
-      // Assuming TripsService has a way to notify via Socket
-      // If not, we rely on the rider app polling or generic notification service
-      // this.notificationsService.notifyRider(riderId, 'New Ride Assigned by Support');
+      // Build job offer payload for the driver
+      const driverJobPayload = {
+        id: updatedRide.id,
+        jobType: 'ride' as const,
+        pickupAddress: updatedRide.pickupAddress,
+        dropoffAddress: updatedRide.dropoffAddress,
+        customerName: updatedRide.customer?.name || 'Customer',
+        earnings: updatedRide.totalFare || 0,
+        estimatedEarnings: updatedRide.totalFare || 0,
+        distanceKm: updatedRide.distanceKm,
+        durationMin: updatedRide.durationMin,
+        pickupContactPhone: updatedRide.customer?.phone || null,
+        dropoffContactPhone: updatedRide.customer?.phone || null,
+        assignedByAdmin: true,
+      };
+
+      // Emit job assignment to driver
+      this.notificationsGateway.emitJobAssigned(riderId, driverJobPayload);
+      this.logger.log(
+        `[manualAssignDriver] Emitted job.assigned to driver ${riderId} for ride ${rideId}`,
+      );
+
+      // Emit driver-assigned notification to customer
+      if (updatedRide.customer?.id) {
+        this.notificationsGateway.server
+          .to(`user_${updatedRide.customer.id}`)
+          .emit('DRIVER_ASSIGNED', {
+            type: 'DRIVER_ASSIGNED',
+            rideId: updatedRide.id,
+            driver: {
+              id: updatedRide.rider?.id,
+              name: updatedRide.rider?.name,
+              vehicle: updatedRide.rider?.vehicle,
+            },
+            message: 'A driver has been assigned to your ride.',
+          });
+        this.logger.log(
+          `[manualAssignDriver] Emitted DRIVER_ASSIGNED to customer ${updatedRide.customer.id} for ride ${rideId}`,
+        );
+      }
     } catch (e) {
-      // Ignore notification errors
+      // Non-fatal — DB update succeeded; socket failure is logged
+      this.logger.error(
+        `[manualAssignDriver] Socket notification failed for ride ${rideId}`,
+        e,
+      );
     }
 
     return { success: true, message: 'Driver assigned successfully' };

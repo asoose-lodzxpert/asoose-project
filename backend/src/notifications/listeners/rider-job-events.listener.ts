@@ -7,6 +7,8 @@ import type {
   JobUpdatedEvent,
   JobCancelledEvent,
 } from '../../matching/events/event-types';
+import { PrismaService } from '../../prisma/prisma.service';
+import { rideToJobSummary, deliveryToJobSummary } from '../../jobs/job.dto';
 
 /**
  * Listener for rider job events
@@ -16,39 +18,96 @@ import type {
 export class RiderJobEventsListener {
   private readonly logger = new Logger(RiderJobEventsListener.name);
 
-  constructor(private readonly gateway: NotificationsGateway) {}
+  constructor(
+    private readonly gateway: NotificationsGateway,
+    private readonly prisma: PrismaService,
+  ) {}
 
   @OnEvent(JOB_EVENTS.ASSIGNED)
-  handleJobAssigned(payload: JobAssignedEvent) {
-    // Only emit for ride jobs (drivers handle rides)
-    if (payload.jobType === 'ride') {
-      this.logger.log(`Emitting job.assigned for driver ${payload.driverId}`);
+  async handleJobAssigned(payload: JobAssignedEvent) {
+    const recipientId =
+      payload.jobType === 'ride'
+        ? payload.driverId
+        : (payload as any).riderId || payload.driverId;
 
-      this.gateway.server.to(`user_${payload.driverId}`).emit('job.assigned', {
-        id: payload.jobId,
-        jobType: payload.jobType,
-        customerId: payload.customerId,
-        expiresAt: payload.expiresAt,
-        timestamp: payload.timestamp,
-      });
+    if (!recipientId) {
+      this.logger.warn(
+        `job.assigned received without recipientId for job ${payload.jobId}`,
+      );
+      return;
     }
-    // For deliveries, the job is assigned to a rider
-    else if (payload.jobType === 'delivery') {
-      // Note: In the current architecture, deliveries don't use JobAssignedEvent
-      // They go through rider-state.service acceptJob which emits job.updated
-      // But we'll handle it here for consistency
-      const riderId = (payload as any).riderId || (payload as any).driverId;
-      if (riderId) {
-        this.logger.log(`Emitting job.assigned for rider ${riderId}`);
 
-        this.gateway.server.to(`user_${riderId}`).emit('job.assigned', {
-          id: payload.jobId,
-          jobType: payload.jobType,
-          customerId: payload.customerId,
+    this.logger.log(
+      `Emitting job.assigned to ${recipientId} for ${payload.jobType} ${payload.jobId}`,
+    );
+
+    try {
+      let jobData: any;
+
+      if (payload.jobType === 'ride') {
+        const ride = await this.prisma.ride.findUnique({
+          where: { id: payload.jobId },
+          include: {
+            customer: { select: { name: true, phone: true } },
+            pickupAddress: true,
+            dropoffAddress: true,
+          },
+        });
+
+        if (!ride) {
+          this.logger.warn(`Ride ${payload.jobId} not found for job.assigned`);
+          return;
+        }
+
+        const summary = rideToJobSummary(ride);
+        jobData = {
+          ...summary,
           expiresAt: payload.expiresAt,
           timestamp: payload.timestamp,
+        };
+      } else {
+        const delivery = await this.prisma.delivery.findUnique({
+          where: { id: payload.jobId },
+          include: {
+            customer: { select: { name: true, phone: true } },
+            pickupAddress: true,
+            dropoffAddress: true,
+            order: {
+              include: {
+                store: {
+                  include: { vendor: { select: { phone: true } } },
+                },
+              },
+            },
+          },
         });
+
+        if (!delivery) {
+          this.logger.warn(
+            `Delivery ${payload.jobId} not found for job.assigned`,
+          );
+          return;
+        }
+
+        const summary = deliveryToJobSummary(delivery);
+        jobData = {
+          ...summary,
+          expiresAt: payload.expiresAt,
+          timestamp: payload.timestamp,
+        };
       }
+
+      this.gateway.server
+        .to(`user_${recipientId}`)
+        .emit('job.assigned', jobData);
+
+      // Join rider/driver to the job room so they receive granular order_update events.
+      // Uses adapter-aware socketsJoin — works across horizontally-scaled instances.
+      await this.gateway.joinJobRoom(recipientId, payload.jobId);
+    } catch (err) {
+      this.logger.error(
+        `Failed to fetch job data for job.assigned ${payload.jobId}: ${(err as Error).message}`,
+      );
     }
   }
 

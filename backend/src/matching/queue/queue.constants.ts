@@ -80,6 +80,11 @@ export interface SendSMSJobData {
  */
 export interface HandleAssignmentTimeoutJobData {
   job: JobSummaryDto;
+  /** The driver/rider ID that was locked — set by the matching processor so the
+   *  timeout handler can release them without a DB round-trip. */
+  driverId?: string;
+  /** The matching attempt count at the time of lock, forwarded for retry logic. */
+  attempt: number;
 }
 
 /* ========================================

@@ -1,5 +1,4 @@
 import { Module } from '@nestjs/common';
-import { EventEmitterModule } from '@nestjs/event-emitter';
 
 // Redis
 import { MatchingRedisModule } from './redis/redis.module';
@@ -38,11 +37,11 @@ import { PrismaModule } from '../prisma/prisma.module';
  */
 @Module({
   imports: [
-    EventEmitterModule.forRoot({
-      wildcard: true,
-      delimiter: '.',
-      maxListeners: 20,
-    }),
+    // EventEmitterModule is not imported here — the global instance configured in
+    // AppModule (wildcard: true) is sufficient and must be the single source of truth.
+    // A second forRoot() here would create a separate EventEmitter2 instance that
+    // EventBusService would receive instead of the global one, silently breaking all
+    // @OnEvent() listeners in other modules.
     MatchingRedisModule,
     QueueModule,
     PrismaModule,

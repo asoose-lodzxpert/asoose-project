@@ -81,27 +81,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         try {
           await refreshAccessToken();
         } catch (err) {
-          // Only clear session if error is 'No refresh token available' or 'Failed to refresh session'
           const msg = err instanceof Error ? err.message : String(err);
-          if (
-            msg.includes("No refresh token available") ||
-            msg.includes("Failed to refresh session") ||
-            msg.includes("Login response missing tokens")
-          ) {
+          if (msg.includes("No refresh token available")) {
+            // No token stored at all — user has never logged in or has explicitly logged out
             await clearSession();
             if (isMounted) {
               setUser(null);
               setLoading(false);
             }
             return;
-          } else {
-            // For transient errors (e.g., network), still restore the stored user
-            // (the cached token may still be valid for API calls)
-            const cachedUser = await AsyncStorage.getItem(AUTH_USER_KEY);
-            if (cachedUser && isMounted) setUser(JSON.parse(cachedUser));
-            if (isMounted) setLoading(false);
-            return;
           }
+          // For ALL other errors (network blip, server error, token format mismatch,
+          // expired token that the server rejected, etc.) restore the cached user and
+          // let the normal request cycle handle token expiry via 401 → re-login flow.
+          const cachedUser = await AsyncStorage.getItem(AUTH_USER_KEY);
+          if (cachedUser && isMounted) setUser(JSON.parse(cachedUser));
+          if (isMounted) setLoading(false);
+          return;
         }
 
         // 3. Restore user only if token is valid

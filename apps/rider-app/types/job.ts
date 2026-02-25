@@ -26,6 +26,8 @@ export interface IncomingJobOffer {
   dropoffAddress: any;
 
   customerName: string;
+  /** Direct customer contact phone (ride only) */
+  customerPhone?: string;
 
   /** Phone of the pickup contact: vendor for deliveries, passenger for rides */
   pickupContactPhone?: string;
@@ -37,8 +39,12 @@ export interface IncomingJobOffer {
   earnings: number;
   packageDetails?: string; // delivery
   requiresOtp?: boolean; // delivery — true when an OTP must be collected from recipient
-  distanceKm?: number; // ride
-  durationMin?: number; // ride
+  distanceKm?: number;
+  durationMin?: number;
+  /** OTP required to start the ride (ride only — shown at pickup) */
+  startOtp?: string;
+  /** OTP required to confirm delivery (delivery only) */
+  deliveryOtp?: string;
 
   // Order items (what is being picked up)
   orderItems?: string[];

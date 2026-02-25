@@ -9,6 +9,7 @@ import { RideStatus, DeliveryStatus } from '@prisma/client';
 import { AppLogger } from 'src/libs/logger/app-logger.service';
 import { TransactionLedgerService } from 'src/super-admin/transactions/transaction-ledger.service';
 import { NotificationsGateway } from '../../notifications/notifications.gateway';
+import { DriverStateService } from '../../matching/driver-state/driver-state.service';
 
 /** Maps a Prisma DeliveryStatus to the rider-app's JobStatus string */
 function deliveryStatusToJobStatus(status: DeliveryStatus): string {
@@ -51,6 +52,7 @@ export class JobsService {
     private readonly logger: AppLogger,
     private readonly transactionLedger: TransactionLedgerService,
     private readonly notificationsGateway: NotificationsGateway,
+    private readonly driverStateService: DriverStateService,
   ) {}
 
   /**
@@ -272,7 +274,10 @@ export class JobsService {
         );
       }
 
-      const acceptable: string[] = ['SEARCHING_DRIVER'];
+      const acceptable: string[] = [
+        'SEARCHING_DRIVER',
+        'DRIVER_ASSIGNED', // admin manual assignment
+      ];
       if (!acceptable.includes(ride.status as string)) {
         this.logger.warn(
           `Invalid state - cannot accept ride ${jobId} in status ${ride.status}`,
@@ -289,7 +294,7 @@ export class JobsService {
       const updateResult = await this.prisma.ride.updateMany({
         where: {
           id: jobId,
-          status: { in: ['SEARCHING_DRIVER'] as any[] },
+          status: { in: ['SEARCHING_DRIVER', 'DRIVER_ASSIGNED'] as any[] },
         },
         data: {
           status: 'DRIVER_ACCEPTED' as any,
@@ -305,10 +310,40 @@ export class JobsService {
         throw new BadRequestException('Ride already accepted or unavailable');
       }
 
-      return this.prisma.ride.findUnique({
+      const updatedRide = await this.prisma.ride.findUnique({
         where: { id: jobId },
         include: { rider: { include: { vehicle: true } } },
       });
+
+      // Notify customer so they can proceed to payment
+      if (updatedRide?.customerId && updatedRide.rider) {
+        try {
+          this.notificationsGateway.server
+            .to(`user_${updatedRide.customerId}`)
+            .emit('DRIVER_ACCEPTED', {
+              type: 'DRIVER_ACCEPTED',
+              rideId: updatedRide.id,
+              driver: {
+                id: updatedRide.rider.id,
+                name: updatedRide.rider.name,
+                phone: updatedRide.rider.phone,
+                vehicle: updatedRide.rider.vehicle,
+              },
+              message:
+                'A driver accepted your ride. Please confirm your payment to proceed.',
+            });
+          this.logger.debug(
+            `Emitted DRIVER_ACCEPTED to customer user_${updatedRide.customerId} for ride ${jobId}`,
+          );
+        } catch (e) {
+          this.logger.error(
+            'Socket error during acceptJob DRIVER_ACCEPTED emit',
+            e,
+          );
+        }
+      }
+
+      return updatedRide;
     }
 
     this.logger.error(`acceptJob - unknown jobType: ${jobType}`);
@@ -351,6 +386,14 @@ export class JobsService {
         DeliveryStatus.REQUESTED,
       ];
 
+      // Already cancelled — treat as success (idempotent)
+      if (delivery.status === DeliveryStatus.CANCELLED) {
+        this.logger.debug(
+          `declineJob - delivery ${jobId} already CANCELLED, skipping`,
+        );
+        return { success: true, message: 'Delivery already ended' };
+      }
+
       if (!declineable.includes(delivery.status)) {
         this.logger.warn(
           `Invalid state - cannot decline delivery ${jobId} in ${delivery.status}`,
@@ -383,6 +426,20 @@ export class JobsService {
       if (!ride) {
         this.logger.warn(`declineJob - ride not found: ${jobId}`);
         throw new NotFoundException('Ride not found');
+      }
+
+      // Already in a terminal state — treat as success (idempotent)
+      const terminalRideStatuses = [
+        'CANCELLED_BY_USER',
+        'CANCELLED_BY_DRIVER',
+        'CANCELLED',
+        'COMPLETED',
+      ];
+      if (terminalRideStatuses.includes(ride.status as string)) {
+        this.logger.debug(
+          `declineJob - ride ${jobId} already in terminal status ${ride.status}, skipping`,
+        );
+        return { success: true, message: 'Ride already ended' };
       }
 
       if ((ride.status as string) !== 'SEARCHING_DRIVER') {
@@ -456,7 +513,7 @@ export class JobsService {
     if (jobType === 'ride') {
       const ride = await this.prisma.ride.findUnique({
         where: { id: jobId },
-        select: { id: true, status: true, riderId: true },
+        select: { id: true, status: true, riderId: true, customerId: true },
       });
 
       if (!ride) {
@@ -485,6 +542,26 @@ export class JobsService {
       this.logger.debug(
         `Ride ${jobId} driver arrived at pickup (no state change)`,
       );
+
+      // Notify customer that driver has arrived
+      if (ride.customerId) {
+        try {
+          this.notificationsGateway.server
+            .to(`user_${ride.customerId}`)
+            .emit('DRIVER_ARRIVED', {
+              type: 'DRIVER_ARRIVED',
+              rideId: jobId,
+              metadata: {
+                message: 'Your driver has arrived at the pickup location.',
+              },
+            });
+          this.logger.debug(
+            `Emitted DRIVER_ARRIVED to customer user_${ride.customerId}`,
+          );
+        } catch (e) {
+          this.logger.error('Socket emit DRIVER_ARRIVED failed', e);
+        }
+      }
 
       return { id: ride.id, status: ride.status };
     }
@@ -600,7 +677,13 @@ export class JobsService {
     if (jobType === 'ride') {
       const ride = await this.prisma.ride.findUnique({
         where: { id: jobId },
-        select: { id: true, status: true, riderId: true, startOtp: true },
+        select: {
+          id: true,
+          status: true,
+          riderId: true,
+          startOtp: true,
+          customerId: true,
+        },
       });
 
       if (!ride) {
@@ -636,10 +719,24 @@ export class JobsService {
 
       this.logger.debug(`Updating ride ${jobId} → IN_PROGRESS`);
 
-      return this.prisma.ride.update({
+      const startedRide = await this.prisma.ride.update({
         where: { id: jobId },
         data: { status: 'IN_PROGRESS' as any, startedAt: new Date() },
       });
+
+      // Notify customer that the trip has started so the UI updates
+      try {
+        this.notificationsGateway.server
+          .to(`user_${ride.customerId}`)
+          .emit('TRIP_STARTED', { type: 'TRIP_STARTED', rideId: jobId });
+        this.logger.debug(
+          `Emitted TRIP_STARTED to customer user_${ride.customerId}`,
+        );
+      } catch (e) {
+        this.logger.error('Socket emit TRIP_STARTED failed', e);
+      }
+
+      return startedRide;
     }
 
     this.logger.error(`confirmPickup - unknown jobType: ${jobType}`);
@@ -810,7 +907,7 @@ export class JobsService {
     if (jobType === 'ride') {
       const ride = await this.prisma.ride.findUnique({
         where: { id: jobId },
-        select: { id: true, status: true, riderId: true },
+        select: { id: true, status: true, riderId: true, customerId: true },
       });
 
       if (!ride) {
@@ -836,13 +933,27 @@ export class JobsService {
 
       this.logger.debug(`Completing ride ${jobId} → COMPLETED`);
 
-      return this.prisma.ride.update({
+      const completedRide = await this.prisma.ride.update({
         where: { id: jobId },
         data: {
           status: RideStatus.COMPLETED,
           completedAt: new Date(),
         } as any,
       });
+
+      // Notify customer that the trip has been completed
+      try {
+        this.notificationsGateway.server
+          .to(`user_${ride.customerId}`)
+          .emit('TRIP_COMPLETED', { type: 'TRIP_COMPLETED', rideId: jobId });
+        this.logger.debug(
+          `Emitted TRIP_COMPLETED to customer user_${ride.customerId}`,
+        );
+      } catch (e) {
+        this.logger.error('Socket emit TRIP_COMPLETED failed', e);
+      }
+
+      return completedRide;
     }
 
     this.logger.error(`completeJob - unknown jobType: ${jobType}`);
@@ -904,6 +1015,14 @@ export class JobsService {
         throw new ForbiddenException('You are not assigned to this delivery');
       }
 
+      // Idempotency: already cancelled
+      if (delivery.status === DeliveryStatus.CANCELLED) {
+        this.logger.debug(
+          `cancelJob idempotent — delivery ${jobId} already CANCELLED`,
+        );
+        return { message: 'Job cancelled' };
+      }
+
       const cancellable: DeliveryStatus[] = [
         DeliveryStatus.ASSIGNED,
         DeliveryStatus.ACCEPTED,
@@ -948,7 +1067,26 @@ export class JobsService {
         throw new ForbiddenException('You are not assigned to this ride');
       }
 
-      const cancellable: string[] = ['DRIVER_ACCEPTED', 'PAID', 'IN_PROGRESS'];
+      // Idempotency: already cancelled
+      const alreadyCancelledRide = [
+        'CANCELLED_BY_DRIVER',
+        'CANCELLED_BY_USER',
+        'CANCELLED',
+      ];
+      if (alreadyCancelledRide.includes(ride.status as string)) {
+        this.logger.debug(
+          `cancelJob idempotent — ride ${jobId} already ${ride.status}`,
+        );
+        return { message: 'Job cancelled' };
+      }
+
+      const cancellable: string[] = [
+        'DRIVER_ACCEPTED',
+        'ACCEPTED', // legacy status (pre-fix admin assignments)
+        'DRIVER_ASSIGNED', // admin manual assignment (new flow)
+        'PAID',
+        'IN_PROGRESS',
+      ];
 
       if (!cancellable.includes(ride.status as string)) {
         this.logger.warn(
@@ -967,19 +1105,30 @@ export class JobsService {
         where: { id: jobId },
         data: {
           status: 'CANCELLED_BY_DRIVER' as any,
-          cancellationReason: reason,
-          cancelledBy: riderId,
+          cancellationReason: reason || 'Driver cancelled',
+          cancelledBy: 'DRIVER', // consistent string enum — was incorrectly storing riderId UUID
           cancelledAt: new Date(),
           riderId: null,
         },
       });
+
+      // Release driver's Redis state so they become available for new matching
+      try {
+        await this.driverStateService.releaseDriver(riderId, jobId);
+      } catch (redisErr) {
+        // Non-fatal — DB cancel succeeded
+        this.logger.error(
+          `[cancelJob/ride] Failed to release driver ${riderId} from Redis`,
+          redisErr,
+        );
+      }
 
       // Notify the customer that their driver cancelled
       const cancelPayload = {
         type: 'RIDE_CANCELLED',
         rideId: jobId,
         cancelledBy: 'DRIVER',
-        reason: reason ?? 'Driver cancelled the ride',
+        reason: reason || 'Driver cancelled the ride',
       };
       try {
         this.notificationsGateway.server

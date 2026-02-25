@@ -45,6 +45,11 @@ const webhookHandlers = [
     PaystackAccountService,
     ...webhookHandlers,
   ],
-  exports: [PaymentService, PaystackService, PaystackAccountService],
+  exports: [
+    PaymentService,
+    PaymentInitService,
+    PaystackService,
+    PaystackAccountService,
+  ],
 })
 export class PaymentModule {}

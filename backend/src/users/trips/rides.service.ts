@@ -30,6 +30,13 @@ import {
 import { TripsCommonService, TRIPS_CONFIG } from './trips.common.service';
 import { randomUUID } from 'crypto';
 import { rideToJobSummary } from '../../jobs/job.dto';
+import { DriverStateService } from '../../matching/driver-state/driver-state.service';
+import { PaymentInitService } from '../../payment/payment-init.service';
+import {
+  PaymentGateway,
+  PaymentMethod as GatewayPaymentMethod,
+  PaymentType,
+} from '../../payment/interfaces/payment.interface';
 
 @Injectable()
 export class RidesService {
@@ -42,6 +49,8 @@ export class RidesService {
     private readonly queue: QueueService,
     private readonly notificationsGateway: NotificationsGateway,
     private readonly common: TripsCommonService,
+    private readonly driverStateService: DriverStateService,
+    private readonly paymentInitService: PaymentInitService,
   ) {}
 
   // ========================================
@@ -349,81 +358,60 @@ export class RidesService {
   }
 
   /**
-   * confirmRide is now the PAYMENT step: called by the customer AFTER the driver
-   * has accepted (DRIVER_ACCEPTED) to confirm payment and transition to PAID.
-   * The driver cannot start the trip until the ride is PAID.
+   * confirmRide — initiates the Paystack payment for a DRIVER_ACCEPTED ride.
+   * Returns { authorizationUrl, reference } so the mobile app can open the
+   * payment webview. The ride transitions to PAID via Paystack webhook.
    */
-  async confirmRide(userId: string, rideId: string, paymentMethod: string) {
-    const methodEnum =
-      paymentMethod.toUpperCase() === 'CASH'
-        ? PaymentMethod.CASH
-        : PaymentMethod.CARD;
-
-    return this.prisma.$transaction(async (tx) => {
-      const ride = await tx.ride.findUnique({
-        where: { id: rideId },
-        include: { rider: { include: { vehicle: true } } },
-      });
-
-      if (!ride || ride.customerId !== userId) {
-        throw new NotFoundException('Ride not found');
-      }
-
-      // Allow idempotency: already PAID
-      if ((ride.status as string) === 'PAID') {
-        return { status: 'PAID', rideId };
-      }
-
-      if ((ride.status as string) !== 'DRIVER_ACCEPTED') {
-        throw new BadRequestException(
-          `Cannot confirm payment for ride in state ${ride.status}`,
-        );
-      }
-
-      // Update payment record
-      await tx.payment.updateMany({
-        where: { rideId },
-        data: { method: methodEnum, status: PaymentStatus.COMPLETED },
-      });
-
-      // Transition ride to PAID
-      await tx.ride.update({
-        where: { id: rideId },
-        data: { status: 'PAID' as any },
-      });
-
-      // Notify customer
-      try {
-        this.notificationsGateway.server
-          .to(`user_${userId}`)
-          .emit('PAYMENT_CONFIRMED', {
-            type: 'PAYMENT_CONFIRMED',
-            rideId,
-            message:
-              'Payment confirmed. Your driver will start the trip shortly.',
-          });
-      } catch (e) {
-        this.logger.error('Socket error confirmRide (PAYMENT_CONFIRMED)', e);
-      }
-
-      // Notify driver that payment is confirmed and they may start
-      if (ride.riderId) {
-        try {
-          this.notificationsGateway.server
-            .to(`rider_${ride.riderId}`)
-            .emit('PAYMENT_CONFIRMED', {
-              type: 'PAYMENT_CONFIRMED',
-              rideId,
-              message: 'Customer has paid. You may now start the trip.',
-            });
-        } catch (e) {
-          this.logger.error('Socket error confirmRide driver notify', e);
-        }
-      }
-
-      await this.common.logActivity(userId, 'RIDE_PAID', { rideId });
-      return { status: 'PAID', rideId };
+  async confirmRide(userId: string, rideId: string, _paymentMethod?: string) {
+    const ride = await this.prisma.ride.findUnique({
+      where: { id: rideId },
+      include: { customer: { select: { email: true, name: true } } },
     });
+
+    if (!ride || ride.customerId !== userId) {
+      throw new NotFoundException('Ride not found');
+    }
+
+    // Idempotency: already paid — return the existing authorization URL
+    if ((ride.status as string) === 'PAID') {
+      const existingPayment = await this.prisma.payment.findUnique({
+        where: { rideId },
+        select: { authorizationUrl: true, reference: true },
+      });
+      return {
+        status: 'ALREADY_PAID',
+        rideId,
+        authorizationUrl: existingPayment?.authorizationUrl,
+        reference: existingPayment?.reference,
+      };
+    }
+
+    if ((ride.status as string) !== 'DRIVER_ACCEPTED') {
+      throw new BadRequestException(
+        `Cannot initiate payment for ride in state ${ride.status}`,
+      );
+    }
+
+    const customerEmail = ride.customer?.email ?? `user-${userId}@asoose.app`;
+
+    const payment = await this.paymentInitService.initiatePayment(
+      {
+        type: PaymentType.RIDE,
+        rideId,
+        email: customerEmail,
+        customerName: ride.customer?.name ?? undefined,
+        gateway: PaymentGateway.PAYSTACK,
+        method: GatewayPaymentMethod.CARD,
+      },
+      userId,
+    );
+
+    await this.common.logActivity(userId, 'RIDE_PAYMENT_INITIATED', { rideId });
+    return {
+      rideId,
+      authorizationUrl: payment.authorizationUrl,
+      reference: payment.reference,
+    };
   }
 
   private async triggerMatchingSideEffects(rideId: string, userId: string) {
@@ -499,26 +487,8 @@ export class RidesService {
     if (!ride?.rider)
       throw new InternalServerErrorException('Rider link failed');
 
-    try {
-      // Notify customer that a driver accepted — they must now pay
-      this.notificationsGateway.server
-        .to(`user_${ride.customerId}`)
-        .emit('DRIVER_ACCEPTED', {
-          type: 'DRIVER_ACCEPTED',
-          rideId: ride.id,
-          driver: {
-            name: ride.rider.name,
-            phone: this.common.maskPhoneNumber(ride.rider.phone),
-            vehicle: ride.rider.vehicle,
-            id: ride.rider.id,
-          },
-          message:
-            'A driver accepted your ride. Please confirm your payment to proceed.',
-        });
-    } catch (e) {
-      this.logger.error('Socket error during acceptRide', e);
-    }
-
+    // Socket notification is handled by jobs.service.ts (canonical rider-side path).
+    // This endpoint is for admin/legacy use only — do not double-emit DRIVER_ACCEPTED.
     await this.common.logActivity(riderId, 'RIDE_ACCEPTED', { rideId });
     return ride;
   }
@@ -557,14 +527,7 @@ export class RidesService {
       },
     });
 
-    try {
-      this.notificationsGateway.server
-        .to(`user_${ride.customerId}`)
-        .emit('TRIP_STARTED', { type: 'TRIP_STARTED', rideId });
-    } catch (e) {
-      this.logger.error('Socket error startRide', e);
-    }
-
+    // Socket notification (TRIP_STARTED) is handled by jobs.service.ts — do not double-emit.
     await this.common.logActivity(riderId, 'RIDE_STARTED', { rideId });
     return { success: true };
   }
@@ -645,14 +608,7 @@ export class RidesService {
         },
       });
 
-      try {
-        this.notificationsGateway.server
-          .to(`user_${ride.customerId}`)
-          .emit('TRIP_COMPLETED', { type: 'TRIP_COMPLETED', rideId });
-      } catch (e) {
-        this.logger.error('Socket error completeRide', e);
-      }
-
+      // Socket notification (TRIP_COMPLETED) is handled by jobs.service.ts — do not double-emit.
       return { message: 'Ride completed' };
     });
   }
@@ -675,6 +631,7 @@ export class RidesService {
     const cancellableStatuses = [
       'REQUESTED',
       'SEARCHING_DRIVER',
+      'DRIVER_ASSIGNED', // admin manual assignment (driver not yet accepted)
       'DRIVER_ACCEPTED',
       'PAID',
     ] as string[];
@@ -691,6 +648,20 @@ export class RidesService {
     if (existingRide.customerId !== userId) {
       throw new ForbiddenException('You do not own this ride');
     }
+
+    // Idempotency: already cancelled — return success so the client UI can update
+    const alreadyCancelled = [
+      'CANCELLED_BY_USER',
+      'CANCELLED_BY_DRIVER',
+      'CANCELLED',
+    ];
+    if (alreadyCancelled.includes(existingRide.status as string)) {
+      this.logger.debug(
+        `cancelRide idempotent — ride ${rideId} already ${existingRide.status}`,
+      );
+      return { message: 'Ride cancelled' };
+    }
+
     if (!cancellableStatuses.includes(existingRide.status as string)) {
       throw new BadRequestException(
         `Cannot cancel a ride in '${existingRide.status}' status`,
@@ -721,14 +692,35 @@ export class RidesService {
         .to(`user_${userId}`)
         .emit('RIDE_CANCELLED', cancelPayload);
 
-      // If a driver was already assigned, notify them too
-      if (existingRide.riderId) {
+      // Determine which driver to notify:
+      // - If the driver already accepted: riderId is set in the DB.
+      // - If the driver was locked by matching but hasn't accepted yet:
+      //   riderId is null in DB but pendingDriver key exists in Redis.
+      const assignedDriverId =
+        existingRide.riderId ??
+        (await this.driverStateService
+          .getPendingDriverForRide(rideId)
+          .catch(() => null));
+
+      if (assignedDriverId) {
+        // Notify driver — they may be showing the incoming job offer
         this.notificationsGateway.server
-          .to(`rider_${existingRide.riderId}`)
+          .to(`user_${assignedDriverId}`)
           .emit('RIDE_CANCELLED', cancelPayload);
         this.logger.log(
-          `[cancelRide] Notified driver ${existingRide.riderId} of customer cancellation`,
+          `[cancelRide] Notified driver ${assignedDriverId} of customer cancellation`,
         );
+
+        // Reset driver's Redis state so they become available for new matches
+        try {
+          await this.driverStateService.releaseDriver(assignedDriverId, rideId);
+        } catch (redisErr) {
+          // Non-fatal — DB cancel succeeded; log and continue
+          this.logger.error(
+            `[cancelRide] Failed to release driver ${assignedDriverId} from Redis`,
+            redisErr,
+          );
+        }
       }
     } catch (e) {
       this.logger.error('Socket error cancelRide', e);

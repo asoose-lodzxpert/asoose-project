@@ -136,7 +136,7 @@ export class QueueService implements OnModuleInit {
       {
         ...QUEUE_OPTIONS.assignmentTimeout,
         delay: delayMs,
-        jobId: `timeout-${data.job.jobType}-${data.job.id}-${data.job.id}`,
+        jobId: `timeout-${data.job.jobType}-${data.job.id}`,
       },
     );
 
@@ -147,7 +147,7 @@ export class QueueService implements OnModuleInit {
   }
 
   async cancelAssignmentTimeout(jobType: 'ride' | 'delivery', jobId: string) {
-    const jobKey = `timeout-${jobType}-${jobId}-${jobId}`;
+    const jobKey = `timeout-${jobType}-${jobId}`;
     const job = await this.assignmentTimeoutQueue.getJob(jobKey);
 
     if (job) {

@@ -16,10 +16,8 @@ export class MatchingEventsListener {
       .to(`user_${payload.customerId}`)
       .emit('NO_DRIVERS_FOUND', {
         type: 'NO_DRIVERS_FOUND',
-        metadata: {
-          rideId: payload.rideId,
-          message: 'No drivers were found in your area. Please try again.',
-        },
+        rideId: payload.rideId,
+        reason: 'No drivers were found in your area. Please try again.',
       });
   }
 }

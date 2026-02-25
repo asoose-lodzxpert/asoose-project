@@ -56,6 +56,7 @@ export class RiderStateService {
     await client.sadd(`hex:${hexId}:riders`, riderId);
     await this.redis.updateRiderLastSeen(riderId);
     await this.redis.addRiderToGeoIndex(riderId, lat, lng);
+    await this.redis.addToRiderActiveSet(riderId); // BUG-6
 
     this.eventBus.emit('rider.online', { riderId, lat, lng, hexId, timestamp });
     this.logger.log(
@@ -87,12 +88,14 @@ export class RiderStateService {
     await client.sadd(`hex:${hexId}:riders`, riderId);
     // Deliberately NO updateRiderLastSeen — inactivity processor evicts stale entries
     await this.redis.addRiderToGeoIndex(riderId, lat, lng);
+    await this.redis.addToRiderActiveSet(riderId); // BUG-6
   }
 
   async setOffline(riderId: string, reason?: string): Promise<void> {
     const timestamp = Date.now();
     await this.redis.getClient().set(`rider:${riderId}:status`, 'OFFLINE');
     await this.redis.removeRiderFromGeoIndex(riderId);
+    await this.redis.removeFromRiderActiveSet(riderId); // BUG-6
 
     this.eventBus.emit('rider.offline', { riderId, reason, timestamp });
     this.logger.log(`Rider offline: ${riderId} (${reason ?? 'no reason'})`);

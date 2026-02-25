@@ -31,6 +31,7 @@ export default function LoginScreen() {
   const [biometricLoading, setBiometricLoading] = useState(false);
   const [error, setError] = useState("");
   const [showLocationDisclosure, setShowLocationDisclosure] = useState(false);
+  const [biometricSaved, setBiometricSaved] = useState(false);
 
   const {
     login,
@@ -50,17 +51,18 @@ export default function LoginScreen() {
   /* ------------------ Auto Prompt Logic ------------------ */
 
   useEffect(() => {
+    if (!biometricAvailable || !biometricEnrolled) return;
+
     async function checkAutoBiometric() {
-      if (biometricAvailable && biometricEnrolled) {
-        const enabled = await isBiometricEnabled();
-        if (enabled) {
-          handleBiometricLogin();
-        }
+      const enabled = await isBiometricEnabled();
+      setBiometricSaved(enabled);
+      if (enabled) {
+        // Delay slightly to ensure UI is ready and doesn't feel jarring
+        setTimeout(handleBiometricLogin, 500);
       }
     }
-    // Delay slightly to ensure UI is ready and doesn't feel jarring
-    const timer = setTimeout(checkAutoBiometric, 500);
-    return () => clearTimeout(timer);
+    checkAutoBiometric();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [biometricAvailable, biometricEnrolled]);
 
   /* ------------------ Logic ------------------ */
@@ -289,7 +291,7 @@ export default function LoginScreen() {
                     )}
                   </Pressable>
 
-                  {biometricAvailable && (
+                  {biometricAvailable && biometricSaved && (
                     <Pressable
                       style={[
                         styles.fingerprintButton,

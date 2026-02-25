@@ -101,9 +101,7 @@ export class RiderDispatchListener {
       requiresOtp: !!(delivery as any).deliveryOtp,
     };
 
-    // Emit via WebSocket
-    this.notificationsGateway.emitJobAssigned(delivery.riderId, jobData);
-
+    // NOTE: Socket emission is handled by RiderJobEventsListener to avoid duplicate events.
     // Join rider to job room for real-time updates (use delivery.id for direct deliveries)
     const roomId = delivery.orderId ?? delivery.id;
     this.notificationsGateway.joinJobRoom(delivery.riderId, roomId);
@@ -137,7 +135,16 @@ export class RiderDispatchListener {
     });
 
     if (!ride || !ride.riderId) {
-      this.logger.warn(`Ride ${rideId} missing rider assignment`);
+      // During auto-matching, riderId is stored in Redis (pending lock) but
+      // NOT yet in the DB. The RiderJobEventsListener handles that path.
+      // Only warn if the ride itself doesn't exist.
+      if (!ride) {
+        this.logger.warn(`Ride ${rideId} not found in handleRideAssignment`);
+      } else {
+        this.logger.debug(
+          `Ride ${rideId} has no riderId yet (auto-match pending) — skipping RiderDispatchListener`,
+        );
+      }
       return;
     }
 
@@ -157,9 +164,7 @@ export class RiderDispatchListener {
       dropoffContactPhone: ride.customer?.phone || null,
     };
 
-    // Emit via WebSocket
-    this.notificationsGateway.emitJobAssigned(ride.riderId, jobData);
-
+    // NOTE: Socket emission is handled by RiderJobEventsListener to avoid duplicate events.
     // Join rider to ride room for real-time updates
     this.notificationsGateway.joinJobRoom(ride.riderId, ride.id);
 

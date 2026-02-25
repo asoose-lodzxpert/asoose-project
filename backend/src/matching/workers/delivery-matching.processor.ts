@@ -74,7 +74,10 @@ export class DeliveryMatchingProcessor extends WorkerHost {
       }
 
       // Get declined drivers
-      const declinedDrivers = await this.redis.getDeclinedDrivers(deliveryId);
+      const declinedDrivers = await this.redis.getDeclinedDrivers(
+        'delivery',
+        deliveryId,
+      ); // BUG-3
       const allExcludedDrivers = [...excludeDriverIds, ...declinedDrivers];
 
       // Get pickup hex
@@ -98,6 +101,7 @@ export class DeliveryMatchingProcessor extends WorkerHost {
         jobSummary.customerName,
         jobSummary.customerPhone ?? '',
         allExcludedDrivers,
+        attempt,
       );
 
       if (driverFound) {
@@ -129,6 +133,7 @@ export class DeliveryMatchingProcessor extends WorkerHost {
     recipientName: string,
     recipientPhone: string,
     excludeDriverIds: string[],
+    attempt: number,
   ): Promise<boolean> {
     const rings = this.geo.getHexRings(centerHex, this.MAX_RINGS);
     let totalAttempts = 0;
@@ -167,6 +172,7 @@ export class DeliveryMatchingProcessor extends WorkerHost {
             packageDetails,
             recipientName,
             recipientPhone,
+            attempt,
           );
           if (assigned) {
             return true;
@@ -191,6 +197,7 @@ export class DeliveryMatchingProcessor extends WorkerHost {
     packageDetails: string | undefined,
     recipientName: string,
     recipientPhone: string,
+    attempt: number,
   ): Promise<boolean> {
     // Use ATOMIC_ASSIGN_DELIVERY — operates on rider:* keys and hex:*:riders sets
     const result = await this.redis
@@ -222,6 +229,8 @@ export class DeliveryMatchingProcessor extends WorkerHost {
             packageDetails,
             status: 'assigned',
           },
+          driverId: riderId, // BUG-1 fix: carry riderId so timeout can release without DB round-trip
+          attempt, // BUG-2 fix: carry attempt count
         },
         this.TIMEOUT_MS,
       );

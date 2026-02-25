@@ -19,7 +19,7 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { Alert } from "react-native";
+import { Alert, AppState, AppStateStatus } from "react-native";
 import { io, Socket } from "socket.io-client";
 import { useAuth } from "./AuthContext";
 
@@ -151,7 +151,19 @@ export function RideProvider({ children }: { children: ReactNode }) {
           );
         return;
       }
-
+      // Guard: if payment was already confirmed optimistically (DRIVER_ASSIGNED view)
+      // but the DB still returns DRIVER_ACCEPTED (webhook hasn't completed), don't revert.
+      if (
+        pageViewRef.current === "DRIVER_ASSIGNED" &&
+        ride &&
+        (ride.status as string) === "DRIVER_ACCEPTED"
+      ) {
+        if (__DEV__)
+          console.log(
+            "[refreshCurrentRide] Skipping revert — payment confirmed optimistically, DB not yet updated",
+          );
+        return;
+      }
       setCurrentRide(ride);
 
       if (ride) {
@@ -204,15 +216,16 @@ export function RideProvider({ children }: { children: ReactNode }) {
       transports: ["websocket", "polling"],
       reconnection: true,
       reconnectionDelay: 1000,
-      reconnectionAttempts: 5,
+      reconnectionDelayMax: 30000,
+      reconnectionAttempts: Infinity,
       auth: { token },
     });
 
     socket.on("connect", () => {
       if (__DEV__) console.log("[RideContext] Socket connected");
       setSocketConnected(true);
-      // Join user's room
-      socket.emit("join", `user_${user.id}`);
+      // User is auto-joined to user_{id} room by the server on handleConnection.
+      // No client-side join emit needed.
     });
 
     socket.on("disconnect", () => {
@@ -220,7 +233,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
       setSocketConnected(false);
     });
 
-    // Handle ride updates
+    // Legacy ride_update — kept as a fallback; canonical updates come via named events below
     socket.on("ride_update", (event: RideSocketEvent) => {
       if (__DEV__) console.log("[RideContext] Ride update:", event);
       if (event.type === "ride_update") {
@@ -228,14 +241,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
       }
     });
 
-    socket.on("DRIVER_FOUND", (event: RideSocketEvent) => {
-      if (__DEV__) console.log("[RideContext] Driver found (legacy):", event);
-      if (event.type === "DRIVER_FOUND") {
-        refreshCurrentRide();
-        setPageView("AWAITING_PAYMENT");
-      }
-    });
-
+    // DRIVER_FOUND is superseded by DRIVER_ACCEPTED — no longer emitted by backend.
     socket.on("DRIVER_ACCEPTED", (event: RideSocketEvent) => {
       if (__DEV__) console.log("[RideContext] Driver accepted:", event);
       if (event.type === "DRIVER_ACCEPTED") {
@@ -248,8 +254,14 @@ export function RideProvider({ children }: { children: ReactNode }) {
     socket.on("PAYMENT_CONFIRMED", (event: RideSocketEvent) => {
       if (__DEV__) console.log("[RideContext] Payment confirmed:", event);
       if (event.type === "PAYMENT_CONFIRMED") {
-        refreshCurrentRide();
+        // Optimistically flip status to PAID so the UI doesn't flash back to
+        // AWAITING_PAYMENT if refreshCurrentRide runs before the webhook writes to DB.
+        setCurrentRide((prev) =>
+          prev ? { ...prev, status: "PAID" as any } : prev,
+        );
         setPageView("DRIVER_ASSIGNED");
+        // Delay refresh to give the Paystack webhook enough time to complete its DB write
+        setTimeout(() => refreshCurrentRide(), 2000);
       }
     });
 
@@ -264,9 +276,9 @@ export function RideProvider({ children }: { children: ReactNode }) {
     socket.on("DRIVER_LOCATION_UPDATE", (event: RideSocketEvent) => {
       if (event.type === "DRIVER_LOCATION_UPDATE") {
         setDriverLocation({
-          latitude: event.metadata.location.lat,
-          longitude: event.metadata.location.lng,
-          heading: event.metadata.location.heading,
+          latitude: event.metadata.lat,
+          longitude: event.metadata.lng,
+          heading: event.metadata.heading ?? 0,
         });
       }
     });
@@ -359,6 +371,27 @@ export function RideProvider({ children }: { children: ReactNode }) {
       initializeSocket();
     }
   }, [user?.id, initializeSocket]);
+
+  // Reconnect socket when app comes back to the foreground (handles silent TCP drops)
+  useEffect(() => {
+    if (!user?.id) return;
+    const subscription = AppState.addEventListener(
+      "change",
+      (nextState: AppStateStatus) => {
+        if (nextState === "active") {
+          const socket = socketRef.current;
+          if (socket && !socket.connected) {
+            if (__DEV__)
+              console.log(
+                "[RideContext] App foregrounded — reconnecting socket",
+              );
+            socket.connect();
+          }
+        }
+      },
+    );
+    return () => subscription.remove();
+  }, [user?.id]);
 
   // Fetch current ride on mount so app resumes correctly after restart
   useEffect(() => {

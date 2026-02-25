@@ -5,6 +5,7 @@ import {
   ConnectionStatus,
 } from "../services/job-events.service";
 import { locationStreamService } from "@/services/location-stream.service";
+import { AppState, AppStateStatus } from "react-native";
 
 interface UseJobEventsOptions {
   onJobAssigned?: (job: IncomingJobOffer) => void;
@@ -91,6 +92,23 @@ export function useJobEvents(options: UseJobEventsOptions) {
       disconnect();
     };
   }, [enabled, connect, disconnect]);
+
+  // Reconnect socket when app comes back to the foreground (handles silent TCP drops)
+  useEffect(() => {
+    if (!enabled) return;
+    const subscription = AppState.addEventListener(
+      "change",
+      (nextState: AppStateStatus) => {
+        if (nextState === "active" && serviceRef.current) {
+          const socket = serviceRef.current.getSocket();
+          if (socket && !socket.connected) {
+            serviceRef.current.connect();
+          }
+        }
+      },
+    );
+    return () => subscription.remove();
+  }, [enabled]);
 
   // Expose joinOrderRoom for consumers
   const joinOrderRoom = (orderId: string) => {

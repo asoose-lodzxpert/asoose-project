@@ -57,7 +57,13 @@ import { MetricsModule } from './metrics/metrics.module';
     }),
 
     // ---------- Scheduling & Events ----------
-    EventEmitterModule.forRoot({ global: true }),
+    // wildcard + delimiter are required so dot-namespaced events (e.g. 'job.assigned',
+    // 'ride.requested') are routed correctly to @OnEvent() listeners.
+    EventEmitterModule.forRoot({
+      global: true,
+      wildcard: true,
+      delimiter: '.',
+    }),
     ScheduleModule.forRoot(),
 
     // ---------- MongoDB (optional — used only for error-log storage) ----------

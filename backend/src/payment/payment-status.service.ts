@@ -223,6 +223,19 @@ export class PaymentStatusService {
               this.logger.warn(
                 `Webhook payment ${verification.reference} arrived for CANCELLED ride ${payment.rideId} — skipping earnings credit`,
               );
+            } else if (
+              (currentRide?.status as string) === 'DRIVER_ACCEPTED' ||
+              (currentRide?.status as string) === 'DRIVER_ASSIGNED'
+            ) {
+              // New flow: payment AFTER driver accepted. Just flip to PAID.
+              // Earnings are recorded when the driver completes the ride.
+              await tx.ride.update({
+                where: { id: payment.rideId },
+                data: { status: 'PAID' as any },
+              });
+              this.logger.log(
+                `Ride ${payment.rideId} transitioned ${currentRide!.status} → PAID via Paystack webhook`,
+              );
             } else if (currentRide?.riderId) {
               const ride = payment.ride;
               const platformFeeRate = 0.2;
@@ -321,19 +334,62 @@ export class PaymentStatusService {
     if (metaType) {
       if (metaType === 'RIDE') {
         if (meta.rideId) {
-          // Transition ride from PENDING → REQUESTED so matching can proceed
-          await this.prisma.ride.updateMany({
-            where: { id: meta.rideId, status: 'PENDING' as any },
-            data: { status: 'REQUESTED' as any },
+          // Refetch after the transaction to know which flow this was
+          const rideNow = await this.prisma.ride.findUnique({
+            where: { id: meta.rideId },
+            select: { status: true, riderId: true, customerId: true },
           });
 
-          await this.startRideMatching(meta.rideId);
-          await this.sendMatchingNotifications({
-            type: 'ride',
-            rideId: meta.rideId,
-            customerId: result.ride?.customer?.id,
-            riderId: result.ride?.riderId ?? undefined,
-          });
+          if ((rideNow?.status as string) === 'PAID') {
+            // New flow: driver already accepted, ride just transitioned to PAID.
+            // Notify both customer and driver so each side's UI can update.
+            try {
+              this.notificationsGateway.server
+                .to(`user_${rideNow!.customerId}`)
+                .emit('PAYMENT_CONFIRMED', {
+                  type: 'PAYMENT_CONFIRMED',
+                  rideId: meta.rideId,
+                  message:
+                    'Payment confirmed. Your driver will start the trip shortly.',
+                });
+            } catch (e) {
+              this.logger.error(
+                'Socket emit PAYMENT_CONFIRMED to customer failed',
+                e,
+              );
+            }
+            if (rideNow?.riderId) {
+              try {
+                this.notificationsGateway.server
+                  .to(`user_${rideNow.riderId}`)
+                  .emit('PAYMENT_CONFIRMED', {
+                    type: 'PAYMENT_CONFIRMED',
+                    rideId: meta.rideId,
+                    message: 'Customer has paid. You may now start the trip.',
+                  });
+              } catch (e) {
+                this.logger.error(
+                  'Socket emit PAYMENT_CONFIRMED to driver failed',
+                  e,
+                );
+              }
+            }
+          } else {
+            // Old / legacy flow: payment was initiated before matching.
+            // Transition PENDING → REQUESTED and kick off driver search.
+            await this.prisma.ride.updateMany({
+              where: { id: meta.rideId, status: 'PENDING' as any },
+              data: { status: 'REQUESTED' as any },
+            });
+
+            await this.startRideMatching(meta.rideId);
+            await this.sendMatchingNotifications({
+              type: 'ride',
+              rideId: meta.rideId,
+              customerId: result.ride?.customer?.id,
+              riderId: result.ride?.riderId ?? undefined,
+            });
+          }
         }
       } else if (metaType === 'ORDER') {
         // Multi-vendor order group

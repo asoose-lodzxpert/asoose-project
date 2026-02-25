@@ -50,7 +50,11 @@ export default function IncomingJobSheet() {
       setTimer((prev) => {
         if (prev <= 1) {
           clearInterval(interval);
-          declineJobRef.current(incomingJob.id, incomingJob.jobType);
+          // Must NOT call declineJob inside a state updater — defer to avoid
+          // "Cannot update a component while rendering a different component"
+          setTimeout(() => {
+            declineJobRef.current(incomingJob.id, incomingJob.jobType);
+          }, 0);
           return 0;
         }
         return prev - 1;
@@ -193,7 +197,7 @@ export default function IncomingJobSheet() {
             </>
           )}
         </View>
-        {/* Contact phones
+        {/* Contact phones */}
         {(incomingJob.pickupContactPhone ||
           incomingJob.dropoffContactPhone) && (
           <View
@@ -265,7 +269,7 @@ export default function IncomingJobSheet() {
               </Pressable>
             )}
           </View>
-        )} */}
+        )}
         {!isRide &&
           (incomingJob.isFragile ||
             incomingJob.isPerishable ||

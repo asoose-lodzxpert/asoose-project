@@ -37,25 +37,21 @@ export class AssignmentTimeoutProcessor extends WorkerHost {
   }
 
   async process(job: Job<HandleAssignmentTimeoutJobData>): Promise<void> {
-    const { job: jobSummary } = job.data;
+    const { job: jobSummary, driverId, attempt = 1 } = job.data;
     const jobType = jobSummary.jobType;
     const jobId = jobSummary.id;
 
-    this.logger.log(`Handling assignment timeout: ${jobType} ${jobId}`);
+    this.logger.log(
+      `Handling assignment timeout: ${jobType} ${jobId} (attempt ${attempt}, driver: ${driverId ?? 'unknown'})`,
+    );
 
     try {
-      // We need driverId for handleAssignmentTimeout. This should come from the matching context, but JobSummaryDto does not have driverId.
-      // If the job was assigned, the driverId should be in the DB (ride or delivery entity). For timeout, we need to know which driver was assigned and timed out.
-      // For now, skip calling handleAssignmentTimeout if driverId is not available, and log a warning.
-      let driverId: string | undefined = undefined;
       if (jobType === 'ride') {
-        const ride = await this.prisma.ride.findUnique({
-          where: { id: jobId },
-        });
-        driverId = ride?.riderId ?? undefined;
         if (!driverId) {
+          // BUG-1 fix: driverId is now forwarded from matching processor.
+          // If it's missing (old job in queue), log and still retry.
           this.logger.warn(
-            `No riderId found for ride ${jobId}, skipping assignment timeout handling.`,
+            `No driverId in timeout payload for ride ${jobId} — skipping driver state cleanup.`,
           );
         } else {
           await this.driverState.handleAssignmentTimeout(driverId, {
@@ -74,7 +70,6 @@ export class AssignmentTimeoutProcessor extends WorkerHost {
           );
         } else {
           try {
-            // Clear pendingDelivery from rider Redis state so the rider can receive new jobs
             await this.riderState.declineJob(
               riderId,
               { jobId, jobType: 'delivery' },
@@ -84,7 +79,6 @@ export class AssignmentTimeoutProcessor extends WorkerHost {
               `Cleared pending delivery ${jobId} from rider ${riderId} after timeout`,
             );
           } catch (e) {
-            // Non-fatal: Redis state may already be cleared (e.g. rider went offline)
             this.logger.warn(
               `Could not clear delivery timeout state for rider ${riderId}: ${e?.message}`,
             );
@@ -94,9 +88,9 @@ export class AssignmentTimeoutProcessor extends WorkerHost {
 
       // Re-enqueue matching job to find another driver
       if (jobType === 'ride') {
-        await this.retryRideMatching(jobSummary);
+        await this.retryRideMatching(jobSummary, attempt, driverId);
       } else {
-        await this.retryDeliveryMatching(jobSummary);
+        await this.retryDeliveryMatching(jobSummary, attempt);
       }
     } catch (error) {
       this.logger.error(
@@ -107,14 +101,13 @@ export class AssignmentTimeoutProcessor extends WorkerHost {
     }
   }
 
-  private async retryRideMatching(jobSummary: any): Promise<void> {
-    // Get ride details
+  private async retryRideMatching(
+    jobSummary: any,
+    attempt: number,
+    timedOutDriverId?: string,
+  ): Promise<void> {
     const ride = await this.prisma.ride.findUnique({
       where: { id: jobSummary.id },
-      include: {
-        pickupAddress: true,
-        dropoffAddress: true,
-      },
     });
 
     if (!ride) {
@@ -122,32 +115,33 @@ export class AssignmentTimeoutProcessor extends WorkerHost {
       return;
     }
 
-    if (ride.status !== 'REQUESTED') {
+    if (ride.status !== 'REQUESTED' && ride.status !== 'SEARCHING_DRIVER') {
       this.logger.log(
-        `Ride ${jobSummary.id} no longer REQUESTED, skipping retry`,
+        `Ride ${jobSummary.id} no longer matchable (status: ${ride.status}), skipping retry`,
       );
       return;
     }
 
-    // Re-enqueue with incremented attempt and exclude timed-out driver
+    const nextAttempt = attempt + 1; // BUG-2 fix: increment from actual attempt count
+    const excludeDriverIds = timedOutDriverId ? [timedOutDriverId] : []; // BUG-1 fix
+
     await this.queue.enqueueRideMatching({
       job: jobSummary,
-      attempt: 2, // Always retry with attempt 2 for timeout
-      excludeDriverIds: [jobSummary.driverId].filter(Boolean),
+      attempt: nextAttempt,
+      excludeDriverIds,
     });
 
     this.logger.log(
-      `Retry ride matching for ${jobSummary.id} (excluded driver: ${jobSummary.driverId})`,
+      `Retry ride matching for ${jobSummary.id} (attempt ${nextAttempt}, excluded: ${excludeDriverIds.join(',') || 'none'})`,
     );
   }
 
-  private async retryDeliveryMatching(jobSummary: any): Promise<void> {
+  private async retryDeliveryMatching(
+    jobSummary: any,
+    attempt: number,
+  ): Promise<void> {
     const delivery = await this.prisma.delivery.findUnique({
       where: { id: jobSummary.id },
-      include: {
-        pickupAddress: true,
-        dropoffAddress: true,
-      },
     });
 
     if (!delivery) {
@@ -162,14 +156,16 @@ export class AssignmentTimeoutProcessor extends WorkerHost {
       return;
     }
 
+    const nextAttempt = attempt + 1; // BUG-2 fix
+
     await this.queue.enqueueDeliveryMatching({
       job: jobSummary,
-      attempt: 2,
-      excludeDriverIds: [jobSummary.driverId].filter(Boolean),
+      attempt: nextAttempt,
+      excludeDriverIds: [],
     });
 
     this.logger.log(
-      `Retry delivery matching for ${jobSummary.id} (excluded driver: ${jobSummary.driverId})`,
+      `Retry delivery matching for ${jobSummary.id} (attempt ${nextAttempt})`,
     );
   }
 }

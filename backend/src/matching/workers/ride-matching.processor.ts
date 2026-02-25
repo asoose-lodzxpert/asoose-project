@@ -48,7 +48,7 @@ export class RideMatchingProcessor extends WorkerHost {
   private readonly MAX_RINGS = 5;
   private readonly MAX_ATTEMPTS = 20; // Max total driver attempts
   private readonly TIMEOUT_MS = 90000; // 90 seconds
-  private readonly MAX_MATCHING_RETRIES = 5; // Max full re-queued attempts before cancel
+  private readonly MAX_MATCHING_RETRIES = 3; // Max full re-queued attempts before cancel
   private readonly RETRY_DELAY_MS = 10_000; // 10s between retries
 
   constructor(
@@ -78,15 +78,23 @@ export class RideMatchingProcessor extends WorkerHost {
         return;
       }
 
-      if (ride.status !== 'REQUESTED') {
+      // Allow matching when the ride is either REQUESTED or SEARCHING_DRIVER.
+      // triggerMatchingSideEffects transitions the ride to SEARCHING_DRIVER before
+      // enqueuing the job, so by the time the worker picks it up the status is
+      // already SEARCHING_DRIVER — the old REQUESTED-only guard always bailed out.
+      const matchableStatuses = ['REQUESTED', 'SEARCHING_DRIVER'];
+      if (!matchableStatuses.includes(ride.status as string)) {
         this.logger.log(
-          `Ride ${rideId} no longer REQUESTED (status: ${ride.status})`,
+          `Ride ${rideId} is not in a matchable status (status: ${ride.status}) — skipping`,
         );
         return;
       }
 
       // Get declined drivers from Redis
-      const declinedDrivers = await this.redis.getDeclinedDrivers(rideId);
+      const declinedDrivers = await this.redis.getDeclinedDrivers(
+        'ride',
+        rideId,
+      ); // BUG-3
       const allExcludedDrivers = [...excludeDriverIds, ...declinedDrivers];
 
       // Get pickup hex
@@ -100,6 +108,7 @@ export class RideMatchingProcessor extends WorkerHost {
       // Expand in rings and search for driver
       const driverFound = await this.searchInRings(
         rideId,
+        ride.customerId,
         pickupHex,
         pickupLat,
         pickupLng,
@@ -108,6 +117,7 @@ export class RideMatchingProcessor extends WorkerHost {
         jobSummary.distanceKm ?? 0,
         jobSummary.earnings,
         allExcludedDrivers,
+        attempt,
       );
 
       if (driverFound) {
@@ -135,6 +145,7 @@ export class RideMatchingProcessor extends WorkerHost {
    */
   private async searchInRings(
     rideId: string,
+    customerId: string,
     centerHex: string,
     pickupLat: number,
     pickupLng: number,
@@ -143,6 +154,7 @@ export class RideMatchingProcessor extends WorkerHost {
     distanceKm: number,
     totalFare: number,
     excludeDriverIds: string[],
+    attempt: number,
   ): Promise<boolean> {
     // Get hex rings (ring 0 to MAX_RINGS)
     const rings = this.geo.getHexRings(centerHex, this.MAX_RINGS);
@@ -179,6 +191,7 @@ export class RideMatchingProcessor extends WorkerHost {
           }
           const assigned = await this.attemptAssignment(
             rideId,
+            customerId,
             driver.id,
             hexId,
             pickupLat,
@@ -187,6 +200,7 @@ export class RideMatchingProcessor extends WorkerHost {
             dropoffLng,
             distanceKm,
             totalFare,
+            attempt,
           );
           if (assigned) {
             return true;
@@ -203,6 +217,7 @@ export class RideMatchingProcessor extends WorkerHost {
    */
   private async attemptAssignment(
     rideId: string,
+    customerId: string,
     driverId: string,
     hexId: string,
     pickupLat: number,
@@ -211,6 +226,7 @@ export class RideMatchingProcessor extends WorkerHost {
     dropoffLng: number,
     distanceKm: number,
     totalFare: number,
+    attempt: number,
   ): Promise<boolean> {
     // Execute atomic lock script
     const result = await this.redis
@@ -229,6 +245,23 @@ export class RideMatchingProcessor extends WorkerHost {
       // Successfully locked driver
       this.logger.log(`Locked driver ${driverId} for ride ${rideId}`);
 
+      // Write reverse mapping so cancelRide() can find the pending driver
+      // even before they accept (while riderId is still null in the DB).
+      await this.redis
+        .getClient()
+        .setex(
+          `ride:${rideId}:pendingDriver`,
+          REDIS_TTL.PENDING_ASSIGNMENT,
+          driverId,
+        );
+
+      // BUG-3 fix: write ride:{rideId}:customer so getRideCustomer() returns correctly
+      await this.redis.getClient().setex(
+        `ride:${rideId}:customer`,
+        REDIS_TTL.PENDING_ASSIGNMENT * 10, // keep longer than the ride itself
+        customerId,
+      );
+
       // Schedule assignment timeout using job-centric payload
       await this.queue.scheduleAssignmentTimeout(
         {
@@ -242,6 +275,8 @@ export class RideMatchingProcessor extends WorkerHost {
             distanceKm,
             status: 'assigned',
           },
+          driverId, // BUG-1 fix: carry driverId so timeout processor can release without DB round-trip
+          attempt, // BUG-2 fix: carry attempt count for proper retry incrementing
         },
         this.TIMEOUT_MS,
       );
@@ -251,7 +286,7 @@ export class RideMatchingProcessor extends WorkerHost {
         jobId: rideId,
         jobType: 'ride',
         driverId,
-        customerId: '', // Will be populated if available from job context
+        customerId, // now correctly populated from ride.customerId
         timestamp: Date.now(),
         expiresAt: Date.now() + this.TIMEOUT_MS,
       });
@@ -269,25 +304,21 @@ export class RideMatchingProcessor extends WorkerHost {
   }
 
   /**
-   * Get driver locations from Redis
+   * Get driver locations from Redis in parallel (BUG-7 fix).
    */
   private async getDriverLocations(
     driverIds: string[],
   ): Promise<Array<{ id: string; lat: number; lng: number }>> {
-    const locations: Array<{ id: string; lat: number; lng: number }> = [];
-
-    for (const driverId of driverIds) {
-      const state = await this.redis.getDriverState(driverId);
-      if (state?.location) {
-        locations.push({
-          id: driverId,
-          lat: state.location.lat,
-          lng: state.location.lng,
-        });
-      }
-    }
-
-    return locations;
+    const states = await Promise.all(
+      driverIds.map((id) => this.redis.getDriverState(id).catch(() => null)),
+    );
+    return states
+      .filter((s) => s !== null && s.location !== null)
+      .map((s) => ({
+        id: s!.id,
+        lat: s!.location!.lat,
+        lng: s!.location!.lng,
+      }));
   }
 
   /**
@@ -386,11 +417,11 @@ export class RideMatchingProcessor extends WorkerHost {
       `Cancelling ride ${rideId} — no driver found after ${attempts} attempts`,
     );
 
-    // Update ride status to CANCELLED_BY_USER (system-triggered, no driver found)
+    // BUG-10 fix: use CANCELLED_BY_SYSTEM — distinct from customer-initiated cancellations
     await this.prisma.ride.update({
       where: { id: rideId },
       data: {
-        status: 'CANCELLED_BY_USER',
+        status: 'CANCELLED_BY_SYSTEM',
         cancellationReason: 'No driver available',
         cancelledBy: 'SYSTEM',
         cancelledAt: new Date(),

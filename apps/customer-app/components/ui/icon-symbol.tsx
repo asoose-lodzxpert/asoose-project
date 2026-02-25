@@ -127,6 +127,7 @@ export type IconSymbolName =
   | "person.fill"
   | "bus.fill"
   | "car.fill"
+  | "car.rear.fill"
   | "square.grid.2x2.fill"
   | "shippingbox.fill"
   | "apple.logo"
@@ -307,6 +308,7 @@ export const MAPPING: Record<
   "person.fill": "person",
   "bus.fill": "directions-bus",
   "car.fill": "directions-car",
+  "car.rear.fill": "car-rental",
   "square.grid.2x2.fill": "grid-view",
   "shippingbox.fill": "inventory",
   "apple.logo": "apple",

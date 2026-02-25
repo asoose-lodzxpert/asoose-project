@@ -17,26 +17,19 @@ export class RedisService {
   private readonly logger = new Logger(RedisService.name);
 
   /**
-   * Returns the active ride/job ID for a driver (if any)
+   * Returns the active ride ID for a driver (if any).
+   * Reads the Lua-written key — driver:{id}:currentRide.
    */
   async getDriverActiveRide(driverId: string): Promise<string | null> {
-    // Uses the current job key, which is set when a driver is on a ride
-    const rideId = await this.redis.get(
-      REDIS_KEYS.DRIVER_CURRENT_JOB(driverId),
-    );
+    const rideId = await this.redis.get(`driver:${driverId}:currentRide`);
     return rideId || null;
   }
 
   /**
-   * Returns the customer/user ID for a given ride/job (if any)
+   * Returns the customer/user ID for a given ride/job (if any).
+   * The key is written by the matching processor via attemptAssignment.
    */
   async getRideCustomer(rideId: string): Promise<string | null> {
-    // Assumes a key like ride:{rideId}:customer exists
-    if (!REDIS_KEYS.RIDE_CUSTOMER) {
-      throw new Error(
-        'REDIS_KEYS.RIDE_CUSTOMER is not defined. Please add it to redis-keys.constants.ts',
-      );
-    }
     const customerId = await this.redis.get(REDIS_KEYS.RIDE_CUSTOMER(rideId));
     return customerId || null;
   }
@@ -58,10 +51,15 @@ export class RedisService {
     pipeline.get(REDIS_KEYS.DRIVER_ROLE(driverId));
     pipeline.get(REDIS_KEYS.DRIVER_HEX(driverId));
     pipeline.get(REDIS_KEYS.DRIVER_LAST_SEEN(driverId));
-    pipeline.get(REDIS_KEYS.DRIVER_CURRENT_JOB(driverId));
-    pipeline.get(REDIS_KEYS.DRIVER_CURRENT_JOB_TYPE(driverId));
-    pipeline.get(REDIS_KEYS.DRIVER_PENDING_JOB(driverId));
-    pipeline.get(REDIS_KEYS.DRIVER_PENDING_JOB_TYPE(driverId));
+    // NOTE: Lua scripts write job state under type-specific keys:
+    //   driver:{id}:pendingRide   / driver:{id}:pendingDelivery
+    //   driver:{id}:currentRide   / driver:{id}:currentDelivery
+    // We read both variants and coalesce so this TypeScript view stays
+    // consistent with what the atomic Lua scripts actually store.
+    pipeline.get(`driver:${driverId}:currentRide`);
+    pipeline.get(`driver:${driverId}:currentDelivery`);
+    pipeline.get(`driver:${driverId}:pendingRide`);
+    pipeline.get(`driver:${driverId}:pendingDelivery`);
     pipeline.get(REDIS_KEYS.DRIVER_LOCATION(driverId));
 
     const results = await pipeline.exec();
@@ -72,14 +70,30 @@ export class RedisService {
       role,
       hexId,
       lastSeen,
-      currentJobId,
-      currentJobType,
-      pendingJobId,
-      pendingJobType,
+      currentRide,
+      currentDelivery,
+      pendingRide,
+      pendingDelivery,
       location,
     ] = results.map((r) => r[1]);
 
     if (!status) return null;
+
+    // Coalesce type-specific keys into the unified DriverState contract
+    const currentJobId =
+      (currentRide as string | null) ?? (currentDelivery as string | null);
+    const currentJobType: JobType | null = currentRide
+      ? JobType.RIDE
+      : currentDelivery
+        ? JobType.DELIVERY
+        : null;
+    const pendingJobId =
+      (pendingRide as string | null) ?? (pendingDelivery as string | null);
+    const pendingJobType: JobType | null = pendingRide
+      ? JobType.RIDE
+      : pendingDelivery
+        ? JobType.DELIVERY
+        : null;
 
     return {
       id: driverId,
@@ -89,10 +103,10 @@ export class RedisService {
       status: status as DriverStatus,
       hexId: hexId as string | null,
       lastSeen: lastSeen ? parseInt(lastSeen as string, 10) : 0,
-      currentJobId: currentJobId as string | null,
-      currentJobType: currentJobType as JobType | null,
-      pendingJobId: pendingJobId as string | null,
-      pendingJobType: pendingJobType as JobType | null,
+      currentJobId,
+      currentJobType,
+      pendingJobId,
+      pendingJobType,
       location: location ? JSON.parse(location as string) : null,
     };
   }
@@ -124,14 +138,14 @@ export class RedisService {
   async getInactiveDrivers(
     inactivityThreshold: number = REDIS_TTL.DRIVER_INACTIVITY,
   ): Promise<string[]> {
-    const keys = await this.redis.keys('driver:*:status');
+    // BUG-6 fix: use the drivers:active SET instead of an O(N) KEYS scan
+    const driverIds = await this.redis.smembers(REDIS_KEYS.DRIVERS_ACTIVE_SET);
 
     const inactive: string[] = [];
     const now = Date.now();
     const thresholdMs = inactivityThreshold * 1000;
 
-    for (const key of keys) {
-      const driverId = key.split(':')[1];
+    for (const driverId of driverIds) {
       const [status, lastSeen] = await Promise.all([
         this.redis.get(REDIS_KEYS.DRIVER_STATUS(driverId)),
         this.redis.get(REDIS_KEYS.DRIVER_LAST_SEEN(driverId)),
@@ -155,12 +169,12 @@ export class RedisService {
 
   async addDriverToHex(driverId: string, hexId: string): Promise<void> {
     await this.redis.sadd(REDIS_KEYS.HEX_AVAILABLE_DRIVERS(hexId), driverId);
-    await this.redis.incr(REDIS_KEYS.HEX_DRIVER_COUNT(hexId));
+    // BUG-9 fix: count is derived from SCARD rather than a drifting INCR key
   }
 
   async removeDriverFromHex(driverId: string, hexId: string): Promise<void> {
     await this.redis.srem(REDIS_KEYS.HEX_AVAILABLE_DRIVERS(hexId), driverId);
-    await this.redis.decr(REDIS_KEYS.HEX_DRIVER_COUNT(hexId));
+    // BUG-9 fix: count is derived from SCARD rather than a drifting DECR key
   }
 
   async getDriversInHex(hexId: string): Promise<string[]> {
@@ -172,9 +186,9 @@ export class RedisService {
     return this.redis.smembers(REDIS_KEYS.HEX_AVAILABLE_RIDERS(hexId));
   }
 
+  /** BUG-9 fix: derive count from SCARD so it's always accurate. */
   async getHexDriverCount(hexId: string): Promise<number> {
-    const count = await this.redis.get(REDIS_KEYS.HEX_DRIVER_COUNT(hexId));
-    return count ? parseInt(count, 10) : 0;
+    return this.redis.scard(REDIS_KEYS.HEX_AVAILABLE_DRIVERS(hexId));
   }
 
   // ========================================
@@ -184,13 +198,13 @@ export class RedisService {
   async getInactiveRiders(
     inactivityThreshold: number = REDIS_TTL.RIDER_INACTIVITY,
   ): Promise<string[]> {
-    const keys = await this.redis.keys('rider:*:status');
+    // BUG-6 fix: use the riders:active SET instead of an O(N) KEYS scan
+    const riderIds = await this.redis.smembers(REDIS_KEYS.RIDERS_ACTIVE_SET);
     const inactive: string[] = [];
     const now = Date.now();
     const thresholdMs = inactivityThreshold * 1000;
 
-    for (const key of keys) {
-      const riderId = key.split(':')[1];
+    for (const riderId of riderIds) {
       const [status, lastSeen] = await Promise.all([
         this.redis.get(REDIS_KEYS.RIDER_STATUS(riderId)),
         this.redis.get(REDIS_KEYS.RIDER_LAST_SEEN(riderId)),
@@ -304,9 +318,13 @@ export class RedisService {
     );
   }
 
-  async setAssignmentLock(jobId: string, driverId: string): Promise<boolean> {
+  async setAssignmentLock(
+    jobType: string,
+    jobId: string,
+    driverId: string,
+  ): Promise<boolean> {
     const result = await this.redis.set(
-      REDIS_KEYS.LOCK_JOB_DRIVER(jobId, driverId),
+      REDIS_KEYS.LOCK_JOB_DRIVER(jobType, jobId, driverId),
       '1',
       'EX',
       REDIS_TTL.ASSIGNMENT_LOCK,
@@ -315,8 +333,12 @@ export class RedisService {
     return result === 'OK';
   }
 
-  async releaseAssignmentLock(jobId: string, driverId: string): Promise<void> {
-    await this.redis.del(REDIS_KEYS.LOCK_JOB_DRIVER(jobId, driverId));
+  async releaseAssignmentLock(
+    jobType: string,
+    jobId: string,
+    driverId: string,
+  ): Promise<void> {
+    await this.redis.del(REDIS_KEYS.LOCK_JOB_DRIVER(jobType, jobId, driverId));
   }
 
   async setJobLock(jobId: string): Promise<boolean> {
@@ -345,20 +367,29 @@ export class RedisService {
     return count;
   }
 
-  async addDeclinedDriver(jobId: string, driverId: string): Promise<void> {
-    const key = REDIS_KEYS.DECLINED_DRIVERS(jobId);
+  async addDeclinedDriver(
+    jobType: string,
+    jobId: string,
+    driverId: string,
+  ): Promise<void> {
+    const key = REDIS_KEYS.DECLINED_DRIVERS(jobType, jobId);
     await this.redis.sadd(key, driverId);
     await this.redis.expire(key, REDIS_TTL.DECLINED_DRIVERS);
   }
 
-  async getDeclinedDrivers(jobId: string): Promise<string[]> {
-    return this.redis.smembers(REDIS_KEYS.DECLINED_DRIVERS(jobId));
+  /** BUG-3 fix: key format now matches Lua — matching:{jobType}:{jobId}:declined */
+  async getDeclinedDrivers(jobType: string, jobId: string): Promise<string[]> {
+    return this.redis.smembers(REDIS_KEYS.DECLINED_DRIVERS(jobType, jobId));
   }
 
-  async hasDriverDeclined(jobId: string, driverId: string): Promise<boolean> {
+  async hasDriverDeclined(
+    jobType: string,
+    jobId: string,
+    driverId: string,
+  ): Promise<boolean> {
     return (
       (await this.redis.sismember(
-        REDIS_KEYS.DECLINED_DRIVERS(jobId),
+        REDIS_KEYS.DECLINED_DRIVERS(jobType, jobId),
         driverId,
       )) === 1
     );
@@ -409,6 +440,11 @@ export class RedisService {
       REDIS_KEYS.DRIVER_PENDING_JOB(driverId),
       REDIS_KEYS.DRIVER_PENDING_JOB_TYPE(driverId),
       REDIS_KEYS.DRIVER_LOCATION(driverId),
+      // Also delete the Lua-written type-specific job keys
+      `driver:${driverId}:pendingRide`,
+      `driver:${driverId}:pendingDelivery`,
+      `driver:${driverId}:currentRide`,
+      `driver:${driverId}:currentDelivery`,
     );
   }
 
@@ -425,12 +461,40 @@ export class RedisService {
   // BULK SCAN — LIVE MAP
   // ========================================
 
-  /** Returns all driver states that have a known location (for the live map) */
-  async getAllDriverStatesWithLocation(): Promise<DriverState[]> {
-    const keys = await this.redis.keys('driver:*:status');
-    if (!keys.length) return [];
+  // ========================================
+  // ACTIVE SET MAINTENANCE  (BUG-6 fix)
+  // ========================================
 
-    const ids = keys.map((k) => k.split(':')[1]);
+  /** Call after successfully setting a driver ONLINE. */
+  async addToDriverActiveSet(driverId: string): Promise<void> {
+    await this.redis.sadd(REDIS_KEYS.DRIVERS_ACTIVE_SET, driverId);
+  }
+
+  /** Call after setting a driver OFFLINE or evicting for inactivity. */
+  async removeFromDriverActiveSet(driverId: string): Promise<void> {
+    await this.redis.srem(REDIS_KEYS.DRIVERS_ACTIVE_SET, driverId);
+  }
+
+  /** Call after successfully setting a rider ONLINE. */
+  async addToRiderActiveSet(riderId: string): Promise<void> {
+    await this.redis.sadd(REDIS_KEYS.RIDERS_ACTIVE_SET, riderId);
+  }
+
+  /** Call after setting a rider OFFLINE or evicting for inactivity. */
+  async removeFromRiderActiveSet(riderId: string): Promise<void> {
+    await this.redis.srem(REDIS_KEYS.RIDERS_ACTIVE_SET, riderId);
+  }
+
+  // ========================================
+  // BULK SCAN — LIVE MAP
+  // ========================================
+
+  /** Returns all driver states that have a known location (for the live map).
+   *  BUG-6 fix: uses drivers:active SET instead of O(N) KEYS scan. */
+  async getAllDriverStatesWithLocation(): Promise<DriverState[]> {
+    const ids = await this.redis.smembers(REDIS_KEYS.DRIVERS_ACTIVE_SET);
+    if (!ids.length) return [];
+
     const states = await Promise.all(
       ids.map((id) => this.getDriverState(id).catch(() => null)),
     );
@@ -440,12 +504,12 @@ export class RedisService {
     );
   }
 
-  /** Returns all rider states that have a known location (for the live map) */
+  /** Returns all rider states that have a known location (for the live map).
+   *  BUG-6 fix: uses riders:active SET instead of O(N) KEYS scan. */
   async getAllRiderStatesWithLocation(): Promise<RiderState[]> {
-    const keys = await this.redis.keys('rider:*:status');
-    if (!keys.length) return [];
+    const ids = await this.redis.smembers(REDIS_KEYS.RIDERS_ACTIVE_SET);
+    if (!ids.length) return [];
 
-    const ids = keys.map((k) => k.split(':')[1]);
     const states = await Promise.all(
       ids.map((id) => this.getRiderState(id).catch(() => null)),
     );
@@ -456,14 +520,13 @@ export class RedisService {
   }
 
   /**
-   * Returns ALL driver states from Redis (online AND offline).
-   * Location key is preserved on offline so last known coords are available.
+   * Returns driver states from the active set.
+   * BUG-6 fix: uses drivers:active SET instead of O(N) KEYS scan.
    */
   async getAllDriverStates(): Promise<DriverState[]> {
-    const keys = await this.redis.keys('driver:*:status');
-    if (!keys.length) return [];
+    const ids = await this.redis.smembers(REDIS_KEYS.DRIVERS_ACTIVE_SET);
+    if (!ids.length) return [];
 
-    const ids = keys.map((k) => k.split(':')[1]);
     const states = await Promise.all(
       ids.map((id) => this.getDriverState(id).catch(() => null)),
     );
@@ -472,14 +535,13 @@ export class RedisService {
   }
 
   /**
-   * Returns ALL rider states from Redis (online AND offline).
-   * Location key is preserved on offline so last known coords are available.
+   * Returns rider states from the active set.
+   * BUG-6 fix: uses riders:active SET instead of O(N) KEYS scan.
    */
   async getAllRiderStates(): Promise<RiderState[]> {
-    const keys = await this.redis.keys('rider:*:status');
-    if (!keys.length) return [];
+    const ids = await this.redis.smembers(REDIS_KEYS.RIDERS_ACTIVE_SET);
+    if (!ids.length) return [];
 
-    const ids = keys.map((k) => k.split(':')[1]);
     const states = await Promise.all(
       ids.map((id) => this.getRiderState(id).catch(() => null)),
     );

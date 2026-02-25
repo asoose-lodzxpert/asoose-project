@@ -92,12 +92,14 @@ enum RideStatus {
   // ── Active flow ──
   REQUESTED           // Customer submitted ride request; matching starts immediately
   SEARCHING_DRIVER    // System is actively searching for a driver
+  DRIVER_ASSIGNED     // Admin manually assigned a driver; driver must accept
   DRIVER_ACCEPTED     // Driver accepted the ride; customer must now pay
   PAID                // Customer confirmed payment; driver may start trip
   IN_PROGRESS         // Trip in progress
   COMPLETED           // Trip completed
   CANCELLED_BY_USER   // Customer cancelled the ride
   CANCELLED_BY_DRIVER // Driver cancelled the ride
+  CANCELLED_BY_SYSTEM // System cancelled (e.g. no driver found after exhausting retries)
 }
 
 enum DeliveryStatus {

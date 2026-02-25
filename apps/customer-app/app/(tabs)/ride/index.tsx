@@ -5,7 +5,7 @@ import {
   Pressable,
   ActivityIndicator,
 } from "react-native";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRouter } from "expo-router";
 import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
@@ -85,23 +85,27 @@ export default function RideBookingScreen() {
     }
   }, [currentRide, pageView, router, resetBooking]);
 
-  // Auto-estimate when locations and vehicle are selected
+  // Build a stable key from the selected coordinates; changes whenever either
+  // location is updated so we can detect and re-estimate.
+  const locKey = useMemo(() => {
+    if (!pickupLocation || !dropoffLocation) return null;
+    return [
+      pickupLocation.latitude.toFixed(6),
+      pickupLocation.longitude.toFixed(6),
+      dropoffLocation.latitude.toFixed(6),
+      dropoffLocation.longitude.toFixed(6),
+    ].join("|");
+  }, [pickupLocation, dropoffLocation]);
+
+  // Keep a ref so the effect only fires when the key actually changes, not on
+  // every render. This prevents double-estimating on the initial load.
+  const prevLocKeyRef = useRef<string | null>(null);
+
   useEffect(() => {
-    if (
-      pickupLocation &&
-      dropoffLocation &&
-      selectedVehicleType &&
-      !fareEstimate
-    ) {
-      handleEstimate();
-    }
-  }, [
-    pickupLocation,
-    dropoffLocation,
-    selectedVehicleType,
-    handleEstimate,
-    fareEstimate,
-  ]);
+    if (!locKey || locKey === prevLocKeyRef.current) return;
+    prevLocKeyRef.current = locKey;
+    handleEstimate();
+  }, [locKey, handleEstimate]);
 
   const handleBookRide = async () => {
     if (!pickupLocation || !dropoffLocation) {
@@ -204,6 +208,8 @@ export default function RideBookingScreen() {
           onSelect={(type: VehicleType) => setSelectedVehicleType(type)}
           fareOptions={fareOptions}
           isFareLoading={estimating}
+          distanceKm={fareEstimate?.distanceKm}
+          durationMin={fareEstimate?.durationMin}
         />
 
         {/* Fare Estimate */}

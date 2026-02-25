@@ -1,100 +1,92 @@
-import { View, StyleSheet } from "react-native";
+import { View, StyleSheet, Pressable } from "react-native";
 import { ThemedText } from "@/components/themed-text";
 import { useThemeColor } from "@/hooks/use-theme-color";
+import * as Clipboard from "expo-clipboard";
+import { useState } from "react";
 
 type Props = {
   otp: string;
 };
 
 export function OTPDisplay({ otp }: Props) {
-  const card = useThemeColor({}, "surfaceCard");
-  const border = useThemeColor({}, "borderDefault");
   const primary = useThemeColor({}, "brandPrimary");
   const textSecondary = useThemeColor({}, "textSecondary");
+  const [copied, setCopied] = useState(false);
 
-  // Display masked OTP (we don't show the actual OTP to customer, driver enters it)
-  const displayOTP = "****";
+  const handleCopy = async () => {
+    await Clipboard.setStringAsync(otp);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   return (
-    <View style={[styles.card, { backgroundColor: card, borderColor: border }]}>
-      <ThemedText
-        type="caption"
-        style={[styles.label, { color: textSecondary }]}
-      >
-        Start OTP
+    <View style={styles.container}>
+      <ThemedText style={[styles.label, { color: textSecondary }]}>
+        Trip Start Code
       </ThemedText>
 
-      <ThemedText
-        type="subtitle"
-        style={[styles.instructions, { color: textSecondary }]}
-      >
-        Share this code with your driver to start the trip
-      </ThemedText>
-
-      <View style={styles.otpContainer}>
-        {displayOTP.split("").map((digit, index) => (
-          <View
-            key={index}
-            style={[
-              styles.otpBox,
-              { backgroundColor: card, borderColor: primary },
-            ]}
-          >
-            <ThemedText style={[styles.otpDigit, { color: primary }]}>
+      <Pressable onPress={handleCopy} style={styles.otpPressable}>
+        <View style={styles.otpRow}>
+          {otp.split("").map((digit, i) => (
+            <ThemedText key={i} style={[styles.digit, { color: primary }]}>
               {digit}
             </ThemedText>
-          </View>
-        ))}
-      </View>
+          ))}
+        </View>
 
-      <ThemedText
-        type="caption"
-        style={[styles.note, { color: textSecondary }]}
-      >
-        The driver will enter this code to begin your trip
+        {/* Subtle feedback replaces a permanent button */}
+        <ThemedText
+          style={[
+            styles.copyFeedback,
+            { color: copied ? primary : "transparent" },
+          ]}
+        >
+          {copied ? "Copied to clipboard" : " "}
+        </ThemedText>
+      </Pressable>
+
+      <ThemedText style={[styles.caption, { color: textSecondary }]}>
+        Share this with your driver to begin the trip.
       </ThemedText>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
-    padding: 20,
-    borderRadius: 12,
-    borderWidth: 1,
-    marginBottom: 16,
+  container: {
     alignItems: "center",
+    paddingVertical: 24,
+    gap: 12,
   },
   label: {
     fontSize: 12,
-    marginBottom: 8,
+    fontWeight: "600",
+    letterSpacing: 0.5,
     textTransform: "uppercase",
-    letterSpacing: 1,
+    opacity: 0.8,
   },
-  instructions: {
-    fontSize: 14,
-    textAlign: "center",
-    marginBottom: 16,
-  },
-  otpContainer: {
-    flexDirection: "row",
-    gap: 12,
-    marginBottom: 16,
-  },
-  otpBox: {
-    width: 48,
-    height: 56,
-    borderRadius: 8,
-    borderWidth: 2,
+  otpPressable: {
     alignItems: "center",
-    justifyContent: "center",
+    paddingVertical: 8,
+    width: "100%",
   },
-  otpDigit: {
-    fontSize: 24,
+  otpRow: {
+    flexDirection: "row",
+    gap: 16, // Large gap replaces the boxes
+  },
+  digit: {
+    fontSize: 36,
     fontWeight: "700",
+    fontFamily: "Platform", // Use a monospaced font if available
   },
-  note: {
+  copyFeedback: {
     fontSize: 11,
+    marginTop: 8,
+    fontWeight: "600",
+  },
+  caption: {
+    fontSize: 13,
     textAlign: "center",
+    opacity: 0.7,
   },
 });
