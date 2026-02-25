@@ -1,28 +1,21 @@
 import { View, StyleSheet, Pressable, Linking } from "react-native";
 import { ThemedText } from "@/components/themed-text";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { useThemeColor } from "@/hooks/use-theme-color";
 
 type DriverInfoRowProps = {
-  driver: any; // improve with proper type when possible
-  onCall?: () => void;
-  primaryColor: string;
-  successColor: string;
-  surface2: string; // usually card/surface
-  border: string;
-  textPrimary: string;
-  textSecondary: string;
+  driver: any;
+  driverPhone?: string;
 };
 
 export default function DriverInfoRow({
   driver,
-  onCall,
-  primaryColor,
-  successColor,
-  surface2,
-  border,
-  textPrimary,
-  textSecondary,
+  driverPhone,
 }: DriverInfoRowProps) {
+  const primaryColor = useThemeColor({}, "brandPrimary");
+  const successColor = useThemeColor({}, "statusSuccess");
+  const textSecondary = useThemeColor({}, "textSecondary");
+
   const initial = (driver?.firstName ?? driver?.name ?? "D")[0].toUpperCase();
 
   const fullName =
@@ -85,9 +78,9 @@ export default function DriverInfoRow({
       </View>
 
       {/* Call button */}
-      {onCall && (
+      {driverPhone && (
         <Pressable
-          onPress={onCall}
+          onPress={() => Linking.openURL(`tel:${driverPhone}`)}
           style={[styles.callBtn, { backgroundColor: successColor }]}
         >
           <IconSymbol name="phone.fill" size={16} color="#fff" />

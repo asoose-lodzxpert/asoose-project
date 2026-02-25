@@ -111,6 +111,8 @@ export interface DriverLocationUpdatedEvent {
   driverId: string;
   lat: number;
   lng: number;
+  /** Compass heading in degrees [0, 360); absent when device doesn't report it */
+  heading?: number;
   hexId: string;
   oldHexId?: string;
   hexChanged: boolean;

@@ -1,26 +1,29 @@
-// components/StatusHeader.tsx
 import { View, StyleSheet, ActivityIndicator } from "react-native";
 import { ThemedText } from "@/components/themed-text";
+import { useThemeColor } from "@/hooks/use-theme-color";
+import {
+  statusInfo,
+  isSearching as checkSearching,
+  getStatusPillColor,
+} from "./utils/rideStatusUtils";
 
 type StatusHeaderProps = {
-  statusLabel: string;
-  statusSub?: string;
+  status: string;
   formattedFare: string;
-  pillColor: string;
-  primaryColor: string;
-  textSecondary: string;
-  isSearching: boolean;
 };
 
 export default function StatusHeader({
-  statusLabel,
-  statusSub,
+  status,
   formattedFare,
-  pillColor,
-  primaryColor,
-  textSecondary,
-  isSearching,
 }: StatusHeaderProps) {
+  const primaryColor = useThemeColor({}, "brandPrimary");
+  const successColor = useThemeColor({}, "statusSuccess");
+  const textSecondary = useThemeColor({}, "textSecondary");
+
+  const { label: statusLabel, sub: statusSub } = statusInfo(status);
+  const searching = checkSearching(status);
+  const pillColor = getStatusPillColor(status, primaryColor, successColor);
+
   return (
     <>
       <View style={styles.statusHeaderRow}>
@@ -33,7 +36,7 @@ export default function StatusHeader({
             },
           ]}
         >
-          {isSearching ? (
+          {searching ? (
             <ActivityIndicator
               size="small"
               color={pillColor}

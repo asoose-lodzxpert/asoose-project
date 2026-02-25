@@ -1,26 +1,20 @@
 import { View, StyleSheet } from "react-native";
 import { ThemedText } from "@/components/themed-text";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { useThemeColor } from "@/hooks/use-theme-color";
 
 type RouteStripProps = {
   pickup?: { street?: string };
   dropoff?: { street?: string };
-  cardColor: string;
-  borderColor: string;
-  successColor: string;
-  dangerColor: string;
-  textSecondary: string;
 };
 
-export default function RouteStrip({
-  pickup,
-  dropoff,
-  cardColor,
-  borderColor,
-  successColor,
-  dangerColor,
-  textSecondary,
-}: RouteStripProps) {
+export default function RouteStrip({ pickup, dropoff }: RouteStripProps) {
+  const cardColor = useThemeColor({}, "surfaceCard");
+  const borderColor = useThemeColor({}, "borderDefault");
+  const successColor = useThemeColor({}, "statusSuccess");
+  const dangerColor = useThemeColor({}, "statusError");
+  const textSecondary = useThemeColor({}, "textSecondary");
+
   return (
     <View
       style={[styles.routeStrip, { backgroundColor: cardColor, borderColor }]}

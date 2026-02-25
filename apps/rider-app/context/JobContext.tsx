@@ -9,6 +9,7 @@ import React, {
   useContext,
   useState,
   useCallback,
+  useRef,
 } from "react";
 import Toast from "react-native-toast-message";
 import { useLocationStream } from "@/hooks/useLocationStream";
@@ -49,6 +50,12 @@ export const JobsProvider = ({ children }: { children: ReactNode }) => {
   const [connectionStatus, setConnectionStatus] =
     useState<ConnectionStatus>("disconnected");
 
+  // Stable ref so handleJobCompleted (defined before checkAndRestoreActiveJob)
+  // can always call the latest version without a circular dependency.
+  const checkAndRestoreRef = useRef<() => Promise<void>>(() =>
+    Promise.resolve(),
+  );
+
   // Memoize callbacks to prevent re-renders
   const handleJobAssigned = useCallback((job: IncomingJobOffer) => {
     if (__DEV__) console.log("Job assigned:", JSON.stringify(job, null, 2));
@@ -58,16 +65,39 @@ export const JobsProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const handleJobUpdated = useCallback((jobId: string, newStatus: string) => {
-    // Update the job object in state — updater must be pure (no setState calls inside)
+    const isTerminal = newStatus === "online-waiting";
+
+    // Update the job object in state
     setActiveJob((prevActiveJob) => {
-      if (prevActiveJob && prevActiveJob.id === jobId) {
-        return { ...prevActiveJob, status: newStatus };
-      }
-      return prevActiveJob;
+      if (!prevActiveJob || prevActiveJob.id !== jobId) return prevActiveJob;
+      // Clear job for terminal non-completed states (declined, timeout, etc.)
+      if (isTerminal) return null;
+      return { ...prevActiveJob, status: newStatus };
     });
-    // Update the UI status OUTSIDE the updater — socket events are per-rider so the
-    // job always matches; calling setStatus inside the updater violates React rules.
+    setIncomingJob((prev) => {
+      if (isTerminal) return null;
+      return prev;
+    });
     setStatus(newStatus as JobStatus);
+  }, []);
+
+  /**
+   * Dedicated COMPLETED handler: clears every piece of job state
+   * (active job, incoming offer/quote) and returns the rider to
+   * online-waiting so they can take a fresh job.
+   */
+  const handleJobCompleted = useCallback(async (_jobId: string) => {
+    setActiveJob(null);
+    setIncomingJob(null);
+    setStatus("online-waiting");
+    Toast.show({
+      type: "success",
+      text1: "Job Completed 🎉",
+      text2: "Great work! Looking for your next job…",
+      visibilityTime: 4000,
+    });
+    // Check if the backend already has a new job assigned (back-to-back jobs)
+    await checkAndRestoreRef.current();
   }, []);
 
   const handleJobCancelled = useCallback((jobId: string) => {
@@ -142,6 +172,7 @@ export const JobsProvider = ({ children }: { children: ReactNode }) => {
     enabled: isOnline,
     onJobAssigned: handleJobAssigned,
     onJobUpdated: handleJobUpdated,
+    onJobCompleted: handleJobCompleted,
     onJobCancelled: handleJobCancelled,
     onConnectionStatusChange: handleConnectionStatusChange,
     onForceLogout: handleForceLogout,
@@ -195,6 +226,9 @@ export const JobsProvider = ({ children }: { children: ReactNode }) => {
       // Silently fail — rider stays on the waiting screen
     }
   }, [joinOrderRoom]);
+
+  // Keep the ref in sync so handleJobCompleted always has the latest version
+  checkAndRestoreRef.current = checkAndRestoreActiveJob;
 
   const goOnline = async () => {
     try {

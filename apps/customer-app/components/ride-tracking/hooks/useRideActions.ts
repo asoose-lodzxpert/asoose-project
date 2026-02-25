@@ -16,6 +16,9 @@ export function useRideActions(currentRide: Ride | null) {
   const [paymentRef, setPaymentRef] = useState<string>("");
   const [showPaymentWebView, setShowPaymentWebView] = useState(false);
 
+  // Refresh
+  const [refreshing, setRefreshing] = useState(false);
+
   // Cancel flow
   const [showCancelSheet, setShowCancelSheet] = useState(false);
   const [selectedReason, setSelectedReason] = useState<string | null>(null);
@@ -65,9 +68,9 @@ export function useRideActions(currentRide: Ride | null) {
   }, []);
 
   const handleRefresh = useCallback(async () => {
-    // You can add setRefreshing(true) here if you want to show spinner in top bar
+    setRefreshing(true);
     await refreshCurrentRide();
-    // setRefreshing(false)
+    setRefreshing(false);
   }, [refreshCurrentRide]);
 
   const handleCancel = useCallback(() => {
@@ -97,6 +100,10 @@ export function useRideActions(currentRide: Ride | null) {
   }, [selectedReason, customReason, cancelRide, router]);
 
   return {
+    // Refresh
+    refreshing,
+    handleRefresh,
+
     // Payment
     paying,
     paymentUrl,
@@ -117,7 +124,6 @@ export function useRideActions(currentRide: Ride | null) {
     handleCancel,
     handleConfirmCancel,
 
-    // Refresh
-    handleRefresh,
+    // (handleRefresh moved to top of return)
   };
 }

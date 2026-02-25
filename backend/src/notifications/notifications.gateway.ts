@@ -200,7 +200,7 @@ export class NotificationsGateway
   @SubscribeMessage('rider_location_update')
   async handleRiderLocationUpdate(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: { lat: number; lng: number; role?: string },
+    @MessageBody() data: { lat: number; lng: number; heading?: number; role?: string },
   ) {
     const riderId = client.data.userId;
     this.logger.debug(
@@ -235,12 +235,13 @@ export class NotificationsGateway
     try {
       if (role === 'DRIVER') {
         this.logger.debug(
-          `[LOC] Driver ${riderId} → calling driverStateService.updateLocation [${data.lat}, ${data.lng}]`,
+          `[LOC] Driver ${riderId} → calling driverStateService.updateLocation [${data.lat}, ${data.lng}] heading=${data.heading ?? 'n/a'}`,
         );
         await this.driverStateService.updateLocation(
           riderId,
           data.lat,
           data.lng,
+          data.heading,
         );
       } else {
         this.logger.debug(

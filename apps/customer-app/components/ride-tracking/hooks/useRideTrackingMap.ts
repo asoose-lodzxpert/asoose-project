@@ -1,9 +1,27 @@
+/**
+ * useRideTrackingMap
+ *
+ * Manages all map-related state for the live tracking screen:
+ *  - User's device location (GPS watch).
+ *  - Static route polyline: pickup → dropoff.
+ *  - Dynamic driver route: driver → pickup (approaching) or driver → destination (in progress).
+ *  - ETA in minutes, throttled to at most one API call per ROUTE_RECALC_INTERVAL_MS.
+ *  - Map camera fitting whenever relevant positions change.
+ *
+ * Performance notes:
+ *  - Driver route is recalculated at most once every 30 s to avoid hammering the API.
+ *  - fitMap is debounced with setTimeout(500) on initial ride load.
+ *  - Subscriptions and timeouts are all cleaned up on unmount.
+ */
 import { useState, useEffect, useCallback, useRef } from "react";
 import * as Location from "expo-location";
 import { get } from "@/lib/authFetch";
 import { Ride } from "@/types/ride";
 import { Dimensions } from "react-native";
 import MapView from "react-native-maps";
+
+/** Minimum ms between driver-route API calls regardless of location frequency */
+const ROUTE_RECALC_INTERVAL_MS = 30_000;
 
 export function useRideTrackingMap(
   currentRide: Ride | null,
@@ -22,9 +40,15 @@ export function useRideTrackingMap(
     { latitude: number; longitude: number }[]
   >([]);
 
+  /** ETA in minutes for the driver's current leg (approaching or in-progress) */
+  const [etaMinutes, setEtaMinutes] = useState<number | null>(null);
+
   const mapRef = useRef<MapView>(null);
 
-  // Watch user location
+  /** Timestamp of the most recent driver-route API call */
+  const lastDriverRouteFetchMs = useRef<number>(0);
+
+  // ── User location watch ────────────────────────────────────────────────────
   useEffect(() => {
     let subscription: Location.LocationSubscription | null = null;
 
@@ -52,7 +76,7 @@ export function useRideTrackingMap(
     };
   }, []);
 
-  // Fetch pickup → dropoff route
+  // ── Static pickup→dropoff polyline ─────────────────────────────────────────
   const fetchRoute = useCallback(async () => {
     if (!currentRide?.pickupAddress || !currentRide?.dropoffAddress) return;
 
@@ -67,38 +91,68 @@ export function useRideTrackingMap(
     }
   }, [currentRide?.pickupAddress, currentRide?.dropoffAddress]);
 
-  // Fetch driver → pickup route (when approaching)
-  const fetchDriverRoute = useCallback(async () => {
-    if (!currentRide?.pickupAddress || !driverLocation) {
-      setDriverRouteCoords([]);
-      return;
-    }
+  // ── Dynamic driver-route polyline + ETA ────────────────────────────────────
+  // Throttled: at most one API call every ROUTE_RECALC_INTERVAL_MS.
+  // Pre-trip  : driver → pickup
+  // In-trip   : driver → dropoff
+  const fetchDriverRoute = useCallback(
+    async (force = false) => {
+      if (!driverLocation || !currentRide) {
+        setDriverRouteCoords([]);
+        setEtaMinutes(null);
+        return;
+      }
 
-    const approachingStatuses = [
-      "DRIVER_ACCEPTED",
-      "PAID",
-      "ACCEPTED",
-      "ARRIVED",
-    ];
-    if (!approachingStatuses.includes(currentRide.status ?? "")) {
-      setDriverRouteCoords([]);
-      return;
-    }
+      const st = currentRide.status as string;
+      const isApproaching = [
+        "DRIVER_ACCEPTED",
+        "PAID",
+        "ACCEPTED",
+        "ARRIVED",
+      ].includes(st);
+      const isInProgress = st === "IN_PROGRESS";
 
-    const p = currentRide.pickupAddress;
-    try {
-      const res = await get(
-        `maps/directions?originLat=${driverLocation.latitude}&originLng=${driverLocation.longitude}&destLat=${p.lat}&destLng=${p.lng}`,
-      );
-      setDriverRouteCoords(
-        Array.isArray(res?.coordinates) ? res.coordinates : [],
-      );
-    } catch {
-      setDriverRouteCoords([]);
-    }
-  }, [currentRide?.pickupAddress, currentRide?.status, driverLocation]);
+      if (!isApproaching && !isInProgress) {
+        setDriverRouteCoords([]);
+        setEtaMinutes(null);
+        return;
+      }
 
-  // Fit map to relevant coordinates
+      // Throttle — skip unless forced (e.g. ride status changed) or enough time elapsed
+      const now = Date.now();
+      if (!force && now - lastDriverRouteFetchMs.current < ROUTE_RECALC_INTERVAL_MS) {
+        return;
+      }
+      lastDriverRouteFetchMs.current = now;
+
+      // Destination for this leg
+      const dest = isApproaching
+        ? currentRide.pickupAddress
+        : currentRide.dropoffAddress;
+      if (!dest) return;
+
+      try {
+        const res = await get(
+          `maps/directions?originLat=${driverLocation.latitude}&originLng=${driverLocation.longitude}&destLat=${dest.lat}&destLng=${dest.lng}`,
+        );
+        setDriverRouteCoords(
+          Array.isArray(res?.coordinates) ? res.coordinates : [],
+        );
+        // Parse ETA if the API returns duration in seconds
+        if (typeof res?.durationSeconds === "number") {
+          setEtaMinutes(res.durationSeconds / 60);
+        } else if (typeof res?.durationMin === "number") {
+          setEtaMinutes(res.durationMin);
+        }
+      } catch {
+        setDriverRouteCoords([]);
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [currentRide?.status, driverLocation],
+  );
+
+  // ── Map camera fitting ─────────────────────────────────────────────────────
   const fitMap = useCallback(() => {
     if (!mapRef.current) return;
 
@@ -134,29 +188,42 @@ export function useRideTrackingMap(
     });
   }, [currentRide, driverLocation, userLocation]);
 
+  // ── Effects ────────────────────────────────────────────────────────────────
+
+  // On new ride: fetch static route + fit camera
   useEffect(() => {
     if (currentRide) {
       fetchRoute();
+      // Force driver route fetch when ride changes (new ride / status flip)
+      fetchDriverRoute(true);
       const timer = setTimeout(fitMap, 500);
       return () => clearTimeout(timer);
     } else {
       setRouteCoords([]);
       setDriverRouteCoords([]);
+      setEtaMinutes(null);
     }
-  }, [currentRide?.id, fetchRoute, fitMap]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentRide?.id, currentRide?.status]);
 
+  // On driver location update: throttled route + ETA refresh; always refit camera
   useEffect(() => {
-    fetchDriverRoute();
-  }, [fetchDriverRoute]);
+    if (driverLocation) {
+      fetchDriverRoute(); // honours internal throttle
+      fitMap();
+    }
+  }, [driverLocation, fetchDriverRoute, fitMap]);
 
+  // Refit when user location changes during live trip
   useEffect(() => {
-    if (driverLocation || userLocation) fitMap();
-  }, [driverLocation, userLocation, fitMap]);
+    if (userLocation) fitMap();
+  }, [userLocation, fitMap]);
 
   return {
     mapRef,
     userLocation,
     routeCoords,
     driverRouteCoords,
+    etaMinutes,
   };
 }

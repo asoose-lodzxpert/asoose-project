@@ -20,6 +20,7 @@ export function setRoleGetter(fn: () => string) {
 interface QueuedLocation {
   lat: number;
   lng: number;
+  heading?: number;
   timestamp: number;
 }
 
@@ -109,8 +110,8 @@ export class LocationStreamService {
           accuracy: Location.Accuracy.Balanced,
         });
 
-        const { latitude, longitude } = location.coords;
-        await this.sendLocation(latitude, longitude);
+        const { latitude, longitude, heading } = location.coords;
+        await this.sendLocation(latitude, longitude, heading ?? undefined);
       } catch (error) {
         // Silent fail
       }
@@ -124,8 +125,8 @@ export class LocationStreamService {
       },
       async (location) => {
         if (!this.isActive) return;
-        const { latitude, longitude } = location.coords;
-        await this.sendLocation(latitude, longitude);
+        const { latitude, longitude, heading } = location.coords;
+        await this.sendLocation(latitude, longitude, heading ?? undefined);
       },
     ).then((subscription) => {
       this.locationSubscription = subscription;
@@ -135,10 +136,11 @@ export class LocationStreamService {
   /**
    * Send location to backend via socket
    */
-  private async sendLocation(lat: number, lng: number) {
+  private async sendLocation(lat: number, lng: number, heading?: number) {
     const locationData: QueuedLocation = {
       lat,
       lng,
+      heading,
       timestamp: Date.now(),
     };
 
@@ -147,6 +149,7 @@ export class LocationStreamService {
         lat,
         lng,
         getRoleFn(),
+        heading,
       );
       if (!sent) {
         this.queueLocation(locationData);

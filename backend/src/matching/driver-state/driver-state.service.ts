@@ -116,7 +116,7 @@ export class DriverStateService {
   /* ============================================================
      LOCATION UPDATES
   ============================================================ */
-  async updateLocation(driverId: string, lat: number, lng: number) {
+  async updateLocation(driverId: string, lat: number, lng: number, heading?: number) {
     if (!this.geo.validateCoordinates(lat, lng)) {
       this.logger.warn(
         `[LOC] Driver ${driverId}: invalid coordinates [${lat}, ${lng}] — skipped`,
@@ -171,6 +171,7 @@ export class DriverStateService {
       driverId,
       lat,
       lng,
+      heading,
       hexId,
       hexChanged: result === 1,
       timestamp,

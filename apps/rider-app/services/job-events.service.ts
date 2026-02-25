@@ -41,6 +41,8 @@ export type JobEventCallbacks = {
   onJobAssigned?: (job: IncomingJobOffer) => void;
   onJobUpdated?: (jobId: string, status: string) => void;
   onJobCancelled?: (jobId: string) => void;
+  /** Called when a job reaches the COMPLETED terminal state — clears all state */
+  onJobCompleted?: (jobId: string) => void;
   onError?: (error: Error) => void;
   onConnectionStatusChange?: (status: ConnectionStatus) => void;
   /** Called when the server forces a logout (e.g. account banned/suspended) */
@@ -193,6 +195,13 @@ export class JobEventsService {
     this.socket.on("job.updated", (data: any) => {
       try {
         // ...existing code...
+        if (data.status === "completed") {
+          // Fire the dedicated completed callback so the context can do a full reset
+          if (this.callbacks?.onJobCompleted) {
+            this.callbacks.onJobCompleted(data.id);
+          }
+          return;
+        }
         const mappedStatus = mapJobUpdatedStatus(data.status);
         if (this.callbacks?.onJobUpdated) {
           this.callbacks.onJobUpdated(data.id, mappedStatus);
@@ -300,11 +309,17 @@ export class JobEventsService {
   }
 
   /**
-   * Send location update via the shared socket
+   * Send location update via the shared socket.
+   * heading is the GPS compass heading in degrees [0, 360); null if device doesn't report it.
    */
-  sendLocationUpdate(lat: number, lng: number, role?: string): boolean {
+  sendLocationUpdate(lat: number, lng: number, role?: string, heading?: number | null): boolean {
     if (this.socket && this.connectionStatus === "connected") {
-      this.socket.emit("rider_location_update", { lat, lng, role });
+      this.socket.emit("rider_location_update", {
+        lat,
+        lng,
+        role,
+        ...(heading != null ? { heading } : {}),
+      });
       return true;
     }
     return false;

@@ -5,23 +5,29 @@ import {
   Platform,
   Dimensions,
   Pressable,
+  ActivityIndicator,
 } from "react-native";
-import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from "react-native-maps";
+import MapView, { Polyline, PROVIDER_GOOGLE } from "react-native-maps";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ThemedText } from "@/components/themed-text";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { useMapStyle } from "@/hooks/useMapStyle";
-import { Ride } from "@/types/ride"; // assuming you have a Ride type
+import { Ride } from "@/types/ride";
+import AnimatedDriverMarker from "./AnimatedDriverMarker";
+import PulsingPickupMarker from "./PulsingPickupMarker";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 type TrackingMapProps = {
   currentRide: Ride | null;
-  driverLocation: { latitude: number; longitude: number } | null;
+  driverLocation: { latitude: number; longitude: number; heading?: number } | null;
   userLocation: { latitude: number; longitude: number } | null;
   routeCoords: { latitude: number; longitude: number }[];
   driverRouteCoords: { latitude: number; longitude: number }[];
   socketConnected: boolean;
+  refreshing?: boolean;
+  /** ETA in minutes, shown as overlay pill when available */
+  etaMinutes?: number | null;
   onRefresh: () => void;
   onBack?: () => void;
 };
@@ -35,6 +41,8 @@ const TrackingMap = forwardRef<MapView, TrackingMapProps>(
       routeCoords,
       driverRouteCoords,
       socketConnected,
+      refreshing = false,
+      etaMinutes,
       onRefresh,
       onBack,
     },
@@ -46,6 +54,11 @@ const TrackingMap = forwardRef<MapView, TrackingMapProps>(
     const success = useThemeColor({}, "statusSuccess");
     const danger = useThemeColor({}, "statusError");
     const textPrimary = useThemeColor({}, "textPrimary");
+
+    // Whether driver is approaching pickup (pulse the pickup marker)
+    const isApproaching = ["DRIVER_ACCEPTED", "PAID", "ACCEPTED", "ARRIVED"].includes(
+      currentRide?.status as string ?? "",
+    );
 
     return (
       <>
@@ -72,44 +85,37 @@ const TrackingMap = forwardRef<MapView, TrackingMapProps>(
           rotateEnabled={false}
         >
           {currentRide?.pickupAddress && (
-            <Marker
+            // Pulsing marker pulses when driver is approaching pickup,
+            // static pin once the trip is in progress.
+            <PulsingPickupMarker
               coordinate={{
                 latitude: currentRide.pickupAddress.lat,
                 longitude: currentRide.pickupAddress.lng,
               }}
-              title="Pickup"
-            >
-              <View style={[styles.mapPin, { backgroundColor: success }]}>
-                <IconSymbol name="mappin" size={11} color="#fff" />
-              </View>
-            </Marker>
+              pulse={isApproaching}
+            />
           )}
 
           {currentRide?.dropoffAddress && (
-            <Marker
+            // Static dropoff pin (danger-coloured)
+            <PulsingPickupMarker
               coordinate={{
                 latitude: currentRide.dropoffAddress.lat,
                 longitude: currentRide.dropoffAddress.lng,
               }}
-              title="Dropoff"
-            >
-              <View style={[styles.mapPin, { backgroundColor: danger }]}>
-                <IconSymbol name="mappin" size={11} color="#fff" />
-              </View>
-            </Marker>
+              pulse={false}
+            />
           )}
 
+          {/* Animated car marker with smooth position + heading transitions */}
           {driverLocation && (
-            <Marker
-              coordinate={driverLocation}
-              title="Driver"
-              flat
-              anchor={{ x: 0.5, y: 0.5 }}
-            >
-              <View style={[styles.carMarker, { backgroundColor: primary }]}>
-                <IconSymbol name="car.fill" size={15} color="#fff" />
-              </View>
-            </Marker>
+            <AnimatedDriverMarker
+              location={{
+                latitude: driverLocation.latitude,
+                longitude: driverLocation.longitude,
+                heading: driverLocation.heading ?? 0,
+              }}
+            />
           )}
 
           {routeCoords.length > 0 && (
@@ -164,13 +170,32 @@ const TrackingMap = forwardRef<MapView, TrackingMapProps>(
               onPress={onRefresh}
               style={[styles.iconBtn, { backgroundColor: surface }]}
             >
-              <IconSymbol
-                name="arrow.clockwise"
-                size={18}
-                color={textPrimary}
-              />
+              {refreshing ? (
+                <ActivityIndicator size="small" color={primary} />
+              ) : (
+                <IconSymbol
+                  name="arrow.clockwise"
+                  size={18}
+                  color={textPrimary}
+                />
+              )}
             </Pressable>
           </View>
+
+          {/* ETA pill — shown when driver is en route */}
+          {etaMinutes != null && etaMinutes > 0 && (
+            <View style={styles.etaRow}>
+              <View style={[styles.etaPill, { backgroundColor: surface }]}>
+                <IconSymbol name="clock" size={12} color={primary} />
+                <ThemedText
+                  type="caption"
+                  style={{ color: primary, fontWeight: "700", marginLeft: 4 }}
+                >
+                  {etaMinutes < 1 ? "< 1" : Math.round(etaMinutes)} min away
+                </ThemedText>
+              </View>
+            </View>
+          )}
         </View>
       </>
     );
@@ -206,6 +231,22 @@ const styles = StyleSheet.create({
     height: 34,
     borderRadius: 17,
     gap: 7,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 5,
+  },
+  etaRow: {
+    alignItems: "center",
+    marginTop: 8,
+  },
+  etaPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 20,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
