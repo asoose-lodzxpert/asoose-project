@@ -3,7 +3,14 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useJobs } from "@/context/JobContext";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import React from "react";
-import { Dimensions, Pressable, StyleSheet, Switch, View } from "react-native";
+import {
+  ActivityIndicator,
+  Dimensions,
+  Pressable,
+  StyleSheet,
+  Switch,
+  View,
+} from "react-native";
 
 import { useConfirm } from "@/hooks/use-confirm";
 import { useRouter } from "expo-router";
@@ -13,7 +20,7 @@ const { width } = Dimensions.get("window");
 
 export default function FloatingHeader() {
   const router = useRouter();
-  const { status, goOnline, goOffline } = useJobs();
+  const { status, goOnline, goOffline, isOnlineLoading } = useJobs();
   const { confirm, ConfirmModal } = useConfirm();
 
   const card = useThemeColor({}, "surfaceCard");
@@ -72,12 +79,21 @@ export default function FloatingHeader() {
             <ConnectionStatusIndicator />
           </View>
 
-          <Switch
-            value={isOnline}
-            onValueChange={handleToggle}
-            trackColor={{ false: statusColor, true: primary }}
-            thumbColor="#fff"
-          />
+          {isOnlineLoading ? (
+            <ActivityIndicator
+              size="small"
+              color={primary}
+              style={styles.switchLoader}
+            />
+          ) : (
+            <Switch
+              value={isOnline}
+              onValueChange={handleToggle}
+              trackColor={{ false: statusColor, true: primary }}
+              thumbColor="#fff"
+              disabled={isOnlineLoading}
+            />
+          )}
         </View>
       </View>
       <ConfirmModal />
@@ -116,5 +132,10 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     textTransform: "capitalize",
     fontSize: 16,
+  },
+  switchLoader: {
+    width: 51,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });

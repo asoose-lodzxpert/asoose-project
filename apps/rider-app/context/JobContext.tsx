@@ -26,6 +26,7 @@ interface JobsContextState {
     isConnected: boolean;
     queueSize: number;
   };
+  isOnlineLoading: boolean;
   goOnline(): Promise<void>;
   goOffline(): Promise<void>;
   acceptJob(jobId: string, jobType: JobType): Promise<void>;
@@ -44,6 +45,7 @@ const JobsContext = createContext<JobsContextState | undefined>(undefined);
 export const JobsProvider = ({ children }: { children: ReactNode }) => {
   const [status, setStatus] = useState<JobStatus>("offline");
   const [isOnline, setIsOnline] = useState(false);
+  const [isOnlineLoading, setIsOnlineLoading] = useState(false);
   const [incomingJob, setIncomingJob] = useState<IncomingJobOffer | null>(null);
   const { logout, user } = useAuth();
   const [activeJob, setActiveJob] = useState<CurrentJob | null>(null);
@@ -231,6 +233,7 @@ export const JobsProvider = ({ children }: { children: ReactNode }) => {
   checkAndRestoreRef.current = checkAndRestoreActiveJob;
 
   const goOnline = async () => {
+    setIsOnlineLoading(true);
     try {
       const coords = await getCurrentCoords();
       if (!coords) throw new Error("Location unavailable");
@@ -242,10 +245,13 @@ export const JobsProvider = ({ children }: { children: ReactNode }) => {
       await checkAndRestoreActiveJob();
     } catch (error) {
       Toast.show({ type: "error", text1: "Failed to go online" });
+    } finally {
+      setIsOnlineLoading(false);
     }
   };
 
   const goOffline = async () => {
+    setIsOnlineLoading(true);
     try {
       const coords = await getCurrentCoords();
       if (!coords) throw new Error("Location unavailable");
@@ -263,6 +269,8 @@ export const JobsProvider = ({ children }: { children: ReactNode }) => {
         type: "error",
         text1: error.message ?? "Failed to go offline",
       });
+    } finally {
+      setIsOnlineLoading(false);
     }
   };
 
@@ -481,6 +489,7 @@ export const JobsProvider = ({ children }: { children: ReactNode }) => {
       value={{
         status,
         isOnline,
+        isOnlineLoading,
         incomingJob,
         activeJob,
         connectionStatus,

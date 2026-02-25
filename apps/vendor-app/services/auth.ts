@@ -90,6 +90,19 @@ export async function refreshAccessToken() {
 // ---------------- LOGOUT ----------------
 
 export async function logout() {
+  // Invalidate the refresh token on the backend (fire-and-forget — never blocks local logout)
+  try {
+    const refreshToken = await SecureStore.getItemAsync(refreshTokenKey());
+    if (refreshToken) {
+      await fetch(`${process.env.EXPO_PUBLIC_API_URL}/vendor-auth/logout`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refreshToken }),
+      });
+    }
+  } catch {
+    // Non-fatal — proceed to clear local tokens regardless
+  }
   await SecureStore.deleteItemAsync(accessTokenKey());
   await SecureStore.deleteItemAsync(refreshTokenKey());
 }

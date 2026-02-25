@@ -5,8 +5,8 @@ import {
   Pressable,
   Platform,
   ActivityIndicator,
-  Alert,
 } from "react-native";
+import Toast from "react-native-toast-message";
 import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
 import { IconSymbol } from "@/components/ui/icon-symbol";
@@ -74,7 +74,7 @@ export default function LinkedAccountsScreen() {
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Something went wrong";
-      Alert.alert("Error", msg);
+      Toast.show({ type: "error", text1: "Error", text2: msg });
     } finally {
       setActionLoading(null);
     }
@@ -94,7 +94,7 @@ export default function LinkedAccountsScreen() {
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Something went wrong";
-      Alert.alert("Error", msg);
+      Toast.show({ type: "error", text1: "Error", text2: msg });
     } finally {
       setActionLoading(null);
     }

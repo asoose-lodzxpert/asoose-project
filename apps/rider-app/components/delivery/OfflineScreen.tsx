@@ -16,7 +16,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function OfflineScreen() {
-  const { goOnline } = useJobs();
+  const { goOnline, isOnlineLoading } = useJobs();
   const { confirm, ConfirmModal } = useConfirm();
 
   const primary = useThemeColor({}, "brandPrimary");
@@ -120,8 +120,12 @@ export default function OfflineScreen() {
             <Pressable
               style={({ pressed }) => [
                 styles.mainBtn,
-                { backgroundColor: primary, opacity: pressed ? 0.9 : 1 },
+                {
+                  backgroundColor: primary,
+                  opacity: pressed || isOnlineLoading ? 0.7 : 1,
+                },
               ]}
+              disabled={isOnlineLoading}
               onPress={async () => {
                 const confirmed = await confirm({
                   title: "Go Online",
@@ -131,13 +135,21 @@ export default function OfflineScreen() {
                 if (confirmed) goOnline();
               }}
             >
-              <ThemedText style={[styles.btnText, { color: textOnPrimary }]}>
-                GO ONLINE
-              </ThemedText>
+              {isOnlineLoading ? (
+                <ActivityIndicator color={textOnPrimary} size="small" />
+              ) : (
+                <ThemedText style={[styles.btnText, { color: textOnPrimary }]}>
+                  GO ONLINE
+                </ThemedText>
+              )}
               <View
                 style={[styles.btnCircle, { backgroundColor: textOnPrimary }]}
               >
-                <IconSymbol name="chevron.right" size={16} color={primary} />
+                {isOnlineLoading ? (
+                  <ActivityIndicator color={primary} size="small" />
+                ) : (
+                  <IconSymbol name="chevron.right" size={16} color={primary} />
+                )}
               </View>
             </Pressable>
           </View>

@@ -19,7 +19,8 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { Alert, AppState, AppStateStatus } from "react-native";
+import { AppState, AppStateStatus } from "react-native";
+import Toast from "react-native-toast-message";
 import { io, Socket } from "socket.io-client";
 import { useAuth } from "./AuthContext";
 
@@ -336,7 +337,12 @@ export function RideProvider({ children }: { children: ReactNode }) {
               : cancelledBy === "DRIVER"
                 ? "Your driver has cancelled the ride. Please book a new ride."
                 : "Your ride was cancelled. Please try again.";
-          Alert.alert(title, message, [{ text: "OK" }]);
+          Toast.show({
+            type: cancelledBy === "DRIVER" ? "error" : "info",
+            text1: title,
+            text2: message,
+            visibilityTime: 5000,
+          });
         }
       }
     });

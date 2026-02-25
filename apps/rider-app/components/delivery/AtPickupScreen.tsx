@@ -111,14 +111,22 @@ export default function AtPickupScreen() {
             numberOfLines={1}
             style={[styles.address, { color: colors.muted }]}
           >
-            {pickup}
+            {pickup} -{" "}
+            {activeJob.pickupContactPhone ||
+              activeJob.customerPhone ||
+              activeJob.pickupAddress?.phone}{" "}
+            - Tap phone icon to call
           </ThemedText>
         </View>
 
-        {activeJob.pickupContactPhone && (
+        {(activeJob.pickupContactPhone ||
+          activeJob.customerPhone ||
+          activeJob.pickupAddress?.phone) && (
           <Pressable
             onPress={() =>
-              Linking.openURL(`tel:${activeJob.pickupContactPhone}`)
+              Linking.openURL(
+                `tel:${activeJob.pickupContactPhone || activeJob.customerPhone || activeJob.pickupAddress?.phone}`,
+              )
             }
             style={styles.callBtn}
           >

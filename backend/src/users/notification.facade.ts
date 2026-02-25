@@ -106,7 +106,12 @@ export class NotificationFacade {
 
       const pushMeta = { ...metadata, notificationId: notification.id };
       if (expoToken) {
-        await this.expoPushService.sendToDevice(expoToken, title, message, pushMeta);
+        await this.expoPushService.sendToDevice(
+          expoToken,
+          title,
+          message,
+          pushMeta,
+        );
       }
       if (fcmToken) {
         await this.fcmService.sendToDevice(fcmToken, title, message, pushMeta);

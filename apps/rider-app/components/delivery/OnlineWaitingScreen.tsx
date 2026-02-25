@@ -19,7 +19,7 @@ import {
 } from "react-native-safe-area-context";
 
 export default function OnlineWaitingScreen() {
-  const { goOffline, activeJob, incomingJob } = useJobs();
+  const { goOffline, activeJob, incomingJob, isOnlineLoading } = useJobs();
   const { user } = useAuth();
   const { confirm, ConfirmModal } = useConfirm();
 
@@ -90,9 +90,10 @@ export default function OnlineWaitingScreen() {
                 {
                   backgroundColor: card,
                   borderColor: border,
-                  opacity: pressed ? 0.7 : 1,
+                  opacity: pressed || isOnlineLoading ? 0.7 : 1,
                 },
               ]}
+              disabled={isOnlineLoading}
               onPress={async () => {
                 const confirmed = await confirm({
                   title: "Go Offline",
@@ -103,7 +104,11 @@ export default function OnlineWaitingScreen() {
                 if (confirmed) goOffline();
               }}
             >
-              <IconSymbol name="power" size={20} color={danger} />
+              {isOnlineLoading ? (
+                <ActivityIndicator size="small" color={danger} />
+              ) : (
+                <IconSymbol name="power" size={20} color={danger} />
+              )}
             </Pressable>
           </View>
 

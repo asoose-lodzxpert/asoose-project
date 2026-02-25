@@ -118,10 +118,14 @@ export default function EnRouteToDropoff({
           </ThemedText>
         </View>
 
-        {activeJob.dropoffContactPhone && (
+        {(activeJob.dropoffContactPhone ||
+          activeJob.customerPhone ||
+          activeJob.dropoffAddress?.phone) && (
           <Pressable
             onPress={() =>
-              Linking.openURL(`tel:${activeJob.dropoffContactPhone}`)
+              Linking.openURL(
+                `tel:${activeJob.dropoffContactPhone || activeJob.customerPhone || activeJob.dropoffAddress?.phone}`,
+              )
             }
             style={styles.callBtn}
           >

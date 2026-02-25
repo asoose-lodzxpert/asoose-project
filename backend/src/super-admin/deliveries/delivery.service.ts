@@ -412,7 +412,9 @@ export class DeliveriesService {
     }
 
     // Guard: prevent assignment to terminal deliveries
-    if (TERMINAL_DELIVERY_STATUSES.includes(delivery.status as DeliveryStatus)) {
+    if (
+      TERMINAL_DELIVERY_STATUSES.includes(delivery.status as DeliveryStatus)
+    ) {
       throw new BadRequestException(
         `Cannot assign a rider to a ${delivery.status} delivery.`,
       );

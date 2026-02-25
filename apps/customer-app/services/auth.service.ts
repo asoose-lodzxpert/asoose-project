@@ -170,6 +170,19 @@ export async function resetPasswordWithOtp(payload: ResetPasswordPayload) {
 }
 
 export async function logout() {
+  // Invalidate the refresh token on the backend (fire-and-forget — never blocks local logout)
+  try {
+    const rToken = await getRefreshToken();
+    if (rToken) {
+      await fetch(`${API_BASE}/auth/logout`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refreshToken: rToken }),
+      });
+    }
+  } catch {
+    // Non-fatal — proceed to clear local tokens regardless
+  }
   await clearTokens();
 }
 

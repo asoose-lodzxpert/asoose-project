@@ -1,4 +1,19 @@
-import * as Location from "expo-location";
+﻿/**
+ * MapCanvas  Uber/Bolt-style rider navigation map
+ *
+ * Improvements over the previous monolith:
+ *    GPS logic extracted to useRiderLocation (2 s / 5 m, AppState-aware)
+ *    Routing logic extracted to useRiderRoute (30 s throttle, force on status change)
+ *    Smooth heading animation via Animated.Value (shortest-path delta  no 3582 flip)
+ *    tracksViewChanges={false}  Animated.View handles rotation natively
+ *    3-D camera pitch (15) + bearing during en-route for Google Maps Nav feel
+ *    Route overview: fitToCoordinates on job start (pickup + dropoff in frame)
+ *    Follow-mode toggle with FAB re-centre button
+ *    onTouchStart on MapView disables follow-mode (user panned away)
+ *    Guards: mapRef.current, isMapReady, coord bounds checks
+ *    No overlapping polylines for the same segment
+ */
+
 import React, {
   forwardRef,
   useCallback,
@@ -8,7 +23,14 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { StyleSheet, Text, View, useColorScheme } from "react-native";
+import {
+  Animated,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+  useColorScheme,
+} from "react-native";
 import MapView, {
   Camera,
   Circle,
@@ -21,25 +43,18 @@ import MapView, {
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useJobs } from "@/context/JobContext";
 import { useThemeColor } from "@/hooks/use-theme-color";
-import { getDirections, NavigationStep } from "@/services/maps";
+import { useRiderLocation } from "@/hooks/useRiderLocation";
+import { useRiderRoute } from "@/hooks/useRiderRoute";
+
+//
+//  Map style constants
+//
 
 const LIGHT_MAP_STYLE = [
-  {
-    elementType: "geometry",
-    stylers: [{ color: "#f5f5f5" }],
-  },
-  {
-    elementType: "labels.icon",
-    stylers: [{ visibility: "off" }],
-  },
-  {
-    elementType: "labels.text.fill",
-    stylers: [{ color: "#616161" }],
-  },
-  {
-    elementType: "labels.text.stroke",
-    stylers: [{ color: "#f5f5f5" }],
-  },
+  { elementType: "geometry", stylers: [{ color: "#f5f5f5" }] },
+  { elementType: "labels.icon", stylers: [{ visibility: "off" }] },
+  { elementType: "labels.text.fill", stylers: [{ color: "#616161" }] },
+  { elementType: "labels.text.stroke", stylers: [{ color: "#f5f5f5" }] },
   {
     featureType: "administrative.land_parcel",
     elementType: "labels.text.fill",
@@ -113,22 +128,10 @@ const LIGHT_MAP_STYLE = [
 ];
 
 const DARK_MAP_STYLE = [
-  {
-    elementType: "geometry",
-    stylers: [{ color: "#1a1a1a" }],
-  },
-  {
-    elementType: "labels.icon",
-    stylers: [{ visibility: "off" }],
-  },
-  {
-    elementType: "labels.text.fill",
-    stylers: [{ color: "#8a8a8a" }],
-  },
-  {
-    elementType: "labels.text.stroke",
-    stylers: [{ color: "#1a1a1a" }],
-  },
+  { elementType: "geometry", stylers: [{ color: "#1a1a1a" }] },
+  { elementType: "labels.icon", stylers: [{ visibility: "off" }] },
+  { elementType: "labels.text.fill", stylers: [{ color: "#8a8a8a" }] },
+  { elementType: "labels.text.stroke", stylers: [{ color: "#1a1a1a" }] },
   {
     featureType: "administrative.land_parcel",
     elementType: "labels.text.fill",
@@ -201,23 +204,19 @@ const DARK_MAP_STYLE = [
   },
 ];
 
-/** Maps a turn-by-turn instruction string to an SF Symbol icon name */
-function instructionToIcon(instruction: string): string {
-  const lower = instruction.toLowerCase();
-  if (lower.includes("u-turn") || lower.includes("uturn"))
-    return "arrow.uturn.left";
-  if (lower.includes("turn left") || lower.includes("left"))
-    return "arrow.turn.up.left";
-  if (lower.includes("turn right") || lower.includes("right"))
-    return "arrow.turn.up.right";
-  if (lower.includes("keep left") || lower.includes("bear left"))
-    return "arrow.up.left";
-  if (lower.includes("keep right") || lower.includes("bear right"))
-    return "arrow.up.right";
-  return "arrow.up";
-}
+//
+//  Camera constants
+//
 
-/** Extract LatLng from various address formats */
+const NAV_ZOOM = 17;
+const OVERVIEW_ZOOM = 13;
+const NAV_PITCH = 15;
+const FIXED_DELTA = 0.005;
+
+//
+//  Helpers
+//
+
 function resolveCoords(addr: unknown): LatLng | null {
   if (!addr || typeof addr !== "object") return null;
   const a = addr as Record<string, unknown>;
@@ -237,22 +236,23 @@ function resolveCoords(addr: unknown): LatLng | null {
   return { latitude: lat, longitude: lng };
 }
 
+function isValidCoord(lat: number, lng: number): boolean {
+  return lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
+}
+
+//
+//  Handle type
+//
+
 export type MapCanvasHandle = {
   animateToPickup: () => void;
   animateToDropoff: () => void;
   animateToCurrentLocation: () => void;
 };
 
-/**
- * Zoom levels:
- *   - NAV_ZOOM         → Google-Nav style close zoom (street-level, ~17-18)
- *   - FIXED_*          → initial region span / non-nav fallback
- *   - NAV_PITCH        → camera tilt for 3D perspective
- *   - AHEAD_OFFSET_DEG → degrees ahead to offset camera center so rider sits at bottom
- */
-const NAV_ZOOM = 18;
-const FIXED_LATITUDE_DELTA = 0.005;
-const FIXED_LONGITUDE_DELTA = 0.005;
+//
+//  Component
+//
 
 const MapCanvas = forwardRef<MapCanvasHandle>((_, ref) => {
   const mapRef = useRef<MapView>(null);
@@ -262,37 +262,22 @@ const MapCanvas = forwardRef<MapCanvasHandle>((_, ref) => {
   const success = useThemeColor({}, "statusSuccess");
   const danger = useThemeColor({}, "statusError");
 
-  const [location, setLocation] = useState<Location.LocationObject | null>(
-    null,
-  );
-  const [riderRouteCoords, setRiderRouteCoords] = useState<LatLng[]>([]);
-  const [plannedRouteCoords, setPlannedRouteCoords] = useState<LatLng[]>([]);
-  const [distanceLeft, setDistanceLeft] = useState("");
-  const [eta, setEta] = useState("");
-  const [mapError, setMapError] = useState<string | null>(null);
   const [isMapReady, setIsMapReady] = useState(false);
-  const [routeSteps, setRouteSteps] = useState<NavigationStep[]>([]);
-  const [currentInstruction, setCurrentInstruction] = useState("");
-  const [nextInstruction, setNextInstruction] = useState("");
-  const [turnIcon, setTurnIcon] = useState<string>("arrow.up");
+  const [followMode, setFollowMode] = useState(true);
 
-  const lastRouteFetchRef = useRef<number>(0);
-  const ROUTE_REFETCH_INTERVAL_MS = 20_000;
+  //  Location
+  const {
+    location,
+    permissionDenied,
+    error: locationError,
+  } = useRiderLocation();
 
-  const mapStyle = colorScheme === "dark" ? DARK_MAP_STYLE : LIGHT_MAP_STYLE;
-
-  // Stabilise coords with useMemo so the object reference only changes when the
-  // actual coordinate values change, not on every render. Without this,
-  // fetchRiderRoute (which depends on pickupCoords / dropoffCoords) gets a new
-  // reference every render, causing an infinite useEffect → setState loop.
+  //  Stabilised pickup / dropoff coords
   const pickupCoords = useMemo(
     () => (activeJob ? resolveCoords(activeJob.pickupAddress) : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [
       activeJob?.id,
-      activeJob?.currentStopIndex,
-      // stringify the relevant parts so the memo updates when the address changes
-      // (e.g. multi-stop advances to the next pickup address)
       activeJob?.pickupAddress?.latitude ?? activeJob?.pickupAddress?.lat,
       activeJob?.pickupAddress?.longitude ?? activeJob?.pickupAddress?.lng,
     ],
@@ -307,203 +292,120 @@ const MapCanvas = forwardRef<MapCanvasHandle>((_, ref) => {
     ],
   );
 
-  // ───────────────────────────────────────────────
-  //  Location tracking
-  // ───────────────────────────────────────────────
+  //  Routing
+  const {
+    riderRouteCoords,
+    plannedRouteCoords,
+    distanceLeft,
+    eta,
+    currentInstruction,
+    turnIcon,
+  } = useRiderRoute({
+    location,
+    status,
+    activeJob,
+    pickupCoords,
+    dropoffCoords,
+  });
+
+  //  Heading animation (smooth, shortest-path)
+  const headingAnimRef = useRef(new Animated.Value(0));
+  const lastHeadingRef = useRef(0);
+
   useEffect(() => {
-    let sub: Location.LocationSubscription | null = null;
+    if (!location) return;
+    const raw = location.heading;
+    const prev = lastHeadingRef.current;
+    const delta = ((raw - prev + 540) % 360) - 180;
+    const next = prev + delta;
+    lastHeadingRef.current = next;
+    Animated.timing(headingAnimRef.current, {
+      toValue: next,
+      duration: 600,
+      useNativeDriver: true,
+    }).start();
+  }, [location]);
 
-    (async () => {
-      try {
-        const { status: perm } =
-          await Location.requestForegroundPermissionsAsync();
-        if (perm !== "granted") {
-          setMapError("Location permission denied");
-          return;
-        }
+  const markerRotation = headingAnimRef.current.interpolate({
+    inputRange: [-360, 360],
+    outputRange: ["-360deg", "360deg"],
+  });
 
-        const current = await Location.getCurrentPositionAsync({});
-        setLocation(current);
-        setMapError(null);
+  //  Route overview on job start
+  const lastFittedJobId = useRef<string | null>(null);
+  useEffect(() => {
+    if (
+      !isMapReady ||
+      !mapRef.current ||
+      !activeJob ||
+      !pickupCoords ||
+      !dropoffCoords ||
+      lastFittedJobId.current === activeJob.id
+    )
+      return;
 
-        sub = await Location.watchPositionAsync(
-          {
-            accuracy: Location.Accuracy.High,
-            timeInterval: 5000,
-            distanceInterval: 10,
-          },
-          (loc) => setLocation(loc),
-        );
-      } catch (e) {
-        setMapError(`Location error: ${String(e)}`);
-      }
-    })();
+    lastFittedJobId.current = activeJob.id;
+    const coords: LatLng[] = [pickupCoords, dropoffCoords];
+    if (location && isValidCoord(location.latitude, location.longitude)) {
+      coords.push({
+        latitude: location.latitude,
+        longitude: location.longitude,
+      });
+    }
 
-    return () => {
-      sub?.remove();
+    setTimeout(() => {
+      mapRef.current?.fitToCoordinates(coords, {
+        edgePadding: { top: 140, right: 50, bottom: 280, left: 50 },
+        animated: true,
+      });
+    }, 400);
+  }, [activeJob?.id, isMapReady, pickupCoords, dropoffCoords, location]);
+
+  //  Navigation camera
+  const isEnRoute =
+    status === "en-route-pickup" || status === "en-route-dropoff";
+
+  useEffect(() => {
+    if (!isMapReady || !location || !mapRef.current || !followMode) return;
+    if (!isValidCoord(location.latitude, location.longitude)) return;
+    if (!isEnRoute) return;
+
+    const camera: Camera = {
+      center: { latitude: location.latitude, longitude: location.longitude },
+      heading: location.heading,
+      pitch: NAV_PITCH,
+      zoom: NAV_ZOOM,
+      altitude: 300,
     };
-  }, []);
-
-  // ───────────────────────────────────────────────
-  //  Planned route: pickup → dropoff (once per job)
-  // ───────────────────────────────────────────────
-  useEffect(() => {
-    if (!pickupCoords || !dropoffCoords) {
-      setPlannedRouteCoords([]);
-      return;
-    }
-
-    (async () => {
-      try {
-        const { coordinates, error } = await getDirections({
-          originLat: pickupCoords.latitude,
-          originLng: pickupCoords.longitude,
-          destLat: dropoffCoords.latitude,
-          destLng: dropoffCoords.longitude,
-        });
-        if (!error && coordinates?.length) {
-          setPlannedRouteCoords(coordinates);
-        }
-      } catch {}
-    })();
-  }, [activeJob?.id]);
-
-  // ───────────────────────────────────────────────
-  //  Live route: rider → current destination
-  // ───────────────────────────────────────────────
-  const fetchRiderRoute = useCallback(async () => {
-    if (!location || !activeJob) {
-      setRiderRouteCoords([]);
-      return;
-    }
-
-    const now = Date.now();
-    if (now - lastRouteFetchRef.current < ROUTE_REFETCH_INTERVAL_MS) return;
-    lastRouteFetchRef.current = now;
-
-    let dest: LatLng | null = null;
-    if (status === "en-route-pickup") dest = pickupCoords;
-    else if (status === "en-route-dropoff") dest = dropoffCoords;
-
-    if (!dest) {
-      setRiderRouteCoords([]);
-      setDistanceLeft("");
-      setEta("");
-      return;
-    }
-
-    try {
-      const { coordinates, distance, duration, steps, error } =
-        await getDirections({
-          originLat: location.coords.latitude,
-          originLng: location.coords.longitude,
-          destLat: dest.latitude,
-          destLng: dest.longitude,
-        });
-
-      if (error || !coordinates?.length) return;
-
-      setRiderRouteCoords(coordinates);
-      setDistanceLeft(distance.text);
-      setEta(duration.text);
-      if (steps?.length) {
-        setRouteSteps(steps);
-        setCurrentInstruction(steps[0]?.instruction ?? "");
-        setNextInstruction(steps[1]?.instruction ?? "");
-        setTurnIcon(instructionToIcon(steps[0]?.instruction ?? ""));
-      }
-    } catch {}
-  }, [location, status, activeJob, pickupCoords, dropoffCoords]);
+    mapRef.current.animateCamera(camera, { duration: 900 });
+  }, [location, isEnRoute, isMapReady, followMode]);
 
   useEffect(() => {
-    if (status === "en-route-pickup" || status === "en-route-dropoff") {
-      lastRouteFetchRef.current = 0; // force immediate fetch
-      fetchRiderRoute();
-    } else {
-      setRiderRouteCoords([]);
-      setRouteSteps([]);
-      setCurrentInstruction("");
-      setNextInstruction("");
-      setDistanceLeft("");
-      setEta("");
-    }
-  }, [status, activeJob?.id, fetchRiderRoute]);
+    if (isEnRoute) setFollowMode(true);
+  }, [isEnRoute]);
 
-  useEffect(() => {
-    if (status === "en-route-pickup" || status === "en-route-dropoff") {
-      fetchRiderRoute();
-    }
-  }, [location, fetchRiderRoute]);
+  //  Re-centre handler
+  const handleRecenter = useCallback(() => {
+    if (!location || !mapRef.current) return;
+    if (!isValidCoord(location.latitude, location.longitude)) return;
+    setFollowMode(true);
+    mapRef.current.animateCamera(
+      {
+        center: { latitude: location.latitude, longitude: location.longitude },
+        heading: isEnRoute ? location.heading : 0,
+        pitch: isEnRoute ? NAV_PITCH : 0,
+        zoom: isEnRoute ? NAV_ZOOM : OVERVIEW_ZOOM,
+        altitude: 300,
+      },
+      { duration: 700 },
+    );
+  }, [location, isEnRoute]);
 
-  // ───────────────────────────────────────────────
-  //  Track which step we're on based on rider position
-  // ───────────────────────────────────────────────
-  useEffect(() => {
-    if (!location || routeSteps.length === 0) return;
-    const riderLat = location.coords.latitude;
-    const riderLng = location.coords.longitude;
-
-    // Find the first step whose endLocation we haven't reached yet
-    // (i.e., distance > 30m from the rider)
-    const PASSED_THRESHOLD_M = 40;
-    const toMeters = (dLat: number, dLng: number) =>
-      Math.sqrt(dLat * dLat + dLng * dLng) * 111_320;
-
-    let activeIdx = 0;
-    for (let i = 0; i < routeSteps.length; i++) {
-      const s = routeSteps[i];
-      const dist = toMeters(
-        s.endLocation.latitude - riderLat,
-        s.endLocation.longitude - riderLng,
-      );
-      if (dist > PASSED_THRESHOLD_M) {
-        activeIdx = i;
-        break;
-      }
-      activeIdx = Math.min(i + 1, routeSteps.length - 1);
-    }
-
-    setCurrentInstruction(routeSteps[activeIdx]?.instruction ?? "");
-    setNextInstruction(routeSteps[activeIdx + 1]?.instruction ?? "");
-    setTurnIcon(instructionToIcon(routeSteps[activeIdx]?.instruction ?? ""));
-  }, [location, routeSteps]);
-
-  // ───────────────────────────────────────────────
-  //  Google-Navigation camera: heading + pitch + close zoom
-  // ───────────────────────────────────────────────
-  useEffect(() => {
-    if (!isMapReady || !location || !mapRef.current) return;
-
-    const isEnRoute =
-      status === "en-route-pickup" || status === "en-route-dropoff";
-
-    if (isEnRoute) {
-      const rawHeading = location.coords.heading ?? 0;
-      const heading = rawHeading >= 0 ? rawHeading : 0;
-
-      // Rider stays exactly at map center — no offset
-      const camera: Camera = {
-        center: {
-          latitude: location.coords.latitude,
-          longitude: location.coords.longitude,
-        },
-        heading,
-        pitch: 0,
-        zoom: NAV_ZOOM,
-        altitude: 200,
-      };
-
-      mapRef.current.animateCamera(camera, { duration: 1000 });
-    }
-    // Note: when NOT en-route, we don't auto-move → lets user explore freely
-  }, [location, status, isMapReady]);
-
-  // ───────────────────────────────────────────────
-  //  Exposed imperative methods
-  // ───────────────────────────────────────────────
+  //  Imperative handle
   useImperativeHandle(ref, () => ({
     animateToPickup() {
       if (!pickupCoords || !mapRef.current) return;
+      setFollowMode(false);
       mapRef.current.animateCamera(
         {
           center: pickupCoords,
@@ -515,9 +417,9 @@ const MapCanvas = forwardRef<MapCanvasHandle>((_, ref) => {
         { duration: 1000 },
       );
     },
-
     animateToDropoff() {
       if (!dropoffCoords || !mapRef.current) return;
+      setFollowMode(false);
       mapRef.current.animateCamera(
         {
           center: dropoffCoords,
@@ -529,49 +431,32 @@ const MapCanvas = forwardRef<MapCanvasHandle>((_, ref) => {
         { duration: 1000 },
       );
     },
-
     animateToCurrentLocation() {
-      if (!location || !mapRef.current) return;
-      mapRef.current.animateCamera(
-        {
-          center: {
-            latitude: location.coords.latitude,
-            longitude: location.coords.longitude,
-          },
-          zoom: NAV_ZOOM,
-          pitch: 0,
-          heading: 0,
-          altitude: 400,
-        },
-        { duration: 800 },
-      );
+      handleRecenter();
     },
   }));
 
-  // ───────────────────────────────────────────────
-  //  Render
-  // ───────────────────────────────────────────────
-  if (mapError) {
+  const mapStyle = colorScheme === "dark" ? DARK_MAP_STYLE : LIGHT_MAP_STYLE;
+  const errorMessage = permissionDenied
+    ? "Location permission denied. Please enable it in Settings."
+    : (locationError ?? null);
+
+  if (errorMessage) {
     return (
       <View
         style={[
           StyleSheet.absoluteFillObject,
-          {
-            justifyContent: "center",
-            alignItems: "center",
-            backgroundColor: colorScheme === "dark" ? "#1a1a1a" : "#f5f5f5",
-          },
+          styles.centered,
+          { backgroundColor: colorScheme === "dark" ? "#1a1a1a" : "#f5f5f5" },
         ]}
       >
         <Text
-          style={{
-            color: colorScheme === "dark" ? "#fff" : "#000",
-            fontSize: 16,
-            textAlign: "center",
-            paddingHorizontal: 20,
-          }}
+          style={[
+            styles.errorText,
+            { color: colorScheme === "dark" ? "#fff" : "#000" },
+          ]}
         >
-          ⚠️ Map Error: {mapError}
+          {errorMessage}
         </Text>
       </View>
     );
@@ -582,19 +467,20 @@ const MapCanvas = forwardRef<MapCanvasHandle>((_, ref) => {
       <View
         style={[
           StyleSheet.absoluteFillObject,
-          {
-            justifyContent: "center",
-            alignItems: "center",
-            backgroundColor: colorScheme === "dark" ? "#1a1a1a" : "#f5f5f5",
-          },
+          styles.centered,
+          { backgroundColor: colorScheme === "dark" ? "#1a1a1a" : "#f5f5f5" },
         ]}
       >
         <Text style={{ color: colorScheme === "dark" ? "#fff" : "#000" }}>
-          Loading map...
+          Acquiring GPS fix
         </Text>
       </View>
     );
   }
+
+  const riderLat = location.latitude;
+  const riderLng = location.longitude;
+  if (!isValidCoord(riderLat, riderLng)) return null;
 
   return (
     <>
@@ -603,68 +489,59 @@ const MapCanvas = forwardRef<MapCanvasHandle>((_, ref) => {
         provider={PROVIDER_GOOGLE}
         customMapStyle={mapStyle}
         showsTraffic={false}
-        pitchEnabled={true}
-        rotateEnabled={true}
+        pitchEnabled
+        rotateEnabled
         style={StyleSheet.absoluteFillObject}
         initialRegion={{
-          latitude: location.coords.latitude,
-          longitude: location.coords.longitude,
-          latitudeDelta: FIXED_LATITUDE_DELTA,
-          longitudeDelta: FIXED_LONGITUDE_DELTA,
+          latitude: riderLat,
+          longitude: riderLng,
+          latitudeDelta: FIXED_DELTA,
+          longitudeDelta: FIXED_DELTA,
         }}
         showsUserLocation={false}
         showsMyLocationButton={false}
-        showsCompass={true}
-        onMapReady={() => {
-          setIsMapReady(true);
-          setMapError(null);
+        showsCompass
+        onMapReady={() => setIsMapReady(true)}
+        onTouchStart={() => {
+          if (followMode) setFollowMode(false);
         }}
       >
-        {/* Custom rider marker — visible arrow with heading rotation */}
+        {/* Rider marker with smooth heading animation */}
         <Marker
-          coordinate={{
-            latitude: location.coords.latitude,
-            longitude: location.coords.longitude,
-          }}
+          coordinate={{ latitude: riderLat, longitude: riderLng }}
           anchor={{ x: 0.5, y: 0.5 }}
           flat
-          rotation={
-            location.coords.heading != null && location.coords.heading >= 0
-              ? location.coords.heading
-              : 0
-          }
-          tracksViewChanges
+          tracksViewChanges={false}
         >
           <View style={styles.riderMarkerWrap}>
-            <View
-              style={[styles.riderMarkerInner, { backgroundColor: primary }]}
+            <Animated.View
+              style={[
+                styles.riderMarkerInner,
+                { backgroundColor: primary },
+                { transform: [{ rotate: markerRotation }] },
+              ]}
             >
               <IconSymbol name="arrow.up" size={18} color="#fff" />
-            </View>
+            </Animated.View>
           </View>
         </Marker>
 
-        {/* Accuracy circle */}
+        {/* GPS accuracy halo */}
         <Circle
-          center={{
-            latitude: location.coords.latitude,
-            longitude: location.coords.longitude,
-          }}
-          radius={location.coords.accuracy || 40}
+          center={{ latitude: riderLat, longitude: riderLng }}
+          radius={Math.max(location.accuracy, 10)}
           strokeColor={`${primary}4D`}
           fillColor={`${primary}1A`}
         />
 
-        {/* Live rider → destination route — thick solid blue line */}
+        {/* Live route  rider to destination */}
         {riderRouteCoords.length > 0 && (
           <>
-            {/* Casing / border */}
             <Polyline
               coordinates={riderRouteCoords}
               strokeColor="rgba(255,255,255,0.6)"
               strokeWidth={12}
             />
-            {/* Main route line */}
             <Polyline
               coordinates={riderRouteCoords}
               strokeColor={primary}
@@ -673,13 +550,14 @@ const MapCanvas = forwardRef<MapCanvasHandle>((_, ref) => {
           </>
         )}
 
-        {/* Planned pickup → dropoff route (context) — thinner grey */}
+        {/* Planned route  pickup to dropoff (dashed, context) */}
         {plannedRouteCoords.length > 0 &&
           (status === "at-pickup" || status === "en-route-dropoff") && (
             <Polyline
               coordinates={plannedRouteCoords}
-              strokeColor={colorScheme === "dark" ? "#666" : "#bbb"}
+              strokeColor={colorScheme === "dark" ? "#555" : "#bbb"}
               strokeWidth={4}
+              lineDashPattern={[8, 4]}
             />
           )}
 
@@ -687,19 +565,16 @@ const MapCanvas = forwardRef<MapCanvasHandle>((_, ref) => {
         {pickupCoords &&
           (status === "en-route-pickup" || status === "at-pickup") &&
           activeJob && (
-            <Marker
-              coordinate={pickupCoords}
-              title={
-                activeJob.jobType === "ride"
-                  ? "Pickup Location"
-                  : "Vendor Location"
-              }
-            >
-              <IconSymbol
-                name={activeJob.jobType === "ride" ? "car" : "storefront"}
-                size={28}
-                color={success}
-              />
+            <Marker coordinate={pickupCoords} tracksViewChanges={false}>
+              <View style={[styles.destMarker, { backgroundColor: success }]}>
+                <IconSymbol
+                  name={
+                    activeJob.jobType === "ride" ? "person.fill" : "storefront"
+                  }
+                  size={20}
+                  color="#fff"
+                />
+              </View>
             </Marker>
           )}
 
@@ -707,32 +582,33 @@ const MapCanvas = forwardRef<MapCanvasHandle>((_, ref) => {
         {dropoffCoords &&
           (status === "at-pickup" || status === "en-route-dropoff") &&
           activeJob && (
-            <Marker
-              coordinate={dropoffCoords}
-              title={
-                activeJob.jobType === "ride"
-                  ? "Drop-off Location"
-                  : "Customer Location"
-              }
-            >
-              <IconSymbol
-                name={activeJob.jobType === "ride" ? "car" : "house"}
-                size={28}
-                color={danger}
-              />
+            <Marker coordinate={dropoffCoords} tracksViewChanges={false}>
+              <View style={[styles.destMarker, { backgroundColor: danger }]}>
+                <IconSymbol
+                  name={activeJob.jobType === "ride" ? "mappin" : "house.fill"}
+                  size={20}
+                  color="#fff"
+                />
+              </View>
             </Marker>
           )}
+
+        {/* Confirm-job dropoff pin */}
+        {status === "confirm-job" && dropoffCoords && (
+          <Marker coordinate={dropoffCoords} tracksViewChanges={false}>
+            <View style={[styles.destMarker, { backgroundColor: danger }]}>
+              <IconSymbol name="checkmark.circle.fill" size={20} color="#fff" />
+            </View>
+          </Marker>
+        )}
       </MapView>
 
-      {/* Floating turn-direction icon — compact card, top-left */}
+      {/* Turn instruction card */}
       {currentInstruction ? (
         <View
           style={[
             styles.turnIconCard,
-            {
-              backgroundColor: colorScheme === "dark" ? "#1E293B" : "#fff",
-              shadowColor: "#000",
-            },
+            { backgroundColor: colorScheme === "dark" ? "#1E293B" : "#fff" },
           ]}
         >
           <View style={[styles.turnIconInner, { backgroundColor: primary }]}>
@@ -751,38 +627,37 @@ const MapCanvas = forwardRef<MapCanvasHandle>((_, ref) => {
         </View>
       ) : null}
 
-      {/* ETA / distance overlay — only when no turn instruction is active */}
+      {/* ETA overlay */}
       {!currentInstruction && distanceLeft && eta && activeJob && (
         <View
           style={[
-            styles.overlay,
+            styles.etaOverlay,
             {
               backgroundColor:
                 colorScheme === "dark"
-                  ? "rgba(255,255,255,0.9)"
-                  : "rgba(0,0,0,0.7)",
+                  ? "rgba(30,41,59,0.92)"
+                  : "rgba(0,0,0,0.72)",
             },
           ]}
         >
-          <Text
-            style={[
-              styles.text,
-              { color: colorScheme === "dark" ? "#000" : "#fff" },
-            ]}
-          >
-            {activeJob.jobType === "ride"
-              ? `${distanceLeft} left`
-              : distanceLeft}
-          </Text>
-          <Text
-            style={[
-              styles.text,
-              { color: colorScheme === "dark" ? "#000" : "#fff" },
-            ]}
-          >
-            ETA {eta}
-          </Text>
+          <Text style={styles.etaText}>{distanceLeft}</Text>
+          <Text style={styles.etaSep}></Text>
+          <Text style={styles.etaText}>ETA {eta}</Text>
         </View>
+      )}
+
+      {/* Re-centre FAB  only visible when follow mode is off */}
+      {!followMode && (
+        <TouchableOpacity
+          style={[
+            styles.recenterFab,
+            { backgroundColor: colorScheme === "dark" ? "#1E293B" : "#fff" },
+          ]}
+          onPress={handleRecenter}
+          activeOpacity={0.8}
+        >
+          <IconSymbol name="location.fill" size={22} color={primary} />
+        </TouchableOpacity>
       )}
     </>
   );
@@ -793,18 +668,15 @@ MapCanvas.displayName = "MapCanvas";
 export default MapCanvas;
 
 const styles = StyleSheet.create({
-  overlay: {
-    position: "absolute",
-    bottom: 60,
-    left: 20,
-    padding: 10,
-    borderRadius: 8,
+  centered: {
+    justifyContent: "center",
+    alignItems: "center",
   },
-  text: {
-    fontWeight: "600",
+  errorText: {
+    fontSize: 15,
+    textAlign: "center",
+    paddingHorizontal: 24,
   },
-  // Rider direction arrow marker
-  // Extra padding on the wrap so elevation shadow isn't clipped on Android
   riderMarkerWrap: {
     padding: 6,
     alignItems: "center",
@@ -825,13 +697,26 @@ const styles = StyleSheet.create({
     borderWidth: 2.5,
     borderColor: "rgba(255,255,255,0.9)",
   },
-  // Floating turn icon card
+  destMarker: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 6,
+    borderWidth: 2,
+    borderColor: "rgba(255,255,255,0.85)",
+  },
   turnIconCard: {
     position: "absolute",
     top: 120,
-    left: 20,
+    left: 16,
     borderRadius: 16,
-    padding: 8,
+    padding: 10,
     alignItems: "center",
     shadowOpacity: 0.2,
     shadowRadius: 8,
@@ -851,5 +736,39 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     marginTop: 6,
     textAlign: "center",
+  },
+  etaOverlay: {
+    position: "absolute",
+    bottom: 64,
+    left: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 24,
+    gap: 6,
+  },
+  etaText: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 13,
+  },
+  etaSep: {
+    color: "rgba(255,255,255,0.5)",
+    fontSize: 13,
+  },
+  recenterFab: {
+    position: "absolute",
+    bottom: 72,
+    right: 16,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 8,
   },
 });

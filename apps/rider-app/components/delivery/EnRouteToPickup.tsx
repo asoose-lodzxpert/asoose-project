@@ -127,9 +127,15 @@ export default function EnRouteToPickup({
           </ThemedText>
         </View>
 
-        {activeJob.customerPhone && (
+        {(activeJob.customerPhone ||
+          activeJob.pickupAddress?.phone ||
+          activeJob.pickupContactPhone) && (
           <Pressable
-            onPress={() => Linking.openURL(`tel:${activeJob.customerPhone}`)}
+            onPress={() =>
+              Linking.openURL(
+                `tel:${activeJob.customerPhone || activeJob.pickupAddress?.phone || activeJob.pickupContactPhone}`,
+              )
+            }
             style={styles.callBtn}
           >
             <IconSymbol name="phone" size={18} color={colors.primary} />
