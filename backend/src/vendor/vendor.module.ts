@@ -37,6 +37,8 @@ import { StoresService } from 'src/super-admin/vendors/vendors.service';
 import { TransactionsModule } from 'src/super-admin/transactions/transaction.module';
 import { VendorAccountNotificationsService } from './notifications/vendor-account-notifications.service';
 import { CommonModule } from '../common/common.module';
+import { TokenRevocationService } from 'src/auth/token-revocation.service';
+import { RedisModule } from '../redis/redis.module';
 
 @Module({
   imports: [
@@ -47,8 +49,9 @@ import { CommonModule } from '../common/common.module';
     OtpModule,
     NotificationsModule,
     CommonModule,
+    RedisModule,
     CacheModule.register(),
-    forwardRef(() => TransactionsModule), // ✅ FIXED: Wrapped in forwardRef to break circular dependency
+    forwardRef(() => TransactionsModule),
   ],
   controllers: [
     VendorProductsController,
@@ -68,6 +71,7 @@ import { CommonModule } from '../common/common.module';
     NubanService, // kept for any remaining usages
     PaystackAccountService,
     PaystackService,
+    TokenRevocationService,
 
     ActivityLogService,
     StoresService,
