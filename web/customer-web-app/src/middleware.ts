@@ -10,6 +10,14 @@ const ADMIN_ROLES = [
   "ADMIN_FINANCE",
 ];
 
+// ── Maintenance-mode cache ────────────────────────────────────────────────────
+// Middleware runs on the Edge runtime where next: { revalidate } is ignored.
+// A module-level variable persists for the lifetime of the Edge worker instance,
+// giving us a simple TTL cache that avoids a backend round-trip on every request.
+const MAINTENANCE_CACHE_TTL_MS = 60_000; // re-check backend at most once per minute
+let maintenanceCacheValue = false;
+let maintenanceCacheExpiry = 0;
+
 export async function middleware(req: NextRequest) {
   const url = req.nextUrl;
 
@@ -28,23 +36,25 @@ export async function middleware(req: NextRequest) {
   const isLoggedIn = !!token;
   const userRole = token?.role as string | undefined;
 
-  // 3. Check Maintenance Mode (Fetch from NestJS Backend)
-  let isMaintenanceActive = false;
+  // 3. Check Maintenance Mode — served from in-memory cache, refreshed once per minute
+  let isMaintenanceActive = maintenanceCacheValue;
 
-  try {
-    const res = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/settings/maintenance-mode`,
-      {
-        next: { revalidate: 60 },
-      },
-    );
+  if (Date.now() > maintenanceCacheExpiry) {
+    try {
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/settings/maintenance-mode`,
+      );
 
-    if (res.ok) {
-      const data = await res.json();
-      isMaintenanceActive = data.isEnabled === true;
+      if (res.ok) {
+        const data = await res.json();
+        isMaintenanceActive = data.isEnabled === true;
+        maintenanceCacheValue = isMaintenanceActive;
+        maintenanceCacheExpiry = Date.now() + MAINTENANCE_CACHE_TTL_MS;
+      }
+    } catch (error) {
+      // Keep the stale cached value if the backend is temporarily unreachable
+      console.error("Middleware fetch error:", error);
     }
-  } catch (error) {
-    console.error("Middleware fetch error:", error);
   }
 
   // Checks if the logged-in user possesses an authorized admin role

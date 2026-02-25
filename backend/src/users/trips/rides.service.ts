@@ -193,18 +193,24 @@ export class RidesService {
       throw new BadRequestException('Invalid vehicle type requested.');
     }
 
-    // 3. Prevent duplicate active rides
-    const activeRide = await this.prisma.ride.findFirst({
-      where: {
-        customerId: userId,
-        status: {
-          in: [
-            RideStatus.REQUESTED,
-            RideStatus.SEARCHING_DRIVER,
-            RideStatus.DRIVER_ACCEPTED,
-            RideStatus.PAID,
-            RideStatus.IN_PROGRESS,
-          ] as RideStatus[],
+    // 2. Resolve addresses + check for an active ride in parallel.
+    //    All three are independent — running them sequentially wasted ~2-8 s
+    //    on every request due to back-to-back Google Maps round-trips.
+    const [securePickup, secureDropoff, activeRide] = await Promise.all([
+      this.common.resolveSecureLocation(dto.pickupLocation),
+      this.common.resolveSecureLocation(dto.dropoffLocation),
+      this.prisma.ride.findFirst({
+        where: {
+          customerId: userId,
+          status: {
+            in: [
+              RideStatus.REQUESTED,
+              RideStatus.SEARCHING_DRIVER,
+              RideStatus.DRIVER_ACCEPTED,
+              RideStatus.PAID,
+              RideStatus.IN_PROGRESS,
+            ] as RideStatus[],
+          },
         },
       }),
     ]);
