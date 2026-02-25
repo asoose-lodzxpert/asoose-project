@@ -312,7 +312,12 @@ export class JobEventsService {
    * Send location update via the shared socket.
    * heading is the GPS compass heading in degrees [0, 360); null if device doesn't report it.
    */
-  sendLocationUpdate(lat: number, lng: number, role?: string, heading?: number | null): boolean {
+  sendLocationUpdate(
+    lat: number,
+    lng: number,
+    role?: string,
+    heading?: number | null,
+  ): boolean {
     if (this.socket && this.connectionStatus === "connected") {
       this.socket.emit("rider_location_update", {
         lat,

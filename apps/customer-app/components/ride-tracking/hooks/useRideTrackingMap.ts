@@ -120,7 +120,10 @@ export function useRideTrackingMap(
 
       // Throttle — skip unless forced (e.g. ride status changed) or enough time elapsed
       const now = Date.now();
-      if (!force && now - lastDriverRouteFetchMs.current < ROUTE_RECALC_INTERVAL_MS) {
+      if (
+        !force &&
+        now - lastDriverRouteFetchMs.current < ROUTE_RECALC_INTERVAL_MS
+      ) {
         return;
       }
       lastDriverRouteFetchMs.current = now;
@@ -203,7 +206,7 @@ export function useRideTrackingMap(
       setDriverRouteCoords([]);
       setEtaMinutes(null);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentRide?.id, currentRide?.status]);
 
   // On driver location update: throttled route + ETA refresh; always refit camera

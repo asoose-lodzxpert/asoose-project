@@ -20,7 +20,11 @@ const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 type TrackingMapProps = {
   currentRide: Ride | null;
-  driverLocation: { latitude: number; longitude: number; heading?: number } | null;
+  driverLocation: {
+    latitude: number;
+    longitude: number;
+    heading?: number;
+  } | null;
   userLocation: { latitude: number; longitude: number } | null;
   routeCoords: { latitude: number; longitude: number }[];
   driverRouteCoords: { latitude: number; longitude: number }[];
@@ -56,9 +60,12 @@ const TrackingMap = forwardRef<MapView, TrackingMapProps>(
     const textPrimary = useThemeColor({}, "textPrimary");
 
     // Whether driver is approaching pickup (pulse the pickup marker)
-    const isApproaching = ["DRIVER_ACCEPTED", "PAID", "ACCEPTED", "ARRIVED"].includes(
-      currentRide?.status as string ?? "",
-    );
+    const isApproaching = [
+      "DRIVER_ACCEPTED",
+      "PAID",
+      "ACCEPTED",
+      "ARRIVED",
+    ].includes((currentRide?.status as string) ?? "");
 
     return (
       <>

@@ -200,7 +200,8 @@ export class NotificationsGateway
   @SubscribeMessage('rider_location_update')
   async handleRiderLocationUpdate(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: { lat: number; lng: number; heading?: number; role?: string },
+    @MessageBody()
+    data: { lat: number; lng: number; heading?: number; role?: string },
   ) {
     const riderId = client.data.userId;
     this.logger.debug(
