@@ -1,4 +1,9 @@
-import { Injectable, BadRequestException, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { AppLogger } from '../libs/logger/app-logger.service';
 import { PrismaService } from '../prisma/prisma.service';
 import axios from 'axios';
@@ -88,8 +93,14 @@ export class MapsService {
     try {
       res = await axios.get(url);
     } catch (networkError: any) {
-      this.appLogger.error('Network error calling Google Geocoding API', networkError?.stack, { placeId });
-      throw new ServiceUnavailableException('Geocoding service temporarily unavailable. Please try again.');
+      this.appLogger.error(
+        'Network error calling Google Geocoding API',
+        networkError?.stack,
+        { placeId },
+      );
+      throw new ServiceUnavailableException(
+        'Geocoding service temporarily unavailable. Please try again.',
+      );
     }
 
     const status: string = res.data?.status;
@@ -111,22 +122,32 @@ export class MapsService {
     });
 
     if (status === 'ZERO_RESULTS' || status === 'NOT_FOUND') {
-      throw new NotFoundException('No location found for this place. Please search again and select a result from the list.');
+      throw new NotFoundException(
+        'No location found for this place. Please search again and select a result from the list.',
+      );
     }
 
     if (status === 'REQUEST_DENIED') {
-      throw new ServiceUnavailableException('Geocoding service configuration error. Please contact support.');
+      throw new ServiceUnavailableException(
+        'Geocoding service configuration error. Please contact support.',
+      );
     }
 
     if (status === 'OVER_QUERY_LIMIT') {
-      throw new ServiceUnavailableException('Geocoding quota exceeded. Please try again shortly.');
+      throw new ServiceUnavailableException(
+        'Geocoding quota exceeded. Please try again shortly.',
+      );
     }
 
     if (status === 'INVALID_REQUEST') {
-      throw new BadRequestException('Invalid Place ID. Please search again and select a valid location.');
+      throw new BadRequestException(
+        'Invalid Place ID. Please search again and select a valid location.',
+      );
     }
 
-    throw new ServiceUnavailableException('Geocoding service error. Please try again or enter your address manually.');
+    throw new ServiceUnavailableException(
+      'Geocoding service error. Please try again or enter your address manually.',
+    );
   }
 
   /**
@@ -143,8 +164,14 @@ export class MapsService {
     try {
       res = await axios.get(url);
     } catch (networkError) {
-      this.appLogger.error('Network error calling Google Geocoding API', networkError?.stack, { lat, lng });
-      throw new ServiceUnavailableException('Geocoding service temporarily unavailable. Please try again.');
+      this.appLogger.error(
+        'Network error calling Google Geocoding API',
+        networkError?.stack,
+        { lat, lng },
+      );
+      throw new ServiceUnavailableException(
+        'Geocoding service temporarily unavailable. Please try again.',
+      );
     }
 
     const status: string = res.data?.status;
@@ -163,7 +190,10 @@ export class MapsService {
     // No address found for this coordinate (e.g. middle of a field, API restriction)
     // Return a graceful fallback so the user's coordinates are still usable.
     if (status === 'ZERO_RESULTS' || status === 'NOT_FOUND') {
-      this.appLogger.warn('Google Geocoding returned no results — returning coordinate fallback', { lat, lng, status });
+      this.appLogger.warn(
+        'Google Geocoding returned no results — returning coordinate fallback',
+        { lat, lng, status },
+      );
       return {
         lat,
         lng,
@@ -173,7 +203,12 @@ export class MapsService {
     }
 
     // API-level errors (REQUEST_DENIED, INVALID_REQUEST, OVER_QUERY_LIMIT, etc.)
-    this.appLogger.error('Google Geocoding API error', undefined, { lat, lng, status, error_message: res.data?.error_message });
+    this.appLogger.error('Google Geocoding API error', undefined, {
+      lat,
+      lng,
+      status,
+      error_message: res.data?.error_message,
+    });
     throw new ServiceUnavailableException(
       status === 'OVER_QUERY_LIMIT'
         ? 'Geocoding quota exceeded. Please try again shortly.'

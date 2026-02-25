@@ -1,10 +1,17 @@
 export enum RideStatus {
+  // ── Active flow ──
+  REQUESTED = "REQUESTED", // Customer submitted ride request
+  SEARCHING_DRIVER = "SEARCHING_DRIVER", // System searching for a driver
+  DRIVER_ACCEPTED = "DRIVER_ACCEPTED", // Driver accepted; customer must pay
+  PAID = "PAID", // Payment confirmed; driver may start
+  IN_PROGRESS = "IN_PROGRESS", // Trip in progress
+  COMPLETED = "COMPLETED", // Trip completed
+  CANCELLED_BY_USER = "CANCELLED_BY_USER", // Customer cancelled
+  CANCELLED_BY_DRIVER = "CANCELLED_BY_DRIVER", // Driver cancelled
+  // ── Legacy (retained for backward compatibility) ──
   PENDING = "PENDING",
-  REQUESTED = "REQUESTED",
   ACCEPTED = "ACCEPTED",
   ARRIVED = "ARRIVED",
-  IN_PROGRESS = "IN_PROGRESS",
-  COMPLETED = "COMPLETED",
   CANCELLED = "CANCELLED",
 }
 
@@ -126,7 +133,8 @@ export type ConfirmRidePayload = {
 };
 
 export type CancelRidePayload = {
-  reason?: string;
+  /** Cancellation reason is required by the backend */
+  reason: string;
 };
 
 export type DriverLocation = {
@@ -139,12 +147,11 @@ export type DriverLocation = {
 export type RidePageView =
   | "IDLE"
   | "BOOKING"
-  | "PAYMENT"
-  | "FINDING_DRIVER"
-  | "DRIVER_ASSIGNED"
-  | "DRIVER_ARRIVED"
-  | "IN_PROGRESS"
-  | "COMPLETED";
+  | "FINDING_DRIVER" // REQUESTED / SEARCHING_DRIVER
+  | "AWAITING_PAYMENT" // DRIVER_ACCEPTED — customer must pay
+  | "DRIVER_ASSIGNED" // PAID — driver is on the way
+  | "IN_PROGRESS" // IN_PROGRESS
+  | "COMPLETED"; // COMPLETED
 
 export type RideContextState = {
   currentRide: Ride | null;
@@ -159,11 +166,25 @@ export type RideContextState = {
 export type RideSocketEvent =
   | {
       type: "ride_update";
-      status: RideStatus;
+      status: string;
       rideId: string;
       label?: string;
     }
   | {
+      /** Driver accepted the ride — customer must now pay */
+      type: "DRIVER_ACCEPTED";
+      rideId: string;
+      driver: Driver;
+      message?: string;
+    }
+  | {
+      /** Customer payment confirmed — driver may start trip */
+      type: "PAYMENT_CONFIRMED";
+      rideId: string;
+      message?: string;
+    }
+  | {
+      /** Legacy event — kept for backward compatibility */
       type: "DRIVER_FOUND";
       metadata: {
         rideId: string;
@@ -199,6 +220,9 @@ export type RideSocketEvent =
   | {
       type: "RIDE_CANCELLED";
       rideId: string;
+      /** Who cancelled: 'CUSTOMER' | 'DRIVER' | 'SYSTEM' */
+      cancelledBy?: "CUSTOMER" | "DRIVER" | "SYSTEM" | string;
+      reason?: string;
     }
   | {
       type: "NO_DRIVERS_FOUND";

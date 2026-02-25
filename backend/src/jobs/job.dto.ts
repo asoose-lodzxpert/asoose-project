@@ -32,12 +32,19 @@ export function mapBackendStatusToFrontend(
 ): string {
   if (jobType === 'ride') {
     const map: Record<string, string> = {
+      // ── Active flow ──
       REQUESTED: 'incoming-job',
+      SEARCHING_DRIVER: 'incoming-job',
+      DRIVER_ACCEPTED: 'en-route-pickup',
+      PAID: 'at-pickup',
+      IN_PROGRESS: 'en-route-dropoff',
+      COMPLETED: 'online-waiting',
+      CANCELLED_BY_USER: 'online-waiting',
+      CANCELLED_BY_DRIVER: 'online-waiting',
+      // ── Legacy ──
       ASSIGNED: 'incoming-job',
       ACCEPTED: 'en-route-pickup',
       ARRIVED: 'at-pickup',
-      IN_PROGRESS: 'en-route-dropoff',
-      COMPLETED: 'online-waiting',
       CANCELLED: 'online-waiting',
     };
     return map[status] ?? 'online-waiting';

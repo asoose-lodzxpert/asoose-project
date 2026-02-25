@@ -69,8 +69,22 @@ export class TripsService {
     return this.ridesService.cancelRide(userId, rideId, dto);
   }
 
-  async rateRide(userId: string, rideId: string, rating: number, comment?: string) {
+  async rateRide(
+    userId: string,
+    rideId: string,
+    rating: number,
+    comment?: string,
+  ) {
     return this.ridesService.rateRide(userId, rideId, rating, comment);
+  }
+
+  async reviewRide(
+    userId: string,
+    rideId: string,
+    rating: number,
+    comment?: string,
+  ) {
+    return this.ridesService.reviewRide(userId, rideId, rating, comment);
   }
 
   async getUserRides(userId: string, status?: string, page = 1, limit = 20) {

@@ -8,6 +8,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { RideStatus, DeliveryStatus } from '@prisma/client';
 import { AppLogger } from 'src/libs/logger/app-logger.service';
 import { TransactionLedgerService } from 'src/super-admin/transactions/transaction-ledger.service';
+import { NotificationsGateway } from '../../notifications/notifications.gateway';
 
 /** Maps a Prisma DeliveryStatus to the rider-app's JobStatus string */
 function deliveryStatusToJobStatus(status: DeliveryStatus): string {
@@ -28,10 +29,13 @@ function deliveryStatusToJobStatus(status: DeliveryStatus): string {
 function rideStatusToJobStatus(status: RideStatus): string {
   switch (status) {
     case RideStatus.REQUESTED:
+    case RideStatus.SEARCHING_DRIVER:
       return 'incoming-job';
-    case RideStatus.ACCEPTED:
+    case RideStatus.DRIVER_ACCEPTED:
       return 'en-route-pickup';
-    case RideStatus.ARRIVED:
+    case RideStatus.PAID:
+    case RideStatus.ACCEPTED: // legacy
+    case RideStatus.ARRIVED: // legacy
       return 'at-pickup';
     case RideStatus.IN_PROGRESS:
       return 'en-route-dropoff';
@@ -46,6 +50,7 @@ export class JobsService {
     private readonly prisma: PrismaService,
     private readonly logger: AppLogger,
     private readonly transactionLedger: TransactionLedgerService,
+    private readonly notificationsGateway: NotificationsGateway,
   ) {}
 
   /**
@@ -131,10 +136,14 @@ export class JobsService {
       this.logger.debug(`Checking for active ride - driver ${riderId}`);
 
       const activeStatuses: RideStatus[] = [
+        RideStatus.SEARCHING_DRIVER,
+        RideStatus.DRIVER_ACCEPTED,
+        RideStatus.PAID,
+        RideStatus.IN_PROGRESS,
+        // Legacy statuses kept for backward compatibility
         RideStatus.REQUESTED,
         RideStatus.ACCEPTED,
         RideStatus.ARRIVED,
-        RideStatus.IN_PROGRESS,
       ];
 
       const ride = await this.prisma.ride.findFirst({
@@ -263,8 +272,8 @@ export class JobsService {
         );
       }
 
-      const acceptable: RideStatus[] = [RideStatus.REQUESTED];
-      if (!acceptable.includes(ride.status as RideStatus)) {
+      const acceptable: string[] = ['SEARCHING_DRIVER'];
+      if (!acceptable.includes(ride.status as string)) {
         this.logger.warn(
           `Invalid state - cannot accept ride ${jobId} in status ${ride.status}`,
         );
@@ -273,15 +282,17 @@ export class JobsService {
         );
       }
 
-      this.logger.debug(`Accepting ride ${jobId} → ACCEPTED, rider=${riderId}`);
+      this.logger.debug(
+        `Accepting ride ${jobId} → DRIVER_ACCEPTED, rider=${riderId}`,
+      );
 
       const updateResult = await this.prisma.ride.updateMany({
         where: {
           id: jobId,
-          status: { in: [RideStatus.REQUESTED] },
+          status: { in: ['SEARCHING_DRIVER'] as any[] },
         },
         data: {
-          status: RideStatus.ACCEPTED,
+          status: 'DRIVER_ACCEPTED' as any,
           riderId,
           acceptedAt: new Date(),
         },
@@ -374,7 +385,7 @@ export class JobsService {
         throw new NotFoundException('Ride not found');
       }
 
-      if (ride.status !== RideStatus.REQUESTED) {
+      if ((ride.status as string) !== 'SEARCHING_DRIVER') {
         this.logger.warn(
           `Invalid state - cannot decline ride ${jobId} in status ${ride.status}`,
         );
@@ -460,21 +471,22 @@ export class JobsService {
         throw new ForbiddenException('Not your ride');
       }
 
-      if (ride.status !== RideStatus.ACCEPTED) {
+      // DRIVER_ACCEPTED or PAID: notify customer, no state change (ARRIVED removed)
+      const validArrivalStatuses: string[] = ['DRIVER_ACCEPTED', 'PAID'];
+      if (!validArrivalStatuses.includes(ride.status as string)) {
         this.logger.warn(
-          `Invalid state - cannot arrive at pickup for ride ${jobId} in ${ride.status}`,
+          `Invalid state - cannot notify arrival for ride ${jobId} in ${ride.status}`,
         );
         throw new BadRequestException(
-          `Cannot arrive at pickup for ride in status ${ride.status}`,
+          `Cannot notify arrival for ride in status ${ride.status}`,
         );
       }
 
-      this.logger.debug(`Updating ride ${jobId} → ARRIVED`);
+      this.logger.debug(
+        `Ride ${jobId} driver arrived at pickup (no state change)`,
+      );
 
-      return this.prisma.ride.update({
-        where: { id: jobId },
-        data: { status: RideStatus.ARRIVED },
-      });
+      return { id: ride.id, status: ride.status };
     }
 
     this.logger.error(`arriveAtPickup - unknown jobType: ${jobType}`);
@@ -603,12 +615,12 @@ export class JobsService {
         throw new ForbiddenException('Not your ride');
       }
 
-      if (ride.status !== RideStatus.ARRIVED) {
+      if ((ride.status as string) !== 'PAID') {
         this.logger.warn(
           `Invalid state - cannot confirm pickup for ride ${jobId} in ${ride.status}`,
         );
         throw new BadRequestException(
-          `Cannot confirm pickup for ride in status ${ride.status}`,
+          `Cannot confirm pickup for ride in status ${ride.status} — customer must pay first`,
         );
       }
 
@@ -626,7 +638,7 @@ export class JobsService {
 
       return this.prisma.ride.update({
         where: { id: jobId },
-        data: { status: RideStatus.IN_PROGRESS, startedAt: new Date() } as any,
+        data: { status: 'IN_PROGRESS' as any, startedAt: new Date() },
       });
     }
 
@@ -921,7 +933,7 @@ export class JobsService {
     if (jobType === 'ride') {
       const ride = await this.prisma.ride.findUnique({
         where: { id: jobId },
-        select: { id: true, status: true, riderId: true },
+        select: { id: true, status: true, riderId: true, customerId: true },
       });
 
       if (!ride) {
@@ -936,13 +948,9 @@ export class JobsService {
         throw new ForbiddenException('You are not assigned to this ride');
       }
 
-      const cancellable: RideStatus[] = [
-        RideStatus.ACCEPTED,
-        RideStatus.ARRIVED,
-        RideStatus.IN_PROGRESS,
-      ];
+      const cancellable: string[] = ['DRIVER_ACCEPTED', 'PAID', 'IN_PROGRESS'];
 
-      if (!cancellable.includes(ride.status as RideStatus)) {
+      if (!cancellable.includes(ride.status as string)) {
         this.logger.warn(
           `Invalid state - cannot cancel ride ${jobId} in ${ride.status}`,
         );
@@ -952,19 +960,39 @@ export class JobsService {
       }
 
       this.logger.debug(
-        `Cancelling ride ${jobId} → CANCELLED, reason: ${reason}`,
+        `Cancelling ride ${jobId} → CANCELLED_BY_DRIVER, reason: ${reason}`,
       );
 
-      return this.prisma.ride.update({
+      await this.prisma.ride.update({
         where: { id: jobId },
         data: {
-          status: RideStatus.CANCELLED,
+          status: 'CANCELLED_BY_DRIVER' as any,
           cancellationReason: reason,
           cancelledBy: riderId,
           cancelledAt: new Date(),
           riderId: null,
         },
       });
+
+      // Notify the customer that their driver cancelled
+      const cancelPayload = {
+        type: 'RIDE_CANCELLED',
+        rideId: jobId,
+        cancelledBy: 'DRIVER',
+        reason: reason ?? 'Driver cancelled the ride',
+      };
+      try {
+        this.notificationsGateway.server
+          .to(`user_${ride.customerId}`)
+          .emit('RIDE_CANCELLED', cancelPayload);
+        this.logger.log(
+          `[cancelJob/ride] Emitted RIDE_CANCELLED to customer ${ride.customerId}`,
+        );
+      } catch (e) {
+        this.logger.error('[cancelJob/ride] Socket emit failed', e);
+      }
+
+      return { message: 'Ride cancelled' };
     }
 
     this.logger.error(`cancelJob - unknown jobType: ${jobType}`);

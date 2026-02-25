@@ -13,6 +13,8 @@ interface UseJobEventsOptions {
   onError?: (error: Error) => void;
   onConnectionStatusChange?: (status: ConnectionStatus) => void;
   onForceLogout?: (reason?: string) => void;
+  /** Called when the customer confirms payment — driver may now start */
+  onPaymentConfirmed?: (rideId: string) => void;
   enabled?: boolean;
 }
 
@@ -24,6 +26,7 @@ export function useJobEvents(options: UseJobEventsOptions) {
     onError,
     onConnectionStatusChange,
     onForceLogout,
+    onPaymentConfirmed,
     enabled = true,
   } = options;
   const serviceRef = useRef<JobEventsService | null>(null);
@@ -47,6 +50,7 @@ export function useJobEvents(options: UseJobEventsOptions) {
         onError,
         onConnectionStatusChange,
         onForceLogout,
+        onPaymentConfirmed,
       });
     }
   }, [
@@ -56,6 +60,7 @@ export function useJobEvents(options: UseJobEventsOptions) {
     onError,
     onConnectionStatusChange,
     onForceLogout,
+    onPaymentConfirmed,
   ]);
 
   const connect = useCallback(() => {

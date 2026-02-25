@@ -128,8 +128,11 @@ export default function OrdersScreen() {
   const getStatusColor = (status: string): string => {
     switch (status) {
       case "REQUESTED":
+      case "SEARCHING_DRIVER":
       case "ASSIGNED":
         return "#F59E0B";
+      case "DRIVER_ACCEPTED":
+      case "PAID":
       case "ACCEPTED":
       case "PICKED_UP":
         return "#3B82F6";
@@ -139,6 +142,8 @@ export default function OrdersScreen() {
       case "COMPLETED":
         return success || "#10B981";
       case "CANCELLED":
+      case "CANCELLED_BY_USER":
+      case "CANCELLED_BY_DRIVER":
       case "REJECTED":
         return danger;
       default:
@@ -150,6 +155,12 @@ export default function OrdersScreen() {
     switch (status) {
       case "REQUESTED":
         return "Requested";
+      case "SEARCHING_DRIVER":
+        return "Finding Driver";
+      case "DRIVER_ACCEPTED":
+        return "Driver Accepted";
+      case "PAID":
+        return "Paid";
       case "ASSIGNED":
         return "Assigned";
       case "ACCEPTED":
@@ -163,7 +174,10 @@ export default function OrdersScreen() {
       case "COMPLETED":
         return "Completed";
       case "CANCELLED":
+      case "CANCELLED_BY_USER":
         return "Cancelled";
+      case "CANCELLED_BY_DRIVER":
+        return "Cancelled by Driver";
       case "REJECTED":
         return "Rejected";
       default:

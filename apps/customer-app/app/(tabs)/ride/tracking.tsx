@@ -6,6 +6,7 @@ import {
   ActivityIndicator,
   Dimensions,
   Platform,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useState, useEffect, useCallback, useRef } from "react";
@@ -17,7 +18,6 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { useRide } from "@/context/RideContext";
 import { RideStatus } from "@/types/ride";
-import { useConfirm } from "@/components/ui/ConfirmDialogProvider";
 import { DriverInfoCard } from "@/components/ride/DriverInfoCard";
 import { OTPDisplay } from "@/components/ride/OTPDisplay";
 import { RideService } from "@/services/ride.service";
@@ -204,11 +204,15 @@ const DARK_MAP_STYLE = [
   },
 ];
 
-function statusLabel(status: RideStatus): string {
+function statusLabel(status: RideStatus | string): string {
   switch (status) {
     case RideStatus.REQUESTED:
-      return "Finding your driver";
-    case RideStatus.ACCEPTED:
+    case RideStatus.SEARCHING_DRIVER:
+      return "Searching for a driver…";
+    case RideStatus.DRIVER_ACCEPTED:
+      return "Driver found! Please pay to confirm";
+    case RideStatus.PAID:
+    case RideStatus.ACCEPTED: // legacy
       return "Driver is on the way";
     case RideStatus.ARRIVED:
       return "Driver has arrived";
@@ -221,11 +225,11 @@ function statusLabel(status: RideStatus): string {
 
 export default function RideTrackingScreen() {
   const router = useRouter();
-  const showConfirm = useConfirm();
   const {
     currentRide,
     driverLocation,
     cancelRide,
+    confirmPayment,
     refreshCurrentRide,
     socketConnected,
   } = useRide();
@@ -244,11 +248,17 @@ export default function RideTrackingScreen() {
 
   const [refreshing, setRefreshing] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const [paying, setPaying] = useState(false);
   const [userLocation, setUserLocation] = useState<{
     latitude: number;
     longitude: number;
   } | null>(null);
+  // Route from pickup → dropoff (shown throughout)
   const [routeCoords, setRouteCoords] = useState<
+    { latitude: number; longitude: number }[]
+  >([]);
+  // Route from driver → pickup (shown while driver is en route to customer)
+  const [driverRouteCoords, setDriverRouteCoords] = useState<
     { latitude: number; longitude: number }[]
   >([]);
 
@@ -282,8 +292,10 @@ export default function RideTrackingScreen() {
   // Fetch route from backend
   const fetchRoute = useCallback(async () => {
     if (!currentRide?.pickupAddress || !currentRide?.dropoffAddress) return;
+    const { pickupAddress: p, dropoffAddress: d } = currentRide;
+
     try {
-      const { pickupAddress: p, dropoffAddress: d } = currentRide;
+      // Always fetch pickup → dropoff (destination leg)
       const res = await get(
         `maps/directions?originLat=${p.lat}&originLng=${p.lng}&destLat=${d.lat}&destLng=${d.lng}`,
       );
@@ -292,6 +304,36 @@ export default function RideTrackingScreen() {
       setRouteCoords([]);
     }
   }, [currentRide?.pickupAddress, currentRide?.dropoffAddress]);
+
+  // Fetch driver → pickup route while driver is en route to customer
+  const fetchDriverRoute = useCallback(async () => {
+    if (!currentRide?.pickupAddress || !driverLocation) {
+      setDriverRouteCoords([]);
+      return;
+    }
+    const { pickupAddress: p } = currentRide;
+    // Show driver route when driver is approaching (DRIVER_ACCEPTED or PAID state)
+    const isApproaching = [
+      "DRIVER_ACCEPTED",
+      "PAID",
+      RideStatus.ACCEPTED,
+      RideStatus.ARRIVED,
+    ].includes(currentRide.status as string);
+    if (!isApproaching) {
+      setDriverRouteCoords([]);
+      return;
+    }
+    try {
+      const res = await get(
+        `maps/directions?originLat=${driverLocation.latitude}&originLng=${driverLocation.longitude}&destLat=${p.lat}&destLng=${p.lng}`,
+      );
+      setDriverRouteCoords(
+        Array.isArray(res?.coordinates) ? res.coordinates : [],
+      );
+    } catch {
+      setDriverRouteCoords([]);
+    }
+  }, [currentRide?.pickupAddress, currentRide?.status, driverLocation]);
 
   const fitMap = useCallback(() => {
     if (!mapRef.current) return;
@@ -325,8 +367,17 @@ export default function RideTrackingScreen() {
     if (currentRide) {
       fetchRoute();
       setTimeout(fitMap, 500);
+    } else {
+      // Ride ended or was cancelled — clear both route segments
+      setRouteCoords([]);
+      setDriverRouteCoords([]);
     }
   }, [currentRide?.id, fetchRoute]);
+
+  // Refresh driver→pickup route whenever driver location updates
+  useEffect(() => {
+    fetchDriverRoute();
+  }, [fetchDriverRoute]);
 
   useEffect(() => {
     if (driverLocation || userLocation) fitMap();
@@ -339,22 +390,38 @@ export default function RideTrackingScreen() {
   };
 
   const handleCancel = async () => {
-    const ok = await showConfirm({
-      title: "Cancel Ride",
-      message: "Are you sure you want to cancel this ride?",
-      confirmLabel: "Yes, Cancel",
-      cancelLabel: "No",
-    });
-    if (!ok) return;
-    setCancelling(true);
-    try {
-      await cancelRide("Cancelled by user");
-      router.replace("/ride");
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setCancelling(false);
-    }
+    // Collect a cancellation reason before confirming
+    const REASONS = [
+      "Changed my mind",
+      "Driver is taking too long",
+      "Wrong location entered",
+      "Found another ride",
+      "Other",
+    ];
+
+    // Build Alert buttons for each reason option
+    const reasonButtons = REASONS.map((r) => ({
+      text: r,
+      onPress: async () => {
+        setCancelling(true);
+        try {
+          await cancelRide(r);
+          router.replace("/ride");
+        } catch (e) {
+          console.error(e);
+        } finally {
+          setCancelling(false);
+        }
+      },
+    }));
+    reasonButtons.push({ text: "Go Back", onPress: () => {} } as any);
+
+    Alert.alert(
+      "Cancel Ride",
+      "Please select a cancellation reason:",
+      reasonButtons,
+      { cancelable: true },
+    );
   };
 
   if (!currentRide) {
@@ -363,17 +430,29 @@ export default function RideTrackingScreen() {
   }
 
   const canCancel = [
-    RideStatus.PENDING,
     RideStatus.REQUESTED,
+    RideStatus.SEARCHING_DRIVER,
+    RideStatus.DRIVER_ACCEPTED,
+    RideStatus.PAID,
+    // legacy
+    RideStatus.PENDING,
     RideStatus.ACCEPTED,
   ].includes(currentRide.status as RideStatus);
   const showDriver =
     currentRide.rider &&
-    [RideStatus.ACCEPTED, RideStatus.ARRIVED, RideStatus.IN_PROGRESS].includes(
-      currentRide.status as RideStatus,
-    );
+    [
+      "DRIVER_ACCEPTED",
+      "PAID",
+      RideStatus.ACCEPTED,
+      RideStatus.ARRIVED,
+      RideStatus.IN_PROGRESS,
+    ].includes(currentRide.status as string);
+  // Show OTP when ride is PAID (customer should show it to driver to start)
   const showOTP =
-    currentRide.status === RideStatus.ARRIVED && currentRide.startOtp;
+    (currentRide.status as string) === "PAID" && currentRide.startOtp;
+  // Show payment button when driver has accepted but customer hasn’t paid
+  const showPaymentButton =
+    (currentRide.status as string) === "DRIVER_ACCEPTED";
 
   return (
     <View style={styles.root}>
@@ -441,6 +520,15 @@ export default function RideTrackingScreen() {
             strokeWidth={3}
           />
         )}
+        {/* Driver → pickup route (blue dashed while approaching) */}
+        {driverRouteCoords.length > 0 && (
+          <Polyline
+            coordinates={driverRouteCoords}
+            strokeColor="#2196F3"
+            strokeWidth={3}
+            lineDashPattern={[8, 4]}
+          />
+        )}
       </MapView>
 
       {/* Floating top bar */}
@@ -499,13 +587,14 @@ export default function RideTrackingScreen() {
 
         {/* Status + fare */}
         <View style={styles.statusRow}>
-          {currentRide.status === RideStatus.REQUESTED && (
+          {currentRide.status === RideStatus.REQUESTED ||
+          (currentRide.status as string) === "SEARCHING_DRIVER" ? (
             <ActivityIndicator
               size="small"
               color={primary}
               style={{ marginRight: 8 }}
             />
-          )}
+          ) : null}
           <ThemedText type="defaultSemiBold" style={{ fontSize: 15, flex: 1 }}>
             {statusLabel(currentRide.status as RideStatus)}
           </ThemedText>
@@ -545,6 +634,57 @@ export default function RideTrackingScreen() {
           <>
             <View style={[styles.divider, { backgroundColor: border }]} />
             <DriverInfoCard driver={currentRide.rider!} />
+          </>
+        )}
+
+        {/* Payment confirmation card — shown when driver accepted but not yet paid */}
+        {showPaymentButton && (
+          <>
+            <View style={[styles.divider, { backgroundColor: border }]} />
+            <View style={{ marginTop: 4, marginBottom: 6 }}>
+              <ThemedText
+                type="caption"
+                style={{ color: textSecondary, marginBottom: 8 }}
+              >
+                Confirm your payment to let the driver start the trip.
+              </ThemedText>
+              <Pressable
+                onPress={async () => {
+                  if (!currentRide?.id) return;
+                  setPaying(true);
+                  try {
+                    await confirmPayment(currentRide.id, "CASH");
+                  } catch (e) {
+                    console.error(e);
+                  } finally {
+                    setPaying(false);
+                  }
+                }}
+                disabled={paying}
+                style={[
+                  styles.cancelBtn,
+                  {
+                    backgroundColor: primary,
+                    borderRadius: 10,
+                    paddingVertical: 12,
+                    paddingHorizontal: 20,
+                    alignSelf: "stretch",
+                    alignItems: "center",
+                  },
+                ]}
+              >
+                {paying ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <ThemedText
+                    type="defaultSemiBold"
+                    style={{ color: "#fff", fontSize: 15 }}
+                  >
+                    Confirm Payment (Cash)
+                  </ThemedText>
+                )}
+              </Pressable>
+            </View>
           </>
         )}
 

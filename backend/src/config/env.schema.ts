@@ -119,7 +119,7 @@ export const envSchema = z.object({
   // ----------------
   // Maps API
   // ----------------
-  GOOGLE_MAPS_API_KEY: z.string().optional(),
+  GOOGLE_MAPS_API_KEY: z.string().min(1, 'GOOGLE_MAPS_API_KEY is required'),
 
   // ----------------
   // Push Notifications (Firebase Cloud Messaging)

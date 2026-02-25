@@ -92,22 +92,36 @@ export default function RideDetailsScreen() {
   const renderTimeline = () => {
     if (!ride) return null;
 
-    const isCancelled = ride.status === "CANCELLED";
+    const isCancelled = [
+      "CANCELLED",
+      "CANCELLED_BY_USER",
+      "CANCELLED_BY_DRIVER",
+    ].includes(ride.status);
 
-    const steps: { label: string; icon: IconSymbolName; status: string }[] = [
-      { label: "Requested", icon: "checkmark.circle", status: "REQUESTED" },
-      { label: "Accepted", icon: "person.badge.plus", status: "ACCEPTED" },
-      { label: "On Trip", icon: "car.fill", status: "IN_PROGRESS" },
+    const steps: { label: string; icon: IconSymbolName; status: string[] }[] = [
+      {
+        label: "Requested",
+        icon: "checkmark.circle",
+        status: ["REQUESTED", "SEARCHING_DRIVER"],
+      },
+      {
+        label: "Driver Found",
+        icon: "person.badge.plus",
+        status: ["DRIVER_ACCEPTED", "PAID", "ACCEPTED"],
+      },
+      { label: "On Trip", icon: "car.fill", status: ["IN_PROGRESS"] },
       {
         label: isCancelled ? "Cancelled" : "Completed",
         icon: isCancelled ? "xmark.circle.fill" : "checkmark.seal.fill",
-        status: isCancelled ? "CANCELLED" : "COMPLETED",
+        status: isCancelled
+          ? ["CANCELLED", "CANCELLED_BY_USER", "CANCELLED_BY_DRIVER"]
+          : ["COMPLETED"],
       },
     ];
 
     const activeIndex = isCancelled
       ? 3
-      : steps.findIndex((s) => s.status === ride.status);
+      : steps.findIndex((s) => s.status.includes(ride.status));
 
     return (
       <View

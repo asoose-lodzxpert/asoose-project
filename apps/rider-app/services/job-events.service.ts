@@ -16,6 +16,8 @@ export type JobEventCallbacks = {
   onConnectionStatusChange?: (status: ConnectionStatus) => void;
   /** Called when the server forces a logout (e.g. account banned/suspended) */
   onForceLogout?: (reason?: string) => void;
+  /** Called when the customer confirms payment — driver may now start the trip */
+  onPaymentConfirmed?: (rideId: string) => void;
 };
 
 export class JobEventsService {
@@ -197,6 +199,14 @@ export class JobEventsService {
       }
       // Disconnect socket immediately
       this.disconnect();
+    });
+
+    // Customer confirmed payment — driver may start the trip
+    this.socket.on("PAYMENT_CONFIRMED", (data: any) => {
+      const rideId = data?.rideId as string | undefined;
+      if (rideId && this.callbacks?.onPaymentConfirmed) {
+        this.callbacks.onPaymentConfirmed(rideId);
+      }
     });
   }
 

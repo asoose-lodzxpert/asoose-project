@@ -276,7 +276,10 @@ export class RidersService {
 
     const totalTrips = Object.values(ridesCount).reduce((a, b) => a + b, 0);
     const completed = ridesCount[RideStatus.COMPLETED] || 0;
-    const cancelled = ridesCount[RideStatus.CANCELLED] || 0;
+    const cancelled =
+      (ridesCount[RideStatus.CANCELLED] || 0) +
+      (ridesCount['CANCELLED_BY_USER' as RideStatus] || 0) +
+      (ridesCount['CANCELLED_BY_DRIVER' as RideStatus] || 0);
 
     const completionRate = totalTrips > 0 ? (completed / totalTrips) * 100 : 0;
     const cancellationRate =

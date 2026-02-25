@@ -51,7 +51,7 @@ function Screen() {
         <ScrollView
           contentContainerStyle={{
             padding: 16,
-            paddingBottom: keyboardVisible ? 16 : 100,
+            paddingBottom: keyboardVisible ? 16 : 120,
           }}
         >
           <LocationCard type="pickup" title="Pickup Location" />
