@@ -29,7 +29,7 @@ import {
 } from './dto/trip.dto';
 import { TripsCommonService, TRIPS_CONFIG } from './trips.common.service';
 import { randomUUID } from 'crypto';
-import { rideToJobSummary } from '../../jobs/job.dto';
+import { rideToJobSummary } from '../../riders/jobs/job.dto';
 import { DriverStateService } from '../../matching/driver-state/driver-state.service';
 import { PaymentInitService } from '../../payment/payment-init.service';
 import {

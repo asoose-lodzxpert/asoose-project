@@ -11,6 +11,7 @@ import {
   Query,
   ParseIntPipe,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { MarketplaceService } from './marketplace.service';
 import { CreateReviewDto } from './dto/create-review.dto';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
@@ -38,6 +39,7 @@ export class MarketplaceController {
   }
 
   @ApiOperation({ summary: 'Search stores and products by keyword' })
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
   @Get('search')
   async search(@Query('q') q: string): Promise<SearchResponseDto> {
     if (!q) return { stores: [], products: [] };
@@ -71,13 +73,15 @@ export class MarketplaceController {
   @ApiOperation({
     summary: 'Get paginated list of stores with optional type filter',
   })
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
   @Get('stores')
   async getStores(
     @Query('page', new ParseIntPipe({ optional: true })) page: number = 1,
     @Query('limit', new ParseIntPipe({ optional: true })) limit: number = 10,
     @Query('type') type?: string,
   ) {
-    return this.marketplaceService.getPaginatedStores(page, limit, type);
+    const safeLimit = Math.min(limit, 50); // enforce max 50 per page
+    return this.marketplaceService.getPaginatedStores(page, safeLimit, type);
   }
 
   @ApiOperation({ summary: 'Get product details by ID' })

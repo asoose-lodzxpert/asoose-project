@@ -74,6 +74,9 @@ export class MapsController {
   }
 
   @ApiOperation({ summary: 'Geocode a Google Place ID to lat/lng' })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
   @Get('geocode')
   async geocode(@Query('placeId') placeId: string) {
     if (!placeId) {
@@ -83,6 +86,9 @@ export class MapsController {
   }
 
   @ApiOperation({ summary: 'Reverse geocode lat/lng to address' })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
   @Get('reverse-geocode')
   async reverseGeocode(@Query('lat') lat: string, @Query('lng') lng: string) {
     if (!lat || !lng) {
@@ -102,6 +108,9 @@ export class MapsController {
   }
 
   @ApiOperation({ summary: 'Get driving directions between two coordinates' })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @Throttle({ default: { limit: 15, ttl: 60_000 } })
   @Get('directions')
   async getDirections(
     @Query('originLat') originLat: string,
@@ -124,6 +133,9 @@ export class MapsController {
   @ApiOperation({
     summary: 'Generate a static map image URL with markers/path',
   })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Get('static-map')
   async getStaticMap(
     @Query('markers') markers: string,

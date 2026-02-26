@@ -8,7 +8,10 @@ import type {
   JobCancelledEvent,
 } from '../../matching/events/event-types';
 import { PrismaService } from '../../prisma/prisma.service';
-import { rideToJobSummary, deliveryToJobSummary } from '../../jobs/job.dto';
+import {
+  rideToJobSummary,
+  deliveryToJobSummary,
+} from '../../riders/jobs/job.dto';
 
 /**
  * Listener for rider job events

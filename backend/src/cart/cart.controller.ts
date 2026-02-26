@@ -6,6 +6,7 @@ import {
   HttpStatus,
   UseGuards,
   Req,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { CartService } from './cart.service';
 import { GetCartSummaryDto } from './dto/cart-summary.dto';
@@ -39,7 +40,7 @@ export class CartController {
     const userId = req.user?.userId || req.user?.id;
 
     if (!userId) {
-      throw new Error('User ID not found in session');
+      throw new UnauthorizedException('User ID not found in session');
     }
 
     return this.cartService.addToCart(userId, dto);

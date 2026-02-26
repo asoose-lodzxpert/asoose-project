@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/../../utils/authOptions";
+import { authOptions } from "../../../../../utils/authOptions";
 
 const API_URL =
   process.env.INTERNAL_API_URL ||

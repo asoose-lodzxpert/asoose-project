@@ -2,7 +2,7 @@
  * Queue Names and Job Types (Job-Based Standardized)
  */
 
-import { JobSummaryDto } from 'src/jobs/job.dto';
+import { JobSummaryDto } from 'src/riders/jobs/job.dto';
 
 /* ========================================
    QUEUE NAMES

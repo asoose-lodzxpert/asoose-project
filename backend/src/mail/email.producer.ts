@@ -14,6 +14,7 @@ export class EmailProducer {
         attempts: 3,
         backoff: { type: 'exponential', delay: 3000 },
         removeOnComplete: { count: 100 },
+        removeOnFail: { count: 50 },
       },
     );
   }
@@ -25,7 +26,9 @@ export class EmailProducer {
       {
         attempts: 3,
         backoff: { type: 'fixed', delay: 2000 },
-        removeOnComplete: { count: 100 },
+        // OTP in payload — purge aggressively so it doesn't linger in Redis/BullBoard
+        removeOnComplete: { count: 5 },
+        removeOnFail: { age: 3600 }, // 1 hour
       },
     );
   }
@@ -37,6 +40,7 @@ export class EmailProducer {
       {
         attempts: 3,
         removeOnComplete: { count: 100 },
+        removeOnFail: { count: 50 },
       },
     );
   }
@@ -49,7 +53,11 @@ export class EmailProducer {
     await this.emailQueue.add(
       'order-created-customer',
       { email, orderId, total },
-      { attempts: 3, removeOnComplete: { count: 100 } },
+      {
+        attempts: 3,
+        removeOnComplete: { count: 100 },
+        removeOnFail: { count: 50 },
+      },
     );
   }
 
@@ -62,7 +70,11 @@ export class EmailProducer {
     await this.emailQueue.add(
       'order-created-vendor',
       { email, storeName, orderId, items },
-      { attempts: 3, removeOnComplete: { count: 100 } },
+      {
+        attempts: 3,
+        removeOnComplete: { count: 100 },
+        removeOnFail: { count: 50 },
+      },
     );
   }
 
@@ -90,7 +102,12 @@ export class EmailProducer {
         securityUrl: `${process.env.VENDOR_APP_URL || 'https://vendor.asoose.com'}/security`,
         year: new Date().getFullYear(),
       },
-      { attempts: 3, removeOnComplete: { count: 100 } },
+      {
+        attempts: 3,
+        // email + ipAddress in payload — limit BullBoard retention
+        removeOnComplete: { count: 20 },
+        removeOnFail: { age: 86400 }, // 24 hours
+      },
     );
   }
 
@@ -111,7 +128,12 @@ export class EmailProducer {
         dashboardUrl: `${process.env.VENDOR_APP_URL || 'https://vendor.asoose.com'}/login`,
         year: new Date().getFullYear(),
       },
-      { attempts: 3, removeOnComplete: { count: 100 } },
+      {
+        attempts: 3,
+        // temporaryPassword in payload — purge aggressively so it doesn't linger in Redis/BullBoard
+        removeOnComplete: { count: 5 },
+        removeOnFail: { age: 3600 }, // 1 hour
+      },
     );
   }
 
@@ -133,7 +155,12 @@ export class EmailProducer {
         securityUrl: `${process.env.VENDOR_APP_URL || 'https://vendor.asoose.com'}/security`,
         year: new Date().getFullYear(),
       },
-      { attempts: 3, removeOnComplete: { count: 100 } },
+      {
+        attempts: 3,
+        // ipAddress in payload — limit BullBoard retention
+        removeOnComplete: { count: 20 },
+        removeOnFail: { age: 86400 }, // 24 hours
+      },
     );
   }
 
@@ -151,7 +178,12 @@ export class EmailProducer {
         resetUrl: `${process.env.VENDOR_APP_URL || 'https://vendor.asoose.com'}/reset-password`,
         year: new Date().getFullYear(),
       },
-      { attempts: 3, removeOnComplete: { count: 100 } },
+      {
+        attempts: 3,
+        // resetCode in payload — purge aggressively so it doesn't linger in Redis/BullBoard
+        removeOnComplete: { count: 5 },
+        removeOnFail: { age: 3600 }, // 1 hour
+      },
     );
   }
 
@@ -164,7 +196,12 @@ export class EmailProducer {
         otp,
         year: new Date().getFullYear(),
       },
-      { attempts: 3, removeOnComplete: { count: 100 } },
+      {
+        attempts: 3,
+        // OTP in payload — purge aggressively so it doesn't linger in Redis/BullBoard
+        removeOnComplete: { count: 5 },
+        removeOnFail: { age: 3600 }, // 1 hour
+      },
     );
   }
 
@@ -191,7 +228,11 @@ export class EmailProducer {
         bankAccountUrl: `${process.env.VENDOR_APP_URL || 'https://vendor.asoose.com'}/settings/bank-accounts`,
         year: new Date().getFullYear(),
       },
-      { attempts: 3, removeOnComplete: { count: 100 } },
+      {
+        attempts: 3,
+        removeOnComplete: { count: 100 },
+        removeOnFail: { count: 50 },
+      },
     );
   }
 
@@ -220,7 +261,11 @@ export class EmailProducer {
         withdrawalsUrl: `${process.env.VENDOR_APP_URL || 'https://vendor.asoose.com'}/withdrawals`,
         year: new Date().getFullYear(),
       },
-      { attempts: 3, removeOnComplete: { count: 100 } },
+      {
+        attempts: 3,
+        removeOnComplete: { count: 100 },
+        removeOnFail: { count: 50 },
+      },
     );
   }
 
@@ -233,7 +278,11 @@ export class EmailProducer {
         supportUrl: `${process.env.VENDOR_APP_URL || 'https://vendor.asoose.com'}/support`,
         year: new Date().getFullYear(),
       },
-      { attempts: 3, removeOnComplete: { count: 100 } },
+      {
+        attempts: 3,
+        removeOnComplete: { count: 100 },
+        removeOnFail: { count: 50 },
+      },
     );
   }
 
@@ -247,7 +296,11 @@ export class EmailProducer {
         name,
         year: new Date().getFullYear(),
       },
-      { attempts: 3, removeOnComplete: { count: 100 } },
+      {
+        attempts: 3,
+        removeOnComplete: { count: 100 },
+        removeOnFail: { count: 50 },
+      },
     );
   }
 
@@ -260,7 +313,12 @@ export class EmailProducer {
         otp,
         year: new Date().getFullYear(),
       },
-      { attempts: 3, removeOnComplete: { count: 100 } },
+      {
+        attempts: 3,
+        // OTP in payload — purge aggressively so it doesn't linger in Redis/BullBoard
+        removeOnComplete: { count: 5 },
+        removeOnFail: { age: 3600 }, // 1 hour
+      },
     );
   }
 
@@ -282,7 +340,12 @@ export class EmailProducer {
         securityUrl: `${process.env.RIDER_APP_URL || 'https://rider.asoose.com'}/security`,
         year: new Date().getFullYear(),
       },
-      { attempts: 3, removeOnComplete: { count: 100 } },
+      {
+        attempts: 3,
+        // ipAddress in payload — limit BullBoard retention
+        removeOnComplete: { count: 20 },
+        removeOnFail: { age: 86400 }, // 24 hours
+      },
     );
   }
 
@@ -300,7 +363,11 @@ export class EmailProducer {
         appUrl: process.env.RIDER_APP_URL || 'https://rider.asoose.com',
         year: new Date().getFullYear(),
       },
-      { attempts: 3, removeOnComplete: { count: 100 } },
+      {
+        attempts: 3,
+        removeOnComplete: { count: 100 },
+        removeOnFail: { count: 50 },
+      },
     );
   }
 
@@ -313,6 +380,7 @@ export class EmailProducer {
       {
         attempts: 3,
         removeOnComplete: { count: 100 },
+        removeOnFail: { count: 50 },
       },
     );
   }
@@ -324,6 +392,7 @@ export class EmailProducer {
       {
         attempts: 3,
         removeOnComplete: { count: 100 },
+        removeOnFail: { count: 50 },
       },
     );
   }
@@ -337,6 +406,7 @@ export class EmailProducer {
       {
         attempts: 3,
         removeOnComplete: { count: 100 },
+        removeOnFail: { count: 50 },
       },
     );
   }
@@ -363,6 +433,7 @@ export class EmailProducer {
       {
         attempts: 3,
         removeOnComplete: { count: 100 },
+        removeOnFail: { count: 50 },
       },
     );
   }
@@ -387,6 +458,7 @@ export class EmailProducer {
       {
         attempts: 3,
         removeOnComplete: { count: 100 },
+        removeOnFail: { count: 50 },
       },
     );
   }
@@ -411,6 +483,7 @@ export class EmailProducer {
       {
         attempts: 3,
         removeOnComplete: { count: 100 },
+        removeOnFail: { count: 50 },
       },
     );
   }
@@ -436,6 +509,7 @@ export class EmailProducer {
       {
         attempts: 3,
         removeOnComplete: { count: 100 },
+        removeOnFail: { count: 50 },
       },
     );
   }
@@ -460,6 +534,7 @@ export class EmailProducer {
       {
         attempts: 3,
         removeOnComplete: { count: 100 },
+        removeOnFail: { count: 50 },
       },
     );
   }
@@ -484,7 +559,9 @@ export class EmailProducer {
       },
       {
         attempts: 3,
-        removeOnComplete: { count: 100 },
+        // Raw account/bank details in payload — limit BullBoard retention
+        removeOnComplete: { count: 20 },
+        removeOnFail: { age: 86400 }, // 24 hours
       },
     );
   }
@@ -501,7 +578,11 @@ export class EmailProducer {
     await this.emailQueue.add(
       'admin-notice-email',
       { email, name, subject, message },
-      { attempts: 3, removeOnComplete: { count: 100 } },
+      {
+        attempts: 3,
+        removeOnComplete: { count: 100 },
+        removeOnFail: { count: 50 },
+      },
     );
   }
 
@@ -515,7 +596,11 @@ export class EmailProducer {
     await this.emailQueue.add(
       'send-marketing-html',
       { email, name, subject, htmlContent },
-      { attempts: 3, removeOnComplete: { count: 100 } },
+      {
+        attempts: 3,
+        removeOnComplete: { count: 100 },
+        removeOnFail: { count: 50 },
+      },
     );
   }
 }

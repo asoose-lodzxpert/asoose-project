@@ -101,6 +101,7 @@ export class UserAuthController {
   })
   @ApiResponse({ status: 400, description: 'Invalid Google ID token' })
   @Post('oauth/google')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } }) // 10/min per IP — account enumeration guard
   googleOAuth(@Body() dto: GoogleOAuthDto) {
     return this.authService.googleOAuthUser(dto);
   }
@@ -112,6 +113,7 @@ export class UserAuthController {
   })
   @ApiResponse({ status: 400, description: 'Invalid Apple identity token' })
   @Post('oauth/apple')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } }) // 10/min per IP — account enumeration guard
   appleOAuth(@Body() dto: AppleOAuthDto) {
     return this.authService.appleOAuthUser(dto);
   }

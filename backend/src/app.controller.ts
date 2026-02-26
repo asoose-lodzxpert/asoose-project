@@ -19,6 +19,7 @@ export class AppController {
   ) {}
 
   @ApiOperation({ summary: 'Root endpoint' })
+  @Public()
   @Get()
   getHello() {
     return this.appService.getHello();

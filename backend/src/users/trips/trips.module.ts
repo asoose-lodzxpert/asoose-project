@@ -16,6 +16,9 @@ import { TestController } from 'src/test/test.controller';
 import { UsersModule } from '../users.module';
 import { MapsModule } from '../../maps/maps.module';
 
+const devOnlyControllers =
+  process.env.NODE_ENV !== 'production' ? [TestController] : [];
+
 @Module({
   imports: [
     PrismaModule,
@@ -26,7 +29,7 @@ import { MapsModule } from '../../maps/maps.module';
     forwardRef(() => PaymentModule),
     forwardRef(() => UsersModule), // ✅ Added with forwardRef to provide AddressesService
   ],
-  controllers: [TripsController, TestController],
+  controllers: [TripsController, ...devOnlyControllers],
   providers: [
     TripsService,
     RidesService,

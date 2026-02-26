@@ -62,11 +62,16 @@ export class AuthService {
       });
 
       if (!user) {
+        this.logger.warn('Failed login: user not found', { email: body.email });
         throw new UnauthorizedException('Invalid email or password');
       }
 
       // Check if user is active
       if (user.status !== 'ACTIVE') {
+        this.logger.warn('Failed login: account inactive', {
+          userId: user.id,
+          status: user.status,
+        });
         throw new UnauthorizedException(
           `Account is ${user.status.toLowerCase()}`,
         );
@@ -78,6 +83,7 @@ export class AuthService {
         user.password,
       );
       if (!isPasswordValid) {
+        this.logger.warn('Failed login: wrong password', { userId: user.id });
         throw new UnauthorizedException('Invalid email or password');
       }
 
