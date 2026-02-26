@@ -119,16 +119,25 @@ async function bootstrap() {
         'CORS_ORIGIN environment variable must be set in production',
       );
     }
-    const allowedOrigins = process.env.CORS_ORIGIN.split(',')
-      .map((origin) => origin.trim())
+    const allowedOrigins = process.env.CORS_ORIGIN
+      // strip surrounding quotes some platforms inject: "https://x.com" → https://x.com
+      .replace(/^["']|["']$/g, '')
+      .split(',')
+      .map((origin) => origin.trim().replace(/^["']|["']$/g, ''))
       .filter((origin) => origin.length > 0);
     app.enableCors({
       origin: (origin, callback) => {
+        // Allow server-to-server and mobile app requests (no Origin header)
         if (!origin) return callback(null, true);
         if (allowedOrigins.includes(origin)) {
           callback(null, true);
         } else {
-          callback(new Error('Not allowed by CORS'));
+          // Use callback(null, false) instead of throwing an Error so the
+          // rejection is handled silently by the CORS middleware (returns no
+          // Access-Control-Allow-Origin header) without propagating to the
+          // global HttpExceptionFilter and spamming the ERROR log.
+          appLogger.warn(`CORS blocked origin: ${origin}`, { context: 'CORS' });
+          callback(null, false);
         }
       },
       methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],

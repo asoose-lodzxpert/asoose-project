@@ -22,27 +22,42 @@ import { join } from 'path';
     MailerModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
-        transport: {
-          host: config.get<string>('EMAIL_HOST'),
-          port: config.get<number>('EMAIL_PORT'),
-          secure: String(config.get('EMAIL_SECURE')) === 'true',
-          auth: {
-            user: config.get<string>('EMAIL_USER'),
-            pass: config.get<string>('EMAIL_PASSWORD'),
+      useFactory: (config: ConfigService) => {
+        const port = config.get<number>('EMAIL_PORT') ?? 587;
+        const secure = String(config.get('EMAIL_SECURE')) === 'true';
+
+        return {
+          transport: {
+            host: config.get<string>('EMAIL_HOST'),
+            port,
+            // port 465 → implicit TLS (secure: true)
+            // port 587 → STARTTLS (secure: false)
+            secure,
+            auth: {
+              user: config.get<string>('EMAIL_USER'),
+              pass: config.get<string>('EMAIL_PASSWORD'),
+            },
+            // Fail fast so BullMQ exponential backoff can retry cleanly
+            connectionTimeout: 10_000, // 10 s to open TCP connection
+            greetingTimeout: 10_000, // 10 s for SMTP greeting
+            socketTimeout: 30_000, // 30 s of inactivity kills the socket
+            tls: {
+              // allow self-signed certs on staging; set to true in production
+              rejectUnauthorized: config.get('NODE_ENV') === 'production',
+            },
           },
-        },
-        defaults: {
-          from: `"Asoose " <${config.get<string>('EMAIL_FROM')}>`,
-        },
-        template: {
-          dir: join(__dirname, '..', '..', 'libs', 'mail', 'templates'),
-          adapter: new HandlebarsAdapter(),
-          options: {
-            strict: true,
+          defaults: {
+            from: `"Asoose " <${config.get<string>('EMAIL_FROM')}>`,
           },
-        },
-      }),
+          template: {
+            dir: join(__dirname, '..', '..', 'libs', 'mail', 'templates'),
+            adapter: new HandlebarsAdapter(),
+            options: {
+              strict: true,
+            },
+          },
+        };
+      },
     }),
   ],
   providers: [EmailProcessor, EmailProducer],

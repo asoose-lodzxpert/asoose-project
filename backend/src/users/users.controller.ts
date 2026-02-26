@@ -32,7 +32,14 @@ import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
   version: '1',
 })
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(UserRole.CUSTOMER)
+@Roles(
+  UserRole.CUSTOMER,
+  UserRole.ADMIN,
+  UserRole.SUPER_ADMIN,
+  UserRole.ADMIN_MANAGER,
+  UserRole.ADMIN_SUPPORT,
+  UserRole.ADMIN_FINANCE,
+)
 export class UsersController {
   constructor(
     private readonly usersService: UsersService,
