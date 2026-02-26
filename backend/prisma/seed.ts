@@ -1,6 +1,6 @@
 import dotenv from 'dotenv';
 import { PrismaClient, UserRole, UserStatus } from '@prisma/client';
-import * as bcrypt from 'bcryptjs';
+import * as argon2 from 'argon2';
 import { seedAdmin } from './admin-seed';
 import { seedBanks } from './08-bank';
 import { seedServiceZones } from './09-service-zones';
@@ -15,7 +15,7 @@ const prisma = new PrismaClient();
 async function main() {
   const email = 'solomonpaul232@gmail.com';
   const passwordRaw = 'SuperAdmin123!';
-  const hashedPassword = await bcrypt.hash(passwordRaw, 10);
+  const hashedPassword = await argon2.hash(passwordRaw);
 
   console.log(`🌱 Seeding Super Admin: ${email}...`);
 
@@ -47,7 +47,6 @@ async function main() {
 
   // Seed Admin
   await seedAdmin(prisma);
-
 }
 
 main()

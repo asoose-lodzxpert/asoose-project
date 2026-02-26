@@ -1,5 +1,5 @@
 // 02-vendors-products.ts
-import { prisma, MAIDUGURI_COORDS, PASSWORD_HASH } from './seed-utils';
+import { prisma, MAIDUGURI_COORDS, hashPassword } from './seed-utils';
 import {
   StoreType,
   UserStatus,
@@ -11,6 +11,7 @@ import {
 export async function seedVendorsAndProducts() {
   console.log('🌱 Seeding Vendors, Stores, and Products...');
   await prisma.$connect();
+  const PASSWORD_HASH = await hashPassword('Calculus@123');
 
   const storeTypes = [
     StoreType.RESTAURANT,

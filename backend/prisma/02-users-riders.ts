@@ -1,9 +1,10 @@
 // 01-users-riders.ts
-import { prisma, MAIDUGURI_COORDS, PASSWORD_HASH } from './seed-utils';
+import { prisma, MAIDUGURI_COORDS, hashPassword } from './seed-utils';
 import { UserRole, UserStatus, VerificationStatus } from '@prisma/client';
 
 export async function seedUsersAndRiders() {
   console.log('🌱 Seeding Users and Riders...');
+  const PASSWORD_HASH = await hashPassword('Calculus@123');
 
   // --- 1. Seed Customers ---
   const customers = Array.from({ length: 5 }).map((_, i) => ({

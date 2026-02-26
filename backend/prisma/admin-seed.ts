@@ -1,10 +1,11 @@
 import { PrismaClient, UserRole, UserStatus } from '@prisma/client';
-import * as bcrypt from 'bcryptjs';
+import * as argon2 from 'argon2';
+import { ARGON2_OPTIONS } from './seed-utils';
 
 async function seedAdmin(prisma: PrismaClient) {
   const email = 'asoose-admin@asoose.com';
   const passwordRaw = 'AdminPassword123!';
-  const hashedPassword = await bcrypt.hash(passwordRaw, 10);
+  const hashedPassword = await argon2.hash(passwordRaw, ARGON2_OPTIONS);
 
   console.log(`🌱 Seeding Admin User: ${email}...`);
 

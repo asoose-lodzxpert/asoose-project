@@ -1,9 +1,10 @@
 // 06-verification.ts
-import { prisma, PASSWORD_HASH, MAIDUGURI_COORDS } from './seed-utils';
+import { prisma, hashPassword, MAIDUGURI_COORDS } from './seed-utils';
 import { VerificationStatus, UserRole, UserStatus } from '@prisma/client';
 
 export async function seedVerificationQueue() {
   console.log('🌱 Seeding Verification Queue (Pending/Rejected docs)...');
+  const PASSWORD_HASH = await hashPassword('Calculus@123');
 
   // --- 1. Pending Vendor (For Admin Approval) ---
   const pendingVendorEmail = 'vendor.pending@example.com';

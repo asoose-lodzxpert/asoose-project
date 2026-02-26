@@ -1,11 +1,23 @@
 // seed-utils.ts
 // Shared constants and helpers
 import { PrismaClient } from '@prisma/client';
+import * as argon2 from 'argon2';
 
 export const prisma = new PrismaClient();
 export const MAIDUGURI_COORDS = { lat: 11.8311, lng: 13.151 };
-export const PASSWORD_HASH =
-  '$2b$10$2AwGc1ssUeYGnseXxmurROycyDVXJlTM8ORgDh7s6kH9kyDJyOu3e'; // "Calculus@123"
+
+export const ARGON2_OPTIONS: argon2.Options & { raw: false } = {
+  type: argon2.argon2id,
+  memoryCost: 65_536, // 64 MB in KiB
+  timeCost: 3, // number of iterations
+  parallelism: 4, // degree of parallelism
+  raw: false, // return encoded string, not raw Buffer
+};
+
+/** Hash a plain-text password using argon2id */
+export async function hashPassword(plain: string): Promise<string> {
+  return argon2.hash(plain, ARGON2_OPTIONS);
+}
 
 export async function cleanDatabase() {
   // Wipe all major tables in dependency order
