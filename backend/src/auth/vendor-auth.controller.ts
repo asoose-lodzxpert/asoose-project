@@ -78,6 +78,7 @@ export class VendorAuthController {
   @ApiResponse({ status: 200, description: 'Email verified' })
   @ApiResponse({ status: 400, description: 'Invalid or expired OTP' })
   @Post('verify-signup-otp')
+  @Throttle({ default: { limit: 5, ttl: 15 * 60_000 } }) // 5 attempts per 15 min — OTP brute-force protection
   async verifySignupOtp(@Body() body: { email: string; otp: string }) {
     return await this.vendorAuthService.verifySignupOtp(body.email, body.otp);
   }
@@ -99,6 +100,7 @@ export class VendorAuthController {
   @ApiResponse({ status: 200, description: 'OTP is valid' })
   @ApiResponse({ status: 400, description: 'Invalid or expired OTP' })
   @Post('verify-otp')
+  @Throttle({ default: { limit: 5, ttl: 15 * 60_000 } }) // 5 attempts per 15 min — OTP brute-force protection
   async verifyOtp(@Body() body: { email: string; otp: string }) {
     return await this.vendorAuthService.verifyOtp(body.email, body.otp);
   }
@@ -133,6 +135,7 @@ export class VendorAuthController {
     description: 'Refresh token missing, expired, or revoked',
   })
   @Post('refresh')
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
   async refreshToken(@Body() body: { refreshToken: string }) {
     return await this.vendorAuthService.refreshVendorToken(body.refreshToken);
   }
@@ -140,6 +143,7 @@ export class VendorAuthController {
   @ApiOperation({ summary: 'Logout and invalidate the supplied refresh token' })
   @ApiResponse({ status: 200, description: 'Refresh token revoked' })
   @Post('logout')
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
   async logout(@Body() body: { refreshToken?: string }) {
     return await this.vendorAuthService.logoutVendor(body.refreshToken ?? '');
   }

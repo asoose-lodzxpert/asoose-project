@@ -3,7 +3,7 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { RideStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { QueueService } from '../../matching/queue/queue.service';
-import { rideToJobSummary } from 'src/jobs/job.dto';
+import { rideToJobSummary } from 'src/riders/jobs/job.dto';
 
 @Injectable()
 export class RidesCleanupService {

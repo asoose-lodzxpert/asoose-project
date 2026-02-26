@@ -4,6 +4,7 @@ import {
   ConflictException,
   NotFoundException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import {
@@ -22,6 +23,8 @@ import { randomUUID } from 'crypto';
 
 @Injectable()
 export class RiderAuthService {
+  private readonly logger = new Logger(RiderAuthService.name);
+
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
@@ -170,12 +173,16 @@ export class RiderAuthService {
     });
 
     if (!rider) {
+      this.logger.warn('Failed rider login: not found', { email: body.email });
       throw new UnauthorizedException('Invalid credentials');
     }
 
     // Verify password — handles both legacy bcrypt hashes and Argon2id hashes
     const isPasswordValid = await verifyPassword(body.password, rider.password);
     if (!isPasswordValid) {
+      this.logger.warn('Failed rider login: wrong password', {
+        riderId: rider.id,
+      });
       throw new UnauthorizedException('Invalid credentials');
     }
 
@@ -194,6 +201,10 @@ export class RiderAuthService {
     }
 
     if (rider.status === 'BANNED' || rider.status === 'SUSPENDED') {
+      this.logger.warn('Failed rider login: account restricted', {
+        riderId: rider.id,
+        status: rider.status,
+      });
       throw new UnauthorizedException(
         `Account is ${rider.status.toLowerCase()}. Contact support.`,
       );

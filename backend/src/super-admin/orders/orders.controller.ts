@@ -30,14 +30,24 @@ export class OrdersController {
 
   @ApiOperation({ summary: 'List all orders with filters' })
   @Get()
-  @Roles('SUPER_ADMIN', 'ADMIN_MANAGER', 'ADMIN_SUPPORT', 'ADMIN_FINANCE')
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN_MANAGER,
+    UserRole.ADMIN_SUPPORT,
+    UserRole.ADMIN_FINANCE,
+  )
   findAll(@Query() query: OrderFilterDto) {
     return this.ordersService.findAll(query);
   }
 
   @ApiOperation({ summary: 'Get order details by ID' })
   @Get(':id')
-  @Roles('SUPER_ADMIN', 'ADMIN_MANAGER', 'ADMIN_SUPPORT', 'ADMIN_FINANCE')
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN_MANAGER,
+    UserRole.ADMIN_SUPPORT,
+    UserRole.ADMIN_FINANCE,
+  )
   findOne(@Param('id') id: string) {
     return this.ordersService.findOne(id);
   }

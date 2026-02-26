@@ -81,6 +81,9 @@ export class VendorAuthService {
     });
 
     if (!vendor) {
+      this.appLogger.warn('Failed vendor login: not found', {
+        email: normalizedEmail,
+      });
       throw new UnauthorizedException(
         'No account found with this email address. Please check your email or register for a new account.',
       );
@@ -93,6 +96,9 @@ export class VendorAuthService {
     );
 
     if (!isPasswordValid) {
+      this.appLogger.warn('Failed vendor login: wrong password', {
+        vendorId: vendor.id,
+      });
       throw new UnauthorizedException(
         'Incorrect password. Please try again or reset your password.',
       );

@@ -12,7 +12,10 @@ import {
   Res,
   Logger,
   ServiceUnavailableException,
+  UnauthorizedException,
+  InternalServerErrorException,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import type { RawBodyRequest } from '@nestjs/common';
 import { PaymentService } from './payment.service';
 import {
@@ -44,12 +47,13 @@ export class PaymentController {
   @ApiBearerAuth()
   @Post('initialize')
   @UseGuards(JwtAuthGuard)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } }) // 10 payment init/min per IP
   async initiatePayment(
     @Body() dto: InitiatePaymentDto & { callbackUrl?: string },
     @Req() req: Request & { user?: { userId: string } },
   ) {
     if (!req.user) {
-      throw new Error('User not authenticated');
+      throw new UnauthorizedException('User not authenticated');
     }
     const userId = req.user['id'];
 
@@ -67,7 +71,13 @@ export class PaymentController {
           'Payment provider is temporarily unavailable. Please try again later.',
         );
       }
-      throw error;
+      // Sanitize unknown errors — do not re-throw raw provider errors
+      if (error?.getStatus && typeof error.getStatus === 'function')
+        throw error;
+      this.logger.error('Unhandled error in initiatePayment', error?.stack);
+      throw new InternalServerErrorException(
+        'Payment initialization failed. Please try again.',
+      );
     }
   }
 
@@ -138,10 +148,13 @@ export class PaymentController {
         `${callbackUrl}/payment/callback?reference=${reference}&status=${statusParam}`,
       );
     } catch (error) {
-      this.logger.error(`Paystack callback failed for ${reference}`, error);
-      return res.redirect(
-        `${frontendUrl}/payment/callback?reference=${reference}&status=failed`,
+      this.logger.error(
+        `Paystack callback failed for ${reference}`,
+        error?.message,
       );
+      // Note: reference is omitted from error redirect to avoid leaking it in
+      // browser history / server access logs on failure paths.
+      return res.redirect(`${frontendUrl}/payment/callback?status=failed`);
     }
   }
 

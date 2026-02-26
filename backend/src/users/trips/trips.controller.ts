@@ -12,6 +12,9 @@ import {
   Headers, // FIX: Added Headers import
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
+import { RolesGuard } from '../../auth/roles.guards';
+import { Roles } from '../../auth/roles.decorator';
+import { UserRole } from '../../common/enums/user-role.enum';
 import { TripsService } from './trips.service';
 import {
   RequestRideDto,
@@ -30,7 +33,8 @@ import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
   path: 'trips',
   version: '1',
 })
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(UserRole.CUSTOMER)
 export class TripsController {
   constructor(
     private readonly tripsService: TripsService,
@@ -157,10 +161,16 @@ export class TripsController {
     @Param('id') rideId: string,
     @Body() body: { rating: number; comment?: string },
   ) {
+    const rating = Number(body.rating);
+    if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+      throw new BadRequestException(
+        'Rating must be an integer between 1 and 5',
+      );
+    }
     return this.tripsService.rateRide(
       req.user.id,
       rideId,
-      body.rating,
+      rating,
       body.comment,
     );
   }
@@ -185,6 +195,7 @@ export class TripsController {
   }
 
   @ApiOperation({ summary: 'Mark driver as arrived at pickup' })
+  @Roles(UserRole.RIDER, UserRole.DRIVER) // override class-level CUSTOMER — only drivers/riders can trigger arrival
   @Patch('rides/:id/arrived')
   async driverArrived(@Request() req, @Param('id') rideId: string) {
     return this.tripsService.driverArrived(rideId, req.user.id);
@@ -199,9 +210,17 @@ export class TripsController {
   async requestDelivery(
     @Request() req,
     @Body() dto: RequestDeliveryDto,
-    @Headers('idempotency-key') idempotencyKey?: string,
+    @Headers('x-idempotency-key') idempotencyKey: string,
   ) {
-    return this.deliveryService.requestDelivery(req.user.id, dto);
+    if (!idempotencyKey)
+      throw new BadRequestException(
+        'Idempotency key required to prevent duplicate deliveries.',
+      );
+    return this.deliveryService.requestDelivery(
+      req.user.id,
+      dto,
+      idempotencyKey,
+    );
   }
 
   @ApiOperation({ summary: 'Get all deliveries for current user' })

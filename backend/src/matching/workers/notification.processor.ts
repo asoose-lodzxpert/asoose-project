@@ -11,7 +11,7 @@ import {
 } from '../queue/queue.constants';
 
 @Processor(QUEUE_NAMES.NOTIFICATION, {
-  concurrency: 10,
+  concurrency: 20,
 })
 export class NotificationProcessor extends WorkerHost {
   private readonly logger = new Logger(NotificationProcessor.name);

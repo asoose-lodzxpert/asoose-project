@@ -48,7 +48,7 @@ export class RidesController {
 
   @ApiOperation({ summary: 'Manually assign a driver to a ride' })
   @Post(':id/assign')
-  @Roles('SUPER_ADMIN', 'ADMIN_MANAGER') // Higher privilege
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN_MANAGER)
   async assignDriver(
     @Param('id') id: string,
     @Body('riderId') riderId: string,
@@ -60,7 +60,7 @@ export class RidesController {
 
   @ApiOperation({ summary: 'Force-update a ride status' })
   @Patch(':id/force-status')
-  @Roles('SUPER_ADMIN', 'ADMIN_MANAGER')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN_MANAGER)
   async forceStatus(
     @Param('id') id: string,
     @Body() body: { status: string; reason?: string },
@@ -76,14 +76,14 @@ export class RidesController {
   }
 
   @Post(':id/retry-matching')
-  @Roles('SUPER_ADMIN', 'ADMIN_MANAGER')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN_MANAGER)
   async retryMatching(@Param('id') id: string, @Req() req: any) {
     const adminId = req.user.id || req.user.sub;
     return this.ridesService.retryMatching(id, adminId);
   }
 
   @Post(':id/unassign')
-  @Roles('SUPER_ADMIN', 'ADMIN_MANAGER')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN_MANAGER)
   async unassignDriver(@Param('id') id: string, @Req() req: any) {
     const adminId = req.user.id || req.user.sub;
     return this.ridesService.unassignDriver(id, adminId);

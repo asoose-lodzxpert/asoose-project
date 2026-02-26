@@ -21,7 +21,7 @@ import { QueueService } from '../../matching/queue/queue.service';
 import { NotificationsGateway } from '../../notifications/notifications.gateway';
 import { RequestDeliveryDto, CancelTripDto } from './dto/trip.dto';
 import { TripsCommonService, TRIPS_CONFIG } from './trips.common.service';
-import { deliveryToJobSummary } from '../../jobs/job.dto';
+import { deliveryToJobSummary } from '../../riders/jobs/job.dto';
 import { AddressesService } from '../addresses.service';
 
 @Injectable()
@@ -116,9 +116,14 @@ export class DeliveriesService {
   // DELIVERY REQUEST LOGIC
   // ==================================================================
 
-  async requestDelivery(userId: string, dto: RequestDeliveryDto) {
+  async requestDelivery(
+    userId: string,
+    dto: RequestDeliveryDto,
+    idempotencyKey: string,
+  ) {
     this.logger.debug(`[requestDelivery] userId=${userId}`);
     this.logger.debug(`[requestDelivery] DTO: ${JSON.stringify(dto, null, 2)}`);
+    this.logger.debug(`[requestDelivery] idempotencyKey=${idempotencyKey}`);
 
     if (
       dto.weightKg &&

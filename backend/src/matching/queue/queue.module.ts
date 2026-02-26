@@ -12,7 +12,15 @@ import { QueueService } from './queue.service';
       { name: QUEUE_NAMES.DELIVERY_MATCHING },
       { name: QUEUE_NAMES.DRIVER_INACTIVITY },
       { name: QUEUE_NAMES.RIDER_INACTIVITY },
-      { name: QUEUE_NAMES.NOTIFICATION },
+      {
+        name: QUEUE_NAMES.NOTIFICATION,
+        defaultJobOptions: {
+          attempts: 3,
+          backoff: { type: 'exponential', delay: 3000 },
+          removeOnComplete: { count: 100 },
+          removeOnFail: { count: 50 },
+        },
+      },
       { name: QUEUE_NAMES.ASSIGNMENT_TIMEOUT },
     ),
   ],

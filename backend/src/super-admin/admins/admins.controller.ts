@@ -23,6 +23,7 @@ import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
   version: '1',
 })
 @UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(UserRole.SUPER_ADMIN) // class-level default — every handler requires SUPER_ADMIN unless overridden
 export class AdminsController {
   constructor(private readonly adminsService: AdminsService) {}
 

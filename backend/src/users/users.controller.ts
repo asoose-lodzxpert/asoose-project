@@ -13,6 +13,9 @@ import {
   Query,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../auth/roles.guards';
+import { Roles } from '../auth/roles.decorator';
+import { UserRole } from '../common/enums/user-role.enum';
 import { UsersService } from './users.service';
 import { OrdersService } from './orders.service'; // Import OrdersService
 import { CreateAddressDto, CreateOrderDto } from './dto/users.dto';
@@ -28,7 +31,8 @@ import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
   path: 'users',
   version: '1',
 })
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(UserRole.CUSTOMER)
 export class UsersController {
   constructor(
     private readonly usersService: UsersService,

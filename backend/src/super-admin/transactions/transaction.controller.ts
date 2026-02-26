@@ -52,7 +52,7 @@ export class TransactionsController {
 
   @ApiOperation({ summary: 'Manually verify a transaction payment' })
   @Post(':id/verify')
-  @Roles('SUPER_ADMIN', 'ADMIN_FINANCE', 'ADMIN_SUPPORT') // ✅ Permission Guard
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN_FINANCE, UserRole.ADMIN_SUPPORT)
   async verifyPayment(@Param('id') id: string, @Req() req: any) {
     const adminId = req.user.id || req.user.sub;
     return this.transactionsService.verifyTransactionPayment(id, adminId);

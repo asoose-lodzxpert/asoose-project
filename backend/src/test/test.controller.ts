@@ -1,8 +1,24 @@
-import { Controller, Post, Param, BadRequestException } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Param,
+  BadRequestException,
+  UseGuards,
+} from '@nestjs/common';
 import { TripsService } from '../users/trips/trips.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { UserStatus } from '@prisma/client'; // Import Enum for type safety
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../auth/roles.guards';
+import { Roles } from '../auth/roles.decorator';
+import { UserRole } from '../common/enums/user-role.enum';
 
+/** ⚠️  This controller is for testing/staging only.
+ *  It is gated by SUPER_ADMIN and must NEVER be registered in production.
+ *  Registration is conditional on NODE_ENV !== 'production' (see trips.module.ts).
+ */
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(UserRole.SUPER_ADMIN)
 @Controller({
   path: 'test',
   version: '1',
