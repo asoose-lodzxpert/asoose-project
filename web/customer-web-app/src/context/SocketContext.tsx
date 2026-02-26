@@ -6,6 +6,7 @@ import React, {
   useEffect,
   useState,
   useCallback,
+  useRef,
 } from "react";
 import { useSession } from "next-auth/react";
 import { socketService } from "@/services/socket.service";
@@ -38,14 +39,26 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
   const { data: session, status } = useSession();
   const [isConnected, setIsConnected] = useState(false);
 
+  // Stable primitive reference to avoid re-creating the connect callback
+  // whenever the session object reference changes.
+  const accessToken = session?.accessToken as string | undefined;
+  // Track the token used for the current connection so we only reconnect
+  // if the actual token value changes (not just the object reference).
+  const connectedTokenRef = useRef<string | null>(null);
+
   const connect = useCallback(() => {
-    if (!session?.accessToken) {
+    if (!accessToken) {
       console.warn("No access token available for socket connection");
       return;
     }
 
-    // If the token changed (e.g. silent NextAuth refresh), tear down the old
-    // connection so the new handshake carries the current JWT (M7 fix).
+    // Only tear down the existing connection if the token ACTUALLY changed.
+    // Previously this disconnected on every session object change, which
+    // caused unnecessary reconnect churn.
+    if (socketService.isConnected() && connectedTokenRef.current === accessToken) {
+      return; // already connected with the same token — nothing to do
+    }
+
     if (socketService.isConnected()) {
       socketService.disconnect();
     }
@@ -79,7 +92,9 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
     socket.on("error", (error: Error) => {
       console.error("Socket error:", error);
     });
-  }, [session?.accessToken]);
+
+    connectedTokenRef.current = accessToken ?? null;
+  }, [accessToken]);
 
   const disconnect = useCallback(() => {
     socketService.disconnect();
@@ -88,7 +103,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
 
   // Auto-connect when authenticated
   useEffect(() => {
-    if (status === "authenticated" && session?.accessToken) {
+    if (status === "authenticated" && accessToken) {
       connect();
     }
 
@@ -96,7 +111,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
       // Don't disconnect on unmount to maintain connection across page navigation
       // Only disconnect on logout
     };
-  }, [status, session?.accessToken, connect]);
+  }, [status, accessToken, connect]);
 
   // Disconnect on logout
   useEffect(() => {

@@ -1,8 +1,43 @@
-import { getSession } from "next-auth/react";
 import { getCookie } from "cookies-next"; // ✅ Import to access cookies
 
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1";
+
+// ── Cached session token ────────────────────────────────────────────────────
+// We cache the token from the last successful getSession() call so that
+// subsequent requests within the same page lifecycle don't trigger a new
+// network round-trip to /api/auth/session, which was the primary driver of
+// the infinite re-render loop (every getSession() call refetches the session,
+// which triggers useSession() consumers to re-render, which fire new API
+// calls, which call getSession() again → infinite loop).
+let _cachedSessionToken: string | null = null;
+let _cacheExpiry = 0;
+const SESSION_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+async function getCachedSessionToken(): Promise<string | null> {
+  // Return cached token if still valid
+  if (_cachedSessionToken && Date.now() < _cacheExpiry) {
+    return _cachedSessionToken;
+  }
+
+  // Lazy-import getSession to avoid module-level side effects
+  const { getSession } = await import("next-auth/react");
+  const session = await getSession();
+  const token = session?.accessToken as string | null;
+
+  if (token) {
+    _cachedSessionToken = token;
+    _cacheExpiry = Date.now() + SESSION_CACHE_TTL_MS;
+  }
+
+  return token ?? null;
+}
+
+/** Call this on sign-out to clear the cached token immediately. */
+export function clearApiSessionCache(): void {
+  _cachedSessionToken = null;
+  _cacheExpiry = 0;
+}
 
 /**
  * Combines multiple AbortSignals so that aborting ANY one cancels the request.
@@ -32,14 +67,12 @@ export class ApiService {
       };
     }
 
-    // 1. Try getting session from NextAuth
-    const session = await getSession();
-    
-    // 2. Fallback: Try getting token directly from cookies
+    // 1. Try getting token from cookies first (no network call)
     // (This handles cases where NextAuth session isn't synced but the cookie exists)
     const cookieToken = getCookie("accessToken");
 
-    const accessToken = session?.accessToken || cookieToken;
+    // 2. Fallback: use the cached session token (avoids per-request /api/auth/session fetch)
+    const accessToken = cookieToken || (await getCachedSessionToken());
 
     return {
       "Content-Type": "application/json",
@@ -121,8 +154,17 @@ export class ApiService {
     // Handle Unauthorized (401) explicitly
     if (response.status === 401) {
       console.error("ApiService: Unauthorized (401). Session may be expired.");
+      // Clear the cached session token so subsequent requests don't reuse it
+      clearApiSessionCache();
+
+      // Sign out via NextAuth so the JWT cookie is cleared. This prevents the
+      // redirect loop that occurred when we hard-navigated to /sign-in while
+      // the NextAuth JWT was still valid (middleware would redirect back to
+      // /main/store → another 401 → /sign-in → redirect → ...).
       if (typeof window !== "undefined" && !window.location.pathname.includes('/sign-in')) {
-        window.location.href = "/sign-in?reason=session_expired";
+        import("next-auth/react").then(({ signOut }) => {
+          signOut({ callbackUrl: "/sign-in?reason=session_expired" });
+        });
       }
       throw {
         status: 401,

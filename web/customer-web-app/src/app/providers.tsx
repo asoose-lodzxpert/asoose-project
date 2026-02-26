@@ -9,7 +9,14 @@ import "react-toastify/dist/ReactToastify.css";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
-    <SessionProvider>
+    <SessionProvider
+      // Disable automatic session refetching — the default behavior refetches
+      // on window focus and on an interval, which creates new session object
+      // references that cascade into infinite re-render loops in components
+      // that depend on the session.
+      refetchInterval={0}
+      refetchOnWindowFocus={false}
+    >
       <ThemeProvider
         attribute="class"
         defaultTheme="system"

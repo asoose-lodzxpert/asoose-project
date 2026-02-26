@@ -28,8 +28,11 @@ export const NotificationListener = () => {
     );
   }, []);
 
+  // Use the primitive accessToken string, NOT the session object reference,
+  // to avoid re-running this effect on every session refetch.
+  const accessToken = (session as any)?.accessToken as string | undefined;
+
   useEffect(() => {
-    const accessToken = (session as any)?.accessToken;
     if (!accessToken) return;
 
     // Connect via the shared singleton — no-ops if already connected by another
@@ -46,7 +49,7 @@ export const NotificationListener = () => {
     return () => {
       socketService.off("notification", handleNotification);
     };
-  }, [session, handleNotification]);
+  }, [accessToken, handleNotification]);
 
   return null;
 };

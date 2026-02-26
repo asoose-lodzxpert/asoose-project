@@ -90,8 +90,12 @@ export function usePushNotifications() {
     };
   }, []);
 
+  // Use the primitive accessToken string, NOT the session object reference,
+  // to avoid re-running push setup on every session refetch.
+  const accessToken = (session as any)?.accessToken as string | undefined;
+
   useEffect(() => {
-    if (status !== "authenticated" || !session?.user) return;
+    if (status !== "authenticated" || !accessToken) return;
     if (typeof window === "undefined" || !("Notification" in window)) return;
     if (!process.env.NEXT_PUBLIC_FIREBASE_API_KEY) {
       console.warn(
@@ -100,7 +104,6 @@ export function usePushNotifications() {
       return;
     }
 
-    const accessToken = (session as any).accessToken as string;
     let cancelled = false;
 
     const setup = async () => {
@@ -180,7 +183,7 @@ export function usePushNotifications() {
       unsubscribeRef.current?.();
       unsubscribeRef.current = null;
     };
-  }, [status, session]);
+  }, [status, accessToken]);
 
   // Clean up token on sign-out
   useEffect(() => {

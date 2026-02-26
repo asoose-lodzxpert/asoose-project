@@ -57,33 +57,44 @@ export const HomeHeader = () => {
 
   const isActive = (path: string) => pathname.startsWith(path);
 
+  // Stable primitive reference — prevents re-fetching when session object changes
+  const accessToken = (session as any)?.accessToken as string | undefined;
+
   useEffect(() => {
     setMounted(true);
+  }, []);
 
+  // Sync search term from URL params
+  useEffect(() => {
     const q = searchParams.get("q");
     if (q) {
       setSearchTerm(sanitizeInput(q));
     } else {
       setSearchTerm("");
     }
+  }, [searchParams]);
+
+  // Fetch address & notifications — depends on accessToken (primitive string),
+  // NOT the session object, to avoid infinite re-fetch loops.
+  useEffect(() => {
+    if (!accessToken) {
+      setDeliveryAddress({
+        label: "Guest",
+        details: "Login to set address",
+      });
+      return;
+    }
+
+    let cancelled = false;
 
     const fetchAddressAndNotifications = async () => {
       try {
-        const token =
-          (session as any)?.accessToken || (session as any)?.user?.accessToken;
-
-        if (!session || !token) {
-          setDeliveryAddress({
-            label: "Guest",
-            details: "Login to set address",
-          });
-          return;
-        }
-
         const [addressResult, notifResult] = await Promise.allSettled([
-          ApiService.get<any[]>('/users/addresses', token),
-          ApiService.get<any>('/notifications', token),
+          ApiService.get<any[]>('/users/addresses', accessToken),
+          ApiService.get<any>('/notifications', accessToken),
         ]);
+
+        if (cancelled) return;
 
         if (addressResult.status === 'fulfilled') {
           const addresses = addressResult.value;
@@ -113,7 +124,9 @@ export const HomeHeader = () => {
     };
 
     fetchAddressAndNotifications();
-  }, [searchParams, session]);
+
+    return () => { cancelled = true; };
+  }, [accessToken]);
 
   const toggleTheme = () => {
     setTheme(theme === "dark" ? "light" : "dark");

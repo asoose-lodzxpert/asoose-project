@@ -32,11 +32,16 @@ api.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       deleteCookie("accessToken");
+      // Sign out via NextAuth to clear the JWT cookie. This prevents the
+      // redirect loop: /main/* → 401 → /sign-in → middleware sees valid JWT
+      // → redirect to /main/* → 401 → ...
       if (
         typeof window !== "undefined" &&
         !window.location.pathname.includes("/sign-in")
       ) {
-        window.location.href = "/sign-in?reason=session_expired";
+        import("next-auth/react").then(({ signOut }) => {
+          signOut({ callbackUrl: "/sign-in?reason=session_expired" });
+        });
       }
     }
     return Promise.reject(error);
