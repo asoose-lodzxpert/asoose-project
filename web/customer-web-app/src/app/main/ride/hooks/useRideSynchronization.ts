@@ -5,6 +5,7 @@ import { useSession } from "next-auth/react";
 import { useRideStore, RideStage } from "../store/ride";
 import { RideService, RideStatus } from "@/services/ride.service";
 import { mapRideToViewModel } from "@/services/mappers/ride.mapper";
+import { mapBackendStatusToRideStage } from "@/services/formatters/ride-status.formatter";
 import { toast } from "react-toastify";
 
 /** Polling interval in ms — acts as safety net when socket drops */
@@ -74,45 +75,20 @@ export function useRideSynchronization() {
           return;
         }
 
-        // statusMap is built AFTER the fetch (M2 fix) so the backend's payment
-        // status can be used as server-side evidence that payment was completed.
-        // This prevents the UI reverting to "awaiting-payment" when paymentConfirmed
-        // is lost (cookie clear, new tab, stale localStorage).
-        //
+        // Use centralized status mapper (State Management fix).
         // IMPORTANT: check payment.status === 'COMPLETED', NOT payment.method.
         // A placeholder Payment record with method=CARD is created at ride-creation
         // time (status=PENDING), so !!payment.method is always truthy and would
         // incorrectly bypass the awaiting-payment screen.
         const serverPaymentCompleted =
           backendRide.payment?.status === "COMPLETED";
-        const statusMap: Record<RideStatus, RideStage> = {
-          // PENDING = ride created but payment not yet confirmed.
-          PENDING: "idle",
-          REQUESTED: "searching",
-          SEARCHING_DRIVER: "searching",
-          DRIVER_ASSIGNED: "searching",
-          // Show awaiting-payment unless the client already confirmed OR the server
-          // shows payment completed (e.g. after page refresh / new tab).
-          DRIVER_ACCEPTED:
-            paymentConfirmed || serverPaymentCompleted
-              ? "confirmed"
-              : "awaiting-payment",
-          ACCEPTED:
-            paymentConfirmed || serverPaymentCompleted
-              ? "confirmed"
-              : "awaiting-payment",
-          PAID: "confirmed",
-          ARRIVED: "arrived",
-          IN_PROGRESS: "in-progress",
-          COMPLETED: "finished",
-          CANCELLED: "idle",
-          CANCELLED_BY_USER: "idle",
-          CANCELLED_BY_DRIVER: "idle",
-          CANCELLED_BY_SYSTEM: "idle",
-        };
 
         const activeRide = mapRideToViewModel(backendRide);
-        const mappedStatus = statusMap[activeRide.status] || "idle";
+        const mappedStatus = mapBackendStatusToRideStage(
+          activeRide.status,
+          paymentConfirmed,
+          serverPaymentCompleted
+        );
 
         // Only update store if something actually changed
         const state = useRideStore.getState();

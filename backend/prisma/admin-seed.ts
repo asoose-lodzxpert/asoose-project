@@ -11,7 +11,7 @@ async function seedAdmin(prisma: PrismaClient) {
   const admin = await prisma.user.upsert({
     where: { email },
     update: {
-      role: UserRole.ADMIN,
+      role: UserRole.SUPER_ADMIN,
       status: UserStatus.ACTIVE,
       verificationStatus: 'VERIFIED',
     },
@@ -19,7 +19,7 @@ async function seedAdmin(prisma: PrismaClient) {
       email,
       name: 'ASOOSE Admin',
       password: hashedPassword,
-      role: UserRole.ADMIN,
+      role: UserRole.SUPER_ADMIN,
       status: UserStatus.ACTIVE,
       verificationStatus: 'VERIFIED',
     },

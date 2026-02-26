@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateAdminDto } from './dto/create-admins.dto';
-import * as bcrypt from 'bcryptjs';
+import { hashPassword } from '../../auth/password-hash.util';
 
 @Injectable()
 export class AdminsService {
@@ -22,8 +22,8 @@ export class AdminsService {
       throw new ConflictException('User with this email already exists');
     }
 
-    // 2. Hash Password
-    const hashedPassword = await bcrypt.hash(dto.password, 10);
+    // 2. Hash Password with Argon2id (production-safe default)
+    const hashedPassword = await hashPassword(dto.password);
 
     // 3. Create the Admin User
     const newUser = await this.prisma.user.create({

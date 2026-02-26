@@ -151,3 +151,47 @@ export function formatCurrency(amount?: number): string {
     currency: 'NGN',
   }).format(amount);
 }
+
+/**
+ * Map backend RideStatus (screaming snake case) to frontend RideStage (kebab/camel)
+ * 
+ * This is the canonical status translation layer between backend and frontend.
+ * All socket events and REST API responses flow through this mapper to ensure
+ * consistent state transitions in the Zustand store.
+ * 
+ * @param backendStatus - Backend status enum (SEARCHING_DRIVER, DRIVER_ACCEPTED, etc.)
+ * @param paymentConfirmed - Whether the user has confirmed payment on the frontend
+ * @param serverPaymentCompleted - Whether payment.status === 'COMPLETED' on backend
+ * @returns Frontend RideStage for the Zustand store
+ */
+export function mapBackendStatusToRideStage(
+  backendStatus: RideStatus,
+  paymentConfirmed: boolean = false,
+  serverPaymentCompleted: boolean = false
+): 'idle' | 'configuring' | 'searching' | 'awaiting-payment' | 'confirmed' | 'arrived' | 'in-progress' | 'finished' {
+  // Payment Flow Fix: Show awaiting-payment unless client confirmed OR server shows completed.
+  // This prevents skipping the payment UI on page refresh when paymentConfirmed is lost.
+  const shouldShowPaymentScreen = !paymentConfirmed && !serverPaymentCompleted;
+
+  const statusMap: Record<RideStatus, 'idle' | 'configuring' | 'searching' | 'awaiting-payment' | 'confirmed' | 'arrived' | 'in-progress' | 'finished'> = {
+    PENDING: 'idle',
+    REQUESTED: 'searching',
+    SEARCHING_DRIVER: 'searching',
+    DRIVER_ASSIGNED: 'searching',
+    // CRITICAL: DRIVER_ACCEPTED → 'awaiting-payment' to trigger PostDriverPayment UI
+    DRIVER_ACCEPTED: shouldShowPaymentScreen ? 'awaiting-payment' : 'confirmed',
+    ACCEPTED: shouldShowPaymentScreen ? 'awaiting-payment' : 'confirmed',
+    // PAID maps to 'confirmed' (driver on the way)
+    PAID: 'confirmed',
+    // ARRIVED persists in localStorage via partialize config (State Management fix)
+    ARRIVED: 'arrived',
+    IN_PROGRESS: 'in-progress',
+    COMPLETED: 'finished',
+    CANCELLED: 'idle',
+    CANCELLED_BY_USER: 'idle',
+    CANCELLED_BY_DRIVER: 'idle',
+    CANCELLED_BY_SYSTEM: 'idle',
+  };
+
+  return statusMap[backendStatus] ?? 'idle';
+}

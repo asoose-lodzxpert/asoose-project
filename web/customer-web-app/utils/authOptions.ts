@@ -12,20 +12,16 @@ interface CustomUser {
 }
 
 const SERVER_API_URL =
-  process.env.INTERNAL_API_URL ||
-  process.env.NEXT_PUBLIC_API_URL ||
-  "http://localhost:3000/api/v1";
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1";
 
 if (
   process.env.NODE_ENV === "production" &&
   SERVER_API_URL.startsWith("http://localhost")
 ) {
+  throw new Error(
+    "NEXT_PUBLIC_API_URL must be set in production. Currently falling back to localhost."
+  );
 }
-
-const _nextAuthUrl = (process.env.NEXTAUTH_URL ?? "").replace(/\/$/, "");
-const _effectiveRedirectUri = _nextAuthUrl
-  ? `${_nextAuthUrl}/api/auth/callback/google`
-  : "(NEXTAUTH_URL is not set — redirect_uri will be wrong!)";
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -58,7 +54,7 @@ export const authOptions: NextAuthOptions = {
           try {
             data = await res.json();
           } catch {
-            return null;
+            throw new Error("ServerError");
           }
 
           if (res.ok && data?.access_token) {
@@ -72,9 +68,13 @@ export const authOptions: NextAuthOptions = {
             } as CustomUser;
           }
 
-          return null;
-        } catch (error) {
-          return null;
+          if (res.status === 401) throw new Error("InvalidCredentials");
+          if (res.status === 403) throw new Error("AccountSuspended");
+          if (res.status === 404) throw new Error("UserNotFound");
+
+          throw new Error(data?.message ?? "ServerError");
+        } catch (error: any) {
+          throw new Error(error.message ?? "ServerError");
         }
       },
     }),
@@ -86,11 +86,9 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async signIn({ user, account, profile }) {
       if (account?.provider === "google") {
-        const apiUrl = SERVER_API_URL;
-
         try {
           const googleProfile = profile as any;
-          const res = await fetch(`${apiUrl}/auth/user/oauth/google`, {
+          const res = await fetch(`${SERVER_API_URL}/auth/user/oauth/google`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -116,16 +114,11 @@ export const authOptions: NextAuthOptions = {
             return true;
           }
 
-          if (res.status === 401) {
-            return "/sign-in?error=AccountSuspended";
-          }
-
-          if (res.status === 409) {
-            return "/sign-in?error=OAuthEmailConflict";
-          }
+          if (res.status === 401) return "/sign-in?error=AccountSuspended";
+          if (res.status === 409) return "/sign-in?error=OAuthEmailConflict";
 
           return "/sign-in?error=OAuthFailed";
-        } catch (error) {
+        } catch {
           return "/sign-in?error=OAuthFailed";
         }
       }

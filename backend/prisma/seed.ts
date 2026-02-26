@@ -48,17 +48,6 @@ async function main() {
   // Seed Admin
   await seedAdmin(prisma);
 
-  // Seed banks
-  // await seedBanks();
-
-  // Seed service zones (Maiduguri only)
-  await seedServiceZones(prisma);
-
-  // Seed categories (required before vendors/products)
-  await seedCategories();
-
-  // Seed vendors, stores, and products
-  await seedVendorsAndProducts();
 }
 
 main()

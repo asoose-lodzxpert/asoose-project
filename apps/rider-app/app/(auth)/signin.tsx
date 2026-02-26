@@ -273,6 +273,15 @@ export default function LoginScreen() {
                   <ThemedText style={styles.inputError}>{error}</ThemedText>
                 ) : null}
 
+                {/* Forgot Password Link */}
+                <View style={styles.forgotPasswordSection}>
+                  <Pressable onPress={() => router.push("/(auth)/forgot-password")}>
+                    <ThemedText type="link" style={{ fontSize: 14 }}>
+                      Forgot Password?
+                    </ThemedText>
+                  </Pressable>
+                </View>
+
                 <View style={styles.actionsRow}>
                   <Pressable
                     style={[styles.loginButton, { backgroundColor: primary }]}
@@ -364,4 +373,5 @@ const styles = StyleSheet.create({
   orText: { marginHorizontal: 12, fontSize: 12, opacity: 0.6 },
   signup: { alignItems: "center", marginBottom: 24 },
   inputError: { marginTop: 4, color: "#EF4444", textAlign: "left" },
+  forgotPasswordSection: { alignItems: "flex-end", marginTop: 8 },
 });

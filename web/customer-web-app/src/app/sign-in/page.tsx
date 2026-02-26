@@ -3,27 +3,41 @@ import { Suspense, useState } from "react";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { signIn } from "next-auth/react";
+import { signIn, getSession } from "next-auth/react";
 
-/** Maps NextAuth error codes (and our custom ones) to user-facing messages. */
-const OAUTH_ERROR_MESSAGES: Record<string, string> = {
+/**
+ * Covers both:
+ * - OAuth redirect errors  → appended by NextAuth as ?error= in the URL
+ * - Credentials errors     → thrown in authorize() and returned in result.error
+ */
+const ERROR_MESSAGES: Record<string, string> = {
+  // Credentials errors (from authorize())
+  InvalidCredentials: "Invalid email or password.",
+  AccountSuspended: "Your account has been suspended. Please contact support.",
+  UserNotFound: "No account found with that email address.",
+  ServerError: "Something went wrong on our end. Please try again.",
+
+  // OAuth redirect errors (from signIn callback or NextAuth internals)
   AccessDenied:
-    "Google sign-in was denied. If you previously signed up with email and password, please use that to sign in.",
+    "Google sign-in was denied. If you signed up with email and password, please use that instead.",
   OAuthEmailConflict:
     "This Google account's email is already registered. Please sign in with your email and password.",
-  AccountSuspended:
-    "Your account has been suspended. Please contact support.",
-  OAuthFailed:
-    "Google sign-in failed. Please try again or use email and password.",
-  OAuthCallback:
-    "There was a problem completing Google sign-in. Please try again.",
-  OAuthSignin:
-    "Could not start Google sign-in. Please try again.",
-  Callback:
-    "An error occurred during sign-in. Please try again.",
-  Verification:
-    "Could not verify your sign-in. Please try again.",
+  OAuthFailed: "Google sign-in failed. Please try again or use email and password.",
+  OAuthCallback: "There was a problem completing Google sign-in. Please try again.",
+  OAuthSignin: "Could not start Google sign-in. Please try again.",
+  Callback: "An error occurred during sign-in. Please try again.",
+  Verification: "Could not verify your sign-in. Please try again.",
+
+  // NextAuth generic fallback
+  CredentialsSignin: "Invalid email or password.",
 };
+
+const ADMIN_ROLES = [
+  "SUPER_ADMIN",
+  "ADMIN_MANAGER",
+  "ADMIN_SUPPORT",
+  "ADMIN_FINANCE",
+];
 
 function SignInForm() {
   const router = useRouter();
@@ -31,23 +45,19 @@ function SignInForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
-  const [loginData, setLoginData] = useState({
-    email: "",
-    password: "",
-  });
+  const [loginData, setLoginData] = useState({ email: "", password: "" });
 
-  // Read the ?error= query param that NextAuth appends on OAuth failure
+  // OAuth errors appended to the URL by NextAuth on redirect failures
   const oauthError = searchParams.get("error");
   const oauthErrorMessage = oauthError
-    ? OAUTH_ERROR_MESSAGES[oauthError] ??
-      "An unexpected sign-in error occurred. Please try again."
+    ? (ERROR_MESSAGES[oauthError] ?? "An unexpected sign-in error occurred. Please try again.")
     : null;
 
   const handleLogin = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
 
     if (!loginData.email || !loginData.password) {
-      setError("Please fill in all fields");
+      setError("Please fill in all fields.");
       return;
     }
 
@@ -58,48 +68,40 @@ function SignInForm() {
       const result = await signIn("credentials", {
         email: loginData.email,
         password: loginData.password,
-        redirect: false, // Keep false so we can handle the redirect manually
+        redirect: false,
       });
 
       if (result?.error) {
-        setError("Invalid email or password");
+        // result.error contains the exact code we threw in authorize()
+        // e.g. "InvalidCredentials", "AccountSuspended", "UserNotFound", "ServerError"
+        setError(
+          ERROR_MESSAGES[result.error] ??
+            "An unexpected error occurred. Please try again."
+        );
         return;
       }
 
-      // 1. Fetch the updated session to determine the user's role
-      const { getSession } = await import("next-auth/react");
+      // Fetch session to determine role-based redirect
       const session = await getSession();
 
-      // 2. Define the admin roles allowed to access the dashboard
-      const ADMIN_ROLES = [
-        "SUPER_ADMIN",
-        "ADMIN_MANAGER",
-        "ADMIN_SUPPORT",
-        "ADMIN_FINANCE",
-      ];
-
-      // 3. Perform dynamic redirection based on the role found in the session
       if (session?.user?.role && ADMIN_ROLES.includes(session.user.role)) {
         router.push("/super-admin/dashboard");
       } else {
         router.push("/main/store");
       }
     } catch (err: any) {
-      setError(err.message || "Login failed");
+      setError(err.message || "Login failed. Please try again.");
     } finally {
       setIsLoading(false);
     }
   };
+
   const handleGoogleSignIn = async () => {
     try {
       setIsLoading(true);
-      // Use /auth/callback so the server reads the session role and routes
-      // admins to /super-admin/dashboard and regular users to /main/store.
-      await signIn("google", {
-        callbackUrl: "/auth/callback",
-      });
+      await signIn("google", { callbackUrl: "/auth/callback" });
     } catch (err: any) {
-      setError(err.message || "Google sign-in failed");
+      setError(err.message || "Google sign-in failed.");
       setIsLoading(false);
     }
   };
@@ -107,7 +109,7 @@ function SignInForm() {
   return (
     <div className="min-h-screen flex items-center justify-center px-4 transition-colors duration-300 bg-white dark:bg-[#0a0a0a]">
       <div className="w-full max-w-sm">
-        {/* Header Section */}
+        {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-3xl font-black tracking-tight text-gray-900 dark:text-white mb-2">
             Sign in
@@ -118,7 +120,7 @@ function SignInForm() {
         </div>
 
         <div className="space-y-4">
-          {/* OAuth error from URL (e.g. ?error=AccessDenied) */}
+          {/* OAuth error from URL (?error=...) */}
           {oauthErrorMessage && (
             <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg dark:bg-red-900/10 dark:text-red-400 dark:border-red-900/20">
               {oauthErrorMessage}
@@ -136,7 +138,8 @@ function SignInForm() {
           <button
             onClick={handleGoogleSignIn}
             type="button"
-            className="w-full flex items-center justify-center gap-3 px-4 py-2.5 border border-gray-200 dark:border-white/10 rounded-xl hover:bg-gray-50 dark:hover:bg-white/5 transition-colors bg-white dark:bg-white/5"
+            disabled={isLoading}
+            className="w-full flex items-center justify-center gap-3 px-4 py-2.5 border border-gray-200 dark:border-white/10 rounded-xl hover:bg-gray-50 dark:hover:bg-white/5 transition-colors bg-white dark:bg-white/5 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <svg className="w-5 h-5" viewBox="0 0 24 24">
               <path
@@ -163,7 +166,7 @@ function SignInForm() {
 
           <div className="relative py-2">
             <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-200 dark:border-white/10"></div>
+              <div className="w-full border-t border-gray-200 dark:border-white/10" />
             </div>
             <div className="relative flex justify-center text-xs uppercase">
               <span className="px-2 bg-white dark:bg-[#0a0a0a] text-gray-500 dark:text-gray-500 font-bold tracking-wider">
@@ -217,8 +220,7 @@ function SignInForm() {
                 </span>
               </label>
               <Link
-                href={"/forgot-password"}
-                type="button"
+                href="/forgot-password"
                 className="text-gray-900 dark:text-white font-medium hover:text-yellow-500 transition-colors"
               >
                 Forgot password?
@@ -228,7 +230,7 @@ function SignInForm() {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full bg-yellow-500 text-black py-3 rounded-xl hover:bg-yellow-400 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-bold  active:scale-[0.98]"
+              className="w-full bg-yellow-500 text-black py-3 rounded-xl hover:bg-yellow-400 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-bold active:scale-[0.98]"
             >
               {isLoading ? (
                 <span className="flex items-center justify-center gap-2">
@@ -256,10 +258,6 @@ function SignInForm() {
   );
 }
 
-/**
- * Wrap in Suspense so that useSearchParams() works correctly in Next.js 14
- * without opting the entire route out of static generation.
- */
 const SignIn = () => (
   <Suspense fallback={null}>
     <SignInForm />

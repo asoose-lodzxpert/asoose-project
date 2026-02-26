@@ -88,12 +88,12 @@ export class RideService {
     token: string,
     signal?: AbortSignal,
   ): Promise<Record<string, PriceEstimate>> {
-    // Transform to the backend DTO field names (all strings)
-    const farePayload: Record<string, string> = {
-      pickuplat: String(data.pickupLat),
-      pickuplong: String(data.pickupLng),
-      dropofflat: String(data.dropoffLat),
-      dropofflong: String(data.dropoffLng),
+    // Transform to camelCase coordinates as numbers (API Integrity fix)
+    const farePayload: Record<string, number | string> = {
+      pickupLat: data.pickupLat!,
+      pickupLng: data.pickupLng!,
+      dropoffLat: data.dropoffLat!,
+      dropoffLng: data.dropoffLng!,
     };
 
     // Pass vehicleType when specified so backend can apply type-specific pricing
@@ -260,6 +260,9 @@ export class RideService {
    * @param options - Query options { page?, limit?, status? }
    * @param signal - Abort signal for cancellation
    * @returns Array of BackendRide objects
+   * 
+   * IMPORTANT: `status` must be sent as screaming snake case (e.g., COMPLETED,
+   * CANCELLED_BY_USER) to match the backend enum filter.
    */
   static async getRideHistory(
     token: string,
@@ -274,6 +277,7 @@ export class RideService {
     const params = new URLSearchParams();
     if (options?.page) params.append("page", String(options.page));
     if (options?.limit) params.append("limit", String(options.limit));
+    // Pass status exactly as provided — caller must send screaming snake case
     if (options?.status) params.append("status", options.status);
 
     const endpoint = `/trips/rides${params.toString() ? `?${params}` : ""}`;

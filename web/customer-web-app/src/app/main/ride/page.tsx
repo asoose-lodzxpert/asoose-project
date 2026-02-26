@@ -47,9 +47,10 @@ export default function Home() {
         {/* --- Invisible logic-only components --- */}
         <UserLocationTracker />
         <MapCameraManager />
-        {/* Only mount socket listener when we have a confirmed rideId — prevents
-            a stale persisted status from opening a socket channel against no ride */}
-        {isRideActive && rideId && <RideSocketListener />}
+        {/* Mount socket listener as soon as we have a rideId to prevent race
+            conditions where rapid backend events arrive before REST API completes.
+            The socket listener internally guards all events with rideId matching. */}
+        {rideId && <RideSocketListener />}
 
         {/* --- Sidebar (left column, only for idle/configuring) --- */}
         {showSidebar && (
