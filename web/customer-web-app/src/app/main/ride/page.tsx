@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { RideController } from "./components/RideController";
 import { GlobalErrorBoundary } from "@/components/GlobalErrorBoundary";
@@ -13,7 +12,6 @@ import { GlobalErrorBanner } from "./components/GlobalErrorBanner";
 import { RideSafetyControls } from "./components/RideSafetyControls";
 import { useRideSynchronization } from "./hooks/useRideSynchronization";
 import { Sidebar } from "./components/Sidebar";
-import { socketService } from "@/services/socket.service";
 
 export default function Home() {
   const { data: session } = useSession();
@@ -21,21 +19,16 @@ export default function Home() {
   const isConfiguring = useRideStore((state) => state.isConfiguring);
   const rideId = useRideStore((state) => state.rideId);
 
-  // Connect socket when authenticated
-  useEffect(() => {
-    if (session?.accessToken && !socketService.isConnected()) {
-      socketService.connect(session.accessToken);
-    }
-    return () => {
-      socketService.disconnect();
-    };
-  }, [session?.accessToken]);
+  // Socket is managed globally by SocketProvider in providers.tsx (C4 fix).
+  // It connects on authentication and stays alive across page navigation and
+  // Paystack redirects, only disconnecting on logout.
 
   // Activate State Recovery
   useRideSynchronization();
 
   const isRideActive = [
     "searching",
+    "awaiting-payment",
     "confirmed",
     "arrived",
     "in-progress",

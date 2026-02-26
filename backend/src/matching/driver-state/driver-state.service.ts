@@ -146,12 +146,18 @@ export class DriverStateService {
         lng.toString(),
         hexId,
         timestamp.toString(),
+        'DRIVER',
       );
 
     if (result === -1) {
-      this.logger.warn(
-        `[LOC] Driver ${driverId}: SKIPPED — status is not ONLINE/ACTIVE (Lua returned -1)`,
+      // Driver was offline/missing in Redis but is actively sending GPS — auto-restored to ONLINE.
+      // Emit the online event and ensure geo-index + active-set are up to date.
+      this.logger.log(
+        `[LOC] Driver ${driverId}: auto-restored to ONLINE (was offline/missing in Redis)`,
       );
+      await this.redis.addDriverToGeoIndex(driverId, lat, lng);
+      await this.redis.addToDriverActiveSet(driverId);
+      this.eventBus.emitDriverOnline({ driverId, lat, lng, hexId, timestamp });
       return;
     }
 

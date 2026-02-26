@@ -24,6 +24,7 @@ import {
   Image,
   Activity,
   MapPin,
+  Megaphone,
 } from "lucide-react";
 import { signOut } from "next-auth/react";
 import useSWR from "swr";
@@ -139,6 +140,12 @@ export default function AdminLayoutClient({
       icon: FileText,
       href: "/super-admin/reports",
       allowed: ["ADMIN", "SUPER_ADMIN", "ADMIN_FINANCE", "ADMIN_MANAGER"],
+    },
+    {
+      name: "Notices",
+      icon: Megaphone,
+      href: "/super-admin/notices",
+      allowed: ["ADMIN", "SUPER_ADMIN"],
     },
   ];
 

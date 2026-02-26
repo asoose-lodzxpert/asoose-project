@@ -25,12 +25,14 @@ import { DeliveryMatchingProcessor } from './workers/delivery-matching.processor
 import { DriverInactivityProcessor } from './workers/driver-inactivity.processor';
 import { RiderInactivityProcessor } from './workers/rider-inactivity.processor';
 import { AssignmentTimeoutProcessor } from './workers/assignment-timeout.processor';
+import { NotificationProcessor } from './workers/notification.processor';
 
 // Startup
 import { StartupReconciliationService } from './startup-reconciliation.service';
 
 // Prisma
 import { PrismaModule } from '../prisma/prisma.module';
+import { FcmModule } from '../libs/fcm/fcm.module';
 
 /**
  * Matching System Module
@@ -45,6 +47,7 @@ import { PrismaModule } from '../prisma/prisma.module';
     MatchingRedisModule,
     QueueModule,
     PrismaModule,
+    FcmModule,
   ],
   providers: [
     // Core Services
@@ -59,6 +62,7 @@ import { PrismaModule } from '../prisma/prisma.module';
     DriverInactivityProcessor,
     RiderInactivityProcessor,
     AssignmentTimeoutProcessor,
+    NotificationProcessor,
 
     // Startup
     StartupReconciliationService,

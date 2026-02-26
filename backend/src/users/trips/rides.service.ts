@@ -321,7 +321,7 @@ export class RidesService {
             include: { pickupAddress: true, dropoffAddress: true },
           });
 
-          // 9. Create Payment (PENDING until driver accepted + customer confirms)
+          // 9. Create Payment placeholder (PENDING until customer completes Paystack checkout)
           const secureReference = `REF-${randomUUID()}`;
 
           const payment = await tx.payment.create({
@@ -330,9 +330,9 @@ export class RidesService {
               rideId: ride.id,
               amount: finalFare,
               status: PaymentStatus.PENDING,
-              method: PaymentMethod.CASH,
+              method: PaymentMethod.CARD, // Card is the only accepted payment method
               reference: secureReference,
-              gateway: 'SYSTEM',
+              gateway: 'PAYSTACK',
             },
           });
 

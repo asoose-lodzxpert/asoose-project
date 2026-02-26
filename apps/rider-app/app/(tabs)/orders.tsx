@@ -47,17 +47,22 @@ export default function OrdersScreen() {
   }>({ page: 1, limit: 10, total: 0, totalPages: 1 });
   const [loadingMore, setLoadingMore] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
+  // Used to ignore responses from stale/cancelled requests
+  const fetchGenRef = useRef(0);
 
   // Fetch orders from backend
   const fetchOrders = useCallback(
     async (page = 1, append = false) => {
+      // Bump generation; capture current gen so we can detect staleness
+      const gen = ++fetchGenRef.current;
+
+      if (page === 1) {
+        setLoading(true);
+      } else {
+        setLoadingMore(true);
+      }
+
       try {
-        if (page === 1) {
-          setLoading(true);
-        } else {
-          setLoadingMore(true);
-        }
-        // Determine status filter based on tab
         let statusFilter: string | undefined;
         if (activeTab === "active") {
           statusFilter = "ACCEPTED,PICKED_UP,IN_PROGRESS";
@@ -65,6 +70,13 @@ export default function OrdersScreen() {
           statusFilter = "DELIVERED,COMPLETED,CANCELLED,REJECTED";
         }
         const response = await getAllJobs(statusFilter, page, pagination.limit);
+
+        if (__DEV__)
+          console.log("Fetched orders:", JSON.stringify(response, null, 2));
+
+        // Discard stale response (another fetch started after this one)
+        if (gen !== fetchGenRef.current) return;
+
         if (append) {
           setOrders((prev) => [...prev, ...response.data]);
         } else {
@@ -72,15 +84,18 @@ export default function OrdersScreen() {
         }
         setPagination(response.pagination);
       } catch (error) {
-        // ...existing code...
+        if (gen !== fetchGenRef.current) return;
         Toast.show({
           type: "error",
           text1: "Failed to fetch jobs",
           text2: "Please try again",
         });
       } finally {
-        setLoading(false);
-        setLoadingMore(false);
+        // Only clear loading if this is still the current request
+        if (gen === fetchGenRef.current) {
+          setLoading(false);
+          setLoadingMore(false);
+        }
       }
     },
     [activeTab, pagination.limit],
@@ -88,10 +103,10 @@ export default function OrdersScreen() {
 
   // Fetch on mount and when tab changes
   useEffect(() => {
+    setOrders([]);
     setPagination((prev) => ({ ...prev, page: 1 }));
     fetchOrders(1, false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab]);
+  }, [activeTab, fetchOrders]);
 
   const onRefresh = async () => {
     setRefreshing(true);

@@ -48,9 +48,10 @@ export class OrderController {
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
-    const { id } = req.user || {};
+    const { id, role } = req.user || {};
     return this.orderService.getOrdersHistory(
       id,
+      role,
       status,
       page ? parseInt(page) : 1,
       limit ? parseInt(limit) : 20,

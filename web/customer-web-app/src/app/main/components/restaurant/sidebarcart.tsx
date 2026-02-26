@@ -46,6 +46,11 @@ export const SidebarCart = ({ restaurantName }: SidebarCartProps) => {
                 </span>
                 <span className="text-gray-700 dark:text-gray-300">
                   {item.name}
+                  {item.modifierNames && item.modifierNames.length > 0 && (
+                    <span className="block text-xs text-gray-400 dark:text-gray-500 font-normal leading-tight">
+                      {item.modifierNames.join(" · ")}
+                    </span>
+                  )}
                 </span>
               </div>
               <span className="font-bold">

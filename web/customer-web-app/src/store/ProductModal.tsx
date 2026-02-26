@@ -136,7 +136,7 @@ export const ProductModal = ({
       const modifierIds: string[] = Object.values(selectedModifiers).flat();
 
       await ApiService.post(
-        '/cart/add',
+        "/cart/add",
         {
           productId: product.id,
           quantity,
@@ -149,6 +149,15 @@ export const ProductModal = ({
 
       // Success: sync local cart store for immediate UI update.
       // Price stored here is display-only — the backend is the authoritative pricing source.
+
+      // Collect human-readable modifier names for display in checkout.
+      const modifierNames: string[] = (product.modifierGroups || []).flatMap(
+        (group) =>
+          group.modifiers
+            .filter((m) => modifierIds.includes(m.id))
+            .map((m) => m.name),
+      );
+
       addItem({
         id: product.id,
         name: product.name,
@@ -157,6 +166,7 @@ export const ProductModal = ({
         restaurantId: storeId,
         image: product.image,
         modifierIds: modifierIds.length > 0 ? modifierIds : undefined,
+        modifierNames: modifierNames.length > 0 ? modifierNames : undefined,
       });
 
       onClose();
@@ -189,8 +199,8 @@ export const ProductModal = ({
             >
               <X className="w-5 h-5" />
             </button>
-            
-            {product.image?.startsWith('http') && !imgError ? (
+
+            {product.image?.startsWith("http") && !imgError ? (
               <Image
                 src={product.image}
                 alt={product.name}
@@ -212,7 +222,7 @@ export const ProductModal = ({
               </div>
             )}
           </div>
-            
+
           <div className="p-6 space-y-6">
             <div>
               <h2 className="text-2xl font-black leading-tight mb-2 text-gray-900 dark:text-white">

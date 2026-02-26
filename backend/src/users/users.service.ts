@@ -133,31 +133,51 @@ export class UsersService {
           ...(statusFilter ? { status: statusFilter } : {}),
         },
         orderBy: { createdAt: 'desc' },
-        include: { dropoffAddress: true },
+        include: { dropoffAddress: true, pickupAddress: true },
         skip: (page - 1) * pageSize,
         take: pageSize,
       });
 
       return deliveries.map((d) => {
-        // Build a meaningful destination label.
-        // Guard against cities stored as placeholder strings ('Unknown', 'N/A') by
-        // old clients — treat them as absent and fall through to the street fragment.
         const PLACEHOLDER = new Set(['unknown', 'n/a']);
-        const cityRaw = d.dropoffAddress?.city;
-        const cityOk =
-          cityRaw &&
-          !PLACEHOLDER.has(cityRaw.trim().toLowerCase());
-        const destination =
-          (cityOk ? cityRaw : null) ||
-          d.dropoffAddress?.street?.split(',')[0] ||
-          'your destination';
+        const isReal = (v: unknown): v is string =>
+          typeof v === 'string' &&
+          v.trim().length > 0 &&
+          !PLACEHOLDER.has(v.trim().toLowerCase());
+
+        // Resolve pickup label: prefer city, fall back to first part of street
+        const pickupCity = isReal(d.pickupAddress?.city)
+          ? d.pickupAddress!.city!
+          : d.pickupAddress?.street?.split(',')[0]?.trim() || null;
+
+        // Resolve dropoff label: prefer city, fall back to first part of street
+        const dropoffCity = isReal(d.dropoffAddress?.city)
+          ? d.dropoffAddress!.city!
+          : d.dropoffAddress?.street?.split(',')[0]?.trim() || null;
+
+        // Build a distinctive description
+        let description: string;
+        if (d.packageDetails && isReal(d.packageDetails)) {
+          // "2x Shoes, 1x Watch → Maiduguri"
+          const dest = dropoffCity || 'destination';
+          description = `${d.packageDetails.trim()} → ${dest}`;
+        } else if (pickupCity && dropoffCity && pickupCity !== dropoffCity) {
+          // "From Lagos to Maiduguri"
+          description = `From ${pickupCity} to ${dropoffCity}`;
+        } else if (d.pickupAddress?.street && dropoffCity) {
+          // "From 12 Herbert Macaulay to Maiduguri"
+          const fromStreet = d.pickupAddress.street.split(',')[0].trim();
+          description = `From ${fromStreet} to ${dropoffCity}`;
+        } else {
+          description = `Delivery to ${dropoffCity || 'destination'}`;
+        }
 
         return {
           id: d.id,
           status: d.status,
           total: d.deliveryFee ?? 0,
           createdAt: d.createdAt,
-          description: `Delivery to ${destination}`,
+          description,
           recipient: d.recipientName || 'Recipient',
         };
       });
@@ -191,7 +211,9 @@ export class UsersService {
         v.trim().length > 0 &&
         !PLACEHOLDER.has(v.trim().toLowerCase());
       const formatAddress = (addr: any) =>
-        addr ? [addr.street, addr.city, addr.state].filter(isReal).join(', ') : '';
+        addr
+          ? [addr.street, addr.city, addr.state].filter(isReal).join(', ')
+          : '';
 
       return {
         ...delivery,

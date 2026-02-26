@@ -146,8 +146,10 @@ local lat = ARGV[2]
 local lng = ARGV[3]
 local newHexId = ARGV[4]
 local timestamp = ARGV[5]
+local role     = ARGV[6]
 
 local statusKey = 'driver:' .. driverId .. ':status'
+local roleKey   = 'driver:' .. driverId .. ':role'
 local hexKey = 'driver:' .. driverId .. ':hex'
 local lastSeenKey = 'driver:' .. driverId .. ':lastSeen'
 local locationKey = 'driver:' .. driverId .. ':location'
@@ -155,11 +157,37 @@ local pendingRideKey = 'driver:' .. driverId .. ':pendingRide'
 local pendingDeliveryKey = 'driver:' .. driverId .. ':pendingDelivery'
 
 local status = redis.call('GET', statusKey)
+
+-- Driver app guarantees it only sends location when the driver is active;
+-- if Redis disagrees (key expired, server restart, etc.) auto-restore to ONLINE.
 if status ~= 'ONLINE' and status ~= 'ACTIVE' then
-  return -1
+  -- Only restore if there is no active job; ACTIVE conflict would mean the key
+  -- was stale but a job is still in flight — skip to avoid data corruption.
+  local hasCurrent = redis.call('GET', 'driver:' .. driverId .. ':currentRide')
+                  or redis.call('GET', 'driver:' .. driverId .. ':currentDelivery')
+  if hasCurrent then
+    -- Has an active job in Redis under a different status — treat as ACTIVE
+    status = 'ACTIVE'
+  else
+    -- Restore to ONLINE
+    redis.call('SET', statusKey, 'ONLINE')
+    redis.call('SET', roleKey, role)
+    status = 'ONLINE'
+    -- Signal caller to emit online event and update geo/active sets
+    -- We'll still fall through to update location, then return -1 at the end.
+    redis.call('SET', locationKey, '{"lat":' .. lat .. ',"lng":' .. lng .. '}')
+    redis.call('SET', lastSeenKey, timestamp)
+    redis.call('SET', hexKey, newHexId)
+    local hasPending = redis.call('GET', pendingRideKey) or redis.call('GET', pendingDeliveryKey)
+    if not hasPending then
+      redis.call('SADD', 'hex:' .. newHexId .. ':drivers', driverId)
+      redis.call('INCR', 'hex:' .. newHexId .. ':count')
+    end
+    return -1  -- caller must emit online event + update geo-index + active-set
+  end
 end
 
-redis.call('SET', locationKey, '{"lat":'..lat..',"lng":'..lng..'}')
+redis.call('SET', locationKey, '{"lat":' .. lat .. ',"lng":' .. lng .. '}')
 redis.call('SET', lastSeenKey, timestamp)
 
 local oldHexId = redis.call('GET', hexKey)
@@ -362,8 +390,10 @@ local lat        = ARGV[2]
 local lng        = ARGV[3]
 local newHexId   = ARGV[4]
 local timestamp  = ARGV[5]
+local role       = ARGV[6]
 
 local statusKey          = 'rider:' .. riderId .. ':status'
+local roleKey            = 'rider:' .. riderId .. ':role'
 local hexKey             = 'rider:' .. riderId .. ':hex'
 local lastSeenKey        = 'rider:' .. riderId .. ':lastSeen'
 local locationKey        = 'rider:' .. riderId .. ':location'
@@ -371,8 +401,26 @@ local pendingDeliveryKey = 'rider:' .. riderId .. ':pendingDelivery'
 local currentDeliveryKey = 'rider:' .. riderId .. ':currentDelivery'
 
 local status = redis.call('GET', statusKey)
-if status ~= 'ONLINE' then
-  return -1
+
+-- Rider app guarantees it only sends location when active;
+-- auto-restore if Redis disagrees (key expired, server restart, etc.).
+if status ~= 'ONLINE' and status ~= 'ACTIVE' then
+  local hasCurrent = redis.call('GET', currentDeliveryKey)
+  if hasCurrent then
+    status = 'ACTIVE'
+  else
+    -- Restore to ONLINE
+    redis.call('SET', statusKey, 'ONLINE')
+    redis.call('SET', roleKey, role)
+    redis.call('SET', locationKey, '{"lat":' .. lat .. ',"lng":' .. lng .. '}')
+    redis.call('SET', lastSeenKey, timestamp)
+    redis.call('SET', hexKey, newHexId)
+    local hasPending = redis.call('GET', pendingDeliveryKey)
+    if not hasPending then
+      redis.call('SADD', 'hex:' .. newHexId .. ':riders', riderId)
+    end
+    return -1  -- caller must emit online event + update geo-index + active-set
+  end
 end
 
 redis.call('SET', locationKey, '{"lat":'..lat..',"lng":'..lng..'}')

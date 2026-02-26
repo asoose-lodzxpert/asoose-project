@@ -257,7 +257,12 @@ export class RiderDispatchListener {
     if (type === 'delivery') {
       const delivery = await this.prisma.delivery.findUnique({
         where: { id: payload.jobId },
-        select: { riderId: true, id: true, customerId: true },
+        select: {
+          riderId: true,
+          id: true,
+          customerId: true,
+          payment: { select: { status: true } },
+        },
       });
 
       if (delivery) {
@@ -272,19 +277,32 @@ export class RiderDispatchListener {
           );
         }
 
-        // Auto-create a dispute so admin can process the refund
-        await this.createCancellationDispute(
-          'delivery',
-          delivery.id,
-          delivery.customerId,
-          payload.cancelledBy,
-          payload.reason,
-        );
+        // Only create a dispute if the customer actually paid — no payment, no refund needed.
+        const deliveryWasPaid =
+          delivery.payment !== null && delivery.payment?.status !== 'PENDING';
+        if (deliveryWasPaid) {
+          await this.createCancellationDispute(
+            'delivery',
+            delivery.id,
+            delivery.customerId,
+            payload.cancelledBy,
+            payload.reason,
+          );
+        } else {
+          this.logger.log(
+            `Delivery ${delivery.id} cancelled with no payment — skipping dispute creation`,
+          );
+        }
       }
     } else if (type === 'ride') {
       const ride = await this.prisma.ride.findUnique({
         where: { id: payload.jobId },
-        select: { riderId: true, id: true, customerId: true },
+        select: {
+          riderId: true,
+          id: true,
+          customerId: true,
+          payment: { select: { status: true } },
+        },
       });
 
       if (ride) {
@@ -299,14 +317,22 @@ export class RiderDispatchListener {
           );
         }
 
-        // Auto-create a dispute so admin can process the refund
-        await this.createCancellationDispute(
-          'ride',
-          ride.id,
-          ride.customerId,
-          payload.cancelledBy,
-          payload.reason,
-        );
+        // Only create a dispute if the customer actually paid — no payment, no refund needed.
+        const rideWasPaid =
+          ride.payment !== null && ride.payment?.status !== 'PENDING';
+        if (rideWasPaid) {
+          await this.createCancellationDispute(
+            'ride',
+            ride.id,
+            ride.customerId,
+            payload.cancelledBy,
+            payload.reason,
+          );
+        } else {
+          this.logger.log(
+            `Ride ${ride.id} cancelled with no payment — skipping dispute creation`,
+          );
+        }
       }
     }
   }

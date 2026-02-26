@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import { useState, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
@@ -15,9 +15,47 @@ import { SidebarSection, SidebarDivider } from "./Sidebar";
 import { PrimaryButton, SecondaryButton, Text } from "@/components/ui";
 import { X, RotateCcw, Loader2 } from "lucide-react";
 
+/**
+ * Retry a transient-failure-prone async operation (H2 fix).
+ *
+ * Retries up to `attempts` times with `delayMs` spacing.
+ * Client errors (4xx) are not retried — except 408 (Request Timeout)
+ * and 429 (Too Many Requests), which are network/capacity issues.
+ */
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  attempts = 3,
+  delayMs = 1000,
+): Promise<T> {
+  let lastError: unknown;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await fn();
+    } catch (err: any) {
+      lastError = err;
+      const status: number | undefined = err?.status ?? err?.response?.status;
+      // Don't retry definitive 4xx failures (validation, auth, not-found …)
+      // but DO retry on 408 (timeout) and 429 (rate-limit).
+      if (
+        status &&
+        status >= 400 &&
+        status < 500 &&
+        status !== 408 &&
+        status !== 429
+      ) {
+        throw err;
+      }
+      if (i < attempts - 1) {
+        await new Promise((res) => setTimeout(res, delayMs));
+      }
+    }
+  }
+  throw lastError;
+}
+
 export function RideSelection() {
   const { data: session } = useSession();
-  
+
   // --- Store Selectors ---
   const pickupLocation = useRideStore((state) => state.pickupLocation);
   const dropoffLocation = useRideStore((state) => state.dropoffLocation);
@@ -26,34 +64,45 @@ export function RideSelection() {
   const setPickupLocation = useRideStore((state) => state.setPickupLocation);
   const setDropoffLocation = useRideStore((state) => state.setDropoffLocation);
   const setRideId = useRideStore((state) => state.setRideId);
-  const clearPickupLocation = useRideStore((state) => state.clearPickupLocation);
-  const clearDropoffLocation = useRideStore((state) => state.clearDropoffLocation);
+  const clearPickupLocation = useRideStore(
+    (state) => state.clearPickupLocation,
+  );
+  const clearDropoffLocation = useRideStore(
+    (state) => state.clearDropoffLocation,
+  );
   const clearAllLocations = useRideStore((state) => state.clearAllLocations);
   const setStartOtp = useRideStore((state) => state.setStartOtp);
   const setLockedEstimate = useRideStore((state) => state.setLockedEstimate);
-  const setPaymentConfirmed = useRideStore((state) => state.setPaymentConfirmed);
+  const setPaymentConfirmed = useRideStore(
+    (state) => state.setPaymentConfirmed,
+  );
 
   // --- Global Address Setters ---
   const setPickupAddressStore = useRideStore((state) => state.setPickupAddress);
-  const setDropoffAddressStore = useRideStore((state) => state.setDropoffAddress);
-  
+  const setDropoffAddressStore = useRideStore(
+    (state) => state.setDropoffAddress,
+  );
+
   // New Selectors for Map Control
   const mapInstance = useRideStore((state) => state.mapInstance);
   const isGoogleMapsLoaded = useRideStore((state) => state.isGoogleMapsLoaded);
   const setRoutePolyline = useRideStore((state) => state.setRoutePolyline);
 
   // --- Address State from Zustand ---
-  const pickupAddress = useRideStore((state) => state.pickupAddress || '');
+  const pickupAddress = useRideStore((state) => state.pickupAddress || "");
   const setPickupAddress = useRideStore((state) => state.setPickupAddress);
-  const dropoffAddress = useRideStore((state) => state.dropoffAddress || '');
+  const dropoffAddress = useRideStore((state) => state.dropoffAddress || "");
   const setDropoffAddress = useRideStore((state) => state.setDropoffAddress);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCalculating, setIsCalculating] = useState(false);
   const [estimateError, setEstimateError] = useState<string | null>(null);
-  const [estimates, setEstimates] = useState<Record<string, PriceEstimate> | null>(null);
+  const [estimates, setEstimates] = useState<Record<
+    string,
+    PriceEstimate
+  > | null>(null);
   // Fare confirmation: set when user selects a ride type, cleared on cancel or location change
   const [pendingBooking, setPendingBooking] = useState<{
-    rideType: 'economy' | 'business';
+    rideType: "economy" | "business";
     estimate: PriceEstimate;
   } | null>(null);
 
@@ -71,7 +120,13 @@ export function RideSelection() {
 
   // --- 1. Effect: Calculate Route Visuals (The Blue Line) ---
   useEffect(() => {
-    if (!isGoogleMapsLoaded || !mapInstance || !debouncedPickup || !debouncedDropoff) return;
+    if (
+      !isGoogleMapsLoaded ||
+      !mapInstance ||
+      !debouncedPickup ||
+      !debouncedDropoff
+    )
+      return;
 
     const calculateRoute = async () => {
       const directionsService = new google.maps.DirectionsService();
@@ -89,7 +144,10 @@ export function RideSelection() {
           bounds.extend(debouncedPickup);
           bounds.extend(debouncedDropoff);
           mapInstance.fitBounds(bounds, {
-             top: 50, right: 50, bottom: 250, left: 50
+            top: 50,
+            right: 50,
+            bottom: 250,
+            left: 50,
           });
         }
       } catch (error) {
@@ -98,15 +156,22 @@ export function RideSelection() {
     };
 
     calculateRoute();
-  }, [debouncedPickup, debouncedDropoff, isGoogleMapsLoaded, mapInstance, setRoutePolyline]);
+  }, [
+    debouncedPickup,
+    debouncedDropoff,
+    isGoogleMapsLoaded,
+    mapInstance,
+    setRoutePolyline,
+  ]);
 
   // --- 2. Effect: Fetch Backend Prices ---
   useEffect(() => {
     async function fetchEstimates() {
-      if (!debouncedPickup || !debouncedDropoff || !session?.accessToken) return;
+      if (!debouncedPickup || !debouncedDropoff || !session?.accessToken)
+        return;
 
       estimateAbortControllerRef.current?.abort();
-      
+
       const controller = new AbortController();
       estimateAbortControllerRef.current = controller;
 
@@ -119,11 +184,14 @@ export function RideSelection() {
           dropoffLat: debouncedDropoff.lat,
           dropoffLng: debouncedDropoff.lng,
         };
-        
+
         try {
           validateFareEstimatePayload(estimatePayload);
         } catch (validationError) {
-          const msg = validationError instanceof Error ? validationError.message : 'Invalid fare estimate payload';
+          const msg =
+            validationError instanceof Error
+              ? validationError.message
+              : "Invalid fare estimate payload";
           setEstimateError(msg);
           setIsCalculating(false);
           return;
@@ -132,22 +200,23 @@ export function RideSelection() {
         const data = await RideService.getEstimate(
           estimatePayload,
           session.accessToken,
-          controller.signal
+          controller.signal,
         );
-        
+
         if (!controller.signal.aborted) {
           setEstimates(data);
           setEstimateError(null);
         }
       } catch (error: any) {
-        if (error.name === 'AbortError') return;
+        if (error.name === "AbortError") return;
         console.error("Failed to get estimates:", error);
         if (!controller.signal.aborted) {
-          const msg = error?.type === 'network-error'
-            ? 'Cannot reach server. Is the backend running? Tap to retry.'
-            : error?.type === 'timeout'
-            ? 'Request timed out. Tap to retry.'
-            : error?.message || 'Failed to load ride prices. Tap to retry.';
+          const msg =
+            error?.type === "network-error"
+              ? "Cannot reach server. Is the backend running? Tap to retry."
+              : error?.type === "timeout"
+                ? "Request timed out. Tap to retry."
+                : error?.message || "Failed to load ride prices. Tap to retry.";
           setEstimateError(msg);
         }
       } finally {
@@ -164,9 +233,11 @@ export function RideSelection() {
     };
   }, [debouncedPickup, debouncedDropoff, session?.accessToken]);
 
-
   // --- Booking Handler (called only after the user confirms on the confirmation panel) ---
-  const handleRideRequest = async (rideType: 'economy' | 'business', lockedEstimate: PriceEstimate) => {
+  const handleRideRequest = async (
+    rideType: "economy" | "business",
+    lockedEstimate: PriceEstimate,
+  ) => {
     if (!pickupLocation || !dropoffLocation) {
       toast.error("Please select both pickup and dropoff locations");
       return;
@@ -212,46 +283,53 @@ export function RideSelection() {
       try {
         validateCreateRidePayload(payload);
       } catch (validationError) {
-        toast.error(validationError instanceof Error ? validationError.message : 'Invalid booking payload');
+        toast.error(
+          validationError instanceof Error
+            ? validationError.message
+            : "Invalid booking payload",
+        );
         setIsSubmitting(false);
-        setRideStatus('idle');
+        setRideStatus("idle");
         return;
       }
 
       const idempotencyKey = crypto.randomUUID();
-      const response = await RideService.createRide(
-        payload,
-        session.accessToken,
-        idempotencyKey
+      const accessToken = session.accessToken as string; // already guarded above
+      // Retry up to 3× on network/server errors; 4xx (except 408/429) rethrown immediately (H2 fix)
+      const response = await withRetry(
+        () => RideService.createRide(payload, accessToken, idempotencyKey),
+        3,
+        1000,
       );
       if (setRideId) setRideId(response.ride.id);
       // Store OTP so it can be shown to the driver when they arrive
-      if ((response.ride as any).startOtp) setStartOtp((response.ride as any).startOtp);
+      if ((response.ride as any).startOtp)
+        setStartOtp((response.ride as any).startOtp);
 
       // Driver matching begins on the backend after createRide.
       // confirmRide is called later from PostDriverPayment after DRIVER_FOUND.
-      setRideStatus('searching');
+      setRideStatus("searching");
     } catch (error: any) {
       const norm = normalizeApiError(error);
       console.error("Booking failed:", JSON.stringify(norm, null, 2));
 
       // Surface specific, user-friendly messages based on error type
       const userMessage =
-        error?.type === 'network-error'
-          ? 'Cannot reach the server. Please check your connection and try again.'
-          : error?.type === 'timeout'
-          ? 'The request timed out. Please try again.'
-          : norm.message || 'Failed to request ride. Please try again.';
+        error?.type === "network-error"
+          ? "Cannot reach the server. Please check your connection and try again."
+          : error?.type === "timeout"
+            ? "The request timed out. Please try again."
+            : norm.message || "Failed to request ride. Please try again.";
 
       toast.error(userMessage);
-      setRideStatus('idle');
+      setRideStatus("idle");
     } finally {
       setIsSubmitting(false);
     }
   };
 
   // --- Show the confirmation panel for the selected ride type ---
-  const handleSelectRide = (rideType: 'economy' | 'business') => {
+  const handleSelectRide = (rideType: "economy" | "business") => {
     const vehicleKey = rideType.toUpperCase();
     const estimate = estimates?.[vehicleKey];
     if (!estimate) {
@@ -261,26 +339,33 @@ export function RideSelection() {
     setPendingBooking({ rideType, estimate });
   };
 
-  const formatMoney = (amount: number) => 
-    new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(amount);
+  const formatMoney = (amount: number) =>
+    new Intl.NumberFormat("en-NG", {
+      style: "currency",
+      currency: "NGN",
+    }).format(amount);
 
-  const formatDuration = (minutes: number) => Math.ceil(minutes) + ' min';
+  const formatDuration = (minutes: number) => Math.ceil(minutes) + " min";
 
   // --- 3. Clear Location Handlers ---
   const handleClearPickup = () => {
     routeAbortControllerRef.current?.abort();
+    routeAbortControllerRef.current = null; // L6: release resolved controller reference
     estimateAbortControllerRef.current?.abort();
+    estimateAbortControllerRef.current = null; // L6
     clearPickupLocation();
-    setPickupAddress('');
+    setPickupAddress("");
     setEstimates(null);
     toast.info("Pickup location cleared");
   };
 
   const handleClearDropoff = () => {
     routeAbortControllerRef.current?.abort();
+    routeAbortControllerRef.current = null; // L6: release resolved controller reference
     estimateAbortControllerRef.current?.abort();
+    estimateAbortControllerRef.current = null; // L6
     clearDropoffLocation();
-    setDropoffAddress('');
+    setDropoffAddress("");
     setEstimates(null);
     toast.info("Dropoff location cleared");
   };
@@ -298,7 +383,9 @@ export function RideSelection() {
                 setPickupAddress(address);
                 setPickupAddressStore(address);
               }}
-              initialValue={pickupLocation ? (pickupAddress || 'Current Pickup') : ''}
+              initialValue={
+                pickupLocation ? pickupAddress || "Current Pickup" : ""
+              }
             />
           </div>
           {pickupLocation && (
@@ -327,7 +414,9 @@ export function RideSelection() {
                 setDropoffAddress(address);
                 setDropoffAddressStore(address);
               }}
-              initialValue={dropoffLocation ? (dropoffAddress || 'Current Dropoff') : ''}
+              initialValue={
+                dropoffLocation ? dropoffAddress || "Current Dropoff" : ""
+              }
             />
           </div>
           {dropoffLocation && (
@@ -353,7 +442,9 @@ export function RideSelection() {
             <SidebarSection title="Select Ride">
               <div className="flex items-center justify-center h-20 text-zinc-500 dark:text-zinc-400">
                 <RotateCcw size={18} className="animate-spin mr-2" />
-                <Text size="sm" variant="secondary">Calculating fares...</Text>
+                <Text size="sm" variant="secondary">
+                  Calculating fares...
+                </Text>
               </div>
             </SidebarSection>
           )}
@@ -369,34 +460,53 @@ export function RideSelection() {
                   estimateAbortControllerRef.current?.abort();
                   const controller = new AbortController();
                   estimateAbortControllerRef.current = controller;
-                  if (debouncedPickup && debouncedDropoff && session?.accessToken) {
+                  if (
+                    debouncedPickup &&
+                    debouncedDropoff &&
+                    session?.accessToken
+                  ) {
                     setIsCalculating(true);
                     RideService.getEstimate(
-                      { pickupLat: debouncedPickup.lat, pickupLng: debouncedPickup.lng, dropoffLat: debouncedDropoff.lat, dropoffLng: debouncedDropoff.lng },
+                      {
+                        pickupLat: debouncedPickup.lat,
+                        pickupLng: debouncedPickup.lng,
+                        dropoffLat: debouncedDropoff.lat,
+                        dropoffLng: debouncedDropoff.lng,
+                      },
                       session.accessToken,
-                      controller.signal
-                    ).then((data) => {
-                      if (!controller.signal.aborted) {
-                        setEstimates(data);
-                        setEstimateError(null);
-                      }
-                    }).catch((err) => {
-                      if (err.name !== 'AbortError' && !controller.signal.aborted) {
-                        const msg = err?.type === 'network-error'
-                          ? 'Cannot reach server. Is the backend running? Tap to retry.'
-                          : err?.type === 'timeout'
-                          ? 'Request timed out. Tap to retry.'
-                          : err?.message || 'Failed to load ride prices. Tap to retry.';
-                        setEstimateError(msg);
-                      }
-                    }).finally(() => {
-                      if (!controller.signal.aborted) setIsCalculating(false);
-                    });
+                      controller.signal,
+                    )
+                      .then((data) => {
+                        if (!controller.signal.aborted) {
+                          setEstimates(data);
+                          setEstimateError(null);
+                        }
+                      })
+                      .catch((err) => {
+                        if (
+                          err.name !== "AbortError" &&
+                          !controller.signal.aborted
+                        ) {
+                          const msg =
+                            err?.type === "network-error"
+                              ? "Cannot reach server. Is the backend running? Tap to retry."
+                              : err?.type === "timeout"
+                                ? "Request timed out. Tap to retry."
+                                : err?.message ||
+                                  "Failed to load ride prices. Tap to retry.";
+                          setEstimateError(msg);
+                        }
+                      })
+                      .finally(() => {
+                        if (!controller.signal.aborted) setIsCalculating(false);
+                      });
                   }
                 }}
                 className="flex items-center justify-center h-20 w-full text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors"
               >
-                <Text size="sm" className="text-red-600 dark:text-red-400">{estimateError}</Text>
+                <Text size="sm" className="text-red-600 dark:text-red-400">
+                  {estimateError}
+                </Text>
               </button>
             </SidebarSection>
           )}
@@ -410,15 +520,19 @@ export function RideSelection() {
                   {/* Route summary */}
                   <div className="w-full space-y-2 bg-gray-50 dark:bg-white/5 rounded-xl p-3">
                     <div>
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">From</p>
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
+                        From
+                      </p>
                       <p className="text-sm font-semibold text-gray-900 dark:text-white truncate mt-0.5">
-                        {pickupAddress || 'Pickup location'}
+                        {pickupAddress || "Pickup location"}
                       </p>
                     </div>
                     <div className="border-t border-gray-200 dark:border-white/10 pt-2">
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">To</p>
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
+                        To
+                      </p>
                       <p className="text-sm font-semibold text-gray-900 dark:text-white truncate mt-0.5">
-                        {dropoffAddress || 'Dropoff location'}
+                        {dropoffAddress || "Dropoff location"}
                       </p>
                     </div>
                   </div>
@@ -434,12 +548,15 @@ export function RideSelection() {
                       </span>
                     </div>
                     <p className="text-xs text-gray-500 dark:text-gray-400">
-                      {pendingBooking.estimate.distance.toFixed(1)} km &middot; {formatDuration(pendingBooking.estimate.duration)} &middot; Pay after driver is assigned
+                      {pendingBooking.estimate.distance.toFixed(1)} km &middot;{" "}
+                      {formatDuration(pendingBooking.estimate.duration)}{" "}
+                      &middot; Pay after driver is assigned
                     </p>
                   </div>
 
                   <p className="text-xs text-amber-600 dark:text-amber-500 font-medium w-full">
-                    ✓ Confirmed fare — you will not be charged more than this amount.
+                    ✓ Confirmed fare — you will not be charged more than this
+                    amount.
                   </p>
 
                   {/* Action buttons */}
@@ -451,7 +568,12 @@ export function RideSelection() {
                       ← Change
                     </SecondaryButton>
                     <PrimaryButton
-                      onClick={() => handleRideRequest(pendingBooking.rideType, pendingBooking.estimate)}
+                      onClick={() =>
+                        handleRideRequest(
+                          pendingBooking.rideType,
+                          pendingBooking.estimate,
+                        )
+                      }
                       disabled={isSubmitting}
                     >
                       {isSubmitting ? (
@@ -459,7 +581,9 @@ export function RideSelection() {
                           <Loader2 size={14} className="animate-spin" />
                           Booking...
                         </span>
-                      ) : 'Confirm & Book'}
+                      ) : (
+                        "Confirm & Book"
+                      )}
                     </PrimaryButton>
                   </div>
                 </SidebarSection>
@@ -469,18 +593,28 @@ export function RideSelection() {
                   <div className="grid grid-cols-2 gap-3 w-full">
                     {/* Economy Button */}
                     <SecondaryButton
-                      onClick={() => handleSelectRide('economy')}
+                      onClick={() => handleSelectRide("economy")}
                       disabled={isSubmitting || isCalculating}
                       className="h-20 flex flex-col items-center justify-center"
                     >
                       {isCalculating ? (
-                        <Text size="xs" variant="secondary">Calculating...</Text>
+                        <Text size="xs" variant="secondary">
+                          Calculating...
+                        </Text>
                       ) : (
                         <>
-                          <Text size="sm" weight="semibold">Economy</Text>
-                          {estimates?.['ECONOMY'] && (
-                            <Text size="xs" variant="secondary" className="mt-1">
-                              {formatDuration(estimates['ECONOMY'].duration)} &bull; {formatMoney(estimates['ECONOMY'].estimatedFare)}
+                          <Text size="sm" weight="semibold">
+                            Economy
+                          </Text>
+                          {estimates?.["ECONOMY"] && (
+                            <Text
+                              size="xs"
+                              variant="secondary"
+                              className="mt-1"
+                            >
+                              {formatDuration(estimates["ECONOMY"].duration)}{" "}
+                              &bull;{" "}
+                              {formatMoney(estimates["ECONOMY"].estimatedFare)}
                             </Text>
                           )}
                         </>
@@ -489,18 +623,28 @@ export function RideSelection() {
 
                     {/* Business Button */}
                     <PrimaryButton
-                      onClick={() => handleSelectRide('business')}
+                      onClick={() => handleSelectRide("business")}
                       disabled={isSubmitting || isCalculating}
                       className="h-20 flex flex-col items-center justify-center"
                     >
                       {isCalculating ? (
-                        <Text size="xs" className="text-white">Calculating...</Text>
+                        <Text size="xs" className="text-white">
+                          Calculating...
+                        </Text>
                       ) : (
                         <>
-                          <Text size="sm" weight="semibold" className="text-white">Business</Text>
-                          {estimates?.['BUSINESS'] && (
+                          <Text
+                            size="sm"
+                            weight="semibold"
+                            className="text-white"
+                          >
+                            Business
+                          </Text>
+                          {estimates?.["BUSINESS"] && (
                             <Text size="xs" className="mt-1 text-white/80">
-                              {formatDuration(estimates['BUSINESS'].duration)} &bull; {formatMoney(estimates['BUSINESS'].estimatedFare)}
+                              {formatDuration(estimates["BUSINESS"].duration)}{" "}
+                              &bull;{" "}
+                              {formatMoney(estimates["BUSINESS"].estimatedFare)}
                             </Text>
                           )}
                         </>

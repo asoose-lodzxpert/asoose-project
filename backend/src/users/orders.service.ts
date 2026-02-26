@@ -247,9 +247,8 @@ export class OrdersService {
         const enrichedItems = groupItems.map((item) => {
           const p = productMap.get(item.id)!;
           // Include modifier add-on prices from DB
-          const allModifiers = (p as any).modifierGroups?.flatMap(
-            (g: any) => g.modifiers,
-          ) ?? [];
+          const allModifiers =
+            (p as any).modifierGroups?.flatMap((g: any) => g.modifiers) ?? [];
           const modifierAddon = (item.modifierIds ?? []).reduce(
             (sum: number, modId: string) => {
               const mod = allModifiers.find((m: any) => m.id === modId);
@@ -691,7 +690,13 @@ export class OrdersService {
   async getOrderDetails(userId: string, id: string) {
     try {
       const orderInclude = {
-        items: true,
+        items: {
+          include: {
+            modifiers: {
+              include: { modifier: true },
+            },
+          },
+        },
         delivery: {
           include: {
             dropoffAddress: true,
@@ -778,6 +783,10 @@ export class OrdersService {
             name: item.nameSnap,
             price: item.price,
             quantity: item.quantity,
+            modifiers: (item.modifiers ?? []).map((m: any) => ({
+              name: m.modifier.name,
+              price: m.modifier.price,
+            })),
           })),
           addressDetails: order.delivery?.dropoffAddress
             ? {
@@ -902,6 +911,10 @@ export class OrdersService {
             name: item.nameSnap,
             price: item.price,
             quantity: item.quantity,
+            modifiers: (item.modifiers ?? []).map((m: any) => ({
+              name: m.modifier.name,
+              price: m.modifier.price,
+            })),
           })),
           // Delivery is now group-level (see top-level `delivery` field)
           delivery: null,
@@ -1046,9 +1059,8 @@ export class OrdersService {
           const p = productMap.get(item.id)!;
 
           // Resolve modifier prices from DB — never trust the client-supplied price
-          const allModifiers = (p as any).modifierGroups?.flatMap(
-            (g: any) => g.modifiers,
-          ) ?? [];
+          const allModifiers =
+            (p as any).modifierGroups?.flatMap((g: any) => g.modifiers) ?? [];
           const selectedModifierIds = item.modifierIds ?? [];
           const selectedModifiers = allModifiers.filter((m: any) =>
             selectedModifierIds.includes(m.id),
@@ -1066,17 +1078,19 @@ export class OrdersService {
             nameSnap: this.addressesService.sanitizeString(p.name),
             price: unitPrice, // DB-authoritative price including modifiers
             quantity: item.quantity,
-            selectedOptions: selectedModifierIds.length > 0
-              ? { modifierIds: selectedModifierIds }
-              : undefined,
+            selectedOptions:
+              selectedModifierIds.length > 0
+                ? { modifierIds: selectedModifierIds }
+                : undefined,
             // Create OrderItemModifier join records
-            modifiers: selectedModifierIds.length > 0
-              ? {
-                  create: selectedModifierIds.map((modifierId) => ({
-                    modifierId,
-                  })),
-                }
-              : undefined,
+            modifiers:
+              selectedModifierIds.length > 0
+                ? {
+                    create: selectedModifierIds.map((modifierId) => ({
+                      modifierId,
+                    })),
+                  }
+                : undefined,
           };
         });
 

@@ -7,7 +7,8 @@ import { toast } from "react-toastify";
 import { useSession } from "next-auth/react";
 import { useCartStore } from "@/store/useCartStore";
 import { useDeliveryStore } from "@/store/useDeliveryStore";
-import { useRideStore } from "@/app/main/ride/store/ride";
+import { useRideStore, type RideStage } from "@/app/main/ride/store/ride";
+import { RideService } from "@/services/ride.service";
 
 // Use the same base URL as ApiService so the versioned path is always correct.
 // NEXT_PUBLIC_API_URL is expected to be "https://host/api/v1" (with prefix+version).
@@ -27,6 +28,7 @@ function CallbackContent() {
   // Zustand ride store setters — used to restore ride state on return from Paystack
   const setRideId = useRideStore((s) => s.setRideId);
   const setRideStatus = useRideStore((s) => s.setRideStatus);
+  const setPaymentConfirmed = useRideStore((s) => s.setPaymentConfirmed);
 
   useEffect(() => {
     if (processedRef.current) return;
@@ -109,7 +111,9 @@ function CallbackContent() {
 
         if (res.status === 401) {
           // Session expired during Paystack redirect — send to sign-in
-          toast.error("Session expired. Please sign in and check your payment status.");
+          toast.error(
+            "Session expired. Please sign in and check your payment status.",
+          );
           router.replace("/sign-in?reason=session_expired");
           return;
         }
@@ -143,18 +147,51 @@ function CallbackContent() {
         // ── Route back to the originating flow ──────────────────────────────
         const isCheckout = localStorage.getItem("pending_checkout");
         // Re-read delivery data in case something changed during the async calls
-        const pendingDeliveryData = localStorage.getItem("pending_delivery_data");
+        const pendingDeliveryData = localStorage.getItem(
+          "pending_delivery_data",
+        );
 
         if (isRide) {
           // Restore ride context into Zustand before navigating so the ride
           // page shows the correct state without waiting for the first poll.
           const pendingRideId = localStorage.getItem("pending_ride_id");
-          if (pendingRideId) {
+          const UUID_RE =
+            /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+          if (pendingRideId && UUID_RE.test(pendingRideId)) {
             setRideId(pendingRideId);
-            // Mark as searching — backend will have transitioned the ride to
-            // REQUESTED after payment verification, and driver matching is live.
+          }
+
+          // Ensure payment confirmed so sync hook maps DRIVER_ACCEPTED → 'confirmed'
+          setPaymentConfirmed(true);
+
+          // Resolve the real backend status (C3 fix) — eliminates the ~15s gap
+          // where the UI was stuck on the wrong screen after Paystack return.
+          // paymentConfirmed=true was set before the redirect, so ACCEPTED
+          // states map directly to 'confirmed' rather than 'awaiting-payment'.
+          try {
+            const currentRide = await RideService.getCurrentRide(token);
+            if (currentRide) {
+              const STATUS_MAP: Record<string, RideStage> = {
+                REQUESTED: "searching",
+                SEARCHING_DRIVER: "searching",
+                DRIVER_ASSIGNED: "searching",
+                DRIVER_ACCEPTED: "confirmed",
+                ACCEPTED: "confirmed",
+                PAID: "confirmed",
+                ARRIVED: "arrived",
+                IN_PROGRESS: "in-progress",
+                COMPLETED: "finished",
+              };
+              setRideStatus(STATUS_MAP[currentRide.status] ?? "searching");
+            } else {
+              setRideStatus("searching");
+            }
+          } catch {
+            // Non-fatal — sync hook corrects within 15s
             setRideStatus("searching");
           }
+
           localStorage.removeItem("pending_ride");
           localStorage.removeItem("pending_ride_id");
           router.replace("/main/ride");
@@ -184,14 +221,24 @@ function CallbackContent() {
       } catch (error: any) {
         console.error("Payment verification error:", error);
         toast.error(
-          error?.message || "Payment verification failed. Please contact support.",
+          error?.message ||
+            "Payment verification failed. Please contact support.",
         );
         handleFailure();
       }
     };
 
     verifyAndComplete();
-  }, [searchParams, router, clearCart, resetDelivery, session, setRideId, setRideStatus]);
+  }, [
+    searchParams,
+    router,
+    clearCart,
+    resetDelivery,
+    session,
+    setRideId,
+    setRideStatus,
+    setPaymentConfirmed,
+  ]);
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-[#0a0a0a]">

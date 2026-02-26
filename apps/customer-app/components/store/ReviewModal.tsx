@@ -70,19 +70,12 @@ export function ReviewModal({
     }
   };
 
-  const handleClose = () => {
-    setComment("");
-    setRating(5);
-    setError(null);
-    onClose();
-  };
-
   return (
     <Modal
       visible={visible}
       animationType="slide"
       transparent
-      onRequestClose={handleClose}
+      onRequestClose={() => {}} // Review is mandatory – back button does nothing
     >
       <View style={styles.overlay}>
         <ThemedView style={[styles.container, { backgroundColor: cardBg }]}>
@@ -90,9 +83,9 @@ export function ReviewModal({
             {/* Header */}
             <View style={styles.header}>
               <ThemedText style={styles.title}>Write a Review</ThemedText>
-              <TouchableOpacity onPress={handleClose} disabled={loading}>
-                <IconSymbol name="xmark" size={28} color={mutedColor} />
-              </TouchableOpacity>
+              <ThemedText style={[styles.requiredBadge, { color: primary }]}>
+                Required
+              </ThemedText>
             </View>
 
             {/* Store Name */}
@@ -187,18 +180,10 @@ export function ReviewModal({
               )}
             </TouchableOpacity>
 
-            {/* Cancel Button */}
-            <TouchableOpacity
-              style={styles.cancelButton}
-              onPress={handleClose}
-              disabled={loading}
-            >
-              <ThemedText
-                style={[styles.cancelButtonText, { color: mutedColor }]}
-              >
-                Cancel
-              </ThemedText>
-            </TouchableOpacity>
+            {/* Mandatory note */}
+            <ThemedText style={[styles.mandatoryNote, { color: mutedColor }]}>
+              A review is required to continue.
+            </ThemedText>
           </ScrollView>
         </ThemedView>
       </View>
@@ -291,12 +276,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "700",
   },
-  cancelButton: {
-    padding: 12,
-    alignItems: "center",
+  requiredBadge: {
+    fontSize: 13,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
   },
-  cancelButtonText: {
-    fontSize: 16,
-    fontWeight: "600",
+  mandatoryNote: {
+    textAlign: "center",
+    fontSize: 13,
+    marginTop: 4,
+    marginBottom: 8,
   },
 });

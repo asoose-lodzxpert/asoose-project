@@ -1,4 +1,5 @@
 import { io, Socket } from "socket.io-client";
+import { devLog } from "@/lib/logger"; // M4: PII-safe dev-only logger
 
 const SOCKET_URL =
   process.env.NEXT_PUBLIC_API_URL?.replace("/api/v1", "") ||
@@ -11,9 +12,13 @@ class SocketService {
   private accessToken: string | null = null;
 
   /**
-   * Initialize socket connection with authentication
+   * Initialize socket connection with authentication.
+   *
+   * @param accessToken - JWT to authenticate the socket handshake
+   * @param onExhausted - Optional callback invoked when all reconnection attempts
+   *   fail (H3 fix). Use to surface a UI warning that live tracking is degraded.
    */
-  connect(accessToken: string) {
+  connect(accessToken: string, onExhausted?: () => void) {
     if (this.socket?.connected) {
       return this.socket;
     }
@@ -31,15 +36,21 @@ class SocketService {
     });
 
     this.socket.on("connect", () => {
-      console.log("✅ Socket connected:", this.socket?.id);
+      devLog("✅ Socket connected:", this.socket?.id);
     });
 
     this.socket.on("disconnect", (reason: string) => {
-      console.log("❌ Socket disconnected:", reason);
+      devLog("❌ Socket disconnected:", reason);
     });
 
     this.socket.on("error", (error: Error) => {
       console.error("Socket error:", error);
+    });
+
+    // Fired by socket.io after all reconnectionAttempts are exhausted (H3 fix)
+    this.socket.io.on("reconnect_failed", () => {
+      console.warn("Socket: all reconnection attempts exhausted.");
+      onExhausted?.();
     });
 
     return this.socket;
@@ -115,7 +126,7 @@ export const socketService = new SocketService();
 
 /** Emitted when a rider accepts the ride request */
 export interface DriverFoundEvent {
-  type: 'DRIVER_FOUND';
+  type: "DRIVER_FOUND";
   metadata: {
     rideId: string;
     driver: {
@@ -135,7 +146,7 @@ export interface DriverFoundEvent {
 
 /** Real-time driver GPS pings while ride is active */
 export interface DriverLocationUpdateEvent {
-  type: 'DRIVER_LOCATION_UPDATE';
+  type: "DRIVER_LOCATION_UPDATE";
   metadata: {
     lat: number;
     lng: number;
@@ -146,7 +157,7 @@ export interface DriverLocationUpdateEvent {
 
 /** Emitted when driver arrives at pickup point */
 export interface DriverArrivedEvent {
-  type: 'DRIVER_ARRIVED';
+  type: "DRIVER_ARRIVED";
   metadata: {
     rideId: string;
     message: string;
@@ -155,13 +166,13 @@ export interface DriverArrivedEvent {
 
 /** Emitted for TRIP_STARTED, TRIP_COMPLETED, RIDE_CANCELLED */
 export interface RideStatusEvent {
-  type: 'TRIP_STARTED' | 'TRIP_COMPLETED' | 'RIDE_CANCELLED';
+  type: "TRIP_STARTED" | "TRIP_COMPLETED" | "RIDE_CANCELLED";
   rideId: string;
 }
 
 /** Emitted by the backend when ride matching starts after payment confirmation */
 export interface RideUpdateEvent {
-  type: 'FINDING_DRIVER' | string;
+  type: "FINDING_DRIVER" | string;
   status?: string;
   rideId: string;
   label?: string;
@@ -169,60 +180,63 @@ export interface RideUpdateEvent {
 
 /** Emitted when no drivers are available in the area */
 export interface NoDriversFoundEvent {
-  type: 'NO_DRIVERS_FOUND';
+  type: "NO_DRIVERS_FOUND";
   metadata: {
     rideId: string;
     message: string;
   };
 }
 
-export const subscribeToRideEvents = (
-  callbacks: {
-    onDriverFound?: (data: DriverFoundEvent) => void;
-    onDriverLocationUpdate?: (data: DriverLocationUpdateEvent) => void;
-    onDriverArrived?: (data: DriverArrivedEvent) => void;
-    onTripStarted?: (data: RideStatusEvent) => void;
-    onTripCompleted?: (data: RideStatusEvent) => void;
-    onRideCancelled?: (data: RideStatusEvent) => void;
-    onRideUpdate?: (data: RideUpdateEvent) => void;
-    onNoDriversFound?: (data: NoDriversFoundEvent) => void;
-  },
-) => {
+export const subscribeToRideEvents = (callbacks: {
+  onDriverFound?: (data: DriverFoundEvent) => void;
+  onDriverLocationUpdate?: (data: DriverLocationUpdateEvent) => void;
+  onDriverArrived?: (data: DriverArrivedEvent) => void;
+  onTripStarted?: (data: RideStatusEvent) => void;
+  onTripCompleted?: (data: RideStatusEvent) => void;
+  onRideCancelled?: (data: RideStatusEvent) => void;
+  onRideUpdate?: (data: RideUpdateEvent) => void;
+  onNoDriversFound?: (data: NoDriversFoundEvent) => void;
+}) => {
   if (callbacks.onDriverFound) {
-    socketService.on('DRIVER_FOUND', callbacks.onDriverFound);
+    socketService.on("DRIVER_FOUND", callbacks.onDriverFound);
   }
   if (callbacks.onDriverLocationUpdate) {
-    socketService.on('DRIVER_LOCATION_UPDATE', callbacks.onDriverLocationUpdate);
+    socketService.on(
+      "DRIVER_LOCATION_UPDATE",
+      callbacks.onDriverLocationUpdate,
+    );
   }
   if (callbacks.onDriverArrived) {
-    socketService.on('DRIVER_ARRIVED', callbacks.onDriverArrived);
+    socketService.on("DRIVER_ARRIVED", callbacks.onDriverArrived);
   }
   if (callbacks.onTripStarted) {
-    socketService.on('TRIP_STARTED', callbacks.onTripStarted);
+    socketService.on("TRIP_STARTED", callbacks.onTripStarted);
   }
   if (callbacks.onTripCompleted) {
-    socketService.on('TRIP_COMPLETED', callbacks.onTripCompleted);
+    socketService.on("TRIP_COMPLETED", callbacks.onTripCompleted);
   }
   if (callbacks.onRideCancelled) {
-    socketService.on('RIDE_CANCELLED', callbacks.onRideCancelled);
+    socketService.on("RIDE_CANCELLED", callbacks.onRideCancelled);
   }
   if (callbacks.onRideUpdate) {
-    socketService.on('ride_update', callbacks.onRideUpdate);
+    // M1 fix: standardised to SCREAMING_SNAKE_CASE to match all other ride events.
+    // Confirm the backend emits "RIDE_UPDATE" (not "ride_update") before deploying.
+    socketService.on("RIDE_UPDATE", callbacks.onRideUpdate);
   }
   if (callbacks.onNoDriversFound) {
-    socketService.on('NO_DRIVERS_FOUND', callbacks.onNoDriversFound);
+    socketService.on("NO_DRIVERS_FOUND", callbacks.onNoDriversFound);
   }
 };
 
 export const unsubscribeFromRideEvents = () => {
-  socketService.off('DRIVER_FOUND');
-  socketService.off('DRIVER_LOCATION_UPDATE');
-  socketService.off('DRIVER_ARRIVED');
-  socketService.off('TRIP_STARTED');
-  socketService.off('TRIP_COMPLETED');
-  socketService.off('RIDE_CANCELLED');
-  socketService.off('ride_update');
-  socketService.off('NO_DRIVERS_FOUND');
+  socketService.off("DRIVER_FOUND");
+  socketService.off("DRIVER_LOCATION_UPDATE");
+  socketService.off("DRIVER_ARRIVED");
+  socketService.off("TRIP_STARTED");
+  socketService.off("TRIP_COMPLETED");
+  socketService.off("RIDE_CANCELLED");
+  socketService.off("RIDE_UPDATE"); // M1 fix: matches subscribe casing above
+  socketService.off("NO_DRIVERS_FOUND");
 };
 
 // ============================================================================
@@ -234,7 +248,7 @@ export const unsubscribeFromRideEvents = () => {
 
 export interface DeliveryUpdateEvent {
   deliveryId: string;
-  status: 'ASSIGNED' | 'PICKED_UP' | 'DELIVERED' | 'CANCELLED';
+  status: "ASSIGNED" | "PICKED_UP" | "DELIVERED" | "CANCELLED";
   label: string;
   rider?: {
     name: string;

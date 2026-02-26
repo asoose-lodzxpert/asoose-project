@@ -18,6 +18,7 @@ export interface CartItem {
   image?: string | null;
   restaurantId: string;
   modifierIds?: string[];
+  modifierNames?: string[];
 }
 
 export interface OrderPayload {

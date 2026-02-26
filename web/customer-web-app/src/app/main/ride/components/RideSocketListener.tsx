@@ -11,6 +11,7 @@ import {
   type NoDriversFoundEvent,
 } from "@/services/socket.service";
 import { RideService } from "@/services/ride.service";
+import { devLog } from "@/lib/logger"; // M4: PII-safe dev-only logger
 
 /** How often to poll driver location via REST when socket has not delivered an update */
 const DRIVER_LOCATION_POLL_MS = 5_000;
@@ -35,7 +36,7 @@ export function RideSocketListener() {
   useEffect(() => {
     if (!rideId) return;
 
-    console.log(`📡 Initializing Socket Listener for Ride: ${rideId}`);
+    devLog(`📡 Initializing Socket Listener for Ride: ${rideId}`);
     receivedSocketLocation.current = false;
 
     subscribeToRideEvents({
@@ -45,13 +46,16 @@ export function RideSocketListener() {
         try {
           if (data.rideId !== rideId) return;
 
-          if (data.type === 'FINDING_DRIVER') {
-            console.log('💳 Card payment confirmed — driver matching started for ride:', rideId);
+          if (data.type === "FINDING_DRIVER") {
+            devLog(
+              "💳 Card payment confirmed — driver matching started for ride:",
+              rideId,
+            );
             // Ensure UI shows the searching/finding-driver screen
-            setRideStatus('searching');
+            setRideStatus("searching");
           }
         } catch (error) {
-          console.error('Socket error (onRideUpdate):', error);
+          console.error("Socket error (onRideUpdate):", error);
         }
       },
 
@@ -62,7 +66,7 @@ export function RideSocketListener() {
           if (data.metadata.rideId !== rideId) return;
 
           const { driver } = data.metadata;
-          console.log("✅ Driver Found:", driver.name);
+          devLog("✅ Driver Found:", driver.name);
 
           setDriver({
             name: driver.name,
@@ -136,22 +140,11 @@ export function RideSocketListener() {
           setRideStatus("finished");
           toast.success("Trip completed!");
 
-          // Fetch final trip summary for the rating screen
-          if (session?.accessToken) {
-            RideService.getCurrentRide(session.accessToken)
-              .then((ride) => {
-                if (ride) {
-                  setTripSummary({
-                    fare: ride.totalFare || ride.estimatedFare || 0,
-                    distance: ride.distanceKm || 0,
-                    duration: 0,
-                  });
-                }
-              })
-              .catch((err) => {
-                console.error("Failed to fetch final trip summary:", err);
-              });
-          }
+          // Trip summary (fare, distance, duration) is restored by
+          // useRideSynchronization's next poll cycle which already handles
+          // the 'finished' → setTripSummary branch. Removing the duplicate
+          // getCurrentRide() call here eliminates the race condition between
+          // the socket-triggered fetch and the 15s poll (H5 fix).
         } catch (error) {
           console.error("Socket error (onTripCompleted):", error);
         }
@@ -176,24 +169,24 @@ export function RideSocketListener() {
           // Guard: only process if it belongs to the current ride
           if (data.metadata?.rideId && data.metadata.rideId !== rideId) return;
 
-          console.log('[RideSocketListener] NO_DRIVERS_FOUND for ride:', rideId);
+          devLog("[RideSocketListener] NO_DRIVERS_FOUND for ride:", rideId);
           // Reset to idle so the user can book again
-          setRideStatus('idle');
+          setRideStatus("idle");
           setRideId(null);
           toast.error(
             data.metadata?.message ||
-              'No drivers available in your area. Please try again.',
+              "No drivers available in your area. Please try again.",
             { autoClose: 6000 },
           );
         } catch (error) {
-          console.error('Socket error (onNoDriversFound):', error);
+          console.error("Socket error (onNoDriversFound):", error);
         }
       },
     });
 
     // Cleanup on unmount or rideId change
     return () => {
-      console.log(`🔌 Disconnecting Socket Listener for Ride: ${rideId}`);
+      devLog(`🔌 Disconnecting Socket Listener for Ride: ${rideId}`);
       unsubscribeFromRideEvents();
     };
   }, [

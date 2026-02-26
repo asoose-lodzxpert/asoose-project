@@ -1,8 +1,16 @@
-import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
+import { create } from "zustand";
+import { persist, createJSONStorage } from "zustand/middleware";
 
-export type RideStage = 'idle' | 'configuring' | 'searching' | 'awaiting-payment' | 'confirmed' | 'arrived' | 'in-progress' | 'finished';
-export type RideType = 'economy' | 'business';
+export type RideStage =
+  | "idle"
+  | "configuring"
+  | "searching"
+  | "awaiting-payment"
+  | "confirmed"
+  | "arrived"
+  | "in-progress"
+  | "finished";
+export type RideType = "economy" | "business";
 
 interface RideState {
   // --- Ride ID Tracking ---
@@ -14,7 +22,7 @@ interface RideState {
   userLocation: google.maps.LatLngLiteral | null;
   pickupLocation: google.maps.LatLngLiteral | null;
   dropoffLocation: google.maps.LatLngLiteral | null;
-  
+
   // --- ADDED: Address Text Persistence ---
   pickupAddress: string | null;
   dropoffAddress: string | null;
@@ -53,7 +61,7 @@ interface RideState {
   } | null;
   rating: number | null;
   feedback: string;
-  isConfiguring: 'pickup' | 'dropoff' | null;
+  isConfiguring: "pickup" | "dropoff" | null;
   startOtp: string | null;
 
   // --- Setters ---
@@ -63,7 +71,7 @@ interface RideState {
   setUserLocation: (location: google.maps.LatLngLiteral) => void;
   setPickupLocation: (location: google.maps.LatLngLiteral | null) => void;
   setDropoffLocation: (location: google.maps.LatLngLiteral | null) => void;
-  
+
   // --- ADDED: Address Setters ---
   setPickupAddress: (address: string | null) => void;
   setDropoffAddress: (address: string | null) => void;
@@ -76,24 +84,28 @@ interface RideState {
   setDriverHeading: (heading: number) => void;
   setIsFollowingDriver: (isFollowing: boolean) => void;
   setRideType: (type: RideType) => void;
-  setDriver: (driver: RideState['driver']) => void;
-  setTripSummary: (summary: {
-    fare: number;
-    distance: number;
-    duration: number;
-  } | null) => void;
+  setDriver: (driver: RideState["driver"]) => void;
+  setTripSummary: (
+    summary: {
+      fare: number;
+      distance: number;
+      duration: number;
+    } | null,
+  ) => void;
   setRating: (rating: number | null) => void;
   setFeedback: (feedback: string) => void;
-  setIsConfiguring: (isConfiguring: 'pickup' | 'dropoff' | null) => void;
+  setIsConfiguring: (isConfiguring: "pickup" | "dropoff" | null) => void;
   setPaymentConfirmed: (confirmed: boolean) => void;
-  setLockedEstimate: (estimate: { fare: number; distance: number; duration: number } | null) => void;
+  setLockedEstimate: (
+    estimate: { fare: number; distance: number; duration: number } | null,
+  ) => void;
   setStartOtp: (otp: string | null) => void;
-  
+
   // --- Clearing Actions ---
   clearPickupLocation: () => void;
   clearDropoffLocation: () => void;
   clearAllLocations: () => void;
-  
+
   // --- Resetters ---
   resetRide: () => void;
 }
@@ -112,15 +124,19 @@ const initialState = {
   isFollowingDriver: true,
   routePolyline: null,
   paymentConfirmed: false,
-  lockedEstimate: null as { fare: number; distance: number; duration: number } | null,
-  rideStatus: 'idle' as RideStage,
+  lockedEstimate: null as {
+    fare: number;
+    distance: number;
+    duration: number;
+  } | null,
+  rideStatus: "idle" as RideStage,
   rideType: null as RideType | null,
   driverLocation: null,
   driverHeading: 0,
   driver: null,
   tripSummary: null,
   rating: null,
-  feedback: '',
+  feedback: "",
   isConfiguring: null,
   startOtp: null,
 };
@@ -131,11 +147,12 @@ export const useRideStore = create<RideState>()(
       ...initialState,
       setRideId: (id) => set({ rideId: id }),
       setMapInstance: (map) => set({ mapInstance: map }),
-      setIsGoogleMapsLoaded: (isLoaded) => set({ isGoogleMapsLoaded: isLoaded }),
+      setIsGoogleMapsLoaded: (isLoaded) =>
+        set({ isGoogleMapsLoaded: isLoaded }),
       setUserLocation: (location) => set({ userLocation: location }),
       setPickupLocation: (location) => set({ pickupLocation: location }),
       setDropoffLocation: (location) => set({ dropoffLocation: location }),
-      
+
       // --- ADDED: Address Setter Implementation ---
       setPickupAddress: (address) => set({ pickupAddress: address }),
       setDropoffAddress: (address) => set({ dropoffAddress: address }),
@@ -146,17 +163,19 @@ export const useRideStore = create<RideState>()(
       setRideStatus: (status) => set({ rideStatus: status }),
       setDriverLocation: (location) => set({ driverLocation: location }),
       setDriverHeading: (heading) => set({ driverHeading: heading }),
-      setIsFollowingDriver: (isFollowing) => set({ isFollowingDriver: isFollowing }),
+      setIsFollowingDriver: (isFollowing) =>
+        set({ isFollowingDriver: isFollowing }),
       setRideType: (type) => set({ rideType: type }),
       setDriver: (driver) => set({ driver: driver }),
       setTripSummary: (summary) => set({ tripSummary: summary }),
       setRating: (rating) => set({ rating: rating }),
       setFeedback: (feedback) => set({ feedback: feedback }),
-      setIsConfiguring: (isConfiguring) => set({ isConfiguring: isConfiguring }),
+      setIsConfiguring: (isConfiguring) =>
+        set({ isConfiguring: isConfiguring }),
       setPaymentConfirmed: (confirmed) => set({ paymentConfirmed: confirmed }),
       setLockedEstimate: (estimate) => set({ lockedEstimate: estimate }),
       setStartOtp: (otp) => set({ startOtp: otp }),
-      
+
       // --- Clear Actions ---
       clearPickupLocation: () =>
         set({
@@ -165,7 +184,7 @@ export const useRideStore = create<RideState>()(
           routePolyline: null, // Clear route when pickup is cleared
           geolocationError: null,
         }),
-      
+
       clearDropoffLocation: () =>
         set({
           dropoffLocation: null,
@@ -173,7 +192,7 @@ export const useRideStore = create<RideState>()(
           routePolyline: null, // Clear route when dropoff is cleared
           geolocationError: null,
         }),
-      
+
       clearAllLocations: () =>
         set({
           pickupLocation: null,
@@ -181,7 +200,7 @@ export const useRideStore = create<RideState>()(
           dropoffLocation: null,
           dropoffAddress: null,
           routePolyline: null,
-          rideStatus: 'idle' as RideStage,
+          rideStatus: "idle" as RideStage,
           rideType: null,
           isConfiguring: null,
           driver: null,
@@ -194,7 +213,7 @@ export const useRideStore = create<RideState>()(
           lockedEstimate: null,
           rideId: null,
         }),
-      
+
       resetRide: () =>
         set((state) => ({
           ...initialState,
@@ -204,7 +223,7 @@ export const useRideStore = create<RideState>()(
         })),
     }),
     {
-      name: 'ride-storage',
+      name: "ride-storage",
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         rideId: state.rideId,
@@ -217,15 +236,18 @@ export const useRideStore = create<RideState>()(
         paymentConfirmed: state.paymentConfirmed,
         lockedEstimate: state.lockedEstimate,
         startOtp: state.startOtp,
-        driverLocation: state.driverLocation,
-        driverHeading: state.driverHeading,
+        // driverLocation / driverHeading intentionally excluded (M3 fix):
+        // persisting stale GPS causes a jarring marker jump on page reload until
+        // live data arrives. The 5s REST poll and socket repopulate within seconds.
         driver: state.driver,
         tripSummary: state.tripSummary,
         rating: state.rating,
         feedback: state.feedback,
-        isConfiguring: state.isConfiguring,
+        // isConfiguring intentionally excluded from persistence (H6 fix):
+        // persisting it caused the LocationSelector overlay to remount on
+        // page reload if the user refreshed while pinning a location.
         routePolyline: state.routePolyline,
       }),
-    }
-  )
+    },
+  ),
 );

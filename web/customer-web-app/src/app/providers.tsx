@@ -3,6 +3,7 @@
 import { SessionProvider } from "next-auth/react";
 import { ThemeProvider } from "@/app/provider/provider"; // Your existing theme provider
 import { GoogleMapsProvider } from "@/providers/GoogleMapsProvider"; // Your existing maps provider
+import { SocketProvider } from "@/context/SocketContext"; // Global socket — survives page navigation & Paystack redirect
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
@@ -15,7 +16,11 @@ export function Providers({ children }: { children: React.ReactNode }) {
         enableSystem
         disableTransitionOnChange
       >
-        <GoogleMapsProvider>{children}</GoogleMapsProvider>
+        {/* SocketProvider wraps the whole app so the socket connection survives
+            page unmounts (e.g. Paystack redirect) and only disconnects on logout. */}
+        <SocketProvider>
+          <GoogleMapsProvider>{children}</GoogleMapsProvider>
+        </SocketProvider>
         <ToastContainer
           position="top-right"
           autoClose={3000}

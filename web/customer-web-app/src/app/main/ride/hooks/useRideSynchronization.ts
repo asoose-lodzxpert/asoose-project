@@ -30,60 +30,86 @@ export function useRideSynchronization() {
   const setDropoffLocation = useRideStore((state) => state.setDropoffLocation);
   const setPickupAddress = useRideStore((state) => state.setPickupAddress);
   const setDropoffAddress = useRideStore((state) => state.setDropoffAddress);
+  const clearAllLocations = useRideStore((state) => state.clearAllLocations);
   const setDriver = useRideStore((state) => state.setDriver);
   const setTripSummary = useRideStore((state) => state.setTripSummary);
   const setRideType = useRideStore((state) => state.setRideType);
   const setStartOtp = useRideStore((state) => state.setStartOtp);
   const paymentConfirmed = useRideStore((state) => state.paymentConfirmed);
 
-  // Build statusMap with a dynamic ACCEPTED mapping:
-  // - 'awaiting-payment' when the user hasn't selected their payment method yet
-  // - 'confirmed'        once paymentConfirmed flag is set (user chose cash/card)
-  const statusMap: Record<RideStatus, RideStage> = {
-    // PENDING = ride created but payment not yet confirmed.
-    // Map to "idle" so users can retry. Card-payment callback handles this
-    // state separately via the /payment/callback route + localStorage keys.
-    PENDING: "idle",
-    REQUESTED: "searching",
-    SEARCHING_DRIVER: "searching",
-    DRIVER_ASSIGNED: "searching",
-    DRIVER_ACCEPTED: paymentConfirmed ? "confirmed" : "awaiting-payment",
-    ACCEPTED: paymentConfirmed ? "confirmed" : "awaiting-payment",
-    PAID: "confirmed",
-    ARRIVED: "arrived",
-    IN_PROGRESS: "in-progress",
-    COMPLETED: "finished",
-    CANCELLED: "idle",
-    CANCELLED_BY_USER: "idle",
-    CANCELLED_BY_DRIVER: "idle",
-    CANCELLED_BY_SYSTEM: "idle",
-  };
-
   /**
    * Core sync function — fetches current ride from backend and reconciles store.
    * Used for both initial sync and periodic polling.
+   *
+   * statusMap is built INSIDE the callback so it always reflects the current
+   * value of paymentConfirmed — no stale-closure risk (C2 fix).
    */
   const syncRideState = useCallback(
     async (token: string) => {
       try {
         const backendRide = await RideService.getCurrentRide(token);
 
-        if (!backendRide) {
+        // Guard: treat missing/malformed ride objects (no id or status) the same as
+        // no active ride — avoids a RideMapper throw on the initial sync when the
+        // backend returns a partial object instead of null.
+        if (!backendRide || !backendRide.id || !backendRide.status) {
           // No active ride on the backend — always reset to idle so stale persisted
           // statuses (searching, confirmed, arrived, in-progress) don't leave the UI
           // stuck on an active-ride screen after the ride ends.
           // IMPORTANT: exclude 'finished' — the rating modal lives in that stage and
           // getCurrentRide() returns null for completed rides, which would destroy it.
           const currentStatus = useRideStore.getState().rideStatus;
-          if (currentStatus !== "idle" && currentStatus !== "configuring" && currentStatus !== "finished") {
+          if (
+            currentStatus !== "idle" &&
+            currentStatus !== "configuring" &&
+            currentStatus !== "finished"
+          ) {
             console.log(
               `🔄 No active ride on backend (local: ${currentStatus}). Resetting to idle.`,
             );
-            setRideId(null);
-            setRideStatus("idle");
+            // Clear all locations/addresses too — prevents stale "Pinned Location"
+            // text appearing in the address fields after the ride ends.
+            clearAllLocations();
           }
           return;
         }
+
+        // statusMap is built AFTER the fetch (M2 fix) so the backend's payment
+        // status can be used as server-side evidence that payment was completed.
+        // This prevents the UI reverting to "awaiting-payment" when paymentConfirmed
+        // is lost (cookie clear, new tab, stale localStorage).
+        //
+        // IMPORTANT: check payment.status === 'COMPLETED', NOT payment.method.
+        // A placeholder Payment record with method=CARD is created at ride-creation
+        // time (status=PENDING), so !!payment.method is always truthy and would
+        // incorrectly bypass the awaiting-payment screen.
+        const serverPaymentCompleted =
+          backendRide.payment?.status === "COMPLETED";
+        const statusMap: Record<RideStatus, RideStage> = {
+          // PENDING = ride created but payment not yet confirmed.
+          PENDING: "idle",
+          REQUESTED: "searching",
+          SEARCHING_DRIVER: "searching",
+          DRIVER_ASSIGNED: "searching",
+          // Show awaiting-payment unless the client already confirmed OR the server
+          // shows payment completed (e.g. after page refresh / new tab).
+          DRIVER_ACCEPTED:
+            paymentConfirmed || serverPaymentCompleted
+              ? "confirmed"
+              : "awaiting-payment",
+          ACCEPTED:
+            paymentConfirmed || serverPaymentCompleted
+              ? "confirmed"
+              : "awaiting-payment",
+          PAID: "confirmed",
+          ARRIVED: "arrived",
+          IN_PROGRESS: "in-progress",
+          COMPLETED: "finished",
+          CANCELLED: "idle",
+          CANCELLED_BY_USER: "idle",
+          CANCELLED_BY_DRIVER: "idle",
+          CANCELLED_BY_SYSTEM: "idle",
+        };
 
         const activeRide = mapRideToViewModel(backendRide);
         const mappedStatus = statusMap[activeRide.status] || "idle";
@@ -100,8 +126,28 @@ export function useRideSynchronization() {
           setRideStatus(mappedStatus);
         }
 
-        // Restore locations
-        setPickupAddress(activeRide.pickupAddress.addressText);
+        // Restore locations.
+        // Guard: don't overwrite a real address label with the generic backend
+        // fallback "Pinned Location" — that string appears when the backend stored
+        // no street/city/state (e.g. tap-to-pin with no reverse-geocode at ride
+        // creation time). Keeping the store value prevents the input fields from
+        // reverting to "Pinned Location" after a page refresh.
+        const PLACEHOLDER = "Pinned Location";
+        if (
+          activeRide.pickupAddress.addressText &&
+          activeRide.pickupAddress.addressText !== PLACEHOLDER
+        ) {
+          setPickupAddress(activeRide.pickupAddress.addressText);
+        } else if (
+          activeRide.pickupAddress.lat !== null &&
+          activeRide.pickupAddress.lng !== null
+        ) {
+          // Backend stored no street/city/state — fall back to coordinates so the
+          // address field is never blank or "Pinned Location".
+          setPickupAddress(
+            `${activeRide.pickupAddress.lat!.toFixed(5)}, ${activeRide.pickupAddress.lng!.toFixed(5)}`,
+          );
+        }
         if (
           activeRide.pickupAddress.lat !== null &&
           activeRide.pickupAddress.lng !== null
@@ -111,7 +157,20 @@ export function useRideSynchronization() {
             lng: activeRide.pickupAddress.lng,
           });
         }
-        setDropoffAddress(activeRide.dropoffAddress.addressText);
+        if (
+          activeRide.dropoffAddress.addressText &&
+          activeRide.dropoffAddress.addressText !== PLACEHOLDER
+        ) {
+          setDropoffAddress(activeRide.dropoffAddress.addressText);
+        } else if (
+          activeRide.dropoffAddress.lat !== null &&
+          activeRide.dropoffAddress.lng !== null
+        ) {
+          // Backend stored no street/city/state — fall back to coordinates.
+          setDropoffAddress(
+            `${activeRide.dropoffAddress.lat!.toFixed(5)}, ${activeRide.dropoffAddress.lng!.toFixed(5)}`,
+          );
+        }
         if (
           activeRide.dropoffAddress.lat !== null &&
           activeRide.dropoffAddress.lng !== null
@@ -124,19 +183,24 @@ export function useRideSynchronization() {
 
         // Restore OTP (for ACCEPTED/ARRIVED — customer needs to show driver)
         if (
-          (mappedStatus === 'confirmed' || mappedStatus === 'arrived') &&
+          (mappedStatus === "confirmed" || mappedStatus === "arrived") &&
           backendRide.startOtp
         ) {
           setStartOtp(backendRide.startOtp);
-        } else if (mappedStatus === 'in-progress' || mappedStatus === 'finished') {
+        } else if (
+          mappedStatus === "in-progress" ||
+          mappedStatus === "finished"
+        ) {
           setStartOtp(null); // Clear once trip has started
         }
 
         // Restore vehicle/ride type from backend (ECONOMY | BUSINESS)
         // This ensures TripInProgress / DriverArrived labels survive page refresh.
         if (backendRide.vehicleType) {
-          const normalised = backendRide.vehicleType.toLowerCase() as 'economy' | 'business';
-          if (normalised === 'economy' || normalised === 'business') {
+          const normalised = backendRide.vehicleType.toLowerCase() as
+            | "economy"
+            | "business";
+          if (normalised === "economy" || normalised === "business") {
             const state = useRideStore.getState();
             if (state.rideType !== normalised) {
               setRideType(normalised);
@@ -178,14 +242,17 @@ export function useRideSynchronization() {
       }
     },
     [
+      paymentConfirmed, // must be here — statusMap reads it inside the callback
       setRideId,
       setRideStatus,
       setPickupLocation,
       setDropoffLocation,
       setPickupAddress,
       setDropoffAddress,
+      clearAllLocations,
       setDriver,
       setTripSummary,
+      setRideType, // called inside the callback but was previously missing
       setStartOtp,
     ],
   );

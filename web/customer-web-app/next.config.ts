@@ -18,23 +18,24 @@ assertValidEnv();
 
 // Derive the backend API origin from NEXT_PUBLIC_API_URL so both dev
 // (http://localhost:3000) and production URLs are covered automatically.
-const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
+const apiUrl =
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1";
 const apiOrigin = (() => {
   try {
     const { origin } = new URL(apiUrl);
     return origin;
   } catch {
-    return 'http://localhost:3000';
+    return "http://localhost:3000";
   }
 })();
 
 const CSP = [
   // Default: only this origin
   "default-src 'self'",
-  // Scripts: this origin + Google Maps SDK entry points
-  "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://maps.googleapis.com https://maps.gstatic.com",
-  // Workers (Maps SDK uses web workers)
-  "worker-src blob:",
+  // Scripts: this origin + Google Maps SDK + Firebase SDK (gstatic CDN used by firebase-messaging-sw.js importScripts)
+  "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://maps.googleapis.com https://maps.gstatic.com https://www.gstatic.com",
+  // Workers: 'self' allows same-origin service workers (Firebase SW); blob: for Maps SDK workers
+  "worker-src 'self' blob:",
   // Styles: inline styles used by Maps + our Tailwind
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   // Fonts
@@ -51,23 +52,23 @@ const CSP = [
   "base-uri 'self'",
   // Form actions: restrict to self
   "form-action 'self'",
-].join('; ');
+].join("; ");
 
 const nextConfig = {
   images: {
     qualities: [75, 85],
     remotePatterns: [
       {
-        protocol: 'https',
-        hostname: 'asoose-storage.s3.eu-north-1.amazonaws.com',
-        port: '',
-        pathname: '/**',
+        protocol: "https",
+        hostname: "asoose-storage.s3.eu-north-1.amazonaws.com",
+        port: "",
+        pathname: "/**",
       },
       {
-        protocol: 'https',
-        hostname: 'ffyfvbgcbvbgnmopmmhi.supabase.co',
-        port: '',
-        pathname: '/storage/v1/object/public/**',
+        protocol: "https",
+        hostname: "ffyfvbgcbvbgnmopmmhi.supabase.co",
+        port: "",
+        pathname: "/storage/v1/object/public/**",
       },
       {
         protocol: "https",
@@ -111,32 +112,33 @@ const nextConfig = {
     return [
       {
         // Apply security headers to all routes
-        source: '/(.*)',
+        source: "/(.*)",
         headers: [
           {
-            key: 'Content-Security-Policy',
+            key: "Content-Security-Policy",
             value: CSP,
           },
           {
             // Prevent browsers sending the Referer header to third-party domains.
             // 'strict-origin-when-cross-origin' is the recommended modern default.
-            key: 'Referrer-Policy',
-            value: 'strict-origin-when-cross-origin',
+            key: "Referrer-Policy",
+            value: "strict-origin-when-cross-origin",
           },
           {
             // Prevent the page from being embedded in an iframe (clickjacking)
-            key: 'X-Frame-Options',
-            value: 'DENY',
+            key: "X-Frame-Options",
+            value: "DENY",
           },
           {
             // Block MIME-type sniffing
-            key: 'X-Content-Type-Options',
-            value: 'nosniff',
+            key: "X-Content-Type-Options",
+            value: "nosniff",
           },
           {
             // Disable browser features not used by the app
-            key: 'Permissions-Policy',
-            value: 'camera=(), microphone=(), payment=(), usb=(), geolocation=(self)',
+            key: "Permissions-Policy",
+            value:
+              "camera=(), microphone=(), payment=(), usb=(), geolocation=(self)",
           },
         ],
       },

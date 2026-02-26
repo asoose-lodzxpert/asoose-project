@@ -15,7 +15,6 @@ import { AppLogger } from 'src/libs/logger/app-logger.service'; // ← added
 const TERMINAL_DELIVERY_STATUSES: DeliveryStatus[] = [
   DeliveryStatus.DELIVERED,
   DeliveryStatus.CANCELLED,
-  DeliveryStatus.FAILED,
 ];
 
 @Injectable()

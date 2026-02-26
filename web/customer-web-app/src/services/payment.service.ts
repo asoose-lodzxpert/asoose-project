@@ -4,7 +4,7 @@ export interface InitiatePaymentPayload {
   amount: number;
   email: string;
   gateway: "PAYSTACK" | "FLUTTERWAVE" | "MONNIFY";
-  method: "CARD" | "BANK_TRANSFER" | "CASH";
+  method: "CARD" | "BANK_TRANSFER";
   type: "ORDER" | "RIDE" | "DELIVERY";
   orderId?: string;
   orderGroupId?: string; // FIX: Added OrderGroup support

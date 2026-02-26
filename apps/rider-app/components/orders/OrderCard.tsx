@@ -34,7 +34,9 @@ export const OrderCard: React.FC<OrderCardProps> = ({
               numberOfLines={1}
               style={[styles.locationText, { color: primaryText }]}
             >
-              {order.pickupAddress?.address || "Pickup location"}
+              {order.pickupAddress?.street ||
+                order.pickupAddress?.address ||
+                "Pickup location"}
             </ThemedText>
           </View>
 
@@ -46,7 +48,9 @@ export const OrderCard: React.FC<OrderCardProps> = ({
               numberOfLines={1}
               style={[styles.locationText, { color: primaryText }]}
             >
-              {order.dropoffAddress?.address || "Dropoff location"}
+              {order.dropoffAddress?.street ||
+                order.dropoffAddress?.address ||
+                "Dropoff location"}
             </ThemedText>
           </View>
         </View>
@@ -55,18 +59,12 @@ export const OrderCard: React.FC<OrderCardProps> = ({
         <View style={styles.metaRow}>
           <IconSymbol name="clock" size={14} color={muted} />
           <ThemedText style={[styles.metaText, { color: muted }]}>
-            {/* createdAt is not in CurrentJob, fallback to assignedAt or pickedUpAt */}
-            {order.assignedAt
-              ? new Date(order.assignedAt).toLocaleDateString("en-US", {
-                  month: "short",
-                  day: "numeric",
-                })
-              : order.pickedUpAt
-                ? new Date(order.pickedUpAt).toLocaleDateString("en-US", {
-                    month: "short",
-                    day: "numeric",
-                  })
-                : "-"}
+            {new Date(
+              order.createdAt ||
+                order.assignedAt ||
+                order.pickedUpAt ||
+                Date.now(),
+            ).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
           </ThemedText>
 
           <View style={styles.metaDot} />

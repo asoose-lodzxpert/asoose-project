@@ -1,6 +1,6 @@
 // src/app/main/cart/page.tsx
-import { redirect } from "next/navigation";
+import Cartcontent from "./cartcontent";
 
 export default function CartPage() {
-  redirect("/main/checkout");
+  return <Cartcontent />;
 }

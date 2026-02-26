@@ -2,7 +2,9 @@ import axios from "axios";
 import { getCookie, deleteCookie } from "cookies-next";
 
 // Use environment variable or fallback to localhost
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api";
+// Fallback MUST include /api/v1 to match NestJS global prefix + versioning (H1 fix)
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1";
 
 export const api = axios.create({
   baseURL: API_URL,

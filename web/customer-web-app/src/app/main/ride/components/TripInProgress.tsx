@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { useRideStore } from '../store/ride';
-import { Navigation, MapPin, Share2, ShieldAlert } from 'lucide-react';
+import { useEffect, useState } from "react";
+import { useRideStore } from "../store/ride";
+import { Navigation, MapPin, Share2, ShieldAlert } from "lucide-react";
 
 export function TripInProgress() {
   const rideType = useRideStore((state) => state.rideType);
@@ -10,7 +10,7 @@ export function TripInProgress() {
   const dropoffAddress = useRideStore((state) => state.dropoffAddress);
   const dropoffLocation = useRideStore((state) => state.dropoffLocation);
   const driverLocation = useRideStore((state) => state.driverLocation);
-  
+
   // Local state for ETA
   const [eta, setEta] = useState<{ minutes: number; km: number } | null>(null);
 
@@ -18,31 +18,56 @@ export function TripInProgress() {
   useEffect(() => {
     if (!driverLocation || !dropoffLocation) return;
 
-    try {
-      let distanceMeters = 0;
-
-      // Try using Google Maps geometry library if available
-      if (typeof google !== 'undefined' && google.maps?.geometry?.spherical) {
-        distanceMeters = google.maps.geometry.spherical.computeDistanceBetween(
-          driverLocation,
-          dropoffLocation
-        );
-      } else {
-        // Fallback: Use Haversine formula if Google Maps geometry library isn't loaded
-        distanceMeters = calculateDistanceHaversine(driverLocation, dropoffLocation);
+    // Haversine + fixed 30 km/h as fallback when Distance Matrix is unavailable (L3 fix)
+    const haversineEta = () => {
+      try {
+        let distanceMeters = 0;
+        if (typeof google !== "undefined" && google.maps?.geometry?.spherical) {
+          distanceMeters =
+            google.maps.geometry.spherical.computeDistanceBetween(
+              driverLocation,
+              dropoffLocation,
+            );
+        } else {
+          distanceMeters = calculateDistanceHaversine(
+            driverLocation,
+            dropoffLocation,
+          );
+        }
+        const km = distanceMeters / 1000;
+        setEta({ minutes: Math.ceil(km / 0.5), km });
+      } catch (error) {
+        console.error("Error calculating ETA:", error);
       }
+    };
 
-      const km = distanceMeters / 1000;
-      
-      // Estimate time (Assuming 30km/h average speed in city)
-      // Speed: 0.5 km/min
-      const minutes = Math.ceil(km / 0.5);
-
-      setEta({ minutes, km });
-    } catch (error) {
-      console.error('Error calculating ETA:', error);
-      // Don't show ETA if calculation fails
+    // Prefer Distance Matrix (traffic-aware) when available (L3 fix).
+    if (typeof google === "undefined" || !google.maps?.DistanceMatrixService) {
+      haversineEta();
+      return;
     }
+
+    const service = new google.maps.DistanceMatrixService();
+    service.getDistanceMatrix(
+      {
+        origins: [{ lat: driverLocation.lat, lng: driverLocation.lng }],
+        destinations: [{ lat: dropoffLocation.lat, lng: dropoffLocation.lng }],
+        travelMode: google.maps.TravelMode.DRIVING,
+      },
+      (result, status) => {
+        if (status === "OK") {
+          const element = result?.rows[0]?.elements[0];
+          if (element?.status === "OK") {
+            const km = element.distance.value / 1000;
+            const minutes = Math.ceil(element.duration.value / 60);
+            setEta({ minutes, km });
+            return;
+          }
+        }
+        // API quota exceeded or network error — degrade gracefully
+        haversineEta();
+      },
+    );
   }, [driverLocation, dropoffLocation]);
 
   /**
@@ -51,12 +76,12 @@ export function TripInProgress() {
    */
   function calculateDistanceHaversine(
     loc1: google.maps.LatLng | google.maps.LatLngLiteral,
-    loc2: google.maps.LatLng | google.maps.LatLngLiteral
+    loc2: google.maps.LatLng | google.maps.LatLngLiteral,
   ): number {
-    const lat1 = typeof loc1.lat === 'function' ? loc1.lat() : loc1.lat;
-    const lng1 = typeof loc1.lng === 'function' ? loc1.lng() : loc1.lng;
-    const lat2 = typeof loc2.lat === 'function' ? loc2.lat() : loc2.lat;
-    const lng2 = typeof loc2.lng === 'function' ? loc2.lng() : loc2.lng;
+    const lat1 = typeof loc1.lat === "function" ? loc1.lat() : loc1.lat;
+    const lng1 = typeof loc1.lng === "function" ? loc1.lng() : loc1.lng;
+    const lat2 = typeof loc2.lat === "function" ? loc2.lat() : loc2.lat;
+    const lng2 = typeof loc2.lng === "function" ? loc2.lng() : loc2.lng;
 
     const R = 6371000; // Earth radius in meters
     const φ1 = (lat1 * Math.PI) / 180;
@@ -74,7 +99,6 @@ export function TripInProgress() {
 
   return (
     <div className="absolute bottom-20 md:bottom-6 left-6 right-6 md:left-auto md:right-6 md:w-96 bg-white dark:bg-zinc-900 shadow-2xl z-30 p-6 rounded-2xl border border-zinc-100 dark:border-zinc-800 animate-in slide-in-from-bottom-5">
-      
       {/* Header with Pulse */}
       <div className="flex items-center gap-4 mb-6">
         <div className="p-3 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-full relative">
@@ -86,7 +110,7 @@ export function TripInProgress() {
             Heading to Destination
           </h2>
           <p className="text-sm text-zinc-500 dark:text-zinc-400 font-medium">
-            {rideType === 'business' ? 'Business Class' : 'Economy Ride'}
+            {rideType === "business" ? "Business Class" : "Economy Ride"}
           </p>
         </div>
       </div>
@@ -96,25 +120,31 @@ export function TripInProgress() {
         <div className="flex items-start gap-3">
           <MapPin className="text-red-500 mt-1 shrink-0" size={18} />
           <div>
-            <p className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-0.5">Dropoff</p>
+            <p className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-0.5">
+              Dropoff
+            </p>
             <p className="text-sm font-bold text-zinc-900 dark:text-white leading-snug line-clamp-2">
               {dropoffAddress || "Selected Destination"}
             </p>
           </div>
         </div>
-        
+
         {/* Live Stats */}
         {eta && (
-            <div className="mt-4 pt-4 border-t border-zinc-200 dark:border-zinc-700 flex justify-between items-center">
-                <div className="text-center flex-1 border-r border-zinc-200 dark:border-zinc-700">
-                    <p className="text-xs text-zinc-400">Estimated Arrival</p>
-                    <p className="font-bold text-zinc-900 dark:text-white">{eta.minutes} min</p>
-                </div>
-                <div className="text-center flex-1">
-                    <p className="text-xs text-zinc-400">Distance Remaining</p>
-                    <p className="font-bold text-zinc-900 dark:text-white">{eta.km.toFixed(1)} km</p>
-                </div>
+          <div className="mt-4 pt-4 border-t border-zinc-200 dark:border-zinc-700 flex justify-between items-center">
+            <div className="text-center flex-1 border-r border-zinc-200 dark:border-zinc-700">
+              <p className="text-xs text-zinc-400">Estimated Arrival</p>
+              <p className="font-bold text-zinc-900 dark:text-white">
+                {eta.minutes} min
+              </p>
             </div>
+            <div className="text-center flex-1">
+              <p className="text-xs text-zinc-400">Distance Remaining</p>
+              <p className="font-bold text-zinc-900 dark:text-white">
+                {eta.km.toFixed(1)} km
+              </p>
+            </div>
+          </div>
         )}
       </div>
 
@@ -122,38 +152,46 @@ export function TripInProgress() {
       <div className="grid grid-cols-2 gap-3">
         <button
           onClick={() => {
-            const text = `I'm in a ride and need help. Ride ID: ${rideId ?? 'unknown'}`;
+            const text = `I'm in a ride and need help. Ride ID: ${rideId ?? "unknown"}`;
             if (navigator.share) {
-              navigator.share({
-                title: 'Share My Trip',
-                text,
-                url: window.location.href,
-              }).catch(() => {}); // User dismissed share sheet — not an error
+              navigator
+                .share({
+                  title: "Share My Trip",
+                  text,
+                  url: window.location.href,
+                })
+                .catch(() => {}); // User dismissed share sheet — not an error
             } else {
-              navigator.clipboard?.writeText(`${text}\n${window.location.href}`);
+              navigator.clipboard?.writeText(
+                `${text}\n${window.location.href}`,
+              );
             }
           }}
-          className="flex items-center justify-center gap-2 py-3 rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors font-bold text-sm text-zinc-700 dark:text-zinc-200">
+          className="flex items-center justify-center gap-2 py-3 rounded-xl bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors font-bold text-sm text-zinc-700 dark:text-zinc-200"
+        >
           <Share2 size={18} /> Share Trip
         </button>
         <button
           onClick={() => {
             // Primary: try the web Share API so the user can pick their emergency contact
-            const emergencyText = `🚨 SOS – I need help! I'm in a ride.\nRide ID: ${rideId ?? 'unknown'}\nTracking: ${window.location.href}`;
+            const emergencyText = `🚨 SOS – I need help! I'm in a ride.\nRide ID: ${rideId ?? "unknown"}\nTracking: ${window.location.href}`;
             if (navigator.share) {
-              navigator.share({
-                title: '🚨 SOS — Need Help',
-                text: emergencyText,
-              }).catch(() => {
-                // Fallback: open emergency call
-                window.location.href = 'tel:112';
-              });
+              navigator
+                .share({
+                  title: "🚨 SOS — Need Help",
+                  text: emergencyText,
+                })
+                .catch(() => {
+                  // Fallback: open emergency call
+                  window.location.href = "tel:112";
+                });
             } else {
               // Direct fallback: open emergency call
-              window.location.href = 'tel:112';
+              window.location.href = "tel:112";
             }
           }}
-          className="flex items-center justify-center gap-2 py-3 rounded-xl bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors font-bold text-sm text-red-600 dark:text-red-400">
+          className="flex items-center justify-center gap-2 py-3 rounded-xl bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors font-bold text-sm text-red-600 dark:text-red-400"
+        >
           <ShieldAlert size={18} /> SOS
         </button>
       </div>

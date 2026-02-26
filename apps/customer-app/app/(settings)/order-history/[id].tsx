@@ -215,6 +215,14 @@ export default function OrderDetailsScreen() {
                 <ThemedText type="caption" style={{ color: textSecondary }}>
                   ₦{formatCurrency(item.price)} per unit
                 </ThemedText>
+                {item.modifiers && item.modifiers.length > 0 && (
+                  <ThemedText
+                    type="caption"
+                    style={{ color: textSecondary, marginTop: 2 }}
+                  >
+                    {item.modifiers.map((m: any) => m.name).join(", ")}
+                  </ThemedText>
+                )}
               </View>
               <ThemedText style={styles.itemTotal}>
                 ₦{formatCurrency(item.price * item.quantity)}
@@ -434,6 +442,14 @@ export default function OrderDetailsScreen() {
               <ThemedText type="caption" style={{ color: textSecondary }}>
                 ₦{formatCurrency(item.price)} per unit
               </ThemedText>
+              {item.modifiers && item.modifiers.length > 0 && (
+                <ThemedText
+                  type="caption"
+                  style={{ color: textSecondary, marginTop: 2 }}
+                >
+                  {item.modifiers.map((m: any) => m.name).join(", ")}
+                </ThemedText>
+              )}
             </View>
             <ThemedText style={styles.itemTotal}>
               ₦{formatCurrency(item.price * item.quantity)}
@@ -562,7 +578,6 @@ export default function OrderDetailsScreen() {
           <>
             {renderTimeline()}
             {renderDeliveryInfo()}
-            {renderOtpCard()}
             {renderItems()}
             {renderPayment(order?.payment)}
             {existingDispute ? (
@@ -713,6 +728,21 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     textAlign: "center",
     marginTop: 12,
+  },
+  otpBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  otpBadgeText: {
+    fontSize: 14,
+    fontWeight: "800",
+    letterSpacing: 2,
+    fontVariant: ["tabular-nums"] as any,
   },
 
   statusBadge: {

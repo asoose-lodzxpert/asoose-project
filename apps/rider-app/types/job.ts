@@ -86,6 +86,7 @@ export interface CurrentJob {
 
   status: string;
 
+  createdAt?: string | Date;
   assignedAt?: Date;
   pickedUpAt?: Date;
 

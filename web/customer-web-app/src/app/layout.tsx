@@ -7,6 +7,9 @@ import { Providers } from "./providers";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_APP_URL || "https://asoose.com",
+  ),
   title: {
     default: "Asoose | Rides, Food & Logistics",
     template: "%s | Asoose",

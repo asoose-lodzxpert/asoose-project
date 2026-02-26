@@ -2,7 +2,7 @@ import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Job } from 'bullmq';
 import { MailerService } from '@nestjs-modules/mailer';
 
-@Processor('email')
+@Processor('email', { concurrency: 20 })
 export class EmailProcessor extends WorkerHost {
   constructor(private readonly mailer: MailerService) {
     super();
@@ -63,6 +63,10 @@ export class EmailProcessor extends WorkerHost {
         return this.sendRiderPasswordChanged(job);
       case 'rider-account-approved':
         return this.sendRiderAccountApproved(job);
+      case 'admin-notice-email':
+        return this.sendAdminNoticeEmail(job);
+      case 'send-marketing-html':
+        return this.sendMarketingHtml(job);
       default:
         throw new Error(`Unknown job name: ${job.name}`);
     }
@@ -582,6 +586,36 @@ export class EmailProcessor extends WorkerHost {
         appUrl: job.data.appUrl,
         year: job.data.year,
       },
+    });
+  }
+
+  private async sendAdminNoticeEmail(
+    job: Job<{ email: string; name: string; subject: string; message: string }>,
+  ) {
+    await this.mailer.sendMail({
+      to: job.data.email,
+      subject: job.data.subject,
+      html: `<p>Hi ${job.data.name},</p><p>${job.data.message}</p>`,
+    });
+  }
+
+  private async sendMarketingHtml(
+    job: Job<{
+      email: string;
+      name: string;
+      subject: string;
+      htmlContent: string;
+    }>,
+  ) {
+    // Replace optional {name} placeholder with recipient name
+    const personalised = job.data.htmlContent.replace(
+      /\{name\}/g,
+      job.data.name,
+    );
+    await this.mailer.sendMail({
+      to: job.data.email,
+      subject: job.data.subject,
+      html: personalised,
     });
   }
 }

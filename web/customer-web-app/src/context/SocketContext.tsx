@@ -44,20 +44,35 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
       return;
     }
 
+    // If the token changed (e.g. silent NextAuth refresh), tear down the old
+    // connection so the new handshake carries the current JWT (M7 fix).
     if (socketService.isConnected()) {
-      console.log("Socket already connected");
-      return;
+      socketService.disconnect();
     }
 
-    const socket = socketService.connect(session.accessToken);
+    const socket = socketService.connect(
+      session.accessToken,
+      // H3: notify the user when all 5 reconnection attempts are exhausted
+      () => {
+        import("react-toastify").then(({ toast }) => {
+          toast.warn(
+            "Live tracking disconnected. Ride status updates may be delayed by up to 15 seconds.",
+            { autoClose: false, toastId: "socket-exhausted" },
+          );
+        });
+        setIsConnected(false);
+      },
+    );
 
     socket.on("connect", () => {
-      console.log("✅ Socket connected");
+      // Dismiss the exhaustion warning if the socket recovers
+      import("react-toastify").then(({ toast }) =>
+        toast.dismiss("socket-exhausted"),
+      );
       setIsConnected(true);
     });
 
     socket.on("disconnect", () => {
-      console.log("❌ Socket disconnected");
       setIsConnected(false);
     });
 

@@ -179,7 +179,11 @@ export class PaymentInitService {
     try {
       switch (dto.gateway) {
         case PaymentGateway.PAYSTACK: {
-          const paystackCallbackUrl = `${process.env.BACKEND_URL}/payment/callback/paystack`;
+          // Prefer the callbackUrl sent by the frontend (already includes the
+          // correct origin). Fall back to the backend URL only if none was given.
+          const paystackCallbackUrl =
+            dto.callbackUrl ||
+            `${process.env.BACKEND_URL}/payment/callback/paystack`;
           response = await this.paystackService.initializePayment(
             amount,
             dto.email,

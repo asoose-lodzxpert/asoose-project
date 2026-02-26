@@ -1,31 +1,46 @@
-'use client';
+"use client";
 
-import { useEffect, useState, useRef, useMemo } from 'react';
-import useSWR from 'swr';
-import { useParams, useRouter } from 'next/navigation';
-import { useSession } from 'next-auth/react';
-import { RideService } from '@/services/ride.service';
-import { mapRideToViewModel, hasValidCoordinates } from '@/services/mappers/ride.mapper';
-import type { RideViewModel } from '@/types/ride-view-model';
-import { GoogleMap, Marker, Polyline } from '@react-google-maps/api';
-import { useGoogleMaps } from '@/providers/GoogleMapsProvider';
-import { ErrorState } from '@/components/ErrorState';
+import { useEffect, useState, useRef, useMemo } from "react";
+import useSWR from "swr";
+import { useParams, useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
+import { RideService } from "@/services/ride.service";
+import {
+  mapRideToViewModel,
+  hasValidCoordinates,
+} from "@/services/mappers/ride.mapper";
+import type { RideViewModel } from "@/types/ride-view-model";
+import { GoogleMap, Marker, Polyline } from "@react-google-maps/api";
+import { useGoogleMaps } from "@/providers/GoogleMapsProvider";
+import { ErrorState } from "@/components/ErrorState";
 import {
   formatRideStatus,
   formatRideDateTime,
   formatRideTime,
   formatCurrency,
-} from '@/services/formatters/ride-status.formatter';
-import { 
-  ArrowLeft, Clock, MapPin, CreditCard, User, Star, ShieldCheck, 
-  Receipt, Navigation, Loader2, AlertCircle, ShieldAlert, Flag, ExternalLink,
-} from 'lucide-react';
-import Link from 'next/link';
-import ReportDisputeModal from '@/app/main/orders/component/reportDisputeModal';
+} from "@/services/formatters/ride-status.formatter";
+import {
+  ArrowLeft,
+  Clock,
+  MapPin,
+  CreditCard,
+  User,
+  Star,
+  ShieldCheck,
+  Receipt,
+  Navigation,
+  Loader2,
+  AlertCircle,
+  ShieldAlert,
+  Flag,
+  ExternalLink,
+} from "lucide-react";
+import Link from "next/link";
+import ReportDisputeModal from "@/app/main/orders/component/reportDisputeModal";
 
 const API_URL = (
-  process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'
-).replace(/\/$/, '');
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1"
+).replace(/\/$/, "");
 
 export default function RideDetailsPage() {
   const params = useParams();
@@ -72,7 +87,11 @@ export default function RideDetailsPage() {
         setError(null);
 
         // Fetch raw backend ride
-        const backendRide = await RideService.getRideById(rideId, token, signal);
+        const backendRide = await RideService.getRideById(
+          rideId,
+          token,
+          signal,
+        );
 
         // Transform backend → ViewModel (handles all mapping and null safety)
         const viewModel = mapRideToViewModel(backendRide);
@@ -102,22 +121,25 @@ export default function RideDetailsPage() {
               },
               (result, status) => {
                 // Only update if request is not aborted
-                if (!signal.aborted && status === 'OK' && result) {
+                if (!signal.aborted && status === "OK" && result) {
                   setRoutePolyline(result.routes[0].overview_polyline);
                 }
-              }
+              },
             );
           } catch (mapError) {
-            console.warn('[RideDetails] Map route calculation failed:', mapError);
+            console.warn(
+              "[RideDetails] Map route calculation failed:",
+              mapError,
+            );
             // Non-fatal: map still works without polyline
           }
         }
       } catch (err) {
         // Don't log abort errors (user navigated away)
-        if (err instanceof Error && err.name !== 'AbortError') {
-          console.error('[RideDetails] Failed to fetch ride:', err);
+        if (err instanceof Error && err.name !== "AbortError") {
+          console.error("[RideDetails] Failed to fetch ride:", err);
           setError(
-            err instanceof Error ? err.message : 'Failed to load ride details'
+            err instanceof Error ? err.message : "Failed to load ride details",
           );
         }
       } finally {
@@ -140,7 +162,7 @@ export default function RideDetailsPage() {
   const rideId = params.id as string;
 
   const disputeCheckKey =
-    ride?.status === 'COMPLETED' && rideId
+    ride?.status === "COMPLETED" && rideId
       ? `${API_URL}/super-admin/disputes/check?rideId=${rideId}`
       : null;
 
@@ -155,11 +177,11 @@ export default function RideDetailsPage() {
       if (!res.ok) return null;
       return res.json();
     },
-    { revalidateOnFocus: true, dedupingInterval: 5000 }
+    { revalidateOnFocus: true, dedupingInterval: 5000 },
   );
 
   const { canReport, isExpired, hasDispute } = useMemo(() => {
-    if (!ride || ride.status !== 'COMPLETED') {
+    if (!ride || ride.status !== "COMPLETED") {
       return { canReport: false, isExpired: false, hasDispute: false };
     }
     const hasActiveDispute = !!disputeData?.dispute;
@@ -183,7 +205,9 @@ export default function RideDetailsPage() {
       <div className="h-screen w-full flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
           <Loader2 size={32} className="animate-spin text-blue-600" />
-          <p className="text-zinc-600 dark:text-zinc-400">Loading ride details...</p>
+          <p className="text-zinc-600 dark:text-zinc-400">
+            Loading ride details...
+          </p>
         </div>
       </div>
     );
@@ -211,7 +235,8 @@ export default function RideDetailsPage() {
               Ride not found
             </h2>
             <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-1">
-              This ride may have been deleted or you don&apos;t have access to it.
+              This ride may have been deleted or you don&apos;t have access to
+              it.
             </p>
           </div>
           <button
@@ -252,11 +277,11 @@ export default function RideDetailsPage() {
           </div>
           <span
             className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
-              ride.status === 'COMPLETED'
-                ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200'
-                : ride.status === 'CANCELLED'
-                  ? 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200'
-                  : 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200'
+              ride.status === "COMPLETED"
+                ? "bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200"
+                : ride.status === "CANCELLED"
+                  ? "bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200"
+                  : "bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200"
             }`}
           >
             {ride.statusLabel}
@@ -264,48 +289,55 @@ export default function RideDetailsPage() {
         </div>
 
         {/* ========== MAP SNAPSHOT ========== */}
-        {isLoaded && hasValidCoordinates(ride.pickupAddress) && hasValidCoordinates(ride.dropoffAddress) && (
-          <div className="h-48 w-full rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800 relative">
-            <GoogleMap
-              mapContainerStyle={{ width: '100%', height: '100%' }}
-              center={{
-                lat: ride.pickupAddress.lat!,
-                lng: ride.pickupAddress.lng!,
-              }}
-              zoom={12}
-              options={{
-                disableDefaultUI: true,
-                draggable: false,
-                zoomControl: false,
-                styles: [
-                  { featureType: 'poi', stylers: [{ visibility: 'off' }] },
-                  { featureType: 'transit', stylers: [{ visibility: 'off' }] },
-                ],
-              }}
-            >
-              <Marker
-                position={{
+        {isLoaded &&
+          hasValidCoordinates(ride.pickupAddress) &&
+          hasValidCoordinates(ride.dropoffAddress) && (
+            <div className="h-48 w-full rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800 relative">
+              <GoogleMap
+                mapContainerStyle={{ width: "100%", height: "100%" }}
+                center={{
                   lat: ride.pickupAddress.lat!,
                   lng: ride.pickupAddress.lng!,
                 }}
-              />
-              <Marker
-                position={{
-                  lat: ride.dropoffAddress.lat!,
-                  lng: ride.dropoffAddress.lng!,
+                zoom={12}
+                options={{
+                  disableDefaultUI: true,
+                  draggable: false,
+                  zoomControl: false,
+                  styles: [
+                    { featureType: "poi", stylers: [{ visibility: "off" }] },
+                    {
+                      featureType: "transit",
+                      stylers: [{ visibility: "off" }],
+                    },
+                  ],
                 }}
-              />
-              {routePolyline && (
-                <Polyline
-                  path={google.maps.geometry.encoding.decodePath(routePolyline)}
-                  options={{ strokeColor: '#000', strokeWeight: 3 }}
+              >
+                <Marker
+                  position={{
+                    lat: ride.pickupAddress.lat!,
+                    lng: ride.pickupAddress.lng!,
+                  }}
                 />
-              )}
-            </GoogleMap>
-            {/* Overlay to prevent interaction */}
-            <div className="absolute inset-0 bg-transparent" />
-          </div>
-        )}
+                <Marker
+                  position={{
+                    lat: ride.dropoffAddress.lat!,
+                    lng: ride.dropoffAddress.lng!,
+                  }}
+                />
+                {routePolyline && (
+                  <Polyline
+                    path={google.maps.geometry.encoding.decodePath(
+                      routePolyline,
+                    )}
+                    options={{ strokeColor: "#000", strokeWeight: 3 }}
+                  />
+                )}
+              </GoogleMap>
+              {/* Overlay to prevent interaction */}
+              <div className="absolute inset-0 bg-transparent" />
+            </div>
+          )}
 
         {/* ========== DRIVER CARD (Safe rendering - check exists) ========== */}
         {ride.driver && (
@@ -377,7 +409,7 @@ export default function RideDetailsPage() {
               <p className="text-xs text-zinc-400 mb-1">
                 {ride.completedTime
                   ? formatRideTime(ride.completedTime.toISOString())
-                  : '--:--'}
+                  : "--:--"}
               </p>
               <p className="font-medium text-zinc-900 dark:text-white">
                 {ride.dropoffAddress.addressText}
@@ -396,23 +428,26 @@ export default function RideDetailsPage() {
             {/* Ride Fare */}
             <div className="flex justify-between">
               <span className="text-zinc-500">Ride Fare</span>
-              <span className="font-medium">{formatCurrency(ride.actualFare)}</span>
+              <span className="font-medium">
+                {formatCurrency(ride.actualFare)}
+              </span>
             </div>
 
             {/* Estimated Fare (if different from actual) */}
-            {ride.estimatedFare &&
-              ride.estimatedFare !== ride.actualFare && (
-                <div className="flex justify-between text-zinc-400 text-xs">
-                  <span>Estimated</span>
-                  <span>{formatCurrency(ride.estimatedFare)}</span>
-                </div>
-              )}
+            {ride.estimatedFare && ride.estimatedFare !== ride.actualFare && (
+              <div className="flex justify-between text-zinc-400 text-xs">
+                <span>Estimated</span>
+                <span>{formatCurrency(ride.estimatedFare)}</span>
+              </div>
+            )}
 
             {/* Distance */}
             {ride.distanceKm && (
               <div className="flex justify-between">
                 <span className="text-zinc-500">Distance</span>
-                <span className="font-medium">{ride.distanceKm.toFixed(1)} km</span>
+                <span className="font-medium">
+                  {ride.distanceKm.toFixed(1)} km
+                </span>
               </div>
             )}
 
@@ -427,7 +462,9 @@ export default function RideDetailsPage() {
             {/* Total */}
             <div className="pt-3 border-t border-dashed border-zinc-200 dark:border-zinc-800 flex justify-between items-center">
               <span className="font-bold text-base">Total</span>
-              <span className="font-black text-xl">{formatCurrency(ride.actualFare)}</span>
+              <span className="font-black text-xl">
+                {formatCurrency(ride.actualFare)}
+              </span>
             </div>
           </div>
 
@@ -438,13 +475,11 @@ export default function RideDetailsPage() {
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-sm font-bold">
-                Paid via{' '}
+                Paid via{" "}
                 {ride.paymentMethod
                   ? ride.paymentMethod.charAt(0).toUpperCase() +
                     ride.paymentMethod.slice(1).toLowerCase()
-                  : ride.paymentStatus === 'PAID' || ride.paymentStatus === 'COMPLETED'
-                  ? 'Card'
-                  : 'Cash'}
+                  : "Card"}
               </p>
               <p className="text-xs text-zinc-400 truncate">
                 Transaction ID: {ride.id.slice(0, 12).toUpperCase()}
@@ -454,7 +489,7 @@ export default function RideDetailsPage() {
         </div>
 
         {/* ========== CANCELLATION REASON (if applicable) ========== */}
-        {ride.status === 'CANCELLED' && ride.cancellationReason && (
+        {ride.status === "CANCELLED" && ride.cancellationReason && (
           <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-xl border border-red-200 dark:border-red-800">
             <p className="text-xs font-bold text-red-600 dark:text-red-400 uppercase tracking-wider mb-2">
               Cancellation Reason
@@ -466,7 +501,7 @@ export default function RideDetailsPage() {
         )}
 
         {/* ========== DISPUTE SECTION ========== */}
-        {ride.status === 'COMPLETED' && (
+        {ride.status === "COMPLETED" && (
           <div className="bg-white dark:bg-zinc-900 p-6 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm">
             <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-4 flex items-center gap-2">
               <ShieldAlert size={14} /> Report an Issue
@@ -475,7 +510,10 @@ export default function RideDetailsPage() {
             {hasDispute && (
               <div className="flex items-start justify-between gap-3 p-4 bg-yellow-50 dark:bg-yellow-900/10 rounded-xl border border-yellow-100 dark:border-yellow-900/20">
                 <div className="flex items-start gap-2">
-                  <Flag size={14} className="text-yellow-600 dark:text-yellow-400 shrink-0 mt-0.5" />
+                  <Flag
+                    size={14}
+                    className="text-yellow-600 dark:text-yellow-400 shrink-0 mt-0.5"
+                  />
                   <p className="text-sm text-yellow-700 dark:text-yellow-400 font-medium">
                     You have an open dispute for this ride.
                   </p>
@@ -494,7 +532,8 @@ export default function RideDetailsPage() {
             {canReport && (
               <>
                 <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-4">
-                  Had a problem with this ride? You can report an issue within 7 days of completion.
+                  Had a problem with this ride? You can report an issue within 7
+                  days of completion.
                 </p>
                 <button
                   onClick={() => setIsDisputeModalOpen(true)}

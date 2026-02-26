@@ -213,7 +213,7 @@ async function bootstrap() {
   if (process.env.SWAGGER_ENABLED === 'true') {
     const swaggerConfig = new DocumentBuilder()
       .setTitle('Asoose API')
-      .setDescription('Asoose platform API documentation')
+      .setDescription('Asoose Lodzxpert Nig. Ltd API documentation')
       .setVersion('1.0')
       .addBearerAuth()
       .build();

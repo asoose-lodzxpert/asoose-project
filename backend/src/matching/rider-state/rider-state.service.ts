@@ -120,12 +120,23 @@ export class RiderStateService {
         lng.toString(),
         hexId,
         timestamp.toString(),
+        'RIDER',
       );
 
     if (result === -1) {
-      this.logger.warn(
-        `[LOC] Rider ${riderId}: SKIPPED — status is not ONLINE (Lua returned -1)`,
+      // Rider was offline/missing in Redis but is actively sending GPS — auto-restored to ONLINE.
+      this.logger.log(
+        `[LOC] Rider ${riderId}: auto-restored to ONLINE (was offline/missing in Redis)`,
       );
+      await this.redis.addRiderToGeoIndex(riderId, lat, lng);
+      await this.redis.addToRiderActiveSet(riderId);
+      this.eventBus.emit('rider.online', {
+        riderId,
+        lat,
+        lng,
+        hexId,
+        timestamp,
+      });
       return;
     }
 

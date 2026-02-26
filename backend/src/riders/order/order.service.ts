@@ -93,129 +93,156 @@ export class OrderService {
 
   async getOrdersHistory(
     riderId: string,
+    role: 'RIDER' | 'DRIVER',
     status?: string,
     page: number = 1,
     limit: number = 20,
   ) {
     const skip = (page - 1) * limit;
 
-    let jobs: any[] = [];
+    // Default: exclude PENDING / REQUESTED (not yet actionable)
+    const validDeliveryStatuses = [
+      'PENDING',
+      'REQUESTED',
+      'ASSIGNED',
+      'ACCEPTED',
+      'PICKED_UP',
+      'IN_TRANSIT',
+      'DELIVERED',
+      'CANCELLED',
+    ];
+    const validRideStatuses = [
+      'PENDING',
+      'REQUESTED',
+      'ACCEPTED',
+      'ARRIVED',
+      'IN_PROGRESS',
+      'COMPLETED',
+      'CANCELLED',
+    ];
 
-    const rider = await this.prisma.rider.findUnique({
-      where: { id: riderId },
-      select: { role: true },
-    });
-
-    if (!rider) throw new NotFoundException('Rider not found');
-    // DeliveryStatus enum: PENDING, REQUESTED, ASSIGNED, ACCEPTED, PICKED_UP, IN_TRANSIT, DELIVERED, CANCELLED
-    // RideStatus enum: PENDING, REQUESTED, ACCEPTED, ARRIVED, IN_PROGRESS, COMPLETED, CANCELLED
-    // Default: exclude PENDING, REQUESTED
-    let statusFilter: any = { notIn: ['PENDING', 'REQUESTED'] };
-
+    let statusFilter: any;
     if (status) {
-      // Map incoming status to valid enums for DeliveryStatus
-      const validDeliveryStatuses = [
-        'PENDING',
-        'REQUESTED',
-        'ASSIGNED',
-        'ACCEPTED',
-        'PICKED_UP',
-        'IN_TRANSIT',
-        'DELIVERED',
-        'CANCELLED',
-      ];
-      const validRideStatuses = [
-        'PENDING',
-        'REQUESTED',
-        'ACCEPTED',
-        'ARRIVED',
-        'IN_PROGRESS',
-        'COMPLETED',
-        'CANCELLED',
-      ];
       const statusArray = status.split(',').map((s) => s.trim().toUpperCase());
-      // Only use valid enums for filter
-      if (rider?.role === 'RIDER') {
-        statusFilter = {
-          in: statusArray.filter((s) => validDeliveryStatuses.includes(s)),
-        };
-      } else if (rider?.role === 'DRIVER') {
-        statusFilter = {
-          in: statusArray.filter((s) => validRideStatuses.includes(s)),
-        };
-      }
+      statusFilter = {
+        in: statusArray.filter((s) =>
+          role === 'RIDER'
+            ? validDeliveryStatuses.includes(s)
+            : validRideStatuses.includes(s),
+        ),
+      };
+    } else {
+      statusFilter = { notIn: ['PENDING', 'REQUESTED'] };
     }
 
-    if (rider.role === 'DRIVER') {
-      const rides = await this.prisma.ride.findMany({
-        where: {
-          riderId,
-          status: statusFilter,
-        },
-        include: {
-          customer: { select: { name: true, phone: true } },
-          pickupAddress: true,
-          dropoffAddress: true,
-        },
-        orderBy: { createdAt: 'desc' },
-      });
-      jobs = rides.map((ride) => ({
-        id: ride.id,
-        jobType: 'ride',
-        pickupAddress: ride.pickupAddress,
-        dropoffAddress: ride.dropoffAddress,
-        customerName: ride.customer?.name || '',
-        customerPhone: ride.customer?.phone || '',
-        earnings: ride.totalFare || 0,
-        startOtp: ride.startOtp,
-        status: ride.status,
-        assignedAt: ride.acceptedAt,
-        pickedUpAt: ride.startedAt,
-      }));
-    } else if (rider.role === 'RIDER') {
-      const deliveries = await this.prisma.delivery.findMany({
-        where: {
-          riderId,
-          status: statusFilter,
-        },
-        include: {
-          customer: { select: { name: true, phone: true } },
-          pickupAddress: true,
-          dropoffAddress: true,
-        },
-        orderBy: { createdAt: 'desc' },
-      });
-      jobs = deliveries.map((delivery) => ({
-        id: delivery.id,
-        jobType: 'delivery',
-        pickupAddress: delivery.pickupAddress,
-        dropoffAddress: delivery.dropoffAddress,
-        customerName: delivery.customer?.name || '',
-        customerPhone: delivery.customer?.phone || '',
-        earnings: delivery.deliveryFee || 0,
-        packageDetails: delivery.packageDetails,
-        deliveryOtp: delivery.deliveryOtp,
-        status: delivery.status,
-        assignedAt: delivery.assignedAt,
-        pickedUpAt: delivery.pickedUpAt,
-      }));
-    } else {
-      // Unknown role, log error and return empty jobs
-      this.logger.error(
-        `Unknown rider role for riderId ${riderId}: ${rider.role}`,
-      );
-      jobs = [];
-    }
-    const total = jobs.length;
-    const paginatedData = jobs.slice(skip, skip + limit);
-    return {
-      data: paginatedData,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
+    const addressSelect = {
+      select: {
+        id: true,
+        street: true,
+        city: true,
+        state: true,
+        lat: true,
+        lng: true,
       },
     };
+
+    if (role === 'DRIVER') {
+      const where = { riderId, status: statusFilter };
+      const [total, rides] = await Promise.all([
+        this.prisma.ride.count({ where }),
+        this.prisma.ride.findMany({
+          where,
+          select: {
+            id: true,
+            status: true,
+            totalFare: true,
+            startOtp: true,
+            acceptedAt: true,
+            startedAt: true,
+            createdAt: true,
+            customer: { select: { name: true, phone: true } },
+            pickupAddress: addressSelect,
+            dropoffAddress: addressSelect,
+          },
+          orderBy: { createdAt: 'desc' },
+          skip,
+          take: limit,
+        }),
+      ]);
+      return {
+        data: rides.map((ride) => ({
+          id: ride.id,
+          jobType: 'ride',
+          pickupAddress: ride.pickupAddress,
+          dropoffAddress: ride.dropoffAddress,
+          customerName: ride.customer?.name || '',
+          customerPhone: ride.customer?.phone || '',
+          earnings: ride.totalFare || 0,
+          startOtp: ride.startOtp,
+          status: ride.status,
+          assignedAt: ride.acceptedAt,
+          pickedUpAt: ride.startedAt,
+          createdAt: ride.createdAt,
+        })),
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
+        },
+      };
+    }
+
+    if (role === 'RIDER') {
+      const where = { riderId, status: statusFilter };
+      const [total, deliveries] = await Promise.all([
+        this.prisma.delivery.count({ where }),
+        this.prisma.delivery.findMany({
+          where,
+          select: {
+            id: true,
+            status: true,
+            deliveryFee: true,
+            packageDetails: true,
+            deliveryOtp: true,
+            assignedAt: true,
+            pickedUpAt: true,
+            createdAt: true,
+            customer: { select: { name: true, phone: true } },
+            pickupAddress: addressSelect,
+            dropoffAddress: addressSelect,
+          },
+          orderBy: { createdAt: 'desc' },
+          skip,
+          take: limit,
+        }),
+      ]);
+      return {
+        data: deliveries.map((delivery) => ({
+          id: delivery.id,
+          jobType: 'delivery',
+          pickupAddress: delivery.pickupAddress,
+          dropoffAddress: delivery.dropoffAddress,
+          customerName: delivery.customer?.name || '',
+          customerPhone: delivery.customer?.phone || '',
+          earnings: delivery.deliveryFee || 0,
+          packageDetails: delivery.packageDetails,
+          deliveryOtp: delivery.deliveryOtp,
+          status: delivery.status,
+          assignedAt: delivery.assignedAt,
+          pickedUpAt: delivery.pickedUpAt,
+          createdAt: delivery.createdAt,
+        })),
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
+        },
+      };
+    }
+
+    this.logger.error(`Unknown rider role for riderId ${riderId}: ${role}`);
+    return { data: [], pagination: { page, limit, total: 0, totalPages: 0 } };
   }
 }

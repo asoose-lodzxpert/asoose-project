@@ -150,7 +150,7 @@ export class RideService {
 
   static async confirmRide(
     rideId: string,
-    paymentMethod: "CASH" | "CARD",
+    paymentMethod: "CARD",
     token: string,
   ): Promise<{ status: string; rideId: string }> {
     return ApiService.post<{ status: string; rideId: string }>(
@@ -174,9 +174,11 @@ export class RideService {
   }
 
   /**
-   * Get single ride by ID
-   * Returns raw backend ride object (use mapper to transform to ViewModel)
+   * Get single ride by ID.
+   * Returns raw backend ride object (use mapper to transform to ViewModel).
    *
+   * @deprecated Not yet wired to any ride-page UI (L1). Wire to a ride-detail
+   *   screen or remove in the next cleanup pass.
    * @param rideId - The ride ID
    * @param token - Auth token
    * @param signal - Abort signal for cancellation
@@ -199,6 +201,12 @@ export class RideService {
     });
   }
 
+  /**
+   * Fetch the list of available vehicle types from the backend.
+   *
+   * @deprecated Not yet wired to any UI (L1). Wire to RideSelection if a
+   *   dynamic vehicle-type selector is added, or remove in the next cleanup pass.
+   */
   static async getVehicleTypes(
     token: string,
     signal?: AbortSignal,
@@ -207,7 +215,16 @@ export class RideService {
   }
 
   static async cancelRide(rideId: string, reason?: string, token?: string) {
-    return ApiService.patch(`/trips/rides/${rideId}/cancel`, { reason }, token);
+    // Deterministic idempotency key: repeated cancels of the same ride produce
+    // the same key, so the backend deduplicates safely (H7 fix).
+    return ApiService.patch(
+      `/trips/rides/${rideId}/cancel`,
+      { reason },
+      token,
+      {
+        headers: { "x-idempotency-key": `cancel-${rideId}` },
+      },
+    );
   }
 
   static async getDriverLocation(

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useCartStore } from "@/store/useCartStore";
 import { useSession } from "next-auth/react";
 import { WifiOff, Loader2, Phone } from "lucide-react";
@@ -21,7 +22,8 @@ import { OrderSummary } from "@/app/main/components/checkout/ordersummary";
 import { AddressPickerModal } from "@/app/main/components/checkout/address-picker-modal";
 
 // Constants
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1";
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1";
 
 export default function CheckoutForm() {
   const router = useRouter();
@@ -160,7 +162,10 @@ export default function CheckoutForm() {
       return;
     }
     const token = session?.accessToken;
-    if (!token) { setIsLoadingProfile(false); return; }
+    if (!token) {
+      setIsLoadingProfile(false);
+      return;
+    }
     try {
       const res = await fetch(`${API_URL}/users/profile`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -236,11 +241,7 @@ export default function CheckoutForm() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedAddress?.id, cartItems.length, status]);
 
-  useEffect(() => {
-    if (mounted && cartItems.length === 0 && !isOrderCreated.current) {
-      router.push("/main/store");
-    }
-  }, [mounted, cartItems, router]);
+  // No redirect on empty cart — handled in render below
 
   const handleSaveAddress = async (addressData: Partial<Address>) => {
     const token = session?.accessToken;
@@ -285,7 +286,7 @@ export default function CheckoutForm() {
         amount: orderTotal,
         email: session?.user?.email || "customer@example.com",
         gateway: selectedPaymentMethod.gateway as any,
-        method: selectedPaymentMethod.type as "CARD" | "BANK_TRANSFER" | "CASH",
+        method: selectedPaymentMethod.type as "CARD" | "BANK_TRANSFER",
         type: "ORDER",
         callbackUrl: process.env.NEXT_PUBLIC_APP_URL,
       };
@@ -416,37 +417,17 @@ export default function CheckoutForm() {
       isOrderCreated.current = true;
       clearCart();
 
-      if ((selectedPaymentMethod.type as "CARD" | "BANK_TRANSFER" | "CASH") === "CASH") {
-        localStorage.removeItem("pending_checkout");
-        localStorage.removeItem("last_order_id");
-
-        await Swal.fire({
-          icon: "success",
-          title: "Order Placed!",
-          text: `Order confirmed.`,
-          confirmButtonColor: "#EAB308",
-          timer: 2000,
-        });
-
-        // Redirect based on whether it was a group or single
-        if (data.orderGroupId) {
-          router.push("/main/orders");
-        } else {
-          router.push(`/main/orders/confirmed?id=${data.id}`);
-        }
+      // Paystack (CARD) is the only payment method — always redirect to checkout
+      if (data.orderGroupId) {
+        // Multi-order group
+        await processPayment(
+          data.orderGroupId,
+          data.grandTotal || data.total,
+          true,
+        );
       } else {
-        // FIX: Detect if response has orderGroupId
-        if (data.orderGroupId) {
-          // It's a multi-order
-          await processPayment(
-            data.orderGroupId,
-            data.grandTotal || data.total,
-            true,
-          );
-        } else {
-          // Single order
-          await processPayment(data.id, data.total, false);
-        }
+        // Single order
+        await processPayment(data.id, data.total, false);
       }
     } catch (error: any) {
       console.error("Order placement error:", error);
@@ -459,6 +440,28 @@ export default function CheckoutForm() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-[#0a0a0a]">
         <Loader2 className="w-8 h-8 animate-spin text-yellow-500" />
+      </div>
+    );
+  }
+
+  if (mounted && cartItems.length === 0 && !isOrderCreated.current) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-[#0a0a0a] flex flex-col items-center justify-center p-6 text-center">
+        <div className="w-20 h-20 bg-gray-100 dark:bg-white/5 rounded-full flex items-center justify-center text-4xl mb-4">
+          🛒
+        </div>
+        <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+          Your cart is empty
+        </h2>
+        <p className="text-sm text-gray-500 dark:text-gray-400 max-w-xs mb-6">
+          Add items to your cart before checking out.
+        </p>
+        <Link
+          href="/main/store"
+          className="px-6 py-3 bg-yellow-500 text-black font-bold rounded-xl hover:bg-yellow-400 transition-colors shadow-lg shadow-yellow-500/10"
+        >
+          Browse Store
+        </Link>
       </div>
     );
   }
@@ -492,7 +495,8 @@ export default function CheckoutForm() {
                   value={phone}
                   onChange={(e) => {
                     setPhone(e.target.value);
-                    if (phoneError) setPhoneError(validatePhone(e.target.value));
+                    if (phoneError)
+                      setPhoneError(validatePhone(e.target.value));
                   }}
                   onBlur={() => setPhoneError(validatePhone(phone))}
                   placeholder="+2348012345678"
@@ -594,7 +598,12 @@ export default function CheckoutForm() {
               serviceFee={serviceFee}
               isLoadingFee={isLoadingFee}
               isProcessing={isProcessing}
-              isDisabled={isProcessing || !selectedAddress || !isOnline || !!validatePhone(phone)}
+              isDisabled={
+                isProcessing ||
+                !selectedAddress ||
+                !isOnline ||
+                !!validatePhone(phone)
+              }
               onPlaceOrder={handlePlaceOrder}
               retryCount={0}
             />

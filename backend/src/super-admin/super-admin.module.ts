@@ -21,6 +21,7 @@ import { ActivityLogService } from 'src/common/services/activity-log.services';
 import { ActivityLogController } from './activity-logs/activity-log.controller';
 import { AdminNotificationsModule } from './notifications/notifications.module';
 import { MapsModule } from './maps/maps.module';
+import { NoticesModule } from './notices/notices.module';
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { MapsModule } from './maps/maps.module';
     PayoutsModule,
     AdminNotificationsModule,
     MapsModule,
+    NoticesModule,
   ],
   controllers: [SettingsController, ActivityLogController],
   providers: [

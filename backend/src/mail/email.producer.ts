@@ -13,7 +13,7 @@ export class EmailProducer {
       {
         attempts: 3,
         backoff: { type: 'exponential', delay: 3000 },
-        removeOnComplete: true,
+        removeOnComplete: { count: 100 },
       },
     );
   }
@@ -25,7 +25,7 @@ export class EmailProducer {
       {
         attempts: 3,
         backoff: { type: 'fixed', delay: 2000 },
-        removeOnComplete: true,
+        removeOnComplete: { count: 100 },
       },
     );
   }
@@ -36,7 +36,7 @@ export class EmailProducer {
       { email, subject, message }, // Payload
       {
         attempts: 3,
-        removeOnComplete: true,
+        removeOnComplete: { count: 100 },
       },
     );
   }
@@ -49,7 +49,7 @@ export class EmailProducer {
     await this.emailQueue.add(
       'order-created-customer',
       { email, orderId, total },
-      { attempts: 3, removeOnComplete: true },
+      { attempts: 3, removeOnComplete: { count: 100 } },
     );
   }
 
@@ -62,7 +62,7 @@ export class EmailProducer {
     await this.emailQueue.add(
       'order-created-vendor',
       { email, storeName, orderId, items },
-      { attempts: 3, removeOnComplete: true },
+      { attempts: 3, removeOnComplete: { count: 100 } },
     );
   }
 
@@ -90,7 +90,7 @@ export class EmailProducer {
         securityUrl: `${process.env.VENDOR_APP_URL || 'https://vendor.asoose.com'}/security`,
         year: new Date().getFullYear(),
       },
-      { attempts: 3, removeOnComplete: true },
+      { attempts: 3, removeOnComplete: { count: 100 } },
     );
   }
 
@@ -111,7 +111,7 @@ export class EmailProducer {
         dashboardUrl: `${process.env.VENDOR_APP_URL || 'https://vendor.asoose.com'}/login`,
         year: new Date().getFullYear(),
       },
-      { attempts: 3, removeOnComplete: true },
+      { attempts: 3, removeOnComplete: { count: 100 } },
     );
   }
 
@@ -133,7 +133,7 @@ export class EmailProducer {
         securityUrl: `${process.env.VENDOR_APP_URL || 'https://vendor.asoose.com'}/security`,
         year: new Date().getFullYear(),
       },
-      { attempts: 3, removeOnComplete: true },
+      { attempts: 3, removeOnComplete: { count: 100 } },
     );
   }
 
@@ -151,7 +151,7 @@ export class EmailProducer {
         resetUrl: `${process.env.VENDOR_APP_URL || 'https://vendor.asoose.com'}/reset-password`,
         year: new Date().getFullYear(),
       },
-      { attempts: 3, removeOnComplete: true },
+      { attempts: 3, removeOnComplete: { count: 100 } },
     );
   }
 
@@ -164,7 +164,7 @@ export class EmailProducer {
         otp,
         year: new Date().getFullYear(),
       },
-      { attempts: 3, removeOnComplete: true },
+      { attempts: 3, removeOnComplete: { count: 100 } },
     );
   }
 
@@ -191,7 +191,7 @@ export class EmailProducer {
         bankAccountUrl: `${process.env.VENDOR_APP_URL || 'https://vendor.asoose.com'}/settings/bank-accounts`,
         year: new Date().getFullYear(),
       },
-      { attempts: 3, removeOnComplete: true },
+      { attempts: 3, removeOnComplete: { count: 100 } },
     );
   }
 
@@ -220,7 +220,7 @@ export class EmailProducer {
         withdrawalsUrl: `${process.env.VENDOR_APP_URL || 'https://vendor.asoose.com'}/withdrawals`,
         year: new Date().getFullYear(),
       },
-      { attempts: 3, removeOnComplete: true },
+      { attempts: 3, removeOnComplete: { count: 100 } },
     );
   }
 
@@ -233,7 +233,7 @@ export class EmailProducer {
         supportUrl: `${process.env.VENDOR_APP_URL || 'https://vendor.asoose.com'}/support`,
         year: new Date().getFullYear(),
       },
-      { attempts: 3, removeOnComplete: true },
+      { attempts: 3, removeOnComplete: { count: 100 } },
     );
   }
 
@@ -247,7 +247,7 @@ export class EmailProducer {
         name,
         year: new Date().getFullYear(),
       },
-      { attempts: 3, removeOnComplete: true },
+      { attempts: 3, removeOnComplete: { count: 100 } },
     );
   }
 
@@ -260,7 +260,7 @@ export class EmailProducer {
         otp,
         year: new Date().getFullYear(),
       },
-      { attempts: 3, removeOnComplete: true },
+      { attempts: 3, removeOnComplete: { count: 100 } },
     );
   }
 
@@ -282,7 +282,7 @@ export class EmailProducer {
         securityUrl: `${process.env.RIDER_APP_URL || 'https://rider.asoose.com'}/security`,
         year: new Date().getFullYear(),
       },
-      { attempts: 3, removeOnComplete: true },
+      { attempts: 3, removeOnComplete: { count: 100 } },
     );
   }
 
@@ -300,7 +300,7 @@ export class EmailProducer {
         appUrl: process.env.RIDER_APP_URL || 'https://rider.asoose.com',
         year: new Date().getFullYear(),
       },
-      { attempts: 3, removeOnComplete: true },
+      { attempts: 3, removeOnComplete: { count: 100 } },
     );
   }
 
@@ -312,7 +312,7 @@ export class EmailProducer {
       { email, subject, message },
       {
         attempts: 3,
-        removeOnComplete: true,
+        removeOnComplete: { count: 100 },
       },
     );
   }
@@ -323,7 +323,7 @@ export class EmailProducer {
       { email, subject, message },
       {
         attempts: 3,
-        removeOnComplete: true,
+        removeOnComplete: { count: 100 },
       },
     );
   }
@@ -336,7 +336,7 @@ export class EmailProducer {
       { adminEmails, subject, message },
       {
         attempts: 3,
-        removeOnComplete: true,
+        removeOnComplete: { count: 100 },
       },
     );
   }
@@ -362,7 +362,7 @@ export class EmailProducer {
       },
       {
         attempts: 3,
-        removeOnComplete: true,
+        removeOnComplete: { count: 100 },
       },
     );
   }
@@ -386,7 +386,7 @@ export class EmailProducer {
       },
       {
         attempts: 3,
-        removeOnComplete: true,
+        removeOnComplete: { count: 100 },
       },
     );
   }
@@ -410,7 +410,7 @@ export class EmailProducer {
       },
       {
         attempts: 3,
-        removeOnComplete: true,
+        removeOnComplete: { count: 100 },
       },
     );
   }
@@ -435,7 +435,7 @@ export class EmailProducer {
       },
       {
         attempts: 3,
-        removeOnComplete: true,
+        removeOnComplete: { count: 100 },
       },
     );
   }
@@ -459,7 +459,7 @@ export class EmailProducer {
       },
       {
         attempts: 3,
-        removeOnComplete: true,
+        removeOnComplete: { count: 100 },
       },
     );
   }
@@ -484,8 +484,38 @@ export class EmailProducer {
       },
       {
         attempts: 3,
-        removeOnComplete: true,
+        removeOnComplete: { count: 100 },
       },
+    );
+  }
+
+  // ─── Super-Admin Notices ───────────────────────────────────────────────────
+
+  /** Plain-text notice from the admin to a single user/rider/vendor */
+  async sendAdminNoticeEmail(
+    email: string,
+    name: string,
+    subject: string,
+    message: string,
+  ) {
+    await this.emailQueue.add(
+      'admin-notice-email',
+      { email, name, subject, message },
+      { attempts: 3, removeOnComplete: { count: 100 } },
+    );
+  }
+
+  /** Raw-HTML marketing email broadcast */
+  async sendMarketingEmail(
+    email: string,
+    name: string,
+    subject: string,
+    htmlContent: string,
+  ) {
+    await this.emailQueue.add(
+      'send-marketing-html',
+      { email, name, subject, htmlContent },
+      { attempts: 3, removeOnComplete: { count: 100 } },
     );
   }
 }

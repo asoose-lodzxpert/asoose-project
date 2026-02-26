@@ -10,15 +10,19 @@ export interface CartItem {
   restaurantId: string;
   image?: string | null;
   modifierIds?: string[];
+  modifierNames?: string[];
 }
 
-export function computeLineId(productId: string, modifierIds?: string[]): string {
+export function computeLineId(
+  productId: string,
+  modifierIds?: string[],
+): string {
   if (!modifierIds || modifierIds.length === 0) return productId;
-  return `${productId}_${modifierIds.slice().sort().join(',')}`;
+  return `${productId}_${modifierIds.slice().sort().join(",")}`;
 }
 
 /** Callers pass everything except `lineId` — the store computes it internally from id + modifierIds. */
-export type AddItemPayload = Omit<CartItem, 'lineId'>;
+export type AddItemPayload = Omit<CartItem, "lineId">;
 
 interface CartState {
   items: CartItem[];
@@ -47,7 +51,7 @@ export const useCartStore = create<CartState>()(
             items: currentItems.map((i) =>
               i.lineId === lineId
                 ? { ...i, quantity: i.quantity + newItem.quantity }
-                : i
+                : i,
             ),
           });
         } else {
@@ -58,13 +62,15 @@ export const useCartStore = create<CartState>()(
       decreaseItem: (lineId) => {
         const currentItems = get().items;
         const existingItem = currentItems.find(
-          (i) => (i.lineId ?? i.id) === lineId
+          (i) => (i.lineId ?? i.id) === lineId,
         );
 
         if (existingItem && existingItem.quantity > 1) {
           set({
             items: currentItems.map((i) =>
-              (i.lineId ?? i.id) === lineId ? { ...i, quantity: i.quantity - 1 } : i
+              (i.lineId ?? i.id) === lineId
+                ? { ...i, quantity: i.quantity - 1 }
+                : i,
             ),
           });
         } else {
@@ -76,30 +82,36 @@ export const useCartStore = create<CartState>()(
         set({
           items: get().items.filter((i) => (i.lineId ?? i.id) !== lineId),
         });
-      },                             // ← was followed by a rogue `});` and `},` here
+      }, // ← was followed by a rogue `});` and `},` here
 
       clearCart: () => set({ items: [] }),
 
       getTotalPrice: () =>
-        get().items.reduce((total, item) => total + item.price * item.quantity, 0),
+        get().items.reduce(
+          (total, item) => total + item.price * item.quantity,
+          0,
+        ),
 
       getTotalItems: () =>
         get().items.reduce((total, item) => total + item.quantity, 0),
 
       getItemsByStore: () => {
-        return get().items.reduce((acc, item) => {
-          if (!acc[item.restaurantId]) {
-            acc[item.restaurantId] = [];
-          }
-          acc[item.restaurantId].push(item);
-          return acc;
-        }, {} as Record<string, CartItem[]>);
+        return get().items.reduce(
+          (acc, item) => {
+            if (!acc[item.restaurantId]) {
+              acc[item.restaurantId] = [];
+            }
+            acc[item.restaurantId].push(item);
+            return acc;
+          },
+          {} as Record<string, CartItem[]>,
+        );
       },
     }),
     {
       name: "asoosee-cart-storage",
       storage: createJSONStorage(() => localStorage),
       skipHydration: true,
-    }
-  )
+    },
+  ),
 );
