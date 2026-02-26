@@ -52,7 +52,7 @@ COPY --from=builder /app/backend/prisma ./prisma
 COPY --from=builder /app/backend/package.json ./package.json
 
 # Regenerate Prisma Client in the runtime container to ensure proper binary bindings
-RUN npx prisma generate --schema=./prisma/schema.prisma
+RUN yarn prisma generate
 
 # Create uploads directory
 RUN mkdir -p /app/uploads && chown -R nodejs:nodejs /app
