@@ -93,7 +93,7 @@ const ForgotPasswordPage = () => {
 
             <button
               onClick={() => {
-                router.push("/reset-password");
+                router.push("/verify-otp");
               }}
               className="w-full bg-yellow-500 text-black py-3 rounded-xl hover:bg-yellow-400 transition-all text-sm font-bold shadow-lg shadow-yellow-500/20 active:scale-[0.98]"
             >
