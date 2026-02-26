@@ -128,36 +128,6 @@ jobs:
             devenochphilip/asoose-backend:latest
             devenochphilip/asoose-backend:${{ github.sha }}
 
-      # 6. Run Prisma migrations before deploying new image
-      # This ensures schema changes are applied before any instance runs the new code.
-      - name: Setup Node.js for migrations
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: "yarn"
-
-      - name: Install dependencies for migrations
-        run: yarn install --frozen-lockfile
-
-      - name: Generate Prisma client
-        run: yarn workspace backend prisma generate
-
-      - name: Deploy database migrations
-        run: yarn workspace backend prisma migrate deploy
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-
-      # 7. Install Railway CLI
-      - name: Install Railway CLI
-        run: npm install -g @railway/cli
-
-      # 7. Deploy to Railway
-      - name: Deploy to Railway
-        env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-        run: |
-          railway up --project d66b9f91-4b15-4e28-b760-6121f59e77ce -- --docker-image devenochphilip/asoose-backend:${GITHUB_SHA}
-
       # 7. Save SHA as artifact for rollback
       - name: Save deployment SHA
         run: echo "${GITHUB_SHA}" > last_successful_sha.txt
