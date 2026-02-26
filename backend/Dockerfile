@@ -46,15 +46,13 @@ COPY --from=builder /app/packages ./packages
 COPY --from=builder /app/backend/package.json ./backend/package.json
 RUN yarn install --frozen-lockfile --production --ignore-scripts && yarn cache clean
 
-# Copy the pre-generated Prisma client native binaries from the builder stage.
-# The builder already ran `prisma generate` for the linux target, so there is
-# no need to re-run it here — and prisma CLI is not available in a --production install.
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
-
 # Copy built backend artifacts
 COPY --from=builder /app/backend/dist ./dist
 COPY --from=builder /app/backend/prisma ./prisma
 COPY --from=builder /app/backend/package.json ./package.json
+
+# Regenerate Prisma Client in the runtime container to ensure proper binary bindings
+# RUN yarn prisma generate
 
 # Create uploads directory
 RUN mkdir -p /app/uploads && chown -R nodejs:nodejs /app
