@@ -36,12 +36,12 @@
 
 ## 📌 Pending Items (Deferred)
 
-| ID          | Reason                                                                                            |
-| ----------- | ------------------------------------------------------------------------------------------------- |
-| H-04        | Requires a global `JwtPayload` interface refactor across all controllers                          |
-| M-06        | Needs payload schema defined with mobile team                                                     |
-| M-07        | Requires 6 new DTO classes across rider/vendor auth                                               |
-| H-05 (full) | Add `idempotencyKey String?` to `Delivery` Prisma schema + migration                              |
+| ID          | Reason                                                                   |
+| ----------- | ------------------------------------------------------------------------ |
+| H-04        | Requires a global `JwtPayload` interface refactor across all controllers |
+| M-06        | Needs payload schema defined with mobile team                            |
+| M-07        | Requires 6 new DTO classes across rider/vendor auth                      |
+| H-05 (full) | Add `idempotencyKey String?` to `Delivery` Prisma schema + migration     |
 
 ---
 
