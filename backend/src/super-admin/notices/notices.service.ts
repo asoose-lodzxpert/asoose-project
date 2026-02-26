@@ -212,13 +212,28 @@ export class NoticesService {
     for (const type of types) {
       if (type === 'USER') {
         const records = await this.prisma.user.findMany({
-          select: { fcmToken: true, expoPushToken: true, email: true, name: true },
+          select: {
+            fcmToken: true,
+            expoPushToken: true,
+            email: true,
+            name: true,
+          },
         });
         await this._inBatches(records, 50, async (rec) => {
           if (sendPush)
-            pushCount += await this._sendPush(rec.fcmToken, rec.expoPushToken, title, message);
+            pushCount += await this._sendPush(
+              rec.fcmToken,
+              rec.expoPushToken,
+              title,
+              message,
+            );
           if (sendEmail && rec.email) {
-            await this.emailProducer.sendAdminNoticeEmail(rec.email, rec.name ?? 'User', title, message);
+            await this.emailProducer.sendAdminNoticeEmail(
+              rec.email,
+              rec.name ?? 'User',
+              title,
+              message,
+            );
             emailCount++;
           }
         });
@@ -226,25 +241,55 @@ export class NoticesService {
         const roleFilter = type === 'DRIVER' ? UserRole.DRIVER : UserRole.RIDER;
         const records = await this.prisma.rider.findMany({
           where: { role: roleFilter },
-          select: { fcmToken: true, expoPushToken: true, email: true, name: true },
+          select: {
+            fcmToken: true,
+            expoPushToken: true,
+            email: true,
+            name: true,
+          },
         });
         await this._inBatches(records, 50, async (rec) => {
           if (sendPush)
-            pushCount += await this._sendPush(rec.fcmToken, rec.expoPushToken, title, message);
+            pushCount += await this._sendPush(
+              rec.fcmToken,
+              rec.expoPushToken,
+              title,
+              message,
+            );
           if (sendEmail && rec.email) {
-            await this.emailProducer.sendAdminNoticeEmail(rec.email, rec.name ?? 'User', title, message);
+            await this.emailProducer.sendAdminNoticeEmail(
+              rec.email,
+              rec.name ?? 'User',
+              title,
+              message,
+            );
             emailCount++;
           }
         });
       } else if (type === 'VENDOR') {
         const records = await this.prisma.vendor.findMany({
-          select: { fcmToken: true, expoPushToken: true, email: true, name: true },
+          select: {
+            fcmToken: true,
+            expoPushToken: true,
+            email: true,
+            name: true,
+          },
         });
         await this._inBatches(records, 50, async (rec) => {
           if (sendPush)
-            pushCount += await this._sendPush(rec.fcmToken, rec.expoPushToken, title, message);
+            pushCount += await this._sendPush(
+              rec.fcmToken,
+              rec.expoPushToken,
+              title,
+              message,
+            );
           if (sendEmail && rec.email) {
-            await this.emailProducer.sendAdminNoticeEmail(rec.email, rec.name ?? 'User', title, message);
+            await this.emailProducer.sendAdminNoticeEmail(
+              rec.email,
+              rec.name ?? 'User',
+              title,
+              message,
+            );
             emailCount++;
           }
         });
@@ -274,7 +319,12 @@ export class NoticesService {
         });
         await this._inBatches(records, 50, async (rec) => {
           if (rec.email) {
-            await this.emailProducer.sendMarketingEmail(rec.email, rec.name ?? 'User', subject, htmlContent);
+            await this.emailProducer.sendMarketingEmail(
+              rec.email,
+              rec.name ?? 'User',
+              subject,
+              htmlContent,
+            );
             queued++;
           }
         });
@@ -286,7 +336,12 @@ export class NoticesService {
         });
         await this._inBatches(records, 50, async (rec) => {
           if (rec.email) {
-            await this.emailProducer.sendMarketingEmail(rec.email, rec.name ?? 'User', subject, htmlContent);
+            await this.emailProducer.sendMarketingEmail(
+              rec.email,
+              rec.name ?? 'User',
+              subject,
+              htmlContent,
+            );
             queued++;
           }
         });
@@ -296,7 +351,12 @@ export class NoticesService {
         });
         await this._inBatches(records, 50, async (rec) => {
           if (rec.email) {
-            await this.emailProducer.sendMarketingEmail(rec.email, rec.name ?? 'User', subject, htmlContent);
+            await this.emailProducer.sendMarketingEmail(
+              rec.email,
+              rec.name ?? 'User',
+              subject,
+              htmlContent,
+            );
             queued++;
           }
         });

@@ -15,7 +15,7 @@ import { join } from 'path';
         attempts: 3,
         backoff: { type: 'exponential', delay: 3000 },
         removeOnComplete: { count: 100 }, // keep the last 100 completed jobs
-        removeOnFail: { count: 50 },      // keep the last 50 failed jobs
+        removeOnFail: { count: 50 }, // keep the last 50 failed jobs
       },
     }),
 
