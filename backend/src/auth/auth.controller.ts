@@ -116,10 +116,10 @@ export class UserAuthController {
     return this.authService.appleOAuthUser(dto);
   }
 
-  @ApiOperation({ summary: 'Request a password reset email' })
+  @ApiOperation({ summary: 'Request a password reset OTP via email' })
   @ApiResponse({
     status: 200,
-    description: 'Reset email queued (always 200 to prevent user enumeration)',
+    description: 'Reset OTP queued (always 200 to prevent user enumeration)',
   })
   @Post('forgot-password')
   @Throttle({ default: { limit: 3, ttl: 60 * 60 * 1000 } }) // 3 requests per hour
@@ -127,9 +127,18 @@ export class UserAuthController {
     return this.authService.forgotUserPassword(dto);
   }
 
-  @ApiOperation({ summary: 'Reset password using token from email' })
+  @ApiOperation({ summary: 'Verify OTP for password reset' })
+  @ApiResponse({ status: 200, description: 'OTP is valid' })
+  @ApiResponse({ status: 400, description: 'Invalid or expired OTP' })
+  @Post('verify-otp')
+  @Throttle({ default: { limit: 10, ttl: 60 * 60 * 1000 } }) // 10 requests per hour
+  async verifyOtp(@Body() body: { email: string; otp: string }) {
+    return await this.authService.verifyUserPasswordResetOtp(body.email, body.otp);
+  }
+
+  @ApiOperation({ summary: 'Reset password using OTP from email' })
   @ApiResponse({ status: 200, description: 'Password updated successfully' })
-  @ApiResponse({ status: 400, description: 'Invalid or expired reset token' })
+  @ApiResponse({ status: 400, description: 'Invalid or expired OTP' })
   @Post('reset-password')
   @Throttle({ default: { limit: 5, ttl: 60 * 60 * 1000 } }) // 5 requests per hour
   resetPassword(@Body() dto: ResetPasswordDto) {

@@ -3,18 +3,27 @@
 import React, { useState } from "react";
 import { Loader2, ArrowLeft, Mail } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 const ForgotPasswordPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [error, setError] = useState("");
   const [emailSent, setEmailSent] = useState(false);
+  const router = useRouter();
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!email) {
-      setError("Input field cannot be empty");
+      setError("Email is required");
+      return;
+    }
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setError("Please enter a valid email address");
       return;
     }
 
@@ -36,8 +45,11 @@ const ForgotPasswordPage = () => {
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.message || "Failed to send reset email");
+        throw new Error(data.message || "Failed to send OTP");
       }
+
+      // Store email in sessionStorage for reset-password page
+      sessionStorage.setItem("resetEmail", email);
 
       // Show success state
       setEmailSent(true);
@@ -60,7 +72,7 @@ const ForgotPasswordPage = () => {
               Check your email
             </h1>
             <p className="text-sm text-gray-600 dark:text-gray-400">
-              We've sent a password reset link to{" "}
+              We've sent a 6-digit OTP to{" "}
               <span className="font-bold text-gray-900 dark:text-white">
                 {email}
               </span>
@@ -70,14 +82,23 @@ const ForgotPasswordPage = () => {
           <div className="space-y-4">
             <div className="p-4 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl transition-colors">
               <p className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
-                Didn't receive the email?
+                Didn't receive the OTP?
               </p>
               <ul className="text-xs text-gray-500 dark:text-gray-400 space-y-1 list-disc list-inside">
                 <li>Check your spam or junk folder</li>
                 <li>Make sure the email address is correct</li>
-                <li>Wait a few minutes and check again</li>
+                <li>The OTP is valid for 10 minutes</li>
               </ul>
             </div>
+
+            <button
+              onClick={() => {
+                router.push("/reset-password");
+              }}
+              className="w-full bg-yellow-500 text-black py-3 rounded-xl hover:bg-yellow-400 transition-all text-sm font-bold shadow-lg shadow-yellow-500/20 active:scale-[0.98]"
+            >
+              Continue to verify OTP
+            </button>
 
             <button
               onClick={() => {
@@ -85,9 +106,9 @@ const ForgotPasswordPage = () => {
                 setEmail("");
                 setError("");
               }}
-              className="w-full bg-yellow-500 text-black py-3 rounded-xl hover:bg-yellow-400 transition-all text-sm font-bold shadow-lg shadow-yellow-500/20 active:scale-[0.98]"
+              className="w-full text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white font-medium transition-colors py-2"
             >
-              Try another email
+              Use a different email
             </button>
 
             <Link
@@ -119,7 +140,7 @@ const ForgotPasswordPage = () => {
             Forgot password?
           </h1>
           <p className="text-sm text-gray-600 dark:text-gray-400">
-            No worries, we'll send you reset instructions
+            No worries, we'll send you a one-time password
           </p>
         </div>
 
@@ -149,10 +170,10 @@ const ForgotPasswordPage = () => {
             {isLoading ? (
               <span className="flex items-center justify-center gap-2">
                 <Loader2 className="w-4 h-4 animate-spin" />
-                Sending...
+                Sending OTP...
               </span>
             ) : (
-              "Reset password"
+              "Send OTP"
             )}
           </button>
         </form>

@@ -31,11 +31,36 @@ messaging.onBackgroundMessage((payload) => {
   const { title, body } = payload.notification ?? {};
   const data = payload.data ?? {};
 
-  self.registration.showNotification(title || "Asoose", {
+  // Notification options with custom sound
+  const notificationOptions = {
     body: body || "",
     icon: "/logo.png",
     badge: "/logo.png",
     data,
+    // Custom sound - supported in some browsers
+    sound: "/sounds/notification.mp3",
+    // Vibration pattern as fallback for mobile [vibrate-ms, pause-ms, ...]
+    vibrate: [200, 100, 200],
+    // Keep notification visible until user interacts
+    requireInteraction: false,
+    // Tag to replace old notifications
+    tag: "asoose-notification",
+  };
+
+  self.registration.showNotification(
+    title || "Asoose",
+    notificationOptions
+  );
+
+  // Attempt to play sound in any open clients as fallback
+  // (since service worker can't directly play audio in all browsers)
+  self.clients.matchAll({ type: "window" }).then((clients) => {
+    clients.forEach((client) => {
+      client.postMessage({
+        type: "PLAY_NOTIFICATION_SOUND",
+        payload: { title, body },
+      });
+    });
   });
 });
 

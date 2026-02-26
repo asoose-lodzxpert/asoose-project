@@ -483,6 +483,34 @@ export class AuthService {
     }
   }
 
+  async verifyUserPasswordResetOtp(email: string, otp: string) {
+    try {
+      // Validate OTP format
+      if (!otp || otp.length !== 6 || !/^\d{6}$/.test(otp)) {
+        throw new BadRequestException('Invalid OTP format');
+      }
+
+      const isValidOtp = await this.otpService.verifyOtp(
+        `password-reset:${email}`,
+        otp,
+      );
+
+      if (!isValidOtp) {
+        throw new BadRequestException('Invalid or expired OTP');
+      }
+
+      return {
+        message: 'OTP verified successfully',
+        valid: true,
+      };
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new BadRequestException('OTP verification failed');
+    }
+  }
+
   async resetUserPassword(dto: ResetPasswordDto) {
     try {
       // Find user by email
@@ -494,20 +522,23 @@ export class AuthService {
         throw new BadRequestException('Invalid email or OTP');
       }
 
-      // Verify OTP if provided
-      if (dto.token) {
-        const isValidOtp = await this.otpService.verifyOtp(
-          `password-reset:${dto.email}`,
-          dto.token,
-        );
-
-        if (!isValidOtp) {
-          throw new BadRequestException('Invalid or expired OTP');
-        }
-
-        // Clear OTP after successful verification
-        await this.otpService.clearOtp(`password-reset:${dto.email}`);
+      // Validate OTP format
+      if (!dto.token || dto.token.length !== 6 || !/^\d{6}$/.test(dto.token)) {
+        throw new BadRequestException('Invalid OTP format');
       }
+
+      // Verify OTP (required)
+      const isValidOtp = await this.otpService.verifyOtp(
+        `password-reset:${dto.email}`,
+        dto.token,
+      );
+
+      if (!isValidOtp) {
+        throw new BadRequestException('Invalid or expired OTP');
+      }
+
+      // Clear OTP after successful verification
+      await this.otpService.clearOtp(`password-reset:${dto.email}`);
 
       // Hash new password with Argon2id
       const hashedPassword = await hashPassword(dto.newPassword);

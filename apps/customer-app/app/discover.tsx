@@ -25,7 +25,7 @@ const CARD_GAP = 12;
 const H_PAD = 16;
 const CARD_WIDTH = (SCREEN_WIDTH - H_PAD * 2 - CARD_GAP) / 2;
 
-const COVER_PLACEHOLDER = require("@/assets/placeholders/store-cover.jpg");
+const COVER_PLACEHOLDER = require("@/assets/placeholders/store-cover.png");
 const LOGO_PLACEHOLDER = require("@/assets/placeholders/store-logo.avif");
 
 const TYPE_ICON_MAP: Record<string, IconSymbolName> = {

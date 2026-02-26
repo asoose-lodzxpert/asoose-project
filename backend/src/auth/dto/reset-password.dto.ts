@@ -13,8 +13,7 @@ export class ResetPasswordDto {
   @MinLength(8, { message: 'Password must be at least 8 characters long' })
   newPassword: string;
 
-  @ApiPropertyOptional({ description: 'OTP or reset token from email' })
+  @ApiProperty({ description: 'OTP from email', example: '123456' })
   @IsString()
-  @IsOptional()
-  token?: string; // OTP or reset token
+  token: string; // OTP for password reset
 }

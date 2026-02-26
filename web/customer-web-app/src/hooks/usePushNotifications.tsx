@@ -4,6 +4,11 @@ import { useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { getFirebaseMessaging, getToken, onMessage } from "@/lib/firebase";
 import { toast } from "react-toastify";
+import { 
+  playNotificationSound, 
+  preloadNotificationSound,
+  unlockNotificationSound 
+} from "@/lib/notification-sound";
 
 const VAPID_KEY = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY!;
 const API_URL =
@@ -66,6 +71,25 @@ export function usePushNotifications() {
   const unsubscribeRef = useRef<(() => void) | null>(null);
   const registeredTokenRef = useRef<string | null>(null);
 
+  // Listen for service worker messages (e.g., play sound for background notifications)
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;
+
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'PLAY_NOTIFICATION_SOUND') {
+        playNotificationSound().catch((err) => {
+          console.debug('[Push] Background sound playback skipped:', err);
+        });
+      }
+    };
+
+    navigator.serviceWorker.addEventListener('message', handleMessage);
+
+    return () => {
+      navigator.serviceWorker.removeEventListener('message', handleMessage);
+    };
+  }, []);
+
   useEffect(() => {
     if (status !== "authenticated" || !session?.user) return;
     if (typeof window === "undefined" || !("Notification" in window)) return;
@@ -81,6 +105,19 @@ export function usePushNotifications() {
 
     const setup = async () => {
       try {
+        // Preload notification sound
+        preloadNotificationSound();
+        
+        // Unlock audio on first user interaction (required by browser autoplay policies)
+        const unlockOnInteraction = () => {
+          unlockNotificationSound();
+          // Remove listeners after first interaction
+          window.removeEventListener('click', unlockOnInteraction);
+          window.removeEventListener('touchstart', unlockOnInteraction);
+        };
+        window.addEventListener('click', unlockOnInteraction, { once: true });
+        window.addEventListener('touchstart', unlockOnInteraction, { once: true });
+
         // 1. Request permission
         const permission = await Notification.requestPermission();
         if (permission !== "granted") return;
@@ -113,6 +150,11 @@ export function usePushNotifications() {
         unsubscribeRef.current = onMessage(messaging, (payload) => {
           const { title, body } = payload.notification ?? {};
           const isDark = document.documentElement.classList.contains("dark");
+
+          // Play notification sound
+          playNotificationSound().catch((err) => {
+            console.debug('[Push] Sound playback skipped:', err);
+          });
 
           toast.info(
             <div className="flex flex-col gap-1">

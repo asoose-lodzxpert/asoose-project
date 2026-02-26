@@ -9,7 +9,7 @@ import { RelativePathString, useRouter } from "expo-router";
 /* ---------------------------------- */
 /* Assets (placeholders) */
 /* ---------------------------------- */
-const COVER_PLACEHOLDER = require("@/assets/placeholders/store-cover.jpg");
+const COVER_PLACEHOLDER = require("@/assets/placeholders/store-cover.png");
 const LOGO_PLACEHOLDER = require("@/assets/placeholders/store-logo.avif");
 
 type Props = {
