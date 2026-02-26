@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, Logger } from '@nestjs/common';
 import { MailerModule } from '@nestjs-modules/mailer';
 import { ConfigService, ConfigModule } from '@nestjs/config';
 import { BullModule } from '@nestjs/bullmq';
@@ -14,8 +14,8 @@ import { join } from 'path';
       defaultJobOptions: {
         attempts: 3,
         backoff: { type: 'exponential', delay: 3000 },
-        removeOnComplete: { count: 100 }, // keep the last 100 completed jobs
-        removeOnFail: { count: 50 }, // keep the last 50 failed jobs
+        removeOnComplete: { count: 100 },
+        removeOnFail: { count: 50 },
       },
     }),
 
@@ -23,31 +23,71 @@ import { join } from 'path';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
+        const logger = new Logger('MailModule');
+
+        const host = config.get<string>('EMAIL_HOST');
         const port = config.get<number>('EMAIL_PORT') ?? 587;
         const secure = String(config.get('EMAIL_SECURE')) === 'true';
+        const user = config.get<string>('EMAIL_USER');
+        const pass = config.get<string>('EMAIL_PASSWORD');
+        const from = config.get<string>('EMAIL_FROM');
+
+        // 🚨 Check required variables
+        if (!host || !user || !pass || !from) {
+          logger.error('❌ Email configuration is incomplete.');
+          logger.error(`EMAIL_HOST: ${host}`);
+          logger.error(`EMAIL_USER: ${user ? '✔ set' : '❌ missing'}`);
+          logger.error(`EMAIL_PASSWORD: ${pass ? '✔ set' : '❌ missing'}`);
+          logger.error(`EMAIL_FROM: ${from}`);
+
+          logger.warn('⚠️ MailerModule will be initialized in disabled mode.');
+
+          // Return disabled transport to prevent crashes
+          return {
+            transport: {
+              jsonTransport: true,
+            },
+          };
+        }
+
+        if ((port === 465 && !secure) || (port === 587 && secure)) {
+          logger.warn(
+            `⚠️ Possible port/secure mismatch → port=${port}, secure=${secure}`,
+          );
+        }
+
+        logger.log(
+          `📨 Mailer configured for ${host}:${port} (secure=${secure})`,
+        );
 
         return {
           transport: {
-            host: config.get<string>('EMAIL_HOST'),
+            pool: true, // Enable connection pooling to prevent rate limits
+            maxConnections: 5, // Limit concurrent SMTP connections
+            maxMessages: 100, // Restart connection after 100 emails
+
+            host,
             port,
-            // port 465 → implicit TLS (secure: true)
-            // port 587 → STARTTLS (secure: false)
             secure,
             auth: {
-              user: config.get<string>('EMAIL_USER'),
-              pass: config.get<string>('EMAIL_PASSWORD'),
+              user,
+              pass,
             },
-            // Fail fast so BullMQ exponential backoff can retry cleanly
-            connectionTimeout: 10_000, // 10 s to open TCP connection
-            greetingTimeout: 10_000, // 10 s for SMTP greeting
-            socketTimeout: 30_000, // 30 s of inactivity kills the socket
+
+            connectionTimeout: 10_000,
+            greetingTimeout: 10_000,
+            socketTimeout: 30_000,
+
+            // Verbose SMTP logging — development only (exposes auth in logs)
+            logger: config.get('NODE_ENV') !== 'production',
+            debug: config.get('NODE_ENV') !== 'production',
+
             tls: {
-              // allow self-signed certs on staging; set to true in production
               rejectUnauthorized: config.get('NODE_ENV') === 'production',
             },
           },
           defaults: {
-            from: `"Asoose " <${config.get<string>('EMAIL_FROM')}>`,
+            from: `"Asoose" <${from}>`,
           },
           template: {
             dir: join(__dirname, '..', '..', 'libs', 'mail', 'templates'),

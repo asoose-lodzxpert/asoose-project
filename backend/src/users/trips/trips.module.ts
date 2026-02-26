@@ -12,6 +12,7 @@ import { PaymentModule } from '../../payment/payment.module';
 import { NotificationsModule } from '../../notifications/notifications.module';
 import { MatchingRedisModule } from 'src/matching/redis/redis.module';
 import { TestController } from 'src/test/test.controller';
+import { MailModule } from '../../mail/mail.module';
 
 import { UsersModule } from '../users.module';
 import { MapsModule } from '../../maps/maps.module';
@@ -26,6 +27,7 @@ const devOnlyControllers =
     NotificationsModule,
     MatchingRedisModule,
     MapsModule, // ✅ Added for TripsCommonService to use MapsService
+    MailModule,
     forwardRef(() => PaymentModule),
     forwardRef(() => UsersModule), // ✅ Added with forwardRef to provide AddressesService
   ],

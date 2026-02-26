@@ -135,7 +135,10 @@ export class UserAuthController {
   @Post('verify-otp')
   @Throttle({ default: { limit: 10, ttl: 60 * 60 * 1000 } }) // 10 requests per hour
   async verifyOtp(@Body() body: { email: string; otp: string }) {
-    return await this.authService.verifyUserPasswordResetOtp(body.email, body.otp);
+    return await this.authService.verifyUserPasswordResetOtp(
+      body.email,
+      body.otp,
+    );
   }
 
   @ApiOperation({ summary: 'Reset password using OTP from email' })
@@ -153,7 +156,14 @@ export class UserAuthController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @Patch('profile')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.CUSTOMER)
+  @Roles(
+    UserRole.CUSTOMER,
+    UserRole.ADMIN,
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN_MANAGER,
+    UserRole.ADMIN_SUPPORT,
+    UserRole.ADMIN_FINANCE,
+  )
   updateProfile(@Body() dto: UpdateProfileDto, @Req() req) {
     return this.authService.updateUserProfile(req.user.id, dto);
   }
@@ -164,7 +174,14 @@ export class UserAuthController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @Post('push-token')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.CUSTOMER)
+  @Roles(
+    UserRole.CUSTOMER,
+    UserRole.ADMIN,
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN_MANAGER,
+    UserRole.ADMIN_SUPPORT,
+    UserRole.ADMIN_FINANCE,
+  )
   savePushToken(@Body() body, @Req() req) {
     return this.authService.savePushToken(
       req.user.id,
@@ -179,7 +196,14 @@ export class UserAuthController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @Delete('push-token')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.CUSTOMER)
+  @Roles(
+    UserRole.CUSTOMER,
+    UserRole.ADMIN,
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN_MANAGER,
+    UserRole.ADMIN_SUPPORT,
+    UserRole.ADMIN_FINANCE,
+  )
   removePushToken(@Req() req) {
     return this.authService.removePushToken(req.user.id);
   }
@@ -195,7 +219,14 @@ export class UserAuthController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @Get('linked-accounts')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.CUSTOMER)
+  @Roles(
+    UserRole.CUSTOMER,
+    UserRole.ADMIN,
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN_MANAGER,
+    UserRole.ADMIN_SUPPORT,
+    UserRole.ADMIN_FINANCE,
+  )
   getLinkedAccounts(@Req() req) {
     return this.authService.getLinkedAccounts(req.user.id);
   }
@@ -210,7 +241,14 @@ export class UserAuthController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @Post('link/google')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.CUSTOMER)
+  @Roles(
+    UserRole.CUSTOMER,
+    UserRole.ADMIN,
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN_MANAGER,
+    UserRole.ADMIN_SUPPORT,
+    UserRole.ADMIN_FINANCE,
+  )
   linkGoogle(@Body() dto: GoogleOAuthDto, @Req() req) {
     return this.authService.linkGoogleAccount(req.user.id, dto);
   }
@@ -223,7 +261,14 @@ export class UserAuthController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @Delete('link/google')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.CUSTOMER)
+  @Roles(
+    UserRole.CUSTOMER,
+    UserRole.ADMIN,
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN_MANAGER,
+    UserRole.ADMIN_SUPPORT,
+    UserRole.ADMIN_FINANCE,
+  )
   unlinkGoogle(@Req() req) {
     return this.authService.unlinkGoogleAccount(req.user.id);
   }
@@ -238,7 +283,14 @@ export class UserAuthController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @Post('link/apple')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.CUSTOMER)
+  @Roles(
+    UserRole.CUSTOMER,
+    UserRole.ADMIN,
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN_MANAGER,
+    UserRole.ADMIN_SUPPORT,
+    UserRole.ADMIN_FINANCE,
+  )
   linkApple(@Body() dto: AppleOAuthDto, @Req() req) {
     return this.authService.linkAppleAccount(req.user.id, dto);
   }
@@ -249,7 +301,14 @@ export class UserAuthController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @Delete('link/apple')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.CUSTOMER)
+  @Roles(
+    UserRole.CUSTOMER,
+    UserRole.ADMIN,
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN_MANAGER,
+    UserRole.ADMIN_SUPPORT,
+    UserRole.ADMIN_FINANCE,
+  )
   unlinkApple(@Req() req) {
     return this.authService.unlinkAppleAccount(req.user.id);
   }

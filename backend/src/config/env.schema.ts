@@ -46,7 +46,7 @@ export const envSchema = z.object({
   EMAIL_SECURE: z.string().optional(),
   EMAIL_USER: z.string(),
   EMAIL_PASSWORD: z.string(),
-  EMAIL_FROM: z.string().email(),
+  EMAIL_FROM: z.email(),
 
   // ----------------
   // File Storage
@@ -144,6 +144,7 @@ export const envSchema = z.object({
   // ----------------
   SWAGGER_ENABLED: z.enum(['true', 'false']).default('false'),
   METRICS_ALLOWED_IPS: z.string().optional(),
+  BULL_BOARD_ALLOWED_IPS: z.string().optional(),
 
   // ----------------
   // Bull Queue (Redis connection — QUEUE_* keys removed; BullModule uses REDIS_* vars)
