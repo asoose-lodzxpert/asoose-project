@@ -18,8 +18,8 @@ const TEST_EMAIL = 'arhyelphilip024@gmail.com';
  *  It is gated by SUPER_ADMIN and must NEVER be registered in production.
  *  Registration is conditional on NODE_ENV !== 'production' (see trips.module.ts).
  */
-// @UseGuards(JwtAuthGuard, RolesGuard)
-// @Roles(UserRole.SUPER_ADMIN)
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(UserRole.SUPER_ADMIN)
 @Controller({
   path: 'test',
   version: '1',
