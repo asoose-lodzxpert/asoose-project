@@ -4,6 +4,7 @@ import { SessionProvider } from "next-auth/react";
 import { ThemeProvider } from "@/app/provider/provider"; // Your existing theme provider
 import { GoogleMapsProvider } from "@/providers/GoogleMapsProvider"; // Your existing maps provider
 import { SocketProvider } from "@/context/SocketContext"; // Global socket — survives page navigation & Paystack redirect
+import { SessionGuard } from "@/components/SessionGuard";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
@@ -17,7 +18,8 @@ export function Providers({ children }: { children: React.ReactNode }) {
       refetchInterval={0}
       refetchOnWindowFocus={false}
     >
-      <ThemeProvider
+      <SessionGuard>
+        <ThemeProvider
         attribute="class"
         defaultTheme="system"
         enableSystem
@@ -41,6 +43,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
           theme="colored"
         />
       </ThemeProvider>
+      </SessionGuard>
     </SessionProvider>
   );
 }

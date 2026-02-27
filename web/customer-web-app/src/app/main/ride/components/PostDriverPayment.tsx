@@ -5,7 +5,6 @@ import { useSession } from "next-auth/react";
 import { toast } from "react-toastify";
 import { CheckCircle2, Phone, Loader2, X, CreditCard } from "lucide-react";
 import { useRideStore } from "../store/ride";
-import { paymentService } from "@/services/payment.service";
 import { RideService } from "@/services/ride.service";
 
 /**
@@ -39,6 +38,8 @@ export function PostDriverPayment() {
     }).format(amount);
 
   // ── PAY ────────────────────────────────────────────────────────────────────
+  // Calls POST /trips/rides/:id/confirm which creates a Paystack session
+  // and returns { rideId, authorizationUrl, reference }.
   const handlePay = async () => {
     if (!session?.accessToken || !rideId) {
       toast.error("Unable to process payment. Please try again.");
@@ -47,28 +48,13 @@ export function PostDriverPayment() {
 
     setIsProcessing(true);
     try {
-      const email = (session.user as any)?.email || "";
-      const amount = lockedEstimate?.fare ?? 0;
-
-      const frontendOrigin =
-        typeof window !== "undefined"
-          ? window.location.origin
-          : process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3001";
-
-      const paymentRes = await paymentService.initiatePayment(
-        {
-          amount,
-          email,
-          gateway: "PAYSTACK",
-          method: "CARD",
-          type: "RIDE",
-          rideId,
-          callbackUrl: `${frontendOrigin}/payment/callback`,
-        },
+      const confirmRes = await RideService.confirmRide(
+        rideId,
+        "CARD",
         session.accessToken,
       );
 
-      if (!paymentRes.authorizationUrl) {
+      if (!confirmRes.authorizationUrl) {
         throw new Error(
           "Paystack authorisation URL not returned. Please try again.",
         );
@@ -82,9 +68,9 @@ export function PostDriverPayment() {
       setPaymentConfirmed(true);
 
       // Hard-navigate to Paystack — page will be unloaded here
-      window.location.href = paymentRes.authorizationUrl;
+      window.location.href = confirmRes.authorizationUrl;
     } catch (err: any) {
-      console.error("Paystack init failed:", err);
+      console.error("Ride confirm/payment failed:", err);
       toast.error(
         err?.message || "Failed to initialise payment. Please try again.",
       );

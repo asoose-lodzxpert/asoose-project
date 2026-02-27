@@ -13,7 +13,7 @@ import { LocationAutocompleteInput } from "./LocationAutocompleteInput";
 import { useDebounce } from "../hooks/useDebounce";
 import { SidebarSection, SidebarDivider } from "./Sidebar";
 import { PrimaryButton, SecondaryButton, Text } from "@/components/ui";
-import { X, RotateCcw, Loader2 } from "lucide-react";
+import { X, RotateCcw, Loader2, Car } from "lucide-react";
 
 /**
  * Retry a transient-failure-prone async operation (H2 fix).
@@ -564,6 +564,7 @@ export function RideSelection() {
                     <SecondaryButton
                       onClick={() => setPendingBooking(null)}
                       disabled={isSubmitting}
+                      className="!text-yellow-700 dark:!text-yellow-500 hover:!bg-yellow-50 dark:hover:!bg-yellow-900/20 focus:ring-yellow-500"
                     >
                       ← Change
                     </SecondaryButton>
@@ -575,6 +576,7 @@ export function RideSelection() {
                         )
                       }
                       disabled={isSubmitting}
+                      className="!bg-yellow-600 hover:!bg-yellow-700 !text-white focus:ring-yellow-500"
                     >
                       {isSubmitting ? (
                         <span className="flex items-center justify-center gap-2">
@@ -592,25 +594,25 @@ export function RideSelection() {
                 <SidebarSection title="Select Ride">
                   <div className="grid grid-cols-2 gap-3 w-full">
                     {/* Economy Button */}
-                    <SecondaryButton
+                    <PrimaryButton
                       onClick={() => handleSelectRide("economy")}
                       disabled={isSubmitting || isCalculating}
-                      className="h-20 flex flex-col items-center justify-center"
+                      className="h-22 flex flex-col items-center justify-center !bg-yellow-600 hover:!bg-yellow-700 !text-white focus:ring-yellow-500"
                     >
                       {isCalculating ? (
-                        <Text size="xs" variant="secondary">
+                        <Text size="xs" className="!text-white/80">
                           Calculating...
                         </Text>
                       ) : (
                         <>
-                          <Text size="sm" weight="semibold">
+                          <Car size={24} className="mb-1 text-white/90" />
+                          <Text size="sm" weight="semibold" className="!text-white">
                             Economy
                           </Text>
                           {estimates?.["ECONOMY"] && (
                             <Text
                               size="xs"
-                              variant="secondary"
-                              className="mt-1"
+                              className="mt-0.5 !text-white/80"
                             >
                               {formatDuration(estimates["ECONOMY"].duration)}{" "}
                               &bull;{" "}
@@ -619,29 +621,30 @@ export function RideSelection() {
                           )}
                         </>
                       )}
-                    </SecondaryButton>
+                    </PrimaryButton>
 
                     {/* Business Button */}
                     <PrimaryButton
                       onClick={() => handleSelectRide("business")}
                       disabled={isSubmitting || isCalculating}
-                      className="h-20 flex flex-col items-center justify-center"
+                      className="h-22 flex flex-col items-center justify-center !bg-green-600 hover:!bg-green-700 !text-white focus:ring-green-500"
                     >
                       {isCalculating ? (
-                        <Text size="xs" className="text-white">
+                        <Text size="xs" className="!text-white/80">
                           Calculating...
                         </Text>
                       ) : (
                         <>
+                          <Car size={24} className="mb-1 text-white/90" />
                           <Text
                             size="sm"
                             weight="semibold"
-                            className="text-white"
+                            className="!text-white"
                           >
                             Business
                           </Text>
                           {estimates?.["BUSINESS"] && (
-                            <Text size="xs" className="mt-1 text-white/80">
+                            <Text size="xs" className="mt-0.5 !text-white/80">
                               {formatDuration(estimates["BUSINESS"].duration)}{" "}
                               &bull;{" "}
                               {formatMoney(estimates["BUSINESS"].estimatedFare)}
