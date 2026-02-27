@@ -77,7 +77,7 @@ const columnHelper = createColumnHelper<Vendor>();
 export default function VendorManagementPage() {
   const router = useRouter();
 
-  const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({});;
+  const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({});
   const [showFilters, setShowFilters] = useState(false);
   const [isProcessingBulk, setIsProcessingBulk] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -485,15 +485,15 @@ export default function VendorManagementPage() {
                 <Download className="w-4 h-4" />
                 <span className="hidden md:inline">Export</span>
               </button>
-              <button
-                onClick={() => setIsManualOnboardOpen(true)}
-                className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-500 text-sm font-bold "
-                title="Manually onboard a vendor as Active & Verified"
+              <Link
+                href="/super-admin/users/vendors/create"
+                className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-bold transition-colors shadow-lg shadow-emerald-600/20"
+                title="Create a new vendor"
               >
-                <UserCheck className="w-4 h-4" />
-                <span className="hidden md:inline">Manual Onboard</span>
-                <span className="inline md:hidden">Onboard</span>
-              </button>
+                <Plus className="w-4 h-4" />
+                <span className="hidden md:inline">Create Vendor</span>
+                <span className="inline md:hidden">Create</span>
+              </Link>
               {/* <button
                 onClick={() => setIsAddModalOpen(true)}
                 className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-yellow-500 text-black rounded-lg hover:bg-yellow-400 text-sm font-bold shadow-lg shadow-yellow-500/20"

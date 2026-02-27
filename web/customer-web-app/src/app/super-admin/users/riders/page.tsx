@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
+import Link from "next/link";
 import {
   Download,
   Search,
@@ -15,6 +16,7 @@ import {
   Star,
   Wallet,
   Car,
+  Plus,
 } from "lucide-react";
 import { DataTable } from "@/app/super-admin/component/datatable";
 import Link from "next/link";
@@ -309,10 +311,19 @@ export default function RidersPage() {
               Manage riders, payouts, and verifications
             </p>
           </div>
-          <button className="flex items-center gap-2 px-4 py-2 bg-[#1E293B] border border-gray-700 hover:bg-gray-800 text-white text-sm font-bold rounded-lg transition-colors">
-            <Download className="w-4 h-4" />{" "}
-            <span className="hidden md:inline">Export CSV</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/super-admin/users/riders/create"
+              className="flex items-center gap-2 px-4 py-2 bg-yellow-500 hover:bg-yellow-400 text-black text-sm font-bold rounded-lg transition-colors shadow-lg shadow-yellow-500/20"
+            >
+              <Plus className="w-4 h-4" />
+              <span className="hidden md:inline">Add Rider</span>
+            </Link>
+            <button className="flex items-center gap-2 px-4 py-2 bg-[#1E293B] border border-gray-700 hover:bg-gray-800 text-white text-sm font-bold rounded-lg transition-colors">
+              <Download className="w-4 h-4" />{" "}
+              <span className="hidden md:inline">Export CSV</span>
+            </button>
+          </div>
         </div>
 
         {/* Stats Grid */}

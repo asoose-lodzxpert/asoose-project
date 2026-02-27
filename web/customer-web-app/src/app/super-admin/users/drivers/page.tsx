@@ -11,6 +11,7 @@ import {
   Trash2,
   CheckCircle,
   Car,
+  Plus,
 } from "lucide-react";
 import { DataTable } from "@/app/super-admin/component/datatable";
 import Link from "next/link";
@@ -307,7 +308,10 @@ export default function DriversPage() {
           {/* Stats skeleton */}
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             {[...Array(3)].map((_, i) => (
-              <div key={i} className="bg-[#1E293B] border border-gray-800 rounded-xl p-4 space-y-3">
+              <div
+                key={i}
+                className="bg-[#1E293B] border border-gray-800 rounded-xl p-4 space-y-3"
+              >
                 <div className="h-4 w-24 bg-gray-700 rounded" />
                 <div className="h-8 w-16 bg-gray-700 rounded" />
               </div>
@@ -323,7 +327,10 @@ export default function DriversPage() {
           <div className="bg-[#1E293B] border border-gray-800 rounded-xl overflow-hidden">
             <div className="h-12 bg-gray-700/50 border-b border-gray-800" />
             {[...Array(8)].map((_, i) => (
-              <div key={i} className="flex items-center gap-4 p-4 border-b border-gray-800">
+              <div
+                key={i}
+                className="flex items-center gap-4 p-4 border-b border-gray-800"
+              >
                 <div className="h-8 w-8 rounded-full bg-gray-700" />
                 <div className="flex-1 space-y-1.5">
                   <div className="h-3 w-36 bg-gray-700 rounded" />
@@ -354,10 +361,19 @@ export default function DriversPage() {
               Manage ride-hailing drivers, payouts, and verifications
             </p>
           </div>
-          <button className="flex items-center gap-2 px-4 py-2 bg-[#1E293B] border border-gray-700 hover:bg-gray-800 text-white text-sm font-bold rounded-lg transition-colors">
-            <Download className="w-4 h-4" />{" "}
-            <span className="hidden md:inline">Export CSV</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/super-admin/users/riders/create"
+              className="flex items-center gap-2 px-4 py-2 bg-yellow-500 hover:bg-yellow-400 text-black text-sm font-bold rounded-lg transition-colors shadow-lg shadow-yellow-500/20"
+            >
+              <Plus className="w-4 h-4" />
+              <span className="hidden md:inline">Add Driver</span>
+            </Link>
+            <button className="flex items-center gap-2 px-4 py-2 bg-[#1E293B] border border-gray-700 hover:bg-gray-800 text-white text-sm font-bold rounded-lg transition-colors">
+              <Download className="w-4 h-4" />{" "}
+              <span className="hidden md:inline">Export CSV</span>
+            </button>
+          </div>
         </div>
 
         {/* Stats Grid */}
