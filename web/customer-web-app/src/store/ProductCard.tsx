@@ -91,7 +91,7 @@ export const ProductCard = ({
         '/cart/add',
         { productId: id, quantity: 1 },
         token,
-        { headers: { "ngrok-skip-browser-warning": "true" } },
+        {},
       );
 
       // 3. Success: Update Local Store (Optimistic or Sync)

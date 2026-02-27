@@ -14,29 +14,7 @@ import {
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-
-// --- ENUMS for Validation ----
-export enum VendorCategory {
-  RESTAURANT = 'RESTAURANT',
-  GROCERY = 'GROCERY',
-  PHARMACY = 'PHARMACY',
-  MARKET = 'MARKET',
-  FASHION = 'FASHION',
-  ELECTRONICS = 'ELECTRONICS',
-  FURNITURE = 'FURNITURE',
-  BEAUTY = 'BEAUTY',
-  HEALTH = 'HEALTH',
-  EDUCATION = 'EDUCATION',
-  SERVICES = 'SERVICES',
-  AUTOMOTIVE = 'AUTOMOTIVE',
-  TRAVEL = 'TRAVEL',
-  ENTERTAINMENT = 'ENTERTAINMENT',
-  RETAIL = 'RETAIL',
-  ONLINE = 'ONLINE',
-  MANUFACTURING = 'MANUFACTURING',
-  LOGISTICS = 'LOGISTICS',
-  OTHER = 'OTHER',
-}
+import { StoreType } from '@prisma/client';
 
 export enum StoreStatus {
   ACTIVE = 'ACTIVE',
@@ -77,9 +55,9 @@ export class AdminCreateVendorDto {
   @IsNotEmpty()
   slug: string;
 
-  @ApiProperty({ enum: VendorCategory, example: VendorCategory.RESTAURANT })
-  @IsEnum(VendorCategory)
-  type: VendorCategory;
+  @ApiProperty({ enum: StoreType, example: StoreType.RESTAURANT })
+  @IsEnum(StoreType)
+  type: StoreType;
 }
 
 // --- QUERY/FILTER DTO ---
@@ -172,9 +150,9 @@ export class ManualOnboardVendorDto {
   @IsNotEmpty()
   slug: string;
 
-  @ApiProperty({ enum: VendorCategory, example: VendorCategory.RESTAURANT })
-  @IsEnum(VendorCategory)
-  type: VendorCategory;
+  @ApiProperty({ enum: StoreType, example: StoreType.RESTAURANT })
+  @IsEnum(StoreType)
+  type: StoreType;
 
   @ApiPropertyOptional({ example: '123 Market Street, Abuja' })
   @IsOptional()

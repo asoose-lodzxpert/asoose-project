@@ -144,7 +144,7 @@ export const ProductModal = ({
           ...(modifierIds.length > 0 && { modifierIds }),
         },
         token,
-        { headers: { "ngrok-skip-browser-warning": "true" } },
+        {},
       );
 
       // Success: sync local cart store for immediate UI update.

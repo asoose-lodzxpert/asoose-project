@@ -17,8 +17,7 @@ async function authFetch(path: string, init?: RequestInit) {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
       ...(process.env.NODE_ENV === "development"
-        ? { "ngrok-skip-browser-warning": "true" }
-        : {}),
+        {}),
       ...init?.headers,
     },
   });

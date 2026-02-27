@@ -16,7 +16,7 @@ export async function login(identifier: string, password: string) {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...(__DEV__ ? { "ngrok-skip-browser-warning": "true" } : {}),
+
         },
         body: JSON.stringify({ email: identifier, password }),
       },
@@ -68,7 +68,7 @@ export async function refreshAccessToken() {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        ...(__DEV__ ? { "ngrok-skip-browser-warning": "true" } : {}),
+
       },
       body: JSON.stringify({ refreshToken }),
     },
