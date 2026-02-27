@@ -1,11 +1,14 @@
 import { NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import CredentialsProvider from "next-auth/providers/credentials";
+import type { JWT } from "next-auth/jwt";
 
+// ─── Constants ────────────────────────────────────────────────────────────────
 interface CustomUser {
   id: string;
   role: string;
   accessToken: string;
+  refreshToken?: string;
   name?: string;
   email?: string;
   image?: string;
@@ -23,6 +26,60 @@ if (
   );
 }
 
+/**
+ * Backend access tokens expire in 7 days. We proactively refresh 1 hour before
+ * expiry so API calls never hit a stale token.
+ */
+const ACCESS_TOKEN_LIFETIME_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+const REFRESH_BUFFER_MS = 60 * 60 * 1000; // 1 hour before expiry
+
+// ─── Token refresh helper ─────────────────────────────────────────────────────
+/**
+ * Calls the backend's POST /auth/refresh endpoint with the stored refresh token.
+ * Returns a new access token, or throws if the refresh token is itself expired
+ * or revoked.
+ */
+async function refreshAccessToken(token: JWT): Promise<JWT> {
+  try {
+    const res = await fetch(`${SERVER_API_URL}/auth/refresh`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refreshToken: token.refreshToken }),
+    });
+
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      console.error("[auth] Refresh token rejected by backend:", res.status, body);
+      throw new Error("RefreshTokenExpired");
+    }
+
+    const data = await res.json();
+
+    if (!data.access_token) {
+      throw new Error("No access_token in refresh response");
+    }
+
+    console.log("[auth] Access token refreshed successfully for user:", token.id);
+
+    return {
+      ...token,
+      accessToken: data.access_token,
+      accessTokenExpiry: Date.now() + ACCESS_TOKEN_LIFETIME_MS,
+      // If the backend ever rotates the refresh token, pick it up:
+      refreshToken: data.refresh_token ?? token.refreshToken,
+      error: undefined,
+    };
+  } catch (error: any) {
+    console.error("[auth] Token refresh failed:", error.message);
+    // Surface the error so the session callback can force sign-out
+    return {
+      ...token,
+      error: "RefreshTokenExpired",
+    };
+  }
+}
+
+// ─── NextAuth config ──────────────────────────────────────────────────────────
 export const authOptions: NextAuthOptions = {
   providers: [
     GoogleProvider({
@@ -65,6 +122,7 @@ export const authOptions: NextAuthOptions = {
               image: data.user.image,
               role: data.user.role,
               accessToken: data.access_token,
+              refreshToken: data.refresh_token,
             } as CustomUser;
           }
 
@@ -81,7 +139,7 @@ export const authOptions: NextAuthOptions = {
   ],
   session: {
     strategy: "jwt",
-    maxAge: 7 * 24 * 60 * 60,
+    maxAge: 30 * 24 * 60 * 60, // 30 days — matches backend refresh token lifetime
   },
   callbacks: {
     async signIn({ user, account, profile }) {
@@ -111,6 +169,7 @@ export const authOptions: NextAuthOptions = {
             user.id = data.user.id;
             (user as any).role = data.user.role;
             (user as any).accessToken = data.access_token;
+            (user as any).refreshToken = data.refresh_token;
             return true;
           }
 
@@ -126,13 +185,34 @@ export const authOptions: NextAuthOptions = {
     },
 
     async jwt({ token, user }) {
+      // ── Initial sign-in: store both tokens + compute expiry ──────────
       if (user) {
         const u = user as CustomUser;
         token.role = u.role;
         token.id = u.id;
         token.accessToken = u.accessToken;
+        token.refreshToken = u.refreshToken;
+        token.accessTokenExpiry = Date.now() + ACCESS_TOKEN_LIFETIME_MS;
+        token.error = undefined;
+        return token;
       }
-      return token;
+
+      // ── Subsequent requests: check if access token needs refresh ─────
+      const expiry = token.accessTokenExpiry ?? 0;
+      const needsRefresh = Date.now() > expiry - REFRESH_BUFFER_MS;
+
+      if (!needsRefresh) {
+        // Token is still fresh — return as-is
+        return token;
+      }
+
+      // ── Refresh the access token ────────────────────────────────────
+      if (!token.refreshToken) {
+        console.error("[auth] No refresh token available — forcing re-login");
+        return { ...token, error: "RefreshTokenExpired" };
+      }
+
+      return refreshAccessToken(token);
     },
 
     async session({ session, token }) {
@@ -141,6 +221,12 @@ export const authOptions: NextAuthOptions = {
         session.user.id = token.id as string;
       }
       session.accessToken = token.accessToken as string;
+
+      // Propagate refresh failure to the client so it can trigger sign-out
+      if (token.error) {
+        session.error = token.error as string;
+      }
+
       return session;
     },
   },

@@ -123,44 +123,59 @@ export const socketService = new SocketService();
 // ============================================================================
 // Event names & payloads match the NestJS backend exactly.
 // Backend emits to `user_${customerId}` room with flat event names.
+//
+// IMPORTANT: backend event payloads are FLAT — no `metadata` wrapper.
 
-/** Emitted when a rider accepts the ride request */
-export interface DriverFoundEvent {
-  type: "DRIVER_FOUND";
-  metadata: {
-    rideId: string;
-    driver: {
-      id: string;
-      name: string;
-      phone: string;
-      vehicle: {
-        brand: string;
-        model: string;
-        plateNumber: string;
-        color: string;
-        year: number;
-      };
+/**
+ * Emitted when a rider accepts the ride request.
+ * Backend event name: "DRIVER_ACCEPTED" (not "DRIVER_FOUND").
+ */
+export interface DriverAcceptedEvent {
+  type: "DRIVER_ACCEPTED";
+  rideId: string;
+  driver: {
+    id: string;
+    name: string;
+    phone: string;
+    vehicle: {
+      brand: string;
+      model: string;
+      plateNumber: string;
+      color: string;
+      year: number;
     };
   };
+  message?: string;
 }
+
+/** @deprecated Alias kept for transition — prefer DriverAcceptedEvent */
+export type DriverFoundEvent = DriverAcceptedEvent;
 
 /** Real-time driver GPS pings while ride is active */
 export interface DriverLocationUpdateEvent {
   type: "DRIVER_LOCATION_UPDATE";
-  metadata: {
-    lat: number;
-    lng: number;
-    heading: number;
-    rideId: string;
-  };
+  lat: number;
+  lng: number;
+  heading: number;
+  rideId: string;
 }
 
-/** Emitted when driver arrives at pickup point */
+/**
+ * Emitted when driver arrives at pickup point.
+ *
+ * Backend has two emission sites with slightly different shapes:
+ *   jobs.service.ts  → { type, rideId, metadata: { message } }  (rideId top-level)
+ *   rides.service.ts → { type, metadata: { rideId, message } }   (rideId in metadata)
+ *
+ * This interface normalises by accepting rideId at BOTH locations;
+ * handlers should read `data.rideId ?? data.metadata?.rideId`.
+ */
 export interface DriverArrivedEvent {
   type: "DRIVER_ARRIVED";
-  metadata: {
-    rideId: string;
-    message: string;
+  rideId?: string;
+  metadata?: {
+    rideId?: string;
+    message?: string;
   };
 }
 
@@ -168,27 +183,38 @@ export interface DriverArrivedEvent {
 export interface RideStatusEvent {
   type: "TRIP_STARTED" | "TRIP_COMPLETED" | "RIDE_CANCELLED";
   rideId: string;
+  /** Present on RIDE_CANCELLED */
+  cancelledBy?: string;
+  /** Present on RIDE_CANCELLED */
+  reason?: string;
 }
 
-/** Emitted by the backend when ride matching starts after payment confirmation */
+/**
+ * Emitted by the backend when ride matching starts after payment confirmation.
+ * Backend event name: "ride_update" (lowercase).
+ * Backend sends type = "SEARCHING_DRIVER" (not "FINDING_DRIVER").
+ */
 export interface RideUpdateEvent {
-  type: "FINDING_DRIVER" | string;
+  type: "SEARCHING_DRIVER" | string;
   status?: string;
   rideId: string;
   label?: string;
 }
 
-/** Emitted when no drivers are available in the area */
+/**
+ * Emitted when no drivers are available in the area.
+ * Backend payload is FLAT: { type, rideId, reason }
+ */
 export interface NoDriversFoundEvent {
   type: "NO_DRIVERS_FOUND";
-  metadata: {
-    rideId: string;
-    message: string;
-  };
+  rideId: string;
+  reason: string;
 }
 
 export const subscribeToRideEvents = (callbacks: {
-  onDriverFound?: (data: DriverFoundEvent) => void;
+  onDriverAccepted?: (data: DriverAcceptedEvent) => void;
+  /** @deprecated Use onDriverAccepted */
+  onDriverFound?: (data: DriverAcceptedEvent) => void;
   onDriverLocationUpdate?: (data: DriverLocationUpdateEvent) => void;
   onDriverArrived?: (data: DriverArrivedEvent) => void;
   onTripStarted?: (data: RideStatusEvent) => void;
@@ -197,8 +223,10 @@ export const subscribeToRideEvents = (callbacks: {
   onRideUpdate?: (data: RideUpdateEvent) => void;
   onNoDriversFound?: (data: NoDriversFoundEvent) => void;
 }) => {
-  if (callbacks.onDriverFound) {
-    socketService.on("DRIVER_FOUND", callbacks.onDriverFound);
+  // Backend emits "DRIVER_ACCEPTED" (not "DRIVER_FOUND")
+  const driverAcceptedHandler = callbacks.onDriverAccepted ?? callbacks.onDriverFound;
+  if (driverAcceptedHandler) {
+    socketService.on("DRIVER_ACCEPTED", driverAcceptedHandler);
   }
   if (callbacks.onDriverLocationUpdate) {
     socketService.on(
@@ -219,9 +247,8 @@ export const subscribeToRideEvents = (callbacks: {
     socketService.on("RIDE_CANCELLED", callbacks.onRideCancelled);
   }
   if (callbacks.onRideUpdate) {
-    // M1 fix: standardised to SCREAMING_SNAKE_CASE to match all other ride events.
-    // Confirm the backend emits "RIDE_UPDATE" (not "ride_update") before deploying.
-    socketService.on("RIDE_UPDATE", callbacks.onRideUpdate);
+    // Backend emits lowercase "ride_update" (not "RIDE_UPDATE")
+    socketService.on("ride_update", callbacks.onRideUpdate);
   }
   if (callbacks.onNoDriversFound) {
     socketService.on("NO_DRIVERS_FOUND", callbacks.onNoDriversFound);
@@ -229,13 +256,13 @@ export const subscribeToRideEvents = (callbacks: {
 };
 
 export const unsubscribeFromRideEvents = () => {
-  socketService.off("DRIVER_FOUND");
+  socketService.off("DRIVER_ACCEPTED");
   socketService.off("DRIVER_LOCATION_UPDATE");
   socketService.off("DRIVER_ARRIVED");
   socketService.off("TRIP_STARTED");
   socketService.off("TRIP_COMPLETED");
   socketService.off("RIDE_CANCELLED");
-  socketService.off("RIDE_UPDATE"); // M1 fix: matches subscribe casing above
+  socketService.off("ride_update");
   socketService.off("NO_DRIVERS_FOUND");
 };
 

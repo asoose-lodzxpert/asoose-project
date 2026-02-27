@@ -605,7 +605,9 @@ export default function DeliveryPage() {
       setIsReviewModalOpen(false);
     } catch (error: any) {
       console.error("Review submission error:", error);
-      toast.error("Failed to submit review. Please try again.");
+      // rateDelivery throws because the backend doesn't support it yet.
+      // Show an honest info toast instead of a generic error.
+      toast.info(error?.message || "Delivery rating is not yet available.");
     }
   };
 

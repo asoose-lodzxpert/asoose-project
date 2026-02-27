@@ -1,9 +1,4 @@
-import { api } from './api';
-
-// Helper to generate auth headers
-const getAuthHeader = (token?: string) => {
-  return token ? { headers: { Authorization: `Bearer ${token}` } } : {};
-};
+import { ApiService } from './api.service';
 
 // ✅ FIX: Expanded interface to match Backend Prisma Model & UsersService response
 export interface Delivery {
@@ -67,13 +62,12 @@ export class DeliveryService {
     dropoff: { lat: number; lng: number },
     token?: string
   ): Promise<{ fare: number; distance: number; duration: number }> {
-    const response = await api.post('/fare/delivery', {
+    return ApiService.post<{ fare: number; distance: number; duration: number }>('/fare/delivery', {
       pickuplat: String(pickup.lat),
       pickuplong: String(pickup.lng),
       dropofflat: String(dropoff.lat),
       dropofflong: String(dropoff.lng),
-    }, getAuthHeader(token));
-    return response.data;
+    }, token);
   }
 
   /**
@@ -93,8 +87,7 @@ export class DeliveryService {
     perishable?: boolean;
     containsLiquid?: boolean;
   }, token?: string) {
-    const response = await api.post('/trips/deliveries/request', data, getAuthHeader(token));
-    return response.data;
+    return ApiService.post('/trips/deliveries/request', data, token);
   }
 
   /**
@@ -125,8 +118,7 @@ export class DeliveryService {
       lat: data.lat,
       lng: data.lng,
     };
-    const response = await api.post('/users/addresses', payload, getAuthHeader(token));
-    return response.data;
+    return ApiService.post('/users/addresses', payload, token);
   }
 
   /**
@@ -134,15 +126,14 @@ export class DeliveryService {
    * Uses /users/deliveries/:id to ensure full details + relations are returned
    */
   static async getDelivery(id: string, token?: string): Promise<Delivery> {
-    const response = await api.get(`/users/deliveries/${id}`, getAuthHeader(token));
-    return response.data;
+    return ApiService.get<Delivery>(`/users/deliveries/${id}`, token);
   }
 
   static async rateDelivery(deliveryId: string, rating: number, comment?: string, token?: string) {
-    // TODO: Backend does not have a delivery rating endpoint yet.
-    // This is a no-op stub to prevent runtime errors until the backend implements it.
-    console.warn(`rateDelivery called for ${deliveryId} but no backend endpoint exists`);
-    return { success: false, message: 'Rating not yet supported' };
+    // Backend does not have a delivery rating endpoint yet.
+    // Throw so callers know this operation is not available — never silently
+    // return success, which causes misleading toast messages in the UI.
+    throw new Error('Delivery rating is not yet available. This feature is coming soon.');
   }
 
   /**
@@ -161,8 +152,8 @@ export class DeliveryService {
     const paidStatuses = ['REQUESTED', 'ASSIGNED', 'ACCEPTED', 'PICKED_UP', 'IN_TRANSIT', 'DELIVERED'];
     while (attempts < maxAttempts) {
       try {
-        const res = await api.get(`/users/deliveries/${deliveryId}`, getAuthHeader(token));
-        const currentStatus = res.data.status;
+        const res: any = await ApiService.get(`/users/deliveries/${deliveryId}`, token);
+        const currentStatus = res.status ?? res.data?.status;
         if (paidStatuses.includes(currentStatus)) return true;
         if (currentStatus === 'CANCELLED') return false;
       } catch (e) {
@@ -186,11 +177,11 @@ export class DeliveryService {
     token?: string,
   ): Promise<boolean> {
     try {
-      const res = await api.get(
+      const res: any = await ApiService.get(
         `/payment/verify?reference=${encodeURIComponent(reference)}&gateway=${gateway}`,
-        getAuthHeader(token),
+        token,
       );
-      return res.data.status === 'success' || res.data.success === true;
+      return res.status === 'success' || res.success === true;
     } catch (error) {
       console.error("Manual verification failed", error);
       return false;

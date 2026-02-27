@@ -1,4 +1,4 @@
-import { api } from "./api";
+import { ApiService } from "./api.service";
 
 export interface InitiatePaymentPayload {
   amount: number;
@@ -28,25 +28,19 @@ export const paymentService = {
    * @param token Optional auth token to ensure authenticated request
    */
   initiatePayment: async (payload: InitiatePaymentPayload, token?: string) => {
-    const config = token
-      ? { headers: { Authorization: `Bearer ${token}` } }
-      : {};
-
-    const { data } = await api.post<PaymentInitResponse>(
+    return ApiService.post<PaymentInitResponse>(
       "/payment/initialize",
       payload,
-      config,
+      token,
     );
-    return data;
   },
 
   /**
    * Verify a transaction
    */
   verifyPayment: async (reference: string, gateway: string) => {
-    const { data } = await api.get(
+    return ApiService.get(
       `/payment/verify?reference=${reference}&gateway=${gateway}`,
     );
-    return data;
   },
 };

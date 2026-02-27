@@ -9,6 +9,7 @@ import {
   unsubscribeFromRideEvents,
   socketService,
   type NoDriversFoundEvent,
+  type DriverAcceptedEvent,
 } from "@/services/socket.service";
 import { RideService } from "@/services/ride.service";
 import { devLog } from "@/lib/logger"; // M4: PII-safe dev-only logger
@@ -42,11 +43,12 @@ export function RideSocketListener() {
     subscribeToRideEvents({
       // 0. Ride Matching Started — emitted by backend when CARD payment is confirmed
       //    and the ride transitions from PENDING → REQUESTED.
+      //    Backend event: "ride_update" with type: "SEARCHING_DRIVER".
       onRideUpdate: (data) => {
         try {
           if (data.rideId !== rideId) return;
 
-          if (data.type === "FINDING_DRIVER") {
+          if (data.type === "SEARCHING_DRIVER") {
             devLog(
               "💳 Card payment confirmed — driver matching started for ride:",
               rideId,
@@ -59,14 +61,14 @@ export function RideSocketListener() {
         }
       },
 
-      // 1. Driver Found — backend emits DRIVER_FOUND with real vehicle data
-      onDriverFound: (data) => {
+      // 1. Driver Accepted — backend emits DRIVER_ACCEPTED with flat payload
+      onDriverAccepted: (data: DriverAcceptedEvent) => {
         try {
           // Guard: ignore events for a different ride
-          if (data.metadata.rideId !== rideId) return;
+          if (data.rideId !== rideId) return;
 
-          const { driver } = data.metadata;
-          devLog("✅ Driver Found:", driver.name);
+          const { driver } = data;
+          devLog("✅ Driver Accepted:", driver.name);
 
           setDriver({
             name: driver.name,
@@ -85,23 +87,23 @@ export function RideSocketListener() {
           setRideStatus("awaiting-payment");
           toast.success(`Driver found! Select how you'd like to pay.`);
         } catch (error) {
-          console.error("Socket error (onDriverFound):", error);
+          console.error("Socket error (onDriverAccepted):", error);
           toast.error("Error processing driver assignment.");
         }
       },
 
-      // 2. Real-time Driver Location Updates (emitted by rider app via socket relay)
+      // 2. Real-time Driver Location Updates — flat payload (no metadata wrapper)
       onDriverLocationUpdate: (data) => {
         try {
-          if (data.metadata.rideId !== rideId) return;
+          if (data.rideId !== rideId) return;
 
           receivedSocketLocation.current = true; // socket is delivering — skip REST poll
           setDriverLocation({
-            lat: data.metadata.lat,
-            lng: data.metadata.lng,
+            lat: data.lat,
+            lng: data.lng,
           });
-          if (data.metadata.heading) {
-            setDriverHeading(data.metadata.heading);
+          if (data.heading) {
+            setDriverHeading(data.heading);
           }
         } catch (error) {
           console.error("Socket error (onDriverLocationUpdate):", error);
@@ -109,9 +111,12 @@ export function RideSocketListener() {
       },
 
       // 3. Driver Arrived at Pickup
+      //    Backend has two emission sites with different shapes, so we
+      //    normalise by checking both locations for the rideId.
       onDriverArrived: (data) => {
         try {
-          if (data.metadata.rideId !== rideId) return;
+          const eventRideId = data.rideId ?? data.metadata?.rideId;
+          if (eventRideId !== rideId) return;
 
           setRideStatus("arrived");
           toast.info("Driver has arrived at pickup point!");
@@ -164,17 +169,18 @@ export function RideSocketListener() {
       },
 
       // 7. No Drivers Found — backend exhausted all matching attempts and auto-cancelled
+      //    Backend payload is FLAT: { type, rideId, reason }
       onNoDriversFound: (data: NoDriversFoundEvent) => {
         try {
           // Guard: only process if it belongs to the current ride
-          if (data.metadata?.rideId && data.metadata.rideId !== rideId) return;
+          if (data.rideId && data.rideId !== rideId) return;
 
           devLog("[RideSocketListener] NO_DRIVERS_FOUND for ride:", rideId);
           // Reset to idle so the user can book again
           setRideStatus("idle");
           setRideId(null);
           toast.error(
-            data.metadata?.message ||
+            data.reason ||
               "No drivers available in your area. Please try again.",
             { autoClose: 6000 },
           );

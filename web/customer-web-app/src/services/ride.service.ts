@@ -58,20 +58,27 @@ export interface CreateRideResponse {
   message?: string;
 }
 
-/** Response shape from the /fare/ride backend endpoint */
-interface FareRideResponse {
-  price: number;
-  distance: { meters: number; text: string };
-  eta: { seconds: number; text: string };
+/**
+ * Response from POST /trips/rides/:id/confirm.
+ *
+ * Normal case: backend returns { rideId, authorizationUrl, reference }.
+ * Idempotent (already paid): backend returns { status: 'ALREADY_PAID', rideId, authorizationUrl, reference }.
+ */
+export interface ConfirmRideResponse {
+  rideId: string;
+  authorizationUrl: string;
+  reference: string;
+  /** Present only when the ride was already paid – value is 'ALREADY_PAID' */
+  status?: string;
 }
-
-/** Business-class fare multiplier applied on top of the base (economy) price */
-const BUSINESS_MULTIPLIER = 1.5;
 
 export class RideService {
   /**
-   * Fetch fare estimates from /fare/ride and map into ECONOMY / BUSINESS
-   * PriceEstimate records consumed by the booking UI.
+   * Fetch fare estimates from POST /trips/rides/estimate.
+   *
+   * The backend returns a Record<VehicleType, PriceEstimate> directly
+   * (e.g. { ECONOMY: {...}, BUSINESS: {...} }), with multipliers already
+   * applied server-side. The frontend must NOT apply its own multiplier.
    *
    * @param data - Coordinates + optional vehicleType ('ECONOMY' | 'BUSINESS')
    * @param token - Auth token
@@ -88,46 +95,25 @@ export class RideService {
     token: string,
     signal?: AbortSignal,
   ): Promise<Record<string, PriceEstimate>> {
-    // Transform to camelCase coordinates as numbers (API Integrity fix)
-    const farePayload: Record<string, number | string> = {
-      pickupLat: data.pickupLat!,
-      pickupLng: data.pickupLng!,
-      dropoffLat: data.dropoffLat!,
-      dropoffLng: data.dropoffLng!,
+    const estimatePayload: Record<string, number | string | undefined> = {
+      pickupLat: data.pickupLat,
+      pickupLng: data.pickupLng,
+      dropoffLat: data.dropoffLat,
+      dropoffLng: data.dropoffLng,
     };
 
-    // Pass vehicleType when specified so backend can apply type-specific pricing
+    // Pass vehicleType when specified so backend can scope the response
     if (data.vehicleType) {
-      farePayload.vehicleType = data.vehicleType;
+      estimatePayload.vehicleType = data.vehicleType;
     }
 
-    const fare = await ApiService.post<FareRideResponse>(
-      "/fare/ride",
-      farePayload,
+    // POST /trips/rides/estimate → returns { ECONOMY: PriceEstimate, BUSINESS: PriceEstimate }
+    return ApiService.post<Record<string, PriceEstimate>>(
+      "/trips/rides/estimate",
+      estimatePayload,
       token,
       { signal },
     );
-
-    const distanceKm = fare.distance.meters / 1000;
-    const durationMin = Math.round(fare.eta.seconds / 60);
-
-    const economy: PriceEstimate = {
-      estimatedFare: fare.price,
-      distance: distanceKm,
-      duration: durationMin,
-      total: fare.price,
-      breakdown: { baseFare: 0, distanceFare: 0, timeFare: 0, platformFee: 0 },
-    };
-
-    const business: PriceEstimate = {
-      estimatedFare: Math.round(fare.price * BUSINESS_MULTIPLIER),
-      distance: distanceKm,
-      duration: durationMin,
-      total: Math.round(fare.price * BUSINESS_MULTIPLIER),
-      breakdown: { baseFare: 0, distanceFare: 0, timeFare: 0, platformFee: 0 },
-    };
-
-    return { ECONOMY: economy, BUSINESS: business };
   }
 
   static async createRide(
@@ -148,12 +134,21 @@ export class RideService {
     );
   }
 
+  /**
+   * Confirm ride payment — initiates a Paystack checkout session.
+   *
+   * Backend response:
+   *   Normal: { rideId, authorizationUrl, reference }
+   *   Idempotent (already paid): { status: 'ALREADY_PAID', rideId, authorizationUrl, reference }
+   *
+   * Only valid when ride.status === DRIVER_ACCEPTED.
+   */
   static async confirmRide(
     rideId: string,
-    paymentMethod: "CARD",
+    paymentMethod: string,
     token: string,
-  ): Promise<{ status: string; rideId: string }> {
-    return ApiService.post<{ status: string; rideId: string }>(
+  ): Promise<ConfirmRideResponse> {
+    return ApiService.post<ConfirmRideResponse>(
       `/trips/rides/${rideId}/confirm`,
       { paymentMethod },
       token,
