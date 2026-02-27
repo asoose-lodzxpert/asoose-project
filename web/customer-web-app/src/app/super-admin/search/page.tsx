@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import useSWR from "swr";
 import {
@@ -59,7 +60,7 @@ interface PaginatedResponse<T> {
   limit: number;
 }
 
-export default function GlobalSearchPage() {
+function GlobalSearchPage() {
   const searchParams = useSearchParams();
   const q = searchParams.get("q") || "";
   const router = useRouter();
@@ -380,5 +381,13 @@ export default function GlobalSearchPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function Page() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <GlobalSearchPage />
+    </Suspense>
   );
 }

@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef, useMemo } from "react";
+import {
+  useEffect,
+  useState,
+  useCallback,
+  useRef,
+  useMemo,
+  Suspense,
+} from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useSearchParams, useRouter } from "next/navigation";
@@ -180,7 +187,7 @@ function useStoreData(query: string | null) {
 }
 
 // --- MAIN PAGE COMPONENT ---
-export default function StorePage() {
+function StorePage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const query = searchParams.get("q")?.trim() || null;
@@ -457,5 +464,14 @@ export default function StorePage() {
 
       <FloatingCart />
     </div>
+  );
+}
+
+// --- SUSPENSE WRAPPER ---
+export default function Page() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <StorePage />
+    </Suspense>
   );
 }

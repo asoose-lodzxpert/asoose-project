@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
+import { Suspense } from "react";
 import {
   Search,
   MapPin,
@@ -25,7 +26,7 @@ const sanitizeInput = (input: string): string => {
   return input.replace(/[<>]/g, "").trim().slice(0, 100);
 };
 
-export const HomeHeader = () => {
+function HomeHeaderInner() {
   const { data: session } = useSession();
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
@@ -90,13 +91,13 @@ export const HomeHeader = () => {
     const fetchAddressAndNotifications = async () => {
       try {
         const [addressResult, notifResult] = await Promise.allSettled([
-          ApiService.get<any[]>('/users/addresses', accessToken),
-          ApiService.get<any>('/notifications', accessToken),
+          ApiService.get<any[]>("/users/addresses", accessToken),
+          ApiService.get<any>("/notifications", accessToken),
         ]);
 
         if (cancelled) return;
 
-        if (addressResult.status === 'fulfilled') {
+        if (addressResult.status === "fulfilled") {
           const addresses = addressResult.value;
           if (addresses && addresses.length > 0) {
             const active =
@@ -110,7 +111,7 @@ export const HomeHeader = () => {
           }
         }
 
-        if (notifResult.status === 'fulfilled') {
+        if (notifResult.status === "fulfilled") {
           const response = notifResult.value;
           const notificationsList = Array.isArray(response)
             ? response
@@ -125,7 +126,9 @@ export const HomeHeader = () => {
 
     fetchAddressAndNotifications();
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [accessToken]);
 
   const toggleTheme = () => {
@@ -339,4 +342,14 @@ export const HomeHeader = () => {
       )}
     </header>
   );
-};
+}
+
+export function HomeHeader() {
+  return (
+    <Suspense fallback={null}>
+      <HomeHeaderInner />
+    </Suspense>
+  );
+}
+
+export default HomeHeader;
