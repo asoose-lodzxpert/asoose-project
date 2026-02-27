@@ -12,7 +12,7 @@ export async function fetchWithAuth(url: string, options: RequestInit = {}) {
     ...(options.headers || {}),
     Authorization: `Bearer ${accessToken}`,
     "Content-Type": "application/json",
-    "ngrok-skip-browser-warning": "true",
+
   };
 
   const res = await fetch(url, { ...options, headers });
@@ -32,7 +32,7 @@ export async function fetchWithAuth(url: string, options: RequestInit = {}) {
         ...(options.headers || {}),
         Authorization: `Bearer ${newAccessToken}`,
         "Content-Type": "application/json",
-        "ngrok-skip-browser-warning": "true",
+
       };
 
       const retryRes = await fetch(url, { ...options, headers: retryHeaders });
@@ -74,7 +74,7 @@ export async function fetchWithAuthMultipart(url: string, formData: FormData) {
 
   const headers: Record<string, string> = {
     Authorization: `Bearer ${accessToken}`,
-    "ngrok-skip-browser-warning": "true",
+
     // Don't set Content-Type - let browser set it with boundary for multipart/form-data
   };
 
@@ -97,7 +97,7 @@ export async function fetchWithAuthMultipart(url: string, formData: FormData) {
 
       const retryHeaders: Record<string, string> = {
         Authorization: `Bearer ${newAccessToken}`,
-        "ngrok-skip-browser-warning": "true",
+
       };
 
       const retryRes = await fetch(url, {
