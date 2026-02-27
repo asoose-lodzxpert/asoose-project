@@ -16,8 +16,6 @@ async function authFetch(path: string, init?: RequestInit) {
     headers: {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
-      ...(process.env.NODE_ENV === "development"
-        {}),
       ...init?.headers,
     },
   });
