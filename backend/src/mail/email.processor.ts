@@ -2,7 +2,7 @@ import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Job } from 'bullmq';
 import { MailerService } from '@nestjs-modules/mailer';
 
-@Processor('email', { concurrency: 5 })
+@Processor('email')
 export class EmailProcessor extends WorkerHost {
   constructor(private readonly mailer: MailerService) {
     super();
