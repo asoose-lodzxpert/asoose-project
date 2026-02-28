@@ -30,6 +30,7 @@ import {
 import { signOut } from "next-auth/react";
 import useSWR from "swr";
 import { fetcher } from "./hooks/useSuperAdminFetch";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
 
 type AdminRole =
   | "ADMIN"
@@ -54,6 +55,9 @@ export default function AdminLayoutClient({
   const [isUsersOpen, setIsUsersOpen] = useState(true);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  // Register FCM push token so admins receive browser push notifications
+  usePushNotifications();
 
   const role = userRole as AdminRole;
 

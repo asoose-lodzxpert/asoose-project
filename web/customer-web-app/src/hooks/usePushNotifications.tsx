@@ -4,20 +4,16 @@ import { useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { getFirebaseMessaging, getToken, onMessage } from "@/lib/firebase";
 import { toast } from "react-toastify";
-import { 
-  playNotificationSound, 
+import {
+  playNotificationSound,
   preloadNotificationSound,
-  unlockNotificationSound 
+  unlockNotificationSound,
 } from "@/lib/notification-sound";
 
 const VAPID_KEY = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY!;
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1";
 
-/**
- * Builds the service-worker URL with Firebase config embedded as query params
- * so the SW can initialize Firebase without needing a build step.
- */
 function buildSwUrl(): string {
   const params = new URLSearchParams({
     apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY ?? "",
@@ -31,148 +27,153 @@ function buildSwUrl(): string {
   return `/firebase-messaging-sw.js?${params.toString()}`;
 }
 
-/**
- * Registers the FCM token with the backend.
- */
-async function registerToken(
-  token: string,
-  accessToken: string,
-): Promise<void> {
-  await fetch(`${API_URL}/auth/user/push-token`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${accessToken}`,
-    },
-    body: JSON.stringify({ token, platform: "web" }),
-  });
-}
-
-/**
- * Removes the FCM token from the backend (on sign-out / session end).
- */
-async function unregisterToken(accessToken: string): Promise<void> {
-  await fetch(`${API_URL}/auth/user/push-token`, {
-    method: "DELETE",
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
+async function registerToken(token: string, accessToken: string) {
+  try {
+    await fetch(`${API_URL}/auth/user/push-token`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({ token, platform: "web" }),
+    });
+  } catch (err) {
+    console.warn("[Push] Failed to register token with backend:", err);
+  }
 }
 
 /**
  * usePushNotifications
  *
- * - Requests notification permission when the user is authenticated.
- * - Registers the FCM token with the backend.
- * - Listens for foreground messages and shows them as toasts.
- * - Cleans up on sign-out.
+ * Runs on every full page reload:
+ *  1. Requests notification permission (browser only prompts when state is "default";
+ *     silently proceeds if already "granted").
+ *  2. Re-registers the FCM token with the backend every reload so the server
+ *     always has a fresh token.
+ *  3. Listens for foreground messages.
  */
 export function usePushNotifications() {
   const { data: session, status } = useSession();
   const unsubscribeRef = useRef<(() => void) | null>(null);
-  const registeredTokenRef = useRef<string | null>(null);
+  // Tracks within-session to avoid double-setup on React strict-mode double-invoke
+  const setupDoneRef = useRef(false);
 
-  // Listen for service worker messages (e.g., play sound for background notifications)
+  // Forward service-worker "play sound" messages to the audio API
   useEffect(() => {
-    if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;
+    if (typeof window === "undefined" || !("serviceWorker" in navigator))
+      return;
 
     const handleMessage = (event: MessageEvent) => {
-      if (event.data?.type === 'PLAY_NOTIFICATION_SOUND') {
-        playNotificationSound().catch((err) => {
-          console.debug('[Push] Background sound playback skipped:', err);
-        });
+      if (event.data?.type === "PLAY_NOTIFICATION_SOUND") {
+        playNotificationSound().catch(() => {});
       }
     };
 
-    navigator.serviceWorker.addEventListener('message', handleMessage);
-
-    return () => {
-      navigator.serviceWorker.removeEventListener('message', handleMessage);
-    };
+    navigator.serviceWorker.addEventListener("message", handleMessage);
+    return () =>
+      navigator.serviceWorker.removeEventListener("message", handleMessage);
   }, []);
 
-  // Use the primitive accessToken string, NOT the session object reference,
-  // to avoid re-running push setup on every session refetch.
   const accessToken = (session as any)?.accessToken as string | undefined;
 
   useEffect(() => {
+    // Wait for authentication
     if (status !== "authenticated" || !accessToken) return;
+    // Browser must support notifications
     if (typeof window === "undefined" || !("Notification" in window)) return;
+    // Firebase must be configured
     if (!process.env.NEXT_PUBLIC_FIREBASE_API_KEY) {
-      console.warn(
-        "[Push] Firebase env vars not configured — skipping push setup.",
-      );
+      console.warn("[Push] Firebase env vars not set — skipping.");
       return;
     }
+    // Don't double-run within the same page session
+    if (setupDoneRef.current) return;
+    setupDoneRef.current = true;
 
     let cancelled = false;
 
     const setup = async () => {
       try {
-        // Preload notification sound
         preloadNotificationSound();
-        
-        // Unlock audio on first user interaction (required by browser autoplay policies)
-        const unlockOnInteraction = () => {
+
+        // Unlock audio on first interaction (browser autoplay policy)
+        const unlock = () => {
           unlockNotificationSound();
-          // Remove listeners after first interaction
-          window.removeEventListener('click', unlockOnInteraction);
-          window.removeEventListener('touchstart', unlockOnInteraction);
+          window.removeEventListener("click", unlock);
+          window.removeEventListener("touchstart", unlock);
         };
-        window.addEventListener('click', unlockOnInteraction, { once: true });
-        window.addEventListener('touchstart', unlockOnInteraction, { once: true });
+        window.addEventListener("click", unlock, { once: true });
+        window.addEventListener("touchstart", unlock, { once: true });
 
-        // 1. Request permission
+        // 1. Request permission — shows dialog on first visit; silent thereafter
         const permission = await Notification.requestPermission();
-        if (permission !== "granted") return;
+        console.log("[Push] Notification permission:", permission);
 
-        // 2. Register service worker with config embedded in SW URL
-        const swReg = await navigator.serviceWorker.register(buildSwUrl(), {
-          scope: "/",
-        });
+        if (permission !== "granted") {
+          console.warn("[Push] Permission not granted:", permission);
+          return;
+        }
 
         if (cancelled) return;
 
-        // 3. Get FCM token
+        // 2. Register service worker
+        const swReg = await navigator.serviceWorker.register(buildSwUrl(), {
+          scope: "/",
+        });
+        await navigator.serviceWorker.ready; // wait for SW to be active
+        console.log("[Push] Service worker registered");
+
+        if (cancelled) return;
+
+        // 3. Get FCM token — always on every full page reload
         const messaging = getFirebaseMessaging();
-        if (!messaging) return;
+        if (!messaging) {
+          console.warn("[Push] Firebase messaging not available");
+          return;
+        }
 
         const fcmToken = await getToken(messaging, {
           vapidKey: VAPID_KEY,
           serviceWorkerRegistration: swReg,
         });
 
-        if (!fcmToken || cancelled) return;
-
-        // 4. Register with backend (only if token changed)
-        if (fcmToken !== registeredTokenRef.current) {
-          await registerToken(fcmToken, accessToken);
-          registeredTokenRef.current = fcmToken;
+        if (!fcmToken) {
+          console.warn("[Push] No FCM token returned");
+          return;
         }
 
-        // 5. Handle foreground messages as toasts
+        console.log("[Push] FCM token obtained, registering with backend...");
+
+        if (cancelled) return;
+
+        // 4. Always send token to backend on every reload (tokens can rotate)
+        await registerToken(fcmToken, accessToken);
+        console.log("[Push] Token registered with backend ✓");
+
+        // 5. Foreground message handler
+        if (unsubscribeRef.current) unsubscribeRef.current();
         unsubscribeRef.current = onMessage(messaging, (payload) => {
           const { title, body } = payload.notification ?? {};
-          const isDark = document.documentElement.classList.contains("dark");
 
-          // Play notification sound
-          playNotificationSound().catch((err) => {
-            console.debug('[Push] Sound playback skipped:', err);
-          });
+          playNotificationSound().catch(() => {});
 
           toast.info(
             <div className="flex flex-col gap-1">
-              <span className="font-bold text-sm">{title}</span>
+              <span className="font-bold text-sm">
+                {title || "Notification"}
+              </span>
               {body && <span className="text-xs opacity-90">{body}</span>}
             </div>,
             {
               icon: <span>🔔</span>,
               position: "bottom-right",
-              theme: isDark ? "dark" : "light",
             },
           );
         });
       } catch (err) {
         console.error("[Push] Setup error:", err);
+        // Allow retry on next reload
+        setupDoneRef.current = false;
       }
     };
 
@@ -184,12 +185,4 @@ export function usePushNotifications() {
       unsubscribeRef.current = null;
     };
   }, [status, accessToken]);
-
-  // Clean up token on sign-out
-  useEffect(() => {
-    if (status === "unauthenticated" && registeredTokenRef.current) {
-      // Best-effort — no access token available after sign-out
-      registeredTokenRef.current = null;
-    }
-  }, [status]);
 }

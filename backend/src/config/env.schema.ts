@@ -125,9 +125,6 @@ export const envSchema = z.object({
   // Push Notifications (Firebase Cloud Messaging)
   // ----------------
   FCM_SERVER_KEY: z.string().optional(),
-  FCM_PROJECT_ID: z.string().optional(),
-  FCM_CLIENT_EMAIL: z.string().optional(),
-  FCM_PRIVATE_KEY: z.string().optional(),
 
   // Expo Push Notifications
   EXPO_ACCESS_TOKEN: z.string().optional(),
