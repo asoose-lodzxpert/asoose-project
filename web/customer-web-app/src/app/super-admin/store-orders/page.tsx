@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import useSWR from "swr";
+import { getSession } from "next-auth/react";
 import {
   Store,
   RefreshCw,
@@ -23,11 +24,15 @@ import Swal from "sweetalert2";
 
 const API = process.env.NEXT_PUBLIC_API_URL;
 
-const fetcher = (url: string) =>
-  fetch(url, { credentials: "include" }).then((r) => {
-    if (!r.ok) throw new Error("Fetch failed");
-    return r.json();
+const fetcher = async (url: string) => {
+  const session = await getSession();
+  const token = (session as any)?.accessToken ?? "";
+  const r = await fetch(url, {
+    headers: { Authorization: `Bearer ${token}` },
   });
+  if (!r.ok) throw new Error("Fetch failed");
+  return r.json();
+};
 
 /* ─── Types ─────────────────────────────────────────────────────────────── */
 type OrderStatus =
@@ -175,10 +180,14 @@ function OrderCard({
   const apiAction = useCallback(
     async (action: string, reason?: string) => {
       const url = `${API}/super-admin/orders/store/${order.id}/${action}`;
+      const session = await getSession();
+      const token = (session as any)?.accessToken ?? "";
       const res = await fetch(url, {
         method: "PATCH",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify(reason ? { reason } : {}),
       });
       if (!res.ok) {

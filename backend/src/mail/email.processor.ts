@@ -75,7 +75,7 @@ export class EmailProcessor extends WorkerHost {
   private async sendWelcome(job: Job<{ email: string }>) {
     await this.mailer.sendMail({
       to: job.data.email,
-      subject: 'Welcome to Asoose! 🎉',
+      subject: 'Welcome to Asoose!',
       template: './welcome',
       context: { email: job.data.email },
     });
@@ -310,7 +310,7 @@ export class EmailProcessor extends WorkerHost {
   ) {
     await this.mailer.sendMail({
       to: job.data.email,
-      subject: '🔑 Password Reset OTP - Asoose',
+      subject: 'Password Reset OTP - Asoose',
       template: './password-reset-otp',
       context: {
         name: job.data.name,
@@ -325,7 +325,7 @@ export class EmailProcessor extends WorkerHost {
   ) {
     await this.mailer.sendMail({
       to: job.data.email,
-      subject: '✉️ Verify Your Email - Asoose',
+      subject: 'Verify Your Email - Asoose',
       template: './vendor-email-verification',
       context: {
         name: job.data.name,
@@ -351,7 +351,7 @@ export class EmailProcessor extends WorkerHost {
   ) {
     await this.mailer.sendMail({
       to: job.data.email,
-      subject: '🔐 New Login to Your Vendor Account',
+      subject: 'New Login to Your Vendor Account',
       template: 'vendor-login',
       context: {
         vendorName: job.data.vendorName,
@@ -378,7 +378,7 @@ export class EmailProcessor extends WorkerHost {
   ) {
     await this.mailer.sendMail({
       to: job.data.email,
-      subject: '🎉 Welcome to Asoose - Your Vendor Account is Ready!',
+      subject: 'Welcome to Asoose - Your Vendor Account is Ready!',
       template: 'vendor-account-created',
       context: {
         vendorName: job.data.vendorName,
@@ -403,7 +403,7 @@ export class EmailProcessor extends WorkerHost {
   ) {
     await this.mailer.sendMail({
       to: job.data.email,
-      subject: '🔒 Your Password Has Been Changed',
+      subject: 'Your Password Has Been Changed',
       template: 'vendor-password-changed',
       context: {
         vendorName: job.data.vendorName,
@@ -426,7 +426,7 @@ export class EmailProcessor extends WorkerHost {
   ) {
     await this.mailer.sendMail({
       to: job.data.email,
-      subject: '🔑 Password Reset Request',
+      subject: 'Password Reset Request',
       template: './vendor-password-reset',
       context: {
         vendorName: job.data.vendorName,
@@ -450,7 +450,7 @@ export class EmailProcessor extends WorkerHost {
   ) {
     await this.mailer.sendMail({
       to: job.data.email,
-      subject: '🏦 Bank Account Added to Your Profile',
+      subject: 'Bank Account Added to Your Profile',
       template: 'vendor-bank-added',
       context: {
         vendorName: job.data.vendorName,
@@ -477,7 +477,7 @@ export class EmailProcessor extends WorkerHost {
   ) {
     await this.mailer.sendMail({
       to: job.data.email,
-      subject: '💸 Withdrawal Request Received',
+      subject: 'Withdrawal Request Received',
       template: 'vendor-withdrawal',
       context: {
         vendorName: job.data.vendorName,
@@ -501,7 +501,7 @@ export class EmailProcessor extends WorkerHost {
   ) {
     await this.mailer.sendMail({
       to: job.data.email,
-      subject: '⚠️ Account Deletion Request Received',
+      subject: 'Account Deletion Request Received',
       template: 'vendor-deletion-request',
       context: {
         vendorName: job.data.vendorName,
@@ -518,7 +518,7 @@ export class EmailProcessor extends WorkerHost {
   ) {
     await this.mailer.sendMail({
       to: job.data.email,
-      subject: '🏍️ Welcome to Asoose Riders!',
+      subject: 'Welcome to Asoose Riders!',
       template: 'rider-welcome',
       context: {
         name: job.data.name,
@@ -532,7 +532,7 @@ export class EmailProcessor extends WorkerHost {
   ) {
     await this.mailer.sendMail({
       to: job.data.email,
-      subject: '🔑 Rider Password Reset Request',
+      subject: 'Rider Password Reset Request',
       template: 'rider-password-reset',
       context: {
         name: job.data.name,
@@ -554,7 +554,7 @@ export class EmailProcessor extends WorkerHost {
   ) {
     await this.mailer.sendMail({
       to: job.data.email,
-      subject: '🔒 Your Rider Password Has Been Changed',
+      subject: 'Your Rider Password Has Been Changed',
       template: 'rider-password-changed',
       context: {
         name: job.data.name,
@@ -578,7 +578,7 @@ export class EmailProcessor extends WorkerHost {
   ) {
     await this.mailer.sendMail({
       to: job.data.email,
-      subject: '🎉 Your Rider Account is Approved!',
+      subject: 'Your Rider Account is Approved!',
       template: 'rider-account-approved',
       context: {
         name: job.data.name,
