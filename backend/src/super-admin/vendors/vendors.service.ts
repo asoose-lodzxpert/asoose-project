@@ -364,7 +364,12 @@ export class StoresService {
   /**
    * Updates vendor details and records an audit log.
    */
-  async update(id: string, dto: any, adminId: string) {
+  async update(
+    id: string,
+    dto: any,
+    adminId: string,
+    files?: { logo?: Express.Multer.File; banner?: Express.Multer.File },
+  ) {
     const store = await this.prisma.store.findUnique({ where: { id } });
     if (!store) throw new NotFoundException('Store not found');
 
@@ -384,6 +389,25 @@ export class StoresService {
       }
     }
 
+    // Upload logo / banner if provided
+    let logoUrl: string | undefined;
+    let bannerUrl: string | undefined;
+    let vendorImageUrl: string | undefined;
+
+    if (files?.logo) {
+      const upload = await this.storageService.uploadFile(files.logo);
+      logoUrl = upload.url;
+    }
+    if (files?.banner) {
+      const upload = await this.storageService.uploadFile(files.banner);
+      bannerUrl = upload.url;
+    }
+
+    // vendorImage: update the vendor (owner) profile image if passed as a URL string
+    if (dto.vendorImage) {
+      vendorImageUrl = dto.vendorImage;
+    }
+
     const updatedStore = await this.prisma.store.update({
       where: { id },
       data: {
@@ -397,13 +421,16 @@ export class StoresService {
           dto.commissionRate !== undefined
             ? Number(dto.commissionRate)
             : undefined,
+        logo: logoUrl,
+        banner: bannerUrl,
         vendor:
-          dto.ownerName || dto.phone || dto.email
+          dto.ownerName || dto.phone || dto.email || vendorImageUrl
             ? {
                 update: {
                   name: dto.ownerName || undefined,
                   phone: dto.phone || undefined,
                   email: dto.email || undefined,
+                  image: vendorImageUrl,
                 },
               }
             : undefined,
@@ -431,6 +458,8 @@ export class StoresService {
       phone: updatedStore.vendor?.phone,
       email: updatedStore.vendor?.email,
       status: updatedStore.status,
+      logo: updatedStore.logo,
+      banner: updatedStore.banner,
     };
   }
 
@@ -541,6 +570,8 @@ export class StoresService {
       verification: store.verification,
       rating: store.rating,
       image: store.logo || store.vendor?.image || null,
+      logo: store.logo,
+      banner: store.banner,
       createdAt: store.createdAt,
       updatedAt: store.updatedAt,
       totalRevenue,
@@ -548,6 +579,7 @@ export class StoresService {
       unpaidBalance: Math.max(0, totalRevenue - paidOut),
       totalOrders: store.orders.length,
       reviewsCount: store.reviews.length,
+      isAdminManaged: store.isAdminManaged ?? false,
 
       orders: store.orders.map((order: any) => ({
         id: order.id,
@@ -572,6 +604,7 @@ export class StoresService {
   /**
    * Admin creates a product for any vendor's store, bypassing ownership checks.
    * Accepts an optional uploaded image file; falls back to images[] in dto.
+   * Optionally creates modifier groups (with modifiers) attached to the product.
    */
   async adminCreateProduct(
     storeId: string,
@@ -581,6 +614,12 @@ export class StoresService {
       price: number;
       stock?: number;
       categoryId: string;
+      modifierGroups?: Array<{
+        name: string;
+        minSelect?: number;
+        maxSelect?: number;
+        modifiers: Array<{ name: string; price: number }>;
+      }>;
     },
     adminId: string,
     file?: Express.Multer.File,
@@ -626,6 +665,29 @@ export class StoresService {
       },
       include: { category: { select: { name: true } } },
     });
+
+    // Create modifier groups if provided
+    if (dto.modifierGroups && dto.modifierGroups.length > 0) {
+      for (const group of dto.modifierGroups) {
+        if (!group.name?.trim()) continue;
+        await this.prisma.modifierGroup.create({
+          data: {
+            productId: product.id,
+            name: group.name.trim(),
+            minSelect: group.minSelect ?? 0,
+            maxSelect: group.maxSelect ?? 1,
+            modifiers: {
+              create: (group.modifiers ?? [])
+                .filter((m) => m.name?.trim())
+                .map((m) => ({
+                  name: m.name.trim(),
+                  price: Number(m.price) || 0,
+                })),
+            },
+          },
+        });
+      }
+    }
 
     await this.logService.record({
       userId: adminId,
@@ -836,5 +898,34 @@ export class StoresService {
       })),
       meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
     };
+  }
+
+  async setAdminManaged(
+    storeId: string,
+    isAdminManaged: boolean,
+    adminId: string,
+  ) {
+    const store = await this.prisma.store.findUnique({
+      where: { id: storeId },
+    });
+    if (!store) throw new NotFoundException('Store not found');
+
+    const updated = await this.prisma.store.update({
+      where: { id: storeId },
+      data: { isAdminManaged },
+      select: { id: true, name: true, isAdminManaged: true },
+    });
+
+    await this.logService.record({
+      userId: adminId,
+      action: isAdminManaged
+        ? 'STORE_ADMIN_MANAGED_ON'
+        : 'STORE_ADMIN_MANAGED_OFF',
+      target: store.name,
+      details: `Admin ${isAdminManaged ? 'enabled' : 'disabled'} admin-managed mode for store ${store.name}`,
+      metadata: { storeId, isAdminManaged },
+    });
+
+    return updated;
   }
 }

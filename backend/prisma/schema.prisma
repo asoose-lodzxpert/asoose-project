@@ -545,9 +545,10 @@ model Store {
   updatedAt    DateTime           @updatedAt
   walletBalance Float @default(0)
   // Operational Settings
-  prepTime       Int     @default(20)
-  isOpen         Boolean @default(true)
-  commissionRate Float   @default(10.0)
+  prepTime         Int     @default(20)
+  isOpen           Boolean @default(true)
+  commissionRate   Float   @default(10.0)
+  isAdminManaged   Boolean @default(false) // Admin handles orders on behalf of vendor
 
   // Analytics
   totalRevenue  Float @default(0)

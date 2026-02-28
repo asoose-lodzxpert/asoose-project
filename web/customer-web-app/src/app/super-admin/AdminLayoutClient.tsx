@@ -25,6 +25,7 @@ import {
   Activity,
   MapPin,
   Megaphone,
+  Store,
 } from "lucide-react";
 import { signOut } from "next-auth/react";
 import useSWR from "swr";
@@ -91,6 +92,12 @@ export default function AdminLayoutClient({
       name: "Orders",
       icon: ShoppingCart,
       href: "/super-admin/orders",
+      allowed: ["ADMIN", "SUPER_ADMIN", "ADMIN_MANAGER", "ADMIN_SUPPORT"],
+    },
+    {
+      name: "Store Orders",
+      icon: Store,
+      href: "/super-admin/store-orders",
       allowed: ["ADMIN", "SUPER_ADMIN", "ADMIN_MANAGER", "ADMIN_SUPPORT"],
     },
     {

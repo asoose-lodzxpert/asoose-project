@@ -13,8 +13,12 @@ import {
   Req,
   UseInterceptors,
   UploadedFile,
+  UploadedFiles,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
+import {
+  FileInterceptor,
+  FileFieldsInterceptor,
+} from '@nestjs/platform-express';
 import { StoresService } from './vendors.service';
 import {
   AdminCreateVendorDto,
@@ -107,11 +111,29 @@ export class VendorsController {
     return this.storesService.delete(id, adminId);
   }
 
-  @ApiOperation({ summary: 'Update vendor/store details' })
+  @ApiOperation({
+    summary: 'Update vendor/store details (incl. logo & banner images)',
+  })
+  @ApiConsumes('multipart/form-data')
   @Patch(':id')
-  async update(@Param('id') id: string, @Body() dto: any, @Req() req) {
+  @UseInterceptors(
+    FileFieldsInterceptor([
+      { name: 'logo', maxCount: 1 },
+      { name: 'banner', maxCount: 1 },
+    ]),
+  )
+  async update(
+    @Param('id') id: string,
+    @Body() body: any,
+    @Req() req,
+    @UploadedFiles()
+    files?: { logo?: Express.Multer.File[]; banner?: Express.Multer.File[] },
+  ) {
     const adminId = req.user.id || req.user.userId;
-    return this.storesService.update(id, dto, adminId);
+    return this.storesService.update(id, body, adminId, {
+      logo: files?.logo?.[0],
+      banner: files?.banner?.[0],
+    });
   }
 
   @ApiOperation({ summary: "List a vendor's products" })
@@ -135,6 +157,20 @@ export class VendorsController {
     @UploadedFile() file?: Express.Multer.File,
   ) {
     const adminId = req.user.id || req.user.userId;
+
+    // Parse modifier groups from JSON string (sent via multipart/form-data)
+    let modifierGroups: any[] | undefined;
+    if (body.modifierGroups) {
+      try {
+        modifierGroups =
+          typeof body.modifierGroups === 'string'
+            ? JSON.parse(body.modifierGroups)
+            : body.modifierGroups;
+      } catch {
+        modifierGroups = undefined;
+      }
+    }
+
     return this.storesService.adminCreateProduct(
       storeId,
       {
@@ -143,6 +179,7 @@ export class VendorsController {
         price: Number(body.price),
         stock: body.stock != null ? Number(body.stock) : 0,
         categoryId: body.categoryId,
+        modifierGroups,
       },
       adminId,
       file,
@@ -221,5 +258,16 @@ export class VendorsController {
     @Body('message') message: string,
   ) {
     return this.storesService.sendMessageToVendor(id, message);
+  }
+
+  @ApiOperation({ summary: 'Toggle admin-managed mode for a store' })
+  @Patch(':id/admin-managed')
+  async toggleAdminManaged(
+    @Param('id') id: string,
+    @Body('isAdminManaged') isAdminManaged: boolean,
+    @Req() req: any,
+  ) {
+    const adminId = req.user.id || req.user.userId;
+    return this.storesService.setAdminManaged(id, isAdminManaged, adminId);
   }
 }

@@ -2,8 +2,10 @@ import {
   Controller,
   Get,
   Patch,
+  Post,
   Param,
   Query,
+  Body,
   UseGuards,
 } from '@nestjs/common';
 import { AdminNotificationsService } from './notifications.service';
@@ -45,5 +47,21 @@ export class AdminNotificationsController {
   @Patch(':id/read')
   markAsRead(@Param('id') id: string) {
     return this.svc.markAsRead(id);
+  }
+
+  // ─── Web Push ────────────────────────────────────────────────────────────
+
+  @ApiOperation({
+    summary:
+      'Send a test push notification to all admins with registered FCM tokens',
+  })
+  @Post('push/test')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
+  testPush(@Body('title') title?: string, @Body('message') message?: string) {
+    return this.svc.testPushToAllAdmins(
+      title || '🔔 Test Notification',
+      message ||
+        'This is a test push notification from the Asoose admin panel.',
+    );
   }
 }

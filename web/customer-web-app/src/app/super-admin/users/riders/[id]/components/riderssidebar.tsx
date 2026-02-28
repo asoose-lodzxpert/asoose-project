@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Mail,
   Phone,
@@ -14,6 +14,7 @@ import {
   X,
   Loader2,
   Wallet,
+  Camera,
 } from "lucide-react";
 import Swal from "sweetalert2";
 import { AppAlert } from "../../../customers/[id]/alerts";
@@ -46,6 +47,18 @@ export const RiderSidebar: React.FC<RiderSidebarProps> = ({
     phone: rider.phone || "",
   });
 
+  // Image upload state
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
+  };
+
   // Sync state when prop updates
   useEffect(() => {
     setFormData({
@@ -60,7 +73,32 @@ export const RiderSidebar: React.FC<RiderSidebarProps> = ({
   const handleSaveProfile = async () => {
     setIsSaving(true);
     try {
-      await onUpdate(formData); // Parent handles the API call & Auth for this one
+      let imageUrl: string | undefined;
+
+      // If a new image was selected, upload it first
+      if (imageFile) {
+        const session = await getSession();
+        const token = (session as any)?.accessToken;
+        const fd = new FormData();
+        fd.append("image", imageFile);
+        const res = await fetch(
+          `${API_URL}/super-admin/${basePath}/${rider.id}`,
+          {
+            method: "PATCH",
+            headers: { Authorization: `Bearer ${token || ""}` },
+            body: fd,
+          },
+        );
+        if (!res.ok) throw new Error("Image upload failed");
+        imageUrl = undefined; // image already saved via multipart
+        // Call parent update without image (already saved)
+        await onUpdate(formData);
+      } else {
+        await onUpdate(formData); // Parent handles the API call & Auth for this one
+      }
+
+      setImageFile(null);
+      setImagePreview(null);
       setIsEditing(false);
     } catch (e) {
       console.error("Update failed", e);
@@ -204,11 +242,16 @@ export const RiderSidebar: React.FC<RiderSidebarProps> = ({
 
         <div className="flex flex-col items-center text-center mt-6">
           {/* Profile Image */}
-          <div className="w-24 h-24 rounded-full border-4 border-gray-700 bg-gray-800 flex items-center justify-center mb-4 overflow-hidden relative shadow-lg">
-            {rider.image ? (
+          <div
+            className={`w-24 h-24 rounded-full border-4 border-gray-700 bg-gray-800 flex items-center justify-center mb-4 overflow-hidden relative shadow-lg ${isEditing ? "cursor-pointer group" : ""}`}
+            onClick={
+              isEditing ? () => imageInputRef.current?.click() : undefined
+            }
+          >
+            {imagePreview || rider.image ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
-                src={rider.image}
+                src={imagePreview || rider.image}
                 alt={rider.name}
                 className="w-full h-full object-cover"
               />
@@ -217,7 +260,24 @@ export const RiderSidebar: React.FC<RiderSidebarProps> = ({
                 {rider.name?.charAt(0)}
               </span>
             )}
+            {isEditing && (
+              <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-full">
+                <Camera className="w-6 h-6 text-white" />
+              </div>
+            )}
+            <input
+              ref={imageInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleImageChange}
+            />
           </div>
+          {isEditing && imageFile && (
+            <p className="text-xs text-yellow-400 -mt-2 mb-2">
+              New image selected — save to apply
+            </p>
+          )}
 
           {/* Name Input */}
           <div className="w-full px-2 mb-1">

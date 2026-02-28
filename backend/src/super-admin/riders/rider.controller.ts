@@ -10,7 +10,10 @@ import {
   UseGuards,
   Delete,
   Req,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { RidersService } from './riders.service';
 import { UserStatus, VerificationStatus } from '@prisma/client';
 import { UserRole } from '../../common/enums/user-role.enum';
@@ -92,14 +95,16 @@ export class RidersController {
     return this.ridersService.updateLocation(id, body.lat, body.lng);
   }
 
-  @ApiOperation({ summary: 'Update rider name/phone/email' })
+  @ApiOperation({ summary: 'Update rider name/phone/email/image' })
   @Patch(':id')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN_MANAGER)
+  @UseInterceptors(FileInterceptor('image'))
   async update(
     @Param('id') id: string,
     @Body() body: { name?: string; phone?: string; email?: string },
+    @UploadedFile() imageFile?: Express.Multer.File,
   ) {
-    return this.ridersService.update(id, body);
+    return this.ridersService.update(id, body, imageFile);
   }
 
   // FINANCE: Wallet & Payouts

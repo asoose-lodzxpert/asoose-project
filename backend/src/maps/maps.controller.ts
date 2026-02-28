@@ -59,9 +59,9 @@ export class MapsController {
   }
 
   @ApiOperation({ summary: 'Google Places autocomplete (rate-limited)' })
-  @ApiBearerAuth()
+  // @ApiBearerAuth()
   @Get('places-autocomplete')
-  @UseGuards(JwtAuthGuard)
+  // @UseGuards(JwtAuthGuard)
   @Throttle({ default: { limit: 20, ttl: 60 * 1000 } }) // 20 requests per minute
   async placesAutocomplete(
     @Query('query') query: string,
@@ -74,8 +74,8 @@ export class MapsController {
   }
 
   @ApiOperation({ summary: 'Geocode a Google Place ID to lat/lng' })
-  @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  // @ApiBearerAuth()
+  // @UseGuards(JwtAuthGuard)
   @Throttle({ default: { limit: 20, ttl: 60_000 } })
   @Get('geocode')
   async geocode(@Query('placeId') placeId: string) {
@@ -86,8 +86,8 @@ export class MapsController {
   }
 
   @ApiOperation({ summary: 'Reverse geocode lat/lng to address' })
-  @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  // @ApiBearerAuth()
+  // @UseGuards(JwtAuthGuard)
   @Throttle({ default: { limit: 20, ttl: 60_000 } })
   @Get('reverse-geocode')
   async reverseGeocode(@Query('lat') lat: string, @Query('lng') lng: string) {
@@ -108,8 +108,8 @@ export class MapsController {
   }
 
   @ApiOperation({ summary: 'Get driving directions between two coordinates' })
-  @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  // @ApiBearerAuth()
+  // @UseGuards(JwtAuthGuard)
   @Throttle({ default: { limit: 15, ttl: 60_000 } })
   @Get('directions')
   async getDirections(
@@ -133,8 +133,8 @@ export class MapsController {
   @ApiOperation({
     summary: 'Generate a static map image URL with markers/path',
   })
-  @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
+  // @ApiBearerAuth()
+  // @UseGuards(JwtAuthGuard)
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Get('static-map')
   async getStaticMap(

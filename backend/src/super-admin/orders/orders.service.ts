@@ -7,6 +7,7 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { OrderFilterDto } from './dto/order-filter.dto';
 import { Prisma, StoreType, OrderStatus } from '@prisma/client';
 import { TransactionLedgerService } from '../transactions/transaction-ledger.service';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 
 const SERVICE_TYPE_MAP: Record<string, StoreType> = {
   Food: 'RESTAURANT',
@@ -20,6 +21,7 @@ export class OrdersService {
   constructor(
     private prisma: PrismaService,
     private ledgerService: TransactionLedgerService,
+    private eventEmitter: EventEmitter2,
   ) {}
 
   // ===========================================================================
@@ -385,6 +387,287 @@ export class OrdersService {
     });
 
     return updatedOrder;
+  }
+
+  // ===========================================================================
+  // 7. ADMIN-MANAGED STORE ORDER ACTIONS
+  //    These mirror VendorOrdersService but skip vendor-ownership checks
+  // ===========================================================================
+
+  /** Fetch orders for a specific store (admin view, with full details) */
+  async getStoreOrders(storeId: string, status?: string, page = 1, limit = 20) {
+    const skip = (page - 1) * limit;
+    const whereClause: Prisma.OrderWhereInput = { storeId };
+
+    if (status && status !== 'all') {
+      const statuses = status
+        .split(',')
+        .map((s) => s.trim().toUpperCase())
+        .filter((s): s is OrderStatus =>
+          Object.values(OrderStatus).includes(s as OrderStatus),
+        );
+      if (statuses.length === 1)
+        whereClause.status = statuses[0] as OrderStatus;
+      else if (statuses.length > 1)
+        whereClause.status = { in: statuses as OrderStatus[] };
+    }
+
+    const [data, total] = await Promise.all([
+      this.prisma.order.findMany({
+        where: whereClause,
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+        skip,
+        include: {
+          items: {
+            include: {
+              modifiers: { include: { modifier: true } },
+            },
+          },
+          user: { select: { name: true, phone: true, image: true } },
+          delivery: { select: { status: true, riderId: true } },
+          payment: { select: { status: true } },
+          orderGroup: { include: { payment: { select: { status: true } } } },
+        },
+      }),
+      this.prisma.order.count({ where: whereClause }),
+    ]);
+
+    return {
+      data: data.map((order) => {
+        const payment = order.payment || order.orderGroup?.payment;
+        return {
+          ...order,
+          paymentStatus: payment?.status ?? 'UNPAID',
+          items: order.items.map((item) => ({
+            ...item,
+            modifierGroups: item.modifiers?.length
+              ? [
+                  {
+                    id: 'default-group',
+                    name: 'Selected Options',
+                    modifiers: item.modifiers.map((m) => ({
+                      id: m.modifier.id,
+                      name: m.modifier.name,
+                      price: m.modifier.price,
+                    })),
+                  },
+                ]
+              : [],
+            modifiers: undefined,
+          })),
+        };
+      }),
+      meta: { total, page, limit, pages: Math.ceil(total / limit) },
+    };
+  }
+
+  /** Get all orders across ALL admin-managed stores */
+  async getAllAdminManagedOrders(
+    storeId?: string,
+    status?: string,
+    page = 1,
+    limit = 20,
+  ) {
+    const skip = (page - 1) * limit;
+    const whereClause: Prisma.OrderWhereInput = {
+      store: { isAdminManaged: true, ...(storeId ? { id: storeId } : {}) },
+    };
+
+    if (status && status !== 'all') {
+      const statuses = status
+        .split(',')
+        .map((s) => s.trim().toUpperCase())
+        .filter((s): s is OrderStatus =>
+          Object.values(OrderStatus).includes(s as OrderStatus),
+        );
+      if (statuses.length === 1)
+        whereClause.status = statuses[0] as OrderStatus;
+      else if (statuses.length > 1)
+        whereClause.status = { in: statuses as OrderStatus[] };
+    }
+
+    const [data, total] = await Promise.all([
+      this.prisma.order.findMany({
+        where: whereClause,
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+        skip,
+        include: {
+          store: {
+            select: { id: true, name: true, logo: true, isAdminManaged: true },
+          },
+          items: {
+            include: { modifiers: { include: { modifier: true } } },
+          },
+          user: { select: { name: true, phone: true, image: true } },
+          delivery: { select: { status: true, riderId: true } },
+          payment: { select: { status: true } },
+          orderGroup: { include: { payment: { select: { status: true } } } },
+        },
+      }),
+      this.prisma.order.count({ where: whereClause }),
+    ]);
+
+    // Also fetch distinct managed stores for the filter dropdown
+    const managedStores = await this.prisma.store.findMany({
+      where: { isAdminManaged: true },
+      select: { id: true, name: true, logo: true },
+      orderBy: { name: 'asc' },
+    });
+
+    return {
+      data: data.map((order) => {
+        const payment = order.payment || order.orderGroup?.payment;
+        return {
+          ...order,
+          paymentStatus: payment?.status ?? 'UNPAID',
+          items: order.items.map((item) => ({
+            ...item,
+            modifierGroups: item.modifiers?.length
+              ? [
+                  {
+                    id: 'default-group',
+                    name: 'Selected Options',
+                    modifiers: item.modifiers.map((m) => ({
+                      id: m.modifier.id,
+                      name: m.modifier.name,
+                      price: m.modifier.price,
+                    })),
+                  },
+                ]
+              : [],
+            modifiers: undefined,
+          })),
+        };
+      }),
+      meta: { total, page, limit, pages: Math.ceil(total / limit) },
+      managedStores,
+    };
+  }
+
+  /** Admin accepts a store order (PENDING → CONFIRMED) */
+  async adminAcceptOrder(orderId: string, adminId: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { store: { select: { isAdminManaged: true, name: true } } },
+    });
+    if (!order) throw new NotFoundException('Order not found');
+    if (!order.store.isAdminManaged)
+      throw new BadRequestException('Store is not in admin-managed mode');
+    if (order.status !== 'PENDING')
+      throw new BadRequestException(
+        `Cannot accept order in ${order.status} status`,
+      );
+
+    const updated = await this.prisma.order.update({
+      where: { id: orderId },
+      data: { status: OrderStatus.CONFIRMED },
+    });
+
+    await this.prisma.activityLog.create({
+      data: {
+        userId: adminId,
+        action: 'ADMIN_ORDER_ACCEPTED',
+        target: orderId,
+        details: `Admin accepted order for store: ${order.store.name}`,
+      },
+    });
+
+    return updated;
+  }
+
+  /** Admin declines a store order (PENDING → REJECTED) */
+  async adminDeclineOrder(orderId: string, adminId: string, reason: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { store: { select: { isAdminManaged: true, name: true } } },
+    });
+    if (!order) throw new NotFoundException('Order not found');
+    if (!order.store.isAdminManaged)
+      throw new BadRequestException('Store is not in admin-managed mode');
+    if (order.status !== 'PENDING')
+      throw new BadRequestException('Can only decline PENDING orders');
+
+    const updated = await this.prisma.order.update({
+      where: { id: orderId },
+      data: { status: OrderStatus.REJECTED, cancelledAt: new Date() },
+    });
+
+    await this.prisma.activityLog.create({
+      data: {
+        userId: adminId,
+        action: 'ADMIN_ORDER_DECLINED',
+        target: orderId,
+        details: reason || 'Admin declined order',
+      },
+    });
+
+    return updated;
+  }
+
+  /** Admin marks order as preparing (CONFIRMED → PREPARING) */
+  async adminStartPreparing(orderId: string, adminId: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { store: { select: { isAdminManaged: true } } },
+    });
+    if (!order) throw new NotFoundException('Order not found');
+    if (!order.store.isAdminManaged)
+      throw new BadRequestException('Store is not in admin-managed mode');
+    if (order.status !== 'CONFIRMED')
+      throw new BadRequestException('Order must be CONFIRMED before preparing');
+
+    const updated = await this.prisma.order.update({
+      where: { id: orderId },
+      data: { status: OrderStatus.PREPARING },
+    });
+
+    await this.prisma.activityLog.create({
+      data: {
+        userId: adminId,
+        action: 'ADMIN_ORDER_PREPARING',
+        target: orderId,
+      },
+    });
+
+    return updated;
+  }
+
+  /** Admin marks order as ready (CONFIRMED|PREPARING → READY) */
+  async adminMarkReady(orderId: string, adminId: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { store: { select: { isAdminManaged: true } } },
+    });
+    if (!order) throw new NotFoundException('Order not found');
+    if (!order.store.isAdminManaged)
+      throw new BadRequestException('Store is not in admin-managed mode');
+    if (
+      !([OrderStatus.PREPARING, OrderStatus.CONFIRMED] as string[]).includes(
+        order.status,
+      )
+    ) {
+      throw new BadRequestException(
+        'Order must be Confirmed or Preparing to mark as Ready',
+      );
+    }
+
+    const updated = await this.prisma.order.update({
+      where: { id: orderId },
+      data: { status: OrderStatus.READY },
+    });
+
+    this.eventEmitter.emit('order.ready', {
+      orderId: updated.id,
+      storeId: updated.storeId,
+    });
+
+    await this.prisma.activityLog.create({
+      data: { userId: adminId, action: 'ADMIN_ORDER_READY', target: orderId },
+    });
+
+    return updated;
   }
 
   // --- Transformers ---

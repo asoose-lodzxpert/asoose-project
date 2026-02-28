@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   Loader2,
   Banknote,
@@ -9,10 +10,15 @@ import {
   Percent,
   ChevronLeft,
   ChevronRight,
+  Camera,
+  ImagePlus,
+  ShieldAlert,
+  ExternalLink,
 } from "lucide-react";
 import Swal from "sweetalert2";
 import useSWR from "swr";
 import { fetcher } from "@/app/super-admin/hooks/useSuperAdminFetch";
+import { getSession } from "next-auth/react";
 
 // --- Components ---
 import SkeletonLoader from "./components/skeletonLoader";
@@ -93,6 +99,8 @@ interface VendorDetails {
   email: string;
   phone: string;
   image?: string;
+  logo?: string;
+  banner?: string;
   status: string;
   verification: string;
   totalRevenue: number;
@@ -105,6 +113,7 @@ interface VendorDetails {
   vendorDocuments: VendorDocument[];
   createdAt: string;
   updatedAt: string;
+  isAdminManaged: boolean;
 }
 
 type PayoutsResponse = { history: any[] } | any[];
@@ -194,7 +203,32 @@ export default function VendorDetailPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isAddProductOpen, setIsAddProductOpen] = useState(false);
-  const [addressCoords, setAddressCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [addressCoords, setAddressCoords] = useState<{
+    lat: number;
+    lng: number;
+  } | null>(null);
+
+  // --- Image Upload State ---
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [bannerFile, setBannerFile] = useState<File | null>(null);
+  const [bannerPreview, setBannerPreview] = useState<string | null>(null);
+  const logoInputRef = useRef<HTMLInputElement>(null);
+  const bannerInputRef = useRef<HTMLInputElement>(null);
+
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setLogoFile(file);
+    setLogoPreview(URL.createObjectURL(file));
+  };
+
+  const handleBannerChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setBannerFile(file);
+    setBannerPreview(URL.createObjectURL(file));
+  };
 
   // Per-tab pagination
   const [docsPage, setDocsPage] = useState(1);
@@ -312,6 +346,10 @@ export default function VendorDetailPage() {
       });
     }
     setAddressCoords(null);
+    setLogoFile(null);
+    setLogoPreview(null);
+    setBannerFile(null);
+    setBannerPreview(null);
     setIsEditing(false);
   };
 
@@ -341,16 +379,60 @@ export default function VendorDetailPage() {
 
     setIsSaving(true);
     try {
-      await fetcher(`/super-admin/vendors/${vendor?.id}`, {
-        method: "PATCH",
-        body: JSON.stringify({
-          ...formData,
-          ...(addressCoords ? { lat: addressCoords.lat, lng: addressCoords.lng } : {}),
-        }),
-      });
+      const hasImages = logoFile || bannerFile;
+
+      if (hasImages) {
+        // Use multipart/form-data when images are attached
+        const session = await getSession();
+        const token = (session as any)?.accessToken;
+
+        const payload = new FormData();
+        payload.append("storeName", formData.storeName);
+        payload.append("ownerName", formData.ownerName);
+        payload.append("phone", formData.phone);
+        payload.append("email", formData.email);
+        payload.append("address", formData.address);
+        payload.append("commissionRate", String(formData.commissionRate));
+        if (addressCoords) {
+          payload.append("lat", String(addressCoords.lat));
+          payload.append("lng", String(addressCoords.lng));
+        }
+        if (logoFile) payload.append("logo", logoFile);
+        if (bannerFile) payload.append("banner", bannerFile);
+
+        const API_URL =
+          process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1";
+        const res = await fetch(
+          `${API_URL}/super-admin/vendors/${vendor?.id}`,
+          {
+            method: "PATCH",
+            headers: { Authorization: `Bearer ${token || ""}` },
+            body: payload,
+          },
+        );
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.message || "Could not save changes.");
+        }
+      } else {
+        // JSON path (no images)
+        await fetcher(`/super-admin/vendors/${vendor?.id}`, {
+          method: "PATCH",
+          body: JSON.stringify({
+            ...formData,
+            ...(addressCoords
+              ? { lat: addressCoords.lat, lng: addressCoords.lng }
+              : {}),
+          }),
+        });
+      }
 
       mutateVendor();
       setAddressCoords(null);
+      setLogoFile(null);
+      setLogoPreview(null);
+      setBannerFile(null);
+      setBannerPreview(null);
       setIsEditing(false);
       Swal.fire({
         icon: "success",
@@ -370,6 +452,51 @@ export default function VendorDetailPage() {
       });
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const [isTogglingManaged, setIsTogglingManaged] = useState(false);
+  const handleToggleAdminManaged = async () => {
+    const newValue = !vendor?.isAdminManaged;
+    const action = newValue ? "enable" : "disable";
+    const result = await Swal.fire({
+      title: `${newValue ? "Enable" : "Disable"} Admin-Managed Mode?`,
+      text: newValue
+        ? "Admins will handle orders for this store on behalf of the vendor."
+        : "The vendor will regain control of their orders.",
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonText: `Yes, ${action}`,
+      confirmButtonColor: newValue ? "#3b82f6" : "#ef4444",
+      background: "#1E293B",
+      color: "#fff",
+    });
+    if (!result.isConfirmed) return;
+    setIsTogglingManaged(true);
+    try {
+      await fetcher(`/super-admin/vendors/${vendor?.id}/admin-managed`, {
+        method: "PATCH",
+        body: JSON.stringify({ isAdminManaged: newValue }),
+      });
+      mutateVendor();
+      Swal.fire({
+        icon: "success",
+        title: `Admin-Managed ${newValue ? "Enabled" : "Disabled"}`,
+        timer: 1500,
+        showConfirmButton: false,
+        background: "#1E293B",
+        color: "#fff",
+      });
+    } catch (err: any) {
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: err.message,
+        background: "#1E293B",
+        color: "#fff",
+      });
+    } finally {
+      setIsTogglingManaged(false);
     }
   };
 
@@ -559,6 +686,84 @@ export default function VendorDetailPage() {
         onMessage={handleMessageVendor}
       />
 
+      {/* ── Image Upload Section (visible only in edit mode) ── */}
+      {isEditing && (
+        <div className="bg-[#1E293B] border border-gray-800 rounded-2xl overflow-hidden">
+          {/* Banner (cover) */}
+          <div
+            className="relative w-full h-36 bg-gray-900 group cursor-pointer"
+            onClick={() => bannerInputRef.current?.click()}
+          >
+            {bannerPreview || vendor.banner ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={bannerPreview || vendor.banner || ""}
+                alt="Banner"
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full text-gray-600">
+                <ImagePlus className="w-8 h-8 mb-1" />
+                <span className="text-xs">
+                  Click to upload banner / cover image
+                </span>
+              </div>
+            )}
+            {/* overlay on hover */}
+            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+              <ImagePlus className="w-8 h-8 text-white" />
+            </div>
+            <input
+              ref={bannerInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleBannerChange}
+            />
+          </div>
+
+          {/* Logo (profile) */}
+          <div className="flex items-end gap-4 px-6 pb-5 -mt-10">
+            <div
+              className="relative w-20 h-20 rounded-full border-4 border-[#1E293B] bg-gray-800 overflow-hidden cursor-pointer group shrink-0 shadow-lg"
+              onClick={() => logoInputRef.current?.click()}
+            >
+              {logoPreview || vendor.logo ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={logoPreview || vendor.logo || ""}
+                  alt="Logo"
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <span className="flex items-center justify-center w-full h-full text-2xl font-bold text-gray-500">
+                  {vendor.name?.charAt(0)}
+                </span>
+              )}
+              <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-full">
+                <Camera className="w-6 h-6 text-white" />
+              </div>
+              <input
+                ref={logoInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleLogoChange}
+              />
+            </div>
+
+            <div className="pb-1">
+              <p className="text-white font-bold text-sm">{vendor.name}</p>
+              <p className="text-gray-500 text-xs mt-0.5">
+                {logoFile || bannerFile
+                  ? `${[logoFile ? "Logo" : null, bannerFile ? "Banner" : null].filter(Boolean).join(" & ")} selected — save to apply`
+                  : "Click logo or banner to replace images"}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pt-2">
         {/* FIX: Added min-w-0 to prevent flex/grid overflow issues on mobile
           Mobile Order: Metrics first (order-1), Info second (order-2)
@@ -567,6 +772,53 @@ export default function VendorDetailPage() {
         {/* Left Column (Info) */}
         <div className="space-y-6 order-2 lg:order-1 min-w-0">
           <HealthScoreCard totalOrders={vendor.totalOrders} />
+
+          {/* ── Admin-Managed Toggle Card ── */}
+          <div
+            className={`bg-[#1E293B] border rounded-2xl p-5 transition-colors ${vendor.isAdminManaged ? "border-blue-500/40" : "border-gray-800"}`}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <ShieldAlert
+                  className={`w-4 h-4 ${vendor.isAdminManaged ? "text-blue-400" : "text-gray-500"}`}
+                />
+                <div>
+                  <p className="text-xs font-bold text-gray-300 uppercase tracking-wider">
+                    Admin-Managed Store
+                  </p>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    {vendor.isAdminManaged
+                      ? "Admins manage this store's orders"
+                      : "Vendor manages their own orders"}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={handleToggleAdminManaged}
+                disabled={isTogglingManaged}
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${vendor.isAdminManaged ? "bg-blue-500" : "bg-gray-700"} disabled:opacity-50`}
+                aria-label="Toggle admin managed"
+              >
+                {isTogglingManaged ? (
+                  <Loader2 className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 animate-spin text-white" />
+                ) : (
+                  <span
+                    className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-lg transform transition-transform duration-200 ${vendor.isAdminManaged ? "translate-x-5" : "translate-x-0"}`}
+                  />
+                )}
+              </button>
+            </div>
+
+            {vendor.isAdminManaged && (
+              <Link
+                href={`/super-admin/store-orders/${vendor.id}`}
+                className="mt-4 flex items-center justify-center gap-2 w-full py-2 px-4 bg-blue-500/10 border border-blue-500/30 text-blue-400 text-sm font-semibold rounded-lg hover:bg-blue-500/20 transition-colors"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+                Manage Store Orders
+              </Link>
+            )}
+          </div>
 
           {/* Commission Rate Card */}
           <div className="bg-[#1E293B] border border-gray-800 rounded-2xl p-5">

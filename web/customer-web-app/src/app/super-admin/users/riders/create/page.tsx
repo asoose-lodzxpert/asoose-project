@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   User,
@@ -17,6 +17,7 @@ import {
   Hash,
   Palette,
   Calendar,
+  Camera,
 } from "lucide-react";
 import Swal from "sweetalert2";
 import { getSession } from "next-auth/react";
@@ -112,6 +113,20 @@ export default function CreateRiderPage() {
   const [activeTab, setActiveTab] = useState<TabId>("personal");
   const [isLoading, setIsLoading] = useState(false);
 
+  // Profile image
+  const [profileImageFile, setProfileImageFile] = useState<File | null>(null);
+  const [profileImagePreview, setProfileImagePreview] = useState<string | null>(
+    null,
+  );
+  const profileImageInputRef = useRef<HTMLInputElement>(null);
+
+  const handleProfileImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setProfileImageFile(file);
+    setProfileImagePreview(URL.createObjectURL(file));
+  };
+
   // Personal
   const [personal, setPersonal] = useState({
     name: "",
@@ -204,6 +219,22 @@ export default function CreateRiderPage() {
       const tempPassword =
         "Asoose@" + Math.random().toString(36).slice(2, 10).toUpperCase();
 
+      // If a profile image is selected, upload it first to get the URL
+      let profileImageUrl: string | undefined;
+      if (profileImageFile) {
+        const imgForm = new FormData();
+        imgForm.append("file", profileImageFile);
+        const imgRes = await fetch(`${API_URL}/storage/upload`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token || ""}` },
+          body: imgForm,
+        });
+        if (imgRes.ok) {
+          const imgData = await imgRes.json();
+          profileImageUrl = imgData.url;
+        }
+      }
+
       const payload: Record<string, any> = {
         name: personal.name.trim(),
         email: personal.email.trim(),
@@ -211,6 +242,7 @@ export default function CreateRiderPage() {
         countryCode: personal.countryCode,
         role: personal.role,
         password: tempPassword,
+        image: profileImageUrl,
         // Vehicle
         vehicleType: vehicle.vehicleType || undefined,
         vehicleBrand: vehicle.vehicleBrand.trim() || undefined,
@@ -348,6 +380,47 @@ export default function CreateRiderPage() {
             {/* ─── Tab 1: Personal Info ─── */}
             {activeTab === "personal" && (
               <div className="p-6 space-y-5">
+                {/* Profile Image Upload */}
+                <FormField label="Profile Photo" optional>
+                  <div className="flex items-center gap-5">
+                    <div
+                      className="relative w-20 h-20 rounded-full border-2 border-dashed border-slate-600 bg-slate-800/60 flex items-center justify-center overflow-hidden cursor-pointer group hover:border-yellow-500/60 transition-colors"
+                      onClick={() => profileImageInputRef.current?.click()}
+                    >
+                      {profileImagePreview ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={profileImagePreview}
+                          alt="Profile preview"
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <User className="w-8 h-8 text-slate-500 group-hover:text-yellow-400 transition-colors" />
+                      )}
+                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-full">
+                        <Camera className="w-6 h-6 text-white" />
+                      </div>
+                      <input
+                        ref={profileImageInputRef}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleProfileImageChange}
+                      />
+                    </div>
+                    <div>
+                      <p className="text-sm text-slate-300 font-medium">
+                        {profileImageFile
+                          ? profileImageFile.name
+                          : "Click to upload a profile photo"}
+                      </p>
+                      <p className="text-xs text-slate-500 mt-1">
+                        PNG, JPG or WEBP · Max 5 MB
+                      </p>
+                    </div>
+                  </div>
+                </FormField>
+
                 {/* Role Toggle */}
                 <FormField label="Role" required>
                   <div className="flex gap-2">

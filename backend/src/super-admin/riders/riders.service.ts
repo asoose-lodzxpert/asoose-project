@@ -22,6 +22,7 @@ import { DriverStateService } from 'src/matching/driver-state/driver-state.servi
 import { RiderStateService } from 'src/matching/rider-state/rider-state.service';
 import { PaystackService } from 'src/payment/paystack.service';
 import { PaystackAccountService } from 'src/payment/paystack-account.service';
+import { StorageService } from 'src/storage/storage.service';
 
 @Injectable()
 export class RidersService {
@@ -39,6 +40,7 @@ export class RidersService {
     private riderStateService: RiderStateService,
     private readonly paystackService: PaystackService,
     private readonly paystackAccountService: PaystackAccountService,
+    private readonly storageService: StorageService,
   ) {}
 
   async findAll(params: {
@@ -495,7 +497,8 @@ export class RidersService {
 
   async update(
     id: string,
-    data: { name?: string; phone?: string; email?: string },
+    data: { name?: string; phone?: string; email?: string; image?: string },
+    imageFile?: Express.Multer.File,
   ) {
     if (data.email) {
       const existing = await this.prisma.rider.findUnique({
@@ -506,12 +509,19 @@ export class RidersService {
       }
     }
 
+    let imageUrl: string | undefined = data.image;
+    if (imageFile) {
+      const upload = await this.storageService.uploadFile(imageFile);
+      imageUrl = upload.url;
+    }
+
     return this.prisma.rider.update({
       where: { id },
       data: {
         name: data.name,
         phone: data.phone,
         email: data.email,
+        image: imageUrl,
       },
     });
   }

@@ -10,6 +10,7 @@ import { AuthModule } from 'src/auth/auth.module';
 import { TransactionsModule } from '../transactions/transaction.module';
 import { MatchingModule } from 'src/matching/matching.module';
 import { PaymentModule } from 'src/payment/payment.module';
+import { StorageModule } from 'src/storage/storage.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { PaymentModule } from 'src/payment/payment.module';
     TransactionsModule,
     MatchingModule,
     PaymentModule,
+    StorageModule,
   ],
   controllers: [RidersController, DriversController],
   providers: [RidersService, ActivityLogService],

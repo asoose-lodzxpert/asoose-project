@@ -48,4 +48,14 @@ export const NotificationService = {
       method: "PATCH",
     });
   },
+
+  async sendTestPush(
+    title = "🔔 Test Notification",
+    message = "This is a test push notification from the Asoose admin panel.",
+  ): Promise<{ success: boolean; tokensFound: number; message?: string }> {
+    return authFetch(`/super-admin/notifications/push/test`, {
+      method: "POST",
+      body: JSON.stringify({ title, message }),
+    });
+  },
 };

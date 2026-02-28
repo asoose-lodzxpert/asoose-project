@@ -8,6 +8,8 @@ import {
   Patch, // ✅ Add Patch
   Body, // ✅ Add Body
   Req,
+  DefaultValuePipe,
+  ParseIntPipe,
 } from '@nestjs/common';
 import { OrdersService } from './orders.service';
 import { OrderFilterDto } from './dto/order-filter.dto';
@@ -73,5 +75,75 @@ export class OrdersController {
       body.reason,
       adminId,
     );
+  }
+
+  // ===========================================================================
+  // Admin-managed store order actions
+  // ===========================================================================
+
+  @ApiOperation({ summary: 'Get all orders across all admin-managed stores' })
+  @Get('store-orders')
+  async getAllAdminManagedOrders(
+    @Query('status') status?: string,
+    @Query('storeId') storeId?: string,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page?: number,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit?: number,
+  ) {
+    return this.ordersService.getAllAdminManagedOrders(
+      storeId,
+      status,
+      page,
+      limit,
+    );
+  }
+
+  @ApiOperation({ summary: 'Get orders for an admin-managed store' })
+  @Get('store/:storeId')
+  async getStoreOrders(
+    @Param('storeId') storeId: string,
+    @Query('status') status?: string,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page?: number,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit?: number,
+  ) {
+    return this.ordersService.getStoreOrders(storeId, status, page, limit);
+  }
+
+  @ApiOperation({
+    summary: 'Admin accepts a pending order for a managed store',
+  })
+  @Patch('store/:orderId/accept')
+  async adminAcceptOrder(@Param('orderId') orderId: string, @Req() req: any) {
+    const adminId = req.user.id || req.user.sub;
+    return this.ordersService.adminAcceptOrder(orderId, adminId);
+  }
+
+  @ApiOperation({
+    summary: 'Admin declines a pending order for a managed store',
+  })
+  @Patch('store/:orderId/decline')
+  async adminDeclineOrder(
+    @Param('orderId') orderId: string,
+    @Body('reason') reason: string,
+    @Req() req: any,
+  ) {
+    const adminId = req.user.id || req.user.sub;
+    return this.ordersService.adminDeclineOrder(orderId, adminId, reason);
+  }
+
+  @ApiOperation({ summary: 'Admin marks order as preparing' })
+  @Patch('store/:orderId/preparing')
+  async adminStartPreparing(
+    @Param('orderId') orderId: string,
+    @Req() req: any,
+  ) {
+    const adminId = req.user.id || req.user.sub;
+    return this.ordersService.adminStartPreparing(orderId, adminId);
+  }
+
+  @ApiOperation({ summary: 'Admin marks order as ready for pickup/dispatch' })
+  @Patch('store/:orderId/ready')
+  async adminMarkReady(@Param('orderId') orderId: string, @Req() req: any) {
+    const adminId = req.user.id || req.user.sub;
+    return this.ordersService.adminMarkReady(orderId, adminId);
   }
 }
