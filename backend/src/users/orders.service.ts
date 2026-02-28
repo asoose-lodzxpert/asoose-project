@@ -130,9 +130,13 @@ export class OrdersService {
         where: { id: { in: productIds } },
       });
 
-      if (products.length !== items.length) {
-        const foundIds = new Set(products.map((p) => p.id));
-        const missingIds = productIds.filter((id) => !foundIds.has(id));
+      // Compare unique product IDs — same product with different modifier combos is valid
+      const foundIds = new Set(products.map((p) => p.id));
+      const uniqueProductIds = new Set(productIds);
+      if (foundIds.size !== uniqueProductIds.size) {
+        const missingIds = [...uniqueProductIds].filter(
+          (id) => !foundIds.has(id),
+        );
         throw new BadRequestException(
           `Products not found: ${missingIds.join(', ')}`,
         );
@@ -211,9 +215,13 @@ export class OrdersService {
         },
       });
 
-      if (products.length !== items.length) {
-        const foundIds = new Set(products.map((p) => p.id));
-        const missingIds = productIds.filter((id) => !foundIds.has(id));
+      // Compare unique product IDs — same product with different modifier combos is valid
+      const foundIds = new Set(products.map((p) => p.id));
+      const uniqueProductIds = new Set(productIds);
+      if (foundIds.size !== uniqueProductIds.size) {
+        const missingIds = [...uniqueProductIds].filter(
+          (id) => !foundIds.has(id),
+        );
         throw new BadRequestException(
           `Products not found: ${missingIds.join(', ')}`,
         );
@@ -1024,8 +1032,13 @@ export class OrdersService {
       },
     });
 
-    if (products.length !== dto.items.length)
-      throw new BadRequestException('Products mismatch');
+    if (products.length !== dto.items.length) {
+      // Same product with different modifier combos appears once in products but multiple times in items
+      const foundIds = new Set(products.map((p) => p.id));
+      const uniqueItemIds = new Set(productIds);
+      if (foundIds.size !== uniqueItemIds.size)
+        throw new BadRequestException('Products mismatch');
+    }
 
     const productMap = new Map(products.map((p) => [p.id, p]));
     const storeGroups = new Map<string, OrderItemDto[]>();
@@ -1311,9 +1324,11 @@ export class OrdersService {
         throw new BadRequestException(
           `Maximum ${VALIDATION.MAX_QUANTITY_PER_ITEM} quantity per item`,
         );
-      if (seen.has(item.id))
+      // Use composite key: same product with different modifier combos is valid
+      const lineKey = `${item.id}_${(item.modifierIds ?? []).slice().sort().join(',')}`;
+      if (seen.has(lineKey))
         throw new BadRequestException(`Duplicate item detected: ${item.id}`);
-      seen.add(item.id);
+      seen.add(lineKey);
     });
   }
 

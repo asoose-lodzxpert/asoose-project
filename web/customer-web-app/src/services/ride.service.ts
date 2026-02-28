@@ -72,15 +72,25 @@ export interface ConfirmRideResponse {
   status?: string;
 }
 
+/** Raw response shape from POST /fare/ride */
+interface FareRideResponse {
+  price: number;
+  economyPrice: number;
+  businessPrice: number;
+  distance: { meters: number; text: string };
+  eta: { seconds: number; text: string };
+}
+
 export class RideService {
   /**
-   * Fetch fare estimates from POST /trips/rides/estimate.
+   * Fetch fare estimates from POST /fare/ride.
    *
-   * The backend returns a Record<VehicleType, PriceEstimate> directly
-   * (e.g. { ECONOMY: {...}, BUSINESS: {...} }), with multipliers already
-   * applied server-side. The frontend must NOT apply its own multiplier.
+   * The backend returns economy-level pricing; the BUSINESS fare is derived
+   * on the frontend as economyPrice * 1.5. The result is transformed into
+   * the standard Record<VehicleType, PriceEstimate> shape so the rest of the
+   * UI requires no changes.
    *
-   * @param data - Coordinates + optional vehicleType ('ECONOMY' | 'BUSINESS')
+   * @param data - Coordinates (camelCase — converted to backend snake_case internally)
    * @param token - Auth token
    * @param signal - AbortSignal for request cancellation
    */
@@ -95,25 +105,41 @@ export class RideService {
     token: string,
     signal?: AbortSignal,
   ): Promise<Record<string, PriceEstimate>> {
-    const estimatePayload: Record<string, number | string | undefined> = {
-      pickupLat: data.pickupLat,
-      pickupLng: data.pickupLng,
-      dropoffLat: data.dropoffLat,
-      dropoffLng: data.dropoffLng,
+    // /fare/ride uses snake_case string coordinates
+    const payload = {
+      pickuplat: String(data.pickupLat ?? ""),
+      pickuplong: String(data.pickupLng ?? ""),
+      dropofflat: String(data.dropoffLat ?? ""),
+      dropofflong: String(data.dropoffLng ?? ""),
     };
 
-    // Pass vehicleType when specified so backend can scope the response
-    if (data.vehicleType) {
-      estimatePayload.vehicleType = data.vehicleType;
-    }
-
-    // POST /trips/rides/estimate → returns { ECONOMY: PriceEstimate, BUSINESS: PriceEstimate }
-    return ApiService.post<Record<string, PriceEstimate>>(
-      "/trips/rides/estimate",
-      estimatePayload,
+    const res = await ApiService.post<FareRideResponse>(
+      "/fare/ride",
+      payload,
       token,
       { signal },
     );
+
+    const distanceKm = res.distance.meters / 1000;
+    const durationMin = res.eta.seconds / 60;
+
+    // Economy fare comes directly from the backend
+    const economyFare = res.economyPrice;
+    // Business fare is calculated on the frontend as economy * 1.5
+    const businessFare = Math.round(economyFare * 1.5);
+
+    const toEstimate = (fare: number): PriceEstimate => ({
+      estimatedFare: fare,
+      distance: distanceKm,
+      duration: durationMin,
+      total: fare,
+      breakdown: { baseFare: 0, distanceFare: 0, timeFare: 0, platformFee: 0 },
+    });
+
+    return {
+      ECONOMY: toEstimate(economyFare),
+      BUSINESS: toEstimate(businessFare),
+    };
   }
 
   static async createRide(
@@ -255,7 +281,7 @@ export class RideService {
    * @param options - Query options { page?, limit?, status? }
    * @param signal - Abort signal for cancellation
    * @returns Array of BackendRide objects
-   * 
+   *
    * IMPORTANT: `status` must be sent as screaming snake case (e.g., COMPLETED,
    * CANCELLED_BY_USER) to match the backend enum filter.
    */

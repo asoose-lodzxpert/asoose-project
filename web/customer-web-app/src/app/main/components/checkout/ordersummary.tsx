@@ -10,6 +10,7 @@ interface OrderSummaryProps {
   isProcessing: boolean;
   isDisabled: boolean;
   isLoadingFee?: boolean;
+  hasAddress?: boolean;
   onPlaceOrder: () => void;
   retryCount: number;
 }
@@ -21,6 +22,7 @@ export const OrderSummary = ({
   isProcessing,
   isDisabled,
   isLoadingFee = false,
+  hasAddress = false,
   onPlaceOrder,
 }: OrderSummaryProps) => {
   const resolvedDelivery = deliveryFee ?? 0;
@@ -84,9 +86,14 @@ export const OrderSummary = ({
           address.
         </p>
       )}
-      {(isLoadingFee || deliveryFee === null) && (
+      {isLoadingFee && (
+        <p className="text-xs text-gray-400 mb-6">Calculating delivery fee…</p>
+      )}
+      {!isLoadingFee && deliveryFee === null && (
         <p className="text-xs text-gray-400 mb-6">
-          Select an address to see the exact delivery fee.
+          {hasAddress
+            ? "Could not calculate delivery fee. Try changing your address."
+            : "Select an address to see the exact delivery fee."}
         </p>
       )}
 

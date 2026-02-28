@@ -111,6 +111,11 @@ export default function CheckoutForm() {
           );
           setDeliveryFee(data.totalDeliveryFee ?? null);
           setServiceFee(totalServiceFee || null);
+        } else {
+          const errData = await res.json().catch(() => ({}));
+          console.error("[CheckoutForm] Quote API error:", res.status, errData);
+          setDeliveryFee(null);
+          setServiceFee(null);
         }
       } catch (err: any) {
         if (err.name !== "AbortError") {
@@ -598,6 +603,7 @@ export default function CheckoutForm() {
               serviceFee={serviceFee}
               isLoadingFee={isLoadingFee}
               isProcessing={isProcessing}
+              hasAddress={!!selectedAddress}
               isDisabled={
                 isProcessing ||
                 !selectedAddress ||
