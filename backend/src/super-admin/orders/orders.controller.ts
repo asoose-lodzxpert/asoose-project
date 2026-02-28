@@ -42,43 +42,8 @@ export class OrdersController {
     return this.ordersService.findAll(query);
   }
 
-  @ApiOperation({ summary: 'Get order details by ID' })
-  @Get(':id')
-  @Roles(
-    UserRole.SUPER_ADMIN,
-    UserRole.ADMIN_MANAGER,
-    UserRole.ADMIN_SUPPORT,
-    UserRole.ADMIN_FINANCE,
-  )
-  findOne(@Param('id') id: string) {
-    return this.ordersService.findOne(id);
-  }
-
-  @ApiOperation({ summary: 'Delete an order record' })
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.ordersService.remove(id);
-  }
-
-  @ApiOperation({ summary: 'Force-update order status (SUPER_ADMIN only)' })
-  @Patch(':id/override')
-  @Roles(UserRole.SUPER_ADMIN) // Restrict to Super Admin only
-  async forceUpdate(
-    @Param('id') id: string,
-    @Body() body: { status: any; reason: string },
-    @Req() req: any,
-  ) {
-    const adminId = req.user.id || req.user.sub;
-    return this.ordersService.forceStatusChange(
-      id,
-      body.status,
-      body.reason,
-      adminId,
-    );
-  }
-
   // ===========================================================================
-  // Admin-managed store order actions
+  // Admin-managed store order actions  (static routes BEFORE :id)
   // ===========================================================================
 
   @ApiOperation({ summary: 'Get all orders across all admin-managed stores' })
@@ -145,5 +110,44 @@ export class OrdersController {
   async adminMarkReady(@Param('orderId') orderId: string, @Req() req: any) {
     const adminId = req.user.id || req.user.sub;
     return this.ordersService.adminMarkReady(orderId, adminId);
+  }
+
+  // ===========================================================================
+  // Dynamic :id routes (must come AFTER all static routes)
+  // ===========================================================================
+
+  @ApiOperation({ summary: 'Get order details by ID' })
+  @Get(':id')
+  @Roles(
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN_MANAGER,
+    UserRole.ADMIN_SUPPORT,
+    UserRole.ADMIN_FINANCE,
+  )
+  findOne(@Param('id') id: string) {
+    return this.ordersService.findOne(id);
+  }
+
+  @ApiOperation({ summary: 'Delete an order record' })
+  @Delete(':id')
+  remove(@Param('id') id: string) {
+    return this.ordersService.remove(id);
+  }
+
+  @ApiOperation({ summary: 'Force-update order status (SUPER_ADMIN only)' })
+  @Patch(':id/override')
+  @Roles(UserRole.SUPER_ADMIN)
+  async forceUpdate(
+    @Param('id') id: string,
+    @Body() body: { status: any; reason: string },
+    @Req() req: any,
+  ) {
+    const adminId = req.user.id || req.user.sub;
+    return this.ordersService.forceStatusChange(
+      id,
+      body.status,
+      body.reason,
+      adminId,
+    );
   }
 }
