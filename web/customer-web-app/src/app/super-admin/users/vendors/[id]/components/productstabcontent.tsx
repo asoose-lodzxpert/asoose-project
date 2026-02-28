@@ -7,6 +7,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Plus,
+  Pencil,
 } from "lucide-react";
 import { Currency } from "@/app/main/components/Currency";
 
@@ -25,6 +26,7 @@ interface ProductsTabProps {
   isLoading?: boolean;
   onToggleBan: (id: string, status: string) => void;
   onAddProduct?: () => void;
+  onEditProduct?: (product: Product) => void;
 }
 
 export default function ProductsTabContent({
@@ -32,6 +34,7 @@ export default function ProductsTabContent({
   onToggleBan,
   isLoading = false,
   onAddProduct,
+  onEditProduct,
 }: ProductsTabProps) {
   const [search, setSearch] = useState("");
 
@@ -160,7 +163,7 @@ export default function ProductsTabContent({
                     <Currency amount={product.price} /> • {product.category}
                   </p>
 
-                  <div className="mt-3">
+                  <div className="mt-3 flex items-center gap-2">
                     <button
                       onClick={() => onToggleBan(product.id, product.status)}
                       className={`text-[10px] font-bold px-3 py-1.5 rounded transition-colors uppercase tracking-wide ${
@@ -173,6 +176,15 @@ export default function ProductsTabContent({
                         ? "Unban Item"
                         : "Ban Item"}
                     </button>
+                    {onEditProduct && (
+                      <button
+                        onClick={() => onEditProduct(product)}
+                        className="text-[10px] font-bold px-3 py-1.5 rounded transition-colors uppercase tracking-wide bg-blue-500/10 text-blue-400 hover:bg-blue-500 hover:text-white border border-blue-500/20 flex items-center gap-1"
+                      >
+                        <Pencil className="w-3 h-3" />
+                        Edit
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>

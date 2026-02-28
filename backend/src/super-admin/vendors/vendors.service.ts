@@ -726,6 +726,102 @@ export class StoresService {
     };
   }
 
+  /**
+   * Admin updates any product fields (name, description, price, stock,
+   * categoryId, image, modifierGroups). Modifier groups are replaced in full
+   * when provided.
+   */
+  async adminUpdateProduct(
+    productId: string,
+    dto: {
+      name?: string;
+      description?: string;
+      price?: number;
+      stock?: number;
+      categoryId?: string;
+      modifierGroups?: Array<{
+        name: string;
+        minSelect?: number;
+        maxSelect?: number;
+        modifiers: Array<{ name: string; price: number }>;
+      }>;
+    },
+    adminId: string,
+    file?: Express.Multer.File,
+  ) {
+    const product = await this.prisma.product.findUnique({
+      where: { id: productId },
+      include: { store: true },
+    });
+    if (!product) throw new NotFoundException('Product not found');
+
+    // Upload new image if provided
+    let images: string[] | undefined;
+    if (file) {
+      const upload = await this.storageService.uploadFile(file);
+      images = [upload.url];
+    }
+
+    const updateData: any = {};
+    if (dto.name?.trim()) updateData.name = dto.name.trim();
+    if (dto.description !== undefined)
+      updateData.description = dto.description?.trim() ?? null;
+    if (dto.price != null && !isNaN(Number(dto.price)))
+      updateData.price = Number(dto.price);
+    if (dto.stock != null && !isNaN(Number(dto.stock)))
+      updateData.stock = Number(dto.stock);
+    if (dto.categoryId) updateData.categoryId = dto.categoryId;
+    if (images) updateData.images = images;
+
+    const updated = await this.prisma.product.update({
+      where: { id: productId },
+      data: updateData,
+      include: { category: { select: { name: true } } },
+    });
+
+    // Replace modifier groups if provided
+    if (dto.modifierGroups !== undefined) {
+      await this.prisma.modifierGroup.deleteMany({ where: { productId } });
+      for (const group of dto.modifierGroups) {
+        if (!group.name?.trim()) continue;
+        await this.prisma.modifierGroup.create({
+          data: {
+            productId,
+            name: group.name.trim(),
+            minSelect: group.minSelect ?? 0,
+            maxSelect: group.maxSelect ?? 1,
+            modifiers: {
+              create: (group.modifiers ?? [])
+                .filter((m) => m.name?.trim())
+                .map((m) => ({
+                  name: m.name.trim(),
+                  price: Number(m.price) || 0,
+                })),
+            },
+          },
+        });
+      }
+    }
+
+    await this.logService.record({
+      userId: adminId,
+      action: 'ADMIN_UPDATE_PRODUCT',
+      target: updated.name,
+      details: `Admin updated product "${updated.name}" in store ${(product as any).store?.name}`,
+      metadata: { productId, storeId: product.storeId },
+    });
+
+    return {
+      id: updated.id,
+      name: updated.name,
+      price: updated.price,
+      image: updated.images?.[0] || null,
+      category: (updated as any).category?.name || 'Uncategorized',
+      status: updated.status,
+      stock: updated.stock,
+    };
+  }
+
   async getVendorProducts(storeId: string) {
     const store = await this.prisma.store.findUnique({
       where: { id: storeId },
@@ -743,9 +839,12 @@ export class StoresService {
     return products.map((p: any) => ({
       id: p.id,
       name: p.name,
+      description: p.description ?? '',
       price: p.price,
+      stock: p.stock ?? 0,
       image: p.images?.[0] || null, // Use first image from array
       category: p.category?.name || 'Uncategorized',
+      categoryId: p.categoryId,
       status: p.status,
       sales: p.salesCount,
     }));

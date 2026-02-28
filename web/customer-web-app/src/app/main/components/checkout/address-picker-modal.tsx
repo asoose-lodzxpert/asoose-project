@@ -82,10 +82,28 @@ export function AddressPickerModal({
         {/* Address list */}
         <div className="overflow-y-auto flex-1 px-5 py-4 space-y-3">
           {addresses.length === 0 ? (
-            <div className="py-8 text-center text-gray-400">
-              <MapPin className="w-10 h-10 mx-auto mb-3 opacity-30" />
-              <p className="font-medium">No saved addresses</p>
-              <p className="text-sm mt-1">Add one to continue</p>
+            <div className="py-10 flex flex-col items-center gap-4 text-center px-4">
+              <div className="w-16 h-16 rounded-full bg-yellow-50 dark:bg-yellow-500/10 flex items-center justify-center">
+                <MapPin className="w-8 h-8 text-yellow-500 opacity-70" />
+              </div>
+              <div>
+                <p className="font-bold text-gray-800 dark:text-white">
+                  No saved addresses
+                </p>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                  Add a delivery address to place your order.
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  onClose();
+                  onAddNew();
+                }}
+                className="flex items-center gap-2 px-5 py-2.5 bg-yellow-500 hover:bg-yellow-400 text-black font-bold rounded-xl text-sm transition-colors shadow-sm shadow-yellow-500/20"
+              >
+                <Plus className="w-4 h-4" />
+                Add Delivery Address
+              </button>
             </div>
           ) : (
             addresses.map((addr) => {

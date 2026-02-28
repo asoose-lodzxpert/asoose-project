@@ -34,16 +34,20 @@ import ProductsTabContent from "./components/productstabcontent";
 import PayoutsTabContent from "./components/payoutstabcontent";
 import DocumentsTab from "@/app/super-admin/component/documentstab";
 import AddProductModal from "./components/addproductmodal";
+import EditProductModal from "./components/editproductmodal";
+import type { EditableProduct } from "./components/editproductmodal";
 import { Currency } from "@/app/main/components/Currency";
 
 // --- Types ---
 interface Product {
   id: string;
   name: string;
+  description?: string;
   price: number;
   status: string;
   image?: string;
   category: string;
+  categoryId?: string;
   stock?: number;
 }
 
@@ -203,6 +207,9 @@ export default function VendorDetailPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isAddProductOpen, setIsAddProductOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<EditableProduct | null>(
+    null,
+  );
   const [addressCoords, setAddressCoords] = useState<{
     lat: number;
     lng: number;
@@ -929,6 +936,19 @@ export default function VendorDetailPage() {
               onToggleBan={toggleProductBan}
               isLoading={isProductsLoading}
               onAddProduct={() => setIsAddProductOpen(true)}
+              onEditProduct={(p) =>
+                setEditingProduct({
+                  id: p.id,
+                  name: p.name,
+                  description: (p as any).description,
+                  price: p.price,
+                  stock: (p as any).stock,
+                  image: p.image,
+                  category: p.category,
+                  categoryId: (p as any).categoryId,
+                  status: p.status,
+                })
+              }
             />
           )}
 
@@ -1030,6 +1050,17 @@ export default function VendorDetailPage() {
         onClose={() => setIsAddProductOpen(false)}
         onSuccess={() => {
           setIsAddProductOpen(false);
+          mutateProducts();
+        }}
+      />
+
+      <EditProductModal
+        isOpen={!!editingProduct}
+        product={editingProduct}
+        storeName={vendor?.name}
+        onClose={() => setEditingProduct(null)}
+        onSuccess={() => {
+          setEditingProduct(null);
           mutateProducts();
         }}
       />

@@ -265,6 +265,43 @@ export class VendorsController {
     return this.storesService.updateProductStatus(productId, status);
   }
 
+  @ApiOperation({ summary: 'Update a vendor product (admin)' })
+  @ApiConsumes('multipart/form-data')
+  @Patch('products/:productId')
+  @UseInterceptors(FileInterceptor('image'))
+  async adminUpdateProduct(
+    @Param('productId') productId: string,
+    @Body() body: any,
+    @Req() req: any,
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
+    const adminId = req.user.id || req.user.userId;
+    let modifierGroups: any[] | undefined;
+    if (body.modifierGroups) {
+      try {
+        modifierGroups =
+          typeof body.modifierGroups === 'string'
+            ? JSON.parse(body.modifierGroups)
+            : body.modifierGroups;
+      } catch {
+        modifierGroups = [];
+      }
+    }
+    return this.storesService.adminUpdateProduct(
+      productId,
+      {
+        name: body.name,
+        description: body.description,
+        price: body.price != null ? Number(body.price) : undefined,
+        stock: body.stock != null ? Number(body.stock) : undefined,
+        categoryId: body.categoryId,
+        modifierGroups,
+      },
+      adminId,
+      file,
+    );
+  }
+
   @ApiOperation({ summary: 'Send a direct message to a vendor' })
   @Post(':id/message')
   async messageVendor(

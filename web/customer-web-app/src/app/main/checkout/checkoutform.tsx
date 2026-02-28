@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useCartStore } from "@/store/useCartStore";
 import { useSession } from "next-auth/react";
-import { WifiOff, Loader2, Phone } from "lucide-react";
+import { WifiOff, Loader2, Phone, MapPin, Plus } from "lucide-react";
 import Swal from "sweetalert2";
 import { toast } from "react-toastify";
 import {
@@ -546,6 +546,30 @@ export default function CheckoutForm() {
             {isLoadingAddresses ? (
               <div className="p-4 flex items-center justify-center">
                 <Loader2 className="w-5 h-5 animate-spin text-yellow-500" />
+              </div>
+            ) : addresses.length === 0 ? (
+              /* ── Empty state: no saved addresses ── */
+              <div className="flex flex-col items-center gap-4 py-6 px-4 rounded-2xl border-2 border-dashed border-gray-200 dark:border-white/10 text-center">
+                <div className="w-14 h-14 rounded-full bg-yellow-50 dark:bg-yellow-500/10 flex items-center justify-center">
+                  <MapPin className="w-7 h-7 text-yellow-500" />
+                </div>
+                <div>
+                  <p className="font-bold text-sm text-gray-900 dark:text-white">
+                    No delivery address yet
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Add an address to complete your order.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowAddAddressModal(true)}
+                  disabled={isProcessing}
+                  className="flex items-center gap-2 px-5 py-2.5 bg-yellow-500 hover:bg-yellow-400 text-black font-bold rounded-xl text-sm transition-colors shadow-sm shadow-yellow-500/20 disabled:opacity-60"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add Delivery Address
+                </button>
               </div>
             ) : (
               <button
