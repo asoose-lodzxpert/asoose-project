@@ -43,9 +43,9 @@ export class MapsController {
   @ApiOperation({
     summary: 'Search addresses with autocomplete (rate-limited)',
   })
-  @ApiBearerAuth()
+  // @ApiBearerAuth()
   @Get('address-search')
-  @UseGuards(JwtAuthGuard)
+  // @UseGuards(JwtAuthGuard)
   @Throttle({ default: { limit: 20, ttl: 60 * 1000 } }) // 20 requests per minute
   async addressSearch(
     @Query('query') query: string,

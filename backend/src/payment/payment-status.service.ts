@@ -396,8 +396,23 @@ export class PaymentStatusService {
         if (payment.orderGroupId && result.orderGroup?.orders) {
           for (const order of result.orderGroup.orders) {
             const orderUser = (order as any).user;
-            // Notify vendor of new confirmed order
-            if (order.store?.vendorId) {
+            // Notify vendor (or admin for admin-managed stores) of new confirmed order
+            if (order.store?.isAdminManaged) {
+              const admins = await this.prisma.user.findMany({
+                where: { role: { in: ['SUPER_ADMIN' as any, 'ADMIN' as any] } },
+                select: { id: true },
+              });
+              for (const admin of admins) {
+                await this.notificationsService.create({
+                  userId: admin.id,
+                  title: `🏪 New Order — ${order.store.name}`,
+                  message: `Order #${order.id.slice(-6)} received at ${order.store.name}. Total: ₦${Number(order.total || 0).toLocaleString()}`,
+                  type: 'ORDER',
+                  category: 'ORDER_CREATED',
+                  metadata: { orderId: order.id, storeName: order.store.name },
+                });
+              }
+            } else if (order.store?.vendorId) {
               await this.notificationsService.createForVendor({
                 vendorId: order.store.vendorId,
                 title: 'New Order Received',
@@ -461,8 +476,26 @@ export class PaymentStatusService {
             this.logger.error('Group delivery OTP email failed', err);
           }
         } else if (result.order?.delivery?.id) {
-          // Single order — notify vendor
-          if (result.order.store?.vendorId) {
+          // Single order — notify vendor (or admin for admin-managed stores)
+          if (result.order.store?.isAdminManaged) {
+            const admins = await this.prisma.user.findMany({
+              where: { role: { in: ['SUPER_ADMIN' as any, 'ADMIN' as any] } },
+              select: { id: true },
+            });
+            for (const admin of admins) {
+              await this.notificationsService.create({
+                userId: admin.id,
+                title: `🏪 New Order — ${result.order.store.name}`,
+                message: `Order #${result.order.id.slice(-6)} received at ${result.order.store.name}. Total: ₦${Number(result.order.total || 0).toLocaleString()}`,
+                type: 'ORDER',
+                category: 'ORDER_CREATED',
+                metadata: {
+                  orderId: result.order.id,
+                  storeName: result.order.store.name,
+                },
+              });
+            }
+          } else if (result.order.store?.vendorId) {
             await this.notificationsService.createForVendor({
               vendorId: result.order.store.vendorId,
               title: 'New Order Received',

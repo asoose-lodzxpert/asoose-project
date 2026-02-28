@@ -10,6 +10,7 @@ import { AppLogger } from 'src/libs/logger/app-logger.service';
 import { TransactionLedgerService } from 'src/super-admin/transactions/transaction-ledger.service';
 import { NotificationsGateway } from '../../notifications/notifications.gateway';
 import { DriverStateService } from '../../matching/driver-state/driver-state.service';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 
 /** Maps a Prisma DeliveryStatus to the rider-app's JobStatus string */
 function deliveryStatusToJobStatus(status: DeliveryStatus): string {
@@ -53,6 +54,7 @@ export class JobsService {
     private readonly transactionLedger: TransactionLedgerService,
     private readonly notificationsGateway: NotificationsGateway,
     private readonly driverStateService: DriverStateService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   /**
@@ -1140,6 +1142,15 @@ export class JobsService {
       } catch (e) {
         this.logger.error('[cancelJob/ride] Socket emit failed', e);
       }
+
+      // Emit event so rider-dispatch.listener can create a dispute if payment was made
+      this.eventEmitter.emit('job.cancelled', {
+        jobId,
+        jobType: 'ride',
+        cancelledBy: 'driver' as const,
+        reason: reason || 'Driver cancelled',
+        customerId: ride.customerId,
+      });
 
       return { message: 'Ride cancelled' };
     }

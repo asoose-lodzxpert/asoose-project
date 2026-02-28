@@ -14,6 +14,7 @@ import {
   ArrowLeft,
   Building2,
   Info,
+  ImagePlus,
 } from "lucide-react";
 import Swal from "sweetalert2";
 import { getSession } from "next-auth/react";
@@ -99,6 +100,24 @@ export default function CreateVendorPage() {
     lng: number;
   } | null>(null);
 
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [bannerFile, setBannerFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [bannerPreview, setBannerPreview] = useState<string | null>(null);
+
+  const handleFileChange =
+    (field: "logo" | "banner") => (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0] ?? null;
+      const url = file ? URL.createObjectURL(file) : null;
+      if (field === "logo") {
+        setLogoFile(file);
+        setLogoPreview(url);
+      } else {
+        setBannerFile(file);
+        setBannerPreview(url);
+      }
+    };
+
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
   ) => {
@@ -156,25 +175,27 @@ export default function CreateVendorPage() {
         process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
       ).replace(/\/$/, "");
 
-      const payload = {
-        name: form.ownerName.trim(),
-        storeName: form.storeName.trim(),
-        email: form.email.trim(),
-        phone: form.phone.trim() || undefined,
-        slug: generateSlug(form.storeName),
-        type: form.type,
-        address: addressText.trim() || undefined,
-        lat: addressCoords?.lat,
-        lng: addressCoords?.lng,
-      };
+      const fd = new FormData();
+      fd.append("name", form.ownerName.trim());
+      fd.append("storeName", form.storeName.trim());
+      fd.append("email", form.email.trim());
+      if (form.phone.trim()) fd.append("phone", form.phone.trim());
+      fd.append("slug", generateSlug(form.storeName));
+      fd.append("type", form.type);
+      if (addressText.trim()) fd.append("address", addressText.trim());
+      if (addressCoords?.lat != null)
+        fd.append("lat", String(addressCoords.lat));
+      if (addressCoords?.lng != null)
+        fd.append("lng", String(addressCoords.lng));
+      if (logoFile) fd.append("logo", logoFile);
+      if (bannerFile) fd.append("banner", bannerFile);
 
       const res = await fetch(`${API_URL}/super-admin/vendors/onboard`, {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
           Authorization: `Bearer ${token || ""}`,
         },
-        body: JSON.stringify(payload),
+        body: fd,
       });
 
       if (!res.ok) {
@@ -341,6 +362,61 @@ export default function CreateVendorPage() {
                     </select>
                   </div>
                 </FormField>
+
+                {/* ── Media: Logo & Banner ── */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  {/* Logo */}
+                  <FormField label="Store Logo" optional>
+                    <label className="flex flex-col items-center justify-center gap-2 border-2 border-dashed border-slate-600/60 rounded-xl p-4 cursor-pointer hover:border-emerald-500/50 transition-colors relative overflow-hidden">
+                      {logoPreview ? (
+                        <img
+                          src={logoPreview}
+                          alt="Logo preview"
+                          className="w-full h-32 object-cover rounded-lg"
+                        />
+                      ) : (
+                        <>
+                          <ImagePlus className="w-8 h-8 text-slate-500" />
+                          <span className="text-xs text-slate-400">
+                            Click to upload logo
+                          </span>
+                        </>
+                      )}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="sr-only"
+                        onChange={handleFileChange("logo")}
+                      />
+                    </label>
+                  </FormField>
+
+                  {/* Banner */}
+                  <FormField label="Store Banner" optional>
+                    <label className="flex flex-col items-center justify-center gap-2 border-2 border-dashed border-slate-600/60 rounded-xl p-4 cursor-pointer hover:border-emerald-500/50 transition-colors relative overflow-hidden">
+                      {bannerPreview ? (
+                        <img
+                          src={bannerPreview}
+                          alt="Banner preview"
+                          className="w-full h-32 object-cover rounded-lg"
+                        />
+                      ) : (
+                        <>
+                          <ImagePlus className="w-8 h-8 text-slate-500" />
+                          <span className="text-xs text-slate-400">
+                            Click to upload banner
+                          </span>
+                        </>
+                      )}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="sr-only"
+                        onChange={handleFileChange("banner")}
+                      />
+                    </label>
+                  </FormField>
+                </div>
 
                 {/* Tab Navigation Button */}
                 <div className="pt-2 flex justify-end">

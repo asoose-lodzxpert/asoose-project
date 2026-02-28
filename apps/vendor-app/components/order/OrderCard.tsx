@@ -171,7 +171,7 @@ export const OrderCard: React.FC<Props> = ({
       </View>
 
       {/* Mark as Ready */}
-      {order.status === "PREPARING" && (
+      {(order.status === "CONFIRMED" || order.status === "PREPARING") && (
         <Pressable
           style={[
             styles.fullButton,
@@ -184,64 +184,6 @@ export const OrderCard: React.FC<Props> = ({
             <ActivityIndicator color="#fff" size="small" />
           ) : (
             <ThemedText style={{ color: "#fff" }}>Mark as Ready</ThemedText>
-          )}
-        </Pressable>
-      )}
-
-      {/* Actions */}
-      {tab === "pending" && order.status === "PENDING" && (
-        <View style={styles.actions}>
-          <Pressable
-            style={[
-              styles.button,
-              {
-                backgroundColor: primary,
-                opacity: accepting || declining ? 0.5 : 1,
-              },
-            ]}
-            onPress={onAccept}
-            disabled={accepting || declining}
-          >
-            {accepting ? (
-              <ActivityIndicator color="#fff" size="small" />
-            ) : (
-              <ThemedText style={{ color: "#fff" }}>Accept</ThemedText>
-            )}
-          </Pressable>
-
-          <Pressable
-            style={[
-              styles.button,
-              {
-                backgroundColor: red,
-                opacity: accepting || declining ? 0.5 : 1,
-              },
-            ]}
-            onPress={onDecline}
-            disabled={accepting || declining}
-          >
-            {declining ? (
-              <ActivityIndicator color="#fff" size="small" />
-            ) : (
-              <ThemedText style={{ color: "#fff" }}>Decline</ThemedText>
-            )}
-          </Pressable>
-        </View>
-      )}
-
-      {tab === "active" && order.status === "CONFIRMED" && (
-        <Pressable
-          style={[
-            styles.fullButton,
-            { backgroundColor: primary, opacity: preparing ? 0.5 : 1 },
-          ]}
-          onPress={onPrepare}
-          disabled={preparing}
-        >
-          {preparing ? (
-            <ActivityIndicator color="#fff" size="small" />
-          ) : (
-            <ThemedText style={{ color: "#fff" }}>Start Preparing</ThemedText>
           )}
         </Pressable>
       )}

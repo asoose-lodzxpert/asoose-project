@@ -27,7 +27,7 @@ export default function DeleteDataPage() {
           </p>
 
           <a
-            href="mailto:support@asoose.com"
+            href="mailto:hello@asoose.com"
             className="inline-block font-medium text-primary underline-offset-4 hover:underline"
           >
             hello@asoose.com

@@ -6,8 +6,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import * as bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
+import { hashPassword } from '../../auth/password-hash.util';
 import {
   Prisma,
   ProductStatus,
@@ -204,7 +204,7 @@ export class StoresService {
 
     const rawPassword =
       dto.password || crypto.randomBytes(8).toString('hex') + '!Aa1';
-    const hashedPassword = await bcrypt.hash(rawPassword, 10);
+    const hashedPassword = await hashPassword(rawPassword);
 
     const result = await this.prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
@@ -245,7 +245,11 @@ export class StoresService {
    * Manually onboards a vendor as ACTIVE + VERIFIED, skipping the PENDING review flow.
    * Optionally creates initial products in the same transaction.
    */
-  async manualOnboard(dto: ManualOnboardVendorDto, adminId: string) {
+  async manualOnboard(
+    dto: ManualOnboardVendorDto,
+    adminId: string,
+    files?: { logo?: Express.Multer.File; banner?: Express.Multer.File },
+  ) {
     // Normalize email the same way loginVendor does, so lookup always matches
     const normalizedEmail = dto.email.toLowerCase().trim();
 
@@ -261,7 +265,19 @@ export class StoresService {
 
     const rawPassword =
       'Asoose@' + crypto.randomBytes(6).toString('hex').toUpperCase() + '1!';
-    const hashedPassword = await bcrypt.hash(rawPassword, 10);
+    const hashedPassword = await hashPassword(rawPassword);
+
+    // Upload logo / banner if provided
+    let logoUrl: string | undefined;
+    let bannerUrl: string | undefined;
+    if (files?.logo) {
+      const upload = await this.storageService.uploadFile(files.logo);
+      logoUrl = upload.url;
+    }
+    if (files?.banner) {
+      const upload = await this.storageService.uploadFile(files.banner);
+      bannerUrl = upload.url;
+    }
 
     const result = await this.prisma.$transaction(async (tx) => {
       // Store.vendorId references the Vendor model, not User.
@@ -291,6 +307,8 @@ export class StoresService {
           status: StoreStatus.ACTIVE,
           verification: VerificationStatus.VERIFIED,
           type: dto.type,
+          logo: logoUrl,
+          banner: bannerUrl,
         },
       });
 

@@ -726,6 +726,15 @@ export class RidesService {
       this.logger.error('Socket error cancelRide', e);
     }
 
+    // Emit event so rider-dispatch.listener can create a dispute if payment was made
+    this.eventBus.emit('job.cancelled', {
+      jobId: rideId,
+      jobType: 'ride',
+      cancelledBy: 'customer' as const,
+      reason,
+      customerId: userId,
+    });
+
     await this.common.logActivity(userId, 'RIDE_CANCELLED', { rideId, reason });
     return { message: 'Ride cancelled' };
   }

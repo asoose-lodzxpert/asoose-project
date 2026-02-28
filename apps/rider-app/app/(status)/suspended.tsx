@@ -13,7 +13,7 @@ export default function SuspendedScreen() {
   const primary = useThemeColor({}, "brandPrimary");
 
   const handleContactSupport = () => {
-    Linking.openURL("mailto:support@asoose.com");
+    Linking.openURL("mailto:hello@asoose.com");
   };
 
   return (

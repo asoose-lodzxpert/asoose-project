@@ -102,8 +102,8 @@ export default function ContactPage() {
               <ContactInfo
                 icon={<Mail />}
                 label="Email"
-                value="support@asoose.com"
-                href="mailto:support@asoose.com"
+                value="hello@asoose.com"
+                href="mailto:hello@asoose.com"
               />
               <ContactInfo
                 icon={<Phone />}

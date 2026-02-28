@@ -93,10 +93,24 @@ export class VendorsController {
   })
   @Post('onboard')
   @Roles(UserRole.SUPER_ADMIN)
-  @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
-  async manualOnboard(@Body() dto: ManualOnboardVendorDto, @Req() req) {
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(
+    FileFieldsInterceptor([
+      { name: 'logo', maxCount: 1 },
+      { name: 'banner', maxCount: 1 },
+    ]),
+  )
+  async manualOnboard(
+    @Body() dto: ManualOnboardVendorDto,
+    @Req() req,
+    @UploadedFiles()
+    files?: { logo?: Express.Multer.File[]; banner?: Express.Multer.File[] },
+  ) {
     const adminId = req.user.id || req.user.userId;
-    return this.storesService.manualOnboard(dto, adminId);
+    return this.storesService.manualOnboard(dto, adminId, {
+      logo: files?.logo?.[0],
+      banner: files?.banner?.[0],
+    });
   }
 
   @ApiOperation({ summary: 'Get vendor performance metrics for N days' })

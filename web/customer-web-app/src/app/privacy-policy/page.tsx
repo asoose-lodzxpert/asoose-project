@@ -474,8 +474,8 @@ export default function PrivacyPolicyPage() {
 
         <p className="text-slate-700 mb-4">
           <strong>Alternative option:</strong> You can also contact our support
-          team at <strong>support@asoose.com</strong> to request account
-          deletion manually.
+          team at <strong>hello@asoose.com</strong> to request account deletion
+          manually.
         </p>
 
         <p className="text-slate-700 mb-4">
@@ -920,7 +920,7 @@ export default function PrivacyPolicyPage() {
             </strong>
           </p>
           <p className="text-slate-700 mb-2">
-            <strong>Email:</strong> support@asoose.com
+            <strong>Email:</strong> hello@asoose.com
           </p>
           <p className="text-slate-700 mb-2">
             <strong>Privacy Team:</strong> privacy@asoose.com

@@ -12,7 +12,7 @@ export default function BannedScreen() {
   const statusError = useThemeColor({}, "statusError");
 
   const handleContactSupport = () => {
-    Linking.openURL("mailto:support@asoose.com");
+    Linking.openURL("mailto:hello@asoose.com");
   };
 
   return (

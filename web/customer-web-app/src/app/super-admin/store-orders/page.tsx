@@ -332,12 +332,31 @@ function OrderCard({
             <ExternalLink className="w-3 h-3 opacity-60" />
           </Link>
         </div>
-        <span
-          className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full ${meta.color}`}
-        >
-          <StatusIcon className="w-3.5 h-3.5" />
-          {meta.label}
-        </span>
+        <div className="flex flex-col items-end gap-1.5">
+          <span
+            className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full ${meta.color}`}
+          >
+            <StatusIcon className="w-3.5 h-3.5" />
+            {meta.label}
+          </span>
+          {order.delivery && (
+            <span
+              className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                order.delivery.status === "DELIVERED"
+                  ? "bg-emerald-500/20 text-emerald-400"
+                  : order.delivery.status === "PICKED_UP"
+                    ? "bg-blue-500/20 text-blue-400"
+                    : order.delivery.status === "ACCEPTED"
+                      ? "bg-sky-500/20 text-sky-400"
+                      : order.delivery.status === "ASSIGNED"
+                        ? "bg-indigo-500/20 text-indigo-400"
+                        : "bg-slate-700 text-slate-400"
+              }`}
+            >
+              🚴 {order.delivery.status}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Customer */}
