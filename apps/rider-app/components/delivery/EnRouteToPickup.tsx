@@ -80,7 +80,8 @@ export default function EnRouteToPickup({
   const isRide = activeJob.jobType === "ride";
   const isMultiStop =
     activeJob.jobType === "delivery" && (activeJob.stops?.length ?? 0) > 1;
-  const canArrive = __DEV__ || (distance !== null && distance <= 50);
+  // const canArrive = __DEV__ || (distance !== null && distance <= 50);
+  const canArrive = true;
   const pickup = resolveAddress(activeJob.pickupAddress);
 
   return (

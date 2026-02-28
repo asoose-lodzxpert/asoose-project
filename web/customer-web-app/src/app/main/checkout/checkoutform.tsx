@@ -303,7 +303,7 @@ export default function CheckoutForm() {
         gateway: selectedPaymentMethod.gateway as any,
         method: selectedPaymentMethod.type as "CARD" | "BANK_TRANSFER",
         type: "ORDER",
-        callbackUrl: process.env.NEXT_PUBLIC_APP_URL,
+        callbackUrl: `${process.env.NEXT_PUBLIC_APP_URL}/payment/callback`,
       };
 
       // FIX: Distinguish between single Order ID and OrderGroup ID

@@ -145,16 +145,25 @@ function CallbackContent() {
         toast.success("Payment verified successfully!");
 
         // ── Route back to the originating flow ──────────────────────────────
+        // Primary: use entity IDs returned directly from the backend verify
+        // response — works even if localStorage was cleared (e.g. different tab).
+        const metaRideId: string | undefined = data.meta?.rideId;
+        const metaOrderGroupId: string | undefined = data.meta?.orderGroupId;
+        const metaOrderId: string | undefined = data.meta?.orderId;
+        const metaDeliveryId: string | undefined = data.meta?.deliveryId;
+
+        // Secondary: localStorage flags set before Paystack redirect (existing flow)
         const isCheckout = localStorage.getItem("pending_checkout");
         // Re-read delivery data in case something changed during the async calls
         const pendingDeliveryData = localStorage.getItem(
           "pending_delivery_data",
         );
 
-        if (isRide) {
+        if (metaRideId || isRide) {
           // Restore ride context into Zustand before navigating so the ride
           // page shows the correct state without waiting for the first poll.
-          const pendingRideId = localStorage.getItem("pending_ride_id");
+          const pendingRideId =
+            metaRideId || localStorage.getItem("pending_ride_id");
           const UUID_RE =
             /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -195,26 +204,33 @@ function CallbackContent() {
           localStorage.removeItem("pending_ride");
           localStorage.removeItem("pending_ride_id");
           router.replace("/main/ride");
-        } else if (isCheckout) {
+        } else if (metaDeliveryId || pendingDeliveryData) {
+          // Delivery — use backend-returned ID first, then localStorage
+          const deliveryId =
+            metaDeliveryId ??
+            (() => {
+              try {
+                return JSON.parse(pendingDeliveryData!).id;
+              } catch {
+                return null;
+              }
+            })();
+          resetDelivery();
+          localStorage.removeItem("pending_delivery_data");
+          router.replace(
+            deliveryId ? `/main/delivery/${deliveryId}` : "/main/delivery",
+          );
+        } else if (metaOrderGroupId || metaOrderId || isCheckout) {
+          // Order — prefer backend-returned group/order ID, fall back to localStorage
           clearCart();
           localStorage.removeItem("pending_checkout");
-          const orderId = localStorage.getItem("last_order_id");
+          const orderId =
+            metaOrderGroupId ||
+            metaOrderId ||
+            localStorage.getItem("last_order_id");
           router.replace(
             orderId ? `/main/orders/confirmed?id=${orderId}` : "/main/orders",
           );
-        } else if (pendingDeliveryData) {
-          try {
-            const { id } = JSON.parse(pendingDeliveryData);
-            // Reset the Zustand delivery store so returning to /main/delivery
-            // after this delivery won't auto-redirect to this tracking page.
-            resetDelivery();
-            localStorage.removeItem("pending_delivery_data");
-            router.replace(id ? `/main/delivery/${id}` : "/main/delivery");
-          } catch (e) {
-            console.error("Failed to parse pending_delivery_data", e);
-            localStorage.removeItem("pending_delivery_data");
-            router.replace("/main/delivery");
-          }
         } else {
           router.replace("/main/store");
         }

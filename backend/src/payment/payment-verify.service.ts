@@ -87,7 +87,13 @@ export class PaymentVerifyService {
 
     const payment = await this.prisma.payment.findUnique({
       where: { reference },
-      select: { metadata: true },
+      select: {
+        metadata: true,
+        orderId: true,
+        orderGroupId: true,
+        rideId: true,
+        deliveryId: true,
+      },
     });
 
     let callbackUrl: string | undefined;
@@ -100,6 +106,15 @@ export class PaymentVerifyService {
       callbackUrl = meta.callbackUrl;
     }
 
-    return { ...verification, meta: { callbackUrl } };
+    return {
+      ...verification,
+      meta: {
+        callbackUrl,
+        orderId: payment?.orderId ?? undefined,
+        orderGroupId: payment?.orderGroupId ?? undefined,
+        rideId: payment?.rideId ?? undefined,
+        deliveryId: payment?.deliveryId ?? undefined,
+      },
+    };
   }
 }

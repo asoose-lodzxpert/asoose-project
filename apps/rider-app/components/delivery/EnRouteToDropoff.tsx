@@ -76,7 +76,8 @@ export default function EnRouteToDropoff({
 
   if (!activeJob) return null;
 
-  const canArrive = __DEV__ || (distance !== null && distance <= 50);
+  // const canArrive = __DEV__ || (distance !== null && distance <= 50);
+  const canArrive = true;
   const dropoff = resolveAddress(activeJob.dropoffAddress);
 
   return (
