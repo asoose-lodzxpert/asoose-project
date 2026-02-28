@@ -23,7 +23,17 @@ export class PaymentVerifyService {
   async verifyPayment(
     reference: string,
     gateway: PaymentGateway,
-  ): Promise<VerifyPaymentResponse & { meta?: { callbackUrl?: string } }> {
+  ): Promise<
+    VerifyPaymentResponse & {
+      meta?: {
+        callbackUrl?: string;
+        orderId?: string | null;
+        orderGroupId?: string | null;
+        rideId?: string | null;
+        deliveryId?: string | null;
+      };
+    }
+  > {
     let verification: VerifyPaymentResponse;
 
     try {
