@@ -46,7 +46,7 @@ export class MapsController {
   // @ApiBearerAuth()
   @Get('address-search')
   // @UseGuards(JwtAuthGuard)
-  @Throttle({ default: { limit: 20, ttl: 60 * 1000 } }) // 20 requests per minute
+  @Throttle({ default: { limit: 20, ttl: 60 * 1000 } }) // 20 requests per minute (s)
   async addressSearch(
     @Query('query') query: string,
     @Query('latitude') latitude?: string,
