@@ -83,6 +83,7 @@ export default function CheckoutScreen() {
     groups: QuoteGroup[];
     totalDeliveryFee: number;
     totalServiceFee: number;
+    totalVatAmount: number;
     grandTotal: number;
   };
   const [quoteResult, setQuoteResult] = useState<QuoteResult | null>(null);
@@ -132,6 +133,10 @@ export default function CheckoutScreen() {
           (sum: number, g: any) => sum + (g.serviceFee ?? 0),
           0,
         );
+        const totalVatAmount = (data.groups ?? []).reduce(
+          (sum: number, g: any) => sum + (g.vatAmount ?? 0),
+          0,
+        );
         setQuoteResult({
           groups: (data.groups ?? []).map((g: any) => ({
             storeId: g.storeId ?? g.restaurantId ?? "",
@@ -141,6 +146,7 @@ export default function CheckoutScreen() {
           })),
           totalDeliveryFee: data.totalDeliveryFee ?? 0,
           totalServiceFee,
+          totalVatAmount,
           grandTotal: data.grandTotal ?? 0,
         });
       } catch (err: any) {
@@ -168,7 +174,10 @@ export default function CheckoutScreen() {
   const resolvedDelivery = quoteResult?.totalDeliveryFee ?? deliveryFee;
   const resolvedService =
     quoteResult?.totalServiceFee ?? Math.round(subtotal * 0.05);
-  const resolvedGrandTotal = subtotal + resolvedDelivery + resolvedService;
+  const resolvedVat =
+    quoteResult?.totalVatAmount ?? Math.round(subtotal * 0.07);
+  const resolvedGrandTotal =
+    subtotal + resolvedDelivery + resolvedService + resolvedVat;
 
   const handlePlaceOrder = async () => {
     if (!selectedAddress) {
@@ -441,7 +450,7 @@ export default function CheckoutScreen() {
                     </ThemedText>
                   )}
                 </View>
-                <View style={[styles.summaryRow, { marginBottom: 12 }]}>
+                <View style={[styles.summaryRow, { marginBottom: 6 }]}>
                   <ThemedText style={{ color: textSecondary, fontSize: 13 }}>
                     Service Fee (5%)
                   </ThemedText>
@@ -452,6 +461,20 @@ export default function CheckoutScreen() {
                   ) : (
                     <ThemedText style={{ fontSize: 13 }}>
                       {formatCurrency(resolvedService, currencySymbol)}
+                    </ThemedText>
+                  )}
+                </View>
+                <View style={[styles.summaryRow, { marginBottom: 12 }]}>
+                  <ThemedText style={{ color: textSecondary, fontSize: 13 }}>
+                    VAT (7%)
+                  </ThemedText>
+                  {isLoadingFee ? (
+                    <ThemedText style={{ fontSize: 13, color: textSecondary }}>
+                      Calculating...
+                    </ThemedText>
+                  ) : (
+                    <ThemedText style={{ fontSize: 13 }}>
+                      {formatCurrency(resolvedVat, currencySymbol)}
                     </ThemedText>
                   )}
                 </View>

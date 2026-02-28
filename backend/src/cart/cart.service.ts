@@ -176,6 +176,8 @@ export class CartService {
       // the floor (MIN_FEE). The checkout page fetches an exact quote via
       // POST /users/cart/quote once the user selects an address.
       const deliveryFee = this.pricingService.calculateDeliveryFee(0);
+      const serviceFee = this.pricingService.calculateServiceFee(g.total);
+      const vatAmount = this.pricingService.calculateVat(g.total);
       return {
         restaurant: {
           id: g.store.id,
@@ -185,15 +187,19 @@ export class CartService {
         items: g.items,
         subtotal: g.total,
         deliveryFee,
-        total: g.total + deliveryFee,
+        serviceFee,
+        vatAmount,
+        total: g.total + deliveryFee + serviceFee + vatAmount,
       };
     });
 
     const grandTotal = groups.reduce((acc, g) => acc + g.total, 0);
+    const totalVatAmount = groups.reduce((acc, g) => acc + g.vatAmount, 0);
 
     return {
       groups,
       grandTotal,
+      totalVatAmount,
     };
   }
 }

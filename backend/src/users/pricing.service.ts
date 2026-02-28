@@ -36,6 +36,13 @@ export class PricingService {
   }
 
   /**
+   * Calculates VAT at 7% of subtotal
+   */
+  public calculateVat(subtotal: number): number {
+    return Math.round(subtotal * 0.07);
+  }
+
+  /**
    * Calculates distance between two coordinates using Haversine formula
    */
   public calculateDistance(

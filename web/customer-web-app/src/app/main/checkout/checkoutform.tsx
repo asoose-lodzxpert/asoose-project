@@ -49,6 +49,7 @@ export default function CheckoutForm() {
   // Live fee state fetched from backend
   const [deliveryFee, setDeliveryFee] = useState<number | null>(null);
   const [serviceFee, setServiceFee] = useState<number | null>(null);
+  const [vatAmount, setVatAmount] = useState<number | null>(null);
   const [isLoadingFee, setIsLoadingFee] = useState(false);
   const quoteAbortRef = useRef<AbortController | null>(null);
 
@@ -72,6 +73,7 @@ export default function CheckoutForm() {
       if (!address || cartItems.length === 0) {
         setDeliveryFee(null);
         setServiceFee(null);
+        setVatAmount(null);
         return;
       }
       const token = session?.accessToken;
@@ -105,23 +107,31 @@ export default function CheckoutForm() {
           const data = await res.json();
           // data.totalDeliveryFee is the route-optimized total
           // data.groups[*].serviceFee summed = total service fee
+          // data.groups[*].vatAmount summed = total VAT
           const totalServiceFee = (data.groups ?? []).reduce(
             (sum: number, g: any) => sum + (g.serviceFee ?? 0),
             0,
           );
+          const totalVatAmount = (data.groups ?? []).reduce(
+            (sum: number, g: any) => sum + (g.vatAmount ?? 0),
+            0,
+          );
           setDeliveryFee(data.totalDeliveryFee ?? null);
           setServiceFee(totalServiceFee || null);
+          setVatAmount(totalVatAmount || null);
         } else {
           const errData = await res.json().catch(() => ({}));
           console.error("[CheckoutForm] Quote API error:", res.status, errData);
           setDeliveryFee(null);
           setServiceFee(null);
+          setVatAmount(null);
         }
       } catch (err: any) {
         if (err.name !== "AbortError") {
           // Silently fail — user sees fallback text
           setDeliveryFee(null);
           setServiceFee(null);
+          setVatAmount(null);
         }
       } finally {
         setIsLoadingFee(false);
@@ -601,6 +611,7 @@ export default function CheckoutForm() {
               cartTotal={cartTotal}
               deliveryFee={deliveryFee}
               serviceFee={serviceFee}
+              vatAmount={vatAmount}
               isLoadingFee={isLoadingFee}
               isProcessing={isProcessing}
               hasAddress={!!selectedAddress}

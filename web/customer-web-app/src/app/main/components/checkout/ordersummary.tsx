@@ -7,6 +7,7 @@ interface OrderSummaryProps {
   cartTotal: number;
   deliveryFee: number | null;
   serviceFee: number | null;
+  vatAmount?: number | null;
   isProcessing: boolean;
   isDisabled: boolean;
   isLoadingFee?: boolean;
@@ -19,6 +20,7 @@ export const OrderSummary = ({
   cartTotal,
   deliveryFee,
   serviceFee,
+  vatAmount,
   isProcessing,
   isDisabled,
   isLoadingFee = false,
@@ -27,7 +29,9 @@ export const OrderSummary = ({
 }: OrderSummaryProps) => {
   const resolvedDelivery = deliveryFee ?? 0;
   const resolvedService = serviceFee ?? Math.round(cartTotal * 0.05);
-  const grandTotal = cartTotal + resolvedDelivery + resolvedService;
+  const resolvedVat = vatAmount ?? Math.round(cartTotal * 0.07);
+  const grandTotal =
+    cartTotal + resolvedDelivery + resolvedService + resolvedVat;
 
   return (
     <div className="bg-white dark:bg-[#151515] p-6 rounded-3xl border border-gray-100 dark:border-white/5 shadow-sm">
@@ -63,6 +67,14 @@ export const OrderSummary = ({
             <span className="w-12 h-4 bg-gray-200 dark:bg-white/10 rounded animate-pulse" />
           ) : (
             <span>₦{resolvedService.toLocaleString()}</span>
+          )}
+        </div>
+        <div className="flex justify-between text-gray-600 dark:text-gray-400">
+          <span>VAT (7%)</span>
+          {isLoadingFee ? (
+            <span className="w-12 h-4 bg-gray-200 dark:bg-white/10 rounded animate-pulse" />
+          ) : (
+            <span>₦{resolvedVat.toLocaleString()}</span>
           )}
         </div>
       </div>

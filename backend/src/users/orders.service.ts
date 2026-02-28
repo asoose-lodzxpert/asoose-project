@@ -166,12 +166,15 @@ export class OrdersService {
 
       const deliveryFee = this.pricingService.calculateDeliveryFee(distance);
       const serviceFee = this.pricingService.calculateServiceFee(subtotal);
-      const total = subtotal + deliveryFee + serviceFee;
+      const vatAmount = this.pricingService.calculateVat(subtotal);
+      const total = subtotal + deliveryFee + serviceFee + vatAmount;
 
       return {
         subtotal,
         deliveryFee,
         serviceFee,
+        vatAmount,
+        vatRate: 0.07,
         total,
         distanceKm: parseFloat(distance.toFixed(2)),
         estimatedTime: this.calculateETA(distance),
@@ -313,7 +316,8 @@ export class OrdersService {
             : Math.round(totalDeliveryFee / storeEntries.length);
 
         const serviceFee = this.pricingService.calculateServiceFee(s.subtotal);
-        const total = s.subtotal + deliveryFee + serviceFee;
+        const vatAmount = this.pricingService.calculateVat(s.subtotal);
+        const total = s.subtotal + deliveryFee + serviceFee + vatAmount;
 
         return {
           storeName: s.storeName,
@@ -322,15 +326,18 @@ export class OrdersService {
           subtotal: s.subtotal,
           deliveryFee,
           serviceFee,
+          vatAmount,
           total,
         };
       });
 
       const grandTotal = breakdown.reduce((sum, b) => sum + b.total, 0);
+      const totalVatAmount = breakdown.reduce((sum, b) => sum + b.vatAmount, 0);
 
       return {
         groups: breakdown,
         totalDeliveryFee,
+        totalVatAmount,
         grandTotal,
         totalRouteKm: parseFloat(totalRouteKm.toFixed(2)),
         currency: 'NGN',

@@ -24,18 +24,65 @@ import { BullMQAdapter } from '@bull-board/api/bullMQAdapter';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
-    // Required for Paystack (and other gateway) webhook HMAC signature verification.
-    // Provides req.rawBody as the exact byte-perfect request body before JSON parsing.
-    // Provides req.rawBody as the exact byte-perfect request body before JSON parsing.
     rawBody: true,
   });
+
+  const isDevelopment = process.env.NODE_ENV !== 'production';
+  if (isDevelopment) {
+    app.enableCors({
+      origin: true,
+      credentials: true,
+      methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+      allowedHeaders: [
+        'Content-Type',
+        'Authorization',
+        'X-Requested-With',
+        'Accept',
+        'Origin',
+        'Idempotency-Key',
+        'x-idempotency-key',
+      ],
+    });
+  } else {
+    if (!process.env.CORS_ORIGIN) {
+      throw new Error(
+        'CORS_ORIGIN environment variable must be set in production',
+      );
+    }
+    const allowedOrigins = process.env.CORS_ORIGIN
+      .replace(/^["']|["']$/g, '')
+      .split(',')
+      .map((origin) => origin.trim().replace(/^["']|["']$/g, ''))
+      .filter((origin) => origin.length > 0);
+    app.enableCors({
+      origin: (origin, callback) => {
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.includes(origin)) {
+          callback(null, true);
+        } else {
+          appLogger.warn(`CORS blocked origin: ${origin}`, { context: 'CORS' });
+          callback(null, false);
+        }
+      },
+      methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+      credentials: true,
+      allowedHeaders: [
+        'Content-Type',
+        'Authorization',
+        'X-Requested-With',
+        'Accept',
+        'Origin',
+        'Idempotency-Key',
+        'x-idempotency-key',
+      ],
+      exposedHeaders: ['X-Total-Count', 'X-Page-Number'],
+      maxAge: 86400,
+    });
+  }
 
   app.use(helmet());
   app.use(compression());
 
-  // Attach correlation ID to every request/response (reads x-correlation-id
-  // header if present, otherwise generates a UUID). Must be registered before
-  // any interceptors so req.correlationId is always set.
   const correlationMiddleware = new CorrelationMiddleware();
   app.use(correlationMiddleware.use.bind(correlationMiddleware));
 
@@ -52,19 +99,12 @@ async function bootstrap() {
     prefix: '/uploads',
   });
 
-  // NOTE: The static asset route above is kept for local development only.
-  // In production all files must be stored in S3; this route will serve nothing
-  // meaningful in an ephemeral container and can be removed once S3 is the
-  // exclusive storage backend.
-
   app.useGlobalFilters(new HttpExceptionFilter());
   app.useGlobalInterceptors(
     new HttpLoggingInterceptor(app.get(AppLogger)),
     app.get(HttpMetricsInterceptor),
   );
 
-  // Restrict /metrics to internal scrapers only in production.
-  // Set METRICS_ALLOWED_IPS (comma-separated) to lock it down.
   app.use('/metrics', (req: any, res: any, next: any) => {
     if (process.env.NODE_ENV !== 'production') return next();
     const allowedIps = (process.env.METRICS_ALLOWED_IPS || '')
@@ -96,64 +136,6 @@ async function bootstrap() {
       },
     }),
   );
-  const isDevelopment = process.env.NODE_ENV !== 'production';
-  if (isDevelopment) {
-    app.enableCors({
-      origin: true,
-      credentials: true,
-      methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
-      allowedHeaders: [
-        'Content-Type',
-        'Authorization',
-        'X-Requested-With',
-        'Accept',
-        'Origin',
-        'Idempotency-Key',
-        'x-idempotency-key',
-      ],
-    });
-  } else {
-    if (!process.env.CORS_ORIGIN) {
-      throw new Error(
-        'CORS_ORIGIN environment variable must be set in production',
-      );
-    }
-    const allowedOrigins = process.env.CORS_ORIGIN
-      // strip surrounding quotes some platforms inject: "https://x.com" → https://x.com
-      .replace(/^["']|["']$/g, '')
-      .split(',')
-      .map((origin) => origin.trim().replace(/^["']|["']$/g, ''))
-      .filter((origin) => origin.length > 0);
-    app.enableCors({
-      origin: (origin, callback) => {
-        // Allow server-to-server and mobile app requests (no Origin header)
-        if (!origin) return callback(null, true);
-        if (allowedOrigins.includes(origin)) {
-          callback(null, true);
-        } else {
-          // Use callback(null, false) instead of throwing an Error so the
-          // rejection is handled silently by the CORS middleware (returns no
-          // Access-Control-Allow-Origin header) without propagating to the
-          // global HttpExceptionFilter and spamming the ERROR log.
-          appLogger.warn(`CORS blocked origin: ${origin}`, { context: 'CORS' });
-          callback(null, false);
-        }
-      },
-      methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
-      credentials: true,
-      allowedHeaders: [
-        'Content-Type',
-        'Authorization',
-        'X-Requested-With',
-        'Accept',
-        'Origin',
-        'Idempotency-Key',
-        'x-idempotency-key',
-      ],
-      exposedHeaders: ['X-Total-Count', 'X-Page-Number'],
-      maxAge: 86400,
-    });
-  }
   const port = process.env.PORT ?? 3000;
 
   // Setup Bull Board
@@ -175,15 +157,13 @@ async function bootstrap() {
           new BullMQAdapter(rideMatchingQueue),
           new BullMQAdapter(deliveryMatchingQueue),
           new BullMQAdapter(driverInactivityQueue),
-          new BullMQAdapter(notificationQueue),
+          new BullMQAdapter(notificationQueue), 
           new BullMQAdapter(assignmentTimeoutQueue),
           new BullMQAdapter(emailQueue),
         ],
         serverAdapter,
       });
 
-      // Protect Bull Board: only allow BULL_BOARD_ALLOWED_IPS in production,
-      // or all traffic in development.
       const allowedIps = (process.env.BULL_BOARD_ALLOWED_IPS || '')
         .split(',')
         .map((ip) => ip.trim())

@@ -41,6 +41,12 @@ export default function CartScreen() {
 
   const currency = restaurants[0]?.currency ?? "₦";
 
+  // Estimated fees (previews; exact amounts confirmed at checkout after address selection)
+  const estimatedServiceFee = Math.round(subtotal * 0.05);
+  const estimatedVat = Math.round(subtotal * 0.07);
+  const estimatedTotal =
+    subtotal + deliveryFee + estimatedServiceFee + estimatedVat;
+
   const grouped = useMemo(() => {
     const map = new Map<string, any>();
     items.forEach((item) => {
@@ -258,6 +264,26 @@ export default function CartScreen() {
             </ThemedText>
           </View>
 
+          <View style={styles.summaryRow}>
+            <ThemedText style={[styles.summaryLabel, { color: textSub }]}>
+              Service Fee (5%)
+            </ThemedText>
+            <ThemedText style={[styles.summaryValue, { color: textMain }]}>
+              {currency}
+              {estimatedServiceFee.toLocaleString()}
+            </ThemedText>
+          </View>
+
+          <View style={styles.summaryRow}>
+            <ThemedText style={[styles.summaryLabel, { color: textSub }]}>
+              VAT (7%)
+            </ThemedText>
+            <ThemedText style={[styles.summaryValue, { color: textMain }]}>
+              {currency}
+              {estimatedVat.toLocaleString()}
+            </ThemedText>
+          </View>
+
           <View style={[styles.divider, { backgroundColor: border }]} />
 
           <View style={styles.summaryRow}>
@@ -266,7 +292,7 @@ export default function CartScreen() {
             </ThemedText>
             <ThemedText style={[styles.totalValue, { color: primary }]}>
               {currency}
-              {total.toLocaleString()}
+              {estimatedTotal.toLocaleString()}
             </ThemedText>
           </View>
         </View>
@@ -298,7 +324,7 @@ export default function CartScreen() {
         >
           <ThemedText style={[styles.checkoutText, { color: onPrimary }]}>
             Checkout · {currency}
-            {total.toLocaleString()}
+            {estimatedTotal.toLocaleString()}
           </ThemedText>
         </Pressable>
       </View>
