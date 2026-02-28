@@ -145,13 +145,7 @@ export async function loadServiceBounds(): Promise<void> {
 }
 
 async function fetchAndCache(): Promise<void> {
-  const res = await fetch(`${_API_BASE}/maps/service-bounds`, {
-    headers: {
-      ...(typeof __DEV__ !== "undefined" && __DEV__
-        ? { "ngrok-skip-browser-warning": "true" }
-        : {}),
-    },
-  });
+  const res = await fetch(`${_API_BASE}/maps/service-bounds`);
   if (!res.ok) throw new Error(`service-bounds: ${res.status}`);
   const payload = (await res.json()) as RemoteBoundsPayload;
   applyPayload(payload);

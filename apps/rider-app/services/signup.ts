@@ -55,7 +55,6 @@ export async function registerRider(
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "ngrok-skip-browser-warning": "true",
       },
       body: JSON.stringify(payload),
     });
@@ -90,9 +89,7 @@ export async function uploadDocument(
     const res = await fetch(`${EXPO_PUBLIC_API_URL}/storage/upload-public`, {
       method: "POST",
       body: formData,
-      headers: {
-        "ngrok-skip-browser-warning": "true",
-      },
+      headers: {},
     });
 
     if (!res.ok) {

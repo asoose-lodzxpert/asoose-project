@@ -140,7 +140,12 @@ function ModifierGroupCard({
   onUpdate: (id: string, field: keyof ModifierGroup, value: any) => void;
   onRemoveGroup: (id: string) => void;
   onAddOption: (groupId: string) => void;
-  onUpdateOption: (groupId: string, optionId: string, field: "name" | "price", value: string) => void;
+  onUpdateOption: (
+    groupId: string,
+    optionId: string,
+    field: "name" | "price",
+    value: string,
+  ) => void;
   onRemoveOption: (groupId: string, optionId: string) => void;
 }) {
   return (
@@ -162,7 +167,11 @@ function ModifierGroupCard({
             onClick={() => onUpdate(group.id, "collapsed", !group.collapsed)}
             className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-all"
           >
-            {group.collapsed ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
+            {group.collapsed ? (
+              <ChevronDown className="w-3.5 h-3.5" />
+            ) : (
+              <ChevronUp className="w-3.5 h-3.5" />
+            )}
           </button>
           <button
             type="button"
@@ -177,21 +186,29 @@ function ModifierGroupCard({
         <div className="p-3 space-y-3">
           <div className="flex gap-3">
             <div className="flex-1 space-y-1">
-              <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Min Required</label>
+              <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+                Min Required
+              </label>
               <input
                 type="number"
                 value={group.minSelect}
-                onChange={(e) => onUpdate(group.id, "minSelect", e.target.value)}
+                onChange={(e) =>
+                  onUpdate(group.id, "minSelect", e.target.value)
+                }
                 min="0"
                 className="w-full bg-slate-900/70 border border-slate-700/50 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-yellow-500/50"
               />
             </div>
             <div className="flex-1 space-y-1">
-              <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Max Allowed</label>
+              <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+                Max Allowed
+              </label>
               <input
                 type="number"
                 value={group.maxSelect}
-                onChange={(e) => onUpdate(group.id, "maxSelect", e.target.value)}
+                onChange={(e) =>
+                  onUpdate(group.id, "maxSelect", e.target.value)
+                }
                 min="1"
                 className="w-full bg-slate-900/70 border border-slate-700/50 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-yellow-500/50"
               />
@@ -199,14 +216,20 @@ function ModifierGroupCard({
           </div>
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Options ({group.options.length})</label>
-              <span className="text-[10px] text-slate-600 font-medium">name  extra price</span>
+              <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+                Options ({group.options.length})
+              </label>
+              <span className="text-[10px] text-slate-600 font-medium">
+                name extra price
+              </span>
             </div>
             {group.options.map((opt) => (
               <OptionRow
                 key={opt.id}
                 option={opt}
-                onUpdate={(optId, field, val) => onUpdateOption(group.id, optId, field, val)}
+                onUpdate={(optId, field, val) =>
+                  onUpdateOption(group.id, optId, field, val)
+                }
                 onRemove={(optId) => onRemoveOption(group.id, optId)}
                 canRemove={group.options.length > 1}
               />
@@ -241,7 +264,9 @@ export default function AddProductModal({
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [activeSection, setActiveSection] = useState<"details" | "modifiers">("details");
+  const [activeSection, setActiveSection] = useState<"details" | "modifiers">(
+    "details",
+  );
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [form, setForm] = useState({
@@ -256,12 +281,20 @@ export default function AddProductModal({
 
   useEffect(() => {
     document.body.style.overflow = isOpen ? "hidden" : "unset";
-    return () => { document.body.style.overflow = "unset"; };
+    return () => {
+      document.body.style.overflow = "unset";
+    };
   }, [isOpen]);
 
   useEffect(() => {
     if (isOpen) {
-      setForm({ name: "", description: "", price: "", stock: "0", categoryId: "" });
+      setForm({
+        name: "",
+        description: "",
+        price: "",
+        stock: "0",
+        categoryId: "",
+      });
       setImageFile(null);
       setImagePreview(null);
       setImageError(null);
@@ -280,75 +313,148 @@ export default function AddProductModal({
       fetch(`${BACKEND_URL}/super-admin/vendors/categories`, {
         headers: {
           Authorization: `Bearer ${token || ""}`,
-          "ngrok-skip-browser-warning": "true",
         },
       })
-        .then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+        .then((r) => {
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          return r.json();
+        })
         .then((data) => {
-          const list: Category[] = Array.isArray(data) ? data : data?.data ?? [];
+          const list: Category[] = Array.isArray(data)
+            ? data
+            : (data?.data ?? []);
           setCategories(list);
           if (list.length === 0) setCategoriesError("No categories found.");
         })
-        .catch(() => { setCategories([]); setCategoriesError("Failed to load categories. Please close and re-open."); })
+        .catch(() => {
+          setCategories([]);
+          setCategoriesError(
+            "Failed to load categories. Please close and re-open.",
+          );
+        })
         .finally(() => setIsCategoriesLoading(false));
     });
   }, [isOpen]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+  const handleChange = (
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+    >,
+  ) => {
     const { name, value } = e.target;
     setForm((prev) => ({ ...prev, [name]: value }));
-    if (errors[name]) setErrors((prev) => { const n = { ...prev }; delete n[name]; return n; });
+    if (errors[name])
+      setErrors((prev) => {
+        const n = { ...prev };
+        delete n[name];
+        return n;
+      });
   };
 
   const handleFileChange = useCallback((file: File | null) => {
     setImageError(null);
-    if (!file) { setImageFile(null); setImagePreview(null); return; }
+    if (!file) {
+      setImageFile(null);
+      setImagePreview(null);
+      return;
+    }
     const err = validateFile(file);
-    if (err) { setImageError(err); return; }
+    if (err) {
+      setImageError(err);
+      return;
+    }
     setImageFile(file);
     const reader = new FileReader();
     reader.onloadend = () => setImagePreview(reader.result as string);
     reader.readAsDataURL(file);
   }, []);
 
-  const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    handleFileChange(e.dataTransfer.files?.[0] ?? null);
-  }, [handleFileChange]);
+  const handleDrop = useCallback(
+    (e: React.DragEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      handleFileChange(e.dataTransfer.files?.[0] ?? null);
+    },
+    [handleFileChange],
+  );
 
   const addGroup = () => setModifierGroups((prev) => [...prev, newGroup()]);
-  const removeGroup = (id: string) => setModifierGroups((prev) => prev.filter((g) => g.id !== id));
+  const removeGroup = (id: string) =>
+    setModifierGroups((prev) => prev.filter((g) => g.id !== id));
   const updateGroup = (id: string, field: keyof ModifierGroup, value: any) =>
-    setModifierGroups((prev) => prev.map((g) => (g.id === id ? { ...g, [field]: value } : g)));
+    setModifierGroups((prev) =>
+      prev.map((g) => (g.id === id ? { ...g, [field]: value } : g)),
+    );
   const addOption = (groupId: string) =>
     setModifierGroups((prev) =>
-      prev.map((g) => g.id === groupId ? { ...g, options: [...g.options, { id: uid(), name: "", price: "0" }] } : g));
-  const updateOption = (groupId: string, optionId: string, field: "name" | "price", value: string) =>
+      prev.map((g) =>
+        g.id === groupId
+          ? {
+              ...g,
+              options: [...g.options, { id: uid(), name: "", price: "0" }],
+            }
+          : g,
+      ),
+    );
+  const updateOption = (
+    groupId: string,
+    optionId: string,
+    field: "name" | "price",
+    value: string,
+  ) =>
     setModifierGroups((prev) =>
-      prev.map((g) => g.id === groupId ? { ...g, options: g.options.map((o) => o.id === optionId ? { ...o, [field]: value } : o) } : g));
+      prev.map((g) =>
+        g.id === groupId
+          ? {
+              ...g,
+              options: g.options.map((o) =>
+                o.id === optionId ? { ...o, [field]: value } : o,
+              ),
+            }
+          : g,
+      ),
+    );
   const removeOption = (groupId: string, optionId: string) =>
     setModifierGroups((prev) =>
-      prev.map((g) => g.id === groupId ? { ...g, options: g.options.filter((o) => o.id !== optionId) } : g));
+      prev.map((g) =>
+        g.id === groupId
+          ? { ...g, options: g.options.filter((o) => o.id !== optionId) }
+          : g,
+      ),
+    );
 
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {};
     if (!form.name.trim()) newErrors.name = "Product name is required.";
-    if (!form.price || isNaN(Number(form.price)) || Number(form.price) < 0) newErrors.price = "Enter a valid price ( 0).";
+    if (!form.price || isNaN(Number(form.price)) || Number(form.price) < 0)
+      newErrors.price = "Enter a valid price ( 0).";
     if (!form.categoryId) newErrors.categoryId = "Select a category.";
-    if (form.stock !== "" && (isNaN(Number(form.stock)) || Number(form.stock) < 0)) newErrors.stock = "Stock must be a non-negative number.";
+    if (
+      form.stock !== "" &&
+      (isNaN(Number(form.stock)) || Number(form.stock) < 0)
+    )
+      newErrors.stock = "Stock must be a non-negative number.";
     for (let i = 0; i < modifierGroups.length; i++) {
       const g = modifierGroups[i];
-      if (!g.name.trim()) newErrors[`group_${g.id}_name`] = `Group ${i + 1}: name is required.`;
-      const min = Number(g.minSelect); const max = Number(g.maxSelect);
-      if (isNaN(min) || min < 0) newErrors[`group_${g.id}_min`] = `Group ${i + 1}: min must be  0.`;
-      if (isNaN(max) || max < 1) newErrors[`group_${g.id}_max`] = `Group ${i + 1}: max must be  1.`;
-      if (!isNaN(min) && !isNaN(max) && min > max) newErrors[`group_${g.id}_range`] = `Group ${i + 1}: min cannot exceed max.`;
+      if (!g.name.trim())
+        newErrors[`group_${g.id}_name`] = `Group ${i + 1}: name is required.`;
+      const min = Number(g.minSelect);
+      const max = Number(g.maxSelect);
+      if (isNaN(min) || min < 0)
+        newErrors[`group_${g.id}_min`] = `Group ${i + 1}: min must be  0.`;
+      if (isNaN(max) || max < 1)
+        newErrors[`group_${g.id}_max`] = `Group ${i + 1}: max must be  1.`;
+      if (!isNaN(min) && !isNaN(max) && min > max)
+        newErrors[`group_${g.id}_range`] =
+          `Group ${i + 1}: min cannot exceed max.`;
       for (let j = 0; j < g.options.length; j++) {
-        if (!g.options[j].name.trim()) newErrors[`group_${g.id}_opt_${j}`] = `Group ${i + 1}, option ${j + 1}: name required.`;
+        if (!g.options[j].name.trim())
+          newErrors[`group_${g.id}_opt_${j}`] =
+            `Group ${i + 1}, option ${j + 1}: name required.`;
       }
     }
     setErrors(newErrors);
-    if (Object.keys(newErrors).some((k) => k.startsWith("group_"))) setActiveSection("modifiers");
+    if (Object.keys(newErrors).some((k) => k.startsWith("group_")))
+      setActiveSection("modifiers");
     return Object.keys(newErrors).length === 0;
   };
 
@@ -361,7 +467,8 @@ export default function AddProductModal({
       const token = (session as any)?.accessToken;
       const formData = new FormData();
       formData.append("name", form.name.trim());
-      if (form.description.trim()) formData.append("description", form.description.trim());
+      if (form.description.trim())
+        formData.append("description", form.description.trim());
       formData.append("price", String(Number(form.price)));
       formData.append("stock", String(Number(form.stock) || 0));
       formData.append("categoryId", form.categoryId);
@@ -371,31 +478,58 @@ export default function AddProductModal({
           name: g.name.trim(),
           minSelect: Number(g.minSelect) || 0,
           maxSelect: Number(g.maxSelect) || 1,
-          modifiers: g.options.filter((o) => o.name.trim()).map((o) => ({ name: o.name.trim(), price: Number(o.price) || 0 })),
+          modifiers: g.options
+            .filter((o) => o.name.trim())
+            .map((o) => ({ name: o.name.trim(), price: Number(o.price) || 0 })),
         }));
         formData.append("modifierGroups", JSON.stringify(serialized));
       }
-      const res = await fetch(`${BACKEND_URL}/super-admin/vendors/${storeId}/products`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token || ""}`, "ngrok-skip-browser-warning": "true" },
-        body: formData,
-      });
+      const res = await fetch(
+        `${BACKEND_URL}/super-admin/vendors/${storeId}/products`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token || ""}`,
+          },
+          body: formData,
+        },
+      );
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        const msg = Array.isArray(err.message) ? err.message.join(", ") : err.message || "Failed to create product";
+        const msg = Array.isArray(err.message)
+          ? err.message.join(", ")
+          : err.message || "Failed to create product";
         throw new Error(msg);
       }
-      const totalModifiers = modifierGroups.reduce((sum, g) => sum + g.options.filter((o) => o.name.trim()).length, 0);
-      const modifierSummary = modifierGroups.length > 0 ? ` with ${modifierGroups.length} modifier group(s) (${totalModifiers} options)` : "";
+      const totalModifiers = modifierGroups.reduce(
+        (sum, g) => sum + g.options.filter((o) => o.name.trim()).length,
+        0,
+      );
+      const modifierSummary =
+        modifierGroups.length > 0
+          ? ` with ${modifierGroups.length} modifier group(s) (${totalModifiers} options)`
+          : "";
       Swal.fire({
-        icon: "success", title: "Product Added!",
+        icon: "success",
+        title: "Product Added!",
         text: `"${form.name.trim()}" has been added to ${storeName || "the store"}${modifierSummary}.`,
-        background: "#1E293B", color: "#fff", confirmButtonColor: "#eab308", timer: 3000, showConfirmButton: false,
+        background: "#1E293B",
+        color: "#fff",
+        confirmButtonColor: "#eab308",
+        timer: 3000,
+        showConfirmButton: false,
       });
       onSuccess();
       onClose();
     } catch (error: any) {
-      Swal.fire({ icon: "error", title: "Failed to Add Product", text: error.message, background: "#1E293B", color: "#fff", confirmButtonColor: "#ef4444" });
+      Swal.fire({
+        icon: "error",
+        title: "Failed to Add Product",
+        text: error.message,
+        background: "#1E293B",
+        color: "#fff",
+        confirmButtonColor: "#ef4444",
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -403,8 +537,12 @@ export default function AddProductModal({
 
   if (!isOpen) return null;
 
-  const hasModifierErrors = Object.keys(errors).some((k) => k.startsWith("group_"));
-  const hasDetailErrors = Object.keys(errors).some((k) => !k.startsWith("group_"));
+  const hasModifierErrors = Object.keys(errors).some((k) =>
+    k.startsWith("group_"),
+  );
+  const hasDetailErrors = Object.keys(errors).some(
+    (k) => !k.startsWith("group_"),
+  );
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
@@ -415,33 +553,56 @@ export default function AddProductModal({
               <Package className="w-5 h-5 text-yellow-500" />
               Add Product
             </h2>
-            {storeName && <p className="text-xs text-gray-500 mt-0.5">to {storeName}</p>}
+            {storeName && (
+              <p className="text-xs text-gray-500 mt-0.5">to {storeName}</p>
+            )}
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-gray-800 rounded-lg text-gray-400 hover:text-white transition-colors">
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-gray-800 rounded-lg text-gray-400 hover:text-white transition-colors"
+          >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         <div className="flex border-b border-gray-800 shrink-0">
-          <button type="button" onClick={() => setActiveSection("details")}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-semibold transition-all border-b-2 ${activeSection === "details" ? "border-yellow-500 text-yellow-400" : "border-transparent text-gray-500 hover:text-gray-300"}`}>
+          <button
+            type="button"
+            onClick={() => setActiveSection("details")}
+            className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-semibold transition-all border-b-2 ${activeSection === "details" ? "border-yellow-500 text-yellow-400" : "border-transparent text-gray-500 hover:text-gray-300"}`}
+          >
             <Package className="w-4 h-4" />
             Product Details
-            {hasDetailErrors && <span className="w-2 h-2 rounded-full bg-red-500 shrink-0" />}
+            {hasDetailErrors && (
+              <span className="w-2 h-2 rounded-full bg-red-500 shrink-0" />
+            )}
           </button>
-          <button type="button" onClick={() => setActiveSection("modifiers")}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-semibold transition-all border-b-2 ${activeSection === "modifiers" ? "border-yellow-500 text-yellow-400" : "border-transparent text-gray-500 hover:text-gray-300"}`}>
+          <button
+            type="button"
+            onClick={() => setActiveSection("modifiers")}
+            className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-semibold transition-all border-b-2 ${activeSection === "modifiers" ? "border-yellow-500 text-yellow-400" : "border-transparent text-gray-500 hover:text-gray-300"}`}
+          >
             <Settings2 className="w-4 h-4" />
             Modifiers
             {modifierGroups.length > 0 && !hasModifierErrors && (
-              <span className="px-1.5 py-0.5 bg-yellow-500/20 text-yellow-400 text-[10px] font-bold rounded-full">{modifierGroups.length}</span>
+              <span className="px-1.5 py-0.5 bg-yellow-500/20 text-yellow-400 text-[10px] font-bold rounded-full">
+                {modifierGroups.length}
+              </span>
             )}
-            {hasModifierErrors && <span className="w-2 h-2 rounded-full bg-red-500 shrink-0" />}
+            {hasModifierErrors && (
+              <span className="w-2 h-2 rounded-full bg-red-500 shrink-0" />
+            )}
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="overflow-y-auto flex-1" encType="multipart/form-data">
-          <div className={`p-5 space-y-5 ${activeSection !== "details" ? "hidden" : ""}`}>
+        <form
+          onSubmit={handleSubmit}
+          className="overflow-y-auto flex-1"
+          encType="multipart/form-data"
+        >
+          <div
+            className={`p-5 space-y-5 ${activeSection !== "details" ? "hidden" : ""}`}
+          >
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-gray-400 uppercase flex items-center gap-1.5">
                 <ImagePlus className="w-3.5 h-3.5" /> Product Image
@@ -449,102 +610,217 @@ export default function AddProductModal({
               {imagePreview ? (
                 <div className="relative group w-full h-40 rounded-lg overflow-hidden border border-gray-700 bg-[#0F172A]">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+                  <img
+                    src={imagePreview}
+                    alt="Preview"
+                    className="w-full h-full object-cover"
+                  />
                   <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <button type="button" onClick={() => { setImageFile(null); setImagePreview(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}
-                      className="p-2 bg-red-500 rounded-full text-white hover:bg-red-400 transition-colors">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setImageFile(null);
+                        setImagePreview(null);
+                        if (fileInputRef.current)
+                          fileInputRef.current.value = "";
+                      }}
+                      className="p-2 bg-red-500 rounded-full text-white hover:bg-red-400 transition-colors"
+                    >
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
               ) : (
-                <div onDrop={handleDrop} onDragOver={(e) => e.preventDefault()} onClick={() => fileInputRef.current?.click()}
-                  className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer transition-colors ${imageError ? "border-red-500/50 bg-red-500/5" : "border-gray-700 bg-[#0F172A] hover:border-yellow-500/50 hover:bg-yellow-500/5"}`}>
+                <div
+                  onDrop={handleDrop}
+                  onDragOver={(e) => e.preventDefault()}
+                  onClick={() => fileInputRef.current?.click()}
+                  className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer transition-colors ${imageError ? "border-red-500/50 bg-red-500/5" : "border-gray-700 bg-[#0F172A] hover:border-yellow-500/50 hover:bg-yellow-500/5"}`}
+                >
                   <ImagePlus className="w-6 h-6 text-gray-600 mb-1.5" />
-                  <p className="text-sm text-gray-500 font-medium">Click or drag &amp; drop to upload</p>
-                  <p className="text-xs text-gray-600 mt-0.5">JPEG, PNG, WebP, GIF  Max {MAX_FILE_SIZE_MB} MB</p>
+                  <p className="text-sm text-gray-500 font-medium">
+                    Click or drag &amp; drop to upload
+                  </p>
+                  <p className="text-xs text-gray-600 mt-0.5">
+                    JPEG, PNG, WebP, GIF Max {MAX_FILE_SIZE_MB} MB
+                  </p>
                 </div>
               )}
-              <input ref={fileInputRef} type="file" accept={ALLOWED_TYPES.join(",")} className="hidden"
-                onChange={(e) => handleFileChange(e.target.files?.[0] ?? null)} />
-              {imageError && <p className="flex items-center gap-1.5 text-xs text-red-400"><AlertCircle className="w-3.5 h-3.5 shrink-0" /> {imageError}</p>}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept={ALLOWED_TYPES.join(",")}
+                className="hidden"
+                onChange={(e) => handleFileChange(e.target.files?.[0] ?? null)}
+              />
+              {imageError && (
+                <p className="flex items-center gap-1.5 text-xs text-red-400">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" /> {imageError}
+                </p>
+              )}
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-gray-400 uppercase">Product Name <span className="text-red-500">*</span></label>
+              <label className="text-xs font-bold text-gray-400 uppercase">
+                Product Name <span className="text-red-500">*</span>
+              </label>
               <div className="relative">
                 <Package className="absolute left-3 top-3 w-4 h-4 text-gray-500" />
-                <input type="text" name="name" value={form.name} onChange={handleChange} placeholder="e.g. Margherita Pizza"
-                  className={`w-full bg-[#0F172A] border rounded-lg pl-10 pr-4 py-2.5 text-sm text-white focus:outline-none placeholder:text-gray-600 transition-colors ${errors.name ? "border-red-500" : "border-gray-700 focus:border-yellow-500"}`} />
+                <input
+                  type="text"
+                  name="name"
+                  value={form.name}
+                  onChange={handleChange}
+                  placeholder="e.g. Margherita Pizza"
+                  className={`w-full bg-[#0F172A] border rounded-lg pl-10 pr-4 py-2.5 text-sm text-white focus:outline-none placeholder:text-gray-600 transition-colors ${errors.name ? "border-red-500" : "border-gray-700 focus:border-yellow-500"}`}
+                />
               </div>
-              {errors.name && <p className="text-xs text-red-400 flex items-center gap-1"><AlertCircle className="w-3 h-3" /> {errors.name}</p>}
+              {errors.name && (
+                <p className="text-xs text-red-400 flex items-center gap-1">
+                  <AlertCircle className="w-3 h-3" /> {errors.name}
+                </p>
+              )}
             </div>
 
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-gray-400 uppercase flex items-center gap-1">
-                <FileText className="w-3.5 h-3.5" /> Description <span className="text-gray-600 font-normal normal-case ml-1">(optional)</span>
+                <FileText className="w-3.5 h-3.5" /> Description{" "}
+                <span className="text-gray-600 font-normal normal-case ml-1">
+                  (optional)
+                </span>
               </label>
-              <textarea name="description" value={form.description} onChange={handleChange} placeholder="Short product description..." rows={2}
-                className="w-full bg-[#0F172A] border border-gray-700 rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:border-yellow-500 placeholder:text-gray-600 resize-none transition-colors" />
+              <textarea
+                name="description"
+                value={form.description}
+                onChange={handleChange}
+                placeholder="Short product description..."
+                rows={2}
+                className="w-full bg-[#0F172A] border border-gray-700 rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:border-yellow-500 placeholder:text-gray-600 resize-none transition-colors"
+              />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-gray-400 uppercase">Price () <span className="text-red-500">*</span></label>
+                <label className="text-xs font-bold text-gray-400 uppercase">
+                  Price () <span className="text-red-500">*</span>
+                </label>
                 <div className="relative">
                   <DollarSign className="absolute left-3 top-3 w-4 h-4 text-gray-500" />
-                  <input type="number" name="price" value={form.price} onChange={handleChange} placeholder="0.00" min="0" step="0.01"
-                    className={`w-full bg-[#0F172A] border rounded-lg pl-10 pr-4 py-2.5 text-sm text-white focus:outline-none placeholder:text-gray-600 transition-colors ${errors.price ? "border-red-500" : "border-gray-700 focus:border-yellow-500"}`} />
+                  <input
+                    type="number"
+                    name="price"
+                    value={form.price}
+                    onChange={handleChange}
+                    placeholder="0.00"
+                    min="0"
+                    step="0.01"
+                    className={`w-full bg-[#0F172A] border rounded-lg pl-10 pr-4 py-2.5 text-sm text-white focus:outline-none placeholder:text-gray-600 transition-colors ${errors.price ? "border-red-500" : "border-gray-700 focus:border-yellow-500"}`}
+                  />
                 </div>
-                {errors.price && <p className="text-xs text-red-400 flex items-center gap-1"><AlertCircle className="w-3 h-3" /> {errors.price}</p>}
+                {errors.price && (
+                  <p className="text-xs text-red-400 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3" /> {errors.price}
+                  </p>
+                )}
               </div>
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-gray-400 uppercase flex items-center gap-1"><Hash className="w-3.5 h-3.5" /> Stock / Qty</label>
-                <input type="number" name="stock" value={form.stock} onChange={handleChange} placeholder="0" min="0"
-                  className={`w-full bg-[#0F172A] border rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none placeholder:text-gray-600 transition-colors ${errors.stock ? "border-red-500" : "border-gray-700 focus:border-yellow-500"}`} />
-                {errors.stock && <p className="text-xs text-red-400 flex items-center gap-1"><AlertCircle className="w-3 h-3" /> {errors.stock}</p>}
+                <label className="text-xs font-bold text-gray-400 uppercase flex items-center gap-1">
+                  <Hash className="w-3.5 h-3.5" /> Stock / Qty
+                </label>
+                <input
+                  type="number"
+                  name="stock"
+                  value={form.stock}
+                  onChange={handleChange}
+                  placeholder="0"
+                  min="0"
+                  className={`w-full bg-[#0F172A] border rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none placeholder:text-gray-600 transition-colors ${errors.stock ? "border-red-500" : "border-gray-700 focus:border-yellow-500"}`}
+                />
+                {errors.stock && (
+                  <p className="text-xs text-red-400 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3" /> {errors.stock}
+                  </p>
+                )}
               </div>
             </div>
 
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-gray-400 uppercase flex items-center gap-1">
-                <Tag className="w-3.5 h-3.5" /> Category <span className="text-red-500">*</span>
+                <Tag className="w-3.5 h-3.5" /> Category{" "}
+                <span className="text-red-500">*</span>
               </label>
-              <select name="categoryId" value={form.categoryId} onChange={handleChange}
-                className={`w-full bg-[#0F172A] border rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none appearance-none cursor-pointer transition-colors ${errors.categoryId ? "border-red-500" : "border-gray-700 focus:border-yellow-500"}`}>
+              <select
+                name="categoryId"
+                value={form.categoryId}
+                onChange={handleChange}
+                className={`w-full bg-[#0F172A] border rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none appearance-none cursor-pointer transition-colors ${errors.categoryId ? "border-red-500" : "border-gray-700 focus:border-yellow-500"}`}
+              >
                 <option value="">Select a category</option>
-                {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
               </select>
-              {errors.categoryId && <p className="text-xs text-red-400 flex items-center gap-1"><AlertCircle className="w-3 h-3" /> {errors.categoryId}</p>}
-              {isCategoriesLoading && <p className="text-xs text-gray-500 flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> Loading categories...</p>}
-              {!isCategoriesLoading && categoriesError && <p className="text-xs text-red-400 flex items-center gap-1"><AlertCircle className="w-3 h-3" /> {categoriesError}</p>}
+              {errors.categoryId && (
+                <p className="text-xs text-red-400 flex items-center gap-1">
+                  <AlertCircle className="w-3 h-3" /> {errors.categoryId}
+                </p>
+              )}
+              {isCategoriesLoading && (
+                <p className="text-xs text-gray-500 flex items-center gap-1">
+                  <Loader2 className="w-3 h-3 animate-spin" /> Loading
+                  categories...
+                </p>
+              )}
+              {!isCategoriesLoading && categoriesError && (
+                <p className="text-xs text-red-400 flex items-center gap-1">
+                  <AlertCircle className="w-3 h-3" /> {categoriesError}
+                </p>
+              )}
             </div>
 
-            <button type="button" onClick={() => setActiveSection("modifiers")}
-              className="w-full flex items-center justify-between px-4 py-3 bg-slate-800/60 border border-slate-700/50 hover:border-yellow-500/30 hover:bg-yellow-500/5 rounded-xl text-sm text-slate-400 hover:text-yellow-400 transition-all">
+            <button
+              type="button"
+              onClick={() => setActiveSection("modifiers")}
+              className="w-full flex items-center justify-between px-4 py-3 bg-slate-800/60 border border-slate-700/50 hover:border-yellow-500/30 hover:bg-yellow-500/5 rounded-xl text-sm text-slate-400 hover:text-yellow-400 transition-all"
+            >
               <span className="flex items-center gap-2 font-semibold">
                 <Settings2 className="w-4 h-4" />
                 Modifier Groups
                 {modifierGroups.length > 0 ? (
                   <span className="ml-1 px-2 py-0.5 bg-yellow-500/20 text-yellow-400 text-[10px] font-bold rounded-full">
-                    {modifierGroups.length} group{modifierGroups.length !== 1 ? "s" : ""}
+                    {modifierGroups.length} group
+                    {modifierGroups.length !== 1 ? "s" : ""}
                   </span>
                 ) : (
-                  <span className="text-slate-600 font-normal text-xs ml-1">(none)</span>
+                  <span className="text-slate-600 font-normal text-xs ml-1">
+                    (none)
+                  </span>
                 )}
               </span>
               <ChevronDown className="w-4 h-4" />
             </button>
           </div>
 
-          <div className={`p-5 space-y-4 ${activeSection !== "modifiers" ? "hidden" : ""}`}>
+          <div
+            className={`p-5 space-y-4 ${activeSection !== "modifiers" ? "hidden" : ""}`}
+          >
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h3 className="text-sm font-bold text-white">Modifier Groups</h3>
-                <p className="text-xs text-gray-500 mt-0.5">Add customization options like size, toppings, or add-ons that customers can select when ordering.</p>
+                <h3 className="text-sm font-bold text-white">
+                  Modifier Groups
+                </h3>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Add customization options like size, toppings, or add-ons that
+                  customers can select when ordering.
+                </p>
               </div>
-              <button type="button" onClick={addGroup}
-                className="shrink-0 flex items-center gap-1.5 px-3 py-2 bg-yellow-500 hover:bg-yellow-400 text-black text-xs font-bold rounded-lg transition-colors">
+              <button
+                type="button"
+                onClick={addGroup}
+                className="shrink-0 flex items-center gap-1.5 px-3 py-2 bg-yellow-500 hover:bg-yellow-400 text-black text-xs font-bold rounded-lg transition-colors"
+              >
                 <Plus className="w-3.5 h-3.5" />
                 Add Group
               </button>
@@ -553,7 +829,11 @@ export default function AddProductModal({
               <div className="flex items-start gap-2 bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-2.5">
                 <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
                 <div className="text-xs text-red-300 space-y-0.5">
-                  {Object.entries(errors).filter(([k]) => k.startsWith("group_")).map(([k, v]) => <p key={k}>{v}</p>)}
+                  {Object.entries(errors)
+                    .filter(([k]) => k.startsWith("group_"))
+                    .map(([k, v]) => (
+                      <p key={k}>{v}</p>
+                    ))}
                 </div>
               </div>
             )}
@@ -562,10 +842,18 @@ export default function AddProductModal({
                 <div className="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center">
                   <Settings2 className="w-6 h-6 text-slate-600" />
                 </div>
-                <p className="text-sm text-slate-500 font-medium">No modifier groups yet</p>
-                <p className="text-xs text-slate-600 max-w-xs">Add groups like "Size", "Extras", or "Toppings" with options customers can choose from.</p>
-                <button type="button" onClick={addGroup}
-                  className="flex items-center gap-2 px-4 py-2 bg-yellow-500/10 hover:bg-yellow-500/20 border border-yellow-500/30 text-yellow-400 text-sm font-semibold rounded-lg transition-all">
+                <p className="text-sm text-slate-500 font-medium">
+                  No modifier groups yet
+                </p>
+                <p className="text-xs text-slate-600 max-w-xs">
+                  Add groups like "Size", "Extras", or "Toppings" with options
+                  customers can choose from.
+                </p>
+                <button
+                  type="button"
+                  onClick={addGroup}
+                  className="flex items-center gap-2 px-4 py-2 bg-yellow-500/10 hover:bg-yellow-500/20 border border-yellow-500/30 text-yellow-400 text-sm font-semibold rounded-lg transition-all"
+                >
                   <Plus className="w-4 h-4" />
                   Add First Group
                 </button>
@@ -584,8 +872,11 @@ export default function AddProductModal({
                     onRemoveOption={removeOption}
                   />
                 ))}
-                <button type="button" onClick={addGroup}
-                  className="w-full flex items-center justify-center gap-2 py-3 border-2 border-dashed border-slate-700 hover:border-yellow-500/40 hover:bg-yellow-500/5 rounded-xl text-sm font-semibold text-slate-500 hover:text-yellow-400 transition-all">
+                <button
+                  type="button"
+                  onClick={addGroup}
+                  className="w-full flex items-center justify-center gap-2 py-3 border-2 border-dashed border-slate-700 hover:border-yellow-500/40 hover:bg-yellow-500/5 rounded-xl text-sm font-semibold text-slate-500 hover:text-yellow-400 transition-all"
+                >
                   <Plus className="w-4 h-4" />
                   Add Another Group
                 </button>
@@ -595,20 +886,33 @@ export default function AddProductModal({
         </form>
 
         <div className="px-5 py-4 border-t border-gray-800 shrink-0 flex gap-3 bg-[#1E293B]">
-          <button type="button" onClick={onClose} disabled={isSubmitting}
-            className="flex-1 py-2.5 border border-gray-600 rounded-lg text-gray-300 font-medium hover:bg-gray-800 transition-colors text-sm disabled:opacity-50">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isSubmitting}
+            className="flex-1 py-2.5 border border-gray-600 rounded-lg text-gray-300 font-medium hover:bg-gray-800 transition-colors text-sm disabled:opacity-50"
+          >
             Cancel
           </button>
-          <button type="button" onClick={() => handleSubmit()} disabled={isSubmitting}
-            className="flex-1 py-2.5 bg-yellow-500 hover:bg-yellow-400 text-black font-bold rounded-lg transition-colors text-sm flex justify-center items-center gap-2 disabled:opacity-50">
+          <button
+            type="button"
+            onClick={() => handleSubmit()}
+            disabled={isSubmitting}
+            className="flex-1 py-2.5 bg-yellow-500 hover:bg-yellow-400 text-black font-bold rounded-lg transition-colors text-sm flex justify-center items-center gap-2 disabled:opacity-50"
+          >
             {isSubmitting ? (
-              <><Loader2 className="w-4 h-4 animate-spin" /> Adding...</>
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" /> Adding...
+              </>
             ) : (
               <>
                 <Check className="w-4 h-4" />
                 Add Product
                 {modifierGroups.length > 0 && (
-                  <span className="text-xs opacity-75">+ {modifierGroups.length} group{modifierGroups.length !== 1 ? "s" : ""}</span>
+                  <span className="text-xs opacity-75">
+                    + {modifierGroups.length} group
+                    {modifierGroups.length !== 1 ? "s" : ""}
+                  </span>
                 )}
               </>
             )}

@@ -98,11 +98,7 @@ export const LocationBlock: React.FC<Props> = ({
     fetch(
       `${_API}/maps/reverse-geocode?lat=${location.lat}&lng=${location.lng}`,
       {
-        headers: {
-          ...(typeof __DEV__ !== "undefined" && __DEV__
-            ? { "ngrok-skip-browser-warning": "true" }
-            : {}),
-        },
+        headers: {},
       },
     )
       .then((r) => r.json())

@@ -3,12 +3,13 @@ const API_URL = process.env.EXPO_PUBLIC_API_URL;
 /**
  * Send OTP to rider's email for password reset
  */
-export async function sendPasswordResetOtp(email: string): Promise<{ message: string }> {
+export async function sendPasswordResetOtp(
+  email: string,
+): Promise<{ message: string }> {
   const response = await fetch(`${API_URL}/auth/rider/send-otp`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "ngrok-skip-browser-warning": "true",
     },
     body: JSON.stringify({ email }),
   });
@@ -24,12 +25,14 @@ export async function sendPasswordResetOtp(email: string): Promise<{ message: st
 /**
  * Verify OTP for password reset
  */
-export async function verifyResetOtp(email: string, otp: string): Promise<boolean> {
+export async function verifyResetOtp(
+  email: string,
+  otp: string,
+): Promise<boolean> {
   const response = await fetch(`${API_URL}/auth/rider/verify-otp`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "ngrok-skip-browser-warning": "true",
     },
     body: JSON.stringify({ email, otp }),
   });
@@ -48,13 +51,12 @@ export async function verifyResetOtp(email: string, otp: string): Promise<boolea
 export async function resetPassword(
   email: string,
   otp: string,
-  newPassword: string
+  newPassword: string,
 ): Promise<{ message: string }> {
   const response = await fetch(`${API_URL}/auth/rider/reset-password`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "ngrok-skip-browser-warning": "true",
     },
     body: JSON.stringify({ email, otp, newPassword }),
   });

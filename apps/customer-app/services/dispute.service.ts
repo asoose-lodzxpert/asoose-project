@@ -125,7 +125,6 @@ export async function uploadDisputeImage(uri: string): Promise<string> {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
-      ...((__DEV__ as boolean) ? { "ngrok-skip-browser-warning": "true" } : {}),
     },
     body: formData,
   });

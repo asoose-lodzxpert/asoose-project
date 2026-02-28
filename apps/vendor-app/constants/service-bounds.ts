@@ -11,9 +11,10 @@
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-const _API_BASE: string = (
-  process.env.EXPO_PUBLIC_API_URL ?? ""
-).replace(/\/+$/, "");
+const _API_BASE: string = (process.env.EXPO_PUBLIC_API_URL ?? "").replace(
+  /\/+$/,
+  "",
+);
 
 export interface ServiceBounds {
   name: string;
@@ -25,7 +26,13 @@ export interface ServiceBounds {
 
 // ── Maiduguri fallback ────────────────────────────────────────────────────────
 const FALLBACK_BOUNDS: ServiceBounds[] = [
-  { name: "Maiduguri", minLat: 11.7, maxLat: 11.95, minLng: 13.0, maxLng: 13.3 },
+  {
+    name: "Maiduguri",
+    minLat: 11.7,
+    maxLat: 11.95,
+    minLng: 13.0,
+    maxLng: 13.3,
+  },
 ];
 
 // Private mutable cache — updated by loadServiceBounds()
@@ -92,13 +99,15 @@ type RemoteBoundsPayload = {
 
 function applyPayload(payload: RemoteBoundsPayload) {
   if (Array.isArray(payload.bounds) && payload.bounds.length > 0) {
-    _activeBounds = payload.bounds.map(({ name, minLat, maxLat, minLng, maxLng }) => ({
-      name,
-      minLat,
-      maxLat,
-      minLng,
-      maxLng,
-    }));
+    _activeBounds = payload.bounds.map(
+      ({ name, minLat, maxLat, minLng, maxLng }) => ({
+        name,
+        minLat,
+        maxLat,
+        minLng,
+        maxLng,
+      }),
+    );
   }
   if (payload.defaultCenter) {
     Object.assign(DEFAULT_MAP_CENTER, payload.defaultCenter);
@@ -136,16 +145,9 @@ export async function loadServiceBounds(): Promise<void> {
 }
 
 async function fetchAndCache(): Promise<void> {
-  const res = await fetch(
-    `${_API_BASE}/maps/service-bounds`,
-    {
-      headers: {
-        ...(typeof __DEV__ !== "undefined" && __DEV__
-          ? { "ngrok-skip-browser-warning": "true" }
-          : {}),
-      },
-    },
-  );
+  const res = await fetch(`${_API_BASE}/maps/service-bounds`, {
+    headers: {},
+  });
   if (!res.ok) throw new Error(`service-bounds: ${res.status}`);
   const payload = (await res.json()) as RemoteBoundsPayload;
   applyPayload(payload);
@@ -154,4 +156,3 @@ async function fetchAndCache(): Promise<void> {
     JSON.stringify({ payload, timestamp: Date.now() }),
   );
 }
-

@@ -75,7 +75,6 @@ async function httpRequest({
 
   const composedHeaders: Record<string, string> = {
     "Content-Type": "application/json",
-    "ngrok-skip-browser-warning": "true",
     ...headers,
   };
 

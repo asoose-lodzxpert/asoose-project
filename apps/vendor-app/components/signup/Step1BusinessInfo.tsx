@@ -108,9 +108,6 @@ export const Step1BusinessInfo: React.FC<Step1Props> = ({ data, onChange }) => {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            ...((__DEV__ as boolean)
-              ? { "ngrok-skip-browser-warning": "true" }
-              : {}),
           },
           body: JSON.stringify({ email: data.businessEmail }),
         },
@@ -169,9 +166,6 @@ export const Step1BusinessInfo: React.FC<Step1Props> = ({ data, onChange }) => {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            ...((__DEV__ as boolean)
-              ? { "ngrok-skip-browser-warning": "true" }
-              : {}),
           },
           body: JSON.stringify({
             email: data.businessEmail,

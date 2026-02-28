@@ -9,7 +9,6 @@ export async function sendVendorOtp(email: string) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        ...(__DEV__ ? { "ngrok-skip-browser-warning": "true" } : {}),
       },
       body: JSON.stringify({ email }),
     },
@@ -25,7 +24,6 @@ export async function verifyVendorOtp(email: string, otp: string) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        ...(__DEV__ ? { "ngrok-skip-browser-warning": "true" } : {}),
       },
       body: JSON.stringify({ email, otp }),
     },
@@ -45,7 +43,6 @@ export async function resetVendorPassword(
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        ...(__DEV__ ? { "ngrok-skip-browser-warning": "true" } : {}),
       },
       body: JSON.stringify({ email, otp, newPassword }),
     },

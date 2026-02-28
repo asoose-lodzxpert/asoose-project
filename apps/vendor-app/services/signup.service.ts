@@ -15,47 +15,47 @@ export interface SignupData {
 
 // Map frontend business type to backend
 function mapBusinessTypeToBackend(type: string): string {
-  switch ((type || '').toUpperCase()) {
-    case 'RESTAURANT & CAFE':
-    case 'FAST FOOD':
-    case 'FOOD DELIVERY':
-      return 'RESTAURANT';
-    case 'GROCERY & SUPERMARKET':
-      return 'GROCERY';
-    case 'PHARMACY':
-      return 'PHARMACY';
-    case 'FASHION & CLOTHING':
-      return 'FASHION';
-    case 'ELECTRONICS & GADGETS':
-      return 'ELECTRONICS';
-    case 'HOME & FURNITURE':
-      return 'FURNITURE';
-    case 'BEAUTY & PERSONAL CARE':
-      return 'BEAUTY';
-    case 'HEALTH & FITNESS':
-      return 'HEALTH';
-    case 'EDUCATION & TUTORING':
-      return 'EDUCATION';
-    case 'PROFESSIONAL SERVICES':
-      return 'SERVICES';
-    case 'AUTOMOTIVE':
-      return 'AUTOMOTIVE';
-    case 'TRAVEL & TOURISM':
-      return 'TRAVEL';
-    case 'ENTERTAINMENT':
-      return 'ENTERTAINMENT';
-    case 'RETAIL SHOP':
-      return 'RETAIL';
-    case 'ONLINE STORE':
-      return 'ONLINE';
-    case 'MANUFACTURING':
-      return 'MANUFACTURING';
-    case 'LOGISTICS & SHIPPING':
-      return 'LOGISTICS';
-    case 'OTHER':
-      return 'OTHER';
+  switch ((type || "").toUpperCase()) {
+    case "RESTAURANT & CAFE":
+    case "FAST FOOD":
+    case "FOOD DELIVERY":
+      return "RESTAURANT";
+    case "GROCERY & SUPERMARKET":
+      return "GROCERY";
+    case "PHARMACY":
+      return "PHARMACY";
+    case "FASHION & CLOTHING":
+      return "FASHION";
+    case "ELECTRONICS & GADGETS":
+      return "ELECTRONICS";
+    case "HOME & FURNITURE":
+      return "FURNITURE";
+    case "BEAUTY & PERSONAL CARE":
+      return "BEAUTY";
+    case "HEALTH & FITNESS":
+      return "HEALTH";
+    case "EDUCATION & TUTORING":
+      return "EDUCATION";
+    case "PROFESSIONAL SERVICES":
+      return "SERVICES";
+    case "AUTOMOTIVE":
+      return "AUTOMOTIVE";
+    case "TRAVEL & TOURISM":
+      return "TRAVEL";
+    case "ENTERTAINMENT":
+      return "ENTERTAINMENT";
+    case "RETAIL SHOP":
+      return "RETAIL";
+    case "ONLINE STORE":
+      return "ONLINE";
+    case "MANUFACTURING":
+      return "MANUFACTURING";
+    case "LOGISTICS & SHIPPING":
+      return "LOGISTICS";
+    case "OTHER":
+      return "OTHER";
     default:
-      return 'OTHER';
+      return "OTHER";
   }
 }
 
@@ -67,7 +67,6 @@ export async function signupVendor(data: SignupData) {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...(__DEV__ ? { "ngrok-skip-browser-warning": "true" } : {}),
         },
         body: JSON.stringify({
           name: data.step1.businessName,

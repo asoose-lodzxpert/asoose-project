@@ -110,7 +110,6 @@ async function bootstrap() {
         'Origin',
         'Idempotency-Key',
         'x-idempotency-key',
-        'ngrok-skip-browser-warning',
       ],
     });
   } else {

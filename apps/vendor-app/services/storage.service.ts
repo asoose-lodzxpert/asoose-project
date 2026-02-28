@@ -91,7 +91,6 @@ export async function deleteFile(url: string): Promise<void> {
       headers: {
         "Content-Type": "application/json",
         ...(token && { Authorization: `Bearer ${token}` }),
-        ...(__DEV__ ? { "ngrok-skip-browser-warning": "true" } : {}),
       },
       body: JSON.stringify({ url }),
     },
