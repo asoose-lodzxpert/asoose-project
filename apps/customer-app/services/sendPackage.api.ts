@@ -128,8 +128,17 @@ export async function createDelivery(deliveryData: any) {
       JSON.stringify(body, null, 2),
     );
 
+  // The backend requires a unique x-idempotency-key header to prevent duplicate
+  // deliveries when requests are retried after network errors. A UUID v4 is
+  // generated per call; the backend deduplicates within a 5-minute Redis window.
+  const idempotencyKey =
+    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
   return await request("trips/deliveries/request", {
     method: "POST",
     body: JSON.stringify(body),
+    headers: { "x-idempotency-key": idempotencyKey },
   });
 }

@@ -623,7 +623,7 @@ export function RideSelection() {
                       )}
                     </PrimaryButton>
 
-                    {/* Business Button */}
+                    {/* Business Ride Button  */}
                     <PrimaryButton
                       onClick={() => handleSelectRide("business")}
                       disabled={isSubmitting || isCalculating}

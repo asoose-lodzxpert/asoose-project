@@ -7,12 +7,14 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { GetCartSummaryDto } from './dto/cart-summary.dto';
 import { AddToCartDto } from './dto/add-to-cart.dto';
+import { PricingService } from '../users/pricing.service';
 import type { RedisClientType } from 'redis';
 
 @Injectable()
 export class CartService {
   constructor(
     private prisma: PrismaService,
+    private pricingService: PricingService,
     @Inject('REDIS_CLIENT') private readonly redis: RedisClientType,
   ) {}
 
@@ -168,17 +170,24 @@ export class CartService {
     }
 
     // 3. Build Response
-    const groups = Array.from(storeGroups.values()).map((g) => ({
-      restaurant: {
-        id: g.store.id,
-        name: g.store.name,
-        image: g.store.logo,
-      },
-      items: g.items,
-      subtotal: g.total,
-      deliveryFee: 500, // TODO: Call pricing service per store location
-      total: g.total + 500,
-    }));
+    const groups = Array.from(storeGroups.values()).map((g) => {
+      // Estimate delivery fee using the pricing service minimum. The cart summary
+      // is a preview — no delivery address is known yet, so distance = 0 yields
+      // the floor (MIN_FEE). The checkout page fetches an exact quote via
+      // POST /users/cart/quote once the user selects an address.
+      const deliveryFee = this.pricingService.calculateDeliveryFee(0);
+      return {
+        restaurant: {
+          id: g.store.id,
+          name: g.store.name,
+          image: g.store.logo,
+        },
+        items: g.items,
+        subtotal: g.total,
+        deliveryFee,
+        total: g.total + deliveryFee,
+      };
+    });
 
     const grandTotal = groups.reduce((acc, g) => acc + g.total, 0);
 

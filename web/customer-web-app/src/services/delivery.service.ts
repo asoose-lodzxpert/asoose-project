@@ -71,7 +71,11 @@ export class DeliveryService {
   }
 
   /**
-   * Create a new delivery request
+   * Create a new delivery request.
+   * The backend requires a unique `x-idempotency-key` header per request to
+   * prevent duplicate deliveries when the user retries after a network error.
+   * We generate a UUID v4 per call — the backend deduplicates within a 5-minute
+   * window using Redis, so retrying the same operation with the same key is safe.
    */
   static async createDelivery(data: {
     pickupAddressId: string;
@@ -87,7 +91,10 @@ export class DeliveryService {
     perishable?: boolean;
     containsLiquid?: boolean;
   }, token?: string) {
-    return ApiService.post('/trips/deliveries/request', data, token);
+    const idempotencyKey = crypto.randomUUID();
+    return ApiService.post('/trips/deliveries/request', data, token, {
+      headers: { 'x-idempotency-key': idempotencyKey },
+    });
   }
 
   /**
