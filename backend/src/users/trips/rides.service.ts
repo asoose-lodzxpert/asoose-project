@@ -769,6 +769,7 @@ export class RidesService {
         createdAt: true,
         pickupAddress: { select: { street: true } },
         dropoffAddress: { select: { street: true } },
+        payment: { select: { status: true, method: true } },
       },
     });
   }

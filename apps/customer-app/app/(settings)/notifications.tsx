@@ -1,5 +1,14 @@
-import React, { useEffect, useState } from "react";
-import { View, StyleSheet, Pressable, ScrollView, Switch } from "react-native";
+import React, { useEffect, useRef, useState } from "react";
+import {
+  Animated,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  View,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
 import { IconSymbol, IconSymbolName } from "@/components/ui/icon-symbol";
@@ -11,21 +20,22 @@ import {
   saveNotificationConfig,
 } from "@/services/notification-config.service";
 
-/* ------------------ Screen ------------------ */
+/* ─────────────────── Screen ─────────────────── */
 export default function NotificationsScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
 
   const card = useThemeColor({}, "surfaceCard");
   const border = useThemeColor({}, "borderDefault");
+  const bg = useThemeColor({}, "background");
 
   const [loading, setLoading] = useState(true);
   const [savingKey, setSavingKey] = useState<keyof NotificationConfig | null>(
     null,
   );
-
   const [config, setConfig] = useState<NotificationConfig | null>(null);
 
-  /* ------------------ Load ------------------ */
+  /* ── Load ── */
   useEffect(() => {
     fetchNotificationConfig().then((data) => {
       setConfig(data);
@@ -33,43 +43,59 @@ export default function NotificationsScreen() {
     });
   }, []);
 
-  /* ------------------ Toggle ------------------ */
+  /* ── Toggle ── */
   const toggle = async (key: keyof NotificationConfig) => {
     if (!config) return;
-
     const updated = { ...config, [key]: !config[key] };
     setConfig(updated);
     setSavingKey(key);
-
     await saveNotificationConfig(updated);
-
     setSavingKey(null);
   };
 
-  /* ------------------ Loading ------------------ */
+  /* ── Loading skeleton ── */
   if (loading) {
     return (
-      <ThemedView style={styles.container}>
+      <ThemedView style={[styles.container, { paddingTop: insets.top }]}>
         <Header title="Notifications" onBack={() => router.back()} />
-        <View
-          style={[styles.card, { backgroundColor: card, borderColor: border }]}
+        <ScrollView
+          contentContainerStyle={[
+            styles.scrollContent,
+            { backgroundColor: bg },
+          ]}
+          showsVerticalScrollIndicator={false}
         >
-          <Skeleton />
-          <Skeleton />
-          <Skeleton />
-        </View>
+          <ThemedText style={styles.sectionLabel}>PREFERENCES</ThemedText>
+          <View
+            style={[
+              styles.card,
+              { backgroundColor: card, borderColor: border },
+            ]}
+          >
+            {[0, 1, 2, 3, 4].map((i) => (
+              <React.Fragment key={i}>
+                <SkeletonRow />
+                {i < 4 && (
+                  <View style={[styles.divider, { backgroundColor: border }]} />
+                )}
+              </React.Fragment>
+            ))}
+          </View>
+        </ScrollView>
       </ThemedView>
     );
   }
 
   return (
-    <ThemedView style={styles.container}>
+    <ThemedView style={[styles.container, { paddingTop: insets.top }]}>
       <Header title="Notifications" onBack={() => router.back()} />
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
+        <ThemedText style={styles.sectionLabel}>PREFERENCES</ThemedText>
+
         <View
           style={[styles.card, { backgroundColor: card, borderColor: border }]}
         >
@@ -82,7 +108,7 @@ export default function NotificationsScreen() {
             onToggle={() => toggle("push")}
           />
 
-          <Divider border={border} />
+          <View style={[styles.divider, { backgroundColor: border }]} />
 
           <Setting
             title="SMS notifications"
@@ -93,7 +119,7 @@ export default function NotificationsScreen() {
             onToggle={() => toggle("sms")}
           />
 
-          <Divider border={border} />
+          <View style={[styles.divider, { backgroundColor: border }]} />
 
           <Setting
             title="Email notifications"
@@ -104,7 +130,7 @@ export default function NotificationsScreen() {
             onToggle={() => toggle("email")}
           />
 
-          <Divider border={border} />
+          <View style={[styles.divider, { backgroundColor: border }]} />
 
           <Setting
             title="Emergency alerts"
@@ -115,7 +141,7 @@ export default function NotificationsScreen() {
             onToggle={() => toggle("emergencyAlerts")}
           />
 
-          <Divider border={border} />
+          <View style={[styles.divider, { backgroundColor: border }]} />
 
           <Setting
             title="Trip updates"
@@ -126,13 +152,17 @@ export default function NotificationsScreen() {
             onToggle={() => toggle("tripUpdates")}
           />
         </View>
+
+        <ThemedText style={styles.footerNote}>
+          You can change these preferences at any time. Some notifications may
+          still be sent for account security reasons.
+        </ThemedText>
       </ScrollView>
     </ThemedView>
   );
 }
 
-/* ------------------ Components ------------------ */
-
+/* ─────────────────── Setting row ─────────────────── */
 function Setting({
   title,
   description,
@@ -154,7 +184,7 @@ function Setting({
   return (
     <View style={styles.settingRow}>
       <View style={styles.settingLeft}>
-        <View style={styles.iconWrap}>
+        <View style={[styles.iconWrap, { backgroundColor: primary + "18" }]}>
           <IconSymbol name={icon} size={18} color={primary} />
         </View>
 
@@ -166,21 +196,89 @@ function Setting({
         </View>
       </View>
 
-      <Switch value={value} onValueChange={onToggle} disabled={loading} />
+      <Switch
+        value={value}
+        onValueChange={onToggle}
+        disabled={loading}
+        trackColor={{ false: "#D1D5DB", true: primary + "60" }}
+        thumbColor={value ? primary : "#F9FAFB"}
+        ios_backgroundColor="#D1D5DB"
+      />
     </View>
   );
 }
 
-function Divider({ border }: { border: string }) {
-  return <View style={[styles.divider, { backgroundColor: border }]} />;
-}
+/* ─────────────────── Skeleton row ─────────────────── */
+function SkeletonRow() {
+  const shimmer = useRef(new Animated.Value(0)).current;
 
-function Header({ title, onBack }: { title: string; onBack: () => void }) {
-  const primary = useThemeColor({}, "brandPrimary");
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(shimmer, {
+          toValue: 1,
+          duration: 900,
+          useNativeDriver: true,
+        }),
+        Animated.timing(shimmer, {
+          toValue: 0,
+          duration: 900,
+          useNativeDriver: true,
+        }),
+      ]),
+    ).start();
+  }, [shimmer]);
+
+  const opacity = shimmer.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.35, 0.75],
+  });
+
+  const S = ({
+    w,
+    h,
+    r = 6,
+  }: {
+    w: number | string;
+    h: number;
+    r?: number;
+  }) => (
+    <Animated.View
+      style={{
+        width: w as any,
+        height: h,
+        borderRadius: r,
+        backgroundColor: "#B0B0B0",
+        opacity,
+      }}
+    />
+  );
 
   return (
-    <View style={styles.header}>
-      <Pressable onPress={onBack} style={styles.backBtn}>
+    <View style={styles.settingRow}>
+      {/* icon circle */}
+      <S w={38} h={38} r={11} />
+
+      {/* text block */}
+      <View style={{ flex: 1, marginLeft: 12, gap: 7 }}>
+        <S w="55%" h={13} />
+        <S w="80%" h={11} />
+      </View>
+
+      {/* switch pill */}
+      <S w={48} h={28} r={14} />
+    </View>
+  );
+}
+
+/* ─────────────────── Header ─────────────────── */
+function Header({ title, onBack }: { title: string; onBack: () => void }) {
+  const primary = useThemeColor({}, "brandPrimary");
+  const border = useThemeColor({}, "borderDefault");
+
+  return (
+    <View style={[styles.header, { borderBottomColor: border }]}>
+      <Pressable onPress={onBack} style={styles.backBtn} hitSlop={8}>
         <IconSymbol name="chevron.left" size={22} color={primary} />
       </Pressable>
       <ThemedText type="title" style={styles.headerTitle}>
@@ -190,33 +288,46 @@ function Header({ title, onBack }: { title: string; onBack: () => void }) {
   );
 }
 
-function Skeleton() {
-  return <View style={styles.skeleton} />;
-}
-
-/* ------------------ Styles ------------------ */
-
+/* ─────────────────── Styles ─────────────────── */
 const styles = StyleSheet.create({
   container: { flex: 1 },
 
   header: {
     flexDirection: "row",
     alignItems: "center",
-    paddingTop: 8,
-    paddingBottom: 12,
+    paddingVertical: 14,
     paddingHorizontal: 16,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   backBtn: { marginRight: 12, padding: 4 },
   headerTitle: { fontSize: 20, fontWeight: "700" },
 
-  scrollContent: { paddingBottom: 32 },
+  scrollContent: { paddingBottom: 40 },
+
+  sectionLabel: {
+    fontSize: 11,
+    fontWeight: "600",
+    letterSpacing: 0.8,
+    opacity: 0.45,
+    marginTop: 20,
+    marginBottom: 8,
+    marginHorizontal: 20,
+  },
 
   card: {
     marginHorizontal: 16,
-    marginTop: 12,
-    borderRadius: 14,
-    borderWidth: 1,
+    borderRadius: 16,
+    borderWidth: StyleSheet.hairlineWidth,
     paddingVertical: 4,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.06,
+        shadowRadius: 8,
+      },
+      android: { elevation: 2 },
+    }),
   },
 
   settingRow: {
@@ -235,36 +346,30 @@ const styles = StyleSheet.create({
   },
 
   iconWrap: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
+    width: 38,
+    height: 38,
+    borderRadius: 11,
     alignItems: "center",
     justifyContent: "center",
     marginRight: 12,
-    backgroundColor: "rgba(0,0,0,0.04)",
   },
 
   settingText: { flex: 1 },
 
-  settingTitle: {
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  settingDesc: {
-    fontSize: 12,
-    marginTop: 2,
-  },
+  settingTitle: { fontSize: 14, fontWeight: "600" },
+  settingDesc: { fontSize: 12, marginTop: 2, lineHeight: 17 },
 
   divider: {
-    height: 1,
+    height: StyleSheet.hairlineWidth,
     marginHorizontal: 16,
   },
 
-  skeleton: {
-    height: 18,
-    borderRadius: 6,
-    backgroundColor: "#E6E6E6",
-    marginVertical: 10,
-    marginHorizontal: 16,
+  footerNote: {
+    fontSize: 12,
+    opacity: 0.45,
+    lineHeight: 18,
+    marginTop: 16,
+    marginHorizontal: 20,
+    textAlign: "center",
   },
 });

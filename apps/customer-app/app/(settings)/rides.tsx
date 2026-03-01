@@ -13,7 +13,13 @@ import {
   RefreshControl,
   StyleSheet,
   View,
+  ActivityIndicator,
 } from "react-native";
+import { PaymentWebView } from "@/components/checkout/PaymentWebView";
+import { initiatePayment } from "@/services/payment.service";
+import { useUserProfile } from "@/hooks/useUserProfile";
+import Toast from "react-native-toast-message";
+import type { InAppTx } from "@/types/payment";
 
 const PAGE_SIZE = 10;
 
@@ -35,6 +41,56 @@ export default function RidesHistoryScreen() {
   const accentYellow = "#F59E0B"; // Warning color
   const accentRed = useThemeColor({}, "statusError");
   const router = useRouter();
+  const { user } = useUserProfile();
+
+  // Payment state
+  const [payingRideId, setPayingRideId] = useState<string | null>(null);
+  const [checkoutTx, setCheckoutTx] = useState<InAppTx | null>(null);
+  const [showPaymentWebView, setShowPaymentWebView] = useState(false);
+
+  const handlePayNow = async (ride: Ride) => {
+    if (!user) {
+      Toast.show({ type: "error", text1: "Profile not loaded" });
+      return;
+    }
+    setPayingRideId(ride.id);
+    try {
+      const response = await initiatePayment(
+        "paystack",
+        {
+          amount: Number(ride.totalFare ?? 0) * 100,
+          type: "RIDE",
+          rideId: ride.id,
+          callbackUrl: "asoose-app://payment-callback",
+        },
+        {
+          email: user.email,
+          name: user.name || user.email,
+          phone: user.phone ?? undefined,
+        },
+      );
+      const checkoutUrl = response.authorizationUrl || response.checkoutUrl;
+      const transactionId = response.reference || response.transactionId;
+      if (checkoutUrl) {
+        setCheckoutTx({
+          transactionId,
+          checkoutUrl,
+          amount: Number(ride.totalFare ?? 0),
+          method: "paystack",
+          status: "pending",
+        });
+        setShowPaymentWebView(true);
+      }
+    } catch (err: any) {
+      Toast.show({
+        type: "error",
+        text1: "Payment failed",
+        text2: err.message || "Could not initiate payment",
+      });
+    } finally {
+      setPayingRideId(null);
+    }
+  };
 
   const loadRides = useCallback(
     async (refresh = false, attempt = 0) => {
@@ -157,6 +213,14 @@ export default function RidesHistoryScreen() {
 
   const renderRideCard = ({ item: ride }: { item: Ride }) => {
     const statusColor = getStatusColor(ride.status);
+    const isPaid =
+      ride.payment?.status === "PAID" ||
+      ride.payment?.status === "COMPLETED" ||
+      ride.payment?.status === "SUCCESS";
+    const isCancelled = (ride.status as string).includes("CANCELLED");
+    const isCompleted = ride.status === "COMPLETED";
+    const showPayBtn = !isPaid && !isCancelled && isCompleted;
+    const isPayingThis = payingRideId === ride.id;
 
     return (
       <Pressable
@@ -165,7 +229,6 @@ export default function RidesHistoryScreen() {
           { backgroundColor: cardBg, borderColor: border },
         ]}
         onPress={() => {
-          // Navigate to ride details (to be implemented)
           router.push(
             `/(settings)/ride-history/${ride.id}` as RelativePathString,
           );
@@ -229,6 +292,36 @@ export default function RidesHistoryScreen() {
           </View>
         )}
 
+        {/* Payment badge */}
+        <View style={styles.paymentRow}>
+          <View
+            style={[
+              styles.paymentBadge,
+              {
+                backgroundColor: isPaid ? accentGreen + "22" : accentRed + "22",
+              },
+            ]}
+          >
+            <IconSymbol
+              name={
+                isPaid ? "checkmark.circle.fill" : "exclamationmark.circle.fill"
+              }
+              size={12}
+              color={isPaid ? accentGreen : accentRed}
+            />
+            <ThemedText
+              style={[
+                styles.paymentBadgeText,
+                { color: isPaid ? accentGreen : accentRed },
+              ]}
+            >
+              {isPaid
+                ? `Paid${ride.payment?.method ? ` · ${ride.payment.method.replace("_", " ")}` : ""}`
+                : "Unpaid"}
+            </ThemedText>
+          </View>
+        </View>
+
         <View style={styles.rideFooter}>
           <View style={styles.dateContainer}>
             <IconSymbol name="clock" size={14} color={textSecondary} />
@@ -236,9 +329,33 @@ export default function RidesHistoryScreen() {
               {formatDate(ride.createdAt)} • {formatTime(ride.createdAt)}
             </ThemedText>
           </View>
-          <ThemedText style={[styles.fareText, { color: brandPrimary }]}>
-            ₦{ride.totalFare?.toLocaleString() || "0"}
-          </ThemedText>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <ThemedText style={[styles.fareText, { color: brandPrimary }]}>
+              ₦{ride.totalFare?.toLocaleString() || "0"}
+            </ThemedText>
+            {showPayBtn && (
+              <Pressable
+                style={[
+                  styles.payNowBtn,
+                  {
+                    backgroundColor: brandPrimary,
+                    opacity: isPayingThis ? 0.7 : 1,
+                  },
+                ]}
+                onPress={(e) => {
+                  e.stopPropagation?.();
+                  handlePayNow(ride);
+                }}
+                disabled={isPayingThis}
+              >
+                {isPayingThis ? (
+                  <ActivityIndicator size="small" color="white" />
+                ) : (
+                  <ThemedText style={styles.payNowText}>Pay Now</ThemedText>
+                )}
+              </Pressable>
+            )}
+          </View>
         </View>
       </Pressable>
     );
@@ -305,6 +422,34 @@ export default function RidesHistoryScreen() {
             <SkeletonRideCard key={index} />
           ))}
         </View>
+      )}
+
+      {/* Retrigger payment WebView */}
+      {checkoutTx && (
+        <PaymentWebView
+          visible={showPaymentWebView}
+          url={checkoutTx.checkoutUrl}
+          reference={checkoutTx.transactionId}
+          paymentMethod="paystack"
+          onSuccess={() => {
+            setShowPaymentWebView(false);
+            setCheckoutTx(null);
+            Toast.show({ type: "success", text1: "Payment successful!" });
+            loadRides(true);
+          }}
+          onCancel={() => {
+            setShowPaymentWebView(false);
+            Toast.show({ type: "info", text1: "Payment cancelled" });
+          }}
+          onFailure={(msg) => {
+            setShowPaymentWebView(false);
+            Toast.show({
+              type: "error",
+              text1: "Payment failed",
+              text2: msg,
+            });
+          }}
+        />
       )}
     </ThemedView>
   );
@@ -428,5 +573,35 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: 12,
+  },
+  paymentRow: {
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  paymentBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    gap: 4,
+  },
+  paymentBadgeText: {
+    fontSize: 11,
+    fontWeight: "600",
+  },
+  payNowBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
+    minWidth: 72,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  payNowText: {
+    color: "white",
+    fontSize: 12,
+    fontWeight: "700",
   },
 });

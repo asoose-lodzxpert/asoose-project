@@ -24,9 +24,9 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
+import { useLocation } from "@/context/LocationContext";
 import { AddressSelectionModal } from "@/components/checkout/AddressSelectionModal";
 import { PaymentWebView } from "@/components/checkout/PaymentWebView";
-import { PaymentSuccessModal } from "@/components/checkout/PaymentSuccessModal";
 import { Address } from "@/types/address";
 import { request } from "@/lib/authFetch";
 import { initiatePayment } from "@/services/payment.service";
@@ -37,6 +37,7 @@ export default function CheckoutScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const { items, groups, total, subtotal, deliveryFee, clearCart } = useCart();
+  const { location: homeLocation } = useLocation();
 
   // Theme Colors
   const primary = useThemeColor({}, "brandPrimary");
@@ -49,7 +50,6 @@ export default function CheckoutScreen() {
   const [selectedAddress, setSelectedAddress] = useState<Address | null>(null);
   const [showAddressModal, setShowAddressModal] = useState(false);
   const [showPaymentWebView, setShowPaymentWebView] = useState(false);
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
   const orderCompleted = useRef(false); // guards against cart-empty redirect after payment
 
   // Intercept Android back when order is done — prevent going back to delivery/cart
@@ -103,17 +103,29 @@ export default function CheckoutScreen() {
       try {
         const response = await request("users/addresses", { method: "GET" });
         if (response && Array.isArray(response) && response.length > 0) {
-          const homeAddr = response.find(
-            (a: Address) => a.label?.toLowerCase() === "home",
-          );
-          setSelectedAddress(homeAddr || response[0]);
+          // Prefer address closest to user's home-screen location
+          if (homeLocation?.coords) {
+            const { latitude, longitude } = homeLocation.coords;
+            const sorted = [...response].sort((a: Address, b: Address) => {
+              const da = Math.hypot(a.lat - latitude, a.lng - longitude);
+              const db = Math.hypot(b.lat - latitude, b.lng - longitude);
+              return da - db;
+            });
+            setSelectedAddress(sorted[0]);
+          } else {
+            // Fallback: prefer "home" label, then first
+            const homeAddr = response.find(
+              (a: Address) => a.label?.toLowerCase() === "home",
+            );
+            setSelectedAddress(homeAddr || response[0]);
+          }
         }
       } catch (error) {
         console.error("Failed to load addresses:", error);
       }
     };
     loadAddresses();
-  }, [user]);
+  }, [user, homeLocation?.coords?.latitude, homeLocation?.coords?.longitude]);
 
   // Fetch live quote from backend whenever address or cart changes
   const fetchQuote = useCallback(
@@ -545,6 +557,18 @@ export default function CheckoutScreen() {
           setShowAddressModal(false);
         }}
         selectedAddressId={selectedAddress?.id}
+        currentLocation={
+          homeLocation?.coords
+            ? {
+                coords: {
+                  latitude: homeLocation.coords.latitude,
+                  longitude: homeLocation.coords.longitude,
+                },
+                label: homeLocation.label,
+                address: homeLocation.address,
+              }
+            : null
+        }
       />
 
       {paymentUrl && paymentReference && (
@@ -555,7 +579,14 @@ export default function CheckoutScreen() {
           paymentMethod="paystack"
           onSuccess={() => {
             setShowPaymentWebView(false);
-            setShowSuccessModal(true);
+            router.replace({
+              pathname: "/order-success" as any,
+              params: {
+                orderId: orderId ?? "",
+                amount: String(capturedAmount.current),
+                currency: currencySymbol,
+              },
+            });
           }}
           onCancel={() => setShowPaymentWebView(false)}
           onPaymentComplete={async () => {
@@ -565,26 +596,6 @@ export default function CheckoutScreen() {
           }}
         />
       )}
-
-      <PaymentSuccessModal
-        visible={showSuccessModal}
-        onClose={() => {
-          setShowSuccessModal(false);
-          router.dismissAll();
-          router.replace("/(tabs)/home");
-        }}
-        onViewOrder={() => {
-          setShowSuccessModal(false);
-          router.dismissAll();
-          router.replace("/(tabs)/home");
-          setTimeout(() => {
-            router.push(`/order-history/${orderId}` as any);
-          }, 100);
-        }}
-        orderId={orderId}
-        amount={capturedAmount.current}
-        currency={currencySymbol}
-      />
     </ThemedView>
   );
 }

@@ -34,6 +34,8 @@ import { useCart } from "@/context/CartContext";
 import Toast from "react-native-toast-message";
 import { ModifierSelectionModal } from "@/components/ModifierSelectionModal";
 import type { ModifierGroup } from "@/components/ModifierSelectionModal";
+import { fetchActiveBanners } from "@/services/banner.service";
+import type { Banner } from "@/services/banner.service";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -63,6 +65,10 @@ export default function StoreScreen() {
   const [currentTab, setCurrentTab] = useState<TabType>("all");
   const [activeCategory, setActiveCategory] = useState("Popular");
   const [searchValue, setSearchValue] = useState("");
+
+  // Banners
+  const [banners, setBanners] = useState<Banner[]>([]);
+  const [bannersLoading, setBannersLoading] = useState(true);
 
   // Modifier modal state
   const [showModifierModal, setShowModifierModal] = useState(false);
@@ -130,6 +136,14 @@ export default function StoreScreen() {
     setLoading(true);
     loadStore();
   }, [loadStore]);
+
+  useEffect(() => {
+    setBannersLoading(true);
+    fetchActiveBanners()
+      .then((data) => setBanners(data))
+      .catch(() => setBanners([]))
+      .finally(() => setBannersLoading(false));
+  }, []);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -352,7 +366,7 @@ export default function StoreScreen() {
     if (currentTab === "info") {
       return (
         <>
-          <PromoBanner promoText="20% off orders over ₦5000 🎉" />
+          <PromoBanner banners={banners} loading={bannersLoading} />
           <ActionTabs
             currentTab={currentTab}
             onTabChange={setCurrentTab}
@@ -370,7 +384,7 @@ export default function StoreScreen() {
 
     return (
       <>
-        <PromoBanner promoText="20% off orders over ₦5000 🎉" />
+        <PromoBanner banners={banners} loading={bannersLoading} />
         <ActionTabs
           currentTab={currentTab}
           onTabChange={setCurrentTab}

@@ -8,6 +8,10 @@ import {
   DisputeSheet,
   ExistingDisputeCard,
 } from "@/components/dispute/DisputeSheet";
+import PaymentWebView from "@/components/checkout/PaymentWebView";
+import { initiatePayment } from "@/services/payment.service";
+import { useUserProfile } from "@/hooks/useUserProfile";
+import type { InAppTx } from "@/types/payment";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import {
@@ -19,6 +23,7 @@ import {
   View,
   ActivityIndicator,
 } from "react-native";
+import Toast from "react-native-toast-message";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -39,12 +44,20 @@ export default function DeliveryDetailsScreen() {
   const textPrimary = useThemeColor({}, "textPrimary");
   const textSecondary = useThemeColor({}, "textSecondary");
   const success = useThemeColor({}, "statusSuccess");
+  const danger = useThemeColor({}, "statusError");
+
+  const { user } = useUserProfile();
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [delivery, setDelivery] = useState<any | null>(null);
   const [showDisputeSheet, setShowDisputeSheet] = useState(false);
   const [existingDispute, setExistingDispute] = useState<Dispute | null>(null);
+
+  // Payment state
+  const [paying, setPaying] = useState(false);
+  const [checkoutTx, setCheckoutTx] = useState<InAppTx | null>(null);
+  const [showPaymentWebView, setShowPaymentWebView] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
@@ -73,6 +86,32 @@ export default function DeliveryDetailsScreen() {
   const onRefresh = () => {
     setRefreshing(true);
     fetchData();
+  };
+
+  const handlePayNow = async () => {
+    if (!delivery || !user) return;
+    setPaying(true);
+    try {
+      const tx = await initiatePayment(
+        "paystack",
+        {
+          amount: parseFloat(delivery.deliveryFee) * 100,
+          type: "DELIVERY",
+          deliveryId: delivery.id,
+          callbackUrl: "asoose-app://payment-callback",
+        },
+        user,
+      );
+      setCheckoutTx(tx);
+      setShowPaymentWebView(true);
+    } catch (e: any) {
+      Toast.show({
+        type: "error",
+        text1: e?.message ?? "Could not initiate payment",
+      });
+    } finally {
+      setPaying(false);
+    }
   };
 
   if (loading && !refreshing) {
@@ -185,6 +224,51 @@ export default function DeliveryDetailsScreen() {
     </View>
   );
 
+  const renderPaymentCard = () => {
+    const isPaid = delivery.payment?.status === "COMPLETED";
+    const isCancelled = delivery.status === "CANCELLED";
+    const showPayBtn = !isPaid && !isCancelled;
+    const badgeColor = isPaid ? success : danger;
+    const badgeLabel = isPaid
+      ? `Paid${delivery.payment?.method ? " · " + delivery.payment.method : ""}`
+      : "Unpaid";
+
+    return (
+      <View
+        style={[styles.card, { backgroundColor: card, borderColor: border }]}
+      >
+        <ThemedText style={styles.cardTitle}>Payment</ThemedText>
+        <View style={styles.paymentRow}>
+          <View
+            style={[
+              styles.paymentBadge,
+              { backgroundColor: badgeColor + "20" },
+            ]}
+          >
+            <ThemedText
+              style={[styles.paymentBadgeText, { color: badgeColor }]}
+            >
+              {badgeLabel}
+            </ThemedText>
+          </View>
+          {showPayBtn && (
+            <Pressable
+              style={[styles.payNowBtn, { backgroundColor: primary }]}
+              onPress={handlePayNow}
+              disabled={paying}
+            >
+              {paying ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <ThemedText style={styles.payNowText}>Pay Now</ThemedText>
+              )}
+            </Pressable>
+          )}
+        </View>
+      </View>
+    );
+  };
+
   return (
     <ThemedView style={[styles.container, { backgroundColor: surface }]}>
       <View style={styles.headerNav}>
@@ -209,6 +293,7 @@ export default function DeliveryDetailsScreen() {
         {renderRouteCard()}
         {renderContactCard()}
         {renderDeliverySpecs()}
+        {renderPaymentCard()}
 
         {/* Dispute section */}
         {existingDispute ? (
@@ -241,6 +326,28 @@ export default function DeliveryDetailsScreen() {
         deliveryId={id as string}
         onDisputeFiled={(d) => setExistingDispute(d)}
       />
+
+      {showPaymentWebView && checkoutTx && (
+        <PaymentWebView
+          tx={checkoutTx}
+          onSuccess={() => {
+            setShowPaymentWebView(false);
+            setCheckoutTx(null);
+            Toast.show({ type: "success", text1: "Payment successful!" });
+            fetchData();
+          }}
+          onCancel={() => {
+            setShowPaymentWebView(false);
+            setCheckoutTx(null);
+            Toast.show({ type: "info", text1: "Payment cancelled" });
+          }}
+          onFailure={(msg) => {
+            setShowPaymentWebView(false);
+            setCheckoutTx(null);
+            Toast.show({ type: "error", text1: msg ?? "Payment failed" });
+          }}
+        />
+      )}
     </ThemedView>
   );
 }
@@ -354,5 +461,33 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: 4,
     marginBottom: 8,
+  },
+  paymentRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  paymentBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  paymentBadgeText: {
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  payNowBtn: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+    minWidth: 90,
+    alignItems: "center",
+  },
+  payNowText: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 14,
   },
 });

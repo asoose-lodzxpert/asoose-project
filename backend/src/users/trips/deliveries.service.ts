@@ -621,6 +621,9 @@ export class DeliveriesService {
         rider: {
           include: { vehicle: true },
         },
+        payment: {
+          select: { status: true, method: true },
+        },
       },
     });
 

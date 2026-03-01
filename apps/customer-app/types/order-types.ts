@@ -25,6 +25,8 @@ export type Order = {
   createdAt: string;
   updatedAt?: string;
   total: number;
+  paymentStatus?: string;
+  paymentMethod?: string;
   // Single order fields
   storeName?: string;
   storeLogo?: string | null;

@@ -30,6 +30,21 @@ export class MarketplaceService {
     private storage: StorageService,
   ) {}
 
+  async getActiveBanners() {
+    const banners = await this.prisma.banner.findMany({
+      where: { isActive: true },
+      orderBy: { priority: 'desc' },
+      take: 10,
+    });
+
+    return Promise.all(
+      banners.map(async (b) => ({
+        ...b,
+        image: await this.resolveImage(b.image ?? null),
+      })),
+    );
+  }
+
   async getHomeData() {
     const verticalTypes: StoreType[] = [
       'RESTAURANT',

@@ -190,22 +190,6 @@ export default function SettingsScreen() {
 
           <Pressable
             style={[styles.row, { borderBottomColor: border }]}
-            onPress={() => router.push("/(settings)/payment-methods")}
-          >
-            <View
-              style={[styles.iconBox, { backgroundColor: accentRed + "15" }]}
-            >
-              <IconSymbol name="credit-card" size={18} color={accentRed} />
-            </View>
-            <View style={styles.rowTextWrap}>
-              <ThemedText style={styles.rowLabel}>Payment Methods</ThemedText>
-              <ThemedText type="caption">Cards, Paystack, Wallet</ThemedText>
-            </View>
-            <IconSymbol name="chevron.right" size={18} color={muted} />
-          </Pressable>
-
-          <Pressable
-            style={[styles.row, { borderBottomColor: border }]}
             onPress={() => router.push("/(settings)/addresses")}
           >
             <View

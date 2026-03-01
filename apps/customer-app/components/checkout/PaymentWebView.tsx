@@ -21,6 +21,7 @@ interface PaymentWebViewProps {
   paymentMethod?: string;
   onSuccess: () => void;
   onCancel: () => void;
+  onFailure?: (message?: string) => void;
   onPaymentComplete?: () => void | Promise<void>;
 }
 
@@ -31,22 +32,32 @@ export function PaymentWebView({
   paymentMethod,
   onSuccess,
   onCancel,
+  onFailure,
   onPaymentComplete,
 }: PaymentWebViewProps) {
   const [loading, setLoading] = useState(true);
   const [verifying, setVerifying] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [failureMessage, setFailureMessage] = useState<string | null>(null);
 
   const accent = useThemeColor({}, "brandPrimary");
   const surface = useThemeColor({}, "surfaceBackground");
   const subtle = useThemeColor({}, "surfaceSubtle");
   const textPrimary = useThemeColor({}, "textPrimary");
   const border = useThemeColor({}, "borderDefault");
+  const danger = useThemeColor({}, "statusError");
+
+  const handleFailure = (message?: string) => {
+    setFailureMessage(message || "Your payment could not be completed.");
+    setVerifying(false);
+    if (onFailure) {
+      onFailure(message);
+    }
+  };
 
   const handleNavigationStateChange = async (navState: any) => {
     const { url: currentUrl } = navState;
 
-    // Try to extract reference and status from URL
     let urlReference: string | null = null;
     let urlStatus: string | null = null;
 
@@ -60,145 +71,110 @@ export function PaymentWebView({
       // Invalid URL, ignore
     }
 
-    // Check for native app callback URL (asoose-app://payment-callback or asoose-app://...)
+    // Native app callback URL
     if (currentUrl.startsWith("asoose-app://")) {
       setVerifying(true);
-
       try {
         if (urlStatus === "success") {
-          // Verify payment status with backend for extra security
           const result = await checkPaymentStatus(
             urlReference || reference,
             paymentMethod as any,
           );
-
           if (
             result.success ||
             result.status === "SUCCESS" ||
             result.status === "COMPLETED"
           ) {
-            // Execute post-payment callback before success
-            if (onPaymentComplete) {
-              await Promise.resolve(onPaymentComplete());
-            }
+            if (onPaymentComplete) await Promise.resolve(onPaymentComplete());
             onSuccess();
           } else {
-            Toast.show({
-              text1: "Payment verification failed. Please contact support.",
-              type: "error",
-            });
-            onCancel();
+            handleFailure(
+              "Payment verification failed. Please contact support.",
+            );
           }
-        } else if (urlStatus === "failed") {
+        } else if (urlStatus === "cancelled") {
           onCancel();
+        } else if (urlStatus === "failed") {
+          handleFailure("Your payment was declined. Please try again.");
         }
       } catch (error) {
         console.error("Payment callback error:", error);
-        Toast.show({
-          text1: "Failed to verify payment. Please contact support.",
-          type: "error",
-        });
-        onCancel();
+        handleFailure("Failed to verify payment. Please contact support.");
       } finally {
         setVerifying(false);
       }
       return;
     }
 
-    // Check if URL contains our payment reference - verify status regardless of callback URL
+    // URL contains our payment reference — verify
     if (urlReference && urlReference === reference) {
       setVerifying(true);
-
       try {
-        // Verify payment status with backend
         const result = await checkPaymentStatus(
           reference,
           paymentMethod as any,
         );
-
         if (
           result.success ||
           result.status === "SUCCESS" ||
           result.status === "COMPLETED"
         ) {
-          // Execute post-payment callback before success
-          if (onPaymentComplete) {
-            await Promise.resolve(onPaymentComplete());
-          }
+          if (onPaymentComplete) await Promise.resolve(onPaymentComplete());
           onSuccess();
-        } else if (
-          result.status === "FAILED" ||
-          result.status === "CANCELLED" ||
-          urlStatus === "failed" ||
-          urlStatus === "cancelled"
-        ) {
+        } else if (result.status === "FAILED" || urlStatus === "failed") {
+          handleFailure("Your payment was declined. Please try again.");
+        } else if (result.status === "CANCELLED" || urlStatus === "cancelled") {
           onCancel();
         }
-        // If status is still pending, keep waiting
+        // Pending — keep waiting
       } catch (error) {
         console.error("Payment verification error:", error);
-        Toast.show({
-          text1: "Failed to verify payment. Please contact support.",
-          type: "error",
-        });
-        onCancel();
+        handleFailure("Failed to verify payment. Please contact support.");
       } finally {
         setVerifying(false);
       }
       return;
     }
 
-    // Check if payment was successful (generic success indicators)
+    // Generic success indicators
     if (
       currentUrl.includes("myapp://checkout/success") ||
       (currentUrl.includes("/payment/callback") && urlStatus === "success")
     ) {
       setVerifying(true);
-
       try {
-        // Verify payment status with backend
         const result = await checkPaymentStatus(
           reference,
           paymentMethod as any,
         );
-
         if (
           result.success ||
           result.status === "SUCCESS" ||
           result.status === "COMPLETED"
         ) {
-          // Execute post-payment callback before success
-          if (onPaymentComplete) {
-            await Promise.resolve(onPaymentComplete());
-          }
+          if (onPaymentComplete) await Promise.resolve(onPaymentComplete());
           onSuccess();
         } else {
-          Toast.show({
-            text1: "Payment verification failed. Please contact support.",
-            type: "error",
-          });
-          onCancel();
+          handleFailure("Payment verification failed. Please contact support.");
         }
       } catch (error) {
         console.error("Payment verification error:", error);
-        Toast.show({
-          text1: "Failed to verify payment. Please contact support.",
-          type: "error",
-        });
-        onCancel();
+        handleFailure("Failed to verify payment. Please contact support.");
       } finally {
         setVerifying(false);
       }
       return;
     }
 
-    // Check if payment was cancelled
-    if (
-      currentUrl.includes("cancelled") ||
-      currentUrl.includes("cancel") ||
-      urlStatus === "failed"
-    ) {
+    // User cancelled on payment page
+    if (currentUrl.includes("cancelled") || currentUrl.includes("cancel")) {
       onCancel();
+      return;
+    }
+
+    // Explicit failure URL
+    if (urlStatus === "failed") {
+      handleFailure("Your payment was declined. Please try again.");
     }
   };
 
@@ -210,12 +186,11 @@ export function PaymentWebView({
       onRequestClose={onCancel}
     >
       <View style={[styles.container, { backgroundColor: surface }]}>
-        {/* Modern Header with Handle */}
+        {/* Header */}
         <View style={[styles.header, { borderBottomColor: border }]}>
           <View style={styles.headerTop}>
             <View style={[styles.handle, { backgroundColor: subtle }]} />
           </View>
-
           <View style={styles.headerContent}>
             <Pressable
               onPress={onCancel}
@@ -249,7 +224,37 @@ export function PaymentWebView({
         </View>
 
         <View style={styles.webContainer}>
-          {verifying ? (
+          {failureMessage ? (
+            <View
+              style={[styles.failureContainer, { backgroundColor: surface }]}
+            >
+              <View
+                style={[
+                  styles.failureIconCircle,
+                  { backgroundColor: danger + "1A" },
+                ]}
+              >
+                <IconSymbol name="xmark.circle.fill" size={56} color={danger} />
+              </View>
+              <ThemedText style={styles.failureTitle}>
+                Payment Failed
+              </ThemedText>
+              <ThemedText
+                style={[styles.failureMessage, { color: textPrimary }]}
+              >
+                {failureMessage}
+              </ThemedText>
+              <Pressable
+                style={[styles.failureBtn, { backgroundColor: accent }]}
+                onPress={() => {
+                  setFailureMessage(null);
+                  onCancel();
+                }}
+              >
+                <ThemedText style={styles.failureBtnText}>Close</ThemedText>
+              </Pressable>
+            </View>
+          ) : verifying ? (
             <View
               style={[styles.verifyingContainer, { backgroundColor: surface }]}
             >
@@ -270,7 +275,7 @@ export function PaymentWebView({
               style={styles.webView}
               javaScriptEnabled
               domStorageEnabled
-              startInLoadingState={false} // We handle it with progress bar
+              startInLoadingState={false}
             />
           )}
         </View>
@@ -356,5 +361,43 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "500",
     letterSpacing: -0.3,
+  },
+  failureContainer: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 32,
+    zIndex: 10,
+  },
+  failureIconCircle: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  failureTitle: {
+    fontSize: 22,
+    fontWeight: "700",
+    marginBottom: 10,
+    letterSpacing: -0.3,
+  },
+  failureMessage: {
+    fontSize: 15,
+    textAlign: "center",
+    opacity: 0.7,
+    lineHeight: 22,
+    marginBottom: 32,
+  },
+  failureBtn: {
+    paddingVertical: 14,
+    paddingHorizontal: 40,
+    borderRadius: 16,
+  },
+  failureBtnText: {
+    color: "white",
+    fontWeight: "700",
+    fontSize: 16,
   },
 });

@@ -598,6 +598,10 @@ export class OrdersService {
       const orderInclude = {
         items: { select: { quantity: true, nameSnap: true } },
         store: { select: { name: true, logo: true } },
+        payment: { select: { status: true, method: true } },
+        orderGroup: {
+          include: { payment: { select: { status: true, method: true } } },
+        },
       };
 
       // 1. Standalone orders (no group) — apply status filter directly
@@ -653,6 +657,8 @@ export class OrdersService {
         total: g.totalAmount,
         createdAt: g.createdAt.toISOString(),
         orderCount: g.orders.length,
+        paymentStatus: (g as any).payment?.status ?? 'PENDING',
+        paymentMethod: (g as any).payment?.method ?? null,
         stores: [
           ...new Set(g.orders.map((o) => o.store?.name).filter(Boolean)),
         ] as string[],
@@ -681,6 +687,8 @@ export class OrdersService {
         createdAt: order.createdAt.toISOString(),
         storeName: order.store?.name,
         storeLogo: order.store?.logo,
+        paymentStatus: (order as any).payment?.status ?? 'PENDING',
+        paymentMethod: (order as any).payment?.method ?? null,
         items: order.items.map((i) => ({
           name: i.nameSnap,
           quantity: i.quantity,

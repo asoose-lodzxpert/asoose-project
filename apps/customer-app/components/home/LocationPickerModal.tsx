@@ -59,6 +59,7 @@ export function LocationPickerModal() {
   const [selectedLocation, setSelectedLocation] = useState<any>(null);
   const [reverseAddress, setReverseAddress] = useState("");
   const [confirming, setConfirming] = useState(false);
+  const [selecting, setSelecting] = useState(false);
   const mapRef = useRef<MapView>(null);
   const mapStyle = useMapStyle();
   // Removed manual search logic, now using useAddressSearch
@@ -105,17 +106,22 @@ export function LocationPickerModal() {
   );
 
   const confirmLocation = useCallback(
-    (loc: any) => {
-      setFromMap({
-        latitude: loc.latitude,
-        longitude: loc.longitude,
-        accuracy: 0,
-        altitude: 0,
-        altitudeAccuracy: 0,
-        heading: 0,
-        speed: 0,
-      });
-      closePicker();
+    async (loc: any) => {
+      setSelecting(true);
+      try {
+        await setFromMap({
+          latitude: loc.latitude,
+          longitude: loc.longitude,
+          accuracy: 0,
+          altitude: 0,
+          altitudeAccuracy: 0,
+          heading: 0,
+          speed: 0,
+        });
+        closePicker();
+      } finally {
+        setSelecting(false);
+      }
     },
     [setFromMap, closePicker],
   );
@@ -131,11 +137,12 @@ export function LocationPickerModal() {
 
   const handleSelectPrediction = useCallback(
     async (place: any) => {
+      setSelecting(true);
       try {
         const res = await fetch(`${API_URL}/maps/geocode?placeId=${place.id}`);
         if (!res.ok) throw new Error();
         const { lat, lng } = await res.json();
-        confirmLocation({
+        await confirmLocation({
           latitude: lat,
           longitude: lng,
           address: place.subtitle
@@ -143,6 +150,7 @@ export function LocationPickerModal() {
             : place.title,
         });
       } catch {
+        setSelecting(false);
         Toast.show({
           type: "error",
           text1: "Location not found",
@@ -175,7 +183,6 @@ export function LocationPickerModal() {
           </Pressable>
           <ThemedText type="subtitle">Select Location</ThemedText>
         </View>
-
         {/* Search Bar */}
         <View style={[styles.searchBar, { backgroundColor: card }]}>
           <IconSymbol name="magnifyingglass" size={20} color={textSecondary} />
@@ -189,7 +196,6 @@ export function LocationPickerModal() {
           />
           {searching && <ActivityIndicator size="small" color={primary} />}
         </View>
-
         <ScrollView
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={styles.scrollContent}
@@ -300,8 +306,7 @@ export function LocationPickerModal() {
           </View>
           <View style={{ height: 80 }} />
         </ScrollView>
-
-        {/* Map Modal */}
+        {/* Map Modal */}{" "}
         <Modal
           visible={mapModalVisible}
           animationType="slide"
@@ -375,6 +380,17 @@ export function LocationPickerModal() {
             </View>
           </ThemedView>
         </Modal>
+        {/* Address processing overlay */}
+        {selecting && (
+          <View style={styles.processingOverlay}>
+            <View style={styles.processingCard}>
+              <ActivityIndicator size="large" color={primary} />
+              <ThemedText style={styles.processingText}>
+                Setting your location…
+              </ThemedText>
+            </View>
+          </View>
+        )}
       </ThemedView>
     </Modal>
   );
@@ -463,4 +479,27 @@ const styles = StyleSheet.create({
     marginLeft: 16,
   },
   confirmText: { color: "white", fontWeight: "700", fontSize: 15 },
+  processingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 99,
+  },
+  processingCard: {
+    backgroundColor: "white",
+    borderRadius: 20,
+    padding: 32,
+    alignItems: "center",
+    gap: 16,
+    shadowColor: "#000",
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  processingText: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#333",
+  },
 });

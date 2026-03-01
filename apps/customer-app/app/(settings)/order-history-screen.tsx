@@ -9,6 +9,7 @@ import {
   StyleSheet,
   Pressable,
   FlatList,
+  ActivityIndicator,
 } from "react-native";
 import { SkeletonCard } from "@/components/ui/Skeleton";
 import { ThemedView } from "@/components/themed-view";
@@ -18,6 +19,11 @@ import { useThemeColor } from "@/hooks/use-theme-color";
 import { RelativePathString, useRouter } from "expo-router";
 import { fetchOrderHistory } from "@/services/order-history.service";
 import { OrderStatus, Order } from "@/types/order-types";
+import { PaymentWebView } from "@/components/checkout/PaymentWebView";
+import { initiatePayment } from "@/services/payment.service";
+import { useUserProfile } from "@/hooks/useUserProfile";
+import Toast from "react-native-toast-message";
+import type { InAppTx } from "@/types/payment";
 
 const ORDER_STATUS_OPTIONS = Object.values(OrderStatus).map((status) => ({
   label: status.charAt(0) + status.slice(1).toLowerCase(),
@@ -68,12 +74,64 @@ export default function OrderHistoryScreen() {
   const statusError = useThemeColor({}, "statusError");
   const statusPending = useThemeColor({}, "statusPending");
   const router = useRouter();
+  const { user } = useUserProfile();
+
+  // Payment state
+  const [payingOrderId, setPayingOrderId] = useState<string | null>(null);
+  const [checkoutTx, setCheckoutTx] = useState<InAppTx | null>(null);
+  const [showPaymentWebView, setShowPaymentWebView] = useState(false);
 
   const statusColors = {
     success: statusSuccess,
     error: statusError,
     pending: statusPending,
     primary: brandPrimary,
+  };
+
+  const handlePayNow = async (order: Order) => {
+    if (!user) {
+      Toast.show({ type: "error", text1: "Profile not loaded" });
+      return;
+    }
+    setPayingOrderId(order.id);
+    try {
+      const amount = order.total * 100; // kobo
+      const payload: any = {
+        amount,
+        type: "ORDER",
+        callbackUrl: "asoose-app://payment-callback",
+      };
+      if (order.type === "GROUP") {
+        payload.orderGroupId = order.id;
+      } else {
+        payload.orderId = order.id;
+      }
+      const response = await initiatePayment("paystack", payload, {
+        email: user.email,
+        name: user.name || user.email,
+        phone: user.phone ?? undefined,
+      });
+      const checkoutUrl = response.authorizationUrl || response.checkoutUrl;
+      const transactionId = response.reference || response.transactionId;
+      if (checkoutUrl) {
+        setCheckoutTx({
+          transactionId,
+          checkoutUrl,
+          amount: order.total,
+          method: "paystack",
+          status: "pending",
+        });
+        setShowPaymentWebView(true);
+      }
+    } catch (err: any) {
+      Toast.show({
+        type: "error",
+        text1: "Payment failed",
+        text2: err.message || "Could not initiate payment",
+      });
+    } finally {
+      setPayingOrderId(null);
+    }
   };
 
   const loadOrders = useCallback(
@@ -128,6 +186,15 @@ export default function OrderHistoryScreen() {
   const renderItem = ({ item: order }: { item: Order }) => {
     const statusColor = getStatusColor(order.status, statusColors);
     const isGroup = order.type === "GROUP";
+    const isPaid =
+      order.paymentStatus === "PAID" ||
+      order.paymentStatus === "COMPLETED" ||
+      order.paymentStatus === "SUCCESS";
+    const isCancelled =
+      order.status === OrderStatus.CANCELLED ||
+      order.status === OrderStatus.REJECTED;
+    const showPayBtn = !isPaid && !isCancelled;
+    const isPayingThis = payingOrderId === order.id;
 
     return (
       <Pressable
@@ -188,17 +255,73 @@ export default function OrderHistoryScreen() {
           {isGroup ? order.stores?.join(" · ") : order.storeName}
         </ThemedText>
 
+        {/* Payment status row */}
+        <View style={styles.paymentRow}>
+          <View
+            style={[
+              styles.paymentBadge,
+              {
+                backgroundColor: isPaid
+                  ? statusSuccess + "22"
+                  : statusError + "22",
+              },
+            ]}
+          >
+            <IconSymbol
+              name={
+                isPaid ? "checkmark.circle.fill" : "exclamationmark.circle.fill"
+              }
+              size={12}
+              color={isPaid ? statusSuccess : statusError}
+            />
+            <ThemedText
+              style={[
+                styles.paymentBadgeText,
+                { color: isPaid ? statusSuccess : statusError },
+              ]}
+            >
+              {isPaid
+                ? `Paid${order.paymentMethod ? ` · ${order.paymentMethod.replace("_", " ")}` : ""}`
+                : "Unpaid"}
+            </ThemedText>
+          </View>
+        </View>
+
         <View style={styles.cardFooter}>
           <ThemedText style={[styles.totalText, { color: textColor }]}>
             ₦{order.total.toLocaleString("en-NG", { minimumFractionDigits: 2 })}
           </ThemedText>
-          <ThemedText style={[styles.dateText, { color: textSecondary }]}>
-            {new Date(order.createdAt).toLocaleDateString("en-NG", {
-              day: "numeric",
-              month: "short",
-              year: "numeric",
-            })}
-          </ThemedText>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <ThemedText style={[styles.dateText, { color: textSecondary }]}>
+              {new Date(order.createdAt).toLocaleDateString("en-NG", {
+                day: "numeric",
+                month: "short",
+                year: "numeric",
+              })}
+            </ThemedText>
+            {showPayBtn && (
+              <Pressable
+                style={[
+                  styles.payNowBtn,
+                  {
+                    backgroundColor: brandPrimary,
+                    opacity: isPayingThis ? 0.7 : 1,
+                  },
+                ]}
+                onPress={(e) => {
+                  e.stopPropagation?.();
+                  handlePayNow(order);
+                }}
+                disabled={isPayingThis}
+              >
+                {isPayingThis ? (
+                  <ActivityIndicator size="small" color="white" />
+                ) : (
+                  <ThemedText style={styles.payNowText}>Pay Now</ThemedText>
+                )}
+              </Pressable>
+            )}
+          </View>
         </View>
       </Pressable>
     );
@@ -377,6 +500,37 @@ export default function OrderHistoryScreen() {
           />
         )}
       </View>
+
+      {/* Retrigger payment WebView */}
+      {checkoutTx && (
+        <PaymentWebView
+          visible={showPaymentWebView}
+          url={checkoutTx.checkoutUrl}
+          reference={checkoutTx.transactionId}
+          paymentMethod="paystack"
+          onSuccess={() => {
+            setShowPaymentWebView(false);
+            setCheckoutTx(null);
+            Toast.show({ type: "success", text1: "Payment successful!" });
+            // Refresh list
+            setPage(1);
+            setHasMore(true);
+            loadOrders(true);
+          }}
+          onCancel={() => {
+            setShowPaymentWebView(false);
+            Toast.show({ type: "info", text1: "Payment cancelled" });
+          }}
+          onFailure={(msg) => {
+            setShowPaymentWebView(false);
+            Toast.show({
+              type: "error",
+              text1: "Payment failed",
+              text2: msg,
+            });
+          }}
+        />
+      )}
     </ThemedView>
   );
 }
@@ -544,5 +698,35 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginTop: 48,
     paddingHorizontal: 24,
+  },
+  paymentRow: {
+    marginTop: 6,
+    marginBottom: 4,
+  },
+  paymentBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    gap: 4,
+  },
+  paymentBadgeText: {
+    fontSize: 11,
+    fontWeight: "600",
+  },
+  payNowBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
+    minWidth: 72,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  payNowText: {
+    color: "white",
+    fontSize: 12,
+    fontWeight: "700",
   },
 });

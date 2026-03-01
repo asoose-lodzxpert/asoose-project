@@ -15,11 +15,35 @@ import { Address } from "@/types/address";
 import { request } from "@/lib/authFetch";
 import { useRouter } from "expo-router";
 
+/** Haversine distance in metres */
+function haversineMetres(
+  lat1: number,
+  lng1: number,
+  lat2: number,
+  lng2: number,
+): number {
+  const R = 6371000;
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+export interface CurrentLocationProp {
+  coords: { latitude: number; longitude: number };
+  label: string;
+  address: string;
+}
+
 interface AddressSelectionModalProps {
   visible: boolean;
   onClose: () => void;
   onSelect: (address: Address) => void;
   selectedAddressId?: string;
+  currentLocation?: CurrentLocationProp | null;
 }
 
 export function AddressSelectionModal({
@@ -27,9 +51,11 @@ export function AddressSelectionModal({
   onClose,
   onSelect,
   selectedAddressId,
+  currentLocation,
 }: AddressSelectionModalProps) {
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [loading, setLoading] = useState(false);
+  const [savingLocation, setSavingLocation] = useState(false);
   const [tentativeId, setTentativeId] = useState<string | undefined>(
     selectedAddressId,
   );
@@ -69,6 +95,42 @@ export function AddressSelectionModal({
     onSelect(addr);
     onClose();
   };
+
+  /** Select the home-screen location: reuse a close existing address, or save a new one */
+  const handleSelectCurrentLocation = useCallback(async () => {
+    if (!currentLocation) return;
+    const { coords, label, address } = currentLocation;
+
+    // Check if any saved address is within 500m
+    const nearby = addresses.find(
+      (a) =>
+        haversineMetres(coords.latitude, coords.longitude, a.lat, a.lng) < 500,
+    );
+    if (nearby) {
+      handleSelect(nearby);
+      return;
+    }
+
+    // Save a new address for this location
+    setSavingLocation(true);
+    try {
+      const saved: Address = await request("users/addresses", {
+        method: "POST",
+        body: JSON.stringify({
+          label: label || "My Location",
+          street: address || label || "My Location",
+          lat: coords.latitude,
+          lng: coords.longitude,
+        }),
+      });
+      setAddresses((prev) => [saved, ...prev]);
+      handleSelect(saved);
+    } catch {
+      // fall through — user can pick manually
+    } finally {
+      setSavingLocation(false);
+    }
+  }, [currentLocation, addresses]);
 
   return (
     <Modal
@@ -116,7 +178,7 @@ export function AddressSelectionModal({
                 Loading addresses...
               </ThemedText>
             </View>
-          ) : addresses.length === 0 ? (
+          ) : addresses.length === 0 && !currentLocation ? (
             <View style={styles.emptyState}>
               <View
                 style={[styles.emptyIcon, { backgroundColor: primary + "12" }]}
@@ -151,6 +213,62 @@ export function AddressSelectionModal({
                 contentContainerStyle={{ paddingBottom: 8 }}
                 showsVerticalScrollIndicator={false}
               >
+                {/* ── Current app location at the very top ── */}
+                {currentLocation && (
+                  <Pressable
+                    style={[
+                      styles.addressCard,
+                      {
+                        backgroundColor: primary + "0D",
+                        borderColor: primary + "60",
+                        borderWidth: 1.5,
+                        marginBottom: 10,
+                      },
+                    ]}
+                    onPress={handleSelectCurrentLocation}
+                    disabled={savingLocation}
+                  >
+                    <View
+                      style={[styles.addressIcon, { backgroundColor: primary }]}
+                    >
+                      {savingLocation ? (
+                        <ActivityIndicator size="small" color="#fff" />
+                      ) : (
+                        <IconSymbol
+                          name="location.fill"
+                          size={18}
+                          color="#fff"
+                        />
+                      )}
+                    </View>
+                    <View style={{ flex: 1, gap: 3 }}>
+                      <ThemedText
+                        style={[styles.addressLabel, { color: primary }]}
+                      >
+                        {currentLocation.label || "My Location"}
+                      </ThemedText>
+                      <ThemedText
+                        style={[styles.addressStreet, { color: textSecondary }]}
+                        numberOfLines={2}
+                      >
+                        {currentLocation.address}
+                      </ThemedText>
+                    </View>
+                    <View
+                      style={[
+                        styles.defaultBadge,
+                        { backgroundColor: primary + "18" },
+                      ]}
+                    >
+                      <ThemedText
+                        style={[styles.defaultText, { color: primary }]}
+                      >
+                        Current
+                      </ThemedText>
+                    </View>
+                  </Pressable>
+                )}
+
                 {addresses.map((addr) => {
                   const isSelected = tentativeId === addr.id;
                   return (

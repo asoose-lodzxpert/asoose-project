@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
 import { ThemedText } from "@/components/themed-text";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { HomeSearchBar } from "./HomeSearchBar";
@@ -7,14 +7,20 @@ import { useThemeColor } from "@/hooks/use-theme-color";
 import { RelativePathString, router } from "expo-router";
 
 export function HomeHeader() {
-  const { location, openPicker } = useLocation();
+  const { location, loading, resolving, openPicker } = useLocation();
   const textMuted = useThemeColor({}, "textMuted");
   const primary = useThemeColor({}, "brandPrimary");
+
+  const isProcessing = loading || resolving;
 
   return (
     <View style={styles.container}>
       {/* Address */}
-      <Pressable style={styles.row} onPress={openPicker}>
+      <Pressable
+        style={styles.row}
+        onPress={openPicker}
+        disabled={isProcessing}
+      >
         <IconSymbol name="location.fill" size={18} color={primary} />
 
         <View style={{ flex: 1 }}>
@@ -22,11 +28,17 @@ export function HomeHeader() {
             {location?.label || "Location"}
           </ThemedText>
           <ThemedText style={{ color: textMuted }} numberOfLines={1}>
-            {location?.address || "Fetching address…"}
+            {isProcessing
+              ? "Setting your location…"
+              : location?.address || "Tap to set location"}
           </ThemedText>
         </View>
 
-        <IconSymbol name="chevron.down" size={18} color={primary} />
+        {isProcessing ? (
+          <ActivityIndicator size="small" color={primary} />
+        ) : (
+          <IconSymbol name="chevron.down" size={18} color={primary} />
+        )}
       </Pressable>
 
       {/* Search */}

@@ -38,6 +38,12 @@ export class MarketplaceController {
     return this.marketplaceService.getHomeData();
   }
 
+  @ApiOperation({ summary: 'Get all active promotional banners' })
+  @Get('banners')
+  async getBanners() {
+    return this.marketplaceService.getActiveBanners();
+  }
+
   @ApiOperation({ summary: 'Search stores and products by keyword' })
   @Throttle({ default: { limit: 30, ttl: 60_000 } })
   @Get('search')

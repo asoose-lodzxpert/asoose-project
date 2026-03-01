@@ -11,6 +11,7 @@ type LocationData = {
 type LocationContextType = {
   location: LocationData | null;
   loading: boolean;
+  resolving: boolean;
   openPicker: () => void;
   closePicker: () => void;
   useCurrentLocation: () => Promise<void>;
@@ -23,29 +24,40 @@ const LocationContext = createContext<LocationContextType | null>(null);
 export function LocationProvider({ children }: { children: React.ReactNode }) {
   const [location, setLocation] = useState<LocationData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [resolving, setResolving] = useState(false);
   const [pickerVisible, setPickerVisible] = useState(false);
 
   async function useCurrentLocation() {
     const { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== "granted") return;
 
-    const loc = await Location.getCurrentPositionAsync({});
-    const resolved = await resolveAddress(loc.coords);
-    setLocation({
-      coords: loc.coords,
-      label: resolved?.label ?? "Current location",
-      address: resolved?.address ?? "Using GPS coordinates",
-    });
+    setResolving(true);
+    try {
+      const loc = await Location.getCurrentPositionAsync({});
+      const resolved = await resolveAddress(loc.coords);
+      setLocation({
+        coords: loc.coords,
+        label: resolved?.label ?? "Current location",
+        address: resolved?.address ?? "Using GPS coordinates",
+      });
+    } finally {
+      setResolving(false);
+    }
     setPickerVisible(false);
   }
 
   async function setFromMap(coords: Location.LocationObjectCoords) {
-    const resolved = await resolveAddress(coords);
-    setLocation({
-      coords: coords,
-      label: resolved?.label ?? "Preferred location",
-      address: resolved?.address ?? "Using GPS coordinates",
-    });
+    setResolving(true);
+    try {
+      const resolved = await resolveAddress(coords);
+      setLocation({
+        coords: coords,
+        label: resolved?.label ?? "Preferred location",
+        address: resolved?.address ?? "Using GPS coordinates",
+      });
+    } finally {
+      setResolving(false);
+    }
     setPickerVisible(false);
   }
 
@@ -58,6 +70,7 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
       value={{
         location,
         loading,
+        resolving,
         pickerVisible,
         openPicker: () => setPickerVisible(true),
         closePicker: () => setPickerVisible(false),

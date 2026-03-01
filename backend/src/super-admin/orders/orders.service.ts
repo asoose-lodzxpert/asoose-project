@@ -438,9 +438,11 @@ export class OrdersService {
         const payment = order.payment || order.orderGroup?.payment;
         return {
           ...order,
+          totalAmount: order.total,
           paymentStatus: payment?.status ?? 'UNPAID',
           items: order.items.map((item) => ({
             ...item,
+            productName: item.nameSnap,
             modifierGroups: item.modifiers?.length
               ? [
                   {
@@ -521,9 +523,11 @@ export class OrdersService {
         const payment = order.payment || order.orderGroup?.payment;
         return {
           ...order,
+          totalAmount: order.total,
           paymentStatus: payment?.status ?? 'UNPAID',
           items: order.items.map((item) => ({
             ...item,
+            productName: item.nameSnap,
             modifierGroups: item.modifiers?.length
               ? [
                   {
