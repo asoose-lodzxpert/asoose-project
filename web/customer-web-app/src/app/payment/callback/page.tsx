@@ -51,7 +51,12 @@ function CallbackContent() {
       if (isRide) {
         localStorage.removeItem("pending_ride");
         localStorage.removeItem("pending_ride_id");
-        setRideStatus("idle");
+        // Reset paymentConfirmed so the sync hook correctly maps
+        // COMPLETED → 'payment-required' if user retries.
+        setPaymentConfirmed(false);
+        // Keep user on payment-required screen so they can retry payment
+        // — the ride is already completed on the backend.
+        setRideStatus("payment-required");
         router.replace("/main/ride");
       } else if (isDelivery) {
         // Do NOT clear pending_delivery_data — the delivery page's recovery
@@ -174,10 +179,8 @@ function CallbackContent() {
           // Ensure payment confirmed so sync hook maps DRIVER_ACCEPTED → 'confirmed'
           setPaymentConfirmed(true);
 
-          // Resolve the real backend status (C3 fix) — eliminates the ~15s gap
-          // where the UI was stuck on the wrong screen after Paystack return.
-          // paymentConfirmed=true was set before the redirect, so ACCEPTED
-          // states map directly to 'confirmed' rather than 'awaiting-payment'.
+          // Post-ride payment: after successful payment, ride is complete.
+          // Map to 'finished' so the RatingModal shows.
           try {
             const currentRide = await RideService.getCurrentRide(token);
             if (currentRide) {
@@ -192,13 +195,15 @@ function CallbackContent() {
                 IN_PROGRESS: "in-progress",
                 COMPLETED: "finished",
               };
-              setRideStatus(STATUS_MAP[currentRide.status] ?? "searching");
+              setRideStatus(STATUS_MAP[currentRide.status] ?? "finished");
             } else {
-              setRideStatus("searching");
+              // No active ride — ride is COMPLETED (not returned by getCurrentRide)
+              // In post-ride model, this is expected. Set to finished.
+              setRideStatus("finished");
             }
           } catch {
-            // Non-fatal — sync hook corrects within 15s
-            setRideStatus("searching");
+            // Non-fatal — set to finished since payment just verified
+            setRideStatus("finished");
           }
 
           localStorage.removeItem("pending_ride");
@@ -236,9 +241,13 @@ function CallbackContent() {
         }
       } catch (error: any) {
         console.error("Payment verification error:", error);
+        // FIX M6: Include the Paystack reference in the error toast so the
+        // user (and support) can trace the transaction.
+        const refSuffix = reference ? ` (ref: ${reference})` : "";
         toast.error(
-          error?.message ||
-            "Payment verification failed. Please contact support.",
+          (error?.message || "Payment verification failed.") +
+            refSuffix +
+            " Please contact support if you were charged.",
         );
         handleFailure();
       }

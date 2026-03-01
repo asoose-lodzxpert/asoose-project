@@ -125,8 +125,8 @@ export class RideService {
 
     // Economy fare comes directly from the backend
     const economyFare = res.economyPrice;
-    // Business fare is calculated on the frontend as economy * 1.5
-    const businessFare = Math.round(economyFare * 1.5);
+    // Business fare comes from the backend — no local multiplier
+    const businessFare = res.businessPrice;
 
     const toEstimate = (fare: number): PriceEstimate => ({
       estimatedFare: fare,

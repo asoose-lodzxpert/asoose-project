@@ -321,25 +321,13 @@ export class RidesService {
             include: { pickupAddress: true, dropoffAddress: true },
           });
 
-          // 9. Create Payment placeholder (PENDING until customer completes Paystack checkout)
-          const secureReference = `REF-${randomUUID()}`;
-
-          const payment = await tx.payment.create({
-            data: {
-              userId,
-              rideId: ride.id,
-              amount: finalFare,
-              status: PaymentStatus.PENDING,
-              method: PaymentMethod.CARD, // Card is the only accepted payment method
-              reference: secureReference,
-              gateway: 'PAYSTACK',
-            },
-          });
+          // Payment is initiated AFTER the ride is completed (post-ride payment model).
+          // No placeholder payment is created at request time.
 
           return {
             ride,
             fare: finalFare,
-            payment,
+            payment: null,
             message: 'Ride requested. Searching for a driver.',
           };
         },
@@ -358,9 +346,9 @@ export class RidesService {
   }
 
   /**
-   * confirmRide — initiates the Paystack payment for a DRIVER_ACCEPTED ride.
-   * Returns { authorizationUrl, reference } so the mobile app can open the
-   * payment webview. The ride transitions to PAID via Paystack webhook.
+   * confirmRide — initiates the Paystack payment for a COMPLETED ride.
+   * Post-ride payment model: the customer pays only after the ride is finished.
+   * Returns { authorizationUrl, reference } so the web app can redirect to Paystack.
    */
   async confirmRide(userId: string, rideId: string, _paymentMethod?: string) {
     const ride = await this.prisma.ride.findUnique({
@@ -373,20 +361,21 @@ export class RidesService {
     }
 
     // Idempotency: already paid — return the existing authorization URL
-    if ((ride.status as string) === 'PAID') {
-      const existingPayment = await this.prisma.payment.findUnique({
-        where: { rideId },
-        select: { authorizationUrl: true, reference: true },
-      });
+    const existingPayment = await this.prisma.payment.findUnique({
+      where: { rideId },
+      select: { authorizationUrl: true, reference: true, status: true },
+    });
+    if (existingPayment?.status === PaymentStatus.COMPLETED) {
       return {
         status: 'ALREADY_PAID',
         rideId,
-        authorizationUrl: existingPayment?.authorizationUrl,
-        reference: existingPayment?.reference,
+        authorizationUrl: existingPayment.authorizationUrl,
+        reference: existingPayment.reference,
       };
     }
 
-    if ((ride.status as string) !== 'DRIVER_ACCEPTED') {
+    // Post-ride payment: only allow from COMPLETED status
+    if ((ride.status as string) !== 'COMPLETED') {
       throw new BadRequestException(
         `Cannot initiate payment for ride in state ${ride.status}`,
       );
@@ -510,9 +499,12 @@ export class RidesService {
     if (!ride) throw new NotFoundException('Ride not found');
     if (ride.riderId !== riderId)
       throw new ForbiddenException('Unauthorized driver');
-    if ((ride.status as string) !== 'PAID')
+    // Post-ride payment model: ride starts from DRIVER_ACCEPTED (no upfront payment).
+    // PAID is kept for backward compatibility with legacy pre-paid rides.
+    const startableStatuses = ['DRIVER_ACCEPTED', 'PAID'];
+    if (!startableStatuses.includes(ride.status as string))
       throw new BadRequestException(
-        'Ride is not ready to start — customer payment required',
+        `Ride is not ready to start (status: ${ride.status})`,
       );
 
     if (!ride.startOtp || otp.trim() !== ride.startOtp.trim()) {
@@ -565,15 +557,6 @@ export class RidesService {
         );
       }
 
-      // driverFee may not be set on older rides — calculate from totalFare if missing
-      const totalFare = Number(ride.totalFare) || 0;
-      const platformFee =
-        Number(ride.platformFee) || Math.round(totalFare * 0.2);
-      const computedDriverFee = Math.max(0, totalFare - platformFee);
-      const earning = this.common.round(
-        Math.max(0, Number(ride.driverFee) || computedDriverFee),
-      );
-
       await tx.ride.update({
         where: { id: rideId },
         data: {
@@ -582,31 +565,9 @@ export class RidesService {
         },
       });
 
-      const rider = await tx.rider.findUnique({ where: { id: riderId } });
-      if (!rider)
-        throw new InternalServerErrorException('Rider profile missing');
-
-      const balanceBefore = Number(rider.walletBalance);
-      const balanceAfter = this.common.round(balanceBefore + earning);
-
-      await tx.rider.update({
-        where: { id: riderId },
-        data: { walletBalance: balanceAfter },
-      });
-
-      await tx.transaction.create({
-        data: {
-          type: TransactionType.RIDER_EARNING,
-          amount: earning,
-          balanceBefore: balanceBefore,
-          balanceAfter: balanceAfter,
-          entityId: riderId,
-          entityType: WalletEntityType.RIDER,
-          rideId: ride.id,
-          status: TransactionStatus.COMPLETED,
-          description: `Earnings for ride ${ride.id}`,
-        },
-      });
+      // Post-ride payment model: driver earnings are recorded when the
+      // customer's payment is confirmed via the Paystack webhook
+      // (see payment-status.service.ts). No wallet update here.
 
       // Socket notification (TRIP_COMPLETED) is handled by jobs.service.ts — do not double-emit.
       return { message: 'Ride completed' };
@@ -849,8 +810,8 @@ export class RidesService {
     if (ride.riderId !== riderId)
       throw new ForbiddenException('Unauthorized driver');
 
-    // Only valid from DRIVER_ACCEPTED or PAID (no state change)
-    const validStatuses: string[] = ['DRIVER_ACCEPTED', 'PAID'];
+    // Only valid from DRIVER_ACCEPTED (no state change)
+    const validStatuses: string[] = ['DRIVER_ACCEPTED'];
     if (!validStatuses.includes(ride.status as string)) {
       throw new BadRequestException(
         `Cannot notify arrival from status ${ride.status}`,

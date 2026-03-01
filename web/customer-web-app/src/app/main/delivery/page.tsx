@@ -197,7 +197,7 @@ export default function DeliveryPage() {
           token || undefined,
         );
 
-        if (isVerified) {
+        if (isVerified === true) {
           handlePaymentSuccess(id);
           return;
         }
@@ -573,10 +573,11 @@ export default function DeliveryPage() {
           gateway,
           token || undefined,
         );
-        if (isVerified) {
+        if (isVerified === true) {
           handlePaymentSuccess();
           return;
         }
+        // null = indeterminate (network error) — fall through to polling
       }
 
       const success = await DeliveryService.pollDeliveryStatus(

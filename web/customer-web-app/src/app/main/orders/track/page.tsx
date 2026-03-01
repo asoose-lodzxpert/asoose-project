@@ -20,7 +20,7 @@ import { toast } from "react-toastify";
 import SmartTimeline, { TimelineStep } from "./component/smartTimeline";
 
 // --- Configuration ---
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
+const API_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1").replace(/\/$/, "");
 const MAX_RECONNECT_ATTEMPTS = 5;
 const RECONNECT_DELAY = 3000;
 
@@ -85,7 +85,7 @@ export default function TrackOrderPage() {
     isLoading,
     mutate: updateOrder,
   } = useSWR<OrderData, ApiError>(
-    orderId ? `/api/orders/${orderId}` : null,
+    orderId ? `/users/orders/${orderId}` : null,
     fetcher,
     {
       revalidateOnFocus: false,

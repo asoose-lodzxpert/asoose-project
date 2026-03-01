@@ -28,10 +28,10 @@ export default function Home() {
 
   const isRideActive = [
     "searching",
-    "awaiting-payment",
     "confirmed",
     "arrived",
     "in-progress",
+    "payment-required",
   ].includes(rideStatus);
 
   // Sidebar-hosted states: idle (RideSelection) and configuring (LocationSelector)

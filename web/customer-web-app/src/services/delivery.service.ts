@@ -177,20 +177,30 @@ export class DeliveryService {
    * The backend's VerifyPaymentDto requires BOTH `reference` AND `gateway`.
    * The delivery flow always uses PAYSTACK; gateway is stored alongside the
    * reference in localStorage so future gateways can be supported.
+   *
+   * Returns:
+   *   true  — payment confirmed
+   *   false — payment genuinely failed / not found
+   *   null  — indeterminate (network/timeout error) — caller should retry or poll
    */
   static async verifyPayment(
     reference: string,
     gateway: string = 'PAYSTACK',
     token?: string,
-  ): Promise<boolean> {
+  ): Promise<boolean | null> {
     try {
       const res: any = await ApiService.get(
         `/payment/verify?reference=${encodeURIComponent(reference)}&gateway=${gateway}`,
         token,
       );
-      return res.status === 'success' || res.success === true;
-    } catch (error) {
+      return res.status === 'COMPLETED' || res.success === true;
+    } catch (error: any) {
       console.error("Manual verification failed", error);
+      // FIX M5: Distinguish transient network/timeout errors from genuine
+      // payment failures so callers can decide whether to retry or give up.
+      if (error?.type === 'network-error' || error?.type === 'timeout') {
+        return null; // Indeterminate — should retry
+      }
       return false;
     }
   }

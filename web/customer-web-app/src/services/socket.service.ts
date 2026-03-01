@@ -151,13 +151,20 @@ export interface DriverAcceptedEvent {
 /** @deprecated Alias kept for transition — prefer DriverAcceptedEvent */
 export type DriverFoundEvent = DriverAcceptedEvent;
 
-/** Real-time driver GPS pings while ride is active */
+/**
+ * Real-time driver GPS pings while ride is active.
+ *
+ * Backend wraps coordinates inside a `metadata` object:
+ *   { type: 'DRIVER_LOCATION_UPDATE', metadata: { lat, lng, heading, rideId } }
+ */
 export interface DriverLocationUpdateEvent {
   type: "DRIVER_LOCATION_UPDATE";
-  lat: number;
-  lng: number;
-  heading: number;
-  rideId: string;
+  metadata: {
+    lat: number;
+    lng: number;
+    heading: number;
+    rideId: string;
+  };
 }
 
 /**

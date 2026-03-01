@@ -44,7 +44,7 @@ interface FullDeliveryDetails {
     phone: string;
     image?: string;
     rating?: number;
-    vehicle?: {
+    vehicle?: string | {
       model: string;
       color: string;
       plateNumber: string;
@@ -256,7 +256,9 @@ export default function DeliveryProgressUI({
                     <Truck size={14} />
                     <span>
                       {rider.vehicle
-                        ? `${rider.vehicle.color} ${rider.vehicle.model} (${rider.vehicle.plateNumber})`
+                        ? typeof rider.vehicle === "string"
+                          ? rider.vehicle
+                          : `${rider.vehicle.color} ${rider.vehicle.model} (${rider.vehicle.plateNumber})`
                         : "Motorbike"}
                     </span>
                   </div>

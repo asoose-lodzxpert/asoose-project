@@ -37,7 +37,7 @@ export const SidebarCart = ({ restaurantName }: SidebarCartProps) => {
         <div className="space-y-3 mb-6 max-h-60 overflow-y-auto pr-1 custom-scrollbar">
           {items.map((item) => (
             <div
-              key={item.id}
+              key={item.lineId}
               className="flex justify-between items-center text-sm"
             >
               <div className="flex items-center gap-2">

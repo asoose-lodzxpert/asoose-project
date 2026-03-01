@@ -5,10 +5,10 @@ export type RideStage =
   | "idle"
   | "configuring"
   | "searching"
-  | "awaiting-payment"
   | "confirmed"
   | "arrived"
   | "in-progress"
+  | "payment-required"
   | "finished";
 export type RideType = "economy" | "business";
 

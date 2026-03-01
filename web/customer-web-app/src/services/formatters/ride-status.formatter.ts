@@ -155,38 +155,34 @@ export function formatCurrency(amount?: number): string {
 /**
  * Map backend RideStatus (screaming snake case) to frontend RideStage (kebab/camel)
  * 
- * This is the canonical status translation layer between backend and frontend.
- * All socket events and REST API responses flow through this mapper to ensure
- * consistent state transitions in the Zustand store.
+ * Post-ride payment model: payment is collected after the ride is completed.
+ * DRIVER_ACCEPTED always maps to 'confirmed' (no pre-ride payment gate).
+ * COMPLETED maps to 'payment-required' (if unpaid) or 'finished' (if paid).
  * 
  * @param backendStatus - Backend status enum (SEARCHING_DRIVER, DRIVER_ACCEPTED, etc.)
- * @param paymentConfirmed - Whether the user has confirmed payment on the frontend
  * @param serverPaymentCompleted - Whether payment.status === 'COMPLETED' on backend
  * @returns Frontend RideStage for the Zustand store
  */
 export function mapBackendStatusToRideStage(
   backendStatus: RideStatus,
-  paymentConfirmed: boolean = false,
+  _paymentConfirmed: boolean = false,
   serverPaymentCompleted: boolean = false
-): 'idle' | 'configuring' | 'searching' | 'awaiting-payment' | 'confirmed' | 'arrived' | 'in-progress' | 'finished' {
-  // Payment Flow Fix: Show awaiting-payment unless client confirmed OR server shows completed.
-  // This prevents skipping the payment UI on page refresh when paymentConfirmed is lost.
-  const shouldShowPaymentScreen = !paymentConfirmed && !serverPaymentCompleted;
+): 'idle' | 'configuring' | 'searching' | 'confirmed' | 'arrived' | 'in-progress' | 'payment-required' | 'finished' {
 
-  const statusMap: Record<RideStatus, 'idle' | 'configuring' | 'searching' | 'awaiting-payment' | 'confirmed' | 'arrived' | 'in-progress' | 'finished'> = {
+  const statusMap: Record<RideStatus, 'idle' | 'configuring' | 'searching' | 'confirmed' | 'arrived' | 'in-progress' | 'payment-required' | 'finished'> = {
     PENDING: 'idle',
     REQUESTED: 'searching',
     SEARCHING_DRIVER: 'searching',
     DRIVER_ASSIGNED: 'searching',
-    // CRITICAL: DRIVER_ACCEPTED → 'awaiting-payment' to trigger PostDriverPayment UI
-    DRIVER_ACCEPTED: shouldShowPaymentScreen ? 'awaiting-payment' : 'confirmed',
-    ACCEPTED: shouldShowPaymentScreen ? 'awaiting-payment' : 'confirmed',
-    // PAID maps to 'confirmed' (driver on the way)
+    // Post-ride payment: DRIVER_ACCEPTED always maps to 'confirmed' (no payment gate)
+    DRIVER_ACCEPTED: 'confirmed',
+    ACCEPTED: 'confirmed',
+    // PAID maps to 'confirmed' (legacy pre-ride payment rides still in progress)
     PAID: 'confirmed',
-    // ARRIVED persists in localStorage via partialize config (State Management fix)
     ARRIVED: 'arrived',
     IN_PROGRESS: 'in-progress',
-    COMPLETED: 'finished',
+    // Post-ride payment: COMPLETED → 'payment-required' until payment is confirmed
+    COMPLETED: serverPaymentCompleted ? 'finished' : 'payment-required',
     CANCELLED: 'idle',
     CANCELLED_BY_USER: 'idle',
     CANCELLED_BY_DRIVER: 'idle',

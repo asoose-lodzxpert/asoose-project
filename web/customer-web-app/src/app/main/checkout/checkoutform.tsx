@@ -67,6 +67,12 @@ export default function CheckoutForm() {
 
   const cartTotal = getTotalPrice();
 
+  // Stable fingerprint of cart contents — triggers quote refetch when items,
+  // quantities, or modifier selections change (not just array length).
+  const cartFingerprint = JSON.stringify(
+    cartItems.map((i) => `${i.id}:${i.quantity}:${(i.modifierIds ?? []).join(",")}`)
+  );
+
   // Fetch live quote from backend whenever address or cart changes
   const fetchQuote = useCallback(
     async (address: typeof selectedAddress) => {
@@ -122,13 +128,14 @@ export default function CheckoutForm() {
         } else {
           const errData = await res.json().catch(() => ({}));
           console.error("[CheckoutForm] Quote API error:", res.status, errData);
+          toast.warn("Could not calculate delivery fee. You can still place your order.");
           setDeliveryFee(null);
           setServiceFee(null);
           setVatAmount(null);
         }
       } catch (err: any) {
         if (err.name !== "AbortError") {
-          // Silently fail — user sees fallback text
+          toast.warn("Could not calculate delivery fee. You can still place your order.");
           setDeliveryFee(null);
           setServiceFee(null);
           setVatAmount(null);
@@ -254,7 +261,7 @@ export default function CheckoutForm() {
       fetchQuote(selectedAddress);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedAddress?.id, cartItems.length, status]);
+  }, [selectedAddress?.id, cartFingerprint, status]);
 
   // No redirect on empty cart — handled in render below
 
@@ -430,7 +437,9 @@ export default function CheckoutForm() {
       if (!res.ok) throw new Error(data.message || "Order creation failed");
 
       isOrderCreated.current = true;
-      clearCart();
+      // FIX C1: Do NOT clear cart here — cart is cleared in /payment/callback
+      // only after payment is verified successfully. Clearing before payment
+      // means the user loses items if they cancel or payment fails.
 
       // Paystack (CARD) is the only payment method — always redirect to checkout
       if (data.orderGroupId) {
@@ -447,6 +456,9 @@ export default function CheckoutForm() {
     } catch (error: any) {
       console.error("Order placement error:", error);
       toast.error(error.message || "Something went wrong.");
+    } finally {
+      // Always release the processing lock so the button isn't stuck
+      // when the user navigates back after a failed/cancelled payment.
       setIsProcessing(false);
     }
   };
@@ -572,51 +584,64 @@ export default function CheckoutForm() {
                 </button>
               </div>
             ) : (
-              <button
-                onClick={() => setShowAddressPicker(true)}
-                disabled={isProcessing}
-                className={`w-full text-left p-4 rounded-2xl border flex items-center gap-3 transition-all ${
-                  selectedAddress
-                    ? "border-yellow-500 bg-yellow-50 dark:bg-yellow-500/10"
-                    : "border-dashed border-gray-300 dark:border-white/20 hover:border-yellow-500"
-                }`}
-              >
-                <div
-                  className={`p-2 rounded-full flex-shrink-0 ${
+              <div className="space-y-3">
+                <button
+                  onClick={() => setShowAddressPicker(true)}
+                  disabled={isProcessing}
+                  className={`w-full text-left p-4 rounded-2xl border flex items-center gap-3 transition-all ${
                     selectedAddress
-                      ? "bg-yellow-500 text-black"
-                      : "bg-gray-100 dark:bg-white/10 text-gray-400"
+                      ? "border-yellow-500 bg-yellow-50 dark:bg-yellow-500/10"
+                      : "border-dashed border-gray-300 dark:border-white/20 hover:border-yellow-500"
                   }`}
                 >
-                  <span className="text-base">📍</span>
-                </div>
-                <div className="flex-1 min-w-0">
-                  {selectedAddress ? (
-                    <>
-                      <p className="font-bold text-sm">
-                        {selectedAddress.label || "Home"}
-                        {selectedAddress.isDefault && (
-                          <span className="ml-2 text-[10px] bg-gray-200 dark:bg-white/10 px-2 py-0.5 rounded-md font-normal">
-                            Default
-                          </span>
-                        )}
+                  <div
+                    className={`p-2 rounded-full flex-shrink-0 ${
+                      selectedAddress
+                        ? "bg-yellow-500 text-black"
+                        : "bg-gray-100 dark:bg-white/10 text-gray-400"
+                    }`}
+                  >
+                    <span className="text-base">📍</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    {selectedAddress ? (
+                      <>
+                        <p className="font-bold text-sm">
+                          {selectedAddress.label || "Home"}
+                          {selectedAddress.isDefault && (
+                            <span className="ml-2 text-[10px] bg-gray-200 dark:bg-white/10 px-2 py-0.5 rounded-md font-normal">
+                              Default
+                            </span>
+                          )}
+                        </p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
+                          {selectedAddress.city
+                            ? `${selectedAddress.street}, ${selectedAddress.city}`
+                            : selectedAddress.street}
+                        </p>
+                      </>
+                    ) : (
+                      <p className="font-bold text-sm text-gray-400">
+                        Select a delivery address
                       </p>
-                      <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
-                        {selectedAddress.city
-                          ? `${selectedAddress.street}, ${selectedAddress.city}`
-                          : selectedAddress.street}
-                      </p>
-                    </>
-                  ) : (
-                    <p className="font-bold text-sm text-gray-400">
-                      Select a delivery address
-                    </p>
-                  )}
-                </div>
-                <span className="text-gray-400 dark:text-gray-500 flex-shrink-0 text-sm font-medium">
-                  Change
-                </span>
-              </button>
+                    )}
+                  </div>
+                  <span className="text-gray-400 dark:text-gray-500 flex-shrink-0 text-sm font-medium">
+                    Change
+                  </span>
+                </button>
+
+                {/* Add new address shortcut — always visible when saved addresses exist */}
+                <button
+                  type="button"
+                  onClick={() => setShowAddAddressModal(true)}
+                  disabled={isProcessing}
+                  className="flex items-center gap-2 text-sm font-medium text-yellow-600 dark:text-yellow-400 hover:text-yellow-500 dark:hover:text-yellow-300 transition-colors disabled:opacity-60 pl-1"
+                >
+                  <Plus className="w-4 h-4" />
+                  Use a different address
+                </button>
+              </div>
             )}
           </section>
 

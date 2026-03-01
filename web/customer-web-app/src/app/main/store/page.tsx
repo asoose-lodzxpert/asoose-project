@@ -147,7 +147,7 @@ function useStoreData(query: string | null) {
               image: s.logo || s.banner, // Map backend logo to image
               rating: s.rating || 0,
               deliveryTime: `${s.prepTime || 20} min`,
-              deliveryFee: 500, // Default fee
+              deliveryFee: s.deliveryFee ?? 0, // Use backend value
               type: s.type,
             })),
             products: json.products.map((p: any) => ({

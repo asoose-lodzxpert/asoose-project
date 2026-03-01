@@ -223,20 +223,84 @@ export class PaymentStatusService {
               this.logger.warn(
                 `Webhook payment ${verification.reference} arrived for CANCELLED ride ${payment.rideId} — skipping earnings credit`,
               );
+            } else if (currentRide && (currentRide.status as string) === 'COMPLETED') {
+              // Post-ride payment model: ride already completed, now recording earnings.
+              const ride = payment.ride;
+
+              if (currentRide.riderId) {
+                const platformFeeRate = 0.2;
+                const totalFare = Number(payment.amount) || 0;
+                const platformFee = Math.round(totalFare * platformFeeRate);
+                const earning = Math.max(0, totalFare - platformFee);
+
+                await this.ledger.recordPayment(
+                  {
+                    id: payment.id,
+                    amount: payment.amount,
+                    userId: ride.customerId,
+                    rideId: payment.rideId,
+                    method: payment.gateway,
+                    status: 'COMPLETED',
+                  },
+                  tx,
+                );
+
+                await this.ledger.recordRideEarnings(
+                  {
+                    id: payment.rideId,
+                    riderId: currentRide.riderId,
+                    totalFare: payment.amount,
+                    platformFee: platformFee,
+                    driverFee: earning,
+                  },
+                  tx,
+                );
+
+                // Credit driver wallet
+                const rider = await tx.rider.findUnique({
+                  where: { id: currentRide.riderId },
+                  select: { walletBalance: true },
+                });
+                if (rider) {
+                  const balanceBefore = Number(rider.walletBalance);
+                  const balanceAfter = Math.round((balanceBefore + earning) * 100) / 100;
+                  await tx.rider.update({
+                    where: { id: currentRide.riderId },
+                    data: { walletBalance: balanceAfter },
+                  });
+                  await tx.transaction.create({
+                    data: {
+                      type: 'RIDER_EARNING' as any,
+                      amount: earning,
+                      balanceBefore,
+                      balanceAfter,
+                      entityId: currentRide.riderId,
+                      entityType: 'RIDER' as any,
+                      rideId: payment.rideId,
+                      status: 'COMPLETED' as any,
+                      description: `Earnings for ride ${payment.rideId}`,
+                    },
+                  });
+                }
+
+                this.logger.log(
+                  `Post-ride payment: credited driver ${currentRide.riderId} ₦${earning} for ride ${payment.rideId}`,
+                );
+              }
             } else if (
               (currentRide?.status as string) === 'DRIVER_ACCEPTED' ||
               (currentRide?.status as string) === 'DRIVER_ASSIGNED'
             ) {
-              // New flow: payment AFTER driver accepted. Just flip to PAID.
-              // Earnings are recorded when the driver completes the ride.
+              // Legacy flow: payment before ride started. Flip to PAID.
               await tx.ride.update({
                 where: { id: payment.rideId },
                 data: { status: 'PAID' as any },
               });
               this.logger.log(
-                `Ride ${payment.rideId} transitioned ${currentRide!.status} → PAID via Paystack webhook`,
+                `Legacy: Ride ${payment.rideId} transitioned ${currentRide!.status} → PAID via Paystack webhook`,
               );
             } else if (currentRide?.riderId) {
+              // Catch-all for other statuses with a driver
               const ride = payment.ride;
               const platformFeeRate = 0.2;
 
@@ -282,12 +346,13 @@ export class PaymentStatusService {
             });
           }
 
-          // Cancel orphaned rides on payment failure
+          // Don't cancel completed rides on payment failure (post-ride model) —
+          // the ride already happened, customer owes money.
           if (payment.rideId) {
             await tx.ride.updateMany({
               where: {
                 id: payment.rideId,
-                status: { notIn: ['COMPLETED', 'CANCELLED'] as any },
+                status: { notIn: ['COMPLETED', 'IN_PROGRESS', 'CANCELLED'] as any },
               },
               data: {
                 status: 'CANCELLED' as any,
@@ -340,9 +405,43 @@ export class PaymentStatusService {
             select: { status: true, riderId: true, customerId: true },
           });
 
-          if ((rideNow?.status as string) === 'PAID') {
-            // New flow: driver already accepted, ride just transitioned to PAID.
-            // Notify both customer and driver so each side's UI can update.
+          if ((rideNow?.status as string) === 'COMPLETED') {
+            // Post-ride payment model: ride already completed, payment confirmed.
+            // Notify customer so their UI transitions from payment-required → finished.
+            try {
+              this.notificationsGateway.server
+                .to(`user_${rideNow!.customerId}`)
+                .emit('RIDE_PAYMENT_COMPLETED', {
+                  type: 'RIDE_PAYMENT_COMPLETED',
+                  rideId: meta.rideId,
+                  message: 'Payment confirmed. Thank you for your ride!',
+                });
+            } catch (e) {
+              this.logger.error(
+                'Socket emit RIDE_PAYMENT_COMPLETED to customer failed',
+                e,
+              );
+            }
+            // Notify driver that payment has been received
+            if (rideNow?.riderId) {
+              try {
+                this.notificationsGateway.server
+                  .to(`user_${rideNow.riderId}`)
+                  .emit('RIDE_PAYMENT_COMPLETED', {
+                    type: 'RIDE_PAYMENT_COMPLETED',
+                    rideId: meta.rideId,
+                    message: 'Customer has paid for the completed ride.',
+                  });
+              } catch (e) {
+                this.logger.error(
+                  'Socket emit RIDE_PAYMENT_COMPLETED to driver failed',
+                  e,
+                );
+              }
+            }
+          } else if ((rideNow?.status as string) === 'PAID') {
+            // Legacy pre-ride payment flow: DRIVER_ACCEPTED → PAID.
+            // Notify both sides so the ride can start.
             try {
               this.notificationsGateway.server
                 .to(`user_${rideNow!.customerId}`)

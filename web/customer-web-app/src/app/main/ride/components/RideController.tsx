@@ -7,7 +7,7 @@ import { DriverArrived } from './DriverArrived';
 import { TripInProgress } from './TripInProgress';
 import { RatingModal } from './RatingModal';
 import { LocationSelector } from './LocationSelector';
-import { PostDriverPayment } from './PostDriverPayment';
+import { PostRidePayment } from './PostRidePayment';
 import { useReverseGeocoding } from '../hooks/useReverseGeocoding'; // Import Hook
 
 export function RideController() {
@@ -23,17 +23,17 @@ export function RideController() {
     return <LocationSelector />;
   }
 
-  // Standard Flow
+  // Standard Flow (post-ride payment model)
   switch (rideStatus) {
     case 'searching':
       return <FindingDriver />;
-    case 'awaiting-payment': // Driver assigned — user selects payment method
-      return <PostDriverPayment />;
     case 'confirmed': // Driver on way
     case 'arrived':   // Driver waiting
       return <DriverArrived />;
     case 'in-progress':
       return <TripInProgress />;
+    case 'payment-required': // Ride completed — collect payment
+      return <PostRidePayment />;
     case 'finished':
       return <RatingModal />;
     case 'idle':

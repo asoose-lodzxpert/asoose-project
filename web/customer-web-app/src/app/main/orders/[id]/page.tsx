@@ -25,7 +25,7 @@ import { OrderTimeline } from "@/app/main/components/order/OrderTimeline";
 import ReportDisputeModal from "../component/reportDisputeModal";
 
 const API_URL = (
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1"
 ).replace(/\/$/, "");
 
 export default function OrderDetailsPage() {

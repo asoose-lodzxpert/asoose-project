@@ -262,26 +262,44 @@ export function LocationAutocompleteInput({
               onClick={handleUseCurrentLocation}
               disabled={isGeolocating}
               className={`
-                p-1.5 rounded transition-all
+                flex items-center gap-1.5 rounded-lg transition-all
+                ${!inputValue && !isGeolocating && !geoError ? "animate-pulse" : ""}
+                ${
+                  inputValue
+                    ? "p-1.5"
+                    : "px-2.5 py-1.5 bg-blue-50 dark:bg-blue-900/20"
+                }
                 ${
                   geoError
                     ? "text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
-                    : "text-zinc-600 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                    : "text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/30"
                 }
                 disabled:opacity-50 disabled:cursor-not-allowed
               `}
-              title="Use current location"
+              title="Detect my location automatically"
               aria-label="Use current location"
             >
               {isGeolocating ? (
-                <Loader2 size={18} className="animate-spin" />
+                <Loader2 size={16} className="animate-spin" />
               ) : (
-                <Navigation size={18} />
+                <Navigation size={16} />
+              )}
+              {!inputValue && (
+                <span className="text-xs font-semibold whitespace-nowrap">
+                  {isGeolocating ? "Detecting…" : "Locate me"}
+                </span>
               )}
             </button>
           </div>
         )}
       </div>
+
+      {/* Geolocation hint — shown when pickup input is empty and no error */}
+      {type === "pickup" && !inputValue && !geoError && !isGeolocating && (
+        <p className="mt-1.5 ml-1 text-xs text-zinc-400 dark:text-zinc-500">
+          Type an address or tap <span className="font-semibold text-blue-500 dark:text-blue-400">Locate me</span> to auto-detect your location.
+        </p>
+      )}
 
       {/* Error Message */}
       {geoError && (

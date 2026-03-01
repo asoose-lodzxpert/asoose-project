@@ -81,29 +81,32 @@ export function RideSocketListener() {
             rating: 5.0, // Backend doesn't send rating in this event
             phone: driver.phone,
           });
-          // Transition to awaiting-payment so the user selects their payment method
-          // BEFORE the ride proceeds. The PostDriverPayment component will move
-          // to 'confirmed' after the user confirms their payment choice.
-          setRideStatus("awaiting-payment");
-          toast.success(`Driver found! Select how you'd like to pay.`);
+          // Post-ride payment model: go straight to 'confirmed' — payment
+          // is collected after the ride completes (no pre-ride payment gate).
+          setRideStatus("confirmed");
+          toast.success(`Driver found! They're on their way.`);
         } catch (error) {
           console.error("Socket error (onDriverAccepted):", error);
           toast.error("Error processing driver assignment.");
         }
       },
 
-      // 2. Real-time Driver Location Updates — flat payload (no metadata wrapper)
+      // 2. Real-time Driver Location Updates
+      //    Backend wraps data in a `metadata` object:
+      //    { type: 'DRIVER_LOCATION_UPDATE', metadata: { lat, lng, heading, rideId } }
       onDriverLocationUpdate: (data) => {
         try {
-          if (data.rideId !== rideId) return;
+          const meta = data.metadata;
+          if (!meta) return;
+          if (meta.rideId !== rideId) return;
 
           receivedSocketLocation.current = true; // socket is delivering — skip REST poll
           setDriverLocation({
-            lat: data.lat,
-            lng: data.lng,
+            lat: meta.lat,
+            lng: meta.lng,
           });
-          if (data.heading) {
-            setDriverHeading(data.heading);
+          if (meta.heading) {
+            setDriverHeading(meta.heading);
           }
         } catch (error) {
           console.error("Socket error (onDriverLocationUpdate):", error);
@@ -137,13 +140,13 @@ export function RideSocketListener() {
         }
       },
 
-      // 5. Trip Completed
+      // 5. Trip Completed — transition to payment (post-ride payment model)
       onTripCompleted: (data) => {
         try {
           if (data.rideId !== rideId) return;
 
-          setRideStatus("finished");
-          toast.success("Trip completed!");
+          setRideStatus("payment-required");
+          toast.success("Trip completed! Please complete your payment.");
 
           // Trip summary (fare, distance, duration) is restored by
           // useRideSynchronization's next poll cycle which already handles
@@ -190,10 +193,24 @@ export function RideSocketListener() {
       },
     });
 
+    // 8. Post-ride payment confirmed via Paystack webhook
+    const socket = socketService.getSocket();
+    const handleRidePaymentCompleted = (data: any) => {
+      try {
+        if (data.rideId !== rideId) return;
+        setRideStatus("finished");
+        toast.success("Payment confirmed!");
+      } catch (error) {
+        console.error("Socket error (RIDE_PAYMENT_COMPLETED):", error);
+      }
+    };
+    socket?.on("RIDE_PAYMENT_COMPLETED", handleRidePaymentCompleted);
+
     // Cleanup on unmount or rideId change
     return () => {
       devLog(`🔌 Disconnecting Socket Listener for Ride: ${rideId}`);
       unsubscribeFromRideEvents();
+      socket?.off("RIDE_PAYMENT_COMPLETED", handleRidePaymentCompleted);
     };
   }, [
     rideId,

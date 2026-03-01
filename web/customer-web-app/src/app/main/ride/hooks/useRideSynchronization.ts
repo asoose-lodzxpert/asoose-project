@@ -14,10 +14,10 @@ const POLL_INTERVAL_MS = 15_000;
 /** Ride stages that indicate an active ride worth polling for */
 const ACTIVE_STAGES: RideStage[] = [
   "searching",
-  "awaiting-payment",
   "confirmed",
   "arrived",
   "in-progress",
+  "payment-required",
 ];
 
 export function useRideSynchronization() {
@@ -63,7 +63,8 @@ export function useRideSynchronization() {
           if (
             currentStatus !== "idle" &&
             currentStatus !== "configuring" &&
-            currentStatus !== "finished"
+            currentStatus !== "finished" &&
+            currentStatus !== "payment-required"
           ) {
             console.log(
               `🔄 No active ride on backend (local: ${currentStatus}). Resetting to idle.`,
@@ -76,17 +77,15 @@ export function useRideSynchronization() {
         }
 
         // Use centralized status mapper (State Management fix).
-        // IMPORTANT: check payment.status === 'COMPLETED', NOT payment.method.
-        // A placeholder Payment record with method=CARD is created at ride-creation
-        // time (status=PENDING), so !!payment.method is always truthy and would
-        // incorrectly bypass the awaiting-payment screen.
+        // Post-ride payment model: payment.status determines whether ride
+        // maps to 'payment-required' or 'finished' (no pre-ride payment gate).
         const serverPaymentCompleted =
           backendRide.payment?.status === "COMPLETED";
 
         const activeRide = mapRideToViewModel(backendRide);
         const mappedStatus = mapBackendStatusToRideStage(
           activeRide.status,
-          paymentConfirmed,
+          false, // paymentConfirmed is unused in post-ride model
           serverPaymentCompleted
         );
 
@@ -96,8 +95,19 @@ export function useRideSynchronization() {
           setRideId(activeRide.id);
         }
 
-        // Always reconcile status — this is the key polling value
-        if (state.rideStatus !== mappedStatus) {
+        // Always reconcile status — this is the key polling value.
+        // Guard: the backend never persists ARRIVED to the database (it's a
+        // socket-only event), so polls always return DRIVER_ACCEPTED even
+        // after the driver has arrived. Without this guard the local state
+        // would regress from 'arrived' back to 'confirmed' on every poll.
+        const STAGE_ORDER: string[] = [
+          'idle', 'configuring', 'searching', 'confirmed',
+          'arrived', 'in-progress', 'payment-required', 'finished',
+        ];
+        const currentIdx = STAGE_ORDER.indexOf(state.rideStatus);
+        const mappedIdx = STAGE_ORDER.indexOf(mappedStatus);
+
+        if (state.rideStatus !== mappedStatus && mappedIdx >= currentIdx) {
           console.log(`🔄 Status sync: ${state.rideStatus} → ${mappedStatus}`);
           setRideStatus(mappedStatus);
         }
@@ -199,8 +209,8 @@ export function useRideSynchronization() {
           });
         }
 
-        // Restore financials if finished
-        if (mappedStatus === "finished") {
+        // Restore financials if finished or payment-required
+        if (mappedStatus === "finished" || mappedStatus === "payment-required") {
           setTripSummary({
             fare: activeRide.actualFare,
             distance: activeRide.distanceKm || 0,

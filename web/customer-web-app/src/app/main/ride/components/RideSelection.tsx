@@ -303,8 +303,8 @@ export function RideSelection() {
       );
       if (setRideId) setRideId(response.ride.id);
       // Store OTP so it can be shown to the driver when they arrive
-      if ((response.ride as any).startOtp)
-        setStartOtp((response.ride as any).startOtp);
+      if (response.ride.startOtp)
+        setStartOtp(response.ride.startOtp);
 
       // Driver matching begins on the backend after createRide.
       // confirmRide is called later from PostDriverPayment after DRIVER_FOUND.
