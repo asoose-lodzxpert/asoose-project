@@ -5,7 +5,7 @@ import { ConfigService } from '@nestjs/config';
 import { appLogger } from './libs/logger/logger';
 import { AppConfigModule } from './config/config.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
-import { MongooseModule } from '@nestjs/mongoose';
+// import { MongooseModule } from '@nestjs/mongoose';  // Commented out - MongoDB optional
 import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis';
@@ -29,7 +29,7 @@ import { StorageModule } from './storage/storage.module';
 import { SuperAdminModule } from './super-admin/super-admin.module';
 import { UsersModule } from './users/users.module';
 import { VendorModule } from './vendor/vendor.module';
-import { LogsModule } from './logs/logs.module';
+// import { LogsModule } from './logs/logs.module';  // Commented out - requires MongoDB
 import { FareModule } from './fare/fare.module';
 import { LoggerModule } from './libs/logger/logger.module';
 import { MetricsModule } from './metrics/metrics.module';
@@ -66,33 +66,17 @@ import { MetricsModule } from './metrics/metrics.module';
     }),
     ScheduleModule.forRoot(),
 
-    // ---------- MongoDB (optional — used only for error-log storage) ----------
-    MongooseModule.forRootAsync({
-      inject: [ConfigService],
-      useFactory: (cs: ConfigService) => ({
-        uri: cs.get<string>('MONGODB_URI', 'mongodb://localhost:27017/asoose'),
-        serverSelectionTimeoutMS: 3_000,
-        connectTimeoutMS: 3_000,
-        socketTimeoutMS: 5_000,
-        retryWrites: false,
-        // connectionFactory goes here (inside useFactory's return), not at async opts level
-        connectionFactory: (connection: any) => {
-          connection.on('error', (err: Error) => {
-            appLogger.warn(
-              '[MongoDB] Connection error (non-fatal): ' + err.message,
-              { context: 'MongoDB' },
-            );
-          });
-          connection.on('disconnected', () => {
-            appLogger.warn(
-              '[MongoDB] Disconnected — log writes will be skipped.',
-              { context: 'MongoDB' },
-            );
-          });
-          return connection;
-        },
-      }),
-    }),
+    // ---------- MongoDB (optional — used only for error-log storage) ----------  
+    // Commented out - enable when you have MongoDB running
+    // MongooseModule.forRootAsync({
+    //   inject: [ConfigService],
+    //   useFactory: (cs: ConfigService) => ({
+    //     uri: cs.get<string>('MONGODB_URI', 'mongodb://localhost:27017/asoose'),
+    //     serverSelectionTimeoutMS: 3_000,
+    //     connectTimeoutMS: 3_000,
+    //     socketTimeoutMS: 5_000,
+    //   }),
+    // }),
 
     // ---------- Rate Limiting ----------
     // ThrottlerStorageRedisService shares counters across instances and survives restarts.
@@ -123,7 +107,7 @@ import { MetricsModule } from './metrics/metrics.module';
     AuthModule,
     CartModule,
     FcmModule,
-    LogsModule,
+    // LogsModule,  // Commented out - requires MongoDB
     MailModule,
     MapsModule,
     MarketplaceModule,

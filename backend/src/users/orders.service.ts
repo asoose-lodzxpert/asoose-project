@@ -279,6 +279,14 @@ export class OrdersService {
           subtotal,
           enrichedItems,
         });
+
+        // Warn when a store has no coordinates — distance will be computed
+        // from (0,0) which produces a wildly inaccurate delivery fee.
+        if (store.lat == null || store.lng == null) {
+          this.logger.warn(
+            `Store "${store.name}" (${storeId}) has no GPS coordinates — delivery fee will be inaccurate`,
+          );
+        }
       }
 
       // ── Route-optimized total delivery fee (FareService formula) ──
@@ -294,9 +302,15 @@ export class OrdersService {
         storeCoords,
       );
 
-      const totalDeliveryFee = Math.round(
+      // The delivery fee must never be zero — the base fare alone guarantees
+      // a minimum, but we guard explicitly in case constants are misconfigured.
+      const calculatedFee = Math.round(
         this.fareService.BaseDeliveryFare +
           totalRouteKm * this.fareService.DeliveryPerKm,
+      );
+      const totalDeliveryFee = Math.max(
+        calculatedFee,
+        this.fareService.BaseDeliveryFare,
       );
 
       const grandSubtotal = storeEntries.reduce(
@@ -1065,6 +1079,12 @@ export class OrdersService {
         const firstProduct = productMap.get(groupItems[0].id)!;
         const store = firstProduct.store;
 
+        if (store.lat == null || store.lng == null) {
+          this.logger.warn(
+            `Store "${store.name}" (${storeId}) has no GPS coordinates — delivery fee will be inaccurate`,
+          );
+        }
+
         const pickupAddress =
           await this.addressesService.getOrCreateStoreAddress(
             store.vendorId,
@@ -1164,9 +1184,13 @@ export class OrdersService {
     }
 
     // FareService delivery formula — matches the /fare/delivery endpoint exactly
-    const totalDeliveryFee = Math.round(
+    const calculatedFee = Math.round(
       this.fareService.BaseDeliveryFare +
         totalRouteKm * this.fareService.DeliveryPerKm,
+    );
+    const totalDeliveryFee = Math.max(
+      calculatedFee,
+      this.fareService.BaseDeliveryFare,
     );
 
     // Sum of all item subtotals (used for proportional split)

@@ -27,11 +27,16 @@ export const OrderSummary = ({
   hasAddress = false,
   onPlaceOrder,
 }: OrderSummaryProps) => {
-  const resolvedDelivery = deliveryFee ?? 0;
+  // When fee values are unknown (null) we must NOT silently resolve them
+  // to 0 — that displays a false ₦0 delivery fee and under-quotes the total.
+  // Show placeholder text instead and compute the total only from known values.
+  const feesKnown = deliveryFee !== null;
+  const resolvedDelivery = deliveryFee ?? null;
   const resolvedService = serviceFee ?? Math.round(cartTotal * 0.05);
   const resolvedVat = vatAmount ?? Math.round(cartTotal * 0.07);
-  const grandTotal =
-    cartTotal + resolvedDelivery + resolvedService + resolvedVat;
+  const grandTotal = feesKnown
+    ? cartTotal + (resolvedDelivery ?? 0) + resolvedService + resolvedVat
+    : null; // Cannot produce a total without a delivery fee
 
   return (
     <div className="bg-white dark:bg-[#151515] p-6 rounded-3xl border border-gray-100 dark:border-white/5 shadow-sm">
@@ -57,8 +62,10 @@ export const OrderSummary = ({
           <span>Delivery Fee</span>
           {isLoadingFee ? (
             <span className="w-16 h-4 bg-gray-200 dark:bg-white/10 rounded animate-pulse" />
-          ) : (
+          ) : resolvedDelivery !== null ? (
             <span>₦{resolvedDelivery.toLocaleString()}</span>
+          ) : (
+            <span className="text-gray-400 dark:text-gray-500 italic">—</span>
           )}
         </div>
         <div className="flex justify-between text-gray-600 dark:text-gray-400">
@@ -85,10 +92,12 @@ export const OrderSummary = ({
         <span className="font-black text-lg">Estimated Total</span>
         {isLoadingFee ? (
           <span className="w-24 h-7 bg-gray-200 dark:bg-white/10 rounded animate-pulse" />
-        ) : (
+        ) : grandTotal !== null ? (
           <span className="font-black text-2xl text-yellow-600 dark:text-yellow-500">
             ₦{grandTotal.toLocaleString()}
           </span>
+        ) : (
+          <span className="font-black text-2xl text-gray-400 dark:text-gray-500">—</span>
         )}
       </div>
 
@@ -111,7 +120,7 @@ export const OrderSummary = ({
 
       <button
         onClick={onPlaceOrder}
-        disabled={isDisabled || isLoadingFee}
+        disabled={isDisabled || isLoadingFee || !feesKnown}
         className="w-full bg-yellow-500 text-black py-4 rounded-xl font-bold shadow-lg shadow-yellow-500/20 hover:bg-yellow-400 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {isProcessing ? (

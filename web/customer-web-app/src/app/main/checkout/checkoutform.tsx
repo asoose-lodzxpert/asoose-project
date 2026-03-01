@@ -255,13 +255,15 @@ export default function CheckoutForm() {
     }
   }, [status, fetchAddresses, fetchProfile]);
 
-  // Fetch quote whenever address is selected or cart changes
+  // Fetch quote whenever address is selected, cart changes, or token becomes available.
+  // `fetchQuote` MUST be in the dep array — it closes over `session?.accessToken`
+  // and is re-created by useCallback when the token changes. Without it, the effect
+  // can fire with a stale fetchQuote that has no token, silently skipping the call.
   useEffect(() => {
     if (status === "authenticated") {
       fetchQuote(selectedAddress);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedAddress?.id, cartFingerprint, status]);
+  }, [selectedAddress?.id, cartFingerprint, status, fetchQuote]);
 
   // No redirect on empty cart — handled in render below
 
@@ -367,6 +369,18 @@ export default function CheckoutForm() {
     if (phoneValidationError) {
       setPhoneError(phoneValidationError);
       toast.error(phoneValidationError);
+      return;
+    }
+
+    // Prevent placing an order when the delivery fee hasn't been calculated.
+    // Without this guard the user sees ₦0 for delivery and the backend
+    // charges the real amount — creating a pricing integrity mismatch.
+    if (deliveryFee === null) {
+      toast.error(
+        "Delivery fee could not be calculated. Please select or change your address and try again.",
+      );
+      // Re-attempt quote in case it failed silently earlier
+      fetchQuote(selectedAddress);
       return;
     }
 

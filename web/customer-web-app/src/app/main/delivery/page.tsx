@@ -154,6 +154,10 @@ export default function DeliveryPage() {
       toast.success("Payment confirmed!");
       if (targetId) {
         router.push(`/main/delivery/${targetId}`);
+      } else {
+        // Fallback: if delivery ID is lost, at least go to deliveries list
+        // so the user can find their delivery instead of being stuck.
+        router.push("/main/deliveries");
       }
     },
     [activeDeliveryId, resetDelivery, router],
