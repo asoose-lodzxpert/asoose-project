@@ -38,7 +38,6 @@ import { DeliveryCard } from "@/app/main/components/profile/deliverycard";
 import { DisputeCard } from "@/app/main/components/profile/DisputeCard";
 import BottomNav from "@/app/main/components/layout/BottomNav";
 import { EmptyState } from "@/app/main/components/profile/EmptyState";
-import { WalletTab } from "@/app/main/components/profile/WalletTab";
 import { LinkedAccountsSection } from "@/app/main/components/profile/LinkedAccountsSection";
 import {
   ProfileSkeleton,
@@ -67,7 +66,6 @@ function ProfilePageContent() {
     "rides",
     "deliveries",
     "disputes",
-    "wallet",
     "addresses",
     "settings",
   ];
@@ -125,13 +123,20 @@ function ProfilePageContent() {
     async (path: string, accessToken: string, options: RequestInit = {}) => {
       try {
         const method = (options.method || "GET").toUpperCase();
-        const data = options.body ? JSON.parse(options.body as string) : undefined;
+        const data = options.body
+          ? JSON.parse(options.body as string)
+          : undefined;
         switch (method) {
-          case "POST":   return await ApiService.post<any>(path, data, accessToken);
-          case "PATCH":  return await ApiService.patch<any>(path, data, accessToken);
-          case "PUT":    return await ApiService.put<any>(path, data, accessToken);
-          case "DELETE": return await ApiService.delete<any>(path, accessToken);
-          default:       return await ApiService.get<any>(path, accessToken);
+          case "POST":
+            return await ApiService.post<any>(path, data, accessToken);
+          case "PATCH":
+            return await ApiService.patch<any>(path, data, accessToken);
+          case "PUT":
+            return await ApiService.put<any>(path, data, accessToken);
+          case "DELETE":
+            return await ApiService.delete<any>(path, accessToken);
+          default:
+            return await ApiService.get<any>(path, accessToken);
         }
       } catch (e: any) {
         console.error(`Fetch error for ${path}`, e?.message ?? e);
@@ -259,12 +264,7 @@ function ProfilePageContent() {
   }, [session, status, router]);
 
   useEffect(() => {
-    if (
-      token &&
-      activeTab !== "addresses" &&
-      activeTab !== "settings" &&
-      activeTab !== "wallet"
-    ) {
+    if (token && activeTab !== "addresses" && activeTab !== "settings") {
       fetchTabData(activeTab, token);
     }
   }, [activeTab, token, fetchTabData]);
@@ -541,10 +541,6 @@ function ProfilePageContent() {
                   ))
                 )}
               </div>
-            )}
-
-            {activeTab === "wallet" && token && (
-              <WalletTab token={token} apiUrl={API_URL} />
             )}
 
             {activeTab === "addresses" && (

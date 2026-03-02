@@ -6,7 +6,6 @@ import {
   MapPin,
   Settings,
   ShieldAlert,
-  Wallet,
 } from "lucide-react";
 
 export const TABS = [
@@ -14,7 +13,6 @@ export const TABS = [
   { id: "rides", label: "Rides", icon: Car },
   { id: "deliveries", label: "Deliveries", icon: Package },
   { id: "disputes", label: "Disputes", icon: ShieldAlert },
-  { id: "wallet", label: "Wallet", icon: Wallet },
   { id: "addresses", label: "Addresses", icon: MapPin },
   { id: "settings", label: "Settings", icon: Settings },
 ] as const;
