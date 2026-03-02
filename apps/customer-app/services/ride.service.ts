@@ -125,7 +125,9 @@ export class RideService {
   /**
    * Get driver's current location
    */
-  static async getDriverLocation(rideId: string): Promise<DriverLocation> {
+  static async getDriverLocation(
+    rideId: string,
+  ): Promise<DriverLocation | null> {
     return get(`trips/rides/${rideId}/driver-location`);
   }
 

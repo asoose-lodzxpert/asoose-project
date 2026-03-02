@@ -186,7 +186,12 @@ export function RideProvider({ children }: { children: ReactNode }) {
         ) {
           try {
             const location = await RideService.getDriverLocation(ride.id);
-            setDriverLocation(location);
+            if (
+              location &&
+              (location.latitude !== 0 || location.longitude !== 0)
+            ) {
+              setDriverLocation(location);
+            }
           } catch (err) {
             if (__DEV__) console.warn("Failed to fetch driver location:", err);
           }

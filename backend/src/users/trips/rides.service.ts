@@ -782,21 +782,40 @@ export class RidesService {
   async getDriverLocation(userId: string, rideId: string) {
     const ride = await this.prisma.ride.findUnique({
       where: { id: rideId },
-      include: { rider: true },
+      select: { customerId: true, riderId: true },
     });
 
     if (!ride || ride.customerId !== userId)
       throw new NotFoundException('Ride not found');
-    if (!ride.riderId) return { latitude: 0, longitude: 0, heading: 0 };
+    if (!ride.riderId) return null;
 
+    // Prefer Redis — location pings are stored there in real-time.
+    // The DB columns (currentLat/currentLng) are only updated on status changes
+    // and are therefore stale between pings.
+    try {
+      const state = await this.driverStateService.getState(ride.riderId);
+      if (state?.location?.lat && state?.location?.lng) {
+        return {
+          latitude: state.location.lat,
+          longitude: state.location.lng,
+          heading: (state.location as any).heading ?? 0,
+        };
+      }
+    } catch {
+      // Fall through to DB
+    }
+
+    // Fallback: DB columns (may be null if driver never updated status with coords)
     const rider = await this.prisma.rider.findUnique({
       where: { id: ride.riderId },
       select: { currentLat: true, currentLng: true },
     });
 
+    if (!rider?.currentLat || !rider?.currentLng) return null;
+
     return {
-      latitude: rider?.currentLat || 0,
-      longitude: rider?.currentLng || 0,
+      latitude: rider.currentLat,
+      longitude: rider.currentLng,
       heading: 0,
     };
   }
