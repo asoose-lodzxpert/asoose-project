@@ -510,7 +510,7 @@ export default function DeliveryPage() {
       // Without this, the backend falls back to process.env.FRONTEND_URL which
       // may be unset or wrong. NEXT_PUBLIC_APP_URL must be this app's port (3001),
       // NOT the backend port (3000).
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3001";
+      const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3001").replace(/\/+$/, "");
       // Send just the base URL — the backend GET /callback/paystack handler
       // appends "/payment/callback" itself before redirecting the browser.
       const frontendCallbackUrl = appUrl;
