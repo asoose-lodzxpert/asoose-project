@@ -11,13 +11,17 @@ interface UseJobEventsOptions {
   onJobAssigned?: (job: IncomingJobOffer) => void;
   onJobUpdated?: (jobId: string, status: string) => void;
   onJobCancelled?: (jobId: string) => void;
+  /** Fired specifically when the customer cancels a ride — shows a tailored toast */
+  onRideCancelledByCustomer?: (rideId: string, reason?: string) => void;
   /** Fired when a job reaches COMPLETED — use to do a full state reset */
   onJobCompleted?: (jobId: string) => void;
   onError?: (error: Error) => void;
   onConnectionStatusChange?: (status: ConnectionStatus) => void;
   onForceLogout?: (reason?: string) => void;
-  /** Called when the customer confirms payment — driver may now start */
+  /** Legacy pre-ride upfront payment confirmed — driver may now start. */
   onPaymentConfirmed?: (rideId: string) => void;
+  /** Post-ride payment confirmed — driver earnings have been credited. */
+  onRidePaymentCompleted?: (rideId: string) => void;
   enabled?: boolean;
 }
 
@@ -26,11 +30,13 @@ export function useJobEvents(options: UseJobEventsOptions) {
     onJobAssigned,
     onJobUpdated,
     onJobCancelled,
+    onRideCancelledByCustomer,
     onJobCompleted,
     onError,
     onConnectionStatusChange,
     onForceLogout,
     onPaymentConfirmed,
+    onRidePaymentCompleted,
     enabled = true,
   } = options;
   const serviceRef = useRef<JobEventsService | null>(null);
@@ -51,22 +57,26 @@ export function useJobEvents(options: UseJobEventsOptions) {
         onJobAssigned,
         onJobUpdated,
         onJobCancelled,
+        onRideCancelledByCustomer,
         onJobCompleted,
         onError,
         onConnectionStatusChange,
         onForceLogout,
         onPaymentConfirmed,
+        onRidePaymentCompleted,
       });
     }
   }, [
     onJobAssigned,
     onJobUpdated,
     onJobCancelled,
+    onRideCancelledByCustomer,
     onJobCompleted,
     onError,
     onConnectionStatusChange,
     onForceLogout,
     onPaymentConfirmed,
+    onRidePaymentCompleted,
   ]);
 
   const connect = useCallback(() => {

@@ -149,10 +149,10 @@ export type RidePageView =
   | "IDLE"
   | "BOOKING"
   | "FINDING_DRIVER" // REQUESTED / SEARCHING_DRIVER
-  | "AWAITING_PAYMENT" // DRIVER_ACCEPTED — customer must pay
-  | "DRIVER_ASSIGNED" // PAID — driver is on the way
+  | "DRIVER_ASSIGNED" // DRIVER_ACCEPTED — driver en route, show OTP
   | "IN_PROGRESS" // IN_PROGRESS
-  | "COMPLETED"; // COMPLETED
+  | "AWAITING_PAYMENT" // COMPLETED — post-ride payment required
+  | "COMPLETED"; // PAID — payment confirmed
 
 export type RideContextState = {
   currentRide: Ride | null;

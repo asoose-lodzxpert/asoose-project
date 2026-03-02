@@ -223,7 +223,10 @@ export class PaymentStatusService {
               this.logger.warn(
                 `Webhook payment ${verification.reference} arrived for CANCELLED ride ${payment.rideId} — skipping earnings credit`,
               );
-            } else if (currentRide && (currentRide.status as string) === 'COMPLETED') {
+            } else if (
+              currentRide &&
+              (currentRide.status as string) === 'COMPLETED'
+            ) {
               // Post-ride payment model: ride already completed, now recording earnings.
               const ride = payment.ride;
 
@@ -263,7 +266,8 @@ export class PaymentStatusService {
                 });
                 if (rider) {
                   const balanceBefore = Number(rider.walletBalance);
-                  const balanceAfter = Math.round((balanceBefore + earning) * 100) / 100;
+                  const balanceAfter =
+                    Math.round((balanceBefore + earning) * 100) / 100;
                   await tx.rider.update({
                     where: { id: currentRide.riderId },
                     data: { walletBalance: balanceAfter },
@@ -287,6 +291,15 @@ export class PaymentStatusService {
                   `Post-ride payment: credited driver ${currentRide.riderId} ₦${earning} for ride ${payment.rideId}`,
                 );
               }
+
+              // Mark ride as PAID so the customer UI navigates to the success screen.
+              await tx.ride.update({
+                where: { id: payment.rideId! },
+                data: { status: 'PAID' as any },
+              });
+              this.logger.log(
+                `Post-ride payment: ride ${payment.rideId} transitioned COMPLETED → PAID`,
+              );
             } else if (
               (currentRide?.status as string) === 'DRIVER_ACCEPTED' ||
               (currentRide?.status as string) === 'DRIVER_ASSIGNED'
@@ -352,7 +365,9 @@ export class PaymentStatusService {
             await tx.ride.updateMany({
               where: {
                 id: payment.rideId,
-                status: { notIn: ['COMPLETED', 'IN_PROGRESS', 'CANCELLED'] as any },
+                status: {
+                  notIn: ['COMPLETED', 'IN_PROGRESS', 'CANCELLED'] as any,
+                },
               },
               data: {
                 status: 'CANCELLED' as any,

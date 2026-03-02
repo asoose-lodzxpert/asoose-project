@@ -2,6 +2,7 @@ import { Ride } from "@/types/ride";
 import { RideService } from "@/services/ride.service";
 import {
   isSearching,
+  isDriverAccepted,
   isAwaitingPayment,
   isPaid,
   isInProgress,
@@ -12,7 +13,11 @@ import {
 export type DerivedRideState = {
   st: string;
   searching: boolean;
+  /** DRIVER_ACCEPTED: driver en route to pickup, show OTP */
+  driverAccepted: boolean;
+  /** COMPLETED: post-ride payment required */
   awaitingPayment: boolean;
+  /** PAID: payment confirmed — navigate to success */
   paid: boolean;
   inProgress: boolean;
   hasDriver: boolean;
@@ -34,12 +39,18 @@ export function getDerivedRideState(
   const st = currentRide.status as string;
 
   const searching = isSearching(st);
-  const awaitingPayment = isAwaitingPayment(st);
-  const paid = isPaid(st);
+  const driverAccepted = isDriverAccepted(st);
+  const awaitingPayment = isAwaitingPayment(st); // = COMPLETED, post-ride
+  const paid = isPaid(st); // = PAID, payment confirmed
   const inProgress = isInProgress(st);
-  const hasDriver =
-    !!currentRide.rider && (awaitingPayment || paid || inProgress);
-  const showOTP = paid && !!currentRide.startOtp;
+
+  // Show driver card only while driver is en route or trip is active.
+  // After COMPLETED, the ride is over — driver info not needed.
+  const hasDriver = !!currentRide.rider && (driverAccepted || inProgress);
+
+  // OTP unlocks the ride start and is shown once the driver is accepted.
+  const showOTP = driverAccepted && !!currentRide.startOtp;
+
   const showCancel = canCancel(st);
   const fareStr = RideService.formatCurrency(currentRide.totalFare ?? 0);
   const driverPhone: string | undefined =
@@ -49,6 +60,7 @@ export function getDerivedRideState(
   return {
     st,
     searching,
+    driverAccepted,
     awaitingPayment,
     paid,
     inProgress,

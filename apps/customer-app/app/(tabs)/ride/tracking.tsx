@@ -54,11 +54,11 @@ export default function RideTrackingScreen() {
     if (!currentRide) return;
     const st = currentRide.status as string;
 
-    if (st === "COMPLETED") {
+    // PAID = post-ride payment confirmed — navigate to the success / receipt screen.
+    if (st === "PAID") {
       const t = setTimeout(() => {
-        resetRideState();
-        router.replace("/ride");
-      }, 3500);
+        router.replace("/(tabs)/ride/success" as any);
+      }, 1500);
       return () => clearTimeout(t);
     }
 
@@ -83,8 +83,8 @@ export default function RideTrackingScreen() {
   const {
     st,
     searching,
+    driverAccepted,
     awaitingPayment,
-    paid,
     inProgress,
     hasDriver,
     showOTP,
@@ -128,26 +128,8 @@ export default function RideTrackingScreen() {
         {/* SEARCHING */}
         {searching && <SearchingState />}
 
-        {/* DRIVER ACCEPTED  awaiting payment */}
-        {awaitingPayment && (
-          <>
-            {hasDriver && (
-              <DriverInfoRow
-                driver={currentRide.rider}
-                driverPhone={driverPhone}
-              />
-            )}
-            <PaymentPrompt
-              fare={currentRide.totalFare ?? 0}
-              formattedFare={fareStr}
-              onPay={actions.handlePayNow}
-              paying={actions.paying}
-            />
-          </>
-        )}
-
-        {/* PAID  show driver info + OTP */}
-        {paid && (
+        {/* DRIVER_ACCEPTED — driver en route to pickup, show OTP for ride start */}
+        {driverAccepted && (
           <>
             {hasDriver && (
               <DriverInfoRow
@@ -163,9 +145,19 @@ export default function RideTrackingScreen() {
           </>
         )}
 
-        {/* IN PROGRESS  show driver info only */}
+        {/* IN_PROGRESS — ride ongoing, show driver info */}
         {inProgress && hasDriver && (
           <DriverInfoRow driver={currentRide.rider} driverPhone={driverPhone} />
+        )}
+
+        {/* COMPLETED — post-ride payment required */}
+        {awaitingPayment && (
+          <PaymentPrompt
+            fare={currentRide.totalFare ?? 0}
+            formattedFare={fareStr}
+            onPay={actions.handlePayNow}
+            paying={actions.paying}
+          />
         )}
 
         {/* Cancel link */}

@@ -104,17 +104,19 @@ export function RideProvider({ children }: { children: ReactNode }) {
         case RideStatus.SEARCHING_DRIVER:
           return "FINDING_DRIVER";
         case RideStatus.DRIVER_ACCEPTED:
+          // Driver is en route to pickup — no upfront payment in new flow.
+          return "DRIVER_ASSIGNED";
+        case RideStatus.COMPLETED:
+          // Post-ride payment required after the ride ends.
           return "AWAITING_PAYMENT";
         case RideStatus.PAID:
-          return "DRIVER_ASSIGNED";
+          return "COMPLETED";
         // Legacy mappings
         case RideStatus.ACCEPTED:
         case RideStatus.ARRIVED:
           return "DRIVER_ASSIGNED";
         case RideStatus.IN_PROGRESS:
           return "IN_PROGRESS";
-        case RideStatus.COMPLETED:
-          return "COMPLETED";
         case RideStatus.CANCELLED_BY_USER:
         case RideStatus.CANCELLED_BY_DRIVER:
         case RideStatus.CANCELLED:
@@ -154,10 +156,12 @@ export function RideProvider({ children }: { children: ReactNode }) {
       }
       // Guard: if payment was already confirmed optimistically (DRIVER_ASSIGNED view)
       // but the DB still returns DRIVER_ACCEPTED (webhook hasn't completed), don't revert.
+      // Note: this guard only applies in the legacy pre-ride payment path (PAID status).
       if (
-        pageViewRef.current === "DRIVER_ASSIGNED" &&
+        pageViewRef.current === "COMPLETED" &&
         ride &&
-        (ride.status as string) === "DRIVER_ACCEPTED"
+        ((ride.status as string) === "DRIVER_ACCEPTED" ||
+          (ride.status as string) === "PAID")
       ) {
         if (__DEV__)
           console.log(
@@ -246,9 +250,9 @@ export function RideProvider({ children }: { children: ReactNode }) {
     socket.on("DRIVER_ACCEPTED", (event: RideSocketEvent) => {
       if (__DEV__) console.log("[RideContext] Driver accepted:", event);
       if (event.type === "DRIVER_ACCEPTED") {
-        // Update current ride with driver info then show payment screen
+        // Post-ride payment model: driver acceptance does NOT require upfront payment.
+        // Refresh so the tracking screen shows the driver info card and OTP.
         refreshCurrentRide();
-        setPageView("AWAITING_PAYMENT");
       }
     });
 
@@ -295,9 +299,26 @@ export function RideProvider({ children }: { children: ReactNode }) {
     socket.on("TRIP_COMPLETED", (event: RideSocketEvent) => {
       if (__DEV__) console.log("[RideContext] Trip completed:", event);
       if (event.type === "TRIP_COMPLETED") {
+        // Post-ride payment model: optimistically flip status to COMPLETED so the
+        // payment prompt appears instantly, then reconcile with the DB.
+        setCurrentRide((prev) =>
+          prev ? { ...prev, status: "COMPLETED" as any } : prev,
+        );
+        setPageView("AWAITING_PAYMENT");
         refreshCurrentRide();
-        setPageView("COMPLETED");
       }
+    });
+
+    // Paystack webhook confirmed that the post-ride payment succeeded.
+    // Flip status to PAID so the tracking screen auto-navigates to the success receipt.
+    socket.on("RIDE_PAYMENT_COMPLETED", (event: any) => {
+      if (__DEV__) console.log("[RideContext] Ride payment completed:", event);
+      setCurrentRide((prev) =>
+        prev ? { ...prev, status: "PAID" as any } : prev,
+      );
+      setPageView("COMPLETED");
+      // Delay refresh to give the webhook time to settle in the DB.
+      setTimeout(() => refreshCurrentRide(), 2000);
     });
 
     socket.on("RIDE_CANCELLED", (event: RideSocketEvent) => {

@@ -114,8 +114,29 @@ export const JobsProvider = ({ children }: { children: ReactNode }) => {
     });
     // Side effects go outside the updaters
     setStatus("online-waiting");
-    Toast.show({ type: "error", text1: "Job Cancelled" });
+    Toast.show({
+      type: "error",
+      text1: "Job Cancelled",
+      text2: "Returning you to standby.",
+    });
   }, []);
+
+  const handleRideCancelledByCustomer = useCallback(
+    (rideId: string, reason?: string) => {
+      setActiveJob((prev) => (prev && prev.id === rideId ? null : prev));
+      setIncomingJob((prev) => (prev && prev.id === rideId ? null : prev));
+      setStatus("online-waiting");
+      Toast.show({
+        type: "error",
+        text1: "Ride Cancelled by Customer",
+        text2: reason?.trim()
+          ? `Reason: ${reason}`
+          : "The customer has cancelled this ride.",
+        visibilityTime: 5000,
+      });
+    },
+    [],
+  );
 
   const handleConnectionStatusChange = useCallback(
     (status: ConnectionStatus) => {
@@ -161,11 +182,21 @@ export const JobsProvider = ({ children }: { children: ReactNode }) => {
   );
 
   const handlePaymentConfirmed = useCallback((rideId: string) => {
-    // Customer paid — notify the driver they can now start the trip
+    // Legacy pre-ride upfront payment: customer paid before the trip started.
     Toast.show({
       type: "success",
       text1: "Payment Confirmed",
       text2: "Customer has paid. You may now start the trip.",
+      visibilityTime: 5000,
+    });
+  }, []);
+
+  const handleRidePaymentCompleted = useCallback((_rideId: string) => {
+    // Post-ride payment: customer paid after the ride completed — earnings credited.
+    Toast.show({
+      type: "success",
+      text1: "Payment Received",
+      text2: "Customer payment confirmed. Earnings have been credited.",
       visibilityTime: 5000,
     });
   }, []);
@@ -176,9 +207,11 @@ export const JobsProvider = ({ children }: { children: ReactNode }) => {
     onJobUpdated: handleJobUpdated,
     onJobCompleted: handleJobCompleted,
     onJobCancelled: handleJobCancelled,
+    onRideCancelledByCustomer: handleRideCancelledByCustomer,
     onConnectionStatusChange: handleConnectionStatusChange,
     onForceLogout: handleForceLogout,
     onPaymentConfirmed: handlePaymentConfirmed,
+    onRidePaymentCompleted: handleRidePaymentCompleted,
   });
 
   // Start location streaming when rider is online (after JobEventsService is set)
@@ -447,6 +480,7 @@ export const JobsProvider = ({ children }: { children: ReactNode }) => {
 
     const previousStatus = status;
     const previousActiveJob = activeJob;
+    const completedJobType = activeJob.jobType; // capture before clearing
 
     try {
       setStatus("online-waiting");
@@ -454,6 +488,16 @@ export const JobsProvider = ({ children }: { children: ReactNode }) => {
       await jobsService.completeJob(activeJob.id, activeJob.jobType, payload);
       // After finishing, check immediately if another job is already assigned
       await checkAndRestoreActiveJob();
+
+      // For rides: driver should see that payment is awaited from the customer.
+      if (completedJobType === "ride") {
+        Toast.show({
+          type: "info",
+          text1: "Ride Completed",
+          text2: "Awaiting customer payment…",
+          visibilityTime: 4000,
+        });
+      }
     } catch (error: any) {
       setStatus(previousStatus);
       setActiveJob(previousActiveJob);

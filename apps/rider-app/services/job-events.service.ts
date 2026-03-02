@@ -40,15 +40,20 @@ export type ConnectionStatus =
 export type JobEventCallbacks = {
   onJobAssigned?: (job: IncomingJobOffer) => void;
   onJobUpdated?: (jobId: string, status: string) => void;
+  /** Generic job cancellation (e.g. system / timeout / driver-side cancel) */
   onJobCancelled?: (jobId: string) => void;
+  /** Called specifically when the CUSTOMER cancels the ride */
+  onRideCancelledByCustomer?: (rideId: string, reason?: string) => void;
   /** Called when a job reaches the COMPLETED terminal state — clears all state */
   onJobCompleted?: (jobId: string) => void;
   onError?: (error: Error) => void;
   onConnectionStatusChange?: (status: ConnectionStatus) => void;
   /** Called when the server forces a logout (e.g. account banned/suspended) */
   onForceLogout?: (reason?: string) => void;
-  /** Called when the customer confirms payment — driver may now start the trip */
+  /** Legacy pre-ride upfront payment confirmed — driver may now start. */
   onPaymentConfirmed?: (rideId: string) => void;
+  /** Post-ride payment confirmed by Paystack webhook — earnings credited to driver. */
+  onRidePaymentCompleted?: (rideId: string) => void;
 };
 
 export class JobEventsService {
@@ -58,6 +63,8 @@ export class JobEventsService {
   private maxReconnectAttempts = 10;
   private baseReconnectDelay = 1000;
   private callbacks: JobEventCallbacks = {};
+  /** Deduplication set: prevents double-callbacks when both job.cancelled and RIDE_CANCELLED arrive. */
+  private recentlyCancelled = new Set<string>();
   private connectionStatus: ConnectionStatus = "disconnected";
 
   private setConnectionStatus(status: ConnectionStatus): void {
@@ -217,15 +224,54 @@ export class JobEventsService {
     // Listen for job.cancelled event
     this.socket.on("job.cancelled", (data: any) => {
       try {
-        // ...existing code...
+        const jobId = data?.id as string | undefined;
+        if (!jobId) return;
+        // Deduplicate: RIDE_CANCELLED may also fire for the same job
+        if (this.recentlyCancelled.has(jobId)) return;
+        this.recentlyCancelled.add(jobId);
+        setTimeout(() => this.recentlyCancelled.delete(jobId), 5000);
         if (this.callbacks?.onJobCancelled) {
-          this.callbacks.onJobCancelled(data.id);
+          this.callbacks.onJobCancelled(jobId);
         }
       } catch (error) {
         // ...existing code...
         if (this.callbacks?.onError) {
           this.callbacks.onError(
             new Error("Failed to process job cancellation"),
+          );
+        }
+      }
+    });
+
+    // RIDE_CANCELLED is emitted by the backend directly to the driver socket
+    // for both DB-assigned drivers (DRIVER_ACCEPTED) and Redis-locked drivers
+    // (SEARCHING_DRIVER). It carries { type, rideId, cancelledBy, reason }.
+    this.socket.on("RIDE_CANCELLED", (data: any) => {
+      try {
+        const rideId = (data?.rideId ?? data?.id) as string | undefined;
+        if (!rideId) return;
+        // Deduplicate with job.cancelled which may also arrive shortly after
+        if (this.recentlyCancelled.has(rideId)) return;
+        this.recentlyCancelled.add(rideId);
+        setTimeout(() => this.recentlyCancelled.delete(rideId), 5000);
+
+        const cancelledBy = data?.cancelledBy as string | undefined;
+        const reason = data?.reason as string | undefined;
+
+        if (cancelledBy === "CUSTOMER") {
+          // Fire the specific customer-cancel callback for a richer toast
+          if (this.callbacks?.onRideCancelledByCustomer) {
+            this.callbacks.onRideCancelledByCustomer(rideId, reason);
+          }
+        }
+        // Always fire the generic cancel callback so state is cleared
+        if (this.callbacks?.onJobCancelled) {
+          this.callbacks.onJobCancelled(rideId);
+        }
+      } catch (error) {
+        if (this.callbacks?.onError) {
+          this.callbacks.onError(
+            new Error("Failed to process RIDE_CANCELLED event"),
           );
         }
       }
@@ -246,6 +292,14 @@ export class JobEventsService {
       const rideId = data?.rideId as string | undefined;
       if (rideId && this.callbacks?.onPaymentConfirmed) {
         this.callbacks.onPaymentConfirmed(rideId);
+      }
+    });
+
+    // Customer's post-ride payment confirmed by webhook — earnings credited to driver.
+    this.socket.on("RIDE_PAYMENT_COMPLETED", (data: any) => {
+      const rideId = data?.rideId as string | undefined;
+      if (rideId && this.callbacks?.onRidePaymentCompleted) {
+        this.callbacks.onRidePaymentCompleted(rideId);
       }
     });
   }

@@ -14,24 +14,26 @@ export function statusInfo(status: string): {
       };
     case "DRIVER_ACCEPTED":
       return {
-        label: "Driver found!",
-        sub: "Confirm payment to let them start",
-      };
-    case "PAID":
-    case "ACCEPTED":
-      return {
         label: "Driver is on the way",
         sub: "Show your trip code when they arrive",
       };
+    case "IN_PROGRESS":
+      return { label: "On the way", sub: "Heading to destination" };
     case "ARRIVED":
       return {
         label: "Driver has arrived",
         sub: "Share your trip code to begin",
       };
-    case "IN_PROGRESS":
-      return { label: "On the way", sub: "Heading to destination" };
     case "COMPLETED":
-      return { label: "Ride completed", sub: "Thanks for riding!" };
+      return {
+        label: "Ride complete",
+        sub: "Please complete payment to finish",
+      };
+    case "PAID":
+      return { label: "Payment confirmed", sub: "Thanks for riding!" };
+    // Legacy
+    case "ACCEPTED":
+      return { label: "Driver is on the way", sub: "Show your trip code" };
     default:
       return { label: "Tracking ride" };
   }
@@ -40,20 +42,25 @@ export function statusInfo(status: string): {
 export const isSearching = (status: string) =>
   status === "REQUESTED" || status === "SEARCHING_DRIVER";
 
-export const isAwaitingPayment = (status: string) =>
+/** Post-ride payment: customer must pay once the ride reaches COMPLETED. */
+export const isAwaitingPayment = (status: string) => status === "COMPLETED";
+
+/** Driver accepted and is en route to pickup — show OTP for ride start. */
+export const isDriverAccepted = (status: string) =>
   status === "DRIVER_ACCEPTED";
 
+/** Payment confirmed — ride fully settled. */
 export const isPaid = (status: string) => status === "PAID";
 
 export const isInProgress = (status: string) =>
   status === "IN_PROGRESS" || status === "ARRIVED";
 
+/** Cancellable only before the ride physically starts. */
 export const canCancel = (status: string) =>
   [
     "REQUESTED",
     "SEARCHING_DRIVER",
     "DRIVER_ACCEPTED",
-    "PAID",
     RideStatus.PENDING,
     RideStatus.ACCEPTED,
   ].includes(status);
@@ -64,6 +71,7 @@ export function getStatusPillColor(
   success: string,
 ) {
   if (isSearching(status)) return primary;
+  // COMPLETED = awaiting post-ride payment — amber warning
   if (isAwaitingPayment(status)) return "#F59E0B";
   if (isInProgress(status)) return success;
   return primary;

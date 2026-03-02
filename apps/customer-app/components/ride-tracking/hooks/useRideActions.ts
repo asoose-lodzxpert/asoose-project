@@ -59,8 +59,11 @@ export function useRideActions(currentRide: Ride | null) {
   const handlePaymentSuccess = useCallback(() => {
     setShowPaymentWebView(false);
     setPaymentUrl(null);
-    // WebSocket / RideContext will update status to PAID
-  }, []);
+    // Navigate to the success / receipt screen.
+    // The RIDE_PAYMENT_COMPLETED socket event will also flip the ride status to PAID,
+    // which triggers the auto-navigate in tracking.tsx as a secondary path.
+    router.replace("/(tabs)/ride/success" as any);
+  }, [router]);
 
   const handlePaymentCancel = useCallback(() => {
     setShowPaymentWebView(false);

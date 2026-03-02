@@ -710,8 +710,13 @@ export class RidesService {
             'SEARCHING_DRIVER',
             'DRIVER_ASSIGNED',
             'DRIVER_ACCEPTED',
-            'PAID',
             'IN_PROGRESS',
+            // Post-ride payment model: include COMPLETED so the payment screen
+            // is still shown if the customer re-opens the app before paying.
+            'COMPLETED',
+            // PAID = post-ride payment done; include so the success screen
+            // can display the receipt immediately after confirmation.
+            'PAID',
           ] as any[],
         },
       },

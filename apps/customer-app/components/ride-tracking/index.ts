@@ -19,6 +19,7 @@ export {
   statusInfo,
   isSearching,
   isAwaitingPayment,
+  isDriverAccepted,
   isPaid,
   isInProgress,
   canCancel,
