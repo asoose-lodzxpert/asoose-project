@@ -32,7 +32,8 @@ export class PaystackService {
   ): Promise<PaymentInitResponse> {
     try {
       const finalCallbackUrl =
-        callbackUrl || `${process.env.BACKEND_URL}/payment/callback/paystack`;
+        callbackUrl ||
+        `${process.env.BACKEND_URL}/api/v1/payment/callback/paystack`;
 
       const response = await axios.post(
         `${this.baseUrl}/transaction/initialize`,
