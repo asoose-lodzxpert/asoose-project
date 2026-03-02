@@ -268,7 +268,7 @@ export default function StoreScreen() {
     [selectedProduct, storeData, addItem],
   );
 
-  /* ---------------- Skeleton Components ---------------- */
+  /* -------------- Skeleton Components ------------- */
   const SkeletonLine = ({
     width = "100%",
     height = 14,
