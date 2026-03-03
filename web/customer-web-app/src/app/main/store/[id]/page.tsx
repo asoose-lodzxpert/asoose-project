@@ -88,9 +88,20 @@ export default function StorePage() {
   const fetchStoreData = useCallback(async () => {
     try {
       setError(null);
-      const data = await ApiService.get<Store>(`/marketplace/vendor/${slugOrId}`);
-      setStore(data);
-      setMenuItems(data.products || []);
+      const data = await ApiService.get<Store>(
+        `/marketplace/vendor/${slugOrId}`,
+      );
+      // Normalise: API returns `images: string[]`; components expect `image: string`
+      const normalizedProducts = (data.products || []).map((p: any) => ({
+        ...p,
+        image:
+          p.image ||
+          (Array.isArray(p.images) && p.images.length > 0
+            ? p.images[0]
+            : undefined),
+      }));
+      setStore({ ...data, products: normalizedProducts });
+      setMenuItems(normalizedProducts);
       setReviews(data.reviews || []);
 
       // Set default tab on first load based on store type
@@ -163,7 +174,7 @@ export default function StorePage() {
     if (!token) throw new Error("Not logged in");
 
     await ApiService.post(
-      '/marketplace/reviews',
+      "/marketplace/reviews",
       { storeId: store?.id, rating, comment: comment.trim() },
       token,
     );
