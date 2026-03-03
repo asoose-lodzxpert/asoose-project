@@ -79,7 +79,6 @@ export default function ConfirmJobScreen() {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== "granted") return;
     const result = await ImagePicker.launchCameraAsync({
-      cameraType: ImagePicker.CameraType.back,
       quality: 0.7,
       allowsEditing: false,
     });

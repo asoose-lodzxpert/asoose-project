@@ -397,41 +397,71 @@ export class OrdersService {
   /** Fetch orders for a specific store (admin view, with full details) */
   async getStoreOrders(storeId: string, status?: string, page = 1, limit = 20) {
     const skip = (page - 1) * limit;
-    const whereClause: Prisma.OrderWhereInput = { storeId };
 
+    // Build status filter
+    const whereClause: Prisma.OrderWhereInput = { storeId };
+    let statuses: OrderStatus[] = [];
     if (status && status !== 'all') {
-      const statuses = status
+      statuses = status
         .split(',')
         .map((s) => s.trim().toUpperCase())
         .filter((s): s is OrderStatus =>
           Object.values(OrderStatus).includes(s as OrderStatus),
         );
-      if (statuses.length === 1)
-        whereClause.status = statuses[0] as OrderStatus;
-      else if (statuses.length > 1)
-        whereClause.status = { in: statuses as OrderStatus[] };
+      if (statuses.length === 1) whereClause.status = statuses[0];
+      else if (statuses.length > 1) whereClause.status = { in: statuses };
     }
 
-    const [data, total] = await Promise.all([
-      this.prisma.order.findMany({
-        where: whereClause,
-        orderBy: { createdAt: 'desc' },
-        take: limit,
-        skip,
-        include: {
-          items: {
-            include: {
-              modifiers: { include: { modifier: true } },
-            },
-          },
-          user: { select: { name: true, phone: true, image: true } },
-          delivery: { select: { status: true, riderId: true } },
-          payment: { select: { status: true } },
-          orderGroup: { include: { payment: { select: { status: true } } } },
-        },
-      }),
+    // Step 1 — get IDs in priority order via raw SQL.
+    // Status priority: PENDING (needs immediate action) → CONFIRMED → PREPARING
+    // → READY → all others → CANCELLED/DECLINED (no action needed).
+    // Secondary sort: most recent first.
+    const statusFilter =
+      statuses.length > 0
+        ? Prisma.sql`AND o.status = ANY(ARRAY[${Prisma.join(statuses)}]::"OrderStatus"[])`
+        : Prisma.sql``;
+
+    const [orderedRows, total] = await Promise.all([
+      this.prisma.$queryRaw<{ id: string }[]>(
+        Prisma.sql`
+          SELECT o.id FROM "Order" o
+          WHERE o."storeId" = ${storeId}
+          ${statusFilter}
+          ORDER BY
+            CASE o.status
+              WHEN 'PENDING'   THEN 1
+              WHEN 'CONFIRMED' THEN 2
+              WHEN 'PREPARING' THEN 3
+              WHEN 'READY'     THEN 4
+              WHEN 'CANCELLED' THEN 6
+              WHEN 'DECLINED'  THEN 6
+              ELSE                  5
+            END ASC,
+            o."createdAt" DESC
+          LIMIT ${limit} OFFSET ${skip}
+        `,
+      ),
       this.prisma.order.count({ where: whereClause }),
     ]);
+
+    // Step 2 — fetch full records with all includes for the page's IDs.
+    const ids = orderedRows.map((r) => r.id);
+    const unordered = await this.prisma.order.findMany({
+      where: { id: { in: ids } },
+      include: {
+        items: { include: { modifiers: { include: { modifier: true } } } },
+        user: { select: { name: true, phone: true, image: true } },
+        delivery: { select: { status: true, riderId: true } },
+        payment: { select: { status: true } },
+        orderGroup: { include: { payment: { select: { status: true } } } },
+      },
+    });
+
+    // Restore the priority order returned by the raw query.
+    const idIndex = new Map(ids.map((id, i) => [id, i]));
+    const data = unordered.sort(
+      (a, b) => (idIndex.get(a.id) ?? 0) - (idIndex.get(b.id) ?? 0),
+    );
 
     return {
       data: data.map((order) => {
@@ -472,51 +502,83 @@ export class OrdersService {
     limit = 20,
   ) {
     const skip = (page - 1) * limit;
+
+    // Build Prisma where clause (used for count and the includes fetch)
     const whereClause: Prisma.OrderWhereInput = {
       store: { isAdminManaged: true, ...(storeId ? { id: storeId } : {}) },
     };
-
+    let statuses: OrderStatus[] = [];
     if (status && status !== 'all') {
-      const statuses = status
+      statuses = status
         .split(',')
         .map((s) => s.trim().toUpperCase())
         .filter((s): s is OrderStatus =>
           Object.values(OrderStatus).includes(s as OrderStatus),
         );
-      if (statuses.length === 1)
-        whereClause.status = statuses[0] as OrderStatus;
-      else if (statuses.length > 1)
-        whereClause.status = { in: statuses as OrderStatus[] };
+      if (statuses.length === 1) whereClause.status = statuses[0];
+      else if (statuses.length > 1) whereClause.status = { in: statuses };
     }
 
-    const [data, total] = await Promise.all([
-      this.prisma.order.findMany({
-        where: whereClause,
-        orderBy: { createdAt: 'desc' },
-        take: limit,
-        skip,
-        include: {
-          store: {
-            select: { id: true, name: true, logo: true, isAdminManaged: true },
-          },
-          items: {
-            include: { modifiers: { include: { modifier: true } } },
-          },
-          user: { select: { name: true, phone: true, image: true } },
-          delivery: { select: { status: true, riderId: true } },
-          payment: { select: { status: true } },
-          orderGroup: { include: { payment: { select: { status: true } } } },
-        },
-      }),
+    // Step 1 — get page of IDs in status-priority + recency order via raw SQL.
+    const statusFilter =
+      statuses.length > 0
+        ? Prisma.sql`AND o.status = ANY(ARRAY[${Prisma.join(statuses)}]::"OrderStatus"[])`
+        : Prisma.sql``;
+    const storeFilter = storeId
+      ? Prisma.sql`AND s.id = ${storeId}`
+      : Prisma.sql``;
+
+    const [orderedRows, total, managedStores] = await Promise.all([
+      this.prisma.$queryRaw<{ id: string }[]>(
+        Prisma.sql`
+          SELECT o.id FROM "Order" o
+          JOIN "Store" s ON s.id = o."storeId"
+          WHERE s."isAdminManaged" = true
+          ${storeFilter}
+          ${statusFilter}
+          ORDER BY
+            CASE o.status
+              WHEN 'PENDING'   THEN 1
+              WHEN 'CONFIRMED' THEN 2
+              WHEN 'PREPARING' THEN 3
+              WHEN 'READY'     THEN 4
+              WHEN 'CANCELLED' THEN 6
+              WHEN 'DECLINED'  THEN 6
+              ELSE                  5
+            END ASC,
+            o."createdAt" DESC
+          LIMIT ${limit} OFFSET ${skip}
+        `,
+      ),
       this.prisma.order.count({ where: whereClause }),
+      this.prisma.store.findMany({
+        where: { isAdminManaged: true },
+        select: { id: true, name: true, logo: true },
+        orderBy: { name: 'asc' },
+      }),
     ]);
 
-    // Also fetch distinct managed stores for the filter dropdown
-    const managedStores = await this.prisma.store.findMany({
-      where: { isAdminManaged: true },
-      select: { id: true, name: true, logo: true },
-      orderBy: { name: 'asc' },
+    // Step 2 — fetch full records with includes for the page's IDs.
+    const ids = orderedRows.map((r) => r.id);
+    const unordered = await this.prisma.order.findMany({
+      where: { id: { in: ids } },
+      include: {
+        store: {
+          select: { id: true, name: true, logo: true, isAdminManaged: true },
+        },
+        items: { include: { modifiers: { include: { modifier: true } } } },
+        user: { select: { name: true, phone: true, image: true } },
+        delivery: { select: { status: true, riderId: true } },
+        payment: { select: { status: true } },
+        orderGroup: { include: { payment: { select: { status: true } } } },
+      },
     });
+
+    // Restore the priority order from the raw query.
+    const idIndex = new Map(ids.map((id, i) => [id, i]));
+    const data = unordered.sort(
+      (a, b) => (idIndex.get(a.id) ?? 0) - (idIndex.get(b.id) ?? 0),
+    );
 
     return {
       data: data.map((order) => {
