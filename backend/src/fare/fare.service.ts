@@ -62,7 +62,10 @@ export class FareService {
     const [baseRideFare, riderPerKm, nightSurchargePerKm] = await Promise.all([
       this.getSetting('ride_base_fare', this.DefaultBaseRideFare),
       this.getSetting('ride_per_km', this.DefaultRiderPerKm),
-      this.getSetting('ride_night_surcharge_per_km', this.DefaultNightSurchargePerKm),
+      this.getSetting(
+        'ride_night_surcharge_per_km',
+        this.DefaultNightSurchargePerKm,
+      ),
     ]);
 
     const lat1 = Number(pickuplat);
@@ -97,7 +100,7 @@ export class FareService {
 
     return {
       price,
-      economyPrice,p
+      economyPrice,
       businessPrice,
       nightSurchargeActive: hour >= 22,
       nightSurchargePerKm: hour >= 22 ? nightSurchargePerKm : undefined,
