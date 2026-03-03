@@ -121,6 +121,7 @@ export class JobsService {
         pickupAddress: delivery.pickupAddress,
         dropoffAddress: delivery.dropoffAddress,
         earnings: delivery.deliveryFee,
+
         // Never expose the OTP to the rider — just signal that one is required
         requiresOtp: !!delivery.deliveryOtp,
         packageDetails: delivery.packageDetails ?? undefined,

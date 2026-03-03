@@ -714,9 +714,10 @@ export class RidesService {
             // Post-ride payment model: include COMPLETED so the payment screen
             // is still shown if the customer re-opens the app before paying.
             'COMPLETED',
-            // PAID = post-ride payment done; include so the success screen
-            // can display the receipt immediately after confirmation.
-            'PAID',
+            // PAID is intentionally excluded: a PAID ride is fully done.
+            // Including it caused useRideSynchronization to restore "finished"
+            // state after the user had already rated and reset to "idle",
+            // making the rating modal re-appear every time the page was visited.
           ] as any[],
         },
       },
