@@ -24,6 +24,7 @@ export class FareService {
   // Ride
   readonly DefaultBaseRideFare = 1000;
   readonly DefaultRiderPerKm = 700;
+  readonly DefaultNightSurchargePerKm = 1000;
   // Delivery
   readonly DefaultBaseDeliveryFare = 700;
   readonly DefaultDeliveryPerKm = 400;
@@ -58,9 +59,10 @@ export class FareService {
     const { pickuplat, pickuplong, dropofflat, dropofflong } = dto;
 
     // Load admin-configured fare rates (or fall back to hardcoded defaults)
-    const [baseRideFare, riderPerKm] = await Promise.all([
+    const [baseRideFare, riderPerKm, nightSurchargePerKm] = await Promise.all([
       this.getSetting('ride_base_fare', this.DefaultBaseRideFare),
       this.getSetting('ride_per_km', this.DefaultRiderPerKm),
+      this.getSetting('ride_night_surcharge_per_km', this.DefaultNightSurchargePerKm),
     ]);
 
     const lat1 = Number(pickuplat);
@@ -79,13 +81,13 @@ export class FareService {
     const durationText = `${Math.round(durationSeconds / 60)} min`;
     const distanceText = `${distanceKm.toFixed(2)} km`;
 
-    // After 10 PM (Africa/Lagos) apply a night surcharge of ₦1,000/km
+    // After 10 PM (Africa/Lagos) apply admin-configured night surcharge rate
     const now = new Date();
     const lagosTime = new Date(
       now.toLocaleString('en-US', { timeZone: 'Africa/Lagos' }),
     );
     const hour = lagosTime.getHours();
-    const perKm = hour >= 22 ? 1000 : riderPerKm;
+    const perKm = hour >= 22 ? nightSurchargePerKm : riderPerKm;
 
     const variableFare = Math.round(distanceKm * perKm);
     const economyPrice = baseRideFare + variableFare;
@@ -95,8 +97,10 @@ export class FareService {
 
     return {
       price,
-      economyPrice,
+      economyPrice,p
       businessPrice,
+      nightSurchargeActive: hour >= 22,
+      nightSurchargePerKm: hour >= 22 ? nightSurchargePerKm : undefined,
       distance: { meters: distanceMeters, text: distanceText },
       eta: { seconds: durationSeconds, text: durationText },
     };

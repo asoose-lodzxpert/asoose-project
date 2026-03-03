@@ -103,6 +103,11 @@ export class SettingsService {
       // Logistics – Ride pricing
       { key: 'ride_base_fare', value: '1000', category: 'Logistics' },
       { key: 'ride_per_km', value: '700', category: 'Logistics' },
+      {
+        key: 'ride_night_surcharge_per_km',
+        value: '1000',
+        category: 'Logistics',
+      },
       // Logistics – Delivery pricing
       { key: 'delivery_base_fare', value: '700', category: 'Logistics' },
       { key: 'delivery_per_km', value: '400', category: 'Logistics' },

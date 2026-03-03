@@ -428,7 +428,7 @@ export class OrdersService {
           WHERE o."storeId" = ${storeId}
           ${statusFilter}
           ORDER BY
-            CASE o.status
+            CASE o.status::text
               WHEN 'PENDING'   THEN 1
               WHEN 'CONFIRMED' THEN 2
               WHEN 'PREPARING' THEN 3
@@ -438,7 +438,7 @@ export class OrdersService {
               ELSE                  5
             END ASC,
             o."createdAt" DESC
-          LIMIT ${limit} OFFSET ${skip}
+          LIMIT ${Prisma.raw(String(limit))} OFFSET ${Prisma.raw(String(skip))}
         `,
       ),
       this.prisma.order.count({ where: whereClause }),
@@ -446,6 +446,12 @@ export class OrdersService {
 
     // Step 2 — fetch full records with all includes for the page's IDs.
     const ids = orderedRows.map((r) => r.id);
+    if (ids.length === 0) {
+      return {
+        data: [],
+        meta: { total, page, limit, pages: Math.ceil(total / limit) },
+      };
+    }
     const unordered = await this.prisma.order.findMany({
       where: { id: { in: ids } },
       include: {
@@ -537,7 +543,7 @@ export class OrdersService {
           ${storeFilter}
           ${statusFilter}
           ORDER BY
-            CASE o.status
+            CASE o.status::text
               WHEN 'PENDING'   THEN 1
               WHEN 'CONFIRMED' THEN 2
               WHEN 'PREPARING' THEN 3
@@ -547,7 +553,7 @@ export class OrdersService {
               ELSE                  5
             END ASC,
             o."createdAt" DESC
-          LIMIT ${limit} OFFSET ${skip}
+          LIMIT ${Prisma.raw(String(limit))} OFFSET ${Prisma.raw(String(skip))}
         `,
       ),
       this.prisma.order.count({ where: whereClause }),
@@ -560,6 +566,13 @@ export class OrdersService {
 
     // Step 2 — fetch full records with includes for the page's IDs.
     const ids = orderedRows.map((r) => r.id);
+    if (ids.length === 0) {
+      return {
+        data: [],
+        meta: { total, page, limit, pages: Math.ceil(total / limit) },
+        managedStores,
+      };
+    }
     const unordered = await this.prisma.order.findMany({
       where: { id: { in: ids } },
       include: {
