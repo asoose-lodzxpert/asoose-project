@@ -185,8 +185,12 @@ export class PaymentInitService {
           // the browser to the correct frontend page after verification.
           // Sending the frontend URL directly to Paystack would bypass the
           // backend handler and land the user on "/" with no verification.
-          const backendBase = (process.env.BACKEND_URL || 'http://localhost:3000/api/v1').replace(/\/+$/, '');
-          const paystackCallbackUrl = `${backendBase}/payment/callback/paystack`;
+          const backendBase = (
+            process.env.BACKEND_URL || 'http://localhost:3000'
+          )
+            .replace(/\/+$/, '') // strip trailing slashes
+            .replace(/\/api\/v1$/, ''); // strip /api/v1 suffix if already present
+          const paystackCallbackUrl = `${backendBase}/api/v1/payment/callback/paystack`;
           response = await this.paystackService.initializePayment(
             amount,
             dto.email,
