@@ -312,7 +312,9 @@ export default function CheckoutForm() {
         gateway: selectedPaymentMethod.gateway as any,
         method: selectedPaymentMethod.type as "CARD" | "BANK_TRANSFER",
         type: "ORDER",
-        callbackUrl: `${process.env.NEXT_PUBLIC_APP_URL}/payment/callback`,
+        // Send just the app origin — the backend GET /callback/paystack handler
+        // appends "/payment/callback" itself before redirecting the browser.
+        callbackUrl: (process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3001").replace(/\/+$/, ""),
       };
 
       // FIX: Distinguish between single Order ID and OrderGroup ID

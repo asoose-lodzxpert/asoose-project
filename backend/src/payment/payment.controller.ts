@@ -150,8 +150,11 @@ export class PaymentController {
 
       let callbackUrl = verification.meta?.callbackUrl || frontendUrl;
 
-      // Normalise: strip trailing slashes to avoid double-slash in the redirect URL
-      callbackUrl = callbackUrl.replace(/\/+$/, '');
+      // Normalise: strip trailing slashes and any trailing /payment/callback path
+      // that the frontend may have included, to avoid duplicating the path segment.
+      callbackUrl = callbackUrl
+        .replace(/\/+$/, '')
+        .replace(/\/payment\/callback\/?$/, '');
 
       // Safety: if the stored callbackUrl is a localhost/dev URL (any port),
       // discard it and use the configured FRONTEND_URL.  In production
