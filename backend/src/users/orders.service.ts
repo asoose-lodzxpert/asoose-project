@@ -164,7 +164,7 @@ export class OrdersService {
         address.lng,
       );
 
-      const deliveryFee = this.pricingService.calculateDeliveryFee(distance);
+      const deliveryFee = await this.fareService.calcDeliveryFee(distance);
       const serviceFee = this.pricingService.calculateServiceFee(subtotal);
       const vatAmount = this.pricingService.calculateVat(subtotal);
       const total = subtotal + deliveryFee + serviceFee + vatAmount;
@@ -302,16 +302,9 @@ export class OrdersService {
         storeCoords,
       );
 
-      // The delivery fee must never be zero — the base fare alone guarantees
-      // a minimum, but we guard explicitly in case constants are misconfigured.
-      const calculatedFee = Math.round(
-        this.fareService.BaseDeliveryFare +
-          totalRouteKm * this.fareService.DeliveryPerKm,
-      );
-      const totalDeliveryFee = Math.max(
-        calculatedFee,
-        this.fareService.BaseDeliveryFare,
-      );
+      // Delivery fee reads admin-configured rates from DB (delivery_base_fare + delivery_per_km).
+      const totalDeliveryFee =
+        await this.fareService.calcDeliveryFee(totalRouteKm);
 
       const grandSubtotal = storeEntries.reduce(
         (sum, s) => sum + s.subtotal,
@@ -1191,15 +1184,9 @@ export class OrdersService {
       sortedStoreIds = route.sortedStoreIds;
     }
 
-    // FareService delivery formula — matches the /fare/delivery endpoint exactly
-    const calculatedFee = Math.round(
-      this.fareService.BaseDeliveryFare +
-        totalRouteKm * this.fareService.DeliveryPerKm,
-    );
-    const totalDeliveryFee = Math.max(
-      calculatedFee,
-      this.fareService.BaseDeliveryFare,
-    );
+    // Delivery fee reads admin-configured rates from DB (delivery_base_fare + delivery_per_km).
+    const totalDeliveryFee =
+      await this.fareService.calcDeliveryFee(totalRouteKm);
 
     // Sum of all item subtotals (used for proportional split)
     const grandSubtotal = resolvedStores.reduce(

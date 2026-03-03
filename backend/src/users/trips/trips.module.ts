@@ -16,6 +16,7 @@ import { MailModule } from '../../mail/mail.module';
 
 import { UsersModule } from '../users.module';
 import { MapsModule } from '../../maps/maps.module';
+import { FareModule } from '../../fare/fare.module';
 
 const devOnlyControllers =
   process.env.NODE_ENV !== 'production' ? [TestController] : [];
@@ -28,6 +29,7 @@ const devOnlyControllers =
     MatchingRedisModule,
     MapsModule, // ✅ Added for TripsCommonService to use MapsService
     MailModule,
+    FareModule, // ✅ Provides FareService for admin-configured delivery fee rates
     forwardRef(() => PaymentModule),
     forwardRef(() => UsersModule), // ✅ Added with forwardRef to provide AddressesService
   ],

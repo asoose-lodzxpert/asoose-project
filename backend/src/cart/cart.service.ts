@@ -8,6 +8,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { GetCartSummaryDto } from './dto/cart-summary.dto';
 import { AddToCartDto } from './dto/add-to-cart.dto';
 import { PricingService } from '../users/pricing.service';
+import { FareService } from '../fare/fare.service';
 import type { RedisClientType } from 'redis';
 
 @Injectable()
@@ -15,6 +16,7 @@ export class CartService {
   constructor(
     private prisma: PrismaService,
     private pricingService: PricingService,
+    private fareService: FareService,
     @Inject('REDIS_CLIENT') private readonly redis: RedisClientType,
   ) {}
 
@@ -169,13 +171,13 @@ export class CartService {
       group.total += lineTotal;
     }
 
+    // Fetch admin-configured base delivery fee once (distance=0 because no
+    // address is known in the cart preview; exact quote comes from /cart/quote).
+    const baseDeliveryFee = await this.fareService.calcDeliveryFee(0);
+
     // 3. Build Response
     const groups = Array.from(storeGroups.values()).map((g) => {
-      // Estimate delivery fee using the pricing service minimum. The cart summary
-      // is a preview — no delivery address is known yet, so distance = 0 yields
-      // the floor (MIN_FEE). The checkout page fetches an exact quote via
-      // POST /users/cart/quote once the user selects an address.
-      const deliveryFee = this.pricingService.calculateDeliveryFee(0);
+      const deliveryFee = baseDeliveryFee;
       const serviceFee = this.pricingService.calculateServiceFee(g.total);
       const vatAmount = this.pricingService.calculateVat(g.total);
       return {

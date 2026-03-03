@@ -367,6 +367,11 @@ export class RedisService {
     return count;
   }
 
+  async resetMatchingAttempts(jobId: string): Promise<void> {
+    const key = REDIS_KEYS.MATCHING_ATTEMPTS(jobId);
+    await this.redis.del(key);
+  }
+
   async addDeclinedDriver(
     jobType: string,
     jobId: string,

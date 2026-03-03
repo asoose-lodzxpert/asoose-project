@@ -91,6 +91,10 @@ async function mutationFetcher(
 
 export default function BannerManagement() {
   const [editingId, setEditingId] = useState<string | null>(null);
+  // Holds the locally-selected File until "Create / Update Banner" is submitted.
+  // We defer the actual S3 upload to avoid orphaned files when a user picks an
+  // image but then never clicks submit.
+  const [pendingImageFile, setPendingImageFile] = useState<File | null>(null);
 
   // 3. Explicitly typed useSWR
   const {
@@ -124,15 +128,39 @@ export default function BannerManagement() {
 
   const onSubmit: SubmitHandler<BannerFormValues> = async (data) => {
     try {
+      // If the user selected a new image file, upload it now (deferred upload).
+      let imageUrl = data.image;
+      if (pendingImageFile) {
+        const session = await getSession();
+        const token = (session as any)?.accessToken;
+        if (!token) throw new Error("Authentication required");
+
+        const formData = new FormData();
+        formData.append("file", pendingImageFile);
+
+        const res = await fetch(`${BACKEND_URL}/storage/upload`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+          body: formData,
+        });
+        if (!res.ok) throw new Error("Image upload failed");
+        const uploadData = await res.json();
+        imageUrl = uploadData.url;
+        // Update the form value so the schema validator sees the real URL.
+        setValue("image", imageUrl, { shouldValidate: false });
+      }
+
+      const payload = { ...data, image: imageUrl };
+
       if (editingId) {
         await mutationTrigger({
           method: "PATCH",
           path: `/super-admin/banners/${editingId}`,
-          body: data,
+          body: payload,
         } as any);
         toast.success("Banner updated successfully!");
       } else {
-        await mutationTrigger({ method: "POST", body: data } as any);
+        await mutationTrigger({ method: "POST", body: payload } as any);
         toast.success("Banner created successfully!");
       }
       handleCancelEdit();
@@ -144,6 +172,7 @@ export default function BannerManagement() {
 
   const handleEdit = (banner: Banner) => {
     setEditingId(banner.id);
+    setPendingImageFile(null); // existing banner already has a server URL
     reset({
       title: banner.title,
       subtitle: banner.subtitle,
@@ -159,6 +188,7 @@ export default function BannerManagement() {
 
   const handleCancelEdit = () => {
     setEditingId(null);
+    setPendingImageFile(null);
     reset({
       title: "",
       subtitle: "",
@@ -224,6 +254,8 @@ export default function BannerManagement() {
             bucket={BUCKET_NAME}
             label="Banner Image *"
             value={watch("image")}
+            deferred={true}
+            onFileSelect={(file) => setPendingImageFile(file)}
             onUpload={(url) => setValue("image", url, { shouldValidate: true })}
           />
           {errors.image && (
@@ -231,43 +263,64 @@ export default function BannerManagement() {
           )}
 
           <div className="space-y-4">
-            <input
-              {...register("title")}
-              placeholder="Title"
-              className="w-full p-2.5 bg-[#0F172A] border border-gray-700 rounded-lg outline-none focus:border-yellow-500 text-white"
-            />
-            {errors.title && (
-              <p className="text-red-500 text-xs mt-1">
-                {errors.title.message}
-              </p>
-            )}
+            <div>
+              <label className="block text-xs font-bold text-gray-400 uppercase mb-1">
+                Title <span className="text-red-500">*</span>
+              </label>
+              <input
+                {...register("title")}
+                placeholder="e.g. Weekend Special Offer"
+                className="w-full p-2.5 bg-[#0F172A] border border-gray-700 rounded-lg outline-none focus:border-yellow-500 text-white placeholder-gray-600"
+              />
+              {errors.title && (
+                <p className="text-red-500 text-xs mt-1">
+                  {errors.title.message}
+                </p>
+              )}
+            </div>
 
-            <input
-              {...register("subtitle")}
-              placeholder="Subtitle"
-              className="w-full p-2.5 bg-[#0F172A] border border-gray-700 rounded-lg outline-none focus:border-yellow-500 text-white"
-            />
-            {errors.subtitle && (
-              <p className="text-red-500 text-xs mt-1">
-                {errors.subtitle.message}
-              </p>
-            )}
+            <div>
+              <label className="block text-xs font-bold text-gray-400 uppercase mb-1">
+                Subtitle <span className="text-red-500">*</span>
+              </label>
+              <input
+                {...register("subtitle")}
+                placeholder="e.g. Get 20% off your next order"
+                className="w-full p-2.5 bg-[#0F172A] border border-gray-700 rounded-lg outline-none focus:border-yellow-500 text-white placeholder-gray-600"
+              />
+              {errors.subtitle && (
+                <p className="text-red-500 text-xs mt-1">
+                  {errors.subtitle.message}
+                </p>
+              )}
+            </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <select
-                {...register("type")}
-                className="p-2.5 bg-[#0F172A] border border-gray-700 rounded-lg text-white"
-              >
-                <option value="PROMO">Promotion</option>
-                <option value="AD">Ad</option>
-                <option value="INFO">Info</option>
-              </select>
               <div>
+                <label className="block text-xs font-bold text-gray-400 uppercase mb-1">
+                  Banner Type <span className="text-red-500">*</span>
+                </label>
+                <select
+                  {...register("type")}
+                  className="w-full p-2.5 bg-[#0F172A] border border-gray-700 rounded-lg text-white"
+                >
+                  <option value="PROMO">Promotion</option>
+                  <option value="AD">Ad</option>
+                  <option value="INFO">Info</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-400 uppercase mb-1">
+                  Priority{" "}
+                  <span className="text-gray-600 font-normal normal-case">
+                    (0 = lowest, 100 = highest)
+                  </span>
+                </label>
                 <input
                   type="number"
                   {...register("priority", { valueAsNumber: true })}
-                  placeholder="Priority (0-100)"
-                  className="w-full p-2.5 bg-[#0F172A] border border-gray-700 rounded-lg text-white"
+                  placeholder="0 – 100"
+                  className="w-full p-2.5 bg-[#0F172A] border border-gray-700 rounded-lg text-white placeholder-gray-600"
                 />
                 {errors.priority && (
                   <p className="text-red-500 text-xs mt-1">
@@ -279,10 +332,13 @@ export default function BannerManagement() {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
+                <label className="block text-xs font-bold text-gray-400 uppercase mb-1">
+                  Button Text <span className="text-red-500">*</span>
+                </label>
                 <input
                   {...register("buttonText")}
-                  placeholder="Button Text"
-                  className="w-full p-2.5 bg-[#0F172A] border border-gray-700 rounded-lg text-white"
+                  placeholder="e.g. Order Now"
+                  className="w-full p-2.5 bg-[#0F172A] border border-gray-700 rounded-lg text-white placeholder-gray-600"
                 />
                 {errors.buttonText && (
                   <p className="text-red-500 text-xs mt-1">
@@ -291,10 +347,13 @@ export default function BannerManagement() {
                 )}
               </div>
               <div>
+                <label className="block text-xs font-bold text-gray-400 uppercase mb-1">
+                  Link / URL <span className="text-red-500">*</span>
+                </label>
                 <input
                   {...register("link")}
-                  placeholder="Link URL"
-                  className="w-full p-2.5 bg-[#0F172A] border border-gray-700 rounded-lg text-white"
+                  placeholder="e.g. /main/store or https://…"
+                  className="w-full p-2.5 bg-[#0F172A] border border-gray-700 rounded-lg text-white placeholder-gray-600"
                 />
                 {errors.link && (
                   <p className="text-red-500 text-xs mt-1">
@@ -304,19 +363,24 @@ export default function BannerManagement() {
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                {...register("isActive")}
-                id="isActive"
-                className="w-4 h-4 accent-yellow-500"
-              />
-              <label
-                htmlFor="isActive"
-                className="text-sm text-gray-300 cursor-pointer"
-              >
-                Active and visible to customers
+            <div>
+              <label className="block text-xs font-bold text-gray-400 uppercase mb-2">
+                Visibility
               </label>
+              <div className="flex items-center gap-2 p-2.5 bg-[#0F172A] border border-gray-700 rounded-lg">
+                <input
+                  type="checkbox"
+                  {...register("isActive")}
+                  id="isActive"
+                  className="w-4 h-4 accent-yellow-500"
+                />
+                <label
+                  htmlFor="isActive"
+                  className="text-sm text-gray-300 cursor-pointer"
+                >
+                  Active and visible to customers
+                </label>
+              </div>
             </div>
           </div>
 
