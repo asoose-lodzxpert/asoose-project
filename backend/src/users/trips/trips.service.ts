@@ -32,8 +32,18 @@ export class TripsService {
     return this.ridesService.requestRide(userId, dto, idempotencyKey);
   }
   // FIX: Added method required by TripsController
-  async confirmRide(userId: string, rideId: string, paymentMethod: string) {
-    return this.ridesService.confirmRide(userId, rideId, paymentMethod);
+  async confirmRide(
+    userId: string,
+    rideId: string,
+    paymentMethod: string,
+    callbackUrl?: string,
+  ) {
+    return this.ridesService.confirmRide(
+      userId,
+      rideId,
+      paymentMethod,
+      callbackUrl,
+    );
   }
 
   async getCurrentRide(userId: string) {

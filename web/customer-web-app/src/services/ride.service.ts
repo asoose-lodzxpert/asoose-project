@@ -173,10 +173,11 @@ export class RideService {
     rideId: string,
     paymentMethod: string,
     token: string,
+    callbackUrl?: string,
   ): Promise<ConfirmRideResponse> {
     return ApiService.post<ConfirmRideResponse>(
       `/trips/rides/${rideId}/confirm`,
-      { paymentMethod },
+      { paymentMethod, callbackUrl },
       token,
     );
   }

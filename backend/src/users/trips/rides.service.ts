@@ -350,7 +350,12 @@ export class RidesService {
    * Post-ride payment model: the customer pays only after the ride is finished.
    * Returns { authorizationUrl, reference } so the web app can redirect to Paystack.
    */
-  async confirmRide(userId: string, rideId: string, _paymentMethod?: string) {
+  async confirmRide(
+    userId: string,
+    rideId: string,
+    _paymentMethod?: string,
+    callbackUrl?: string,
+  ) {
     const ride = await this.prisma.ride.findUnique({
       where: { id: rideId },
       include: { customer: { select: { email: true, name: true } } },
@@ -391,6 +396,7 @@ export class RidesService {
         customerName: ride.customer?.name ?? undefined,
         gateway: PaymentGateway.PAYSTACK,
         method: GatewayPaymentMethod.CARD,
+        ...(callbackUrl ? { callbackUrl } : {}),
       },
       userId,
     );

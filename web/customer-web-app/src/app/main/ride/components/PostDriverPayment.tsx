@@ -52,6 +52,7 @@ export function PostDriverPayment() {
         rideId,
         "CARD",
         session.accessToken,
+        window.location.origin,
       );
 
       if (!confirmRes.authorizationUrl) {
