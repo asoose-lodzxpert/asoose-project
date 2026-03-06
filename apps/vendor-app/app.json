@@ -71,7 +71,8 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "ASOOSE Vendor App needs access to your photo library to upload product images, store logos, and business verification documents for your multi-marketplace store."
+          "photosPermission": "ASOOSE Vendor App needs access to your photo library to upload product images, store logos, and business verification documents for your multi-marketplace store.",
+          "cameraPermission": "ASOOSE Vendor App needs camera access to photograph products, your store front, and business verification documents."
         }
       ],
       [

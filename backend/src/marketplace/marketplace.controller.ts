@@ -10,6 +10,7 @@ import {
   Delete,
   Query,
   ParseIntPipe,
+  BadRequestException,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { MarketplaceService } from './marketplace.service';
@@ -116,5 +117,46 @@ export class MarketplaceController {
   async deleteReview(@Request() req, @Param('storeId') storeId: string) {
     const userId = req.user.sub || req.user.id || req.user.userId;
     return this.marketplaceService.deleteReview(userId, storeId);
+  }
+
+  /**
+   * Guideline 1.2 — Report offensive / spam UGC content
+   * POST /marketplace/report
+   */
+  @ApiOperation({ summary: 'Report a store or review (UGC moderation)' })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } }) // 5 reports/minute per user
+  @Post('report')
+  async reportContent(
+    @Request() req,
+    @Body()
+    body: {
+      targetType: 'STORE' | 'REVIEW';
+      targetId: string;
+      reason: string;
+      description?: string;
+    },
+  ) {
+    const userId = req.user.sub || req.user.id || req.user.userId;
+    const { targetType, targetId, reason, description } = body;
+
+    if (!['STORE', 'REVIEW'].includes(targetType)) {
+      throw new BadRequestException('targetType must be STORE or REVIEW');
+    }
+    if (!targetId?.trim()) {
+      throw new BadRequestException('targetId is required');
+    }
+    if (!reason?.trim() || reason.trim().length < 3) {
+      throw new BadRequestException('reason must be at least 3 characters');
+    }
+
+    return this.marketplaceService.reportContent(
+      userId,
+      targetType,
+      targetId,
+      reason.trim(),
+      description?.trim(),
+    );
   }
 }

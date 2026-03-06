@@ -462,4 +462,33 @@ export class MarketplaceService {
           : ['https://via.placeholder.com/400'],
     };
   }
+
+  /** Guideline 1.2 — submit a UGC content report */
+  async reportContent(
+    reporterId: string,
+    targetType: 'STORE' | 'REVIEW',
+    targetId: string,
+    reason: string,
+    description?: string,
+  ) {
+    // Basic duplicate check — one pending report per (user, target) is enough
+    const existing = await this.prisma.contentReport.findFirst({
+      where: { reporterId, targetType, targetId, status: 'PENDING' },
+    });
+    if (existing) {
+      return { message: 'Report already submitted and under review.' };
+    }
+
+    await this.prisma.contentReport.create({
+      data: { reporterId, targetType, targetId, reason, description },
+    });
+
+    this.logger.log(
+      `ContentReport created: ${targetType}/${targetId} by user ${reporterId} — reason: ${reason}`,
+    );
+    return {
+      message:
+        'Your report has been submitted. Our team will review it shortly.',
+    };
+  }
 }

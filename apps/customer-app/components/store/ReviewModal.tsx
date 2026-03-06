@@ -7,12 +7,17 @@ import {
   TextInput,
   ActivityIndicator,
   ScrollView,
+  Alert,
 } from "react-native";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
-import { submitReview, validateReview } from "@/services/review.service";
+import {
+  submitReview,
+  validateReview,
+  reportContent,
+} from "@/services/review.service";
 import type { CreateReviewDto } from "@/types/marketplace";
 
 type ReviewModalProps = {
@@ -40,6 +45,37 @@ export function ReviewModal({
   const mutedColor = useThemeColor({}, "textMuted");
   const cardBg = useThemeColor({}, "surfaceCard");
   const borderColor = useThemeColor({}, "borderDefault");
+
+  const handleReport = () => {
+    const reasons = [
+      "Spam or fake listing",
+      "Offensive or inappropriate content",
+      "Misleading information",
+      "Fraudulent activity",
+      "Other",
+    ];
+    Alert.alert(
+      "Report This Store",
+      "Please select a reason for your report. Our moderation team will review it within 24 hours.",
+      [
+        ...reasons.map((reason) => ({
+          text: reason,
+          onPress: async () => {
+            try {
+              const res = await reportContent("STORE", storeId, reason);
+              Alert.alert("Report Submitted", res.message);
+            } catch {
+              Alert.alert(
+                "Error",
+                "Could not submit report. Please try again.",
+              );
+            }
+          },
+        })),
+        { text: "Cancel", style: "cancel" },
+      ],
+    );
+  };
 
   const handleSubmit = async () => {
     const reviewData: CreateReviewDto = {
@@ -180,6 +216,19 @@ export function ReviewModal({
               )}
             </TouchableOpacity>
 
+            {/* Report link */}
+            <TouchableOpacity
+              style={styles.reportLink}
+              onPress={handleReport}
+              disabled={loading}
+            >
+              <ThemedText
+                style={[styles.reportLinkText, { color: mutedColor }]}
+              >
+                Report this store
+              </ThemedText>
+            </TouchableOpacity>
+
             {/* Mandatory note */}
             <ThemedText style={[styles.mandatoryNote, { color: mutedColor }]}>
               A review is required to continue.
@@ -287,5 +336,14 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginTop: 4,
     marginBottom: 8,
+  },
+  reportLink: {
+    alignItems: "center",
+    paddingVertical: 10,
+    marginBottom: 4,
+  },
+  reportLinkText: {
+    fontSize: 13,
+    textDecorationLine: "underline",
   },
 });
