@@ -175,15 +175,15 @@ export function RideProvider({ children }: { children: ReactNode }) {
         // Guard: a COMPLETED ride whose payment is already COMPLETED is fully settled.
         // Don't restore the payment prompt or success/rate-driver screen for it.
         if (
-          (ride.status as string) === 'COMPLETED' &&
-          (ride as any).payment?.status === 'COMPLETED'
+          (ride.status as string) === "COMPLETED" &&
+          (ride as any).payment?.status === "COMPLETED"
         ) {
           if (__DEV__)
             console.log(
-              '[refreshCurrentRide] Ignoring stale COMPLETED+paid ride — treating as settled',
+              "[refreshCurrentRide] Ignoring stale COMPLETED+paid ride — treating as settled",
             );
           setCurrentRide(null);
-          setPageView('IDLE');
+          setPageView("IDLE");
           setDriverLocation(null);
           return;
         }
