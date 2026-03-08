@@ -726,6 +726,15 @@ export class RidesService {
             // making the rating modal re-appear every time the page was visited.
           ] as any[],
         },
+        // Exclude COMPLETED rides whose payment has already been settled.
+        // This prevents a fully paid ride from re-triggering the payment
+        // prompt / rate-driver screen when the user re-opens the app.
+        NOT: {
+          AND: [
+            { status: 'COMPLETED' as any },
+            { payment: { status: 'COMPLETED' } },
+          ],
+        },
       },
       include: {
         pickupAddress: true,
