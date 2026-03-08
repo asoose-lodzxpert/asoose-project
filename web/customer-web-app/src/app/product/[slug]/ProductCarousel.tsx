@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
+import { ChevronRight } from "lucide-react";
 import { ApiService } from "@/services/api.service";
 import { MiniProductCard, SidebarMiniItem } from "./MiniProductCard";
 import type { MiniProduct } from "./types";
@@ -45,13 +47,19 @@ interface ProductCarouselProps {
   title: string;
   /** API endpoint, e.g. /marketplace/products/my-slug/store-items */
   endpoint: string;
+  /** When provided, renders a "View all →" link in the section header */
+  viewAllHref?: string;
 }
 
 /**
  * Self-fetching horizontal carousel.
  * Shows a skeleton while loading so it never blocks page render.
  */
-export function ProductCarousel({ title, endpoint }: ProductCarouselProps) {
+export function ProductCarousel({
+  title,
+  endpoint,
+  viewAllHref,
+}: ProductCarouselProps) {
   const [items, setItems] = useState<MiniProduct[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -78,9 +86,16 @@ export function ProductCarousel({ title, endpoint }: ProductCarouselProps) {
     <section>
       <div className="flex items-center justify-between mb-3">
         <h2 className="font-black text-base">{title}</h2>
-        {loading && (
+        {loading ? (
           <span className="text-xs text-gray-400 animate-pulse">Loading…</span>
-        )}
+        ) : viewAllHref ? (
+          <Link
+            href={viewAllHref}
+            className="text-sm text-yellow-500 font-semibold flex items-center gap-0.5 hover:underline"
+          >
+            View all <ChevronRight className="w-3.5 h-3.5" />
+          </Link>
+        ) : null}
       </div>
       {loading ? (
         <CarouselSkeleton />
