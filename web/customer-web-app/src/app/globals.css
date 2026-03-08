@@ -15,7 +15,7 @@
 
 /* ── Popup container ────────────────────────────────────────────────────── */
 .asoose-swal-popup {
-  font-family: inherit !important;   /* match app font stack */
+  font-family: inherit !important; /* match app font stack */
   border-radius: 1.25rem !important; /* rounded-2xl */
   padding: 2rem 1.75rem !important;
   box-shadow:
@@ -36,7 +36,7 @@
 /* ── Title ──────────────────────────────────────────────────────────────── */
 .asoose-swal-title {
   font-size: 1.125rem !important; /* text-lg */
-  font-weight: 800 !important;    /* font-extrabold */
+  font-weight: 800 !important; /* font-extrabold */
   line-height: 1.35 !important;
   margin-bottom: 0.25rem !important;
   letter-spacing: -0.01em;
@@ -44,7 +44,7 @@
 
 /* ── Body / HTML container ──────────────────────────────────────────────── */
 .asoose-swal-html {
-  font-size: 0.875rem !important;  /* text-sm */
+  font-size: 0.875rem !important; /* text-sm */
   line-height: 1.6 !important;
   margin-top: 0.5rem !important;
 }
@@ -68,8 +68,8 @@
 
 /* Tint brand yellow on warning icon to match palette */
 .asoose-swal-icon.swal2-warning {
-  border-color: #E5A503 !important;
-  color: #E5A503 !important;
+  border-color: #e5a503 !important;
+  color: #e5a503 !important;
 }
 .asoose-swal-icon.swal2-error {
   border-color: #ef4444 !important;
@@ -78,11 +78,11 @@
   border-color: #22c55e !important;
 }
 .asoose-swal-icon.swal2-question {
-  border-color: #E5A503 !important;
-  color: #E5A503 !important;
+  border-color: #e5a503 !important;
+  color: #e5a503 !important;
 }
 /* Fix success ring/line colours */
-.asoose-swal-icon.swal2-success [class^='swal2-success-line'] {
+.asoose-swal-icon.swal2-success [class^="swal2-success-line"] {
   background-color: #22c55e !important;
 }
 .asoose-swal-icon.swal2-success .swal2-success-ring {
@@ -103,7 +103,9 @@
   font-size: 0.875rem !important;
   padding: 0.625rem 1.375rem !important;
   letter-spacing: 0.01em;
-  transition: background-color 0.15s, transform 0.1s !important;
+  transition:
+    background-color 0.15s,
+    transform 0.1s !important;
   box-shadow: 0 4px 14px rgba(229, 165, 3, 0.28) !important;
 }
 .asoose-swal-confirm:hover {
@@ -119,7 +121,9 @@
   font-weight: 600 !important;
   font-size: 0.875rem !important;
   padding: 0.625rem 1.375rem !important;
-  transition: background-color 0.15s, transform 0.1s !important;
+  transition:
+    background-color 0.15s,
+    transform 0.1s !important;
 }
 .asoose-swal-cancel:active {
   transform: scale(0.97) !important;
@@ -131,7 +135,7 @@
   font-size: 1.5rem !important;
 }
 .asoose-swal-close:hover {
-  color: #E5A503 !important;
+  color: #e5a503 !important;
 }
 
 /* ── Entry / exit animations ────────────────────────────────────────────── */
@@ -177,10 +181,9 @@
   background: transparent;
 }
 .asoose-swal-popup .swal2-html-container::-webkit-scrollbar-thumb {
-  background: #E5A503;
+  background: #e5a503;
   border-radius: 9999px;
 }
-
 
 /* ═══════════════════════════════════════════════════════════════════════════
    Ride page — custom utilities not covered by Tailwind config
@@ -188,9 +191,15 @@
 
 /* Indeterminate progress bar animation (FindingDriver loading bar) */
 @keyframes indeterminateBar {
-  0%   { transform: translateX(-100%); }
-  50%  { transform: translateX(0%); }
-  100% { transform: translateX(100%); }
+  0% {
+    transform: translateX(-100%);
+  }
+  50% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
 }
 
 .animate-indeterminate-bar {
@@ -205,9 +214,9 @@
 
 /* Hide scrollbar while keeping scroll functionality */
 .scrollbar-hide {
-  -ms-overflow-style: none;  /* IE / Edge */
-  scrollbar-width: none;     /* Firefox */
+  -ms-overflow-style: none; /* IE / Edge */
+  scrollbar-width: none; /* Firefox */
 }
 .scrollbar-hide::-webkit-scrollbar {
-  display: none;             /* Chrome / Safari / Opera */
+  display: none; /* Chrome / Safari / Opera */
 }

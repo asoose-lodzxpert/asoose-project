@@ -60,6 +60,14 @@ export default function StorePage() {
   const params = useParams();
   const slugOrId = params.id as string;
 
+  // Guard against reserved path segments that would otherwise fall into this
+  // dynamic route (e.g. /main/store/categories hitting the vendor API).
+  const RESERVED = ["categories", "category", "search", "favorites"];
+  if (RESERVED.includes(slugOrId?.toLowerCase())) {
+    if (typeof window !== "undefined") window.location.replace("/main/store");
+    return null;
+  }
+
   // Data States
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -287,7 +295,11 @@ export default function StorePage() {
                         key={item.id}
                         {...item}
                         storeId={store.id}
-                        href={item.slug ? `/product/${item.slug}` : `/main/store/${slugOrId}/product/${item.id}`}
+                        href={
+                          item.slug
+                            ? `/product/${item.slug}`
+                            : `/main/store/${slugOrId}/product/${item.id}`
+                        }
                         onClick={() => setSelectedProduct(item)}
                       />
                     ))}

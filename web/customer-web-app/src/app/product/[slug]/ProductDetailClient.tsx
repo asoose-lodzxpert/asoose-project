@@ -166,10 +166,10 @@ export default function ProductDetailClient({ product }: { product: Product }) {
     try {
       const [si, ri] = await Promise.all([
         ApiService.get<MiniProduct[]>(
-          `/marketplace/products/${product.slug}/store-items`
+          `/marketplace/products/${product.slug}/store-items`,
         ),
         ApiService.get<MiniProduct[]>(
-          `/marketplace/products/${product.slug}/related`
+          `/marketplace/products/${product.slug}/related`,
         ),
       ]);
       setStoreItems(si || []);
@@ -196,8 +196,7 @@ export default function ProductDetailClient({ product }: { product: Product }) {
   };
 
   const hasModifiers = (product.modifierGroups ?? []).length > 0;
-  const descTooLong =
-    (product.description?.length ?? 0) > 200 && !descExpanded;
+  const descTooLong = (product.description?.length ?? 0) > 200 && !descExpanded;
 
   return (
     <div className="min-h-screen bg-[#f5f5f5] dark:bg-[#0a0a0a] text-gray-900 dark:text-gray-100">

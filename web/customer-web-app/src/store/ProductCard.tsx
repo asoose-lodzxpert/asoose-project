@@ -92,10 +92,11 @@ export const ProductCard = ({
 
     try {
       // 2. Backend Enforcement (Critical) — ApiService handles 401 redirect automatically
-      const token = (session as any)?.accessToken || (session as any)?.user?.accessToken;
+      const token =
+        (session as any)?.accessToken || (session as any)?.user?.accessToken;
 
       await ApiService.post(
-        '/cart/add',
+        "/cart/add",
         { productId: id, quantity: 1 },
         token,
         {},
@@ -122,7 +123,7 @@ export const ProductCard = ({
   const cardBody = (
     <>
       <div className="w-24 h-24 sm:w-28 sm:h-28 bg-gray-100 dark:bg-white/5 rounded-xl flex-shrink-0 overflow-hidden relative">
-        {image?.startsWith('http') ? (
+        {image?.startsWith("http") ? (
           <Image
             src={image}
             alt={name}
@@ -158,7 +159,11 @@ export const ProductCard = ({
             disabled={loading}
             className="w-8 h-8 rounded-full bg-gray-100 dark:bg-white/10 flex items-center justify-center text-gray-900 dark:text-white hover:bg-yellow-500 hover:text-black transition-colors z-10 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+            {loading ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Plus className="w-4 h-4" />
+            )}
           </button>
         </div>
       </div>

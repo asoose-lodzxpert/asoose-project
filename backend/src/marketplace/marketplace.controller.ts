@@ -106,7 +106,10 @@ export class MarketplaceController {
   async getProductStoreItems(@Param('idOrSlug') idOrSlug: string) {
     const product = await this.marketplaceService.getProductById(idOrSlug);
     if (!product) throw new NotFoundException(`Product not found: ${idOrSlug}`);
-    return this.marketplaceService.getStoreProducts(product.store.id, product.id);
+    return this.marketplaceService.getStoreProducts(
+      product.store.id,
+      product.id,
+    );
   }
 
   @ApiOperation({ summary: 'Get related products in the same category' })
@@ -114,7 +117,10 @@ export class MarketplaceController {
   async getRelatedProducts(@Param('idOrSlug') idOrSlug: string) {
     const product = await this.marketplaceService.getProductById(idOrSlug);
     if (!product) throw new NotFoundException(`Product not found: ${idOrSlug}`);
-    return this.marketplaceService.getRelatedProducts(product.category.id, product.id);
+    return this.marketplaceService.getRelatedProducts(
+      product.category.id,
+      product.id,
+    );
   }
 
   @ApiOperation({ summary: 'Create or update a store review' })

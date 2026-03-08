@@ -472,7 +472,11 @@ export class MarketplaceService {
       take: limit,
       orderBy: { salesCount: 'desc' },
       select: {
-        id: true, slug: true, name: true, price: true, images: true,
+        id: true,
+        slug: true,
+        name: true,
+        price: true,
+        images: true,
         category: { select: { name: true } },
       },
     });
@@ -488,13 +492,21 @@ export class MarketplaceService {
   }
 
   /** Returns products in the same category, excluding the given product. */
-  async getRelatedProducts(categoryId: string, excludeProductId: string, limit = 8) {
+  async getRelatedProducts(
+    categoryId: string,
+    excludeProductId: string,
+    limit = 8,
+  ) {
     const products = await this.prisma.product.findMany({
       where: { categoryId, id: { not: excludeProductId }, status: 'ACTIVE' },
       take: limit,
       orderBy: { salesCount: 'desc' },
       select: {
-        id: true, slug: true, name: true, price: true, images: true,
+        id: true,
+        slug: true,
+        name: true,
+        price: true,
+        images: true,
         store: { select: { id: true, name: true, slug: true } },
         category: { select: { name: true } },
       },
