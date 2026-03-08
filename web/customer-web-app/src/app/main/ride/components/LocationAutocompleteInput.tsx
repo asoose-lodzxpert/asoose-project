@@ -55,6 +55,8 @@ export function LocationAutocompleteInput({
   );
 
   const geoError = useRideStore((state) => state.geolocationError);
+  // Use user's live location (or fall back to Maiduguri) to bias search results
+  const userLocation = useRideStore((state) => state.userLocation);
   const setGeoError = (err: string | null) => {
     useRideStore.getState().setGeolocationError(err);
   };
@@ -77,7 +79,11 @@ export function LocationAutocompleteInput({
       return;
     }
 
-    searchPlaces(debouncedInputValue).then((results) => {
+    searchPlaces(
+      debouncedInputValue,
+      userLocation?.lat ?? 11.8345,
+      userLocation?.lng ?? 13.1507,
+    ).then((results) => {
       if (justSelectedRef.current) return;
       setSuggestions(results);
       setShowDropdown(results.length > 0);
@@ -297,7 +303,11 @@ export function LocationAutocompleteInput({
       {/* Geolocation hint — shown when pickup input is empty and no error */}
       {type === "pickup" && !inputValue && !geoError && !isGeolocating && (
         <p className="mt-1.5 ml-1 text-xs text-zinc-400 dark:text-zinc-500">
-          Type an address or tap <span className="font-semibold text-blue-500 dark:text-blue-400">Locate me</span> to auto-detect your location.
+          Type an address or tap{" "}
+          <span className="font-semibold text-blue-500 dark:text-blue-400">
+            Locate me
+          </span>{" "}
+          to auto-detect your location.
         </p>
       )}
 
@@ -329,7 +339,11 @@ export function LocationAutocompleteInput({
               key={suggestion.id}
               onMouseDown={(e) => {
                 e.preventDefault();
-                handleSelect(suggestion.id, suggestion.title);
+                // Build full address: "Title, Subtitle" so it includes city/country
+                const fullAddress = suggestion.subtitle
+                  ? `${suggestion.title}, ${suggestion.subtitle}`
+                  : suggestion.title;
+                handleSelect(suggestion.id, fullAddress);
               }}
               className="p-3.5 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800 flex items-center space-x-3 transition-colors border-b border-zinc-50 dark:border-zinc-800/50 last:border-0"
             >

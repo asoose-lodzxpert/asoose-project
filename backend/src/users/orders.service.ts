@@ -20,6 +20,7 @@ import { InventoryService } from './inventory.service';
 import { VendorOrdersStreamService } from '../vendor/orders/vendor-orders-stream.service';
 import { NotificationsGateway } from '../notifications/notifications.gateway';
 import { QueueService } from '../matching/queue/queue.service';
+import { isStoreCurrentlyOpen } from '../shared/vendor-availability.util';
 // ==================== CONSTANTS ====================
 
 const ORDER_STATUS = { PENDING: 'PENDING' } as const;
@@ -109,7 +110,14 @@ export class OrdersService {
       const [store, address] = await Promise.all([
         this.prisma.store.findUnique({
           where: { id: restaurantId },
-          select: { lat: true, lng: true, name: true },
+          select: {
+            lat: true,
+            lng: true,
+            name: true,
+            isOpen: true,
+            openHours: true,
+            openingHours: true,
+          },
         }),
         this.prisma.address.findUnique({
           where: { id: addressId },
@@ -118,6 +126,12 @@ export class OrdersService {
 
       if (!store) {
         throw new NotFoundException('Store not found');
+      }
+
+      // ── Availability guard ──────────────────────────────────────────
+      const quoteAvailability = isStoreCurrentlyOpen(store);
+      if (!quoteAvailability.open) {
+        throw new BadRequestException(quoteAvailability.message);
       }
 
       if (!address || address.userId !== userId) {
@@ -164,7 +178,7 @@ export class OrdersService {
         address.lng,
       );
 
-      const deliveryFee = this.pricingService.calculateDeliveryFee(distance);
+      const deliveryFee = await this.fareService.calcDeliveryFee(distance);
       const serviceFee = this.pricingService.calculateServiceFee(subtotal);
       const vatAmount = this.pricingService.calculateVat(subtotal);
       const total = subtotal + deliveryFee + serviceFee + vatAmount;
@@ -254,6 +268,25 @@ export class OrdersService {
       for (const [storeId, groupItems] of storeGroups) {
         const firstProduct = productMap.get(groupItems[0].id)!;
         const store = firstProduct.store;
+
+        // ── Availability guard (fetch fresh availability fields) ────
+        const storeAvail = await this.prisma.store.findUnique({
+          where: { id: storeId },
+          select: {
+            isOpen: true,
+            openHours: true,
+            openingHours: true,
+            name: true,
+          },
+        });
+        if (storeAvail) {
+          const avail = isStoreCurrentlyOpen(storeAvail);
+          if (!avail.open) {
+            throw new BadRequestException(
+              `${storeAvail.name}: ${avail.message}`,
+            );
+          }
+        }
         let subtotal = 0;
         const enrichedItems = groupItems.map((item) => {
           const p = productMap.get(item.id)!;
@@ -302,16 +335,9 @@ export class OrdersService {
         storeCoords,
       );
 
-      // The delivery fee must never be zero — the base fare alone guarantees
-      // a minimum, but we guard explicitly in case constants are misconfigured.
-      const calculatedFee = Math.round(
-        this.fareService.BaseDeliveryFare +
-          totalRouteKm * this.fareService.DeliveryPerKm,
-      );
-      const totalDeliveryFee = Math.max(
-        calculatedFee,
-        this.fareService.BaseDeliveryFare,
-      );
+      // Delivery fee reads admin-configured rates from DB (delivery_base_fare + delivery_per_km).
+      const totalDeliveryFee =
+        await this.fareService.calcDeliveryFee(totalRouteKm);
 
       const grandSubtotal = storeEntries.reduce(
         (sum, s) => sum + s.subtotal,
@@ -1087,6 +1113,25 @@ export class OrdersService {
         const firstProduct = productMap.get(groupItems[0].id)!;
         const store = firstProduct.store;
 
+        // ── Availability guard ──────────────────────────────────────
+        const storeAvail = await this.prisma.store.findUnique({
+          where: { id: storeId },
+          select: {
+            isOpen: true,
+            openHours: true,
+            openingHours: true,
+            name: true,
+          },
+        });
+        if (storeAvail) {
+          const avail = isStoreCurrentlyOpen(storeAvail);
+          if (!avail.open) {
+            throw new BadRequestException(
+              `${storeAvail.name}: ${avail.message}`,
+            );
+          }
+        }
+
         if (store.lat == null || store.lng == null) {
           this.logger.warn(
             `Store "${store.name}" (${storeId}) has no GPS coordinates — delivery fee will be inaccurate`,
@@ -1191,15 +1236,9 @@ export class OrdersService {
       sortedStoreIds = route.sortedStoreIds;
     }
 
-    // FareService delivery formula — matches the /fare/delivery endpoint exactly
-    const calculatedFee = Math.round(
-      this.fareService.BaseDeliveryFare +
-        totalRouteKm * this.fareService.DeliveryPerKm,
-    );
-    const totalDeliveryFee = Math.max(
-      calculatedFee,
-      this.fareService.BaseDeliveryFare,
-    );
+    // Delivery fee reads admin-configured rates from DB (delivery_base_fare + delivery_per_km).
+    const totalDeliveryFee =
+      await this.fareService.calcDeliveryFee(totalRouteKm);
 
     // Sum of all item subtotals (used for proportional split)
     const grandSubtotal = resolvedStores.reduce(

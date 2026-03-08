@@ -121,6 +121,7 @@ export class JobsService {
         pickupAddress: delivery.pickupAddress,
         dropoffAddress: delivery.dropoffAddress,
         earnings: delivery.deliveryFee,
+
         // Never expose the OTP to the rider — just signal that one is required
         requiresOtp: !!delivery.deliveryOtp,
         packageDetails: delivery.packageDetails ?? undefined,
@@ -317,7 +318,7 @@ export class JobsService {
         include: { rider: { include: { vehicle: true } } },
       });
 
-      // Notify customer so they can proceed to payment
+      // Notify customer that a driver is on the way
       if (updatedRide?.customerId && updatedRide.rider) {
         try {
           this.notificationsGateway.server
@@ -331,8 +332,7 @@ export class JobsService {
                 phone: updatedRide.rider.phone,
                 vehicle: updatedRide.rider.vehicle,
               },
-              message:
-                'A driver accepted your ride. Please confirm your payment to proceed.',
+              message: 'A driver has accepted your ride and is on the way.',
             });
           this.logger.debug(
             `Emitted DRIVER_ACCEPTED to customer user_${updatedRide.customerId} for ride ${jobId}`,
@@ -700,12 +700,15 @@ export class JobsService {
         throw new ForbiddenException('Not your ride');
       }
 
-      if ((ride.status as string) !== 'PAID') {
+      // Post-ride payment model: driver starts ride from DRIVER_ACCEPTED.
+      // PAID is kept for backward compatibility with legacy pre-paid rides.
+      const startableStatuses = ['DRIVER_ACCEPTED', 'PAID'];
+      if (!startableStatuses.includes(ride.status as string)) {
         this.logger.warn(
           `Invalid state - cannot confirm pickup for ride ${jobId} in ${ride.status}`,
         );
         throw new BadRequestException(
-          `Cannot confirm pickup for ride in status ${ride.status} — customer must pay first`,
+          `Cannot start ride in status ${ride.status}`,
         );
       }
 

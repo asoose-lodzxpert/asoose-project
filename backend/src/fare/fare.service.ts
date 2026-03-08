@@ -24,6 +24,7 @@ export class FareService {
   // Ride
   readonly DefaultBaseRideFare = 1000;
   readonly DefaultRiderPerKm = 700;
+  readonly DefaultNightSurchargePerKm = 1000;
   // Delivery
   readonly DefaultBaseDeliveryFare = 700;
   readonly DefaultDeliveryPerKm = 400;
@@ -42,7 +43,10 @@ export class FareService {
         if (!isNaN(parsed) && parsed > 0) return parsed;
       }
     } catch (err) {
-      this.logger.warn(`Could not read setting "${key}", using default ${fallback}`, err);
+      this.logger.warn(
+        `Could not read setting "${key}", using default ${fallback}`,
+        err,
+      );
     }
     return fallback;
   }
@@ -55,28 +59,39 @@ export class FareService {
     const { pickuplat, pickuplong, dropofflat, dropofflong } = dto;
 
     // Load admin-configured fare rates (or fall back to hardcoded defaults)
-    const [baseRideFare, riderPerKm] = await Promise.all([
+    const [baseRideFare, riderPerKm, nightSurchargePerKm] = await Promise.all([
       this.getSetting('ride_base_fare', this.DefaultBaseRideFare),
       this.getSetting('ride_per_km', this.DefaultRiderPerKm),
+      this.getSetting(
+        'ride_night_surcharge_per_km',
+        this.DefaultNightSurchargePerKm,
+      ),
     ]);
 
     const lat1 = Number(pickuplat);
     const lng1 = Number(pickuplong);
     const lat2 = Number(dropofflat);
     const lng2 = Number(dropofflong);
-    const distanceKm = this.geoService.calculateDistance(lat1, lng1, lat2, lng2);
+    const distanceKm = this.geoService.calculateDistance(
+      lat1,
+      lng1,
+      lat2,
+      lng2,
+    );
     const distanceMeters = Math.round(distanceKm * 1000);
 
     const durationSeconds = Math.round(distanceKm * 180); // ~3 min/km
     const durationText = `${Math.round(durationSeconds / 60)} min`;
     const distanceText = `${distanceKm.toFixed(2)} km`;
 
-    // After 10 PM (Africa/Lagos) apply a night surcharge of ₦1,000/km
+    // After 10 PM (Africa/Lagos) apply admin-configured night surcharge rate
     const now = new Date();
-    const lagosTime = new Date(now.toLocaleString('en-US', { timeZone: 'Africa/Lagos' }));
+    const lagosTime = new Date(
+      now.toLocaleString('en-US', { timeZone: 'Africa/Lagos' }),
+    );
     const hour = lagosTime.getHours();
     const isNightRate = hour >= 22;
-    const perKm = isNightRate ? 1000 : riderPerKm;
+    const perKm = isNightRate ? nightSurchargePerKm : riderPerKm;
 
     const variableFare = Math.round(distanceKm * perKm);
     const economyPrice = baseRideFare + variableFare;
@@ -89,6 +104,7 @@ export class FareService {
       economyPrice,
       businessPrice,
       isNightRate,
+      nightSurchargePerKm: isNightRate ? nightSurchargePerKm : undefined,
       distance: { meters: distanceMeters, text: distanceText },
       eta: { seconds: durationSeconds, text: durationText },
     };
@@ -107,7 +123,12 @@ export class FareService {
     const lng1 = Number(pickuplong);
     const lat2 = Number(dropofflat);
     const lng2 = Number(dropofflong);
-    const distanceKm = this.geoService.calculateDistance(lat1, lng1, lat2, lng2);
+    const distanceKm = this.geoService.calculateDistance(
+      lat1,
+      lng1,
+      lat2,
+      lng2,
+    );
     const distanceMeters = Math.round(distanceKm * 1000);
 
     const durationSeconds = Math.round(distanceKm * 180);
@@ -124,13 +145,33 @@ export class FareService {
     };
   }
 
-  // ── Convenience accessors (used by OrdersService / rides.service) ────────────
-  // These remain synchronous by returning the hardcoded defaults.
-  // Code that builds total order fares in OrdersService uses these directly;
-  // for truly live values use getSetting() inside an async context.
-  get BaseRideFare() { return this.DefaultBaseRideFare; }
-  get RiderPerKm() { return this.DefaultRiderPerKm; }
-  get BaseDeliveryFare() { return this.DefaultBaseDeliveryFare; }
-  get DeliveryPerKm() { return this.DefaultDeliveryPerKm; }
-}
+  /**
+   * Calculates the delivery fee for a given distance using admin-configured
+   * DB settings (delivery_base_fare + delivery_per_km). Falls back to
+   * hardcoded defaults if the settings are not found.
+   *
+   * Use this in place of the synchronous getter accessors below.
+   */
+  async calcDeliveryFee(distanceKm: number): Promise<number> {
+    const [baseFare, perKm] = await Promise.all([
+      this.getSetting('delivery_base_fare', this.DefaultBaseDeliveryFare),
+      this.getSetting('delivery_per_km', this.DefaultDeliveryPerKm),
+    ]);
+    const fee = Math.round(baseFare + distanceKm * perKm);
+    return Math.max(fee, baseFare);
+  }
 
+  // ── Convenience accessors (kept for backward-compat; prefer calcDeliveryFee) ─
+  get BaseRideFare() {
+    return this.DefaultBaseRideFare;
+  }
+  get RiderPerKm() {
+    return this.DefaultRiderPerKm;
+  }
+  get BaseDeliveryFare() {
+    return this.DefaultBaseDeliveryFare;
+  }
+  get DeliveryPerKm() {
+    return this.DefaultDeliveryPerKm;
+  }
+}

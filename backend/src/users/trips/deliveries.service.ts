@@ -23,6 +23,7 @@ import { RequestDeliveryDto, CancelTripDto } from './dto/trip.dto';
 import { TripsCommonService, TRIPS_CONFIG } from './trips.common.service';
 import { deliveryToJobSummary } from '../../riders/jobs/job.dto';
 import { AddressesService } from '../addresses.service';
+import { FareService } from '../../fare/fare.service';
 
 @Injectable()
 export class DeliveriesService {
@@ -31,6 +32,7 @@ export class DeliveriesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly geo: GeoService,
+    private readonly fareService: FareService,
     private readonly eventBus: EventBusService,
     private readonly queue: QueueService,
     private readonly notificationsGateway: NotificationsGateway,
@@ -253,10 +255,8 @@ export class DeliveriesService {
           dropoffAddress.lng,
         );
 
-        const deliveryFee = this.geo.calculateDeliveryFee(
-          distanceKm,
-          dto.weightKg || 1,
-        );
+        // Use admin-configured rates (delivery_base_fare + delivery_per_km from systemSetting).
+        const deliveryFee = await this.fareService.calcDeliveryFee(distanceKm);
         this.logger.log(
           `[requestDelivery] Distance: ${distanceKm} km, Fee: ${deliveryFee} (calc took ${Date.now() - t3}ms)`,
         );

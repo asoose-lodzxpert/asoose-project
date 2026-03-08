@@ -112,8 +112,14 @@ export class TripsController {
     @Request() req,
     @Param('id') rideId: string,
     @Body('paymentMethod') paymentMethod: string,
+    @Body('callbackUrl') callbackUrl?: string,
   ) {
-    return this.tripsService.confirmRide(req.user.id, rideId, paymentMethod);
+    return this.tripsService.confirmRide(
+      req.user.id,
+      rideId,
+      paymentMethod,
+      callbackUrl,
+    );
   }
 
   /**

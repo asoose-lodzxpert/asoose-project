@@ -32,8 +32,9 @@ export class DeliveryMatchingProcessor extends WorkerHost {
   private readonly MAX_RINGS = 5;
   private readonly MAX_ATTEMPTS = 20;
   private readonly TIMEOUT_MS = 90000; // 90 seconds
-  private readonly MAX_MATCHING_RETRIES = 5; // Max full re-queued attempts before cancel
-  private readonly RETRY_DELAY_MS = 10_000; // 10s between retries
+  private readonly MAX_MATCHING_RETRIES = 5; // Max fast retries before switching to long-wait queue
+  private readonly RETRY_DELAY_MS = 10_000; // 10s between fast retries
+  private readonly LONG_RETRY_DELAY_MS = 20 * 60 * 1000; // 20 minutes — used when no rider found after fast retries
 
   constructor(
     private readonly redis: RedisService,
@@ -108,12 +109,7 @@ export class DeliveryMatchingProcessor extends WorkerHost {
       if (driverFound) {
         this.logger.log(`✅ Driver found for delivery ${deliveryId}`);
       } else {
-        await this.handleNoDriverFound(
-          deliveryId,
-          jobSummary,
-          attempt,
-          delivery.orderId ?? undefined,
-        );
+        await this.handleNoDriverFound(deliveryId, jobSummary, attempt);
       }
     } catch (error) {
       this.logger.error(`Error matching delivery ${deliveryId}:`, error);
@@ -289,7 +285,6 @@ export class DeliveryMatchingProcessor extends WorkerHost {
     deliveryId: string,
     jobSummary: MatchDeliveryJobData['job'],
     attempt: number,
-    orderId: string | undefined,
   ): Promise<void> {
     const attempts = await this.redis.incrementMatchingAttempts(deliveryId);
 
@@ -298,6 +293,7 @@ export class DeliveryMatchingProcessor extends WorkerHost {
     );
 
     if (attempts < this.MAX_MATCHING_RETRIES) {
+      // Fast retry — try again after a short delay
       this.logger.log(
         `Retrying delivery matching for ${deliveryId} (attempt ${attempts + 1}) in ${this.RETRY_DELAY_MS}ms`,
       );
@@ -308,31 +304,18 @@ export class DeliveryMatchingProcessor extends WorkerHost {
       return;
     }
 
+    // All fast retries exhausted — do NOT cancel. Queue for another cycle in 20 minutes.
+    // This allows a rider to come online later and pick up the delivery.
     this.logger.warn(
-      `Cancelling delivery ${deliveryId} — no driver found after ${attempts} attempts`,
+      `No driver found after ${attempts} fast attempts for delivery ${deliveryId} — scheduling long retry in 20 min`,
     );
 
-    // Update delivery status
-    await this.prisma.delivery.update({
-      where: { id: deliveryId },
-      data: { status: 'CANCELLED' },
-    });
+    // Reset attempt counter so the next cycle starts fresh fast-retries
+    await this.redis.resetMatchingAttempts(deliveryId);
 
-    // If linked to order, update order status
-    if (orderId) {
-      await this.prisma.order.update({
-        where: { id: String(orderId) },
-        data: { status: 'CANCELLED' },
-      });
-    }
-
-    // Emit cancellation event so customers are notified via socket
-    this.eventBus.emitJobCancelled({
-      jobId: deliveryId,
-      jobType: 'delivery',
-      reason: 'No driver available',
-      cancelledBy: 'system',
-      timestamp: Date.now(),
-    });
+    await this.queue.enqueueDeliveryMatching(
+      { job: jobSummary, attempt: 1, excludeDriverIds: [] },
+      this.LONG_RETRY_DELAY_MS,
+    );
   }
 }

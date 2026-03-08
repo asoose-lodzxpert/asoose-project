@@ -190,7 +190,8 @@ function CallbackContent() {
                 DRIVER_ASSIGNED: "searching",
                 DRIVER_ACCEPTED: "confirmed",
                 ACCEPTED: "confirmed",
-                PAID: "confirmed",
+                // Post-ride model: PAID means payment collected after ride = fully done
+                PAID: "finished",
                 ARRIVED: "arrived",
                 IN_PROGRESS: "in-progress",
                 COMPLETED: "finished",

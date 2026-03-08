@@ -31,6 +31,22 @@ export async function deleteReview(storeId: string): Promise<void> {
 }
 
 /**
+ * Report a store or review for moderation (Guideline 1.2)
+ * POST /marketplace/report
+ */
+export async function reportContent(
+  targetType: "STORE" | "REVIEW",
+  targetId: string,
+  reason: string,
+  description?: string,
+): Promise<{ message: string }> {
+  return request("marketplace/report", {
+    method: "POST",
+    body: JSON.stringify({ targetType, targetId, reason, description }),
+  }) as Promise<{ message: string }>;
+}
+
+/**
  * Validate review data before submission
  */
 export function validateReview(data: CreateReviewDto): {

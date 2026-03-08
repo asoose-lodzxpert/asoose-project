@@ -110,8 +110,18 @@ const SETTING_DEFINITIONS: SystemSettingDef[] = [
     key: "ride_per_km",
     label: "Ride Rate Per KM (₦)",
     type: "currency",
-    description: "Per-kilometre charge for rides (after 10 PM rate: ₦1,000/km)",
+    description:
+      "Per-kilometre charge for rides during normal hours (before 10 PM)",
     defaultValue: 700,
+  },
+  {
+    category: "Logistics",
+    key: "ride_night_surcharge_per_km",
+    label: "Night Surcharge Per KM (₦)",
+    type: "currency",
+    description:
+      "Per-kilometre rate applied after 10 PM (Africa/Lagos time). Replaces the normal rate.",
+    defaultValue: 1000,
   },
   // ── Delivery Pricing ─────────────────────────────────────────────────────────
   {

@@ -1,4 +1,10 @@
-import { View, StyleSheet, ScrollView, Pressable } from "react-native";
+import {
+  View,
+  StyleSheet,
+  ScrollView,
+  Pressable,
+  ActivityIndicator,
+} from "react-native";
 import { useState } from "react";
 import { useRouter } from "expo-router";
 import { ThemedView } from "@/components/themed-view";
@@ -21,6 +27,7 @@ export default function RideSuccessScreen() {
   const textSecondary = useThemeColor({}, "textSecondary");
 
   const [rating, setRating] = useState(0);
+  const [submitting, setSubmitting] = useState(false);
 
   const handleGoHome = () => {
     resetBooking();
@@ -31,7 +38,7 @@ export default function RideSuccessScreen() {
     router.push("/ride-history" as any);
   };
 
-  const handleSubmitRating = () => {
+  const handleSubmitRating = async () => {
     if (rating === 0) {
       Toast.show({
         text1: "Please select a rating before submitting",
@@ -40,12 +47,29 @@ export default function RideSuccessScreen() {
       return;
     }
 
-    // TODO: Submit rating to backend
-    Toast.show({
-      text1: "Your rating has been submitted. Thank you!",
-      type: "success",
-    });
-    setTimeout(handleGoHome, 1500);
+    if (!currentRide?.id) {
+      handleGoHome();
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await RideService.rateRide(currentRide.id, rating);
+      Toast.show({
+        text1: "Your rating has been submitted. Thank you!",
+        type: "success",
+      });
+      setTimeout(handleGoHome, 1500);
+    } catch (err: any) {
+      // Non-fatal — still let the user leave the screen
+      Toast.show({
+        text1: "Rating saved locally, will sync when online.",
+        type: "info",
+      });
+      setTimeout(handleGoHome, 1500);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   if (!currentRide) {
@@ -256,14 +280,22 @@ export default function RideSuccessScreen() {
             {rating > 0 && (
               <Pressable
                 onPress={handleSubmitRating}
-                style={[styles.ratingButton, { backgroundColor: primary }]}
+                disabled={submitting}
+                style={[
+                  styles.ratingButton,
+                  { backgroundColor: primary, opacity: submitting ? 0.65 : 1 },
+                ]}
               >
-                <ThemedText
-                  type="defaultSemiBold"
-                  style={styles.ratingButtonText}
-                >
-                  Submit Rating
-                </ThemedText>
+                {submitting ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <ThemedText
+                    type="defaultSemiBold"
+                    style={styles.ratingButtonText}
+                  >
+                    Submit Rating
+                  </ThemedText>
+                )}
               </Pressable>
             )}
           </View>

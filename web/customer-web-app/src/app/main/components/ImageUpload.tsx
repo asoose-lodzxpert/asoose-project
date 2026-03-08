@@ -9,7 +9,15 @@ interface ImageUploadProps {
   onUpload: (url: string) => void;
   value?: string;
   label?: string;
-  bucket?: string; // Kept for prop compatibility, though now handled by backend
+  bucket?: string;
+  /**
+   * When true, the component does NOT upload on file select.
+   * Instead it shows a local blob preview and calls onFileSelect(file).
+   * The parent is responsible for uploading when it's ready (e.g. on form submit).
+   * Clicking X on a blob preview just clears the UI — no DELETE request is made.
+   */
+  deferred?: boolean;
+  onFileSelect?: (file: File | null) => void;
 }
 
 export default function ImageUpload({
@@ -17,6 +25,8 @@ export default function ImageUpload({
   value,
   label = "Upload Image",
   bucket,
+  deferred = false,
+  onFileSelect,
 }: ImageUploadProps) {
   const { data: session } = useSession();
   const [uploading, setUploading] = useState(false);
@@ -24,36 +34,39 @@ export default function ImageUpload({
   const API_URL =
     process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1";
 
-  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    const file = e.target.files[0];
+
+    if (deferred) {
+      // Deferred mode: just show a local preview, don't upload yet.
+      const blobUrl = URL.createObjectURL(file);
+      setPreview(blobUrl);
+      onFileSelect?.(file);
+      // Pass the blob URL into the form field so schema validation sees a
+      // non-empty value; the parent replaces it with the real URL on submit.
+      onUpload(blobUrl);
+      return;
+    }
+
+    // Immediate upload mode (original behaviour).
     try {
       setUploading(true);
-      if (!e.target.files || e.target.files.length === 0) return;
-
       const token = (session as any)?.accessToken;
-      if (!token) {
-        throw new Error("Authentication required to upload");
-      }
+      if (!token) throw new Error("Authentication required to upload");
 
-      const file = e.target.files[0];
       const formData = new FormData();
       formData.append("file", file);
 
-      // Use the backend upload endpoint
       const response = await fetch(`${API_URL}/storage/upload`, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
         body: formData,
       });
 
-      if (!response.ok) {
-        throw new Error("Upload failed");
-      }
+      if (!response.ok) throw new Error("Upload failed");
 
       const data = await response.json();
-      // Backend returns { url: string }
-
       setPreview(data.url);
       onUpload(data.url);
       toast.success("Image uploaded!");
@@ -66,9 +79,19 @@ export default function ImageUpload({
   };
 
   const removeImage = async () => {
-    try {
-      if (!preview) return;
+    if (!preview) return;
 
+    // Blob URL = file was chosen locally but never uploaded — just clear UI.
+    if (preview.startsWith("blob:")) {
+      URL.revokeObjectURL(preview);
+      setPreview(null);
+      onUpload("");
+      onFileSelect?.(null);
+      return;
+    }
+
+    // Remote URL = file lives on the server — delete it.
+    try {
       const token = (session as any)?.accessToken;
       if (!token) throw new Error("Authentication required");
 
@@ -85,6 +108,7 @@ export default function ImageUpload({
 
       setPreview(null);
       onUpload("");
+      onFileSelect?.(null);
       toast.info("Image removed");
     } catch (error: any) {
       console.error("Delete error:", error);
@@ -130,7 +154,7 @@ export default function ImageUpload({
               type="file"
               className="hidden"
               accept="image/*"
-              onChange={handleUpload}
+              onChange={handleFileChange}
               disabled={uploading}
             />
           </label>

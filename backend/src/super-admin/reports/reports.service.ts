@@ -1,11 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import {
-  OrderStatus,
-  StoreStatus,
-  RideStatus,
-  DeliveryStatus,
-  Prisma,
-} from '@prisma/client';
+import { StoreStatus, Prisma } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 
 // DTOs
@@ -119,7 +113,7 @@ export class AnalyticsService {
         this.prisma.order.aggregate({
           where: {
             createdAt: { gte: startDate, lte: endDate },
-            status: OrderStatus.DELIVERED,
+            paymentStatus: 'PAID',
           },
           _sum: { total: true },
           _count: true,
@@ -127,7 +121,7 @@ export class AnalyticsService {
         this.prisma.order.aggregate({
           where: {
             createdAt: { gte: previousStartDate, lt: startDate },
-            status: OrderStatus.DELIVERED,
+            paymentStatus: 'PAID',
           },
           _sum: { total: true },
           _count: true,
@@ -202,7 +196,7 @@ export class AnalyticsService {
         SUM("total")::numeric as revenue
       FROM "Order"
       WHERE "createdAt" >= ${startDate}
-        AND status = ${OrderStatus.DELIVERED}::"OrderStatus"
+        AND "paymentStatus" = 'PAID'
       GROUP BY DATE_TRUNC(${Prisma.raw(`'${truncType}'`)}, "createdAt")
       ORDER BY date ASC
     `;
@@ -297,7 +291,7 @@ export class AnalyticsService {
         INNER JOIN "Store" s ON o."storeId" = s.id
         WHERE o."createdAt" >= ${startDate}
           AND o."createdAt" <= ${endDate}
-          AND o.status = ${OrderStatus.DELIVERED}::"OrderStatus"
+          AND o."paymentStatus" = 'PAID'
         GROUP BY s.type
         ORDER BY amount DESC
       `,
@@ -309,7 +303,7 @@ export class AnalyticsService {
         INNER JOIN "Store" s ON o."storeId" = s.id
         WHERE o."createdAt" >= ${previousStartDate}
           AND o."createdAt" < ${startDate}
-          AND o.status = ${OrderStatus.DELIVERED}::"OrderStatus"
+          AND o."paymentStatus" = 'PAID'
         GROUP BY s.type
       `,
     ]);
@@ -395,7 +389,7 @@ export class AnalyticsService {
       INNER JOIN "Order" o ON o."storeId" = s.id
       WHERE o."createdAt" >= ${startDate}
         AND o."createdAt" <= ${endDate}
-        AND o.status = ${OrderStatus.DELIVERED}::"OrderStatus"
+        AND o."paymentStatus" = 'PAID'
       GROUP BY s.id, s.name, s.rating
       ORDER BY revenue DESC
       LIMIT ${limit}
@@ -412,7 +406,7 @@ export class AnalyticsService {
       FROM "Order"
       WHERE "createdAt" >= ${previousStartDate}
         AND "createdAt" < ${startDate}
-        AND status = ${OrderStatus.DELIVERED}::"OrderStatus"
+        AND "paymentStatus" = 'PAID'
         AND "storeId" = ANY(${storeIds})
       GROUP BY "storeId"
     `;

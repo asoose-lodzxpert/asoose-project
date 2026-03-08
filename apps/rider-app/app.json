@@ -18,10 +18,7 @@
         "ITSAppUsesNonExemptEncryption": false
       }
     },
-    "platforms": [
-      "ios",
-      "android"
-    ],
+    "platforms": ["ios", "android"],
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#0A0A0A",
@@ -99,9 +96,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "21470b69-c153-4845-aaac-0436aae439b8"
+        "projectId": "2d48f46a-1d28-48e3-9a5b-77e6256bdc3b"
       }
     },
-    "owner": "wyteshadow"
+    "owner": "iamwyteshadow"
   }
 }

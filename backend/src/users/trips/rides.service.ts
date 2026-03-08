@@ -351,7 +351,12 @@ export class RidesService {
    * Post-ride payment model: the customer pays only after the ride is finished.
    * Returns { authorizationUrl, reference } so the web app can redirect to Paystack.
    */
-  async confirmRide(userId: string, rideId: string, _paymentMethod?: string) {
+  async confirmRide(
+    userId: string,
+    rideId: string,
+    _paymentMethod?: string,
+    callbackUrl?: string,
+  ) {
     const ride = await this.prisma.ride.findUnique({
       where: { id: rideId },
       include: { customer: { select: { email: true, name: true } } },
@@ -392,6 +397,7 @@ export class RidesService {
         customerName: ride.customer?.name ?? undefined,
         gateway: PaymentGateway.PAYSTACK,
         method: GatewayPaymentMethod.CARD,
+        ...(callbackUrl ? { callbackUrl } : {}),
       },
       userId,
     );
@@ -715,10 +721,20 @@ export class RidesService {
             // Post-ride payment model: include COMPLETED so the payment screen
             // is still shown if the customer re-opens the app before paying.
             'COMPLETED',
-            // PAID = post-ride payment done; include so the success screen
-            // can display the receipt immediately after confirmation.
-            'PAID',
+            // PAID is intentionally excluded: a PAID ride is fully done.
+            // Including it caused useRideSynchronization to restore "finished"
+            // state after the user had already rated and reset to "idle",
+            // making the rating modal re-appear every time the page was visited.
           ] as any[],
+        },
+        // Exclude COMPLETED rides whose payment has already been settled.
+        // This prevents a fully paid ride from re-triggering the payment
+        // prompt / rate-driver screen when the user re-opens the app.
+        NOT: {
+          AND: [
+            { status: 'COMPLETED' as any },
+            { payment: { status: 'COMPLETED' } },
+          ],
         },
       },
       include: {

@@ -150,7 +150,7 @@ export class PaymentStatusService {
 
             await tx.order.updateMany({
               where: { orderGroupId: payment.orderGroupId },
-              data: { status: OrderStatus.CONFIRMED },
+              data: { status: OrderStatus.CONFIRMED, paymentStatus: 'PAID' },
             });
 
             // Ledger: Record Incoming Payment
@@ -185,7 +185,7 @@ export class PaymentStatusService {
             // B. Single Order
             await tx.order.update({
               where: { id: payment.orderId },
-              data: { status: OrderStatus.CONFIRMED },
+              data: { status: OrderStatus.CONFIRMED, paymentStatus: 'PAID' },
             });
 
             if (payment.order) {
@@ -350,12 +350,12 @@ export class PaymentStatusService {
             });
             await tx.order.updateMany({
               where: { orderGroupId: payment.orderGroupId },
-              data: { status: OrderStatus.CANCELLED },
+              data: { status: OrderStatus.CANCELLED, paymentStatus: 'FAILED' },
             });
           } else if (payment.orderId) {
             await tx.order.update({
               where: { id: payment.orderId },
-              data: { status: OrderStatus.CANCELLED },
+              data: { status: OrderStatus.CANCELLED, paymentStatus: 'FAILED' },
             });
           }
 

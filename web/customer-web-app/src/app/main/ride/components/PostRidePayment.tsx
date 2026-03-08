@@ -3,7 +3,14 @@
 import { useState } from "react";
 import { useSession } from "next-auth/react";
 import { toast } from "react-toastify";
-import { CheckCircle2, Loader2, CreditCard, MapPin, Clock, Route } from "lucide-react";
+import {
+  CheckCircle2,
+  Loader2,
+  CreditCard,
+  MapPin,
+  Clock,
+  Route,
+} from "lucide-react";
 import { useRideStore } from "../store/ride";
 import { RideService } from "@/services/ride.service";
 
@@ -54,6 +61,7 @@ export function PostRidePayment() {
         rideId,
         "CARD",
         session.accessToken,
+        window.location.origin,
       );
 
       if (!confirmRes.authorizationUrl) {
@@ -163,9 +171,7 @@ export function PostRidePayment() {
         ) : (
           <>
             <CreditCard size={18} />
-            <span>
-              Pay{fare ? ` · ${formatMoney(fare)}` : ""}
-            </span>
+            <span>Pay{fare ? ` · ${formatMoney(fare)}` : ""}</span>
           </>
         )}
       </button>

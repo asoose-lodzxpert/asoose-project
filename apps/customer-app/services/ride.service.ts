@@ -149,6 +149,21 @@ export class RideService {
   }
 
   /**
+   * Rate a completed ride driver
+   * POST /trips/rides/:id/rate
+   */
+  static async rateRide(
+    rideId: string,
+    rating: number,
+    comment?: string,
+  ): Promise<{ message: string }> {
+    return post(`trips/rides/${rideId}/rate`, {
+      rating,
+      ...(comment?.trim() ? { comment: comment.trim() } : {}),
+    });
+  }
+
+  /**
    * Format currency for display
    */
   static formatCurrency(amount: number): string {

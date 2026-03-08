@@ -10,6 +10,7 @@ import {
   Delete,
   Query,
   ParseIntPipe,
+  BadRequestException,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { MarketplaceService } from './marketplace.service';
@@ -90,14 +91,47 @@ export class MarketplaceController {
     return this.marketplaceService.getPaginatedStores(page, safeLimit, type);
   }
 
-  @ApiOperation({ summary: 'Get product details by ID' })
-  @Get('products/:id')
-  async getProduct(@Param('id') id: string) {
-    const product = await this.marketplaceService.getProductById(id);
+  @ApiOperation({ summary: 'Get product details by ID or slug' })
+  @Get('products/:idOrSlug')
+  async getProduct(@Param('idOrSlug') idOrSlug: string) {
+    const product = await this.marketplaceService.getProductById(idOrSlug);
     if (!product) {
-      throw new NotFoundException(`Product not found: ${id}`);
+      throw new NotFoundException(`Product not found: ${idOrSlug}`);
     }
     return product;
+  }
+
+  @ApiOperation({ summary: 'Get other products from the same store' })
+  @Get('products/:idOrSlug/store-items')
+  async getProductStoreItems(@Param('idOrSlug') idOrSlug: string) {
+    const product = await this.marketplaceService.getProductById(idOrSlug);
+    if (!product) throw new NotFoundException(`Product not found: ${idOrSlug}`);
+    return this.marketplaceService.getStoreProducts(
+      product.store.id,
+      product.id,
+    );
+  }
+
+  @ApiOperation({ summary: 'Get related products in the same category' })
+  @Get('products/:idOrSlug/related')
+  async getRelatedProducts(@Param('idOrSlug') idOrSlug: string) {
+    const product = await this.marketplaceService.getProductById(idOrSlug);
+    if (!product) throw new NotFoundException(`Product not found: ${idOrSlug}`);
+    return this.marketplaceService.getRelatedProducts(
+      product.category.id,
+      product.id,
+    );
+  }
+
+  @ApiOperation({ summary: 'Get real-time availability of a vendor/store' })
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
+  @Get(['vendor/:id/availability', 'restaurant/:id/availability'])
+  async getVendorAvailability(@Param('id') id: string) {
+    const result = await this.marketplaceService.getVendorAvailability(id);
+    if (!result) {
+      throw new NotFoundException(`Vendor not found: ${id}`);
+    }
+    return result;
   }
 
   @ApiOperation({ summary: 'Create or update a store review' })
@@ -116,5 +150,46 @@ export class MarketplaceController {
   async deleteReview(@Request() req, @Param('storeId') storeId: string) {
     const userId = req.user.sub || req.user.id || req.user.userId;
     return this.marketplaceService.deleteReview(userId, storeId);
+  }
+
+  /**
+   * Guideline 1.2 — Report offensive / spam UGC content
+   * POST /marketplace/report
+   */
+  @ApiOperation({ summary: 'Report a store or review (UGC moderation)' })
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } }) // 5 reports/minute per user
+  @Post('report')
+  async reportContent(
+    @Request() req,
+    @Body()
+    body: {
+      targetType: 'STORE' | 'REVIEW';
+      targetId: string;
+      reason: string;
+      description?: string;
+    },
+  ) {
+    const userId = req.user.sub || req.user.id || req.user.userId;
+    const { targetType, targetId, reason, description } = body;
+
+    if (!['STORE', 'REVIEW'].includes(targetType)) {
+      throw new BadRequestException('targetType must be STORE or REVIEW');
+    }
+    if (!targetId?.trim()) {
+      throw new BadRequestException('targetId is required');
+    }
+    if (!reason?.trim() || reason.trim().length < 3) {
+      throw new BadRequestException('reason must be at least 3 characters');
+    }
+
+    return this.marketplaceService.reportContent(
+      userId,
+      targetType,
+      targetId,
+      reason.trim(),
+      description?.trim(),
+    );
   }
 }

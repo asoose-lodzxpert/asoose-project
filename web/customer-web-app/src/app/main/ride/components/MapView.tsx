@@ -146,6 +146,32 @@ export function MapView() {
     [],
   );
 
+  /**
+   * Reverse-geocode the dragged marker position and commit it to the store.
+   * Markers are only draggable while the user is actively configuring that leg.
+   */
+  const handleMarkerDragEnd = useCallback(
+    async (e: google.maps.MapMouseEvent, type: "pickup" | "dropoff") => {
+      if (!e.latLng) return;
+      const location = { lat: e.latLng.lat(), lng: e.latLng.lng() };
+      const label = await reverseGeocode(location.lat, location.lng);
+      if (type === "pickup") {
+        setPickupLocation(location);
+        setPickupAddress(label);
+      } else {
+        setDropoffLocation(location);
+        setDropoffAddress(label);
+      }
+    },
+    [
+      reverseGeocode,
+      setPickupLocation,
+      setDropoffLocation,
+      setPickupAddress,
+      setDropoffAddress,
+    ],
+  );
+
   // Safe Polyline Decoding
   const routePath = useMemo(() => {
     if (
@@ -254,12 +280,18 @@ export function MapView() {
         <Marker
           position={pickupLocation}
           label={{ text: "P", color: "white" }}
+          draggable={isConfiguring === "pickup"}
+          onDragEnd={(e) => handleMarkerDragEnd(e, "pickup")}
+          title="Drag to adjust pickup location"
         />
       )}
       {dropoffLocation && (
         <Marker
           position={dropoffLocation}
           label={{ text: "D", color: "white" }}
+          draggable={isConfiguring === "dropoff"}
+          onDragEnd={(e) => handleMarkerDragEnd(e, "dropoff")}
+          title="Drag to adjust dropoff location"
         />
       )}
 

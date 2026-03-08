@@ -4,6 +4,7 @@ import { Plus, Loader2 } from "lucide-react";
 import { useCartStore } from "@/store/useCartStore";
 import { toast } from "react-toastify";
 import Image from "next/image";
+import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -26,6 +27,11 @@ export interface ProductProps {
   /** Modifier groups passed through so the card can gate direct-add for required-modifier products. */
   modifierGroups?: ModifierGroupRef[];
   onClick?: () => void;
+  /**
+   * When provided, clicking the card body navigates to this URL.
+   * The + button still calls onClick (for modal) or direct-adds.
+   */
+  href?: string;
 }
 
 export const ProductCard = ({
@@ -38,6 +44,7 @@ export const ProductCard = ({
   storeName,
   modifierGroups,
   onClick,
+  href,
 }: ProductProps) => {
   const addItem = useCartStore((state) => state.addItem);
   const { data: session, status } = useSession();
@@ -85,10 +92,11 @@ export const ProductCard = ({
 
     try {
       // 2. Backend Enforcement (Critical) — ApiService handles 401 redirect automatically
-      const token = (session as any)?.accessToken || (session as any)?.user?.accessToken;
+      const token =
+        (session as any)?.accessToken || (session as any)?.user?.accessToken;
 
       await ApiService.post(
-        '/cart/add',
+        "/cart/add",
         { productId: id, quantity: 1 },
         token,
         {},
@@ -112,13 +120,10 @@ export const ProductCard = ({
     }
   };
 
-  return (
-    <div
-      onClick={onClick}
-      className="bg-white dark:bg-[#151515] p-3 rounded-2xl border border-gray-100 dark:border-white/5 shadow-sm flex gap-4 hover:border-yellow-500/30 transition-colors group cursor-pointer"
-    >
+  const cardBody = (
+    <>
       <div className="w-24 h-24 sm:w-28 sm:h-28 bg-gray-100 dark:bg-white/5 rounded-xl flex-shrink-0 overflow-hidden relative">
-        {image?.startsWith('http') ? (
+        {image?.startsWith("http") ? (
           <Image
             src={image}
             alt={name}
@@ -154,10 +159,34 @@ export const ProductCard = ({
             disabled={loading}
             className="w-8 h-8 rounded-full bg-gray-100 dark:bg-white/10 flex items-center justify-center text-gray-900 dark:text-white hover:bg-yellow-500 hover:text-black transition-colors z-10 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+            {loading ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Plus className="w-4 h-4" />
+            )}
           </button>
         </div>
       </div>
+    </>
+  );
+
+  if (href) {
+    return (
+      <Link
+        href={href}
+        className="bg-white dark:bg-[#151515] p-3 rounded-2xl border border-gray-100 dark:border-white/5 shadow-sm flex gap-4 hover:border-yellow-500/30 transition-colors group cursor-pointer"
+      >
+        {cardBody}
+      </Link>
+    );
+  }
+
+  return (
+    <div
+      onClick={onClick}
+      className="bg-white dark:bg-[#151515] p-3 rounded-2xl border border-gray-100 dark:border-white/5 shadow-sm flex gap-4 hover:border-yellow-500/30 transition-colors group cursor-pointer"
+    >
+      {cardBody}
     </div>
   );
 };

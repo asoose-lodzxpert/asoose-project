@@ -54,6 +54,7 @@ function HomeHeaderInner() {
     "/main/orders",
     "/main/checkout",
     "/main/notifications",
+    "/product",
   ].some((path) => pathname.startsWith(path));
 
   const isActive = (path: string) => pathname.startsWith(path);

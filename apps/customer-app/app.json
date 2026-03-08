@@ -24,13 +24,11 @@
         }
       },
       "infoPlist": {
-        "NSFaceIDUsageDescription": "This app uses Face ID to securely authenticate you.",
-        "NSBiometricUsageDescription": "Biometric authentication is used for secure login.",
-        "NSUserAuthenticationUsageDescription": "Authentication is required to access your account.",
-        "NSCameraUsageDescription": "This app requires camera access to take photos and scan documents.",
-        "NSPhotoLibraryUsageDescription": "This app requires access to your photo library to select images.",
-        "NSLocationWhenInUseUsageDescription": "Location is used to provide location-based services.",
-        "NSUserNotificationUsageDescription": "Notifications are used to keep you updated about your account and activity.",
+        "NSFaceIDUsageDescription": "ASOOSE uses Face ID to securely authenticate you when logging into your account.",
+        "NSBiometricUsageDescription": "ASOOSE uses biometric authentication so you can log in quickly and securely.",
+        "NSUserAuthenticationUsageDescription": "Authentication is required to access your ASOOSE account and protect your personal data.",
+        "NSCameraUsageDescription": "ASOOSE needs camera access to let you take or upload a profile photo.",
+        "NSLocationWhenInUseUsageDescription": "ASOOSE uses your location to show nearby stores, calculate accurate delivery fees, track your orders in real time, and let you set pickup and drop-off points for rides.",
         "ITSAppUsesNonExemptEncryption": false
       },
       "bundleIdentifier": "com.asoose.app",
@@ -39,10 +37,7 @@
       },
       "usesAppleSignIn": true
     },
-    "platforms": [
-      "ios",
-      "android"
-    ],
+    "platforms": ["ios", "android"],
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
@@ -112,7 +107,8 @@
         {
           "icon": "./assets/images/asoose icon.png",
           "color": "#0EA5E9",
-          "mode": "production"
+          "mode": "production",
+          "NSUserNotificationsUsageDescription": "ASOOSE sends you notifications for order updates, delivery tracking, ride confirmations, and important account activity."
         }
       ],
       "expo-secure-store",
