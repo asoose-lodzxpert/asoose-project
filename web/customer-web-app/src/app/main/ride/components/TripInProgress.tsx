@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { useRideStore } from "../store/ride";
 import { Navigation, MapPin, Share2, ShieldAlert } from "lucide-react";
 
@@ -8,94 +7,9 @@ export function TripInProgress() {
   const rideType = useRideStore((state) => state.rideType);
   const rideId = useRideStore((state) => state.rideId);
   const dropoffAddress = useRideStore((state) => state.dropoffAddress);
-  const dropoffLocation = useRideStore((state) => state.dropoffLocation);
-  const driverLocation = useRideStore((state) => state.driverLocation);
 
-  // Local state for ETA
-  const [eta, setEta] = useState<{ minutes: number; km: number } | null>(null);
-
-  // --- Calculate Live ETA to Dropoff ---
-  useEffect(() => {
-    if (!driverLocation || !dropoffLocation) return;
-
-    // Haversine + fixed 30 km/h as fallback when Distance Matrix is unavailable (L3 fix)
-    const haversineEta = () => {
-      try {
-        let distanceMeters = 0;
-        if (typeof google !== "undefined" && google.maps?.geometry?.spherical) {
-          distanceMeters =
-            google.maps.geometry.spherical.computeDistanceBetween(
-              driverLocation,
-              dropoffLocation,
-            );
-        } else {
-          distanceMeters = calculateDistanceHaversine(
-            driverLocation,
-            dropoffLocation,
-          );
-        }
-        const km = distanceMeters / 1000;
-        setEta({ minutes: Math.ceil(km / 0.5), km });
-      } catch (error) {
-        console.error("Error calculating ETA:", error);
-      }
-    };
-
-    // Prefer Distance Matrix (traffic-aware) when available (L3 fix).
-    if (typeof google === "undefined" || !google.maps?.DistanceMatrixService) {
-      haversineEta();
-      return;
-    }
-
-    const service = new google.maps.DistanceMatrixService();
-    service.getDistanceMatrix(
-      {
-        origins: [{ lat: driverLocation.lat, lng: driverLocation.lng }],
-        destinations: [{ lat: dropoffLocation.lat, lng: dropoffLocation.lng }],
-        travelMode: google.maps.TravelMode.DRIVING,
-      },
-      (result, status) => {
-        if (status === "OK") {
-          const element = result?.rows[0]?.elements[0];
-          if (element?.status === "OK") {
-            const km = element.distance.value / 1000;
-            const minutes = Math.ceil(element.duration.value / 60);
-            setEta({ minutes, km });
-            return;
-          }
-        }
-        // API quota exceeded or network error — degrade gracefully
-        haversineEta();
-      },
-    );
-  }, [driverLocation, dropoffLocation]);
-
-  /**
-   * Fallback: Calculate distance using Haversine formula
-   * Returns distance in meters
-   */
-  function calculateDistanceHaversine(
-    loc1: google.maps.LatLng | google.maps.LatLngLiteral,
-    loc2: google.maps.LatLng | google.maps.LatLngLiteral,
-  ): number {
-    const lat1 = typeof loc1.lat === "function" ? loc1.lat() : loc1.lat;
-    const lng1 = typeof loc1.lng === "function" ? loc1.lng() : loc1.lng;
-    const lat2 = typeof loc2.lat === "function" ? loc2.lat() : loc2.lat;
-    const lng2 = typeof loc2.lng === "function" ? loc2.lng() : loc2.lng;
-
-    const R = 6371000; // Earth radius in meters
-    const φ1 = (lat1 * Math.PI) / 180;
-    const φ2 = (lat2 * Math.PI) / 180;
-    const Δφ = ((lat2 - lat1) * Math.PI) / 180;
-    const Δλ = ((lng2 - lng1) * Math.PI) / 180;
-
-    const a =
-      Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
-      Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
-
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c; // Distance in meters
-  }
+  // Backend-computed ETA (populated by RideSocketListener's 5s poll)
+  const driverEta = useRideStore((state) => state.driverEta);
 
   return (
     <div className="absolute bottom-20 md:bottom-6 left-6 right-6 md:left-auto md:right-6 md:w-96 bg-white dark:bg-zinc-900 shadow-2xl z-30 p-6 rounded-2xl border border-zinc-100 dark:border-zinc-800 animate-in slide-in-from-bottom-5">
@@ -130,18 +44,18 @@ export function TripInProgress() {
         </div>
 
         {/* Live Stats */}
-        {eta && (
+        {driverEta && (
           <div className="mt-4 pt-4 border-t border-zinc-200 dark:border-zinc-700 flex justify-between items-center">
             <div className="text-center flex-1 border-r border-zinc-200 dark:border-zinc-700">
               <p className="text-xs text-zinc-400">Estimated Arrival</p>
               <p className="font-bold text-zinc-900 dark:text-white">
-                {eta.minutes} min
+                {driverEta.minutes} min
               </p>
             </div>
             <div className="text-center flex-1">
               <p className="text-xs text-zinc-400">Distance Remaining</p>
               <p className="font-bold text-zinc-900 dark:text-white">
-                {eta.km.toFixed(1)} km
+                {driverEta.km.toFixed(1)} km
               </p>
             </div>
           </div>

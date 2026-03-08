@@ -11,6 +11,8 @@ export interface PriceEstimate {
   distance: number;
   duration: number;
   total: number;
+  /** True when a night surcharge is active (after 10 PM Lagos time) */
+  isNightRate?: boolean;
   breakdown: {
     baseFare: number;
     distanceFare: number;
@@ -77,6 +79,7 @@ interface FareRideResponse {
   price: number;
   economyPrice: number;
   businessPrice: number;
+  isNightRate?: boolean;
   distance: { meters: number; text: string };
   eta: { seconds: number; text: string };
 }
@@ -121,7 +124,8 @@ export class RideService {
     );
 
     const distanceKm = res.distance.meters / 1000;
-    const durationMin = res.eta.seconds / 60;
+    // Round to integer — backend schema stores durationMin as Int
+    const durationMin = Math.round(res.eta.seconds / 60);
 
     // Economy fare comes directly from the backend
     const economyFare = res.economyPrice;
@@ -133,6 +137,9 @@ export class RideService {
       distance: distanceKm,
       duration: durationMin,
       total: fare,
+      isNightRate: res.isNightRate ?? false,
+      // Breakdown is not provided by the backend fare endpoint;
+      // zeros are placeholders — the backend stores its own breakdown.
       breakdown: { baseFare: 0, distanceFare: 0, timeFare: 0, platformFee: 0 },
     });
 
@@ -257,6 +264,8 @@ export class RideService {
       latitude: number;
       longitude: number;
       heading: number;
+      etaMinutes: number | null;
+      distanceKm: number | null;
     }>(`/trips/rides/${rideId}/driver-location`, token, { signal });
   }
 

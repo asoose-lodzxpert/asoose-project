@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useSession } from "next-auth/react";
 import { toast } from "react-toastify";
 import { useRideStore } from "../store/ride";
@@ -20,63 +20,13 @@ export function DriverArrived() {
   const driver = useRideStore((s) => s.driver);
   const rideStatus = useRideStore((s) => s.rideStatus);
   const rideId = useRideStore((s) => s.rideId);
-  const driverLocation = useRideStore((s) => s.driverLocation);
-  const pickupLocation = useRideStore((s) => s.pickupLocation);
   const startOtp = useRideStore((s) => s.startOtp);
   const setRideStatus = useRideStore((s) => s.setRideStatus);
   const setRideId = useRideStore((s) => s.setRideId);
 
-  // ETA calculation — local state (not in Zustand)
-  const [distanceKm, setDistanceKm] = useState<number | null>(null);
-  const [etaMinutes, setEtaMinutes] = useState<number | null>(null);
+  // Backend-computed ETA (populated by RideSocketListener's 5s poll)
+  const driverEta = useRideStore((s) => s.driverEta);
   const [isCancelling, setIsCancelling] = useState(false);
-
-  // --- Calculate Distance & ETA ---
-  useEffect(() => {
-    if (!driverLocation || !pickupLocation) return;
-
-    // Haversine + fixed 30 km/h used as a fallback when Distance Matrix
-    // is unavailable or returns an error (L3 fix).
-    const haversineEta = () => {
-      if (typeof google === "undefined" || !google.maps?.geometry?.spherical)
-        return;
-      const distanceMeters =
-        google.maps.geometry.spherical.computeDistanceBetween(
-          driverLocation,
-          pickupLocation,
-        );
-      const km = distanceMeters / 1000;
-      setDistanceKm(km);
-      setEtaMinutes(Math.ceil(km / 0.5));
-    };
-
-    // Prefer Distance Matrix (traffic-aware) when available (L3 fix).
-    if (typeof google === "undefined" || !google.maps?.DistanceMatrixService) {
-      haversineEta();
-      return;
-    }
-
-    const service = new google.maps.DistanceMatrixService();
-    service.getDistanceMatrix(
-      {
-        origins: [{ lat: driverLocation.lat, lng: driverLocation.lng }],
-        destinations: [{ lat: pickupLocation.lat, lng: pickupLocation.lng }],
-        travelMode: google.maps.TravelMode.DRIVING,
-      },
-      (result, status) => {
-        if (status === "OK") {
-          const element = result?.rows[0]?.elements[0];
-          if (element?.status === "OK") {
-            setDistanceKm(element.distance.value / 1000);
-            setEtaMinutes(Math.ceil(element.duration.value / 60));
-            return;
-          }
-        }
-        // API quota exceeded or network error — degrade gracefully
-        haversineEta();
-      },
-    );
-  }, [driverLocation, pickupLocation]);
 
   // --- Cancel Ride Handler ---
   const handleCancelRide = async () => {
@@ -116,8 +66,8 @@ export function DriverArrived() {
   const statusTitle = isArrived ? "Driver Arrived!" : "Driver is on the way";
   const statusMessage = isArrived
     ? "Your ride is waiting at the pickup point."
-    : etaMinutes
-      ? `Arriving in approx ${etaMinutes} mins (${distanceKm?.toFixed(1)} km)`
+    : driverEta
+      ? `Arriving in approx ${driverEta.minutes} min (${driverEta.km.toFixed(1)} km)`
       : "Heading to your pickup location...";
 
   const statusColor = isArrived

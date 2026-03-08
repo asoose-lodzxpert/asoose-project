@@ -317,6 +317,7 @@ export class RidesService {
               totalFare: finalFare,
               startOtp: rawOtp,
               surgeMultiplier: 1.0,
+              vehicleType: dto.vehicleType, // ECONOMY | BUSINESS
             },
             include: { pickupAddress: true, dropoffAddress: true },
           });
@@ -771,9 +772,26 @@ export class RidesService {
         id: true,
         status: true,
         totalFare: true,
+        distanceKm: true,
+        durationMin: true,
+        vehicleType: true,
         createdAt: true,
-        pickupAddress: { select: { street: true } },
-        dropoffAddress: { select: { street: true } },
+        acceptedAt: true,
+        startedAt: true,
+        completedAt: true,
+        cancellationReason: true,
+        pickupAddress: { select: { street: true, city: true, state: true, lat: true, lng: true } },
+        dropoffAddress: { select: { street: true, city: true, state: true, lat: true, lng: true } },
+        rider: {
+          select: {
+            id: true,
+            name: true,
+            phone: true,
+            image: true,
+            rating: true,
+            vehicle: { select: { brand: true, model: true, plateNumber: true, color: true } },
+          },
+        },
         payment: { select: { status: true, method: true } },
       },
     });
@@ -782,12 +800,22 @@ export class RidesService {
   async getDriverLocation(userId: string, rideId: string) {
     const ride = await this.prisma.ride.findUnique({
       where: { id: rideId },
-      select: { customerId: true, riderId: true },
+      select: {
+        customerId: true,
+        riderId: true,
+        status: true,
+        pickupAddress: { select: { lat: true, lng: true } },
+        dropoffAddress: { select: { lat: true, lng: true } },
+      },
     });
 
     if (!ride || ride.customerId !== userId)
       throw new NotFoundException('Ride not found');
     if (!ride.riderId) return null;
+
+    let latitude: number | null = null;
+    let longitude: number | null = null;
+    let heading = 0;
 
     // Prefer Redis — location pings are stored there in real-time.
     // The DB columns (currentLat/currentLng) are only updated on status changes
@@ -795,28 +823,55 @@ export class RidesService {
     try {
       const state = await this.driverStateService.getState(ride.riderId);
       if (state?.location?.lat && state?.location?.lng) {
-        return {
-          latitude: state.location.lat,
-          longitude: state.location.lng,
-          heading: (state.location as any).heading ?? 0,
-        };
+        latitude = state.location.lat;
+        longitude = state.location.lng;
+        heading = (state.location as any).heading ?? 0;
       }
     } catch {
       // Fall through to DB
     }
 
     // Fallback: DB columns (may be null if driver never updated status with coords)
-    const rider = await this.prisma.rider.findUnique({
-      where: { id: ride.riderId },
-      select: { currentLat: true, currentLng: true },
-    });
+    if (latitude === null || longitude === null) {
+      const rider = await this.prisma.rider.findUnique({
+        where: { id: ride.riderId },
+        select: { currentLat: true, currentLng: true },
+      });
 
-    if (!rider?.currentLat || !rider?.currentLng) return null;
+      if (!rider?.currentLat || !rider?.currentLng) return null;
+      latitude = rider.currentLat;
+      longitude = rider.currentLng;
+    }
+
+    // --- Compute ETA from driver to the relevant destination ---
+    // DRIVER_ACCEPTED / ARRIVED → ETA to pickup
+    // IN_PROGRESS → ETA to dropoff
+    let etaMinutes: number | null = null;
+    let distanceKm: number | null = null;
+
+    const destination =
+      ride.status === 'IN_PROGRESS'
+        ? ride.dropoffAddress
+        : ride.pickupAddress;
+
+    if (destination?.lat && destination?.lng && latitude && longitude) {
+      const km = this.geo.calculateDistance(
+        latitude,
+        longitude,
+        destination.lat,
+        destination.lng,
+      );
+      distanceKm = Math.round(km * 10) / 10; // 1 decimal place
+      // ~3 min/km average urban speed (consistent with fare.service.ts)
+      etaMinutes = Math.max(1, Math.round(km * 3));
+    }
 
     return {
-      latitude: rider.currentLat,
-      longitude: rider.currentLng,
-      heading: 0,
+      latitude,
+      longitude,
+      heading,
+      etaMinutes,
+      distanceKm,
     };
   }
 
@@ -898,7 +953,10 @@ export class RidesService {
     if (!ride || ride.customerId !== userId) {
       throw new NotFoundException('Ride not found');
     }
-    if (ride.status !== RideStatus.COMPLETED) {
+    // Accept both COMPLETED and PAID — post-ride payment transitions
+    // COMPLETED → PAID, but the customer should still be able to rate.
+    const rateableStatuses: string[] = [RideStatus.COMPLETED, RideStatus.PAID];
+    if (!rateableStatuses.includes(ride.status)) {
       throw new BadRequestException('Can only rate completed rides');
     }
     if (!ride.riderId) {

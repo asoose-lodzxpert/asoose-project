@@ -87,6 +87,7 @@ function mapDriver(
     name?: string;
     image?: string;
     rating?: number;
+    phone?: string;
     vehicle?: {
       plateNumber?: string;
       brand?: string;
@@ -107,6 +108,7 @@ function mapDriver(
     vehicleNumber: rider.vehicle?.plateNumber ?? null,
     vehicleBrand: rider.vehicle?.brand ?? null,
     vehicleModel: rider.vehicle?.model ?? null,
+    phone: rider.phone ?? null,
   };
 }
 
@@ -143,8 +145,8 @@ export function mapRideToViewModel(backendRide: BackendRide): RideViewModel {
 
     // ========== PRICING ==========
     // Map totalFare (backend) → actualFare (frontend)
-    // Priority: totalFare > estimatedFare > 0
-    const actualFare = backendRide.totalFare ?? backendRide.estimatedFare ?? 0;
+    // estimatedFare is not a real backend column — use totalFare only
+    const actualFare = backendRide.totalFare ?? 0;
 
     // ========== STATUS ==========
     // Format status enum to human-readable
@@ -205,7 +207,7 @@ export function mapRideToViewModel(backendRide: BackendRide): RideViewModel {
       createdAt: parseDate(backendRide.createdAt) ?? new Date(),
 
       // Metadata
-      ...(backendRide.paymentStatus && { paymentStatus: backendRide.paymentStatus }),
+      ...(backendRide.payment?.status && { paymentStatus: backendRide.payment.status }),
       ...(backendRide.payment?.method && { paymentMethod: backendRide.payment.method }),
       ...(backendRide.vehicleType && { vehicleType: backendRide.vehicleType }),
       ...(backendRide.cancellationReason && {

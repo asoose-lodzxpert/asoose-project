@@ -65,6 +65,9 @@ export interface DriverView {
   
   /** Vehicle brand (e.g., "Toyota") */
   vehicleBrand: string | null;
+
+  /** Driver phone number (masked) */
+  phone: string | null;
 }
 
 export interface RideViewModel {

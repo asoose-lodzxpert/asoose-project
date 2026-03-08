@@ -75,7 +75,8 @@ export class FareService {
     const now = new Date();
     const lagosTime = new Date(now.toLocaleString('en-US', { timeZone: 'Africa/Lagos' }));
     const hour = lagosTime.getHours();
-    const perKm = hour >= 22 ? 1000 : riderPerKm;
+    const isNightRate = hour >= 22;
+    const perKm = isNightRate ? 1000 : riderPerKm;
 
     const variableFare = Math.round(distanceKm * perKm);
     const economyPrice = baseRideFare + variableFare;
@@ -87,6 +88,7 @@ export class FareService {
       price,
       economyPrice,
       businessPrice,
+      isNightRate,
       distance: { meters: distanceMeters, text: distanceText },
       eta: { seconds: durationSeconds, text: durationText },
     };

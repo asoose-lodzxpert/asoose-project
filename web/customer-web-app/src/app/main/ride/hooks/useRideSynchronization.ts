@@ -76,6 +76,20 @@ export function useRideSynchronization() {
           return;
         }
 
+        // Guard: if user already rated and reset to idle, but the backend still
+        // shows the ride as PAID (it hasn't dropped off getCurrentRide yet),
+        // don't re-show the ride. This prevents the rating modal from popping
+        // up again after the user completed the flow.
+        {
+          const currentStatus = useRideStore.getState().rideStatus;
+          if (
+            currentStatus === "idle" &&
+            backendRide.status === "PAID"
+          ) {
+            return;
+          }
+        }
+
         // Use centralized status mapper (State Management fix).
         // Post-ride payment model: payment.status determines whether ride
         // maps to 'payment-required' or 'finished' (no pre-ride payment gate).
@@ -204,8 +218,8 @@ export function useRideSynchronization() {
               model: activeRide.driver.vehicleModel || "Car",
               licensePlate: activeRide.driver.vehicleNumber || "---",
             },
-            rating: activeRide.driver.rating || 5.0,
-            phone: "",
+            rating: activeRide.driver.rating ?? null,
+            phone: activeRide.driver.phone || "",
           });
         }
 

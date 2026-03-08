@@ -21,11 +21,13 @@ export function TripComplete() {
           <div className="bg-zinc-50 dark:bg-zinc-800 rounded-2xl p-6 space-y-4 mb-6">
             <div className="flex justify-between items-center border-b border-zinc-200 dark:border-zinc-700 pb-4">
               <span className="text-zinc-500 dark:text-zinc-400">Total Fare</span>
-              <span className="text-2xl font-black text-zinc-900 dark:text-white">${tripSummary.fare.toFixed(2)}</span>
+              <span className="text-2xl font-black text-zinc-900 dark:text-white">
+                {new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(tripSummary.fare)}
+              </span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-zinc-500 dark:text-zinc-400">Distance</span>
-              <span className="font-bold text-zinc-900 dark:text-white">{tripSummary.distance.toFixed(2)} miles</span>
+              <span className="font-bold text-zinc-900 dark:text-white">{tripSummary.distance.toFixed(1)} km</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-zinc-500 dark:text-zinc-400">Duration</span>

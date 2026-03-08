@@ -47,6 +47,11 @@ export class StoresService {
     });
   }
 
+  /** Returns the valid StoreType enum values (source of truth for store categories). */
+  getStoreTypes(): string[] {
+    return Object.values(StoreType);
+  }
+
   /** Returns aggregate stats for the vendors dashboard (excludes SUSPENDED/soft-deleted). */
   async getStats() {
     const [total, pending, active, closed] = await Promise.all([
@@ -435,6 +440,9 @@ export class StoresService {
         lat: dto.lat !== undefined ? Number(dto.lat) : undefined,
         lng: dto.lng !== undefined ? Number(dto.lng) : undefined,
         status: dto.status || undefined,
+        type: dto.storeType && Object.values(StoreType).includes(dto.storeType)
+          ? (dto.storeType as StoreType)
+          : undefined,
         commissionRate:
           dto.commissionRate !== undefined
             ? Number(dto.commissionRate)
@@ -476,6 +484,7 @@ export class StoresService {
       phone: updatedStore.vendor?.phone,
       email: updatedStore.vendor?.email,
       status: updatedStore.status,
+      storeType: updatedStore.type,
       logo: updatedStore.logo,
       banner: updatedStore.banner,
     };
@@ -593,6 +602,7 @@ export class StoresService {
       createdAt: store.createdAt,
       updatedAt: store.updatedAt,
       totalRevenue,
+      storeType: store.type,
       commissionRate: store.commissionRate ?? 20,
       unpaidBalance: Math.max(0, totalRevenue - paidOut),
       totalOrders: store.orders.length,

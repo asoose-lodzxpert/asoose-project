@@ -118,6 +118,7 @@ interface VendorDetails {
   createdAt: string;
   updatedAt: string;
   isAdminManaged: boolean;
+  storeType?: string;
 }
 
 type PayoutsResponse = { history: any[] } | any[];
@@ -250,6 +251,7 @@ export default function VendorDetailPage() {
     email: "",
     address: "",
     commissionRate: 20,
+    storeType: "",
   });
 
   // 1. Main Vendor Profile
@@ -271,6 +273,7 @@ export default function VendorDetailPage() {
             address: data.address || "",
             email: data.email,
             commissionRate: data.commissionRate ?? 20,
+            storeType: data.storeType || "",
           });
         }
       },
@@ -280,6 +283,12 @@ export default function VendorDetailPage() {
   // 2. Performance Charts
   const { data: performanceData } = useSWR<PerformanceData[]>(
     vendor?.id ? `/super-admin/vendors/${vendor.id}/performance?days=30` : null,
+    fetcher,
+  );
+
+  // 2b. Store type options (fetched from backend — source of truth)
+  const { data: storeTypes } = useSWR<string[]>(
+    isEditing ? `/super-admin/vendors/store-types` : null,
     fetcher,
   );
 
@@ -350,6 +359,7 @@ export default function VendorDetailPage() {
         address: vendor.address || "",
         email: vendor.email,
         commissionRate: vendor.commissionRate ?? 20,
+        storeType: vendor.storeType || "",
       });
     }
     setAddressCoords(null);
@@ -400,6 +410,9 @@ export default function VendorDetailPage() {
         payload.append("email", formData.email);
         payload.append("address", formData.address);
         payload.append("commissionRate", String(formData.commissionRate));
+        if (formData.storeType) {
+          payload.append("storeType", formData.storeType);
+        }
         if (addressCoords) {
           payload.append("lat", String(addressCoords.lat));
           payload.append("lng", String(addressCoords.lng));
@@ -863,6 +876,7 @@ export default function VendorDetailPage() {
             vendor={vendor}
             formData={formData}
             isEditing={isEditing}
+            storeTypes={storeTypes || []}
             onFormChange={(data) =>
               setFormData((prev) => ({ ...prev, ...data }))
             }

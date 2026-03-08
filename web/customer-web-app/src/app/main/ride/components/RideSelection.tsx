@@ -277,7 +277,8 @@ export function RideSelection() {
         vehicleType: vehicleKey,
         fare: selectedEstimate.estimatedFare,
         distanceKm: selectedEstimate.distance,
-        durationMin: selectedEstimate.duration,
+        // Ensure integer — backend schema stores durationMin as Int
+        durationMin: Math.round(selectedEstimate.duration),
       });
 
       try {

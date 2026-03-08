@@ -7,6 +7,7 @@ import {
   Store,
   Calendar,
   Clock,
+  Tag,
 } from "lucide-react";
 import { LocationInput } from "@/components/shared/LocationInput";
 
@@ -14,6 +15,7 @@ interface BusinessInfoCardProps {
   vendor: any;
   formData: any;
   isEditing: boolean;
+  storeTypes: string[];
   onFormChange: (data: any) => void;
   addressCoords: { lat: number; lng: number } | null;
   onAddressChange: (text: string, coords: { lat: number; lng: number } | null) => void;
@@ -23,6 +25,7 @@ const BusinessInfoCard = ({
   vendor,
   formData,
   isEditing,
+  storeTypes,
   onFormChange,
   addressCoords,
   onAddressChange,
@@ -106,6 +109,35 @@ const BusinessInfoCard = ({
               />
             ) : (
               <span>{vendor.phone || "No phone provided"}</span>
+            )}
+          </div>
+
+          {/* Store Category */}
+          <div className="flex items-center gap-3 text-sm text-gray-300">
+            <Tag className="w-4 h-4 text-gray-500 shrink-0" />
+            {isEditing ? (
+              <select
+                value={formData.storeType || ""}
+                onChange={(e) =>
+                  onFormChange({ ...formData, storeType: e.target.value })
+                }
+                className="bg-[#1E293B] border border-gray-700 text-white text-xs rounded px-2 py-1.5 w-full focus:border-yellow-500 focus:outline-none appearance-none cursor-pointer"
+              >
+                <option value="" disabled>
+                  Select category…
+                </option>
+                {storeTypes.map((t) => (
+                  <option key={t} value={t}>
+                    {t.charAt(0) + t.slice(1).toLowerCase()}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <span>
+                {vendor.storeType
+                  ? vendor.storeType.charAt(0) + vendor.storeType.slice(1).toLowerCase()
+                  : "No category set"}
+              </span>
             )}
           </div>
 

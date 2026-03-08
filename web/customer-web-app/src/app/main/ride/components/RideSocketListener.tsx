@@ -27,6 +27,7 @@ export function RideSocketListener() {
   const setRideStatus = useRideStore((state) => state.setRideStatus);
   const setDriverLocation = useRideStore((state) => state.setDriverLocation);
   const setDriverHeading = useRideStore((state) => state.setDriverHeading);
+  const setDriverEta = useRideStore((state) => state.setDriverEta);
   const setTripSummary = useRideStore((state) => state.setTripSummary);
 
   // Track whether we've received at least one live socket location update so
@@ -72,13 +73,13 @@ export function RideSocketListener() {
 
           setDriver({
             name: driver.name,
-            photoUrl: "/profile.jpg",
+            photoUrl: driver.image || "/profile.jpg",
             vehicle: {
               make: driver.vehicle?.brand || "Vehicle",
               model: driver.vehicle?.model || "Car",
               licensePlate: driver.vehicle?.plateNumber || "---",
             },
-            rating: 5.0, // Backend doesn't send rating in this event
+            rating: driver.rating ?? null,
             phone: driver.phone,
           });
           // Post-ride payment model: go straight to 'confirmed' — payment
@@ -249,6 +250,10 @@ export function RideSocketListener() {
         if (loc && (loc.latitude !== 0 || loc.longitude !== 0)) {
           setDriverLocation({ lat: loc.latitude, lng: loc.longitude });
           if (loc.heading) setDriverHeading(loc.heading);
+          // Update backend-computed ETA
+          if (loc.etaMinutes != null && loc.distanceKm != null) {
+            setDriverEta({ minutes: loc.etaMinutes, km: loc.distanceKm });
+          }
         }
       } catch {
         // Silently ignore — socket or next poll will recover
@@ -263,6 +268,7 @@ export function RideSocketListener() {
     session?.accessToken,
     setDriverLocation,
     setDriverHeading,
+    setDriverEta,
   ]);
 
   return null;

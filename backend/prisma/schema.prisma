@@ -398,17 +398,19 @@ model Rider {
 }
 
 model RiderPayout {
-  id        String        @id @default(uuid())
-  riderId   String
-  amount    Float
-  status    PayoutStatus  @default(PENDING)
-  method    PaymentMethod @default(BANK_TRANSFER)
-  reference String?       // Transaction ID from bank/payment gateway
-  processedAt DateTime?
-  createdAt   DateTime    @default(now())
-  bankAccountId String?
-  rider        Rider         @relation(fields: [riderId], references: [id], onDelete: Cascade)
-  transactions Transaction[] // Link to transaction ledger
+  id              String        @id @default(uuid())
+  riderId         String
+  amount          Float
+  status          PayoutStatus  @default(PENDING)
+  method          PaymentMethod @default(BANK_TRANSFER)
+  reference       String?       // Transaction ID from bank/payment gateway
+  rejectionReason String?
+  processedAt     DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  bankAccountId   String?
+  rider           Rider         @relation(fields: [riderId], references: [id], onDelete: Cascade)
+  transactions    Transaction[] // Link to transaction ledger
 
   @@index([riderId, status])
   @@index([createdAt])
@@ -926,6 +928,7 @@ model Ride {
   // Trip Data
   distanceKm  Float?
   durationMin Int?
+  vehicleType String?   // ECONOMY | BUSINESS
 
   // Timestamps
   acceptedAt  DateTime?
@@ -1020,8 +1023,8 @@ model Transaction {
   
   // Reference to source transactions
   paymentId       String?   @unique
-  vendorPayoutId  String?   @unique
-  riderPayoutId   String?   @unique
+  vendorPayoutId  String?
+  riderPayoutId   String?
   
   // Reference to business entities
   orderId         String?

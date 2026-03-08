@@ -57,6 +57,16 @@ export class VendorsController {
     return this.storesService.getAllCategories();
   }
 
+  /** GET /api/v1/super-admin/vendors/store-types
+   *  Returns the valid StoreType enum values (the backend source of truth).
+   *  Must be declared BEFORE `:id` routes to avoid route collision.
+   */
+  @ApiOperation({ summary: 'Get valid store type/category values' })
+  @Get('store-types')
+  getStoreTypes() {
+    return this.storesService.getStoreTypes();
+  }
+
   @ApiOperation({ summary: 'List all vendors/stores with filters' })
   @Get()
   @UsePipes(new ValidationPipe({ transform: true }))

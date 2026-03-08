@@ -19,6 +19,12 @@ export function RatingModal() {
   const handleSubmit = async () => {
     if (isSubmitting) return;
 
+    // Require a star rating before allowing submission
+    if (!rating) {
+      toast.info('Please select a star rating before submitting.');
+      return;
+    }
+
     // Submit to backend if we have the required data
     if (rideId && rating && session?.accessToken) {
       setIsSubmitting(true);
@@ -68,7 +74,7 @@ export function RatingModal() {
         <button
           className="w-full bg-yellow-400 text-black py-4 rounded-xl font-bold text-lg hover:bg-yellow-300 transition-colors shadow-lg active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
           onClick={handleSubmit}
-          disabled={isSubmitting}
+          disabled={!rating || isSubmitting}
         >
           {isSubmitting ? 'Submitting...' : 'Submit Review'}
         </button>

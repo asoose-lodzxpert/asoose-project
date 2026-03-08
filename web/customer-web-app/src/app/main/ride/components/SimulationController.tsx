@@ -12,6 +12,10 @@ const MOCK_SPEED_KMH = 120; // Fast speed for testing
 import { RideService } from '@/services/ride.service';
 
 export function SimulationController() {
+  // Only run in development — this component polls driver location via REST
+  // as a testing aid and should never be active in production builds.
+  if (process.env.NODE_ENV === 'production') return null;
+
   const rideStatus = useRideStore((s) => s.rideStatus);
   const rideId = useRideStore((s) => s.rideId);
   const setDriverLocation = useRideStore((s) => s.setDriverLocation);

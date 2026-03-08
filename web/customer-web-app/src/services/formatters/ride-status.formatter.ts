@@ -177,8 +177,8 @@ export function mapBackendStatusToRideStage(
     // Post-ride payment: DRIVER_ACCEPTED always maps to 'confirmed' (no payment gate)
     DRIVER_ACCEPTED: 'confirmed',
     ACCEPTED: 'confirmed',
-    // PAID maps to 'confirmed' (legacy pre-ride payment rides still in progress)
-    PAID: 'confirmed',
+    // PAID = payment completed post-ride → ride is finished
+    PAID: 'finished',
     ARRIVED: 'arrived',
     IN_PROGRESS: 'in-progress',
     // Post-ride payment: COMPLETED → 'payment-required' until payment is confirmed

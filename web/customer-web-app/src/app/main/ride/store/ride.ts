@@ -43,6 +43,8 @@ interface RideState {
   rideType: RideType | null;
   driverLocation: google.maps.LatLngLiteral | null;
   driverHeading: number;
+  /** Backend-computed ETA (minutes + km to pickup or dropoff) */
+  driverEta: { minutes: number; km: number } | null;
   driver: {
     name: string;
     photoUrl: string;
@@ -82,6 +84,7 @@ interface RideState {
   setRideStatus: (status: RideStage) => void;
   setDriverLocation: (location: google.maps.LatLngLiteral) => void;
   setDriverHeading: (heading: number) => void;
+  setDriverEta: (eta: { minutes: number; km: number } | null) => void;
   setIsFollowingDriver: (isFollowing: boolean) => void;
   setRideType: (type: RideType) => void;
   setDriver: (driver: RideState["driver"]) => void;
@@ -133,6 +136,7 @@ const initialState = {
   rideType: null as RideType | null,
   driverLocation: null,
   driverHeading: 0,
+  driverEta: null,
   driver: null,
   tripSummary: null,
   rating: null,
@@ -163,6 +167,7 @@ export const useRideStore = create<RideState>()(
       setRideStatus: (status) => set({ rideStatus: status }),
       setDriverLocation: (location) => set({ driverLocation: location }),
       setDriverHeading: (heading) => set({ driverHeading: heading }),
+      setDriverEta: (eta) => set({ driverEta: eta }),
       setIsFollowingDriver: (isFollowing) =>
         set({ isFollowingDriver: isFollowing }),
       setRideType: (type) => set({ rideType: type }),
@@ -206,6 +211,7 @@ export const useRideStore = create<RideState>()(
           driver: null,
           tripSummary: null,
           driverLocation: null,
+          driverEta: null,
           geolocationError: null,
           watchId: null,
           isFollowingDriver: false,
