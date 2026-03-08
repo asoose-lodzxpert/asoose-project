@@ -91,14 +91,36 @@ export class MarketplaceController {
     return this.marketplaceService.getPaginatedStores(page, safeLimit, type);
   }
 
-  @ApiOperation({ summary: 'Get product details by ID' })
-  @Get('products/:id')
-  async getProduct(@Param('id') id: string) {
-    const product = await this.marketplaceService.getProductById(id);
+  @ApiOperation({ summary: 'Get product details by ID or slug' })
+  @Get('products/:idOrSlug')
+  async getProduct(@Param('idOrSlug') idOrSlug: string) {
+    const product = await this.marketplaceService.getProductById(idOrSlug);
     if (!product) {
-      throw new NotFoundException(`Product not found: ${id}`);
+      throw new NotFoundException(`Product not found: ${idOrSlug}`);
     }
     return product;
+  }
+
+  @ApiOperation({ summary: 'Get other products from the same store' })
+  @Get('products/:idOrSlug/store-items')
+  async getProductStoreItems(@Param('idOrSlug') idOrSlug: string) {
+    const product = await this.marketplaceService.getProductById(idOrSlug);
+    if (!product) throw new NotFoundException(`Product not found: ${idOrSlug}`);
+    return this.marketplaceService.getStoreProducts(
+      product.store.id,
+      product.id,
+    );
+  }
+
+  @ApiOperation({ summary: 'Get related products in the same category' })
+  @Get('products/:idOrSlug/related')
+  async getRelatedProducts(@Param('idOrSlug') idOrSlug: string) {
+    const product = await this.marketplaceService.getProductById(idOrSlug);
+    if (!product) throw new NotFoundException(`Product not found: ${idOrSlug}`);
+    return this.marketplaceService.getRelatedProducts(
+      product.category.id,
+      product.id,
+    );
   }
 
   @ApiOperation({ summary: 'Create or update a store review' })

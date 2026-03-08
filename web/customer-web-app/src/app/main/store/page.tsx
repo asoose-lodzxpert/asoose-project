@@ -305,7 +305,7 @@ function StorePage() {
               <div className="flex justify-between items-center mb-4 px-1">
                 <h2 className="text-lg font-bold">Categories</h2>
                 <Link
-                  href="/main/store/categories"
+                  href="/main/store"
                   className="text-yellow-600 dark:text-yellow-500 text-xs font-bold hover:underline"
                 >
                   View All
