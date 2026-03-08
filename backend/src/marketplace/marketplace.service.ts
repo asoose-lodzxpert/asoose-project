@@ -310,6 +310,7 @@ export class MarketplaceService {
       deliveryTime: `${store.prepTime || 20} - ${(store.prepTime || 20) + 15} mins`,
       products: store.products.map((p) => ({
         id: p.id,
+        slug: p.slug,
         name: p.name,
         price: p.price,
         // Return all valid HTTPS URLs — filter out device-local file:// URIs
@@ -397,9 +398,10 @@ export class MarketplaceService {
     });
   }
 
-  async getProductById(id: string) {
-    const product = await this.prisma.product.findUnique({
-      where: { id },
+  async getProductById(idOrSlug: string) {
+    const isId = isUUID(idOrSlug);
+    const product = await this.prisma.product.findFirst({
+      where: isId ? { id: idOrSlug } : { slug: idOrSlug },
       select: {
         id: true,
         name: true,
@@ -461,6 +463,51 @@ export class MarketplaceService {
           ? resolvedImages
           : ['https://via.placeholder.com/400'],
     };
+  }
+
+  /** Returns other active products from the same store, excluding the given product. */
+  async getStoreProducts(storeId: string, excludeProductId: string, limit = 8) {
+    const products = await this.prisma.product.findMany({
+      where: { storeId, id: { not: excludeProductId }, status: 'ACTIVE' },
+      take: limit,
+      orderBy: { salesCount: 'desc' },
+      select: {
+        id: true, slug: true, name: true, price: true, images: true,
+        category: { select: { name: true } },
+      },
+    });
+
+    return Promise.all(
+      products.map(async (p) => ({
+        ...p,
+        images: (
+          await Promise.all(p.images.map((k) => this.resolveImage(k)))
+        ).filter((u): u is string => !!u),
+      })),
+    );
+  }
+
+  /** Returns products in the same category, excluding the given product. */
+  async getRelatedProducts(categoryId: string, excludeProductId: string, limit = 8) {
+    const products = await this.prisma.product.findMany({
+      where: { categoryId, id: { not: excludeProductId }, status: 'ACTIVE' },
+      take: limit,
+      orderBy: { salesCount: 'desc' },
+      select: {
+        id: true, slug: true, name: true, price: true, images: true,
+        store: { select: { id: true, name: true, slug: true } },
+        category: { select: { name: true } },
+      },
+    });
+
+    return Promise.all(
+      products.map(async (p) => ({
+        ...p,
+        images: (
+          await Promise.all(p.images.map((k) => this.resolveImage(k)))
+        ).filter((u): u is string => !!u),
+      })),
+    );
   }
 
   /** Guideline 1.2 — submit a UGC content report */

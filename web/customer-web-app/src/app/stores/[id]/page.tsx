@@ -28,6 +28,7 @@ interface ModifierGroup {
 
 interface Product {
   id: string;
+  slug?: string;
   name: string;
   description?: string;
   price: number;
@@ -209,12 +210,12 @@ function buildProductListSchema(store: StoreDetail, storeUrl: string) {
       return {
         "@type": "ListItem",
         position: i + 1,
-        url: `${SITE_URL}/stores/${storeSlug}/product/${p.id}`,
+        url: `${SITE_URL}/product/${p.slug ?? p.id}`,
         item: {
           "@type": "Product",
           name: p.name,
           description: p.description,
-          url: `${SITE_URL}/stores/${storeSlug}/product/${p.id}`,
+          url: `${SITE_URL}/product/${p.slug ?? p.id}`,
           ...(productImage && { image: productImage }),
           ...(p.category?.name && { category: p.category.name }),
           offers: {

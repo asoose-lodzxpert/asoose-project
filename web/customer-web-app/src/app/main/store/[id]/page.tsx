@@ -23,6 +23,7 @@ const POPULAR_ITEMS_COUNT = 6;
 
 interface Product {
   id: string;
+  slug: string;
   name: string;
   price: number;
   category: { name: string };
@@ -286,7 +287,7 @@ export default function StorePage() {
                         key={item.id}
                         {...item}
                         storeId={store.id}
-                        href={`/main/store/${slugOrId}/product/${item.id}`}
+                        href={item.slug ? `/product/${item.slug}` : `/main/store/${slugOrId}/product/${item.id}`}
                         onClick={() => setSelectedProduct(item)}
                       />
                     ))}

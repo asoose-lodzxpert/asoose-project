@@ -12,6 +12,7 @@ import {
 
 interface PublicProduct {
   id: string;
+  slug?: string;
   name: string;
   description?: string;
   price: number;
@@ -49,7 +50,7 @@ function PublicProductCard({
     <article className="relative bg-white dark:bg-[#151515] rounded-2xl border border-gray-100 dark:border-white/5 shadow-sm hover:shadow-md hover:border-orange-500/30 transition-all group">
       {/* Card body â€” navigates to product detail page */}
       <Link
-        href={`/stores/${storeId}/product/${product.id}`}
+        href={product.slug ? `/product/${product.slug}` : `/stores/${storeId}/product/${product.id}`}
         className="flex gap-4 p-3"
         aria-label={`View ${product.name} details`}
       >
