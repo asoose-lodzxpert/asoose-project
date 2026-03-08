@@ -3,10 +3,8 @@
 import { useState, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { ArrowLeft, ShoppingBag, Plus, ShoppingCart, Loader2 } from "lucide-react";
+import { ShoppingBag, Plus, Loader2 } from "lucide-react";
 import { toast } from "react-toastify";
-import { FloatingCart } from "@/app/main/components/home/FloatingCart";
-import BottomNav from "@/app/main/components/layout/BottomNav";
 import { useCartStore } from "@/store/useCartStore";
 import { ApiService } from "@/services/api.service";
 
@@ -168,33 +166,7 @@ export default function ProductDetailClient({ product }: { product: Product }) {
       : `Add to Order · ₦${totalPrice.toLocaleString()}`;
 
   return (
-    <div className="min-h-screen bg-[#f5f5f5] dark:bg-[#0a0a0a] text-gray-900 dark:text-gray-100">
-      {/* Sticky top bar */}
-      <header className="sticky top-0 z-40 bg-white/90 dark:bg-[#111]/90 backdrop-blur border-b border-gray-100 dark:border-white/5">
-        <div className="max-w-6xl mx-auto px-4 h-14 flex items-center gap-3">
-          <button
-            onClick={() => router.back()}
-            className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-white/10 transition-colors flex-shrink-0"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <span className="font-bold truncate flex-1 text-sm sm:text-base">
-            {product.name}
-          </span>
-          <button
-            onClick={handleAddToOrder}
-            aria-label="Add to cart"
-            className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-white/10 transition-colors flex-shrink-0"
-          >
-            {isSubmitting ? (
-              <Loader2 className="w-5 h-5 animate-spin" />
-            ) : (
-              <ShoppingCart className="w-5 h-5" />
-            )}
-          </button>
-        </div>
-      </header>
-
+    <div className="text-gray-900 dark:text-gray-100">
       <div className="max-w-6xl mx-auto pb-32">
         {/* Main 2-column grid */}
         <div className="lg:grid lg:grid-cols-[1fr_420px] lg:gap-6 lg:p-6">
@@ -227,7 +199,7 @@ export default function ProductDetailClient({ product }: { product: Product }) {
           <div className="hidden lg:flex flex-col gap-4">
             {product.store && <StoreCard store={product.store} />}
 
-            <div className="sticky top-20 space-y-3">
+            <div className="sticky top-[72px] space-y-3">
               {/* Add to Order card */}
               <div className="bg-white dark:bg-[#151515] rounded-2xl p-5">
                 <div className="mb-3">
@@ -310,9 +282,6 @@ export default function ProductDetailClient({ product }: { product: Product }) {
           {!isSubmitting && <Plus className="w-4 h-4" />}
         </button>
       </div>
-
-      <FloatingCart />
-      <BottomNav />
 
       {/* Modifier bottom sheet — only shown when required selections are missing */}
       {modifierGroups.length > 0 && (
