@@ -123,6 +123,17 @@ export class MarketplaceController {
     );
   }
 
+  @ApiOperation({ summary: 'Get real-time availability of a vendor/store' })
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
+  @Get(['vendor/:id/availability', 'restaurant/:id/availability'])
+  async getVendorAvailability(@Param('id') id: string) {
+    const result = await this.marketplaceService.getVendorAvailability(id);
+    if (!result) {
+      throw new NotFoundException(`Vendor not found: ${id}`);
+    }
+    return result;
+  }
+
   @ApiOperation({ summary: 'Create or update a store review' })
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)

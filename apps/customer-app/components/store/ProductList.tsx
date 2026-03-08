@@ -11,12 +11,15 @@ export function ProductList({
   isRestaurant,
   onAddToCart,
   loading = false,
+  disabled = false,
 }: {
   products: Product[];
   isRestaurant: boolean;
   onAddToCart?: (productId: string) => void;
   loading?: boolean;
   vendorId: string;
+  /** When true the add-to-cart button is visually muted and non-functional */
+  disabled?: boolean;
 }) {
   const router = useRouter();
   const primary = useThemeColor({}, "brandPrimary");
@@ -72,11 +75,16 @@ export function ProductList({
               ₦{item.price?.toFixed(2) || "0.00"}
             </ThemedText>
             <TouchableOpacity
-              style={[styles.addButton, { backgroundColor: primary }]}
+              style={[
+                styles.addButton,
+                { backgroundColor: disabled ? '#9ca3af' : primary },
+              ]}
               onPress={(e) => {
                 e.stopPropagation();
-                onAddToCart?.(item.id);
+                if (!disabled) onAddToCart?.(item.id);
               }}
+              disabled={disabled}
+              activeOpacity={disabled ? 1 : 0.7}
             >
               <ThemedText style={[styles.addButtonText, { color: "#FFF" }]}>
                 +

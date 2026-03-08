@@ -20,6 +20,7 @@ import { InventoryService } from './inventory.service';
 import { VendorOrdersStreamService } from '../vendor/orders/vendor-orders-stream.service';
 import { NotificationsGateway } from '../notifications/notifications.gateway';
 import { QueueService } from '../matching/queue/queue.service';
+import { isStoreCurrentlyOpen } from '../shared/vendor-availability.util';
 // ==================== CONSTANTS ====================
 
 const ORDER_STATUS = { PENDING: 'PENDING' } as const;
@@ -109,7 +110,7 @@ export class OrdersService {
       const [store, address] = await Promise.all([
         this.prisma.store.findUnique({
           where: { id: restaurantId },
-          select: { lat: true, lng: true, name: true },
+          select: { lat: true, lng: true, name: true, isOpen: true, openHours: true, openingHours: true },
         }),
         this.prisma.address.findUnique({
           where: { id: addressId },
@@ -118,6 +119,12 @@ export class OrdersService {
 
       if (!store) {
         throw new NotFoundException('Store not found');
+      }
+
+      // ── Availability guard ──────────────────────────────────────────
+      const quoteAvailability = isStoreCurrentlyOpen(store);
+      if (!quoteAvailability.open) {
+        throw new BadRequestException(quoteAvailability.message);
       }
 
       if (!address || address.userId !== userId) {
@@ -254,6 +261,20 @@ export class OrdersService {
       for (const [storeId, groupItems] of storeGroups) {
         const firstProduct = productMap.get(groupItems[0].id)!;
         const store = firstProduct.store;
+
+        // ── Availability guard (fetch fresh availability fields) ────
+        const storeAvail = await this.prisma.store.findUnique({
+          where: { id: storeId },
+          select: { isOpen: true, openHours: true, openingHours: true, name: true },
+        });
+        if (storeAvail) {
+          const avail = isStoreCurrentlyOpen(storeAvail);
+          if (!avail.open) {
+            throw new BadRequestException(
+              `${storeAvail.name}: ${avail.message}`,
+            );
+          }
+        }
         let subtotal = 0;
         const enrichedItems = groupItems.map((item) => {
           const p = productMap.get(item.id)!;
@@ -1079,6 +1100,20 @@ export class OrdersService {
       storeEntries.map(async ([storeId, groupItems]) => {
         const firstProduct = productMap.get(groupItems[0].id)!;
         const store = firstProduct.store;
+
+        // ── Availability guard ──────────────────────────────────────
+        const storeAvail = await this.prisma.store.findUnique({
+          where: { id: storeId },
+          select: { isOpen: true, openHours: true, openingHours: true, name: true },
+        });
+        if (storeAvail) {
+          const avail = isStoreCurrentlyOpen(storeAvail);
+          if (!avail.open) {
+            throw new BadRequestException(
+              `${storeAvail.name}: ${avail.message}`,
+            );
+          }
+        }
 
         if (store.lat == null || store.lng == null) {
           this.logger.warn(

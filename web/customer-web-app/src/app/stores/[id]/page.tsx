@@ -53,6 +53,13 @@ interface StoreDetail {
   description?: string;
   deliveryFee?: number;
   products: Product[];
+  /** Whether the vendor has manually toggled the store online */
+  isOpen?: boolean;
+  /** True only when isOpen=true AND current time is within opening hours */
+  isCurrentlyOpen?: boolean;
+  /** Backend-generated human-readable closed message */
+  closedMessage?: string | null;
+  closedReason?: string | null;
   reviews?: {
     id: string;
     rating: number;
@@ -368,12 +375,18 @@ export default async function StoreDetailPage({
 
         {/* CTA */}
         <section className="max-w-5xl mx-auto px-4 py-3">
-          <Link
-            href={`/sign-in?callbackUrl=/main/store/${store.slug ?? store.id}`}
-            className="inline-flex items-center gap-2 rounded-full bg-orange-500 px-5 py-2 text-sm font-semibold text-white hover:bg-orange-600 transition-colors"
-          >
-            Order from {store.name} â†’
-          </Link>
+          {store.isCurrentlyOpen === false ? (
+            <div className="inline-flex items-center gap-2 rounded-full bg-red-100 dark:bg-red-900/30 border border-red-200 dark:border-red-700 px-5 py-2 text-sm font-semibold text-red-700 dark:text-red-400">
+              {store.closedReason === "MANUAL_CLOSE" ? "🔴 Store Temporarily Closed" : "🕐 Outside Opening Hours"}
+            </div>
+          ) : (
+            <Link
+              href={`/sign-in?callbackUrl=/main/store/${store.slug ?? store.id}`}
+              className="inline-flex items-center gap-2 rounded-full bg-orange-500 px-5 py-2 text-sm font-semibold text-white hover:bg-orange-600 transition-colors"
+            >
+              Order from {store.name} →
+            </Link>
+          )}
         </section>
 
         {/* Products â€” client component handles card clicks + modal */}
@@ -382,6 +395,9 @@ export default async function StoreDetailPage({
             storeId={storeSlug}
             storeName={store.name}
             byCategory={byCategory}
+            isCurrentlyOpen={store.isCurrentlyOpen}
+            closedReason={store.closedReason ?? undefined}
+            closedMessage={store.closedMessage ?? undefined}
           />
         </section>
       </main>

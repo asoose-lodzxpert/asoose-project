@@ -256,8 +256,26 @@ export default function CheckoutScreen() {
       setPaymentUrl(paymentResponse.authorizationUrl);
       setPaymentReference(paymentResponse.reference);
       setShowPaymentWebView(true);
-    } catch (error) {
-      Toast.show({ type: "error", text1: "Payment initialization failed" });
+    } catch (error: any) {
+      // Surface backend messages (e.g. store closed / outside hours)
+      const serverMessage =
+        error?.response?.data?.message ||
+        error?.data?.message ||
+        error?.message ||
+        "";
+
+      const isAvailabilityError =
+        serverMessage.toLowerCase().includes("closed") ||
+        serverMessage.toLowerCase().includes("operating hours") ||
+        serverMessage.toLowerCase().includes("temporarily");
+
+      Toast.show({
+        type: "error",
+        text1: isAvailabilityError ? "Store Unavailable" : "Payment initialization failed",
+        text2: serverMessage || undefined,
+        visibilityTime: 5000,
+      });
+
       if (__DEV__)
         console.error("Error during order/payment initialization:", error);
     } finally {
