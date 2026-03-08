@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import { useState } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Plus } from "lucide-react";
 import {
@@ -46,24 +46,27 @@ function PublicProductCard({
   onAddClick: (p: PublicProduct) => void;
   storeClosed?: boolean;
 }) {
+  const router = useRouter();
   const image =
     product.image ??
     (Array.isArray(product.images) && product.images.length > 0
       ? product.images[0]
       : null);
 
+  const href =
+    product.slug
+      ? `/product/${product.slug}`
+      : `/stores/${storeId}/product/${product.id}`;
+
   return (
-    <article className="relative bg-white dark:bg-[#151515] rounded-2xl border border-gray-100 dark:border-white/5 shadow-sm hover:shadow-md hover:border-orange-500/30 transition-all group">
+    <article
+      className="relative bg-white dark:bg-[#151515] rounded-2xl border border-gray-100 dark:border-white/5 shadow-sm hover:shadow-md hover:border-orange-500/30 transition-all group cursor-pointer"
+      onClick={() => router.push(href)}
+      role="link"
+      aria-label={`View ${product.name} details`}
+    >
       {/* Card body â€” navigates to product detail page */}
-      <Link
-        href={
-          product.slug
-            ? `/product/${product.slug}`
-            : `/stores/${storeId}/product/${product.id}`
-        }
-        className="flex gap-4 p-3"
-        aria-label={`View ${product.name} details`}
-      >
+      <div className="flex gap-4 p-3">
         {/* Image */}
         <div className="w-24 h-24 sm:w-28 sm:h-28 bg-gray-100 dark:bg-white/5 rounded-xl flex-shrink-0 overflow-hidden relative">
           {image?.startsWith("http") ? (
@@ -102,12 +105,11 @@ function PublicProductCard({
             <span className="w-9" />
           </div>
         </div>
-      </Link>
+      </div>
 
       {/* "+" button â€” stops propagation so it doesn't trigger navigation */}
       <button
         onClick={(e) => {
-          e.preventDefault();
           e.stopPropagation();
           if (!storeClosed) onAddClick(product);
         }}

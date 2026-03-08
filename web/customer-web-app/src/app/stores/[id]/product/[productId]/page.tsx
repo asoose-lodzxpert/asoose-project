@@ -352,7 +352,7 @@ export default async function ProductDetailPage({
           <div className="bg-white dark:bg-gray-900 rounded-2xl overflow-hidden shadow-sm border border-gray-100 dark:border-gray-800">
             <div className="md:flex">
               {/* Image */}
-              <div className="relative h-72 md:h-auto md:w-80 md:flex-shrink-0 bg-gray-100 dark:bg-gray-800">
+              <div className="relative h-52 sm:h-64 md:h-auto md:w-64 md:flex-shrink-0 bg-gray-100 dark:bg-gray-800">
                 {primaryImage ? (
                   <Image
                     src={primaryImage}
