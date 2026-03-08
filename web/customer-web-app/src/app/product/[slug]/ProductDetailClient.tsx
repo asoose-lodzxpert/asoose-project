@@ -115,14 +115,7 @@ export default function ProductDetailClient({ product }: { product: Product }) {
         setIsSubmitting(false);
       }
     },
-    [
-      isSubmitting,
-      session,
-      product,
-      modifierGroups,
-      totalPrice,
-      addItem,
-    ],
+    [isSubmitting, session, product, modifierGroups, totalPrice, addItem],
   );
 
   // ── "Add to Order" click handler ─────────────────────────────────────────

@@ -157,13 +157,19 @@ export function ProductInfo({
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {group.modifiers.map((mod) => {
-                      const selected = (selectedModifiers[group.id] || []).includes(mod.id);
+                      const selected = (
+                        selectedModifiers[group.id] || []
+                      ).includes(mod.id);
                       if (isInteractive) {
                         return (
                           <button
                             key={mod.id}
                             onClick={() =>
-                              onToggleModifier!(group.id, mod.id, group.maxSelect)
+                              onToggleModifier!(
+                                group.id,
+                                mod.id,
+                                group.maxSelect,
+                              )
                             }
                             className={`flex items-center gap-1.5 rounded-xl px-3 py-2 border text-xs font-semibold transition-all ${
                               selected

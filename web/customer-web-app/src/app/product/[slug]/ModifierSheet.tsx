@@ -32,9 +32,8 @@ export function ModifierSheet({
   basePrice,
   isSubmitting = false,
 }: ModifierSheetProps) {
-  const [selections, setSelections] = useState<Record<string, string[]>>(
-    initialSelections,
-  );
+  const [selections, setSelections] =
+    useState<Record<string, string[]>>(initialSelections);
 
   // Re-sync whenever the sheet is opened (in case inline selections changed)
   useEffect(() => {
