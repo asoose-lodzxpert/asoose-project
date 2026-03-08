@@ -11,6 +11,7 @@ import {
   Plus,
   ChevronDown,
   ChevronUp,
+  ChevronLeft,
   Store,
   Package,
   ChevronRight,
@@ -142,6 +143,24 @@ export default function ProductDetailClient({ product }: { product: Product }) {
   const [descExpanded, setDescExpanded] = useState(false);
   const [storeItems, setStoreItems] = useState<MiniProduct[]>([]);
   const [relatedItems, setRelatedItems] = useState<MiniProduct[]>([]);
+  const [touchStartX, setTouchStartX] = useState<number | null>(null);
+
+  // Only use valid HTTP(S) images
+  const images = (product.images ?? []).filter((u) => u?.startsWith("http"));
+
+  const goTo = (idx: number) =>
+    setActiveImg((idx + images.length) % images.length);
+  const prevImg = () => goTo(activeImg - 1);
+  const nextImg = () => goTo(activeImg + 1);
+
+  const handleTouchStart = (e: React.TouchEvent) =>
+    setTouchStartX(e.touches[0].clientX);
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartX === null) return;
+    const dx = e.changedTouches[0].clientX - touchStartX;
+    if (Math.abs(dx) > 40) dx < 0 ? nextImg() : prevImg();
+    setTouchStartX(null);
+  };
 
   const fetchSidebar = useCallback(async () => {
     try {
@@ -164,7 +183,6 @@ export default function ProductDetailClient({ product }: { product: Product }) {
     fetchSidebar();
   }, [fetchSidebar]);
 
-  const images = product.images?.length ? product.images : [];
   const storeId = product.store?.id ?? "";
 
   const modalProduct = {
@@ -211,15 +229,21 @@ export default function ProductDetailClient({ product }: { product: Product }) {
           <div className="space-y-3">
             {/* Image gallery */}
             <div className="bg-white dark:bg-[#151515] lg:rounded-2xl overflow-hidden">
-              {/* Main image */}
-              <div className="relative w-full aspect-square sm:aspect-[4/3] md:aspect-[16/9] lg:aspect-square bg-gray-100 dark:bg-white/5">
+              {/* ── Main image ───────────────────────────────────────────── */}
+              <div
+                className="relative w-full aspect-square bg-gray-100 dark:bg-white/5 select-none"
+                onTouchStart={handleTouchStart}
+                onTouchEnd={handleTouchEnd}
+              >
                 {images.length > 0 ? (
                   <Image
+                    key={images[activeImg]}
                     src={images[activeImg]}
-                    alt={product.name}
+                    alt={`${product.name} – photo ${activeImg + 1}`}
                     fill
                     priority
-                    className="object-contain"
+                    sizes="(max-width: 1024px) 100vw, 55vw"
+                    className="object-cover transition-opacity duration-200"
                   />
                 ) : (
                   <div className="w-full h-full flex flex-col items-center justify-center gap-3 text-gray-300 dark:text-white/20">
@@ -228,31 +252,50 @@ export default function ProductDetailClient({ product }: { product: Product }) {
                   </div>
                 )}
 
-                {/* Image counter badge */}
+                {/* Left / Right arrow navigation */}
                 {images.length > 1 && (
-                  <span className="absolute bottom-3 right-3 bg-black/50 text-white text-xs px-2.5 py-1 rounded-full backdrop-blur-sm">
-                    {activeImg + 1} / {images.length}
-                  </span>
+                  <>
+                    <button
+                      onClick={prevImg}
+                      aria-label="Previous image"
+                      className="absolute left-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/40 hover:bg-black/65 text-white flex items-center justify-center backdrop-blur-sm transition-colors z-10"
+                    >
+                      <ChevronLeft className="w-5 h-5" />
+                    </button>
+                    <button
+                      onClick={nextImg}
+                      aria-label="Next image"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/40 hover:bg-black/65 text-white flex items-center justify-center backdrop-blur-sm transition-colors z-10"
+                    >
+                      <ChevronRight className="w-5 h-5" />
+                    </button>
+
+                    {/* Counter badge */}
+                    <span className="absolute bottom-3 right-3 bg-black/50 text-white text-xs px-2.5 py-1 rounded-full backdrop-blur-sm pointer-events-none">
+                      {activeImg + 1} / {images.length}
+                    </span>
+                  </>
                 )}
               </div>
 
-              {/* Thumbnail filmstrip */}
+              {/* ── Thumbnail strip ──────────────────────────────────────── */}
               {images.length > 1 && (
-                <div className="flex gap-2 p-3 overflow-x-auto">
+                <div className="flex gap-2 px-3 py-3 overflow-x-auto scrollbar-hide">
                   {images.map((img, i) => (
                     <button
                       key={i}
                       onClick={() => setActiveImg(i)}
-                      className={`relative flex-shrink-0 w-16 h-16 rounded-xl overflow-hidden border-2 transition-all ${
+                      className={`relative flex-shrink-0 rounded-xl overflow-hidden border-2 transition-all duration-200 ${
                         activeImg === i
-                          ? "border-yellow-500 scale-105"
-                          : "border-transparent opacity-60 hover:opacity-100"
+                          ? "w-[72px] h-[72px] border-yellow-500 shadow-md shadow-yellow-500/25 opacity-100"
+                          : "w-14 h-14 border-transparent opacity-55 hover:opacity-90 hover:border-gray-300 dark:hover:border-white/20"
                       }`}
                     >
                       <Image
                         src={img}
-                        alt={`${product.name} ${i + 1}`}
+                        alt={`${product.name} thumbnail ${i + 1}`}
                         fill
+                        sizes="72px"
                         className="object-cover"
                       />
                     </button>
