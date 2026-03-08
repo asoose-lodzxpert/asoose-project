@@ -271,7 +271,9 @@ export default function CheckoutScreen() {
 
       Toast.show({
         type: "error",
-        text1: isAvailabilityError ? "Store Unavailable" : "Payment initialization failed",
+        text1: isAvailabilityError
+          ? "Store Unavailable"
+          : "Payment initialization failed",
         text2: serverMessage || undefined,
         visibilityTime: 5000,
       });

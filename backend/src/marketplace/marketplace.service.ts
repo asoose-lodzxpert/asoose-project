@@ -398,7 +398,9 @@ export class MarketplaceService {
     return '/icons/default.png';
   }
 
-  private mapStoresToVendors(stores: (Partial<Store> & { openingHours?: any[] })[]) {
+  private mapStoresToVendors(
+    stores: (Partial<Store> & { openingHours?: any[] })[],
+  ) {
     return stores.map((store) => {
       const availability = isStoreCurrentlyOpen({
         isOpen: store.isOpen ?? true,

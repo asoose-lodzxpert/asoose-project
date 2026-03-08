@@ -51,7 +51,12 @@ export type StoreData = {
   /** True only if isOpen=true AND current time falls within openingHours/openHours */
   isCurrentlyOpen: boolean;
   /** Why the store is closed; null when open */
-  closedReason?: 'MANUAL_CLOSE' | 'OUTSIDE_HOURS' | 'NO_SCHEDULE' | 'OPEN' | null;
+  closedReason?:
+    | "MANUAL_CLOSE"
+    | "OUTSIDE_HOURS"
+    | "NO_SCHEDULE"
+    | "OPEN"
+    | null;
   /** Human-readable closed message returned by the server */
   closedMessage?: string | null;
 };

@@ -112,13 +112,19 @@ function PublicProductCard({
           if (!storeClosed) onAddClick(product);
         }}
         disabled={storeClosed}
-        title={storeClosed ? "Store is currently closed" : `Add ${product.name} to cart`}
+        title={
+          storeClosed
+            ? "Store is currently closed"
+            : `Add ${product.name} to cart`
+        }
         className={`absolute bottom-3 right-3 w-8 h-8 rounded-full flex items-center justify-center transition-colors z-10 ${
           storeClosed
             ? "bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-not-allowed"
             : "bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-white hover:bg-orange-500 hover:text-white"
         }`}
-        aria-label={storeClosed ? "Store closed" : `Add ${product.name} to cart`}
+        aria-label={
+          storeClosed ? "Store closed" : `Add ${product.name} to cart`
+        }
       >
         <Plus className="w-4 h-4" />
       </button>

@@ -77,7 +77,7 @@ export function ProductList({
             <TouchableOpacity
               style={[
                 styles.addButton,
-                { backgroundColor: disabled ? '#9ca3af' : primary },
+                { backgroundColor: disabled ? "#9ca3af" : primary },
               ]}
               onPress={(e) => {
                 e.stopPropagation();

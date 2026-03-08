@@ -75,7 +75,12 @@ async function getProduct(productId: string): Promise<ProductDetail | null> {
 
 async function getStoreReviews(
   storeSlugOrId: string,
-): Promise<{ reviews: StoreReview[]; storeRating: number; isCurrentlyOpen?: boolean; closedMessage?: string | null }> {
+): Promise<{
+  reviews: StoreReview[];
+  storeRating: number;
+  isCurrentlyOpen?: boolean;
+  closedMessage?: string | null;
+}> {
   try {
     const res = await fetch(`${API_URL}/marketplace/vendor/${storeSlugOrId}`, {
       next: { revalidate: 3600 },
@@ -273,10 +278,8 @@ export default async function ProductDetailPage({
 }) {
   const { id: storeId, productId } = await params;
 
-  const [product, { reviews, storeRating, isCurrentlyOpen, closedMessage }] = await Promise.all([
-    getProduct(productId),
-    getStoreReviews(storeId),
-  ]);
+  const [product, { reviews, storeRating, isCurrentlyOpen, closedMessage }] =
+    await Promise.all([getProduct(productId), getStoreReviews(storeId)]);
 
   if (!product) notFound();
 

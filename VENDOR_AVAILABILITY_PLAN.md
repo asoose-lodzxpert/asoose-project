@@ -11,24 +11,24 @@
 
 The `Store` model already holds both availability signals:
 
-| Field | Location | Meaning |
-|---|---|---|
-| `isOpen` | `Store.isOpen: Boolean` | Manual toggle — vendor switches themselves online/offline |
-| `openHours` | `Store.openHours: Json?` | Weekly schedule (JSON blob from signup) |
+| Field          | Location                            | Meaning                                                    |
+| -------------- | ----------------------------------- | ---------------------------------------------------------- |
+| `isOpen`       | `Store.isOpen: Boolean`             | Manual toggle — vendor switches themselves online/offline  |
+| `openHours`    | `Store.openHours: Json?`            | Weekly schedule (JSON blob from signup)                    |
 | `openingHours` | `Store.openingHours: OpeningHour[]` | Structured relation — `dayOfWeek`, `openTime`, `closeTime` |
 
 ### 1.2 Where the Gap Is
 
-| Layer | What Happens Today | What Should Happen |
-|---|---|---|
-| **Backend — Marketplace listing** | Stores shown if `status=ACTIVE` + `verification=VERIFIED` only. `isOpen` and `openingHours` are never checked. | Filter out closed stores **or** return them with an `isOpen` flag so the UI can grey them out. |
-| **Backend — `getVendorDetails`** | Returns the store page regardless of `isOpen` or schedule. Does **not** include `isOpen` in the response. | Include `isOpen` / `isCurrentlyOpen` in the response payload. |
-| **Backend — `createOrder` / `prepareOrderContext`** | Fetches products and creates orders with no check on whether the store is open. | **Hard-block**: throw `BadRequestException` if the store is not open at order time. |
-| **Backend — `calculateQuote`** | Same — no availability check. | Reject quote if store is closed. |
-| **Customer App — Store Screen** | Calls `fetchStoreBySlug`, which maps to `getVendorDetails`. The response never includes `isOpen`. UI never shows closed state. | Show a "Closed" banner; disable "Add to Cart" button. |
-| **Customer App — Cart / Checkout** | Places the order without cross-checking store availability. | Re-validate before calling `createOrder`. |
-| **Customer Web App — Store Page** | Fetches the same `getVendorDetails` endpoint. `StorePageClient` shows the "+" button unconditionally. | Same — show closed banner, disable add/order button. |
-| **Customer Web App — `AddToOrderButton`** | No guard at all. | Blocked when store is closed. |
+| Layer                                               | What Happens Today                                                                                                             | What Should Happen                                                                             |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------- |
+| **Backend — Marketplace listing**                   | Stores shown if `status=ACTIVE` + `verification=VERIFIED` only. `isOpen` and `openingHours` are never checked.                 | Filter out closed stores **or** return them with an `isOpen` flag so the UI can grey them out. |
+| **Backend — `getVendorDetails`**                    | Returns the store page regardless of `isOpen` or schedule. Does **not** include `isOpen` in the response.                      | Include `isOpen` / `isCurrentlyOpen` in the response payload.                                  |
+| **Backend — `createOrder` / `prepareOrderContext`** | Fetches products and creates orders with no check on whether the store is open.                                                | **Hard-block**: throw `BadRequestException` if the store is not open at order time.            |
+| **Backend — `calculateQuote`**                      | Same — no availability check.                                                                                                  | Reject quote if store is closed.                                                               |
+| **Customer App — Store Screen**                     | Calls `fetchStoreBySlug`, which maps to `getVendorDetails`. The response never includes `isOpen`. UI never shows closed state. | Show a "Closed" banner; disable "Add to Cart" button.                                          |
+| **Customer App — Cart / Checkout**                  | Places the order without cross-checking store availability.                                                                    | Re-validate before calling `createOrder`.                                                      |
+| **Customer Web App — Store Page**                   | Fetches the same `getVendorDetails` endpoint. `StorePageClient` shows the "+" button unconditionally.                          | Same — show closed banner, disable add/order button.                                           |
+| **Customer Web App — `AddToOrderButton`**           | No guard at all.                                                                                                               | Blocked when store is closed.                                                                  |
 
 ---
 
@@ -69,49 +69,63 @@ function isStoreCurrentlyOpen(store: {
   openingHours: { dayOfWeek: number; openTime: string; closeTime: string }[];
   openHours?: any;
   timezone?: string; // optional — default to Africa/Lagos
-}): { open: boolean; reason: 'MANUAL_CLOSE' | 'OUTSIDE_HOURS' | 'NO_SCHEDULE' | 'OPEN' } {
-  if (!store.isOpen) return { open: false, reason: 'MANUAL_CLOSE' };
+}): {
+  open: boolean;
+  reason: "MANUAL_CLOSE" | "OUTSIDE_HOURS" | "NO_SCHEDULE" | "OPEN";
+} {
+  if (!store.isOpen) return { open: false, reason: "MANUAL_CLOSE" };
 
-  const tz = store.timezone ?? 'Africa/Lagos';
-  const now = new Date(new Date().toLocaleString('en-US', { timeZone: tz }));
+  const tz = store.timezone ?? "Africa/Lagos";
+  const now = new Date(new Date().toLocaleString("en-US", { timeZone: tz }));
   const dayOfWeek = now.getDay(); // 0=Sun
   const currentMinutes = now.getHours() * 60 + now.getMinutes();
 
   // --- Structured openingHours ---
   if (store.openingHours.length > 0) {
-    const todayHours = store.openingHours.find(h => h.dayOfWeek === dayOfWeek);
-    if (!todayHours) return { open: false, reason: 'OUTSIDE_HOURS' }; // day not configured = closed
-    const [oH, oM] = todayHours.openTime.split(':').map(Number);
-    const [cH, cM] = todayHours.closeTime.split(':').map(Number);
+    const todayHours = store.openingHours.find(
+      (h) => h.dayOfWeek === dayOfWeek,
+    );
+    if (!todayHours) return { open: false, reason: "OUTSIDE_HOURS" }; // day not configured = closed
+    const [oH, oM] = todayHours.openTime.split(":").map(Number);
+    const [cH, cM] = todayHours.closeTime.split(":").map(Number);
     const openMin = oH * 60 + oM;
     const closeMin = cH * 60 + cM;
     if (currentMinutes < openMin || currentMinutes >= closeMin) {
-      return { open: false, reason: 'OUTSIDE_HOURS' };
+      return { open: false, reason: "OUTSIDE_HOURS" };
     }
-    return { open: true, reason: 'OPEN' };
+    return { open: true, reason: "OPEN" };
   }
 
   // --- Legacy openHours JSON fallback ---
   if (store.openHours) {
-    const days = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+    const days = [
+      "sunday",
+      "monday",
+      "tuesday",
+      "wednesday",
+      "thursday",
+      "friday",
+      "saturday",
+    ];
     const dayKey = days[dayOfWeek];
     const dayData = (store.openHours as any)?.[dayKey];
-    if (!dayData || dayData.closed) return { open: false, reason: 'OUTSIDE_HOURS' };
-    if (dayData.is24Hours) return { open: true, reason: 'OPEN' };
+    if (!dayData || dayData.closed)
+      return { open: false, reason: "OUTSIDE_HOURS" };
+    if (dayData.is24Hours) return { open: true, reason: "OPEN" };
     if (dayData.open && dayData.close) {
-      const [oH, oM] = dayData.open.split(':').map(Number);
-      const [cH, cM] = dayData.close.split(':').map(Number);
+      const [oH, oM] = dayData.open.split(":").map(Number);
+      const [cH, cM] = dayData.close.split(":").map(Number);
       const openMin = oH * 60 + oM;
       const closeMin = cH * 60 + cM;
       if (currentMinutes < openMin || currentMinutes >= closeMin) {
-        return { open: false, reason: 'OUTSIDE_HOURS' };
+        return { open: false, reason: "OUTSIDE_HOURS" };
       }
     }
-    return { open: true, reason: 'OPEN' };
+    return { open: true, reason: "OPEN" };
   }
 
   // No schedule configured — treat as open (do not block stores that haven't configured hours)
-  return { open: true, reason: 'NO_SCHEDULE' };
+  return { open: true, reason: "NO_SCHEDULE" };
 }
 ```
 
@@ -175,17 +189,24 @@ After fetching the store (around line 120), add:
 ```typescript
 const store = await this.prisma.store.findUnique({
   where: { id: restaurantId },
-  select: { lat: true, lng: true, name: true, isOpen: true, openHours: true, openingHours: true },
+  select: {
+    lat: true,
+    lng: true,
+    name: true,
+    isOpen: true,
+    openHours: true,
+    openingHours: true,
+  },
 });
 
-if (!store) throw new NotFoundException('Store not found');
+if (!store) throw new NotFoundException("Store not found");
 
 const availability = isStoreCurrentlyOpen(store);
 if (!availability.open) {
   throw new BadRequestException(
-    availability.reason === 'MANUAL_CLOSE'
+    availability.reason === "MANUAL_CLOSE"
       ? `${store.name} is currently closed.`
-      : `${store.name} is outside its operating hours.`
+      : `${store.name} is outside its operating hours.`,
   );
 }
 ```
@@ -211,8 +232,10 @@ const availability = isStoreCurrentlyOpen(storeWithHours!);
 if (!availability.open) {
   throw new BadRequestException(
     `Store "${store.name}" is currently ${
-      availability.reason === 'MANUAL_CLOSE' ? 'closed' : 'outside its operating hours'
-    }. Please try again later.`
+      availability.reason === "MANUAL_CLOSE"
+        ? "closed"
+        : "outside its operating hours"
+    }. Please try again later.`,
   );
 }
 ```
@@ -236,6 +259,7 @@ Same pattern: after fetching each store during the breakdown calculation.
 **File:** `apps/customer-app/types/store-types.ts`
 
 Add:
+
 ```typescript
 export type StoreData = {
   ...existing fields...
@@ -258,34 +282,41 @@ const isStoreClosed = storeData ? !storeData.isCurrentlyOpen : false;
 ```
 
 In `handleAddToCart`:
-```typescript
-const handleAddToCart = useCallback(async (productId: string) => {
-  if (!storeData) return;
 
-  // Guard: store must be open
-  if (isStoreClosed) {
-    Toast.show({
-      type: 'error',
-      text1: 'Store is currently closed',
-      text2: 'This store is not accepting orders right now.',
-    });
-    return;
-  }
-  // ... rest of existing logic
-}, [addItem, storeData, isStoreClosed]);
+```typescript
+const handleAddToCart = useCallback(
+  async (productId: string) => {
+    if (!storeData) return;
+
+    // Guard: store must be open
+    if (isStoreClosed) {
+      Toast.show({
+        type: "error",
+        text1: "Store is currently closed",
+        text2: "This store is not accepting orders right now.",
+      });
+      return;
+    }
+    // ... rest of existing logic
+  },
+  [addItem, storeData, isStoreClosed],
+);
 ```
 
 In the Store Hero / header area — display a "Closed" pill badge when `isStoreClosed`:
+
 ```tsx
-{isStoreClosed && (
-  <View style={styles.closedBanner}>
-    <ThemedText style={styles.closedBannerText}>
-      {storeData?.closedReason === 'MANUAL_CLOSE'
-        ? '🔴 Currently Closed'
-        : '🕐 Outside Opening Hours'}
-    </ThemedText>
-  </View>
-)}
+{
+  isStoreClosed && (
+    <View style={styles.closedBanner}>
+      <ThemedText style={styles.closedBannerText}>
+        {storeData?.closedReason === "MANUAL_CLOSE"
+          ? "🔴 Currently Closed"
+          : "🕐 Outside Opening Hours"}
+      </ThemedText>
+    </View>
+  );
+}
 ```
 
 Pass `disabled={isStoreClosed}` to the `ProductList` component's "Add" buttons.
@@ -305,8 +336,8 @@ try {
   const order = await createOrder(payload);
   // ... proceed
 } catch (err: any) {
-  const msg = err?.message || 'Failed to place order';
-  Toast.show({ type: 'error', text1: msg });
+  const msg = err?.message || "Failed to place order";
+  Toast.show({ type: "error", text1: msg });
   return;
 }
 ```
@@ -322,6 +353,7 @@ Optionally, add an explicit pre-flight call to a new endpoint: `GET /marketplace
 **File:** `web/customer-web-app/src/app/stores/[id]/page.tsx`
 
 Add to `StoreDetail`:
+
 ```typescript
 isCurrentlyOpen?: boolean;
 closedReason?: string;
@@ -346,30 +378,35 @@ interface StorePageClientProps {
   storeId: string;
   storeName: string;
   byCategory: Record<string, PublicProduct[]>;
-  isCurrentlyOpen?: boolean;   // NEW
-  closedReason?: string;       // NEW
+  isCurrentlyOpen?: boolean; // NEW
+  closedReason?: string; // NEW
 }
 ```
 
 If `!isCurrentlyOpen`:
+
 - Render a prominent "Store Currently Closed" banner at the top.
 - Disable all "+" (Add to Cart) buttons with `disabled` + reduced opacity.
 - Do not open `ProductModal` on click.
 
 ```tsx
-{!isCurrentlyOpen && (
-  <div className="mb-4 rounded-xl bg-red-50 border border-red-200 p-4 flex items-center gap-3">
-    <span className="text-2xl">🔴</span>
-    <div>
-      <p className="font-semibold text-red-700">This store is currently closed</p>
-      <p className="text-sm text-red-500">
-        {closedReason === 'MANUAL_CLOSE'
-          ? 'The vendor has temporarily closed.'
-          : 'This store is outside its operating hours.'}
-      </p>
+{
+  !isCurrentlyOpen && (
+    <div className="mb-4 rounded-xl bg-red-50 border border-red-200 p-4 flex items-center gap-3">
+      <span className="text-2xl">🔴</span>
+      <div>
+        <p className="font-semibold text-red-700">
+          This store is currently closed
+        </p>
+        <p className="text-sm text-red-500">
+          {closedReason === "MANUAL_CLOSE"
+            ? "The vendor has temporarily closed."
+            : "This store is outside its operating hours."}
+        </p>
+      </div>
     </div>
-  </div>
-)}
+  );
+}
 ```
 
 ---
@@ -406,27 +443,30 @@ This lets the mobile and web apps poll for real-time status without re-fetching 
 ## 8. Summary of All Files to Change
 
 ### Backend (`backend/src/`)
-| File | Change |
-|---|---|
-| `shared/vendor-availability.util.ts` | **Create** — `isStoreCurrentlyOpen()` helper |
-| `marketplace/marketplace.service.ts` | `getVendorDetails` → include `isCurrentlyOpen`; all listing methods → include `isCurrentlyOpen` flag |
-| `users/orders.service.ts` | `calculateQuote` → availability guard; `prepareOrderContext` → guard per store; `calculateOrderBreakdown` → same |
-| `marketplace/marketplace.controller.ts` | **Optional** — add `GET vendor/:id/availability` endpoint |
+
+| File                                    | Change                                                                                                           |
+| --------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `shared/vendor-availability.util.ts`    | **Create** — `isStoreCurrentlyOpen()` helper                                                                     |
+| `marketplace/marketplace.service.ts`    | `getVendorDetails` → include `isCurrentlyOpen`; all listing methods → include `isCurrentlyOpen` flag             |
+| `users/orders.service.ts`               | `calculateQuote` → availability guard; `prepareOrderContext` → guard per store; `calculateOrderBreakdown` → same |
+| `marketplace/marketplace.controller.ts` | **Optional** — add `GET vendor/:id/availability` endpoint                                                        |
 
 ### Customer Mobile App (`apps/customer-app/`)
-| File | Change |
-|---|---|
-| `types/store-types.ts` | Add `isCurrentlyOpen`, `closedReason` to `StoreData` |
-| `app/(store)/store-screen.tsx` | Closed banner; guard `handleAddToCart` |
-| `app/checkout.tsx` | Handle backend 400 gracefully with user-facing message |
+
+| File                           | Change                                                 |
+| ------------------------------ | ------------------------------------------------------ |
+| `types/store-types.ts`         | Add `isCurrentlyOpen`, `closedReason` to `StoreData`   |
+| `app/(store)/store-screen.tsx` | Closed banner; guard `handleAddToCart`                 |
+| `app/checkout.tsx`             | Handle backend 400 gracefully with user-facing message |
 
 ### Customer Web App (`web/customer-web-app/`)
-| File | Change |
-|---|---|
-| `app/stores/[id]/page.tsx` | Add fields to `StoreDetail` type; pass to client |
-| `app/stores/[id]/StorePageClient.tsx` | Closed banner; disable "+" buttons |
-| `app/stores/[id]/product/[productId]/AddToOrderButton.tsx` | Disable when closed |
-| `store/ProductModal.tsx` | Accept + respect `isStoreClosed` |
+
+| File                                                       | Change                                           |
+| ---------------------------------------------------------- | ------------------------------------------------ |
+| `app/stores/[id]/page.tsx`                                 | Add fields to `StoreDetail` type; pass to client |
+| `app/stores/[id]/StorePageClient.tsx`                      | Closed banner; disable "+" buttons               |
+| `app/stores/[id]/product/[productId]/AddToOrderButton.tsx` | Disable when closed                              |
+| `store/ProductModal.tsx`                                   | Accept + respect `isStoreClosed`                 |
 
 ---
 
@@ -443,11 +483,11 @@ This lets the mobile and web apps poll for real-time status without re-fetching 
 
 ## 10. Edge Cases to Handle
 
-| Case | Handling |
-|---|---|
-| Store has no `openingHours` and no `openHours` | Treat as open (no schedule = no restriction) |
-| `openingHours` row missing for today | Treat as closed for that day |
-| Vendor is `MANUAL_CLOSE` but within hours | `isOpen=false` wins — store is closed |
-| Timezone | Default to `Africa/Lagos`; add `timezone` field to `Store` model in a future migration if multi-region is needed |
-| Cart contains items from a store that closed between add and checkout | Backend guard catches it; frontend shows 400 error message |
-| Admin-managed store (`isAdminManaged=true`) | Should still respect `isOpen` — admins can override by toggling `isOpen` manually |
+| Case                                                                  | Handling                                                                                                         |
+| --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Store has no `openingHours` and no `openHours`                        | Treat as open (no schedule = no restriction)                                                                     |
+| `openingHours` row missing for today                                  | Treat as closed for that day                                                                                     |
+| Vendor is `MANUAL_CLOSE` but within hours                             | `isOpen=false` wins — store is closed                                                                            |
+| Timezone                                                              | Default to `Africa/Lagos`; add `timezone` field to `Store` model in a future migration if multi-region is needed |
+| Cart contains items from a store that closed between add and checkout | Backend guard catches it; frontend shows 400 error message                                                       |
+| Admin-managed store (`isAdminManaged=true`)                           | Should still respect `isOpen` — admins can override by toggling `isOpen` manually                                |

@@ -24,7 +24,7 @@ export interface AvailabilityResult {
 
 interface OpeningHourRow {
   dayOfWeek: number; // 0 = Sunday … 6 = Saturday
-  openTime: string;  // "09:00"
+  openTime: string; // "09:00"
   closeTime: string; // "22:00"
 }
 
@@ -44,7 +44,9 @@ function nowInTimezone(tz: string): Date {
     return new Date(new Date().toLocaleString('en-US', { timeZone: tz }));
   } catch {
     // Fallback if tz string is invalid
-    return new Date(new Date().toLocaleString('en-US', { timeZone: 'Africa/Lagos' }));
+    return new Date(
+      new Date().toLocaleString('en-US', { timeZone: 'Africa/Lagos' }),
+    );
   }
 }
 

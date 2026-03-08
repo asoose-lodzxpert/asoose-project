@@ -110,7 +110,14 @@ export class OrdersService {
       const [store, address] = await Promise.all([
         this.prisma.store.findUnique({
           where: { id: restaurantId },
-          select: { lat: true, lng: true, name: true, isOpen: true, openHours: true, openingHours: true },
+          select: {
+            lat: true,
+            lng: true,
+            name: true,
+            isOpen: true,
+            openHours: true,
+            openingHours: true,
+          },
         }),
         this.prisma.address.findUnique({
           where: { id: addressId },
@@ -265,7 +272,12 @@ export class OrdersService {
         // ── Availability guard (fetch fresh availability fields) ────
         const storeAvail = await this.prisma.store.findUnique({
           where: { id: storeId },
-          select: { isOpen: true, openHours: true, openingHours: true, name: true },
+          select: {
+            isOpen: true,
+            openHours: true,
+            openingHours: true,
+            name: true,
+          },
         });
         if (storeAvail) {
           const avail = isStoreCurrentlyOpen(storeAvail);
@@ -1104,7 +1116,12 @@ export class OrdersService {
         // ── Availability guard ──────────────────────────────────────
         const storeAvail = await this.prisma.store.findUnique({
           where: { id: storeId },
-          select: { isOpen: true, openHours: true, openingHours: true, name: true },
+          select: {
+            isOpen: true,
+            openHours: true,
+            openingHours: true,
+            name: true,
+          },
         });
         if (storeAvail) {
           const avail = isStoreCurrentlyOpen(storeAvail);

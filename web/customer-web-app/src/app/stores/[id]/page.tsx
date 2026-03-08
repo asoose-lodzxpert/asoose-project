@@ -377,7 +377,9 @@ export default async function StoreDetailPage({
         <section className="max-w-5xl mx-auto px-4 py-3">
           {store.isCurrentlyOpen === false ? (
             <div className="inline-flex items-center gap-2 rounded-full bg-red-100 dark:bg-red-900/30 border border-red-200 dark:border-red-700 px-5 py-2 text-sm font-semibold text-red-700 dark:text-red-400">
-              {store.closedReason === "MANUAL_CLOSE" ? "🔴 Store Temporarily Closed" : "🕐 Outside Opening Hours"}
+              {store.closedReason === "MANUAL_CLOSE"
+                ? "🔴 Store Temporarily Closed"
+                : "🕐 Outside Opening Hours"}
             </div>
           ) : (
             <Link

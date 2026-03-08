@@ -184,7 +184,8 @@ export default function StoreScreen() {
         Toast.show({
           type: "error",
           text1: "Store is currently closed",
-          text2: closedMessage ?? "This store is not accepting orders right now.",
+          text2:
+            closedMessage ?? "This store is not accepting orders right now.",
         });
         return;
       }
@@ -418,17 +419,24 @@ export default function StoreScreen() {
           <View
             style={[
               styles.closedBanner,
-              { backgroundColor: `${errorColor}18`, borderColor: `${errorColor}60` },
+              {
+                backgroundColor: `${errorColor}18`,
+                borderColor: `${errorColor}60`,
+              },
             ]}
           >
             <View style={styles.closedBannerDot} />
             <View style={{ flex: 1 }}>
-              <ThemedText style={[styles.closedBannerTitle, { color: errorColor }]}>
+              <ThemedText
+                style={[styles.closedBannerTitle, { color: errorColor }]}
+              >
                 {storeData?.closedReason === "MANUAL_CLOSE"
                   ? "🔴 Store Temporarily Closed"
                   : "🕐 Outside Opening Hours"}
               </ThemedText>
-              <ThemedText style={[styles.closedBannerSub, { color: errorColor }]}>
+              <ThemedText
+                style={[styles.closedBannerSub, { color: errorColor }]}
+              >
                 {closedMessage}
               </ThemedText>
             </View>
