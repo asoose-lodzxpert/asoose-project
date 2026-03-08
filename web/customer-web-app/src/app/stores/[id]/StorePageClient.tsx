@@ -23,9 +23,13 @@ interface PublicProduct {
 }
 
 interface StorePageClientProps {
-  storeId: string; // slug or id â€” used in the URL
+  storeId: string; // slug or id — used in the URL
   storeName: string;
   byCategory: Record<string, PublicProduct[]>;
+  /** True when the store is open and accepting orders */
+  isCurrentlyOpen?: boolean;
+  closedReason?: string;
+  closedMessage?: string;
 }
 
 // â”€â”€ Product card purpose-built for the public store page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -35,10 +39,12 @@ function PublicProductCard({
   product,
   storeId,
   onAddClick,
+  storeClosed,
 }: {
   product: PublicProduct;
   storeId: string;
   onAddClick: (p: PublicProduct) => void;
+  storeClosed?: boolean;
 }) {
   const image =
     product.image ??
@@ -103,10 +109,22 @@ function PublicProductCard({
         onClick={(e) => {
           e.preventDefault();
           e.stopPropagation();
-          onAddClick(product);
+          if (!storeClosed) onAddClick(product);
         }}
-        className="absolute bottom-3 right-3 w-8 h-8 rounded-full bg-gray-100 dark:bg-white/10 flex items-center justify-center text-gray-900 dark:text-white hover:bg-orange-500 hover:text-white transition-colors z-10"
-        aria-label={`Add ${product.name} to cart`}
+        disabled={storeClosed}
+        title={
+          storeClosed
+            ? "Store is currently closed"
+            : `Add ${product.name} to cart`
+        }
+        className={`absolute bottom-3 right-3 w-8 h-8 rounded-full flex items-center justify-center transition-colors z-10 ${
+          storeClosed
+            ? "bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-not-allowed"
+            : "bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-white hover:bg-orange-500 hover:text-white"
+        }`}
+        aria-label={
+          storeClosed ? "Store closed" : `Add ${product.name} to cart`
+        }
       >
         <Plus className="w-4 h-4" />
       </button>
@@ -119,10 +137,15 @@ export default function StorePageClient({
   storeId,
   storeName,
   byCategory,
+  isCurrentlyOpen,
+  closedReason,
+  closedMessage,
 }: StorePageClientProps) {
+  const storeClosed = isCurrentlyOpen === false;
   const [activeProduct, setActiveProduct] = useState<ModalProduct | null>(null);
 
   const openModal = (p: PublicProduct) => {
+    if (storeClosed) return; // guard
     setActiveProduct({
       id: p.id,
       name: p.name,
@@ -140,6 +163,25 @@ export default function StorePageClient({
 
   return (
     <>
+      {/* ── Closed banner ──────────────────────────────────────────────── */}
+      {storeClosed && (
+        <div className="mb-6 rounded-2xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700/50 p-4 flex items-start gap-3">
+          <span className="text-2xl leading-none">
+            {closedReason === "MANUAL_CLOSE" ? "🔴" : "🕐"}
+          </span>
+          <div>
+            <p className="font-bold text-red-700 dark:text-red-400 text-sm">
+              {closedReason === "MANUAL_CLOSE"
+                ? "Store Temporarily Closed"
+                : "Currently Outside Opening Hours"}
+            </p>
+            <p className="text-xs text-red-600 dark:text-red-400/80 mt-0.5">
+              {closedMessage ||
+                "This store is not accepting orders right now. Please check back later."}
+            </p>
+          </div>
+        </div>
+      )}
       {Object.keys(byCategory).length > 0 ? (
         Object.entries(byCategory).map(([category, products]) => (
           <div key={category} className="mb-10">
@@ -153,6 +195,7 @@ export default function StorePageClient({
                   product={p}
                   storeId={storeId}
                   onAddClick={openModal}
+                  storeClosed={storeClosed}
                 />
               ))}
             </div>

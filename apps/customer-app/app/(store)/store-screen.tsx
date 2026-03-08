@@ -77,6 +77,17 @@ export default function StoreScreen() {
 
   const border = useThemeColor({}, "borderDefault");
   const surfaceSubtle = useThemeColor({}, "surfaceSubtle");
+  const errorColor = useThemeColor({}, "statusError");
+
+  // Derived availability state
+  const isStoreClosed = storeData ? !storeData.isCurrentlyOpen : false;
+  const closedMessage =
+    storeData?.closedMessage ||
+    (storeData && !storeData.isCurrentlyOpen
+      ? storeData.closedReason === "MANUAL_CLOSE"
+        ? "The vendor has temporarily closed this store."
+        : "This store is currently outside its operating hours."
+      : null);
 
   const loadStore = useCallback(
     async (attempt = 0) => {
@@ -167,6 +178,18 @@ export default function StoreScreen() {
   const handleAddToCart = useCallback(
     async (productId: string) => {
       if (!storeData) return;
+
+      // Guard: prevent ordering from a closed store
+      if (isStoreClosed) {
+        Toast.show({
+          type: "error",
+          text1: "Store is currently closed",
+          text2:
+            closedMessage ?? "This store is not accepting orders right now.",
+        });
+        return;
+      }
+
       const product = storeData.products.find((p) => p.id === productId);
       if (!product) return;
 
@@ -202,7 +225,7 @@ export default function StoreScreen() {
         });
       }
     },
-    [addItem, storeData],
+    [addItem, storeData, isStoreClosed, closedMessage],
   );
 
   const handleModifierConfirm = useCallback(
@@ -391,6 +414,34 @@ export default function StoreScreen() {
           searchValue={searchValue}
           onSearchChange={setSearchValue}
         />
+        {/* ── Closed banner ──────────────────────────────────────────── */}
+        {isStoreClosed && (
+          <View
+            style={[
+              styles.closedBanner,
+              {
+                backgroundColor: `${errorColor}18`,
+                borderColor: `${errorColor}60`,
+              },
+            ]}
+          >
+            <View style={styles.closedBannerDot} />
+            <View style={{ flex: 1 }}>
+              <ThemedText
+                style={[styles.closedBannerTitle, { color: errorColor }]}
+              >
+                {storeData?.closedReason === "MANUAL_CLOSE"
+                  ? "🔴 Store Temporarily Closed"
+                  : "🕐 Outside Opening Hours"}
+              </ThemedText>
+              <ThemedText
+                style={[styles.closedBannerSub, { color: errorColor }]}
+              >
+                {closedMessage}
+              </ThemedText>
+            </View>
+          </View>
+        )}
         <CategoryFilter
           categories={categories}
           activeCategory={activeCategory}
@@ -401,6 +452,7 @@ export default function StoreScreen() {
           isRestaurant={!!isRestaurant}
           onAddToCart={handleAddToCart}
           vendorId={storeData.id}
+          disabled={isStoreClosed}
         />
       </>
     );
@@ -547,5 +599,32 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 12,
     backgroundColor: "transparent",
+  },
+  closedBanner: {
+    marginHorizontal: 16,
+    marginTop: 12,
+    marginBottom: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 14,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+  },
+  closedBannerDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: "#ef4444",
+    marginTop: 3,
+  },
+  closedBannerTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    marginBottom: 2,
+  },
+  closedBannerSub: {
+    fontSize: 12,
+    opacity: 0.85,
   },
 });

@@ -46,4 +46,17 @@ export type StoreData = {
   deliveryTime: string;
   products: Product[];
   reviews: Review[];
+  /** Whether the vendor toggled themselves online */
+  isOpen: boolean;
+  /** True only if isOpen=true AND current time falls within openingHours/openHours */
+  isCurrentlyOpen: boolean;
+  /** Why the store is closed; null when open */
+  closedReason?:
+    | "MANUAL_CLOSE"
+    | "OUTSIDE_HOURS"
+    | "NO_SCHEDULE"
+    | "OPEN"
+    | null;
+  /** Human-readable closed message returned by the server */
+  closedMessage?: string | null;
 };

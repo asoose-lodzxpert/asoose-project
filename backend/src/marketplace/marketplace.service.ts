@@ -9,6 +9,7 @@ import {
 } from '@prisma/client';
 import { CreateReviewDto } from './dto/create-review.dto';
 import { StorageService } from '../storage/storage.service';
+import { isStoreCurrentlyOpen } from '../shared/vendor-availability.util';
 
 const isUUID = (str: string) =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
@@ -74,6 +75,9 @@ export class MarketplaceService {
           prepTime: true,
           address: true,
           type: true,
+          isOpen: true,
+          openHours: true,
+          openingHours: true,
         },
       });
 
@@ -136,6 +140,7 @@ export class MarketplaceService {
         skip,
         take: limit,
         orderBy: { rating: 'desc' },
+        include: { openingHours: true },
       }),
       this.prisma.store.count({ where }),
     ]);
@@ -196,6 +201,9 @@ export class MarketplaceService {
         type: true,
         prepTime: true,
         address: true,
+        isOpen: true,
+        openHours: true,
+        openingHours: true,
       },
     });
 
@@ -203,19 +211,29 @@ export class MarketplaceService {
     return {
       id: verticalId,
       title: this.formatTitle(verticalId),
-      vendors: stores.map((store) => ({
-        id: store.id,
-        name: store.name,
-        slug: store.slug,
-        image: store.logo,
-        rating: store.rating || 0,
-        type: store.type,
-        // Calculate display strings
-        deliveryTime: `${store.prepTime || 20} - ${(store.prepTime || 20) + 15} min`,
-        deliveryFee: 500, // Hardcoded for now per requirements
-        prepTime: store.prepTime || 20,
-        address: store.address,
-      })),
+      vendors: stores.map((store) => {
+        const avail = isStoreCurrentlyOpen({
+          isOpen: (store as any).isOpen ?? true,
+          openingHours: (store as any).openingHours ?? [],
+          openHours: (store as any).openHours,
+        });
+        return {
+          id: store.id,
+          name: store.name,
+          slug: store.slug,
+          image: store.logo,
+          rating: store.rating || 0,
+          type: store.type,
+          // Calculate display strings
+          deliveryTime: `${store.prepTime || 20} - ${(store.prepTime || 20) + 15} min`,
+          deliveryFee: 500, // Hardcoded for now per requirements
+          prepTime: store.prepTime || 20,
+          address: store.address,
+          isCurrentlyOpen: avail.open,
+          closedReason: avail.reason,
+          closedMessage: avail.open ? null : avail.message,
+        };
+      }),
     };
   }
 
@@ -248,6 +266,7 @@ export class MarketplaceService {
         name: { contains: query, mode: 'insensitive' },
       },
       take: 10,
+      include: { openingHours: true },
     });
 
     const products = await this.prisma.product.findMany({
@@ -266,7 +285,21 @@ export class MarketplaceService {
       take: 20,
     });
 
-    return { stores, products };
+    const storesWithAvailability = stores.map((s) => {
+      const avail = isStoreCurrentlyOpen({
+        isOpen: s.isOpen,
+        openingHours: s.openingHours,
+        openHours: s.openHours,
+      });
+      return {
+        ...s,
+        isCurrentlyOpen: avail.open,
+        closedReason: avail.reason,
+        closedMessage: avail.open ? null : avail.message,
+      };
+    });
+
+    return { stores: storesWithAvailability, products };
   }
 
   async getVendorDetails(identifier: string) {
@@ -293,10 +326,13 @@ export class MarketplaceService {
             user: { select: { name: true, image: true } },
           },
         },
+        openingHours: true,
       },
     });
 
     if (!store) return null;
+
+    const availability = isStoreCurrentlyOpen(store);
 
     return {
       id: store.id,
@@ -308,6 +344,10 @@ export class MarketplaceService {
       address: store.address || 'Address not available',
       rating: store.rating || 0,
       deliveryTime: `${store.prepTime || 20} - ${(store.prepTime || 20) + 15} mins`,
+      isOpen: store.isOpen,
+      isCurrentlyOpen: availability.open,
+      closedReason: availability.reason,
+      closedMessage: availability.open ? null : availability.message,
       products: store.products.map((p) => ({
         id: p.id,
         slug: p.slug,
@@ -358,19 +398,32 @@ export class MarketplaceService {
     return '/icons/default.png';
   }
 
-  private mapStoresToVendors(stores: Partial<Store>[]) {
-    return stores.map((store) => ({
-      id: store.id,
-      slug: store.slug,
-      name: store.name,
-      image: store.logo || null,
-      rating: store.rating || 0,
-      ratingCount: store.ratingCount || 0,
-      deliveryTime: `${store.prepTime || 20} - ${(store.prepTime || 20) + 15} mins`,
-      address: store.address,
-      deliveryFee: 500,
-      type: store.type,
-    }));
+  private mapStoresToVendors(
+    stores: (Partial<Store> & { openingHours?: any[] })[],
+  ) {
+    return stores.map((store) => {
+      const availability = isStoreCurrentlyOpen({
+        isOpen: store.isOpen ?? true,
+        openingHours: store.openingHours ?? [],
+        openHours: (store as any).openHours,
+      });
+      return {
+        id: store.id,
+        slug: store.slug,
+        name: store.name,
+        image: store.logo || null,
+        rating: store.rating || 0,
+        ratingCount: store.ratingCount || 0,
+        deliveryTime: `${store.prepTime || 20} - ${(store.prepTime || 20) + 15} mins`,
+        address: store.address,
+        deliveryFee: 500,
+        type: store.type,
+        isOpen: store.isOpen ?? true,
+        isCurrentlyOpen: availability.open,
+        closedReason: availability.reason,
+        closedMessage: availability.open ? null : availability.message,
+      };
+    });
   }
 
   async upsertReview(userId: string, dto: CreateReviewDto) {
@@ -396,6 +449,37 @@ export class MarketplaceService {
     return this.prisma.review.delete({
       where: { userId_storeId: { userId: userId, storeId: storeId } },
     });
+  }
+
+  /** Lightweight availability check — no ISR cache, always fresh */
+  async getVendorAvailability(identifier: string) {
+    const isId = isUUID(identifier);
+    const query = isId ? { id: identifier } : { slug: identifier };
+
+    const store = await this.prisma.store.findUnique({
+      where: query,
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        isOpen: true,
+        openHours: true,
+        openingHours: true,
+      },
+    });
+
+    if (!store) return null;
+
+    const availability = isStoreCurrentlyOpen(store);
+
+    return {
+      storeId: store.id,
+      storeName: store.name,
+      isOpen: store.isOpen,
+      isCurrentlyOpen: availability.open,
+      closedReason: availability.reason,
+      closedMessage: availability.open ? null : availability.message,
+    };
   }
 
   async getProductById(idOrSlug: string) {

@@ -75,7 +75,12 @@ async function getProduct(productId: string): Promise<ProductDetail | null> {
 
 async function getStoreReviews(
   storeSlugOrId: string,
-): Promise<{ reviews: StoreReview[]; storeRating: number }> {
+): Promise<{
+  reviews: StoreReview[];
+  storeRating: number;
+  isCurrentlyOpen?: boolean;
+  closedMessage?: string | null;
+}> {
   try {
     const res = await fetch(`${API_URL}/marketplace/vendor/${storeSlugOrId}`, {
       next: { revalidate: 3600 },
@@ -85,6 +90,8 @@ async function getStoreReviews(
     return {
       reviews: data.reviews ?? [],
       storeRating: data.rating ?? 0,
+      isCurrentlyOpen: data.isCurrentlyOpen,
+      closedMessage: data.closedMessage,
     };
   } catch {
     return { reviews: [], storeRating: 0 };
@@ -271,12 +278,12 @@ export default async function ProductDetailPage({
 }) {
   const { id: storeId, productId } = await params;
 
-  const [product, { reviews, storeRating }] = await Promise.all([
-    getProduct(productId),
-    getStoreReviews(storeId),
-  ]);
+  const [product, { reviews, storeRating, isCurrentlyOpen, closedMessage }] =
+    await Promise.all([getProduct(productId), getStoreReviews(storeId)]);
 
   if (!product) notFound();
+
+  const storeClosed = isCurrentlyOpen === false;
 
   const storeSlug = product.store?.slug ?? product.store?.id ?? storeId;
   const storeName = product.store?.name ?? "Store";
@@ -429,6 +436,8 @@ export default async function ProductDetailPage({
                   <AddToOrderButton
                     product={modalProduct}
                     storeId={product.store?.id ?? storeId}
+                    isStoreClosed={storeClosed}
+                    closedMessage={closedMessage ?? undefined}
                   />
                   <Link
                     href={`/stores/${storeSlug}`}
