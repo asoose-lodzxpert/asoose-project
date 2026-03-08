@@ -3,7 +3,7 @@
 import { useState, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { ShoppingBag, Plus, Loader2 } from "lucide-react";
+import { ArrowLeft, ShoppingBag, Plus, Loader2 } from "lucide-react";
 import { toast } from "react-toastify";
 import { useCartStore } from "@/store/useCartStore";
 import { ApiService } from "@/services/api.service";
@@ -167,6 +167,19 @@ export default function ProductDetailClient({ product }: { product: Product }) {
 
   return (
     <div className="text-gray-900 dark:text-gray-100">
+      {/* Back button */}
+      <div className="max-w-6xl mx-auto px-4 pt-4 pb-1 lg:px-6">
+        <button
+          onClick={() => router.back()}
+          className="inline-flex items-center gap-2 text-sm font-semibold text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors group"
+        >
+          <span className="w-8 h-8 rounded-full bg-white dark:bg-white/10 border border-gray-200 dark:border-white/10 flex items-center justify-center group-hover:bg-gray-100 dark:group-hover:bg-white/15 transition-colors">
+            <ArrowLeft className="w-4 h-4" />
+          </span>
+          Back
+        </button>
+      </div>
+
       <div className="max-w-6xl mx-auto pb-32">
         {/* Main 2-column grid */}
         <div className="lg:grid lg:grid-cols-[1fr_420px] lg:gap-6 lg:p-6">
