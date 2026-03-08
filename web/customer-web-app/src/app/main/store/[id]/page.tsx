@@ -286,6 +286,7 @@ export default function StorePage() {
                         key={item.id}
                         {...item}
                         storeId={store.id}
+                        href={`/main/store/${slugOrId}/product/${item.id}`}
                         onClick={() => setSelectedProduct(item)}
                       />
                     ))}
