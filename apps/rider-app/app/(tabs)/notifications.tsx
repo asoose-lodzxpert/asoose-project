@@ -90,7 +90,7 @@ export default function NotificationsScreen() {
       setNotifications((prev) =>
         prev.map((n) => (n.id === notificationId ? { ...n, isRead: true } : n)),
       );
-    } catch (error: any) {
+    } catch {
       Toast.show({
         type: "error",
         text1: "Failed to mark as read",
@@ -106,7 +106,7 @@ export default function NotificationsScreen() {
         type: "success",
         text1: "All notifications marked as read",
       });
-    } catch (error: any) {
+    } catch {
       Toast.show({
         type: "error",
         text1: "Failed to mark all as read",
@@ -179,8 +179,8 @@ export default function NotificationsScreen() {
           No Notifications
         </ThemedText>
         <ThemedText style={{ color: textMuted, textAlign: "center" }}>
-          You're all caught up! We'll notify you when something important
-          happens.
+          You&apos;re all caught up! We&apos;ll notify you when something
+          important happens.
         </ThemedText>
       </View>
     );

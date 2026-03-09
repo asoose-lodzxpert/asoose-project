@@ -32,7 +32,6 @@ export default function OnboardingScreen() {
   const textPrimary = useThemeColor({}, "textPrimary");
   const textSecondary = useThemeColor({}, "textSecondary");
   const textOnPrimary = useThemeColor({}, "textOnPrimary");
-  const surfaceSubtle = useThemeColor({}, "surfaceSubtle");
   const dotInactive = useThemeColor({}, "borderDefault");
 
   const steps: Step[] = [
@@ -103,8 +102,7 @@ export default function OnboardingScreen() {
     try {
       await AsyncStorage.setItem(ONBOARDING_KEY, "true");
       router.replace("/(auth)/signin");
-    } catch (error) {
-      // ...existing code...
+    } catch {
       router.replace("/(auth)/signin");
     }
   };

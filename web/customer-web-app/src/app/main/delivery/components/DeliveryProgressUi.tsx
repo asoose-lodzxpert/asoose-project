@@ -44,11 +44,13 @@ interface FullDeliveryDetails {
     phone: string;
     image?: string;
     rating?: number;
-    vehicle?: string | {
-      model: string;
-      color: string;
-      plateNumber: string;
-    };
+    vehicle?:
+      | string
+      | {
+          model: string;
+          color: string;
+          plateNumber: string;
+        };
   };
   pickupAddress?: {
     address?: string; // Resolved string from backend
@@ -158,7 +160,6 @@ export default function DeliveryProgressUI({
                   ? "Delivery Completed"
                   : "Tracking Delivery"}
               </h2>
-
             </div>
             <p className="text-zinc-500 text-sm">ID: {delivery?.id || "---"}</p>
           </div>

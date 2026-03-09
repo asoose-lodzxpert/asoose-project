@@ -4,7 +4,6 @@ import { useThemeColor } from "@/hooks/use-theme-color";
 
 export function LocationStreamIndicator() {
   const { locationStreamStatus, isOnline } = useJobs();
-  const primary = useThemeColor({}, "brandPrimary");
   const success = useThemeColor({}, "statusSuccess");
   const error = useThemeColor({}, "statusError");
   const warning = useThemeColor({}, "statusPending");

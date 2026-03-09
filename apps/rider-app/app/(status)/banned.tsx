@@ -7,7 +7,7 @@ import { useThemeColor } from "@/hooks/use-theme-color";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 
 export default function BannedScreen() {
-  const { user, logout } = useAuth();
+  const { logout } = useAuth();
   const textSecondary = useThemeColor({}, "textSecondary");
   const statusError = useThemeColor({}, "statusError");
 

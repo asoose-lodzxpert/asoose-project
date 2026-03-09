@@ -380,7 +380,6 @@ export default function DeliveryDetailPage() {
           <div className="flex-1">
             <div className="flex items-center gap-3">
               <h1 className="text-lg font-bold">Delivery Details</h1>{" "}
-
             </div>
             <p className="text-xs text-gray-500 dark:text-gray-400 font-mono">
               #{delivery.id.split("-")[0].toUpperCase()}

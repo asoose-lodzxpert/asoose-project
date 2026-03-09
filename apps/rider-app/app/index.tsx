@@ -24,7 +24,7 @@ export default function Index() {
       try {
         const seen = await AsyncStorage.getItem(ONBOARDING_KEY);
         setHasSeenWelcome(seen === "true");
-      } catch (e) {
+      } catch {
         setHasSeenWelcome(false);
       } finally {
         setOnboardingChecked(true);
@@ -100,7 +100,14 @@ export default function Index() {
         return;
       }
     }
-  }, [user, segments, onboardingChecked, initialLoading, hasSeenWelcome]);
+  }, [
+    user,
+    segments,
+    onboardingChecked,
+    initialLoading,
+    hasSeenWelcome,
+    router,
+  ]);
 
   return (
     <ThemedView style={styles.container}>

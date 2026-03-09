@@ -5,6 +5,7 @@ import {
   ScrollView,
   Pressable,
   RefreshControl,
+  Image,
 } from "react-native";
 import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
@@ -19,7 +20,7 @@ import {
   type RiderProfile,
   type ProfileStats,
 } from "@/services/profile.service";
-import { Image } from "react-native";
+
 import { getRoleLabel } from "@/utils/role";
 
 const accountManagementItems = [
@@ -114,9 +115,7 @@ export default function ProfileScreen() {
   const border = useThemeColor({}, "borderDefault");
   const textOnPrimary = useThemeColor({}, "textOnPrimary");
   const textSecondary = useThemeColor({}, "textSecondary");
-  const textMuted = useThemeColor({}, "textMuted");
   const statusSuccess = useThemeColor({}, "statusSuccess");
-  const statusError = useThemeColor({}, "statusError");
   const statusWarning = useThemeColor({}, "statusWarning");
 
   const router = useRouter();

@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { View as SkeletonView } from "react-native";
-import {
+import { View as SkeletonView ,
   View,
   StyleSheet,
   ScrollView,
@@ -9,6 +8,7 @@ import {
   RefreshControl,
   Linking,
 } from "react-native";
+
 import Toast from "react-native-toast-message";
 
 import { ThemedView } from "@/components/themed-view";

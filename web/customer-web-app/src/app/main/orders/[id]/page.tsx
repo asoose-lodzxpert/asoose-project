@@ -214,7 +214,6 @@ export default function OrderDetailsPage() {
           <>
             {/* Status Card */}
             <div className="bg-white dark:bg-[#151515] rounded-3xl p-6 border border-gray-100 dark:border-white/5 shadow-sm">
-
               <div className="mb-8 text-center">
                 <h2 className="text-3xl font-black capitalize tracking-tight mb-2">
                   {order.status?.replace("_", " ").toLowerCase()}

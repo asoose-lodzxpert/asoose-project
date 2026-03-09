@@ -1,4 +1,4 @@
-﻿import { ThemedText } from "@/components/themed-text";
+import { ThemedText } from "@/components/themed-text";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useJobs } from "@/context/JobContext";
 import { useThemeColor } from "@/hooks/use-theme-color";
@@ -125,7 +125,6 @@ export default function ConfirmJobScreen() {
                 </View>
               </View>
             </View>
-
           </View>
 
           {/* Footer */}
@@ -157,7 +156,6 @@ export default function ConfirmJobScreen() {
                 Cancel job
               </ThemedText>
             </Pressable>
-
           </View>
         </ScrollView>
       </KeyboardAvoidingView>

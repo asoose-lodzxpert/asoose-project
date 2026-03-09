@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import { Modal, View, ScrollView, StyleSheet, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ThemedText } from "@/components/themed-text";
@@ -15,11 +15,9 @@ export const LocationDisclosureModal: React.FC<
   LocationDisclosureModalProps
 > = ({ visible, onAccept }) => {
   const primary = useThemeColor({}, "brandPrimary");
-  const background = useThemeColor({}, "surfaceBackground");
   const card = useThemeColor({}, "surfaceCard");
   const textPrimary = useThemeColor({}, "textPrimary");
   const textSecondary = useThemeColor({}, "textSecondary");
-  const success = useThemeColor({}, "statusSuccess");
 
   return (
     <Modal
@@ -113,8 +111,8 @@ export const LocationDisclosureModal: React.FC<
                   { color: textSecondary, marginVertical: 16 },
                 ]}
               >
-                By tapping "Continue", you agree to grant background location
-                access to ASOOSE Rider App for delivery operations.
+                By tapping &quot;Continue&quot;, you agree to grant background
+                location access to ASOOSE Rider App for delivery operations.
               </ThemedText>
             </ScrollView>
 
