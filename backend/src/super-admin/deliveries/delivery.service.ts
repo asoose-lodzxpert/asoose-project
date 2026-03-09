@@ -284,6 +284,16 @@ export class DeliveriesService {
     if (status === DeliveryStatus.DELIVERED) {
       this.logger.debug(`Full completion flow triggered for delivery ${id}`);
       return this.prisma.$transaction(async (tx) => {
+        // Re-check inside the transaction to guard against concurrent calls
+        const current = await tx.delivery.findUnique({
+          where: { id },
+          select: { status: true },
+        });
+        if (current?.status === DeliveryStatus.DELIVERED) {
+          this.logger.warn(`Delivery ${id} already DELIVERED — skipping duplicate completion`);
+          return tx.delivery.findUnique({ where: { id } });
+        }
+
         const updatedDelivery = await tx.delivery.update({
           where: { id },
           data: { status: DeliveryStatus.DELIVERED, deliveredAt: new Date() },

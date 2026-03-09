@@ -58,8 +58,9 @@ export class TransactionLedgerService {
         }
       }
 
-      return client.transaction.create({
-        data: {
+      return client.transaction.upsert({
+        where: { paymentId: payment.id },
+        create: {
           type: 'PAYMENT_RECEIVED',
           amount: payment.amount,
           paymentId: payment.id,
@@ -76,6 +77,8 @@ export class TransactionLedgerService {
             ...(payment.orderGroupId && { orderGroupId: payment.orderGroupId }),
           },
         },
+        // Already recorded — no-op on duplicate (idempotent)
+        update: {},
       });
     }, tx);
   }
@@ -329,6 +332,13 @@ export class TransactionLedgerService {
     const vendorEarning = order.total;
 
     return this.withTransaction(async (client) => {
+      // Idempotency guard: skip if earnings for this order already recorded
+      const existing = await client.transaction.findFirst({
+        where: { type: 'VENDOR_EARNING', orderId: order.id },
+        select: { id: true },
+      });
+      if (existing) return { vendorEarning };
+
       // Get current vendor balance
       const store = await client.store.findUnique({
         where: { id: order.storeId },
@@ -436,6 +446,13 @@ export class TransactionLedgerService {
     const riderEarning = delivery.deliveryFee;
 
     return this.withTransaction(async (client) => {
+      // Idempotency guard: skip if earnings for this delivery already recorded
+      const existing = await client.transaction.findFirst({
+        where: { type: 'RIDER_EARNING', deliveryId: delivery.id },
+        select: { id: true },
+      });
+      if (existing) return { riderEarning };
+
       const rider = await client.rider.findUnique({
         where: { id: delivery.riderId },
         select: { walletBalance: true },
