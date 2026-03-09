@@ -109,8 +109,8 @@ export function useRiderLocation(): UseRiderLocationResult {
 
       const initialAccuracyLevels = [
         Location.Accuracy.Balanced, // GPS + network, ~5 s cold
-        Location.Accuracy.Low,      // network only, ~1-2 s
-        Location.Accuracy.Lowest,   // coarse network, immediate
+        Location.Accuracy.Low, // network only, ~1-2 s
+        Location.Accuracy.Lowest, // coarse network, immediate
       ];
 
       for (const accuracy of initialAccuracyLevels) {

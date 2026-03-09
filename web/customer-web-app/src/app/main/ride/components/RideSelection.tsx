@@ -304,8 +304,7 @@ export function RideSelection() {
       );
       if (setRideId) setRideId(response.ride.id);
       // Store OTP so it can be shown to the driver when they arrive
-      if (response.ride.startOtp)
-        setStartOtp(response.ride.startOtp);
+      if (response.ride.startOtp) setStartOtp(response.ride.startOtp);
 
       // Driver matching begins on the backend after createRide.
       // confirmRide is called later from PostDriverPayment after DRIVER_FOUND.
@@ -601,12 +600,18 @@ export function RideSelection() {
                       {isCalculating ? (
                         <span className="flex items-center gap-2">
                           <Loader2 size={14} className="animate-spin" />
-                          <Text size="xs" className="!text-white/80">Calculating fare...</Text>
+                          <Text size="xs" className="!text-white/80">
+                            Calculating fare...
+                          </Text>
                         </span>
                       ) : (
                         <>
                           <Car size={24} className="mb-1 text-white/90" />
-                          <Text size="sm" weight="semibold" className="!text-white">
+                          <Text
+                            size="sm"
+                            weight="semibold"
+                            className="!text-white"
+                          >
                             Standard Ride
                           </Text>
                           {estimates?.["ECONOMY"] && (

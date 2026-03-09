@@ -10,10 +10,7 @@ import * as Location from "expo-location";
  *   3. If that also fails, fall back to Lowest accuracy.
  */
 async function getPositionWithFallback(): Promise<Location.LocationObject> {
-  const withTimeout = (
-    promise: Promise<Location.LocationObject>,
-    ms: number,
-  ) =>
+  const withTimeout = (promise: Promise<Location.LocationObject>, ms: number) =>
     Promise.race([
       promise,
       new Promise<never>((_, reject) =>

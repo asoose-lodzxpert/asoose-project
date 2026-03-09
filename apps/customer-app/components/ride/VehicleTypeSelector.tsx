@@ -59,12 +59,7 @@ export function VehicleTypeSelector({
           },
         ]}
       >
-        <View
-          style={[
-            styles.iconWrap,
-            { backgroundColor: `${primary}22` },
-          ]}
-        >
+        <View style={[styles.iconWrap, { backgroundColor: `${primary}22` }]}>
           <IconSymbol name="car.fill" size={22} color={primary} />
         </View>
 
