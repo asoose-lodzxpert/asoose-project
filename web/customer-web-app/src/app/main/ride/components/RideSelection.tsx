@@ -100,9 +100,9 @@ export function RideSelection() {
     string,
     PriceEstimate
   > | null>(null);
-  // Fare confirmation: set when user selects a ride type, cleared on cancel or location change
+  // Fare confirmation: set when user taps Book Ride, cleared on cancel or location change
   const [pendingBooking, setPendingBooking] = useState<{
-    rideType: "economy" | "business";
+    rideType: "economy";
     estimate: PriceEstimate;
   } | null>(null);
 
@@ -235,7 +235,7 @@ export function RideSelection() {
 
   // --- Booking Handler (called only after the user confirms on the confirmation panel) ---
   const handleRideRequest = async (
-    rideType: "economy" | "business",
+    rideType: "economy",
     lockedEstimate: PriceEstimate,
   ) => {
     if (!pickupLocation || !dropoffLocation) {
@@ -329,15 +329,14 @@ export function RideSelection() {
     }
   };
 
-  // --- Show the confirmation panel for the selected ride type ---
-  const handleSelectRide = (rideType: "economy" | "business") => {
-    const vehicleKey = rideType.toUpperCase();
-    const estimate = estimates?.[vehicleKey];
+  // --- Show the confirmation panel when user taps Book Ride ---
+  const handleSelectRide = () => {
+    const estimate = estimates?.["ECONOMY"];
     if (!estimate) {
       toast.error("Fare estimate not available. Please wait for calculation.");
       return;
     }
-    setPendingBooking({ rideType, estimate });
+    setPendingBooking({ rideType: "economy", estimate });
   };
 
   const formatMoney = (amount: number) =>
@@ -542,7 +541,7 @@ export function RideSelection() {
                   <div className="w-full bg-yellow-50 dark:bg-yellow-500/10 border border-yellow-200 dark:border-yellow-500/20 rounded-xl p-3 space-y-1">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-bold uppercase tracking-wide text-yellow-700 dark:text-yellow-400">
-                        {pendingBooking.rideType}
+                        Standard Ride
                       </span>
                       <span className="text-xl font-black text-gray-900 dark:text-white">
                         {formatMoney(pendingBooking.estimate.estimatedFare)}
@@ -591,64 +590,30 @@ export function RideSelection() {
                   </div>
                 </SidebarSection>
               ) : (
-                /* ── Ride Type Selection ─────────────────────────────── */
+                /* ── Ride Selection ─────────────────────────────── */
                 <SidebarSection title="Select Ride">
-                  <div className="grid grid-cols-2 gap-3 w-full">
-                    {/* Economy Button */}
+                  <div className="w-full">
                     <PrimaryButton
-                      onClick={() => handleSelectRide("economy")}
+                      onClick={handleSelectRide}
                       disabled={isSubmitting || isCalculating}
-                      className="h-22 flex flex-col items-center justify-center !bg-yellow-600 hover:!bg-yellow-700 !text-white focus:ring-yellow-500"
+                      className="w-full flex flex-col items-center justify-center !bg-yellow-600 hover:!bg-yellow-700 !text-white focus:ring-yellow-500 py-4"
                     >
                       {isCalculating ? (
-                        <Text size="xs" className="!text-white/80">
-                          Calculating...
-                        </Text>
+                        <span className="flex items-center gap-2">
+                          <Loader2 size={14} className="animate-spin" />
+                          <Text size="xs" className="!text-white/80">Calculating fare...</Text>
+                        </span>
                       ) : (
                         <>
                           <Car size={24} className="mb-1 text-white/90" />
                           <Text size="sm" weight="semibold" className="!text-white">
-                            Economy
+                            Standard Ride
                           </Text>
                           {estimates?.["ECONOMY"] && (
-                            <Text
-                              size="xs"
-                              className="mt-0.5 !text-white/80"
-                            >
+                            <Text size="xs" className="mt-0.5 !text-white/80">
                               {formatDuration(estimates["ECONOMY"].duration)}{" "}
                               &bull;{" "}
                               {formatMoney(estimates["ECONOMY"].estimatedFare)}
-                            </Text>
-                          )}
-                        </>
-                      )}
-                    </PrimaryButton>
-
-                    {/* Business Ride Button  */}
-                    <PrimaryButton
-                      onClick={() => handleSelectRide("business")}
-                      disabled={isSubmitting || isCalculating}
-                      className="h-22 flex flex-col items-center justify-center !bg-green-600 hover:!bg-green-700 !text-white focus:ring-green-500"
-                    >
-                      {isCalculating ? (
-                        <Text size="xs" className="!text-white/80">
-                          Calculating...
-                        </Text>
-                      ) : (
-                        <>
-                          <Car size={24} className="mb-1 text-white/90" />
-                          <Text
-                            size="sm"
-                            weight="semibold"
-                            className="!text-white"
-                          >
-                            Business
-                          </Text>
-                          {estimates?.["BUSINESS"] && (
-                            <Text size="xs" className="mt-0.5 !text-white/80">
-                              {formatDuration(estimates["BUSINESS"].duration)}{" "}
-                              &bull;{" "}
-                              {formatMoney(estimates["BUSINESS"].estimatedFare)}
                             </Text>
                           )}
                         </>

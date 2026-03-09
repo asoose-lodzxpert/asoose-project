@@ -18,7 +18,6 @@ export enum RideStatus {
 
 export enum VehicleType {
   ECONOMY = "ECONOMY",
-  BUSINESS = "BUSINESS",
 }
 
 export type Location = {

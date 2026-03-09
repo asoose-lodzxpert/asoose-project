@@ -31,7 +31,7 @@ export function RideDetails() {
 
   return (
     <div className="p-4 rounded-lg shadow-lg w-96 bg-white">
-      <h2 className="text-xl font-bold mb-4">{`Ride: ${rideType}`.toUpperCase()}</h2>
+      <h2 className="text-xl font-bold mb-4">Standard Ride</h2>
       <div className="mb-4">
         {isConfiguring === 'pickup' && (
           <div>

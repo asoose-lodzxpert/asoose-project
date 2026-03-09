@@ -10,7 +10,7 @@ export type RideStage =
   | "in-progress"
   | "payment-required"
   | "finished";
-export type RideType = "economy" | "business";
+export type RideType = "economy";
 
 interface RideState {
   // --- Ride ID Tracking ---

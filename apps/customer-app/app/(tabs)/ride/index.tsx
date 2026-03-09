@@ -16,7 +16,6 @@ import { useRide } from "@/context/RideContext";
 import { RideLocationCard } from "@/components/ride/RideLocationCard";
 import { VehicleTypeSelector } from "@/components/ride/VehicleTypeSelector";
 import { FareEstimateCard } from "@/components/ride/FareEstimateCard";
-import { VehicleType } from "@/types/ride";
 import Toast from "react-native-toast-message";
 
 export default function RideBookingScreen() {
@@ -26,12 +25,9 @@ export default function RideBookingScreen() {
     pageView,
     pickupLocation,
     dropoffLocation,
-    selectedVehicleType,
     fareEstimate,
-    fareOptions,
     loading,
     error,
-    setSelectedVehicleType,
     estimateFare,
     createRide,
     resetBooking,
@@ -202,11 +198,9 @@ export default function RideBookingScreen() {
           }
         />
 
-        {/* Vehicle Type Selection */}
+        {/* Ride Info */}
         <VehicleTypeSelector
-          selected={selectedVehicleType}
-          onSelect={(type: VehicleType) => setSelectedVehicleType(type)}
-          fareOptions={fareOptions}
+          fare={fareEstimate?.fareBreakdown.totalFare}
           isFareLoading={estimating}
           distanceKm={fareEstimate?.distanceKm}
           durationMin={fareEstimate?.durationMin}
