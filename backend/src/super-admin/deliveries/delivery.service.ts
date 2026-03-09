@@ -470,7 +470,7 @@ export class DeliveriesService {
           null,
         dropoffContactPhone: (updated as any).recipientPhone || null,
         recipientName: (updated as any).recipientName || null,
-        requiresOtp: !!(updated as any).deliveryOtp,
+        requiresOtp: false,
         assignedByAdmin: true,
       });
     } catch (e) {
@@ -607,7 +607,7 @@ export class DeliveriesService {
         storeCount: stops.length,
         currentStopIndex: 0,
         orderGroupId,
-        requiresOtp: !!(leadDelivery as any).deliveryOtp,
+        requiresOtp: false,
         assignedByAdmin: true,
       });
     } catch (e) {

@@ -458,7 +458,6 @@ export class OrdersService {
                   distanceKm: parseFloat(prep.distance.toFixed(2)),
                   recipientName: context.user.name,
                   recipientPhone: context.user.phone || 'N/A',
-                  deliveryOtp: String(crypto.randomInt(100000, 999999)),
                 },
               },
             },
@@ -551,7 +550,6 @@ export class OrdersService {
           );
 
           // C. Create ONE group delivery with stops for multi-store orders
-          const deliveryOtp = String(crypto.randomInt(100000, 999999));
           const totalDeliveryFee = preparedStores.reduce(
             (sum, p) => sum + p.deliveryFee,
             0,
@@ -573,7 +571,6 @@ export class OrdersService {
               distanceKm: parseFloat(totalRouteKm.toFixed(2)),
               recipientName: user.name,
               recipientPhone: user.phone || 'N/A',
-              deliveryOtp,
               stops,
               currentStopIndex: 0,
             } as any,

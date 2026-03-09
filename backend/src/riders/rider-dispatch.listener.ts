@@ -97,8 +97,7 @@ export class RiderDispatchListener {
       stops: stops ?? null,
       storeCount: stops?.length ?? 1,
       currentStopIndex: (delivery as any).currentStopIndex ?? 0,
-      // Signal to the rider app whether an OTP must be collected at dropoff
-      requiresOtp: !!(delivery as any).deliveryOtp,
+      requiresOtp: false,
     };
 
     // NOTE: Socket emission is handled by RiderJobEventsListener to avoid duplicate events.
