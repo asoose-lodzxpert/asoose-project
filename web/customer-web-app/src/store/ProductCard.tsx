@@ -58,6 +58,7 @@ export const ProductCard = ({
 
   const handleQuickAdd = async (e: React.MouseEvent) => {
     e.stopPropagation();
+    e.preventDefault();
 
     // If the parent provided an onClick handler (e.g., to open a ProductModal),
     // delegate to it so modifier groups with required selections can be satisfied.
@@ -155,6 +156,7 @@ export const ProductCard = ({
         <div className="flex justify-between items-end mt-2">
           <span className="font-black text-lg">₦{price.toLocaleString()}</span>
           <button
+            type="button"
             onClick={handleQuickAdd}
             disabled={loading}
             className="w-8 h-8 rounded-full bg-gray-100 dark:bg-white/10 flex items-center justify-center text-gray-900 dark:text-white hover:bg-yellow-500 hover:text-black transition-colors z-10 disabled:opacity-50 disabled:cursor-not-allowed"
