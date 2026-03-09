@@ -439,6 +439,15 @@ export class DeliveriesService {
 
     this.logger.debug(JSON.stringify(updated, null, 2));
 
+    // Mark linked order as DISPATCHED now that a rider is on the way
+    if (updated.orderId) {
+      await this.prisma.order.update({
+        where: { id: updated.orderId },
+        data: { status: 'DISPATCHED' },
+      });
+      this.logger.debug(`Order ${updated.orderId} status → DISPATCHED`);
+    }
+
     await this.prisma.activityLog.create({
       data: {
         userId: adminId,
@@ -568,6 +577,18 @@ export class DeliveriesService {
         }),
       ),
     );
+
+    // Mark all linked orders as DISPATCHED
+    const orderIds = groupDeliveries
+      .map((d) => d.orderId)
+      .filter((id): id is string => !!id);
+    if (orderIds.length > 0) {
+      await this.prisma.order.updateMany({
+        where: { id: { in: orderIds } },
+        data: { status: 'DISPATCHED' },
+      });
+      this.logger.debug(`Orders [${orderIds.join(', ')}] status → DISPATCHED`);
+    }
 
     await this.prisma.activityLog.create({
       data: {

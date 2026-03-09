@@ -243,7 +243,7 @@ export class JobsService {
         `Updating delivery ${jobId} → ACCEPTED, rider=${riderId}`,
       );
 
-      return this.prisma.delivery.update({
+      const updatedDelivery = await this.prisma.delivery.update({
         where: { id: jobId },
         data: {
           status: DeliveryStatus.ACCEPTED,
@@ -254,6 +254,17 @@ export class JobsService {
           dropoffAddress: true,
         },
       });
+
+      // Update linked order status to DISPATCHED
+      if (delivery.orderId) {
+        await this.prisma.order.update({
+          where: { id: delivery.orderId },
+          data: { status: 'DISPATCHED' },
+        });
+        this.logger.debug(`Order ${delivery.orderId} status → DISPATCHED`);
+      }
+
+      return updatedDelivery;
     }
 
     if (jobType === 'ride') {
