@@ -12,7 +12,7 @@ import {
 const REASONS = [
   "Customer no-show",
   "Long wait time",
-  "Safety concern",
+  "Safety concerns",
   "Vehicle breakdown",
   "Wrong order / wrong location",
   "Other",
