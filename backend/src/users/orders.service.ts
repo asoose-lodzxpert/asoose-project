@@ -168,12 +168,25 @@ export class OrdersService {
       });
 
       // Calculate fees
-      const storeLat = store.lat ?? 0;
-      const storeLng = store.lng ?? 0;
+      if (
+        store.lat == null ||
+        store.lng == null ||
+        (store.lat === 0 && store.lng === 0)
+      ) {
+        throw new BadRequestException(
+          `"${store.name}" does not have a location set. Please contact support.`,
+        );
+      }
+
+      if (address.lat === 0 && address.lng === 0) {
+        throw new BadRequestException(
+          'Your delivery address could not be located. Please update your address.',
+        );
+      }
 
       const distance = this.pricingService.calculateDistance(
-        storeLat,
-        storeLng,
+        store.lat,
+        store.lng,
         address.lat,
         address.lng,
       );
@@ -219,6 +232,12 @@ export class OrdersService {
 
       if (!dropoffAddress || dropoffAddress.userId !== userId) {
         throw new BadRequestException('Invalid delivery address');
+      }
+
+      if (dropoffAddress.lat === 0 && dropoffAddress.lng === 0) {
+        throw new BadRequestException(
+          'Your delivery address could not be located. Please update your address.',
+        );
       }
 
       const productIds = items.map((i) => i.id);
@@ -304,22 +323,28 @@ export class OrdersService {
           subtotal += unitPrice * item.quantity;
           return { ...item, name: p.name, price: unitPrice };
         });
+
+        // Hard-stop: store must have GPS coordinates. Defaulting to (0,0)
+        // places the store in the Gulf of Guinea and produces a wildly wrong
+        // delivery fee (~3,000+ km from Nigeria).
+        if (
+          store.lat == null ||
+          store.lng == null ||
+          (store.lat === 0 && store.lng === 0)
+        ) {
+          throw new BadRequestException(
+            `"${store.name}" does not have a location set. Please contact support.`,
+          );
+        }
+
         storeEntries.push({
           storeId,
           storeName: store.name,
-          lat: store.lat ?? 0,
-          lng: store.lng ?? 0,
+          lat: store.lat,
+          lng: store.lng,
           subtotal,
           enrichedItems,
         });
-
-        // Warn when a store has no coordinates — distance will be computed
-        // from (0,0) which produces a wildly inaccurate delivery fee.
-        if (store.lat == null || store.lng == null) {
-          this.logger.warn(
-            `Store "${store.name}" (${storeId}) has no GPS coordinates — delivery fee will be inaccurate`,
-          );
-        }
       }
 
       // ── Route-optimized total delivery fee (FareService formula) ──
