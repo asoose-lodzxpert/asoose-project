@@ -7,6 +7,7 @@ import { mapRidesToViewModels } from '@/services/mappers/ride.mapper';
 import type { RideViewModel } from '@/types/ride-view-model';
 import { Loader2, Calendar, MapPin, Clock, AlertCircle } from 'lucide-react';
 import { toast } from 'react-toastify';
+import Link from 'next/link';
 import {
   formatRideDateTime,
   formatCurrency,
@@ -48,7 +49,11 @@ export function RideHistoryClient() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'COMPLETED': return 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400';
-      case 'CANCELLED': return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400';
+      case 'CANCELLED':
+      case 'CANCELLED_BY_USER':
+      case 'CANCELLED_BY_DRIVER':
+      case 'CANCELLED_BY_SYSTEM':
+        return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400';
       case 'IN_PROGRESS': return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400';
       default: return 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-400';
     }
@@ -84,9 +89,10 @@ export function RideHistoryClient() {
       
       <div className="space-y-4">
         {rides.map((ride) => (
-          <div 
-            key={ride.id} 
-            className="p-5 rounded-xl bg-white dark:bg-zinc-900 shadow-sm border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors"
+          <Link
+            key={ride.id}
+            href={`/main/ride/history/${ride.id}`}
+            className="block p-5 rounded-xl bg-white dark:bg-zinc-900 shadow-sm border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors"
           >
             {/* Header: Date & Status */}
             <div className="flex justify-between items-start mb-4">
@@ -138,7 +144,7 @@ export function RideHistoryClient() {
                 </p>
               </div>
             </div>
-          </div>
+          </Link>
         ))}
       </div>
     </div>

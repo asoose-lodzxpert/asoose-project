@@ -11,12 +11,23 @@ export interface StatusDisplay {
   icon: "clock" | "check" | "x" | "car" | "person";
 }
 
-const STATUS_MAP: Record<RideStatus, StatusDisplay> = {
+/**
+ * Status display map — keyed by string (not RideStatus) so legacy DB values
+ * like PENDING / ACCEPTED are still handled gracefully without polluting
+ * the canonical RideStatus union. (H1 fix)
+ */
+const STATUS_MAP: Record<string, StatusDisplay> = {
+  // Legacy statuses kept for old DB records — never emitted for new rides (H1)
   PENDING: {
     label: "Processing",
     badge:
       "bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200",
     icon: "clock",
+  },
+  ACCEPTED: {
+    label: "Driver Arriving",
+    badge: "bg-cyan-100 dark:bg-cyan-900 text-cyan-800 dark:text-cyan-200",
+    icon: "car",
   },
   REQUESTED: {
     label: "Finding Driver",
@@ -35,11 +46,6 @@ const STATUS_MAP: Record<RideStatus, StatusDisplay> = {
   },
   DRIVER_ACCEPTED: {
     label: "Driver Accepted",
-    badge: "bg-cyan-100 dark:bg-cyan-900 text-cyan-800 dark:text-cyan-200",
-    icon: "car",
-  },
-  ACCEPTED: {
-    label: "Driver Arriving",
     badge: "bg-cyan-100 dark:bg-cyan-900 text-cyan-800 dark:text-cyan-200",
     icon: "car",
   },
@@ -90,14 +96,14 @@ const STATUS_MAP: Record<RideStatus, StatusDisplay> = {
 /**
  * Convert RideStatus enum to human-readable label
  */
-export function formatRideStatus(status: RideStatus): string {
+export function formatRideStatus(status: RideStatus | string): string {
   return STATUS_MAP[status]?.label ?? status;
 }
 
 /**
  * Get status display info (label, colors, icon)
  */
-export function getStatusDisplay(status: RideStatus): StatusDisplay {
+export function getStatusDisplay(status: RideStatus | string): StatusDisplay {
   return (
     STATUS_MAP[status] ?? {
       label: status,
@@ -169,8 +175,7 @@ export function formatCurrency(amount?: number): string {
  * @returns Frontend RideStage for the Zustand store
  */
 export function mapBackendStatusToRideStage(
-  backendStatus: RideStatus,
-  _paymentConfirmed: boolean = false,
+  backendStatus: RideStatus | string,
   serverPaymentCompleted: boolean = false,
 ):
   | "idle"
@@ -182,7 +187,7 @@ export function mapBackendStatusToRideStage(
   | "payment-required"
   | "finished" {
   const statusMap: Record<
-    RideStatus,
+    string,
     | "idle"
     | "configuring"
     | "searching"
@@ -192,13 +197,15 @@ export function mapBackendStatusToRideStage(
     | "payment-required"
     | "finished"
   > = {
+    // Legacy statuses (H1) — map gracefully for old DB records
     PENDING: "idle",
+    ACCEPTED: "confirmed",
     REQUESTED: "searching",
     SEARCHING_DRIVER: "searching",
-    DRIVER_ASSIGNED: "searching",
+    // H2 fix: DRIVER_ASSIGNED means a driver was found → 'confirmed', not 'searching'
+    DRIVER_ASSIGNED: "confirmed",
     // Post-ride payment: DRIVER_ACCEPTED always maps to 'confirmed' (no payment gate)
     DRIVER_ACCEPTED: "confirmed",
-    ACCEPTED: "confirmed",
     // Post-ride model: PAID means payment collected after ride completes = ride fully done
     PAID: "finished",
     ARRIVED: "arrived",

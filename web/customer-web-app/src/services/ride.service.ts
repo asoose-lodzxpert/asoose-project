@@ -10,15 +10,8 @@ export interface PriceEstimate {
   estimatedFare: number;
   distance: number;
   duration: number;
-  total: number;
   /** True when a night surcharge is active (after 10 PM Lagos time) */
   isNightRate?: boolean;
-  breakdown: {
-    baseFare: number;
-    distanceFare: number;
-    timeFare: number;
-    platformFee: number;
-  };
 }
 
 /**
@@ -50,13 +43,14 @@ export interface RideRequestPayload {
 export interface CreateRideResponse {
   ride: BackendRide;
   fare: number;
+  /** null in post-ride payment model — payment is created after ride completes */
   payment: {
     id: string;
     amount: number;
     status: string;
     method: string;
     gateway?: string;
-  };
+  } | null;
   message?: string;
 }
 
@@ -136,11 +130,7 @@ export class RideService {
       estimatedFare: fare,
       distance: distanceKm,
       duration: durationMin,
-      total: fare,
       isNightRate: res.isNightRate ?? false,
-      // Breakdown is not provided by the backend fare endpoint;
-      // zeros are placeholders — the backend stores its own breakdown.
-      breakdown: { baseFare: 0, distanceFare: 0, timeFare: 0, platformFee: 0 },
     });
 
     return {

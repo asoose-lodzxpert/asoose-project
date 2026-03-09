@@ -73,13 +73,16 @@ export function RideSocketListener() {
 
           setDriver({
             name: driver.name,
-            photoUrl: driver.image || "/profile.jpg",
+            // Socket payload does NOT include image or rating (C1 fix).
+            // REST sync (useRideSynchronization) will backfill from the
+            // full backend ride object within seconds.
+            photoUrl: "/profile.jpg",
             vehicle: {
               make: driver.vehicle?.brand || "Vehicle",
               model: driver.vehicle?.model || "Car",
               licensePlate: driver.vehicle?.plateNumber || "---",
             },
-            rating: driver.rating ?? null,
+            rating: null,
             phone: driver.phone,
           });
           // Post-ride payment model: go straight to 'confirmed' — payment
@@ -149,11 +152,26 @@ export function RideSocketListener() {
           setRideStatus("payment-required");
           toast.success("Trip completed! Please complete your payment.");
 
-          // Trip summary (fare, distance, duration) is restored by
-          // useRideSynchronization's next poll cycle which already handles
-          // the 'finished' → setTripSummary branch. Removing the duplicate
-          // getCurrentRide() call here eliminates the race condition between
-          // the socket-triggered fetch and the 15s poll (H5 fix).
+          // H6 fix: immediately fetch the completed ride to populate
+          // tripSummary (fare / distance / duration) so PostRidePayment
+          // shows the real fare instead of the locked estimate.
+          const token = session?.accessToken;
+          if (token && rideId) {
+            RideService.getCurrentRide(token)
+              .then((ride) => {
+                if (ride && ride.totalFare != null) {
+                  setTripSummary({
+                    fare: ride.totalFare,
+                    distance: ride.distanceKm ?? 0,
+                    duration: ride.durationMin ?? 0,
+                  });
+                }
+              })
+              .catch((err) => {
+                // Non-fatal — polling will pick it up on next cycle
+                console.warn("[RideSocketListener] Failed to fetch trip summary:", err);
+              });
+          }
         } catch (error) {
           console.error("Socket error (onTripCompleted):", error);
         }

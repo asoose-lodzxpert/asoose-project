@@ -78,6 +78,15 @@ export function RatingModal() {
         >
           {isSubmitting ? 'Submitting...' : 'Submit Review'}
         </button>
+
+        {/* H5/L7 fix: allow user to skip rating without blocking the UI */}
+        <button
+          className="w-full mt-2 py-3 rounded-xl text-sm font-medium text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors"
+          onClick={() => resetRide()}
+          disabled={isSubmitting}
+        >
+          Skip
+        </button>
       </div>
     </div>
   );

@@ -53,7 +53,8 @@ interface RideState {
       model: string;
       licensePlate: string;
     };
-    rating: number;
+    /** L8 fix: rating can be null when the socket payload doesn't include it */
+    rating: number | null;
     phone: string;
   } | null;
   tripSummary: {

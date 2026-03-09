@@ -13,12 +13,10 @@
  */
 
 export type RideStatus = 
-  | 'PENDING' 
   | 'REQUESTED' 
   | 'SEARCHING_DRIVER'
   | 'DRIVER_ASSIGNED'
   | 'DRIVER_ACCEPTED'
-  | 'ACCEPTED' 
   | 'PAID'
   | 'ARRIVED' 
   | 'IN_PROGRESS' 
@@ -92,9 +90,6 @@ export interface RideViewModel {
   /** Actual fare charged (from backend totalFare) */
   actualFare: number;
   
-  /** Estimated fare (if available at request time) */
-  estimatedFare?: number;
-  
   /** Distance traveled in km */
   distanceKm?: number;
   
@@ -118,6 +113,9 @@ export interface RideViewModel {
 
   /** Payment method used (CASH, CARD, BANK_TRANSFER, etc.) */
   paymentMethod?: string;
+
+  /** Payment reference from Paystack (C5 fix) */
+  paymentReference?: string;
   
   /** Cancellation reason (if cancelled) */
   cancellationReason?: string;
@@ -164,6 +162,8 @@ export interface BackendRide {
   
   // Pricing
   totalFare?: number;
+  /** @deprecated estimatedFare is not a real backend column — kept on BackendRide
+   *  only because the API may still include it in responses for old rides. */
   estimatedFare?: number;
   baseFare?: number;
   distanceFare?: number;

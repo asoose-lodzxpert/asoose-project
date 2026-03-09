@@ -64,6 +64,17 @@ export function PostRidePayment() {
         window.location.origin,
       );
 
+      // H3 fix: if server says ride is already paid, skip Paystack redirect
+      if (confirmRes.status === "ALREADY_PAID") {
+        toast.info("Payment was already completed.");
+        setPaymentConfirmed(true);
+        // Transition to finished — payment is done
+        const { setRideStatus } = useRideStore.getState();
+        setRideStatus("finished");
+        setIsProcessing(false);
+        return;
+      }
+
       if (!confirmRes.authorizationUrl) {
         throw new Error(
           "Paystack authorisation URL not returned. Please try again.",

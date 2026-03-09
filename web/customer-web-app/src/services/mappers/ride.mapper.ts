@@ -180,9 +180,6 @@ export function mapRideToViewModel(backendRide: BackendRide): RideViewModel {
 
       // Pricing
       actualFare,
-      ...(backendRide.estimatedFare !== undefined && {
-        estimatedFare: backendRide.estimatedFare,
-      }),
 
       // Distance & Duration
       ...(backendRide.distanceKm !== undefined && {
@@ -209,6 +206,7 @@ export function mapRideToViewModel(backendRide: BackendRide): RideViewModel {
       // Metadata
       ...(backendRide.payment?.status && { paymentStatus: backendRide.payment.status }),
       ...(backendRide.payment?.method && { paymentMethod: backendRide.payment.method }),
+      ...(backendRide.payment?.reference && { paymentReference: backendRide.payment.reference }),
       ...(backendRide.vehicleType && { vehicleType: backendRide.vehicleType }),
       ...(backendRide.cancellationReason && {
         cancellationReason: backendRide.cancellationReason,
@@ -222,7 +220,7 @@ export function mapRideToViewModel(backendRide: BackendRide): RideViewModel {
     // Return minimal safe fallback to prevent UI crash
     return {
       id: backendRide.id ?? 'unknown',
-      status: backendRide.status ?? 'PENDING',
+      status: backendRide.status ?? 'REQUESTED',
       statusLabel: 'Unknown',
       pickupAddress: {
         addressText: 'Pinned Location',

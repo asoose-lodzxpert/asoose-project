@@ -42,6 +42,13 @@ const API_URL = (
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1"
 ).replace(/\/$/, "");
 
+/** C4 fix: helper to check all cancelled status variants */
+const isCancelledStatus = (status: string) =>
+  status === "CANCELLED" ||
+  status === "CANCELLED_BY_USER" ||
+  status === "CANCELLED_BY_DRIVER" ||
+  status === "CANCELLED_BY_SYSTEM";
+
 export default function RideDetailsPage() {
   const params = useParams();
   const router = useRouter();
@@ -161,9 +168,10 @@ export default function RideDetailsPage() {
   const [isDisputeModalOpen, setIsDisputeModalOpen] = useState(false);
   const rideId = params.id as string;
 
+  // C6 fix: use the customer-facing dispute check endpoint (not super-admin)
   const disputeCheckKey =
     ride?.status === "COMPLETED" && rideId
-      ? `${API_URL}/super-admin/disputes/check?rideId=${rideId}`
+      ? `${API_URL}/disputes/check?rideId=${rideId}`
       : null;
 
   const { data: disputeData, mutate: mutateDispute } = useSWR(
@@ -279,7 +287,7 @@ export default function RideDetailsPage() {
             className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
               ride.status === "COMPLETED"
                 ? "bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200"
-                : ride.status === "CANCELLED"
+                : isCancelledStatus(ride.status)
                   ? "bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200"
                   : "bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200"
             }`}
@@ -433,14 +441,6 @@ export default function RideDetailsPage() {
               </span>
             </div>
 
-            {/* Estimated Fare (if different from actual) */}
-            {ride.estimatedFare && ride.estimatedFare !== ride.actualFare && (
-              <div className="flex justify-between text-zinc-400 text-xs">
-                <span>Estimated</span>
-                <span>{formatCurrency(ride.estimatedFare)}</span>
-              </div>
-            )}
-
             {/* Distance */}
             {ride.distanceKm && (
               <div className="flex justify-between">
@@ -482,14 +482,14 @@ export default function RideDetailsPage() {
                   : "Card"}
               </p>
               <p className="text-xs text-zinc-400 truncate">
-                Transaction ID: {ride.id.slice(0, 12).toUpperCase()}
+                Transaction ID: {ride.paymentReference?.toUpperCase() || ride.id.slice(0, 12).toUpperCase()}
               </p>
             </div>
           </div>
         </div>
 
         {/* ========== CANCELLATION REASON (if applicable) ========== */}
-        {ride.status === "CANCELLED" && ride.cancellationReason && (
+        {isCancelledStatus(ride.status) && ride.cancellationReason && (
           <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-xl border border-red-200 dark:border-red-800">
             <p className="text-xs font-bold text-red-600 dark:text-red-400 uppercase tracking-wider mb-2">
               Cancellation Reason

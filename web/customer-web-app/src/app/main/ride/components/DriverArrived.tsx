@@ -107,10 +107,13 @@ export function DriverArrived() {
               <p className="font-bold text-zinc-900 dark:text-white truncate">
                 {driver.name}
               </p>
-              <div className="flex items-center gap-1 bg-yellow-100 dark:bg-yellow-900/30 px-1.5 py-0.5 rounded text-[10px] font-bold text-yellow-700 dark:text-yellow-400">
-                <span>★</span>
-                <span>{driver.rating.toFixed(1)}</span>
-              </div>
+              {/* C2 fix: only render rating badge when rating is not null */}
+              {driver.rating != null && (
+                <div className="flex items-center gap-1 bg-yellow-100 dark:bg-yellow-900/30 px-1.5 py-0.5 rounded text-[10px] font-bold text-yellow-700 dark:text-yellow-400">
+                  <span>★</span>
+                  <span>{driver.rating.toFixed(1)}</span>
+                </div>
+              )}
             </div>
             <p className="text-sm text-zinc-500 dark:text-zinc-400 truncate">
               {driver.vehicle.model} •{" "}

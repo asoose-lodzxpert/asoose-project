@@ -36,14 +36,10 @@ export function useRideSynchronization() {
   const setTripSummary = useRideStore((state) => state.setTripSummary);
   const setRideType = useRideStore((state) => state.setRideType);
   const setStartOtp = useRideStore((state) => state.setStartOtp);
-  const paymentConfirmed = useRideStore((state) => state.paymentConfirmed);
 
   /**
    * Core sync function — fetches current ride from backend and reconciles store.
    * Used for both initial sync and periodic polling.
-   *
-   * statusMap is built INSIDE the callback so it always reflects the current
-   * value of paymentConfirmed — no stale-closure risk (C2 fix).
    */
   const syncRideState = useCallback(
     async (token: string) => {
@@ -99,7 +95,6 @@ export function useRideSynchronization() {
         const activeRide = mapRideToViewModel(backendRide);
         const mappedStatus = mapBackendStatusToRideStage(
           activeRide.status,
-          false, // paymentConfirmed is unused in post-ride model
           serverPaymentCompleted
         );
 
@@ -242,7 +237,6 @@ export function useRideSynchronization() {
       }
     },
     [
-      paymentConfirmed, // must be here — statusMap reads it inside the callback
       setRideId,
       setRideStatus,
       setPickupLocation,
