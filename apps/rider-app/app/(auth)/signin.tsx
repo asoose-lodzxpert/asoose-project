@@ -176,7 +176,7 @@ export default function LoginScreen() {
 
       // Navigate to home
       router.replace("/");
-    } catch (e: any) {
+    } catch {
       Toast.show({
         type: "error",
         text1: "Error",
@@ -275,7 +275,9 @@ export default function LoginScreen() {
 
                 {/* Forgot Password Link */}
                 <View style={styles.forgotPasswordSection}>
-                  <Pressable onPress={() => router.push("/(auth)/forgot-password")}>
+                  <Pressable
+                    onPress={() => router.push("/(auth)/forgot-password")}
+                  >
                     <ThemedText type="link" style={{ fontSize: 14 }}>
                       Forgot Password?
                     </ThemedText>

@@ -44,11 +44,13 @@ interface FullDeliveryDetails {
     phone: string;
     image?: string;
     rating?: number;
-    vehicle?: string | {
-      model: string;
-      color: string;
-      plateNumber: string;
-    };
+    vehicle?:
+      | string
+      | {
+          model: string;
+          color: string;
+          plateNumber: string;
+        };
   };
   pickupAddress?: {
     address?: string; // Resolved string from backend
@@ -158,14 +160,6 @@ export default function DeliveryProgressUI({
                   ? "Delivery Completed"
                   : "Tracking Delivery"}
               </h2>
-              {delivery?.deliveryOtp &&
-                !["DELIVERED", "CANCELLED"].includes(status) && (
-                  <span className="flex items-center gap-1.5 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-500/30 rounded-lg px-2.5 py-1">
-                    <span className="font-black tracking-[0.15em] text-yellow-600 dark:text-yellow-400 font-mono text-sm">
-                      Code: {delivery.deliveryOtp}
-                    </span>
-                  </span>
-                )}
             </div>
             <p className="text-zinc-500 text-sm">ID: {delivery?.id || "---"}</p>
           </div>

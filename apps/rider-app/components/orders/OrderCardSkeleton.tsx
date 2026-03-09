@@ -23,7 +23,7 @@ export function OrderCardSkeleton() {
         }),
       ]),
     ).start();
-  }, []);
+  }, [shimmer]);
 
   const shimmerOpacity = shimmer.interpolate({
     inputRange: [0, 1],

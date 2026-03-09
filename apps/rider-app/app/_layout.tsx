@@ -10,8 +10,6 @@ import { NotificationPreferencesProvider } from "@/context/NotificationPreferenc
 import { toastConfig } from "@/components/ThemedToast";
 import { loadServiceBounds } from "@/constants/service-bounds";
 
-const ONBOARDING_KEY = "asoose_rider_onboarded";
-
 function RootNavigator() {
   // Always render all routes - navigation logic is handled by index.tsx
   return (

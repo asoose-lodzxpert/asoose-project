@@ -1,4 +1,4 @@
-﻿/**
+/**
  * MapCanvas  Uber/Bolt-style rider navigation map
  *
  * Improvements over the previous monolith:
@@ -275,21 +275,11 @@ const MapCanvas = forwardRef<MapCanvasHandle>((_, ref) => {
   //  Stabilised pickup / dropoff coords
   const pickupCoords = useMemo(
     () => (activeJob ? resolveCoords(activeJob.pickupAddress) : null),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [
-      activeJob?.id,
-      activeJob?.pickupAddress?.latitude ?? activeJob?.pickupAddress?.lat,
-      activeJob?.pickupAddress?.longitude ?? activeJob?.pickupAddress?.lng,
-    ],
+    [activeJob],
   );
   const dropoffCoords = useMemo(
     () => (activeJob ? resolveCoords(activeJob.dropoffAddress) : null),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [
-      activeJob?.id,
-      activeJob?.dropoffAddress?.latitude ?? activeJob?.dropoffAddress?.lat,
-      activeJob?.dropoffAddress?.longitude ?? activeJob?.dropoffAddress?.lng,
-    ],
+    [activeJob],
   );
 
   //  Routing
@@ -359,7 +349,7 @@ const MapCanvas = forwardRef<MapCanvasHandle>((_, ref) => {
         animated: true,
       });
     }, 400);
-  }, [activeJob?.id, isMapReady, pickupCoords, dropoffCoords, location]);
+  }, [activeJob, isMapReady, pickupCoords, dropoffCoords, location]);
 
   //  Navigation camera
   const isEnRoute =

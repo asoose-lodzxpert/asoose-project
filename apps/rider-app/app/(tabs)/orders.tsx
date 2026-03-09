@@ -83,7 +83,7 @@ export default function OrdersScreen() {
           setOrders(response.data);
         }
         setPagination(response.pagination);
-      } catch (error) {
+      } catch {
         if (gen !== fetchGenRef.current) return;
         Toast.show({
           type: "error",

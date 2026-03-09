@@ -122,8 +122,7 @@ export class JobsService {
         dropoffAddress: delivery.dropoffAddress,
         earnings: delivery.deliveryFee,
 
-        // Never expose the OTP to the rider — just signal that one is required
-        requiresOtp: !!delivery.deliveryOtp,
+        requiresOtp: false,
         packageDetails: delivery.packageDetails ?? undefined,
         distanceKm: delivery.distanceKm ?? undefined,
         assignedAt: delivery.assignedAt ?? undefined,
@@ -786,7 +785,7 @@ export class JobsService {
         id: delivery.id,
         status: delivery.status,
         dropoffAddress: delivery.dropoffAddress,
-        requiresOtp: !!(delivery as any).deliveryOtp,
+        requiresOtp: false,
       };
     }
 
@@ -839,7 +838,6 @@ export class JobsService {
           id: true,
           status: true,
           riderId: true,
-          deliveryOtp: true,
           deliveryFee: true,
         },
       });
@@ -865,19 +863,6 @@ export class JobsService {
         );
       }
 
-      // OTP check — if delivery was created with an OTP, the rider must provide it
-      if (delivery.deliveryOtp) {
-        const providedOtp = payload?.otp as string | undefined;
-        if (!providedOtp) {
-          throw new BadRequestException(
-            'A delivery OTP is required to complete this delivery.',
-          );
-        }
-        if (providedOtp.trim() !== delivery.deliveryOtp.trim()) {
-          throw new BadRequestException('Incorrect delivery OTP.');
-        }
-      }
-
       this.logger.debug(`Completing delivery ${jobId} → DELIVERED`);
 
       const updatedDelivery = await this.prisma.delivery.update({
@@ -885,7 +870,6 @@ export class JobsService {
         data: {
           status: DeliveryStatus.DELIVERED,
           deliveredAt: new Date(),
-          deliveryProof: payload?.proof ?? null,
         },
       });
 
