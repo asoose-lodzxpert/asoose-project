@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { useRideStore } from '../store/ride';
+import { useRideStore } from "../store/ride";
 
 export function RideDetails() {
   const rideType = useRideStore((state) => state.rideType);
@@ -14,16 +14,16 @@ export function RideDetails() {
   const setDropoffLocation = useRideStore((state) => state.setDropoffLocation);
 
   const handleConfirm = () => {
-    if (isConfiguring === 'pickup') {
-      setIsConfiguring('dropoff');
-    } else if (isConfiguring === 'dropoff') {
-      setRideStatus('searching');
+    if (isConfiguring === "pickup") {
+      setIsConfiguring("dropoff");
+    } else if (isConfiguring === "dropoff") {
+      setRideStatus("searching");
       setIsConfiguring(null);
     }
   };
 
   const handleCancel = () => {
-    setRideStatus('idle');
+    setRideStatus("idle");
     setIsConfiguring(null);
     setPickupLocation(null);
     setDropoffLocation(null);
@@ -33,7 +33,7 @@ export function RideDetails() {
     <div className="p-4 rounded-lg shadow-lg w-96 bg-white">
       <h2 className="text-xl font-bold mb-4">Standard Ride</h2>
       <div className="mb-4">
-        {isConfiguring === 'pickup' && (
+        {isConfiguring === "pickup" && (
           <div>
             <h3 className="font-semibold">Set Pickup Location</h3>
             {/* In a real app, this would be a map interface to select a location */}
@@ -50,7 +50,7 @@ export function RideDetails() {
             />
           </div>
         )}
-        {isConfiguring === 'dropoff' && (
+        {isConfiguring === "dropoff" && (
           <div>
             <h3 className="font-semibold">Set Dropoff Location</h3>
             {/* In a real app, this would be a map interface to select a location */}
@@ -69,13 +69,13 @@ export function RideDetails() {
       </div>
       {isConfiguring && (
         <div className="flex justify-between">
-          <button 
+          <button
             className="px-4 py-2 rounded-md bg-gray-400 hover:bg-gray-500 text-white"
             onClick={handleCancel}
           >
             Cancel
           </button>
-          <button 
+          <button
             className="px-4 py-2 rounded-md bg-blue-500 text-white hover:bg-blue-600"
             onClick={handleConfirm}
           >
@@ -83,9 +83,7 @@ export function RideDetails() {
           </button>
         </div>
       )}
-      {rideStatus === 'searching' && (
-        <p>Searching for a driver...</p>
-      )}
+      {rideStatus === "searching" && <p>Searching for a driver...</p>}
     </div>
   );
 }

@@ -528,12 +528,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
         setLoading(false);
       }
     },
-    [
-      pickupLocation,
-      dropoffLocation,
-      fareEstimate,
-      refreshCurrentRide,
-    ],
+    [pickupLocation, dropoffLocation, fareEstimate, refreshCurrentRide],
   );
 
   // Confirm payment (called after DRIVER_ACCEPTED — transitions ride to PAID)
