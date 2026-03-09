@@ -38,13 +38,10 @@ export interface IncomingJobOffer {
 
   earnings: number;
   packageDetails?: string; // delivery
-  requiresOtp?: boolean; // delivery — true when an OTP must be collected from recipient
   distanceKm?: number;
   durationMin?: number;
   /** OTP required to start the ride (ride only — shown at pickup) */
   startOtp?: string;
-  /** OTP required to confirm delivery (delivery only) */
-  deliveryOtp?: string;
 
   // Order items (what is being picked up)
   orderItems?: string[];
@@ -81,7 +78,6 @@ export interface CurrentJob {
   earnings: number;
 
   packageDetails?: string; // delivery
-  requiresOtp?: boolean; // delivery — true when an OTP must be collected from recipient
   startOtp?: string; // ride
 
   status: string;

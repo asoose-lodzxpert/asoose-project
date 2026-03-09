@@ -24,8 +24,6 @@ import Toast from "react-native-toast-message";
 import { io, Socket } from "socket.io-client";
 import { useAuth } from "./AuthContext";
 
-type FareOptions = { economy: number; business: number };
-
 type RideContextType = {
   // State
   currentRide: Ride | null;
@@ -33,16 +31,13 @@ type RideContextType = {
   loading: boolean;
   error: string | null;
   fareEstimate: FareEstimate | null;
-  fareOptions: FareOptions | null;
   driverLocation: DriverLocation | null;
 
   // Booking flow
   pickupLocation: Location | null;
   dropoffLocation: Location | null;
-  selectedVehicleType: VehicleType;
   setPickupLocation: (location: Location | null) => void;
   setDropoffLocation: (location: Location | null) => void;
-  setSelectedVehicleType: (type: VehicleType) => void;
 
   // Actions
   estimateFare: () => Promise<void>;
@@ -77,7 +72,6 @@ export function RideProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fareEstimate, setFareEstimate] = useState<FareEstimate | null>(null);
-  const [fareOptions, setFareOptions] = useState<FareOptions | null>(null);
   const [driverLocation, setDriverLocation] = useState<DriverLocation | null>(
     null,
   );
@@ -86,9 +80,6 @@ export function RideProvider({ children }: { children: ReactNode }) {
   // Booking state
   const [pickupLocation, setPickupLocation] = useState<Location | null>(null);
   const [dropoffLocation, setDropoffLocation] = useState<Location | null>(null);
-  const [selectedVehicleType, setSelectedVehicleType] = useState<VehicleType>(
-    VehicleType.ECONOMY,
-  );
 
   const socketRef = useRef<Socket | null>(null);
   const pollingIntervalRef = useRef<number | null>(null);
@@ -363,7 +354,6 @@ export function RideProvider({ children }: { children: ReactNode }) {
         setPageView("IDLE");
         setDriverLocation(null);
         setFareEstimate(null);
-        setFareOptions(null);
         setError(null);
 
         // Show alert only when driver or system cancelled — not when the user
@@ -449,23 +439,6 @@ export function RideProvider({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
-  // Update fareEstimate totalFare when vehicle type changes (if fareOptions available)
-  useEffect(() => {
-    if (!fareOptions) return;
-    const totalFare =
-      selectedVehicleType === VehicleType.BUSINESS
-        ? fareOptions.business
-        : fareOptions.economy;
-    setFareEstimate((prev) =>
-      prev
-        ? {
-            ...prev,
-            fareBreakdown: { ...prev.fareBreakdown, totalFare },
-          }
-        : prev,
-    );
-  }, [selectedVehicleType, fareOptions]);
-
   // Estimate fare
   const estimateFare = useCallback(async () => {
     if (!pickupLocation || !dropoffLocation) {
@@ -482,22 +455,10 @@ export function RideProvider({ children }: { children: ReactNode }) {
         pickupLng: pickupLocation.longitude,
         dropoffLat: dropoffLocation.latitude,
         dropoffLng: dropoffLocation.longitude,
-        vehicleType: selectedVehicleType,
+        vehicleType: VehicleType.ECONOMY,
       });
 
-      // Map backend response to FareEstimate type
-      const options: FareOptions = {
-        economy: Number(response.economyPrice ?? response.price),
-        business: Number(
-          response.businessPrice ?? Math.round(Number(response.price) * 1.5),
-        ),
-      };
-      setFareOptions(options);
-
-      const totalFare =
-        selectedVehicleType === VehicleType.BUSINESS
-          ? options.business
-          : options.economy;
+      const totalFare = Number(response.economyPrice ?? response.price);
 
       const estimate: FareEstimate = {
         distanceKm: response.distance.meters / 1000,
@@ -521,7 +482,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }, [pickupLocation, dropoffLocation, selectedVehicleType]);
+  }, [pickupLocation, dropoffLocation]);
 
   // Create ride
   const createRide = useCallback(
@@ -543,7 +504,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
         const response = await RideService.requestRide({
           pickupLocation,
           dropoffLocation,
-          vehicleType: selectedVehicleType,
+          vehicleType: VehicleType.ECONOMY,
           fare: fareEstimate.fareBreakdown.totalFare,
           distanceKm: fareEstimate.distanceKm,
           durationMin: fareEstimate.durationMin,
@@ -570,7 +531,6 @@ export function RideProvider({ children }: { children: ReactNode }) {
     [
       pickupLocation,
       dropoffLocation,
-      selectedVehicleType,
       fareEstimate,
       refreshCurrentRide,
     ],
@@ -619,9 +579,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
         setDriverLocation(null);
         setPickupLocation(null);
         setDropoffLocation(null);
-        setSelectedVehicleType(VehicleType.ECONOMY);
         setFareEstimate(null);
-        setFareOptions(null);
         setError(null);
       } catch (err: any) {
         setError(err?.message || "Failed to cancel ride");
@@ -637,9 +595,7 @@ export function RideProvider({ children }: { children: ReactNode }) {
   const resetBooking = useCallback(() => {
     setPickupLocation(null);
     setDropoffLocation(null);
-    setSelectedVehicleType(VehicleType.ECONOMY);
     setFareEstimate(null);
-    setFareOptions(null);
     setError(null);
     setCurrentRide(null);
     setPageView("IDLE");
@@ -655,10 +611,8 @@ export function RideProvider({ children }: { children: ReactNode }) {
     setPageView("IDLE");
     setDriverLocation(null);
     setFareEstimate(null);
-    setFareOptions(null);
     setPickupLocation(null);
     setDropoffLocation(null);
-    setSelectedVehicleType(VehicleType.ECONOMY);
     setError(null);
   }, []);
 
@@ -668,14 +622,11 @@ export function RideProvider({ children }: { children: ReactNode }) {
     loading,
     error,
     fareEstimate,
-    fareOptions,
     driverLocation,
     pickupLocation,
     dropoffLocation,
-    selectedVehicleType,
     setPickupLocation,
     setDropoffLocation,
-    setSelectedVehicleType,
     estimateFare,
     createRide,
     confirmPayment,

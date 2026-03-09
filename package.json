@@ -23,5 +23,8 @@
     "packages/*",
     "backend",
     "web/*"
-  ]
+  ],
+  "resolutions": {
+    "@bull-board/api": "6.20.3"
+  }
 }

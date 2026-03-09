@@ -35,6 +35,8 @@ export class OrdersService {
       type && type !== 'All' ? SERVICE_TYPE_MAP[type] : undefined;
 
     const where: Prisma.OrderWhereInput = {
+      // Only show paid orders in the admin dashboard
+      paymentStatus: 'PAID',
       ...(search && {
         OR: [
           { id: { contains: search, mode: 'insensitive' } },
@@ -68,7 +70,7 @@ export class OrdersService {
         include: {
           user: { select: { name: true } },
           store: { select: { name: true, type: true } },
-          // ✅ FIX: Include Direct Payment AND Group Payment
+          // Γ£à FIX: Include Direct Payment AND Group Payment
           payment: { select: { status: true, amount: true, method: true } },
           orderGroup: {
             include: {
@@ -130,7 +132,7 @@ export class OrdersService {
             modifiers: true,
           },
         },
-        // ✅ FIX: Include Direct Payment AND Group Payment
+        // Γ£à FIX: Include Direct Payment AND Group Payment
         payment: true,
         orderGroup: {
           include: { payment: true },
@@ -190,7 +192,7 @@ export class OrdersService {
         data: { status: 'DELIVERED', deliveredAt: new Date() },
       });
 
-      // ✅ LOGIC FIX: Check resolved payment
+      // Γ£à LOGIC FIX: Check resolved payment
       if (payment && payment.status === 'COMPLETED') {
         // Record Commission (Vendor Earning)
         await this.ledgerService.recordOrderCommission({
@@ -412,9 +414,9 @@ export class OrdersService {
       else if (statuses.length > 1) whereClause.status = { in: statuses };
     }
 
-    // Step 1 — get IDs in priority order via raw SQL.
-    // Status priority: PENDING (needs immediate action) → CONFIRMED → PREPARING
-    // → READY → all others → CANCELLED/DECLINED (no action needed).
+    // Step 1 ΓÇö get IDs in priority order via raw SQL.
+    // Status priority: PENDING (needs immediate action) ΓåÆ CONFIRMED ΓåÆ PREPARING
+    // ΓåÆ READY ΓåÆ all others ΓåÆ CANCELLED/DECLINED (no action needed).
     // Secondary sort: most recent first.
     const statusFilter =
       statuses.length > 0
@@ -444,7 +446,7 @@ export class OrdersService {
       this.prisma.order.count({ where: whereClause }),
     ]);
 
-    // Step 2 — fetch full records with all includes for the page's IDs.
+    // Step 2 ΓÇö fetch full records with all includes for the page's IDs.
     const ids = orderedRows.map((r) => r.id);
     if (ids.length === 0) {
       return {
@@ -525,7 +527,7 @@ export class OrdersService {
       else if (statuses.length > 1) whereClause.status = { in: statuses };
     }
 
-    // Step 1 — get page of IDs in status-priority + recency order via raw SQL.
+    // Step 1 ΓÇö get page of IDs in status-priority + recency order via raw SQL.
     const statusFilter =
       statuses.length > 0
         ? Prisma.sql`AND o.status = ANY(ARRAY[${Prisma.join(statuses)}]::"OrderStatus"[])`
@@ -564,7 +566,7 @@ export class OrdersService {
       }),
     ]);
 
-    // Step 2 — fetch full records with includes for the page's IDs.
+    // Step 2 ΓÇö fetch full records with includes for the page's IDs.
     const ids = orderedRows.map((r) => r.id);
     if (ids.length === 0) {
       return {
@@ -625,7 +627,7 @@ export class OrdersService {
     };
   }
 
-  /** Admin accepts a store order (PENDING → CONFIRMED) */
+  /** Admin accepts a store order (PENDING ΓåÆ CONFIRMED) */
   async adminAcceptOrder(orderId: string, adminId: string) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
@@ -656,7 +658,7 @@ export class OrdersService {
     return updated;
   }
 
-  /** Admin declines a store order (PENDING → REJECTED) */
+  /** Admin declines a store order (PENDING ΓåÆ REJECTED) */
   async adminDeclineOrder(orderId: string, adminId: string, reason: string) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
@@ -685,7 +687,7 @@ export class OrdersService {
     return updated;
   }
 
-  /** Admin marks order as preparing (CONFIRMED → PREPARING) */
+  /** Admin marks order as preparing (CONFIRMED ΓåÆ PREPARING) */
   async adminStartPreparing(orderId: string, adminId: string) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
@@ -713,7 +715,7 @@ export class OrdersService {
     return updated;
   }
 
-  /** Admin marks order as ready (CONFIRMED|PREPARING → READY) */
+  /** Admin marks order as ready (CONFIRMED|PREPARING ΓåÆ READY) */
   async adminMarkReady(orderId: string, adminId: string) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },

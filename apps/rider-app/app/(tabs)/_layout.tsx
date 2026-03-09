@@ -31,7 +31,7 @@ export default function TabLayout() {
       try {
         const count = await getUnreadCount();
         setUnreadCount(count);
-      } catch (error) {
+      } catch {
         // Silently fail
       }
     };

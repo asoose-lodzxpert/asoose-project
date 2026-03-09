@@ -20,7 +20,7 @@ export function SignupSuccess() {
           Application Sent
         </ThemedText>
         <ThemedText style={styles.subTitle}>
-          We're reviewing your profile
+          We&apos;re reviewing your profile
         </ThemedText>
       </View>
 
@@ -59,7 +59,7 @@ export function SignupSuccess() {
       {/* 3. Simple Footer Info */}
       <View style={styles.footer}>
         <ThemedText style={[styles.footerText, { color: muted }]}>
-          We'll notify you via email as soon as your account is activated.
+          We&apos;ll notify you via email as soon as your account is activated.
         </ThemedText>
       </View>
     </ThemedView>

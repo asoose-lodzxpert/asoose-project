@@ -248,7 +248,7 @@ export class UsersService {
         status: r.status,
         total: r.totalFare,
         createdAt: r.createdAt,
-        description: `Ride to ${r.dropoffAddress.city}`,
+        description: `Ride to ${r.dropoffAddress.street || r.dropoffAddress.city || 'Unknown location'}`,
       }));
     } catch (error) {
       this.logger.error(

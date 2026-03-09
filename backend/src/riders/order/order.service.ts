@@ -204,7 +204,7 @@ export class OrderService {
             status: true,
             deliveryFee: true,
             packageDetails: true,
-            deliveryOtp: true,
+
             assignedAt: true,
             pickedUpAt: true,
             createdAt: true,
@@ -227,7 +227,7 @@ export class OrderService {
           customerPhone: delivery.customer?.phone || '',
           earnings: delivery.deliveryFee || 0,
           packageDetails: delivery.packageDetails,
-          deliveryOtp: delivery.deliveryOtp,
+
           status: delivery.status,
           assignedAt: delivery.assignedAt,
           pickedUpAt: delivery.pickedUpAt,

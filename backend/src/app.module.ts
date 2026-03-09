@@ -2,10 +2,8 @@ import { BullModule } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
-import { appLogger } from './libs/logger/logger';
 import { AppConfigModule } from './config/config.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
-// import { MongooseModule } from '@nestjs/mongoose';  // Commented out - MongoDB optional
 import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis';
@@ -66,7 +64,7 @@ import { MetricsModule } from './metrics/metrics.module';
     }),
     ScheduleModule.forRoot(),
 
-    // ---------- MongoDB (optional — used only for error-log storage) ----------  
+    // ---------- MongoDB (optional — used only for error-log storage) ----------
     // Commented out - enable when you have MongoDB running
     // MongooseModule.forRootAsync({
     //   inject: [ConfigService],

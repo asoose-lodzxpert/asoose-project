@@ -94,16 +94,37 @@ export function useRiderLocation(): UseRiderLocationResult {
       setPermissionDenied(false);
 
       // Immediately surface a position before the watcher delivers its first fix.
-      // Use Balanced accuracy here because getting a High-accuracy fix cold can
-      // take several seconds.
-      try {
-        const initial = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Balanced,
-        });
-        setLocation(toRiderLocation(initial));
-        setError(null);
-      } catch {
-        // Non-fatal: the watcher will deliver the first fix shortly
+      // Try progressively lower accuracy levels so we get *something* quickly
+      // (network location ~1 s) even when the GPS chip is cold or unavailable.
+      const withTimeout = (
+        promise: Promise<Location.LocationObject>,
+        ms: number,
+      ) =>
+        Promise.race([
+          promise,
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error("timeout")), ms),
+          ),
+        ]);
+
+      const initialAccuracyLevels = [
+        Location.Accuracy.Balanced, // GPS + network, ~5 s cold
+        Location.Accuracy.Low,      // network only, ~1-2 s
+        Location.Accuracy.Lowest,   // coarse network, immediate
+      ];
+
+      for (const accuracy of initialAccuracyLevels) {
+        try {
+          const initial = await withTimeout(
+            Location.getCurrentPositionAsync({ accuracy }),
+            5000,
+          );
+          setLocation(toRiderLocation(initial));
+          setError(null);
+          break; // got a fix — stop trying lower accuracies
+        } catch {
+          // try next lower accuracy level
+        }
       }
 
       // Start continuous, high-accuracy watch for navigation quality

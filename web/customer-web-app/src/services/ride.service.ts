@@ -72,7 +72,7 @@ export interface ConfirmRideResponse {
 interface FareRideResponse {
   price: number;
   economyPrice: number;
-  businessPrice: number;
+  businessPrice?: number;
   isNightRate?: boolean;
   distance: { meters: number; text: string };
   eta: { seconds: number; text: string };
@@ -80,12 +80,9 @@ interface FareRideResponse {
 
 export class RideService {
   /**
-   * Fetch fare estimates from POST /fare/ride.
+   * Fetch fare estimate from POST /fare/ride.
    *
-   * The backend returns economy-level pricing; the BUSINESS fare is derived
-   * on the frontend as economyPrice * 1.5. The result is transformed into
-   * the standard Record<VehicleType, PriceEstimate> shape so the rest of the
-   * UI requires no changes.
+   * Returns a single Standard Ride estimate (economy pricing from the backend).
    *
    * @param data - Coordinates (camelCase — converted to backend snake_case internally)
    * @param token - Auth token
@@ -123,8 +120,6 @@ export class RideService {
 
     // Economy fare comes directly from the backend
     const economyFare = res.economyPrice;
-    // Business fare comes from the backend — no local multiplier
-    const businessFare = res.businessPrice;
 
     const toEstimate = (fare: number): PriceEstimate => ({
       estimatedFare: fare,
@@ -135,7 +130,6 @@ export class RideService {
 
     return {
       ECONOMY: toEstimate(economyFare),
-      BUSINESS: toEstimate(businessFare),
     };
   }
 

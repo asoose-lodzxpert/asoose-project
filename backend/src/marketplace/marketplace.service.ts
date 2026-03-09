@@ -62,6 +62,8 @@ export class MarketplaceService {
           status: 'ACTIVE',
           verification: 'VERIFIED',
           products: { some: { status: 'ACTIVE' } },
+          lat: { not: null },
+          lng: { not: null },
         },
         take: 10,
         orderBy: { rating: 'desc' },
@@ -128,9 +130,11 @@ export class MarketplaceService {
 
     // Explicitly type the where object
     const where: Prisma.StoreWhereInput = {
-      status: StoreStatus.ACTIVE, // Use the Enum instead of a string
-      verification: VerificationStatus.VERIFIED, // Use the Enum instead of a string
+      status: StoreStatus.ACTIVE,
+      verification: VerificationStatus.VERIFIED,
       products: { some: { status: 'ACTIVE' } },
+      lat: { not: null },
+      lng: { not: null },
       ...(type ? { type: this.mapSlugToType(type) } : {}),
     };
 
@@ -187,8 +191,10 @@ export class MarketplaceService {
       where: {
         type: this.mapSlugToType(verticalId),
         status: 'ACTIVE',
-        verification: 'VERIFIED', // Ensure we only show verified stores
+        verification: 'VERIFIED',
         products: { some: { status: 'ACTIVE' } },
+        lat: { not: null },
+        lng: { not: null },
       },
       orderBy: orderBy,
       take: 20,
@@ -263,6 +269,8 @@ export class MarketplaceService {
         status: 'ACTIVE',
         verification: 'VERIFIED',
         products: { some: { status: 'ACTIVE' } },
+        lat: { not: null },
+        lng: { not: null },
         name: { contains: query, mode: 'insensitive' },
       },
       take: 10,
@@ -331,6 +339,9 @@ export class MarketplaceService {
     });
 
     if (!store) return null;
+
+    // Hide store if it lacks GPS coordinates — ordering would fail anyway
+    if (store.lat == null || store.lng == null) return null;
 
     const availability = isStoreCurrentlyOpen(store);
 

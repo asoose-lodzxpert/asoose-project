@@ -27,13 +27,13 @@ export default function PendingScreen() {
         </ThemedText>
 
         <ThemedText style={[styles.subtitle, { color: textSecondary }]}>
-          Hang tight, {user?.name?.split(" ")[0]}. We're reviewing your rider
-          account. This usually takes 24-48 hours.
+          Hang tight, {user?.name?.split(" ")[0]}. We&apos;re reviewing your
+          rider account. This usually takes 24-48 hours.
         </ThemedText>
 
         <ThemedText style={[styles.info, { color: textSecondary }]}>
-          We'll notify you via email once your account is approved and ready to
-          start accepting deliveries.
+          We&apos;ll notify you via email once your account is approved and
+          ready to start accepting deliveries.
         </ThemedText>
 
         <Pressable

@@ -165,17 +165,6 @@ export const jobsService = {
     return response;
   },
 
-  async verifyDeliveryOtp(jobId: string, otp: string) {
-    const response = await fetchWithAuth(
-      `${EXPO_PUBLIC_API_URL}/rider/jobs/${jobId}/verify-otp`,
-      {
-        method: "POST",
-        body: JSON.stringify({ otp }),
-      },
-    );
-    return response as { valid: boolean; requiresOtp: boolean };
-  },
-
   async goOnline(coords: { latitude: number; longitude: number }) {
     return retryWithBackoff(
       async () => {

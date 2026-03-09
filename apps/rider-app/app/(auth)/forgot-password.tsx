@@ -24,7 +24,7 @@ export default function ForgotPasswordScreen() {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  
+
   const router = useRouter();
   const primary = useThemeColor({}, "brandPrimary");
   const textOnPrimary = useThemeColor({}, "textOnPrimary");
@@ -35,30 +35,30 @@ export default function ForgotPasswordScreen() {
       setError("Email is required");
       return false;
     }
-    
+
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       setError("Please enter a valid email address");
       return false;
     }
-    
+
     return true;
   }
 
   async function handleSendOtp() {
     setError("");
     if (!validateEmail()) return;
-    
+
     setLoading(true);
     try {
       await sendPasswordResetOtp(email);
-      
+
       Toast.show({
         type: "success",
         text1: "OTP Sent",
         text2: "Check your email for the verification code",
       });
-      
+
       // Navigate to verify screen with email
       // @ts-ignore - Dynamic route not yet in type system
       router.push({
@@ -108,7 +108,8 @@ export default function ForgotPasswordScreen() {
                     Forgot Password
                   </ThemedText>
                   <ThemedText style={[styles.subtitle, { color: muted }]}>
-                    Enter your email address and we'll send you a verification code to reset your password
+                    Enter your email address and we&apos;ll send you a
+                    verification code to reset your password
                   </ThemedText>
                 </View>
 
@@ -152,10 +153,7 @@ export default function ForgotPasswordScreen() {
                 <View style={styles.backToLogin}>
                   <ThemedText>
                     Remember your password?{" "}
-                    <ThemedText
-                      type="link"
-                      onPress={() => router.back()}
-                    >
+                    <ThemedText type="link" onPress={() => router.back()}>
                       Sign in
                     </ThemedText>
                   </ThemedText>

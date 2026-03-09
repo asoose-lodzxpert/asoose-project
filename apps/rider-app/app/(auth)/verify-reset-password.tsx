@@ -16,14 +16,17 @@ import { ThemedView } from "@/components/themed-view";
 import { ThemedInput } from "@/components/ThemedInput";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
-import { resetPassword, sendPasswordResetOtp } from "@/services/password-reset.service";
+import {
+  resetPassword,
+  sendPasswordResetOtp,
+} from "@/services/password-reset.service";
 import Toast from "react-native-toast-message";
 import { useRouter, useLocalSearchParams } from "expo-router";
 
 export default function VerifyResetPasswordScreen() {
   const params = useLocalSearchParams();
   const email = params.email as string;
-  
+
   const [otp, setOtp] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -32,7 +35,7 @@ export default function VerifyResetPasswordScreen() {
   const [loading, setLoading] = useState(false);
   const [resendLoading, setResendLoading] = useState(false);
   const [error, setError] = useState("");
-  
+
   const router = useRouter();
   const primary = useThemeColor({}, "brandPrimary");
   const textOnPrimary = useThemeColor({}, "textOnPrimary");
@@ -43,34 +46,34 @@ export default function VerifyResetPasswordScreen() {
       setError("Please enter the 6-digit verification code");
       return false;
     }
-    
+
     if (!newPassword || newPassword.length < 6) {
       setError("Password must be at least 6 characters");
       return false;
     }
-    
+
     if (newPassword !== confirmPassword) {
       setError("Passwords do not match");
       return false;
     }
-    
+
     return true;
   }
 
   async function handleResetPassword() {
     setError("");
     if (!validateForm()) return;
-    
+
     setLoading(true);
     try {
       await resetPassword(email, otp, newPassword);
-      
+
       Toast.show({
         type: "success",
         text1: "Password Reset Successful",
         text2: "You can now sign in with your new password",
       });
-      
+
       // Navigate back to sign in
       router.replace("/(auth)/signin");
     } catch (e: any) {
@@ -89,7 +92,7 @@ export default function VerifyResetPasswordScreen() {
     setResendLoading(true);
     try {
       await sendPasswordResetOtp(email);
-      
+
       Toast.show({
         type: "success",
         text1: "OTP Resent",
@@ -137,7 +140,8 @@ export default function VerifyResetPasswordScreen() {
                     Reset Password
                   </ThemedText>
                   <ThemedText style={[styles.subtitle, { color: muted }]}>
-                    Enter the verification code sent to {email} and your new password
+                    Enter the verification code sent to {email} and your new
+                    password
                   </ThemedText>
                 </View>
 
@@ -188,7 +192,9 @@ export default function VerifyResetPasswordScreen() {
                       if (error) setError("");
                     }}
                     iconRight={
-                      <Pressable onPress={() => setSecureConfirm(!secureConfirm)}>
+                      <Pressable
+                        onPress={() => setSecureConfirm(!secureConfirm)}
+                      >
                         <IconSymbol
                           size={24}
                           name={secureConfirm ? "eye.fill" : "eye.slash.fill"}
@@ -224,13 +230,13 @@ export default function VerifyResetPasswordScreen() {
                 {/* Resend OTP */}
                 <View style={styles.resendSection}>
                   <ThemedText style={{ color: muted }}>
-                    Didn't receive the code?{" "}
+                    Didn&apos;t receive the code?{" "}
                   </ThemedText>
-                  <Pressable
-                    onPress={handleResendOtp}
-                    disabled={resendLoading}
-                  >
-                    <ThemedText type="link" style={{ opacity: resendLoading ? 0.5 : 1 }}>
+                  <Pressable onPress={handleResendOtp} disabled={resendLoading}>
+                    <ThemedText
+                      type="link"
+                      style={{ opacity: resendLoading ? 0.5 : 1 }}
+                    >
                       {resendLoading ? "Sending..." : "Resend"}
                     </ThemedText>
                   </Pressable>

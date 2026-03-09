@@ -171,7 +171,6 @@ export class JobEventsService {
           distanceKm: data.distanceKm || data.distance,
           durationMin: data.durationMin,
           startOtp: data.startOtp,
-          deliveryOtp: data.deliveryOtp,
           packageDetails: data.packageDetails,
           pickupContactPhone: data.pickupContactPhone,
           dropoffContactPhone: data.dropoffContactPhone,

@@ -261,8 +261,6 @@ export class DeliveriesService {
           `[requestDelivery] Distance: ${distanceKm} km, Fee: ${deliveryFee} (calc took ${Date.now() - t3}ms)`,
         );
 
-        const deliveryOtp = this.geo.generateOTP(TRIPS_CONFIG.OTP_LENGTH);
-
         this.logger.log(`[requestDelivery] Creating delivery record in DB`);
         const t4 = Date.now();
         const delivery = await tx.delivery.create({
@@ -281,7 +279,6 @@ export class DeliveriesService {
               : undefined,
             senderPhone: dto.senderPhone ?? undefined,
             packageDetails: this.common.sanitizeText(dto.packageDetails),
-            deliveryOtp,
 
             weightKg: dto.weightKg,
             isFragile: dto.fragile ?? false,
@@ -430,7 +427,6 @@ export class DeliveriesService {
       data: {
         status: DeliveryStatus.PICKED_UP,
         pickedUpAt: new Date(),
-        pickupProof: proof || undefined,
       },
     });
 
@@ -462,16 +458,12 @@ export class DeliveriesService {
   async completeDelivery(
     deliveryId: string,
     riderId: string,
-    otp: string,
-    proof: string,
     lat: number,
     lng: number,
   ) {
     if (!riderId) throw new ForbiddenException();
     if (!this.geo.validateCoordinates(lat, lng))
       throw new BadRequestException('Invalid coords');
-
-    await this.common.checkOtpRateLimit(deliveryId, 'complete_delivery');
 
     return this.prisma.$transaction(async (tx) => {
       const delivery = await tx.delivery.findUnique({
@@ -483,8 +475,6 @@ export class DeliveriesService {
         throw new ForbiddenException();
       if (delivery.status !== DeliveryStatus.PICKED_UP)
         throw new BadRequestException('Invalid state');
-      if (delivery.deliveryOtp !== otp)
-        throw new BadRequestException('Invalid OTP');
 
       const dist = this.geo.calculateDistance(
         lat,
@@ -500,7 +490,6 @@ export class DeliveriesService {
         data: {
           status: DeliveryStatus.DELIVERED,
           deliveredAt: new Date(),
-          deliveryProof: proof,
         },
       });
 

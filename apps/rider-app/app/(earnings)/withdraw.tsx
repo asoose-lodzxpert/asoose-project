@@ -101,8 +101,8 @@ export default function WithdrawEarningsScreen() {
     (async () => {
       try {
         await loadWithdrawalInfo();
-      } catch (err) {
-        // ...existing code...
+      } catch {
+        // silent
       }
     })();
   }, []);
@@ -115,8 +115,7 @@ export default function WithdrawEarningsScreen() {
       if (data.bankAccount) {
         setAccount(data.bankAccount);
       }
-    } catch (err) {
-      // ...existing code...
+    } catch {
       setError("Failed to load withdrawal info. Please try again later.");
     } finally {
       setLoading(false);

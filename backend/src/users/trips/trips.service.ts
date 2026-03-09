@@ -124,16 +124,12 @@ export class TripsService {
   async completeDelivery(
     deliveryId: string,
     riderId: string,
-    otp: string,
-    proof: string,
     lat: number,
     lng: number,
   ) {
     return this.deliveriesService.completeDelivery(
       deliveryId,
       riderId,
-      otp,
-      proof,
       lat,
       lng,
     );

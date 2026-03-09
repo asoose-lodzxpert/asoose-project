@@ -1,12 +1,20 @@
-import { ApiService } from './api.service';
+import { ApiService } from "./api.service";
 
 // ✅ FIX: Expanded interface to match Backend Prisma Model & UsersService response
 export interface Delivery {
   id: string;
-  status: 'PENDING' | 'REQUESTED' | 'ASSIGNED' | 'ACCEPTED' | 'PICKED_UP' | 'IN_TRANSIT' | 'DELIVERED' | 'CANCELLED';
+  status:
+    | "PENDING"
+    | "REQUESTED"
+    | "ASSIGNED"
+    | "ACCEPTED"
+    | "PICKED_UP"
+    | "IN_TRANSIT"
+    | "DELIVERED"
+    | "CANCELLED";
   deliveryFee: number;
   distanceKm?: number;
-  
+
   // Package Info
   packageDetails?: string;
   recipientName?: string;
@@ -17,7 +25,7 @@ export interface Delivery {
   isPerishable?: boolean;
   containsLiquid?: boolean;
   declaredValue?: number;
-  
+
   // Relations
   rider?: {
     id: string;
@@ -41,9 +49,6 @@ export interface Delivery {
     state?: string;
     address?: string; // UsersService might return this composite string
   };
-  
-  // OTP
-  deliveryOtp?: string;
 
   // Timestamps
   createdAt: string;
@@ -60,14 +65,22 @@ export class DeliveryService {
   static async getDeliveryFareEstimate(
     pickup: { lat: number; lng: number },
     dropoff: { lat: number; lng: number },
-    token?: string
+    token?: string,
   ): Promise<{ fare: number; distance: number; duration: number }> {
-    return ApiService.post<{ fare: number; distance: number; duration: number }>('/fare/delivery', {
-      pickuplat: String(pickup.lat),
-      pickuplong: String(pickup.lng),
-      dropofflat: String(dropoff.lat),
-      dropofflong: String(dropoff.lng),
-    }, token);
+    return ApiService.post<{
+      fare: number;
+      distance: number;
+      duration: number;
+    }>(
+      "/fare/delivery",
+      {
+        pickuplat: String(pickup.lat),
+        pickuplong: String(pickup.lng),
+        dropofflat: String(dropoff.lat),
+        dropofflong: String(dropoff.lng),
+      },
+      token,
+    );
   }
 
   /**
@@ -77,23 +90,26 @@ export class DeliveryService {
    * We generate a UUID v4 per call — the backend deduplicates within a 5-minute
    * window using Redis, so retrying the same operation with the same key is safe.
    */
-  static async createDelivery(data: {
-    pickupAddressId: string;
-    dropoffAddressId: string;
-    recipientName: string;
-    recipientPhone: string;
-    packageDetails: string;
-    weightKg: number;
-    senderName?: string;
-    senderPhone?: string;
-    declaredValue?: number;
-    fragile?: boolean;
-    perishable?: boolean;
-    containsLiquid?: boolean;
-  }, token?: string) {
+  static async createDelivery(
+    data: {
+      pickupAddressId: string;
+      dropoffAddressId: string;
+      recipientName: string;
+      recipientPhone: string;
+      packageDetails: string;
+      weightKg: number;
+      senderName?: string;
+      senderPhone?: string;
+      declaredValue?: number;
+      fragile?: boolean;
+      perishable?: boolean;
+      containsLiquid?: boolean;
+    },
+    token?: string,
+  ) {
     const idempotencyKey = crypto.randomUUID();
-    return ApiService.post('/trips/deliveries/request', data, token, {
-      headers: { 'x-idempotency-key': idempotencyKey },
+    return ApiService.post("/trips/deliveries/request", data, token, {
+      headers: { "x-idempotency-key": idempotencyKey },
     });
   }
 
@@ -104,14 +120,17 @@ export class DeliveryService {
    * 'Maiduguri' / 'Borno'. Never pass placeholder strings like 'Unknown' here;
    * they are stored verbatim and would surface as "Unknown Unknown" in the UI.
    */
-  static async saveAddress(data: {
-    label: string;   // REQUIRED by Prisma schema (non-nullable String)
-    street: string;
-    city?: string;
-    state?: string;
-    lat: number;
-    lng: number;
-  }, token?: string) {
+  static async saveAddress(
+    data: {
+      label: string; // REQUIRED by Prisma schema (non-nullable String)
+      street: string;
+      city?: string;
+      state?: string;
+      lat: number;
+      lng: number;
+    },
+    token?: string,
+  ) {
     // city & state are @IsOptional() in the backend DTO — omit them rather than
     // sending the sentinel string 'Unknown', which would be stored verbatim in the DB
     // and cause "Unknown Unknown" to render on the Delivery Details page.
@@ -125,7 +144,7 @@ export class DeliveryService {
       lat: data.lat,
       lng: data.lng,
     };
-    return ApiService.post('/users/addresses', payload, token);
+    return ApiService.post("/users/addresses", payload, token);
   }
 
   /**
@@ -136,11 +155,18 @@ export class DeliveryService {
     return ApiService.get<Delivery>(`/users/deliveries/${id}`, token);
   }
 
-  static async rateDelivery(deliveryId: string, rating: number, comment?: string, token?: string) {
+  static async rateDelivery(
+    deliveryId: string,
+    rating: number,
+    comment?: string,
+    token?: string,
+  ) {
     // Backend does not have a delivery rating endpoint yet.
     // Throw so callers know this operation is not available — never silently
     // return success, which causes misleading toast messages in the UI.
-    throw new Error('Delivery rating is not yet available. This feature is coming soon.');
+    throw new Error(
+      "Delivery rating is not yet available. This feature is coming soon.",
+    );
   }
 
   /**
@@ -148,26 +174,36 @@ export class DeliveryService {
    * Backend DeliveryStatus enum: PENDING | REQUESTED | ASSIGNED | ACCEPTED | PICKED_UP | IN_TRANSIT | DELIVERED | CANCELLED
    */
   static async pollDeliveryStatus(
-    deliveryId: string, 
-    targetStatus: string = 'REQUESTED',
+    deliveryId: string,
+    targetStatus: string = "REQUESTED",
     maxAttempts: number = 20,
     interval: number = 3000,
-    token?: string
+    token?: string,
   ): Promise<boolean> {
     let attempts = 0;
     // Only statuses that exist in the backend DeliveryStatus enum
-    const paidStatuses = ['REQUESTED', 'ASSIGNED', 'ACCEPTED', 'PICKED_UP', 'IN_TRANSIT', 'DELIVERED'];
+    const paidStatuses = [
+      "REQUESTED",
+      "ASSIGNED",
+      "ACCEPTED",
+      "PICKED_UP",
+      "IN_TRANSIT",
+      "DELIVERED",
+    ];
     while (attempts < maxAttempts) {
       try {
-        const res: any = await ApiService.get(`/users/deliveries/${deliveryId}`, token);
+        const res: any = await ApiService.get(
+          `/users/deliveries/${deliveryId}`,
+          token,
+        );
         const currentStatus = res.status ?? res.data?.status;
         if (paidStatuses.includes(currentStatus)) return true;
-        if (currentStatus === 'CANCELLED') return false;
+        if (currentStatus === "CANCELLED") return false;
       } catch (e) {
         console.error("Polling error", e);
       }
       attempts++;
-      await new Promise(resolve => setTimeout(resolve, interval));
+      await new Promise((resolve) => setTimeout(resolve, interval));
     }
     return false;
   }
@@ -185,7 +221,7 @@ export class DeliveryService {
    */
   static async verifyPayment(
     reference: string,
-    gateway: string = 'PAYSTACK',
+    gateway: string = "PAYSTACK",
     token?: string,
   ): Promise<boolean | null> {
     try {
@@ -193,12 +229,12 @@ export class DeliveryService {
         `/payment/verify?reference=${encodeURIComponent(reference)}&gateway=${gateway}`,
         token,
       );
-      return res.status === 'COMPLETED' || res.success === true;
+      return res.status === "COMPLETED" || res.success === true;
     } catch (error: any) {
       console.error("Manual verification failed", error);
       // FIX M5: Distinguish transient network/timeout errors from genuine
       // payment failures so callers can decide whether to retry or give up.
-      if (error?.type === 'network-error' || error?.type === 'timeout') {
+      if (error?.type === "network-error" || error?.type === "timeout") {
         return null; // Indeterminate — should retry
       }
       return false;

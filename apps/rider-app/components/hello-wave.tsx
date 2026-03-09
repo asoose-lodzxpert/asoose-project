@@ -20,7 +20,7 @@ export function HelloWave() {
       ]),
       { iterations: 4 },
     ).start();
-  }, []);
+  }, [rotateAnim]);
 
   const rotate = rotateAnim.interpolate({
     inputRange: [0, 1],
