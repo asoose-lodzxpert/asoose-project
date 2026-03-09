@@ -375,53 +375,6 @@ export default function OrderDetailsScreen() {
     );
   };
 
-  const renderOtpCard = () => {
-    const otp: string | null | undefined = order?.deliveryOtp;
-    const status: string = order?.status ?? "";
-    const isDone = ["DELIVERED", "CANCELLED"].includes(status);
-
-    if (!otp || isDone) return null;
-
-    return (
-      <View
-        style={[
-          styles.modernCard,
-          {
-            backgroundColor: brandPrimary + "18",
-            borderWidth: 1,
-            borderColor: brandPrimary + "40",
-          },
-        ]}
-      >
-        <View style={styles.cardHeader}>
-          <IconSymbol name="lock.shield.fill" size={18} color={brandPrimary} />
-          <ThemedText style={[styles.headerTitle, { color: brandPrimary }]}>
-            DELIVERY OTP
-          </ThemedText>
-        </View>
-        <ThemedText
-          style={[
-            styles.otpCode,
-            {
-              color: brandPrimary,
-              letterSpacing: 12,
-              fontVariant: ["tabular-nums"] as any,
-            },
-          ]}
-        >
-          {otp}
-        </ThemedText>
-        <ThemedText
-          type="caption"
-          style={{ color: textSecondary, textAlign: "center", marginTop: 8 }}
-        >
-          Only share this code with your rider when they arrive at your
-          location.
-        </ThemedText>
-      </View>
-    );
-  };
-
   const renderItems = () => {
     if (!order?.items) return null;
     return (
@@ -571,7 +524,6 @@ export default function OrderDetailsScreen() {
         {order?.type === "GROUP" ? (
           <>
             {renderPayment(order?.payment)}
-            {renderOtpCard()}
             {renderGroupOrders()}
           </>
         ) : (

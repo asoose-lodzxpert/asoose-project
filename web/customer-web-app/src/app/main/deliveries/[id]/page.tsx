@@ -380,14 +380,7 @@ export default function DeliveryDetailPage() {
           <div className="flex-1">
             <div className="flex items-center gap-3">
               <h1 className="text-lg font-bold">Delivery Details</h1>{" "}
-              {delivery?.deliveryOtp &&
-                !["DELIVERED", "CANCELLED"].includes(delivery.status) && (
-                  <span className="flex items-center gap-1.5 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-500/30 rounded-lg px-2.5 py-1">
-                    <span className="font-black tracking-[0.15em] text-yellow-600 dark:text-yellow-400 font-mono text-sm">
-                      Code: {delivery.deliveryOtp}
-                    </span>
-                  </span>
-                )}
+
             </div>
             <p className="text-xs text-gray-500 dark:text-gray-400 font-mono">
               #{delivery.id.split("-")[0].toUpperCase()}

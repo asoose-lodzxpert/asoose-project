@@ -214,20 +214,7 @@ export default function OrderDetailsPage() {
           <>
             {/* Status Card */}
             <div className="bg-white dark:bg-[#151515] rounded-3xl p-6 border border-gray-100 dark:border-white/5 shadow-sm">
-              {/* OTP badge — top right of card */}
-              {order.deliveryOtp &&
-                !["DELIVERED", "CANCELLED"].includes(order.status) && (
-                  <div className="flex justify-end mb-4">
-                    <div className="flex items-center gap-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-500/30 rounded-xl px-3 py-2">
-                      <span className="text-xs font-bold text-yellow-700 dark:text-yellow-400 uppercase tracking-widest">
-                        🔐 OTP
-                      </span>
-                      <span className="text-lg font-black tracking-[0.2em] text-yellow-600 dark:text-yellow-400 font-mono">
-                        {order.deliveryOtp}
-                      </span>
-                    </div>
-                  </div>
-                )}
+
               <div className="mb-8 text-center">
                 <h2 className="text-3xl font-black capitalize tracking-tight mb-2">
                   {order.status?.replace("_", " ").toLowerCase()}
