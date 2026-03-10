@@ -279,6 +279,7 @@ export const RecentOrdersFeed: React.FC<Props> = ({
                     image: item.customerProfile,
                   },
                   total: item.total,
+                  createdAt: item.timestamp,
                   items: Array.isArray(item.items)
                     ? item.items.map((it: any) => ({
                         ...it,

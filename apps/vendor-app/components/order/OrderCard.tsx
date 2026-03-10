@@ -11,6 +11,22 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { Order } from "@/services/orders.service";
 
+const formatOrderDateTime = (dateString: string): string => {
+  try {
+    const date = new Date(dateString);
+    return date.toLocaleString("en-NG", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    });
+  } catch {
+    return dateString;
+  }
+};
+
 interface Props {
   order: Order;
   tab: "pending" | "active" | "history";
@@ -96,6 +112,11 @@ export const OrderCard: React.FC<Props> = ({
             {order.user?.phone && (
               <ThemedText style={{ color: grey, fontSize: 12 }}>
                 {order.user.phone}
+              </ThemedText>
+            )}
+            {order.createdAt && (
+              <ThemedText style={{ color: grey, fontSize: 11, marginTop: 2 }}>
+                {formatOrderDateTime(order.createdAt)}
               </ThemedText>
             )}
           </View>

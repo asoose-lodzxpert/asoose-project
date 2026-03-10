@@ -12,5 +12,5 @@ export interface StoreOrder {
   items: { id: string; name: string; quantity: number }[];
   total: number; // Naira
   status: "pending" | "accepted";
-  timestamp: string; // e.g., "5 min ago"
+  timestamp: string; // ISO date string, e.g., "2026-03-10T08:18:55.753Z"
 }

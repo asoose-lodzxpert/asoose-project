@@ -850,6 +850,7 @@ export class JobsService {
           status: true,
           riderId: true,
           deliveryFee: true,
+          orderId: true,
         },
       });
 
@@ -876,12 +877,26 @@ export class JobsService {
 
       this.logger.debug(`Completing delivery ${jobId} → DELIVERED`);
 
-      const updatedDelivery = await this.prisma.delivery.update({
-        where: { id: jobId },
-        data: {
-          status: DeliveryStatus.DELIVERED,
-          deliveredAt: new Date(),
-        },
+      const updatedDelivery = await this.prisma.$transaction(async (tx) => {
+        const updated = await tx.delivery.update({
+          where: { id: jobId },
+          data: {
+            status: DeliveryStatus.DELIVERED,
+            deliveredAt: new Date(),
+          },
+        });
+
+        if (delivery.orderId) {
+          this.logger.debug(
+            `Updating associated order ${delivery.orderId} → DELIVERED`,
+          );
+          await tx.order.update({
+            where: { id: delivery.orderId },
+            data: { status: 'DELIVERED', deliveredAt: new Date() },
+          });
+        }
+
+        return updated;
       });
 
       // Credit rider wallet with delivery earnings
