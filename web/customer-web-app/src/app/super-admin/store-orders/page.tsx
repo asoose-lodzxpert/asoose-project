@@ -395,7 +395,9 @@ function OrderCard({
           <p className="text-sm font-bold text-white">
             {fmt(order.totalAmount)}
           </p>
-          <p className="text-xs text-gray-500">{formatDateTime(order.createdAt)}</p>
+          <p className="text-xs text-gray-500">
+            {formatDateTime(order.createdAt)}
+          </p>
         </div>
       </div>
 
