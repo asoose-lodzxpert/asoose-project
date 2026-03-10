@@ -152,11 +152,15 @@ function fmt(n: number) {
   }).format(n);
 }
 
-function timeAgo(dateStr: string) {
-  const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
-  if (diff < 60) return `${diff}s ago`;
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  return `${Math.floor(diff / 3600)}h ago`;
+function formatDateTime(dateStr: string) {
+  return new Date(dateStr).toLocaleString("en-NG", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
 }
 
 /* ─── Order Card ─────────────────────────────────────────────────────────── */
@@ -391,7 +395,7 @@ function OrderCard({
           <p className="text-sm font-bold text-white">
             {fmt(order.totalAmount)}
           </p>
-          <p className="text-xs text-gray-500">{timeAgo(order.createdAt)}</p>
+          <p className="text-xs text-gray-500">{formatDateTime(order.createdAt)}</p>
         </div>
       </div>
 
