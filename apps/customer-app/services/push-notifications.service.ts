@@ -22,7 +22,7 @@ async function logErrorToBackend(context: string, error: any) {
       }),
     });
   } catch (e) {
-    console.error("Failed to log error to backend", e);
+    if (__DEV__) console.error("Failed to log error to backend", e);
   }
 }
 
