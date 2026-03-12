@@ -159,6 +159,13 @@ export class AddressesService {
           isDefault: false,
         },
       });
+    } else if (pickupAddress.lat !== lat || pickupAddress.lng !== lng) {
+      // Coordinates changed (vendor moved store pin) — refresh cached address
+      // so that delivery fee at order creation matches the quote.
+      pickupAddress = await tx.address.update({
+        where: { id: pickupAddress.id },
+        data: { lat, lng },
+      });
     }
 
     return pickupAddress;

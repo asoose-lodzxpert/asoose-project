@@ -1155,9 +1155,13 @@ export class OrdersService {
           }
         }
 
-        if (store.lat == null || store.lng == null) {
-          this.logger.warn(
-            `Store "${store.name}" (${storeId}) has no GPS coordinates — delivery fee will be inaccurate`,
+        if (
+          store.lat == null ||
+          store.lng == null ||
+          (store.lat === 0 && store.lng === 0)
+        ) {
+          throw new BadRequestException(
+            `"${store.name}" does not have a location set. Please contact support.`,
           );
         }
 
