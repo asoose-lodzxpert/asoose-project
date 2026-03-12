@@ -233,7 +233,9 @@ export default function CheckoutScreen() {
         })),
         // Send the price-lock token so the backend uses the exact quoted amounts.
         // If the quote expired (>15 min) the backend will throw a clear error.
-        ...(quoteResult?.quoteToken ? { quoteToken: quoteResult.quoteToken } : {}),
+        ...(quoteResult?.quoteToken
+          ? { quoteToken: quoteResult.quoteToken }
+          : {}),
       };
 
       const orderResponse = await createOrder(orderPayload);

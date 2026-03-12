@@ -1312,7 +1312,12 @@ export class OrdersService {
     let sortedStoreIds: string[];
     let lockedPriceMap: Map<
       string,
-      { deliveryFee: number; serviceFee: number; vatAmount: number; finalTotal: number }
+      {
+        deliveryFee: number;
+        serviceFee: number;
+        vatAmount: number;
+        finalTotal: number;
+      }
     > | null = null;
 
     if (lockedQuote) {
@@ -1322,7 +1327,12 @@ export class OrdersService {
       lockedPriceMap = new Map(
         lockedQuote.stores.map((s) => [
           s.storeId,
-          { deliveryFee: s.deliveryFee, serviceFee: s.serviceFee, vatAmount: s.vatAmount, finalTotal: s.finalTotal },
+          {
+            deliveryFee: s.deliveryFee,
+            serviceFee: s.serviceFee,
+            vatAmount: s.vatAmount,
+            finalTotal: s.finalTotal,
+          },
         ]),
       );
     } else if (isSingleStore) {
