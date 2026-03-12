@@ -290,7 +290,9 @@ export class DeliveriesService {
           select: { status: true },
         });
         if (current?.status === DeliveryStatus.DELIVERED) {
-          this.logger.warn(`Delivery ${id} already DELIVERED — skipping duplicate completion`);
+          this.logger.warn(
+            `Delivery ${id} already DELIVERED — skipping duplicate completion`,
+          );
           return tx.delivery.findUnique({ where: { id } });
         }
 

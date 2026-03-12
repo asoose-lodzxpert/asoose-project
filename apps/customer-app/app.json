@@ -104,7 +104,7 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/images/asoose icon.png",
+          "icon": "./assets/images/asoose-icon.png",
           "color": "#0EA5E9",
           "mode": "production",
           "NSUserNotificationsUsageDescription": "ASOOSE sends you notifications for order updates, delivery tracking, ride confirmations, and important account activity."

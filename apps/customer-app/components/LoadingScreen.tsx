@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from "react";
 import { View, Image, Animated, StyleSheet } from "react-native";
 
-const icon = require("../assets/images/asoose icon.png");
+const icon = require("../assets/images/asoose-icon.png");
 
 export default function LoadingScreen() {
   const dot1 = useRef(new Animated.Value(0)).current;
@@ -10,25 +10,25 @@ export default function LoadingScreen() {
 
   useEffect(() => {
     interface AnimateFn {
-        (dot: Animated.Value, delay: number): void;
+      (dot: Animated.Value, delay: number): void;
     }
 
     const animate: AnimateFn = (dot, delay) => {
-        Animated.loop(
-            Animated.sequence([
-                Animated.timing(dot, {
-                    toValue: -10,
-                    duration: 300,
-                    delay,
-                    useNativeDriver: true,
-                }),
-                Animated.timing(dot, {
-                    toValue: 0,
-                    duration: 300,
-                    useNativeDriver: true,
-                }),
-            ]),
-        ).start();
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(dot, {
+            toValue: -10,
+            duration: 300,
+            delay,
+            useNativeDriver: true,
+          }),
+          Animated.timing(dot, {
+            toValue: 0,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+        ]),
+      ).start();
     };
     animate(dot1, 0);
     animate(dot2, 150);
