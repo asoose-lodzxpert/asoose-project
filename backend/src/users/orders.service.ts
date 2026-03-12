@@ -53,6 +53,7 @@ interface PreparedStoreContext {
   distance: number;
   deliveryFee: number;
   serviceFee: number;
+  vatAmount: number;
   finalTotal: number;
   orderItemsData: any[];
   groupItems: OrderItemDto[];
@@ -1291,7 +1292,8 @@ export class OrdersService {
         const serviceFee = this.pricingService.calculateServiceFee(
           s.itemsTotal,
         );
-        const finalTotal = s.itemsTotal + deliveryFee + serviceFee;
+        const vatAmount = this.pricingService.calculateVat(s.itemsTotal);
+        const finalTotal = s.itemsTotal + deliveryFee + serviceFee + vatAmount;
         calculatedGrandTotal += finalTotal;
 
         return {
@@ -1301,6 +1303,7 @@ export class OrdersService {
           distance,
           deliveryFee,
           serviceFee,
+          vatAmount,
           finalTotal,
           orderItemsData: s.orderItemsData,
           groupItems: s.groupItems,

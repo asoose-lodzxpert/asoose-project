@@ -135,11 +135,16 @@ export class CartService {
   async getCartSummary(dto: GetCartSummaryDto) {
     if (!dto.items.length) return { groups: [], total: 0 };
 
-    // 1. Fetch Products & Stores
+    // 1. Fetch Products & Stores (include modifier groups for accurate pricing)
     const productIds = dto.items.map((i) => i.productId);
     const products = await this.prisma.product.findMany({
       where: { id: { in: productIds } },
-      include: { store: true },
+      include: {
+        store: true,
+        modifierGroups: {
+          include: { modifiers: { select: { id: true, price: true } } },
+        },
+      },
     });
 
     // 2. Group by Store
@@ -161,11 +166,24 @@ export class CartService {
       }
 
       const group = storeGroups.get(product.storeId)!;
-      const lineTotal = product.price * itemDto.quantity;
+
+      // Compute modifier add-on from DB — never trust client-supplied prices
+      const allModifiers =
+        (product as any).modifierGroups?.flatMap((g: any) => g.modifiers) ?? [];
+      const modifierAddon = (itemDto.modifierIds ?? []).reduce(
+        (sum: number, modId: string) => {
+          const mod = allModifiers.find((m: any) => m.id === modId);
+          return sum + (mod?.price ?? 0);
+        },
+        0,
+      );
+      const unitPrice = product.price + modifierAddon;
+      const lineTotal = unitPrice * itemDto.quantity;
 
       group.items.push({
-        ...product, // map fields as needed
+        ...product,
         quantity: itemDto.quantity,
+        price: unitPrice, // authoritative unit price including modifiers
         lineTotal,
       });
       group.total += lineTotal;

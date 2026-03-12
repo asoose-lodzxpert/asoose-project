@@ -137,7 +137,16 @@ export default function CheckoutScreen() {
           method: "POST",
           body: JSON.stringify({
             addressId: address.id,
-            items: items.map((item) => ({ id: item.id, quantity: item.qty })),
+            items: items.map((item) => ({
+              id: item.id,
+              quantity: item.qty,
+              // Include selected modifier IDs so the backend computes the
+              // correct subtotal (base price + modifier add-ons).
+              modifierIds:
+                item.modifierGroups?.flatMap((g) =>
+                  g.selectedModifiers.map((m) => m.id),
+                ) ?? [],
+            })),
           }),
         });
         if (requestId !== quoteAbortRef.current) return;
@@ -188,7 +197,11 @@ export default function CheckoutScreen() {
     quoteResult?.totalServiceFee ?? Math.round(subtotal * 0.05);
   const resolvedVat =
     quoteResult?.totalVatAmount ?? Math.round(subtotal * 0.07);
+  // Use the backend-authoritative grand total from the quote when available.
+  // This is the single source of truth and prevents discrepancies from
+  // modifier prices or rounding that arise from recomputing client-side.
   const resolvedGrandTotal =
+    quoteResult?.grandTotal ??
     subtotal + resolvedDelivery + resolvedService + resolvedVat;
 
   const handlePlaceOrder = async () => {

@@ -90,6 +90,10 @@ export const CartProvider: React.FC<CartProviderProps> = ({
           items: nextItems.map((item) => ({
             productId: item.id,
             quantity: item.qty,
+            modifierIds:
+              item.modifierGroups?.flatMap((g) =>
+                g.selectedModifiers.map((m) => m.id),
+              ) ?? [],
           })),
         });
 
@@ -137,6 +141,9 @@ export const CartProvider: React.FC<CartProviderProps> = ({
                 vendorId: group.restaurant.id,
                 description: serverItem.description ?? local?.description,
                 available: serverItem.available,
+                // Preserve modifier selections from the local (persisted) cart
+                // so quote requests and order creation include accurate pricing.
+                modifierGroups: local?.modifierGroups,
               });
             });
           });

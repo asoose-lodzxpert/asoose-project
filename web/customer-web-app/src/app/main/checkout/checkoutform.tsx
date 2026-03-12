@@ -50,6 +50,9 @@ export default function CheckoutForm() {
   const [deliveryFee, setDeliveryFee] = useState<number | null>(null);
   const [serviceFee, setServiceFee] = useState<number | null>(null);
   const [vatAmount, setVatAmount] = useState<number | null>(null);
+  // Backend-authoritative grand total from the quote. Used as the single source
+  // of truth for display — prevents discrepancies from client-side subtotal recomputation.
+  const [quoteGrandTotal, setQuoteGrandTotal] = useState<number | null>(null);
   const [isLoadingFee, setIsLoadingFee] = useState(false);
   const quoteAbortRef = useRef<AbortController | null>(null);
 
@@ -70,7 +73,9 @@ export default function CheckoutForm() {
   // Stable fingerprint of cart contents — triggers quote refetch when items,
   // quantities, or modifier selections change (not just array length).
   const cartFingerprint = JSON.stringify(
-    cartItems.map((i) => `${i.id}:${i.quantity}:${(i.modifierIds ?? []).join(",")}`)
+    cartItems.map(
+      (i) => `${i.id}:${i.quantity}:${(i.modifierIds ?? []).join(",")}`,
+    ),
   );
 
   // Fetch live quote from backend whenever address or cart changes
@@ -125,20 +130,28 @@ export default function CheckoutForm() {
           setDeliveryFee(data.totalDeliveryFee ?? null);
           setServiceFee(totalServiceFee || null);
           setVatAmount(totalVatAmount || null);
+          // Use the backend-computed grand total as the single source of truth.
+          setQuoteGrandTotal(data.grandTotal ?? null);
         } else {
           const errData = await res.json().catch(() => ({}));
           console.error("[CheckoutForm] Quote API error:", res.status, errData);
-          toast.warn("Could not calculate delivery fee. You can still place your order.");
+          toast.warn(
+            "Could not calculate delivery fee. You can still place your order.",
+          );
           setDeliveryFee(null);
           setServiceFee(null);
           setVatAmount(null);
+          setQuoteGrandTotal(null);
         }
       } catch (err: any) {
         if (err.name !== "AbortError") {
-          toast.warn("Could not calculate delivery fee. You can still place your order.");
+          toast.warn(
+            "Could not calculate delivery fee. You can still place your order.",
+          );
           setDeliveryFee(null);
           setServiceFee(null);
           setVatAmount(null);
+          setQuoteGrandTotal(null);
         }
       } finally {
         setIsLoadingFee(false);
@@ -314,7 +327,9 @@ export default function CheckoutForm() {
         type: "ORDER",
         // Send just the app origin — the backend GET /callback/paystack handler
         // appends "/payment/callback" itself before redirecting the browser.
-        callbackUrl: (process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3001").replace(/\/+$/, ""),
+        callbackUrl: (
+          process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3001"
+        ).replace(/\/+$/, ""),
       };
 
       // FIX: Distinguish between single Order ID and OrderGroup ID
@@ -677,6 +692,7 @@ export default function CheckoutForm() {
               deliveryFee={deliveryFee}
               serviceFee={serviceFee}
               vatAmount={vatAmount}
+              quoteGrandTotal={quoteGrandTotal}
               isLoadingFee={isLoadingFee}
               isProcessing={isProcessing}
               hasAddress={!!selectedAddress}

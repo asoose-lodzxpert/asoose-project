@@ -5,6 +5,7 @@ export type CartSummaryPayload = {
   items: {
     productId: string;
     quantity: number;
+    modifierIds?: string[];
   }[];
 };
 

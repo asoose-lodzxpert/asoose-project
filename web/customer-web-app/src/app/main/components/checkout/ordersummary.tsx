@@ -8,6 +8,9 @@ interface OrderSummaryProps {
   deliveryFee: number | null;
   serviceFee: number | null;
   vatAmount?: number | null;
+  /** Backend-authoritative grand total from the quote. When present, used as
+   * the displayed total instead of the client-side recomputation. */
+  quoteGrandTotal?: number | null;
   isProcessing: boolean;
   isDisabled: boolean;
   isLoadingFee?: boolean;
@@ -21,6 +24,7 @@ export const OrderSummary = ({
   deliveryFee,
   serviceFee,
   vatAmount,
+  quoteGrandTotal,
   isProcessing,
   isDisabled,
   isLoadingFee = false,
@@ -34,9 +38,13 @@ export const OrderSummary = ({
   const resolvedDelivery = deliveryFee ?? null;
   const resolvedService = serviceFee ?? Math.round(cartTotal * 0.05);
   const resolvedVat = vatAmount ?? Math.round(cartTotal * 0.07);
-  const grandTotal = feesKnown
-    ? cartTotal + (resolvedDelivery ?? 0) + resolvedService + resolvedVat
-    : null; // Cannot produce a total without a delivery fee
+  // Prefer the backend-authoritative grand total from the quote. Fall back to
+  // client-side recomputation only when the quote hasn't loaded yet.
+  const grandTotal =
+    quoteGrandTotal ??
+    (feesKnown
+      ? cartTotal + (resolvedDelivery ?? 0) + resolvedService + resolvedVat
+      : null); // Cannot produce a total without a delivery fee
 
   return (
     <div className="bg-white dark:bg-[#151515] p-6 rounded-3xl border border-gray-100 dark:border-white/5 shadow-sm">
@@ -97,7 +105,9 @@ export const OrderSummary = ({
             ₦{grandTotal.toLocaleString()}
           </span>
         ) : (
-          <span className="font-black text-2xl text-gray-400 dark:text-gray-500">—</span>
+          <span className="font-black text-2xl text-gray-400 dark:text-gray-500">
+            —
+          </span>
         )}
       </div>
 
