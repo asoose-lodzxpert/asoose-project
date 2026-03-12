@@ -32,8 +32,8 @@ const apiOrigin = (() => {
 const CSP = [
   // Default: only this origin
   "default-src 'self'",
-  // Scripts: this origin + Google Maps SDK + Firebase SDK (gstatic CDN used by firebase-messaging-sw.js importScripts)
-  "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://maps.googleapis.com https://maps.gstatic.com https://www.gstatic.com",
+  // Scripts: this origin + Google Maps SDK + Firebase SDK (gstatic CDN used by firebase-messaging-sw.js importScripts) + Vercel Live feedback widget
+  "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://maps.googleapis.com https://maps.gstatic.com https://www.gstatic.com https://vercel.live",
   // Workers: 'self' allows same-origin service workers (Firebase SW); blob: for Maps SDK workers
   "worker-src 'self' blob:",
   // Styles: inline styles used by Maps + our Tailwind
