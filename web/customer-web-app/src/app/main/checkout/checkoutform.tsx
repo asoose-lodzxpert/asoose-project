@@ -53,6 +53,9 @@ export default function CheckoutForm() {
   // Backend-authoritative grand total from the quote. Used as the single source
   // of truth for display — prevents discrepancies from client-side subtotal recomputation.
   const [quoteGrandTotal, setQuoteGrandTotal] = useState<number | null>(null);
+  // Price-lock token returned by the quote endpoint. Must be sent back with the
+  // order so the backend uses the exact same amounts without recalculating.
+  const [quoteToken, setQuoteToken] = useState<string | null>(null);
   const [isLoadingFee, setIsLoadingFee] = useState(false);
   const quoteAbortRef = useRef<AbortController | null>(null);
 
@@ -132,6 +135,8 @@ export default function CheckoutForm() {
           setVatAmount(totalVatAmount || null);
           // Use the backend-computed grand total as the single source of truth.
           setQuoteGrandTotal(data.grandTotal ?? null);
+          // Store the price-lock token so we can send it back with the order.
+          setQuoteToken(data.quoteToken ?? null);
         } else {
           const errData = await res.json().catch(() => ({}));
           console.error("[CheckoutForm] Quote API error:", res.status, errData);
@@ -142,6 +147,7 @@ export default function CheckoutForm() {
           setServiceFee(null);
           setVatAmount(null);
           setQuoteGrandTotal(null);
+          setQuoteToken(null);
         }
       } catch (err: any) {
         if (err.name !== "AbortError") {
@@ -152,6 +158,7 @@ export default function CheckoutForm() {
           setServiceFee(null);
           setVatAmount(null);
           setQuoteGrandTotal(null);
+          setQuoteToken(null);
         }
       } finally {
         setIsLoadingFee(false);
@@ -452,6 +459,9 @@ export default function CheckoutForm() {
             ? { modifierIds: item.modifierIds }
             : {}),
         })),
+        // Send price-lock token so the backend uses the exact quoted amounts.
+        // If quote expired (>15 min) the backend returns a clear error message.
+        ...(quoteToken ? { quoteToken } : {}),
       };
 
       const res = await fetch(`${API_URL}/users/orders`, {

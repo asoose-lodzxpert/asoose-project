@@ -113,6 +113,14 @@ export class CreateOrderDto {
   @ValidateNested({ each: true })
   @Type(() => OrderItemDto)
   items: OrderItemDto[];
+
+  @ApiPropertyOptional({
+    example: 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx',
+    description: 'Price lock token returned by the quote endpoint (15 min TTL). Pass this when placing an order to guarantee the charged amount matches the quoted amount.',
+  })
+  @IsString()
+  @IsOptional()
+  quoteToken?: string;
 }
 
 export class GetQuoteDto {

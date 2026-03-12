@@ -85,6 +85,7 @@ export default function CheckoutScreen() {
     totalServiceFee: number;
     totalVatAmount: number;
     grandTotal: number;
+    quoteToken?: string; // price-lock token — must be sent back with the order
   };
   const [quoteResult, setQuoteResult] = useState<QuoteResult | null>(null);
   const [isLoadingFee, setIsLoadingFee] = useState(false);
@@ -169,6 +170,7 @@ export default function CheckoutScreen() {
           totalServiceFee,
           totalVatAmount,
           grandTotal: data.grandTotal ?? 0,
+          quoteToken: data.quoteToken, // lock token — sent back when placing order
         });
       } catch (err: any) {
         if (requestId === quoteAbortRef.current) {
@@ -229,6 +231,9 @@ export default function CheckoutScreen() {
             g.selectedModifiers.map((m) => m.id),
           ),
         })),
+        // Send the price-lock token so the backend uses the exact quoted amounts.
+        // If the quote expired (>15 min) the backend will throw a clear error.
+        ...(quoteResult?.quoteToken ? { quoteToken: quoteResult.quoteToken } : {}),
       };
 
       const orderResponse = await createOrder(orderPayload);

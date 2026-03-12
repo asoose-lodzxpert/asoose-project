@@ -34,6 +34,11 @@ const DB_TIMEOUT_MS = 20000;
 const LOCK_TTL_MS = 30000;
 const COMPLETED_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
+// Price-lock: quote result cached in Redis for 15 minutes.
+// Ensures the amount charged exactly matches what was shown to the user at quote time.
+const QUOTE_LOCK_PREFIX = 'quote_lock:';
+const QUOTE_LOCK_TTL_SECONDS = 900; // 15 minutes
+
 const VALIDATION = {
   MAX_ITEMS_PER_ORDER: 50,
   MAX_QUANTITY_PER_ITEM: 100,
@@ -45,6 +50,22 @@ const DISTANCE_TIME_MULTIPLIER = 5; // minutes per km
 const BASE_PREP_TIME = 15; // minutes
 
 // ==================== TYPES ====================
+
+interface LockedQuote {
+  userId: string;
+  addressId: string;
+  grandTotal: number;
+  totalRouteKm: number;
+  sortedStoreIds: string[];
+  stores: Array<{
+    storeId: string;
+    deliveryFee: number;
+    serviceFee: number;
+    vatAmount: number;
+    finalTotal: number;
+    itemsTotal: number;
+  }>;
+}
 
 interface PreparedStoreContext {
   storeId: string;
@@ -400,6 +421,33 @@ export class OrdersService {
       const grandTotal = breakdown.reduce((sum, b) => sum + b.total, 0);
       const totalVatAmount = breakdown.reduce((sum, b) => sum + b.vatAmount, 0);
 
+      // ── Price lock: cache the authoritative pricing for 15 minutes ───────────
+      // When the client sends this token back with the order, prepareOrderContext
+      // reads stored fees directly instead of recalculating — preventing any
+      // quote-vs-charge drift caused by stale coordinates, rate changes, or
+      // floating-point rounding differences.
+      const quoteToken = crypto.randomUUID();
+      const lockData: LockedQuote = {
+        userId,
+        addressId: dto.addressId,
+        grandTotal,
+        totalRouteKm: parseFloat(totalRouteKm.toFixed(2)),
+        sortedStoreIds,
+        stores: breakdown.map((b) => ({
+          storeId: b.storeId,
+          deliveryFee: b.deliveryFee,
+          serviceFee: b.serviceFee,
+          vatAmount: b.vatAmount,
+          finalTotal: b.total,
+          itemsTotal: b.subtotal,
+        })),
+      };
+      await this.redis.set(
+        `${QUOTE_LOCK_PREFIX}${userId}:${quoteToken}`,
+        JSON.stringify(lockData),
+        { EX: QUOTE_LOCK_TTL_SECONDS },
+      );
+
       return {
         groups: breakdown,
         totalDeliveryFee,
@@ -407,6 +455,7 @@ export class OrdersService {
         grandTotal,
         totalRouteKm: parseFloat(totalRouteKm.toFixed(2)),
         currency: 'NGN',
+        quoteToken,
       };
     } catch (error) {
       if (
@@ -1098,7 +1147,27 @@ export class OrdersService {
     if (!dropoffAddress || dropoffAddress.userId !== userId)
       throw new BadRequestException('Invalid delivery address');
 
-    // Fetch Products
+    // ── Price-lock check ───────────────────────────────────────────────────────────────
+    // If the client passes a quoteToken (returned by POST /cart/quote), load
+    // the pre-computed pricing from Redis. This guarantees the DB order.total
+    // exactly matches what was displayed to the user — no recalculation risk.
+    let lockedQuote: LockedQuote | null = null;
+    if (dto.quoteToken) {
+      const lockKey = `${QUOTE_LOCK_PREFIX}${userId}:${dto.quoteToken}`;
+      const raw = await this.redis.get(lockKey);
+      if (!raw) {
+        throw new BadRequestException(
+          'Your quote has expired (15 min limit). Please go back and review your order before trying again.',
+        );
+      }
+      const parsed: LockedQuote = JSON.parse(raw);
+      if (parsed.addressId !== dto.addressId) {
+        throw new BadRequestException(
+          'Delivery address changed since the quote was generated. Please review your order.',
+        );
+      }
+      lockedQuote = parsed;
+    }
     const productIds = dto.items.map((i) => i.id);
     const products = await this.prisma.product.findMany({
       where: { id: { in: productIds } },
@@ -1228,12 +1297,10 @@ export class OrdersService {
       }),
     );
 
-    // ── Phase 2: Route-optimized delivery fee (FareService formula) ──
+    // ── Phase 2: Route-optimized delivery fee ───────────────────────────────
     //
-    // Single store  → straight line: store → customer, fee = 700 + km × 400
-    // Multi-store   → one rider travels: customer → store_A → store_B → customer
-    //                 Total route km computed by greedy nearest-neighbor.
-    //                 Single fee on total route, split proportionally by subtotal.
+    // If a quoteToken was provided: use the locked prices (authoritative source).
+    // Otherwise: run live route-optimization + DB fare lookup (backward compat).
     const isSingleStore = resolvedStores.length === 1;
     const storeCoords = resolvedStores.map((s) => ({
       storeId: s.storeId,
@@ -1243,8 +1310,22 @@ export class OrdersService {
 
     let totalRouteKm: number;
     let sortedStoreIds: string[];
+    let lockedPriceMap: Map<
+      string,
+      { deliveryFee: number; serviceFee: number; vatAmount: number; finalTotal: number }
+    > | null = null;
 
-    if (isSingleStore) {
+    if (lockedQuote) {
+      // ✔ Price-lock path — no DB fare call needed
+      totalRouteKm = lockedQuote.totalRouteKm;
+      sortedStoreIds = lockedQuote.sortedStoreIds;
+      lockedPriceMap = new Map(
+        lockedQuote.stores.map((s) => [
+          s.storeId,
+          { deliveryFee: s.deliveryFee, serviceFee: s.serviceFee, vatAmount: s.vatAmount, finalTotal: s.finalTotal },
+        ]),
+      );
+    } else if (isSingleStore) {
       const s = resolvedStores[0];
       totalRouteKm = this.pricingService.calculateDistance(
         s.pickupAddress.lat,
@@ -1264,10 +1345,11 @@ export class OrdersService {
     }
 
     // Delivery fee reads admin-configured rates from DB (delivery_base_fare + delivery_per_km).
-    const totalDeliveryFee =
-      await this.fareService.calcDeliveryFee(totalRouteKm);
+    const totalDeliveryFee = lockedQuote
+      ? lockedQuote.stores.reduce((sum, s) => sum + s.deliveryFee, 0)
+      : await this.fareService.calcDeliveryFee(totalRouteKm);
 
-    // Sum of all item subtotals (used for proportional split)
+    // Sum of all item subtotals (used for proportional split when no lock)
     const grandSubtotal = resolvedStores.reduce(
       (sum, s) => sum + s.itemsTotal,
       0,
@@ -1281,11 +1363,7 @@ export class OrdersService {
       (storeId) => {
         const s = storeMap.get(storeId)!;
 
-        const deliveryFee =
-          grandSubtotal > 0
-            ? Math.round(totalDeliveryFee * (s.itemsTotal / grandSubtotal))
-            : Math.round(totalDeliveryFee / resolvedStores.length);
-
+        // Distance is always computed from fresh coordinates (needed for Delivery record)
         const distance = this.pricingService.calculateDistance(
           s.pickupAddress.lat,
           s.pickupAddress.lng,
@@ -1293,11 +1371,29 @@ export class OrdersService {
           dropoffAddress.lng,
         );
 
-        const serviceFee = this.pricingService.calculateServiceFee(
-          s.itemsTotal,
-        );
-        const vatAmount = this.pricingService.calculateVat(s.itemsTotal);
-        const finalTotal = s.itemsTotal + deliveryFee + serviceFee + vatAmount;
+        let deliveryFee: number;
+        let serviceFee: number;
+        let vatAmount: number;
+        let finalTotal: number;
+
+        const lp = lockedPriceMap?.get(storeId);
+        if (lp) {
+          // ✔ Use locked (quoted) amounts — guaranteed to match what user saw
+          deliveryFee = lp.deliveryFee;
+          serviceFee = lp.serviceFee;
+          vatAmount = lp.vatAmount;
+          finalTotal = lp.finalTotal;
+        } else {
+          // Live computation (no lock / backward compat)
+          deliveryFee =
+            grandSubtotal > 0
+              ? Math.round(totalDeliveryFee * (s.itemsTotal / grandSubtotal))
+              : Math.round(totalDeliveryFee / resolvedStores.length);
+          serviceFee = this.pricingService.calculateServiceFee(s.itemsTotal);
+          vatAmount = this.pricingService.calculateVat(s.itemsTotal);
+          finalTotal = s.itemsTotal + deliveryFee + serviceFee + vatAmount;
+        }
+
         calculatedGrandTotal += finalTotal;
 
         return {
@@ -1315,6 +1411,13 @@ export class OrdersService {
         };
       },
     );
+
+    // Consume price lock — single use only (prevents reuse/replay)
+    if (dto.quoteToken) {
+      await this.redis
+        .del(`${QUOTE_LOCK_PREFIX}${userId}:${dto.quoteToken}`)
+        .catch(() => {}); // best-effort; don't fail the order if Redis blips
+    }
 
     return {
       user,
