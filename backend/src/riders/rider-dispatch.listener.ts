@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { PrismaService } from '../prisma/prisma.service';
-import { NotificationFacade } from '../users/notification.facade';
+import { NotificationsService } from '../notifications/notifications.service';
 import { NotificationsGateway } from '../notifications/notifications.gateway';
 
 @Injectable()
@@ -10,21 +10,29 @@ export class RiderDispatchListener {
 
   constructor(
     private prisma: PrismaService,
-    private notificationFacade: NotificationFacade,
+    private notificationsService: NotificationsService,
     private notificationsGateway: NotificationsGateway,
   ) {}
 
   @OnEvent('job.assigned')
-  async handleJobAssignedEvent(payload: { jobId: string; jobType: string }) {
+  async handleJobAssignedEvent(payload: {
+    jobId: string;
+    jobType: string;
+    driverId?: string;
+    riderId?: string;
+  }) {
     this.logger.log(
       `Processing job.assigned event: ${payload.jobType} ${payload.jobId}`,
     );
+
+    // driverId is present in JobAssignedEvent for both rides and deliveries
+    const fallbackRiderId = payload.driverId || payload.riderId;
 
     const type = payload.jobType?.toLowerCase();
     if (type === 'delivery') {
       await this.handleDeliveryAssignment(payload.jobId);
     } else if (type === 'ride') {
-      await this.handleRideAssignment(payload.jobId);
+      await this.handleRideAssignment(payload.jobId, fallbackRiderId);
     }
   }
 
@@ -105,25 +113,27 @@ export class RiderDispatchListener {
     const roomId = delivery.orderId ?? delivery.id;
     this.notificationsGateway.joinJobRoom(delivery.riderId, roomId);
 
-    // Send push notification
+    // Create in-app notification (stored in DB) + send socket + push notification
     const pickupName =
       delivery.order?.store?.name ||
       (delivery as any).customer?.name ||
       'Sender';
     const shortRef = (delivery.orderId ?? delivery.id).slice(0, 8);
-    await this.notificationFacade.notifyRider(
-      delivery.riderId,
-      'New Delivery Assigned',
-      `Pick up ${isDirectDelivery ? 'package' : `order #${shortRef}`} at ${pickupName}`,
-      { deliveryId: delivery.id, type: 'DELIVERY_ASSIGNED' },
-    );
+    await this.notificationsService.createForRider({
+      riderId: delivery.riderId,
+      title: 'New Delivery Assigned',
+      message: `Pick up ${isDirectDelivery ? 'package' : `order #${shortRef}`} at ${pickupName}`,
+      type: 'DELIVERY',
+      category: 'DELIVERY_ASSIGNED',
+      metadata: { deliveryId: delivery.id, type: 'DELIVERY_ASSIGNED' },
+    });
 
     this.logger.log(
       `Delivery ${deliveryId} assigned to rider ${delivery.riderId}`,
     );
   }
 
-  private async handleRideAssignment(rideId: string) {
+  private async handleRideAssignment(rideId: string, fallbackRiderId?: string) {
     const ride = await this.prisma.ride.findUnique({
       where: { id: rideId },
       include: {
@@ -133,17 +143,19 @@ export class RiderDispatchListener {
       },
     });
 
-    if (!ride || !ride.riderId) {
-      // During auto-matching, riderId is stored in Redis (pending lock) but
-      // NOT yet in the DB. The RiderJobEventsListener handles that path.
-      // Only warn if the ride itself doesn't exist.
-      if (!ride) {
-        this.logger.warn(`Ride ${rideId} not found in handleRideAssignment`);
-      } else {
-        this.logger.debug(
-          `Ride ${rideId} has no riderId yet (auto-match pending) — skipping RiderDispatchListener`,
-        );
-      }
+    if (!ride) {
+      this.logger.warn(`Ride ${rideId} not found in handleRideAssignment`);
+      return;
+    }
+
+    // During auto-matching, riderId may be stored in Redis (pending lock)
+    // but not yet written to the DB. Use the fallback from the event payload.
+    const riderId = ride.riderId || fallbackRiderId;
+
+    if (!riderId) {
+      this.logger.debug(
+        `Ride ${rideId} has no riderId yet and no fallback in event — skipping push notification`,
+      );
       return;
     }
 
@@ -165,17 +177,19 @@ export class RiderDispatchListener {
 
     // NOTE: Socket emission is handled by RiderJobEventsListener to avoid duplicate events.
     // Join rider to ride room for real-time updates
-    this.notificationsGateway.joinJobRoom(ride.riderId, ride.id);
+    this.notificationsGateway.joinJobRoom(riderId, ride.id);
 
-    // Send push notification
-    await this.notificationFacade.notifyRider(
-      ride.riderId,
-      'New Ride Assigned',
-      `New ride request from ${ride.customer?.name || 'Customer'}`,
-      { rideId: ride.id, type: 'RIDE_ASSIGNED' },
-    );
+    // Create in-app notification (stored in DB) + send socket + push notification
+    await this.notificationsService.createForRider({
+      riderId,
+      title: 'New Ride Assigned',
+      message: `New ride request from ${ride.customer?.name || 'Customer'}`,
+      type: 'RIDE',
+      category: 'RIDE_ASSIGNED',
+      metadata: { rideId: ride.id, type: 'RIDE_ASSIGNED' },
+    });
 
-    this.logger.log(`Ride ${rideId} assigned to rider ${ride.riderId}`);
+    this.logger.log(`Ride ${rideId} assigned to rider ${riderId}`);
   }
 
   @OnEvent('job.updated')

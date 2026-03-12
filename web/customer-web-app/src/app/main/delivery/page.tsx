@@ -510,7 +510,9 @@ export default function DeliveryPage() {
       // Without this, the backend falls back to process.env.FRONTEND_URL which
       // may be unset or wrong. NEXT_PUBLIC_APP_URL must be this app's port (3001),
       // NOT the backend port (3000).
-      const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3001").replace(/\/+$/, "");
+      const appUrl = (
+        process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3001"
+      ).replace(/\/+$/, "");
       // Send just the base URL — the backend GET /callback/paystack handler
       // appends "/payment/callback" itself before redirecting the browser.
       const frontendCallbackUrl = appUrl;
@@ -688,13 +690,8 @@ export default function DeliveryPage() {
                 onClick={handlePayment}
                 className="w-full py-4 bg-yellow-500 hover:bg-yellow-600 text-white font-black rounded-xl shadow-lg transition-all active:scale-[0.98] flex items-center justify-center gap-2"
               >
-                Pay Securely <ChevronRight size={18} />
-              </button>
-              <button
-                onClick={() => setStage(DeliveryStage.CONFIGURING)}
-                className="w-full py-3 text-zinc-500 font-medium hover:text-zinc-800 transition-colors"
-              >
-                Cancel & Edit
+                <CreditCard size={20} />
+                Pay Securely
               </button>
             </div>
           </div>

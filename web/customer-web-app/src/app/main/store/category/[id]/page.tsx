@@ -12,14 +12,10 @@ const API_URL = RAW_API_URL.replace(/\/$/, "");
 const UI_FILTERS = {
   All: "all",
   "Top Rated": "top-rated",
-  "Fastest Delivery": "fastest",
-  "Low Delivery Fee": "cheapest",
 };
 
 const API_FILTER_MAP: Record<string, string> = {
   "top-rated": "RATING_DESC",
-  fastest: "TIME_ASC",
-  cheapest: "FEE_ASC",
 };
 
 // --- DATA FETCHING ---

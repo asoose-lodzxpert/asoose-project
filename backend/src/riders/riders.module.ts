@@ -30,6 +30,7 @@ import { PaystackAccountService } from '../payment/paystack-account.service';
 
 import { RiderAccountNotificationsService } from './notifications/rider-account-notifications.service';
 import { CommonModule } from '../common/common.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { CommonModule } from '../common/common.module';
     CacheModule.register(),
     MailModule,
     CommonModule,
+    NotificationsModule,
   ],
   controllers: [
     ProfileController,
