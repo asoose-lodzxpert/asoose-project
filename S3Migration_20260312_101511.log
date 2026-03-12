@@ -1,0 +1,7 @@
+[2026-03-12 10:15:11] [INFO] === S3 Migration Started ===
+[2026-03-12 10:15:11] [INFO] Source      : s3://asoose-storage  (profile: old-account)
+[2026-03-12 10:15:11] [INFO] Destination : s3://asoose-storage-migration  (profile: new-account)
+[2026-03-12 10:15:11] [INFO] Log file    : S3Migration_20260312_101511.log
+[2026-03-12 10:15:11] [INFO] Key prefix  : upload/
+[2026-03-12 10:15:11] [INFO] Listing objects in source bucket...
+[2026-03-12 10:15:15] [WARN] No objects found in source bucket. Nothing to migrate.

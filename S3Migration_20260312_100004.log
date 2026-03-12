@@ -1,0 +1,8 @@
+[2026-03-12 10:00:04] [INFO] === S3 Migration Started ===
+[2026-03-12 10:00:04] [INFO] Source      : s3://asoose-storage  (profile: old-account)
+[2026-03-12 10:00:04] [INFO] Destination : s3://asoose-storage-migration  (profile: new-account)
+[2026-03-12 10:00:04] [INFO] Log file    : S3Migration_20260312_100004.log
+[2026-03-12 10:00:04] [INFO] Listing objects in source bucket...
+[2026-03-12 10:00:07] [INFO] Found 470 object(s) to migrate.
+[2026-03-12 10:00:07] [INFO] Copying: s3://asoose-storage/migrated/item-thumbnails/BSw3GrjnIegH6TxTQlBkIO9pYL23/item_4_liters_Tigernut_Drink_1752618455794.jpeg  -->  s3://asoose-storage-migration/migrated/item-thumbnails/BSw3GrjnIegH6TxTQlBkIO9pYL23/item_4_liters_Tigernut_Drink_1752618455794.jpeg
+[2026-03-12 10:00:10] [WARN]   Exception reading metadata for 'migrated/item-thumbnails/BSw3GrjnIegH6TxTQlBkIO9pYL23/item_4_liters_Tigernut_Drink_1752618455794.jpeg': The property 'StorageClass' cannot be found on this object. Verify that the property exists.
