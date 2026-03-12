@@ -1,0 +1,737 @@
+ASOOSE PLATFORM - VENDOR LIST
+Generated: 2026-03-12T14:14:18.752Z
+Total Vendors: 104
+================================================================================
+
+ACTIVE VENDORS (89)
+--------------------------------------------------------------------------------
+  1. Store: shamsy
+      Type:         MARKET
+      Email:        injohsam9@gmail.com
+      Phone:        07033388378
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+  2. Store: Messy J Collections
+      Type:         FASHION
+      Email:        inyamfafa@gmail.com
+      Phone:        08063525266
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+  3. Store: Benny
+      Type:         MARKET
+      Email:        riopatrick222@gmail.com
+      Phone:        08067408701
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+  4. Store: Quick Bites
+      Type:         MARKET
+      Email:        lannod190@gmail.com
+      Phone:        08116676564
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+  5. Store: EVEBAT SOLUTION LIMITED
+      Type:         MARKET
+      Email:        evebatsolution@gmai.com
+      Phone:        07031838238
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+  6. Store: Princess Elberta's Palace
+      Type:         MARKET
+      Email:        princesselbertaspalace@gmail.com
+      Phone:        08034778660
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+  7. Store: Tertseagha Silas Tor
+      Type:         MARKET
+      Email:        bestmintstaff@gmail.com
+      Phone:        07032141008
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+  8. Store: NEWCITYCREAMERIES
+      Type:         MARKET
+      Email:        newcitycreamries@gmail.com
+      Phone:        09120049880
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+  9. Store: VIRONYS SUPERSTORES
+      Type:         MARKET
+      Email:        vironyssuperstores@gmail.com
+      Phone:        09099000080
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 10. Store: Blessed sparkle
+      Type:         MARKET
+      Email:        blessedsparkle360@gmail.com
+      Phone:        09021819341
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 11. Store: bintuu's delight
+      Type:         MARKET
+      Email:        bintuibrahimmusa040@gmail.com
+      Phone:        08102365047
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 12. Store: Light Hills Electrical Ventures
+      Type:         MARKET
+      Email:        onuachipeternnaji@gmail.com
+      Phone:        08068520111
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 13. Store: MADAM P RESTAURANT
+      Type:         MARKET
+      Email:        madamprestaurant2@gmail.com
+      Phone:        07061575033
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 14. Store: DORADOO_WEARS
+      Type:         FASHION
+      Email:        doodora7180@gmail.com
+      Phone:        08104321850
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 15. Store: DELISH FOOD DEPOT
+      Type:         MARKET
+      Email:        joyehi590@gmail.com
+      Phone:        07069209120
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 16. Store: Queen Fruits
+      Type:         MARKET
+      Email:        doowuesetyogema@gmail.com
+      Phone:        09052406738
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 17. Store: Aondoosoose Businees Enterprise
+      Type:         MARKET
+      Email:        nguseerakaa@gmail.com
+      Phone:        08031952990
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 18. Store: Titogate
+      Type:         MARKET
+      Email:        titogatehiivedelivery@gmail.com
+      Phone:        08066119865
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 19. Store: Glafanmo interior
+      Type:         MARKET
+      Email:        mbapuungladys@gmail.com
+      Phone:        08163450867
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 20. Store: MANGO WORLD
+      Type:         RESTAURANT
+      Email:        mangoworldnig@gmail.com
+      Phone:        09166385000
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 21. Store: Famous Technical Solutions
+      Type:         MARKET
+      Email:        amosiyaji24@gmail.com
+      Phone:        08038185010
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 22. Store: Shawarma Fantasy
+      Type:         MARKET
+      Email:        shawarmafantasy@gmail.com
+      Phone:        07077425629
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 23. Store: Nelson P
+      Type:         MARKET
+      Email:        fordamad@outlook.com
+      Phone:        09055030282
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 24. Store: foodiga cafe & grill
+      Type:         RESTAURANT
+      Email:        agboameh109775@gmail.com
+      Phone:        08148109775
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 25. Store: TeeVee Kitchen
+      Type:         MARKET
+      Email:        theresaveregh1@gmail.com
+      Phone:        07043303531
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 26. Store: GONEX CAP'S MAIDUGURI
+      Type:         MARKET
+      Email:        abbatijjanigoni22@gmail.com
+      Phone:        08148277646
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 27. Store: meals palace restaurant mkd
+      Type:         RESTAURANT
+      Email:        mealspalace@yahoo.com
+      Phone:        08160742976
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 28. Store: Hive stores
+      Type:         MARKET
+      Email:        hiiveallapps@gmail.com
+      Phone:        09035855015
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 29. Store:  Nicky's Bites 
+      Type:         RESTAURANT
+      Email:        nickysbite@gmail.com
+      Phone:        09162842611
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 30. Store: Coriander Flavors 
+      Type:         RESTAURANT
+      Email:        greenyieldacres01@gmail.com
+      Phone:        08086088053
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 31. Store: Musa Makka Adam
+      Type:         MARKET
+      Email:        musamakkah70@gmail.com
+      Phone:        +2340000000000
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 32. Store: Hyelnice
+      Type:         MARKET
+      Email:        nicedibal001@gmail.com
+      Phone:        +2340000000000
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 33. Store: Scent_By_Billz
+      Type:         MARKET
+      Email:        dayamblessingpaul@gmail.com
+      Phone:        +2340000000000
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 34. Store: Qawsar
+      Type:         MARKET
+      Email:        aishabomai456@gmail.com
+      Phone:        +2340000000000
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 35. Store: Jonce Store
+      Type:         MARKET
+      Email:        wahirasaje@gmail.com
+      Phone:        +2340000000000
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 36. Store: JD Cakes N Event
+      Type:         MARKET
+      Email:        judithsunnny@gmail.com
+      Phone:        +2340000000000
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 37. Store: Take-Out Cafe
+      Type:         MARKET
+      Email:        bericahsolos@gmail.com
+      Phone:        +2340000000000
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 38. Store: Favour restaurant
+      Type:         MARKET
+      Email:        standardvision@gmail.com
+      Phone:        +2340000000000
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 39. Store: Solo store
+      Type:         MARKET
+      Email:        renzel02@gmail.com
+      Phone:        +2340000000000
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 40. Store: hababa Chadian hair growth
+      Type:         MARKET
+      Email:        aishamaina1964@gmail.com
+      Phone:        +2340000000000
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 41. Store: Popcorn paradise
+      Type:         MARKET
+      Email:        xaraheem@gmail.com
+      Phone:        +2340000000000
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 42. Store: Madam Chioma Airport Road
+      Type:         MARKET
+      Email:        mchioma078@gmail.com
+      Phone:        +2340000000000
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 43. Store: Henry
+      Type:         MARKET
+      Email:        donhenrydx100@gmail.com
+      Phone:        +2340000000000
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 44. Store: kadai's collection
+      Type:         MARKET
+      Email:        falmataadam123@gmai.com
+      Phone:        +2340000000000
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 45. Store: Amala Westend
+      Type:         RESTAURANT
+      Email:        amalawestend@gmail.com
+      Phone:        +2340000000000
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 46. Store: Richdotcom Apple store
+      Type:         MARKET
+      Email:        richdotcomnigerialimited@gmail.com
+      Phone:        +2340000000000
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 47. Store: chuks last b one enterprise
+      Type:         MARKET
+      Email:        musaishaya07@gmail.com
+      Phone:        +2340000000000
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 48. Store: JG Malgwi and Bakes
+      Type:         MARKET
+      Email:        jesseganamalgwi1@gmail.com
+      Phone:        +2340000000000
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 49. Store: MACAW EMPORIUM
+      Type:         MARKET
+      Email:        macawemporium@gmail.com
+      Phone:        +2340000000000
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 50. Store: Coriander Flavours
+      Type:         MARKET
+      Email:        corianderflavors@gmail.com
+      Phone:        +2340000000000
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 51. Store: take_out café CDC ex x X xxdxMLxdxXxx
+      Type:         MARKET
+      Email:        take_outcafé@gmail.com
+      Phone:        +2340000000000
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 52. Store: Morning Dew Cafe And Restaurant
+      Type:         MARKET
+      Email:        jemimadibal02@gmail.com
+      Phone:        +2340000000000
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 53. Store: Chill In
+      Type:         MARKET
+      Email:        chillineateryandbakery@gmail.com
+      Phone:        +2340000000000
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 54. Store: SAUKI-PLUS PHARMACEUTICAL AND INTEGRATED SERVICES LIMITED
+      Type:         MARKET
+      Email:        saukipluspharmacy@gmail.com
+      Phone:        +2340000000000
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 55. Store: Smile fragrance
+      Type:         MARKET
+      Email:        blessingbashiramtagu@gmail.com
+      Phone:        +2340000000000
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 56. Store: Rise and shine by Mbarkindo
+      Type:         MARKET
+      Email:        mbarkindomaryam@gmail.com
+      Phone:        +2340000000000
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 57. Store: Favour Restaurant
+      Type:         MARKET
+      Email:        restaurantfavour0@gmail.com
+      Phone:        +2340000000000
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 58. Store: Today's cafeteria
+      Type:         RESTAURANT
+      Email:        todayscafteria@gmail.com
+      Phone:        +2347056813862    
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 59. Store: Falmata Omar Lawan
+      Type:         MARKET
+      Email:        folt7200@gmail.com
+      Phone:        +2340000000000
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 60. Store: Hally's Way Concept
+      Type:         MARKET
+      Email:        hallyisa24@gmail.com
+      Phone:        +2340000000000
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 61. Store: Cosmopolitan Suya (Giwa barrack junction)
+      Type:         MARKET
+      Email:        isacosmopolitan@gmail.com
+      Phone:        +2340000000000
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 62. Store: The Confectionery Company
+      Type:         MARKET
+      Email:        affikujoy1996@gmail.com
+      Phone:        +2340000000000
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 63. Store: Amickys Sparkles
+      Type:         MARKET
+      Email:        amiijed@gmail.com
+      Phone:        +2340000000000
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 64. Store: GLOWORLD
+      Type:         MARKET
+      Email:        amanda.charles@gloworld.com
+      Phone:        +2340000000000
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 65. Store: Madam Chioma Airport
+      Type:         MARKET
+      Email:        madamchioma21@gmail.com
+      Phone:        +2340000000000
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 66. Store: somabake delight
+      Type:         MARKET
+      Email:        bosomafatima@gmail.com
+      Phone:        +2340000000000
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 67. Store: Undiluted Luxury Perfumes
+      Type:         MARKET
+      Email:        undilutedluxuryperfume@gmail.com
+      Phone:        +2340000000000
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 68. Store: N&S Kitchen Pride
+      Type:         MARKET
+      Email:        alimusamaryam04@gmail.com
+      Phone:        +2340000000000
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 69. Store: RITTZ  CLOTHING'S
+      Type:         MARKET
+      Email:        ritankirukanwachukwu@gmail.com
+      Phone:        +2340000000000
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 70. Store: Deejerh Assorted
+      Type:         MARKET
+      Email:        deejerhassorted21@gmail.com
+      Phone:        +2340000000000
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 71. Store: Bumba's Yummy Bites
+      Type:         MARKET
+      Email:        bumbasyummybites@gmail.com
+      Phone:        +2340000000000
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 72. Store: Starlight Exclusive Wears
+      Type:         MARKET
+      Email:        hyeladiiliya@gmail.com
+      Phone:        +2340000000000
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 73. Store: Treats by AIA
+      Type:         MARKET
+      Email:        treastbyaia92@gmail.com
+      Phone:        +2340000000000
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 74. Store: Ekeson A Standard business
+      Type:         MARKET
+      Email:        ekesonstandard@gmail.com
+      Phone:        +2340000000000
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 75. Store: Hannas Restaurant and catering services
+      Type:         MARKET
+      Email:        ibrohannas@gmail.com
+      Phone:        +2340000000000
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 76. Store: Legend Gadgets
+      Type:         MARKET
+      Email:        jibson368@gmail.com
+      Phone:        +2340000000000
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 77. Store: Binta's Empire 🦋✨🌹
+      Type:         MARKET
+      Email:        bintabitrus27@gmail.com
+      Phone:        +2340000000000
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 78. Store: Nerisa Mamah
+      Type:         RESTAURANT
+      Email:        mamalarasconcept.chefschoice@gmail.com
+      Phone:        08032125336
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 79. Store: Amaka's Restaurant local dishes (Baga Road)
+      Type:         RESTAURANT
+      Email:        amakarestaurant6@gmail.com
+      Phone:        N/A
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 80. Store: Today's Super Store
+      Type:         RESTAURANT
+      Email:        todaysstoremaidugurionhiives@gmail.com
+      Phone:        0705 681 3862
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 81. Store: USIJU TASTY FRIED
+      Type:         RESTAURANT
+      Email:        usijutastyfried@gmail.com
+      Phone:        07035666090
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 82. Store: Jabex Store
+      Type:         MARKET
+      Email:        jabez@gmail.com
+      Phone:        09123456789
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 83. Store: Hebron Foods
+      Type:         RESTAURANT
+      Email:        hebronrestaurant0@gmail.com
+      Phone:        08142382515
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 84. Store: Dibal tech 
+      Type:         ONLINE
+      Email:        jophilip013@gmail.com
+      Phone:        7017567693
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 85. Store: William
+      Type:         RESTAURANT
+      Email:        nmnamu46196@gmail.com
+      Phone:        08165496680
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 86. Store: Asooselodzxpert 
+      Type:         RESTAURANT
+      Email:        hello@asoose.com
+      Phone:        08061966145
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 87. Store: Crimlea
+      Type:         RESTAURANT
+      Email:        test@gmail.com
+      Phone:        700000000
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 88. Store: Dau001
+      Type:         RESTAURANT
+      Email:        daudahabila2020@gmail.com
+      Phone:        09162472271
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+ 89. Store: Dalha's Store
+      Type:         RESTAURANT
+      Email:        dalhabuisness@gmail.com
+      Phone:        9035853467
+      Status:       ACTIVE
+      Verification: VERIFIED
+
+
+SUSPENDED / INACTIVE VENDORS (15)
+--------------------------------------------------------------------------------
+  1. Store: Amala restaurant
+      Type:         RESTAURANT
+      Email:        amalarestaurant169@gmail.com
+      Phone:        +2340000000000
+      Status:       SUSPENDED
+      Verification: VERIFIED
+
+  2. Store: Hiive Restaurant
+      Type:         MARKET
+      Email:        gana.jkgadzamallp@gmail.com
+      Phone:        +2340000000000
+      Status:       SUSPENDED
+      Verification: VERIFIED
+
+  3. Store: Hebron Bakery
+      Type:         MARKET
+      Email:        hebronbakery1@gmail.com
+      Phone:        +2340000000000
+      Status:       SUSPENDED
+      Verification: VERIFIED
+
+  4. Store: streetside Xpress
+      Type:         MARKET
+      Email:        streetsidexpress01@gmail.com
+      Phone:        +2340000000000
+      Status:       SUSPENDED
+      Verification: VERIFIED
+
+  5. Store: Mamalara Chef Choice
+      Type:         RESTAURANT
+      Email:        mamalarasconcept.chefchoice@gmail.com
+      Phone:        08032125336
+      Status:       SUSPENDED
+      Verification: VERIFIED
+
+  6. Store: GROCERY Spot 8
+      Type:         GROCERY
+      Email:        vendor_grocery_2@example.com
+      Phone:        +234802222228
+      Status:       SUSPENDED
+      Verification: VERIFIED
+
+  7. Store: GROCERY Spot 7
+      Type:         GROCERY
+      Email:        vendor_grocery_1@example.com
+      Phone:        +234802222227
+      Status:       SUSPENDED
+      Verification: VERIFIED
+
+  8. Store: RESTAURANT Spot 3
+      Type:         RESTAURANT
+      Email:        vendor_restaurant_3@example.com
+      Phone:        +234802222223
+      Status:       SUSPENDED
+      Verification: VERIFIED
+
+  9. Store: RESTAURANT Spot 2
+      Type:         RESTAURANT
+      Email:        vendor_restaurant_2@example.com
+      Phone:        +234802222222
+      Status:       SUSPENDED
+      Verification: VERIFIED
+
+ 10. Store: RESTAURANT Spot 1
+      Type:         RESTAURANT
+      Email:        vendor_restaurant_1@example.com
+      Phone:        +234802222221
+      Status:       SUSPENDED
+      Verification: VERIFIED
+
+ 11. Store: Test
+      Type:         OTHER
+      Email:        sophiechen992@gmail.com
+      Phone:        7061647972
+      Status:       SUSPENDED
+      Verification: PENDING
+
+ 12. Store: my store
+      Type:         RESTAURANT
+      Email:        ladisolomon560@gmail.com
+      Phone:        09112023933
+      Status:       SUSPENDED
+      Verification: VERIFIED
+
+ 13. Store: Fatima's Kitchen
+      Type:         MARKET
+      Email:        payndeliver1@gmail.com
+      Phone:        +2348036930772
+      Status:       SUSPENDED
+      Verification: VERIFIED
+
+ 14. Store: Intmega 
+      Type:         RESTAURANT
+      Email:        intmega.im@gmail.com
+      Phone:        08165496680
+      Status:       SUSPENDED
+      Verification: VERIFIED
+
+ 15. Store: Kavari
+      Type:         RESTAURANT
+      Email:        vendor_market_1@example.com
+      Phone:        08036930772
+      Status:       SUSPENDED
+      Verification: VERIFIED

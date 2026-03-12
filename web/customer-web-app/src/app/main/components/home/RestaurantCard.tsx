@@ -96,8 +96,6 @@ export const RestaurantCard = ({
           </div>
         </div>
 
-
-
         <div className="flex flex-wrap gap-1 mt-3">
           {tags.length > 0 ? (
             tags.slice(0, 3).map((tag) => (
