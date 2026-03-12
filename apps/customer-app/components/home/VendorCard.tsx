@@ -78,7 +78,6 @@ export function VendorCard({ item }: Props) {
         <View style={styles.meta}>
           <IconSymbol name="star.fill" size={14} color={primary} />
           <ThemedText>{rating.toFixed(1)}</ThemedText>
-          <ThemedText style={{ color: textMuted }}>• {deliveryText}</ThemedText>
         </View>
 
         {tags.length ? (

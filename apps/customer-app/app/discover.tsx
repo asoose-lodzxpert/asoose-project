@@ -99,13 +99,6 @@ function StoreCard({ item }: { item: Vendor }) {
           <ThemedText style={[sc.metaText, { color: textMuted }]}>
             {rating.toFixed(1)}
           </ThemedText>
-          <View style={sc.dot} />
-          <ThemedText
-            style={[sc.metaText, { color: textMuted }]}
-            numberOfLines={1}
-          >
-            {deliveryText}
-          </ThemedText>
         </View>
         {item.tags?.length ? (
           <ThemedText style={[sc.tags, { color: textMuted }]} numberOfLines={1}>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Star, Clock, Bike } from "lucide-react";
+import { Star } from "lucide-react";
 import Image from "next/image";
 
 interface RestaurantProps {
@@ -96,15 +96,7 @@ export const RestaurantCard = ({
           </div>
         </div>
 
-        <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400 mt-2 font-medium">
-          <span className="flex items-center gap-1">
-            <Clock className="w-3 h-3" /> {time}
-          </span>
-          <span className="w-1 h-1 rounded-full bg-gray-300 dark:bg-gray-700"></span>
-          <span className="flex items-center gap-1">
-            <Bike className="w-3 h-3" /> {deliveryText}
-          </span>
-        </div>
+
 
         <div className="flex flex-wrap gap-1 mt-3">
           {tags.length > 0 ? (
