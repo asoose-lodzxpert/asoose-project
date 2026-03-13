@@ -35,7 +35,7 @@ import { StatCard } from "./component/statcard";
 
 interface Vendor {
   id: string;
-  slug?: string;
+  slug: string | null;
   name: string;
   email: string;
   category: string;
@@ -92,7 +92,7 @@ export default function VendorManagementPage() {
   const debouncedSearch = useDebounce(searchQuery, 500);
   const [statusFilter, setStatusFilter] = useState("All Status");
   const [categoryFilter, setCategoryFilter] = useState("All");
-  const [verificationFilter, setVerificationFilter] = useState("All");
+  const [verificationFilter, setVerificationFilter] = useState("All Verification");
 
   useEffect(() => {
     setPagination((prev) => ({ ...prev, pageIndex: 0 }));
@@ -107,7 +107,7 @@ export default function VendorManagementPage() {
     if (debouncedSearch) params.set("search", debouncedSearch);
     if (statusFilter !== "All Status") params.set("status", statusFilter);
     if (categoryFilter !== "All") params.set("category", categoryFilter);
-    if (verificationFilter !== "All")
+    if (verificationFilter !== "All Verification")
       params.set("verification", verificationFilter);
 
     return params.toString();
@@ -130,15 +130,8 @@ export default function VendorManagementPage() {
     { revalidateOnFocus: false },
   );
 
-  // ✅ FIX: Filter out 'SUSPENDED' vendors (used for soft delete in backend)
-  const vendors = useMemo(() => {
-    const rawData = apiResponse?.data || [];
-    return rawData.filter((v) => {
-      // Backend sets status to SUSPENDED and appends -deleted- to slug on delete
-      // We filter based on status 'SUSPENDED' or explicit slug check if available
-      return v.status !== "SUSPENDED" && !v.slug?.includes("-deleted-");
-    });
-  }, [apiResponse?.data]);
+  // Backend already excludes soft-deleted / SUSPENDED stores; pass data through as-is.
+  const vendors = useMemo(() => apiResponse?.data ?? [], [apiResponse?.data]);
 
   const meta = apiResponse?.meta || {
     total: 0,
@@ -157,7 +150,7 @@ export default function VendorManagementPage() {
     setSearchQuery("");
     setStatusFilter("All Status");
     setCategoryFilter("All");
-    setVerificationFilter("All");
+    setVerificationFilter("All Verification");
     setPagination((prev) => ({ ...prev, pageIndex: 0 }));
   };
 
@@ -170,7 +163,7 @@ export default function VendorManagementPage() {
     } else if (type === "ACTIVE") {
       setStatusFilter("ACTIVE");
     } else if (type === "REJECTED") {
-      setStatusFilter("REJECTED");
+      setStatusFilter("CLOSED_PERMANENTLY");
     }
   };
 
@@ -384,11 +377,11 @@ export default function VendorManagementPage() {
         header: "Status",
         cell: (info) => {
           const status = info.getValue() || "PENDING";
-          const colors = {
+        const colors: Record<string, string> = {
             ACTIVE: "bg-green-500/20 text-green-500 border-green-500/20",
             PENDING: "bg-yellow-500/20 text-yellow-500 border-yellow-500/20",
-            DISABLED: "bg-gray-500/20 text-gray-400 border-gray-500/20",
-            REJECTED: "bg-red-500/20 text-red-500 border-red-500/20",
+            SUSPENDED: "bg-gray-500/20 text-gray-400 border-gray-500/20",
+            CLOSED_PERMANENTLY: "bg-red-500/20 text-red-500 border-red-500/20",
           };
           return (
             <span
@@ -456,6 +449,24 @@ export default function VendorManagementPage() {
   );
 
   if (isLoading) return <VendorManagementPageSkeleton />;
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-[#0F172A] flex flex-col items-center justify-center gap-4">
+        <AlertCircle className="w-12 h-12 text-red-500" />
+        <p className="text-white font-bold text-lg">Failed to load vendors</p>
+        <p className="text-gray-400 text-sm">
+          {error?.message || "An unexpected error occurred. Check your permissions."}
+        </p>
+        <button
+          onClick={() => mutate()}
+          className="px-6 py-2 bg-yellow-500 text-black font-bold rounded-lg hover:bg-yellow-400 transition-colors"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#0F172A] p-4 md:p-6 overflow-x-hidden relative pb-20">
@@ -558,18 +569,18 @@ export default function VendorManagementPage() {
             label="Status"
             value={statusFilter}
             onChange={setStatusFilter}
-            options={["ACTIVE", "PENDING", "DISABLED", "REJECTED"]}
+            options={["ACTIVE", "PENDING", "SUSPENDED", "CLOSED_PERMANENTLY"]}
           />
           <FilterSelect
             label="Verification"
             value={verificationFilter}
             onChange={setVerificationFilter}
-            options={["VERIFIED", "UNVERIFIED", "PENDING"]}
+            options={["VERIFIED", "REJECTED", "PENDING"]}
           />
 
           {(searchQuery ||
             statusFilter !== "All Status" ||
-            verificationFilter !== "All") && (
+            verificationFilter !== "All Verification") && (
             <button
               onClick={handleClearFilters}
               className="text-sm text-red-400 hover:text-red-300 font-bold px-2 py-2.5 w-full md:w-auto text-center"

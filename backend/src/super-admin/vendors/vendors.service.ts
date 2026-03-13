@@ -106,9 +106,17 @@ export class StoresService {
       ];
     }
 
-    if (status) where.status = status as StoreStatus;
+    if (status) {
+      where.status = status as StoreStatus;
+    } else {
+      // By default exclude soft-deleted (SUSPENDED) stores, matching getStats() behaviour
+      where.status = { not: StoreStatus.SUSPENDED };
+    }
     if (category) where.type = category as StoreType;
     if (verification) where.verification = verification as VerificationStatus;
+
+    // Always exclude physically soft-deleted stores (slug contains -deleted-)
+    where.slug = { not: { contains: '-deleted-' } };
 
     const [stores, total] = await Promise.all([
       this.prisma.store.findMany({
@@ -127,6 +135,7 @@ export class StoresService {
     return {
       data: stores.map((store) => ({
         id: store.id,
+        slug: store.slug,
         name: store.name,
         email: store.vendor?.email ?? 'No Owner',
         category: store.type,

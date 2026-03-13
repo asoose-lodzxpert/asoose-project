@@ -43,7 +43,12 @@ import {
   version: '1',
 })
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
+@Roles(
+  UserRole.SUPER_ADMIN,
+  UserRole.ADMIN,
+  UserRole.ADMIN_MANAGER,
+  UserRole.ADMIN_SUPPORT,
+)
 export class VendorsController {
   constructor(private readonly storesService: StoresService) {}
 
