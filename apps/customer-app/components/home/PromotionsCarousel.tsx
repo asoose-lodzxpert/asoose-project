@@ -178,10 +178,11 @@ export function PromotionsCarousel({ data }: { data: Promotion[] }) {
             <ImageBackground
               source={backgroundSource}
               style={styles.card}
-              imageStyle={{ borderRadius: 12 }}
+              resizeMode="cover"
+              imageStyle={{ borderRadius: 12, resizeMode: "cover" }}
             >
               <LinearGradient
-                colors={["rgba(0,0,0,0.35)", "rgba(0,0,0,0.05)"]}
+                colors={["rgba(200,130,0,0.68)", "rgba(120,70,0,0.22)"]}
                 style={StyleSheet.absoluteFill}
               />
               {Content}

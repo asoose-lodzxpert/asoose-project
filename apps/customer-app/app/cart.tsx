@@ -1,5 +1,6 @@
 import React, { useMemo } from "react";
 import {
+  Alert,
   View,
   StyleSheet,
   Pressable,
@@ -23,6 +24,7 @@ export default function CartScreen() {
     removeItem,
     increaseQty,
     decreaseQty,
+    clearCart,
     canCheckout,
   } = useCart();
   const router = useRouter();
@@ -102,6 +104,26 @@ export default function CartScreen() {
             {items.length}
           </ThemedText>
         </View>
+        <Pressable
+          onPress={() =>
+            Alert.alert(
+              "Clear Cart",
+              "Remove all items from your cart?",
+              [
+                { text: "Cancel", style: "cancel" },
+                {
+                  text: "Clear All",
+                  style: "destructive",
+                  onPress: clearCart,
+                },
+              ],
+            )
+          }
+          style={styles.clearBtn}
+          hitSlop={8}
+        >
+          <IconSymbol name="trash" size={18} color={danger} />
+        </Pressable>
       </View>
 
       <ScrollView
@@ -346,6 +368,12 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   backBtn: {
+    width: 36,
+    height: 36,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  clearBtn: {
     width: 36,
     height: 36,
     alignItems: "center",

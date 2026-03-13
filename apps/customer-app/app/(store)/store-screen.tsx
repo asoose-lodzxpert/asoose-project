@@ -1,8 +1,10 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Dimensions,
   DimensionValue,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -63,8 +65,9 @@ export default function StoreScreen() {
   const retryTimeoutRef = React.useRef<number | null>(null);
 
   const [currentTab, setCurrentTab] = useState<TabType>("all");
-  const [activeCategory, setActiveCategory] = useState("Popular");
+  const [activeCategory, setActiveCategory] = useState("All");
   const [searchValue, setSearchValue] = useState("");
+  const [displayLimit, setDisplayLimit] = useState(12);
 
   // Banners
   const [banners, setBanners] = useState<Banner[]>([]);
@@ -156,6 +159,11 @@ export default function StoreScreen() {
       .finally(() => setBannersLoading(false));
   }, []);
 
+  // Reset pagination when filters change
+  useEffect(() => {
+    setDisplayLimit(12);
+  }, [activeCategory, searchValue, currentTab]);
+
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     loadStore(0);
@@ -164,17 +172,58 @@ export default function StoreScreen() {
   const isRestaurant = storeData?.type === "RESTAURANT";
 
   const categories = storeData
-    ? ["Popular", ...new Set(storeData.products.map((p) => p.category.name))]
-    : ["Popular"];
+    ? ["All", ...new Set(storeData.products.map((p) => p.category.name))]
+    : ["All"];
 
-  const favorites = storeData
-    ? storeData.products.filter((_, index) => index === 0)
-    : [];
+  const favorites = useMemo(
+    () =>
+      storeData ? storeData.products.filter((_, index) => index === 0) : [],
+    [storeData],
+  );
 
-  const productsToShow =
-    currentTab === "favorites" ? favorites : (storeData?.products ?? []);
+  const filteredProducts = useMemo(() => {
+    const base =
+      currentTab === "favorites" ? favorites : (storeData?.products ?? []);
+    let list = base;
+
+    if (activeCategory !== "All") {
+      list = list.filter((p) => p.category.name === activeCategory);
+    }
+
+    if (searchValue.trim()) {
+      const q = searchValue.trim().toLowerCase();
+      list = list.filter(
+        (p) =>
+          p.name.toLowerCase().includes(q) ||
+          (typeof p.description === "string" &&
+            p.description.toLowerCase().includes(q)) ||
+          p.category.name.toLowerCase().includes(q),
+      );
+    }
+
+    return list;
+  }, [currentTab, favorites, storeData, activeCategory, searchValue]);
+
+  const productsToShow = filteredProducts.slice(0, displayLimit);
 
   const { addItem } = useCart();
+
+  const handleScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const { layoutMeasurement, contentOffset, contentSize } =
+        event.nativeEvent;
+      const nearBottom =
+        layoutMeasurement.height + contentOffset.y >=
+        contentSize.height - 300;
+      if (nearBottom && displayLimit < filteredProducts.length) {
+        setDisplayLimit((prev) =>
+          Math.min(prev + 12, filteredProducts.length),
+        );
+      }
+    },
+    [displayLimit, filteredProducts.length],
+  );
+
   const handleAddToCart = useCallback(
     async (productId: string) => {
       if (!storeData) return;
@@ -215,6 +264,11 @@ export default function StoreScreen() {
           description:
             typeof product.description === "string" ? product.description : "",
           available: true,
+        });
+        Toast.show({
+          type: "success",
+          text1: "Added to cart",
+          text2: `${product.name} added to your cart`,
         });
       } catch (e) {
         Toast.show({
@@ -504,6 +558,8 @@ export default function StoreScreen() {
       <ScrollView
         style={styles.contentContainer}
         showsVerticalScrollIndicator={false}
+        scrollEventThrottle={400}
+        onScroll={handleScroll}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }

@@ -305,28 +305,34 @@ export default function ProductDetailsScreen() {
           </View>
         )}
 
-        <View style={styles.quantitySelector}>
-          <ThemedText style={[styles.quantityLabel, { color: textSecondary }]}>
-            Quantity
-          </ThemedText>
-          <View style={styles.quantityControls}>
-            <Pressable
-              style={[styles.quantityButton, { borderColor: border }]}
-              onPress={() => setQuantity(Math.max(1, quantity - 1))}
+        {/* Only show local quantity selector when item is not yet in cart.
+            When the item IS in cart, the footer stepper is the sole control. */}
+        {!cartItem && (
+          <View style={styles.quantitySelector}>
+            <ThemedText
+              style={[styles.quantityLabel, { color: textSecondary }]}
             >
-              <IconSymbol name="minus" size={20} color={textColor} />
-            </Pressable>
-            <ThemedText style={[styles.quantityValue, { color: textColor }]}>
-              {quantity}
+              Quantity
             </ThemedText>
-            <Pressable
-              style={[styles.quantityButton, { borderColor: border }]}
-              onPress={() => setQuantity(quantity + 1)}
-            >
-              <IconSymbol name="plus" size={20} color={textColor} />
-            </Pressable>
+            <View style={styles.quantityControls}>
+              <Pressable
+                style={[styles.quantityButton, { borderColor: border }]}
+                onPress={() => setQuantity(Math.max(1, quantity - 1))}
+              >
+                <IconSymbol name="minus" size={20} color={textColor} />
+              </Pressable>
+              <ThemedText style={[styles.quantityValue, { color: textColor }]}>
+                {quantity}
+              </ThemedText>
+              <Pressable
+                style={[styles.quantityButton, { borderColor: border }]}
+                onPress={() => setQuantity(quantity + 1)}
+              >
+                <IconSymbol name="plus" size={20} color={textColor} />
+              </Pressable>
+            </View>
           </View>
-        </View>
+        )}
       </View>
     );
   };

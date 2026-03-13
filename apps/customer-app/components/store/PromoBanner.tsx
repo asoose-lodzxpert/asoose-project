@@ -91,7 +91,7 @@ function BannerCard({ item }: { item: Banner }) {
       <ImageBackground
         source={{ uri: item.image }}
         style={[styles.card, { marginHorizontal: 0 }]}
-        imageStyle={styles.cardImage}
+        imageStyle={[styles.cardImage, { resizeMode: "cover" }]}
         resizeMode="cover"
       >
         <View style={styles.overlay} />
@@ -199,7 +199,7 @@ const styles = StyleSheet.create({
   cardImage: { borderRadius: 16 },
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.38)",
+    backgroundColor: "rgba(190,120,0,0.58)",
     borderRadius: 16,
   },
   cardContent: { padding: 16, gap: 4 },
