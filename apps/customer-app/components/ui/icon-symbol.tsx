@@ -85,6 +85,7 @@ export type IconSymbolName =
   | "truck"
   | "moon"
   | "log-out"
+  | "link"
   | "alert-circle"
   | "person.2.fill"
   | "calender"
@@ -203,6 +204,7 @@ export const MAPPING: Record<
   truck: "local-shipping",
   moon: "dark-mode",
   "log-out": "logout",
+  link: "link",
   "house.fill": "home",
   "ticket.fill": "confirmation-number",
   "fork.knife": "restaurant",

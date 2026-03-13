@@ -3,10 +3,12 @@ import React, { useCallback, useEffect, useState } from "react";
 import {
   Dimensions,
   DimensionValue,
+  FlatList,
   Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
+  TouchableOpacity,
   View,
 } from "react-native";
 import { Image } from "expo-image";
@@ -27,7 +29,10 @@ import { useCart } from "@/context/CartContext";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import {
   fetchProductById,
+  fetchProductRelated,
+  fetchProductStoreItems,
   ProductDetails,
+  SummaryProduct,
 } from "@/services/marketplace.service";
 import {
   ModifierSelectionModal,
@@ -57,6 +62,10 @@ export default function ProductDetailsScreen() {
   const [quantity, setQuantity] = useState(1);
   const [showModifierModal, setShowModifierModal] = useState(false);
   const retryTimeoutRef = React.useRef<number | null>(null);
+
+  const [storeItems, setStoreItems] = useState<SummaryProduct[]>([]);
+  const [relatedProducts, setRelatedProducts] = useState<SummaryProduct[]>([]);
+  const [sectionsLoading, setSectionsLoading] = useState(false);
 
   const {
     items: cartItems,
@@ -117,6 +126,21 @@ export default function ProductDetailsScreen() {
       if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current);
     };
   }, [loadProduct]);
+
+  // Load "More from this store" and "You may also like" once we have the product id
+  useEffect(() => {
+    if (!id || typeof id !== "string") return;
+    setSectionsLoading(true);
+    Promise.allSettled([
+      fetchProductStoreItems(id),
+      fetchProductRelated(id),
+    ]).then(([storeRes, relatedRes]) => {
+      if (storeRes.status === "fulfilled") setStoreItems(storeRes.value);
+      if (relatedRes.status === "fulfilled")
+        setRelatedProducts(relatedRes.value);
+      setSectionsLoading(false);
+    });
+  }, [id]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -271,8 +295,20 @@ export default function ProductDetailsScreen() {
   /* ---------------- UI Renderers ---------------- */
   const renderProductInfo = () => {
     if (!product) return null;
+
+    const isAvailable = product.available && product.status === "ACTIVE";
+    const lowStock =
+      product.stock !== null &&
+      product.stock !== undefined &&
+      product.stock <= 10;
+    const outOfStock =
+      product.stock !== null &&
+      product.stock !== undefined &&
+      product.stock === 0;
+
     return (
       <View style={styles.infoSection}>
+        {/* Name + Price row */}
         <View style={styles.nameRow}>
           <View style={{ flex: 1 }}>
             <ThemedText style={[styles.productName, { color: textColor }]}>
@@ -294,6 +330,71 @@ export default function ProductDetailsScreen() {
           </ThemedText>
         </View>
 
+        {/* Availability + stock badges */}
+        <View style={styles.badgeRow}>
+          <View
+            style={[
+              styles.availBadge,
+              {
+                backgroundColor: isAvailable
+                  ? "rgba(34,197,94,0.12)"
+                  : "rgba(239,68,68,0.12)",
+              },
+            ]}
+          >
+            <View
+              style={[
+                styles.availDot,
+                { backgroundColor: isAvailable ? "#22c55e" : "#ef4444" },
+              ]}
+            />
+            <ThemedText
+              style={[
+                styles.availText,
+                { color: isAvailable ? "#16a34a" : "#dc2626" },
+              ]}
+            >
+              {outOfStock
+                ? "Out of stock"
+                : isAvailable
+                  ? "Available"
+                  : "Unavailable"}
+            </ThemedText>
+          </View>
+          {lowStock && !outOfStock && (
+            <View
+              style={[
+                styles.availBadge,
+                { backgroundColor: "rgba(234,179,8,0.12)" },
+              ]}
+            >
+              <ThemedText style={{ fontSize: 12, color: "#ca8a04" }}>
+                Only {product.stock} left
+              </ThemedText>
+            </View>
+          )}
+          {product.salesCount > 0 && (
+            <View
+              style={[
+                styles.availBadge,
+                { backgroundColor: "rgba(99,102,241,0.10)" },
+              ]}
+            >
+              <IconSymbol
+                name="chart.line.uptrend.xyaxis"
+                size={12}
+                color="#6366f1"
+              />
+              <ThemedText
+                style={{ fontSize: 12, color: "#6366f1", marginLeft: 4 }}
+              >
+                {product.salesCount} sold
+              </ThemedText>
+            </View>
+          )}
+        </View>
+
+        {/* Description */}
         {product.description && (
           <View style={styles.descriptionSection}>
             <ThemedText style={[styles.sectionTitle, { color: textColor }]}>
@@ -302,6 +403,112 @@ export default function ProductDetailsScreen() {
             <ThemedText style={[styles.description, { color: textSecondary }]}>
               {product.description}
             </ThemedText>
+          </View>
+        )}
+
+        {/* Store info */}
+        <Pressable
+          style={[
+            styles.storeInfoRow,
+            { backgroundColor: surfaceCard, borderColor: border },
+          ]}
+          onPress={() => router.push(`/store/${product.store.slug}` as any)}
+        >
+          <View
+            style={[
+              styles.storeIconBox,
+              { backgroundColor: brandPrimary + "15" },
+            ]}
+          >
+            <IconSymbol
+              name="building.columns.fill"
+              size={18}
+              color={brandPrimary}
+            />
+          </View>
+          <View style={{ flex: 1, marginLeft: 12 }}>
+            <ThemedText
+              style={{ fontSize: 15, fontWeight: "700", color: textColor }}
+            >
+              {product.store.name}
+            </ThemedText>
+            {product.store.type && (
+              <ThemedText
+                style={{
+                  fontSize: 12,
+                  color: textSecondary,
+                  textTransform: "capitalize",
+                }}
+              >
+                {product.store.type.toLowerCase().replace(/_/g, " ")}
+              </ThemedText>
+            )}
+          </View>
+          <IconSymbol name="chevron.right" size={16} color={textSecondary} />
+        </Pressable>
+
+        {/* Modifier groups */}
+        {product.modifierGroups && product.modifierGroups.length > 0 && (
+          <View style={styles.modifiersSection}>
+            <ThemedText style={[styles.sectionTitle, { color: textColor }]}>
+              Customizations
+            </ThemedText>
+            {product.modifierGroups.map((group) => (
+              <View
+                key={group.id}
+                style={[
+                  styles.modifierGroup,
+                  { borderColor: border, backgroundColor: surfaceCard },
+                ]}
+              >
+                <View style={styles.modifierGroupHeader}>
+                  <ThemedText
+                    style={{
+                      fontSize: 14,
+                      fontWeight: "700",
+                      color: textColor,
+                    }}
+                  >
+                    {group.name}
+                  </ThemedText>
+                  <ThemedText
+                    style={{
+                      fontSize: 11,
+                      color: textSecondary,
+                      backgroundColor: surfaceSubtle,
+                      paddingHorizontal: 8,
+                      paddingVertical: 2,
+                      borderRadius: 8,
+                    }}
+                  >
+                    {group.minSelect === 0 ? "Optional" : "Required"} · Choose{" "}
+                    {group.minSelect === group.maxSelect
+                      ? group.maxSelect
+                      : `${group.minSelect}–${group.maxSelect}`}
+                  </ThemedText>
+                </View>
+                <View style={styles.modifierList}>
+                  {group.modifiers.map((mod) => (
+                    <View key={mod.id} style={styles.modifierItem}>
+                      <ThemedText style={{ fontSize: 13, color: textColor }}>
+                        {mod.name}
+                      </ThemedText>
+                      {mod.price > 0 && (
+                        <ThemedText
+                          style={{
+                            fontSize: 13,
+                            color: brandPrimary,
+                            fontWeight: "600",
+                          }}
+                        >
+                          +₦{mod.price.toFixed(2)}
+                        </ThemedText>
+                      )}
+                    </View>
+                  ))}
+                </View>
+              </View>
+            ))}
           </View>
         )}
 
@@ -336,6 +543,47 @@ export default function ProductDetailsScreen() {
       </View>
     );
   };
+
+  /* ---------------- Mini product card for horizontal lists ---------------- */
+  const renderMiniCard = (item: SummaryProduct) => (
+    <TouchableOpacity
+      key={item.id}
+      style={[
+        styles.miniCard,
+        { backgroundColor: surfaceCard, borderColor: border },
+      ]}
+      activeOpacity={0.8}
+      onPress={() => router.push(`/product/${item.id}` as any)}
+    >
+      <Image
+        source={{
+          uri: item.images?.[0] || "https://via.placeholder.com/150",
+        }}
+        style={styles.miniCardImage}
+        contentFit="cover"
+        transition={200}
+      />
+      <View style={styles.miniCardBody}>
+        <ThemedText
+          style={[styles.miniCardName, { color: textColor }]}
+          numberOfLines={2}
+        >
+          {item.name}
+        </ThemedText>
+        {item.category?.name && (
+          <ThemedText
+            style={[styles.miniCardCategory, { color: textSecondary }]}
+            numberOfLines={1}
+          >
+            {item.category.name}
+          </ThemedText>
+        )}
+        <ThemedText style={[styles.miniCardPrice, { color: brandPrimary }]}>
+          ₦{item.price?.toFixed(2)}
+        </ThemedText>
+      </View>
+    </TouchableOpacity>
+  );
 
   return (
     <ThemedView style={[styles.mainContainer, { backgroundColor: surface }]}>
@@ -429,6 +677,58 @@ export default function ProductDetailsScreen() {
           <View style={[styles.contentContainer, { backgroundColor: surface }]}>
             {renderProductInfo()}
           </View>
+
+          {/* More from this store */}
+          {storeItems.length > 0 && (
+            <View style={styles.horizontalSection}>
+              <View style={styles.horizontalSectionHeader}>
+                <ThemedText
+                  style={[styles.horizontalSectionTitle, { color: textColor }]}
+                >
+                  More from {product.store.name}
+                </ThemedText>
+                <Pressable
+                  onPress={() =>
+                    router.push(`/store/${product.store.slug}` as any)
+                  }
+                >
+                  <ThemedText style={{ fontSize: 13, color: brandPrimary }}>
+                    See all
+                  </ThemedText>
+                </Pressable>
+              </View>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.horizontalList}
+              >
+                {storeItems.map(renderMiniCard)}
+              </ScrollView>
+            </View>
+          )}
+
+          {/* You may also like */}
+          {relatedProducts.length > 0 && (
+            <View style={styles.horizontalSection}>
+              <View style={styles.horizontalSectionHeader}>
+                <ThemedText
+                  style={[styles.horizontalSectionTitle, { color: textColor }]}
+                >
+                  You may also like
+                </ThemedText>
+              </View>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.horizontalList}
+              >
+                {relatedProducts.map(renderMiniCard)}
+              </ScrollView>
+            </View>
+          )}
+
+          {/* Bottom padding so footer doesn't overlap last section */}
+          <View style={{ height: 20 }} />
         </ScrollView>
       )}
 
@@ -636,4 +936,91 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 12,
   },
+
+  /* Availability badges */
+  badgeRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 20,
+  },
+  availBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+  },
+  availDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 6,
+  },
+  availText: { fontSize: 12, fontWeight: "600" },
+
+  /* Store info row */
+  storeInfoRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 14,
+    marginBottom: 20,
+  },
+  storeIconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  /* Modifier groups */
+  modifiersSection: { marginBottom: 20 },
+  modifierGroup: {
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 14,
+    marginBottom: 10,
+  },
+  modifierGroupHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  modifierList: { gap: 6 },
+  modifierItem: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 6,
+    paddingHorizontal: 4,
+  },
+
+  /* Horizontal sections */
+  horizontalSection: { paddingBottom: 8 },
+  horizontalSectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+  },
+  horizontalSectionTitle: { fontSize: 16, fontWeight: "700" },
+  horizontalList: { paddingHorizontal: 16, gap: 12 },
+
+  /* Mini product card */
+  miniCard: {
+    width: 160,
+    borderRadius: 14,
+    borderWidth: 1,
+    overflow: "hidden",
+  },
+  miniCardImage: { width: "100%", height: 110 },
+  miniCardBody: { padding: 10, gap: 3 },
+  miniCardName: { fontSize: 13, fontWeight: "600", lineHeight: 18 },
+  miniCardCategory: { fontSize: 11 },
+  miniCardPrice: { fontSize: 14, fontWeight: "700", marginTop: 4 },
 });
