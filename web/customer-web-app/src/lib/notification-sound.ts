@@ -141,3 +141,5 @@ export function unlockNotificationSound(): void {
   const ctx = getAudioContext();
   if (ctx && ctx.state === 'suspended') {
     ctx.resume().catch(() => { /* ignore */ });
+  }
+}
