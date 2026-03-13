@@ -275,7 +275,17 @@ export default function DisputeChatModal({ disputeId, onClose }: Props) {
         (payload: { disputeId: string; message: DisputeMessage }) => {
           if (cancelled || payload.disputeId !== disputeId) return;
           setMessages((prev) => {
-            // Deduplicate by id (sender already appended optimistically)
+            // If this is our own message arriving via socket, replace the
+            // optimistic temp entry rather than appending a duplicate.
+            if (payload.message.sender?.id === user?.id) {
+              const tempIdx = prev.findIndex((m) => m.id.startsWith("temp_"));
+              if (tempIdx >= 0) {
+                return prev.map((m, i) =>
+                  i === tempIdx ? payload.message : m,
+                );
+              }
+            }
+            // For others' messages (or self with no pending temp), deduplicate by id
             const exists = prev.some((m) => m.id === payload.message.id);
             if (exists) return prev;
             return [...prev, payload.message];
@@ -331,8 +341,13 @@ export default function DisputeChatModal({ disputeId, onClose }: Props) {
 
     try {
       const saved = await sendDisputeMessage(disputeId, text);
-      // Replace temp entry with real one
-      setMessages((prev) => prev.map((m) => (m.id === tempId ? saved : m)));
+      // Replace temp entry with confirmed message — but only if the socket
+      // hasn't already swapped it in (avoids a second duplicate entry).
+      setMessages((prev) => {
+        const hasTmp = prev.some((m) => m.id === tempId);
+        if (!hasTmp) return prev;
+        return prev.map((m) => (m.id === tempId ? saved : m));
+      });
     } catch {
       // Roll back optimistic message on error
       setMessages((prev) => prev.filter((m) => m.id !== tempId));

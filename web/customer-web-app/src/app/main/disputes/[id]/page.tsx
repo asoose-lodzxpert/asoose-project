@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   ChevronLeft,
@@ -18,15 +18,20 @@ import {
   ExternalLink,
   Calendar,
   Flag,
+  Wifi,
+  WifiOff,
 } from "lucide-react";
 import Link from "next/link";
 import useSWR from "swr";
 import { useSession } from "next-auth/react";
 import { toast } from "react-toastify";
+import { io, Socket } from "socket.io-client";
 
 const API_URL = (
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1"
 ).replace(/\/$/, "");
+
+const SOCKET_URL = API_URL.replace("/api/v1", "");
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -75,7 +80,10 @@ function associatedEntityLink(dispute: any) {
   if (dispute.orderId)
     return { label: "View Order", href: `/main/orders/${dispute.orderId}` };
   if (dispute.deliveryId)
-    return { label: "View Delivery", href: `/main/deliveries/${dispute.deliveryId}` };
+    return {
+      label: "View Delivery",
+      href: `/main/deliveries/${dispute.deliveryId}`,
+    };
   if (dispute.rideId)
     return { label: "View Ride", href: `/main/rides/${dispute.rideId}` };
   return null;
@@ -84,9 +92,17 @@ function associatedEntityLink(dispute: any) {
 // ---------------------------------------------------------------------------
 // Message bubble
 // ---------------------------------------------------------------------------
-function MessageBubble({ message, currentUserId }: { message: any; currentUserId: string }) {
+function MessageBubble({
+  message,
+  currentUserId,
+}: {
+  message: any;
+  currentUserId: string;
+}) {
   const isMe = message.sender?.id === currentUserId;
-  const isSupport = ["SUPER_ADMIN", "ADMIN_MANAGER", "ADMIN_SUPPORT"].includes(message.sender?.role);
+  const isSupport = ["SUPER_ADMIN", "ADMIN_MANAGER", "ADMIN_SUPPORT"].includes(
+    message.sender?.role,
+  );
   return (
     <div className={`flex gap-3 ${isMe ? "flex-row-reverse" : "flex-row"}`}>
       <div
@@ -98,7 +114,9 @@ function MessageBubble({ message, currentUserId }: { message: any; currentUserId
       >
         {isSupport ? "S" : (message.sender?.name?.[0] ?? "?").toUpperCase()}
       </div>
-      <div className={`max-w-[75%] ${isMe ? "items-end" : "items-start"} flex flex-col gap-1`}>
+      <div
+        className={`max-w-[75%] ${isMe ? "items-end" : "items-start"} flex flex-col gap-1`}
+      >
         {!isMe && (
           <p className="text-[10px] text-gray-400 font-semibold ml-1">
             {isSupport ? "Support Team" : (message.sender?.name ?? "Unknown")}
@@ -113,12 +131,13 @@ function MessageBubble({ message, currentUserId }: { message: any; currentUserId
         >
           {message.message}
         </div>
-        <p className="text-[10px] text-gray-400 mx-1">{fmtDate(message.createdAt)}</p>
+        <p className="text-[10px] text-gray-400 mx-1">
+          {fmtDate(message.createdAt)}
+        </p>
       </div>
     </div>
   );
 }
-
 
 // ---------------------------------------------------------------------------
 // Page
@@ -132,6 +151,40 @@ export default function DisputeDetailPage() {
 
   const [messageText, setMessageText] = useState("");
   const [isSending, setIsSending] = useState(false);
+  const [socketConnected, setSocketConnected] = useState(false);
+  const socketRef = useRef<Socket | null>(null);
+
+  // Real-time socket — refresh messages when admin replies
+  useEffect(() => {
+    if (status !== "authenticated" || !disputeId) return;
+
+    const token = (session as any)?.accessToken;
+    if (!token) return;
+
+    const socket = io(SOCKET_URL, {
+      auth: { token },
+      transports: ["websocket", "polling"],
+      reconnection: true,
+      reconnectionAttempts: 5,
+    });
+
+    socketRef.current = socket;
+
+    socket.on("connect", () => setSocketConnected(true));
+    socket.on("disconnect", () => setSocketConnected(false));
+
+    socket.on("dispute:message", (payload: { disputeId: string }) => {
+      if (payload.disputeId !== disputeId) return;
+      // Refresh the SWR data to pick up the new message
+      mutate();
+    });
+
+    return () => {
+      socket.disconnect();
+      socketRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, disputeId, session]);
 
   const fetcher = async (url: string) => {
     if (status === "unauthenticated") {
@@ -140,7 +193,10 @@ export default function DisputeDetailPage() {
     }
     const token = (session as any)?.accessToken;
     const res = await fetch(url, {
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
     });
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
@@ -154,7 +210,12 @@ export default function DisputeDetailPage() {
       ? `${API_URL}/super-admin/disputes/${disputeId}`
       : null;
 
-  const { data: dispute, error, isLoading, mutate } = useSWR(shouldFetch, fetcher, {
+  const {
+    data: dispute,
+    error,
+    isLoading,
+    mutate,
+  } = useSWR(shouldFetch, fetcher, {
     revalidateOnFocus: true,
     dedupingInterval: 5000,
   });
@@ -164,11 +225,17 @@ export default function DisputeDetailPage() {
     setIsSending(true);
     try {
       const token = (session as any)?.accessToken;
-      const res = await fetch(`${API_URL}/super-admin/disputes/${disputeId}/messages`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ message: messageText.trim() }),
-      });
+      const res = await fetch(
+        `${API_URL}/super-admin/disputes/${disputeId}/messages`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ message: messageText.trim() }),
+        },
+      );
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.message || "Failed to send message");
@@ -182,8 +249,13 @@ export default function DisputeDetailPage() {
     }
   };
 
-  const entityLink = useMemo(() => (dispute ? associatedEntityLink(dispute) : null), [dispute]);
-  const statusStyle = dispute ? (STATUS_STYLES[dispute.status] ?? STATUS_STYLES.OPEN) : STATUS_STYLES.OPEN;
+  const entityLink = useMemo(
+    () => (dispute ? associatedEntityLink(dispute) : null),
+    [dispute],
+  );
+  const statusStyle = dispute
+    ? (STATUS_STYLES[dispute.status] ?? STATUS_STYLES.OPEN)
+    : STATUS_STYLES.OPEN;
 
   // ---------- Loading ----------
   if (status === "loading" || isLoading) {
@@ -206,11 +278,16 @@ export default function DisputeDetailPage() {
         <div className="w-16 h-16 bg-gray-100 dark:bg-[#151515] rounded-full flex items-center justify-center mb-4">
           <AlertCircle className="w-8 h-8 text-gray-400" />
         </div>
-        <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Dispute not found</h3>
+        <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+          Dispute not found
+        </h3>
         <p className="text-sm text-gray-500 dark:text-gray-400 mb-6 max-w-xs mx-auto">
           {error?.message || "We could not locate this dispute record."}
         </p>
-        <Link href="/main/profile" className="px-6 py-3 bg-yellow-500 text-black font-bold rounded-xl hover:bg-yellow-400 transition-colors">
+        <Link
+          href="/main/profile"
+          className="px-6 py-3 bg-yellow-500 text-black font-bold rounded-xl hover:bg-yellow-400 transition-colors"
+        >
           Back to Profile
         </Link>
       </div>
@@ -219,7 +296,6 @@ export default function DisputeDetailPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-[#0a0a0a] text-gray-900 dark:text-gray-100 pb-24">
-
       {/* Sticky header */}
       <div className="sticky top-0 z-20 bg-gray-50/80 dark:bg-[#0a0a0a]/80 backdrop-blur-md px-4 py-4 border-b border-gray-200 dark:border-white/5">
         <div className="max-w-2xl mx-auto flex items-center gap-4">
@@ -235,7 +311,19 @@ export default function DisputeDetailPage() {
               #{dispute.id.split("-")[0].toUpperCase()}
             </p>
           </div>
-          <span className={`inline-flex items-center gap-1.5 px-3 py-1 text-xs font-bold rounded-full border ${statusStyle.chip}`}>
+          <span
+            title={socketConnected ? "Live updates active" : "Connecting…"}
+            className="ml-auto"
+          >
+            {socketConnected ? (
+              <Wifi className="w-4 h-4 text-green-500" />
+            ) : (
+              <WifiOff className="w-4 h-4 text-gray-400" />
+            )}
+          </span>
+          <span
+            className={`inline-flex items-center gap-1.5 px-3 py-1 text-xs font-bold rounded-full border ${statusStyle.chip}`}
+          >
             {statusStyle.icon}
             {dispute.status}
           </span>
@@ -243,7 +331,6 @@ export default function DisputeDetailPage() {
       </div>
 
       <div className="max-w-2xl mx-auto px-4 py-6 space-y-5">
-
         {/* Overview */}
         <div className="bg-white dark:bg-[#151515] rounded-3xl p-6 border border-gray-100 dark:border-white/5 shadow-sm space-y-4">
           <div className="flex items-center justify-between gap-3">
@@ -259,7 +346,9 @@ export default function DisputeDetailPage() {
               </div>
             </div>
             {dispute.priority && (
-              <span className={`text-[10px] font-black px-2.5 py-1 rounded-lg shrink-0 ${PRIORITY_STYLES[dispute.priority] ?? PRIORITY_STYLES.LOW}`}>
+              <span
+                className={`text-[10px] font-black px-2.5 py-1 rounded-lg shrink-0 ${PRIORITY_STYLES[dispute.priority] ?? PRIORITY_STYLES.LOW}`}
+              >
                 {dispute.priority}
               </span>
             )}
@@ -267,7 +356,9 @@ export default function DisputeDetailPage() {
 
           {dispute.description && (
             <div className="pt-4 border-t border-gray-50 dark:border-white/5">
-              <p className="text-[10px] text-gray-400 uppercase tracking-widest font-bold mb-1">Description</p>
+              <p className="text-[10px] text-gray-400 uppercase tracking-widest font-bold mb-1">
+                Description
+              </p>
               <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap">
                 {dispute.description}
               </p>
@@ -278,7 +369,9 @@ export default function DisputeDetailPage() {
             <div className="flex items-center gap-1.5">
               <Calendar className="w-3.5 h-3.5 shrink-0" />
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Filed</p>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                  Filed
+                </p>
                 <p>{fmtDate(dispute.createdAt)}</p>
               </div>
             </div>
@@ -286,7 +379,9 @@ export default function DisputeDetailPage() {
               <div className="flex items-center gap-1.5">
                 <Clock className="w-3.5 h-3.5 shrink-0" />
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Last Updated</p>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                    Last Updated
+                  </p>
                   <p>{fmtDate(dispute.updatedAt)}</p>
                 </div>
               </div>
@@ -306,7 +401,9 @@ export default function DisputeDetailPage() {
               <div className="flex items-center gap-1.5">
                 <Flag className="w-3.5 h-3.5 shrink-0 text-yellow-500" />
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Time Open</p>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                    Time Open
+                  </p>
                   <p>{dispute.hoursOpen ?? 0}h</p>
                 </div>
               </div>
@@ -318,7 +415,9 @@ export default function DisputeDetailPage() {
         {entityLink && (
           <div className="bg-white dark:bg-[#151515] rounded-3xl p-5 border border-gray-100 dark:border-white/5 shadow-sm flex items-center justify-between gap-4">
             <div>
-              <p className="text-[10px] text-gray-400 uppercase tracking-widest font-bold mb-0.5">Related to</p>
+              <p className="text-[10px] text-gray-400 uppercase tracking-widest font-bold mb-0.5">
+                Related to
+              </p>
               <p className="text-sm font-bold">
                 {dispute.orderId
                   ? `Order #${dispute.orderId.split("-")[0].toUpperCase()}`
@@ -338,41 +437,58 @@ export default function DisputeDetailPage() {
         )}
 
         {/* Resolution / rejection note */}
-        {(dispute.status === "RESOLVED" || dispute.status === "REJECTED") && (dispute.resolution || dispute.resolutionNote) && (
-          <div
-            className={`rounded-3xl p-5 border shadow-sm ${
-              dispute.status === "RESOLVED"
-                ? "bg-green-50 dark:bg-green-900/10 border-green-100 dark:border-green-900/20"
-                : "bg-red-50 dark:bg-red-900/10 border-red-100 dark:border-red-900/20"
-            }`}
-          >
-            <div className="flex items-center gap-2 mb-3">
-              {dispute.status === "RESOLVED" ? (
-                <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400" />
-              ) : (
-                <XCircle className="w-4 h-4 text-red-600 dark:text-red-400" />
-              )}
-              <p className={`text-xs font-bold uppercase tracking-widest ${dispute.status === "RESOLVED" ? "text-green-700 dark:text-green-400" : "text-red-700 dark:text-red-400"}`}>
-                {dispute.status === "RESOLVED" ? "Resolution Note" : "Rejection Reason"}
+        {(dispute.status === "RESOLVED" || dispute.status === "REJECTED") &&
+          (dispute.resolution || dispute.resolutionNote) && (
+            <div
+              className={`rounded-3xl p-5 border shadow-sm ${
+                dispute.status === "RESOLVED"
+                  ? "bg-green-50 dark:bg-green-900/10 border-green-100 dark:border-green-900/20"
+                  : "bg-red-50 dark:bg-red-900/10 border-red-100 dark:border-red-900/20"
+              }`}
+            >
+              <div className="flex items-center gap-2 mb-3">
+                {dispute.status === "RESOLVED" ? (
+                  <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400" />
+                ) : (
+                  <XCircle className="w-4 h-4 text-red-600 dark:text-red-400" />
+                )}
+                <p
+                  className={`text-xs font-bold uppercase tracking-widest ${dispute.status === "RESOLVED" ? "text-green-700 dark:text-green-400" : "text-red-700 dark:text-red-400"}`}
+                >
+                  {dispute.status === "RESOLVED"
+                    ? "Resolution Note"
+                    : "Rejection Reason"}
+                </p>
+              </div>
+              <p
+                className={`text-sm leading-relaxed ${dispute.status === "RESOLVED" ? "text-green-800 dark:text-green-300" : "text-red-800 dark:text-red-300"}`}
+              >
+                {dispute.resolution ?? dispute.resolutionNote}
               </p>
             </div>
-            <p className={`text-sm leading-relaxed ${dispute.status === "RESOLVED" ? "text-green-800 dark:text-green-300" : "text-red-800 dark:text-red-300"}`}>
-              {dispute.resolution ?? dispute.resolutionNote}
-            </p>
-          </div>
-        )}
+          )}
 
         {/* Evidence images */}
         {dispute.evidenceImages?.length > 0 && (
           <div className="bg-white dark:bg-[#151515] rounded-3xl p-5 border border-gray-100 dark:border-white/5 shadow-sm">
-            <p className="text-[10px] text-gray-400 uppercase tracking-widest font-bold mb-3">Evidence Photos</p>
+            <p className="text-[10px] text-gray-400 uppercase tracking-widest font-bold mb-3">
+              Evidence Photos
+            </p>
             <div className="grid grid-cols-2 gap-3">
               {dispute.evidenceImages.map((url: string, i: number) => (
-                <a key={i} href={url} target="_blank" rel="noopener noreferrer"
+                <a
+                  key={i}
+                  href={url}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="block aspect-square rounded-2xl overflow-hidden border border-gray-100 dark:border-white/10 hover:opacity-90 transition-opacity"
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={url} alt={`Evidence ${i + 1}`} className="w-full h-full object-cover" />
+                  <img
+                    src={url}
+                    alt={`Evidence ${i + 1}`}
+                    className="w-full h-full object-cover"
+                  />
                 </a>
               ))}
             </div>
@@ -386,25 +502,33 @@ export default function DisputeDetailPage() {
             Conversation
           </h2>
 
-          {(!dispute.messages || dispute.messages.length === 0) ? (
+          {!dispute.messages || dispute.messages.length === 0 ? (
             <div className="text-center py-8">
               <MessageSquare className="w-8 h-8 text-gray-200 dark:text-white/10 mx-auto mb-2" />
               <p className="text-sm text-gray-400">No messages yet.</p>
               {dispute.canAddMessage && (
-                <p className="text-xs text-gray-400 mt-1">Send a message below to start the conversation.</p>
+                <p className="text-xs text-gray-400 mt-1">
+                  Send a message below to start the conversation.
+                </p>
               )}
             </div>
           ) : (
             <div className="space-y-4">
               {(dispute.messages ?? []).map((msg: any) => (
-                <MessageBubble key={msg.id} message={msg} currentUserId={currentUserId} />
+                <MessageBubble
+                  key={msg.id}
+                  message={msg}
+                  currentUserId={currentUserId}
+                />
               ))}
             </div>
           )}
 
           {dispute.canAddMessage && (
             <div className="mt-5 pt-5 border-t border-gray-50 dark:border-white/5">
-              <p className="text-[10px] text-gray-400 uppercase tracking-widest font-bold mb-3">Send a Message</p>
+              <p className="text-[10px] text-gray-400 uppercase tracking-widest font-bold mb-3">
+                Send a Message
+              </p>
               <div className="flex gap-3 items-end">
                 <textarea
                   value={messageText}
@@ -424,16 +548,24 @@ export default function DisputeDetailPage() {
                   disabled={isSending || !messageText.trim()}
                   className="h-12 w-12 bg-yellow-500 hover:bg-yellow-400 disabled:opacity-50 text-black rounded-2xl flex items-center justify-center shrink-0 transition-all active:scale-95"
                 >
-                  {isSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                  {isSending ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Send className="w-4 h-4" />
+                  )}
                 </button>
               </div>
-              <p className="text-[10px] text-gray-400 mt-2 ml-1">Ctrl+Enter to send</p>
+              <p className="text-[10px] text-gray-400 mt-2 ml-1">
+                Ctrl+Enter to send
+              </p>
             </div>
           )}
 
           {!dispute.canAddMessage && dispute.status !== "OPEN" && (
             <div className="mt-4 pt-4 border-t border-gray-50 dark:border-white/5 text-center">
-              <p className="text-xs text-gray-400 font-medium">This dispute is closed. No further messages can be added.</p>
+              <p className="text-xs text-gray-400 font-medium">
+                This dispute is closed. No further messages can be added.
+              </p>
             </div>
           )}
         </div>
@@ -445,9 +577,13 @@ export default function DisputeDetailPage() {
               {(dispute.openedByUser.name?.[0] ?? "U").toUpperCase()}
             </div>
             <div>
-              <p className="text-[10px] text-gray-400 uppercase tracking-widest font-bold mb-0.5">Filed by</p>
+              <p className="text-[10px] text-gray-400 uppercase tracking-widest font-bold mb-0.5">
+                Filed by
+              </p>
               <p className="text-sm font-bold">{dispute.openedByUser.name}</p>
-              <p className="text-xs text-gray-500">{dispute.openedByUser.email}</p>
+              <p className="text-xs text-gray-500">
+                {dispute.openedByUser.email}
+              </p>
             </div>
           </div>
         )}

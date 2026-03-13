@@ -701,7 +701,13 @@ export class DisputesService {
           .sendToUser(dispute.openedByUserId, {
             title: 'Dispute Resolved',
             body: `Your dispute has been resolved with a refund of ₦${refundAmount.toFixed(2)}.`,
-            data: { type: 'DISPUTE_UPDATE', disputeId: dispute.id },
+            data: {
+              type: 'DISPUTE_UPDATE',
+              disputeId: dispute.id,
+              ...(dispute.orderId && { orderId: dispute.orderId }),
+              ...(dispute.rideId && { rideId: dispute.rideId }),
+              ...(dispute.deliveryId && { deliveryId: dispute.deliveryId }),
+            },
           })
           .catch((err) =>
             this.logger.error('Failed to send notification', err),
@@ -764,7 +770,13 @@ export class DisputesService {
         .sendToUser(dispute.openedByUserId, {
           title: 'Dispute Resolved',
           body: `Your dispute has been resolved. Please check the app for details.`,
-          data: { type: 'DISPUTE_UPDATE', disputeId: dispute.id },
+          data: {
+            type: 'DISPUTE_UPDATE',
+            disputeId: dispute.id,
+            ...(dispute.orderId && { orderId: dispute.orderId }),
+            ...(dispute.rideId && { rideId: dispute.rideId }),
+            ...(dispute.deliveryId && { deliveryId: dispute.deliveryId }),
+          },
         })
         .catch((err) => this.logger.error('Failed to send notification', err));
     }
@@ -890,7 +902,13 @@ export class DisputesService {
         .sendToUser(dispute.openedByUserId, {
           title: 'Dispute Update',
           body: `Your dispute has been closed. Reason: ${reason}`,
-          data: { type: 'DISPUTE_UPDATE', disputeId: id },
+          data: {
+            type: 'DISPUTE_UPDATE',
+            disputeId: id,
+            ...(dispute.orderId && { orderId: dispute.orderId }),
+            ...(dispute.rideId && { rideId: dispute.rideId }),
+            ...(dispute.deliveryId && { deliveryId: dispute.deliveryId }),
+          },
         })
         .catch((err) => this.logger.error('Failed to send notification', err));
     }
@@ -953,6 +971,37 @@ export class DisputesService {
       disputeId: id,
       message: created,
     });
+
+    // Push notification to the customer when an admin replies
+    if (
+      isAdmin &&
+      dispute.openedByUserId &&
+      dispute.openedByUserId !== userId
+    ) {
+      const entityMeta: Record<string, string> = {
+        type: 'DISPUTE_MESSAGE',
+        disputeId: id,
+      };
+      if (dispute.orderId) entityMeta.orderId = dispute.orderId;
+      if (dispute.rideId) entityMeta.rideId = dispute.rideId;
+      if (dispute.deliveryId) entityMeta.deliveryId = dispute.deliveryId;
+
+      this.notificationsService
+        .create({
+          userId: dispute.openedByUserId,
+          title: 'Support Agent Replied',
+          message:
+            dto.message.length > 80
+              ? `${dto.message.substring(0, 80)}…`
+              : dto.message,
+          type: 'DISPUTE',
+          category: 'DISPUTE_MESSAGE',
+          metadata: entityMeta,
+        })
+        .catch((err) =>
+          this.logger.error('Failed to notify customer of admin reply', err),
+        );
+    }
 
     return created;
   }

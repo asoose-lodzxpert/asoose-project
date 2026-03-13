@@ -97,6 +97,16 @@ export function NotificationProvider({
         const data = response.notification.request.content.data;
         const actionId = response.actionIdentifier;
 
+        // Dispute notifications — navigate to the dispute detail page
+        if (data.type === "DISPUTE_MESSAGE" || data.type === "DISPUTE_UPDATE") {
+          if (data.disputeId) {
+            router.push(`/(settings)/dispute/${data.disputeId}` as any);
+          } else {
+            router.push("/(settings)/disputes" as any);
+          }
+          return;
+        }
+
         // Handle action buttons
         if (actionId === "view" && data.orderId) {
           router.push("/(tabs)/orders" as any);
