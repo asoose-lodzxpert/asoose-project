@@ -53,7 +53,7 @@ export class BullBoardController {
           new BullMQAdapter(this.assignmentTimeoutQueue),
           new BullMQAdapter(this.emailQueue),
         ],
-        serverAdapter,
+        serverAdapter: serverAdapter as any,
       });
 
       BullBoardController.serverAdapter = serverAdapter;

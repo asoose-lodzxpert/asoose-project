@@ -99,6 +99,7 @@ export class NotificationsService {
           this.resolveChannelId(data.type),
         );
       }
+      if (user?.fcmToken) {
         await this.fcmService.sendToDevice(
           user.fcmToken,
           data.title,

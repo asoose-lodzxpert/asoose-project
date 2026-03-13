@@ -49,8 +49,7 @@ async function bootstrap() {
         'CORS_ORIGIN environment variable must be set in production',
       );
     }
-    const allowedOrigins = process.env.CORS_ORIGIN
-      .replace(/^["']|["']$/g, '')
+    const allowedOrigins = process.env.CORS_ORIGIN.replace(/^["']|["']$/g, '')
       .split(',')
       .map((origin) => origin.trim().replace(/^["']|["']$/g, ''))
       .filter((origin) => origin.length > 0);
@@ -157,11 +156,11 @@ async function bootstrap() {
           new BullMQAdapter(rideMatchingQueue),
           new BullMQAdapter(deliveryMatchingQueue),
           new BullMQAdapter(driverInactivityQueue),
-          new BullMQAdapter(notificationQueue), 
+          new BullMQAdapter(notificationQueue),
           new BullMQAdapter(assignmentTimeoutQueue),
           new BullMQAdapter(emailQueue),
         ],
-        serverAdapter,
+        serverAdapter: serverAdapter as any,
       });
 
       const allowedIps = (process.env.BULL_BOARD_ALLOWED_IPS || '')
