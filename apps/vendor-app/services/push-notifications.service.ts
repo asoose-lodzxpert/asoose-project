@@ -72,20 +72,32 @@ export async function registerForPushNotificationsAsync(): Promise<
     // Create notification channels for Android 8.0+
     // These channels only affect foreground notifications
     await Notifications.setNotificationChannelAsync("default", {
-      name: "default",
-      importance: Notifications.AndroidImportance.MAX,
+      name: "General",
+      importance: Notifications.AndroidImportance.HIGH,
       vibrationPattern: [0, 250, 250, 250],
       lightColor: "#FF231F7C",
-      sound: "default",
+      sound: "notification_alarm",
     });
 
-    // Create order notifications channel
+    // New order notifications — highest priority, alarm sound
     await Notifications.setNotificationChannelAsync("orders", {
-      name: "Order Notifications",
+      name: "New Order Alerts",
       importance: Notifications.AndroidImportance.MAX,
-      vibrationPattern: [0, 500, 250, 500],
+      vibrationPattern: [0, 500, 200, 500, 200, 500],
       lightColor: "#FF6B46",
-      sound: "default",
+      sound: "notification_alarm",
+      enableVibrate: true,
+      enableLights: true,
+      bypassDnd: true,
+    });
+
+    // Earnings / payout notifications
+    await Notifications.setNotificationChannelAsync("payouts", {
+      name: "Payouts & Earnings",
+      importance: Notifications.AndroidImportance.HIGH,
+      vibrationPattern: [0, 300, 150, 300],
+      lightColor: "#F59E0B",
+      sound: "notification_alarm",
       enableVibrate: true,
     });
   }

@@ -19,6 +19,7 @@ export class ExpoPushService {
     title: string,
     body: string,
     data?: Record<string, any>,
+    channelId?: string,
   ): Promise<boolean> {
     try {
       // Check that the token is valid
@@ -34,6 +35,7 @@ export class ExpoPushService {
         body,
         data: data || {},
         priority: 'high',
+        channelId: channelId || 'default',
       };
 
       const chunks = this.expo.chunkPushNotifications([message]);
@@ -80,6 +82,7 @@ export class ExpoPushService {
     title: string,
     body: string,
     data?: Record<string, any>,
+    channelId?: string,
   ): Promise<{ success: number; failed: number }> {
     const validTokens = tokens.filter((token) => Expo.isExpoPushToken(token));
 
@@ -95,6 +98,7 @@ export class ExpoPushService {
       body,
       data: data || {},
       priority: 'high',
+      channelId: channelId || 'default',
     }));
 
     const chunks = this.expo.chunkPushNotifications(messages);

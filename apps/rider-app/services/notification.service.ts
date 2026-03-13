@@ -59,7 +59,46 @@ export async function registerForPushNotificationsAsync(): Promise<
   let token: string | undefined;
 
   if (Platform.OS === "android") {
-    // ... (Your channel code remains the same)
+    // Default fallback channel
+    await Notifications.setNotificationChannelAsync("default", {
+      name: "General",
+      importance: Notifications.AndroidImportance.HIGH,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: "#0EA5E9",
+      sound: "notification_alarm",
+    });
+
+    // New job/ride assignment — highest priority, alarm sound
+    await Notifications.setNotificationChannelAsync("new-job", {
+      name: "New Job Alerts",
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 400, 200, 400, 200, 400],
+      lightColor: "#22C55E",
+      sound: "notification_alarm",
+      enableVibrate: true,
+      enableLights: true,
+      bypassDnd: true,
+    });
+
+    // Trip / delivery status updates
+    await Notifications.setNotificationChannelAsync("trip-updates", {
+      name: "Trip & Delivery Updates",
+      importance: Notifications.AndroidImportance.HIGH,
+      vibrationPattern: [0, 300, 150, 300],
+      lightColor: "#3AB795",
+      sound: "notification_alarm",
+      enableVibrate: true,
+    });
+
+    // Earnings and payout notifications
+    await Notifications.setNotificationChannelAsync("payouts", {
+      name: "Earnings & Payouts",
+      importance: Notifications.AndroidImportance.HIGH,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: "#F59E0B",
+      sound: "notification_alarm",
+      enableVibrate: true,
+    });
   }
 
   if (!Device.isDevice) {

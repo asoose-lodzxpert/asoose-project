@@ -82,7 +82,8 @@
         {
           "icon": "./assets/images/icon.png",
           "color": "#0EA5E9",
-          "mode": "production"
+          "mode": "production",
+          "sounds": ["./assets/sounds/notification_alarm.wav"]
         }
       ],
       "expo-secure-store",

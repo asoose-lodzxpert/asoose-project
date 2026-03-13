@@ -107,6 +107,7 @@
           "icon": "./assets/images/asoose-icon.png",
           "color": "#0EA5E9",
           "mode": "production",
+          "sounds": ["./assets/sounds/notification_alarm.wav"],
           "NSUserNotificationsUsageDescription": "ASOOSE sends you notifications for order updates, delivery tracking, ride confirmations, and important account activity."
         }
       ],

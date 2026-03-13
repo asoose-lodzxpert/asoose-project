@@ -22,6 +22,18 @@ export class NotificationsService {
     private fcmService: FcmService,
   ) {}
 
+  /** Map notification type to Android channel id */
+  private resolveChannelId(type: string): string {
+    const t = (type || 'SYSTEM').toUpperCase();
+    if (t === 'ORDER') return 'orders';
+    if (t === 'RIDE') return 'rides';
+    if (t === 'DELIVERY') return 'deliveries';
+    if (t === 'PAYOUT' || t === 'PAYMENT') return 'payouts';
+    if (t === 'JOB' || t === 'NEW_JOB') return 'new-job';
+    if (t === 'TRIP') return 'trip-updates';
+    return 'default';
+  }
+
   /**
    * ✅ ADAPTER METHOD: Fixes 'Property sendToUser does not exist' error
    * Maps the generic payload to the specific 'create' method structure
@@ -84,9 +96,9 @@ export class NotificationsService {
           data.title,
           data.message,
           data.metadata,
+          this.resolveChannelId(data.type),
         );
       }
-      if (user?.fcmToken) {
         await this.fcmService.sendToDevice(
           user.fcmToken,
           data.title,
@@ -148,6 +160,7 @@ export class NotificationsService {
           data.title,
           data.message,
           data.metadata,
+          this.resolveChannelId(data.type),
         );
       } else if (vendor?.fcmToken) {
         await this.fcmService.sendToDevice(
@@ -212,6 +225,7 @@ export class NotificationsService {
           data.title,
           data.message,
           data.metadata,
+          this.resolveChannelId(data.type),
         );
       }
       if (rider?.fcmToken) {

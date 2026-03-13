@@ -68,42 +68,45 @@ export async function registerForPushNotificationsAsync(): Promise<
 
   if (Platform.OS === "android") {
     // Create notification channels for Android 8.0+
-    // These channels only affect foreground notifications
     await Notifications.setNotificationChannelAsync("default", {
-      name: "default",
-      importance: Notifications.AndroidImportance.MAX,
+      name: "General",
+      importance: Notifications.AndroidImportance.HIGH,
       vibrationPattern: [0, 250, 250, 250],
       lightColor: "#FF231F7C",
-      sound: "default",
+      sound: "notification_alarm",
     });
 
-    // Create order notifications channel
+    // Order notifications channel
     await Notifications.setNotificationChannelAsync("orders", {
       name: "Order Notifications",
       importance: Notifications.AndroidImportance.MAX,
-      vibrationPattern: [0, 500, 250, 500],
+      vibrationPattern: [0, 500, 200, 500, 200, 500],
       lightColor: "#FF6B46",
-      sound: "default",
+      sound: "notification_alarm",
       enableVibrate: true,
+      enableLights: true,
+      bypassDnd: true,
     });
 
-    // Create ride notifications channel
+    // Ride notifications channel
     await Notifications.setNotificationChannelAsync("rides", {
       name: "Ride Notifications",
       importance: Notifications.AndroidImportance.MAX,
-      vibrationPattern: [0, 500, 250, 500],
+      vibrationPattern: [0, 500, 200, 500, 200, 500],
       lightColor: "#3AB795",
-      sound: "default",
+      sound: "notification_alarm",
       enableVibrate: true,
+      enableLights: true,
+      bypassDnd: true,
     });
 
-    // Create delivery notifications channel
+    // Delivery notifications channel
     await Notifications.setNotificationChannelAsync("deliveries", {
       name: "Delivery Notifications",
       importance: Notifications.AndroidImportance.MAX,
-      vibrationPattern: [0, 500, 250, 500],
+      vibrationPattern: [0, 500, 200, 500],
       lightColor: "#F59E0B",
-      sound: "default",
+      sound: "notification_alarm",
       enableVibrate: true,
     });
   }
