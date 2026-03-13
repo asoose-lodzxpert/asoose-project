@@ -387,12 +387,12 @@ export default function DriversPage() {
             onClick={() => setStatusFilter("ALL")}
           />
           <StatCard
-            title="Online"
+            title="Active"
             value={stats.active}
             icon={Wifi}
             color="green"
-            isActive={statusFilter === "ONLINE"}
-            onClick={() => setStatusFilter("ONLINE")}
+            isActive={statusFilter === "ACTIVE"}
+            onClick={() => setStatusFilter("ACTIVE")}
           />
           <StatCard
             title="Suspended"

@@ -352,7 +352,10 @@ export class DashboardService {
           where: { createdAt: { gte: sevenDaysAgo }, paymentStatus: 'PAID' },
         }),
         this.prisma.order.count({
-          where: { createdAt: { gte: fourteenDaysAgo, lt: sevenDaysAgo }, paymentStatus: 'PAID' },
+          where: {
+            createdAt: { gte: fourteenDaysAgo, lt: sevenDaysAgo },
+            paymentStatus: 'PAID',
+          },
         }),
         // FIX: was using thirtyDaysAgo→fourteenDaysAgo window (14-30 days ago).
         // Now correctly counts the last 30 days. Also filter to paid-only.
@@ -360,7 +363,10 @@ export class DashboardService {
           where: { createdAt: { gte: thirtyDaysAgo }, paymentStatus: 'PAID' },
         }),
         this.prisma.order.count({
-          where: { createdAt: { gte: sixtyDaysAgo, lt: thirtyDaysAgo }, paymentStatus: 'PAID' },
+          where: {
+            createdAt: { gte: sixtyDaysAgo, lt: thirtyDaysAgo },
+            paymentStatus: 'PAID',
+          },
         }),
       ]);
 

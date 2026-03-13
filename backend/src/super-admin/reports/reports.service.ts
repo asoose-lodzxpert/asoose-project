@@ -216,12 +216,18 @@ export class AnalyticsService {
       deliveryRevenue,
     ] = await Promise.all([
       this.prisma.order.aggregate({
-        where: { createdAt: { gte: startDate, lte: endDate }, paymentStatus: 'PAID' },
+        where: {
+          createdAt: { gte: startDate, lte: endDate },
+          paymentStatus: 'PAID',
+        },
         _sum: { total: true },
         _count: true,
       }),
       this.prisma.order.aggregate({
-        where: { createdAt: { gte: previousStartDate, lt: startDate }, paymentStatus: 'PAID' },
+        where: {
+          createdAt: { gte: previousStartDate, lt: startDate },
+          paymentStatus: 'PAID',
+        },
         _sum: { total: true },
         _count: true,
       }),
@@ -232,16 +238,28 @@ export class AnalyticsService {
         where: { status: StoreStatus.ACTIVE, createdAt: { lt: startDate } },
       }),
       this.prisma.ride.count({
-        where: { createdAt: { gte: startDate, lte: endDate }, status: 'COMPLETED' },
+        where: {
+          createdAt: { gte: startDate, lte: endDate },
+          status: 'COMPLETED',
+        },
       }),
       this.prisma.ride.count({
-        where: { createdAt: { gte: previousStartDate, lt: startDate }, status: 'COMPLETED' },
+        where: {
+          createdAt: { gte: previousStartDate, lt: startDate },
+          status: 'COMPLETED',
+        },
       }),
       this.prisma.delivery.count({
-        where: { createdAt: { gte: startDate, lte: endDate }, status: 'DELIVERED' },
+        where: {
+          createdAt: { gte: startDate, lte: endDate },
+          status: 'DELIVERED',
+        },
       }),
       this.prisma.delivery.count({
-        where: { createdAt: { gte: previousStartDate, lt: startDate }, status: 'DELIVERED' },
+        where: {
+          createdAt: { gte: previousStartDate, lt: startDate },
+          status: 'DELIVERED',
+        },
       }),
       this.prisma.ride.aggregate({
         where: {
@@ -252,7 +270,10 @@ export class AnalyticsService {
         _sum: { totalFare: true },
       }),
       this.prisma.delivery.aggregate({
-        where: { createdAt: { gte: startDate, lte: endDate }, status: 'DELIVERED' },
+        where: {
+          createdAt: { gte: startDate, lte: endDate },
+          status: 'DELIVERED',
+        },
         _sum: { deliveryFee: true },
       }),
     ]);
@@ -270,17 +291,32 @@ export class AnalyticsService {
 
     return {
       totalRevenue: this.toTwoDecimals(totalRevenue),
-      revenueChange: this.calculatePercentageChange(totalRevenue, previousRevenue),
+      revenueChange: this.calculatePercentageChange(
+        totalRevenue,
+        previousRevenue,
+      ),
       totalOrders,
-      ordersChange: this.calculatePercentageChange(totalOrders, previousOrderCount),
+      ordersChange: this.calculatePercentageChange(
+        totalOrders,
+        previousOrderCount,
+      ),
       activeStores,
-      storesChange: this.calculatePercentageChange(activeStores, previousActiveStores),
+      storesChange: this.calculatePercentageChange(
+        activeStores,
+        previousActiveStores,
+      ),
       avgOrderValue: this.toTwoDecimals(avgOrderValue),
-      avgOrderValueChange: this.calculatePercentageChange(avgOrderValue, previousAvgOrderValue),
+      avgOrderValueChange: this.calculatePercentageChange(
+        avgOrderValue,
+        previousAvgOrderValue,
+      ),
       totalRides: currentRides,
       ridesChange: this.calculatePercentageChange(currentRides, previousRides),
       totalDeliveries: currentDeliveries,
-      deliveriesChange: this.calculatePercentageChange(currentDeliveries, previousDeliveries),
+      deliveriesChange: this.calculatePercentageChange(
+        currentDeliveries,
+        previousDeliveries,
+      ),
       rideRevenue: this.toTwoDecimals(rideRev),
       deliveryRevenue: this.toTwoDecimals(deliveryRev),
       platformRevenue: this.toTwoDecimals(totalRevenue + rideRev + deliveryRev),
@@ -325,56 +361,69 @@ export class AnalyticsService {
     const sixMonthsAgo = new Date();
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 
-    const [storeGrowth, orderGrowth, riderGrowth, rideGrowth, deliveryGrowth, userGrowth] =
-      await Promise.all([
-        this.prisma.$queryRaw<Array<{ month: string; count: bigint }>>`
+    const [
+      storeGrowth,
+      orderGrowth,
+      riderGrowth,
+      rideGrowth,
+      deliveryGrowth,
+      userGrowth,
+    ] = await Promise.all([
+      this.prisma.$queryRaw<Array<{ month: string; count: bigint }>>`
           SELECT TO_CHAR("createdAt", 'Mon YYYY') as month, COUNT(*)::bigint as count,
             DATE_TRUNC('month', "createdAt") as sort_date
           FROM "Store" WHERE "createdAt" >= ${sixMonthsAgo}
           GROUP BY TO_CHAR("createdAt", 'Mon YYYY'), DATE_TRUNC('month', "createdAt")
           ORDER BY sort_date ASC
         `,
-        // FIX: filter to paid orders only so cancelled orders don't inflate the chart
-        this.prisma.$queryRaw<Array<{ month: string; count: bigint }>>`
+      // FIX: filter to paid orders only so cancelled orders don't inflate the chart
+      this.prisma.$queryRaw<Array<{ month: string; count: bigint }>>`
           SELECT TO_CHAR("createdAt", 'Mon YYYY') as month, COUNT(*)::bigint as count,
             DATE_TRUNC('month', "createdAt") as sort_date
           FROM "Order" WHERE "createdAt" >= ${sixMonthsAgo} AND "paymentStatus" = 'PAID'
           GROUP BY TO_CHAR("createdAt", 'Mon YYYY'), DATE_TRUNC('month', "createdAt")
           ORDER BY sort_date ASC
         `,
-        this.prisma.$queryRaw<Array<{ month: string; count: bigint }>>`
+      this.prisma.$queryRaw<Array<{ month: string; count: bigint }>>`
           SELECT TO_CHAR("createdAt", 'Mon YYYY') as month, COUNT(*)::bigint as count,
             DATE_TRUNC('month', "createdAt") as sort_date
           FROM "Rider" WHERE "createdAt" >= ${sixMonthsAgo}
           GROUP BY TO_CHAR("createdAt", 'Mon YYYY'), DATE_TRUNC('month', "createdAt")
           ORDER BY sort_date ASC
         `,
-        this.prisma.$queryRaw<Array<{ month: string; count: bigint }>>`
+      this.prisma.$queryRaw<Array<{ month: string; count: bigint }>>`
           SELECT TO_CHAR("createdAt", 'Mon YYYY') as month, COUNT(*)::bigint as count,
             DATE_TRUNC('month', "createdAt") as sort_date
           FROM "Ride" WHERE "createdAt" >= ${sixMonthsAgo} AND status = 'COMPLETED'
           GROUP BY TO_CHAR("createdAt", 'Mon YYYY'), DATE_TRUNC('month', "createdAt")
           ORDER BY sort_date ASC
         `,
-        this.prisma.$queryRaw<Array<{ month: string; count: bigint }>>`
+      this.prisma.$queryRaw<Array<{ month: string; count: bigint }>>`
           SELECT TO_CHAR("createdAt", 'Mon YYYY') as month, COUNT(*)::bigint as count,
             DATE_TRUNC('month', "createdAt") as sort_date
           FROM "Delivery" WHERE "createdAt" >= ${sixMonthsAgo} AND status = 'DELIVERED'
           GROUP BY TO_CHAR("createdAt", 'Mon YYYY'), DATE_TRUNC('month', "createdAt")
           ORDER BY sort_date ASC
         `,
-        this.prisma.$queryRaw<Array<{ month: string; count: bigint }>>`
+      this.prisma.$queryRaw<Array<{ month: string; count: bigint }>>`
           SELECT TO_CHAR("createdAt", 'Mon YYYY') as month, COUNT(*)::bigint as count,
             DATE_TRUNC('month', "createdAt") as sort_date
           FROM "User" WHERE "createdAt" >= ${sixMonthsAgo}
           GROUP BY TO_CHAR("createdAt", 'Mon YYYY'), DATE_TRUNC('month', "createdAt")
           ORDER BY sort_date ASC
         `,
-      ]);
+    ]);
 
     const monthMap = new Map<
       string,
-      { stores: number; orders: number; riders: number; rides: number; deliveries: number; newUsers: number }
+      {
+        stores: number;
+        orders: number;
+        riders: number;
+        rides: number;
+        deliveries: number;
+        newUsers: number;
+      }
     >();
 
     const processGrowth = (
@@ -383,7 +432,12 @@ export class AnalyticsService {
     ) => {
       data.forEach((row) => {
         const existing = monthMap.get(row.month) || {
-          stores: 0, orders: 0, riders: 0, rides: 0, deliveries: 0, newUsers: 0,
+          stores: 0,
+          orders: 0,
+          riders: 0,
+          rides: 0,
+          deliveries: 0,
+          newUsers: 0,
         };
         existing[key] = Number(row.count);
         monthMap.set(row.month, existing);
@@ -586,7 +640,10 @@ export class AnalyticsService {
         _count: true,
       }),
       this.prisma.ride.aggregate({
-        where: { createdAt: { gte: previousStartDate, lt: startDate }, status: 'COMPLETED' },
+        where: {
+          createdAt: { gte: previousStartDate, lt: startDate },
+          status: 'COMPLETED',
+        },
         _count: true,
         _sum: { totalFare: true },
       }),
@@ -602,9 +659,14 @@ export class AnalyticsService {
     ]);
 
     const total = current.reduce((s, g) => s + g._count, 0);
-    const completed = current.find((g) => g.status === 'COMPLETED')?._count || 0;
+    const completed =
+      current.find((g) => g.status === 'COMPLETED')?._count || 0;
     const cancelled = current
-      .filter((g) => ['CANCELLED', 'CANCELLED_BY_USER', 'CANCELLED_BY_DRIVER'].includes(g.status))
+      .filter((g) =>
+        ['CANCELLED', 'CANCELLED_BY_USER', 'CANCELLED_BY_DRIVER'].includes(
+          g.status,
+        ),
+      )
       .reduce((s, g) => s + g._count, 0);
 
     const revenue = Number(avgStats._sum.totalFare || 0);
@@ -615,10 +677,13 @@ export class AnalyticsService {
       total,
       completed,
       cancelled,
-      completionRate: total > 0 ? this.toTwoDecimals((completed / total) * 100) : 0,
+      completionRate:
+        total > 0 ? this.toTwoDecimals((completed / total) * 100) : 0,
       revenue: this.toTwoDecimals(revenue),
       avgFare: this.toTwoDecimals(Number(avgStats._avg.totalFare || 0)),
-      avgDurationMin: this.toTwoDecimals(Number(avgStats._avg.durationMin || 0)),
+      avgDurationMin: this.toTwoDecimals(
+        Number(avgStats._avg.durationMin || 0),
+      ),
       avgDistanceKm: this.toTwoDecimals(Number(avgStats._avg.distanceKm || 0)),
       revenueChange: this.calculatePercentageChange(revenue, prevRevenue),
       countChange: this.calculatePercentageChange(completed, prevCount),
@@ -637,12 +702,18 @@ export class AnalyticsService {
         _count: true,
       }),
       this.prisma.delivery.aggregate({
-        where: { createdAt: { gte: previousStartDate, lt: startDate }, status: 'DELIVERED' },
+        where: {
+          createdAt: { gte: previousStartDate, lt: startDate },
+          status: 'DELIVERED',
+        },
         _count: true,
         _sum: { deliveryFee: true },
       }),
       this.prisma.delivery.aggregate({
-        where: { createdAt: { gte: startDate, lte: endDate }, status: 'DELIVERED' },
+        where: {
+          createdAt: { gte: startDate, lte: endDate },
+          status: 'DELIVERED',
+        },
         _count: true,
         _sum: { deliveryFee: true },
         _avg: { deliveryFee: true, distanceKm: true },
@@ -650,7 +721,8 @@ export class AnalyticsService {
     ]);
 
     const total = current.reduce((s, g) => s + g._count, 0);
-    const completed = current.find((g) => g.status === 'DELIVERED')?._count || 0;
+    const completed =
+      current.find((g) => g.status === 'DELIVERED')?._count || 0;
     const cancelled = current
       .filter((g) => g.status === 'CANCELLED')
       .reduce((s, g) => s + g._count, 0);
@@ -663,7 +735,8 @@ export class AnalyticsService {
       total,
       completed,
       cancelled,
-      completionRate: total > 0 ? this.toTwoDecimals((completed / total) * 100) : 0,
+      completionRate:
+        total > 0 ? this.toTwoDecimals((completed / total) * 100) : 0,
       revenue: this.toTwoDecimals(revenue),
       avgFee: this.toTwoDecimals(Number(avgStats._avg.deliveryFee || 0)),
       avgDistanceKm: this.toTwoDecimals(Number(avgStats._avg.distanceKm || 0)),
@@ -673,37 +746,50 @@ export class AnalyticsService {
   }
 
   private async getPayoutSummary(): Promise<PayoutSummary> {
-    const [vendorPending, vendorPaid, riderPending, riderPaid] = await Promise.all([
-      this.prisma.vendorPayout.aggregate({
-        where: { status: 'PENDING' },
-        _sum: { amount: true },
-      }),
-      this.prisma.vendorPayout.aggregate({
-        where: { status: 'PAID' },
-        _sum: { amount: true },
-      }),
-      this.prisma.riderPayout.aggregate({
-        where: { status: 'PENDING' },
-        _sum: { amount: true },
-      }),
-      this.prisma.riderPayout.aggregate({
-        where: { status: 'PAID' },
-        _sum: { amount: true },
-      }),
-    ]);
+    const [vendorPending, vendorPaid, riderPending, riderPaid] =
+      await Promise.all([
+        this.prisma.vendorPayout.aggregate({
+          where: { status: 'PENDING' },
+          _sum: { amount: true },
+        }),
+        this.prisma.vendorPayout.aggregate({
+          where: { status: 'PAID' },
+          _sum: { amount: true },
+        }),
+        this.prisma.riderPayout.aggregate({
+          where: { status: 'PENDING' },
+          _sum: { amount: true },
+        }),
+        this.prisma.riderPayout.aggregate({
+          where: { status: 'PAID' },
+          _sum: { amount: true },
+        }),
+      ]);
 
-    const vendorPayoutsPending = this.toTwoDecimals(Number(vendorPending._sum.amount || 0));
-    const vendorPayoutsPaid = this.toTwoDecimals(Number(vendorPaid._sum.amount || 0));
-    const riderPayoutsPending = this.toTwoDecimals(Number(riderPending._sum.amount || 0));
-    const riderPayoutsPaid = this.toTwoDecimals(Number(riderPaid._sum.amount || 0));
+    const vendorPayoutsPending = this.toTwoDecimals(
+      Number(vendorPending._sum.amount || 0),
+    );
+    const vendorPayoutsPaid = this.toTwoDecimals(
+      Number(vendorPaid._sum.amount || 0),
+    );
+    const riderPayoutsPending = this.toTwoDecimals(
+      Number(riderPending._sum.amount || 0),
+    );
+    const riderPayoutsPaid = this.toTwoDecimals(
+      Number(riderPaid._sum.amount || 0),
+    );
 
     return {
       vendorPayoutsPending,
       vendorPayoutsPaid,
       riderPayoutsPending,
       riderPayoutsPaid,
-      totalPendingPayouts: this.toTwoDecimals(vendorPayoutsPending + riderPayoutsPending),
-      totalPaidPayouts: this.toTwoDecimals(vendorPayoutsPaid + riderPayoutsPaid),
+      totalPendingPayouts: this.toTwoDecimals(
+        vendorPayoutsPending + riderPayoutsPending,
+      ),
+      totalPaidPayouts: this.toTwoDecimals(
+        vendorPayoutsPaid + riderPayoutsPaid,
+      ),
     };
   }
 
@@ -735,14 +821,21 @@ export class AnalyticsService {
       customers: counts('CUSTOMER'),
       vendors: counts('VENDOR'),
       riders: counts('RIDER'),
-      admins: counts('ADMIN') + counts('SUPER_ADMIN') + counts('ADMIN_MANAGER') + counts('ADMIN_SUPPORT') + counts('ADMIN_FINANCE'),
+      admins:
+        counts('ADMIN') +
+        counts('SUPER_ADMIN') +
+        counts('ADMIN_MANAGER') +
+        counts('ADMIN_SUPPORT') +
+        counts('ADMIN_FINANCE'),
       newThisPeriod,
       newPreviousPeriod,
       growth: this.calculatePercentageChange(newThisPeriod, newPreviousPeriod),
     };
   }
 
-  private async getPaymentMethodBreakdown(startDate: Date): Promise<PaymentMethodBreakdown[]> {
+  private async getPaymentMethodBreakdown(
+    startDate: Date,
+  ): Promise<PaymentMethodBreakdown[]> {
     const endDate = new Date();
     const results = await this.prisma.$queryRaw<
       Array<{ method: string; count: bigint; amount: number }>
@@ -762,7 +855,8 @@ export class AnalyticsService {
       method: r.method,
       count: Number(r.count),
       amount: this.toTwoDecimals(Number(r.amount)),
-      percentage: total > 0 ? this.toTwoDecimals((Number(r.amount) / total) * 100) : 0,
+      percentage:
+        total > 0 ? this.toTwoDecimals((Number(r.amount) / total) * 100) : 0,
     }));
   }
 
@@ -783,7 +877,8 @@ export class AnalyticsService {
       open,
       resolved,
       total,
-      resolutionRate: total > 0 ? this.toTwoDecimals((resolved / total) * 100) : 0,
+      resolutionRate:
+        total > 0 ? this.toTwoDecimals((resolved / total) * 100) : 0,
       byCategory: byReason.map((r) => ({ reason: r.reason, count: r._count })),
     };
   }
@@ -826,7 +921,9 @@ export class AnalyticsService {
     sections.push('=== TOP VENDORS ===');
     sections.push('Name,Revenue,Orders,Rating,Change%');
     data.topVendors.forEach((v) => {
-      sections.push(`${v.name},${v.revenue},${v.orders},${v.rating},${v.change}`);
+      sections.push(
+        `${v.name},${v.revenue},${v.orders},${v.rating},${v.change}`,
+      );
     });
     sections.push('');
 

@@ -395,7 +395,7 @@ export class TransactionsService {
         this.prisma.transaction.aggregate({
           _sum: { amount: true },
           where: {
-            type: { in: ['PAYOUT_COMPLETED', 'VENDOR_EARNING'] },
+            type: 'PAYOUT_COMPLETED',
             entityType: 'STORE',
             status: 'COMPLETED',
             ...dateFilter,
@@ -404,7 +404,7 @@ export class TransactionsService {
         this.prisma.transaction.aggregate({
           _sum: { amount: true },
           where: {
-            type: { in: ['PAYOUT_COMPLETED', 'RIDER_EARNING'] },
+            type: 'PAYOUT_COMPLETED',
             entityType: 'RIDER',
             status: 'COMPLETED',
             ...dateFilter,

@@ -280,7 +280,7 @@ export default function LoginScreen() {
                     style={[styles.bioIconButton, { borderColor: border }]}
                     onPress={handleBiometricLogin}
                   >
-                    <IconSymbol name="faceid" size={28} color={primary} />
+                    <IconSymbol name="fingerprint" size={28} color={primary} />
                   </Pressable>
                 )}
               </View>
@@ -312,7 +312,7 @@ export default function LoginScreen() {
                     onPress={handleAppleSignIn}
                   >
                     <Image
-                      source={require("@/assets/images/icons8-google-48.png")}
+                      source={require("@/assets/images/apple-logo.png")}
                       style={styles.logoImage}
                     />
                   </Pressable>

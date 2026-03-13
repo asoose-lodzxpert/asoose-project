@@ -213,12 +213,9 @@ export default function StoreScreen() {
       const { layoutMeasurement, contentOffset, contentSize } =
         event.nativeEvent;
       const nearBottom =
-        layoutMeasurement.height + contentOffset.y >=
-        contentSize.height - 300;
+        layoutMeasurement.height + contentOffset.y >= contentSize.height - 300;
       if (nearBottom && displayLimit < filteredProducts.length) {
-        setDisplayLimit((prev) =>
-          Math.min(prev + 12, filteredProducts.length),
-        );
+        setDisplayLimit((prev) => Math.min(prev + 12, filteredProducts.length));
       }
     },
     [displayLimit, filteredProducts.length],
