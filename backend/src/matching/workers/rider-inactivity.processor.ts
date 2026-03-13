@@ -10,6 +10,9 @@ import { RedisService } from '../redis/redis.service';
 import { EventBusService } from '../events/event-bus.service';
 import { REDIS_TTL, RiderStatus } from '../redis/redis-keys.constants';
 import { ATOMIC_SET_RIDER_OFFLINE } from '../redis/lua-scripts';
+import { PrismaService } from '../../prisma/prisma.service';
+import { FcmService } from '../../libs/fcm/fcm.service';
+import { ExpoPushService } from '../../libs/expo/expo-push.service';
 
 /**
  * Rider Inactivity Monitor Worker
@@ -29,7 +32,7 @@ import { ATOMIC_SET_RIDER_OFFLINE } from '../redis/lua-scripts';
 export class RiderInactivityProcessor extends WorkerHost {
   private readonly logger = new Logger(RiderInactivityProcessor.name);
 
-  private readonly INACTIVITY_THRESHOLD = REDIS_TTL.RIDER_INACTIVITY; // 120 s
+  private readonly INACTIVITY_THRESHOLD = REDIS_TTL.RIDER_INACTIVITY; // 4 h
   private readonly GRACE_PERIOD = 30; // 30 s
 
   /** Tracks first detection time so we can enforce the grace period */
@@ -38,6 +41,9 @@ export class RiderInactivityProcessor extends WorkerHost {
   constructor(
     private readonly redis: RedisService,
     private readonly eventBus: EventBusService,
+    private readonly prisma: PrismaService,
+    private readonly fcmService: FcmService,
+    private readonly expoPushService: ExpoPushService,
   ) {
     super();
   }
@@ -111,6 +117,10 @@ export class RiderInactivityProcessor extends WorkerHost {
         timestamp: now,
       });
 
+      // Send push notification so the rider knows we haven't received
+      // a location update and their status may change.
+      await this.sendInactivityPing(riderId);
+
       this.inactiveRidersLastCheck.set(riderId, now);
     } else {
       // Second+ detection — check if the grace period has elapsed
@@ -162,5 +172,38 @@ export class RiderInactivityProcessor extends WorkerHost {
     });
 
     this.logger.log(`✅ Rider ${riderId} marked OFFLINE due to inactivity`);
+  }
+
+  /** Send a push notification to an inactive rider asking them to confirm they are still online. */
+  private async sendInactivityPing(riderId: string): Promise<void> {
+    try {
+      const rider = await this.prisma.rider.findUnique({
+        where: { id: riderId },
+        select: { expoPushToken: true, fcmToken: true },
+      });
+      if (!rider) return;
+
+      const title = 'Are you still online?';
+      const body =
+        "We haven't received a location update from you. Open the app to keep your status active.";
+      const data = { type: 'INACTIVITY_PING' };
+
+      if (rider.expoPushToken) {
+        await this.expoPushService.sendToDevice(
+          rider.expoPushToken,
+          title,
+          body,
+          data,
+        );
+      }
+      if (rider.fcmToken) {
+        await this.fcmService.sendToDevice(rider.fcmToken, title, body, data);
+      }
+    } catch (err) {
+      this.logger.error(
+        `Failed to send inactivity ping to rider ${riderId}:`,
+        err,
+      );
+    }
   }
 }

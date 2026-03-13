@@ -58,7 +58,7 @@ const columnHelper = createColumnHelper<Rider>();
 export default function RidersPage() {
   // --- State ---
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("ALL");
+  const [statusFilter, setStatusFilter] = useState("ONLINE");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [rowSelection, setRowSelection] = useState({});
   const [showFilters, setShowFilters] = useState(false);
@@ -375,15 +375,17 @@ export default function RidersPage() {
               />
             </div>
             <div className="flex gap-2">
-              {["ALL", "PENDING", "ONLINE", "SUSPENDED"].map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setStatusFilter(tab)}
-                  className={`px-4 py-2 text-[10px] font-bold rounded-lg uppercase tracking-wider transition-all ${statusFilter === tab ? "bg-yellow-500 text-black" : "bg-gray-800 text-gray-400 hover:text-white"}`}
-                >
-                  {tab}
-                </button>
-              ))}
+              {["ALL", "ACTIVE", "PENDING", "ONLINE", "SUSPENDED"].map(
+                (tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => setStatusFilter(tab)}
+                    className={`px-4 py-2 text-[10px] font-bold rounded-lg uppercase tracking-wider transition-all ${statusFilter === tab ? "bg-yellow-500 text-black" : "bg-gray-800 text-gray-400 hover:text-white"}`}
+                  >
+                    {tab}
+                  </button>
+                ),
+              )}
             </div>
           </div>
         </div>

@@ -153,17 +153,17 @@ export const REDIS_KEYS = {
 } as const;
 
 export const REDIS_TTL = {
-  /** Pending assignment TTL (driver response window) */
-  PENDING_ASSIGNMENT: 90,
+  /** Pending assignment TTL (driver response window) — 3 minutes */
+  PENDING_ASSIGNMENT: 180,
 
-  /** Assignment lock TTL */
-  ASSIGNMENT_LOCK: 90,
+  /** Assignment lock TTL — 3 minutes */
+  ASSIGNMENT_LOCK: 180,
 
-  /** Driver inactivity threshold */
-  DRIVER_INACTIVITY: 120,
+  /** Driver inactivity threshold — 4 h; we ping after 4 h of no heartbeat */
+  DRIVER_INACTIVITY: 14400,
 
-  /** Rider inactivity threshold */
-  RIDER_INACTIVITY: 120,
+  /** Rider inactivity threshold — 4 h; we ping after 4 h of no heartbeat */
+  RIDER_INACTIVITY: 14400,
 
   /** Matching state cache */
   MATCHING_STATE: 300,

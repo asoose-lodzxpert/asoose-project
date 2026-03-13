@@ -125,7 +125,16 @@ export class RiderDispatchListener {
       message: `Pick up ${isDirectDelivery ? 'package' : `order #${shortRef}`} at ${pickupName}`,
       type: 'DELIVERY',
       category: 'DELIVERY_ASSIGNED',
-      metadata: { deliveryId: delivery.id, type: 'DELIVERY_ASSIGNED' },
+      // Include full job identity so the rider app can handle the offer from
+      // a push notification even when the socket is disconnected.
+      metadata: {
+        jobId: delivery.id,
+        jobType: 'delivery',
+        orderId: delivery.orderId || delivery.id,
+        type: 'DELIVERY_ASSIGNED',
+        earnings: String(delivery.deliveryFee || 0),
+        pickupName,
+      },
     });
 
     this.logger.log(
@@ -186,7 +195,16 @@ export class RiderDispatchListener {
       message: `New ride request from ${ride.customer?.name || 'Customer'}`,
       type: 'RIDE',
       category: 'RIDE_ASSIGNED',
-      metadata: { rideId: ride.id, type: 'RIDE_ASSIGNED' },
+      // Include full job identity so the rider app can handle the offer from
+      // a push notification even when the socket is disconnected.
+      metadata: {
+        jobId: ride.id,
+        jobType: 'ride',
+        orderId: ride.id,
+        type: 'RIDE_ASSIGNED',
+        earnings: String(ride.totalFare || 0),
+        customerName: ride.customer?.name || 'Customer',
+      },
     });
 
     this.logger.log(`Ride ${rideId} assigned to rider ${riderId}`);

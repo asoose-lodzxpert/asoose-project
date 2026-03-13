@@ -54,7 +54,7 @@ const columnHelper = createColumnHelper<Driver>();
 export default function DriversPage() {
   // --- State ---
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("ALL");
+  const [statusFilter, setStatusFilter] = useState("ONLINE");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [rowSelection, setRowSelection] = useState({});
 

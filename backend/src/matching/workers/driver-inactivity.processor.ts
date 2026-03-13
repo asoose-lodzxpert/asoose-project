@@ -14,6 +14,9 @@ import {
   ATOMIC_SET_OFFLINE,
   ATOMIC_SET_RIDER_OFFLINE,
 } from '../redis/lua-scripts'; // BUG-4 fix
+import { PrismaService } from '../../prisma/prisma.service';
+import { FcmService } from '../../libs/fcm/fcm.service';
+import { ExpoPushService } from '../../libs/expo/expo-push.service';
 
 /**
  * Driver Inactivity Monitor Worker
@@ -32,7 +35,7 @@ import {
 export class DriverInactivityProcessor extends WorkerHost {
   private readonly logger = new Logger(DriverInactivityProcessor.name);
 
-  private readonly INACTIVITY_THRESHOLD = REDIS_TTL.DRIVER_INACTIVITY; // 120 seconds
+  private readonly INACTIVITY_THRESHOLD = REDIS_TTL.DRIVER_INACTIVITY; // 4 h
   private readonly GRACE_PERIOD = 30; // 30 seconds grace period after ping
 
   // BUG-11 fix: removed in-memory inactiveDriversLastCheck Map.
@@ -42,6 +45,9 @@ export class DriverInactivityProcessor extends WorkerHost {
   constructor(
     private readonly redis: RedisService,
     private readonly eventBus: EventBusService,
+    private readonly prisma: PrismaService,
+    private readonly fcmService: FcmService,
+    private readonly expoPushService: ExpoPushService,
   ) {
     super();
   }
@@ -117,6 +123,10 @@ export class DriverInactivityProcessor extends WorkerHost {
         lastSeen: state?.lastSeen || 0,
         timestamp: now,
       });
+
+      // Send push notification so the driver knows we haven't received
+      // a location update and their status may change.
+      await this.sendInactivityPing(driverId);
 
       // Store ping timestamp with TTL = grace period
       await this.redis
@@ -215,5 +225,38 @@ export class DriverInactivityProcessor extends WorkerHost {
     }
 
     this.logger.log(`✅ Rider ${riderId} marked INACTIVE due to inactivity`);
+  }
+
+  /** Send a push notification to an inactive driver asking them to confirm they are still online. */
+  private async sendInactivityPing(driverId: string): Promise<void> {
+    try {
+      const driver = await this.prisma.rider.findUnique({
+        where: { id: driverId },
+        select: { expoPushToken: true, fcmToken: true },
+      });
+      if (!driver) return;
+
+      const title = 'Are you still online?';
+      const body =
+        "We haven't received a location update from you. Open the app to keep your status active.";
+      const data = { type: 'INACTIVITY_PING' };
+
+      if (driver.expoPushToken) {
+        await this.expoPushService.sendToDevice(
+          driver.expoPushToken,
+          title,
+          body,
+          data,
+        );
+      }
+      if (driver.fcmToken) {
+        await this.fcmService.sendToDevice(driver.fcmToken, title, body, data);
+      }
+    } catch (err) {
+      this.logger.error(
+        `Failed to send inactivity ping to driver ${driverId}:`,
+        err,
+      );
+    }
   }
 }

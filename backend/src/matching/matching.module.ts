@@ -29,6 +29,7 @@ import { NotificationProcessor } from './workers/notification.processor';
 
 // Startup
 import { StartupReconciliationService } from './startup-reconciliation.service';
+import { EndOfDaySchedulerService } from './end-of-day-scheduler.service';
 
 // Prisma
 import { PrismaModule } from '../prisma/prisma.module';
@@ -66,6 +67,7 @@ import { FcmModule } from '../libs/fcm/fcm.module';
 
     // Startup
     StartupReconciliationService,
+    EndOfDaySchedulerService,
   ],
   exports: [
     // RedisService,
