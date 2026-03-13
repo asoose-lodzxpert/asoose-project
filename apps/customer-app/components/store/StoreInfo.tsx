@@ -5,6 +5,17 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import type { StoreData, Review } from "@/types/store-types";
 import { useThemeColor } from "@/hooks/use-theme-color";
 
+/** Returns a human-readable address. If the value is a raw coordinate string
+ * (e.g. "6.51234, 3.37651") stored by the geocoding fallback, show a friendly
+ * label instead of the raw numbers. */
+function formatAddress(address: string | undefined | null): string {
+  if (!address) return "Address not available";
+  if (/^-?\d+\.\d+,\s*-?\d+\.\d+$/.test(address.trim())) {
+    return "Location available";
+  }
+  return address;
+}
+
 interface StoreInfoProps {
   store: StoreData;
   reviews: Review[];
@@ -155,7 +166,7 @@ export function StoreInfo({
                 color={textSecondary}
               />
               <ThemedText style={[styles.infoText, { color: text }]}>
-                {store.address || "Address not available"}
+                {formatAddress(store.address)}
               </ThemedText>
             </View>
 

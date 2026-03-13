@@ -5,6 +5,18 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import type { StoreData } from "@/types/store-types";
 
+/** Returns a human-readable address string.
+ * If the DB stored raw coordinates (e.g. "6.51234, 3.37651") due to a
+ * geocoding fallback, we show a friendly label instead. */
+function formatAddress(address: string | undefined | null): string {
+  if (!address) return "Location not set";
+  // Matches "<float>, <float>" with optional leading minus on each part
+  if (/^-?\d+\.\d+,\s*-?\d+\.\d+$/.test(address.trim())) {
+    return "Location available (map)";
+  }
+  return address;
+}
+
 export function StoreHero({
   store,
   onBack,
@@ -129,10 +141,13 @@ export function StoreHero({
                 </ThemedText>
               </View>
 
-              <View style={styles.metadataItem}>
-                <IconSymbol name="banknote.fill" size={14} color="#E5E7EB" />
-                <ThemedText style={[styles.metadataText, { color: "#E5E7EB" }]}>
-                  Store
+              <View style={[styles.metadataItem, { flex: 1 }]}>
+                <IconSymbol name="location.fill" size={14} color="#E5E7EB" />
+                <ThemedText
+                  style={[styles.metadataText, { color: "#E5E7EB", flex: 1 }]}
+                  numberOfLines={1}
+                >
+                  {formatAddress(store.address)}
                 </ThemedText>
               </View>
             </View>
