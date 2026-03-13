@@ -449,9 +449,10 @@ export class StoresService {
         lat: dto.lat !== undefined ? Number(dto.lat) : undefined,
         lng: dto.lng !== undefined ? Number(dto.lng) : undefined,
         status: dto.status || undefined,
-        type: dto.storeType && Object.values(StoreType).includes(dto.storeType)
-          ? (dto.storeType as StoreType)
-          : undefined,
+        type:
+          dto.storeType && Object.values(StoreType).includes(dto.storeType)
+            ? (dto.storeType as StoreType)
+            : undefined,
         commissionRate:
           dto.commissionRate !== undefined
             ? Number(dto.commissionRate)

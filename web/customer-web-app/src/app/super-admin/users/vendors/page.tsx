@@ -92,7 +92,8 @@ export default function VendorManagementPage() {
   const debouncedSearch = useDebounce(searchQuery, 500);
   const [statusFilter, setStatusFilter] = useState("All Status");
   const [categoryFilter, setCategoryFilter] = useState("All");
-  const [verificationFilter, setVerificationFilter] = useState("All Verification");
+  const [verificationFilter, setVerificationFilter] =
+    useState("All Verification");
 
   useEffect(() => {
     setPagination((prev) => ({ ...prev, pageIndex: 0 }));
@@ -377,7 +378,7 @@ export default function VendorManagementPage() {
         header: "Status",
         cell: (info) => {
           const status = info.getValue() || "PENDING";
-        const colors: Record<string, string> = {
+          const colors: Record<string, string> = {
             ACTIVE: "bg-green-500/20 text-green-500 border-green-500/20",
             PENDING: "bg-yellow-500/20 text-yellow-500 border-yellow-500/20",
             SUSPENDED: "bg-gray-500/20 text-gray-400 border-gray-500/20",
@@ -456,7 +457,8 @@ export default function VendorManagementPage() {
         <AlertCircle className="w-12 h-12 text-red-500" />
         <p className="text-white font-bold text-lg">Failed to load vendors</p>
         <p className="text-gray-400 text-sm">
-          {error?.message || "An unexpected error occurred. Check your permissions."}
+          {error?.message ||
+            "An unexpected error occurred. Check your permissions."}
         </p>
         <button
           onClick={() => mutate()}
