@@ -1,6 +1,6 @@
 /**
  * Notification Sound Utility
- * 
+ *
  * Uses the Web Audio API to synthesise a distinctive three-tone rising alarm
  * (A5 → C6 → E6) directly in the browser — no audio file dependency, no
  * codec / MIME issues, zero network requests.
@@ -12,10 +12,12 @@
 let audioCtx: AudioContext | null = null;
 
 function getAudioContext(): AudioContext | null {
-  if (typeof window === 'undefined') return null;
+  if (typeof window === "undefined") return null;
   try {
     if (!audioCtx) {
-      audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      audioCtx = new (
+        window.AudioContext || (window as any).webkitAudioContext
+      )();
     }
     return audioCtx;
   } catch {
@@ -29,13 +31,13 @@ function getAudioContext(): AudioContext | null {
  */
 async function playWebAudioAlarm(): Promise<void> {
   const ctx = getAudioContext();
-  if (!ctx) throw new Error('Web Audio API not available');
+  if (!ctx) throw new Error("Web Audio API not available");
 
   // Resume suspended context (required after first user gesture)
-  if (ctx.state === 'suspended') await ctx.resume();
+  if (ctx.state === "suspended") await ctx.resume();
 
   const beeps: Array<{ freq: number; start: number }> = [
-    { freq: 880,  start: 0 },
+    { freq: 880, start: 0 },
     { freq: 1047, start: 0.26 },
     { freq: 1319, start: 0.52 },
   ];
@@ -48,7 +50,7 @@ async function playWebAudioAlarm(): Promise<void> {
     const osc = ctx.createOscillator();
     const envGain = ctx.createGain();
 
-    osc.type = 'sine';
+    osc.type = "sine";
     osc.frequency.value = freq;
     osc.connect(envGain);
     envGain.connect(masterGain);
@@ -72,8 +74,8 @@ let audioFallback: HTMLAudioElement | null = null;
 
 function getAudioFallback(): HTMLAudioElement {
   if (!audioFallback) {
-    audioFallback = new Audio('/sounds/notification.mp3');
-    audioFallback.preload = 'auto';
+    audioFallback = new Audio("/sounds/notification.mp3");
+    audioFallback.preload = "auto";
     audioFallback.volume = 0.8;
   }
   return audioFallback;
@@ -84,11 +86,15 @@ function getAudioFallback(): HTMLAudioElement {
  * Safe to call during mount — triggers no sound.
  */
 export function preloadNotificationSound(): void {
-  if (typeof window === 'undefined') return;
+  if (typeof window === "undefined") return;
   // Prime the Web Audio context so it's ready (avoids first-play latency)
   getAudioContext();
   // Also preload the mp3 fallback
-  try { getAudioFallback(); } catch { /* ignore */ }
+  try {
+    getAudioFallback();
+  } catch {
+    /* ignore */
+  }
 }
 
 /**
@@ -98,7 +104,7 @@ export function preloadNotificationSound(): void {
  * Falls back to the /sounds/notification.mp3 file if Web Audio is blocked.
  */
 export async function playNotificationSound(): Promise<void> {
-  if (typeof window === 'undefined') return;
+  if (typeof window === "undefined") return;
 
   try {
     await playWebAudioAlarm();
@@ -109,10 +115,12 @@ export async function playNotificationSound(): Promise<void> {
       audio.currentTime = 0;
       await audio.play();
     } catch (err) {
-      if (err instanceof Error && err.name === 'NotAllowedError') {
-        console.debug('[NotificationSound] Autoplay blocked; sound will play after first user gesture.');
+      if (err instanceof Error && err.name === "NotAllowedError") {
+        console.debug(
+          "[NotificationSound] Autoplay blocked; sound will play after first user gesture.",
+        );
       } else {
-        console.warn('[NotificationSound] Failed to play sound:', err);
+        console.warn("[NotificationSound] Failed to play sound:", err);
       }
     }
   }
@@ -122,7 +130,7 @@ export async function playNotificationSound(): Promise<void> {
  * Test if notification sound can be played.
  */
 export async function canPlayNotificationSound(): Promise<boolean> {
-  if (typeof window === 'undefined') return false;
+  if (typeof window === "undefined") return false;
   try {
     return !!(window.AudioContext || (window as any).webkitAudioContext);
   } catch {
@@ -137,9 +145,11 @@ export async function canPlayNotificationSound(): Promise<boolean> {
  * so that subsequent programmatic play() calls succeed without a gesture.
  */
 export function unlockNotificationSound(): void {
-  if (typeof window === 'undefined') return;
+  if (typeof window === "undefined") return;
   const ctx = getAudioContext();
-  if (ctx && ctx.state === 'suspended') {
-    ctx.resume().catch(() => { /* ignore */ });
+  if (ctx && ctx.state === "suspended") {
+    ctx.resume().catch(() => {
+      /* ignore */
+    });
   }
 }
