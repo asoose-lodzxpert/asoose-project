@@ -38,6 +38,7 @@ export class MapsService {
   async getLiveLocations(): Promise<LiveMapUser[]> {
     // 1. Fetch ALL Prisma riders/drivers + ALL Redis states in parallel.
     //    Location key is NOT deleted on offline, so last known coords persist.
+    //    We also select isOnline / currentLat / currentLng as a DB fallback.
     const [dbUsers, driverStates, riderStates] = await Promise.all([
       this.prisma.rider.findMany({
         where: { role: { in: [UserRole.DRIVER, UserRole.RIDER] } },
@@ -47,6 +48,9 @@ export class MapsService {
           image: true,
           phone: true,
           role: true,
+          isOnline: true,
+          currentLat: true,
+          currentLng: true,
           vehicle: { select: { plateNumber: true } },
         },
       }),
@@ -62,13 +66,14 @@ export class MapsService {
       riderStates.map((s): [string, RiderState] => [s.id, s]),
     );
 
-    // 3. Build result — only include users where we have coordinates.
+    // 3. Build result — include users where we have coordinates (Redis or DB).
     //
     // IMPORTANT: A single person can hold both RIDER and DRIVER roles and uses
     // the same app. Location is emitted under whichever role they are currently
     // active as — which may differ from their Prisma `role` column. We therefore
     // check BOTH Redis state maps for every user and pick the state that has a
     // location, preferring the most-recently-seen one when both have coordinates.
+    // When Redis has no location, we fall back to the DB's currentLat/currentLng.
     const result: LiveMapUser[] = [];
 
     for (const db of dbUsers) {
@@ -102,11 +107,16 @@ export class MapsService {
         effectiveRole = 'RIDER';
       }
 
-      // Skip if no last known location is available in either map
-      if (!state?.location) continue;
+      // Resolve final lat/lng — Redis location first, then DB fallback
+      const redisLoc = state?.location as
+        | NonNullable<DriverState['location']>
+        | null
+        | undefined;
+      const lat: number = redisLoc?.lat ?? db.currentLat ?? 0;
+      const lng: number = redisLoc?.lng ?? db.currentLng ?? 0;
 
-      // state.location is guaranteed non-null here after the guard above
-      const loc = state.location as NonNullable<DriverState['location']>;
+      // Skip if no location data is available anywhere
+      if (!lat || !lng) continue;
 
       result.push({
         id: db.id,
@@ -117,14 +127,14 @@ export class MapsService {
         phone: db.phone ?? null,
         plateNumber: db.vehicle?.plateNumber ?? null,
         role: effectiveRole,
-        // Default to OFFLINE for anyone not in Redis
-        status: state.status ?? 'OFFLINE',
-        lastSeen: state.lastSeen ?? 0,
-        lat: loc.lat,
-        lng: loc.lng,
-        currentJobId: state.currentJobId ?? null,
-        currentJobType: state.currentJobType ?? null,
-        pendingJobId: state.pendingJobId ?? null,
+        // Use Redis status when available; fall back to DB isOnline flag
+        status: state?.status ?? (db.isOnline ? 'ONLINE' : 'OFFLINE'),
+        lastSeen: state?.lastSeen ?? 0,
+        lat,
+        lng,
+        currentJobId: state?.currentJobId ?? null,
+        currentJobType: state?.currentJobType ?? null,
+        pendingJobId: state?.pendingJobId ?? null,
       });
     }
 

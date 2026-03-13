@@ -64,6 +64,8 @@ export class RidesService {
 
     // Build Search Query
     const where: Prisma.RideWhereInput = {
+      // Only show rides with a completed (paid) payment
+      payment: { status: 'COMPLETED' },
       ...(search && {
         OR: [
           { id: { contains: search, mode: 'insensitive' } },

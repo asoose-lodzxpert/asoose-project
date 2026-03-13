@@ -33,7 +33,10 @@ export class DeliveriesService {
     const { status, riderId, from, to, page = 1, limit = 10 } = params;
     const skip = (page - 1) * limit;
 
-    const where: any = {};
+    const where: any = {
+      // Only show deliveries with a completed (paid) payment
+      payment: { status: 'COMPLETED' },
+    };
 
     if (status && status !== 'All') where.status = status;
     if (riderId) where.riderId = riderId;
