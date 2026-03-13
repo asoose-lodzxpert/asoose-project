@@ -103,6 +103,72 @@ export class AnalyticsController {
     return { distribution: report.ratings, average: report.avgRating };
   }
 
+  @ApiOperation({ summary: 'Ride metrics for the selected period' })
+  @Get('rides')
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @HttpCode(HttpStatus.OK)
+  async getRideMetrics(
+    @Query('days', new DefaultValuePipe(30), ParseIntPipe) days: number,
+  ) {
+    const report = await this.analyticsService.getAnalyticsReport(days);
+    return report.rides;
+  }
+
+  @ApiOperation({ summary: 'Delivery metrics for the selected period' })
+  @Get('deliveries')
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @HttpCode(HttpStatus.OK)
+  async getDeliveryMetrics(
+    @Query('days', new DefaultValuePipe(30), ParseIntPipe) days: number,
+  ) {
+    const report = await this.analyticsService.getAnalyticsReport(days);
+    return report.deliveries;
+  }
+
+  @ApiOperation({ summary: 'Payout summary (vendor + rider pending/paid)' })
+  @Get('payouts')
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @HttpCode(HttpStatus.OK)
+  async getPayoutSummary(
+    @Query('days', new DefaultValuePipe(30), ParseIntPipe) days: number,
+  ) {
+    const report = await this.analyticsService.getAnalyticsReport(days);
+    return report.payouts;
+  }
+
+  @ApiOperation({ summary: 'User breakdown by role and new registrations' })
+  @Get('users')
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @HttpCode(HttpStatus.OK)
+  async getUserBreakdown(
+    @Query('days', new DefaultValuePipe(30), ParseIntPipe) days: number,
+  ) {
+    const report = await this.analyticsService.getAnalyticsReport(days);
+    return report.users;
+  }
+
+  @ApiOperation({ summary: 'Payment method breakdown for the selected period' })
+  @Get('payments')
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @HttpCode(HttpStatus.OK)
+  async getPaymentMethodBreakdown(
+    @Query('days', new DefaultValuePipe(30), ParseIntPipe) days: number,
+  ) {
+    const report = await this.analyticsService.getAnalyticsReport(days);
+    return report.paymentMethods;
+  }
+
+  @ApiOperation({ summary: 'Dispute metrics and breakdown by reason' })
+  @Get('disputes')
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @HttpCode(HttpStatus.OK)
+  async getDisputeMetrics(
+    @Query('days', new DefaultValuePipe(30), ParseIntPipe) days: number,
+  ) {
+    const report = await this.analyticsService.getAnalyticsReport(days);
+    return report.disputes;
+  }
+
   @ApiOperation({ summary: 'Export analytics report as CSV download' })
   @Get('export')
   @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)

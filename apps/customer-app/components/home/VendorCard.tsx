@@ -1,7 +1,6 @@
 import { View, StyleSheet, Pressable, Image } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
-import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { Vendor } from "@/types/home";
 import { RelativePathString, useRouter } from "expo-router";
@@ -21,8 +20,6 @@ export function VendorCard({ item }: Props) {
   const textMuted = useThemeColor({}, "textMuted");
   const card = useThemeColor({}, "surfaceCard");
 
-  const rating = typeof item.rating === "number" ? item.rating : 0;
-  const deliveryText = item.deliveryTime || item.eta || "30-45 mins";
   const tags = item.tags?.length
     ? item.tags
     : item.type
@@ -74,11 +71,6 @@ export function VendorCard({ item }: Props) {
       {/* ---------------- Bottom Section ---------------- */}
       <View style={styles.bottom}>
         <ThemedText style={styles.name}>{item.name}</ThemedText>
-
-        <View style={styles.meta}>
-          <IconSymbol name="star.fill" size={14} color={primary} />
-          <ThemedText>{rating.toFixed(1)}</ThemedText>
-        </View>
 
         {tags.length ? (
           <ThemedText style={styles.tags}>{tags.join(" • ")}</ThemedText>
@@ -146,12 +138,6 @@ const styles = StyleSheet.create({
   name: {
     fontSize: 16,
     fontWeight: "700",
-  },
-  meta: {
-    flexDirection: "row",
-    gap: 6,
-    marginTop: 4,
-    alignItems: "center",
   },
   tags: {
     marginTop: 6,

@@ -53,13 +53,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const isLoggingIn = React.useRef(false);
   const hasInitialized = React.useRef(false);
 
+  // Destructure the stable useCallback([]) methods so the init effect deps are
+  // constant references — this prevents the effect from re-firing on every render
+  // (a fresh `biometric` object is returned each render by useBiometric()).
+  const { clearCredentials: clearBiometricCreds, checkBiometricAvailability } =
+    biometric;
+
   // Single atomic initialization flow
   useEffect(() => {
     let isMounted = true;
     async function initializeAuth() {
-      // Skip init if actively logging in OR already initialized
+      // Skip init if actively logging in OR already initialized.
+      // Do NOT call setLoading(false) here — the ongoing async init will do it.
+      // Calling it here while user is still null causes a premature redirect to login.
       if (isLoggingIn.current || hasInitialized.current) {
-        if (isMounted) setLoading(false);
         return;
       }
 
@@ -115,11 +122,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }
     initializeAuth();
-    biometric.checkBiometricAvailability();
+    checkBiometricAvailability();
     return () => {
       isMounted = false;
     };
-  }, [biometric]);
+    // checkBiometricAvailability is defined with useCallback([]) in useBiometric,
+    // so it is a stable reference that never changes — this effect runs only once.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [checkBiometricAvailability]);
 
   // Save session: only after successful login
   const saveSession = async (
@@ -152,7 +162,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await AsyncStorage.removeItem(AUTH_USER_KEY);
     await AsyncStorage.removeItem(AUTH_ACCESS_TOKEN_KEY);
     await AsyncStorage.removeItem(AUTH_REFRESH_TOKEN_KEY);
-    await biometric.clearCredentials();
+    await clearBiometricCreds();
   };
 
   // Login flow

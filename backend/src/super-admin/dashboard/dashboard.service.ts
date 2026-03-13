@@ -12,7 +12,7 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { DisputesService } from '../dispute/dispute.service';
 import { StoresService } from '../vendors/vendors.service';
 import {
-  OrderStatus,
+  OrderStatus, // kept for future use
   DisputeStatus,
   StoreStatus,
   VerificationStatus,
@@ -349,16 +349,18 @@ export class DashboardService {
     const [lastWeek, previousWeek, currentMonth, previousMonth] =
       await Promise.all([
         this.prisma.order.count({
-          where: { createdAt: { gte: sevenDaysAgo } },
+          where: { createdAt: { gte: sevenDaysAgo }, paymentStatus: 'PAID' },
         }),
         this.prisma.order.count({
-          where: { createdAt: { gte: fourteenDaysAgo, lt: sevenDaysAgo } },
+          where: { createdAt: { gte: fourteenDaysAgo, lt: sevenDaysAgo }, paymentStatus: 'PAID' },
+        }),
+        // FIX: was using thirtyDaysAgo→fourteenDaysAgo window (14-30 days ago).
+        // Now correctly counts the last 30 days. Also filter to paid-only.
+        this.prisma.order.count({
+          where: { createdAt: { gte: thirtyDaysAgo }, paymentStatus: 'PAID' },
         }),
         this.prisma.order.count({
-          where: { createdAt: { gte: thirtyDaysAgo, lt: fourteenDaysAgo } },
-        }),
-        this.prisma.order.count({
-          where: { createdAt: { gte: sixtyDaysAgo, lt: thirtyDaysAgo } },
+          where: { createdAt: { gte: sixtyDaysAgo, lt: thirtyDaysAgo }, paymentStatus: 'PAID' },
         }),
       ]);
 
@@ -373,35 +375,37 @@ export class DashboardService {
   ) {
     const [lifetime, lastWeek, previousWeek, currentMonth, previousMonth] =
       await Promise.all([
+        // FIX: use paymentStatus:'PAID' consistently (previously used OrderStatus.DELIVERED
+        // which disagrees with the analytics service and excludes paid-but-not-delivered orders).
         this.prisma.order.aggregate({
-          where: { status: OrderStatus.DELIVERED },
+          where: { paymentStatus: 'PAID' },
           _sum: { total: true },
         }),
         this.prisma.order.aggregate({
           where: {
-            status: OrderStatus.DELIVERED,
-            deliveredAt: { gte: sevenDaysAgo },
+            paymentStatus: 'PAID',
+            createdAt: { gte: sevenDaysAgo },
           },
           _sum: { total: true },
         }),
         this.prisma.order.aggregate({
           where: {
-            status: OrderStatus.DELIVERED,
-            deliveredAt: { gte: fourteenDaysAgo, lt: sevenDaysAgo },
+            paymentStatus: 'PAID',
+            createdAt: { gte: fourteenDaysAgo, lt: sevenDaysAgo },
           },
           _sum: { total: true },
         }),
         this.prisma.order.aggregate({
           where: {
-            status: OrderStatus.DELIVERED,
-            deliveredAt: { gte: thirtyDaysAgo, lt: fourteenDaysAgo },
+            paymentStatus: 'PAID',
+            createdAt: { gte: thirtyDaysAgo },
           },
           _sum: { total: true },
         }),
         this.prisma.order.aggregate({
           where: {
-            status: OrderStatus.DELIVERED,
-            deliveredAt: { gte: sixtyDaysAgo, lt: thirtyDaysAgo },
+            paymentStatus: 'PAID',
+            createdAt: { gte: sixtyDaysAgo, lt: thirtyDaysAgo },
           },
           _sum: { total: true },
         }),
