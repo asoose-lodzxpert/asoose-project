@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Reply to your inquiry</title>
+  <style>
+    body { margin: 0; padding: 0; background: #f4f4f4; font-family: Arial, Helvetica, sans-serif; }
+    .wrapper { width: 100%; background: #f4f4f4; }
+    .header { width: 100%; background: #e5a503; text-align: center; color: #ffffff; padding: 40px 20px; font-size: 28px; font-weight: bold; }
+    .main { width: 100%; background: #ffffff; }
+    .content { max-width: 720px; margin: auto; padding: 40px 30px; }
+    .subtext { font-size: 16px; line-height: 1.7; color: #333333; }
+    .highlight { color: #e5a503; font-weight: bold; }
+    .reply-box { background: #fafafa; border: 1px solid #eee; border-left: 4px solid #e5a503; padding: 20px 25px; border-radius: 8px; margin-top: 20px; }
+    .reply-box p { margin: 0; font-size: 15px; color: #333; line-height: 1.7; white-space: pre-wrap; }
+    .footer { width: 100%; background: #f7f7f7; text-align: center; padding: 30px 20px; font-size: 13px; color: #777; }
+    .footer a { color: #e5a503; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="header">Reply from Asoose Support</div>
+    <div class="main">
+      <div class="content">
+        <p class="subtext">Hello <strong>{{name}}</strong>,</p>
+        <p class="subtext">
+          Thank you for contacting the <span class="highlight">Asoose team</span>. Here is our response to your inquiry
+          regarding <strong>"{{subject}}"</strong>:
+        </p>
+
+        <div class="reply-box">
+          <p>{{replyMessage}}</p>
+        </div>
+
+        <p class="subtext" style="margin-top: 24px;">
+          If you have any further questions, please don't hesitate to reach out again at
+          <a href="mailto:hello@asoose.com" style="color: #e5a503;">hello@asoose.com</a>.
+        </p>
+
+        <p class="subtext"><strong>The Asoose Support Team</strong></p>
+      </div>
+    </div>
+    <div class="footer">
+      &copy; {{year}} Asoose <br /><br />
+      <a href="https://asoose.com">Visit Website</a> | <a href="https://asoose.com/contact">Contact Support</a>
+    </div>
+  </div>
+</body>
+</html>

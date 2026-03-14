@@ -603,4 +603,55 @@ export class EmailProducer {
       },
     );
   }
-}
+  // ========== SUPPORT INQUIRY HANDLERS ==========
+
+  async sendAdminNewInquiry(
+    adminEmail: string,
+    senderName: string,
+    senderEmail: string,
+    subject: string,
+    message: string,
+  ) {
+    await this.emailQueue.add(
+      'admin-new-inquiry',
+      { adminEmail, senderName, senderEmail, subject, message, year: new Date().getFullYear() },
+      {
+        attempts: 3,
+        removeOnComplete: { count: 100 },
+        removeOnFail: { count: 50 },
+      },
+    );
+  }
+
+  async sendInquiryConfirmation(
+    email: string,
+    name: string,
+    subject: string,
+  ) {
+    await this.emailQueue.add(
+      'inquiry-confirmation',
+      { email, name, subject, year: new Date().getFullYear() },
+      {
+        attempts: 3,
+        removeOnComplete: { count: 100 },
+        removeOnFail: { count: 50 },
+      },
+    );
+  }
+
+  async sendInquiryReply(
+    email: string,
+    name: string,
+    subject: string,
+    replyMessage: string,
+  ) {
+    await this.emailQueue.add(
+      'inquiry-reply',
+      { email, name, subject, replyMessage, year: new Date().getFullYear() },
+      {
+        attempts: 3,
+        removeOnComplete: { count: 100 },
+        removeOnFail: { count: 50 },
+      },
+    );
+  }}

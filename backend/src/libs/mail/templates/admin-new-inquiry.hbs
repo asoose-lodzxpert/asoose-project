@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>New Support Inquiry</title>
+  <style>
+    body { margin: 0; padding: 0; background: #f4f4f4; font-family: Arial, Helvetica, sans-serif; }
+    .wrapper { width: 100%; background: #f4f4f4; }
+    .header { width: 100%; background: #e5a503; text-align: center; color: #ffffff; padding: 40px 20px; font-size: 28px; font-weight: bold; }
+    .main { width: 100%; background: #ffffff; }
+    .content { max-width: 720px; margin: auto; padding: 40px 30px; }
+    .subtext { font-size: 16px; line-height: 1.7; color: #333333; }
+    .box { background: #fafafa; border: 1px solid #eee; padding: 25px; border-radius: 8px; margin-top: 20px; }
+    .box h3 { margin-top: 0; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; color: #111; }
+    .box table { width: 100%; border-collapse: collapse; }
+    .box td { padding: 8px 0; font-size: 15px; vertical-align: top; }
+    .box .label { color: #777; width: 130px; }
+    .box .value { color: #111; }
+    .message-body { margin-top: 16px; font-size: 15px; color: #333; line-height: 1.7; white-space: pre-wrap; }
+    .button { display: inline-block; margin-top: 25px; background: #e5a503; color: #ffffff !important; padding: 14px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 15px; }
+    .footer { width: 100%; background: #f7f7f7; text-align: center; padding: 30px 20px; font-size: 13px; color: #777; }
+    .footer a { color: #e5a503; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="header">New Support Inquiry</div>
+    <div class="main">
+      <div class="content">
+        <p class="subtext">A new inquiry has been submitted via the Asoose contact form.</p>
+
+        <div class="box">
+          <h3>Inquiry Details</h3>
+          <table>
+            <tr>
+              <td class="label">From</td>
+              <td class="value">{{senderName}}</td>
+            </tr>
+            <tr>
+              <td class="label">Email</td>
+              <td class="value">{{senderEmail}}</td>
+            </tr>
+            <tr>
+              <td class="label">Subject</td>
+              <td class="value">{{subject}}</td>
+            </tr>
+          </table>
+          <div class="message-body">{{message}}</div>
+        </div>
+
+        <a href="https://asoose.com/super-admin/inquiries" class="button">View in Admin Panel</a>
+
+        <p class="subtext" style="margin-top: 30px;">Log in to the admin panel to reply to this inquiry.</p>
+        <p class="subtext"><strong>The Asoose Team</strong></p>
+      </div>
+    </div>
+    <div class="footer">
+      &copy; {{year}} Asoose <br /><br />
+      <a href="https://asoose.com">Visit Website</a> | <a href="https://asoose.com/contact">Contact Support</a>
+    </div>
+  </div>
+</body>
+</html>

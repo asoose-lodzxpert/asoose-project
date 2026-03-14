@@ -67,6 +67,12 @@ export class EmailProcessor extends WorkerHost {
         return this.sendAdminNoticeEmail(job);
       case 'send-marketing-html':
         return this.sendMarketingHtml(job);
+      case 'admin-new-inquiry':
+        return this.sendAdminNewInquiry(job);
+      case 'inquiry-confirmation':
+        return this.sendInquiryConfirmation(job);
+      case 'inquiry-reply':
+        return this.sendInquiryReply(job);
       default:
         throw new Error(`Unknown job name: ${job.name}`);
     }
@@ -616,6 +622,67 @@ export class EmailProcessor extends WorkerHost {
       to: job.data.email,
       subject: job.data.subject,
       html: personalised,
+    });
+  }
+
+  private async sendAdminNewInquiry(
+    job: Job<{
+      adminEmail: string;
+      senderName: string;
+      senderEmail: string;
+      subject: string;
+      message: string;
+      year: number;
+    }>,
+  ) {
+    await this.mailer.sendMail({
+      to: job.data.adminEmail,
+      subject: `[New Inquiry] ${job.data.subject}`,
+      template: 'admin-new-inquiry',
+      context: {
+        senderName: job.data.senderName,
+        senderEmail: job.data.senderEmail,
+        subject: job.data.subject,
+        message: job.data.message,
+        year: job.data.year,
+      },
+    });
+  }
+
+  private async sendInquiryConfirmation(
+    job: Job<{ email: string; name: string; subject: string; year: number }>,
+  ) {
+    await this.mailer.sendMail({
+      to: job.data.email,
+      subject: `We received your message — ${job.data.subject}`,
+      template: 'inquiry-confirmation',
+      context: {
+        name: job.data.name,
+        subject: job.data.subject,
+        year: job.data.year,
+      },
+    });
+  }
+
+  private async sendInquiryReply(
+    job: Job<{
+      email: string;
+      name: string;
+      subject: string;
+      replyMessage: string;
+      year: number;
+    }>,
+  ) {
+    await this.mailer.sendMail({
+      to: job.data.email,
+      subject: `Re: ${job.data.subject}`,
+      template: 'inquiry-reply',
+      context: {
+        name: job.data.name,
+        subject: job.data.subject,
+        replyMessage: job.data.replyMessage,
+        year: job.data.year,
+      },
     });
   }
 }

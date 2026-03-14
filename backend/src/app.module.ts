@@ -31,6 +31,7 @@ import { VendorModule } from './vendor/vendor.module';
 import { FareModule } from './fare/fare.module';
 import { LoggerModule } from './libs/logger/logger.module';
 import { MetricsModule } from './metrics/metrics.module';
+import { SupportModule } from './support/support.module';
 
 @Module({
   imports: [
@@ -120,6 +121,7 @@ import { MetricsModule } from './metrics/metrics.module';
     UsersModule,
     VendorModule,
     FareModule,
+    SupportModule,
   ],
   controllers: [AppController],
   providers: [

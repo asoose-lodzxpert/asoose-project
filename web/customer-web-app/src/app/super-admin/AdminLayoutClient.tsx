@@ -26,6 +26,7 @@ import {
   MapPin,
   Megaphone,
   Store,
+  MessageSquare,
 } from "lucide-react";
 import { signOut } from "next-auth/react";
 import useSWR from "swr";
@@ -75,6 +76,18 @@ export default function AdminLayoutClient({
       revalidateOnFocus: true,
     },
   );
+
+  // Inquiry unread count
+  const inquiryCountKey =
+    role === "SUPER_ADMIN" || role === "ADMIN" || role === "ADMIN_SUPPORT"
+      ? "/super-admin/inquiries/unread-count"
+      : null;
+  const { data: inquiryUnreadData } = useSWR<{ count: number }>(
+    inquiryCountKey,
+    fetcher,
+    { refreshInterval: 30000, revalidateOnFocus: true },
+  );
+  const inquiryUnreadCount = inquiryUnreadData?.count ?? 0;
 
   const hasUnread = (unreadData?.count ?? 0) > 0;
   const hasAccess = (allowedRoles: AdminRole[]) => allowedRoles.includes(role);
@@ -157,6 +170,12 @@ export default function AdminLayoutClient({
       icon: Megaphone,
       href: "/super-admin/notices",
       allowed: ["ADMIN", "SUPER_ADMIN"],
+    },
+    {
+      name: "Inquiries",
+      icon: MessageSquare,
+      href: "/super-admin/inquiries",
+      allowed: ["ADMIN", "SUPER_ADMIN", "ADMIN_SUPPORT"],
     },
   ];
 
@@ -300,6 +319,11 @@ export default function AdminLayoutClient({
               >
                 <item.icon className="w-5 h-5" />
                 {item.name}
+                {item.name === "Inquiries" && inquiryUnreadCount > 0 && (
+                  <span className="ml-auto bg-red-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center">
+                    {inquiryUnreadCount}
+                  </span>
+                )}
               </Link>
             );
           })}
@@ -414,6 +438,20 @@ export default function AdminLayoutClient({
 
         <div className="p-4 md:p-8">{children}</div>
       </main>
+
+      {/* Floating Action Button — Inquiries */}
+      {inquiryUnreadCount > 0 && !isActive("/super-admin/inquiries") && (
+        <Link
+          href="/super-admin/inquiries"
+          className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 bg-yellow-500 text-black font-bold rounded-full shadow-lg shadow-yellow-500/30 hover:bg-yellow-400 transition-all hover:scale-105"
+        >
+          <MessageSquare className="w-5 h-5" />
+          <span className="hidden sm:inline">Inquiries</span>
+          <span className="flex items-center justify-center bg-red-500 text-white text-xs font-black rounded-full w-5 h-5">
+            {inquiryUnreadCount > 9 ? "9+" : inquiryUnreadCount}
+          </span>
+        </Link>
+      )}
 
       {isMobileMenuOpen && (
         <div
