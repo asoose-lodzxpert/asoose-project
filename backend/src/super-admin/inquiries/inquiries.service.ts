@@ -1,8 +1,4 @@
-import {
-  Injectable,
-  NotFoundException,
-  Logger,
-} from '@nestjs/common';
+import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { EmailProducer } from 'src/mail/email.producer';
 import { ReplyInquiryDto } from './dto/reply-inquiry.dto';
@@ -96,7 +92,12 @@ export class InquiriesService {
 
     // Send reply email to the enquirer
     this.emailProducer
-      .sendInquiryReply(inquiry.email, inquiry.name, inquiry.subject, dto.message)
+      .sendInquiryReply(
+        inquiry.email,
+        inquiry.name,
+        inquiry.subject,
+        dto.message,
+      )
       .catch((err: any) =>
         this.logger.warn(`Inquiry reply email failed: ${err.message}`),
       );

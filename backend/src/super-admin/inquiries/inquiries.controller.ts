@@ -10,11 +10,16 @@ import {
   ParseIntPipe,
   DefaultValuePipe,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
-import { Roles } from 'src/auth/decorators/roles.decorator';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
 import { InquiriesService } from './inquiries.service';
 import { ReplyInquiryDto } from './dto/reply-inquiry.dto';
+import { Roles } from 'src/auth/roles.decorator';
 
 @ApiTags('Admin — Inquiries')
 @ApiBearerAuth()
@@ -32,7 +37,11 @@ export class InquiriesController {
   @ApiOperation({ summary: 'List all inquiries with pagination' })
   @ApiQuery({ name: 'page', required: false })
   @ApiQuery({ name: 'limit', required: false })
-  @ApiQuery({ name: 'status', required: false, enum: ['UNREAD', 'READ', 'REPLIED'] })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    enum: ['UNREAD', 'READ', 'REPLIED'],
+  })
   @Get()
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.ADMIN_SUPPORT)
   findAll(
@@ -60,7 +69,11 @@ export class InquiriesController {
   @ApiOperation({ summary: 'Reply to an inquiry — sends email to the user' })
   @Post(':id/reply')
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.ADMIN_SUPPORT)
-  reply(@Param('id') id: string, @Body() dto: ReplyInquiryDto, @Req() req: any) {
+  reply(
+    @Param('id') id: string,
+    @Body() dto: ReplyInquiryDto,
+    @Req() req: any,
+  ) {
     const adminName = req.user?.name || req.user?.email || 'Asoose Support';
     return this.inquiriesService.reply(id, dto, adminName);
   }

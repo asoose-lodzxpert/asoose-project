@@ -46,11 +46,9 @@ const STATUS_COLORS: Record<string, string> = {
   REPLIED: "bg-green-500/10 text-green-400 border border-green-500/20",
 };
 
-const BACKEND_URL =
-  (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1").replace(
-    /\/$/,
-    "",
-  );
+const BACKEND_URL = (
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1"
+).replace(/\/$/, "");
 
 async function apiFetch(path: string, options?: RequestInit) {
   const { getSession } = await import("next-auth/react");
@@ -180,10 +178,7 @@ export default function InquiriesPage() {
       {isLoading ? (
         <div className="space-y-3">
           {[...Array(5)].map((_, i) => (
-            <div
-              key={i}
-              className="h-24 rounded-xl bg-white/5 animate-pulse"
-            />
+            <div key={i} className="h-24 rounded-xl bg-white/5 animate-pulse" />
           ))}
         </div>
       ) : !data?.items?.length ? (
@@ -212,7 +207,9 @@ export default function InquiriesPage() {
                     <span className="font-semibold text-white">
                       {inquiry.name}
                     </span>
-                    <span className="text-gray-400 text-sm">{inquiry.email}</span>
+                    <span className="text-gray-400 text-sm">
+                      {inquiry.email}
+                    </span>
                     <span
                       className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[inquiry.status]}`}
                     >
@@ -297,7 +294,9 @@ export default function InquiriesPage() {
                       className="w-full bg-[#0F172A] border border-gray-700 rounded-lg px-4 py-3 text-sm text-white placeholder-gray-600 outline-none focus:border-yellow-500 transition-colors resize-none"
                     />
                     <button
-                      disabled={!replyText[inquiry.id]?.trim() || sending === inquiry.id}
+                      disabled={
+                        !replyText[inquiry.id]?.trim() || sending === inquiry.id
+                      }
                       onClick={() => handleReply(inquiry)}
                       className="flex items-center gap-2 px-5 py-2.5 bg-yellow-500 text-black font-semibold text-sm rounded-lg hover:bg-yellow-400 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                     >

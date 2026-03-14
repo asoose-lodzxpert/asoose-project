@@ -614,7 +614,14 @@ export class EmailProducer {
   ) {
     await this.emailQueue.add(
       'admin-new-inquiry',
-      { adminEmail, senderName, senderEmail, subject, message, year: new Date().getFullYear() },
+      {
+        adminEmail,
+        senderName,
+        senderEmail,
+        subject,
+        message,
+        year: new Date().getFullYear(),
+      },
       {
         attempts: 3,
         removeOnComplete: { count: 100 },
@@ -623,11 +630,7 @@ export class EmailProducer {
     );
   }
 
-  async sendInquiryConfirmation(
-    email: string,
-    name: string,
-    subject: string,
-  ) {
+  async sendInquiryConfirmation(email: string, name: string, subject: string) {
     await this.emailQueue.add(
       'inquiry-confirmation',
       { email, name, subject, year: new Date().getFullYear() },
@@ -654,4 +657,5 @@ export class EmailProducer {
         removeOnFail: { count: 50 },
       },
     );
-  }}
+  }
+}
