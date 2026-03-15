@@ -19,6 +19,9 @@ export { MATCHING_REDIS_CLIENT } from './redis.constants';
           port: configService.get('REDIS_PORT', 6379),
           password: configService.get('REDIS_PASSWORD'),
           db: configService.get('MATCHING_REDIS_DB', 1),
+          ...(configService.get('REDIS_TLS') === 'true' && {
+            tls: { servername: configService.get('REDIS_HOST') },
+          }),
           retryStrategy: (times) => {
             const delay = Math.min(times * 50, 2000);
             return delay;
