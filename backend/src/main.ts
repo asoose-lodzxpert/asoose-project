@@ -28,64 +28,56 @@ async function bootstrap() {
   });
 
   const isDevelopment = process.env.NODE_ENV !== 'production';
-  if (isDevelopment) {
-    app.enableCors({
-      origin: true,
-      credentials: true,
-      methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
-      allowedHeaders: [
-        'Content-Type',
-        'Authorization',
-        'X-Requested-With',
-        'Accept',
-        'Origin',
-        'Idempotency-Key',
-        'x-idempotency-key',
-      ],
-    });
-  } else {
-    if (!process.env.CORS_ORIGIN) {
-      throw new Error(
-        'CORS_ORIGIN environment variable must be set in production',
-      );
-    }
-    const allowedOrigins = process.env.CORS_ORIGIN.replace(/^["']|["']$/g, '')
-      .split(',')
-      .map((origin) => origin.trim().replace(/^["']|["']$/g, ''))
-      .filter((origin) => origin.length > 0);
-    app.enableCors({
-      origin: (origin, callback) => {
-        if (!origin) return callback(null, true);
-        if (allowedOrigins.includes(origin)) {
-          callback(null, true);
-        } else {
-          appLogger.warn(`CORS blocked origin: ${origin}`, { context: 'CORS' });
-          callback(null, false);
-        }
-      },
-      methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
-      credentials: true,
-      allowedHeaders: [
-        'Content-Type',
-        'Authorization',
-        'X-Requested-With',
-        'Accept',
-        'Origin',
-        'Idempotency-Key',
-        'x-idempotency-key',
-      ],
-      exposedHeaders: ['X-Total-Count', 'X-Page-Number'],
-      maxAge: 86400,
-    });
-  }
 
-  app.use(helmet());
+  // Parse allowed origins once at startup
+  const allowedOrigins = (process.env.CORS_ORIGIN || '')
+    .replace(/^["']|["']$/g, '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter((origin) => origin.length > 0);
+
+  app.enableCors({
+    origin: (origin, callback) => {
+      // 1. Always allow if origin is missing (Mobile Apps/Servers)
+      // 2. Always allow literal string "null" (Mobile Apps/Redirects)
+      // 3. Always allow in development mode
+      if (!origin || origin === 'null' || isDevelopment) {
+        return callback(null, true);
+      }
+
+      // 4. Check against white-list in production
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      appLogger.warn(`CORS blocked origin: ${origin}`, { context: 'CORS' });
+      return callback(null, false);
+    },
+    methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+    credentials: true,
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'X-Requested-With',
+      'Accept',
+      'Origin',
+      'Idempotency-Key',
+      'x-idempotency-key',
+    ],
+    exposedHeaders: ['X-Total-Count', 'X-Page-Number'],
+    maxAge: 86400,
+  });
+
+  app.use(
+    helmet({
+      crossOriginResourcePolicy: false, // Ensure images/uploads are accessible cross-origin
+    }),
+  );
   app.use(compression());
 
   const correlationMiddleware = new CorrelationMiddleware();
   app.use(correlationMiddleware.use.bind(correlationMiddleware));
 
-  // Exclude /metrics so Prometheus scrapers can reach it without the 'api' prefix.
   app.setGlobalPrefix('api', {
     exclude: [{ path: 'metrics', method: RequestMethod.GET }],
   });
@@ -110,7 +102,7 @@ async function bootstrap() {
       .split(',')
       .map((ip) => ip.trim())
       .filter(Boolean);
-    if (allowedIps.length === 0) return next(); // no restriction configured
+    if (allowedIps.length === 0) return next();
     const clientIp: string =
       (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ??
       req.ip ??
@@ -118,6 +110,7 @@ async function bootstrap() {
     if (allowedIps.includes(clientIp)) return next();
     return res.status(403).json({ message: 'Forbidden' });
   });
+
   app.useGlobalPipes(
     new ValidationPipe({
       transform: true,
@@ -135,6 +128,7 @@ async function bootstrap() {
       },
     }),
   );
+
   const port = process.env.PORT ?? 3000;
 
   // Setup Bull Board
@@ -142,7 +136,6 @@ async function bootstrap() {
     const serverAdapter = new ExpressAdapter();
     serverAdapter.setBasePath('/api/v1/system/queues');
 
-    // Get queues from DI container
     try {
       const rideMatchingQueue = app.get('BullQueue_ride-matching');
       const deliveryMatchingQueue = app.get('BullQueue_delivery-matching');
@@ -163,7 +156,7 @@ async function bootstrap() {
         serverAdapter: serverAdapter as any,
       });
 
-      const allowedIps = (process.env.BULL_BOARD_ALLOWED_IPS || '')
+      const allowedBoardIps = (process.env.BULL_BOARD_ALLOWED_IPS || '')
         .split(',')
         .map((ip) => ip.trim())
         .filter(Boolean);
@@ -176,7 +169,10 @@ async function bootstrap() {
             (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
             req.ip ||
             '';
-          if (allowedIps.length === 0 || allowedIps.includes(clientIp)) {
+          if (
+            allowedBoardIps.length === 0 ||
+            allowedBoardIps.includes(clientIp)
+          ) {
             return next();
           }
           return res.status(403).json({ message: 'Forbidden' });

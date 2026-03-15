@@ -58,10 +58,10 @@ export function NotificationProvider({
   useEffect(() => {
     if (!user) return;
 
-    // Initialize notification handler first (must be done after React Native is ready)
+    // Initialize notification handler first
     initializeNotificationHandler();
 
-    // Setup notification categories
+    // Setup notification categories (like 'job' with Accept/Decline buttons)
     setupNotificationCategories();
 
     // Register for push notifications
@@ -88,14 +88,14 @@ export function NotificationProvider({
       },
     );
 
-    // Listen for user interactions with notifications
+    // Listen for user interactions with notifications (taps and buttons)
     responseListener.current = addNotificationResponseListener(
       async (response) => {
         const data = response.notification.request.content.data;
         const actionId = response.actionIdentifier;
 
-        // Handle action buttons
-        if (actionId === "accept" && data.orderId) {
+        // Handle "Accept" button click directly from the notification shade
+        if (actionId === "accept" && data.jobId) {
           try {
             await jobsService.acceptJob(
               data.jobId as string,
@@ -105,6 +105,7 @@ export function NotificationProvider({
               type: "success",
               text1: "Job accepted",
             });
+            // Redirect to orders to see the active job state
             router.push("/(tabs)/orders");
           } catch (error: any) {
             Toast.show({
@@ -112,11 +113,14 @@ export function NotificationProvider({
               text1: error.message || "Failed to accept job",
             });
           }
-        } else if (actionId === "decline" && data.jobId) {
+        }
+        // Handle "Decline" button click or general Job notifications
+        else if (actionId === "decline" || data.jobId) {
+          // Navigating to /orders triggers the state restoration logic in JobContext
           router.push("/(tabs)/orders");
-        } else if (data.jobId) {
-          router.push("/(tabs)/orders");
-        } else if (data.payoutId) {
+        }
+        // Handle Payout notifications
+        else if (data.payoutId) {
           router.push("/(earnings)/withdraw");
         }
       },

@@ -25,10 +25,9 @@ export class RiderDispatchListener {
       `Processing job.assigned event: ${payload.jobType} ${payload.jobId}`,
     );
 
-    // driverId is present in JobAssignedEvent for both rides and deliveries
     const fallbackRiderId = payload.driverId || payload.riderId;
-
     const type = payload.jobType?.toLowerCase();
+
     if (type === 'delivery') {
       await this.handleDeliveryAssignment(payload.jobId);
     } else if (type === 'ride') {
@@ -40,12 +39,7 @@ export class RiderDispatchListener {
     const delivery = await this.prisma.delivery.findUnique({
       where: { id: deliveryId },
       include: {
-        order: {
-          include: {
-            store: { include: { vendor: true } },
-            items: { include: { product: true } },
-          },
-        },
+        order: { include: { store: { include: { vendor: true } } } },
         customer: true,
         pickupAddress: true,
         dropoffAddress: true,
@@ -57,80 +51,26 @@ export class RiderDispatchListener {
       return;
     }
 
-    const stops = (delivery as any).stops as any[] | null;
-    const isMultiStop = stops && stops.length > 1;
-    const isDirectDelivery = !delivery.orderId;
-
-    // Build order items list (what the rider is picking up)
-    const orderItems: string[] = (delivery.order?.items ?? []).map(
-      (i: any) => i.product?.name || 'Item',
-    );
-
-    // Format data to match IncomingJobOffer interface
-    const jobData = {
-      id: delivery.id,
-      jobType: 'delivery' as const,
-      pickupAddress: delivery.pickupAddress,
-      dropoffAddress: delivery.dropoffAddress,
-      // Direct delivery: sender name; marketplace: store name
-      customerName: isMultiStop
-        ? `${stops!.length} Stores`
-        : delivery.order?.store?.name ||
-          (delivery as any).customer?.name ||
-          'Sender',
-      earnings: delivery.deliveryFee || 0,
-      estimatedEarnings: delivery.deliveryFee || 0,
-      packageDetails: isDirectDelivery
-        ? ((delivery as any).packageDetails ?? undefined)
-        : this.buildPackageDetails(delivery.order),
-      distanceKm: delivery.distanceKm,
-      // Contact phones:
-      //   - Pickup: address phone → vendor phone → customer phone (sender)
-      //   - Dropoff: recipientPhone
-      pickupContactPhone:
-        delivery.pickupAddress?.phone ||
-        (delivery.order as any)?.store?.vendor?.phone ||
-        (delivery as any).customer?.phone ||
-        null,
-      dropoffContactPhone: (delivery as any).recipientPhone || null,
-      recipientName: (delivery as any).recipientName || null,
-      // Order items (what's being picked up)
-      orderItems,
-      // Package handling flags
-      isFragile: (delivery as any).isFragile ?? false,
-      isPerishable: (delivery as any).isPerishable ?? false,
-      containsLiquid: (delivery as any).containsLiquid ?? false,
-      weightKg: (delivery as any).weightKg ?? null,
-      // Multi-stop fields
-      stops: stops ?? null,
-      storeCount: stops?.length ?? 1,
-      currentStopIndex: (delivery as any).currentStopIndex ?? 0,
-      requiresOtp: false,
-    };
-
-    // NOTE: Socket emission is handled by RiderJobEventsListener to avoid duplicate events.
-    // Join rider to job room for real-time updates (use delivery.id for direct deliveries)
+    // Join rider to job room for real-time socket updates
     const roomId = delivery.orderId ?? delivery.id;
     this.notificationsGateway.joinJobRoom(delivery.riderId, roomId);
 
-    // Create in-app notification (stored in DB) + send socket + push notification
     const pickupName =
       delivery.order?.store?.name ||
       (delivery as any).customer?.name ||
       'Sender';
     const shortRef = (delivery.orderId ?? delivery.id).slice(0, 8);
+
     await this.notificationsService.createForRider({
       riderId: delivery.riderId,
       title: 'New Delivery Assigned',
-      message: `Pick up ${isDirectDelivery ? 'package' : `order #${shortRef}`} at ${pickupName}`,
+      message: `Pick up ${delivery.orderId ? `order #${shortRef}` : 'package'} at ${pickupName}`,
       type: 'DELIVERY',
-      category: 'DELIVERY_ASSIGNED',
-      // Include full job identity so the rider app can handle the offer from
-      // a push notification even when the socket is disconnected.
+      category: 'job', // CRITICAL: Matches setupNotificationCategories in rider app
       metadata: {
         jobId: delivery.id,
         jobType: 'delivery',
-        orderId: delivery.orderId || delivery.id,
+        // Ensure keys match what NotificationContext.tsx expects
         type: 'DELIVERY_ASSIGNED',
         earnings: String(delivery.deliveryFee || 0),
         pickupName,
@@ -145,62 +85,25 @@ export class RiderDispatchListener {
   private async handleRideAssignment(rideId: string, fallbackRiderId?: string) {
     const ride = await this.prisma.ride.findUnique({
       where: { id: rideId },
-      include: {
-        customer: true,
-        pickupAddress: true,
-        dropoffAddress: true,
-      },
+      include: { customer: true },
     });
 
-    if (!ride) {
-      this.logger.warn(`Ride ${rideId} not found in handleRideAssignment`);
-      return;
-    }
+    if (!ride) return;
 
-    // During auto-matching, riderId may be stored in Redis (pending lock)
-    // but not yet written to the DB. Use the fallback from the event payload.
     const riderId = ride.riderId || fallbackRiderId;
+    if (!riderId) return;
 
-    if (!riderId) {
-      this.logger.debug(
-        `Ride ${rideId} has no riderId yet and no fallback in event — skipping push notification`,
-      );
-      return;
-    }
-
-    // Format data to match IncomingJobOffer interface
-    const jobData = {
-      id: ride.id,
-      jobType: 'ride' as const,
-      pickupAddress: ride.pickupAddress,
-      dropoffAddress: ride.dropoffAddress,
-      customerName: ride.customer?.name || 'Customer',
-      earnings: ride.totalFare || 0,
-      estimatedEarnings: ride.totalFare || 0,
-      distanceKm: ride.distanceKm,
-      durationMin: ride.durationMin,
-      // Contact phone (same person for both pickup and dropoff)
-      pickupContactPhone: ride.customer?.phone || null,
-      dropoffContactPhone: ride.customer?.phone || null,
-    };
-
-    // NOTE: Socket emission is handled by RiderJobEventsListener to avoid duplicate events.
-    // Join rider to ride room for real-time updates
     this.notificationsGateway.joinJobRoom(riderId, ride.id);
 
-    // Create in-app notification (stored in DB) + send socket + push notification
     await this.notificationsService.createForRider({
       riderId,
       title: 'New Ride Assigned',
       message: `New ride request from ${ride.customer?.name || 'Customer'}`,
       type: 'RIDE',
-      category: 'RIDE_ASSIGNED',
-      // Include full job identity so the rider app can handle the offer from
-      // a push notification even when the socket is disconnected.
+      category: 'job', // CRITICAL: Matches setupNotificationCategories in rider app
       metadata: {
         jobId: ride.id,
         jobType: 'ride',
-        orderId: ride.id,
         type: 'RIDE_ASSIGNED',
         earnings: String(ride.totalFare || 0),
         customerName: ride.customer?.name || 'Customer',
@@ -216,59 +119,24 @@ export class RiderDispatchListener {
     jobType: string;
     status: string;
   }) {
-    this.logger.log(
-      `Processing job.updated event: ${payload.jobType} ${payload.jobId} -> ${payload.status}`,
-    );
-
     const type = payload.jobType?.toLowerCase();
-    if (type === 'delivery') {
-      const delivery = await this.prisma.delivery.findUnique({
-        where: { id: payload.jobId },
-        include: {
-          order: {
-            include: {
-              store: true,
-            },
-          },
-          pickupAddress: true,
-          dropoffAddress: true,
-        },
+    const job =
+      type === 'delivery'
+        ? await this.prisma.delivery.findUnique({
+            where: { id: payload.jobId },
+            select: { riderId: true, status: true },
+          })
+        : await this.prisma.ride.findUnique({
+            where: { id: payload.jobId },
+            select: { riderId: true, status: true },
+          });
+
+    if (job?.riderId) {
+      this.notificationsGateway.emitJobUpdated(job.riderId, {
+        id: payload.jobId,
+        status: job.status,
+        jobType: type as any,
       });
-
-      if (delivery && delivery.riderId) {
-        const jobData = {
-          id: delivery.id,
-          status: delivery.status,
-          jobType: 'delivery' as const,
-        };
-
-        this.notificationsGateway.emitJobUpdated(delivery.riderId, jobData);
-        this.logger.log(
-          `Delivery ${payload.jobId} update sent to rider ${delivery.riderId}`,
-        );
-      }
-    } else if (type === 'ride') {
-      const ride = await this.prisma.ride.findUnique({
-        where: { id: payload.jobId },
-        include: {
-          customer: true,
-          pickupAddress: true,
-          dropoffAddress: true,
-        },
-      });
-
-      if (ride && ride.riderId) {
-        const jobData = {
-          id: ride.id,
-          status: ride.status,
-          jobType: 'ride' as const,
-        };
-
-        this.notificationsGateway.emitJobUpdated(ride.riderId, jobData);
-        this.logger.log(
-          `Ride ${payload.jobId} update sent to rider ${ride.riderId}`,
-        );
-      }
     }
   }
 
@@ -276,168 +144,65 @@ export class RiderDispatchListener {
   async handleJobCancelledEvent(payload: {
     jobId: string;
     jobType: string;
-    cancelledBy?: 'customer' | 'driver' | 'system';
     reason?: string;
     customerId?: string;
+    cancelledBy?: string;
   }) {
-    this.logger.log(
-      `Processing job.cancelled event: ${payload.jobType} ${payload.jobId}`,
-    );
-
     const type = payload.jobType?.toLowerCase();
-    if (type === 'delivery') {
-      const delivery = await this.prisma.delivery.findUnique({
-        where: { id: payload.jobId },
-        select: {
-          riderId: true,
-          id: true,
-          customerId: true,
-          payment: { select: { status: true } },
-        },
+    const job =
+      type === 'delivery'
+        ? await this.prisma.delivery.findUnique({
+            where: { id: payload.jobId },
+            select: { riderId: true, customerId: true, payment: true },
+          })
+        : await this.prisma.ride.findUnique({
+            where: { id: payload.jobId },
+            select: { riderId: true, customerId: true, payment: true },
+          });
+
+    if (!job) return;
+
+    if (job.riderId) {
+      this.notificationsGateway.emitJobCancelled(job.riderId, {
+        id: payload.jobId,
+        reason: payload.reason || 'Cancelled',
       });
+    }
 
-      if (delivery) {
-        if (delivery.riderId) {
-          const jobData = {
-            id: delivery.id,
-            reason: payload.reason || 'Cancelled',
-          };
-          this.notificationsGateway.emitJobCancelled(delivery.riderId, jobData);
-          this.logger.log(
-            `Delivery ${payload.jobId} cancellation sent to rider ${delivery.riderId}`,
-          );
-        }
-
-        // Only create a dispute if the customer actually paid — no payment, no refund needed.
-        const deliveryWasPaid =
-          delivery.payment !== null && delivery.payment?.status !== 'PENDING';
-        if (deliveryWasPaid) {
-          await this.createCancellationDispute(
-            'delivery',
-            delivery.id,
-            delivery.customerId,
-            payload.cancelledBy,
-            payload.reason,
-          );
-        } else {
-          this.logger.log(
-            `Delivery ${delivery.id} cancelled with no payment — skipping dispute creation`,
-          );
-        }
-      }
-    } else if (type === 'ride') {
-      const ride = await this.prisma.ride.findUnique({
-        where: { id: payload.jobId },
-        select: {
-          riderId: true,
-          id: true,
-          customerId: true,
-          payment: { select: { status: true } },
-        },
-      });
-
-      if (ride) {
-        if (ride.riderId) {
-          const jobData = {
-            id: ride.id,
-            reason: payload.reason || 'Cancelled',
-          };
-          this.notificationsGateway.emitJobCancelled(ride.riderId, jobData);
-          this.logger.log(
-            `Ride ${payload.jobId} cancellation sent to rider ${ride.riderId}`,
-          );
-        }
-
-        // Only create a dispute if the customer actually paid — no payment, no refund needed.
-        const rideWasPaid =
-          ride.payment !== null && ride.payment?.status !== 'PENDING';
-        if (rideWasPaid) {
-          await this.createCancellationDispute(
-            'ride',
-            ride.id,
-            ride.customerId,
-            payload.cancelledBy,
-            payload.reason,
-          );
-        } else {
-          this.logger.log(
-            `Ride ${ride.id} cancelled with no payment — skipping dispute creation`,
-          );
-        }
-      }
+    // Auto-create dispute if payment was already processed
+    const wasPaid =
+      (job as any).payment && (job as any).payment.status !== 'PENDING';
+    if (wasPaid) {
+      await this.createCancellationDispute(
+        type as any,
+        payload.jobId,
+        job.customerId,
+        payload.cancelledBy,
+        payload.reason,
+      );
     }
   }
 
-  /**
-   * Creates a dispute record when a job is cancelled so the admin
-   * can review and issue a refund to the customer if applicable.
-   * Idempotent — skips creation if a dispute already exists for this job.
-   */
   private async createCancellationDispute(
     jobType: 'ride' | 'delivery',
     jobId: string,
     customerId: string,
     cancelledBy?: string,
     reason?: string,
-  ): Promise<void> {
-    try {
-      // Guard: skip if a dispute already exists for this job
-      const existing = await this.prisma.dispute.findFirst({
-        where:
-          jobType === 'delivery' ? { deliveryId: jobId } : { rideId: jobId },
-        select: { id: true },
-      });
-      if (existing) {
-        this.logger.log(
-          `Dispute already exists for ${jobType} ${jobId} — skipping`,
-        );
-        return;
-      }
+  ) {
+    const existing = await this.prisma.dispute.findFirst({
+      where: jobType === 'delivery' ? { deliveryId: jobId } : { rideId: jobId },
+    });
+    if (existing) return;
 
-      const cancelSource = cancelledBy ?? 'system';
-      const description = [
-        `This ${jobType} was cancelled and may require a refund.`,
-        `Cancelled by: ${cancelSource}`,
-        reason ? `Reason: ${reason}` : null,
-      ]
-        .filter(Boolean)
-        .join('\n');
-
-      await this.prisma.dispute.create({
-        data: {
-          openedByUserId: customerId,
-          ...(jobType === 'delivery'
-            ? { deliveryId: jobId }
-            : { rideId: jobId }),
-          reason: `${jobType === 'delivery' ? 'Delivery' : 'Ride'} cancelled – refund required`,
-          description,
-          priority: 'HIGH',
-        },
-      });
-
-      this.logger.log(
-        `Cancellation dispute created for ${jobType} ${jobId} (customer ${customerId})`,
-      );
-    } catch (err) {
-      this.logger.error(
-        `Failed to create cancellation dispute for ${jobType} ${jobId}`,
-        err,
-      );
-    }
-  }
-
-  private buildPackageDetails(order: any): string {
-    if (!order?.items || order.items.length === 0) {
-      return 'Package';
-    }
-
-    const itemCount = order.items.length;
-    const firstItem = order.items[0]?.product?.name || 'items';
-
-    if (itemCount === 1) {
-      return firstItem;
-    }
-
-    return `${firstItem} and ${itemCount - 1} more item${itemCount > 2 ? 's' : ''}`;
+    await this.prisma.dispute.create({
+      data: {
+        openedByUserId: customerId,
+        ...(jobType === 'delivery' ? { deliveryId: jobId } : { rideId: jobId }),
+        reason: `${jobType === 'delivery' ? 'Delivery' : 'Ride'} cancelled – refund required`,
+        description: `Cancelled by: ${cancelledBy ?? 'system'}\nReason: ${reason ?? 'No reason provided'}`,
+        priority: 'HIGH',
+      },
+    });
   }
 }

@@ -10,7 +10,9 @@ import React, {
   useState,
   useCallback,
   useRef,
+  useEffect,
 } from "react";
+import { AppState, AppStateStatus } from "react-native"; // Added AppState
 import Toast from "react-native-toast-message";
 import { useLocationStream } from "@/hooks/useLocationStream";
 import { useAuth } from "@/context/AuthContext";
@@ -52,13 +54,10 @@ export const JobsProvider = ({ children }: { children: ReactNode }) => {
   const [connectionStatus, setConnectionStatus] =
     useState<ConnectionStatus>("disconnected");
 
-  // Stable ref so handleJobCompleted (defined before checkAndRestoreActiveJob)
-  // can always call the latest version without a circular dependency.
   const checkAndRestoreRef = useRef<() => Promise<void>>(() =>
     Promise.resolve(),
   );
 
-  // Memoize callbacks to prevent re-renders
   const handleJobAssigned = useCallback((job: IncomingJobOffer) => {
     if (__DEV__) console.log("Job assigned:", JSON.stringify(job, null, 2));
     setIncomingJob(job);
@@ -68,11 +67,8 @@ export const JobsProvider = ({ children }: { children: ReactNode }) => {
 
   const handleJobUpdated = useCallback((jobId: string, newStatus: string) => {
     const isTerminal = newStatus === "online-waiting";
-
-    // Update the job object in state
     setActiveJob((prevActiveJob) => {
       if (!prevActiveJob || prevActiveJob.id !== jobId) return prevActiveJob;
-      // Clear job for terminal non-completed states (declined, timeout, etc.)
       if (isTerminal) return null;
       return { ...prevActiveJob, status: newStatus };
     });
@@ -83,11 +79,6 @@ export const JobsProvider = ({ children }: { children: ReactNode }) => {
     setStatus(newStatus as JobStatus);
   }, []);
 
-  /**
-   * Dedicated COMPLETED handler: clears every piece of job state
-   * (active job, incoming offer/quote) and returns the rider to
-   * online-waiting so they can take a fresh job.
-   */
   const handleJobCompleted = useCallback(async (_jobId: string) => {
     setActiveJob(null);
     setIncomingJob(null);
@@ -98,12 +89,10 @@ export const JobsProvider = ({ children }: { children: ReactNode }) => {
       text2: "Great work! Looking for your next job…",
       visibilityTime: 4000,
     });
-    // Check if the backend already has a new job assigned (back-to-back jobs)
     await checkAndRestoreRef.current();
   }, []);
 
   const handleJobCancelled = useCallback((jobId: string) => {
-    // Updater functions must be pure — no setState or Toast calls inside them
     setActiveJob((prevActiveJob) => {
       if (prevActiveJob && prevActiveJob.id === jobId) return null;
       return prevActiveJob;
@@ -112,7 +101,6 @@ export const JobsProvider = ({ children }: { children: ReactNode }) => {
       if (prevIncomingJob && prevIncomingJob.id === jobId) return null;
       return prevIncomingJob;
     });
-    // Side effects go outside the updaters
     setStatus("online-waiting");
     Toast.show({
       type: "error",
@@ -140,9 +128,7 @@ export const JobsProvider = ({ children }: { children: ReactNode }) => {
 
   const handleConnectionStatusChange = useCallback(
     (status: ConnectionStatus) => {
-      // ...existing code...
       setConnectionStatus(status);
-
       if (status === "failed") {
         Toast.show({
           type: "error",
@@ -161,8 +147,6 @@ export const JobsProvider = ({ children }: { children: ReactNode }) => {
     [],
   );
 
-  // IMPORTANT: Initialize job events BEFORE location stream
-  // The location stream service needs the JobEventsService to be set first
   const handleForceLogout = useCallback(
     (reason?: string) => {
       Toast.show({
@@ -182,7 +166,6 @@ export const JobsProvider = ({ children }: { children: ReactNode }) => {
   );
 
   const handlePaymentConfirmed = useCallback((rideId: string) => {
-    // Legacy pre-ride upfront payment: customer paid before the trip started.
     Toast.show({
       type: "success",
       text1: "Payment Confirmed",
@@ -192,7 +175,6 @@ export const JobsProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const handleRidePaymentCompleted = useCallback((_rideId: string) => {
-    // Post-ride payment: customer paid after the ride completed — earnings credited.
     Toast.show({
       type: "success",
       text1: "Payment Received",
@@ -214,56 +196,54 @@ export const JobsProvider = ({ children }: { children: ReactNode }) => {
     onRidePaymentCompleted: handleRidePaymentCompleted,
   });
 
-  // Start location streaming when rider is online (after JobEventsService is set)
   const locationStreamStatus = useLocationStream({
     enabled: isOnline,
     role: user?.role ?? "RIDER",
   });
 
-  /**
-   * After going online OR completing/cancelling a job, check whether the backend
-   * already has an active job assigned to this rider and restore the UI to the
-   * correct step. This handles:
-   *  - App restart / crash recovery
-   *  - Admin-assigned jobs waiting before the rider went online
-   *  - Back-to-back jobs: after finishing one, pick up the next assigned one
-   */
   const checkAndRestoreActiveJob = useCallback(async () => {
     try {
       const job = await jobsService.getActiveJob();
-
       if (__DEV__ && job) console.log("Job found:", job);
-
-      if (!job || job.status === "online-waiting") return;
+      if (!job || job.status === "online-waiting") {
+        setIncomingJob(null);
+        return;
+      }
 
       if (job.status === "incoming-job") {
-        // Show the accept/decline screen for an unconfirmed assignment
         setIncomingJob(job as IncomingJobOffer);
         setStatus("incoming-job");
-        Toast.show({
-          type: "info",
-          text1: "Job Waiting",
-          text2: "You have a new job assignment",
-        });
       } else {
-        // Restore the active job at whatever step it was at
         setActiveJob(job as CurrentJob);
         setStatus(job.status as JobStatus);
-        // Re-join the socket room so we receive live status updates
         joinOrderRoom(job.id);
-        Toast.show({
-          type: "info",
-          text1: "Job Resumed",
-          text2: "Continuing your active job",
-        });
       }
     } catch {
-      // Silently fail — rider stays on the waiting screen
+      // Silently fail
     }
   }, [joinOrderRoom]);
 
-  // Keep the ref in sync so handleJobCompleted always has the latest version
   checkAndRestoreRef.current = checkAndRestoreActiveJob;
+
+  /**
+   * FIX: Listen for App State changes.
+   * When a user clicks a push notification, the app moves to 'active'.
+   * This ensures the job state is refreshed immediately.
+   */
+  useEffect(() => {
+    if (!isOnline) return;
+
+    const subscription = AppState.addEventListener(
+      "change",
+      (nextState: AppStateStatus) => {
+        if (nextState === "active") {
+          checkAndRestoreActiveJob();
+        }
+      },
+    );
+
+    return () => subscription.remove();
+  }, [isOnline, checkAndRestoreActiveJob]);
 
   const goOnline = async () => {
     setIsOnlineLoading(true);
@@ -273,8 +253,6 @@ export const JobsProvider = ({ children }: { children: ReactNode }) => {
       await jobsService.goOnline(coords);
       setIsOnline(true);
       setStatus("online-waiting");
-      // Check if a job was already assigned before going online
-      // (e.g. admin-dispatched, or app was restarted mid-job)
       await checkAndRestoreActiveJob();
     } catch (error) {
       Toast.show({ type: "error", text1: "Failed to go online" });
@@ -288,10 +266,7 @@ export const JobsProvider = ({ children }: { children: ReactNode }) => {
     try {
       const coords = await getCurrentCoords();
       if (!coords) throw new Error("Location unavailable");
-
-      if (activeJob) {
-        throw new Error("Complete active job first");
-      }
+      if (activeJob) throw new Error("Complete active job first");
       await jobsService.goOffline(coords);
       setIsOnline(false);
       setStatus("offline");
@@ -310,22 +285,16 @@ export const JobsProvider = ({ children }: { children: ReactNode }) => {
   const acceptJob = async (jobId: string, jobType: JobType) => {
     const previousJob = incomingJob;
     const previousStatus = status;
-
     try {
-      // Optimistic update
       setStatus("en-route-pickup");
       setActiveJob(incomingJob as CurrentJob);
       setIncomingJob(null);
-
       await jobsService.acceptJob(jobId, jobType);
-      // After successful accept, join the order/job room for granular updates
       joinOrderRoom(jobId);
     } catch (error: any) {
-      // Rollback on error
       setIncomingJob(previousJob);
       setStatus(previousStatus);
       setActiveJob(null);
-
       Toast.show({
         type: "error",
         text1: "Failed to accept job",
@@ -339,18 +308,13 @@ export const JobsProvider = ({ children }: { children: ReactNode }) => {
   const declineJob = async (jobId: string, jobType: JobType) => {
     const previousJob = incomingJob;
     const previousStatus = status;
-
     try {
-      // Optimistic update
       setIncomingJob(null);
       setStatus("online-waiting");
-
       await jobsService.declineJob(jobId, jobType);
     } catch (error: any) {
-      // Rollback on error
       setIncomingJob(previousJob);
       setStatus(previousStatus);
-
       Toast.show({
         type: "error",
         text1: "Failed to decline job",
@@ -364,13 +328,11 @@ export const JobsProvider = ({ children }: { children: ReactNode }) => {
   const cancelJob = async (jobId: string, jobType: JobType, reason: string) => {
     const previousStatus = status;
     const previousActiveJob = activeJob;
-
     try {
       setStatus("online-waiting");
       setActiveJob(null);
       setIncomingJob(null);
       await jobsService.cancelJob(jobId, jobType, reason);
-      // After cancelling, check if another job is already waiting
       await checkAndRestoreActiveJob();
     } catch (error: any) {
       setStatus(previousStatus);
@@ -387,9 +349,7 @@ export const JobsProvider = ({ children }: { children: ReactNode }) => {
 
   const arriveAtPickup = async () => {
     if (!activeJob) return;
-
     const previousStatus = status;
-
     try {
       setStatus("at-pickup");
       await jobsService.arriveAtPickup(activeJob.id, activeJob.jobType);
@@ -407,17 +367,13 @@ export const JobsProvider = ({ children }: { children: ReactNode }) => {
 
   const confirmPickup = async (otp?: string) => {
     if (!activeJob) return;
-
     const previousStatus = status;
-
     try {
       const result = await jobsService.confirmPickup(
         activeJob.id,
         activeJob.jobType,
         otp,
       );
-
-      // Multi-stop delivery: more stores to pick up from
       if (activeJob.jobType === "delivery" && result?.nextStop) {
         setActiveJob((prev) =>
           prev
@@ -429,18 +385,7 @@ export const JobsProvider = ({ children }: { children: ReactNode }) => {
             : null,
         );
         setStatus("en-route-pickup");
-        const stopNum = (result.nextStopIndex ?? 0) + 1;
-        const total = activeJob.stops?.length ?? stopNum;
-        Toast.show({
-          type: "info",
-          text1: `Head to stop ${stopNum} of ${total}`,
-          text2: result.nextStop.storeName ?? "Next store",
-          visibilityTime: 5000,
-          position: "top",
-          topOffset: 40,
-        });
       } else {
-        // Single-stop or all stops done → head to customer
         setStatus("en-route-dropoff");
       }
     } catch (error: any) {
@@ -457,9 +402,7 @@ export const JobsProvider = ({ children }: { children: ReactNode }) => {
 
   const arriveAtDropoff = async () => {
     if (!activeJob) return;
-
     const previousStatus = status;
-
     try {
       setStatus("confirm-job");
       await jobsService.arriveAtDropoff(activeJob.id, activeJob.jobType);
@@ -477,19 +420,14 @@ export const JobsProvider = ({ children }: { children: ReactNode }) => {
 
   const completeJob = async (payload?: any) => {
     if (!activeJob) return;
-
     const previousStatus = status;
     const previousActiveJob = activeJob;
-    const completedJobType = activeJob.jobType; // capture before clearing
-
+    const completedJobType = activeJob.jobType;
     try {
       setStatus("online-waiting");
       setActiveJob(null);
       await jobsService.completeJob(activeJob.id, activeJob.jobType, payload);
-      // After finishing, check immediately if another job is already assigned
       await checkAndRestoreActiveJob();
-
-      // For rides: driver should see that payment is awaited from the customer.
       if (completedJobType === "ride") {
         Toast.show({
           type: "info",
@@ -521,10 +459,7 @@ export const JobsProvider = ({ children }: { children: ReactNode }) => {
   const manualReconnect = () => {
     if (reconnect) {
       reconnect();
-      Toast.show({
-        type: "info",
-        text1: "Reconnecting...",
-      });
+      Toast.show({ type: "info", text1: "Reconnecting..." });
     }
   };
 
