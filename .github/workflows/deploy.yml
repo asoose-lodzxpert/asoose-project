@@ -31,7 +31,7 @@ jobs:
           context: .
           file: backend/Dockerfile
           push: false
-          tags: devenochphilip/asoose-backend:${{ github.sha }}
+          tags: asooselodzxpert/asoose-backend:${{ github.sha }}
 
       # 4. (Optional) Test Docker image
       # Uncomment and configure if needed
@@ -47,8 +47,8 @@ jobs:
           file: backend/Dockerfile
           push: true
           tags: |
-            devenochphilip/asoose-backend:latest
-            devenochphilip/asoose-backend:${{ github.sha }}
+            asooselodzxpert/asoose-backend:latest
+            asooselodzxpert/asoose-backend:${{ github.sha }}
 
       # 6. Save SHA as artifact for rollback
       - name: Save deployment SHA
