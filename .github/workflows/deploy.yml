@@ -58,3 +58,25 @@ jobs:
         with:
           name: last-successful-sha
           path: last_successful_sha.txt
+
+      # 6. Trigger Railway Deployment
+      - name: Trigger Railway Deployment
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          ENV_ID: ${{ secrets.ENV_ID }}
+          PROJECT_ID: ${{ secrets.PROJECT_ID }}
+          SERVICE_ID: ${{ secrets.SERVICE_ID }}
+        run: |
+          curl -X POST "https://backboard.railway.com/graphql/v2" \
+            -H "Authorization: Bearer $RAILWAY_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "query": "mutation environmentTriggersDeploy($input: EnvironmentTriggersDeployInput!) { environmentTriggersDeploy(input: $input) }",
+              "variables": {
+                "input": {
+                  "environmentId": "'"$ENV_ID"'",
+                  "projectId": "'"$PROJECT_ID"'",
+                  "serviceId": "'"$SERVICE_ID"'"
+                }
+              }
+            }'
