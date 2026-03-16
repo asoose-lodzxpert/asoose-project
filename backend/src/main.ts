@@ -29,7 +29,7 @@ async function bootstrap() {
 
   const isDevelopment = process.env.NODE_ENV !== 'production';
 
-  // Parse allowed origins once at startup
+  // Parse allowed origins once at startup (init)
   const allowedOrigins = (process.env.CORS_ORIGIN || '')
     .replace(/^["']|["']$/g, '')
     .split(',')
