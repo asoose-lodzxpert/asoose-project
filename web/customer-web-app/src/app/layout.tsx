@@ -3,6 +3,8 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { NotificationListener } from "@/app/main/components/NotificationListener";
 import { Providers } from "./providers";
+import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import JsonLd from "@/components/JsonLd";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -136,10 +138,13 @@ export default function RootLayout({
         {/* Sitewide structured data — injected once in the root layout */}
         <JsonLd data={websiteSchema} />
         <JsonLd data={organizationSchema} />
+
         <Providers>
           <NotificationListener />
           {children}
         </Providers>
+        <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );

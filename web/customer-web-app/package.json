@@ -19,6 +19,8 @@
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.89.0",
     "@tanstack/react-table": "^8.21.3",
+    "@vercel/analytics": "^2.0.1",
+    "@vercel/speed-insights": "^2.0.0",
     "bcryptjs": "^3.0.3",
     "cookies-next": "^6.1.1",
     "date-fns": "^4.1.0",
@@ -40,7 +42,6 @@
     "sweetalert2": "^11.26.10",
     "swr": "^2.3.8",
     "use-places-autocomplete": "^4.0.1",
-
     "zod": "^4.3.5",
     "zustand": "^5.0.9"
   },
@@ -57,7 +58,6 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/react-is": "^19",
-
     "autoprefixer": "^10.4.23",
     "eslint": "^9",
     "eslint-config-next": "15.5.4",

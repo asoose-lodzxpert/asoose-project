@@ -20,29 +20,29 @@ export function Providers({ children }: { children: React.ReactNode }) {
     >
       <SessionGuard>
         <ThemeProvider
-        attribute="class"
-        defaultTheme="system"
-        enableSystem
-        disableTransitionOnChange
-      >
-        {/* SocketProvider wraps the whole app so the socket connection survives
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          {/* SocketProvider wraps the whole app so the socket connection survives
             page unmounts (e.g. Paystack redirect) and only disconnects on logout. */}
-        <SocketProvider>
-          <GoogleMapsProvider>{children}</GoogleMapsProvider>
-        </SocketProvider>
-        <ToastContainer
-          position="top-right"
-          autoClose={3000}
-          hideProgressBar={true}
-          newestOnTop={false}
-          closeOnClick
-          rtl={false}
-          pauseOnFocusLoss
-          draggable
-          pauseOnHover
-          theme="colored"
-        />
-      </ThemeProvider>
+          <SocketProvider>
+            <GoogleMapsProvider>{children}</GoogleMapsProvider>
+          </SocketProvider>
+          <ToastContainer
+            position="top-right"
+            autoClose={3000}
+            hideProgressBar={true}
+            newestOnTop={false}
+            closeOnClick
+            rtl={false}
+            pauseOnFocusLoss
+            draggable
+            pauseOnHover
+            theme="colored"
+          />
+        </ThemeProvider>
       </SessionGuard>
     </SessionProvider>
   );
