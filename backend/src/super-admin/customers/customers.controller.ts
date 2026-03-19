@@ -86,6 +86,23 @@ export class CustomersController {
     return this.customersService.remove(id);
   }
 
+  @ApiOperation({ summary: 'Send a message to a single customer' })
+  @Post(':id/message')
+  @Roles(
+    UserRole.ADMIN,
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN_SUPPORT,
+    UserRole.ADMIN_MANAGER,
+  )
+  async sendMessage(
+    @Param('id') id: string,
+    @Body() body: { message: string },
+    @Req() req: any,
+  ) {
+    const adminId = req.user?.id || 'SYSTEM';
+    return this.customersService.sendMessage(id, body.message, adminId);
+  }
+
   @ApiOperation({ summary: 'Suspend or ban a customer (kill-switch)' })
   @Post(':id/kill-switch')
   @Roles(UserRole.SUPER_ADMIN)
