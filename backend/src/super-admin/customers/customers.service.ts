@@ -7,6 +7,7 @@ import {
 import { PrismaService } from '../../prisma/prisma.service'; // Changed to relative path for safety
 import { UserStatus, UserRole, Prisma, OrderStatus } from '@prisma/client';
 import { UserAccountNotificationsService } from 'src/users/notifications/user-account-notifications.service';
+import { ResendService } from 'src/mail/resend.service';
 
 @Injectable()
 export class CustomersService {
@@ -15,6 +16,7 @@ export class CustomersService {
   constructor(
     private prisma: PrismaService,
     private userNotificationsService: UserAccountNotificationsService,
+    private mailer: ResendService,
   ) {}
 
   async findAll(params: {
@@ -307,5 +309,31 @@ export class CustomersService {
     });
 
     return { success: true, message: `Customer has been ${action}ED.` };
+  }
+
+  async sendMessage(id: string, message: string, adminId: string) {
+    const customer = await this.prisma.user.findUnique({
+      where: { id: id },
+    });
+    if (!customer) throw new NotFoundException('Customer not found');
+
+    this.mailer.sendMail({
+      to: customer.email,
+      subject: 'Mail - hello@asoose.com',
+      text: message,
+    });
+
+    await this.prisma.activityLog.create({
+      data: {
+        userId: adminId,
+        action: `MESAGE_USER`,
+        target: id,
+        details: `Send a direct message to user`,
+        metadata: {
+          message,
+          actionType: 'DIRECT_MESSAGE',
+        },
+      },
+    });
   }
 }
