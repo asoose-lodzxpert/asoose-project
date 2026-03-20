@@ -21,6 +21,8 @@ export default function CustomerDetailPage({
   const [activeTab, setActiveTab] = useState<"Orders" | "Rides" | "Logs">(
     "Orders",
   );
+  // Guard against double-clicks / concurrent calls on the send-message action
+  const [isSendingMessage, setIsSendingMessage] = useState(false);
 
   // ===========================================================================
   //  ✅ SWR DATA FETCHING
@@ -113,16 +115,27 @@ export default function CustomerDetailPage({
   };
 
   const handleSendMessage = async () => {
+    // Prevent concurrent submissions (double-click, rapid re-render, etc.)
+    if (isSendingMessage) return;
+
     const result = await AppAlert.input("Send Message", "Type your message...");
     if (result.isConfirmed && result.value) {
+      setIsSendingMessage(true);
       try {
+        // retries: 0 — never auto-replay a POST mutation
         await fetcher(`/super-admin/customers/${customerId}/message`, {
           method: "POST",
           body: JSON.stringify({ message: result.value }),
+          retries: 0,
         });
         AppAlert.success("Message Sent!");
       } catch (err: any) {
-        AppAlert.error("Error", "Failed to send message");
+        AppAlert.error(
+          "Error",
+          err.message || "Failed to send message",
+        );
+      } finally {
+        setIsSendingMessage(false);
       }
     }
   };
@@ -147,6 +160,7 @@ export default function CustomerDetailPage({
         customer={customer}
         onToggleStatus={handleToggleStatus}
         onSendMessage={handleSendMessage}
+        isSendingMessage={isSendingMessage}
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

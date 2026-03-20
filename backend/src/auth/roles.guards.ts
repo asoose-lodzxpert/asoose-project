@@ -2,6 +2,7 @@ import {
   Injectable,
   CanActivate,
   ExecutionContext,
+  ForbiddenException,
   Logger,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
@@ -12,7 +13,7 @@ import { UserRole } from '../common/enums/user-role.enum';
 export class RolesGuard implements CanActivate {
   private readonly logger = new Logger(RolesGuard.name);
 
-  constructor(private reflector: Reflector) {}
+  constructor(private reflector: Reflector) { }
 
   canActivate(context: ExecutionContext): boolean {
     const requiredRoles = this.reflector.getAllAndOverride<UserRole[]>(
@@ -43,11 +44,17 @@ export class RolesGuard implements CanActivate {
     ];
 
     if (!validRoles.includes(user.role)) {
-      return false;
+      throw new ForbiddenException(`Role '${user.role}' is not a recognised role`);
     }
 
     const hasRole = requiredRoles.includes(user.role);
 
-    return hasRole;
+    if (!hasRole) {
+      throw new ForbiddenException(
+        `Role '${user.role}' does not have permission to access this resource`,
+      );
+    }
+
+    return true;
   }
 }
