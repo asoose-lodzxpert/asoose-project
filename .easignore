@@ -1,0 +1,44 @@
+# EAS Build ignore file for monorepo root
+# EAS uses this (like .gitignore) to determine what gets uploaded to build servers
+
+# Never upload node_modules — EAS installs them fresh on the build server
+node_modules/
+
+# Never upload other apps in the monorepo (each app uploads itself)
+apps/
+
+# Backend server code — not needed for mobile builds
+backend/
+
+# Web frontend — not needed for mobile builds
+web/
+
+# Shared packages source (EAS resolves these from the workspace)
+packages/
+
+# Logs and temporary files
+*.log
+*.tmp
+*.local
+
+# Editor / OS files
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Git internals
+.git/
+
+# Docker / infra configs
+docker-compose.yml
+public-read-policy.json
+
+# Research / planning docs
+*.txt
+*.md
+VENDOR_AVAILABILITY_PLAN.md
+RideScheduling_Research.txt
+
+# Migration scripts
+update-s3-urls.mjs
+scripts/
