@@ -12,6 +12,7 @@ import {
 } from '@nestjs/common';
 import { DeliveriesService } from './delivery.service';
 import { DeliveryFilterDto } from './dto/delivery-filter.dto';
+import { AdminCreateDeliveryDto } from './dto/create-delivery.dto';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { RolesGuard } from '../../auth/roles.guards';
 import { Roles } from '../../auth/roles.decorator';
@@ -26,13 +27,21 @@ import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 })
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class DeliveriesController {
-  constructor(private readonly deliveriesService: DeliveriesService) {}
+  constructor(private readonly deliveriesService: DeliveriesService) { }
 
   @ApiOperation({ summary: 'List all deliveries with filters' })
   @Get()
   @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN_MANAGER, UserRole.ADMIN_SUPPORT)
   findAll(@Query() query: DeliveryFilterDto) {
     return this.deliveriesService.findAll(query);
+  }
+
+  @ApiOperation({ summary: 'Create a delivery on behalf of a customer' })
+  @Post()
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN_MANAGER, UserRole.ADMIN_SUPPORT)
+  createAdminDelivery(@Body() dto: AdminCreateDeliveryDto, @Req() req: any) {
+    const adminId = req.user.id || req.user.sub;
+    return this.deliveriesService.createAdminDelivery(dto, adminId);
   }
 
   @ApiOperation({ summary: 'Get delivery details by ID' })

@@ -76,9 +76,8 @@ const DeliveryMap = ({ deliveries }: { deliveries: Delivery[] }) => (
           style={{ top: `${20 + i * 15}%`, left: `${10 + i * 18}%` }}
         >
           <div
-            className={`p-2 rounded-full border-2 border-white shadow-lg ${
-              d.status === "In Transit" ? "bg-blue-500" : "bg-yellow-500"
-            }`}
+            className={`p-2 rounded-full border-2 border-white shadow-lg ${d.status === "In Transit" ? "bg-blue-500" : "bg-yellow-500"
+              }`}
           >
             <Truck className="w-4 h-4 text-white" />
           </div>
@@ -297,7 +296,7 @@ export default function DeliveriesPage() {
         cell: ({ row }) => (
           <div className="flex items-center gap-2">
             {row.original.status === "Pending Pickup" ||
-            row.original.driver === "-" ? (
+              row.original.driver === "-" ? (
               <button
                 onClick={() => handleAssignRider(row.original.id)}
                 className="p-1.5 bg-yellow-500/10 text-yellow-500 border border-yellow-500/20 rounded hover:bg-yellow-500 hover:text-black transition-colors"
@@ -374,9 +373,9 @@ export default function DeliveriesPage() {
                 <Filter className="w-4 h-4" />
               </button>
 
-              <button className="flex items-center gap-2 px-4 py-2 bg-yellow-500 text-black font-bold rounded-lg text-sm hover:bg-yellow-400 transition-colors">
+              <Link href="/super-admin/deliveries/new" className="flex items-center gap-2 px-4 py-2 bg-yellow-500 text-black font-bold rounded-lg text-sm hover:bg-yellow-400 transition-colors">
                 <Package className="w-4 h-4" /> New Shipment
-              </button>
+              </Link>
             </div>
           </div>
 
@@ -487,11 +486,10 @@ export default function DeliveriesPage() {
                       </div>
                       <div className="flex items-center gap-2">
                         <span
-                          className={`px-2 py-1 rounded text-[10px] font-bold uppercase border ${
-                            allAssigned
+                          className={`px-2 py-1 rounded text-[10px] font-bold uppercase border ${allAssigned
                               ? "bg-green-500/10 text-green-400 border-green-500/20"
                               : "bg-yellow-500/10 text-yellow-500 border-yellow-500/20"
-                          }`}
+                            }`}
                         >
                           {allAssigned ? "Assigned" : "Unassigned"}
                         </span>
