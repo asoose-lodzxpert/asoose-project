@@ -11,6 +11,10 @@ import { NotificationsGateway } from '../../notifications/notifications.gateway'
 import { NotificationsService } from '../../notifications/notifications.service';
 import { AppLogger } from 'src/libs/logger/app-logger.service'; // ← added
 
+import { AdminCreateDeliveryDto } from './dto/create-delivery.dto';
+import { GeoService } from '../../matching/geo/geo.service';
+import { FareService } from '../../fare/fare.service';
+
 /** Delivery statuses that can never receive a new rider assignment */
 const TERMINAL_DELIVERY_STATUSES: DeliveryStatus[] = [
   DeliveryStatus.DELIVERED,
@@ -24,8 +28,122 @@ export class DeliveriesService {
     private ledgerService: TransactionLedgerService,
     private notificationsGateway: NotificationsGateway,
     private notificationsService: NotificationsService,
+    private geoService: GeoService,
+    private fareService: FareService,
     private readonly logger: AppLogger, // ← added
-  ) {}
+  ) { }
+
+  async createAdminDelivery(dto: AdminCreateDeliveryDto, adminId: string) {
+    this.logger.debug(`createAdminDelivery - By Admin: ${adminId}`);
+
+    return this.prisma.$transaction(async (tx) => {
+      // 1. Resolve Customer
+      let user;
+      if (dto.customerId) {
+        user = await tx.user.findUnique({ where: { id: dto.customerId } });
+        if (!user) throw new NotFoundException('Selected customer not found');
+      } else {
+        const queryPhone = dto.senderPhone || dto.recipientPhone;
+        const queryName = dto.senderName || dto.recipientName;
+        // Check if phone exists
+        user = await tx.user.findFirst({ where: { phone: queryPhone, role: 'CUSTOMER' } });
+        if (!user) {
+          // Create guest account
+          user = await tx.user.create({
+            data: {
+              name: queryName,
+              phone: queryPhone,
+              email: `guest-${Date.now()}@asoose.com`,
+              password: '', // Should be set to something safe or not usable
+              role: 'CUSTOMER',
+              status: 'ACTIVE',
+            },
+          });
+        }
+      }
+
+      // 2. Resolve Addresses
+      const pickupAddress = await tx.address.create({
+        data: {
+          userId: user.id,
+          label: 'Pickup Location',
+          street: dto.pickupLocation.address,
+          city: 'Unknown',
+          state: 'Unknown',
+          lat: dto.pickupLocation.lat,
+          lng: dto.pickupLocation.lng,
+        },
+      });
+
+      const dropoffAddress = await tx.address.create({
+        data: {
+          userId: user.id,
+          label: 'Dropoff Location',
+          street: dto.dropoffLocation.address,
+          city: 'Unknown',
+          state: 'Unknown',
+          lat: dto.dropoffLocation.lat,
+          lng: dto.dropoffLocation.lng,
+        },
+      });
+
+      // 3. Calc Distance & Fare
+      const distanceKm = this.geoService.calculateDistance(
+        pickupAddress.lat,
+        pickupAddress.lng,
+        dropoffAddress.lat,
+        dropoffAddress.lng,
+      );
+      const deliveryFee = await this.fareService.calcDeliveryFee(distanceKm);
+
+      // 4. Create Delivery
+      const delivery = await tx.delivery.create({
+        data: {
+          customerId: user.id,
+          pickupAddressId: pickupAddress.id,
+          dropoffAddressId: dropoffAddress.id,
+          status: DeliveryStatus.REQUESTED, // Directly set as requested so drivers can see it or admin can assign
+          deliveryFee: Math.round(deliveryFee),
+          distanceKm: Math.round(distanceKm * 10) / 10,
+          recipientName: dto.recipientName,
+          recipientPhone: dto.recipientPhone,
+          senderName: dto.senderName || user.name,
+          senderPhone: dto.senderPhone || user.phone,
+          packageDetails: dto.packageDetails,
+          weightKg: dto.weightKg || 1,
+          isFragile: dto.isFragile || false,
+          isPerishable: dto.isPerishable || false,
+          containsLiquid: dto.containsLiquid || false,
+          declaredValue: dto.declaredValue || 0,
+        },
+      });
+
+      // 5. Activity log
+      await tx.activityLog.create({
+        data: {
+          userId: adminId,
+          action: 'ADMIN_CREATED_DELIVERY',
+          target: delivery.id,
+          metadata: { fee: deliveryFee, distanceKm },
+        },
+      });
+
+      // Create a spoofed "completed payment" record so it shows up in findAll which filters by COMPLETED payments
+      await tx.payment.create({
+        data: {
+          userId: user.id,
+          deliveryId: delivery.id,
+          amount: deliveryFee,
+          method: 'CASH',
+          status: 'COMPLETED',
+          gateway: 'MANUAL',
+          reference: `ADM_DEL_${delivery.id}`,
+        },
+      });
+
+      return delivery;
+    });
+  }
 
   async findAll(params: DeliveryFilterDto) {
     this.logger.debug(`findAll deliveries - params: ${JSON.stringify(params)}`);
@@ -888,17 +1006,17 @@ export class DeliveriesService {
 
       sender: d.order
         ? {
-            name: d.order.store.name,
-            address: d.order.store.address || 'N/A',
-            phone: d.order.store.vendor?.phone || 'N/A',
-          }
+          name: d.order.store.name,
+          address: d.order.store.address || 'N/A',
+          phone: d.order.store.vendor?.phone || 'N/A',
+        }
         : {
-            name: d.customer.name,
-            address: d.pickupAddress
-              ? this.formatAddress(d.pickupAddress)
-              : 'N/A',
-            phone: d.customer.phone,
-          },
+          name: d.customer.name,
+          address: d.pickupAddress
+            ? this.formatAddress(d.pickupAddress)
+            : 'N/A',
+          phone: d.customer.phone,
+        },
 
       recipient: {
         name: d.recipientName,
@@ -912,13 +1030,13 @@ export class DeliveriesService {
       // ✅ FIX: Access rider fields directly
       courier: d.rider
         ? {
-            name: d.rider.name,
-            id: d.rider.id,
-            vehicle: d.rider.vehicle
-              ? `${d.rider.vehicle.color} ${d.rider.vehicle.model}`.trim()
-              : 'Not registered',
-            phone: d.rider.phone,
-          }
+          name: d.rider.name,
+          id: d.rider.id,
+          vehicle: d.rider.vehicle
+            ? `${d.rider.vehicle.color} ${d.rider.vehicle.model}`.trim()
+            : 'Not registered',
+          phone: d.rider.phone,
+        }
         : null,
 
       history: [

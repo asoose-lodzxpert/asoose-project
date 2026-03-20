@@ -1,0 +1,21 @@
+# EAS Build ignore file — rider-app
+# EAS uses .easignore (like .gitignore) to determine what NOT to upload to build servers.
+
+node_modules/
+.expo/
+dist/
+web-build/
+.DS_Store
+*.log
+*.local
+.env*.local
+
+# Plan / research documents
+README.md
+
+# TypeScript build cache
+*.tsbuildinfo
+
+# Generated native folders
+android/
+ios/

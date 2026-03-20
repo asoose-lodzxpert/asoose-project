@@ -7,6 +7,7 @@ import {
   Ban,
   ShieldAlert,
   Loader2,
+  Send,
 } from "lucide-react";
 import { CustomerProfile } from "../types";
 import Swal from "sweetalert2";
@@ -16,12 +17,15 @@ interface CustomerHeaderProps {
   customer: CustomerProfile;
   onToggleStatus: () => void;
   onSendMessage: () => void;
+  /** True while the send-message POST is in-flight — disables the button */
+  isSendingMessage?: boolean;
 }
 
 export const CustomerHeader: React.FC<CustomerHeaderProps> = ({
   customer,
   onToggleStatus,
   onSendMessage,
+  isSendingMessage = false,
 }) => {
   const [isProcessing, setIsProcessing] = React.useState(false);
 
@@ -180,11 +184,10 @@ export const CustomerHeader: React.FC<CustomerHeaderProps> = ({
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-bold text-white">{customer.name}</h1>
           <span
-            className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${
-              customer.status === "ACTIVE"
+            className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${customer.status === "ACTIVE"
                 ? "bg-green-500/20 text-green-500 border-green-500/20"
                 : "bg-red-500/20 text-red-500 border-red-500/20"
-            }`}
+              }`}
           >
             {customer.status}
           </span>
@@ -194,9 +197,15 @@ export const CustomerHeader: React.FC<CustomerHeaderProps> = ({
       <div className="flex gap-2">
         <button
           onClick={onSendMessage}
-          className="px-4 py-2 bg-[#1E293B] border border-gray-700 rounded-lg text-gray-300 hover:text-white hover:bg-gray-800 flex items-center gap-2 transition-colors text-sm font-medium"
+          disabled={isSendingMessage}
+          className="px-4 py-2 bg-[#1E293B] border border-gray-700 rounded-lg text-gray-300 hover:text-white hover:bg-gray-800 flex items-center gap-2 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          <MessageSquare className="w-4 h-4" /> Message
+          {isSendingMessage ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <Send className="w-4 h-4" />
+          )}
+          {isSendingMessage ? "Sending..." : "Message"}
         </button>
 
         {isBannedOrSuspended ? (
