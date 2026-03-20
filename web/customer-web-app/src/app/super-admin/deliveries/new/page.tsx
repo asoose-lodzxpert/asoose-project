@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
     ChevronLeft,
@@ -44,6 +44,39 @@ export default function CreateAdminDeliveryPage() {
     const [isFragile, setIsFragile] = useState(false);
     const [isPerishable, setIsPerishable] = useState(false);
     const [containsLiquid, setContainsLiquid] = useState(false);
+
+    // Fare state
+    const [fareEstimate, setFareEstimate] = useState<{ fare: number; distance: number; duration?: number } | null>(null);
+    const [isCalculatingFare, setIsCalculatingFare] = useState(false);
+
+    useEffect(() => {
+        if (pickup && dropoff) {
+            setIsCalculatingFare(true);
+            fetcher("/fare/delivery", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    pickuplat: String(pickup.lat),
+                    pickuplong: String(pickup.lng),
+                    dropofflat: String(dropoff.lat),
+                    dropofflong: String(dropoff.lng),
+                }),
+                retries: 0,
+            })
+                .then((res: any) => {
+                    setFareEstimate(res);
+                })
+                .catch((err) => {
+                    console.error("Failed to calc fare:", err);
+                    setFareEstimate(null);
+                })
+                .finally(() => {
+                    setIsCalculatingFare(false);
+                });
+        } else {
+            setFareEstimate(null);
+        }
+    }, [pickup, dropoff]);
 
     // Validate & Submit
     const handleCreateDelivery = async () => {
@@ -293,10 +326,28 @@ export default function CreateAdminDeliveryPage() {
                         </div>
                     </section>
 
+                    {/* Quote Summary */}
+                    {(isCalculatingFare || fareEstimate) && (
+                        <div className="bg-yellow-50 dark:bg-yellow-900/10 p-5 rounded-2xl border border-yellow-200 dark:border-yellow-900/50 mb-6 flex flex-col items-center justify-center text-center animate-in fade-in slide-in-from-bottom-2 duration-300">
+                            {isCalculatingFare ? (
+                                <div className="flex flex-col items-center gap-2 py-2">
+                                    <Loader2 className="w-6 h-6 animate-spin text-yellow-500" />
+                                    <p className="text-sm font-semibold text-yellow-700 dark:text-yellow-600">Calculating Delivery Fare...</p>
+                                </div>
+                            ) : fareEstimate ? (
+                                <div className="space-y-1">
+                                    <p className="text-xs font-bold text-yellow-600 dark:text-yellow-500 uppercase tracking-widest">Delivery Quote</p>
+                                    <div className="text-4xl font-black text-gray-900 dark:text-white">₦{fareEstimate.fare.toLocaleString()}</div>
+                                    <p className="text-sm font-medium text-gray-500">Distance: {fareEstimate.distance.toFixed(1)} km</p>
+                                </div>
+                            ) : null}
+                        </div>
+                    )}
+
                     {/* Submit Button */}
                     <button
                         onClick={handleCreateDelivery}
-                        disabled={isLoading}
+                        disabled={isLoading || isCalculatingFare}
                         className="w-full py-4 bg-yellow-500 hover:bg-yellow-600 disabled:opacity-50 text-black font-black rounded-2xl shadow-lg flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
                     >
                         {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Box className="w-5 h-5" />}
