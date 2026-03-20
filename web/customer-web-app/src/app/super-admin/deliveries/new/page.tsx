@@ -108,7 +108,7 @@ export default function CreateAdminDeliveryPage() {
     };
 
     return (
-        <div className="min-h-screen bg-white dark:bg-[#0a0a0a] text-zinc-900 dark:text-white transition-colors duration-500 pb-32">
+        <div className="min-h-screen transition-colors duration-500 pb-32">
             <main className="max-w-4xl mx-auto px-6 pt-10">
                 <header className="mb-10 flex items-center gap-4">
                     <button
