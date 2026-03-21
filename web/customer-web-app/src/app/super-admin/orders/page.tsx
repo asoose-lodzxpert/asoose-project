@@ -12,6 +12,7 @@ import {
   RotateCcw,
   Download,
   Layers, // Added icon for Group
+  AlertTriangle,
 } from "lucide-react";
 import Link from "next/link";
 import { format } from "date-fns";
@@ -165,6 +166,25 @@ export default function OrdersPage() {
         ),
       },
       {
+        accessorKey: "paymentStatus",
+        header: "Payment",
+        cell: ({ row }) => {
+          const status = row.original.paymentStatus;
+          const isCompleted = status === "COMPLETED" || status === "PAID";
+          return (
+            <span
+              className={`px-2 py-1 flex w-fit items-center rounded-full text-[9px] font-bold border uppercase ${isCompleted
+                  ? "text-emerald-500 bg-emerald-500/10 border-emerald-500/20"
+                  : "text-amber-500 bg-amber-500/10 border-amber-500/20"
+                }`}
+            >
+              {!isCompleted && <AlertTriangle className="w-2.5 h-2.5 mr-1" />}
+              {status || "UNPAID"}
+            </span>
+          );
+        },
+      },
+      {
         accessorKey: "placedAt",
         header: "Date",
         cell: ({ row }) => (
@@ -295,11 +315,18 @@ export default function OrdersPage() {
                     </span>
                   )}
                 </div>
-                <span
-                  className={`px-2 py-0.5 rounded-full text-[9px] font-bold border uppercase ${order.status === "PENDING" ? "text-amber-500 border-amber-500/20" : "text-emerald-500 border-emerald-500/20"}`}
-                >
-                  {order.status}
-                </span>
+                <div className="flex flex-col items-end gap-1">
+                  <span
+                    className={`px-2 py-0.5 rounded-full text-[9px] font-bold border uppercase ${order.status === "PENDING" ? "text-amber-500 border-amber-500/20" : "text-emerald-500 border-emerald-500/20"}`}
+                  >
+                    {order.status}
+                  </span>
+                  {order.paymentStatus !== "COMPLETED" && order.paymentStatus !== "PAID" && (
+                    <span className="text-[9px] bg-red-500/10 text-red-500 border border-red-500/20 px-1.5 py-0.5 rounded flex items-center gap-1 font-bold">
+                      <AlertTriangle className="w-2.5 h-2.5" /> UNPAID
+                    </span>
+                  )}
+                </div>
               </div>
               <div className="flex justify-between items-end">
                 <div>

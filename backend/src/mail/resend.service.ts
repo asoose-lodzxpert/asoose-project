@@ -29,7 +29,14 @@ export class ResendService implements OnModuleInit {
     this.from = `Asoose <${this.config.get<string>('EMAIL_FROM', 'hello@asoose.com')}>`;
     // Templates are in src/libs/mail/templates/ and copied to dist/libs/mail/templates/
     // __dirname resolves to dist/mail/ in production
-    this.templateDir = path.join(__dirname, '..', "..", 'libs', 'mail', 'templates');
+    this.templateDir = path.join(
+      __dirname,
+      '..',
+      '..',
+      'libs',
+      'mail',
+      'templates',
+    );
   }
 
   onModuleInit() {

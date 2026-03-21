@@ -12,4 +12,4 @@ import { FareModule } from '../../fare/fare.module';
   controllers: [DeliveriesController],
   providers: [DeliveriesService, PrismaService],
 })
-export class DeliveriesModule { }
+export class DeliveriesModule {}

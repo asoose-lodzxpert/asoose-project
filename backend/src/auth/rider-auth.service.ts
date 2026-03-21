@@ -20,6 +20,7 @@ import { OtpService } from './otp.service';
 import { EmailProducer } from '../mail/email.producer';
 import { TokenRevocationService } from './token-revocation.service';
 import { randomUUID } from 'crypto';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 
 @Injectable()
 export class RiderAuthService {
@@ -31,7 +32,8 @@ export class RiderAuthService {
     private otpService: OtpService,
     private emailProducer: EmailProducer,
     private tokenRevocation: TokenRevocationService,
-  ) {}
+    private eventEmitter: EventEmitter2,
+  ) { }
 
   private signRefreshToken(
     payload: Record<string, unknown>,
@@ -101,16 +103,16 @@ export class RiderAuthService {
         // Create bank account if provided
         ...(dto.bankName &&
           dto.accountNumber && {
-            bankAccount: {
-              create: {
-                bankName: dto.bankName,
-                bankCode: dto.bankCode || '000',
-                accountNumber: dto.accountNumber,
-                accountName: dto.accountName || dto.name,
-                currency: 'NGN',
-              },
+          bankAccount: {
+            create: {
+              bankName: dto.bankName,
+              bankCode: dto.bankCode || '000',
+              accountNumber: dto.accountNumber,
+              accountName: dto.accountName || dto.name,
+              currency: 'NGN',
             },
-          }),
+          },
+        }),
 
         // Create documents if provided
         ...(dto.driverLicense && {
@@ -123,21 +125,21 @@ export class RiderAuthService {
               },
               ...(dto.vehicleInsurance
                 ? [
-                    {
-                      type: 'VEHICLE_INSURANCE',
-                      url: dto.vehicleInsurance,
-                      status: 'PENDING' as const,
-                    },
-                  ]
+                  {
+                    type: 'VEHICLE_INSURANCE',
+                    url: dto.vehicleInsurance,
+                    status: 'PENDING' as const,
+                  },
+                ]
                 : []),
               ...(dto.vehicleRegistration
                 ? [
-                    {
-                      type: 'VEHICLE_REGISTRATION',
-                      url: dto.vehicleRegistration,
-                      status: 'PENDING' as const,
-                    },
-                  ]
+                  {
+                    type: 'VEHICLE_REGISTRATION',
+                    url: dto.vehicleRegistration,
+                    status: 'PENDING' as const,
+                  },
+                ]
                 : []),
             ],
           },
@@ -148,6 +150,21 @@ export class RiderAuthService {
 
     // Send welcome email
     await this.emailProducer.sendRiderWelcomeEmail(rider.email, rider.name);
+
+    // Audit Hook
+    this.eventEmitter.emit('system.action', {
+      action: 'RIDER_REGISTERED',
+      severity: 'NORMAL',
+      title: 'New Dispatcher Registration',
+      message: `${rider.name} (${rider.email}) registered as a ${dto.role.toLowerCase() || 'rider'}.`,
+      metadata: {
+        riderId: rider.id,
+        email: rider.email,
+        phone: rider.phone,
+        role: rider.role,
+        vehicleType: dto.vehicleType,
+      },
+    });
 
     return {
       rider: {

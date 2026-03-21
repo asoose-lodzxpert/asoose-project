@@ -16,7 +16,7 @@ import {
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
 export class NoticesController {
-  constructor(private readonly svc: NoticesService) {}
+  constructor(private readonly svc: NoticesService) { }
 
   /**
    * TEST – fire a push notification to every device on the platform.
@@ -29,6 +29,18 @@ export class NoticesController {
     @Query('message') message = 'This is a test broadcast from Admin.',
   ) {
     return this.svc.testBroadcastAll(title, message);
+  }
+
+  /**
+   * TEST – blast a push notification to all admins.
+   */
+  @ApiOperation({ summary: '[TEST] Broadcast push to all admins' })
+  @Post('broadcast/admin-test')
+  testAdminPush(
+    @Body('title') title = 'Admin Test Notification',
+    @Body('message') message = 'This is a test push notification to all admins.',
+  ) {
+    return this.svc.testAdminPush(title, message);
   }
 
   /**

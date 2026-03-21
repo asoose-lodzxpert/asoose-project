@@ -125,7 +125,10 @@ export class VerificationService {
           if (!isNaN(parsed)) resolvedCommissionRate = parsed;
         }
       } catch (err) {
-        this.logger.warn('Could not read global_commission setting, using default 10%', err);
+        this.logger.warn(
+          'Could not read global_commission setting, using default 10%',
+          err,
+        );
       }
       if (resolvedCommissionRate === undefined) resolvedCommissionRate = 10;
     }

@@ -123,12 +123,14 @@ export class PaymentController {
     @Query('reference') reference: string,
     @Res() res: Response,
   ) {
-    const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:3001').replace(/\/+$/, '');
+    const frontendUrl = (
+      process.env.FRONTEND_URL || 'http://localhost:3001'
+    ).replace(/\/+$/, '');
 
     if (!process.env.FRONTEND_URL) {
       this.logger.warn(
         'FRONTEND_URL is not set — post-payment redirects will use http://localhost:3001. ' +
-        'Set FRONTEND_URL to the production web app URL (e.g. https://www.asoose.com).',
+          'Set FRONTEND_URL to the production web app URL (e.g. https://www.asoose.com).',
       );
     }
 
@@ -161,7 +163,10 @@ export class PaymentController {
       // NEXT_PUBLIC_APP_URL or FRONTEND_URL must be set — but if either is
       // accidentally left as a dev default, this prevents the redirect from
       // going to an unreachable address.
-      if (/localhost|127\.0\.0\.1/i.test(callbackUrl) && !frontendUrl.includes('localhost')) {
+      if (
+        /localhost|127\.0\.0\.1/i.test(callbackUrl) &&
+        !frontendUrl.includes('localhost')
+      ) {
         callbackUrl = frontendUrl;
       }
 

@@ -21,6 +21,8 @@ import { VendorOrdersStreamService } from '../vendor/orders/vendor-orders-stream
 import { NotificationsGateway } from '../notifications/notifications.gateway';
 import { QueueService } from '../matching/queue/queue.service';
 import { isStoreCurrentlyOpen } from '../shared/vendor-availability.util';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+
 // ==================== CONSTANTS ====================
 
 const ORDER_STATUS = { PENDING: 'PENDING' } as const;
@@ -109,7 +111,8 @@ export class OrdersService {
     private queueService: QueueService, // Injected for Durable Handoff
     private fareService: FareService,
     @Inject('REDIS_CLIENT') private readonly redis: RedisClientType,
-  ) {}
+    private eventEmitter: EventEmitter2,
+  ) { }
 
   // ==================== PUBLIC METHODS ====================
 
@@ -551,6 +554,19 @@ export class OrdersService {
       // NOTE: Notifications are intentionally deferred to the payment webhook.
       // They fire only after payment is confirmed, not at order creation.
 
+      // Audit Hook
+      this.eventEmitter.emit('system.action', {
+        action: 'ORDER_PLACED',
+        severity: 'NORMAL',
+        title: 'New User Order',
+        message: `User (ID: ${userId}) placed a single-store order for ₦${order.total}.`,
+        metadata: {
+          orderId: order.id,
+          storeId: order.storeId,
+          total: order.total,
+        },
+      });
+
       return order;
     } catch (error) {
       await this.releaseIdempotencyLock(redisKey);
@@ -673,6 +689,19 @@ export class OrdersService {
 
       // NOTE: Notifications are intentionally deferred to the payment webhook.
       // They fire only after payment is confirmed, not at order creation.
+
+      // Audit Hook
+      this.eventEmitter.emit('system.action', {
+        action: 'MULTI_ORDER_PLACED',
+        severity: 'NORMAL',
+        title: 'New Multi-Store Order',
+        message: `User (ID: ${userId}) placed a multi-store order (${result.orders.length} stores) for ₦${result.group.totalAmount}.`,
+        metadata: {
+          orderGroupId: result.group.id,
+          totalAmount: result.group.totalAmount,
+          orderCount: result.orders.length,
+        },
+      });
 
       return responsePayload;
     } catch (error) {
@@ -925,9 +954,9 @@ export class OrdersService {
           })),
           addressDetails: order.delivery?.dropoffAddress
             ? {
-                address: order.delivery.dropoffAddress.street,
-                city: order.delivery.dropoffAddress.city,
-              }
+              address: order.delivery.dropoffAddress.street,
+              city: order.delivery.dropoffAddress.city,
+            }
             : null,
           store: {
             name: order.store?.name,
@@ -937,12 +966,12 @@ export class OrdersService {
           },
           payment: payment
             ? {
-                status: payment.status,
-                method: payment.method ?? payment.gateway,
-                amount: payment.amount,
-                paidAt: payment.paidAt,
-                reference: payment.reference,
-              }
+              status: payment.status,
+              method: payment.method ?? payment.gateway,
+              amount: payment.amount,
+              paidAt: payment.paidAt,
+              reference: payment.reference,
+            }
             : null,
           deliveryOtp: ['DELIVERED', 'CANCELLED'].includes(order.status)
             ? undefined
@@ -1008,29 +1037,29 @@ export class OrdersService {
         createdAt: group.createdAt,
         payment: group.payment
           ? {
-              status: group.payment.status,
-              method: group.payment.method ?? group.payment.gateway,
-              amount: group.payment.amount,
-              paidAt: group.payment.paidAt,
-              reference: group.payment.reference,
-            }
+            status: group.payment.status,
+            method: group.payment.method ?? group.payment.gateway,
+            amount: group.payment.amount,
+            paidAt: group.payment.paidAt,
+            reference: group.payment.reference,
+          }
           : null,
         deliveryOtp: ['DELIVERED', 'CANCELLED'].includes(groupStatus)
           ? undefined
           : (groupDelivery?.deliveryOtp ?? null),
         delivery: groupDelivery
           ? {
-              status: groupDelivery.status,
-              distanceKm: groupDelivery.distanceKm,
-              stops: groupDelivery.stops,
-              rider: this.formatRiderInfo(groupDelivery.rider),
-              address: groupDelivery.dropoffAddress
-                ? {
-                    address: groupDelivery.dropoffAddress.street,
-                    city: groupDelivery.dropoffAddress.city,
-                  }
-                : null,
-            }
+            status: groupDelivery.status,
+            distanceKm: groupDelivery.distanceKm,
+            stops: groupDelivery.stops,
+            rider: this.formatRiderInfo(groupDelivery.rider),
+            address: groupDelivery.dropoffAddress
+              ? {
+                address: groupDelivery.dropoffAddress.street,
+                city: groupDelivery.dropoffAddress.city,
+              }
+              : null,
+          }
           : null,
         orders: group.orders.map((o) => ({
           id: o.id,
@@ -1275,10 +1304,10 @@ export class OrdersService {
             modifiers:
               selectedModifierIds.length > 0
                 ? {
-                    create: selectedModifierIds.map((modifierId) => ({
-                      modifierId,
-                    })),
-                  }
+                  create: selectedModifierIds.map((modifierId) => ({
+                    modifierId,
+                  })),
+                }
                 : undefined,
           };
         });
@@ -1426,7 +1455,7 @@ export class OrdersService {
     if (dto.quoteToken) {
       await this.redis
         .del(`${QUOTE_LOCK_PREFIX}${userId}:${dto.quoteToken}`)
-        .catch(() => {}); // best-effort; don't fail the order if Redis blips
+        .catch(() => { }); // best-effort; don't fail the order if Redis blips
     }
 
     return {

@@ -24,6 +24,7 @@ import { TripsCommonService, TRIPS_CONFIG } from './trips.common.service';
 import { deliveryToJobSummary } from '../../riders/jobs/job.dto';
 import { AddressesService } from '../addresses.service';
 import { FareService } from '../../fare/fare.service';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 
 @Injectable()
 export class DeliveriesService {
@@ -38,6 +39,7 @@ export class DeliveriesService {
     private readonly notificationsGateway: NotificationsGateway,
     private readonly common: TripsCommonService,
     private readonly addressesService: AddressesService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   // ==================================================================
@@ -294,6 +296,20 @@ export class DeliveriesService {
         this.logger.log(
           `[requestDelivery] SUCCESS (total ${Date.now() - t0}ms)`,
         );
+
+        // Audit Hook
+        this.eventEmitter.emit('system.action', {
+          action: 'DELIVERY_REQUESTED',
+          severity: 'NORMAL',
+          title: 'New Delivery Requested',
+          message: `User (ID: ${userId}) requested a delivery to ${this.common.sanitizeText(dto.recipientName)}.`,
+          metadata: {
+            deliveryId: delivery.id,
+            distanceKm,
+            fee: deliveryFee,
+          },
+        });
+
         return {
           delivery,
           deliveryId: delivery.id,

@@ -9,6 +9,7 @@ interface OrderActionsPanelProps {
   currentStatus: string;
   onUpdate: () => void; // Function to refresh page data
   isSuperAdmin?: boolean;
+  isDisabled?: boolean;
 }
 
 export default function OrderActionsPanel({
@@ -16,6 +17,7 @@ export default function OrderActionsPanel({
   currentStatus,
   onUpdate,
   isSuperAdmin = false,
+  isDisabled = false,
 }: OrderActionsPanelProps) {
   const handleOverride = async (newStatus: string) => {
     // 1. Force the Admin to give a reason
@@ -79,34 +81,37 @@ export default function OrderActionsPanel({
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        {/* Force Cancel */}
-        {currentStatus !== "CANCELLED" && (
-          <button
-            onClick={() => handleOverride("CANCELLED")}
-            className="flex items-center justify-center gap-2 p-3 bg-red-500/10 border border-red-500/50 text-red-500 hover:bg-red-500 hover:text-white rounded-lg font-bold transition-all"
-          >
-            <XCircle className="w-4 h-4" /> Force Cancel Order
-          </button>
-        )}
+          {/* Force Cancel */}
+          {currentStatus !== "CANCELLED" && (
+            <button
+              onClick={() => handleOverride("CANCELLED")}
+              disabled={isDisabled}
+              className="flex items-center justify-center gap-2 p-3 bg-red-500/10 border border-red-500/50 text-red-500 hover:bg-red-500 hover:text-white rounded-lg font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <XCircle className="w-4 h-4" /> Force Cancel Order
+            </button>
+          )}
 
-        {/* Force Complete (e.g. Driver forgot to swipe) */}
-        {currentStatus !== "DELIVERED" && (
-          <button
-            onClick={() => handleOverride("DELIVERED")}
-            className="flex items-center justify-center gap-2 p-3 bg-green-500/10 border border-green-500/50 text-green-500 hover:bg-green-500 hover:text-white rounded-lg font-bold transition-all"
-          >
-            <CheckCircle className="w-4 h-4" /> Force Mark Delivered
-          </button>
-        )}
+          {/* Force Complete (e.g. Driver forgot to swipe) */}
+          {currentStatus !== "DELIVERED" && (
+            <button
+              onClick={() => handleOverride("DELIVERED")}
+              disabled={isDisabled}
+              className="flex items-center justify-center gap-2 p-3 bg-green-500/10 border border-green-500/50 text-green-500 hover:bg-green-500 hover:text-white rounded-lg font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <CheckCircle className="w-4 h-4" /> Force Mark Delivered
+            </button>
+          )}
 
-        {/* Reset to Pending (If it got stuck in processing) */}
-        <button
-          onClick={() => handleOverride("PENDING")}
-          className="flex items-center justify-center gap-2 p-3 bg-blue-500/10 border border-blue-500/50 text-blue-500 hover:bg-blue-500 hover:text-white rounded-lg font-bold transition-all"
-        >
-          <RefreshCcw className="w-4 h-4" /> Reset to Pending
-        </button>
-      </div>
+          {/* Reset to Pending (If it got stuck in processing) */}
+          <button
+            onClick={() => handleOverride("PENDING")}
+            disabled={isDisabled}
+            className="flex items-center justify-center gap-2 p-3 bg-blue-500/10 border border-blue-500/50 text-blue-500 hover:bg-blue-500 hover:text-white rounded-lg font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <RefreshCcw className="w-4 h-4" /> Reset to Pending
+          </button>
+        </div>
       )}
 
       <p className="text-xs text-gray-500 mt-3 text-center">

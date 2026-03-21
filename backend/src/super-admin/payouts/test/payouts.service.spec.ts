@@ -12,13 +12,11 @@ const mockPrisma = {
   vendorPayout: { findUnique: jest.fn(), update: jest.fn() },
   riderPayout: { findUnique: jest.fn(), update: jest.fn() },
   bankAccount: {
-    findUnique: jest
-      .fn()
-      .mockResolvedValue({
-        accountNumber: '0123456789',
-        bankCode: '058',
-        accountName: 'Test Vendor',
-      }),
+    findUnique: jest.fn().mockResolvedValue({
+      accountNumber: '0123456789',
+      bankCode: '058',
+      accountName: 'Test Vendor',
+    }),
   },
 };
 

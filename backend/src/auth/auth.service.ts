@@ -11,6 +11,7 @@ import {
 import { Prisma } from '@prisma/client';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
@@ -38,6 +39,7 @@ export class AuthService {
     private readonly otpService: OtpService,
     private readonly emailProducer: EmailProducer,
     private readonly tokenRevocation: TokenRevocationService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   /** Signs a refresh token embedding a unique JTI for individual revocation. */
@@ -175,6 +177,15 @@ export class AuthService {
       };
       const access_token = this.jwtService.sign(payload);
       const refresh_token = this.signRefreshToken(payload);
+
+      // Audit Hook
+      this.eventEmitter.emit('system.action', {
+        action: 'USER_REGISTERED',
+        severity: 'NORMAL',
+        title: 'New Customer Registered',
+        message: `${user.name} (${user.email}) just created a new customer account.`,
+        metadata: { userId: user.id, phone: user.phone },
+      });
 
       // Split name back for response
       const nameParts = user.name.split(' ');

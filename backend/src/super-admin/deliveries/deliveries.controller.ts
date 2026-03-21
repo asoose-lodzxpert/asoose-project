@@ -27,7 +27,7 @@ import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 })
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class DeliveriesController {
-  constructor(private readonly deliveriesService: DeliveriesService) { }
+  constructor(private readonly deliveriesService: DeliveriesService) {}
 
   @ApiOperation({ summary: 'List all deliveries with filters' })
   @Get()

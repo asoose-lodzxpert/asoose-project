@@ -1,8 +1,8 @@
-import { 
-  Injectable, 
-  Logger, 
-  ForbiddenException, 
-  BadRequestException 
+import {
+  Injectable,
+  Logger,
+  ForbiddenException,
+  BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RedisService } from '../../matching/redis/redis.service';
@@ -27,7 +27,13 @@ export class TripsCommonService {
   private readonly logger = new Logger(TripsCommonService.name);
 
   // Cache service zones for 5 minutes to avoid DB hits on every request
-  private serviceZonesCache: { zones: Array<{ name: string; coordinates: Array<{ lat: number; lng: number }> }>; expiresAt: number } | null = null;
+  private serviceZonesCache: {
+    zones: Array<{
+      name: string;
+      coordinates: Array<{ lat: number; lng: number }>;
+    }>;
+    expiresAt: number;
+  } | null = null;
   private readonly CACHE_TTL_MS = 5 * 60 * 1000;
 
   constructor(
@@ -79,7 +85,9 @@ export class TripsCommonService {
   /**
    * Load active service zones from DB with in-memory cache.
    */
-  private async getActiveServiceZones(): Promise<Array<{ name: string; coordinates: Array<{ lat: number; lng: number }> }>> {
+  private async getActiveServiceZones(): Promise<
+    Array<{ name: string; coordinates: Array<{ lat: number; lng: number }> }>
+  > {
     const now = Date.now();
     if (this.serviceZonesCache && now < this.serviceZonesCache.expiresAt) {
       return this.serviceZonesCache.zones;
@@ -95,8 +103,13 @@ export class TripsCommonService {
       coordinates: z.coordinates as Array<{ lat: number; lng: number }>,
     }));
 
-    this.serviceZonesCache = { zones: parsed, expiresAt: now + this.CACHE_TTL_MS };
-    this.logger.log(`Loaded ${parsed.length} active service zone(s): ${parsed.map(z => z.name).join(', ')}`);
+    this.serviceZonesCache = {
+      zones: parsed,
+      expiresAt: now + this.CACHE_TTL_MS,
+    };
+    this.logger.log(
+      `Loaded ${parsed.length} active service zone(s): ${parsed.map((z) => z.name).join(', ')}`,
+    );
     return parsed;
   }
 
@@ -104,14 +117,21 @@ export class TripsCommonService {
    * Ray-casting point-in-polygon test.
    * Returns true if (lat, lng) is inside the polygon defined by `vertices`.
    */
-  private isPointInPolygon(lat: number, lng: number, vertices: Array<{ lat: number; lng: number }>): boolean {
+  private isPointInPolygon(
+    lat: number,
+    lng: number,
+    vertices: Array<{ lat: number; lng: number }>,
+  ): boolean {
     let inside = false;
     for (let i = 0, j = vertices.length - 1; i < vertices.length; j = i++) {
-      const xi = vertices[i].lat, yi = vertices[i].lng;
-      const xj = vertices[j].lat, yj = vertices[j].lng;
+      const xi = vertices[i].lat,
+        yi = vertices[i].lng;
+      const xj = vertices[j].lat,
+        yj = vertices[j].lng;
 
-      const intersect = ((yi > lng) !== (yj > lng)) &&
-        (lat < (xj - xi) * (lng - yi) / (yj - yi) + xi);
+      const intersect =
+        yi > lng !== yj > lng &&
+        lat < ((xj - xi) * (lng - yi)) / (yj - yi) + xi;
       if (intersect) inside = !inside;
     }
     return inside;
@@ -131,7 +151,9 @@ export class TripsCommonService {
 
     // If no zones are configured, allow all valid coordinates (fail-open for new deployments)
     if (zones.length === 0) {
-      this.logger.warn('No active service zones configured — allowing all coordinates');
+      this.logger.warn(
+        'No active service zones configured — allowing all coordinates',
+      );
       return;
     }
 
@@ -143,28 +165,38 @@ export class TripsCommonService {
 
     this.logger.warn(
       `Geofence rejected: (${lat}, ${lng}) outside all ${zones.length} active zone(s)`,
-      { coordinate: { lat, lng }, zones: zones.map(z => z.name) },
+      { coordinate: { lat, lng }, zones: zones.map((z) => z.name) },
     );
     throw new BadRequestException(
-      `Location (${lat}, ${lng}) is outside our active service area. We currently serve: ${zones.map(z => z.name).join(', ')}.`,
+      `Location (${lat}, ${lng}) is outside our active service area. We currently serve: ${zones.map((z) => z.name).join(', ')}.`,
     );
   }
 
   // ✅ ADDED: Secure Location Resolver (Source of Truth)
-  async resolveSecureLocation(dto: LocationPayloadDto): Promise<{ lat: number, lng: number, address: string }> {
+  async resolveSecureLocation(
+    dto: LocationPayloadDto,
+  ): Promise<{ lat: number; lng: number; address: string }> {
     let resolved;
 
     if (dto.placeId) {
       // 1. Primary Source of Truth: Google Place ID
       resolved = await this.mapsService.geocodePlace(dto.placeId);
-      this.logger.debug(`Resolved placeId ${dto.placeId} to (${resolved.lat}, ${resolved.lng})`);
+      this.logger.debug(
+        `Resolved placeId ${dto.placeId} to (${resolved.lat}, ${resolved.lng})`,
+      );
     } else if (dto.lat && dto.lng) {
       // 2. Fallback: Snap raw GPS coordinates to trusted road network via Reverse Geocoding
-      this.logger.debug(`Resolving raw coordinates (${dto.lat}, ${dto.lng}) via reverse geocoding`);
+      this.logger.debug(
+        `Resolving raw coordinates (${dto.lat}, ${dto.lng}) via reverse geocoding`,
+      );
       resolved = await this.mapsService.reverseGeocode(dto.lat, dto.lng);
-      this.logger.debug(`Reverse geocoding snapped to (${resolved.lat}, ${resolved.lng})`);
+      this.logger.debug(
+        `Reverse geocoding snapped to (${resolved.lat}, ${resolved.lng})`,
+      );
     } else {
-      throw new BadRequestException('Invalid location payload. Provide placeId or coordinates.');
+      throw new BadRequestException(
+        'Invalid location payload. Provide placeId or coordinates.',
+      );
     }
 
     // 3. Security Check: Enforce boundaries before billing/dispatching
