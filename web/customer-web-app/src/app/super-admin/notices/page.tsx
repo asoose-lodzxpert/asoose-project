@@ -409,11 +409,10 @@ function MarketingEmailForm() {
                   key={type}
                   type="button"
                   onClick={() => toggleType(type)}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
-                    checked
+                  className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${checked
                       ? "bg-yellow-500 text-black border-yellow-500"
                       : "bg-transparent text-gray-400 border-gray-700 hover:border-gray-500"
-                  }`}
+                    }`}
                 >
                   {label}
                 </button>
@@ -480,6 +479,53 @@ function MarketingEmailForm() {
   );
 }
 
+// ─── Section 4: Test push to admins ──────────────────────────────────────────
+
+function TestAdminPushForm() {
+  const [loading, setLoading] = useState(false);
+
+  const handleTestAdminPush = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const confirmed = window.confirm(
+      "Send a test push notification to ALL admins?\n\nThis will trigger a push to all active SUPER_ADMIN and ADMIN devices.",
+    );
+    if (!confirmed) return;
+
+    setLoading(true);
+    try {
+      const res = await apiFetch(
+        "/super-admin/notices/broadcast/admin-test",
+        "POST",
+        {
+          title: "Test Admin Push",
+          message: "Hello from the Admin dashboard test button!",
+        },
+      );
+      toast.success(`Test sent! Reached ${res.sent} admin device(s).`);
+    } catch (err: any) {
+      toast.error(err.message ?? "Failed to send test push");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Card title="Test Push to Admins" icon={Send}>
+      <form onSubmit={handleTestAdminPush} className="space-y-4">
+        <p className="text-gray-400 text-sm">
+          Clicking this button will dispatch a simple test push notification to all platform administrators instantly. Use this to verify that the push notification service is working perfectly for admins.
+        </p>
+        <div className="flex justify-start pt-2">
+          <SubmitButton loading={loading}>
+            <Send className="w-4 h-4" />
+            Notify All Admins
+          </SubmitButton>
+        </div>
+      </form>
+    </Card>
+  );
+}
+
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export default function NoticesPage() {
@@ -503,6 +549,9 @@ export default function NoticesPage() {
 
       {/* Broadcast */}
       <BroadcastForm />
+
+      {/* Admin Test Push */}
+      <TestAdminPushForm />
 
       {/* Marketing email */}
       <MarketingEmailForm />

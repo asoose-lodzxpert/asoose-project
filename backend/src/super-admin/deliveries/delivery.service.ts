@@ -31,7 +31,7 @@ export class DeliveriesService {
     private geoService: GeoService,
     private fareService: FareService,
     private readonly logger: AppLogger, // ← added
-  ) { }
+  ) {}
 
   async createAdminDelivery(dto: AdminCreateDeliveryDto, adminId: string) {
     this.logger.debug(`createAdminDelivery - By Admin: ${adminId}`);
@@ -46,7 +46,9 @@ export class DeliveriesService {
         const queryPhone = dto.senderPhone || dto.recipientPhone;
         const queryName = dto.senderName || dto.recipientName;
         // Check if phone exists
-        user = await tx.user.findFirst({ where: { phone: queryPhone, role: 'CUSTOMER' } });
+        user = await tx.user.findFirst({
+          where: { phone: queryPhone, role: 'CUSTOMER' },
+        });
         if (!user) {
           // Create guest account
           user = await tx.user.create({
@@ -1006,17 +1008,17 @@ export class DeliveriesService {
 
       sender: d.order
         ? {
-          name: d.order.store.name,
-          address: d.order.store.address || 'N/A',
-          phone: d.order.store.vendor?.phone || 'N/A',
-        }
+            name: d.order.store.name,
+            address: d.order.store.address || 'N/A',
+            phone: d.order.store.vendor?.phone || 'N/A',
+          }
         : {
-          name: d.customer.name,
-          address: d.pickupAddress
-            ? this.formatAddress(d.pickupAddress)
-            : 'N/A',
-          phone: d.customer.phone,
-        },
+            name: d.customer.name,
+            address: d.pickupAddress
+              ? this.formatAddress(d.pickupAddress)
+              : 'N/A',
+            phone: d.customer.phone,
+          },
 
       recipient: {
         name: d.recipientName,
@@ -1030,13 +1032,13 @@ export class DeliveriesService {
       // ✅ FIX: Access rider fields directly
       courier: d.rider
         ? {
-          name: d.rider.name,
-          id: d.rider.id,
-          vehicle: d.rider.vehicle
-            ? `${d.rider.vehicle.color} ${d.rider.vehicle.model}`.trim()
-            : 'Not registered',
-          phone: d.rider.phone,
-        }
+            name: d.rider.name,
+            id: d.rider.id,
+            vehicle: d.rider.vehicle
+              ? `${d.rider.vehicle.color} ${d.rider.vehicle.model}`.trim()
+              : 'Not registered',
+            phone: d.rider.phone,
+          }
         : null,
 
       history: [

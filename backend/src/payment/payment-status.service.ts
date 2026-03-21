@@ -11,6 +11,7 @@ import { PaymentStatus, OrderStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { NotificationsGateway } from '../notifications/notifications.gateway';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { TripsService } from '../users/trips/trips.service';
 import { TransactionLedgerService } from '../super-admin/transactions/transaction-ledger.service';
 import { PaymentGateway } from './interfaces/payment.interface';
@@ -33,7 +34,8 @@ export class PaymentStatusService {
     @Optional()
     @Inject(forwardRef(() => TripsService))
     private readonly tripsService?: TripsService,
-  ) {}
+    private readonly eventEmitter?: EventEmitter2,
+  ) { }
 
   // =================================================================
   //  GATEWAY STATUS TRANSLATION
@@ -402,6 +404,25 @@ export class PaymentStatusService {
     // =========================================================
     // 👇 MATCHING & NOTIFICATION LOGIC — only runs on confirmed payment
     // =========================================================
+    const meta = payment.metadata as any;
+    const metaType = meta?.type?.toUpperCase?.();
+
+    // Audit Hook
+    if (this.eventEmitter) {
+      this.eventEmitter.emit('system.action', {
+        action: 'PAYMENT_PROCESSED',
+        severity: finalStatus === PaymentStatus.FAILED ? 'CRITICAL' : 'NORMAL',
+        title: `Payment ${finalStatus === PaymentStatus.COMPLETED ? 'Completed' : 'Failed'}`,
+        message: `Payment of ₦${verification.amount} for ${metaType || 'Unknown'} was ${finalStatus.toLowerCase()}.`,
+        metadata: {
+          reference: verification.reference,
+          amount: verification.amount,
+          status: finalStatus,
+          type: metaType,
+        },
+      });
+    }
+
     if (finalStatus !== PaymentStatus.COMPLETED) {
       this.logger.log(
         `Payment ${verification.reference} status is ${finalStatus} — skipping notifications and matching`,
@@ -409,8 +430,6 @@ export class PaymentStatusService {
       return;
     }
 
-    const meta = payment.metadata as any;
-    const metaType = meta?.type?.toUpperCase?.();
     if (metaType) {
       if (metaType === 'RIDE') {
         if (meta.rideId) {

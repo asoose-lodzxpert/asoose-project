@@ -64,7 +64,7 @@ export class NoticesService {
     private readonly emailProducer: EmailProducer,
     private readonly fcm: FcmService,
     private readonly expo: ExpoPushService,
-  ) {}
+  ) { }
 
   // ─────────────────────────────────────────────────────────────────────────
   // TEST – blast a push to everyone
@@ -105,6 +105,25 @@ export class NoticesService {
       sent += await this._sendPush(v.fcmToken, v.expoPushToken, title, message);
     }
 
+    return { sent, title, message };
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // TEST - Blast a push to all admins
+  // ─────────────────────────────────────────────────────────────────────────
+  async testAdminPush(title: string, message: string) {
+    let sent = 0;
+    const admins = await this.prisma.user.findMany({
+      where: {
+        role: { in: ['SUPER_ADMIN', 'ADMIN'] as any[] },
+        OR: [{ fcmToken: { not: null } }, { expoPushToken: { not: null } }],
+      },
+      select: { fcmToken: true, expoPushToken: true },
+    });
+
+    for (const a of admins) {
+      sent += await this._sendPush(a.fcmToken, a.expoPushToken, title, message);
+    }
     return { sent, title, message };
   }
 

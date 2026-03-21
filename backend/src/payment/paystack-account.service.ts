@@ -398,9 +398,7 @@ export class PaystackAccountService {
    * Fetches a Paystack customer by code or email, returning their DVA details.
    * Useful for reconciling account numbers received via webhook.
    */
-  async fetchCustomerByCode(
-    customerCode: string,
-  ): Promise<{
+  async fetchCustomerByCode(customerCode: string): Promise<{
     customerCode: string;
     email: string;
     dedicatedAccount?: any;

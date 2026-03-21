@@ -335,5 +335,7 @@ export class CustomersService {
         },
       },
     });
+
+    return { success: true, message: `Message sent successfully.` };
   }
 }

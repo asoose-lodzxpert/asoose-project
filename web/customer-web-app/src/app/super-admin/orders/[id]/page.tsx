@@ -112,24 +112,21 @@ const OrderStepper = ({ status }: { status: string }) => {
           >
             {i !== 0 && (
               <div
-                className={`absolute top-3 -left-1/2 w-full h-1 transition-colors duration-500 ${
-                  i <= activeIndex ? "bg-green-500" : "bg-gray-700"
-                }`}
+                className={`absolute top-3 -left-1/2 w-full h-1 transition-colors duration-500 ${i <= activeIndex ? "bg-green-500" : "bg-gray-700"
+                  }`}
               />
             )}
             <div
-              className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all bg-slate-900 ${
-                i <= activeIndex
+              className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all bg-slate-900 ${i <= activeIndex
                   ? "bg-green-500 border-green-500 text-slate-900"
                   : "border-gray-600 text-gray-500"
-              }`}
+                }`}
             >
               {i < activeIndex ? <Check className="w-4 h-4" /> : i + 1}
             </div>
             <span
-              className={`text-[10px] uppercase mt-3 font-bold transition-colors ${
-                i <= activeIndex ? "text-white" : "text-gray-500"
-              }`}
+              className={`text-[10px] uppercase mt-3 font-bold transition-colors ${i <= activeIndex ? "text-white" : "text-gray-500"
+                }`}
             >
               {step.replace("_", " ")}
             </span>
@@ -181,6 +178,20 @@ export default function OrderDetailsPage() {
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto p-4 md:p-6 pb-20 print:p-0 print:bg-white overflow-hidden">
+      {/* Payment Not Completed Alert */}
+      {order.payment?.status !== "PAID" && order.payment?.status !== "COMPLETED" && (
+        <div className="bg-amber-500/10 border border-amber-500/50 p-4 rounded-xl flex items-start gap-4 text-amber-500 shadow-md mb-6">
+          <AlertTriangle className="w-6 h-6 flex-shrink-0" />
+          <div className="flex-1 w-full">
+            <h3 className="font-bold uppercase text-sm">Payment Not Completed</h3>
+            <p className="text-sm opacity-90 break-words">
+              This order has an outstanding payment status ({order.payment?.status || "UNPAID"}).
+              Administrative actions on this order are restricted until payment is confirmed.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Sticky Header */}
       <div className="flex flex-col md:flex-row justify-between items-start gap-4 print:hidden sticky top-0 z-20 bg-[#0F172A]/95 backdrop-blur-md py-4 border-b border-gray-800 -mx-4 px-4 md:-mx-6 md:px-6 shadow-xl">
         <div className="w-full md:w-auto">
@@ -464,7 +475,8 @@ export default function OrderDetailsPage() {
                   {order.deliveryId ? (
                     <button
                       onClick={() => setShowAssignModal(true)}
-                      className="w-full py-2 bg-yellow-500 text-slate-900 text-[10px] font-bold rounded-lg uppercase tracking-wider hover:bg-yellow-400 transition-all"
+                      disabled={order.payment?.status !== "PAID" && order.payment?.status !== "COMPLETED"}
+                      className="w-full py-2 bg-yellow-500 text-slate-900 text-[10px] font-bold rounded-lg uppercase tracking-wider hover:bg-yellow-400 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       Assign Rider
                     </button>
@@ -489,13 +501,12 @@ export default function OrderDetailsPage() {
                   Status
                 </span>
                 <span
-                  className={`px-2.5 py-1 rounded text-[10px] font-bold uppercase border ${
-                    order.payment?.status === "PAID" ||
-                    order.payment?.status === "COMPLETED" ||
-                    order.payment?.status === "PARTIALLY_REFUNDED"
+                  className={`px-2.5 py-1 rounded text-[10px] font-bold uppercase border ${order.payment?.status === "PAID" ||
+                      order.payment?.status === "COMPLETED" ||
+                      order.payment?.status === "PARTIALLY_REFUNDED"
                       ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
                       : "bg-red-500/10 text-red-500 border-red-500/20"
-                  }`}
+                    }`}
                 >
                   {order.payment?.status || "UNPAID"}
                 </span>
@@ -525,6 +536,7 @@ export default function OrderDetailsPage() {
             currentStatus={order.status}
             onUpdate={() => mutate()}
             isSuperAdmin={isSuperAdmin}
+            isDisabled={order.payment?.status !== "PAID" && order.payment?.status !== "COMPLETED"}
           />
         </div>
       </div>

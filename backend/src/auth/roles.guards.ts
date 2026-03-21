@@ -13,7 +13,7 @@ import { UserRole } from '../common/enums/user-role.enum';
 export class RolesGuard implements CanActivate {
   private readonly logger = new Logger(RolesGuard.name);
 
-  constructor(private reflector: Reflector) { }
+  constructor(private reflector: Reflector) {}
 
   canActivate(context: ExecutionContext): boolean {
     const requiredRoles = this.reflector.getAllAndOverride<UserRole[]>(
@@ -44,7 +44,9 @@ export class RolesGuard implements CanActivate {
     ];
 
     if (!validRoles.includes(user.role)) {
-      throw new ForbiddenException(`Role '${user.role}' is not a recognised role`);
+      throw new ForbiddenException(
+        `Role '${user.role}' is not a recognised role`,
+      );
     }
 
     const hasRole = requiredRoles.includes(user.role);

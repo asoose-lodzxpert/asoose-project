@@ -37,6 +37,7 @@ import {
   PaymentMethod as GatewayPaymentMethod,
   PaymentType,
 } from '../../payment/interfaces/payment.interface';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 
 @Injectable()
 export class RidesService {
@@ -51,7 +52,8 @@ export class RidesService {
     private readonly common: TripsCommonService,
     private readonly driverStateService: DriverStateService,
     private readonly paymentInitService: PaymentInitService,
-  ) {}
+    private readonly eventEmitter: EventEmitter2,
+  ) { }
 
   // ========================================
   // CORE RIDE FLOW
@@ -342,6 +344,22 @@ export class RidesService {
             err,
           );
         });
+
+        // Audit Hook
+        this.eventEmitter.emit('system.action', {
+          action: 'RIDE_REQUESTED',
+          severity: 'NORMAL',
+          title: 'New Ride Requested',
+          message: `User (ID: ${userId}) requested a ${dto.vehicleType} ride for ${result.ride.distanceKm}km.`,
+          metadata: {
+            rideId: result.ride.id,
+            distanceKm: result.ride.distanceKm,
+            durationMin: result.ride.durationMin,
+            fare: result.fare,
+            vehicleType: dto.vehicleType,
+          },
+        });
+
         return result;
       });
   }
@@ -796,8 +814,24 @@ export class RidesService {
         startedAt: true,
         completedAt: true,
         cancellationReason: true,
-        pickupAddress: { select: { street: true, city: true, state: true, lat: true, lng: true } },
-        dropoffAddress: { select: { street: true, city: true, state: true, lat: true, lng: true } },
+        pickupAddress: {
+          select: {
+            street: true,
+            city: true,
+            state: true,
+            lat: true,
+            lng: true,
+          },
+        },
+        dropoffAddress: {
+          select: {
+            street: true,
+            city: true,
+            state: true,
+            lat: true,
+            lng: true,
+          },
+        },
         rider: {
           select: {
             id: true,
@@ -805,7 +839,14 @@ export class RidesService {
             phone: true,
             image: true,
             rating: true,
-            vehicle: { select: { brand: true, model: true, plateNumber: true, color: true } },
+            vehicle: {
+              select: {
+                brand: true,
+                model: true,
+                plateNumber: true,
+                color: true,
+              },
+            },
           },
         },
         payment: { select: { status: true, method: true } },
@@ -866,9 +907,7 @@ export class RidesService {
     let distanceKm: number | null = null;
 
     const destination =
-      ride.status === 'IN_PROGRESS'
-        ? ride.dropoffAddress
-        : ride.pickupAddress;
+      ride.status === 'IN_PROGRESS' ? ride.dropoffAddress : ride.pickupAddress;
 
     if (destination?.lat && destination?.lng && latitude && longitude) {
       const km = this.geo.calculateDistance(

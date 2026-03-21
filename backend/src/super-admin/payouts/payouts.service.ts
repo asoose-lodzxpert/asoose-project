@@ -167,7 +167,13 @@ export class PayoutsService {
       }
 
       // 4. Record PAYOUT_APPROVED event in the ledger (same tx — fully atomic)
-      await this.ledger.recordPayoutApproved(payoutId, type, p.amount, adminId, tx);
+      await this.ledger.recordPayoutApproved(
+        payoutId,
+        type,
+        p.amount,
+        adminId,
+        tx,
+      );
 
       return { payout: p, bankDetails };
     });
@@ -214,7 +220,12 @@ export class PayoutsService {
       this.logger.error(`Transfer Failed for ${payoutId}`, error);
       // DO NOT auto-revert to PENDING. Leave as APPROVED for manual review.
       // Record a PAYOUT_GATEWAY_ERROR ledger entry so auditors can see the failure event.
-      await this.ledger.recordGatewayError(payoutId, type, adminId, error?.message ?? 'Unknown gateway error');
+      await this.ledger.recordGatewayError(
+        payoutId,
+        type,
+        adminId,
+        error?.message ?? 'Unknown gateway error',
+      );
       throw new BadRequestException('Payment Gateway Error. Check logs.');
     }
 

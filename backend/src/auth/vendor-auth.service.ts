@@ -23,6 +23,7 @@ import {
 } from './password-hash.util';
 import { TokenRevocationService } from './token-revocation.service';
 import { randomUUID } from 'crypto';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 
 @Injectable()
 export class VendorAuthService {
@@ -36,7 +37,8 @@ export class VendorAuthService {
     private readonly emailProducer: EmailProducer,
     private readonly appLogger: AppLogger,
     private readonly tokenRevocation: TokenRevocationService,
-  ) {}
+    private readonly eventEmitter: EventEmitter2,
+  ) { }
 
   private signRefreshToken(
     payload: Record<string, unknown>,
@@ -275,6 +277,20 @@ export class VendorAuthService {
         );
       }
     }
+
+    // Audit Hook
+    this.eventEmitter.emit('system.action', {
+      action: 'VENDOR_REGISTERED',
+      severity: 'NORMAL',
+      title: 'New Vendor Registration',
+      message: `Vendor ${vendor.name} (${vendor.email}) has registered a new store.`,
+      metadata: {
+        vendorId: vendor.id,
+        email: vendor.email,
+        storeName: vendor.store?.name,
+        businessType: vendor.businessType,
+      },
+    });
 
     return vendor;
   }
