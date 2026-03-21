@@ -119,13 +119,14 @@ function OrderCard({
     ["PENDING", "CONFIRMED", "PREPARING"].includes(order.status) &&
     Date.now() - new Date(order.createdAt).getTime() > 45 * 60000;
 
+  const isPaymentCompleted = order.paymentStatus === "COMPLETED" || order.paymentStatus === "PAID";
+
   return (
     <div
-      className={`bg-[#1E293B] border rounded-2xl overflow-hidden transition-all ${
-        isLate
+      className={`bg-[#1E293B] border rounded-2xl overflow-hidden transition-all ${isLate
           ? "border-orange-500/50 shadow-orange-500/10 shadow-lg"
           : "border-gray-800"
-      }`}
+        }`}
     >
       {/* Header */}
       <div className="p-4 border-b border-gray-800 flex items-start justify-between gap-3">
@@ -165,6 +166,11 @@ function OrderCard({
           {isLate && (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-500/10 text-orange-400 border border-orange-500/30">
               <AlertTriangle className="w-3 h-3" /> Late
+            </span>
+          )}
+          {!isPaymentCompleted && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-500/10 text-red-500 border border-red-500/30">
+              <AlertTriangle className="w-3 h-3" /> UNPAID
             </span>
           )}
         </div>
@@ -208,79 +214,87 @@ function OrderCard({
         </div>
 
         {/* Action buttons */}
-        <div className="flex gap-2 shrink-0">
-          {order.status === "PENDING" && (
-            <>
+        <div className="flex flex-col gap-2 shrink-0 items-end">
+          {!isPaymentCompleted && !["DELIVERED", "CANCELLED", "REJECTED"].includes(order.status) && (
+            <div className="bg-amber-500/10 border border-amber-500/50 px-2 py-1.5 rounded-lg flex items-center gap-1.5 text-amber-500 text-[10px] w-full max-w-[180px]">
+              <AlertTriangle className="w-3 h-3 flex-shrink-0" />
+              <span className="font-bold">Payment pending.</span>
+            </div>
+          )}
+          <div className="flex gap-2">
+            {order.status === "PENDING" && (
+              <>
+                <button
+                  onClick={() => onDecline(order.id)}
+                  disabled={isLoading || !isPaymentCompleted}
+                  className="px-3 py-1.5 text-xs font-bold rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500 hover:text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isLoading ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    "Decline"
+                  )}
+                </button>
+                <button
+                  onClick={() => onAccept(order.id)}
+                  disabled={isLoading || !isPaymentCompleted}
+                  className="px-3 py-1.5 text-xs font-bold rounded-lg bg-green-500 text-white hover:bg-green-400 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isLoading ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    "Accept"
+                  )}
+                </button>
+              </>
+            )}
+
+            {order.status === "CONFIRMED" && (
               <button
-                onClick={() => onDecline(order.id)}
-                disabled={isLoading}
-                className="px-3 py-1.5 text-xs font-bold rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500 hover:text-white transition-all disabled:opacity-50"
+                onClick={() => onPreparing(order.id)}
+                disabled={isLoading || !isPaymentCompleted}
+                className="px-3 py-1.5 text-xs font-bold rounded-lg bg-purple-500/10 border border-purple-500/30 text-purple-400 hover:bg-purple-500 hover:text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isLoading ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
                 ) : (
-                  "Decline"
+                  <>
+                    <ChefHat className="w-3.5 h-3.5 inline mr-1" />
+                    Start Preparing
+                  </>
                 )}
               </button>
+            )}
+
+            {(order.status === "PREPARING" || order.status === "CONFIRMED") && (
               <button
-                onClick={() => onAccept(order.id)}
-                disabled={isLoading}
-                className="px-3 py-1.5 text-xs font-bold rounded-lg bg-green-500 text-white hover:bg-green-400 transition-all disabled:opacity-50"
+                onClick={() => onReady(order.id)}
+                disabled={isLoading || !isPaymentCompleted}
+                className="px-3 py-1.5 text-xs font-bold rounded-lg bg-green-500/10 border border-green-500/30 text-green-400 hover:bg-green-500 hover:text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isLoading ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
                 ) : (
-                  "Accept"
+                  <>
+                    <BadgeCheck className="w-3.5 h-3.5 inline mr-1" />
+                    Mark Ready
+                  </>
                 )}
               </button>
-            </>
-          )}
+            )}
 
-          {order.status === "CONFIRMED" && (
-            <button
-              onClick={() => onPreparing(order.id)}
-              disabled={isLoading}
-              className="px-3 py-1.5 text-xs font-bold rounded-lg bg-purple-500/10 border border-purple-500/30 text-purple-400 hover:bg-purple-500 hover:text-white transition-all disabled:opacity-50"
-            >
-              {isLoading ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              ) : (
-                <>
-                  <ChefHat className="w-3.5 h-3.5 inline mr-1" />
-                  Start Preparing
-                </>
+            {[
+              "DELIVERED",
+              "CANCELLED",
+              "REJECTED",
+              "READY",
+              "DISPATCHED",
+            ].includes(order.status) && (
+                <span className="px-3 py-1.5 text-xs text-gray-600 italic">
+                  No actions
+                </span>
               )}
-            </button>
-          )}
-
-          {(order.status === "PREPARING" || order.status === "CONFIRMED") && (
-            <button
-              onClick={() => onReady(order.id)}
-              disabled={isLoading}
-              className="px-3 py-1.5 text-xs font-bold rounded-lg bg-green-500/10 border border-green-500/30 text-green-400 hover:bg-green-500 hover:text-white transition-all disabled:opacity-50"
-            >
-              {isLoading ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              ) : (
-                <>
-                  <BadgeCheck className="w-3.5 h-3.5 inline mr-1" />
-                  Mark Ready
-                </>
-              )}
-            </button>
-          )}
-
-          {[
-            "DELIVERED",
-            "CANCELLED",
-            "REJECTED",
-            "READY",
-            "DISPATCHED",
-          ].includes(order.status) && (
-            <span className="px-3 py-1.5 text-xs text-gray-600 italic">
-              No actions
-            </span>
-          )}
+          </div>
         </div>
       </div>
     </div>
@@ -425,11 +439,10 @@ export default function StoreOrdersPage() {
             <button
               key={tab.value}
               onClick={() => handleTabChange(tab.value)}
-              className={`px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition-all ${
-                activeTab === tab.value
+              className={`px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition-all ${activeTab === tab.value
                   ? "bg-yellow-500 text-black shadow-lg shadow-yellow-500/20"
                   : "bg-gray-800/60 text-gray-400 hover:text-white hover:bg-gray-700"
-              }`}
+                }`}
             >
               {tab.label}
               {tab.value === "PENDING" && pendingCount > 0 && (
