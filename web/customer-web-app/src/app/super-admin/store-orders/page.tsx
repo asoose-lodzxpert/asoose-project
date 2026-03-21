@@ -180,6 +180,8 @@ function OrderCard({
   const isHistory = ["DELIVERED", "CANCELLED", "REJECTED"].includes(
     order.status,
   );
+  const isPaymentCompleted =
+    order.paymentStatus === "COMPLETED" || order.paymentStatus === "PAID";
 
   const apiAction = useCallback(
     async (action: string, reason?: string) => {
@@ -354,8 +356,7 @@ function OrderCard({
           </span>
           {order.delivery && (
             <span
-              className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-                order.delivery.status === "DELIVERED"
+              className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${order.delivery.status === "DELIVERED"
                   ? "bg-emerald-500/20 text-emerald-400"
                   : order.delivery.status === "PICKED_UP"
                     ? "bg-blue-500/20 text-blue-400"
@@ -364,9 +365,14 @@ function OrderCard({
                       : order.delivery.status === "ASSIGNED"
                         ? "bg-indigo-500/20 text-indigo-400"
                         : "bg-slate-700 text-slate-400"
-              }`}
+                }`}
             >
               🚴 {order.delivery.status}
+            </span>
+          )}
+          {!isPaymentCompleted && (
+            <span className="flex w-fit ml-auto items-center gap-1.5 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-red-500/10 text-red-500 border border-red-500/20">
+              <AlertCircle className="w-2.5 h-2.5" /> UNPAID
             </span>
           )}
         </div>
@@ -433,50 +439,63 @@ function OrderCard({
 
       {/* Actions */}
       {!isHistory && (
-        <div className="flex gap-2 pt-1">
-          {isPending && (
-            <>
-              <button
-                onClick={handleDecline}
-                className="flex-1 py-2 text-sm font-semibold rounded-lg border border-red-500/40 text-red-400 hover:bg-red-500/10 transition-colors"
-              >
-                Decline
-              </button>
-              <button
-                onClick={handleAccept}
-                className="flex-1 py-2 text-sm font-semibold rounded-lg bg-green-600 hover:bg-green-500 text-white transition-colors"
-              >
-                Accept
-              </button>
-            </>
+        <div className="flex flex-col gap-2 pt-1 border-t border-gray-800/50 mt-2">
+          {!isPaymentCompleted && (
+            <div className="bg-amber-500/10 border border-amber-500/50 p-2 rounded-lg flex items-center gap-2 text-amber-500 text-[10px] justify-center text-center mt-2">
+              <AlertCircle className="w-4 h-4 flex-shrink-0" />
+              <span className="font-bold">Payment pending. Actions restricted.</span>
+            </div>
           )}
-          {isConfirmed && (
-            <>
-              <button
-                onClick={handlePreparing}
-                className="flex-1 py-2 text-sm font-semibold rounded-lg border border-purple-500/40 text-purple-400 hover:bg-purple-500/10 transition-colors"
-              >
-                Start Preparing
-              </button>
+          <div className="flex gap-2 w-full mt-1">
+            {isPending && (
+              <>
+                <button
+                  onClick={handleDecline}
+                  disabled={!isPaymentCompleted}
+                  className="flex-1 py-2 text-sm font-semibold rounded-lg border border-red-500/40 text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Decline
+                </button>
+                <button
+                  onClick={handleAccept}
+                  disabled={!isPaymentCompleted}
+                  className="flex-1 py-2 text-sm font-semibold rounded-lg bg-green-600 hover:bg-green-500 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Accept
+                </button>
+              </>
+            )}
+            {isConfirmed && (
+              <>
+                <button
+                  onClick={handlePreparing}
+                  disabled={!isPaymentCompleted}
+                  className="flex-1 py-2 text-sm font-semibold rounded-lg border border-purple-500/40 text-purple-400 hover:bg-purple-500/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Start Preparing
+                </button>
+                <button
+                  onClick={handleReady}
+                  disabled={!isPaymentCompleted}
+                  className="flex-1 py-2 text-sm font-semibold rounded-lg bg-green-600 hover:bg-green-500 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Mark Ready
+                </button>
+              </>
+            )}
+            {isPreparing && (
               <button
                 onClick={handleReady}
-                className="flex-1 py-2 text-sm font-semibold rounded-lg bg-green-600 hover:bg-green-500 text-white transition-colors"
+                disabled={!isPaymentCompleted}
+                className="w-full py-2 text-sm font-semibold rounded-lg bg-green-600 hover:bg-green-500 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Mark Ready
               </button>
-            </>
-          )}
-          {isPreparing && (
-            <button
-              onClick={handleReady}
-              className="w-full py-2 text-sm font-semibold rounded-lg bg-green-600 hover:bg-green-500 text-white transition-colors"
-            >
-              Mark Ready
-            </button>
-          )}
-          {!isPending && !isConfirmed && !isPreparing && (
-            <p className="text-xs text-gray-500 italic">Waiting for rider…</p>
-          )}
+            )}
+            {!isPending && !isConfirmed && !isPreparing && (
+              <p className="text-xs text-gray-500 italic flex-1 text-center py-2">Waiting for rider…</p>
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -583,11 +602,10 @@ export default function StoreOrdersOverviewPage() {
               <button
                 key={t.key}
                 onClick={() => setTab(t.key)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  tab === t.key
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === t.key
                     ? "bg-white/10 text-white"
                     : "text-gray-400 hover:text-white"
-                }`}
+                  }`}
               >
                 {t.label}
                 {t.key === "pending" &&
