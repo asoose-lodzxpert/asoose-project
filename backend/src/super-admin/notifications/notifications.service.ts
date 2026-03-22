@@ -29,9 +29,15 @@ export class AdminNotificationsService {
 
     const where: any = {};
 
+    const adminUsers = await this.prisma.user.findMany({
+      where: { role: { in: ADMIN_ROLES } },
+      select: { id: true },
+    });
+    const adminIds = adminUsers.map((u) => u.id);
+
     where.OR = [
       { userId: null, vendorId: null, riderId: null }, // System alerts
-      { userId: adminId },                             // Alerts explicitly sent to this admin
+      { userId: { in: adminIds } },                    // Alerts explicitly sent to ANY admin
     ];
 
     if (type && type.toUpperCase() !== 'ALL') {
@@ -68,9 +74,15 @@ export class AdminNotificationsService {
   async getUnreadCount(adminId: string, type?: string) {
     const where: any = { isRead: false };
 
+    const adminUsers = await this.prisma.user.findMany({
+      where: { role: { in: ADMIN_ROLES } },
+      select: { id: true },
+    });
+    const adminIds = adminUsers.map((u) => u.id);
+
     where.OR = [
       { userId: null, vendorId: null, riderId: null },
-      { userId: adminId },
+      { userId: { in: adminIds } },
     ];
 
     if (type && type.toUpperCase() !== 'ALL') {
@@ -92,9 +104,15 @@ export class AdminNotificationsService {
   async markAllAsRead(adminId: string, type?: string) {
     const where: any = { isRead: false };
 
+    const adminUsers = await this.prisma.user.findMany({
+      where: { role: { in: ADMIN_ROLES } },
+      select: { id: true },
+    });
+    const adminIds = adminUsers.map((u) => u.id);
+
     where.OR = [
       { userId: null, vendorId: null, riderId: null },
-      { userId: adminId },
+      { userId: { in: adminIds } },
     ];
 
     if (type && type.toUpperCase() !== 'ALL') {
