@@ -16,6 +16,7 @@ import { CommonModule } from '../common/common.module';
 import { UserAccountNotificationsService } from './notifications/user-account-notifications.service';
 import { IdempotencyService } from './idempotency.service';
 import { OrderReadyListenerService } from './order-ready-listener.service';
+import { OrderRemindersProcessor } from './order-reminders.processor';
 
 // Modules
 import { RedisModule } from 'src/redis/redis.module';
@@ -41,9 +42,10 @@ import { PaystackAccountService } from '../payment/paystack-account.service';
     VendorModule,
     QueueModule,
     FareModule,
-    BullModule.registerQueue({
-      name: 'email',
-    }),
+    BullModule.registerQueue(
+      { name: 'email' },
+      { name: 'order-reminders' },
+    ),
     CommonModule,
   ],
   controllers: [UsersController],
@@ -58,6 +60,7 @@ import { PaystackAccountService } from '../payment/paystack-account.service';
     IdempotencyService,
     PaystackAccountService,
     OrderReadyListenerService,
+    OrderRemindersProcessor,
   ],
   exports: [
     UsersService,
@@ -67,4 +70,4 @@ import { PaystackAccountService } from '../payment/paystack-account.service';
     IdempotencyService,
   ],
 })
-export class UsersModule {}
+export class UsersModule { }

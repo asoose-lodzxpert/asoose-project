@@ -21,18 +21,22 @@ export class AdminNotificationsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly fcm: FcmService,
-  ) {}
+  ) { }
 
   async getAll(page = 1, type?: string) {
     const take = 25;
     const skip = (page - 1) * take;
 
-    const typeFilter =
-      type && type.toUpperCase() !== 'ALL'
-        ? [type.toUpperCase()]
-        : ADMIN_PRIORITY_TYPES;
+    const where: any = {};
 
-    const where = { type: { in: typeFilter } };
+    if (type && type.toUpperCase() !== 'ALL') {
+      where.type = type.toUpperCase();
+    } else {
+      where.OR = [
+        { userId: null, vendorId: null, riderId: null },
+        { type: { in: ADMIN_PRIORITY_TYPES } },
+      ];
+    }
 
     const [rawData, total] = await Promise.all([
       this.prisma.notification.findMany({
@@ -62,14 +66,18 @@ export class AdminNotificationsService {
   }
 
   async getUnreadCount(type?: string) {
-    const typeFilter =
-      type && type.toUpperCase() !== 'ALL'
-        ? [type.toUpperCase()]
-        : ADMIN_PRIORITY_TYPES;
+    const where: any = { isRead: false };
 
-    const count = await this.prisma.notification.count({
-      where: { type: { in: typeFilter }, isRead: false },
-    });
+    if (type && type.toUpperCase() !== 'ALL') {
+      where.type = type.toUpperCase();
+    } else {
+      where.OR = [
+        { userId: null, vendorId: null, riderId: null },
+        { type: { in: ADMIN_PRIORITY_TYPES } },
+      ];
+    }
+
+    const count = await this.prisma.notification.count({ where });
 
     return { count };
   }
@@ -82,13 +90,19 @@ export class AdminNotificationsService {
   }
 
   async markAllAsRead(type?: string) {
-    const typeFilter =
-      type && type.toUpperCase() !== 'ALL'
-        ? [type.toUpperCase()]
-        : ADMIN_PRIORITY_TYPES;
+    const where: any = { isRead: false };
+
+    if (type && type.toUpperCase() !== 'ALL') {
+      where.type = type.toUpperCase();
+    } else {
+      where.OR = [
+        { userId: null, vendorId: null, riderId: null },
+        { type: { in: ADMIN_PRIORITY_TYPES } },
+      ];
+    }
 
     return this.prisma.notification.updateMany({
-      where: { type: { in: typeFilter }, isRead: false },
+      where,
       data: { isRead: true },
     });
   }

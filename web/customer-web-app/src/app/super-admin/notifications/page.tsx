@@ -106,11 +106,11 @@ export default function NotificationsPage() {
         (prev) =>
           prev
             ? {
-                ...prev,
-                data: prev.data.map((n) =>
-                  n.id === id ? { ...n, isRead: true } : n,
-                ),
-              }
+              ...prev,
+              data: prev.data.map((n) =>
+                n.id === id ? { ...n, isRead: true } : n,
+              ),
+            }
             : prev,
         false,
       );
@@ -152,12 +152,12 @@ export default function NotificationsPage() {
       const result = await NotificationService.sendTestPush();
       if (result.success) {
         toast.success(
-          `🔔 Test push sent to ${result.tokensFound} admin device(s)`,
+          `Test push sent to ${result.tokensFound} admin device(s)`,
         );
       } else {
         toast.warn(
           result.message ||
-            "No admin tokens found. Grant notification permission in your browser first.",
+          "No admin tokens found. Grant notification permission in your browser first.",
         );
       }
     } catch {
@@ -234,11 +234,10 @@ export default function NotificationsPage() {
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key)}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all border shrink-0 ${
-              activeTab === tab.key
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all border shrink-0 ${activeTab === tab.key
                 ? "bg-yellow-500 text-black border-yellow-500 shadow-lg shadow-yellow-500/20"
                 : "bg-[#1E293B] text-gray-400 border-gray-800 hover:border-gray-600 hover:text-white"
-            }`}
+              }`}
           >
             {tab.icon}
             {tab.label}

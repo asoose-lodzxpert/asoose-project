@@ -138,7 +138,7 @@ export interface AnalyticsReport {
 
 @Injectable()
 export class AnalyticsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   async getAnalyticsReport(days: number = 30): Promise<AnalyticsReport> {
     const startDate = new Date();
@@ -149,33 +149,20 @@ export class AnalyticsService {
     if (days > 30 && days <= 90) granularity = 'week';
     if (days > 90) granularity = 'month';
 
-    const [
-      overview,
-      orderVolume,
-      growth,
-      revenueBreakdown,
-      ratings,
-      topVendors,
-      rides,
-      deliveries,
-      payouts,
-      users,
-      paymentMethods,
-      disputes,
-    ] = await Promise.all([
-      this.getOverviewMetrics(startDate),
-      this.getOrderVolumeData(startDate, granularity),
-      this.getGrowthData(),
-      this.getRevenueBreakdown(startDate),
-      this.getRatingsDistribution(),
-      this.getTopVendors(startDate),
-      this.getRideMetrics(startDate),
-      this.getDeliveryMetrics(startDate),
-      this.getPayoutSummary(),
-      this.getUserBreakdown(startDate),
-      this.getPaymentMethodBreakdown(startDate),
-      this.getDisputeMetrics(),
-    ]);
+    // Execute sequentially to prevent database connection pool exhaustion
+    // (There are ~25 aggregate sub-queries across these calls)
+    const overview = await this.getOverviewMetrics(startDate);
+    const orderVolume = await this.getOrderVolumeData(startDate, granularity);
+    const growth = await this.getGrowthData();
+    const revenueBreakdown = await this.getRevenueBreakdown(startDate);
+    const ratings = await this.getRatingsDistribution();
+    const topVendors = await this.getTopVendors(startDate);
+    const rides = await this.getRideMetrics(startDate);
+    const deliveries = await this.getDeliveryMetrics(startDate);
+    const payouts = await this.getPayoutSummary();
+    const users = await this.getUserBreakdown(startDate);
+    const paymentMethods = await this.getPaymentMethodBreakdown(startDate);
+    const disputes = await this.getDisputeMetrics();
 
     const avgRating = await this.getAverageRating();
 
@@ -533,8 +520,8 @@ export class AnalyticsService {
       percentage:
         totalReviews > 0
           ? this.toTwoDecimals(
-              ((ratingsMap.get(star) || 0) / totalReviews) * 100,
-            )
+            ((ratingsMap.get(star) || 0) / totalReviews) * 100,
+          )
           : 0,
     }));
   }
@@ -844,7 +831,7 @@ export class AnalyticsService {
       FROM "Payment"
       WHERE "createdAt" >= ${startDate}
         AND "createdAt" <= ${endDate}
-        AND status = 'PAID'
+        AND status = 'COMPLETED'::"PaymentStatus"
       GROUP BY method
       ORDER BY amount DESC
     `;
