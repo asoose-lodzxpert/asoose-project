@@ -23,19 +23,19 @@ export class AdminNotificationsService {
     private readonly fcm: FcmService,
   ) { }
 
-  async getAll(page = 1, type?: string) {
+  async getAll(adminId: string, page = 1, type?: string) {
     const take = 25;
     const skip = (page - 1) * take;
 
     const where: any = {};
 
+    where.OR = [
+      { userId: null, vendorId: null, riderId: null }, // System alerts
+      { userId: adminId },                             // Alerts explicitly sent to this admin
+    ];
+
     if (type && type.toUpperCase() !== 'ALL') {
       where.type = type.toUpperCase();
-    } else {
-      where.OR = [
-        { userId: null, vendorId: null, riderId: null },
-        { type: { in: ADMIN_PRIORITY_TYPES } },
-      ];
     }
 
     const [rawData, total] = await Promise.all([
@@ -65,16 +65,16 @@ export class AdminNotificationsService {
     };
   }
 
-  async getUnreadCount(type?: string) {
+  async getUnreadCount(adminId: string, type?: string) {
     const where: any = { isRead: false };
+
+    where.OR = [
+      { userId: null, vendorId: null, riderId: null },
+      { userId: adminId },
+    ];
 
     if (type && type.toUpperCase() !== 'ALL') {
       where.type = type.toUpperCase();
-    } else {
-      where.OR = [
-        { userId: null, vendorId: null, riderId: null },
-        { type: { in: ADMIN_PRIORITY_TYPES } },
-      ];
     }
 
     const count = await this.prisma.notification.count({ where });
@@ -89,16 +89,16 @@ export class AdminNotificationsService {
     });
   }
 
-  async markAllAsRead(type?: string) {
+  async markAllAsRead(adminId: string, type?: string) {
     const where: any = { isRead: false };
+
+    where.OR = [
+      { userId: null, vendorId: null, riderId: null },
+      { userId: adminId },
+    ];
 
     if (type && type.toUpperCase() !== 'ALL') {
       where.type = type.toUpperCase();
-    } else {
-      where.OR = [
-        { userId: null, vendorId: null, riderId: null },
-        { type: { in: ADMIN_PRIORITY_TYPES } },
-      ];
     }
 
     return this.prisma.notification.updateMany({
