@@ -7,6 +7,7 @@ import {
   Query,
   Body,
   UseGuards,
+  Request,
 } from '@nestjs/common';
 import { AdminNotificationsService } from './notifications.service';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
@@ -21,26 +22,30 @@ import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
 export class AdminNotificationsController {
-  constructor(private readonly svc: AdminNotificationsService) {}
+  constructor(private readonly svc: AdminNotificationsService) { }
 
   @ApiOperation({
     summary: 'List admin notifications (paginated, filterable by type)',
   })
   @Get()
-  getAll(@Query('page') page: string, @Query('type') type: string) {
-    return this.svc.getAll(Number(page) || 1, type);
+  getAll(
+    @Request() req,
+    @Query('page') page: string,
+    @Query('type') type: string,
+  ) {
+    return this.svc.getAll(req.user.id, Number(page) || 1, type);
   }
 
   @ApiOperation({ summary: 'Get unread notification count by type' })
   @Get('unread-count')
-  unreadCount(@Query('type') type: string) {
-    return this.svc.getUnreadCount(type);
+  unreadCount(@Request() req, @Query('type') type: string) {
+    return this.svc.getUnreadCount(req.user.id, type);
   }
 
   @ApiOperation({ summary: 'Mark all admin notifications as read' })
   @Patch('read-all')
-  markAllAsRead(@Query('type') type: string) {
-    return this.svc.markAllAsRead(type);
+  markAllAsRead(@Request() req, @Query('type') type: string) {
+    return this.svc.markAllAsRead(req.user.id, type);
   }
 
   @ApiOperation({ summary: 'Mark a single notification as read' })
@@ -61,7 +66,7 @@ export class AdminNotificationsController {
     return this.svc.testPushToAllAdmins(
       title || '🔔 Test Notification',
       message ||
-        'This is a test push notification from the Asoose admin panel.',
+      'This is a test push notification from the Asoose admin panel.',
     );
   }
 }

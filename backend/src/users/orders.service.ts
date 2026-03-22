@@ -22,6 +22,8 @@ import { NotificationsGateway } from '../notifications/notifications.gateway';
 import { QueueService } from '../matching/queue/queue.service';
 import { isStoreCurrentlyOpen } from '../shared/vendor-availability.util';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 
 // ==================== CONSTANTS ====================
 
@@ -112,6 +114,7 @@ export class OrdersService {
     private fareService: FareService,
     @Inject('REDIS_CLIENT') private readonly redis: RedisClientType,
     private eventEmitter: EventEmitter2,
+    @InjectQueue('order-reminders') private orderRemindersQueue: Queue,
   ) { }
 
   // ==================== PUBLIC METHODS ====================
@@ -551,6 +554,13 @@ export class OrdersService {
       // 4. Durable Handoff
       await this.completeIdempotency(redisKey, { orderId: order.id });
 
+      // BullMQ: Schedule 30-minute unpaid reminder
+      await this.orderRemindersQueue.add(
+        'check-unpaid',
+        { orderId: order.id },
+        { delay: 30 * 60 * 1000, removeOnComplete: true },
+      );
+
       // NOTE: Notifications are intentionally deferred to the payment webhook.
       // They fire only after payment is confirmed, not at order creation.
 
@@ -686,6 +696,15 @@ export class OrdersService {
       };
 
       await this.completeIdempotency(redisKey, responsePayload);
+
+      // BullMQ: Schedule 30-minute unpaid reminder for group orders
+      for (const o of result.orders) {
+        await this.orderRemindersQueue.add(
+          'check-unpaid',
+          { orderId: o.id },
+          { delay: 30 * 60 * 1000, removeOnComplete: true },
+        );
+      }
 
       // NOTE: Notifications are intentionally deferred to the payment webhook.
       // They fire only after payment is confirmed, not at order creation.

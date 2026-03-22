@@ -9,10 +9,24 @@ import { PrismaClient } from '@prisma/client';
 @Injectable()
 export class PrismaService
   extends PrismaClient
-  implements OnModuleInit, OnModuleDestroy
-{
+  implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(PrismaService.name);
   private connected = false;
+
+  constructor() {
+    let url = process.env.DATABASE_URL;
+    if (url && !url.includes('connection_limit')) {
+      const separator = url.includes('?') ? '&' : '?';
+      url = `${url}${separator}connection_limit=10&pool_timeout=20`;
+    }
+    super({
+      datasources: {
+        db: {
+          url,
+        },
+      },
+    });
+  }
 
   /**
    * Attempt to connect to the database with retries.
@@ -41,8 +55,8 @@ export class PrismaService
 
     this.logger.error(
       'All database connection attempts failed. ' +
-        'Server will start, but DB-dependent endpoints will return errors. ' +
-        'Check DATABASE_URL in your .env file and ensure the database is reachable.',
+      'Server will start, but DB-dependent endpoints will return errors. ' +
+      'Check DATABASE_URL in your .env file and ensure the database is reachable.',
     );
   }
 
