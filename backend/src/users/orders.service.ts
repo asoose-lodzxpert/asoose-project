@@ -212,7 +212,7 @@ export class OrdersService {
         );
       }
 
-      const distance = this.pricingService.calculateDistance(
+      const distance = this.fareService.calculateDistance(
         store.lat,
         store.lng,
         address.lat,
@@ -437,7 +437,7 @@ export class OrdersService {
         userId,
         addressId: dto.addressId,
         grandTotal,
-        totalRouteKm: parseFloat(totalRouteKm.toFixed(2)),
+        totalRouteKm,
         sortedStoreIds,
         stores: breakdown.map((b) => ({
           storeId: b.storeId,
@@ -1127,29 +1127,21 @@ export class OrdersService {
     customerLng: number,
     stores: Array<{ storeId: string; lat: number; lng: number }>,
   ): { sortedStoreIds: string[]; totalRouteKm: number } {
-    if (stores.length === 1) {
-      const d = this.pricingService.calculateDistance(
-        customerLat,
-        customerLng,
-        stores[0].lat,
-        stores[0].lng,
-      );
-      // single store: customer → store → customer
-      return { sortedStoreIds: [stores[0].storeId], totalRouteKm: d * 2 };
-    }
-
     const unvisited = [...stores];
     const visited: string[] = [];
     let curLat = customerLat;
     let curLng = customerLng;
     let totalRouteKm = 0;
+    let firstLegDist = 0; // The leg from customer to first store ( rider pickup )
+
+    // Create a map for quick lookup of store objects by ID
+    const storeMap = new Map(stores.map(s => [s.storeId, s]));
 
     while (unvisited.length > 0) {
-      // Find nearest unvisited store from current position
       let nearestIdx = 0;
       let nearestDist = Infinity;
       for (let i = 0; i < unvisited.length; i++) {
-        const d = this.pricingService.calculateDistance(
+        const d = this.fareService.calculateDistance(
           curLat,
           curLng,
           unvisited[i].lat,
@@ -1163,20 +1155,34 @@ export class OrdersService {
 
       const chosen = unvisited.splice(nearestIdx, 1)[0];
       visited.push(chosen.storeId);
+
+      // Track the first leg separately so we can subtract it (billing is one-way)
+      if (visited.length === 1) {
+        firstLegDist = nearestDist;
+      }
+
       totalRouteKm += nearestDist;
       curLat = chosen.lat;
       curLng = chosen.lng;
     }
 
-    // Final leg: last store → customer
-    totalRouteKm += this.pricingService.calculateDistance(
-      curLat,
-      curLng,
+    // Final leg: last store to customer
+    const lastStore = storeMap.get(visited[visited.length - 1])!;
+    totalRouteKm += this.fareService.calculateDistance(
+      lastStore.lat,
+      lastStore.lng,
       customerLat,
       customerLng,
     );
 
-    return { sortedStoreIds: visited, totalRouteKm };
+    // Bill for the delivery route only (StoreA → StoreB → Customer),
+    // not the rider's trip TO the first store.
+    totalRouteKm = Math.max(0, totalRouteKm - firstLegDist);
+
+    return {
+      sortedStoreIds: visited,
+      totalRouteKm: parseFloat(totalRouteKm.toFixed(2)),
+    };
   }
 
   // ==================== HELPER: CONTEXT PREPARATION ====================
@@ -1385,7 +1391,7 @@ export class OrdersService {
       );
     } else if (isSingleStore) {
       const s = resolvedStores[0];
-      totalRouteKm = this.pricingService.calculateDistance(
+      totalRouteKm = this.fareService.calculateDistance(
         s.pickupAddress.lat,
         s.pickupAddress.lng,
         dropoffAddress.lat,
@@ -1422,7 +1428,7 @@ export class OrdersService {
         const s = storeMap.get(storeId)!;
 
         // Distance is always computed from fresh coordinates (needed for Delivery record)
-        const distance = this.pricingService.calculateDistance(
+        const distance = this.fareService.calculateDistance(
           s.pickupAddress.lat,
           s.pickupAddress.lng,
           dropoffAddress.lat,

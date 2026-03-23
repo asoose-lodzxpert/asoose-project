@@ -40,7 +40,7 @@ export class DeliveriesService {
     private readonly common: TripsCommonService,
     private readonly addressesService: AddressesService,
     private readonly eventEmitter: EventEmitter2,
-  ) {}
+  ) { }
 
   // ==================================================================
   // JOBS SERVICE COMPATIBILITY METHODS
@@ -250,7 +250,7 @@ export class DeliveriesService {
         // Calculate Distance & Fee securely from DB-verified addresses
         this.logger.log(`[requestDelivery] Calculating distance and fee`);
         const t3 = Date.now();
-        const distanceKm = this.geo.calculateDistance(
+        const distanceKm = this.fareService.calculateDistance(
           pickupAddress.lat,
           pickupAddress.lng,
           dropoffAddress.lat,

@@ -20,7 +20,9 @@ export class PricingService {
   }
 
   /**
-   * Calculates delivery fee based on distance
+   * @deprecated Use FareService.calcDeliveryFee(distanceKm).
+   * This method uses inconsistently-sourced environment variables (500/200)
+   * while the rest of the app uses admin-configured database settings (700/400).
    */
   public calculateDeliveryFee(distanceKm: number): number {
     const fee = this.BASE_FEE + distanceKm * this.RATE_PER_KM;
@@ -43,7 +45,9 @@ export class PricingService {
   }
 
   /**
-   * Calculates distance between two coordinates using Haversine formula
+   * @deprecated Use GeoService.calculateDistance or FareService.calculateDistance.
+   * This internal Haversine formula is being phased out to ensure consistent
+   * pricing between store orders and direct delivery requests.
    */
   public calculateDistance(
     lat1: number,
@@ -59,9 +63,9 @@ export class PricingService {
     const a =
       Math.sin(dLat / 2) * Math.sin(dLat / 2) +
       Math.cos(this.deg2rad(lat1)) *
-        Math.cos(this.deg2rad(lat2)) *
-        Math.sin(dLon / 2) *
-        Math.sin(dLon / 2);
+      Math.cos(this.deg2rad(lat2)) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
   }
