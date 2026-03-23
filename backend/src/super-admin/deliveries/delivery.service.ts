@@ -31,7 +31,7 @@ export class DeliveriesService {
     private geoService: GeoService,
     private fareService: FareService,
     private readonly logger: AppLogger, // ← added
-  ) {}
+  ) { }
 
   async createAdminDelivery(dto: AdminCreateDeliveryDto, adminId: string) {
     this.logger.debug(`createAdminDelivery - By Admin: ${adminId}`);
@@ -154,8 +154,12 @@ export class DeliveriesService {
     const skip = (page - 1) * limit;
 
     const where: any = {
-      // Only show deliveries with a completed (paid) payment
-      payment: { status: 'COMPLETED' },
+      OR: [
+        { payment: { status: 'COMPLETED' } }, // Standalone paid packages
+        { order: { paymentStatus: { in: ['PAID', 'COMPLETED'] } } }, // Paid store orders
+        { orderGroupId: { not: null } }, // Multi-store orders
+        { status: { not: 'REQUESTED' } }, // Manually created admin deliveries or assigned active orders
+      ],
     };
 
     if (status && status !== 'All') where.status = status;
@@ -1008,17 +1012,17 @@ export class DeliveriesService {
 
       sender: d.order
         ? {
-            name: d.order.store.name,
-            address: d.order.store.address || 'N/A',
-            phone: d.order.store.vendor?.phone || 'N/A',
-          }
+          name: d.order.store.name,
+          address: d.order.store.address || 'N/A',
+          phone: d.order.store.vendor?.phone || 'N/A',
+        }
         : {
-            name: d.customer.name,
-            address: d.pickupAddress
-              ? this.formatAddress(d.pickupAddress)
-              : 'N/A',
-            phone: d.customer.phone,
-          },
+          name: d.customer.name,
+          address: d.pickupAddress
+            ? this.formatAddress(d.pickupAddress)
+            : 'N/A',
+          phone: d.customer.phone,
+        },
 
       recipient: {
         name: d.recipientName,
@@ -1032,13 +1036,13 @@ export class DeliveriesService {
       // ✅ FIX: Access rider fields directly
       courier: d.rider
         ? {
-            name: d.rider.name,
-            id: d.rider.id,
-            vehicle: d.rider.vehicle
-              ? `${d.rider.vehicle.color} ${d.rider.vehicle.model}`.trim()
-              : 'Not registered',
-            phone: d.rider.phone,
-          }
+          name: d.rider.name,
+          id: d.rider.id,
+          vehicle: d.rider.vehicle
+            ? `${d.rider.vehicle.color} ${d.rider.vehicle.model}`.trim()
+            : 'Not registered',
+          phone: d.rider.phone,
+        }
         : null,
 
       history: [
