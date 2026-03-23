@@ -18,7 +18,7 @@ export class FareService {
   constructor(
     private readonly geoService: GeoService,
     private readonly prisma: PrismaService,
-  ) {}
+  ) { }
 
   // ── Hardcoded fallback constants (used when DB setting is not found) ─────────
   // Ride
@@ -113,30 +113,18 @@ export class FareService {
   async getDeliveryFare(dto: DeliveryFareDto) {
     const { pickuplat, pickuplong, dropofflat, dropofflong } = dto;
 
-    // Load admin-configured delivery fare rates (or fall back to hardcoded defaults)
-    const [baseDeliveryFare, deliveryPerKm] = await Promise.all([
-      this.getSetting('delivery_base_fare', this.DefaultBaseDeliveryFare),
-      this.getSetting('delivery_per_km', this.DefaultDeliveryPerKm),
-    ]);
-
     const lat1 = Number(pickuplat);
     const lng1 = Number(pickuplong);
     const lat2 = Number(dropofflat);
     const lng2 = Number(dropofflong);
-    const distanceKm = this.geoService.calculateDistance(
-      lat1,
-      lng1,
-      lat2,
-      lng2,
-    );
-    const distanceMeters = Math.round(distanceKm * 1000);
 
+    const distanceKm = this.calculateDistance(lat1, lng1, lat2, lng2);
+    const price = await this.calcDeliveryFee(distanceKm);
+
+    const distanceMeters = Math.round(distanceKm * 1000);
     const durationSeconds = Math.round(distanceKm * 180);
     const durationText = `${Math.round(durationSeconds / 60)} min`;
     const distanceText = `${distanceKm.toFixed(2)} km`;
-
-    const variableFare = Math.round(distanceKm * deliveryPerKm);
-    const price = baseDeliveryFare + variableFare;
 
     return {
       price,
@@ -149,8 +137,6 @@ export class FareService {
    * Calculates the delivery fee for a given distance using admin-configured
    * DB settings (delivery_base_fare + delivery_per_km). Falls back to
    * hardcoded defaults if the settings are not found.
-   *
-   * Use this in place of the synchronous getter accessors below.
    */
   async calcDeliveryFee(distanceKm: number): Promise<number> {
     const [baseFare, perKm] = await Promise.all([
@@ -161,16 +147,33 @@ export class FareService {
     return Math.max(fee, baseFare);
   }
 
+  /**
+   * Unified distance calculation using the GeoService (H3/Great Circle).
+   * Use this as the standard across the backend to ensure price consistency.
+   */
+  calculateDistance(
+    lat1: number,
+    lng1: number,
+    lat2: number,
+    lng2: number,
+  ): number {
+    return this.geoService.calculateDistance(lat1, lng1, lat2, lng2);
+  }
+
   // ── Convenience accessors (kept for backward-compat; prefer calcDeliveryFee) ─
+  /** @deprecated Use getSetting('ride_base_fare', DefaultBaseRideFare) or async methods */
   get BaseRideFare() {
     return this.DefaultBaseRideFare;
   }
+  /** @deprecated Use getSetting('ride_per_km', DefaultRiderPerKm) or async methods */
   get RiderPerKm() {
     return this.DefaultRiderPerKm;
   }
+  /** @deprecated Use getSetting('delivery_base_fare', DefaultBaseDeliveryFare) or calcDeliveryFee */
   get BaseDeliveryFare() {
     return this.DefaultBaseDeliveryFare;
   }
+  /** @deprecated Use getSetting('delivery_per_km', DefaultDeliveryPerKm) or calcDeliveryFee */
   get DeliveryPerKm() {
     return this.DefaultDeliveryPerKm;
   }

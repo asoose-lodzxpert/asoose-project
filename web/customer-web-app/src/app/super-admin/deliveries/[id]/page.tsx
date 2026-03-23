@@ -53,6 +53,8 @@ interface DeliveryDetail {
   };
   courier: { name: string; id: string; vehicle: string; phone: string } | null;
   history: DeliveryHistoryStep[];
+  isPaid?: boolean;
+  paymentStatus?: string;
 }
 
 // Visual Barcode Component
@@ -161,14 +163,18 @@ export default function DeliveryDetailPage() {
                 </div>
                 <div className="flex flex-wrap items-center gap-3">
                   <span
-                    className={`px-2.5 py-0.5 text-xs font-bold uppercase rounded border ${
-                      delivery.status === "Delivered"
+                    className={`px-2.5 py-0.5 text-xs font-bold uppercase rounded border ${delivery.status === "Delivered"
                         ? "bg-green-500/10 text-green-500 border-green-500/20"
                         : "bg-blue-500/10 text-blue-400 border-blue-500/20"
-                    }`}
+                      }`}
                   >
                     {delivery.status}
                   </span>
+                  {delivery.isPaid === false && (
+                    <span className="px-2.5 py-0.5 text-xs font-bold uppercase rounded border bg-red-500/10 text-red-500 border-red-500/20 animate-pulse">
+                      UNPAID
+                    </span>
+                  )}
                   <span className="text-gray-400 text-sm">{delivery.type}</span>
                 </div>
               </div>
@@ -212,11 +218,10 @@ export default function DeliveryDetailPage() {
                   >
                     {/* Icon */}
                     <div
-                      className={`w-7 h-7 rounded-full flex items-center justify-center border-2 transition-all flex-shrink-0 ${
-                        step.done
+                      className={`w-7 h-7 rounded-full flex items-center justify-center border-2 transition-all flex-shrink-0 ${step.done
                           ? "bg-green-500 border-green-500 text-white"
                           : "bg-[#0F172A] border-gray-600 text-gray-600 print:bg-white"
-                      } ${!step.done && "bg-[#1E293B]"}`}
+                        } ${!step.done && "bg-[#1E293B]"}`}
                     >
                       {step.done ? (
                         <CheckCircle className="w-4 h-4" />
@@ -447,11 +452,17 @@ export default function DeliveryDetailPage() {
                       No courier assigned
                     </p>
                     <button
-                      onClick={() => setShowAssignModal(true)}
-                      className="px-4 py-1.5 bg-yellow-500 text-black text-xs font-bold rounded hover:bg-yellow-400 transition-colors"
+                      onClick={() => delivery.isPaid !== false ? setShowAssignModal(true) : toast.error("Cannot assign rider to an unpaid delivery.")}
+                      className={`px-4 py-1.5 text-xs font-bold rounded transition-colors ${delivery.isPaid !== false
+                          ? "bg-yellow-500 text-black hover:bg-yellow-400"
+                          : "bg-gray-800 text-gray-500 cursor-not-allowed opacity-50"
+                        }`}
                     >
                       Assign Rider
                     </button>
+                    {delivery.isPaid === false && (
+                      <p className="text-red-400 text-[10px] mt-2 font-bold animate-pulse">Payment required before dispatch</p>
+                    )}
                   </div>
                 )}
               </div>
