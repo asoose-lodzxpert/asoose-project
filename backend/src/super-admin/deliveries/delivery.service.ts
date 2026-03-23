@@ -182,6 +182,7 @@ export class DeliveriesService {
         skip,
         take: limit,
         include: {
+          payment: { select: { status: true } },
           order: {
             include: {
               store: { select: { name: true } },
@@ -225,6 +226,7 @@ export class DeliveriesService {
     const delivery = await this.prisma.delivery.findUnique({
       where: { id },
       include: {
+        payment: { select: { status: true, amount: true } },
         customer: { select: { name: true, phone: true, email: true } },
         order: {
           include: {
@@ -961,8 +963,17 @@ export class DeliveriesService {
     const orderItems: string[] = (d.order?.items ?? []).map(
       (i: any) => i.product?.name || 'Item',
     );
+
+    const isPaid =
+      d.payment?.status === 'COMPLETED' ||
+      d.order?.paymentStatus === 'PAID' ||
+      d.order?.paymentStatus === 'COMPLETED' ||
+      d.orderGroupId !== null;
+
     return {
       id: d.id,
+      isPaid,
+      paymentStatus: isPaid ? 'PAID' : 'UNPAID',
       orderGroupId: (d as any).orderGroupId ?? null,
       type: this.inferType(d.weightKg || 0, d.isFragile),
       sender: d.order?.store?.name || d.customer?.name || '—',
@@ -991,8 +1002,16 @@ export class DeliveriesService {
   };
 
   private transformForDetail = (d: any) => {
+    const isPaid =
+      d.payment?.status === 'COMPLETED' ||
+      d.order?.paymentStatus === 'PAID' ||
+      d.order?.paymentStatus === 'COMPLETED' ||
+      d.orderGroupId !== null;
+
     return {
       id: d.id,
+      isPaid,
+      paymentStatus: isPaid ? 'PAID' : 'UNPAID',
       status:
         d.status === 'PICKED_UP'
           ? 'In Transit'
