@@ -1494,10 +1494,10 @@
   resolved "https://registry.npmjs.org/@borewit/text-codec/-/text-codec-0.2.1.tgz"
   integrity sha512-k7vvKPbf7J2fZ5klGRD9AeKfUvojuZIQ3BT5u7Jfv+puwXkUBUT5PVyMDfJZpy30CBDXGMgw7fguK/lpOMBvgw==
 
-"@bull-board/api@6.16.4":
-  version "6.16.4"
-  resolved "https://registry.yarnpkg.com/@bull-board/api/-/api-6.16.4.tgz#6e7b07e2867c18930f24970589a7cc4a196b1eca"
-  integrity sha512-fn4O+QbA3mRj0rEE41mvwbvtiiv0UYgnxQ9ErWb9n74EwIC/yZbiyxQ+Gh/ehU9u7B0PuaNyR0IOG/h3DGo1Mg==
+"@bull-board/api@6.16.4", "@bull-board/api@6.20.3":
+  version "6.20.3"
+  resolved "https://registry.npmmirror.com/@bull-board/api/-/api-6.20.3.tgz#78d04e017bdb636a9db8ec71942b58e8a8661169"
+  integrity sha512-cDrsJJsmF4DbbY8/5oHxO4qFtyFjxexsWQKHowsud/8H4mtZN7MZg4fCmNzfaxc9Ov7V6r9Y9F5G2Mq6t7ZEJg==
   dependencies:
     redis-info "^3.1.0"
 
