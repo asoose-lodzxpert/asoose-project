@@ -11,7 +11,7 @@ import {
   ExternalLink,
   User,
 } from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
+import { formatAbsoluteTimestamp } from "@/services/formatters/absolute-timestamp.formatter";
 import { Notification } from "../types";
 
 interface NotificationProps {
@@ -70,7 +70,7 @@ export default function NotificationCard({
             {notification.title}
           </h4>
           <span className="text-[10px] text-gray-500 whitespace-nowrap shrink-0">
-            {formatDistanceToNow(new Date(notification.createdAt), { addSuffix: true })}
+            {formatAbsoluteTimestamp(notification.createdAt)}
           </span>
         </div>
 

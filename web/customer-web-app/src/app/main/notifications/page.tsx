@@ -9,7 +9,7 @@ import {
   Info,
   Trash2,
 } from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
+import { formatAbsoluteTimestamp } from "@/services/formatters/absolute-timestamp.formatter";
 import useSWR from "swr";
 import { toast } from "react-toastify";
 
@@ -193,9 +193,7 @@ export default function NotificationsPage() {
                         {notif.title}
                       </h3>
                       <span className="text-[10px] font-bold text-gray-400 uppercase">
-                        {formatDistanceToNow(new Date(notif.createdAt), {
-                          addSuffix: true,
-                        })}
+                        {formatAbsoluteTimestamp(notif.createdAt)}
                       </span>
                     </div>
                     <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
