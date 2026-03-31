@@ -106,13 +106,14 @@ function OrderCard({
 }) {
   const isLoading = actionLoading === order.id;
 
-  const timeAgo = (date: string) => {
-    const diff = Date.now() - new Date(date).getTime();
-    const mins = Math.floor(diff / 60000);
-    if (mins < 1) return "just now";
-    if (mins < 60) return `${mins}m ago`;
-    const hrs = Math.floor(mins / 60);
-    return `${hrs}h ${mins % 60}m ago`;
+  const formatDateTime = (dateStr: string) => {
+    const date = new Date(dateStr);
+    const day = String(date.getDate()).padStart(2, "0");
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const year = String(date.getFullYear()).slice(-2);
+    const hours = String(date.getHours()).padStart(2, "0");
+    const minutes = String(date.getMinutes()).padStart(2, "0");
+    return `${day}/${month}/${year} ${hours}:${minutes}`;
   };
 
   const isLate =
@@ -205,7 +206,7 @@ function OrderCard({
         <div className="text-xs text-gray-500 flex items-center gap-3">
           <span className="flex items-center gap-1">
             <CalendarDays className="w-3 h-3" />
-            {timeAgo(order.createdAt)}
+            {formatDateTime(order.createdAt)}
           </span>
           <span className="flex items-center gap-1">
             <Receipt className="w-3 h-3" />

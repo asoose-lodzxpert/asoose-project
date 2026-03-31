@@ -580,14 +580,10 @@ export class DeliveriesService {
 
     this.logger.debug(JSON.stringify(updated, null, 2));
 
-    // Mark linked order as DISPATCHED now that a rider is on the way
-    if (updated.orderId) {
-      await this.prisma.order.update({
-        where: { id: updated.orderId },
-        data: { status: 'DISPATCHED' },
-      });
-      this.logger.debug(`Order ${updated.orderId} status → DISPATCHED`);
-    }
+    // BUGFIX: Do NOT automatically change order status when assigning a rider
+    // Rider assignment is independent of order status transitions.
+    // Order status should only change through explicit lifecycle actions:
+    // READY → DISPATCHED only when rider actually starts moving/picks up
 
     await this.prisma.activityLog.create({
       data: {
@@ -719,17 +715,10 @@ export class DeliveriesService {
       ),
     );
 
-    // Mark all linked orders as DISPATCHED
-    const orderIds = groupDeliveries
-      .map((d) => d.orderId)
-      .filter((id): id is string => !!id);
-    if (orderIds.length > 0) {
-      await this.prisma.order.updateMany({
-        where: { id: { in: orderIds } },
-        data: { status: 'DISPATCHED' },
-      });
-      this.logger.debug(`Orders [${orderIds.join(', ')}] status → DISPATCHED`);
-    }
+    // BUGFIX: Do NOT automatically change order statuses when assigning a rider to group
+    // Rider assignment is independent of order status transitions.
+    // Each order status should only change through explicit lifecycle actions:
+    // READY → DISPATCHED only when orders are actually picked up
 
     await this.prisma.activityLog.create({
       data: {

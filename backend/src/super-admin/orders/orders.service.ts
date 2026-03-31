@@ -37,6 +37,12 @@ export class OrdersService {
     const where: Prisma.OrderWhereInput = {
       // Only show paid orders in the admin dashboard
       paymentStatus: 'PAID',
+      // BUGFIX: Exclude admin-managed stores from global Orders view
+      // Admin-managed orders should only appear in the Store Orders section
+      store: {
+        isAdminManaged: false,
+        ...(storeType && { type: storeType }),
+      },
       ...(search && {
         OR: [
           { id: { contains: search, mode: 'insensitive' } },
@@ -50,9 +56,6 @@ export class OrdersService {
         status !== 'All' && {
           status: status as Prisma.EnumOrderStatusFilter,
         }),
-      ...(storeType && {
-        store: { type: storeType },
-      }),
       ...((from || to) && {
         createdAt: {
           ...(from && { gte: new Date(new Date(from).setHours(0, 0, 0, 0)) }),
