@@ -210,8 +210,9 @@ model User {
   googleId  String?    @unique @map("google_id")
   appleId   String?    @unique @map("apple_id")
   notifications Notification[]
-  fcmToken  String?  @map("fcm_token")
-  expoPushToken String? @map("expo_push_token")
+  pushTokens    PushToken[]
+  fcmToken      String?     @map("fcm_token")
+  expoPushToken String?     @map("expo_push_token")
   role      UserRole   @default(CUSTOMER)
   status    UserStatus @default(ACTIVE)
   verificationStatus String? @default("UNVERIFIED")
@@ -284,6 +285,24 @@ model Notification {
   @@index([riderId, isRead])
   @@index([createdAt(sort: Desc)])
   @@index([type])
+}
+
+model PushToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  platform  String   // e.g., 'web', 'android', 'ios', 'expo'
+  userId    String?
+  riderId   String?
+  vendorId  String?
+  createdAt DateTime @default(now())
+
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rider  Rider?  @relation(fields: [riderId], references: [id], onDelete: Cascade)
+  vendor Vendor? @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([riderId])
+  @@index([vendorId])
 }
 
 model Address {
@@ -362,6 +381,7 @@ model Rider {
   image           String?
   role            UserRole   @default(RIDER) // RIDER or DRIVER
   status          UserStatus @default(PENDING)
+  pushTokens      PushToken[]
   expoPushToken   String?    // Expo push notification token
   fcmToken        String?    // Firebase Cloud Messaging token
   createdAt       DateTime   @default(now())
@@ -506,6 +526,7 @@ model Vendor {
   password               String
   image                  String?
   status                 UserStatus @default(PENDING)
+  pushTokens             PushToken[]
   expoPushToken          String?    // Expo push notification token
   fcmToken               String?    // Firebase Cloud Messaging token
 

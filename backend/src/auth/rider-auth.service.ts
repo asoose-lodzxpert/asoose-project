@@ -434,27 +434,38 @@ export class RiderAuthService {
 
   // ============== PUSH TOKEN ==============
   async savePushToken(riderId: string, token: string, platform: string) {
-    await this.prisma.rider.update({
-      where: { id: riderId },
-      data: {
-        ...(platform === 'expo'
-          ? { expoPushToken: token }
-          : { fcmToken: token }),
-      },
-    });
+    const isExpoToken = token.startsWith('ExponentPushToken[');
+    const effectivePlatform = isExpoToken ? 'expo' : platform;
 
-    return { message: 'Push token saved' };
+    try {
+      await this.prisma.pushToken.upsert({
+        where: { token },
+        update: { riderId, platform: effectivePlatform },
+        create: { token, riderId, platform: effectivePlatform },
+      });
+      return { message: 'Push token saved' };
+    } catch (error) {
+      this.logger.error(`Failed to save push token for rider ${riderId}:`, error);
+      throw new BadRequestException('Failed to save push token');
+    }
   }
 
   // ============== DELETE PUSH TOKEN ==============
-  async deletePushToken(riderId: string) {
-    await this.prisma.rider.update({
-      where: { id: riderId },
-      data: {
-        expoPushToken: null,
-      },
-    });
-    return { message: 'Push token deleted' };
+  async deletePushToken(riderId: string, token?: string) {
+    try {
+      if (token) {
+        await this.prisma.pushToken.deleteMany({
+          where: { token, riderId },
+        });
+      } else {
+        await this.prisma.pushToken.deleteMany({
+          where: { riderId },
+        });
+      }
+      return { message: 'Push token deleted' };
+    } catch (error) {
+      throw new BadRequestException('Failed to delete push token');
+    }
   }
 
   // ============== RIDER DETAILS (Vehicle, Documents, Bank) ==============

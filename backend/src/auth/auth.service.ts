@@ -646,27 +646,30 @@ export class AuthService {
 
   async savePushToken(userId: string, token: string, platform: string) {
     try {
-      await this.prisma.user.update({
-        where: { id: userId },
-        data: {
-          fcmToken: token,
-        },
+      await this.prisma.pushToken.upsert({
+        where: { token },
+        update: { userId, platform },
+        create: { token, userId, platform },
       });
 
       return { success: true, message: 'Push token saved' };
     } catch (error) {
+      this.logger.error(`Failed to save push token for user ${userId}:`, error);
       throw new ConflictException('Failed to save push token');
     }
   }
 
-  async removePushToken(userId: string) {
+  async removePushToken(userId: string, token?: string) {
     try {
-      await this.prisma.user.update({
-        where: { id: userId },
-        data: {
-          fcmToken: null,
-        },
-      });
+      if (token) {
+        await this.prisma.pushToken.deleteMany({
+          where: { token, userId },
+        });
+      } else {
+        await this.prisma.pushToken.deleteMany({
+          where: { userId },
+        });
+      }
 
       return { success: true, message: 'Push token removed' };
     } catch (error) {

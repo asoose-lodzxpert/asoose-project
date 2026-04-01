@@ -20,7 +20,55 @@ export class NotificationsService {
     private notificationsGateway: NotificationsGateway,
     private expoPushService: ExpoPushService,
     private fcmService: FcmService,
-  ) {}
+  ) { }
+
+  /** Sends push notifications to a list of tokens based on their platform */
+  private async sendToPushTokens(
+    tokens: { token: string; platform: string }[],
+    title: string,
+    message: string,
+    metadata?: any,
+    type?: string,
+  ) {
+    if (!tokens.length) return;
+
+    const expoTokens = tokens
+      .filter((t) => t.platform === 'expo' || t.token.startsWith('ExponentPushToken['))
+      .map((t) => t.token);
+
+    const fcmTokens = tokens
+      .filter((t) => t.platform !== 'expo' && !t.token.startsWith('ExponentPushToken['))
+      .map((t) => t.token);
+
+    const channelId = type ? this.resolveChannelId(type) : 'default';
+
+    const results: Promise<any>[] = [];
+
+    if (expoTokens.length > 0) {
+      results.push(
+        this.expoPushService.sendToMultipleDevices(
+          expoTokens,
+          title,
+          message,
+          metadata,
+          channelId,
+        ).catch(err => this.logger.error('Expo push failed', err)),
+      );
+    }
+
+    if (fcmTokens.length > 0) {
+      results.push(
+        this.fcmService.sendToDevices(
+          fcmTokens,
+          title,
+          message,
+          metadata,
+        ).catch(err => this.logger.error('FCM push failed', err)),
+      );
+    }
+
+    await Promise.all(results);
+  }
 
   /** Map notification type to Android channel id */
   private resolveChannelId(type: string): string {
@@ -83,30 +131,20 @@ export class NotificationsService {
       this.notificationsGateway.sendToAdminRoom(notification);
     }
 
-    // Send push notification to all available channels for this user
+    // Send push notification to all devices for this user
     try {
-      const user = await this.prisma.user.findUnique({
-        where: { id: data.userId },
-        select: { fcmToken: true, expoPushToken: true },
+      const tokens = await this.prisma.pushToken.findMany({
+        where: { userId: data.userId },
+        select: { token: true, platform: true },
       });
 
-      if (user?.expoPushToken) {
-        await this.expoPushService.sendToDevice(
-          user.expoPushToken,
-          data.title,
-          data.message,
-          data.metadata,
-          this.resolveChannelId(data.type),
-        );
-      }
-      if (user?.fcmToken) {
-        await this.fcmService.sendToDevice(
-          user.fcmToken,
-          data.title,
-          data.message,
-          data.metadata,
-        );
-      }
+      await this.sendToPushTokens(
+        tokens,
+        data.title,
+        data.message,
+        data.metadata,
+        data.type,
+      );
     } catch (error) {
       this.logger.error(
         `Failed to send push notification to user ${data.userId}:`,
@@ -148,29 +186,20 @@ export class NotificationsService {
       this.notificationsGateway.sendToAdminRoom(notification);
     }
 
-    // Send push notification if vendor has token
+    // Send push notification to all devices for this vendor
     try {
-      const vendor = await this.prisma.vendor.findUnique({
-        where: { id: data.vendorId },
-        select: { expoPushToken: true, fcmToken: true },
+      const tokens = await this.prisma.pushToken.findMany({
+        where: { vendorId: data.vendorId },
+        select: { token: true, platform: true },
       });
 
-      if (vendor?.expoPushToken) {
-        await this.expoPushService.sendToDevice(
-          vendor.expoPushToken,
-          data.title,
-          data.message,
-          data.metadata,
-          this.resolveChannelId(data.type),
-        );
-      } else if (vendor?.fcmToken) {
-        await this.fcmService.sendToDevice(
-          vendor.fcmToken,
-          data.title,
-          data.message,
-          data.metadata,
-        );
-      }
+      await this.sendToPushTokens(
+        tokens,
+        data.title,
+        data.message,
+        data.metadata,
+        data.type,
+      );
     } catch (error) {
       this.logger.error(
         `Failed to send push notification to vendor ${data.vendorId}:`,
@@ -212,31 +241,20 @@ export class NotificationsService {
       this.notificationsGateway.sendToAdminRoom(notification);
     }
 
-    // Send push notification if rider has token
+    // Send push notification to all devices for this rider
     try {
-      const rider = await this.prisma.rider.findUnique({
-        where: { id: data.riderId },
-        select: { expoPushToken: true, fcmToken: true },
+      const tokens = await this.prisma.pushToken.findMany({
+        where: { riderId: data.riderId },
+        select: { token: true, platform: true },
       });
 
-      // Send to both expo and FCM channels if both are present
-      if (rider?.expoPushToken) {
-        await this.expoPushService.sendToDevice(
-          rider.expoPushToken,
-          data.title,
-          data.message,
-          data.metadata,
-          this.resolveChannelId(data.type),
-        );
-      }
-      if (rider?.fcmToken) {
-        await this.fcmService.sendToDevice(
-          rider.fcmToken,
-          data.title,
-          data.message,
-          data.metadata,
-        );
-      }
+      await this.sendToPushTokens(
+        tokens,
+        data.title,
+        data.message,
+        data.metadata,
+        data.type,
+      );
     } catch (error) {
       this.logger.error(
         `Failed to send push notification to rider ${data.riderId}:`,
@@ -272,6 +290,29 @@ export class NotificationsService {
 
     // Broadcast to all connected admin WebSocket clients
     this.notificationsGateway.sendToAdminRoom(notification);
+
+    // Send push notifications to all users with ADMIN/SUPER_ADMIN role
+    try {
+      const adminTokens = await this.prisma.pushToken.findMany({
+        where: {
+          user: {
+            role: { in: ['ADMIN', 'SUPER_ADMIN'] },
+            status: 'ACTIVE',
+          },
+        },
+        select: { token: true, platform: true },
+      });
+
+      await this.sendToPushTokens(
+        adminTokens,
+        data.title,
+        data.message,
+        data.metadata,
+        data.type,
+      );
+    } catch (error) {
+      this.logger.error('Failed to send push notifications to admins:', error);
+    }
 
     return notification;
   }

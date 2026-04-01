@@ -489,26 +489,34 @@ export class VendorAuthService {
 
   // ---------------- PUSH TOKENS ----------------
   async savePushToken(vendorId: string, token: string, platform: string) {
-    const field =
-      platform === 'ios' || platform === 'android'
-        ? 'expoPushToken'
-        : 'fcmToken';
-
-    await this.prisma.vendor.update({
-      where: { id: vendorId },
-      data: { [field]: token },
-    });
-
-    return { message: 'Push token saved successfully' };
+    try {
+      await this.prisma.pushToken.upsert({
+        where: { token },
+        update: { vendorId, platform },
+        create: { token, vendorId, platform },
+      });
+      return { message: 'Push token saved successfully' };
+    } catch (error) {
+      this.appLogger.error(`Failed to save push token for vendor ${vendorId}:`, error?.stack);
+      throw new InternalServerErrorException('Failed to save push token');
+    }
   }
 
-  async removePushToken(vendorId: string) {
-    await this.prisma.vendor.update({
-      where: { id: vendorId },
-      data: { expoPushToken: null, fcmToken: null },
-    });
-
-    return { message: 'Push token removed successfully' };
+  async removePushToken(vendorId: string, token?: string) {
+    try {
+      if (token) {
+        await this.prisma.pushToken.deleteMany({
+          where: { token, vendorId },
+        });
+      } else {
+        await this.prisma.pushToken.deleteMany({
+          where: { vendorId },
+        });
+      }
+      return { message: 'Push token removed successfully' };
+    } catch (error) {
+      throw new InternalServerErrorException('Failed to remove push token');
+    }
   }
 
   // ---------------- PROFILE ----------------
