@@ -15,8 +15,8 @@ export class PricingService {
     this.MIN_FEE = this.validateConfig('DELIVERY_MIN_FEE', 1000);
     this.SERVICE_FEE_PERCENTAGE = this.validateConfig(
       'SERVICE_FEE_PERCENTAGE',
-      0.05,
-    ); // Default 5%
+      0.015,
+    ); // Default 1.5%
   }
 
   /**
@@ -41,7 +41,7 @@ export class PricingService {
    * Calculates VAT at 7% of subtotal
    */
   public calculateVat(subtotal: number): number {
-    return Math.round(subtotal * 0.07);
+    return Math.round(subtotal * 0.075);
   }
 
   /**

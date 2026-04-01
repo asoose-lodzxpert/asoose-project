@@ -27,7 +27,7 @@ import { StorageModule } from './storage/storage.module';
 import { SuperAdminModule } from './super-admin/super-admin.module';
 import { UsersModule } from './users/users.module';
 import { VendorModule } from './vendor/vendor.module';
-// import { LogsModule } from './logs/logs.module';  // Commented out - requires MongoDB
+import { LogsModule } from './logs/logs.module';
 import { FareModule } from './fare/fare.module';
 import { LoggerModule } from './libs/logger/logger.module';
 import { MetricsModule } from './metrics/metrics.module';
@@ -66,17 +66,6 @@ import { AdminAuditModule } from './admin-audit/admin-audit.module';
     }),
     ScheduleModule.forRoot(),
 
-    // ---------- MongoDB (optional — used only for error-log storage) ----------
-    // Commented out - enable when you have MongoDB running
-    // MongooseModule.forRootAsync({
-    //   inject: [ConfigService],
-    //   useFactory: (cs: ConfigService) => ({
-    //     uri: cs.get<string>('MONGODB_URI', 'mongodb://localhost:27017/asoose'),
-    //     serverSelectionTimeoutMS: 3_000,
-    //     connectTimeoutMS: 3_000,
-    //     socketTimeoutMS: 5_000,
-    //   }),
-    // }),
 
     // ---------- Rate Limiting ----------
     // ThrottlerStorageRedisService shares counters across instances and survives restarts.
@@ -107,7 +96,7 @@ import { AdminAuditModule } from './admin-audit/admin-audit.module';
     AuthModule,
     CartModule,
     FcmModule,
-    // LogsModule,  // Commented out - requires MongoDB
+    LogsModule,
     MailModule,
     MapsModule,
     MarketplaceModule,

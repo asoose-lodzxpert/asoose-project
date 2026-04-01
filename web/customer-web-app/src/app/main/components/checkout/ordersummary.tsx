@@ -36,8 +36,8 @@ export const OrderSummary = ({
   // Show placeholder text instead and compute the total only from known values.
   const feesKnown = deliveryFee !== null;
   const resolvedDelivery = deliveryFee ?? null;
-  const resolvedService = serviceFee ?? Math.round(cartTotal * 0.05);
-  const resolvedVat = vatAmount ?? Math.round(cartTotal * 0.07);
+  const resolvedService = serviceFee ?? Math.round(cartTotal * 0.015);
+  const resolvedVat = vatAmount ?? Math.round(cartTotal * 0.075);
   // Prefer the backend-authoritative grand total from the quote. Fall back to
   // client-side recomputation only when the quote hasn't loaded yet.
   const grandTotal =
@@ -77,7 +77,7 @@ export const OrderSummary = ({
           )}
         </div>
         <div className="flex justify-between text-gray-600 dark:text-gray-400">
-          <span>Service Fee (5%)</span>
+          <span>Service Fee (1.5%)</span>
           {isLoadingFee ? (
             <span className="w-12 h-4 bg-gray-200 dark:bg-white/10 rounded animate-pulse" />
           ) : (
@@ -85,7 +85,7 @@ export const OrderSummary = ({
           )}
         </div>
         <div className="flex justify-between text-gray-600 dark:text-gray-400">
-          <span>VAT (7%)</span>
+          <span>VAT (7.5%)</span>
           {isLoadingFee ? (
             <span className="w-12 h-4 bg-gray-200 dark:bg-white/10 rounded animate-pulse" />
           ) : (

@@ -1293,3 +1293,16 @@ enum InquiryStatus {
   READ
   REPLIED
 }
+model ErrorLog {
+  id        String   @id @default(uuid())
+  message   String
+  context   String?
+  stack     String?
+  device    String?
+  platform  String?
+  timestamp String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("error_logs")
+}

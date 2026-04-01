@@ -104,22 +104,46 @@ export default function CheckoutScreen() {
       try {
         const response = await request("users/addresses", { method: "GET" });
         if (response && Array.isArray(response) && response.length > 0) {
-          // Prefer address closest to user's home-screen location
+          let bestMatch: Address | null = null;
+
+          // 1. Try to find exact coordinate match with Home Screen location
           if (homeLocation?.coords) {
             const { latitude, longitude } = homeLocation.coords;
-            const sorted = [...response].sort((a: Address, b: Address) => {
-              const da = Math.hypot(a.lat - latitude, a.lng - longitude);
-              const db = Math.hypot(b.lat - latitude, b.lng - longitude);
-              return da - db;
-            });
-            setSelectedAddress(sorted[0]);
-          } else {
-            // Fallback: prefer "home" label, then first
-            const homeAddr = response.find(
-              (a: Address) => a.label?.toLowerCase() === "home",
+            bestMatch = response.find(
+              (a: Address) =>
+                Math.abs(a.lat - latitude) < 0.0001 &&
+                Math.abs(a.lng - longitude) < 0.0001,
             );
-            setSelectedAddress(homeAddr || response[0]);
+
+            // 2. If no exact coord match, try matching by address string
+            if (!bestMatch && homeLocation.address) {
+              bestMatch = response.find(
+                (a: Address) =>
+                  a.street?.toLowerCase() ===
+                  homeLocation.address.toLowerCase(),
+              );
+            }
+
+            // 3. Fallback: select the closest one by distance
+            if (!bestMatch) {
+              const sorted = [...response].sort((a: Address, b: Address) => {
+                const da = Math.hypot(a.lat - latitude, a.lng - longitude);
+                const db = Math.hypot(b.lat - latitude, b.lng - longitude);
+                return da - db;
+              });
+              bestMatch = sorted[0];
+            }
           }
+
+          // 4. Ultimate fallback: prefer "home" label, then default, then first
+          if (!bestMatch) {
+            bestMatch =
+              response.find((a: Address) => a.label?.toLowerCase() === "home") ||
+              response.find((a: Address) => a.isDefault) ||
+              response[0];
+          }
+
+          setSelectedAddress(bestMatch);
         }
       } catch (error) {
         console.error("Failed to load addresses:", error);
@@ -196,9 +220,9 @@ export default function CheckoutScreen() {
   // Resolve totals: prefer live quote, fall back to cart-computed values
   const resolvedDelivery = quoteResult?.totalDeliveryFee ?? deliveryFee;
   const resolvedService =
-    quoteResult?.totalServiceFee ?? Math.round(subtotal * 0.05);
+    quoteResult?.totalServiceFee ?? Math.round(subtotal * 0.015);
   const resolvedVat =
-    quoteResult?.totalVatAmount ?? Math.round(subtotal * 0.07);
+    quoteResult?.totalVatAmount ?? Math.round(subtotal * 0.075);
   // Use the backend-authoritative grand total from the quote when available.
   // This is the single source of truth and prevents discrepancies from
   // modifier prices or rounding that arise from recomputing client-side.
@@ -504,7 +528,7 @@ export default function CheckoutScreen() {
                 </View>
                 <View style={[styles.summaryRow, { marginBottom: 6 }]}>
                   <ThemedText style={{ color: textSecondary, fontSize: 13 }}>
-                    Service Fee (5%)
+                    Service Fee (1.5%)
                   </ThemedText>
                   {isLoadingFee ? (
                     <ThemedText style={{ fontSize: 13, color: textSecondary }}>
@@ -518,7 +542,7 @@ export default function CheckoutScreen() {
                 </View>
                 <View style={[styles.summaryRow, { marginBottom: 12 }]}>
                   <ThemedText style={{ color: textSecondary, fontSize: 13 }}>
-                    VAT (7%)
+                    VAT (7.5%)
                   </ThemedText>
                   {isLoadingFee ? (
                     <ThemedText style={{ fontSize: 13, color: textSecondary }}>
