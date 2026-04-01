@@ -30,7 +30,7 @@ export class LogsController {
     return {
       success: true,
       message: 'Error logged successfully',
-      id: (log as any)._id?.toString() || (log as any).id,
+      id: log?.id,
     };
   }
 }

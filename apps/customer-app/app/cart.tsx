@@ -44,8 +44,8 @@ export default function CartScreen() {
   const currency = restaurants[0]?.currency ?? "₦";
 
   // Estimated fees (previews; exact amounts confirmed at checkout after address selection)
-  const estimatedServiceFee = Math.round(subtotal * 0.05);
-  const estimatedVat = Math.round(subtotal * 0.07);
+  const estimatedServiceFee = Math.round(subtotal * 0.015);
+  const estimatedVat = Math.round(subtotal * 0.075);
   const estimatedTotal =
     subtotal + deliveryFee + estimatedServiceFee + estimatedVat;
 
@@ -284,7 +284,7 @@ export default function CartScreen() {
 
           <View style={styles.summaryRow}>
             <ThemedText style={[styles.summaryLabel, { color: textSub }]}>
-              Service Fee (5%)
+              Service Fee (1.5%)
             </ThemedText>
             <ThemedText style={[styles.summaryValue, { color: textMain }]}>
               {currency}
@@ -294,7 +294,7 @@ export default function CartScreen() {
 
           <View style={styles.summaryRow}>
             <ThemedText style={[styles.summaryLabel, { color: textSub }]}>
-              VAT (7%)
+              VAT (7.5%)
             </ThemedText>
             <ThemedText style={[styles.summaryValue, { color: textMain }]}>
               {currency}
