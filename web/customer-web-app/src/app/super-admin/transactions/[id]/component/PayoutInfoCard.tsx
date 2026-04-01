@@ -3,6 +3,7 @@ import { FileText } from "lucide-react";
 import { CopyButton } from "./CopyButton";
 import { SectionCard } from "./SectionCard";
 import { TransactionDetail } from "../types";
+import { formatDateTime } from "@/utils/formatDate";
 export const PayoutInfoCard = ({
   info,
 }: {
@@ -31,7 +32,7 @@ export const PayoutInfoCard = ({
         <div>
           <p className="text-gray-400 text-xs mb-2">Requested</p>
           <p className="text-white text-sm">
-            {new Date(info.requestedAt).toLocaleDateString()}
+            {formatDateTime(info.requestedAt)}
           </p>
         </div>
         <div>

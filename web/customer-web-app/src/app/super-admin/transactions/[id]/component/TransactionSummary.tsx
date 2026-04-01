@@ -9,6 +9,7 @@ import {
 import { CopyButton } from "./CopyButton";
 import { TransactionDetail } from "../types";
 import { Currency } from "@/app/main/components/Currency";
+import { formatDateTime } from "@/utils/formatDate";
 
 export const TransactionSummary = ({ txn }: { txn: TransactionDetail }) => {
   const isCredit =
@@ -105,7 +106,7 @@ export const TransactionSummary = ({ txn }: { txn: TransactionDetail }) => {
             Date & Time
           </p>
           <p className="text-white font-medium text-sm truncate">
-            {new Date(txn.date).toLocaleString()}
+            {formatDateTime(txn.date)}
           </p>
         </div>
         <div className="space-y-1">

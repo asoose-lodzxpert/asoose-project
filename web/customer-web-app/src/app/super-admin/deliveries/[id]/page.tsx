@@ -24,6 +24,7 @@ import { useParams, useRouter } from "next/navigation";
 import { toast } from "react-toastify";
 import useSWR from "swr";
 import { fetcher } from "../../hooks/useSuperAdminFetch";
+import { formatDateTime } from "@/utils/formatDate";
 import { DeliveryDetailsSkeleton } from "./skeleton";
 import { AssignRiderModal } from "../components/AssignRiderModal";
 import { UpdateStatusModal } from "../components/UpdateStatusModal";
@@ -238,7 +239,7 @@ export default function DeliveryDetailPage() {
                         {step.status}
                       </p>
                       <p className="text-xs md:text-[10px] text-gray-400 font-mono mb-2">
-                        {step.time ? new Date(step.time).toLocaleString() : "-"}
+                        {step.time ? formatDateTime(step.time) : "-"}
                       </p>
 
                       {step.done && (

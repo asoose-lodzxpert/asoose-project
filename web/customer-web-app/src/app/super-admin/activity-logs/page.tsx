@@ -14,6 +14,7 @@ import { DataTable } from "../component/datatable";
 import { fetcher } from "../hooks/useSuperAdminFetch";
 import ActivityLogSkeleton from "./skeleton";
 import LogDetailModal from "./components/logDetailModal";
+import { formatDateTime } from "@/utils/formatDate";
 interface ActivityLog {
   id: string;
   action: string;
@@ -98,7 +99,7 @@ export default function ActivityLogsPage() {
       header: "Timestamp",
       cell: ({ row }: any) => (
         <span className="text-gray-400 text-sm">
-          {new Date(row.original.createdAt).toLocaleString()}
+          {formatDateTime(row.original.createdAt)}
         </span>
       ),
     },
@@ -193,7 +194,7 @@ export default function ActivityLogsPage() {
                 </div>
                 <span className="text-[10px] text-gray-500 flex items-center gap-1">
                   <Calendar className="w-3 h-3" />
-                  {new Date(log.createdAt).toLocaleDateString()}
+                  {formatDateTime(log.createdAt)}
                 </span>
               </div>
 

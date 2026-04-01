@@ -25,6 +25,7 @@ import {
 import { toast } from "react-toastify";
 import Swal from "sweetalert2";
 import { fetcher } from "../../hooks/useSuperAdminFetch";
+import { formatDateTime, formatDateOnly } from "@/utils/formatDate";
 
 // --- Shared Types ---
 interface Document {
@@ -200,10 +201,7 @@ export default function VerificationDetailPage() {
                 <InfoRow
                   icon={<Calendar className="text-orange-400 w-4 h-4" />}
                   label="Registered On"
-                  value={new Date(entity.createdAt).toLocaleDateString(
-                    undefined,
-                    { dateStyle: "medium" },
-                  )}
+                  value={formatDateOnly(entity.createdAt)}
                 />
               </div>
             </div>

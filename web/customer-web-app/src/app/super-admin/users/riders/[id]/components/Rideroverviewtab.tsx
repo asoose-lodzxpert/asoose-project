@@ -10,7 +10,8 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { VehicleCard } from "./vechilecard";
-import { fetcher } from "@/app/super-admin/hooks/useSuperAdminFetch"; // ✅ Standardized Fetcher
+import { fetcher } from "@/app/super-admin/hooks/useSuperAdminFetch";
+import { formatDateTime, formatTimeOnly } from "@/utils/formatDate";
 
 // Dynamic import for the Map component
 const RiderMap = dynamic(() => import("./map"), {
@@ -136,7 +137,7 @@ export const RiderOverviewTab = ({
               />
               <span className="text-[10px] text-gray-400 font-bold uppercase">
                 {lastSeen
-                  ? `Last Seen: ${new Date(lastSeen).toLocaleTimeString()}`
+                  ? `Last Seen: ${formatTimeOnly(lastSeen)}`
                   : "Connection Lost"}
               </span>
             </div>

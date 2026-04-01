@@ -13,7 +13,8 @@ import {
   AlertCircle,
   Filter,
 } from "lucide-react";
-import PayoutsSkeleton from "./skeleton"; // ← adjust path if needed
+import PayoutsSkeleton from "./skeleton";
+import { formatDateTime } from "@/utils/formatDate";
 
 // ──────────────────────────────────────────────
 // Types
@@ -99,13 +100,7 @@ function fmt(amount: number) {
 
 function fmtDate(d?: string | null) {
   if (!d) return "—";
-  return new Date(d).toLocaleString("en-NG", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return formatDateTime(d);
 }
 
 function mask(n?: string | null) {

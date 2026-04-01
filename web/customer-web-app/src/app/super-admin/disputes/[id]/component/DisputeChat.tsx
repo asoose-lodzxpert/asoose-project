@@ -2,6 +2,7 @@
 import React, { useState } from "react";
 import { Send, AlertTriangle, AlertCircle, Loader2 } from "lucide-react";
 import { DisputeDetail } from "../types";
+import { formatTimeOnly } from "@/utils/formatDate";
 interface Props {
   messages: DisputeDetail["messages"];
   canAddMessage: boolean;
@@ -55,10 +56,7 @@ export default function DisputeChat({
                     {msg.sender.role}
                   </span>
                   <span className="text-[10px] text-gray-600">
-                    {new Date(msg.createdAt).toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
+                    {formatTimeOnly(msg.createdAt)}
                   </span>
                 </div>
                 <div

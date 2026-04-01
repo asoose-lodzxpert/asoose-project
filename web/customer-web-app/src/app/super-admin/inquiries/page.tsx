@@ -13,6 +13,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { fetcher } from "../hooks/useSuperAdminFetch";
+import { formatDateTime } from "@/utils/formatDate";
 
 interface InquiryReply {
   id: string;
@@ -220,7 +221,7 @@ export default function InquiriesPage() {
                     {inquiry.subject}
                   </p>
                   <p className="text-xs text-gray-500 mt-1">
-                    {new Date(inquiry.createdAt).toLocaleString()}
+                    {formatDateTime(inquiry.createdAt)}
                   </p>
                 </div>
                 <div className="ml-4 flex items-center gap-2 shrink-0">
@@ -265,7 +266,7 @@ export default function InquiriesPage() {
                               {reply.adminName}
                             </span>
                             <span className="text-gray-500 text-xs ml-auto">
-                              {new Date(reply.createdAt).toLocaleString()}
+                              {formatDateTime(reply.createdAt)}
                             </span>
                           </div>
                           <p className="text-gray-200 text-sm leading-relaxed whitespace-pre-wrap">

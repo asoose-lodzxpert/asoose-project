@@ -22,8 +22,9 @@ import {
   SortingState,
 } from "@tanstack/react-table";
 import Swal from "sweetalert2";
-import { fetcher } from "../../hooks/useSuperAdminFetch"; // ✅ Standardized Fetcher
+import { fetcher } from "../../hooks/useSuperAdminFetch";
 import { CustomersPageSkeleton } from "./components/skeleton";
+import { formatDateOnly } from "@/utils/formatDate";
 
 // --- Types ---
 type UserStatus = "ACTIVE" | "PENDING" | "SUSPENDED" | "BANNED" | "ALL";
@@ -302,7 +303,7 @@ export default function CustomersPage() {
         header: "Joined",
         cell: (info) => (
           <span className="text-gray-400 text-xs">
-            {new Date(info.getValue()).toLocaleDateString()}
+            {formatDateOnly(info.getValue())}
           </span>
         ),
       }),

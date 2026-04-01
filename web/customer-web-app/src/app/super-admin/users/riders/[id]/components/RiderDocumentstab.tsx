@@ -1,6 +1,7 @@
 import React from "react";
 import { FileText, Eye, Check, X, AlertCircle } from "lucide-react";
 import Swal from "sweetalert2";
+import { formatDateOnly } from "@/utils/formatDate";
 
 interface Document {
   id: string;
@@ -75,7 +76,7 @@ export const RiderDocumentsTab: React.FC<RiderDocumentsTabProps> = ({
                 </span>
                 {doc.updatedAt && (
                   <span className="text-xs text-gray-500">
-                    {new Date(doc.updatedAt).toLocaleDateString()}
+                    {formatDateOnly(doc.updatedAt)}
                   </span>
                 )}
               </div>

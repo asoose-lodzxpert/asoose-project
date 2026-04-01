@@ -20,6 +20,7 @@ import {
   Calendar,
   Layers, // Added for Group visualization
 } from "lucide-react";
+import { formatDateTime } from "@/utils/formatDate";
 import { DataTable } from "@/app/super-admin/component/datatable";
 import { ColumnDef } from "@tanstack/react-table";
 import { TransactionsListSkeleton } from "./component/skeleton";
@@ -261,7 +262,7 @@ export default function TransactionsPage() {
         header: "Date",
         cell: (info) => (
           <span className="text-gray-400 text-sm">
-            {new Date(info.getValue<string>()).toLocaleDateString()}
+            {formatDateTime(info.getValue<string>())}
           </span>
         ),
       },

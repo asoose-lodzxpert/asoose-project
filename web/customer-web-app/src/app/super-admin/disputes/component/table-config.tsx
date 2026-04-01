@@ -11,6 +11,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { Dispute } from "../types";
+import { formatDateTime } from "@/utils/formatDate";
 
 const columnHelper = createColumnHelper<Dispute>();
 
@@ -83,7 +84,7 @@ export const disputeColumns = [
             </span>
           ) : (
             <span className="text-[10px] text-gray-500">
-              {new Date(info.row.original.reportedAt).toLocaleDateString()}
+              {formatDateTime(info.row.original.reportedAt)}
             </span>
           )}
         </div>

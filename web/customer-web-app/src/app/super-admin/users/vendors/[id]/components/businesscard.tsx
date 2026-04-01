@@ -10,6 +10,7 @@ import {
   Tag,
 } from "lucide-react";
 import { LocationInput } from "@/components/shared/LocationInput";
+import { formatDateOnly } from "@/utils/formatDate";
 
 interface BusinessInfoCardProps {
   vendor: any;
@@ -30,14 +31,6 @@ const BusinessInfoCard = ({
   addressCoords,
   onAddressChange,
 }: BusinessInfoCardProps) => {
-  const formatDate = (date: string) =>
-    date
-      ? new Date(date).toLocaleDateString("en-US", {
-          year: "numeric",
-          month: "short",
-          day: "numeric",
-        })
-      : "N/A";
 
   return (
     <div className="bg-[#1E293B] border border-gray-800 rounded-xl p-6 relative overflow-hidden h-fit">
@@ -177,13 +170,13 @@ const BusinessInfoCard = ({
           {/* Joined Date */}
           <div className="flex items-center gap-3 text-sm text-gray-300">
             <Calendar className="w-4 h-4 text-gray-500 shrink-0" />
-            <span>Joined {formatDate(vendor.createdAt)}</span>
+            <span>Joined {formatDateOnly(vendor.createdAt)}</span>
           </div>
 
           {/* Updated Date */}
           <div className="flex items-center gap-3 text-sm text-gray-300">
             <Clock className="w-4 h-4 text-gray-500 shrink-0" />
-            <span>Updated {formatDate(vendor.updatedAt)}</span>
+            <span>Updated {formatDateOnly(vendor.updatedAt)}</span>
           </div>
         </div>
       </div>

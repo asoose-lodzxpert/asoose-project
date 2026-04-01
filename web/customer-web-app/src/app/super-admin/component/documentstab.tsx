@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import Swal from "sweetalert2";
 import Image from "next/image";
+import { formatDateTime } from "@/utils/formatDate";
 
 // Unified Interface matching your Prisma Schema
 export interface Document {
@@ -103,7 +104,7 @@ export default function DocumentsTab({
                     </h4>
                     <span className="text-xs text-gray-500 flex items-center gap-1">
                       <Clock className="w-3 h-3" />{" "}
-                      {new Date(doc.createdAt).toLocaleDateString()}
+                      {formatDateTime(doc.createdAt)}
                     </span>
                   </div>
                 </div>
