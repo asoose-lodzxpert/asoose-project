@@ -96,80 +96,96 @@ export function usePushNotifications() {
       try {
         preloadNotificationSound();
 
-        // Unlock audio on first interaction (browser autoplay policy)
-        const unlock = () => {
+        // Helper to perform registration after permission is granted
+        const proceedWithRegistration = async (perm: NotificationPermission) => {
+          if (perm !== "granted" || cancelled) return;
+
+          // 2. Register service worker
+          const swReg = await navigator.serviceWorker.register(buildSwUrl(), {
+            scope: "/",
+          });
+          await navigator.serviceWorker.ready; // wait for SW to be active
+          console.log("[Push] Service worker registered");
+
+          if (cancelled) return;
+
+          // 3. Get FCM token — always on every full page reload
+          const messaging = getFirebaseMessaging();
+          if (!messaging) {
+            console.warn("[Push] Firebase messaging not available");
+            return;
+          }
+
+          const fcmToken = await getToken(messaging, {
+            vapidKey: VAPID_KEY,
+            serviceWorkerRegistration: swReg,
+          });
+
+          if (!fcmToken) {
+            console.warn("[Push] No FCM token returned");
+            return;
+          }
+
+          console.log("[Push] FCM token obtained, registering with backend...");
+
+          if (cancelled) return;
+
+          // 4. Always send token to backend on every reload (tokens can rotate)
+          await registerToken(fcmToken, accessToken);
+          console.log("[Push] Token registered with backend ✓");
+
+          // 5. Foreground message handler
+          if (unsubscribeRef.current) unsubscribeRef.current();
+          unsubscribeRef.current = onMessage(messaging, (payload) => {
+            const { title, body } = payload.notification ?? {};
+
+            playNotificationSound().catch(() => {});
+
+            toast.info(
+              <div className="flex flex-col gap-1">
+                <span className="font-bold text-sm">
+                  {title || "Notification"}
+                </span>
+                {body && <span className="text-xs opacity-90">{body}</span>}
+              </div>,
+              {
+                icon: <span>🔔</span>,
+                position: "bottom-right",
+              },
+            );
+          });
+        };
+
+        // 1. Request permission — shows dialog on first visit; silent thereafter
+        if (Notification.permission === "granted") {
+          await proceedWithRegistration("granted");
+        } else if (Notification.permission === "default") {
+          console.log("[Push] Permission is default — waiting for user gesture...");
+          // Wait for the 'unlock' interaction which we already set up listeners for
+        } else {
+          console.warn("[Push] Permission denied previously.");
+        }
+
+        // Unlock audio AND request permission on first interaction (browser autoplay/push policy)
+        const unlock = async () => {
           unlockNotificationSound();
           window.removeEventListener("click", unlock);
           window.removeEventListener("touchstart", unlock);
+
+          if (Notification.permission === "default") {
+            try {
+              const perm = await Notification.requestPermission();
+              console.log("[Push] Notification permission requested:", perm);
+              if (perm === "granted") {
+                await proceedWithRegistration(perm);
+              }
+            } catch (err) {
+              console.error("[Push] Request permission error:", err);
+            }
+          }
         };
         window.addEventListener("click", unlock, { once: true });
         window.addEventListener("touchstart", unlock, { once: true });
-
-        // 1. Request permission — shows dialog on first visit; silent thereafter
-        const permission = await Notification.requestPermission();
-        console.log("[Push] Notification permission:", permission);
-
-        if (permission !== "granted") {
-          console.warn("[Push] Permission not granted:", permission);
-          return;
-        }
-
-        if (cancelled) return;
-
-        // 2. Register service worker
-        const swReg = await navigator.serviceWorker.register(buildSwUrl(), {
-          scope: "/",
-        });
-        await navigator.serviceWorker.ready; // wait for SW to be active
-        console.log("[Push] Service worker registered");
-
-        if (cancelled) return;
-
-        // 3. Get FCM token — always on every full page reload
-        const messaging = getFirebaseMessaging();
-        if (!messaging) {
-          console.warn("[Push] Firebase messaging not available");
-          return;
-        }
-
-        const fcmToken = await getToken(messaging, {
-          vapidKey: VAPID_KEY,
-          serviceWorkerRegistration: swReg,
-        });
-
-        if (!fcmToken) {
-          console.warn("[Push] No FCM token returned");
-          return;
-        }
-
-        console.log("[Push] FCM token obtained, registering with backend...");
-
-        if (cancelled) return;
-
-        // 4. Always send token to backend on every reload (tokens can rotate)
-        await registerToken(fcmToken, accessToken);
-        console.log("[Push] Token registered with backend ✓");
-
-        // 5. Foreground message handler
-        if (unsubscribeRef.current) unsubscribeRef.current();
-        unsubscribeRef.current = onMessage(messaging, (payload) => {
-          const { title, body } = payload.notification ?? {};
-
-          playNotificationSound().catch(() => {});
-
-          toast.info(
-            <div className="flex flex-col gap-1">
-              <span className="font-bold text-sm">
-                {title || "Notification"}
-              </span>
-              {body && <span className="text-xs opacity-90">{body}</span>}
-            </div>,
-            {
-              icon: <span>🔔</span>,
-              position: "bottom-right",
-            },
-          );
-        });
       } catch (err) {
         console.error("[Push] Setup error:", err);
         // Allow retry on next reload
