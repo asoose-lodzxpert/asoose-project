@@ -25,6 +25,7 @@ import useSWR from "swr";
 import { getSession } from "next-auth/react"; // ✅ Import NextAuth
 import RidesPageSkeleton from "./skeleton";
 import { fetcher } from "../hooks/useSuperAdminFetch";
+import { formatDateTime } from "@/utils/formatDate";
 
 // --- Types ---
 interface Ride {
@@ -201,10 +202,7 @@ export default function RidesPage() {
             </Link>
             <span className="text-xs text-gray-500 flex items-center gap-1 mt-1">
               <Clock className="w-3 h-3" />
-              {new Date(row.original.time).toLocaleTimeString([], {
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
+              {formatDateTime(row.original.time)}
             </span>
           </div>
         ),

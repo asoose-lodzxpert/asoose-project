@@ -2,6 +2,7 @@
 import React from "react";
 import { Calendar } from "lucide-react";
 import { DisputeDetail } from "../types";
+import { formatDateTime } from "@/utils/formatDate";
 
 interface Props {
   dispute: DisputeDetail;
@@ -19,7 +20,7 @@ export default function DisputeTimeline({ dispute }: Props) {
           <div className="absolute -left-[29px] top-1 w-3 h-3 rounded-full border-2 border-[#1E293B] bg-blue-500"></div>
           <p className="text-xs font-bold text-gray-300">Opened</p>
           <p className="text-[10px] text-gray-500 font-mono">
-            {new Date(dispute.createdAt).toLocaleString()}
+            {formatDateTime(dispute.createdAt)}
           </p>
         </div>
 
@@ -35,7 +36,7 @@ export default function DisputeTimeline({ dispute }: Props) {
               {dispute.status === "RESOLVED" ? "Resolved" : "Rejected"}
             </p>
             <p className="text-[10px] text-gray-500 font-mono">
-              {new Date(dispute.resolvedAt).toLocaleString()}
+              {formatDateTime(dispute.resolvedAt)}
             </p>
             {dispute.refundAmount && dispute.refundAmount > 0 && (
               <span className="inline-block mt-1 text-[10px] bg-green-900 text-green-300 px-1.5 py-0.5 rounded border border-green-800">

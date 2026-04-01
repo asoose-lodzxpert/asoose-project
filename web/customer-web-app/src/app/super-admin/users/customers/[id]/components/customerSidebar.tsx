@@ -11,6 +11,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { CustomerProfile } from "../types";
+import { formatDateOnly } from "@/utils/formatDate";
 
 interface CustomerSidebarProps {
   customer: CustomerProfile;
@@ -51,18 +52,6 @@ export const CustomerSidebar: React.FC<CustomerSidebarProps> = ({
   };
 
   // ✅ FIX 1: Robust Date Formatter
-  const formatDate = (dateString?: string) => {
-    if (!dateString) return "N/A";
-    const date = new Date(dateString);
-    // Check if date is valid
-    if (isNaN(date.getTime())) return "Invalid Date";
-
-    return date.toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
-  };
 
   // ✅ FIX 2: Handle Backend Property Mismatch
   // The backend returns 'createdAt', but your interface might expect 'joinedAt'
@@ -180,11 +169,11 @@ export const CustomerSidebar: React.FC<CustomerSidebarProps> = ({
             {/* ✅ FIX 3: Use the resolved Date Variables */}
             <div className="flex items-center gap-3 text-sm text-gray-300">
               <Calendar className="w-4 h-4 text-gray-500" />
-              <span>Joined {formatDate(joinDate)}</span>
+              <span>Joined {formatDateOnly(joinDate)}</span>
             </div>
             <div className="flex items-center gap-3 text-sm text-gray-300">
               <Clock className="w-4 h-4 text-gray-500" />
-              <span>Updated {formatDate(updateDate)}</span>
+              <span>Updated {formatDateOnly(updateDate)}</span>
             </div>
           </div>
         </div>

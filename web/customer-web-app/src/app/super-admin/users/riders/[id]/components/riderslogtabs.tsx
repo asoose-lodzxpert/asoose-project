@@ -1,5 +1,5 @@
-import React from "react";
 import { Clock, ShieldAlert, CheckCircle, Info, User } from "lucide-react";
+import { formatDateTime } from "@/utils/formatDate";
 
 interface Log {
   id: string;
@@ -49,7 +49,7 @@ export const RiderLogsTab = ({ logs }: { logs: Log[] }) => {
                 {log.action.replace(/_/g, " ").toLowerCase()}
               </p>
               <span className="text-[10px] text-gray-500 whitespace-nowrap">
-                {new Date(log.createdAt).toLocaleString()}
+                {formatDateTime(log.createdAt)}
               </span>
             </div>
 

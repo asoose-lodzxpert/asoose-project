@@ -9,6 +9,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { BarChart3 } from "lucide-react";
+import { formatDateOnly } from "@/utils/formatDate";
 
 interface PerformanceData {
   date: string;
@@ -86,13 +87,7 @@ const PerformanceChart = ({ data }: PerformanceChartProps) => {
                 fontSize: "12px",
               }}
               labelFormatter={(label) => {
-                if (!label) return "";
-                const date = new Date(label);
-                return date.toLocaleDateString(undefined, {
-                  month: "short",
-                  day: "numeric",
-                  year: "numeric",
-                });
+                return formatDateOnly(label);
               }}
               // ✅ FIX: Use Intl.NumberFormat for Naira currency
               formatter={(value: number | undefined) => [

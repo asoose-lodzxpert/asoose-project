@@ -20,6 +20,7 @@ import Swal from "sweetalert2";
 import { AppAlert } from "../../../customers/[id]/alerts";
 import { getSession } from "next-auth/react"; // ✅ Import NextAuth
 import { Currency } from "@/app/main/components/Currency";
+import { formatDateOnly } from "@/utils/formatDate";
 
 interface RiderSidebarProps {
   rider: any;
@@ -181,14 +182,6 @@ export const RiderSidebar: React.FC<RiderSidebarProps> = ({
     }
   };
 
-  const formatDate = (date: string) =>
-    date
-      ? new Date(date).toLocaleDateString("en-US", {
-          year: "numeric",
-          month: "short",
-          day: "numeric",
-        })
-      : "N/A";
 
   const isSuspended = rider.status === "SUSPENDED";
 
@@ -349,7 +342,7 @@ export const RiderSidebar: React.FC<RiderSidebarProps> = ({
             <div className="flex items-center gap-3 text-sm text-gray-300">
               <Calendar className="w-4 h-4 text-gray-500 shrink-0" />
               <span>
-                Joined {formatDate(rider.joinedAt || rider.createdAt)}
+                Joined {formatDateOnly(rider.joinedAt || rider.createdAt)}
               </span>
             </div>
           </div>

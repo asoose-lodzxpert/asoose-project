@@ -21,6 +21,7 @@ import useSWR from "swr";
 import { fetcher } from "../../hooks/useSuperAdminFetch";
 import { getSession } from "next-auth/react";
 import { Currency } from "@/app/main/components/Currency";
+import { formatDateTime } from "@/utils/formatDate";
 
 // --- Types ---
 interface Driver {
@@ -233,8 +234,7 @@ export default function DriversPage() {
               </span>
               {info.row.original.lastSeen && status !== "ONLINE" && (
                 <div className="text-[10px] text-gray-600 mt-0.5">
-                  Last seen{" "}
-                  {new Date(info.row.original.lastSeen).toLocaleDateString()}
+                  Last seen {formatDateTime(info.row.original.lastSeen)}
                 </div>
               )}
             </div>

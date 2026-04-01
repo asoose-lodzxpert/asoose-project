@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { AppAlert } from "../../../customers/[id]/alerts";
 import { Currency } from "@/app/main/components/Currency";
+import { formatDateOnly, formatTimeOnly } from "@/utils/formatDate";
 interface Payout {
   id: string;
   amount: number;
@@ -72,10 +73,10 @@ export const RiderPayoutsTab = ({
             >
               <td className="p-4">
                 <div className="text-white font-bold">
-                  {new Date(payout.createdAt).toLocaleDateString()}
+                  {formatDateOnly(payout.createdAt)}
                 </div>
                 <div className="text-xs">
-                  {new Date(payout.createdAt).toLocaleTimeString()}
+                  {formatTimeOnly(payout.createdAt)}
                 </div>
               </td>
               <td className="p-4 font-mono text-white">

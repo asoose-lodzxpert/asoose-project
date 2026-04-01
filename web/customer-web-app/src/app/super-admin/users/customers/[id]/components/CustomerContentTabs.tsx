@@ -3,6 +3,7 @@ import { Car, AlertCircle } from "lucide-react";
 import OrderHistoryTab from "../../../vendors/[id]/components/orderhistorytab";
 import { Order, Ride } from "../types";
 import { Currency } from "@/app/main/components/Currency";
+import { formatDateTime } from "@/utils/formatDate";
 
 interface CustomerContentTabsProps {
   activeTab: "Orders" | "Rides" | "Logs";
@@ -14,19 +15,6 @@ interface CustomerContentTabsProps {
 }
 
 // Safe Date Helper
-const safeDate = (dateString: string | undefined) => {
-  if (!dateString) return "N/A";
-  const date = new Date(dateString);
-  return isNaN(date.getTime())
-    ? "Invalid Date"
-    : date.toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-};
 
 export const CustomerContentTabs: React.FC<CustomerContentTabsProps> = ({
   activeTab,
@@ -99,9 +87,7 @@ export const CustomerContentTabs: React.FC<CustomerContentTabsProps> = ({
                           (ride.dropoffAddress as any)?.city ||
                           "Unknown Destination"}
                       </p>
-                      <p className="text-xs text-gray-500">
-                        {safeDate(ride.createdAt)}
-                      </p>
+                        {formatDateTime(ride.createdAt)}
                     </div>
                   </div>
                   <div className="text-right">

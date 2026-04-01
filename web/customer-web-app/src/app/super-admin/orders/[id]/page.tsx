@@ -28,6 +28,7 @@ import OrderActionsPanel from "./component/OrderActionsPanel";
 import { AssignRiderModal } from "../../deliveries/components/AssignRiderModal";
 import { Currency } from "@/app/main/components/Currency";
 import { OrderDetailsSkeleton } from "./component/skeleton";
+import { formatDateOnly, formatTimeOnly } from "@/utils/formatDate";
 
 // --- Types ---
 interface OrderDetail {
@@ -365,7 +366,7 @@ export default function OrderDetailsPage() {
                         {log.action.replace("_", " ")}
                       </p>
                       <span className="text-[10px] text-gray-500 font-medium">
-                        {new Date(log.date).toLocaleTimeString()}
+                        {formatTimeOnly(log.date)}
                       </span>
                     </div>
                     <p className="text-[10px] text-gray-400 break-words">
@@ -373,7 +374,7 @@ export default function OrderDetailsPage() {
                       <span className="text-blue-400 font-bold">
                         {log.user}
                       </span>{" "}
-                      • {new Date(log.date).toLocaleDateString()}
+                      • {formatDateOnly(log.date)}
                     </p>
                     {log.details && (
                       <div className="mt-2 text-[10px] text-gray-400 bg-black/20 p-2 rounded border border-slate-800 break-words">

@@ -1,6 +1,7 @@
 import { Calendar, CheckCircle, Clock } from 'lucide-react';
 import { SectionCard } from './SectionCard';
 import { TransactionDetail } from '../types';
+import { formatDateTime } from '@/utils/formatDate';
 
 export const Timeline = ({ timeline }: { timeline: TransactionDetail['timeline'] }) => (
   <SectionCard title="Transaction Timeline" icon={Calendar} iconColorClass="bg-[#0F172A] text-gray-300">
@@ -20,7 +21,7 @@ export const Timeline = ({ timeline }: { timeline: TransactionDetail['timeline']
           <div className="flex-1 pb-6">
             <div className="flex items-center justify-between mb-1">
               <p className="text-white font-medium">{event.status}</p>
-              <p className="text-gray-400 text-sm">{new Date(event.date).toLocaleString()}</p>
+              <p className="text-gray-400 text-sm">{formatDateTime(event.date)}</p>
             </div>
             {event.note && (
               <p className="text-red-400 text-sm mt-2 bg-red-500/10 p-3 rounded-lg">{event.note}</p>

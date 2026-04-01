@@ -30,6 +30,7 @@ import {
   renderAlertMobileCard,
 } from "./component/columns";
 import SuperAdminDashboardSkeleton from "./component/skeletom";
+import { formatDateTime } from "@/utils/formatDate";
 
 // --- Types (Matching Backend) ---
 interface SelectedCardState {
@@ -190,7 +191,7 @@ export default function SuperAdminDashboard() {
 
       const csvRows = [];
       csvRows.push(["--- SYSTEM OVERVIEW REPORT ---"]);
-      csvRows.push([`Generated on: ${new Date().toLocaleString()}`]);
+      csvRows.push([`Generated on: ${formatDateTime(new Date())}`]);
       csvRows.push([]);
 
       // Key Metrics

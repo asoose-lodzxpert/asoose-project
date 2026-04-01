@@ -10,6 +10,7 @@ import { toast } from "react-toastify";
 import { getSession } from "next-auth/react";
 
 import { fetcher } from "../hooks/useSuperAdminFetch";
+import { formatDateTime } from "@/utils/formatDate";
 import AdminProfileSkeleton from "./skeleton";
 
 interface AdminProfile {
@@ -241,7 +242,7 @@ export default function AdminProfilePage() {
                 </span>
                 <span className="text-xs font-bold text-white">
                   {profile.createdAt
-                    ? new Date(profile.createdAt).toLocaleDateString()
+                    ? formatDateTime(profile.createdAt)
                     : "N/A"}
                 </span>
               </div>

@@ -15,6 +15,7 @@ import {
   Bike,
 } from "lucide-react";
 import { fetcher } from "../hooks/useSuperAdminFetch";
+import { formatDateTime } from "@/utils/formatDate";
 
 // --- 1. Define Data Interfaces ---
 
@@ -368,7 +369,7 @@ function GlobalSearchPage() {
                         {item.dropoffAddress?.split(",")[0]}
                       </p>
                       <p className="text-xs text-gray-500">
-                        {new Date(item.createdAt).toLocaleDateString()} •{" "}
+                        {formatDateTime(item.createdAt)} •{" "}
                         {item.status}
                       </p>
                     </div>

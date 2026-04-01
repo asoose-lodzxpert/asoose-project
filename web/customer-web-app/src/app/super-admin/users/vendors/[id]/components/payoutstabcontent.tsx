@@ -3,6 +3,7 @@
 import React from "react";
 import { Banknote, CheckCircle } from "lucide-react"; // ✅ Switched to Banknote for a better NGN context
 import { Currency } from "@/app/main/components/Currency";
+import { formatDateOnly } from "@/utils/formatDate";
 
 interface Payout {
   id: string;
@@ -68,11 +69,7 @@ export default function PayoutsTabContent({
                       <Currency amount={p.amount} />
                     </p>
                     <p className="text-[10px] text-gray-500 font-medium">
-                      {new Date(p.createdAt).toLocaleDateString(undefined, {
-                        year: "numeric",
-                        month: "short",
-                        day: "numeric",
-                      })}
+                      {formatDateOnly(p.createdAt)}
                     </p>
                   </div>
                 </div>

@@ -22,6 +22,7 @@ import { fetcher } from "../../hooks/useSuperAdminFetch";
 import RideDetailSkeleton from "./skeleton";
 import DriverSelectorModal from "./component/DriverSelectorModal";
 import ForceStatusModal from "./component/ForceStatusModal";
+import { formatDateTime, formatTimeOnly } from "@/utils/formatDate";
 
 // Matches Backend DTO
 interface RideDetail {
@@ -362,7 +363,7 @@ export default function RideDetailPage() {
               </span>
             </div>
             <p className="text-gray-400 text-sm font-mono mt-1">
-              ID: {ride.id} • {ride.date}
+              ID: {ride.id} • {formatDateTime(ride.date)}
             </p>
           </div>
 
@@ -438,7 +439,7 @@ export default function RideDetailPage() {
                   </div>
                   <div>
                     <p className="text-xs text-gray-400 uppercase font-bold tracking-wider">
-                      Pickup • {ride.pickup.time}
+                      Pickup • {formatTimeOnly(ride.pickup.time)}
                     </p>
                     <p className="text-lg font-bold text-white mt-1">
                       {ride.pickup.address}
@@ -451,7 +452,7 @@ export default function RideDetailPage() {
                   </div>
                   <div>
                     <p className="text-xs text-gray-400 uppercase font-bold tracking-wider">
-                      Dropoff • {ride.dropoff.time}
+                      Dropoff • {formatTimeOnly(ride.dropoff.time)}
                     </p>
                     <p className="text-lg font-bold text-white mt-1">
                       {ride.dropoff.address}
@@ -486,7 +487,7 @@ export default function RideDetailPage() {
                         {step.status}
                       </h4>
                       <span className="text-xs text-gray-500 font-mono">
-                        {step.time}
+                        {formatTimeOnly(step.time)}
                       </span>
                     </div>
                   </div>
@@ -518,7 +519,7 @@ export default function RideDetailPage() {
                           {log.performedBy}
                         </td>
                         <td className="px-4 py-3 text-gray-400 font-mono">
-                          {new Date(log.date).toLocaleString()}
+                          {formatDateTime(log.date)}
                         </td>
                       </tr>
                     ))}

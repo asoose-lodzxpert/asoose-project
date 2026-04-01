@@ -6,7 +6,8 @@ import { DataTable } from "@/app/super-admin/component/datatable";
 import { Eye, CheckSquare, Square, Search, Filter, X } from "lucide-react";
 import OrderCard from "@/app/super-admin/component/ordercard";
 import Link from "next/link";
-import { Currency } from "@/app/main/components/Currency"; // ✅ Using your reusable Currency component
+import { Currency } from "@/app/main/components/Currency";
+import { formatDateTime, formatDateOnly } from "@/utils/formatDate";
 
 // --- Types ---
 interface Order {
@@ -28,8 +29,8 @@ const mapToCardOrder = (order: Order): any => ({
   rider: "N/A",
   amount: order.total,
   type: `${order.itemsCount} Items`,
-  placedAt: new Date(order.date).toLocaleDateString(),
-  updated: new Date(order.date).toLocaleDateString(),
+  placedAt: formatDateTime(order.date),
+  updated: formatDateTime(order.date),
 });
 
 const columnHelper = createColumnHelper<Order>();
@@ -105,7 +106,7 @@ export default function OrderHistoryTab({ orders }: { orders: Order[] }) {
         header: "Date",
         cell: (info) => (
           <span className="text-gray-300 text-sm">
-            {new Date(info.getValue()).toLocaleDateString()}
+            {formatDateOnly(info.getValue())}
           </span>
         ),
       }),
