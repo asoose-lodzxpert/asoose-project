@@ -21,6 +21,7 @@ import {
 import { useTheme } from "next-themes";
 import { useSession } from "next-auth/react";
 import { ApiService } from "@/services/api.service";
+import { CheckoutConfirmationModal } from "../cart/CheckoutConfirmationModal";
 
 const sanitizeInput = (input: string): string => {
   return input.replace(/[<>]/g, "").trim().slice(0, 100);
@@ -37,6 +38,7 @@ function HomeHeaderInner() {
   } | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
 
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
   const pathname = usePathname();
@@ -268,13 +270,22 @@ function HomeHeaderInner() {
               <Package className="w-3.5 h-3.5" /> Send a package
             </Link>
 
-            <Link
-              href="/main/checkout"
+            <button
+              onClick={() => setShowConfirmModal(true)}
               className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-yellow-500 ${isActive("/main/checkout") ? "bg-white dark:bg-zinc-800 text-yellow-500 shadow-sm" : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"}`}
             >
               <ShoppingBag className="w-3.5 h-3.5" /> Cart
-            </Link>
+            </button>
           </nav>
+
+          <CheckoutConfirmationModal
+            isOpen={showConfirmModal}
+            onClose={() => setShowConfirmModal(false)}
+            onConfirm={() => {
+              setShowConfirmModal(false);
+              router.push("/main/checkout");
+            }}
+          />
 
           <div
             className="hidden md:block h-6 w-px bg-gray-200 dark:bg-white/10"
