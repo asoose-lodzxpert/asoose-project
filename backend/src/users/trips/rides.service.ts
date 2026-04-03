@@ -345,12 +345,18 @@ export class RidesService {
           );
         });
 
+        const user = await this.prisma.user.findUnique({
+          where: { id: userId },
+          select: { name: true },
+        });
+        const userName = user?.name || 'A customer';
+
         // Audit Hook
         this.eventEmitter.emit('system.action', {
           action: 'RIDE_REQUESTED',
           severity: 'NORMAL',
           title: 'New Ride Requested',
-          message: `User (ID: ${userId}) requested a ${dto.vehicleType} ride for ${result.ride.distanceKm}km.`,
+          message: `${userName} (ID: ${userId.slice(0, 8)}) requested a ${dto.vehicleType} ride for ${result.ride.distanceKm}km.`,
           metadata: {
             rideId: result.ride.id,
             distanceKm: result.ride.distanceKm,
@@ -431,7 +437,7 @@ export class RidesService {
   private async triggerMatchingSideEffects(rideId: string, userId: string) {
     const ride = await this.prisma.ride.findUnique({
       where: { id: rideId },
-      include: { pickupAddress: true, dropoffAddress: true },
+      include: { pickupAddress: true, dropoffAddress: true, customer: true },
     });
     if (!ride) return;
 
@@ -441,13 +447,15 @@ export class RidesService {
       data: { status: 'SEARCHING_DRIVER' as any },
     });
 
+    const customerName = ride.customer?.name || 'A customer';
+
     // Broadcast to admin dashboard
     this.notificationsGateway.sendToAdminRoom({
       id: rideId,
       type: 'RIDE',
       category: 'RIDE_REQUESTED',
       title: 'New Ride Request',
-      message: `A ride (${rideId.substring(0, 8)}…) is now searching for a driver`,
+      message: `Ride ${rideId.substring(0, 8)} for ${customerName} is now searching for a driver`,
       isRead: false,
       createdAt: new Date().toISOString(),
       metadata: { rideId },

@@ -1293,6 +1293,7 @@ enum InquiryStatus {
   READ
   REPLIED
 }
+
 model ErrorLog {
   id        String   @id @default(uuid())
   message   String
