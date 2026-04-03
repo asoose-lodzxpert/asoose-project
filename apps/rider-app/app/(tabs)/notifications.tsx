@@ -17,8 +17,9 @@ import {
   markAllAsRead,
 } from "@/services/notifications.service";
 import type { Notification } from "@/types/notification";
-import Toast from "react-native-toast-message";
 import { formatDistanceToNow } from "date-fns";
+import { jobsService } from "@/services/jobs.service";
+import { useRouter } from "expo-router";
 
 export default function NotificationsScreen() {
   const primary = useThemeColor({}, "brandPrimary");
@@ -34,6 +35,8 @@ export default function NotificationsScreen() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
+  const [processingId, setProcessingId] = useState<string | null>(null);
+  const router = useRouter();
 
   const fetchNotifications = useCallback(
     async (pageNum: number = 1, append: boolean = false) => {
@@ -97,6 +100,55 @@ export default function NotificationsScreen() {
       });
     }
   }, []);
+
+  const handleAcceptJob = useCallback(
+    async (notificationId: string, jobId: string, jobType: any) => {
+      try {
+        setProcessingId(notificationId);
+        await jobsService.acceptJob(jobId, jobType);
+        Toast.show({
+          type: "success",
+          text1: "Job Accepted! 🛵",
+          text2: "Heading to pick up now.",
+        });
+        // Mark as read and refresh to reflect changes
+        await handleMarkAsRead(notificationId);
+        router.push("/(tabs)/orders");
+      } catch (error: any) {
+        Toast.show({
+          type: "error",
+          text1: "Failed to accept job",
+          text2: error.message || "Job might be already taken",
+        });
+      } finally {
+        setProcessingId(null);
+      }
+    },
+    [handleMarkAsRead, router],
+  );
+
+  const handleDeclineJob = useCallback(
+    async (notificationId: string, jobId: string, jobType: any) => {
+      try {
+        setProcessingId(notificationId);
+        await jobsService.declineJob(jobId, jobType);
+        Toast.show({
+          type: "info",
+          text1: "Job Declined",
+        });
+        await handleMarkAsRead(notificationId);
+      } catch (error: any) {
+        Toast.show({
+          type: "error",
+          text1: "Failed to decline job",
+          text2: error.message,
+        });
+      } finally {
+        setProcessingId(null);
+      }
+    },
+    [handleMarkAsRead],
+  );
 
   const handleMarkAllAsRead = useCallback(async () => {
     try {
@@ -165,6 +217,54 @@ export default function NotificationsScreen() {
               addSuffix: true,
             })}
           </ThemedText>
+
+          {/* Action Buttons for Job Assignments */}
+          {item.metadata?.jobId && !item.isRead && (
+            <View style={styles.actionRow}>
+              <Pressable
+                style={[
+                  styles.actionButton,
+                  styles.acceptButton,
+                  { backgroundColor: primary },
+                  processingId === item.id && styles.disabledButton,
+                ]}
+                onPress={() =>
+                  handleAcceptJob(
+                    item.id,
+                    item.metadata.jobId,
+                    item.metadata.jobType,
+                  )
+                }
+                disabled={processingId !== null}
+              >
+                {processingId === item.id ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <ThemedText style={styles.actionText}>YES, ACCEPT ✅</ThemedText>
+                )}
+              </Pressable>
+              <Pressable
+                style={[
+                  styles.actionButton,
+                  styles.declineButton,
+                  { borderColor: border },
+                  processingId === item.id && styles.disabledButton,
+                ]}
+                onPress={() =>
+                  handleDeclineJob(
+                    item.id,
+                    item.metadata.jobId,
+                    item.metadata.jobType,
+                  )
+                }
+                disabled={processingId !== null}
+              >
+                <ThemedText style={[styles.actionText, { color: textSecondary }]}>
+                  NO ❌
+                </ThemedText>
+              </Pressable>
+            </View>
+          )}
         </View>
       </Pressable>
     );
@@ -298,5 +398,29 @@ const styles = StyleSheet.create({
   loadingFooter: {
     padding: 20,
     alignItems: "center",
+  },
+  actionRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 12,
+  },
+  actionButton: {
+    flex: 1,
+    height: 44,
+    borderRadius: 8,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "transparent",
+  },
+  acceptButton: {},
+  declineButton: {},
+  disabledButton: {
+    opacity: 0.5,
+  },
+  actionText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "700",
   },
 });

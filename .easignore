@@ -4,8 +4,8 @@
 # Never upload node_modules — EAS installs them fresh on the build server
 node_modules/
 
-# Never upload other apps in the monorepo (each app uploads itself)
-apps/
+# Never upload other apps in the monorepo (each app uploads what it needs via local .easignore or git)
+# apps/
 
 # Backend server code — not needed for mobile builds
 backend/

@@ -1,26 +1,47 @@
-# EAS Build ignore file — customer-app
-# EAS uses .easignore (like .gitignore) to determine what NOT to upload to build servers.
-# node_modules are NOT uploaded — EAS installs them fresh on build servers.
+# .easignore - tells EAS to upload everything except these patterns
+# By creating this file, EAS CLI will use it instead of .gitignore
+# and will upload untracked files (like google-services.json) unless excluded ici.
 
+# dependencies
 node_modules/
+
+# Expo
 .expo/
 dist/
 web-build/
+expo-env.d.ts
+
+# Native
+.kotlin/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Metro
+.metro-health-check*
+
+# debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# macOS
 .DS_Store
-*.log
-*.local
+*.pem
+
+# local env files
 .env*.local
 
-# Plan / research documents (not needed for building)
-PLAN.md
-README.md
-
-# Development scripts (not needed for building)
-scripts/
-
-# TypeScript build cache
+# typescript
 *.tsbuildinfo
 
-# Generated native folders (EAS manages these)
-android/
-ios/
+app-example
+
+# generated native folders
+/ios
+/android
+
+/lib/generated/prisma

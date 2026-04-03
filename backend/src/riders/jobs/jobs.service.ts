@@ -255,14 +255,7 @@ export class JobsService {
         },
       });
 
-      // Update linked order status to DISPATCHED
-      if (delivery.orderId) {
-        await this.prisma.order.update({
-          where: { id: delivery.orderId },
-          data: { status: 'DISPATCHED' },
-        });
-        this.logger.debug(`Order ${delivery.orderId} status → DISPATCHED`);
-      }
+      // Status transition removed: Order should only move to DISPATCHED on physical pickup.
 
       return updatedDelivery;
     }
@@ -648,6 +641,24 @@ export class JobsService {
               pickedUpAt: new Date(),
             } as any,
           });
+
+          // Update linked orders to DISPATCHED
+          if (delivery.orderGroupId) {
+            await this.prisma.order.updateMany({
+              where: { orderGroupId: delivery.orderGroupId },
+              data: { status: 'DISPATCHED' },
+            });
+            this.logger.debug(
+              `Order Group ${delivery.orderGroupId} status → DISPATCHED`,
+            );
+          } else if (delivery.orderId) {
+            await this.prisma.order.update({
+              where: { id: delivery.orderId },
+              data: { status: 'DISPATCHED' },
+            });
+            this.logger.debug(`Order ${delivery.orderId} status → DISPATCHED`);
+          }
+
           return { nextStop: null, nextStopIndex: null, isComplete: true };
         } else {
           this.logger.debug(
@@ -682,6 +693,15 @@ export class JobsService {
         where: { id: jobId },
         data: { status: DeliveryStatus.PICKED_UP, pickedUpAt: new Date() },
       });
+
+      // Update linked order to DISPATCHED
+      if (delivery.orderId) {
+        await this.prisma.order.update({
+          where: { id: delivery.orderId },
+          data: { status: 'DISPATCHED' },
+        });
+        this.logger.debug(`Order ${delivery.orderId} status → DISPATCHED`);
+      }
 
       return { nextStop: null, nextStopIndex: null, isComplete: true };
     }

@@ -21,6 +21,7 @@ import { useThemeColor } from "@/hooks/use-theme-color";
 import { MenuItem } from "@/types/menu";
 import { uploadFile } from "@/services/storage.service";
 import { fetchCategories, Category } from "@/services/products.service";
+import { ImagePickerModal } from "@/components/ImagePickerModal";
 
 interface Props {
   visible: boolean;
@@ -57,6 +58,7 @@ export const AddMenuItemModal: React.FC<Props> = ({
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [loadingCategories, setLoadingCategories] = useState(false);
+  const [isPhotoModalVisible, setIsPhotoModalVisible] = useState(false);
 
   // Load categories when modal opens
   useEffect(() => {
@@ -99,62 +101,48 @@ export const AddMenuItemModal: React.FC<Props> = ({
     }
   }, [itemToEdit, visible]);
 
-  const pickImage = async () => {
-    try {
-      // Check if we already have 5 images (max limit)
-      if (images.length >= 5) {
-        Toast.show({
-          type: "error",
-          text1: "Maximum 5 images allowed",
-        });
-        return;
-      }
-
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ["images"],
-        quality: 0.7,
-        allowsEditing: true,
-        aspect: [1, 1],
+  const pickImage = () => {
+    if (images.length >= 5) {
+      Toast.show({
+        type: "error",
+        text1: "Maximum 5 images allowed",
       });
+      return;
+    }
+    setIsPhotoModalVisible(true);
+  };
 
-      if (!result.canceled && result.assets.length > 0) {
-        const asset = result.assets[0];
+  const onImageSelected = async (uri: string) => {
+    setUploading(true);
+    setUploadProgress(0);
 
-        setUploading(true);
-        setUploadProgress(0);
+    try {
+      // Upload to backend storage
+      const fileName = uri.split("/").pop() || `product-${Date.now()}.jpg`;
+      const fileType = "image/jpeg"; // Default to jpeg from picker
 
-        try {
-          // Upload to backend storage
-          const fileUri = asset.uri;
-          const fileName =
-            fileUri.split("/").pop() || `product-${Date.now()}.jpg`;
-          const fileType = asset.type === "image" ? "image/jpeg" : "image/png";
+      const uploadedUrl = await uploadFile(
+        {
+          uri: uri,
+          name: fileName,
+          type: fileType,
+        },
+        (progress) => {
+          setUploadProgress(progress.percentage);
+        },
+      );
 
-          const uploadedUrl = await uploadFile(
-            {
-              uri: fileUri,
-              name: fileName,
-              type: fileType,
-            },
-            (progress) => {
-              setUploadProgress(progress.percentage);
-            },
-          );
-
-          // Add uploaded URL to images array
-          setImages((prev) => [...prev, uploadedUrl]);
-        } catch (error) {
-          Toast.show({
-            type: "error",
-            text1: "Failed to upload image",
-          });
-        } finally {
-          setUploading(false);
-          setUploadProgress(0);
-        }
-      }
+      // Add uploaded URL to images array
+      setImages((prev) => [...prev, uploadedUrl]);
     } catch (error) {
-      // Silent error handling
+      Toast.show({
+        type: "error",
+        text1: "Failed to upload image",
+      });
+    } finally {
+      setUploading(false);
+      setUploadProgress(0);
+      setIsPhotoModalVisible(false);
     }
   };
 
@@ -383,6 +371,11 @@ export const AddMenuItemModal: React.FC<Props> = ({
         </KeyboardAvoidingView>
       </Pressable>
 
+      <ImagePickerModal
+        visible={isPhotoModalVisible}
+        onClose={() => setIsPhotoModalVisible(false)}
+        onSelectImage={onImageSelected}
+      />
       <Toast />
     </Modal>
   );
