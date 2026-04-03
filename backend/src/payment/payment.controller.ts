@@ -147,8 +147,16 @@ export class PaymentController {
       );
 
       // ✅ FIX: Comparison now matches Enum type
-      const statusParam =
-        verification.status === PaymentStatus.COMPLETED ? 'success' : 'failed';
+      // ✅ FIXED: Explicitly handle CANCELLED status to distinguish from FAILED
+      let statusParam: string;
+      if (verification.status === PaymentStatus.COMPLETED) {
+        statusParam = 'success';
+      } else if (verification.status === PaymentStatus.CANCELLED) {
+        // Signal explicit cancellation so frontend can handle appropriately
+        statusParam = 'cancelled';
+      } else {
+        statusParam = 'failed';
+      }
 
       let callbackUrl = verification.meta?.callbackUrl || frontendUrl;
 

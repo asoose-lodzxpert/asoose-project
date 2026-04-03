@@ -285,6 +285,63 @@ export default function CheckoutForm() {
     }
   }, [selectedAddress?.id, cartFingerprint, status, fetchQuote]);
 
+  // ✅ FIXED: Detect and handle cancelled/failed order payments on return
+  // This runs when user returns from payment cancellation and allows them to retry
+  useEffect(() => {
+    const handleCancelledOrderRecovery = async () => {
+      if (status !== "authenticated" || !mounted) return;
+
+      const orderContext = localStorage.getItem("pending_checkout");
+      if (orderContext !== "true") return;
+
+      try {
+        const token = session?.accessToken;
+        if (!token) return;
+
+        const lastOrderId = localStorage.getItem("last_order_id");
+        if (!lastOrderId) {
+          localStorage.removeItem("pending_checkout");
+          return;
+        }
+
+        // Check order status to see if payment was cancelled
+        const orderRes = await fetch(`${API_URL}/users/orders/${lastOrderId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (orderRes.ok) {
+          const order = await orderRes.json();
+
+          // Only show message if order is in pending/cancelled state
+          // (i.e., payment was not completed)
+          if (
+            order.paymentStatus === "CANCELLED" ||
+            order.paymentStatus === "FAILED" ||
+            order.paymentStatus === "PENDING"
+          ) {
+            toast.warn(
+              "Previous payment was " +
+                (order.paymentStatus === "CANCELLED"
+                  ? "cancelled"
+                  : "not completed") +
+                ". Your cart is ready for a fresh order.",
+            );
+            // Clear the pending context but preserve cart for immediate retry
+            localStorage.removeItem("pending_checkout");
+            localStorage.removeItem("last_order_id");
+          }
+        }
+      } catch (err) {
+        // Non-fatal error — user can still proceed
+        console.warn("Could not recover order context:", err);
+        localStorage.removeItem("pending_checkout");
+        localStorage.removeItem("last_order_id");
+      }
+    };
+
+    handleCancelledOrderRecovery();
+  }, [status, mounted, session?.accessToken]);
+
   // No redirect on empty cart — handled in render below
 
   const handleSaveAddress = async (addressData: Partial<Address>) => {

@@ -46,6 +46,31 @@ function CallbackContent() {
     const pendingDeliveryRaw = localStorage.getItem("pending_delivery_data");
     const isDelivery = !!pendingDeliveryRaw;
 
+    /** Route the user to the correct page on payment cancellation */
+    const handleCancellation = () => {
+      // ✅ FIXED: Explicit handler for user-cancelled payments with appropriate messaging
+      toast.warn("Payment cancelled. You can try again whenever you're ready.");
+
+      if (isRide) {
+        localStorage.removeItem("pending_ride");
+        localStorage.removeItem("pending_ride_id");
+        // Reset paymentConfirmed so the sync hook correctly maps states
+        setPaymentConfirmed(false);
+        // Keep user on payment-required screen so they can retry payment
+        setRideStatus("payment-required");
+        router.replace("/main/ride");
+      } else if (isDelivery) {
+        // ✅ FIXED: Clear pending_delivery_data on cancellation but preserve form data
+        // so user can restart the delivery process or retry immediately
+        localStorage.removeItem("pending_delivery_data");
+        // User should be returned to delivery config form to retry, not stuck on processing
+        router.replace("/main/delivery");
+      } else {
+        // For checkout, return to checkout (cart items preserved by NOT clearing here)
+        router.replace("/main/checkout");
+      }
+    };
+
     /** Route the user to the correct page on payment failure */
     const handleFailure = () => {
       if (isRide) {
@@ -75,6 +100,12 @@ function CallbackContent() {
 
     const verifyAndComplete = async () => {
       processedRef.current = true;
+
+      // ✅ FIXED: Explicitly handle cancellation status separately
+      if (urlStatus === "cancelled") {
+        handleCancellation();
+        return;
+      }
 
       // If Paystack itself reported failure via URL param, fast-fail without
       // making a network call that would record a failed status redundantly.
