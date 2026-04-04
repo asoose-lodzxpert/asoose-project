@@ -1,8 +1,9 @@
 import React from "react";
 import { Order, Ride, AdminCustomerMessage } from "../types";
-import { Mail, User } from "lucide-react";
+import { Mail, User, Car, AlertCircle } from "lucide-react";
 import { Currency } from "@/app/main/components/Currency";
 import { formatDateTime } from "@/utils/formatDate";
+import OrderHistoryTab from "./OrderHistoryTab";
 
 interface CustomerContentTabsProps {
   activeTab: "Orders" | "Rides" | "Logs" | "Messages";
