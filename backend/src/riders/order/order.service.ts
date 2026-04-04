@@ -113,12 +113,19 @@ export class OrderService {
     ];
     const validRideStatuses = [
       'PENDING',
-      'REQUESTED',
       'ACCEPTED',
       'ARRIVED',
+      'CANCELLED',
+      'REQUESTED',
+      'SEARCHING_DRIVER',
+      'DRIVER_ASSIGNED',
+      'DRIVER_ACCEPTED',
+      'PAID',
       'IN_PROGRESS',
       'COMPLETED',
-      'CANCELLED',
+      'CANCELLED_BY_USER',
+      'CANCELLED_BY_DRIVER',
+      'CANCELLED_BY_SYSTEM',
     ];
 
     let statusFilter: any;
