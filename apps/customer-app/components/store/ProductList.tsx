@@ -45,11 +45,15 @@ export function ProductList({
     // Safely get category name
     const categoryName = item.category?.name || "Uncategorized";
 
+    const isSoldOut = item.manageStock && (item.stock <= 0 || item.status === 'OUT_OF_STOCK');
+    const isEffectivelyDisabled = disabled || isSoldOut;
+
     return (
       <TouchableOpacity
-        activeOpacity={0.85}
-        onPress={() => handleProductPress(item)}
-        style={[styles.menuCard, { backgroundColor: cardBg }]}
+        activeOpacity={isEffectivelyDisabled ? 1 : 0.85}
+        onPress={() => !isEffectivelyDisabled && handleProductPress(item)}
+        style={[styles.menuCard, { backgroundColor: cardBg }, isSoldOut && { opacity: 0.6 }]}
+        disabled={isEffectivelyDisabled}
       >
         <Image
           source={{ uri: imageUri }}
@@ -57,6 +61,11 @@ export function ProductList({
           contentFit="cover"
           transition={200}
         />
+        {isSoldOut && (
+          <View style={styles.soldOutBadge}>
+            <ThemedText style={styles.soldOutText}>Sold Out</ThemedText>
+          </View>
+        )}
         <View style={styles.cardContent}>
           <ThemedText
             style={[styles.menuTitle, { color: text }]}
@@ -77,14 +86,14 @@ export function ProductList({
             <TouchableOpacity
               style={[
                 styles.addButton,
-                { backgroundColor: disabled ? "#9ca3af" : primary },
+                { backgroundColor: isEffectivelyDisabled ? "#9ca3af" : primary },
               ]}
               onPress={(e) => {
                 e.stopPropagation();
-                if (!disabled) onAddToCart?.(item.id);
+                if (!isEffectivelyDisabled) onAddToCart?.(item.id);
               }}
-              disabled={disabled}
-              activeOpacity={disabled ? 1 : 0.7}
+              disabled={isEffectivelyDisabled}
+              activeOpacity={isEffectivelyDisabled ? 1 : 0.7}
             >
               <ThemedText style={[styles.addButtonText, { color: "#FFF" }]}>
                 +
@@ -234,5 +243,21 @@ const styles = StyleSheet.create({
   addButtonText: {
     fontSize: 18,
     fontWeight: "bold",
+  },
+  soldOutBadge: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 120, // matches menuImage height
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  soldOutText: {
+    color: "#FFF",
+    fontWeight: "bold",
+    fontSize: 14,
+    textTransform: "uppercase",
   },
 });

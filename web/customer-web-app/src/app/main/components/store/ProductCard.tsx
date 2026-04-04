@@ -22,6 +22,9 @@ export interface ProductProps {
   image?: string;
   storeId: string;
   storeName?: string;
+  stock?: number;
+  status?: string;
+  manageStock?: boolean;
   /** Modifier groups passed through so the card can gate direct-add for required-modifier products. */
   modifierGroups?: ModifierGroupRef[];
   onClick?: () => void;
@@ -35,6 +38,9 @@ export const ProductCard = ({
   image,
   storeId,
   storeName,
+  stock = 0,
+  status = "ACTIVE",
+  manageStock = false,
   modifierGroups,
   onClick,
 }: ProductProps) => {
@@ -42,6 +48,8 @@ export const ProductCard = ({
   const { data: session, status } = useSession();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+
+  const isSoldOut = manageStock && (stock <= 0 || status === "OUT_OF_STOCK");
 
   /** True when ONE OR MORE modifier groups require a selection (minSelect > 0). */
   const hasRequiredModifiers = (modifierGroups ?? []).some(
@@ -127,8 +135,8 @@ export const ProductCard = ({
 
   return (
     <div
-      onClick={onClick}
-      className="bg-white dark:bg-[#151515] p-3 rounded-2xl border border-gray-100 dark:border-white/5 shadow-sm flex gap-4 hover:border-yellow-500/30 transition-colors group cursor-pointer"
+      onClick={isSoldOut ? undefined : onClick}
+      className={`bg-white dark:bg-[#151515] p-3 rounded-2xl border border-gray-100 dark:border-white/5 shadow-sm flex gap-4 transition-colors group relative ${isSoldOut ? 'opacity-60 cursor-not-allowed' : 'hover:border-yellow-500/30 cursor-pointer'}`}
     >
       <div className="w-24 h-24 sm:w-28 sm:h-28 bg-gray-100 dark:bg-white/5 rounded-xl flex-shrink-0 overflow-hidden relative">
         {image ? (
@@ -141,6 +149,13 @@ export const ProductCard = ({
         ) : (
           <div className="w-full h-full flex items-center justify-center text-2xl">
             📦
+          </div>
+        )}
+        {isSoldOut && (
+          <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+            <span className="text-[10px] font-bold text-white uppercase tracking-widest px-2 py-1 bg-red-600 rounded">
+              Sold Out
+            </span>
           </div>
         )}
       </div>
@@ -164,7 +179,7 @@ export const ProductCard = ({
           <span className="font-black text-lg">₦{price.toLocaleString()}</span>
           <button
             onClick={handleQuickAdd}
-            disabled={loading}
+            disabled={loading || isSoldOut}
             className="w-8 h-8 rounded-full bg-gray-100 dark:bg-white/10 flex items-center justify-center text-gray-900 dark:text-white hover:bg-yellow-500 hover:text-black transition-colors z-10 disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {loading ? (

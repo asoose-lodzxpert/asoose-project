@@ -1,0 +1,147 @@
+﻿3ab65d4 feat: configure security headers and add customer detail tabs for order history management
+M	web/customer-web-app/next.config.ts
+M	web/customer-web-app/src/app/super-admin/users/customers/[id]/components/CustomerContentTabs.tsx
+A	web/customer-web-app/src/app/super-admin/users/customers/[id]/components/OrderHistoryTab.tsx
+bc928c6 feat: implement OrderService for managing rider wallet balance, earnings, and order history
+M	backend/src/riders/order/order.service.ts
+f2bd7c2 feat: implement rider order history, earnings service, and notification management with database connectivity scripts
+A	backend/prisma/seed-demo-rider-data.ts
+A	backend/prisma/seed-tester-rider.ts
+M	backend/src/riders/order/order.service.ts
+M	backend/src/riders/rider-notifications.service.ts
+A	backend/test-db-prisma.js
+A	backend/test-db.js
+M	package-lock.json
+M	yarn.lock
+e607038 Merge pull request #45 from asoose-lodzxpert/feat/job-lifecycle-readability-fixes
+1e796f6 feat: implement admin-customer message history tracking and relocate checkout confirmation modal to payment step
+M	apps/customer-app/app/cart.tsx
+M	apps/customer-app/app/checkout.tsx
+M	apps/customer-app/components/checkout/AddressSelectionModal.tsx
+M	apps/customer-app/components/checkout/CheckoutConfirmationModal.tsx
+M	apps/customer-app/context/AuthContext.tsx
+M	apps/customer-app/lib/authFetch.tsx
+M	backend/prisma/schema.prisma
+M	backend/src/super-admin/customers/customers.controller.ts
+M	backend/src/super-admin/customers/customers.service.ts
+A	backend/tmp_check_zones.ts
+M	web/customer-web-app/src/app/super-admin/users/customers/[id]/components/CustomerContentTabs.tsx
+M	web/customer-web-app/src/app/super-admin/users/customers/[id]/page.tsx
+M	web/customer-web-app/src/app/super-admin/users/customers/[id]/types.ts
+5e9b933 Merge pull request #44 from asoose-lodzxpert/feat/job-lifecycle-readability-fixes
+490c346 feat: implement modular home header, cart components, and backend seed scripts for customer and vendor apps
+M	apps/customer-app/app.json
+M	apps/customer-app/app/cart.tsx
+A	apps/customer-app/components/checkout/CheckoutConfirmationModal.tsx
+M	apps/rider-app/app.json
+M	apps/vendor-app/app.json
+A	backend/check-stores.js
+A	backend/prisma/seed-demo-vendor-data.ts
+A	backend/prisma/seed-tester-vendor.ts
+A	web/customer-web-app/src/app/main/components/cart/CheckoutConfirmationModal.tsx
+M	web/customer-web-app/src/app/main/components/home/FloatingCart.tsx
+M	web/customer-web-app/src/app/main/components/home/HomeHeader.tsx
+M	web/customer-web-app/src/app/main/components/restaurant/sidebarcart.tsx
+6e9efed feat: job lifecycle and readability enhancements. Orders now move to DISPATCHED on pickup. Admin alerts include human-readable names.
+M	.easignore
+M	apps/customer-app/.easignore
+M	apps/rider-app/app/(tabs)/notifications.tsx
+M	apps/rider-app/components/orders/OrderCard.tsx
+M	apps/vendor-app/app/(main)/profile.tsx
+M	apps/vendor-app/app/(menu)/add-item.tsx
+A	apps/vendor-app/components/ImagePickerModal.tsx
+M	apps/vendor-app/components/menu/AddMenuItemModal.tsx
+M	backend/prisma/schema.prisma
+M	backend/src/notifications/notifications.service.ts
+M	backend/src/payment/payment-status.service.ts
+M	backend/src/riders/jobs/jobs.service.ts
+M	backend/src/riders/rider-dispatch.listener.ts
+M	backend/src/users/trips/deliveries.service.ts
+M	backend/src/users/trips/rides.service.ts
+M	web/customer-web-app/src/app/super-admin/rides/[id]/page.tsx
+5208670 Merge pull request #43 from asoose-lodzxpert/feature/fees-and-prisma-migration
+cacb259 feat: standardize fees (1.5% fee, 7.5% VAT), fix mobile address selection, and migrate logs to Prisma
+M	apps/customer-app/app/cart.tsx
+M	apps/customer-app/app/checkout.tsx
+M	backend/package.json
+A	backend/prisma/migrations/20260401035554_add_error_log/migration.sql
+M	backend/prisma/schema.prisma
+M	backend/src/app.module.ts
+M	backend/src/logs/logs.controller.ts
+M	backend/src/logs/logs.module.ts
+M	backend/src/logs/logs.service.ts
+D	backend/src/logs/schemas/error-log.schema.ts
+M	backend/src/users/pricing.service.ts
+M	package-lock.json
+M	web/customer-web-app/src/app/main/components/checkout/ordersummary.tsx
+M	yarn.lock
+16f9101 Merge pull request #42 from asoose-lodzxpert/feature/multi-device-push-notifications
+c065fae Merge branch 'main' into feature/multi-device-push-notifications
+43ffe52 fix: move tailwind, postcss, and autoprefixer to dependencies to resolve build error
+M	web/customer-web-app/package.json
+c1b4637 Merge pull request #41 from asoose-lodzxpert/feature/multi-device-push-notifications
+9214ac4 fix: move tailwind, postcss, and autoprefixer to dependencies to resolve build error
+M	web/customer-web-app/package.json
+7e49d90 Merge pull request #40 from asoose-lodzxpert/feature/multi-device-push-notifications
+271a47a feat: initialize customer-web-app with Next.js, Supabase, and core dependencies
+M	web/customer-web-app/package.json
+83b5a28 fix: resolve build error by moving typescript to dependencies and updating next config
+M	web/customer-web-app/next.config.ts
+M	web/customer-web-app/package.json
+476f933 Merge pull request #39 from asoose-lodzxpert/feature/multi-device-push-notifications
+c4e7158 feat: implement multi-device push notification support
+A	backend/prisma/migrations/20260401022636_notification_update/migration.sql
+M	backend/prisma/schema.prisma
+M	backend/src/auth/auth.service.ts
+M	backend/src/auth/rider-auth.service.ts
+M	backend/src/auth/vendor-auth.service.ts
+M	backend/src/notifications/notifications.service.ts
+M	web/customer-web-app/src/hooks/usePushNotifications.tsx
+b5b86ec Merge pull request #38 from asoose-lodzxpert/fix-date/time
+b7352ae Date and time update
+M	web/customer-web-app/src/app/super-admin/activity-logs/page.tsx
+M	web/customer-web-app/src/app/super-admin/component/documentstab.tsx
+M	web/customer-web-app/src/app/super-admin/dashboard/page.tsx
+M	web/customer-web-app/src/app/super-admin/deliveries/[id]/page.tsx
+M	web/customer-web-app/src/app/super-admin/disputes/[id]/component/DisputeChat.tsx
+M	web/customer-web-app/src/app/super-admin/disputes/[id]/component/DisputeTimeline.tsx
+M	web/customer-web-app/src/app/super-admin/disputes/component/table-config.tsx
+M	web/customer-web-app/src/app/super-admin/inquiries/page.tsx
+M	web/customer-web-app/src/app/super-admin/orders/[id]/page.tsx
+M	web/customer-web-app/src/app/super-admin/payouts/page.tsx
+M	web/customer-web-app/src/app/super-admin/profile/page.tsx
+M	web/customer-web-app/src/app/super-admin/rides/[id]/page.tsx
+M	web/customer-web-app/src/app/super-admin/rides/page.tsx
+M	web/customer-web-app/src/app/super-admin/search/page.tsx
+M	web/customer-web-app/src/app/super-admin/store-orders/[storeId]/page.tsx
+M	web/customer-web-app/src/app/super-admin/store-orders/page.tsx
+M	web/customer-web-app/src/app/super-admin/transactions/[id]/component/PayoutInfoCard.tsx
+M	web/customer-web-app/src/app/super-admin/transactions/[id]/component/Timeline.tsx
+M	web/customer-web-app/src/app/super-admin/transactions/[id]/component/TransactionSummary.tsx
+M	web/customer-web-app/src/app/super-admin/transactions/page.tsx
+M	web/customer-web-app/src/app/super-admin/users/customers/[id]/components/CustomerContentTabs.tsx
+M	web/customer-web-app/src/app/super-admin/users/customers/[id]/components/customerSidebar.tsx
+M	web/customer-web-app/src/app/super-admin/users/customers/page.tsx
+M	web/customer-web-app/src/app/super-admin/users/drivers/page.tsx
+M	web/customer-web-app/src/app/super-admin/users/riders/[id]/components/RiderDocumentstab.tsx
+M	web/customer-web-app/src/app/super-admin/users/riders/[id]/components/Rideroverviewtab.tsx
+M	web/customer-web-app/src/app/super-admin/users/riders/[id]/components/RiderpayoutsTab.tsx
+M	web/customer-web-app/src/app/super-admin/users/riders/[id]/components/riderslogtabs.tsx
+M	web/customer-web-app/src/app/super-admin/users/riders/[id]/components/riderssidebar.tsx
+M	web/customer-web-app/src/app/super-admin/users/vendors/[id]/components/businesscard.tsx
+M	web/customer-web-app/src/app/super-admin/users/vendors/[id]/components/orderhistorytab.tsx
+M	web/customer-web-app/src/app/super-admin/users/vendors/[id]/components/payoutstabcontent.tsx
+M	web/customer-web-app/src/app/super-admin/users/vendors/[id]/components/performancechart.tsx
+M	web/customer-web-app/src/app/super-admin/verification/[id]/page.tsx
+A	web/customer-web-app/src/utils/formatDate.ts
+44737e9 fixed time format in store orders, order timeline when rider assigned and what not
+A	ORDER_STATUS_RIDER_ASSIGNMENT_FIX.md
+A	STORE_ORDERS_BUG_FIX.md
+A	STORE_ORDERS_TIME_FORMAT_FIX.md
+M	backend/src/super-admin/deliveries/delivery.service.ts
+M	backend/src/super-admin/orders/orders.service.ts
+M	backend/src/tests/order-sorting.test.ts
+A	backend/test/order-status-rider-assignment.e2e-spec.ts
+A	backend/test/orders-isolation.e2e-spec.ts
+M	web/customer-web-app/src/app/super-admin/store-orders/[storeId]/page.tsx
+M	web/customer-web-app/src/app/super-admin/store-orders/page.tsx

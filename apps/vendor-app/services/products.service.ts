@@ -45,6 +45,7 @@ export interface Product {
 
   /** 🔹 Modifiers */
   modifierGroups?: ModifierGroup[];
+  manageStock?: boolean;
 }
 
 /* ---------- Inputs ---------- */
@@ -57,6 +58,7 @@ export interface CreateProductInput {
   images?: string[];
   categoryId: string;
   stock?: number;
+  manageStock?: boolean;
 
   /** 🔹 Optional modifiers */
   modifierGroups?: {
@@ -78,6 +80,7 @@ export interface UpdateProductInput {
   categoryId?: string;
   stock?: number;
   status?: "ACTIVE" | "OUT_OF_STOCK" | "DISABLED";
+  manageStock?: boolean;
 
   /** 🔹 Optional modifiers */
   modifierGroups?: {

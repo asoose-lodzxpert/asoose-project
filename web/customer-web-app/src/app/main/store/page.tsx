@@ -158,6 +158,9 @@ function useStoreData(query: string | null) {
               image: p.images?.[0] || null,
               storeId: p.storeId,
               storeName: p.store?.name,
+              stock: p.stock,
+              status: p.status,
+              manageStock: p.manageStock,
             })),
           },
         };

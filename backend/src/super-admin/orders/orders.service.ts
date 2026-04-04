@@ -8,6 +8,7 @@ import { OrderFilterDto } from './dto/order-filter.dto';
 import { Prisma, StoreType, OrderStatus } from '@prisma/client';
 import { TransactionLedgerService } from '../transactions/transaction-ledger.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { InventoryService } from 'src/users/inventory.service';
 
 const SERVICE_TYPE_MAP: Record<string, StoreType> = {
   Food: 'RESTAURANT',
@@ -22,6 +23,7 @@ export class OrdersService {
     private prisma: PrismaService,
     private ledgerService: TransactionLedgerService,
     private eventEmitter: EventEmitter2,
+    private inventoryService: InventoryService,
   ) {}
 
   // ===========================================================================
@@ -248,10 +250,14 @@ export class OrdersService {
     const payment = order.payment || order.orderGroup?.payment;
 
     return this.prisma.$transaction(async (tx) => {
-      await tx.order.update({
+      const updated = await tx.order.update({
         where: { id },
         data: { status: 'CANCELLED', cancelledAt: new Date() },
+        include: { items: true },
       });
+
+      // Restore stock
+      await this.inventoryService.atomicIncrementStock(tx, updated.items);
 
       if (payment && payment.status === 'COMPLETED') {
         // Logic: If Group Payment, mark Partially Refunded. If Single, Refunded.
@@ -673,9 +679,16 @@ export class OrdersService {
     if (order.status !== 'PENDING')
       throw new BadRequestException('Can only decline PENDING orders');
 
-    const updated = await this.prisma.order.update({
-      where: { id: orderId },
-      data: { status: OrderStatus.REJECTED, cancelledAt: new Date() },
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const u = await tx.order.update({
+        where: { id: orderId },
+        data: { status: OrderStatus.REJECTED, cancelledAt: new Date() },
+        include: { items: true },
+      });
+
+      // Restore stock
+      await this.inventoryService.atomicIncrementStock(tx, u.items);
+      return u;
     });
 
     await this.prisma.activityLog.create({

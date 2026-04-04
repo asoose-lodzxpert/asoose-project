@@ -30,6 +30,16 @@ export const AppAlert = {
       color: themeColors.color,
     }),
 
+  successModal: (title: string, text: string) =>
+    Swal.fire({
+      icon: "success",
+      title,
+      text,
+      confirmButtonColor: themeColors.confirmButton,
+      background: themeColors.background,
+      color: themeColors.color,
+    }),
+
   confirm: async (
     title: string,
     text: string,

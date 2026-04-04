@@ -1,0 +1,21 @@
+﻿commit cacb2595c2e6a6c4a4d04261722714ba044beede
+Author: Dev Enoch <arhyelphilip024@gmail.com>
+Date:   Wed Apr 1 04:57:56 2026 +0100
+
+    feat: standardize fees (1.5% fee, 7.5% VAT), fix mobile address selection, and migrate logs to Prisma
+
+ apps/customer-app/app/cart.tsx                     |    8 +-
+ apps/customer-app/app/checkout.tsx                 |   56 +-
+ backend/package.json                               |    2 -
+ .../20260401035554_add_error_log/migration.sql     |   17 +
+ backend/prisma/schema.prisma                       |   15 +-
+ backend/src/app.module.ts                          |   15 +-
+ backend/src/logs/logs.controller.ts                |    2 +-
+ backend/src/logs/logs.module.ts                    |    9 +-
+ backend/src/logs/logs.service.ts                   |   41 +-
+ backend/src/logs/schemas/error-log.schema.ts       |   27 -
+ backend/src/users/pricing.service.ts               |    6 +-
+ package-lock.json                                  |  407 +--
+ .../app/main/components/checkout/ordersummary.tsx  |    8 +-
+ yarn.lock                                          | 2883 ++++++++++----------
+ 14 files changed, 1704 insertions(+), 1792 deletions(-)

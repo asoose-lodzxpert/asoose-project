@@ -40,6 +40,7 @@ export interface MenuItem {
 
   /** 🔹 Optional modifier groups */
   modifierGroups?: ModifierGroup[];
+  manageStock?: boolean;
 }
 
 /* ---------- Category ---------- */

@@ -1,0 +1,1700 @@
+﻿commit 6e9efed23c02aa16106a64553a5c75583b653c83
+Author: Dev Enoch <arhyelphilip024@gmail.com>
+Date:   Fri Apr 3 10:10:20 2026 +0100
+
+    feat: job lifecycle and readability enhancements. Orders now move to DISPATCHED on pickup. Admin alerts include human-readable names.
+
+diff --git a/.easignore b/.easignore
+index 1c8ad7b..355f1d5 100644
+--- a/.easignore
++++ b/.easignore
+@@ -4,8 +4,8 @@
+ # Never upload node_modules ΓÇö EAS installs them fresh on the build server
+ node_modules/
+ 
+-# Never upload other apps in the monorepo (each app uploads itself)
+-apps/
++# Never upload other apps in the monorepo (each app uploads what it needs via local .easignore or git)
++# apps/
+ 
+ # Backend server code ΓÇö not needed for mobile builds
+ backend/
+diff --git a/apps/customer-app/.easignore b/apps/customer-app/.easignore
+index 4e2ee45..b1b134f 100644
+--- a/apps/customer-app/.easignore
++++ b/apps/customer-app/.easignore
+@@ -1,26 +1,47 @@
+-# EAS Build ignore file ΓÇö customer-app
+-# EAS uses .easignore (like .gitignore) to determine what NOT to upload to build servers.
+-# node_modules are NOT uploaded ΓÇö EAS installs them fresh on build servers.
++# .easignore - tells EAS to upload everything except these patterns
++# By creating this file, EAS CLI will use it instead of .gitignore
++# and will upload untracked files (like google-services.json) unless excluded ici.
+ 
++# dependencies
+ node_modules/
++
++# Expo
+ .expo/
+ dist/
+ web-build/
++expo-env.d.ts
++
++# Native
++.kotlin/
++*.orig.*
++*.jks
++*.p8
++*.p12
++*.key
++*.mobileprovision
++
++# Metro
++.metro-health-check*
++
++# debug
++npm-debug.*
++yarn-debug.*
++yarn-error.*
++
++# macOS
+ .DS_Store
+-*.log
+-*.local
++*.pem
++
++# local env files
+ .env*.local
+ 
+-# Plan / research documents (not needed for building)
+-PLAN.md
+-README.md
++# typescript
++*.tsbuildinfo
+ 
+-# Development scripts (not needed for building)
+-scripts/
++app-example
+ 
+-# TypeScript build cache
+-*.tsbuildinfo
++# generated native folders
++/ios
++/android
+ 
+-# Generated native folders (EAS manages these)
+-android/
+-ios/
++/lib/generated/prisma
+diff --git a/apps/rider-app/app/(tabs)/notifications.tsx b/apps/rider-app/app/(tabs)/notifications.tsx
+index 4c4116a..eacd66f 100644
+--- a/apps/rider-app/app/(tabs)/notifications.tsx
++++ b/apps/rider-app/app/(tabs)/notifications.tsx
+@@ -17,8 +17,9 @@ import {
+   markAllAsRead,
+ } from "@/services/notifications.service";
+ import type { Notification } from "@/types/notification";
+-import Toast from "react-native-toast-message";
+ import { formatDistanceToNow } from "date-fns";
++import { jobsService } from "@/services/jobs.service";
++import { useRouter } from "expo-router";
+ 
+ export default function NotificationsScreen() {
+   const primary = useThemeColor({}, "brandPrimary");
+@@ -34,6 +35,8 @@ export default function NotificationsScreen() {
+   const [loadingMore, setLoadingMore] = useState(false);
+   const [page, setPage] = useState(1);
+   const [hasMore, setHasMore] = useState(true);
++  const [processingId, setProcessingId] = useState<string | null>(null);
++  const router = useRouter();
+ 
+   const fetchNotifications = useCallback(
+     async (pageNum: number = 1, append: boolean = false) => {
+@@ -98,6 +101,55 @@ export default function NotificationsScreen() {
+     }
+   }, []);
+ 
++  const handleAcceptJob = useCallback(
++    async (notificationId: string, jobId: string, jobType: any) => {
++      try {
++        setProcessingId(notificationId);
++        await jobsService.acceptJob(jobId, jobType);
++        Toast.show({
++          type: "success",
++          text1: "Job Accepted! ≡ƒ¢╡",
++          text2: "Heading to pick up now.",
++        });
++        // Mark as read and refresh to reflect changes
++        await handleMarkAsRead(notificationId);
++        router.push("/(tabs)/orders");
++      } catch (error: any) {
++        Toast.show({
++          type: "error",
++          text1: "Failed to accept job",
++          text2: error.message || "Job might be already taken",
++        });
++      } finally {
++        setProcessingId(null);
++      }
++    },
++    [handleMarkAsRead, router],
++  );
++
++  const handleDeclineJob = useCallback(
++    async (notificationId: string, jobId: string, jobType: any) => {
++      try {
++        setProcessingId(notificationId);
++        await jobsService.declineJob(jobId, jobType);
++        Toast.show({
++          type: "info",
++          text1: "Job Declined",
++        });
++        await handleMarkAsRead(notificationId);
++      } catch (error: any) {
++        Toast.show({
++          type: "error",
++          text1: "Failed to decline job",
++          text2: error.message,
++        });
++      } finally {
++        setProcessingId(null);
++      }
++    },
++    [handleMarkAsRead],
++  );
++
+   const handleMarkAllAsRead = useCallback(async () => {
+     try {
+       await markAllAsRead();
+@@ -165,6 +217,54 @@ export default function NotificationsScreen() {
+               addSuffix: true,
+             })}
+           </ThemedText>
++
++          {/* Action Buttons for Job Assignments */}
++          {item.metadata?.jobId && !item.isRead && (
++            <View style={styles.actionRow}>
++              <Pressable
++                style={[
++                  styles.actionButton,
++                  styles.acceptButton,
++                  { backgroundColor: primary },
++                  processingId === item.id && styles.disabledButton,
++                ]}
++                onPress={() =>
++                  handleAcceptJob(
++                    item.id,
++                    item.metadata.jobId,
++                    item.metadata.jobType,
++                  )
++                }
++                disabled={processingId !== null}
++              >
++                {processingId === item.id ? (
++                  <ActivityIndicator size="small" color="#fff" />
++                ) : (
++                  <ThemedText style={styles.actionText}>YES, ACCEPT Γ£à</ThemedText>
++                )}
++              </Pressable>
++              <Pressable
++                style={[
++                  styles.actionButton,
++                  styles.declineButton,
++                  { borderColor: border },
++                  processingId === item.id && styles.disabledButton,
++                ]}
++                onPress={() =>
++                  handleDeclineJob(
++                    item.id,
++                    item.metadata.jobId,
++                    item.metadata.jobType,
++                  )
++                }
++                disabled={processingId !== null}
++              >
++                <ThemedText style={[styles.actionText, { color: textSecondary }]}>
++                  NO Γ¥î
++                </ThemedText>
++              </Pressable>
++            </View>
++          )}
+         </View>
+       </Pressable>
+     );
+@@ -299,4 +399,28 @@ const styles = StyleSheet.create({
+     padding: 20,
+     alignItems: "center",
+   },
++  actionRow: {
++    flexDirection: "row",
++    gap: 8,
++    marginTop: 12,
++  },
++  actionButton: {
++    flex: 1,
++    height: 44,
++    borderRadius: 8,
++    justifyContent: "center",
++    alignItems: "center",
++    borderWidth: 1,
++    borderColor: "transparent",
++  },
++  acceptButton: {},
++  declineButton: {},
++  disabledButton: {
++    opacity: 0.5,
++  },
++  actionText: {
++    color: "#fff",
++    fontSize: 14,
++    fontWeight: "700",
++  },
+ });
+diff --git a/apps/rider-app/components/orders/OrderCard.tsx b/apps/rider-app/components/orders/OrderCard.tsx
+index 41f73d7..81c986a 100644
+--- a/apps/rider-app/components/orders/OrderCard.tsx
++++ b/apps/rider-app/components/orders/OrderCard.tsx
+@@ -25,78 +25,83 @@ export const OrderCard: React.FC<OrderCardProps> = ({
+   return (
+     <View style={[styles.card, { backgroundColor: surface }]}>
+       {/* LEFT: Route + meta */}
+-      <View style={{ flex: 1, gap: 10 }}>
++      <View style={{ flex: 1, gap: 12 }}>
+         {/* Locations */}
+         <View style={styles.routeBlock}>
+           <View style={styles.routeRow}>
+-            <IconSymbol name="circle.fill" size={10} color="#22C55E" />
+-            <ThemedText
+-              numberOfLines={1}
+-              style={[styles.locationText, { color: primaryText }]}
+-            >
+-              {order.pickupAddress?.street ||
+-                order.pickupAddress?.address ||
+-                "Pickup location"}
+-            </ThemedText>
++            <View style={styles.labelContainer}>
++              <ThemedText style={styles.stepLabel}>PICK UP</ThemedText>
++            </View>
++            <View style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 8 }}>
++              <IconSymbol name="circle.fill" size={10} color="#22C55E" />
++              <ThemedText
++                numberOfLines={2}
++                style={[styles.locationText, { color: primaryText }]}
++              >
++                {order.pickupAddress?.street ||
++                  order.pickupAddress?.address ||
++                  "Pickup location"}
++              </ThemedText>
++            </View>
+           </View>
+ 
+           <View style={styles.routeLine} />
+ 
+           <View style={styles.routeRow}>
+-            <IconSymbol name="mappin.circle.fill" size={14} color="#EF4444" />
+-            <ThemedText
+-              numberOfLines={1}
+-              style={[styles.locationText, { color: primaryText }]}
+-            >
+-              {order.dropoffAddress?.street ||
+-                order.dropoffAddress?.address ||
+-                "Dropoff location"}
+-            </ThemedText>
++            <View style={styles.labelContainer}>
++              <ThemedText style={styles.stepLabel}>DROP OFF</ThemedText>
++            </View>
++            <View style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 8 }}>
++              <IconSymbol name="mappin.circle.fill" size={14} color="#EF4444" />
++              <ThemedText
++                numberOfLines={2}
++                style={[styles.locationText, { color: primaryText }]}
++              >
++                {order.dropoffAddress?.street ||
++                  order.dropoffAddress?.address ||
++                  "Dropoff location"}
++              </ThemedText>
++            </View>
+           </View>
+         </View>
+ 
+-        {/* Meta */}
++        {/* Meta info */}
+         <View style={styles.metaRow}>
+-          <IconSymbol name="clock" size={14} color={muted} />
++          <View style={styles.typeBadge}>
++            <IconSymbol
++              name={order.jobType === "ride" ? "car.fill" : "shippingbox.fill"}
++              size={12}
++              color={muted}
++            />
++            <ThemedText style={[styles.metaText, { color: muted }]}>
++              {order.jobType === "ride" ? "Ride" : "Delivery"}
++            </ThemedText>
++          </View>
++          
++          <View style={styles.metaDot} />
++          
+           <ThemedText style={[styles.metaText, { color: muted }]}>
+             {new Date(
+-              order.createdAt ||
+-                order.assignedAt ||
+-                order.pickedUpAt ||
+-                Date.now(),
++              order.createdAt || order.assignedAt || Date.now()
+             ).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+           </ThemedText>
+-
+-          <View style={styles.metaDot} />
+-
+-          <IconSymbol
+-            name={order.jobType === "ride" ? "car.fill" : "shippingbox.fill"}
+-            size={14}
+-            color={muted}
+-          />
+-          <ThemedText style={[styles.metaText, { color: muted }]}>
+-            {order.jobType === "ride" ? "Ride" : "Delivery"}
+-          </ThemedText>
+         </View>
+       </View>
+ 
+       {/* RIGHT: Amount + Status */}
+       <View style={styles.rightColumn}>
+-        <ThemedText style={styles.amountText}>
+-          Γéª{order.earnings?.toLocaleString() || "0"}
+-        </ThemedText>
+-
+-        <View style={styles.statusRow}>
+-          <View
+-            style={[
+-              styles.statusDot,
+-              { backgroundColor: getStatusColor(order.status) },
+-            ]}
+-          />
++        <View style={styles.earningsContainer}>
++          <ThemedText style={[styles.earnLabel, { color: muted }]}>YOU EARN</ThemedText>
++          <ThemedText style={styles.amountText}>
++            Γéª{order.earnings?.toLocaleString() || "0"}
++          </ThemedText>
++        </View>
++
++        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(order.status) + "20" }]}>
+           <ThemedText
+             style={[styles.statusText, { color: getStatusColor(order.status) }]}
+           >
+-            {getStatusLabel(order.status)}
++            {getStatusLabel(order.status).toUpperCase()}
+           </ThemedText>
+         </View>
+       </View>
+@@ -121,26 +126,40 @@ const styles = StyleSheet.create({
+   /* Route */
+ 
+   routeBlock: {
+-    gap: 6,
++    gap: 8,
+   },
+ 
+   routeRow: {
+     flexDirection: "row",
+-    alignItems: "center",
++    alignItems: "flex-start",
+     gap: 8,
+   },
+ 
++  labelContainer: {
++    width: 65,
++    paddingVertical: 2,
++    backgroundColor: "#F3F4F6",
++    borderRadius: 4,
++    alignItems: "center",
++  },
++
++  stepLabel: {
++    fontSize: 10,
++    fontWeight: "800",
++    color: "#6B7280",
++  },
++
+   routeLine: {
+-    marginLeft: 7,
+-    height: 10,
+-    borderLeftWidth: 1,
+-    borderLeftColor: "#ccc",
+-    opacity: 0.5,
++    marginLeft: 32,
++    height: 12,
++    borderLeftWidth: 1.5,
++    borderLeftColor: "#E5E7EB",
++    borderStyle: "dashed",
+   },
+ 
+   locationText: {
+-    fontSize: 14,
+-    fontWeight: "500",
++    fontSize: 15,
++    fontWeight: "600",
+     flex: 1,
+   },
+ 
+@@ -149,46 +168,64 @@ const styles = StyleSheet.create({
+   metaRow: {
+     flexDirection: "row",
+     alignItems: "center",
+-    gap: 6,
++    gap: 8,
++  },
++
++  typeBadge: {
++    flexDirection: "row",
++    alignItems: "center",
++    gap: 4,
++    backgroundColor: "#F9FAFB",
++    paddingHorizontal: 6,
++    paddingVertical: 2,
++    borderRadius: 4,
+   },
+ 
+   metaText: {
+     fontSize: 12,
++    fontWeight: "500",
+   },
+ 
+   metaDot: {
+     width: 4,
+     height: 4,
+     borderRadius: 2,
+-    backgroundColor: "#999",
++    backgroundColor: "#D1D5DB",
+   },
+ 
+   /* Right side */
+ 
+   rightColumn: {
+     alignItems: "flex-end",
+-    gap: 6,
++    gap: 12,
++    justifyContent: "space-between",
++    alignSelf: "stretch",
++  },
++
++  earningsContainer: {
++    alignItems: "flex-end",
+   },
+ 
+-  amountText: {
+-    fontSize: 15,
++  earnLabel: {
++    fontSize: 10,
+     fontWeight: "700",
++    marginBottom: 2,
+   },
+ 
+-  statusRow: {
+-    flexDirection: "row",
+-    alignItems: "center",
+-    gap: 6,
++  amountText: {
++    fontSize: 18,
++    fontWeight: "800",
++    color: "#111827",
+   },
+ 
+-  statusDot: {
+-    width: 8,
+-    height: 8,
+-    borderRadius: 4,
++  statusBadge: {
++    paddingHorizontal: 8,
++    paddingVertical: 4,
++    borderRadius: 6,
+   },
+ 
+   statusText: {
+-    fontSize: 12,
+-    fontWeight: "600",
++    fontSize: 10,
++    fontWeight: "800",
+   },
+ });
+diff --git a/apps/vendor-app/app/(main)/profile.tsx b/apps/vendor-app/app/(main)/profile.tsx
+index 9fde340..ba42b13 100644
+--- a/apps/vendor-app/app/(main)/profile.tsx
++++ b/apps/vendor-app/app/(main)/profile.tsx
+@@ -24,6 +24,7 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
+ import { useAuth } from "@/context/AuthContext";
+ import { useThemeColor } from "@/hooks/use-theme-color";
+ import { useBalance } from "@/context/BalanceContext";
++import { ImagePickerModal } from "@/components/ImagePickerModal";
+ import { ProfileData, VendorStatus } from "@/types/profile";
+ 
+ /* -------------------------------------------------------------------------- */
+@@ -76,6 +77,10 @@ export default function ProfileScreen() {
+   const { confirm, ConfirmModal } = useConfirm();
+   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+ 
++  // Image Picker Modal State
++  const [isPhotoModalVisible, setIsPhotoModalVisible] = useState(false);
++  const [photoPickType, setPhotoPickType] = useState<"avatar" | "banner">("avatar");
++
+   const loadProfile = async (isRefresh = false) => {
+     if (!isRefresh) setLoading(true);
+     try {
+@@ -113,23 +118,15 @@ export default function ProfileScreen() {
+     await loadProfile(true);
+   };
+ 
+-  const pickImage = async () => {
+-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+-
+-    if (!permission.granted) {
+-      Toast.show({ type: "error", text1: "Permission required" });
+-      return;
+-    }
+-
+-    const result = await ImagePicker.launchImageLibraryAsync({
+-      mediaTypes: ["images"],
+-      allowsEditing: true,
+-      aspect: [1, 1],
+-      quality: 0.8,
+-    });
++  const pickImage = () => {
++    setPhotoPickType("avatar");
++    setIsPhotoModalVisible(true);
++  };
+ 
+-    if (!result.canceled) {
+-      setSelectedImage(result.assets[0].uri);
++  const onImageSelected = async (uri: string) => {
++    setIsPhotoModalVisible(false);
++    if (photoPickType === "avatar") {
++      setSelectedImage(uri);
+       const resultConfirm = await confirm({
+         title: "Change profile image?",
+         message: "Do you want to update your profile image?",
+@@ -139,33 +136,21 @@ export default function ProfileScreen() {
+         icon: "camera.fill",
+       });
+       if (resultConfirm) {
+-        await handleConfirmImageChange();
++        // Need to pass the uri since selectedImage might not be updated yet
++        setUploadingImage(true);
++        try {
++          await updateVendorProfileImage(uri);
++          await loadProfile(true);
++          Toast.show({ type: "success", text1: "Profile image updated" });
++        } finally {
++          setUploadingImage(false);
++          setSelectedImage(null);
++        }
+       } else {
+         setSelectedImage(null);
+       }
+-    }
+-  };
+-
+-  /* -------------------- BANNER HANDLER (OUTSIDE COMPONENT) -------------------- */
+-  async function pickAndUploadBanner(onSuccess: () => Promise<void>) {
+-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+-
+-    if (!permission.granted) {
+-      Toast.show({
+-        type: "error",
+-        text1: "Permission required to access photos",
+-      });
+-      return;
+-    }
+-
+-    const result = await ImagePicker.launchImageLibraryAsync({
+-      mediaTypes: ["images"],
+-      quality: 0.8,
+-      allowsEditing: true,
+-      aspect: [16, 9],
+-    });
+-
+-    if (!result.canceled && result.assets.length > 0) {
++    } else {
++      // Banner
+       const confirmResult = await confirm({
+         title: "Change store banner?",
+         message: "Do you want to update your store banner image?",
+@@ -176,12 +161,12 @@ export default function ProfileScreen() {
+       });
+       if (!confirmResult) return;
+       try {
+-        await updateVendorProfileImage(result.assets[0].uri, "banner");
++        await updateVendorProfileImage(uri, "banner");
+         Toast.show({
+           type: "success",
+           text1: "Store banner updated successfully",
+         });
+-        await onSuccess();
++        await loadProfile(true);
+       } catch (error: any) {
+         Toast.show({
+           type: "error",
+@@ -189,7 +174,13 @@ export default function ProfileScreen() {
+         });
+       }
+     }
+-  }
++  };
++
++  /* -------------------- BANNER HANDLER (OUTSIDE COMPONENT) -------------------- */
++  const handlePickBanner = () => {
++    setPhotoPickType("banner");
++    setIsPhotoModalVisible(true);
++  };
+ 
+   const handleConfirmImageChange = async () => {
+     if (!selectedImage) return;
+@@ -244,7 +235,7 @@ export default function ProfileScreen() {
+ 
+             <Pressable
+               style={styles.bannerEditOverlay}
+-              onPress={() => pickAndUploadBanner(() => loadProfile(true))}
++              onPress={handlePickBanner}
+             >
+               <IconSymbol name="camera.fill" size={20} color="#fff" />
+             </Pressable>
+@@ -368,6 +359,11 @@ export default function ProfileScreen() {
+       </ScrollView>
+ 
+       <ConfirmModal />
++      <ImagePickerModal
++        visible={isPhotoModalVisible}
++        onClose={() => setIsPhotoModalVisible(false)}
++        onSelectImage={onImageSelected}
++      />
+     </ThemedView>
+   );
+ }
+diff --git a/apps/vendor-app/app/(menu)/add-item.tsx b/apps/vendor-app/app/(menu)/add-item.tsx
+index afaf4b7..304762a 100644
+--- a/apps/vendor-app/app/(menu)/add-item.tsx
++++ b/apps/vendor-app/app/(menu)/add-item.tsx
+@@ -21,6 +21,7 @@ import { ThemedText } from "@/components/themed-text";
+ import { ThemedView } from "@/components/themed-view";
+ import { ThemedInput } from "@/components/ThemedInput";
+ import { IconSymbol } from "@/components/ui/icon-symbol";
++import { ImagePickerModal } from "@/components/ImagePickerModal";
+ import { useAuth } from "@/context/AuthContext";
+ import { useConfirm } from "@/hooks/use-confirm";
+ import { useThemeColor } from "@/hooks/use-theme-color";
+@@ -85,6 +86,10 @@ export default function AddEditItemScreen() {
+   const [categories, setCategories] = useState<Category[]>([]);
+   const [modifierGroups, setModifierGroups] = useState<ModifierGroup[]>([]);
+ 
++  // Image Picker Modal State
++  const [isPhotoModalVisible, setIsPhotoModalVisible] = useState(false);
++  const [targetImageIndex, setTargetImageIndex] = useState<number | null>(null);
++
+   useEffect(() => {
+     loadCategories();
+     if (isEdit) loadItem();
+@@ -144,28 +149,38 @@ export default function AddEditItemScreen() {
+     return !result.canceled ? result.assets[0].uri : null;
+   };
+ 
+-  const handleAddImage = async () => {
++  const handleAddImage = () => {
+     if (images.length >= 8) {
+       Toast.show({ type: "info", text1: "Maximum 8 images allowed" });
+       return;
+     }
+-    const uri = await pickImage();
+-    if (uri) setImages((p) => [...p, { uri, isNew: true }]);
++    setTargetImageIndex(null);
++    setIsPhotoModalVisible(true);
+   };
+ 
+-  const handleReplaceImage = async (index: number) => {
+-    const uri = await pickImage();
+-    if (!uri) return;
+-    setImages((prev) => {
+-      const copy = [...prev];
+-      copy[index] = {
+-        uri,
+-        isNew: true,
+-        isEdited: true,
+-        originalUri: copy[index].uri,
+-      };
+-      return copy;
+-    });
++  const handleReplaceImage = (index: number) => {
++    setTargetImageIndex(index);
++    setIsPhotoModalVisible(true);
++  };
++
++  const onImageSelected = (uri: string) => {
++    if (targetImageIndex === null) {
++      // Adding new image
++      setImages((p) => [...p, { uri, isNew: true }]);
++    } else {
++      // Replacing existing image
++      setImages((prev) => {
++        const copy = [...prev];
++        copy[targetImageIndex] = {
++          uri,
++          isNew: true,
++          isEdited: true,
++          originalUri: copy[targetImageIndex].uri,
++        };
++        return copy;
++      });
++    }
++    setIsPhotoModalVisible(false);
+   };
+ 
+   const handleDeleteImage = (idx: number) => {
+@@ -556,6 +571,11 @@ export default function AddEditItemScreen() {
+         </ScrollView>
+       </KeyboardAvoidingView>
+       <ConfirmModal />
++      <ImagePickerModal
++        visible={isPhotoModalVisible}
++        onClose={() => setIsPhotoModalVisible(false)}
++        onSelectImage={onImageSelected}
++      />
+       <Toast />
+     </ThemedView>
+   );
+diff --git a/apps/vendor-app/components/ImagePickerModal.tsx b/apps/vendor-app/components/ImagePickerModal.tsx
+new file mode 100644
+index 0000000..94a8a43
+--- /dev/null
++++ b/apps/vendor-app/components/ImagePickerModal.tsx
+@@ -0,0 +1,231 @@
++import React from "react";
++import {
++  Modal,
++  Pressable,
++  StyleSheet,
++  View,
++  Animated,
++  Dimensions,
++} from "react-native";
++import { IconSymbol } from "./ui/icon-symbol";
++import { ThemedText } from "./themed-text";
++import { ThemedView } from "./themed-view";
++import { useThemeColor } from "@/hooks/use-theme-color";
++import * as ImagePicker from "expo-image-picker";
++import Toast from "react-native-toast-message";
++
++interface ImagePickerModalProps {
++  visible: boolean;
++  onClose: () => void;
++  onSelectImage: (uri: string) => void;
++}
++
++export const ImagePickerModal: React.FC<ImagePickerModalProps> = ({
++  visible,
++  onClose,
++  onSelectImage,
++}) => {
++  const primary = useThemeColor({}, "brandPrimary");
++  const background = useThemeColor({}, "surfaceBackground");
++  const cardBackground = useThemeColor({}, "surfaceCard");
++  const textMuted = useThemeColor({}, "textMuted");
++  const borderColor = useThemeColor({}, "borderDefault");
++
++  const [panY] = React.useState(new Animated.Value(Dimensions.get("window").height));
++
++  React.useEffect(() => {
++    if (visible) {
++      Animated.spring(panY, {
++        toValue: 0,
++        useNativeDriver: true,
++        tension: 50,
++        friction: 8,
++      }).start();
++    } else {
++      Animated.timing(panY, {
++        toValue: Dimensions.get("window").height,
++        duration: 200,
++        useNativeDriver: true,
++      }).start();
++    }
++  }, [visible]);
++
++  const handleCamera = async () => {
++    const { status } = await ImagePicker.requestCameraPermissionsAsync();
++    if (status !== "granted") {
++      Toast.show({
++        type: "error",
++        text1: "Permission Denied",
++        text2: "Permission to access camera was denied",
++      });
++      return;
++    }
++
++    const result = await ImagePicker.launchCameraAsync({
++      mediaTypes: ["images"],
++      quality: 0.7,
++      allowsEditing: true,
++      aspect: [1, 1],
++    });
++
++    if (!result.canceled) {
++      onSelectImage(result.assets[0].uri);
++      onClose();
++    }
++  };
++
++  const handleGallery = async () => {
++    const result = await ImagePicker.launchImageLibraryAsync({
++      mediaTypes: ["images"],
++      quality: 0.7,
++      allowsEditing: true,
++      aspect: [1, 1],
++    });
++
++    if (!result.canceled) {
++      onSelectImage(result.assets[0].uri);
++      onClose();
++    }
++  };
++
++  if (!visible) return null;
++
++  return (
++    <Modal visible={visible} transparent animationType="none">
++      <View style={styles.overlay}>
++        <Pressable style={styles.dismissArea} onPress={onClose} />
++        <Animated.View
++          style={[
++            styles.content,
++            { backgroundColor: cardBackground, transform: [{ translateY: panY }] },
++          ]}
++        >
++          <View style={[styles.handle, { backgroundColor: borderColor }]} />
++
++          <View style={styles.header}>
++            <ThemedText type="subtitle" style={styles.title}>
++              Add Photo
++            </ThemedText>
++            <ThemedText style={{ color: textMuted, fontSize: 14 }}>
++              Choose a medium to add your product image
++            </ThemedText>
++          </View>
++
++          <View style={styles.optionsContainer}>
++            <Pressable
++              onPress={handleCamera}
++              style={({ pressed }) => [
++                styles.optionButton,
++                { borderColor: borderColor },
++                pressed && { backgroundColor: background },
++              ]}
++            >
++              <View style={[styles.iconWrapper, { backgroundColor: primary + "10" }]}>
++                <IconSymbol name="camera.fill" size={24} color={primary} />
++              </View>
++              <View style={styles.optionTextContainer}>
++                <ThemedText type="defaultSemiBold">Take a Photo</ThemedText>
++                <ThemedText style={{ color: textMuted, fontSize: 12 }}>
++                  Use camera to snap a fresh image
++                </ThemedText>
++              </View>
++              <IconSymbol name="chevron.right" size={18} color={textMuted} />
++            </Pressable>
++
++            <Pressable
++              onPress={handleGallery}
++              style={({ pressed }) => [
++                styles.optionButton,
++                { borderColor: borderColor },
++                pressed && { backgroundColor: background },
++              ]}
++            >
++              <View style={[styles.iconWrapper, { backgroundColor: primary + "10" }]}>
++                <IconSymbol name="photo" size={24} color={primary} />
++              </View>
++              <View style={styles.optionTextContainer}>
++                <ThemedText type="defaultSemiBold">Choose from Gallery</ThemedText>
++                <ThemedText style={{ color: textMuted, fontSize: 12 }}>
++                  Pick an existing image from your media
++                </ThemedText>
++              </View>
++              <IconSymbol name="chevron.right" size={18} color={textMuted} />
++            </Pressable>
++          </View>
++
++          <Pressable
++            onPress={onClose}
++            style={[styles.cancelButton, { backgroundColor: background }]}
++          >
++            <ThemedText type="defaultSemiBold" style={{ color: primary }}>
++              Cancel
++            </ThemedText>
++          </Pressable>
++        </Animated.View>
++      </View>
++    </Modal>
++  );
++};
++
++const styles = StyleSheet.create({
++  overlay: {
++    flex: 1,
++    backgroundColor: "rgba(0,0,0,0.4)",
++    justifyContent: "flex-end",
++  },
++  dismissArea: {
++    flex: 1,
++  },
++  content: {
++    borderTopLeftRadius: 24,
++    borderTopRightRadius: 24,
++    paddingHorizontal: 20,
++    paddingBottom: 40,
++    paddingTop: 12,
++    alignItems: "center",
++  },
++  handle: {
++    width: 40,
++    height: 4,
++    borderRadius: 2,
++    marginBottom: 20,
++  },
++  header: {
++    width: "100%",
++    marginBottom: 24,
++  },
++  title: {
++    fontWeight: "700",
++    marginBottom: 4,
++  },
++  optionsContainer: {
++    width: "100%",
++    gap: 12,
++    marginBottom: 24,
++  },
++  optionButton: {
++    flexDirection: "row",
++    alignItems: "center",
++    padding: 16,
++    borderRadius: 16,
++    borderWidth: 1,
++  },
++  iconWrapper: {
++    width: 48,
++    height: 48,
++    borderRadius: 12,
++    justifyContent: "center",
++    alignItems: "center",
++    marginRight: 16,
++  },
++  optionTextContainer: {
++    flex: 1,
++  },
++  cancelButton: {
++    width: "100%",
++    height: 56,
++    borderRadius: 16,
++    justifyContent: "center",
++    alignItems: "center",
++  },
++});
+diff --git a/apps/vendor-app/components/menu/AddMenuItemModal.tsx b/apps/vendor-app/components/menu/AddMenuItemModal.tsx
+index 61c55da..f0cde2a 100644
+--- a/apps/vendor-app/components/menu/AddMenuItemModal.tsx
++++ b/apps/vendor-app/components/menu/AddMenuItemModal.tsx
+@@ -21,6 +21,7 @@ import { useThemeColor } from "@/hooks/use-theme-color";
+ import { MenuItem } from "@/types/menu";
+ import { uploadFile } from "@/services/storage.service";
+ import { fetchCategories, Category } from "@/services/products.service";
++import { ImagePickerModal } from "@/components/ImagePickerModal";
+ 
+ interface Props {
+   visible: boolean;
+@@ -57,6 +58,7 @@ export const AddMenuItemModal: React.FC<Props> = ({
+ 
+   const [categories, setCategories] = useState<Category[]>([]);
+   const [loadingCategories, setLoadingCategories] = useState(false);
++  const [isPhotoModalVisible, setIsPhotoModalVisible] = useState(false);
+ 
+   // Load categories when modal opens
+   useEffect(() => {
+@@ -99,62 +101,48 @@ export const AddMenuItemModal: React.FC<Props> = ({
+     }
+   }, [itemToEdit, visible]);
+ 
+-  const pickImage = async () => {
+-    try {
+-      // Check if we already have 5 images (max limit)
+-      if (images.length >= 5) {
+-        Toast.show({
+-          type: "error",
+-          text1: "Maximum 5 images allowed",
+-        });
+-        return;
+-      }
+-
+-      const result = await ImagePicker.launchImageLibraryAsync({
+-        mediaTypes: ["images"],
+-        quality: 0.7,
+-        allowsEditing: true,
+-        aspect: [1, 1],
++  const pickImage = () => {
++    if (images.length >= 5) {
++      Toast.show({
++        type: "error",
++        text1: "Maximum 5 images allowed",
+       });
++      return;
++    }
++    setIsPhotoModalVisible(true);
++  };
+ 
+-      if (!result.canceled && result.assets.length > 0) {
+-        const asset = result.assets[0];
+-
+-        setUploading(true);
+-        setUploadProgress(0);
+-
+-        try {
+-          // Upload to backend storage
+-          const fileUri = asset.uri;
+-          const fileName =
+-            fileUri.split("/").pop() || `product-${Date.now()}.jpg`;
+-          const fileType = asset.type === "image" ? "image/jpeg" : "image/png";
+-
+-          const uploadedUrl = await uploadFile(
+-            {
+-              uri: fileUri,
+-              name: fileName,
+-              type: fileType,
+-            },
+-            (progress) => {
+-              setUploadProgress(progress.percentage);
+-            },
+-          );
++  const onImageSelected = async (uri: string) => {
++    setUploading(true);
++    setUploadProgress(0);
+ 
+-          // Add uploaded URL to images array
+-          setImages((prev) => [...prev, uploadedUrl]);
+-        } catch (error) {
+-          Toast.show({
+-            type: "error",
+-            text1: "Failed to upload image",
+-          });
+-        } finally {
+-          setUploading(false);
+-          setUploadProgress(0);
+-        }
+-      }
++    try {
++      // Upload to backend storage
++      const fileName = uri.split("/").pop() || `product-${Date.now()}.jpg`;
++      const fileType = "image/jpeg"; // Default to jpeg from picker
++
++      const uploadedUrl = await uploadFile(
++        {
++          uri: uri,
++          name: fileName,
++          type: fileType,
++        },
++        (progress) => {
++          setUploadProgress(progress.percentage);
++        },
++      );
++
++      // Add uploaded URL to images array
++      setImages((prev) => [...prev, uploadedUrl]);
+     } catch (error) {
+-      // Silent error handling
++      Toast.show({
++        type: "error",
++        text1: "Failed to upload image",
++      });
++    } finally {
++      setUploading(false);
++      setUploadProgress(0);
++      setIsPhotoModalVisible(false);
+     }
+   };
+ 
+@@ -383,6 +371,11 @@ export const AddMenuItemModal: React.FC<Props> = ({
+         </KeyboardAvoidingView>
+       </Pressable>
+ 
++      <ImagePickerModal
++        visible={isPhotoModalVisible}
++        onClose={() => setIsPhotoModalVisible(false)}
++        onSelectImage={onImageSelected}
++      />
+       <Toast />
+     </Modal>
+   );
+diff --git a/backend/prisma/schema.prisma b/backend/prisma/schema.prisma
+index d240a34..5a4a7a3 100644
+--- a/backend/prisma/schema.prisma
++++ b/backend/prisma/schema.prisma
+@@ -1293,6 +1293,7 @@ enum InquiryStatus {
+   READ
+   REPLIED
+ }
++
+ model ErrorLog {
+   id        String   @id @default(uuid())
+   message   String
+diff --git a/backend/src/notifications/notifications.service.ts b/backend/src/notifications/notifications.service.ts
+index 8f7936d..ca77929 100644
+--- a/backend/src/notifications/notifications.service.ts
++++ b/backend/src/notifications/notifications.service.ts
+@@ -33,11 +33,21 @@ export class NotificationsService {
+     if (!tokens.length) return;
+ 
+     const expoTokens = tokens
+-      .filter((t) => t.platform === 'expo' || t.token.startsWith('ExponentPushToken['))
++      .filter(
++        (t) =>
++          t.platform === 'expo' ||
++          t.token.startsWith('ExponentPushToken[') ||
++          t.token.startsWith('ExpoPushToken['),
++      )
+       .map((t) => t.token);
+ 
+     const fcmTokens = tokens
+-      .filter((t) => t.platform !== 'expo' && !t.token.startsWith('ExponentPushToken['))
++      .filter(
++        (t) =>
++          t.platform !== 'expo' &&
++          !t.token.startsWith('ExponentPushToken[') &&
++          !t.token.startsWith('ExpoPushToken['),
++      )
+       .map((t) => t.token);
+ 
+     const channelId = type ? this.resolveChannelId(type) : 'default';
+diff --git a/backend/src/payment/payment-status.service.ts b/backend/src/payment/payment-status.service.ts
+index 12248ad..ccd8cd7 100644
+--- a/backend/src/payment/payment-status.service.ts
++++ b/backend/src/payment/payment-status.service.ts
+@@ -539,7 +539,7 @@ export class PaymentStatusService {
+                 await this.notificationsService.create({
+                   userId: admin.id,
+                   title: `≡ƒÅ¬ New Order ΓÇö ${order.store.name}`,
+-                  message: `Order #${order.id.slice(-6)} received at ${order.store.name}. Total: Γéª${Number(order.total || 0).toLocaleString()}`,
++                  message: `Order from ${orderUser?.name || 'Customer'} at ${order.store.name}. Total: Γéª${Number(order.total || 0).toLocaleString()}`,
+                   type: 'ORDER',
+                   category: 'ORDER_CREATED',
+                   metadata: { orderId: order.id, storeName: order.store.name },
+@@ -619,7 +619,7 @@ export class PaymentStatusService {
+               await this.notificationsService.create({
+                 userId: admin.id,
+                 title: `≡ƒÅ¬ New Order ΓÇö ${result.order.store.name}`,
+-                message: `Order #${result.order.id.slice(-6)} received at ${result.order.store.name}. Total: Γéª${Number(result.order.total || 0).toLocaleString()}`,
++                message: `Order from ${result.order.user?.name || 'Customer'} at ${result.order.store.name}. Total: Γéª${Number(result.order.total || 0).toLocaleString()}`,
+                 type: 'ORDER',
+                 category: 'ORDER_CREATED',
+                 metadata: {
+@@ -822,11 +822,23 @@ export class PaymentStatusService {
+         where: { role: 'ADMIN' },
+         select: { id: true },
+       });
++      const delivery = await this.prisma.delivery.findUnique({
++        where: { id: deliveryId },
++        include: {
++          customer: { select: { name: true } },
++          dropoffAddress: { select: { street: true } },
++        },
++      });
++
++      const customerLabel = delivery?.customer?.name || 'A customer';
++      const destination = delivery?.dropoffAddress?.street || 'unknown destination';
++      const shortId = deliveryId.slice(0, 8);
++
+       for (const admin of admins) {
+         await this.notificationsService.create({
+           userId: admin.id,
+           title: 'Manual Delivery Assignment Needed',
+-          message: `A new delivery request (${deliveryId}) requires manual rider assignment.`,
++          message: `${customerLabel} requested a delivery to ${destination} (${shortId}). Please assign a rider.`,
+           type: 'DELIVERY_MANUAL_ASSIGN',
+           metadata: { deliveryId, customerId },
+         });
+diff --git a/backend/src/riders/jobs/jobs.service.ts b/backend/src/riders/jobs/jobs.service.ts
+index 580c31e..189f468 100644
+--- a/backend/src/riders/jobs/jobs.service.ts
++++ b/backend/src/riders/jobs/jobs.service.ts
+@@ -255,14 +255,7 @@ export class JobsService {
+         },
+       });
+ 
+-      // Update linked order status to DISPATCHED
+-      if (delivery.orderId) {
+-        await this.prisma.order.update({
+-          where: { id: delivery.orderId },
+-          data: { status: 'DISPATCHED' },
+-        });
+-        this.logger.debug(`Order ${delivery.orderId} status ΓåÆ DISPATCHED`);
+-      }
++      // Status transition removed: Order should only move to DISPATCHED on physical pickup.
+ 
+       return updatedDelivery;
+     }
+@@ -648,6 +641,24 @@ export class JobsService {
+               pickedUpAt: new Date(),
+             } as any,
+           });
++
++          // Update linked orders to DISPATCHED
++          if (delivery.orderGroupId) {
++            await this.prisma.order.updateMany({
++              where: { orderGroupId: delivery.orderGroupId },
++              data: { status: 'DISPATCHED' },
++            });
++            this.logger.debug(
++              `Order Group ${delivery.orderGroupId} status ΓåÆ DISPATCHED`,
++            );
++          } else if (delivery.orderId) {
++            await this.prisma.order.update({
++              where: { id: delivery.orderId },
++              data: { status: 'DISPATCHED' },
++            });
++            this.logger.debug(`Order ${delivery.orderId} status ΓåÆ DISPATCHED`);
++          }
++
+           return { nextStop: null, nextStopIndex: null, isComplete: true };
+         } else {
+           this.logger.debug(
+@@ -683,6 +694,15 @@ export class JobsService {
+         data: { status: DeliveryStatus.PICKED_UP, pickedUpAt: new Date() },
+       });
+ 
++      // Update linked order to DISPATCHED
++      if (delivery.orderId) {
++        await this.prisma.order.update({
++          where: { id: delivery.orderId },
++          data: { status: 'DISPATCHED' },
++        });
++        this.logger.debug(`Order ${delivery.orderId} status ΓåÆ DISPATCHED`);
++      }
++
+       return { nextStop: null, nextStopIndex: null, isComplete: true };
+     }
+ 
+diff --git a/backend/src/riders/rider-dispatch.listener.ts b/backend/src/riders/rider-dispatch.listener.ts
+index f8fbbf5..8d87ebf 100644
+--- a/backend/src/riders/rider-dispatch.listener.ts
++++ b/backend/src/riders/rider-dispatch.listener.ts
+@@ -43,6 +43,7 @@ export class RiderDispatchListener {
+         customer: true,
+         pickupAddress: true,
+         dropoffAddress: true,
++        rider: true,
+       },
+     });
+ 
+@@ -63,8 +64,8 @@ export class RiderDispatchListener {
+ 
+     await this.notificationsService.createForRider({
+       riderId: delivery.riderId,
+-      title: 'New Delivery Assigned',
+-      message: `Pick up ${delivery.orderId ? `order #${shortRef}` : 'package'} at ${pickupName}`,
++      title: '≡ƒôª New Delivery Job!',
++      message: `Pick up from ${pickupName}. Tap to see details.`,
+       type: 'DELIVERY',
+       category: 'job', // CRITICAL: Matches setupNotificationCategories in rider app
+       metadata: {
+@@ -80,12 +81,22 @@ export class RiderDispatchListener {
+     this.logger.log(
+       `Delivery ${deliveryId} assigned to rider ${delivery.riderId}`,
+     );
++
++    // Admin Notification
++    const riderName = (delivery as any).rider?.name || 'A rider';
++    const customerName = delivery.customer?.name || 'Customer';
++    await this.notificationsService.createForAdmin({
++      title: '≡ƒôª Delivery Assigned',
++      message: `${riderName} assigned to delivery ${shortRef} for ${customerName}.`,
++      type: 'DELIVERY',
++      metadata: { deliveryId, riderId: delivery.riderId, riderName, customerName },
++    });
+   }
+ 
+   private async handleRideAssignment(rideId: string, fallbackRiderId?: string) {
+     const ride = await this.prisma.ride.findUnique({
+       where: { id: rideId },
+-      include: { customer: true },
++      include: { customer: true, rider: true },
+     });
+ 
+     if (!ride) return;
+@@ -97,8 +108,8 @@ export class RiderDispatchListener {
+ 
+     await this.notificationsService.createForRider({
+       riderId,
+-      title: 'New Ride Assigned',
+-      message: `New ride request from ${ride.customer?.name || 'Customer'}`,
++      title: '≡ƒ¢╡ New Ride Request!',
++      message: `${ride.customer?.name || 'A customer'} is waiting for a ride.`,
+       type: 'RIDE',
+       category: 'job', // CRITICAL: Matches setupNotificationCategories in rider app
+       metadata: {
+@@ -111,6 +122,16 @@ export class RiderDispatchListener {
+     });
+ 
+     this.logger.log(`Ride ${rideId} assigned to rider ${riderId}`);
++
++    // Admin Notification
++    const riderName = ride.rider?.name || 'A rider';
++    const customerName = ride.customer?.name || 'Customer';
++    await this.notificationsService.createForAdmin({
++      title: '≡ƒ¢╡ Ride Assigned',
++      message: `${riderName} assigned to ride ${rideId.slice(0, 8)} for ${customerName}.`,
++      type: 'RIDE',
++      metadata: { rideId, riderId, riderName, customerName },
++    });
+   }
+ 
+   @OnEvent('job.updated')
+@@ -120,24 +141,52 @@ export class RiderDispatchListener {
+     status: string;
+   }) {
+     const type = payload.jobType?.toLowerCase();
+-    const job =
+-      type === 'delivery'
+-        ? await this.prisma.delivery.findUnique({
+-            where: { id: payload.jobId },
+-            select: { riderId: true, status: true },
+-          })
+-        : await this.prisma.ride.findUnique({
+-            where: { id: payload.jobId },
+-            select: { riderId: true, status: true },
+-          });
+-
+-    if (job?.riderId) {
+-      this.notificationsGateway.emitJobUpdated(job.riderId, {
+-        id: payload.jobId,
+-        status: job.status,
+-        jobType: type as any,
+-      });
+-    }
++    const isDelivery = type === 'delivery';
++
++    // Fetch full job details including rider info for better notification messages
++    const job = isDelivery
++      ? await this.prisma.delivery.findUnique({
++          where: { id: payload.jobId },
++          include: { rider: true, order: true },
++        })
++      : await this.prisma.ride.findUnique({
++          where: { id: payload.jobId },
++          include: { rider: true, customer: true },
++        });
++
++    if (!job || !job.riderId) return;
++
++    // 1. Send real-time socket update to rider mobile app
++    this.notificationsGateway.emitJobUpdated(job.riderId, {
++      id: payload.jobId,
++      status: job.status,
++      jobType: type as any,
++    });
++
++    // 2. Prepare readable status message
++    const readableStatus = job.status.replace(/_/g, ' ').toLowerCase();
++    const jobLabel = isDelivery ? 'Delivery' : 'Ride';
++    const riderName = (job as any).rider?.name || 'A rider';
++    const title = `≡ƒÜ⌐ ${jobLabel} Update`;
++    const message = `Job ${jobLabel === 'Delivery' ? (job as any).order?.id?.slice(0, 8) ?? payload.jobId : payload.jobId.slice(0, 8)} status: ${readableStatus}`;
++
++    // 3. Create persistent notification for Rider (In-App History)
++    await this.notificationsService.createForRider({
++      riderId: job.riderId,
++      title,
++      message: `Your active ${jobLabel.toLowerCase()} is now: ${readableStatus.toUpperCase()}`,
++      type: jobLabel.toUpperCase(),
++      category: 'job',
++      metadata: { jobId: payload.jobId, jobType: type, status: job.status },
++    });
++
++    // 4. Create readable alert for Admins
++    await this.notificationsService.createForAdmin({
++      title: `${jobLabel} ${readableStatus.toUpperCase()}`,
++      message: `${riderName} updated ${jobLabel} ${payload.jobId.slice(0, 8)} to ${readableStatus}.`,
++      type: jobLabel.toUpperCase(),
++      metadata: { jobId: payload.jobId, jobType: type, status: job.status, riderName },
++    });
+   }
+ 
+   @OnEvent('job.cancelled')
+@@ -149,27 +198,54 @@ export class RiderDispatchListener {
+     cancelledBy?: string;
+   }) {
+     const type = payload.jobType?.toLowerCase();
+-    const job =
+-      type === 'delivery'
+-        ? await this.prisma.delivery.findUnique({
+-            where: { id: payload.jobId },
+-            select: { riderId: true, customerId: true, payment: true },
+-          })
+-        : await this.prisma.ride.findUnique({
+-            where: { id: payload.jobId },
+-            select: { riderId: true, customerId: true, payment: true },
+-          });
++    const isDelivery = type === 'delivery';
++
++    const job = isDelivery
++      ? await this.prisma.delivery.findUnique({
++          where: { id: payload.jobId },
++          include: { payment: true, rider: true },
++        })
++      : await this.prisma.ride.findUnique({
++          where: { id: payload.jobId },
++          include: { payment: true, rider: true },
++        });
+ 
+     if (!job) return;
+ 
++    const jobLabel = isDelivery ? 'Delivery' : 'Ride';
++
++    // 1. WebSocket update for rider (mobile app UI update)
+     if (job.riderId) {
+       this.notificationsGateway.emitJobCancelled(job.riderId, {
+         id: payload.jobId,
+         reason: payload.reason || 'Cancelled',
+       });
++
++      // 2. Create persistent notification for Rider (In-App History)
++      await this.notificationsService.createForRider({
++        riderId: job.riderId,
++        title: `ΓÜá∩╕Å ${jobLabel} Cancelled`,
++        message: `Your active ${jobLabel.toLowerCase()} was cancelled. Reason: ${payload.reason || 'No reason provided'}`,
++        type: jobLabel.toUpperCase(),
++        metadata: { jobId: payload.jobId, reason: payload.reason },
++      });
+     }
+ 
+-    // Auto-create dispute if payment was already processed
++    // 3. Create readable alert for Admins
++    const actor = payload.cancelledBy || 'System';
++    await this.notificationsService.createForAdmin({
++      title: `≡ƒÜ½ ${jobLabel} Cancelled`,
++      message: `${jobLabel} ${payload.jobId.slice(0, 8)} was cancelled by ${actor}. Reason: ${payload.reason || 'N/A'}`,
++      type: jobLabel.toUpperCase(),
++      metadata: {
++        jobId: payload.jobId,
++        jobType: type,
++        cancelledBy: actor,
++        reason: payload.reason,
++      },
++    });
++
++    // 4. Auto-create dispute if payment was already processed
+     const wasPaid =
+       (job as any).payment && (job as any).payment.status !== 'PENDING';
+     if (wasPaid) {
+diff --git a/backend/src/users/trips/deliveries.service.ts b/backend/src/users/trips/deliveries.service.ts
+index 8613622..656b898 100644
+--- a/backend/src/users/trips/deliveries.service.ts
++++ b/backend/src/users/trips/deliveries.service.ts
+@@ -297,12 +297,18 @@ export class DeliveriesService {
+           `[requestDelivery] SUCCESS (total ${Date.now() - t0}ms)`,
+         );
+ 
++        const user = await tx.user.findUnique({
++          where: { id: userId },
++          select: { name: true },
++        });
++        const userName = user?.name || 'A customer';
++
+         // Audit Hook
+         this.eventEmitter.emit('system.action', {
+           action: 'DELIVERY_REQUESTED',
+           severity: 'NORMAL',
+           title: 'New Delivery Requested',
+-          message: `User (ID: ${userId}) requested a delivery to ${this.common.sanitizeText(dto.recipientName)}.`,
++          message: `${userName} (ID: ${userId.slice(0, 8)}) requested a delivery to ${this.common.sanitizeText(dto.recipientName)}.`,
+           metadata: {
+             deliveryId: delivery.id,
+             distanceKm,
+@@ -325,7 +331,7 @@ export class DeliveriesService {
+           type: 'DELIVERY',
+           category: 'DELIVERY_CREATED',
+           title: 'New Delivery Request',
+-          message: `Delivery from ${result.delivery.recipientName || 'Customer'} ΓÇö Γéª${result.delivery.deliveryFee} (${result.delivery.distanceKm} km)`,
++          message: `Delivery for ${result.delivery.recipientName || (result.delivery as any).customer?.name || 'Customer'} ΓÇö Γéª${result.delivery.deliveryFee} (${result.delivery.distanceKm} km)`,
+           isRead: false,
+           createdAt: new Date().toISOString(),
+           metadata: { deliveryId: result.deliveryId },
+diff --git a/backend/src/users/trips/rides.service.ts b/backend/src/users/trips/rides.service.ts
+index 1107bea..378e59e 100644
+--- a/backend/src/users/trips/rides.service.ts
++++ b/backend/src/users/trips/rides.service.ts
+@@ -345,12 +345,18 @@ export class RidesService {
+           );
+         });
+ 
++        const user = await this.prisma.user.findUnique({
++          where: { id: userId },
++          select: { name: true },
++        });
++        const userName = user?.name || 'A customer';
++
+         // Audit Hook
+         this.eventEmitter.emit('system.action', {
+           action: 'RIDE_REQUESTED',
+           severity: 'NORMAL',
+           title: 'New Ride Requested',
+-          message: `User (ID: ${userId}) requested a ${dto.vehicleType} ride for ${result.ride.distanceKm}km.`,
++          message: `${userName} (ID: ${userId.slice(0, 8)}) requested a ${dto.vehicleType} ride for ${result.ride.distanceKm}km.`,
+           metadata: {
+             rideId: result.ride.id,
+             distanceKm: result.ride.distanceKm,
+@@ -431,7 +437,7 @@ export class RidesService {
+   private async triggerMatchingSideEffects(rideId: string, userId: string) {
+     const ride = await this.prisma.ride.findUnique({
+       where: { id: rideId },
+-      include: { pickupAddress: true, dropoffAddress: true },
++      include: { pickupAddress: true, dropoffAddress: true, customer: true },
+     });
+     if (!ride) return;
+ 
+@@ -441,13 +447,15 @@ export class RidesService {
+       data: { status: 'SEARCHING_DRIVER' as any },
+     });
+ 
++    const customerName = ride.customer?.name || 'A customer';
++
+     // Broadcast to admin dashboard
+     this.notificationsGateway.sendToAdminRoom({
+       id: rideId,
+       type: 'RIDE',
+       category: 'RIDE_REQUESTED',
+       title: 'New Ride Request',
+-      message: `A ride (${rideId.substring(0, 8)}ΓÇª) is now searching for a driver`,
++      message: `Ride ${rideId.substring(0, 8)} for ${customerName} is now searching for a driver`,
+       isRead: false,
+       createdAt: new Date().toISOString(),
+       metadata: { rideId },
+diff --git a/web/customer-web-app/src/app/super-admin/rides/[id]/page.tsx b/web/customer-web-app/src/app/super-admin/rides/[id]/page.tsx
+index d672922..716d129 100644
+--- a/web/customer-web-app/src/app/super-admin/rides/[id]/page.tsx
++++ b/web/customer-web-app/src/app/super-admin/rides/[id]/page.tsx
+@@ -14,6 +14,11 @@ import {
+   RefreshCw,
+   UserPlus,
+   UserMinus,
++  CheckCircle,
++  User,
++  Truck,
++  MapPin,
++  Box,
+ } from "lucide-react";
+ import Swal from "sweetalert2";
+ import useSWR from "swr";
+@@ -462,36 +467,82 @@ export default function RideDetailPage() {
+               </div>
+             </div>
+ 
+-            {/* Ride Timeline */}
+-            <div className="bg-[#1E293B] border border-gray-800 rounded-2xl p-6">
+-              <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
+-                <Clock className="w-5 h-5 text-gray-400" /> Trip Timeline
++            {/* Ride Chain of Custody (Synced with Delivery UI) */}
++            <div className="bg-[#1E293B] border border-gray-800 rounded-2xl p-6 md:p-8">
++              <h3 className="text-sm font-bold text-gray-400 uppercase mb-6 md:mb-8 flex items-center gap-2">
++                <Clock className="w-4 h-4" /> Chain of Custody
+               </h3>
+-              <div className="space-y-6 relative border-l-2 border-gray-700 ml-3 pl-8">
+-                {ride.timeline.map((step, i) => (
+-                  <div key={i} className="relative">
+-                    <div
+-                      className={`absolute -left-[41px] top-1 w-5 h-5 rounded-full border-2 flex items-center justify-center bg-[#1E293B] z-10 
+-                            ${step.active ? "border-blue-500 text-blue-500" : step.done ? "border-green-500 text-green-500" : "border-gray-600 text-gray-600"}`}
+-                    >
+-                      {step.active ? (
+-                        <div className="w-2 h-2 bg-blue-500 rounded-full animate-ping" />
+-                      ) : step.done ? (
+-                        <div className="w-2 h-2 bg-green-500 rounded-full" />
+-                      ) : null}
+-                    </div>
+-                    <div className="flex justify-between items-start">
+-                      <h4
+-                        className={`text-sm font-bold ${step.active ? "text-blue-400" : step.done ? "text-gray-200" : "text-gray-500"}`}
++
++              <div className="relative">
++                {/* Connector Lines */}
++                {/* Mobile Vertical Line */}
++                <div className="absolute left-[13px] top-3 bottom-3 w-0.5 bg-gray-800 -z-0 md:hidden"></div>
++                {/* Desktop Horizontal Line */}
++                <div className="hidden md:block absolute left-0 right-0 top-[14px] h-0.5 bg-gray-700 -z-0"></div>
++
++                <div className="flex flex-col md:flex-row justify-between gap-8 md:gap-4">
++                  {ride.timeline.map((step, i) => {
++                    const iconMap: Record<string, React.ReactNode> = {
++                      'REQUESTED': <Box className="w-4 h-4" />,
++                      'SEARCHING': <Loader2 className="w-4 h-4 animate-spin" />,
++                      'ACCEPTED': <CheckCircle className="w-4 h-4" />,
++                      'ARRIVED': <MapPin className="w-4 h-4" />,
++                      'IN_PROGRESS': <Truck className="w-4 h-4" />,
++                      'COMPLETED': <CheckCircle className="w-4 h-4" />,
++                      'CANCELLED': <Ban className="w-4 h-4" />,
++                    };
++
++                    const statusKey = step.status.toUpperCase().replace(/\s/g, '_');
++                    const icon = iconMap[statusKey] || (step.done ? <CheckCircle className="w-4 h-4" /> : <div className="w-2 h-2 bg-gray-600 rounded-full" />);
++
++                    return (
++                      <div
++                        key={i}
++                        className="relative z-10 flex md:flex-col items-start md:items-center gap-4 md:gap-3"
+                       >
+-                        {step.status}
+-                      </h4>
+-                      <span className="text-xs text-gray-500 font-mono">
+-                        {formatTimeOnly(step.time)}
+-                      </span>
+-                    </div>
+-                  </div>
+-                ))}
++                        {/* Icon Container */}
++                        <div
++                          className={`w-7 h-7 rounded-full flex items-center justify-center border-2 transition-all flex-shrink-0 ${
++                            step.active
++                              ? "bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-500/20"
++                              : step.done
++                              ? "bg-green-500 border-green-500 text-white"
++                              : "bg-[#0F172A] border-gray-600 text-gray-600"
++                          }`}
++                        >
++                          {icon}
++                        </div>
++
++                        {/* Text Content */}
++                        <div className="md:text-center pt-1 md:pt-0">
++                          <p
++                            className={`text-sm md:text-xs font-bold mb-1 ${
++                              step.active
++                                ? "text-blue-400"
++                                : step.done
++                                ? "text-white"
++                                : "text-gray-500"
++                            }`}
++                          >
++                            {step.status}
++                          </p>
++                          <p className="text-xs md:text-[10px] text-gray-400 font-mono mb-2">
++                            {step.time ? formatTimeOnly(step.time) : "-"}
++                          </p>
++
++                          {step.done && (
++                            <div className="inline-flex items-center gap-1.5 bg-[#0F172A] py-1 px-2 rounded border border-gray-700">
++                              <User className="w-3 h-3 text-gray-500" />
++                              <span className="text-[10px] text-gray-300 whitespace-nowrap">
++                                {i === 0 ? "System" : i === 1 ? (ride.driver?.name || "Rider") : "Trip Update"}
++                              </span>
++                            </div>
++                          )}
++                        </div>
++                      </div>
++                    );
++                  })}
++                </div>
+               </div>
+             </div>
+ 

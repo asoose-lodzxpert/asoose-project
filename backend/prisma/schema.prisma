@@ -720,6 +720,7 @@ model Product {
   status      ProductStatus @default(ACTIVE)
   storeId     String
   stock       Int           @default(0)
+  manageStock Boolean       @default(true)
   categoryId  String
   inventory   Int?
   salesCount  Int           @default(0)

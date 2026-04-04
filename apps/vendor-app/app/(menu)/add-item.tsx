@@ -10,6 +10,7 @@ import {
   ScrollView,
   StyleSheet,
   View,
+  Switch,
 } from "react-native";
 import DraggableFlatList, {
   RenderItemParams,
@@ -30,6 +31,7 @@ import {
   fetchCategories,
   fetchProduct,
   updateProduct,
+  Product,
 } from "@/services/products.service";
 import { uploadBulk, UploadProgress } from "@/services/storage.service";
 import { Category } from "@/types/menu";
@@ -80,6 +82,7 @@ export default function AddEditItemScreen() {
   const [description, setDescription] = useState("");
   const [price, setPrice] = useState("");
   const [stock, setStock] = useState("");
+  const [manageStock, setManageStock] = useState(false);
   const [images, setImages] = useState<ImageItem[]>([]);
   const [categoryId, setCategoryId] = useState("");
 
@@ -107,11 +110,12 @@ export default function AddEditItemScreen() {
     if (!itemId) return;
     try {
       setLoading(true);
-      const item = await fetchProduct(itemId);
+      const item: Product = await fetchProduct(itemId);
       setName(item.name);
       setDescription(item.description || "");
       setPrice(item.price.toString());
       setStock(item.stock?.toString() || "0");
+      setManageStock(!!item.manageStock);
       setCategoryId(item.categoryId);
       if (item.images?.length) {
         setImages(item.images.map((uri: string) => ({ uri, isNew: false })));
@@ -240,6 +244,7 @@ export default function AddEditItemScreen() {
         price: Number(price),
         categoryId,
         stock: Number(stock) || 0,
+        manageStock,
         images: finalImages,
         modifierGroups: modifierGroups.map((g) => ({
           ...g,
@@ -403,13 +408,30 @@ export default function AddEditItemScreen() {
                 keyboardType="numeric"
                 containerStyle={{ flex: 1 }}
               />
-              <ThemedInput
-                label="Stock"
-                placeholder="0"
-                value={stock}
-                onChangeText={setStock}
-                keyboardType="numeric"
-                containerStyle={{ flex: 1 }}
+              {manageStock && (
+                <ThemedInput
+                  label="Stock *"
+                  placeholder="0"
+                  value={stock}
+                  onChangeText={setStock}
+                  keyboardType="numeric"
+                  containerStyle={{ flex: 1 }}
+                />
+              )}
+            </View>
+
+            <View style={[styles.row, { alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8 }]}>
+              <View>
+                <ThemedText type="defaultSemiBold">Track Inventory</ThemedText>
+                <ThemedText style={{ fontSize: 12, color: textMuted }}>
+                  Automatically decrement stock on orders
+                </ThemedText>
+              </View>
+              <Switch
+                value={manageStock}
+                onValueChange={setManageStock}
+                trackColor={{ false: borderColor, true: primary }}
+                thumbColor="#fff"
               />
             </View>
             <CustomDropdown

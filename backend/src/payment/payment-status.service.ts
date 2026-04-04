@@ -15,7 +15,8 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { TripsService } from '../users/trips/trips.service';
 import { TransactionLedgerService } from '../super-admin/transactions/transaction-ledger.service';
 import { PaymentGateway } from './interfaces/payment.interface';
-import type { VerifyPaymentResponse } from './interfaces/payment.interface';
+import { VerifyPaymentResponse } from './interfaces/payment.interface';
+import { InventoryService } from '../users/inventory.service';
 
 /**
  * Core status update logic — runs inside an atomic Prisma transaction,
@@ -35,6 +36,7 @@ export class PaymentStatusService {
     @Inject(forwardRef(() => TripsService))
     private readonly tripsService?: TripsService,
     private readonly eventEmitter?: EventEmitter2,
+    private readonly inventoryService?: InventoryService,
   ) { }
 
   // =================================================================
@@ -354,11 +356,26 @@ export class PaymentStatusService {
               where: { orderGroupId: payment.orderGroupId },
               data: { status: OrderStatus.CANCELLED, paymentStatus: 'FAILED' },
             });
+
+            // Restore stock for all orders in group
+            const orders = await tx.order.findMany({
+              where: { orderGroupId: payment.orderGroupId },
+              include: { items: true },
+            });
+            if (this.inventoryService) {
+              for (const o of orders) {
+                await this.inventoryService.atomicIncrementStock(tx, o.items);
+              }
+            }
           } else if (payment.orderId) {
-            await tx.order.update({
+            const updated = await tx.order.update({
               where: { id: payment.orderId },
               data: { status: OrderStatus.CANCELLED, paymentStatus: 'FAILED' },
+              include: { items: true },
             });
+            if (this.inventoryService) {
+              await this.inventoryService.atomicIncrementStock(tx, updated.items);
+            }
           }
 
           // Don't cancel completed rides on payment failure (post-ride model) —

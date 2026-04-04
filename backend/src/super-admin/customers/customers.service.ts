@@ -317,36 +317,62 @@ export class CustomersService {
     });
     if (!customer) throw new NotFoundException('Customer not found');
 
-    this.mailer.sendMail({
-      to: customer.email,
-      subject: 'Mail - hello@asoose.com',
-      text: message,
-    });
-
-    await this.prisma.$transaction(async (tx) => {
-      // 1. Save to the new specialized message table
-      await tx.adminCustomerMessage.create({
-        data: {
-          adminId,
-          customerId: id,
-          message,
-        },
+    // 1. Attempt to send direct Email
+    try {
+      await this.mailer.sendMail({
+        to: customer.email,
+        subject: 'Asoose Delivery - Message from Admin',
+        text: message,
       });
+    } catch (error) {
+      this.logger.error(
+        `Failed to send direct email to customer ${id}: ${error.message}`,
+      );
+      // We continue here so the message is at least saved to the dashboard history
+    }
 
-      // 2. Audit in activity logs
-      await tx.activityLog.create({
-        data: {
-          userId: adminId,
-          action: `MESSAGE_USER`,
-          target: id,
-          details: `Direct message to customer`,
-          metadata: {
-            message,
-            actionType: "DIRECT_MESSAGE",
+    try {
+      // 2. Persist to Dashboard History & Activity Log
+      // NOTE: Prisma transactions will FAIL with 500 (Foreign Key Constraint)
+      // if the adminId (from req.user.id or "SYSTEM") does not exist in the User table.
+      // In super-admin routes, the User SHOULD exist unless it's a seed script / or misconfigured.
+      
+      const adminExists = await this.prisma.user.findUnique({ where: { id: adminId }, select: { id: true } });
+
+      await this.prisma.$transaction(async (tx) => {
+        // Only save to AdminCustomerMessage if admin exists (Foreign key requirement)
+        if (adminExists) {
+          await tx.adminCustomerMessage.create({
+            data: {
+              adminId,
+              customerId: id,
+              message,
+            },
+          });
+        }
+
+        // 3. Audit in activity logs
+        await tx.activityLog.create({
+          data: {
+            userId: adminExists ? adminId : id, // Fallback to customer's own ID for the log if admin is missing (rare)
+            action: `MESSAGE_USER`,
+            target: id,
+            details: `Direct message to customer. Admin: ${adminId === 'SYSTEM' ? 'SYSTEM' : adminId}`,
+            metadata: {
+              message,
+              actionType: "DIRECT_MESSAGE",
+              deliveredBy: adminId === 'SYSTEM' ? 'SYSTEM' : 'ADMIN',
+            },
           },
-        },
+        });
       });
-    });
+    } catch (dbError: any) {
+      this.logger.error(`Failed to persist admin message in database: ${dbError.message}`);
+      // If persistence fails, we've already tried email, but we don't want to throw 500 
+      // if the email went out or if it's just an audit failure.
+      // However, we throw here to let the controller/filter handle the response if critical.
+      throw dbError; 
+    }
 
     return { success: true, message: `Message sent successfully.` };
   }

@@ -29,7 +29,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
           >
             <span style={{ color: entry.color }}>{entry.name}</span>
             <span className="font-mono font-bold text-white">
-              {entry.name === "Revenue" ? "$" : ""}
+              {entry.name === "Revenue" ? "₦" : ""}
               {entry.value.toLocaleString()}
             </span>
           </div>
