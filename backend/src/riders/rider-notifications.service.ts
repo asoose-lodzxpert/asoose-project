@@ -49,24 +49,27 @@ export class RiderNotificationsService {
     ]);
 
     return {
-      data,
-      meta: {
-        total,
-        page,
-        limit,
-        pages: Math.ceil(total / limit),
-        unreadCount: await this.getUnreadCount(riderId),
-      },
+      notifications: data,
+      total,
+      page,
+      limit,
+      hasMore: page < Math.ceil(total / limit),
+      unreadCount: await this.getUnreadCountInternal(riderId),
     };
   }
 
-  async getUnreadCount(riderId: string): Promise<number> {
+  async getUnreadCountInternal(riderId: string): Promise<number> {
     return this.prisma.notification.count({
       where: {
         riderId,
         isRead: false,
       },
     });
+  }
+
+  async getUnreadCount(riderId: string) {
+    const count = await this.getUnreadCountInternal(riderId);
+    return { count };
   }
 
   async markAsRead(riderId: string, notificationId: string) {

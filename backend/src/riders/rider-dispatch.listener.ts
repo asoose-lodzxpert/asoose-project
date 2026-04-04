@@ -43,6 +43,7 @@ export class RiderDispatchListener {
         customer: true,
         pickupAddress: true,
         dropoffAddress: true,
+        rider: true,
       },
     });
 
@@ -63,8 +64,8 @@ export class RiderDispatchListener {
 
     await this.notificationsService.createForRider({
       riderId: delivery.riderId,
-      title: 'New Delivery Assigned',
-      message: `Pick up ${delivery.orderId ? `order #${shortRef}` : 'package'} at ${pickupName}`,
+      title: '📦 New Delivery Job!',
+      message: `Pick up from ${pickupName}. Tap to see details.`,
       type: 'DELIVERY',
       category: 'job', // CRITICAL: Matches setupNotificationCategories in rider app
       metadata: {
@@ -80,12 +81,22 @@ export class RiderDispatchListener {
     this.logger.log(
       `Delivery ${deliveryId} assigned to rider ${delivery.riderId}`,
     );
+
+    // Admin Notification
+    const riderName = (delivery as any).rider?.name || 'A rider';
+    const customerName = delivery.customer?.name || 'Customer';
+    await this.notificationsService.createForAdmin({
+      title: '📦 Delivery Assigned',
+      message: `${riderName} assigned to delivery ${shortRef} for ${customerName}.`,
+      type: 'DELIVERY',
+      metadata: { deliveryId, riderId: delivery.riderId, riderName, customerName },
+    });
   }
 
   private async handleRideAssignment(rideId: string, fallbackRiderId?: string) {
     const ride = await this.prisma.ride.findUnique({
       where: { id: rideId },
-      include: { customer: true },
+      include: { customer: true, rider: true },
     });
 
     if (!ride) return;
@@ -97,8 +108,8 @@ export class RiderDispatchListener {
 
     await this.notificationsService.createForRider({
       riderId,
-      title: 'New Ride Assigned',
-      message: `New ride request from ${ride.customer?.name || 'Customer'}`,
+      title: '🛵 New Ride Request!',
+      message: `${ride.customer?.name || 'A customer'} is waiting for a ride.`,
       type: 'RIDE',
       category: 'job', // CRITICAL: Matches setupNotificationCategories in rider app
       metadata: {
@@ -111,6 +122,16 @@ export class RiderDispatchListener {
     });
 
     this.logger.log(`Ride ${rideId} assigned to rider ${riderId}`);
+
+    // Admin Notification
+    const riderName = ride.rider?.name || 'A rider';
+    const customerName = ride.customer?.name || 'Customer';
+    await this.notificationsService.createForAdmin({
+      title: '🛵 Ride Assigned',
+      message: `${riderName} assigned to ride ${rideId.slice(0, 8)} for ${customerName}.`,
+      type: 'RIDE',
+      metadata: { rideId, riderId, riderName, customerName },
+    });
   }
 
   @OnEvent('job.updated')
@@ -120,24 +141,52 @@ export class RiderDispatchListener {
     status: string;
   }) {
     const type = payload.jobType?.toLowerCase();
-    const job =
-      type === 'delivery'
-        ? await this.prisma.delivery.findUnique({
-            where: { id: payload.jobId },
-            select: { riderId: true, status: true },
-          })
-        : await this.prisma.ride.findUnique({
-            where: { id: payload.jobId },
-            select: { riderId: true, status: true },
-          });
+    const isDelivery = type === 'delivery';
 
-    if (job?.riderId) {
-      this.notificationsGateway.emitJobUpdated(job.riderId, {
-        id: payload.jobId,
-        status: job.status,
-        jobType: type as any,
-      });
-    }
+    // Fetch full job details including rider info for better notification messages
+    const job = isDelivery
+      ? await this.prisma.delivery.findUnique({
+          where: { id: payload.jobId },
+          include: { rider: true, order: true },
+        })
+      : await this.prisma.ride.findUnique({
+          where: { id: payload.jobId },
+          include: { rider: true, customer: true },
+        });
+
+    if (!job || !job.riderId) return;
+
+    // 1. Send real-time socket update to rider mobile app
+    this.notificationsGateway.emitJobUpdated(job.riderId, {
+      id: payload.jobId,
+      status: job.status,
+      jobType: type as any,
+    });
+
+    // 2. Prepare readable status message
+    const readableStatus = job.status.replace(/_/g, ' ').toLowerCase();
+    const jobLabel = isDelivery ? 'Delivery' : 'Ride';
+    const riderName = (job as any).rider?.name || 'A rider';
+    const title = `🚩 ${jobLabel} Update`;
+    const message = `Job ${jobLabel === 'Delivery' ? (job as any).order?.id?.slice(0, 8) ?? payload.jobId : payload.jobId.slice(0, 8)} status: ${readableStatus}`;
+
+    // 3. Create persistent notification for Rider (In-App History)
+    await this.notificationsService.createForRider({
+      riderId: job.riderId,
+      title,
+      message: `Your active ${jobLabel.toLowerCase()} is now: ${readableStatus.toUpperCase()}`,
+      type: jobLabel.toUpperCase(),
+      category: 'job',
+      metadata: { jobId: payload.jobId, jobType: type, status: job.status },
+    });
+
+    // 4. Create readable alert for Admins
+    await this.notificationsService.createForAdmin({
+      title: `${jobLabel} ${readableStatus.toUpperCase()}`,
+      message: `${riderName} updated ${jobLabel} ${payload.jobId.slice(0, 8)} to ${readableStatus}.`,
+      type: jobLabel.toUpperCase(),
+      metadata: { jobId: payload.jobId, jobType: type, status: job.status, riderName },
+    });
   }
 
   @OnEvent('job.cancelled')
@@ -149,27 +198,54 @@ export class RiderDispatchListener {
     cancelledBy?: string;
   }) {
     const type = payload.jobType?.toLowerCase();
-    const job =
-      type === 'delivery'
-        ? await this.prisma.delivery.findUnique({
-            where: { id: payload.jobId },
-            select: { riderId: true, customerId: true, payment: true },
-          })
-        : await this.prisma.ride.findUnique({
-            where: { id: payload.jobId },
-            select: { riderId: true, customerId: true, payment: true },
-          });
+    const isDelivery = type === 'delivery';
+
+    const job = isDelivery
+      ? await this.prisma.delivery.findUnique({
+          where: { id: payload.jobId },
+          include: { payment: true, rider: true },
+        })
+      : await this.prisma.ride.findUnique({
+          where: { id: payload.jobId },
+          include: { payment: true, rider: true },
+        });
 
     if (!job) return;
 
+    const jobLabel = isDelivery ? 'Delivery' : 'Ride';
+
+    // 1. WebSocket update for rider (mobile app UI update)
     if (job.riderId) {
       this.notificationsGateway.emitJobCancelled(job.riderId, {
         id: payload.jobId,
         reason: payload.reason || 'Cancelled',
       });
+
+      // 2. Create persistent notification for Rider (In-App History)
+      await this.notificationsService.createForRider({
+        riderId: job.riderId,
+        title: `⚠️ ${jobLabel} Cancelled`,
+        message: `Your active ${jobLabel.toLowerCase()} was cancelled. Reason: ${payload.reason || 'No reason provided'}`,
+        type: jobLabel.toUpperCase(),
+        metadata: { jobId: payload.jobId, reason: payload.reason },
+      });
     }
 
-    // Auto-create dispute if payment was already processed
+    // 3. Create readable alert for Admins
+    const actor = payload.cancelledBy || 'System';
+    await this.notificationsService.createForAdmin({
+      title: `🚫 ${jobLabel} Cancelled`,
+      message: `${jobLabel} ${payload.jobId.slice(0, 8)} was cancelled by ${actor}. Reason: ${payload.reason || 'N/A'}`,
+      type: jobLabel.toUpperCase(),
+      metadata: {
+        jobId: payload.jobId,
+        jobType: type,
+        cancelledBy: actor,
+        reason: payload.reason,
+      },
+    });
+
+    // 4. Auto-create dispute if payment was already processed
     const wasPaid =
       (job as any).payment && (job as any).payment.status !== 'PENDING';
     if (wasPaid) {

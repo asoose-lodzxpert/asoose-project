@@ -323,19 +323,41 @@ export class CustomersService {
       text: message,
     });
 
-    await this.prisma.activityLog.create({
-      data: {
-        userId: adminId,
-        action: `MESAGE_USER`,
-        target: id,
-        details: `Send a direct message to user`,
-        metadata: {
+    await this.prisma.$transaction(async (tx) => {
+      // 1. Save to the new specialized message table
+      await tx.adminCustomerMessage.create({
+        data: {
+          adminId,
+          customerId: id,
           message,
-          actionType: 'DIRECT_MESSAGE',
         },
-      },
+      });
+
+      // 2. Audit in activity logs
+      await tx.activityLog.create({
+        data: {
+          userId: adminId,
+          action: `MESSAGE_USER`,
+          target: id,
+          details: `Direct message to customer`,
+          metadata: {
+            message,
+            actionType: "DIRECT_MESSAGE",
+          },
+        },
+      });
     });
 
     return { success: true, message: `Message sent successfully.` };
+  }
+
+  async getCustomerMessages(customerId: string) {
+    return this.prisma.adminCustomerMessage.findMany({
+      where: { customerId },
+      include: {
+        admin: { select: { name: true, image: true } },
+      },
+      orderBy: { createdAt: "desc" },
+    });
   }
 }

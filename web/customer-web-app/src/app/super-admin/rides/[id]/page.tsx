@@ -14,6 +14,11 @@ import {
   RefreshCw,
   UserPlus,
   UserMinus,
+  CheckCircle,
+  User,
+  Truck,
+  MapPin,
+  Box,
 } from "lucide-react";
 import Swal from "sweetalert2";
 import useSWR from "swr";
@@ -462,36 +467,82 @@ export default function RideDetailPage() {
               </div>
             </div>
 
-            {/* Ride Timeline */}
-            <div className="bg-[#1E293B] border border-gray-800 rounded-2xl p-6">
-              <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
-                <Clock className="w-5 h-5 text-gray-400" /> Trip Timeline
+            {/* Ride Chain of Custody (Synced with Delivery UI) */}
+            <div className="bg-[#1E293B] border border-gray-800 rounded-2xl p-6 md:p-8">
+              <h3 className="text-sm font-bold text-gray-400 uppercase mb-6 md:mb-8 flex items-center gap-2">
+                <Clock className="w-4 h-4" /> Chain of Custody
               </h3>
-              <div className="space-y-6 relative border-l-2 border-gray-700 ml-3 pl-8">
-                {ride.timeline.map((step, i) => (
-                  <div key={i} className="relative">
-                    <div
-                      className={`absolute -left-[41px] top-1 w-5 h-5 rounded-full border-2 flex items-center justify-center bg-[#1E293B] z-10 
-                            ${step.active ? "border-blue-500 text-blue-500" : step.done ? "border-green-500 text-green-500" : "border-gray-600 text-gray-600"}`}
-                    >
-                      {step.active ? (
-                        <div className="w-2 h-2 bg-blue-500 rounded-full animate-ping" />
-                      ) : step.done ? (
-                        <div className="w-2 h-2 bg-green-500 rounded-full" />
-                      ) : null}
-                    </div>
-                    <div className="flex justify-between items-start">
-                      <h4
-                        className={`text-sm font-bold ${step.active ? "text-blue-400" : step.done ? "text-gray-200" : "text-gray-500"}`}
+
+              <div className="relative">
+                {/* Connector Lines */}
+                {/* Mobile Vertical Line */}
+                <div className="absolute left-[13px] top-3 bottom-3 w-0.5 bg-gray-800 -z-0 md:hidden"></div>
+                {/* Desktop Horizontal Line */}
+                <div className="hidden md:block absolute left-0 right-0 top-[14px] h-0.5 bg-gray-700 -z-0"></div>
+
+                <div className="flex flex-col md:flex-row justify-between gap-8 md:gap-4">
+                  {ride.timeline.map((step, i) => {
+                    const iconMap: Record<string, React.ReactNode> = {
+                      'REQUESTED': <Box className="w-4 h-4" />,
+                      'SEARCHING': <Loader2 className="w-4 h-4 animate-spin" />,
+                      'ACCEPTED': <CheckCircle className="w-4 h-4" />,
+                      'ARRIVED': <MapPin className="w-4 h-4" />,
+                      'IN_PROGRESS': <Truck className="w-4 h-4" />,
+                      'COMPLETED': <CheckCircle className="w-4 h-4" />,
+                      'CANCELLED': <Ban className="w-4 h-4" />,
+                    };
+
+                    const statusKey = step.status.toUpperCase().replace(/\s/g, '_');
+                    const icon = iconMap[statusKey] || (step.done ? <CheckCircle className="w-4 h-4" /> : <div className="w-2 h-2 bg-gray-600 rounded-full" />);
+
+                    return (
+                      <div
+                        key={i}
+                        className="relative z-10 flex md:flex-col items-start md:items-center gap-4 md:gap-3"
                       >
-                        {step.status}
-                      </h4>
-                      <span className="text-xs text-gray-500 font-mono">
-                        {formatTimeOnly(step.time)}
-                      </span>
-                    </div>
-                  </div>
-                ))}
+                        {/* Icon Container */}
+                        <div
+                          className={`w-7 h-7 rounded-full flex items-center justify-center border-2 transition-all flex-shrink-0 ${
+                            step.active
+                              ? "bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-500/20"
+                              : step.done
+                              ? "bg-green-500 border-green-500 text-white"
+                              : "bg-[#0F172A] border-gray-600 text-gray-600"
+                          }`}
+                        >
+                          {icon}
+                        </div>
+
+                        {/* Text Content */}
+                        <div className="md:text-center pt-1 md:pt-0">
+                          <p
+                            className={`text-sm md:text-xs font-bold mb-1 ${
+                              step.active
+                                ? "text-blue-400"
+                                : step.done
+                                ? "text-white"
+                                : "text-gray-500"
+                            }`}
+                          >
+                            {step.status}
+                          </p>
+                          <p className="text-xs md:text-[10px] text-gray-400 font-mono mb-2">
+                            {step.time ? formatTimeOnly(step.time) : "-"}
+                          </p>
+
+                          {step.done && (
+                            <div className="inline-flex items-center gap-1.5 bg-[#0F172A] py-1 px-2 rounded border border-gray-700">
+                              <User className="w-3 h-3 text-gray-500" />
+                              <span className="text-[10px] text-gray-300 whitespace-nowrap">
+                                {i === 0 ? "System" : i === 1 ? (ride.driver?.name || "Rider") : "Trip Update"}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </div>
 

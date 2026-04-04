@@ -13,6 +13,7 @@ import { ThemedText } from "@/components/themed-text";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { useCart } from "@/context/CartContext";
+import { CheckoutConfirmationModal } from "@/components/checkout/CheckoutConfirmationModal";
 
 export default function CartScreen() {
   const {
@@ -346,6 +347,8 @@ export default function CartScreen() {
           </ThemedText>
         </Pressable>
       </View>
+
+      />
     </View>
   );
 }

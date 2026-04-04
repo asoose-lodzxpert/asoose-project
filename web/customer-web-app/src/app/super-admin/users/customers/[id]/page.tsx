@@ -10,7 +10,7 @@ import { CustomerStats } from "./components/CustomerStats";
 import { CustomerContentTabs } from "./components/CustomerContentTabs";
 import { AppAlert } from "./alerts";
 
-import { CustomerProfile, Order, Ride } from "./types";
+import { CustomerProfile, Order, Ride, AdminCustomerMessage } from "./types";
 
 export default function CustomerDetailPage({
   params,
@@ -18,9 +18,9 @@ export default function CustomerDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id: customerId } = React.use(params);
-  const [activeTab, setActiveTab] = useState<"Orders" | "Rides" | "Logs">(
-    "Orders",
-  );
+  const [activeTab, setActiveTab] = useState<
+    "Orders" | "Rides" | "Logs" | "Messages"
+  >("Orders");
   // Guard against double-clicks / concurrent calls on the send-message action
   const [isSendingMessage, setIsSendingMessage] = useState(false);
 
@@ -52,9 +52,21 @@ export default function CustomerDetailPage({
     fetcher,
   );
 
+  const {
+    data: messages,
+    isLoading: messagesLoading,
+    mutate: mutateMessages,
+  } = useSWR<AdminCustomerMessage[]>(
+    customerId && activeTab === "Messages"
+      ? `/super-admin/customers/${customerId}/messages`
+      : null,
+    fetcher,
+  );
+
   const isTabLoading =
     (activeTab === "Orders" && ordersLoading) ||
-    (activeTab === "Rides" && ridesLoading);
+    (activeTab === "Rides" && ridesLoading) ||
+    (activeTab === "Messages" && messagesLoading);
 
   // ===========================================================================
   //  ✅ REFACTORED HANDLERS (Fixes 404 and Port issues)
@@ -129,6 +141,7 @@ export default function CustomerDetailPage({
           retries: 0,
         });
         AppAlert.success("Message Sent!");
+        mutateMessages();
       } catch (err: any) {
         AppAlert.error(
           "Error",
@@ -181,6 +194,7 @@ export default function CustomerDetailPage({
               setActiveTab={setActiveTab}
               orders={orders || []}
               rides={rides || []}
+              messages={messages || []}
               isLoading={isTabLoading}
               customerName={customer.name}
             />

@@ -43,3 +43,13 @@ export interface Ride {
   createdAt: string;
   totalFare?: number;
 }
+
+export interface AdminCustomerMessage {
+  id: string;
+  adminId: string;
+  customerId: string;
+  message: string;
+  subject?: string;
+  createdAt: string;
+  admin: { name: string; image?: string };
+}

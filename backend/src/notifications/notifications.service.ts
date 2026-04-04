@@ -33,11 +33,21 @@ export class NotificationsService {
     if (!tokens.length) return;
 
     const expoTokens = tokens
-      .filter((t) => t.platform === 'expo' || t.token.startsWith('ExponentPushToken['))
+      .filter(
+        (t) =>
+          t.platform === 'expo' ||
+          t.token.startsWith('ExponentPushToken[') ||
+          t.token.startsWith('ExpoPushToken['),
+      )
       .map((t) => t.token);
 
     const fcmTokens = tokens
-      .filter((t) => t.platform !== 'expo' && !t.token.startsWith('ExponentPushToken['))
+      .filter(
+        (t) =>
+          t.platform !== 'expo' &&
+          !t.token.startsWith('ExponentPushToken[') &&
+          !t.token.startsWith('ExpoPushToken['),
+      )
       .map((t) => t.token);
 
     const channelId = type ? this.resolveChannelId(type) : 'default';

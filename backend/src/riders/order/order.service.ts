@@ -4,7 +4,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 @Injectable()
 export class OrderService {
   private readonly logger = new Logger(OrderService.name);
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   async getWalletBalance(riderId: string) {
     const rider = await this.prisma.rider.findUnique({
@@ -47,7 +47,7 @@ export class OrderService {
     let avgPerRide = 0;
     let hoursOnline = 0;
     if (rider?.role === 'DRIVER') {
-      // Get rides for driver, exclude PENDING and CANCELLED
+      // Get rides for driver, exclude PENDING and CANCELLED!
       const rides = await this.prisma.ride.findMany({
         where: {
           riderId,
@@ -113,12 +113,19 @@ export class OrderService {
     ];
     const validRideStatuses = [
       'PENDING',
-      'REQUESTED',
       'ACCEPTED',
       'ARRIVED',
+      'CANCELLED',
+      'REQUESTED',
+      'SEARCHING_DRIVER',
+      'DRIVER_ASSIGNED',
+      'DRIVER_ACCEPTED',
+      'PAID',
       'IN_PROGRESS',
       'COMPLETED',
-      'CANCELLED',
+      'CANCELLED_BY_USER',
+      'CANCELLED_BY_DRIVER',
+      'CANCELLED_BY_SYSTEM',
     ];
 
     let statusFilter: any;

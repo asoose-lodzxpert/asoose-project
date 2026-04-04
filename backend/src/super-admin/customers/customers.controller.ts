@@ -103,6 +103,18 @@ export class CustomersController {
     return this.customersService.sendMessage(id, body.message, adminId);
   }
 
+  @ApiOperation({ summary: "Get a customer's message history" })
+  @Get(':id/messages')
+  @Roles(
+    UserRole.ADMIN,
+    UserRole.SUPER_ADMIN,
+    UserRole.ADMIN_SUPPORT,
+    UserRole.ADMIN_MANAGER,
+  )
+  async getMessages(@Param('id') id: string) {
+    return this.customersService.getCustomerMessages(id);
+  }
+
   @ApiOperation({ summary: 'Suspend or ban a customer (kill-switch)' })
   @Post(':id/kill-switch')
   @Roles(UserRole.SUPER_ADMIN)

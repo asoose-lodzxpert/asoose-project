@@ -21,6 +21,7 @@ import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { ThemedInput } from "@/components/ThemedInput";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { ImagePickerModal } from "@/components/ImagePickerModal";
 import { useAuth } from "@/context/AuthContext";
 import { useConfirm } from "@/hooks/use-confirm";
 import { useThemeColor } from "@/hooks/use-theme-color";
@@ -85,6 +86,10 @@ export default function AddEditItemScreen() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [modifierGroups, setModifierGroups] = useState<ModifierGroup[]>([]);
 
+  // Image Picker Modal State
+  const [isPhotoModalVisible, setIsPhotoModalVisible] = useState(false);
+  const [targetImageIndex, setTargetImageIndex] = useState<number | null>(null);
+
   useEffect(() => {
     loadCategories();
     if (isEdit) loadItem();
@@ -144,28 +149,38 @@ export default function AddEditItemScreen() {
     return !result.canceled ? result.assets[0].uri : null;
   };
 
-  const handleAddImage = async () => {
+  const handleAddImage = () => {
     if (images.length >= 8) {
       Toast.show({ type: "info", text1: "Maximum 8 images allowed" });
       return;
     }
-    const uri = await pickImage();
-    if (uri) setImages((p) => [...p, { uri, isNew: true }]);
+    setTargetImageIndex(null);
+    setIsPhotoModalVisible(true);
   };
 
-  const handleReplaceImage = async (index: number) => {
-    const uri = await pickImage();
-    if (!uri) return;
-    setImages((prev) => {
-      const copy = [...prev];
-      copy[index] = {
-        uri,
-        isNew: true,
-        isEdited: true,
-        originalUri: copy[index].uri,
-      };
-      return copy;
-    });
+  const handleReplaceImage = (index: number) => {
+    setTargetImageIndex(index);
+    setIsPhotoModalVisible(true);
+  };
+
+  const onImageSelected = (uri: string) => {
+    if (targetImageIndex === null) {
+      // Adding new image
+      setImages((p) => [...p, { uri, isNew: true }]);
+    } else {
+      // Replacing existing image
+      setImages((prev) => {
+        const copy = [...prev];
+        copy[targetImageIndex] = {
+          uri,
+          isNew: true,
+          isEdited: true,
+          originalUri: copy[targetImageIndex].uri,
+        };
+        return copy;
+      });
+    }
+    setIsPhotoModalVisible(false);
   };
 
   const handleDeleteImage = (idx: number) => {
@@ -556,6 +571,11 @@ export default function AddEditItemScreen() {
         </ScrollView>
       </KeyboardAvoidingView>
       <ConfirmModal />
+      <ImagePickerModal
+        visible={isPhotoModalVisible}
+        onClose={() => setIsPhotoModalVisible(false)}
+        onSelectImage={onImageSelected}
+      />
       <Toast />
     </ThemedView>
   );

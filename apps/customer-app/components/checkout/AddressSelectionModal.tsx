@@ -14,6 +14,7 @@ import { useThemeColor } from "@/hooks/use-theme-color";
 import { Address } from "@/types/address";
 import { request } from "@/lib/authFetch";
 import { useRouter } from "expo-router";
+import Toast from "react-native-toast-message";
 
 /** Haversine distance in metres */
 function haversineMetres(
@@ -125,8 +126,13 @@ export function AddressSelectionModal({
       });
       setAddresses((prev) => [saved, ...prev]);
       handleSelect(saved);
-    } catch {
-      // fall through — user can pick manually
+    } catch (err: any) {
+      const msg = err?.message || "Failed to save address";
+      Toast.show({
+        type: "error",
+        text1: "Location Unavailable",
+        text2: msg,
+      });
     } finally {
       setSavingLocation(false);
     }

@@ -4,6 +4,7 @@ import {
   AUTH_USER_KEY,
 } from "@/constants/static-config";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { DeviceEventEmitter } from "react-native";
 import React, {
   createContext,
   useCallback,
@@ -214,6 +215,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
     }
   }, []);
+
+  // Listen for global session-expiry events from authFetch
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener("auth:session-expired", () => {
+      logout();
+    });
+    return () => sub.remove();
+  }, [logout]);
 
   const enableBiometrics = useCallback(
     async (email: string, password: string) => {

@@ -539,7 +539,7 @@ export class PaymentStatusService {
                 await this.notificationsService.create({
                   userId: admin.id,
                   title: `🏪 New Order — ${order.store.name}`,
-                  message: `Order #${order.id.slice(-6)} received at ${order.store.name}. Total: ₦${Number(order.total || 0).toLocaleString()}`,
+                  message: `Order from ${orderUser?.name || 'Customer'} at ${order.store.name}. Total: ₦${Number(order.total || 0).toLocaleString()}`,
                   type: 'ORDER',
                   category: 'ORDER_CREATED',
                   metadata: { orderId: order.id, storeName: order.store.name },
@@ -619,7 +619,7 @@ export class PaymentStatusService {
               await this.notificationsService.create({
                 userId: admin.id,
                 title: `🏪 New Order — ${result.order.store.name}`,
-                message: `Order #${result.order.id.slice(-6)} received at ${result.order.store.name}. Total: ₦${Number(result.order.total || 0).toLocaleString()}`,
+                message: `Order from ${result.order.user?.name || 'Customer'} at ${result.order.store.name}. Total: ₦${Number(result.order.total || 0).toLocaleString()}`,
                 type: 'ORDER',
                 category: 'ORDER_CREATED',
                 metadata: {
@@ -822,11 +822,23 @@ export class PaymentStatusService {
         where: { role: 'ADMIN' },
         select: { id: true },
       });
+      const delivery = await this.prisma.delivery.findUnique({
+        where: { id: deliveryId },
+        include: {
+          customer: { select: { name: true } },
+          dropoffAddress: { select: { street: true } },
+        },
+      });
+
+      const customerLabel = delivery?.customer?.name || 'A customer';
+      const destination = delivery?.dropoffAddress?.street || 'unknown destination';
+      const shortId = deliveryId.slice(0, 8);
+
       for (const admin of admins) {
         await this.notificationsService.create({
           userId: admin.id,
           title: 'Manual Delivery Assignment Needed',
-          message: `A new delivery request (${deliveryId}) requires manual rider assignment.`,
+          message: `${customerLabel} requested a delivery to ${destination} (${shortId}). Please assign a rider.`,
           type: 'DELIVERY_MANUAL_ASSIGN',
           metadata: { deliveryId, customerId },
         });

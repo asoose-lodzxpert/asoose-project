@@ -2,7 +2,8 @@
 
 import React, { useEffect, useState } from "react";
 import { useCartStore } from "@/store/useCartStore";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { CheckoutConfirmationModal } from "../cart/CheckoutConfirmationModal";
 
 interface SidebarCartProps {
   restaurantName: string;
@@ -10,6 +11,8 @@ interface SidebarCartProps {
 
 export const SidebarCart = ({ restaurantName }: SidebarCartProps) => {
   const [mounted, setMounted] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const router = useRouter();
   const items = useCartStore((state) => state.items);
   const totalPrice = useCartStore((state) => state.getTotalPrice());
 
@@ -71,12 +74,21 @@ export const SidebarCart = ({ restaurantName }: SidebarCartProps) => {
         </div>
       )}
 
-      <Link
-        href={"/main/checkout"}
+      <button
+        onClick={() => setShowConfirmModal(true)}
         className="block text-center w-full bg-yellow-500 text-black py-4 rounded-xl font-bold shadow-lg shadow-yellow-500/20 hover:bg-yellow-400 transition-colors"
       >
         Checkout
-      </Link>
+      </button>
+
+      <CheckoutConfirmationModal
+        isOpen={showConfirmModal}
+        onClose={() => setShowConfirmModal(false)}
+        onConfirm={() => {
+          setShowConfirmModal(false);
+          router.push("/main/checkout");
+        }}
+      />
     </div>
   );
 };

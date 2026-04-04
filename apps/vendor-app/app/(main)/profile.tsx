@@ -24,6 +24,7 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useAuth } from "@/context/AuthContext";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { useBalance } from "@/context/BalanceContext";
+import { ImagePickerModal } from "@/components/ImagePickerModal";
 import { ProfileData, VendorStatus } from "@/types/profile";
 
 /* -------------------------------------------------------------------------- */
@@ -76,6 +77,10 @@ export default function ProfileScreen() {
   const { confirm, ConfirmModal } = useConfirm();
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
+  // Image Picker Modal State
+  const [isPhotoModalVisible, setIsPhotoModalVisible] = useState(false);
+  const [photoPickType, setPhotoPickType] = useState<"avatar" | "banner">("avatar");
+
   const loadProfile = async (isRefresh = false) => {
     if (!isRefresh) setLoading(true);
     try {
@@ -113,23 +118,15 @@ export default function ProfileScreen() {
     await loadProfile(true);
   };
 
-  const pickImage = async () => {
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+  const pickImage = () => {
+    setPhotoPickType("avatar");
+    setIsPhotoModalVisible(true);
+  };
 
-    if (!permission.granted) {
-      Toast.show({ type: "error", text1: "Permission required" });
-      return;
-    }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
-    });
-
-    if (!result.canceled) {
-      setSelectedImage(result.assets[0].uri);
+  const onImageSelected = async (uri: string) => {
+    setIsPhotoModalVisible(false);
+    if (photoPickType === "avatar") {
+      setSelectedImage(uri);
       const resultConfirm = await confirm({
         title: "Change profile image?",
         message: "Do you want to update your profile image?",
@@ -139,33 +136,21 @@ export default function ProfileScreen() {
         icon: "camera.fill",
       });
       if (resultConfirm) {
-        await handleConfirmImageChange();
+        // Need to pass the uri since selectedImage might not be updated yet
+        setUploadingImage(true);
+        try {
+          await updateVendorProfileImage(uri);
+          await loadProfile(true);
+          Toast.show({ type: "success", text1: "Profile image updated" });
+        } finally {
+          setUploadingImage(false);
+          setSelectedImage(null);
+        }
       } else {
         setSelectedImage(null);
       }
-    }
-  };
-
-  /* -------------------- BANNER HANDLER (OUTSIDE COMPONENT) -------------------- */
-  async function pickAndUploadBanner(onSuccess: () => Promise<void>) {
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-    if (!permission.granted) {
-      Toast.show({
-        type: "error",
-        text1: "Permission required to access photos",
-      });
-      return;
-    }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
-      quality: 0.8,
-      allowsEditing: true,
-      aspect: [16, 9],
-    });
-
-    if (!result.canceled && result.assets.length > 0) {
+    } else {
+      // Banner
       const confirmResult = await confirm({
         title: "Change store banner?",
         message: "Do you want to update your store banner image?",
@@ -176,12 +161,12 @@ export default function ProfileScreen() {
       });
       if (!confirmResult) return;
       try {
-        await updateVendorProfileImage(result.assets[0].uri, "banner");
+        await updateVendorProfileImage(uri, "banner");
         Toast.show({
           type: "success",
           text1: "Store banner updated successfully",
         });
-        await onSuccess();
+        await loadProfile(true);
       } catch (error: any) {
         Toast.show({
           type: "error",
@@ -189,7 +174,13 @@ export default function ProfileScreen() {
         });
       }
     }
-  }
+  };
+
+  /* -------------------- BANNER HANDLER (OUTSIDE COMPONENT) -------------------- */
+  const handlePickBanner = () => {
+    setPhotoPickType("banner");
+    setIsPhotoModalVisible(true);
+  };
 
   const handleConfirmImageChange = async () => {
     if (!selectedImage) return;
@@ -244,7 +235,7 @@ export default function ProfileScreen() {
 
             <Pressable
               style={styles.bannerEditOverlay}
-              onPress={() => pickAndUploadBanner(() => loadProfile(true))}
+              onPress={handlePickBanner}
             >
               <IconSymbol name="camera.fill" size={20} color="#fff" />
             </Pressable>
@@ -368,6 +359,11 @@ export default function ProfileScreen() {
       </ScrollView>
 
       <ConfirmModal />
+      <ImagePickerModal
+        visible={isPhotoModalVisible}
+        onClose={() => setIsPhotoModalVisible(false)}
+        onSelectImage={onImageSelected}
+      />
     </ThemedView>
   );
 }

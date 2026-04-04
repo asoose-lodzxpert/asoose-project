@@ -297,12 +297,18 @@ export class DeliveriesService {
           `[requestDelivery] SUCCESS (total ${Date.now() - t0}ms)`,
         );
 
+        const user = await tx.user.findUnique({
+          where: { id: userId },
+          select: { name: true },
+        });
+        const userName = user?.name || 'A customer';
+
         // Audit Hook
         this.eventEmitter.emit('system.action', {
           action: 'DELIVERY_REQUESTED',
           severity: 'NORMAL',
           title: 'New Delivery Requested',
-          message: `User (ID: ${userId}) requested a delivery to ${this.common.sanitizeText(dto.recipientName)}.`,
+          message: `${userName} (ID: ${userId.slice(0, 8)}) requested a delivery to ${this.common.sanitizeText(dto.recipientName)}.`,
           metadata: {
             deliveryId: delivery.id,
             distanceKm,
@@ -325,7 +331,7 @@ export class DeliveriesService {
           type: 'DELIVERY',
           category: 'DELIVERY_CREATED',
           title: 'New Delivery Request',
-          message: `Delivery from ${result.delivery.recipientName || 'Customer'} — ₦${result.delivery.deliveryFee} (${result.delivery.distanceKm} km)`,
+          message: `Delivery for ${result.delivery.recipientName || (result.delivery as any).customer?.name || 'Customer'} — ₦${result.delivery.deliveryFee} (${result.delivery.distanceKm} km)`,
           isRead: false,
           createdAt: new Date().toISOString(),
           metadata: { deliveryId: result.deliveryId },

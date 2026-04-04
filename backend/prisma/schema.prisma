@@ -262,6 +262,9 @@ model User {
   @@index([role, status])
   @@index([createdAt])
   @@index([status, createdAt(sort: Desc)])
+
+  adminCustomerMessages    AdminCustomerMessage[] @relation("AdminMessages")
+  receivedCustomerMessages AdminCustomerMessage[] @relation("CustomerMessages")
 }
 
 model Notification {
@@ -1294,6 +1297,7 @@ enum InquiryStatus {
   READ
   REPLIED
 }
+
 model ErrorLog {
   id        String   @id @default(uuid())
   message   String
@@ -1306,4 +1310,19 @@ model ErrorLog {
   updatedAt DateTime @updatedAt
 
   @@map("error_logs")
+}
+model AdminCustomerMessage {
+  id         String   @id @default(uuid())
+  adminId    String
+  customerId String
+  message    String   @db.Text
+  subject    String?
+  createdAt  DateTime @default(now())
+
+  admin      User     @relation("AdminMessages", fields: [adminId], references: [id])
+  customer   User     @relation("CustomerMessages", fields: [customerId], references: [id])
+
+  @@index([customerId])
+  @@index([adminId])
+  @@index([createdAt(sort: Desc)])
 }
