@@ -41,7 +41,7 @@ const CSP = [
   // Fonts
   "font-src 'self' https://fonts.gstatic.com",
   // Images: self + Maps tiles + placeholder services used in next.config images
-  "img-src 'self' data: blob: https://*.googleapis.com https://*.gstatic.com https://maps.gstatic.com https://*.openstreetmap.org https://asoose-storage.s3.eu-north-1.amazonaws.com https://asoose-storage-migration.s3.us-east-1.amazonaws.com https://ffyfvbgcbvbgnmopmmhi.supabase.co https://avatars.githubusercontent.com https://stackable-eclair-kzms-p62.storage.railway.app https://loremflickr.com https://picsum.photos https://placehold.co https://via.placeholder.com",
+  "img-src 'self' data: blob: https://*.googleapis.com https://*.gstatic.com https://maps.gstatic.com https://*.googleusercontent.com https://*.openstreetmap.org https://asoose-storage.s3.eu-north-1.amazonaws.com https://asoose-storage-migration.s3.us-east-1.amazonaws.com https://ffyfvbgcbvbgnmopmmhi.supabase.co https://avatars.githubusercontent.com https://stackable-eclair-kzms-p62.storage.railway.app https://loremflickr.com https://picsum.photos https://placehold.co https://via.placeholder.com",
   // XHR/Fetch: backend API + Google Maps XHR calls (geocoding relay etc.)
   `connect-src 'self' ${apiOrigin} https://*.googleapis.com https://maps.googleapis.com wss: ws:`,
   // Frames: block all
