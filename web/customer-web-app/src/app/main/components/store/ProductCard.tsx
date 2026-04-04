@@ -45,7 +45,7 @@ export const ProductCard = ({
   onClick,
 }: ProductProps) => {
   const addItem = useCartStore((state) => state.addItem);
-  const { data: session, status } = useSession();
+  const { data: session, status: sessionStatus } = useSession();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
 
@@ -76,7 +76,7 @@ export const ProductCard = ({
       return;
     }
 
-    if (status !== "authenticated") {
+    if (sessionStatus !== "authenticated") {
       toast.info("Please log in to add items to your cart", {
         position: "bottom-center",
         autoClose: 3000,
