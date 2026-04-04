@@ -12,6 +12,8 @@ import {
   MapPin,
   User,
   Phone,
+  ChevronLeft,
+  X,
 } from "lucide-react";
 import { toast } from "react-toastify";
 import { deliverySwal } from "@/lib/swal-theme";
@@ -644,6 +646,45 @@ export default function DeliveryPage() {
     }
   }, [activeDeliveryId, handlePaymentSuccess, session]);
 
+  const handleGoBack = useCallback(() => {
+    setStage(DeliveryStage.CONFIGURING);
+  }, [setStage]);
+
+  const handleCancelDelivery = useCallback(async () => {
+    if (!activeDeliveryId) {
+      setStage(DeliveryStage.CONFIGURING);
+      return;
+    }
+
+    const swal = deliverySwal();
+    const result = await swal.fire({
+      title: "Cancel Delivery?",
+      text: "Are you sure you want to completely cancel this delivery request?",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Yes, Cancel It",
+      cancelButtonColor: "#ef4444",
+      cancelButtonText: "No, Keep It",
+    });
+
+    if (result.isConfirmed) {
+      const token = getAuthToken(session);
+      try {
+        await DeliveryService.cancelDelivery(
+          activeDeliveryId,
+          "User cancelled before payment",
+          token || undefined,
+        );
+        toast.info("Delivery cancelled.");
+      } catch (error) {
+        console.error("Cancel Error:", error);
+      } finally {
+        resetDelivery();
+        setStage(DeliveryStage.CONFIGURING);
+      }
+    }
+  }, [activeDeliveryId, resetDelivery, session, setStage]);
+
   const handleReviewSubmit = async (rating: number, comment: string) => {
     if (!activeDeliveryId) return;
     const token = getAuthToken(session);
@@ -739,6 +780,23 @@ export default function DeliveryPage() {
                 <CreditCard size={20} />
                 Pay Securely
               </button>
+
+              <div className="grid grid-cols-2 gap-3 mt-4 pt-4 border-t border-zinc-100 dark:border-zinc-800">
+                <button
+                  onClick={handleGoBack}
+                  className="py-3 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-900 dark:text-white font-bold rounded-xl transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+                >
+                  <ChevronLeft size={18} />
+                  Go Back
+                </button>
+                <button
+                  onClick={handleCancelDelivery}
+                  className="py-3 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/30 text-red-600 dark:text-red-400 font-bold rounded-xl transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+                >
+                  <X size={18} />
+                  Cancel
+                </button>
+              </div>
             </div>
           </div>
         );
