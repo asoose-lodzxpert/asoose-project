@@ -106,11 +106,16 @@ export class DeliveryService {
       containsLiquid?: boolean;
     },
     token?: string,
-  ) {
+  ): Promise<{ delivery: any; deliveryFee: number }> {
     const idempotencyKey = crypto.randomUUID();
-    return ApiService.post("/trips/deliveries/request", data, token, {
-      headers: { "x-idempotency-key": idempotencyKey },
-    });
+    return ApiService.post<{ delivery: any; deliveryFee: number }>(
+      "/trips/deliveries/request",
+      data,
+      token,
+      {
+        headers: { "x-idempotency-key": idempotencyKey },
+      },
+    );
   }
 
   /**
@@ -144,7 +149,11 @@ export class DeliveryService {
       lat: data.lat,
       lng: data.lng,
     };
-    return ApiService.post("/users/addresses", payload, token);
+    return ApiService.post<{ id: string; [key: string]: any }>(
+      "/users/addresses",
+      payload,
+      token,
+    );
   }
 
   /**
@@ -268,5 +277,17 @@ export class DeliveryService {
       console.error("Payment status lookup failed", error);
       throw error;
     }
+  }
+
+  /**
+   * Cancel a delivery request.
+   * Backend endpoint: PATCH /v1/trips/deliveries/:id/cancel
+   */
+  static async cancelDelivery(
+    deliveryId: string,
+    reason: string = "User cancelled before payment",
+    token?: string,
+  ) {
+    return ApiService.patch(`/trips/deliveries/${deliveryId}/cancel`, { reason }, token);
   }
 }
