@@ -220,3 +220,36 @@
 .scrollbar-hide::-webkit-scrollbar {
   display: none; /* Chrome / Safari / Opera */
 }
+
+/* ── Documentation / Documentation Custom Scrollbar ───────────────────── */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 5px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(229, 165, 3, 0.2);
+  border-radius: 10px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(229, 165, 3, 0.4);
+}
+
+/* ── Typography / Prose Overrides ─────────────────────────────────────── */
+.prose {
+  max-width: 100% !important;
+}
+
+.dark .prose h1,
+.dark .prose h2,
+.dark .prose h3,
+.dark .prose h4,
+.dark .prose strong {
+  color: #fff !important;
+}
+
+.dark .prose p,
+.dark .prose li {
+  color: #a1a1aa !important; /* zinc-400 */
+}
