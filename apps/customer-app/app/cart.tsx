@@ -16,7 +16,6 @@ import { useCart } from "@/context/CartContext";
 import { CheckoutConfirmationModal } from "@/components/checkout/CheckoutConfirmationModal";
 
 export default function CartScreen() {
-  const [showConfirmModal, setShowConfirmModal] = React.useState(false);
   const {
     items,
     restaurants,
@@ -334,7 +333,7 @@ export default function CartScreen() {
         ]}
       >
         <Pressable
-          onPress={() => setShowConfirmModal(true)}
+          onPress={() => router.push("/checkout")}
           disabled={!canCheckout}
           style={[
             styles.checkoutBtn,
@@ -349,13 +348,6 @@ export default function CartScreen() {
         </Pressable>
       </View>
 
-      <CheckoutConfirmationModal
-        isVisible={showConfirmModal}
-        onConfirm={() => {
-          setShowConfirmModal(false);
-          router.push("/checkout");
-        }}
-        onCancel={() => setShowConfirmModal(false)}
       />
     </View>
   );

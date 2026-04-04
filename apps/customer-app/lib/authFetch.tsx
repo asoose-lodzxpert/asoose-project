@@ -1,3 +1,4 @@
+import { DeviceEventEmitter } from "react-native";
 import {
   authConfig,
   getAccessToken,
@@ -67,12 +68,16 @@ export async function request(path: string, opts: FetchOpts = {}) {
         })();
       }
       const newToken = await refreshPromise;
-      if (!newToken) throw new Error("Session expired");
+      if (!newToken) {
+        DeviceEventEmitter.emit("auth:session-expired");
+        throw new Error("Session expired");
+      }
       token = newToken;
       headers["Authorization"] = `Bearer ${newToken}`;
       ({ response, parsed } = await execute());
     } catch (error) {
       refreshPromise = null;
+      DeviceEventEmitter.emit("auth:session-expired");
       throw error instanceof Error ? error : new Error("Session expired");
     }
   }

@@ -1,15 +1,15 @@
 import React from "react";
-import { Car, AlertCircle } from "lucide-react";
-import OrderHistoryTab from "../../../vendors/[id]/components/orderhistorytab";
-import { Order, Ride } from "../types";
+import { Order, Ride, AdminCustomerMessage } from "../types";
+import { Mail, User } from "lucide-react";
 import { Currency } from "@/app/main/components/Currency";
 import { formatDateTime } from "@/utils/formatDate";
 
 interface CustomerContentTabsProps {
-  activeTab: "Orders" | "Rides" | "Logs";
-  setActiveTab: (tab: "Orders" | "Rides" | "Logs") => void;
+  activeTab: "Orders" | "Rides" | "Logs" | "Messages";
+  setActiveTab: (tab: "Orders" | "Rides" | "Logs" | "Messages") => void;
   orders: Order[];
   rides: Ride[];
+  messages: AdminCustomerMessage[];
   isLoading: boolean;
   customerName: string;
 }
@@ -21,6 +21,7 @@ export const CustomerContentTabs: React.FC<CustomerContentTabsProps> = ({
   setActiveTab,
   orders,
   rides,
+  messages,
   isLoading,
   customerName,
 }) => {
@@ -28,7 +29,7 @@ export const CustomerContentTabs: React.FC<CustomerContentTabsProps> = ({
     <div className="bg-[#1E293B] border border-gray-800 rounded-xl overflow-hidden min-h-[500px]">
       {/* Tab Navigation */}
       <div className="flex border-b border-gray-800 overflow-x-auto hide-scrollbar">
-        {["Orders", "Rides", "Logs"].map((tab) => (
+        {["Orders", "Rides", "Logs", "Messages"].map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab as any)}
@@ -132,6 +133,50 @@ export const CustomerContentTabs: React.FC<CustomerContentTabsProps> = ({
             </div>
           </div>
         )}
+
+        {/* MESSAGES TAB */}
+        {activeTab === "Messages" &&
+          (messages.length > 0 ? (
+            <div className="divide-y divide-gray-800 animate-in fade-in duration-300">
+              {messages.map((msg) => (
+                <div
+                  key={msg.id}
+                  className="p-6 hover:bg-[#0F172A] transition-colors"
+                >
+                  <div className="flex justify-between items-start mb-2">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-yellow-500/10 flex items-center justify-center text-yellow-500">
+                        <User className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <p className="text-white font-bold text-sm">
+                          {msg.admin?.name || "Admin"}
+                        </p>
+                        <p className="text-[10px] text-gray-500">
+                          {formatDateTime(msg.createdAt)}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="bg-blue-500/10 text-blue-500 text-[10px] uppercase font-bold px-2 py-0.5 rounded border border-blue-500/20">
+                      Outgoing
+                    </div>
+                  </div>
+                  <div className="ml-11">
+                    <p className="text-gray-300 text-sm leading-relaxed">
+                      {msg.message}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            !isLoading && (
+              <div className="text-center py-20 text-gray-500">
+                <Mail className="w-10 h-10 mx-auto mb-2 opacity-20" />
+                No message history found
+              </div>
+            )
+          ))}
       </div>
     </div>
   );

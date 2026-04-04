@@ -15,7 +15,7 @@ import {
   Platform,
   BackHandler,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedView } from "@/components/themed-view";
@@ -26,6 +26,7 @@ import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
 import { useLocation } from "@/context/LocationContext";
 import { AddressSelectionModal } from "@/components/checkout/AddressSelectionModal";
+import { CheckoutConfirmationModal } from "@/components/checkout/CheckoutConfirmationModal";
 import { PaymentWebView } from "@/components/checkout/PaymentWebView";
 import { Address } from "@/types/address";
 import { request } from "@/lib/authFetch";
@@ -49,6 +50,7 @@ export default function CheckoutScreen() {
   // State
   const [selectedAddress, setSelectedAddress] = useState<Address | null>(null);
   const [showAddressModal, setShowAddressModal] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showPaymentWebView, setShowPaymentWebView] = useState(false);
   const orderCompleted = useRef(false); // guards against cart-empty redirect after payment
 
@@ -99,58 +101,62 @@ export default function CheckoutScreen() {
     }
   }, [items]);
 
-  useEffect(() => {
-    const loadAddresses = async () => {
-      try {
-        const response = await request("users/addresses", { method: "GET" });
-        if (response && Array.isArray(response) && response.length > 0) {
-          let bestMatch: Address | null = null;
+  useFocusEffect(
+    useCallback(() => {
+      const loadAddresses = async () => {
+        try {
+          const response = await request("users/addresses", { method: "GET" });
+          if (response && Array.isArray(response) && response.length > 0) {
+            let bestMatch: Address | null = null;
 
-          // 1. Try to find exact coordinate match with Home Screen location
-          if (homeLocation?.coords) {
-            const { latitude, longitude } = homeLocation.coords;
-            bestMatch = response.find(
-              (a: Address) =>
-                Math.abs(a.lat - latitude) < 0.0001 &&
-                Math.abs(a.lng - longitude) < 0.0001,
-            );
-
-            // 2. If no exact coord match, try matching by address string
-            if (!bestMatch && homeLocation.address) {
+            // 1. Try to find exact coordinate match with Home Screen location
+            if (homeLocation?.coords) {
+              const { latitude, longitude } = homeLocation.coords;
               bestMatch = response.find(
                 (a: Address) =>
-                  a.street?.toLowerCase() ===
-                  homeLocation.address.toLowerCase(),
+                  Math.abs(a.lat - latitude) < 0.0001 &&
+                  Math.abs(a.lng - longitude) < 0.0001,
               );
+
+              // 2. If no exact coord match, try matching by address string
+              if (!bestMatch && homeLocation.address) {
+                bestMatch = response.find(
+                  (a: Address) =>
+                    a.street?.toLowerCase() ===
+                    homeLocation.address.toLowerCase(),
+                );
+              }
+
+              // 3. Fallback: select the closest one by distance
+              if (!bestMatch) {
+                const sorted = [...response].sort((a: Address, b: Address) => {
+                  const da = Math.hypot(a.lat - latitude, a.lng - longitude);
+                  const db = Math.hypot(b.lat - latitude, b.lng - longitude);
+                  return da - db;
+                });
+                bestMatch = sorted[0];
+              }
             }
 
-            // 3. Fallback: select the closest one by distance
+            // 4. Ultimate fallback: prefer "home" label, then default, then first
             if (!bestMatch) {
-              const sorted = [...response].sort((a: Address, b: Address) => {
-                const da = Math.hypot(a.lat - latitude, a.lng - longitude);
-                const db = Math.hypot(b.lat - latitude, b.lng - longitude);
-                return da - db;
-              });
-              bestMatch = sorted[0];
+              bestMatch =
+                response.find(
+                  (a: Address) => a.label?.toLowerCase() === "home",
+                ) ||
+                response.find((a: Address) => a.isDefault) ||
+                response[0];
             }
-          }
 
-          // 4. Ultimate fallback: prefer "home" label, then default, then first
-          if (!bestMatch) {
-            bestMatch =
-              response.find((a: Address) => a.label?.toLowerCase() === "home") ||
-              response.find((a: Address) => a.isDefault) ||
-              response[0];
+            setSelectedAddress(bestMatch);
           }
-
-          setSelectedAddress(bestMatch);
+        } catch (error) {
+          console.error("Failed to load addresses:", error);
         }
-      } catch (error) {
-        console.error("Failed to load addresses:", error);
-      }
-    };
-    loadAddresses();
-  }, [user, homeLocation?.coords?.latitude, homeLocation?.coords?.longitude]);
+      };
+      loadAddresses();
+    }, [user, homeLocation?.coords?.latitude, homeLocation?.coords?.longitude]),
+  );
 
   // Fetch live quote from backend whenever address or cart changes
   const fetchQuote = useCallback(
@@ -586,7 +592,7 @@ export default function CheckoutScreen() {
         >
           <Pressable
             disabled={isProcessing || !selectedAddress || !user || isLoadingFee}
-            onPress={handlePlaceOrder}
+            onPress={() => setShowConfirmModal(true)}
             style={[
               styles.payButton,
               { backgroundColor: primary },
@@ -660,6 +666,16 @@ export default function CheckoutScreen() {
           }}
         />
       )}
+
+      <CheckoutConfirmationModal
+        isVisible={showConfirmModal}
+        onConfirm={() => {
+          setShowConfirmModal(false);
+          handlePlaceOrder();
+        }}
+        onCancel={() => setShowConfirmModal(false)}
+        confirmText="Confirm and Pay"
+      />
     </ThemedView>
   );
 }
