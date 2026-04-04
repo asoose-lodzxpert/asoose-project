@@ -12,6 +12,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { TripsModule } from '../users/trips/trips.module';
 import { TransactionsModule } from '../super-admin/transactions/transaction.module';
 import { EmailQueue } from '../queue/email.queue';
+import { UsersModule } from '../users/users.module';
 import {
   ChargeSuccessHandler,
   DvaAssignHandler,
@@ -32,6 +33,7 @@ const webhookHandlers = [
     NotificationsModule,
     forwardRef(() => TripsModule),
     forwardRef(() => TransactionsModule),
+    forwardRef(() => UsersModule),
     EmailQueue,
   ],
   controllers: [PaymentController],

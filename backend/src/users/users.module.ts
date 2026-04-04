@@ -68,6 +68,7 @@ import { PaystackAccountService } from '../payment/paystack-account.service';
     NotificationFacade,
     UserAccountNotificationsService,
     IdempotencyService,
+    InventoryService,
   ],
 })
 export class UsersModule { }

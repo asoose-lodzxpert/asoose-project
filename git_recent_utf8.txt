@@ -1,0 +1,15 @@
+﻿3ab65d4 | 2026-04-04 | Dev Enoch | feat: configure security headers and add customer detail tabs for order history management
+bc928c6 | 2026-04-04 | Dev Enoch | feat: implement OrderService for managing rider wallet balance, earnings, and order history
+f2bd7c2 | 2026-04-04 | Dev Enoch | feat: implement rider order history, earnings service, and notification management with database connectivity scripts
+e607038 | 2026-04-04 | asoose-lodzxpert | Merge pull request #45 from asoose-lodzxpert/feat/job-lifecycle-readability-fixes
+1e796f6 | 2026-04-04 | Dev Enoch | feat: implement admin-customer message history tracking and relocate checkout confirmation modal to payment step
+5e9b933 | 2026-04-03 | asoose-lodzxpert | Merge pull request #44 from asoose-lodzxpert/feat/job-lifecycle-readability-fixes
+490c346 | 2026-04-03 | Dev Enoch | feat: implement modular home header, cart components, and backend seed scripts for customer and vendor apps
+6e9efed | 2026-04-03 | Dev Enoch | feat: job lifecycle and readability enhancements. Orders now move to DISPATCHED on pickup. Admin alerts include human-readable names.
+5208670 | 2026-04-01 | asoose-lodzxpert | Merge pull request #43 from asoose-lodzxpert/feature/fees-and-prisma-migration
+cacb259 | 2026-04-01 | Dev Enoch | feat: standardize fees (1.5% fee, 7.5% VAT), fix mobile address selection, and migrate logs to Prisma
+16f9101 | 2026-04-01 | asoose-lodzxpert | Merge pull request #42 from asoose-lodzxpert/feature/multi-device-push-notifications
+c065fae | 2026-04-01 | asoose-lodzxpert | Merge branch 'main' into feature/multi-device-push-notifications
+43ffe52 | 2026-04-01 | Dev Enoch | fix: move tailwind, postcss, and autoprefixer to dependencies to resolve build error
+c1b4637 | 2026-04-01 | asoose-lodzxpert | Merge pull request #41 from asoose-lodzxpert/feature/multi-device-push-notifications
+9214ac4 | 2026-04-01 | Dev Enoch | fix: move tailwind, postcss, and autoprefixer to dependencies to resolve build error

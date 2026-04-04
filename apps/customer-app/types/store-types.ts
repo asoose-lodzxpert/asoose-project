@@ -32,6 +32,9 @@ export type Product = {
   description: string;
   category: Category;
   modifierGroups: ModifierGroup[];
+  manageStock?: boolean;
+  stock?: number;
+  status?: string;
 };
 
 export type StoreData = {

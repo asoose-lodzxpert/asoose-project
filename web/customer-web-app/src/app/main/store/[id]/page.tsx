@@ -32,6 +32,9 @@ interface Product {
   images?: string[];
   description: string;
   modifierGroups: ModifierGroup[];
+  stock?: number;
+  status?: string;
+  manageStock?: boolean;
 }
 
 interface Review {
@@ -108,6 +111,9 @@ export default function StorePage() {
           (Array.isArray(p.images) && p.images.length > 0
             ? p.images[0]
             : undefined),
+        stock: p.stock,
+        status: p.status,
+        manageStock: p.manageStock,
       }));
       setStore({ ...data, products: normalizedProducts });
       setMenuItems(normalizedProducts);

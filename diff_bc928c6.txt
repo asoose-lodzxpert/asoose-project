@@ -1,0 +1,28 @@
+﻿commit bc928c654f98ae7093920e2ab00ae78adca69df4
+Author: Dev Enoch <arhyelphilip024@gmail.com>
+Date:   Sat Apr 4 08:43:51 2026 +0100
+
+    feat: implement OrderService for managing rider wallet balance, earnings, and order history
+
+diff --git a/backend/src/riders/order/order.service.ts b/backend/src/riders/order/order.service.ts
+index d49a32c..ca2d07c 100644
+--- a/backend/src/riders/order/order.service.ts
++++ b/backend/src/riders/order/order.service.ts
+@@ -4,7 +4,7 @@ import { PrismaService } from '../../prisma/prisma.service';
+ @Injectable()
+ export class OrderService {
+   private readonly logger = new Logger(OrderService.name);
+-  constructor(private readonly prisma: PrismaService) {}
++  constructor(private readonly prisma: PrismaService) { }
+ 
+   async getWalletBalance(riderId: string) {
+     const rider = await this.prisma.rider.findUnique({
+@@ -47,7 +47,7 @@ export class OrderService {
+     let avgPerRide = 0;
+     let hoursOnline = 0;
+     if (rider?.role === 'DRIVER') {
+-      // Get rides for driver, exclude PENDING and CANCELLED
++      // Get rides for driver, exclude PENDING and CANCELLED!
+       const rides = await this.prisma.ride.findMany({
+         where: {
+           riderId,

@@ -140,7 +140,10 @@ export default function CustomerDetailPage({
           body: JSON.stringify({ message: result.value }),
           retries: 0,
         });
-        AppAlert.success("Message Sent!");
+        AppAlert.successModal(
+          "Message Sent!",
+          "The customer has been notified and the message recorded in the logs."
+        );
         mutateMessages();
       } catch (err: any) {
         AppAlert.error(

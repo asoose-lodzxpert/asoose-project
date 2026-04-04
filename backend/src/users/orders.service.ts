@@ -515,7 +515,7 @@ export class OrdersService {
       const order = await this.prisma.$transaction(
         async (tx) => {
           // Atomic Stock Update (Prevents race conditions)
-          await this.atomicStockDecrement(
+          await this.inventoryService.atomicDecrementStock(
             tx,
             context.preparedStores[0].groupItems,
           );
@@ -633,7 +633,7 @@ export class OrdersService {
           const orders = await Promise.all(
             preparedStores.map(async (prep) => {
               // 1. Atomic Stock Decrement (The Guard)
-              await this.atomicStockDecrement(tx, prep.groupItems);
+              await this.inventoryService.atomicDecrementStock(tx, prep.groupItems);
 
               // 2. Create Order (no inline delivery for group orders)
               return tx.order.create({
@@ -1498,32 +1498,6 @@ export class OrdersService {
    * Atomically decrements stock using UpdateMany with 'gte' clause.
    * This guarantees no overselling without needing Serializable isolation.
    */
-  private async atomicStockDecrement(
-    tx: Prisma.TransactionClient,
-    items: OrderItemDto[],
-  ) {
-    // Sort items to prevent Deadlocks between concurrent orders with same items
-    const sortedItems = [...items].sort((a, b) => a.id.localeCompare(b.id));
-
-    for (const item of sortedItems) {
-      const result = await tx.product.updateMany({
-        where: {
-          id: item.id,
-          stock: { gte: item.quantity }, // The Guard
-        },
-        data: {
-          stock: { decrement: item.quantity },
-        },
-      });
-
-      if (result.count === 0) {
-        // Since we checked existence in Prepare phase, count=0 means Insufficient Stock
-        throw new BadRequestException(
-          `Insufficient stock for product ID: ${item.id}`,
-        );
-      }
-    }
-  }
 
   // ==================== HELPER: IDEMPOTENCY & VALIDATION ====================
 

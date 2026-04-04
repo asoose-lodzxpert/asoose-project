@@ -10,6 +10,8 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { NotificationsGateway } from 'src/notifications/notifications.gateway';
 
+import { InventoryService } from 'src/users/inventory.service';
+
 @Injectable()
 export class VendorOrdersService {
   private readonly logger = new Logger(VendorOrdersService.name);
@@ -18,6 +20,7 @@ export class VendorOrdersService {
     private readonly prisma: PrismaService,
     private readonly eventEmitter: EventEmitter2,
     private readonly notificationsGateway: NotificationsGateway,
+    private readonly inventoryService: InventoryService,
   ) {}
 
   private async validateOrderAccess(userId: string, orderId: string) {
@@ -185,7 +188,11 @@ export class VendorOrdersService {
       const updated = await tx.order.update({
         where: { id: orderId },
         data: { status: OrderStatus.REJECTED, cancelledAt: new Date() },
+        include: { items: true },
       });
+
+      // Restore stock
+      await this.inventoryService.atomicIncrementStock(tx, updated.items);
 
       await tx.activityLog.create({
         data: {

@@ -43,7 +43,7 @@ export const CartItem = ({
             </p>
           </div>
           <div className="flex items-center gap-3">
-            <span className="font-bold text-sm">${price.toFixed(2)}</span>
+            <span className="font-bold text-sm">₦{price.toFixed(2)}</span>
             <button
               onClick={() => onRemove(id)}
               className="text-red-500 bg-red-50 dark:bg-red-900/20 p-1.5 rounded-lg hover:bg-red-100 transition-colors"
