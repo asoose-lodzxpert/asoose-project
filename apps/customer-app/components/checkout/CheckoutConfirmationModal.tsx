@@ -8,9 +8,10 @@ interface CheckoutConfirmationModalProps {
   isVisible: boolean;
   onConfirm: () => void;
   onCancel: () => void;
+  confirmText?: string;
 }
 
-export function CheckoutConfirmationModal({ isVisible, onConfirm, onCancel }: CheckoutConfirmationModalProps) {
+export function CheckoutConfirmationModal({ isVisible, onConfirm, onCancel, confirmText }: CheckoutConfirmationModalProps) {
   const primary = useThemeColor({}, 'brandPrimary');
   const bg = useThemeColor({}, 'surfaceBackground');
   const card = useThemeColor({}, 'surfaceCard');
@@ -47,7 +48,7 @@ export function CheckoutConfirmationModal({ isVisible, onConfirm, onCancel }: Ch
               onPress={onConfirm}
               style={[styles.btn, { backgroundColor: primary }]}
             >
-              <ThemedText style={[styles.btnText, { color: onPrimary }]}>Continue to Checkout</ThemedText>
+              <ThemedText style={[styles.btnText, { color: onPrimary }]}>{confirmText || "Continue"}</ThemedText>
             </Pressable>
             
             <Pressable
