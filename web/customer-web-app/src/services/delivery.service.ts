@@ -240,4 +240,33 @@ export class DeliveryService {
       return false;
     }
   }
+
+  /**
+   * Get full payment details including status (for recovery/debugging).
+   * ✅ FIXED: Added to support detecting CANCELLED vs FAILED payments
+   * in the delivery recovery flow.
+   *
+   * Returns:
+   *   { status: "COMPLETED" | "CANCELLED" | "FAILED" | "PENDING", ... }
+   *   or throws error if payment not found
+   */
+  static async getPaymentStatus(
+    reference: string,
+    gateway: string = "PAYSTACK",
+    token?: string,
+  ): Promise<{ status: string; [key: string]: any }> {
+    try {
+      const res: any = await ApiService.get(
+        `/payment/verify?reference=${encodeURIComponent(reference)}&gateway=${gateway}`,
+        token,
+      );
+      return {
+        status: res.status || res.data?.status || "UNKNOWN",
+        ...res,
+      };
+    } catch (error: any) {
+      console.error("Payment status lookup failed", error);
+      throw error;
+    }
+  }
 }

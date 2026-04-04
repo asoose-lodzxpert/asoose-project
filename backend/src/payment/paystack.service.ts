@@ -248,11 +248,13 @@ export class PaystackService {
   private mapStatus(status: string): PaymentStatus {
     switch (status) {
       case 'success':
-        return PaymentStatus.COMPLETED; // ✅ FIXED
+        return PaymentStatus.COMPLETED;
       case 'failed':
         return PaymentStatus.FAILED;
       case 'abandoned':
-        return PaymentStatus.FAILED; // ✅ FIXED: Mapped to FAILED
+        // ✅ FIXED: Explicitly distinguish user cancellation from technical failures
+        // Paystack sends 'abandoned' when user cancels payment UI (not completing auth)
+        return PaymentStatus.CANCELLED;
       default:
         return PaymentStatus.PENDING;
     }

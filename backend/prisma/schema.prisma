@@ -143,11 +143,12 @@ enum DisputePriority {
 }
 
 enum PaymentStatus {
-  PENDING
-  COMPLETED
-  FAILED
-  REFUNDED
-  PARTIALLY_REFUNDED
+  PENDING                 // Payment not yet completed (authorizing or awaiting confirmation)
+  COMPLETED              // Payment successfully collected and verified
+  FAILED                 // Payment declined or failed (technical/card issue)
+  CANCELLED              // User-initiated cancellation (e.g. abandoned at Paystack UI)
+  REFUNDED               // Payment was refunded to user
+  PARTIALLY_REFUNDED     // Only part of payment was refunded
 }
 
 enum PaymentMethod {

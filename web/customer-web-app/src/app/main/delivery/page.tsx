@@ -206,6 +206,33 @@ export default function DeliveryPage() {
           return;
         }
 
+        // ✅ FIXED: Check payment status to detect cancellation
+        // If verification failed, try to determine WHY to provide appropriate UX
+        let paymentStatus = "unknown";
+        if (token) {
+          try {
+            const paymentData = await DeliveryService.getPaymentStatus(
+              reference,
+              gateway,
+              token,
+            );
+            paymentStatus = paymentData.status || "unknown";
+          } catch (err) {
+            // Non-fatal — continue with polling
+            console.warn("Could not fetch payment status:", err);
+          }
+        }
+
+        // ✅ FIXED: Exit PAYMENT_PENDING if payment was explicitly cancelled
+        if (paymentStatus === "CANCELLED") {
+          toast.warn(
+            "Payment was cancelled. You can start a new delivery or use this form again.",
+          );
+          setStage(DeliveryStage.REVIEW_PAYMENT); // Reset to payment review
+          localStorage.removeItem(PENDING_DELIVERY_KEY);
+          return;
+        }
+
         // 2. Fall back to polling the delivery status from the DB
         useDeliveryStore.setState({ activeDeliveryId: id });
         setStage(DeliveryStage.PAYMENT_PENDING);
@@ -217,11 +244,30 @@ export default function DeliveryPage() {
           undefined,
           token || undefined,
         );
+
+        // ✅ FIXED: Exit PAYMENT_PENDING even if polling fails
+        // (prevents indefinite stuck state)
         if (success) {
           handlePaymentSuccess(id);
+        } else {
+          // Polling failed — either payment timed out or backend unavailable
+          toast.error(
+            "Could not verify payment status. Please check your email for confirmation or try again.",
+          );
+          setStage(DeliveryStage.REVIEW_PAYMENT); // Reset to allow retry
+          localStorage.removeItem(PENDING_DELIVERY_KEY);
         }
       } catch (e) {
         console.error("Failed to recover pending delivery state", e);
+        // ✅ FIXED: Exit PAYMENT_PENDING on error
+        if (
+          useDeliveryStore.getState().stage === DeliveryStage.PAYMENT_PENDING
+        ) {
+          toast.warn(
+            "Payment status unclear. Returning to delivery form to retry.",
+          );
+          setStage(DeliveryStage.REVIEW_PAYMENT);
+        }
         localStorage.removeItem(PENDING_DELIVERY_KEY);
       }
     };
