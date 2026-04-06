@@ -127,6 +127,9 @@ export default function DeliveryPage() {
   const [phoneError, setPhoneError] = useState<string | null>(null);
   const [senderPhoneError, setSenderPhoneError] = useState<string | null>(null);
   const [apiError, setApiError] = useState<boolean>(false);
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [isGoingBack, setIsGoingBack] = useState(false);
+  const [isCheckingPayment, setIsCheckingPayment] = useState(false);
   const { data: session, status } = useSession();
 
   // Redirect if we are in a backend-sourced tracking state.
@@ -610,6 +613,7 @@ export default function DeliveryPage() {
 
   const handleManualPaymentCheck = useCallback(async () => {
     if (activeDeliveryId) {
+      setIsCheckingPayment(true);
       const token = getAuthToken(session);
       // Read stored gateway so verification uses the correct payment provider
       let gateway = "PAYSTACK";
@@ -621,33 +625,41 @@ export default function DeliveryPage() {
       const storedRef = localStorage.getItem(PENDING_DELIVERY_KEY);
       const reference = storedRef ? JSON.parse(storedRef).reference : null;
 
-      if (reference) {
-        const isVerified = await DeliveryService.verifyPayment(
-          reference,
-          gateway,
+      try {
+        if (reference) {
+          const isVerified = await DeliveryService.verifyPayment(
+            reference,
+            gateway,
+            token || undefined,
+          );
+          if (isVerified === true) {
+            handlePaymentSuccess();
+            return;
+          }
+          // null = indeterminate (network error) — fall through to polling
+        }
+
+        const success = await DeliveryService.pollDeliveryStatus(
+          activeDeliveryId,
+          undefined,
+          undefined,
+          undefined,
           token || undefined,
         );
-        if (isVerified === true) {
-          handlePaymentSuccess();
-          return;
-        }
-        // null = indeterminate (network error) — fall through to polling
+        if (success) handlePaymentSuccess();
+        else toast.info("Payment not yet confirmed. We are still checking...");
+      } finally {
+        setIsCheckingPayment(false);
       }
-
-      const success = await DeliveryService.pollDeliveryStatus(
-        activeDeliveryId,
-        undefined,
-        undefined,
-        undefined,
-        token || undefined,
-      );
-      if (success) handlePaymentSuccess();
-      else toast.info("Payment not yet confirmed. We are still checking...");
     }
   }, [activeDeliveryId, handlePaymentSuccess, session]);
 
   const handleGoBack = useCallback(() => {
+    setIsGoingBack(true);
+    // Update stage immediately, the state change will handle the transition
     setStage(DeliveryStage.CONFIGURING);
+    // Use setTimeout to ensure the loader is seen briefly if transition is too fast
+    setTimeout(() => setIsGoingBack(false), 300);
   }, [setStage]);
 
   const handleCancelDelivery = useCallback(async () => {
@@ -668,6 +680,7 @@ export default function DeliveryPage() {
     });
 
     if (result.isConfirmed) {
+      setIsCancelling(true);
       const token = getAuthToken(session);
       try {
         await DeliveryService.cancelDelivery(
@@ -681,6 +694,7 @@ export default function DeliveryPage() {
       } finally {
         resetDelivery();
         setStage(DeliveryStage.CONFIGURING);
+        setIsCancelling(false);
       }
     }
   }, [activeDeliveryId, resetDelivery, session, setStage]);
@@ -784,17 +798,27 @@ export default function DeliveryPage() {
               <div className="grid grid-cols-2 gap-3 mt-4 pt-4 border-t border-zinc-100 dark:border-zinc-800">
                 <button
                   onClick={handleGoBack}
-                  className="py-3 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-900 dark:text-white font-bold rounded-xl transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+                  disabled={isGoingBack || isCancelling}
+                  className="py-3 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-900 dark:text-white font-bold rounded-xl transition-all active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <ChevronLeft size={18} />
-                  Go Back
+                  {isGoingBack ? (
+                    <Loader2 size={18} className="animate-spin" />
+                  ) : (
+                    <ChevronLeft size={18} />
+                  )}
+                  {isGoingBack ? "Returning..." : "Go Back"}
                 </button>
                 <button
                   onClick={handleCancelDelivery}
-                  className="py-3 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/30 text-red-600 dark:text-red-400 font-bold rounded-xl transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+                  disabled={isGoingBack || isCancelling}
+                  className="py-3 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/30 text-red-600 dark:text-red-400 font-bold rounded-xl transition-all active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <X size={18} />
-                  Cancel
+                  {isCancelling ? (
+                    <Loader2 size={18} className="animate-spin" />
+                  ) : (
+                    <X size={18} />
+                  )}
+                  {isCancelling ? "Cancelling..." : "Cancel"}
                 </button>
               </div>
             </div>
@@ -816,9 +840,13 @@ export default function DeliveryPage() {
             </p>
             <button
               onClick={handleManualPaymentCheck}
-              className="mt-6 text-sm font-medium text-blue-500 hover:underline"
+              disabled={isCheckingPayment}
+              className="mt-6 text-sm font-medium text-blue-500 hover:underline disabled:text-gray-400 disabled:no-underline flex items-center gap-2 mx-auto"
             >
-              I have completed payment
+              {isCheckingPayment && (
+                <Loader2 size={14} className="animate-spin" />
+              )}
+              {isCheckingPayment ? "Checking..." : "I have completed payment"}
             </button>
           </div>
         );

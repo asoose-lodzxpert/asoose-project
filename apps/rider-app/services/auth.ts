@@ -154,7 +154,7 @@ export async function logout() {
   try {
     const refreshToken = await SecureStore.getItemAsync(refreshTokenKey());
     if (refreshToken) {
-      await fetch(`${process.env.EXPO_PUBLIC_API_URL}/rider-auth/logout`, {
+      await fetch(`${process.env.EXPO_PUBLIC_API_URL}/auth/rider/logout`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ refreshToken }),

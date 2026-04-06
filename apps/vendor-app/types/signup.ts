@@ -55,4 +55,5 @@ export interface SignupData {
   step1: SignupStep1Data;
   step2: SignupStep2Data;
   step3: SignupStep3Data;
+  acceptedTerms: boolean;
 }

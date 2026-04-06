@@ -5,7 +5,7 @@ import { Step3Props } from "./types";
 
 export const StoreInfo: React.FC<Step3Props> = ({ data, onChange }) => (
   <>
-    <Field label="Store Display Name">
+    <Field label="Store Display Name" required={true}>
       <ThemedInput
         value={data.storeName}
         placeholder="Enter store display name"
@@ -13,7 +13,7 @@ export const StoreInfo: React.FC<Step3Props> = ({ data, onChange }) => (
       />
     </Field>
 
-    <Field label="Store Description">
+    <Field label="Store Description" required={true}>
       <ThemedInput
         multiline
         maxLength={150}

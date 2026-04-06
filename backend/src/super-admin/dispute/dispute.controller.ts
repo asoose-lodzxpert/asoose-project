@@ -43,6 +43,7 @@ export class DisputesController {
     UserRole.CUSTOMER,
     UserRole.VENDOR,
     UserRole.RIDER,
+    UserRole.DRIVER,
   )
   @ApiOperation({ summary: 'Create a new dispute' })
   @HttpCode(HttpStatus.CREATED)
@@ -60,6 +61,7 @@ export class DisputesController {
     UserRole.CUSTOMER,
     UserRole.VENDOR,
     UserRole.RIDER,
+    UserRole.DRIVER,
   )
   @ApiOperation({ summary: 'Get my own disputes' })
   findMine(@Query() query: FilterDisputesDto, @Request() req) {
@@ -79,6 +81,7 @@ export class DisputesController {
     UserRole.CUSTOMER,
     UserRole.VENDOR,
     UserRole.RIDER,
+    UserRole.DRIVER,
   )
   @ApiOperation({ summary: 'Check if dispute exists for order/ride/delivery' })
   checkDispute(
@@ -124,6 +127,7 @@ export class DisputesController {
     UserRole.CUSTOMER,
     UserRole.VENDOR,
     UserRole.RIDER,
+    UserRole.DRIVER,
   )
   @ApiOperation({ summary: 'Get dispute details' })
   findOne(@Param('id') id: string, @Request() req) {
@@ -139,6 +143,7 @@ export class DisputesController {
     UserRole.CUSTOMER,
     UserRole.VENDOR,
     UserRole.RIDER,
+    UserRole.DRIVER,
   )
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Add message to dispute' })

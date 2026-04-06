@@ -13,6 +13,7 @@ import { RiderAuthController } from './rider-auth.controller';
 import { RiderAuthService } from './rider-auth.service';
 import { AuthService } from './auth.service';
 import { MailModule } from 'src/mail/mail.module';
+import { StorageModule } from 'src/storage/storage.module';
 import { TokenRevocationService } from './token-revocation.service';
 
 @Module({
@@ -34,6 +35,7 @@ import { TokenRevocationService } from './token-revocation.service';
     OtpModule,
     MailModule,
     PrismaModule,
+    StorageModule,
   ],
 
   controllers: [

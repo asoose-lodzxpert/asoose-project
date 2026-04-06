@@ -4,12 +4,15 @@ import { ThemedText } from "@/components/themed-text";
 import { SignupData } from "@/types/signup";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useThemeColor } from "@/hooks/use-theme-color";
+import { Checkbox } from "react-native-paper";
+import * as Linking from "expo-linking";
 
 interface Step4Props {
   data: SignupData;
+  onCheck: (val: boolean) => void;
 }
 
-export const Step4Review: React.FC<Step4Props> = ({ data }) => {
+export const Step4Review: React.FC<Step4Props> = ({ data, onCheck }) => {
   const { step1, step2, step3 } = data;
   const successColor = useThemeColor({}, "statusSuccess");
   const errorColor = useThemeColor({}, "statusError");
@@ -188,6 +191,27 @@ export const Step4Review: React.FC<Step4Props> = ({ data }) => {
         </>
       )}
 
+      {/* Terms & Conditions Section */}
+      <View style={[styles.termsRow, { borderColor: border }]}>
+        <Checkbox
+          status={data.acceptedTerms ? "checked" : "unchecked"}
+          onPress={() => onCheck(!data.acceptedTerms)}
+          color={useThemeColor({}, "brandPrimary")}
+        />
+        <View style={{ flex: 1 }}>
+          <ThemedText style={styles.termsText}>
+            I have read and agree to the{" "}
+            <ThemedText
+              onPress={() => Linking.openURL("https://asoose.com/terms")}
+              style={{ color: useThemeColor({}, "brandPrimary"), fontWeight: "700" }}
+            >
+              Terms and Conditions
+            </ThemedText>
+            {" "}and privacy policy.
+          </ThemedText>
+        </View>
+      </View>
+
       <View style={{ height: 8 }} />
     </ScrollView>
   );
@@ -273,5 +297,18 @@ const styles = StyleSheet.create({
     width: "100%",
     height: 80,
     borderRadius: 8,
+  },
+  termsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 20,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    backgroundColor: "rgba(0,0,0,0.02)",
+  },
+  termsText: {
+    fontSize: 13,
+    lineHeight: 20,
   },
 });

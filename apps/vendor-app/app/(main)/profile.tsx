@@ -14,6 +14,8 @@ import {
   StyleSheet,
   Text,
   View,
+  ActivityIndicator,
+  Modal,
 } from "react-native";
 import Toast from "react-native-toast-message";
 
@@ -80,6 +82,11 @@ export default function ProfileScreen() {
   // Image Picker Modal State
   const [isPhotoModalVisible, setIsPhotoModalVisible] = useState(false);
   const [photoPickType, setPhotoPickType] = useState<"avatar" | "banner">("avatar");
+  const [successModal, setSuccessModal] = useState<{
+    visible: boolean;
+    title: string;
+    message: string;
+  }>({ visible: false, title: "", message: "" });
 
   const loadProfile = async (isRefresh = false) => {
     if (!isRefresh) setLoading(true);
@@ -141,7 +148,11 @@ export default function ProfileScreen() {
         try {
           await updateVendorProfileImage(uri);
           await loadProfile(true);
-          Toast.show({ type: "success", text1: "Profile image updated" });
+          setSuccessModal({
+            visible: true,
+            title: "Update Successful",
+            message: "Your profile picture has been updated successfully.",
+          });
         } finally {
           setUploadingImage(false);
           setSelectedImage(null);
@@ -160,11 +171,13 @@ export default function ProfileScreen() {
         icon: "camera.fill",
       });
       if (!confirmResult) return;
+      setUploadingImage(true);
       try {
         await updateVendorProfileImage(uri, "banner");
-        Toast.show({
-          type: "success",
-          text1: "Store banner updated successfully",
+        setSuccessModal({
+          visible: true,
+          title: "Update Successful",
+          message: "Your store banner has been updated successfully.",
         });
         await loadProfile(true);
       } catch (error: any) {
@@ -172,6 +185,8 @@ export default function ProfileScreen() {
           type: "error",
           text1: error.message || "Failed to update store banner",
         });
+      } finally {
+        setUploadingImage(false);
       }
     }
   };
@@ -180,20 +195,6 @@ export default function ProfileScreen() {
   const handlePickBanner = () => {
     setPhotoPickType("banner");
     setIsPhotoModalVisible(true);
-  };
-
-  const handleConfirmImageChange = async () => {
-    if (!selectedImage) return;
-    setUploadingImage(true);
-
-    try {
-      await updateVendorProfileImage(selectedImage);
-      await loadProfile(true);
-      Toast.show({ type: "success", text1: "Profile image updated" });
-    } finally {
-      setUploadingImage(false);
-      setSelectedImage(null);
-    }
   };
 
   const getStatusColor = (status: VendorStatus) => {
@@ -358,12 +359,58 @@ export default function ProfileScreen() {
         </View>
       </ScrollView>
 
+      {uploadingImage && (
+        <View style={styles.loadingOverlay}>
+          <View style={styles.loadingCard}>
+            <ActivityIndicator size="large" color={primary} />
+            <ThemedText style={{ marginTop: 12, fontWeight: "600" }}>
+              Uploading image...
+            </ThemedText>
+            <ThemedText
+              style={{ color: mutedText, fontSize: 12, marginTop: 4 }}
+            >
+              Please wait a moment
+            </ThemedText>
+          </View>
+        </View>
+      )}
+
       <ConfirmModal />
       <ImagePickerModal
         visible={isPhotoModalVisible}
         onClose={() => setIsPhotoModalVisible(false)}
         onSelectImage={onImageSelected}
       />
+
+      {/* Success Modal */}
+      <Modal transparent visible={successModal.visible} animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: surfaceCard }]}>
+            <View
+              style={[
+                styles.successIconCircle,
+                { backgroundColor: statusSuccess + "15" },
+              ]}
+            >
+              <IconSymbol name="checkmark.circle.fill" size={40} color={statusSuccess} />
+            </View>
+            <ThemedText type="subtitle" style={styles.modalTitle}>
+              {successModal.title}
+            </ThemedText>
+            <ThemedText style={styles.modalMessage}>
+              {successModal.message}
+            </ThemedText>
+            <Pressable
+              style={[styles.modalButton, { backgroundColor: primary }]}
+              onPress={() => setSuccessModal({ ...successModal, visible: false })}
+            >
+              <ThemedText style={{ color: textOnPrimary, fontWeight: "600" }}>
+                Done
+              </ThemedText>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </ThemedView>
   );
 }
@@ -479,5 +526,61 @@ const styles = StyleSheet.create({
     color: "#9CA3AF",
     marginTop: 20,
     fontSize: 12,
+  },
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 999,
+  },
+  loadingCard: {
+    backgroundColor: "#fff",
+    padding: 30,
+    borderRadius: 20,
+    alignItems: "center",
+    width: 220,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 24,
+  },
+  modalContent: {
+    width: "100%",
+    maxWidth: 320,
+    borderRadius: 24,
+    padding: 24,
+    alignItems: "center",
+    elevation: 5,
+  },
+  successIconCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: 20,
+    marginBottom: 10,
+    textAlign: "center",
+  },
+  modalMessage: {
+    fontSize: 14,
+    color: "#6B7280",
+    textAlign: "center",
+    marginBottom: 24,
+    lineHeight: 20,
+  },
+  modalButton: {
+    width: "100%",
+    height: 50,
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
   },
 });

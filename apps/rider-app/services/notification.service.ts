@@ -124,10 +124,18 @@ export async function registerForPushNotificationsAsync(): Promise<
       Constants?.expoConfig?.extra?.eas?.projectId ??
       Constants?.easConfig?.projectId;
 
-    if (!projectId) throw new Error("Project ID is missing from Expo config");
+    console.log("[Push Notifications] Project ID:", projectId);
 
-    token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
+    if (!projectId) {
+      console.error("[Push Notifications] Project ID is missing from Expo config");
+      throw new Error("Project ID is missing from Expo config");
+    }
+
+    const expoTokenRes = await Notifications.getExpoPushTokenAsync({ projectId });
+    token = expoTokenRes.data;
+    console.log("[Push Notifications] Expo Push Token obtained:", token);
   } catch (e: any) {
+    console.error("[Push Notifications] Registration error:", e);
     showToast("Failed to initialize notifications.");
     await logErrorToBackend("registerForPushNotificationsAsync", e);
     return undefined;
@@ -137,12 +145,20 @@ export async function registerForPushNotificationsAsync(): Promise<
 }
 
 export async function savePushToken(token: string): Promise<void> {
+  if (!EXPO_PUBLIC_API_URL) {
+    console.error("[Push Notifications] EXPO_PUBLIC_API_URL is not defined!");
+    return;
+  }
+
   try {
+    console.log("[Push Notifications] Saving token to backend:", token);
     await fetchWithAuth(`${EXPO_PUBLIC_API_URL}/auth/rider/push-token`, {
       method: "POST",
       body: JSON.stringify({ token, platform: Platform.OS }),
     });
+    console.log("[Push Notifications] Token saved successfully.");
   } catch (error: any) {
+    console.error("[Push Notifications] Save token error:", error);
     showToast("Connection error: Notifications might not be synced.");
     await logErrorToBackend("savePushToken", error);
   }

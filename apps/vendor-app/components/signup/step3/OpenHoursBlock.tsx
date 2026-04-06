@@ -29,7 +29,7 @@ export const OpenHoursBlock: React.FC<Props> = ({ value, onChange }) => {
       style={{ gap: 4 }}
     >
       <ThemedText type="defaultSemiBold" style={styles.blockTitle}>
-        Open Hours
+        Open Hours <ThemedText style={{ color: useThemeColor({}, "statusError") }}>*</ThemedText>
       </ThemedText>
 
       {DAYS.map((day, i) => {

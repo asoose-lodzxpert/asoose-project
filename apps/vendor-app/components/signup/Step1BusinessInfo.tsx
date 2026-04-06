@@ -229,7 +229,9 @@ export const Step1BusinessInfo: React.FC<Step1Props> = ({ data, onChange }) => {
 
         {/* Business Email - OTP Section */}
         <View style={styles.field}>
-          <ThemedText type="defaultSemiBold">Business email</ThemedText>
+          <ThemedText type="defaultSemiBold">
+            Business email <ThemedText style={{ color: errorColor }}>*</ThemedText>
+          </ThemedText>
           <View style={styles.emailOtpRow}>
             <ThemedInput
               placeholder="Enter your business email"
@@ -282,7 +284,7 @@ export const Step1BusinessInfo: React.FC<Step1Props> = ({ data, onChange }) => {
         {data.otpSent && !data.businessEmailVerified && (
           <View style={styles.field}>
             <ThemedText type="defaultSemiBold">
-              Verification code{" "}
+              Verification code <ThemedText style={{ color: errorColor }}>*</ThemedText>
               {otpTimer > 0 && (
                 <ThemedText style={{ color: brandPrimary }}>
                   ({otpTimer}s)
@@ -324,7 +326,9 @@ export const Step1BusinessInfo: React.FC<Step1Props> = ({ data, onChange }) => {
         <View style={{ opacity: data.businessEmailVerified ? 1 : 0.5 }}>
           {/* Business Name */}
           <View style={styles.field}>
-            <ThemedText type="defaultSemiBold">Business name</ThemedText>
+            <ThemedText type="defaultSemiBold">
+              Business name <ThemedText style={{ color: errorColor }}>*</ThemedText>
+            </ThemedText>
             <ThemedInput
               placeholder="What is your registered business name?"
               value={data.businessName}
@@ -336,7 +340,7 @@ export const Step1BusinessInfo: React.FC<Step1Props> = ({ data, onChange }) => {
           {/* Phone */}
           <View style={styles.field}>
             <ThemedText type="defaultSemiBold">
-              Business phone number
+              Business phone number <ThemedText style={{ color: errorColor }}>*</ThemedText>
             </ThemedText>
             <View style={styles.row}>
               <CustomDropdown
@@ -362,7 +366,9 @@ export const Step1BusinessInfo: React.FC<Step1Props> = ({ data, onChange }) => {
 
           {/* Business Type */}
           <View style={styles.field}>
-            <ThemedText type="defaultSemiBold">Type of business</ThemedText>
+            <ThemedText type="defaultSemiBold">
+              Type of business <ThemedText style={{ color: errorColor }}>*</ThemedText>
+            </ThemedText>
             <CustomDropdown
               data={BUSINESS_TYPES.map((type) => ({
                 label: type,
@@ -377,7 +383,9 @@ export const Step1BusinessInfo: React.FC<Step1Props> = ({ data, onChange }) => {
 
           {/* Employees */}
           <View style={styles.field}>
-            <ThemedText type="defaultSemiBold">Number of employees</ThemedText>
+            <ThemedText type="defaultSemiBold">
+              Number of employees <ThemedText style={{ color: errorColor }}>*</ThemedText>
+            </ThemedText>
             <CustomDropdown
               data={EMPLOYEE_RANGES.map((range) => ({
                 label: range,
@@ -392,7 +400,9 @@ export const Step1BusinessInfo: React.FC<Step1Props> = ({ data, onChange }) => {
 
           {/* Password */}
           <View style={styles.field}>
-            <ThemedText type="defaultSemiBold">Password</ThemedText>
+            <ThemedText type="defaultSemiBold">
+              Password <ThemedText style={{ color: errorColor }}>*</ThemedText>
+            </ThemedText>
             <ThemedInput
               placeholder="Create a strong password"
               secureTextEntry={secure}

@@ -1,19 +1,28 @@
+import { useThemeColor } from "@/hooks/use-theme-color";
+import { ThemedText } from "@/components/themed-text";
 import React from "react";
 import { View, StyleSheet } from "react-native";
-import { ThemedText } from "@/components/themed-text";
 
 export const Field = ({
   label,
   children,
+  required,
 }: {
   label: string;
   children: React.ReactNode;
-}) => (
-  <View style={styles.container}>
-    <ThemedText>{label}</ThemedText>
-    {children}
-  </View>
-);
+  required?: boolean;
+}) => {
+  const errorColor = useThemeColor({}, "statusError");
+
+  return (
+    <View style={styles.container}>
+      <ThemedText type="defaultSemiBold">
+        {label} {required && <ThemedText style={{ color: errorColor }}>*</ThemedText>}
+      </ThemedText>
+      {children}
+    </View>
+  );
+};
 
 const styles = StyleSheet.create({
   container: {
