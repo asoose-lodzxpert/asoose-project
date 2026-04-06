@@ -129,7 +129,7 @@ export const Step2VerifyDocs: React.FC<Step2Props> = ({ data, onChange }) => {
           key: "proofOfAddressUri" as const,
           nameKey: "proofOfAddressName" as const,
           label: "Proof of Address",
-          required: false,
+          required: true,
         },
       ].map(({ key, nameKey, label, required }) => {
         const status = getDocumentStatus(data[key]);
@@ -138,7 +138,9 @@ export const Step2VerifyDocs: React.FC<Step2Props> = ({ data, onChange }) => {
           <View key={key} style={styles.documentCard}>
             <View style={styles.documentHeader}>
               <View style={{ flex: 1 }}>
-                <ThemedText type="defaultSemiBold">{label}</ThemedText>
+                <ThemedText type="defaultSemiBold">
+                  {label} {required && <ThemedText style={{ color: errorColor }}>*</ThemedText>}
+                </ThemedText>
                 {!required && (
                   <ThemedText style={{ color: textMuted, fontSize: 12 }}>
                     Optional

@@ -59,23 +59,33 @@ export function NotificationProvider({
     if (!user) return;
 
     // Initialize notification handler first
-    initializeNotificationHandler();
+    // Setup notifications
+    const setupNotifications = async () => {
+      try {
+        console.log("[NotificationContext] Initializing handlers...");
+        initializeNotificationHandler();
 
-    // Setup notification categories (like 'job' with Accept/Decline buttons)
-    setupNotificationCategories();
+        console.log("[NotificationContext] Setting up categories...");
+        await setupNotificationCategories();
 
-    // Register for push notifications
-    registerForPushNotificationsAsync()
-      .then((token) => {
+        console.log("[NotificationContext] Registering for push notifications...");
+        const token = await registerForPushNotificationsAsync();
+
         if (token) {
+          console.log("[NotificationContext] Token received:", token);
           setExpoPushToken(token);
           // Save token to backend
-          savePushToken(token)
-            .then(() => {})
-            .catch(() => {});
+          await savePushToken(token);
+          console.log("[NotificationContext] Token saved to backend successfully.");
+        } else {
+          console.warn("[NotificationContext] No push token returned.");
         }
-      })
-      .catch(() => {});
+      } catch (error) {
+        console.error("[NotificationContext] Error during notification setup:", error);
+      }
+    };
+
+    setupNotifications();
 
     // Load initial unread count
     refreshUnreadCount();

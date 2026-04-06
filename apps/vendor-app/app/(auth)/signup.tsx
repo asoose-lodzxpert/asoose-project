@@ -1,19 +1,20 @@
 import { ProgressBar } from "@/components/signup/ProgressBar";
+import { SignupProgress } from "@/components/signup/SignupProgress";
 import { Step1BusinessInfo } from "@/components/signup/Step1BusinessInfo";
-import { Step2VerifyDocs } from "@/components/signup/Step2VerifyDocs";
+import { Step2VerifyDocs } from "@/components/signup/Step2VerifyDocs_new";
 import { Step3StoreSetup } from "@/components/signup/Step3StoreSetup";
 import { Step4Review } from "@/components/signup/Step4Review";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { signupVendor } from "@/services/signup.service";
-import { uploadFile } from "@/services/storage.service";
 import {
   SignupData,
   SignupStep1Data,
   SignupStep2Data,
   SignupStep3Data,
 } from "@/types/signup";
+import { mapBusinessTypeToBackend } from "@/services/signup.service";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import { Pressable, StyleSheet, View, ActivityIndicator } from "react-native";
@@ -38,6 +39,7 @@ export default function Signup() {
     },
     step2: {},
     step3: { storeName: "", storeDescription: "", openHours: {} },
+    acceptedTerms: false,
   });
 
   const surfaceCard = useThemeColor({}, "surfaceCard");
@@ -113,7 +115,11 @@ export default function Signup() {
         return true;
       case 2:
         const s2 = data.step2;
-        if (!s2.businessRegCertUri || !s2.taxIdDocUri) {
+        if (
+          !s2.businessRegCertUri ||
+          !s2.taxIdDocUri ||
+          !s2.proofOfAddressUri
+        ) {
           Toast.show({ text1: "Please select all required documents." });
           return false;
         }
@@ -128,6 +134,39 @@ export default function Signup() {
           !s3.location
         ) {
           Toast.show({ text1: "Please complete your store setup." });
+          return false;
+        }
+
+        // Check if openHours is fully filled (7 days)
+        const daysCount = Object.keys(s3.openHours || {}).length;
+        if (daysCount < 7) {
+          Toast.show({
+            text1: "Opening Hours Required",
+            text2: "Please set hours for all 7 days of the week.",
+          });
+          return false;
+        }
+
+        // Additional check: make sure every day has either open/close or closed set
+        const complete = Object.values(s3.openHours || {}).every(
+          (h: any) => h.closed || h.is24Hours || (h.open && h.close),
+        );
+        if (!complete) {
+          Toast.show({
+            text1: "Incomplete Hours",
+            text2: "Each day must have open/close times or be marked as closed.",
+          });
+          return false;
+        }
+
+        return true;
+      case 4:
+        if (!data.acceptedTerms) {
+          Toast.show({
+            type: "error",
+            text1: "Accept Terms",
+            text2: "You must accept the terms and conditions to continue.",
+          });
           return false;
         }
         return true;
@@ -150,62 +189,79 @@ export default function Signup() {
   const handleSubmit = async () => {
     setSubmitting(true);
     try {
-      // Upload all files before submitting
-      const uploadedData = { ...data };
+      const formData = new FormData();
 
-      // Upload Step 2 documents
+      // Step 1 Data
+      formData.append("name", data.step1.businessName);
+      formData.append("email", data.step1.businessEmail);
+      formData.append("password", data.step1.password);
+      formData.append("countryCode", data.step1.countryCode);
+      formData.append("phone", data.step1.phoneNumber);
+      formData.append(
+        "businessType",
+        mapBusinessTypeToBackend(data.step1.businessType),
+      );
+      formData.append("employees", data.step1.employees);
+
+      // Step 2 Documents (No Public Uploads - send as files)
       if (data.step2.businessRegCertUri) {
-        const certUrl = await uploadFile({
+        // @ts-ignore
+        formData.append("businessRegCert", {
           uri: data.step2.businessRegCertUri,
           name: data.step2.businessRegCertName || "cert.jpg",
           type: "image/jpeg",
         });
-        uploadedData.step2.businessRegCertUri = certUrl;
       }
 
       if (data.step2.taxIdDocUri) {
-        const taxUrl = await uploadFile({
+        // @ts-ignore
+        formData.append("taxIdDoc", {
           uri: data.step2.taxIdDocUri,
           name: data.step2.taxIdDocName || "tax.jpg",
           type: "image/jpeg",
         });
-        uploadedData.step2.taxIdDocUri = taxUrl;
       }
 
       if (data.step2.proofOfAddressUri) {
-        const proofUrl = await uploadFile({
+        // @ts-ignore
+        formData.append("proofOfAddress", {
           uri: data.step2.proofOfAddressUri,
           name: data.step2.proofOfAddressName || "address.jpg",
           type: "image/jpeg",
         });
-        uploadedData.step2.proofOfAddressUri = proofUrl;
       }
 
-      // Upload Step 3 images
+      // Step 3 Store & Images
+      formData.append("storeName", data.step3.storeName);
+      formData.append("storeDescription", data.step3.storeDescription);
+
       if (data.step3.storeLogoUri) {
-        const logoUrl = await uploadFile({
+        // @ts-ignore
+        formData.append("storeLogo", {
           uri: data.step3.storeLogoUri,
           name: data.step3.storeLogoName || "logo.jpg",
           type: "image/jpeg",
         });
-        uploadedData.step3.storeLogoUri = logoUrl;
       }
 
       if (data.step3.storeBannerUri) {
-        const bannerUrl = await uploadFile({
+        // @ts-ignore
+        formData.append("storeBanner", {
           uri: data.step3.storeBannerUri,
           name: data.step3.storeBannerName || "banner.jpg",
           type: "image/jpeg",
         });
-        uploadedData.step3.storeBannerUri = bannerUrl;
       }
 
-      // Now submit with uploaded URLs
-      await signupVendor(uploadedData);
+      formData.append("location", JSON.stringify(data.step3.location));
+      formData.append("openHours", JSON.stringify(data.step3.openHours));
+
+      // Now submit with all data in one request
+      await signupVendor(formData);
       Toast.show({
         type: "success",
-        text1: "Account created successfully!",
-        text2: "Please login to continue",
+        text1: "Application submitted!",
+        text2: "Our team will review your account shortly.",
       });
       // Navigate to login after short delay
       setTimeout(() => {
@@ -237,7 +293,12 @@ export default function Signup() {
           <Step3StoreSetup data={data.step3} onChange={handleChangeStep3} />
         );
       case 4:
-        return <Step4Review data={data} />;
+        return (
+          <Step4Review
+            data={data}
+            onCheck={(v) => setData({ ...data, acceptedTerms: v })}
+          />
+        );
       default:
         return null;
     }
@@ -283,16 +344,13 @@ export default function Signup() {
           onPress={handleNext}
           disabled={submitting}
         >
-          {submitting ? (
-            <ActivityIndicator size="small" color={textOnPrimary} />
-          ) : (
-            <ThemedText type="defaultSemiBold" style={{ color: textOnPrimary }}>
-              {step < 4 ? "Continue" : "Submit"}
-            </ThemedText>
-          )}
+          <ThemedText type="defaultSemiBold" style={{ color: textOnPrimary }}>
+            {step < 4 ? "Continue" : "Submit"}
+          </ThemedText>
         </Pressable>
       </View>
 
+      <SignupProgress visible={submitting} />
       <Toast />
     </ThemedView>
   );

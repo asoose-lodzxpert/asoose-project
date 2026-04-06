@@ -110,6 +110,7 @@ export const Step3StoreSetup: React.FC<Step3Props> = ({ data, onChange }) => {
         label="Store Logo"
         value={data.storeLogoUri}
         circular
+        required={true}
         onPick={(uri, name) => {
           onChange("storeLogoUri", uri);
           onChange("storeLogoName", name);
@@ -119,6 +120,7 @@ export const Step3StoreSetup: React.FC<Step3Props> = ({ data, onChange }) => {
       <ImageUpload
         label="Store Banner"
         value={data.storeBannerUri}
+        required={true}
         onPick={(uri, name) => {
           onChange("storeBannerUri", uri);
           onChange("storeBannerName", name);
@@ -127,7 +129,9 @@ export const Step3StoreSetup: React.FC<Step3Props> = ({ data, onChange }) => {
 
       {/* Location Block */}
       <View style={{ gap: 8 }}>
-        <ThemedText type="subtitle">Store Location</ThemedText>
+        <ThemedText type="subtitle">
+          Store Location <ThemedText style={{ color: useThemeColor({}, 'statusError') }}>*</ThemedText>
+        </ThemedText>
         <LocationBlock
           mapRef={mapRef}
           primary={primary}

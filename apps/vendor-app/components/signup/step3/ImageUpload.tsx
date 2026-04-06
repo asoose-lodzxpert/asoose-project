@@ -11,6 +11,7 @@ interface Props {
   value?: string;
   circular?: boolean;
   onPick: (uri: string, name: string) => void;
+  required?: boolean;
 }
 
 export const ImageUpload: React.FC<Props> = ({
@@ -18,6 +19,7 @@ export const ImageUpload: React.FC<Props> = ({
   value,
   circular,
   onPick,
+  required,
 }) => {
   const primary = useThemeColor({}, "brandPrimary");
   const successColor = useThemeColor({}, "statusSuccess");
@@ -66,7 +68,9 @@ export const ImageUpload: React.FC<Props> = ({
 
   return (
     <View style={{ gap: 6 }}>
-      <ThemedText style={styles.label}>{label}</ThemedText>
+      <ThemedText style={styles.label}>
+        {label} {required && <ThemedText style={{ color: errorColor }}>*</ThemedText>}
+      </ThemedText>
 
       <Pressable
         onPress={pickImage}

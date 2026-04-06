@@ -8,14 +8,18 @@ import {
   Get,
   Put,
   Delete,
+  UseInterceptors,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import {
-  ApiTags,
-  ApiOperation,
   ApiBearerAuth,
   ApiResponse,
+  ApiConsumes,
+  ApiOperation,
+  ApiTags,
 } from '@nestjs/swagger';
+import { FileFieldsInterceptor } from '@nestjs/platform-express';
+import { UploadedFiles as UploadedFilesDecorator } from '@nestjs/common';
 import { VendorAuthService } from './vendor-auth.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guards';
@@ -58,10 +62,42 @@ export class VendorAuthController {
   @ApiOperation({ summary: 'Register a new vendor account' })
   @ApiResponse({ status: 201, description: 'Vendor account created' })
   @ApiResponse({ status: 409, description: 'Email already in use' })
+  @ApiConsumes('multipart/form-data')
   @Post('register')
   @Throttle({ default: { limit: 5, ttl: 60 * 60 * 1000 } }) // 5 requests per hour
-  register(@Body() dto: CreateVendorDto) {
-    return this.vendorAuthService.registerVendor(dto);
+  @UseInterceptors(
+    FileFieldsInterceptor([
+      { name: 'businessRegCert', maxCount: 1 },
+      { name: 'taxIdDoc', maxCount: 1 },
+      { name: 'proofOfAddress', maxCount: 1 },
+      { name: 'storeLogo', maxCount: 1 },
+      { name: 'storeBanner', maxCount: 1 },
+    ]),
+  )
+  register(
+    @Body() dto: CreateVendorDto,
+    @UploadedFilesDecorator()
+    files: {
+      businessRegCert?: Express.Multer.File[];
+      taxIdDoc?: Express.Multer.File[];
+      proofOfAddress?: Express.Multer.File[];
+      storeLogo?: Express.Multer.File[];
+      storeBanner?: Express.Multer.File[];
+    },
+  ) {
+    // If location or openHours are strings (from FormData), parse them
+    if (typeof dto.location === 'string') {
+      try {
+        dto.location = JSON.parse(dto.location);
+      } catch (e) {}
+    }
+    if (typeof dto.openHours === 'string') {
+      try {
+        dto.openHours = JSON.parse(dto.openHours);
+      } catch (e) {}
+    }
+
+    return this.vendorAuthService.registerVendor(dto, files);
   }
 
   // ---------- Signup Email Verification OTP ----------

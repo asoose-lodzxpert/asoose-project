@@ -24,6 +24,7 @@ import {
 import { TokenRevocationService } from './token-revocation.service';
 import { randomUUID } from 'crypto';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { StorageService } from 'src/storage/storage.service';
 
 @Injectable()
 export class VendorAuthService {
@@ -38,6 +39,7 @@ export class VendorAuthService {
     private readonly appLogger: AppLogger,
     private readonly tokenRevocation: TokenRevocationService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly storageService: StorageService,
   ) { }
 
   private signRefreshToken(
@@ -169,7 +171,16 @@ export class VendorAuthService {
 
   // ---------------- REGISTER ----------------
 
-  async registerVendor(dto: CreateVendorDto) {
+  async registerVendor(
+    dto: CreateVendorDto,
+    files?: {
+      businessRegCert?: Express.Multer.File[];
+      taxIdDoc?: Express.Multer.File[];
+      proofOfAddress?: Express.Multer.File[];
+      storeLogo?: Express.Multer.File[];
+      storeBanner?: Express.Multer.File[];
+    },
+  ) {
     // Normalize email to lowercase
     const normalizedEmail = dto.email.toLowerCase().trim();
 
@@ -182,6 +193,39 @@ export class VendorAuthService {
       throw new UnauthorizedException(
         'An account with this email already exists. Please login or use a different email.',
       );
+    }
+
+    // 1. Process files if they are present in the request (Multipart)
+    // This allows "No Public Uploads" by keeping everything in one transaction
+    // Moved here after duplicate check to prevent orphan file uploads
+    if (files) {
+      if (files.businessRegCert?.[0]) {
+        const result = await this.storageService.uploadFile(
+          files.businessRegCert[0],
+        );
+        dto.businessRegCert = result.url;
+      }
+      if (files.taxIdDoc?.[0]) {
+        const result = await this.storageService.uploadFile(files.taxIdDoc[0]);
+        dto.taxIdDoc = result.url;
+      }
+      if (files.proofOfAddress?.[0]) {
+        const result = await this.storageService.uploadFile(
+          files.proofOfAddress[0],
+        );
+        dto.proofOfAddress = result.url;
+      }
+      if (files.storeLogo?.[0]) {
+        const result = await this.storageService.uploadFile(files.storeLogo[0]);
+        dto.storeLogo = result.url;
+        dto.image = result.url; // Use logo as profile image too
+      }
+      if (files.storeBanner?.[0]) {
+        const result = await this.storageService.uploadFile(
+          files.storeBanner[0],
+        );
+        dto.storeBanner = result.url;
+      }
     }
 
     // Hash with Argon2id for all new vendor registrations

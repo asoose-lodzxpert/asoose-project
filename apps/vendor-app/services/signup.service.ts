@@ -14,7 +14,7 @@ export interface SignupData {
 }
 
 // Map frontend business type to backend
-function mapBusinessTypeToBackend(type: string): string {
+export function mapBusinessTypeToBackend(type: string): string {
   switch ((type || "").toUpperCase()) {
     case "RESTAURANT & CAFE":
     case "FAST FOOD":
@@ -59,35 +59,15 @@ function mapBusinessTypeToBackend(type: string): string {
   }
 }
 
-export async function signupVendor(data: SignupData) {
+export async function signupVendor(data: FormData) {
   try {
     const res = await fetch(
       `${process.env.EXPO_PUBLIC_API_URL}/auth/vendor/register`,
       {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name: data.step1.businessName,
-          email: data.step1.businessEmail,
-          password: data.step1.password,
-          countryCode: data.step1.countryCode,
-          phone: data.step1.phoneNumber,
-          businessType: mapBusinessTypeToBackend(data.step1.businessType),
-          employees: data.step1.employees,
-          businessRegCert: data.step2.businessRegCertUri,
-          taxIdDoc: data.step2.taxIdDocUri,
-          proofOfAddress: data.step2.proofOfAddressUri,
-          image: data.step3.storeLogoUri,
-          // Store info
-          storeName: data.step3.storeName,
-          storeDescription: data.step3.storeDescription,
-          storeLogo: data.step3.storeLogoUri,
-          storeBanner: data.step3.storeBannerUri,
-          location: data.step3.location,
-          openHours: data.step3.openHours,
-        }),
+        // Note: Don't set Content-Type header when sending FormData
+        // It'll be set automatically with the boundary
+        body: data,
       },
     );
     if (!res.ok) {
