@@ -11,18 +11,20 @@ import {
   DriverStatus,
   DriverRole,
   DriverState,
+  RiderStatus,
+  RiderState,
 } from '../redis/redis-keys.constants';
 
-// Helper to create mock driver state
-const createMockDriverState = (
+// Helper to create mock rider state (for delivery matching)
+const createMockRiderState = (
   id: string,
   lat: number,
   lng: number,
   hexId: string = '88283082fffffff',
-): DriverState => ({
+): RiderState => ({
   id,
   role: DriverRole.RIDER,
-  status: DriverStatus.ONLINE,
+  status: RiderStatus.ONLINE,
   hexId,
   lastSeen: Date.now(),
   currentJobId: null,
@@ -61,7 +63,7 @@ describe('DeliveryMatchingProcessor', () => {
             getRiderState: jest.fn(),
             incrementMatchingAttempts: jest.fn(),
             getClient: jest.fn(() => ({
-              eval: jest.fn(),
+              // No-op
             })),
           },
         },
@@ -221,7 +223,7 @@ describe('DeliveryMatchingProcessor', () => {
 
       // Mock rider location
       redisService.getRiderState.mockResolvedValue(
-        createMockDriverState(mockRiderId, 6.5245, 3.3793, mockHexId),
+        createMockRiderState(mockRiderId, 6.5245, 3.3793, mockHexId),
       );
 
       // Mock distance sorting
@@ -299,10 +301,10 @@ describe('DeliveryMatchingProcessor', () => {
       // Mock rider locations
       redisService.getRiderState
         .mockResolvedValueOnce(
-          createMockDriverState(declinedRiderId, 6.5246, 3.3794, mockHexId),
+          createMockRiderState(declinedRiderId, 6.5246, 3.3794, mockHexId),
         )
         .mockResolvedValueOnce(
-          createMockDriverState(mockRiderId, 6.5245, 3.3793, mockHexId),
+          createMockRiderState(mockRiderId, 6.5245, 3.3793, mockHexId),
         );
 
       // Only non-declined rider should be in sorted list
@@ -356,10 +358,10 @@ describe('DeliveryMatchingProcessor', () => {
       // Mock both riders online
       redisService.getRiderState
         .mockResolvedValueOnce(
-          createMockDriverState(rider1, 6.5245, 3.3793, mockHexId),
+          createMockRiderState(rider1, 6.5245, 3.3793, mockHexId),
         )
         .mockResolvedValueOnce(
-          createMockDriverState(rider2, 6.5247, 3.3795, mockHexId),
+          createMockRiderState(rider2, 6.5247, 3.3795, mockHexId),
         );
 
       geoService.sortByDistance.mockReturnValue([
@@ -463,7 +465,7 @@ describe('DeliveryMatchingProcessor', () => {
       redisService.getRidersInHex.mockResolvedValue([mockRiderId]);
 
       redisService.getRiderState.mockResolvedValue(
-        createMockDriverState(mockRiderId, 6.5245, 3.3793, mockHexId),
+        createMockRiderState(mockRiderId, 6.5245, 3.3793, mockHexId),
       );
 
       geoService.sortByDistance.mockReturnValue([
@@ -529,7 +531,7 @@ describe('DeliveryMatchingProcessor', () => {
         .mockResolvedValueOnce([mockRiderId]); // ring 2, hex 1
 
       redisService.getRiderState.mockResolvedValue(
-        createMockDriverState(mockRiderId, 6.525, 3.38, 'hex-2-1'),
+        createMockRiderState(mockRiderId, 6.525, 3.38, 'hex-2-1'),
       );
 
       geoService.sortByDistance.mockReturnValue([
@@ -590,7 +592,7 @@ describe('DeliveryMatchingProcessor', () => {
 
       manyRiders.forEach((id) => {
         redisService.getRiderState.mockResolvedValueOnce(
-          createMockDriverState(id, 6.5245, 3.3793, mockHexId),
+          createMockRiderState(id, 6.5245, 3.3793, mockHexId),
         );
       });
 

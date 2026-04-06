@@ -72,7 +72,7 @@ describe('Payment Security & Reliability', () => {
         // If it throws the raw error, it means no reconciliation logic exists for ambiguous states
       }
 
-      logSpy.restore?.();
+      // No-op
       logSpy.mockRestore();
     });
   });
