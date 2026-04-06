@@ -20,6 +20,7 @@ import { VendorProductsController } from './products/products.controller';
 import { VendorOrdersService } from './orders/vendor-orders.service';
 import { VendorOrdersController } from './orders/vendor-orders.controller';
 import { VendorOrdersStreamService } from './orders/vendor-orders-stream.service';
+import { InventoryService } from 'src/users/inventory.service';
 
 // Notifications
 import { VendorNotificationsService } from './notifications/vendor-notifications.service';
@@ -75,6 +76,7 @@ import { RedisModule } from '../redis/redis.module';
 
     ActivityLogService,
     StoresService,
+    InventoryService,
   ],
   exports: [
     VendorSecurityNotificationsService,
