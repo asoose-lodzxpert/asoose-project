@@ -7926,6 +7926,7 @@ csstype@^3.0.2, csstype@^3.2.2:
     "@react-google-maps/api" "^2.20.8"
     "@supabase/ssr" "^0.8.0"
     "@supabase/supabase-js" "^2.89.0"
+    "@tailwindcss/typography" "^0.5.19"
     "@tanstack/react-table" "^8.21.3"
     "@vercel/analytics" "^2.0.1"
     "@vercel/speed-insights" "^2.0.0"
