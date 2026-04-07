@@ -15,7 +15,8 @@
         "googleMapsApiKey": "AIzaSyC1QLEDtvDu8r1gLtEec4d28aWP8VozXfA"
       },
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSPhotoLibraryUsageDescription": "ASOOSE Rider App requires access to your photo library to allow you to upload a profile picture and provide proof of delivery by selecting stored images. For example, you can select a photo of a delivered package as confirmation."
       }
     },
     "platforms": [
@@ -75,8 +76,8 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "ASOOSE Rider App needs your location to show your real-time position, match you with nearby orders, and provide accurate navigation. Location is required for delivery services.",
-          "locationAlwaysPermission": "ASOOSE Rider App requires background location access to track your position and keep you matched with orders while the app is closed."
+          "locationAlwaysAndWhenInUsePermission": "ASOOSE Rider App needs your location to show your real-time position, match you with nearby orders, and provide accurate navigation. For example, your location is shared with the customer while you are on your way to deliver their order to keep them updated on your arrival.",
+          "locationAlwaysPermission": "ASOOSE Rider App requires background location access to track your position and keep you matched with orders even when the app is in the background. This ensures you can receive delivery opportunities while you are on the move."
         }
       ],
       [
