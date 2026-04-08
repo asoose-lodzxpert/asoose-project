@@ -49,6 +49,8 @@ export interface SignupStep3Data {
   storeBannerName?: string;
   location?: { lat: number; lng: number };
   openHours?: OpenHours;
+  cityId?: string;
+  cityName?: string;
 }
 
 export interface SignupData {

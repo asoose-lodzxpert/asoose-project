@@ -20,6 +20,7 @@ export class ZonesService {
     return this.prisma.serviceZone.create({
       data: {
         name: dto.name,
+        state: dto.state,
         description: dto.description,
         coordinates: coords as any, // Cast to any for Prisma Json compatibility
         isActive: dto.isActive ?? true,

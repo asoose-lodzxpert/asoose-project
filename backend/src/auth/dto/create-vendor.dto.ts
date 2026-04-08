@@ -88,4 +88,9 @@ export class CreateVendorDto {
   @IsObject()
   @Transform(({ value }) => typeof value === 'string' ? JSON.parse(value) : value)
   openHours?: any;
+
+  @ApiPropertyOptional({ description: 'City ID to link the store to a service city' })
+  @IsOptional()
+  @IsString()
+  cityId?: string;
 }

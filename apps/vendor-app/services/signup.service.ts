@@ -85,3 +85,10 @@ export async function signupVendor(data: FormData) {
     throw err;
   }
 }
+
+export async function fetchActiveLocations(): Promise<{ name: string; state: string }[]> {
+  const url = `${process.env.EXPO_PUBLIC_API_URL}/maps/active-locations`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error("Failed to fetch locations");
+  return await res.json();
+}

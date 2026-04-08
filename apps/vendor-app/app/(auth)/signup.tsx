@@ -160,6 +160,14 @@ export default function Signup() {
           return false;
         }
 
+        if (!s3.cityId) {
+          Toast.show({
+            text1: "City Required",
+            text2: "Please select the city where your store operates.",
+          });
+          return false;
+        }
+
         // Check if openHours is fully filled (7 days)
         const daysCount = Object.keys(s3.openHours || {}).length;
         if (daysCount < 7) {
@@ -278,6 +286,9 @@ export default function Signup() {
 
       formData.append("location", JSON.stringify(data.step3.location));
       formData.append("openHours", JSON.stringify(data.step3.openHours));
+      if (data.step3.cityId) {
+        formData.append("cityId", data.step3.cityId);
+      }
 
       // Now submit with all data in one request
       await signupVendor(formData);

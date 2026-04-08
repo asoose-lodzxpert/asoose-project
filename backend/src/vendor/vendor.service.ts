@@ -37,6 +37,7 @@ export class VendorService {
         address: true,
         rating: true,
         isOpen: true,
+        cityId: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -120,6 +121,29 @@ export class VendorService {
     const store = await this.prisma.store.findUnique({ where: { vendorId } });
     const active = store?.status === 'ACTIVE';
     return { active };
+  }
+
+  /** Update the city a store is registered in. Validates city is active. */
+  async updateStoreCity(vendorId: string, cityId: string) {
+    const city = await this.prisma.city.findUnique({ where: { id: cityId } });
+    if (!city) throw new Error('City not found');
+    if (!city.isActive) throw new Error(`${city.name} is not yet an active service area`);
+
+    const store = await this.prisma.store.update({
+      where: { vendorId },
+      data: { cityId },
+      select: { id: true, cityId: true },
+    });
+    return { storeId: store.id, cityId: store.cityId, cityName: city.name };
+  }
+
+  /** Return the list of active cities for vendor dropdowns */
+  async getActiveCities() {
+    return this.prisma.city.findMany({
+      where: { isActive: true },
+      select: { id: true, name: true, state: true },
+      orderBy: [{ state: 'asc' }, { name: 'asc' }],
+    });
   }
 
   async getStoreMetrics(vendorId: string) {

@@ -583,7 +583,9 @@ model Store {
   // Analytics
   totalRevenue  Float @default(0)
   totalOrders   Int   @default(0)
-  
+    // Location / City
+  cityId    String?
+  city      City?   @relation(fields: [cityId], references: [id])
 
   // Relations
   vendor           Vendor?           @relation(fields: [vendorId], references: [id], onDelete: Restrict)
@@ -596,11 +598,10 @@ model Store {
   paystackSubaccountCode String? @map("paystack_subaccount_code") // For split-payment settlements
   storeLogs        StoreLog[]
 
-  
-
   @@index([vendorId])
   @@index([status, verification])
   @@index([type, status])
+  @@index([cityId, status])
   @@index([lat, lng])
   @@index([slug])
   @@index([rating])
@@ -1221,9 +1222,29 @@ model DisputeMessage {
   createdAt DateTime @default(now())
 }
 
+/// Lightweight city model — the single source of truth for
+/// whether a service area is active. Admins toggle isActive
+/// instead of drawing polygons. The polygon-based ServiceZone
+/// model remains for live-map geofencing.
+model City {
+  id        String   @id @default(uuid())
+  name      String   @unique // e.g. "Maiduguri", "Abuja"
+  state     String            // e.g. "Borno", "FCT"
+  isActive  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  stores    Store[]
+
+  @@index([isActive])
+  @@index([state])
+  @@map("cities")
+}
+
 model ServiceZone {
   id          String   @id @default(uuid())
   name        String   // e.g. "Abuja Central", "Lagos Island"
+  state       String   @default("Borno") // e.g. "Borno", "FCT", "Lagos"
   description String?
   
   // Stored as an array of { lat: number, lng: number }

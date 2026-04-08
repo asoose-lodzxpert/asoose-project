@@ -364,10 +364,16 @@ export default function AdminLayoutClient({
                     General
                   </Link>
                   <Link
+                    href="/super-admin/settings/cities"
+                    className={`block px-4 py-2 text-sm rounded-lg transition-colors ${isActive("/super-admin/settings/cities") ? "text-yellow-500 font-bold bg-yellow-500/10" : "text-gray-400 hover:text-white"}`}
+                  >
+                    🏙️ City Management
+                  </Link>
+                  <Link
                     href="/super-admin/settings/zones"
                     className={`block px-4 py-2 text-sm rounded-lg transition-colors ${isActive("/super-admin/settings/zones") ? "text-yellow-500 font-bold bg-yellow-500/10" : "text-gray-400 hover:text-white"}`}
                   >
-                    Service Zones
+                    Service Zones (Map)
                   </Link>
                 </div>
               )}

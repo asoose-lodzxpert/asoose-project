@@ -42,6 +42,7 @@ type AllowedRoute =
 
 const SETTINGS = [
   { label: "Edit business profile", route: "/(profile)/edit-business" },
+  { label: "Change service city", route: "/(profile)/change-city" },
   { label: "Change password", route: "/(profile)/resetpassword" },
   { label: "Notification preferences", route: "/(profile)/notifications" },
   { label: "Support and help", route: "/(profile)/support" },

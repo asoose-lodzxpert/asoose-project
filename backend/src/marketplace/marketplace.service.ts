@@ -46,7 +46,7 @@ export class MarketplaceService {
     );
   }
 
-  async getHomeData() {
+  async getHomeData(cityId?: string) {
     const verticalTypes: StoreType[] = [
       'RESTAURANT',
       'GROCERY',
@@ -62,10 +62,10 @@ export class MarketplaceService {
           status: 'ACTIVE',
           verification: 'VERIFIED',
           products: { some: { status: 'ACTIVE' } },
-          lat: { not: null },
-          lng: { not: null },
+          // Hard city filter — no cityId means no results for that section
+          ...(cityId ? { cityId } : { cityId: null }),
         },
-        take: 10,
+        take: 12,
         orderBy: { rating: 'desc' },
         select: {
           id: true,
@@ -76,6 +76,8 @@ export class MarketplaceService {
           ratingCount: true,
           prepTime: true,
           address: true,
+          lat: true,
+          lng: true,
           type: true,
           isOpen: true,
           openHours: true,
@@ -100,7 +102,7 @@ export class MarketplaceService {
           name: c.name,
           image: this.getCategoryImage(c.name),
         })),
-        vendors: this.mapStoresToVendors(stores),
+        vendors: this.mapStoresToVendors(stores.slice(0, 10)),
       });
     }
 
@@ -125,29 +127,26 @@ export class MarketplaceService {
       return null;
     }
   }
-  async getPaginatedStores(page: number, limit: number, type?: string) {
+  async getPaginatedStores(page: number, limit: number, type?: string, cityId?: string) {
     const skip = (page - 1) * limit;
 
-    // Explicitly type the where object
     const where: Prisma.StoreWhereInput = {
       status: StoreStatus.ACTIVE,
       verification: VerificationStatus.VERIFIED,
       products: { some: { status: 'ACTIVE' } },
-      lat: { not: null },
-      lng: { not: null },
       ...(type ? { type: this.mapSlugToType(type) } : {}),
+      // Hard city filter
+      ...(cityId ? { cityId } : { cityId: null }),
     };
 
-    const [stores, total] = await Promise.all([
-      this.prisma.store.findMany({
-        where,
-        skip,
-        take: limit,
-        orderBy: { rating: 'desc' },
-        include: { openingHours: true },
-      }),
-      this.prisma.store.count({ where }),
-    ]);
+    const total = await this.prisma.store.count({ where });
+    const stores = await this.prisma.store.findMany({
+      where,
+      orderBy: { rating: 'desc' },
+      include: { openingHours: true },
+      skip,
+      take: limit,
+    });
 
     return {
       stores: this.mapStoresToVendors(stores),
@@ -160,10 +159,8 @@ export class MarketplaceService {
     };
   }
 
-  async getCategoryData(verticalId: string, sortParam?: string) {
-    // 1. Determine Sorting Logic
-    // We map the frontend codes (RATING_DESC, etc) to Prisma orderBy objects
-    let orderBy: any = { rating: 'desc' }; // Default to popular
+  async getCategoryData(verticalId: string, sortParam?: string, cityId?: string) {
+    let orderBy: any = { rating: 'desc' };
 
     switch (sortParam) {
       case 'RATING_DESC':
@@ -172,13 +169,10 @@ export class MarketplaceService {
         break;
       case 'TIME_ASC':
       case 'fastest':
-        // Sort by prepTime as a proxy for delivery speed
         orderBy = { prepTime: 'asc' };
         break;
       case 'FEE_ASC':
       case 'cheapest':
-        // Delivery Fee is currently calculated dynamically (500), so we can't sort by it in DB.
-        // Fallback to sorting by prepTime or Rating, or price if you had a avgPrice column.
         orderBy = { prepTime: 'asc' };
         break;
       case 'all':
@@ -186,34 +180,21 @@ export class MarketplaceService {
         orderBy = { rating: 'desc' };
     }
 
-    // 2. Fetch the data
     const stores = await this.prisma.store.findMany({
       where: {
         type: this.mapSlugToType(verticalId),
         status: 'ACTIVE',
         verification: 'VERIFIED',
         products: { some: { status: 'ACTIVE' } },
-        lat: { not: null },
-        lng: { not: null },
+        // Hard city filter
+        ...(cityId ? { cityId } : { cityId: null }),
       },
       orderBy: orderBy,
-      take: 20,
-      select: {
-        id: true,
-        name: true,
-        slug: true,
-        logo: true, // mapped to 'image' in frontend
-        rating: true,
-        type: true,
-        prepTime: true,
-        address: true,
-        isOpen: true,
-        openHours: true,
-        openingHours: true,
-      },
+      include: { openingHours: true },
+      take: 24,
     });
 
-    // 3. Return formatted structure matching frontend expectations
+    // Return formatted structure matching frontend expectations
     return {
       id: verticalId,
       title: this.formatTitle(verticalId),
@@ -644,5 +625,24 @@ export class MarketplaceService {
       message:
         'Your report has been submitted. Our team will review it shortly.',
     };
+  }
+
+  /**
+   * Haversine distance calculation in kilometers.
+   */
+  private calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+    const R = 6371; // Radius of the earth in km
+    const dLat = this.deg2rad(lat2 - lat1);
+    const dLon = this.deg2rad(lon2 - lon1);
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(this.deg2rad(lat1)) * Math.cos(this.deg2rad(lat2)) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  }
+
+  private deg2rad(deg: number): number {
+    return deg * (Math.PI / 180);
   }
 }

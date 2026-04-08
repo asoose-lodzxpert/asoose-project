@@ -1,10 +1,12 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { SignupStep3Data, OpenHour } from "@/types/vendor-signup";
 import { DAYS } from "@/constants/vendor-signup";
-import { Store, Image, MapPin, Clock, Plus, Trash2, Camera } from "lucide-react";
+import { Store, Image, MapPin, Clock, Plus, Trash2, Camera, Building2 } from "lucide-react";
 import LocationInput from "@/components/LocationInput";
+
+type CityItem = { id: string; name: string; state: string };
 
 interface Step3Props {
   data: SignupStep3Data;
@@ -13,6 +15,17 @@ interface Step3Props {
 
 export default function Step3({ data, onChange }: Step3Props) {
   const [activeDay, setActiveDay] = useState<string>(DAYS[0]);
+  const [cities, setCities] = useState<CityItem[]>([]);
+  const [loadingCities, setLoadingCities] = useState(true);
+
+  useEffect(() => {
+    const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1";
+    fetch(`${API_URL}/vendor/dashboard/cities`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((d) => setCities(Array.isArray(d) ? d : []))
+      .catch(() => setCities([]))
+      .finally(() => setLoadingCities(false));
+  }, []);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>, uriKey: keyof SignupStep3Data, nameKey: keyof SignupStep3Data, fileKey: keyof SignupStep3Data) => {
     const file = e.target.files?.[0];
@@ -111,6 +124,35 @@ export default function Step3({ data, onChange }: Step3Props) {
                rows={3}
                className={inputCls}
              />
+           </div>
+
+           {/* City Picker */}
+           <div className="space-y-2">
+             <label className="text-sm font-bold flex items-center gap-2">
+               <Building2 size={16} className="text-yellow-500" />
+               Service City <span className="text-red-500">*</span>
+             </label>
+             <select
+               value={data.cityId || ""}
+               onChange={(e) => {
+                 const city = cities.find((c) => c.id === e.target.value);
+                 onChange({ cityId: e.target.value, cityName: city?.name || "" });
+               }}
+               disabled={loadingCities}
+               className={inputCls + " appearance-none"}
+             >
+               <option value="">
+                 {loadingCities ? "Loading cities..." : "Select your service city"}
+               </option>
+               {cities.map((city) => (
+                 <option key={city.id} value={city.id}>
+                   {city.name} — {city.state}
+                 </option>
+               ))}
+             </select>
+             <p className="text-xs text-gray-500 dark:text-gray-400">
+               Store orders are only visible to customers in this city.
+             </p>
            </div>
         </div>
 

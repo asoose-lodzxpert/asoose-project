@@ -32,11 +32,11 @@ export class MarketplaceController {
   constructor(private readonly marketplaceService: MarketplaceService) {}
 
   @ApiOperation({
-    summary: 'Get home page data (banners, featured stores, categories)',
+    summary: 'Get home page data — filtered by city (use cityId)',
   })
   @Get('home')
-  async getHomeData() {
-    return this.marketplaceService.getHomeData();
+  async getHomeData(@Query('cityId') cityId?: string) {
+    return this.marketplaceService.getHomeData(cityId);
   }
 
   @ApiOperation({ summary: 'Get all active promotional banners' })
@@ -53,14 +53,18 @@ export class MarketplaceController {
     return this.marketplaceService.search(q);
   }
 
-  @ApiOperation({ summary: 'Get stores and products in a category' })
+  @ApiOperation({ summary: 'Get stores and products in a category, filtered by city' })
   @Get('categories/:id')
-  async getCategory(@Param('id') id: string, @Query('sort') sort?: string) {
+  async getCategory(
+    @Param('id') id: string,
+    @Query('sort') sort?: string,
+    @Query('cityId') cityId?: string,
+  ) {
     const categoryData = await this.marketplaceService.getCategoryData(
       id,
       sort || 'all',
+      cityId,
     );
-
     if (!categoryData) {
       throw new NotFoundException(`Category vertical not found: ${id}`);
     }
@@ -78,7 +82,7 @@ export class MarketplaceController {
   }
 
   @ApiOperation({
-    summary: 'Get paginated list of stores with optional type filter',
+    summary: 'Get paginated list of stores filtered by city',
   })
   @Throttle({ default: { limit: 30, ttl: 60_000 } })
   @Get('stores')
@@ -86,9 +90,10 @@ export class MarketplaceController {
     @Query('page', new ParseIntPipe({ optional: true })) page: number = 1,
     @Query('limit', new ParseIntPipe({ optional: true })) limit: number = 10,
     @Query('type') type?: string,
+    @Query('cityId') cityId?: string,
   ) {
-    const safeLimit = Math.min(limit, 50); // enforce max 50 per page
-    return this.marketplaceService.getPaginatedStores(page, safeLimit, type);
+    const safeLimit = Math.min(limit, 50);
+    return this.marketplaceService.getPaginatedStores(page, safeLimit, type, cityId);
   }
 
   @ApiOperation({ summary: 'Get product details by ID or slug' })

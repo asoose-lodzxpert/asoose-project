@@ -31,6 +31,11 @@ export class CreateZoneDto {
   @IsOptional()
   description?: string;
 
+  @ApiProperty({ example: 'Borno' })
+  @IsString()
+  @IsNotEmpty()
+  state: string;
+
   @ApiProperty({ type: [Coordinate] })
   @IsArray()
   @ValidateNested({ each: true })

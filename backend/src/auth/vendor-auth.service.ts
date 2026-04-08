@@ -273,6 +273,7 @@ export class VendorAuthService {
             openHours: dto.openHours,
             status: 'PENDING',
             commissionRate: storeCommissionRate,
+            ...(dto.cityId && { cityId: dto.cityId }),
           },
         },
       },

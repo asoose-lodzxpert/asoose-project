@@ -45,6 +45,8 @@ export interface SignupStep3Data {
     lng: number;
   };
   openHours: Record<string, OpenHour>;
+  cityId?: string;
+  cityName?: string;
 }
 
 export interface SignupData {
