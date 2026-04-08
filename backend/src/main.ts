@@ -27,6 +27,11 @@ async function bootstrap() {
     rawBody: true,
   });
 
+  // Explicitly set payload limits for body-parser to handle multiple document uploads
+  const bodyLimit = '50mb';
+  app.use(require('body-parser').json({ limit: bodyLimit }));
+  app.use(require('body-parser').urlencoded({ limit: bodyLimit, extended: true }));
+
   const isDevelopment = process.env.NODE_ENV !== 'production';
 
   // Parse allowed origins once at startup (init)

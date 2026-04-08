@@ -1,16 +1,17 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
-import { MapPin, Loader2, AlertCircle, Navigation } from 'lucide-react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { MapPin, Loader2, AlertCircle, Navigation, Search, X } from 'lucide-react';
 import { requestGeolocation } from '@/services/geolocation.service';
 import type { GeolocationCoordinates } from '@/services/geolocation.types';
 import { reverseGeocode, formatGeocodeError } from '@/services/reverse-geocode.service';
 import type { ReverseGeocodeResult } from '@/services/reverse-geocode.service';
 import type { GeolocationError } from '@/services/geolocation.types';
+import { searchPlaces, geocodePlace, PlaceSuggestion, PlaceLocation } from '@/services/maps-api.service';
 
 export interface LocationInputProps {
   value: string;
-  onChange: (address: string, details?: ReverseGeocodeResult) => void;
+  onChange: (address: string, details?: ReverseGeocodeResult & { lat?: number, lng?: number }) => void;
   placeholder?: string;
   label?: string;
   required?: boolean;
@@ -21,13 +22,14 @@ export interface LocationInputProps {
 interface LocationInputState {
   isLoading: boolean;
   error: string | null;
-  selectedLocation?: ReverseGeocodeResult;
+  suggestions: PlaceSuggestion[];
+  showSuggestions: boolean;
 }
 
 export default function LocationInput({
   value,
   onChange,
-  placeholder = 'Enter location',
+  placeholder = 'Enter business address...',
   label = 'Location',
   required = false,
   disabled = false,
@@ -36,202 +38,158 @@ export default function LocationInput({
   const [state, setState] = useState<LocationInputState>({
     isLoading: false,
     error: null,
+    suggestions: [],
+    showSuggestions: false,
   });
 
-  /**
-   * Handle manual input change
-   */
-  const handleInputChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const newValue = e.target.value;
-      onChange(newValue);
-      setState((prev) => ({ ...prev, error: null }));
-    },
-    [onChange]
-  );
+  const containerRef = useRef<HTMLDivElement>(null);
+  const debounceTimer = useRef<NodeJS.Timeout | null>(null);
 
-  /**
-   * Get current location and reverse geocode
-   */
-  const handleUseCurrentLocation = useCallback(async () => {
-    setState({ isLoading: true, error: null });
+  // Close suggestions when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setState(prev => ({ ...prev, showSuggestions: false }));
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newValue = e.target.value;
+    onChange(newValue);
+    setState(prev => ({ ...prev, error: null, showSuggestions: true }));
+
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+
+    if (newValue.length >= 3) {
+      debounceTimer.current = setTimeout(async () => {
+        const results = await searchPlaces(newValue);
+        setState(prev => ({ ...prev, suggestions: results }));
+      }, 500);
+    } else {
+      setState(prev => ({ ...prev, suggestions: [] }));
+    }
+  };
+
+  const handleSelectSuggestion = async (suggestion: PlaceSuggestion) => {
+    setState(prev => ({ ...prev, isLoading: true, showSuggestions: false }));
+    onChange(suggestion.title + ", " + suggestion.subtitle);
 
     try {
-      // Step 1: Get geolocation
+      const details = await geocodePlace(suggestion.id);
+      onChange(details.address, {
+        address: details.address,
+        lat: details.lat,
+        lng: details.lng,
+        city: "", // Backend doesn't split these easily
+        state: "",
+        country: "",
+      });
+      setState(prev => ({ ...prev, isLoading: false }));
+    } catch (err) {
+      setState(prev => ({ ...prev, isLoading: false, error: "Failed to resolve location details." }));
+    }
+  };
+
+  const handleUseCurrentLocation = async () => {
+    setState(prev => ({ ...prev, isLoading: true, error: null }));
+
+    try {
       const { lat, lng } = await requestGeolocation() as GeolocationCoordinates;
-
-      // Step 2: Reverse geocode to address
       const result = await reverseGeocode(lat, lng);
-
-      // Step 3: Update state and parent
-      setState({
-        isLoading: false,
-        error: null,
-        selectedLocation: result,
-      });
-      onChange(result.address, result);
+      setState(prev => ({ ...prev, isLoading: false }));
+      onChange(result.address, { ...result, lat, lng });
     } catch (error) {
-      const errorMessage = formatLocationError(error as GeolocationError);
-      setState({
-        isLoading: false,
-        error: errorMessage,
-      });
+      const errorMessage = error instanceof Error ? error.message : "Location blocked or unavailable";
+      setState(prev => ({ ...prev, isLoading: false, error: errorMessage }));
       onError?.(errorMessage);
     }
-  }, [onChange, onError]);
+  };
 
-  /**
-   * Clear location and errors
-   */
-  const handleClear = useCallback(() => {
+  const handleClear = () => {
     onChange('');
-    setState({
-      isLoading: false,
-      error: null,
-      selectedLocation: undefined,
-    });
-  }, [onChange]);
-
-  /**
-   * Retry after error
-   */
-  const handleRetry = useCallback(async () => {
-    await handleUseCurrentLocation();
-  }, [handleUseCurrentLocation]);
-
-  const hasError = state.error !== null;
-  const showSubtitle = state.selectedLocation && !value.includes(',');
+    setState(prev => ({ ...prev, suggestions: [], error: null }));
+  };
 
   return (
-    <div className="w-full">
-      {/* Label */}
+    <div className="w-full relative" ref={containerRef}>
       {label && (
-        <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
-          {label}
-          {required && <span className="text-red-500 ml-1">*</span>}
+        <label className="block text-sm font-bold text-gray-900 dark:text-gray-100 mb-2">
+          {label} {required && <span className="text-red-500">*</span>}
         </label>
       )}
 
-      {/* Input Container */}
-      <div className="relative">
-        {/* Main Input */}
-        <div className="relative">
-          <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
-          <input
-            type="text"
-            value={value}
-            onChange={handleInputChange}
-            placeholder={placeholder}
-            disabled={disabled || state.isLoading}
-            className={`
-              w-full pl-10 pr-40 py-2 rounded-lg border-2 transition-colors
-              ${
-                hasError
-                  ? 'border-red-500 focus:border-red-600 focus:outline-none'
-                  : 'border-gray-200 dark:border-gray-700 focus:border-blue-500 dark:focus:border-blue-500 focus:outline-none'
-              }
-              bg-white dark:bg-gray-900
-              text-gray-900 dark:text-gray-100
-              placeholder-gray-400 dark:placeholder-gray-500
-              disabled:bg-gray-50 dark:disabled:bg-gray-800 disabled:opacity-50
-            `}
-          />
+      <div className="relative group">
+        <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-yellow-500 transition-colors pointer-events-none" />
+        
+        <input
+          type="text"
+          value={value}
+          onChange={handleInputChange}
+          placeholder={placeholder}
+          disabled={disabled || state.isLoading}
+          className={`
+            w-full pl-12 pr-24 py-3.5 rounded-2xl border transition-all text-sm
+            ${state.error 
+              ? 'border-red-500/50 bg-red-500/5 focus:ring-red-500/20' 
+              : 'border-gray-200 dark:border-white/10 bg-white dark:bg-black/20 focus:ring-yellow-500/20 focus:border-yellow-500'
+            }
+            dark:text-white placeholder-gray-400 dark:placeholder-gray-500
+            focus:outline-none focus:ring-4
+            disabled:opacity-50
+          `}
+        />
 
-          {/* Action Buttons */}
-          <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-2">
-            {/* Loading Indicator */}
-            {state.isLoading && (
-              <button
-                type="button"
-                disabled
-                className="p-1.5 text-blue-500 dark:text-blue-400"
-                aria-label="Loading location"
-              >
-                <Loader2 className="w-5 h-5 animate-spin" />
-              </button>
-            )}
-
-            {/* Clear Button */}
-            {!state.isLoading && value && (
-              <button
-                type="button"
-                onClick={handleClear}
-                disabled={disabled}
-                className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors disabled:opacity-50"
-                aria-label="Clear location"
-              >
-                ✕
-              </button>
-            )}
-
-            {/* Use Current Location Button */}
+        <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+          {state.isLoading && <Loader2 className="w-5 h-5 animate-spin text-yellow-500 mr-2" />}
+          
+          {value && !state.isLoading && (
             <button
-              type="button"
-              onClick={handleUseCurrentLocation}
-              disabled={disabled || state.isLoading}
-              className={`
-                p-1.5 rounded transition-colors disabled:opacity-50
-                ${
-                  hasError
-                    ? 'text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20'
-                    : 'text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20'
-                }
-              `}
-              aria-label="Use current location"
-              title="Use current location"
+              onClick={handleClear}
+              className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
             >
-              <Navigation className="w-5 h-5" />
+              <X size={18} />
             </button>
-          </div>
-        </div>
+          )}
 
-        {/* Subtitle: City, State */}
-        {showSubtitle && (
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            {[state.selectedLocation?.city, state.selectedLocation?.state]
-              .filter(Boolean)
-              .join(', ')}
-          </p>
-        )}
+          <button
+            onClick={handleUseCurrentLocation}
+            disabled={disabled || state.isLoading}
+            className="p-2 text-gray-400 hover:text-yellow-500 dark:hover:text-yellow-400 rounded-lg transition-colors disabled:opacity-50"
+            title="Use current location"
+          >
+            <Navigation size={20} />
+          </button>
+        </div>
       </div>
 
-      {/* Error Message */}
-      {hasError && (
-        <div className="mt-2 p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
-          <div className="flex items-start gap-2">
-            <AlertCircle className="w-5 h-5 text-red-500 dark:text-red-400 flex-shrink-0 mt-0.5" />
-            <div className="flex-1 min-w-0">
-              <p className="text-sm text-red-800 dark:text-red-200">{state.error}</p>
-              <button
-                type="button"
-                onClick={handleRetry}
-                disabled={state.isLoading}
-                className="text-xs font-medium text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 mt-2 disabled:opacity-50"
-              >
-                Try again
-              </button>
-            </div>
-          </div>
+      {/* Suggestions Dropdown */}
+      {state.showSuggestions && state.suggestions.length > 0 && (
+        <div className="absolute z-[100] mt-2 w-full bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-white/10 rounded-2xl shadow-2xl overflow-hidden backdrop-blur-3xl animate-in fade-in slide-in-from-top-2 duration-200">
+          {state.suggestions.map((suggestion) => (
+            <button
+              key={suggestion.id}
+              onClick={() => handleSelectSuggestion(suggestion)}
+              className="w-full text-left p-4 hover:bg-gray-50 dark:hover:bg-white/5 border-b border-gray-100 dark:border-white/5 last:border-0 flex items-start gap-3 transition-colors"
+            >
+              <Search size={16} className="text-gray-400 mt-1 flex-shrink-0" />
+              <div className="min-w-0">
+                <p className="text-sm font-bold truncate dark:text-white">{suggestion.title}</p>
+                <p className="text-xs text-gray-500 truncate mt-0.5">{suggestion.subtitle}</p>
+              </div>
+            </button>
+          ))}
         </div>
+      )}
+
+      {state.error && (
+        <p className="mt-2 text-xs text-red-500 flex items-center gap-1.5 font-medium ml-1">
+          <AlertCircle size={14} />
+          {state.error}
+        </p>
       )}
     </div>
   );
-}
-
-/**
- * Format location error for display
- */
-function formatLocationError(error: GeolocationError): string {
-  switch (error.code) {
-    case 'PERMISSION_DENIED':
-      return 'Location permission denied. Please enable it in settings and try again.';
-    case 'POSITION_UNAVAILABLE':
-      return 'Unable to determine your location. Please try again or enter address manually.';
-    case 'TIMEOUT':
-      return 'Location request timed out. Please try again.';
-    case 'UNSUPPORTED':
-      return 'Location services not available on this device.';
-    default:
-      return error.details || 'Failed to get location. Please try again.';
-  }
 }

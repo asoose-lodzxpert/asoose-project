@@ -8,6 +8,7 @@ import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { signupVendor } from "@/services/signup.service";
+import * as WebBrowser from "expo-web-browser";
 import {
   SignupData,
   SignupStep1Data,
@@ -16,12 +17,34 @@ import {
 } from "@/types/signup";
 import { mapBusinessTypeToBackend } from "@/services/signup.service";
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
-import { Pressable, StyleSheet, View, ActivityIndicator } from "react-native";
+import React, { useState, useEffect } from "react";
+import { Pressable, StyleSheet, View, ActivityIndicator, Platform } from "react-native";
 import Toast from "react-native-toast-message";
+
+const VENDOR_ONBOARDING_URL = "https://asoose.com/vendor/register";
 
 export default function Signup() {
   const router = useRouter();
+
+  useEffect(() => {
+    if (Platform.OS === "ios") {
+      WebBrowser.openBrowserAsync(VENDOR_ONBOARDING_URL);
+      // Also go back so they don't see the form if they dismiss the browser
+      router.back();
+    }
+  }, []);
+
+  if (Platform.OS === "ios") {
+    return (
+      <ThemedView style={styles.container}>
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center", padding: 24 }}>
+          <ActivityIndicator size="large" />
+          <ThemedText style={{ marginTop: 16 }}>Redirecting to web registration...</ThemedText>
+        </View>
+      </ThemedView>
+    );
+  }
+
   const [step, setStep] = useState<number>(1);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [data, setData] = useState<SignupData>({
