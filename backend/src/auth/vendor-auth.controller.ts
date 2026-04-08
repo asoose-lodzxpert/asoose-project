@@ -72,7 +72,11 @@ export class VendorAuthController {
       { name: 'proofOfAddress', maxCount: 1 },
       { name: 'storeLogo', maxCount: 1 },
       { name: 'storeBanner', maxCount: 1 },
-    ]),
+    ], {
+      limits: {
+        fileSize: 10 * 1024 * 1024, // 10MB per file
+      }
+    }),
   )
   register(
     @Body() dto: CreateVendorDto,

@@ -257,6 +257,31 @@ export class ApiService {
     );
   }
 
+  static async postFormData<T>(
+    endpoint: string,
+    formData: FormData,
+    token?: string,
+    options?: RequestInit & { timeoutMs?: number }
+  ): Promise<T> {
+    const headers = await this.getHeaders(token);
+    // CRITICAL: We must remove Content-Type so fetch can set it with the correct boundary
+    delete (headers as any)["Content-Type"];
+
+    return this.request<T>(
+      endpoint,
+      {
+        ...options,
+        method: "POST",
+        body: formData,
+        headers: {
+          ...headers,
+          ...options?.headers,
+        },
+      } as any,
+      token
+    );
+  }
+
   static async delete<T>(endpoint: string, token?: string, options?: RequestInit): Promise<T> {
     return this.request<T>(endpoint, { method: "DELETE", ...options }, token);
   }

@@ -12,6 +12,7 @@ import {
   TouchableWithoutFeedback,
   Animated,
 } from "react-native";
+import * as WebBrowser from "expo-web-browser";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { ThemedView } from "@/components/themed-view";
@@ -21,6 +22,8 @@ import { LocationDisclosureModal } from "@/components/LocationDisclosureModal";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "expo-router";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+
+const VENDOR_ONBOARDING_URL = "https://asoose.com/vendor/register";
 
 export default function LoginScreen() {
   const [identifier, setIdentifier] = useState("");
@@ -111,6 +114,14 @@ export default function LoginScreen() {
       setError("Failed to proceed. Please try again.");
     }
   }
+
+  const handleSignUp = async () => {
+    if (Platform.OS === "ios") {
+      await WebBrowser.openBrowserAsync(VENDOR_ONBOARDING_URL);
+    } else {
+      router.push("/(auth)/signup");
+    }
+  };
 
   return (
     <ThemedView style={styles.container}>
@@ -206,10 +217,7 @@ export default function LoginScreen() {
                 <View style={styles.footer}>
                   <ThemedText>
                     Don't have an account?{" "}
-                    <ThemedText
-                      type="link"
-                      onPress={() => router.push("/(auth)/signup")}
-                    >
+                    <ThemedText type="link" onPress={handleSignUp}>
                       Sign up
                     </ThemedText>
                   </ThemedText>

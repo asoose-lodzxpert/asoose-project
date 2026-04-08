@@ -80,10 +80,12 @@ export class CreateVendorDto {
   @ApiPropertyOptional({ example: { lat: 6.5244, lng: 3.3792 } })
   @IsOptional()
   @IsObject()
+  @Transform(({ value }) => typeof value === 'string' ? JSON.parse(value) : value)
   location?: { lat: number; lng: number };
 
   @ApiPropertyOptional({ description: 'Store opening hours per day' })
   @IsOptional()
   @IsObject()
+  @Transform(({ value }) => typeof value === 'string' ? JSON.parse(value) : value)
   openHours?: any;
 }
