@@ -93,6 +93,14 @@ export class ApiService {
     const headers = await this.getHeaders(token);
     const url = `${API_URL}${endpoint}`;
 
+    // --- FormData Handling ---
+    // If we're sending FormData, the browser MUST set the Content-Type header
+    // with its unique boundary. If we provide application/json here, the server
+    // will fail to parse the body.
+    if (options.body instanceof FormData) {
+      delete (headers as any)["Content-Type"];
+    }
+
     // Use caller-supplied timeout, or fall back to the global default
     const { timeoutMs: callerTimeout, ...fetchOptions } = options;
     const effectiveTimeout = callerTimeout ?? this.REQUEST_TIMEOUT_MS;
