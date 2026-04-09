@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { X, Star, Loader2 } from "lucide-react";
 
 interface ReviewModalProps {
@@ -25,7 +26,7 @@ export const ReviewModal = ({
   isOpen,
   onClose,
   onSubmit,
-  orderId, // Destructured to pass to the submission logic
+  orderId,
   initialData,
 }: ReviewModalProps) => {
   const isEditMode = Boolean(initialData);
@@ -44,6 +45,10 @@ export const ReviewModal = ({
 
   const modalRef = useRef<HTMLDivElement>(null);
 
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   /* ===================== SYNC STATE ===================== */
   useEffect(() => {
     if (!isOpen) return;
@@ -53,9 +58,6 @@ export const ReviewModal = ({
     setHoverRating(0);
     setErrors({});
     setIsSubmitting(false);
-
-    setMounted(false);
-    requestAnimationFrame(() => setMounted(true));
 
     modalRef.current?.focus();
   }, [isOpen, initialData]);
@@ -96,7 +98,6 @@ export const ReviewModal = ({
     setIsSubmitting(true);
 
     try {
-      // Passes orderId as the third argument to link the review to a specific purchase
       await onSubmit(rating, comment.trim(), orderId);
       onClose();
     } catch (err) {
@@ -108,13 +109,13 @@ export const ReviewModal = ({
     }
   };
 
-  if (!isOpen) return null;
+  if (!isOpen || !mounted) return null;
 
-  return (
+  return createPortal(
     <div
-      className={`fixed inset-0 z-50 flex items-center justify-center p-4
+      className={`fixed inset-0 z-[9997] flex items-center justify-center p-4
         bg-black/60 backdrop-blur-sm transition-opacity duration-200
-        ${mounted ? "opacity-100" : "opacity-0"}`}
+        ${isOpen ? "opacity-100" : "opacity-0"}`}
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <div
@@ -126,10 +127,9 @@ export const ReviewModal = ({
         className={`w-full max-w-md rounded-3xl p-6 outline-none
           bg-white dark:bg-[#1a1a1a]
           transform transition-all duration-200 ease-out
-          ${mounted ? "scale-100 opacity-100" : "scale-95 opacity-0"}`}
+          ${isOpen ? "scale-100 opacity-100" : "scale-95 opacity-0"}`}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
         <div className="flex justify-between items-center mb-6">
           <h3 id="review-title" className="text-xl font-black italic">
             {isEditMode ? "Edit Review" : "Write a Review"}
@@ -138,20 +138,16 @@ export const ReviewModal = ({
             onClick={onClose}
             disabled={isSubmitting}
             className="p-2 hover:bg-gray-100 dark:hover:bg-white/5 rounded-full transition-colors"
-            aria-label="Close modal"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Stars */}
         <div className="flex justify-center gap-2 mb-2">
           {[1, 2, 3, 4, 5].map((s) => (
             <button
               key={s}
               type="button"
-              aria-label={`Rate ${s} stars`}
-              aria-pressed={rating === s}
               disabled={isSubmitting}
               onMouseEnter={() => setHoverRating(s)}
               onMouseLeave={() => setHoverRating(0)}
@@ -174,7 +170,6 @@ export const ReviewModal = ({
           </p>
         )}
 
-        {/* Comment */}
         <textarea
           value={comment}
           onChange={(e) =>
@@ -196,12 +191,6 @@ export const ReviewModal = ({
           <span>{MAX_COMMENT_LENGTH - comment.length} characters left</span>
         </div>
 
-        {errors.comment && (
-          <p className="text-xs font-bold text-red-500 mb-3 uppercase tracking-widest">
-            {errors.comment}
-          </p>
-        )}
-
         {errors.submit && (
           <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl mb-4">
             <p className="text-xs font-bold text-red-600 text-center">
@@ -214,7 +203,7 @@ export const ReviewModal = ({
           onClick={handleSubmit}
           disabled={isSubmitting}
           className="w-full h-14 bg-yellow-500 hover:bg-yellow-600 text-black rounded-2xl font-black
-            disabled:opacity-60 disabled:cursor-not-allowed transition-all active:scale-[0.98] flex items-center justify-center gap-2 shadow-xl shadow-yellow-500/20"
+             transition-all active:scale-[0.98] flex items-center justify-center gap-2 shadow-xl shadow-yellow-500/20"
         >
           {isSubmitting ? (
             <>
@@ -228,6 +217,7 @@ export const ReviewModal = ({
           )}
         </button>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

@@ -22,6 +22,8 @@ export interface ProductProps {
   image?: string;
   storeId: string;
   storeName?: string;
+  cityId?: string;
+  isAvailable?: boolean;
   stock?: number;
   status?: string;
   manageStock?: boolean;
@@ -38,6 +40,8 @@ export const ProductCard = ({
   image,
   storeId,
   storeName,
+  cityId,
+  isAvailable = true,
   stock = 0,
   status = "ACTIVE",
   manageStock = false,
@@ -58,6 +62,20 @@ export const ProductCard = ({
 
   const handleQuickAdd = async (e: React.MouseEvent) => {
     e.stopPropagation();
+
+    if (!isAvailable) {
+      toast.error("This item is not available in your current location", {
+        position: "bottom-center",
+      });
+      return;
+    }
+
+    if (isSoldOut) {
+      toast.error("This item is currently sold out", {
+        position: "bottom-center",
+      });
+      return;
+    }
 
     // Delegate to modal opener if available, to ensure modifier selections are collected.
     if (onClick) {
@@ -123,6 +141,7 @@ export const ProductCard = ({
         quantity: 1,
         image,
         restaurantId: storeId,
+        cityId,
       });
 
       toast.success("Added to basket");
@@ -138,39 +157,40 @@ export const ProductCard = ({
       onClick={isSoldOut ? undefined : onClick}
       className={`bg-white dark:bg-[#151515] p-3 rounded-2xl border border-gray-100 dark:border-white/5 shadow-sm flex gap-4 transition-colors group relative ${isSoldOut ? 'opacity-60 cursor-not-allowed' : 'hover:border-yellow-500/30 cursor-pointer'}`}
     >
-      <div className="w-24 h-24 sm:w-28 sm:h-28 bg-gray-100 dark:bg-white/5 rounded-xl flex-shrink-0 overflow-hidden relative">
+      <div className="w-24 h-24 sm:w-32 sm:h-32 bg-gray-100 dark:bg-white/5 rounded-xl flex-shrink-0 overflow-hidden relative">
         {image ? (
           <Image
             src={image}
             alt={name}
             fill
+            sizes="(max-width: 640px) 96px, 128px"
             className="object-cover group-hover:scale-105 transition-transform duration-500"
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-2xl">
+          <div className="w-full h-full flex items-center justify-center text-3xl">
             📦
           </div>
         )}
         {isSoldOut && (
           <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-            <span className="text-[10px] font-bold text-white uppercase tracking-widest px-2 py-1 bg-red-600 rounded">
+            <span className="text-[10px] sm:text-xs font-bold text-white uppercase tracking-widest px-2 py-1 bg-red-600 rounded">
               Sold Out
             </span>
           </div>
         )}
       </div>
 
-      <div className="flex-1 flex flex-col justify-between py-1">
+      <div className="flex-1 flex flex-col justify-between py-1 min-w-0">
         <div>
           {storeName && (
             <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1 block">
               {storeName}
             </span>
           )}
-          <h4 className="font-bold text-gray-900 dark:text-gray-100 line-clamp-2 leading-tight mb-1">
+          <h4 className="font-bold text-gray-900 dark:text-gray-100 line-clamp-2 leading-tight mb-1 text-sm sm:text-base">
             {name}
           </h4>
-          <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">
+          <p className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400 line-clamp-2">
             {description}
           </p>
         </div>
@@ -179,7 +199,7 @@ export const ProductCard = ({
           <span className="font-black text-lg">₦{price.toLocaleString()}</span>
           <button
             onClick={handleQuickAdd}
-            disabled={loading || isSoldOut}
+            disabled={loading || isSoldOut || !isAvailable}
             className="w-8 h-8 rounded-full bg-gray-100 dark:bg-white/10 flex items-center justify-center text-gray-900 dark:text-white hover:bg-yellow-500 hover:text-black transition-colors z-10 disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {loading ? (

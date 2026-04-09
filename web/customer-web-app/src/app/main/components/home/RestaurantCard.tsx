@@ -43,14 +43,14 @@ export const RestaurantCard = ({
 
   return (
     <div className="group relative bg-white dark:bg-[#151515] rounded-2xl p-3 shadow-sm border border-gray-100 dark:border-white/5 active:scale-[0.98] transition-all duration-300 hover:shadow-md cursor-pointer h-full flex flex-col">
-      {/* Image Area - ✅ Using banner as main image */}
-      <div className="aspect-[4/3] w-full bg-gray-100 dark:bg-white/5 rounded-xl relative overflow-hidden mb-3">
+      {/* Image Area - ✅ Standardized 16:9 Aspect Ratio */}
+      <div className="aspect-video w-full bg-gray-100 dark:bg-white/5 rounded-xl relative overflow-hidden mb-3">
         <Image
           src={imgSrc}
           alt={name}
           fill
           className="object-cover transition-transform duration-700 group-hover:scale-110"
-          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
           // ✅ FIX: If the original image link is expired (403), switch to the generated PNG
           onError={() => setImgSrc(placeholder)}
         />
@@ -79,9 +79,9 @@ export const RestaurantCard = ({
       </div>
 
       {/* Content */}
-      <div className="pt-2 pl-1 flex-1 flex flex-col">
+      <div className="pt-2 pl-1 flex-1 flex flex-col justify-between">
         <div className="flex justify-between items-start">
-          <h4 className="font-bold text-base truncate pr-2 text-gray-900 dark:text-gray-100">
+          <h4 className="font-bold text-base line-clamp-1 pr-2 text-gray-900 dark:text-gray-100">
             {name}
           </h4>
           <div

@@ -62,8 +62,8 @@ export class MarketplaceService {
           status: 'ACTIVE',
           verification: 'VERIFIED',
           products: { some: { status: 'ACTIVE' } },
-          // Hard city filter — no cityId means no results for that section
-          ...(cityId ? { cityId } : { cityId: null }),
+          // Filter by city only if provided; otherwise show all
+          ...(cityId ? { cityId } : {}),
         },
         take: 12,
         orderBy: { rating: 'desc' },
@@ -135,8 +135,8 @@ export class MarketplaceService {
       verification: VerificationStatus.VERIFIED,
       products: { some: { status: 'ACTIVE' } },
       ...(type ? { type: this.mapSlugToType(type) } : {}),
-      // Hard city filter
-      ...(cityId ? { cityId } : { cityId: null }),
+      // Filter by city only if provided
+      ...(cityId ? { cityId } : {}),
     };
 
     const total = await this.prisma.store.count({ where });
@@ -186,8 +186,8 @@ export class MarketplaceService {
         status: 'ACTIVE',
         verification: 'VERIFIED',
         products: { some: { status: 'ACTIVE' } },
-        // Hard city filter
-        ...(cityId ? { cityId } : { cityId: null }),
+        // Filter by city only if provided
+        ...(cityId ? { cityId } : {}),
       },
       orderBy: orderBy,
       include: { openingHours: true },
@@ -291,7 +291,7 @@ export class MarketplaceService {
     return { stores: storesWithAvailability, products };
   }
 
-  async getVendorDetails(identifier: string) {
+  async getVendorDetails(identifier: string, cityId?: string) {
     const isId = isUUID(identifier);
     const query = isId ? { id: identifier } : { slug: identifier };
 
@@ -336,6 +336,8 @@ export class MarketplaceService {
       address: store.address || 'Address not available',
       rating: store.rating || 0,
       deliveryTime: `${store.prepTime || 20} - ${(store.prepTime || 20) + 15} mins`,
+      cityId: store.cityId,
+      isAvailableInLocation: cityId ? store.cityId === cityId : true,
       isOpen: store.isOpen,
       isCurrentlyOpen: availability.open,
       closedReason: availability.reason,
@@ -644,5 +646,14 @@ export class MarketplaceService {
 
   private deg2rad(deg: number): number {
     return deg * (Math.PI / 180);
+  }
+
+  async getUserDefaultAddress(userId: string) {
+    const addresses = await this.prisma.address.findMany({
+      where: { userId },
+    });
+    return (
+      addresses.find((a) => a.isDefault) || addresses[0] || null
+    );
   }
 }

@@ -24,14 +24,17 @@ export interface ProductProps {
   image?: string;
   storeId: string;
   storeName?: string;
+  cityId?: string; // ✅ Added cityId
   /** Modifier groups passed through so the card can gate direct-add for required-modifier products. */
   modifierGroups?: ModifierGroupRef[];
+  isAvailable?: boolean;
   onClick?: () => void;
   /**
    * When provided, clicking the card body navigates to this URL.
    * The + button still calls onClick (for modal) or direct-adds.
    */
   href?: string;
+  isSoldOut?: boolean;
 }
 
 export const ProductCard = ({
@@ -42,9 +45,12 @@ export const ProductCard = ({
   image,
   storeId,
   storeName,
+  cityId,
   modifierGroups,
   onClick,
   href,
+  isAvailable = true,
+  isSoldOut = false,
 }: ProductProps) => {
   const addItem = useCartStore((state) => state.addItem);
   const { data: session, status } = useSession();
@@ -59,6 +65,13 @@ export const ProductCard = ({
   const handleQuickAdd = async (e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
+
+    if (!isAvailable) {
+      toast.error("This item is not available in your current location", {
+        position: "bottom-center",
+      });
+      return;
+    }
 
     // If the parent provided an onClick handler (e.g., to open a ProductModal),
     // delegate to it so modifier groups with required selections can be satisfied.
@@ -111,6 +124,7 @@ export const ProductCard = ({
         quantity: 1,
         image: image,
         restaurantId: storeId,
+        cityId, // ✅ Store cityId in cart
       });
 
       toast.success("Added to basket");
@@ -123,32 +137,33 @@ export const ProductCard = ({
 
   const cardBody = (
     <>
-      <div className="w-24 h-24 sm:w-28 sm:h-28 bg-gray-100 dark:bg-white/5 rounded-xl flex-shrink-0 overflow-hidden relative">
+      <div className="w-24 h-24 sm:w-32 sm:h-32 bg-gray-100 dark:bg-white/5 rounded-xl flex-shrink-0 overflow-hidden relative">
         {image?.startsWith("http") ? (
           <Image
             src={image}
             alt={name}
             fill
+            sizes="(max-width: 640px) 96px, 128px"
             className="object-cover group-hover:scale-105 transition-transform duration-500"
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-2xl">
+          <div className="w-full h-full flex items-center justify-center text-3xl">
             📦
           </div>
         )}
       </div>
 
-      <div className="flex-1 flex flex-col justify-between py-1">
+      <div className="flex-1 flex flex-col justify-between py-1 min-w-0">
         <div>
           {storeName && (
             <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1 block">
               {storeName}
             </span>
           )}
-          <h4 className="font-bold text-gray-900 dark:text-gray-100 line-clamp-2 leading-tight mb-1">
+          <h4 className="font-bold text-gray-900 dark:text-gray-100 line-clamp-2 leading-tight mb-1 text-sm sm:text-base">
             {name}
           </h4>
-          <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">
+          <p className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400 line-clamp-2">
             {description}
           </p>
         </div>
@@ -158,7 +173,7 @@ export const ProductCard = ({
           <button
             type="button"
             onClick={handleQuickAdd}
-            disabled={loading}
+            disabled={loading || !isAvailable || isSoldOut}
             className="w-8 h-8 rounded-full bg-gray-100 dark:bg-white/10 flex items-center justify-center text-gray-900 dark:text-white hover:bg-yellow-500 hover:text-black transition-colors z-10 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? (

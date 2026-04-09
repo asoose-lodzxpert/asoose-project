@@ -34,4 +34,12 @@ export class GetCartSummaryDto {
   @ValidateNested({ each: true })
   @Type(() => CartItemDto)
   items: CartItemDto[];
+
+  @ApiPropertyOptional({ example: 6.5244 })
+  @IsOptional()
+  lat?: number;
+
+  @ApiPropertyOptional({ example: 3.3792 })
+  @IsOptional()
+  lng?: number;
 }

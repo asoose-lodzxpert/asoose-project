@@ -1,6 +1,7 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { Phone, X } from "lucide-react";
 
 interface CheckoutConfirmationModalProps {
@@ -14,10 +15,16 @@ export const CheckoutConfirmationModal = ({
   onClose,
   onConfirm,
 }: CheckoutConfirmationModalProps) => {
-  if (!isOpen) return null;
+  const [mounted, setMounted] = useState(false);
 
-  return (
-    <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4">
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!isOpen || !mounted) return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
       {/* Backdrop */}
       <div 
         className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" 
@@ -60,6 +67,7 @@ export const CheckoutConfirmationModal = ({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 };

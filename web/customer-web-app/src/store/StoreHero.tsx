@@ -2,6 +2,7 @@
 
 import { ArrowLeft, Share2, Star, Clock, MapPin } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 import { toast } from "react-toastify";
 
 interface HeroProps {
@@ -11,6 +12,7 @@ interface HeroProps {
   type: string; // RESTAURANT, GROCERY, etc.
   time: string;
   address: string;
+  isAvailable?: boolean;
 }
 
 export const StoreHero = ({
@@ -20,6 +22,7 @@ export const StoreHero = ({
   type,
   time,
   address,
+  isAvailable = true,
 }: HeroProps) => {
   // Determine icon based on type
   const typeIcon =
@@ -59,12 +62,15 @@ export const StoreHero = ({
   return (
     <div className="relative h-[280px] w-full bg-gray-900">
       {/* Background with overlay */}
-      <div className="absolute inset-0">
+      <div className="absolute inset-0 z-0">
         {image && (
-          <img
+          <Image
             src={image}
             alt={name}
-            className="w-full h-full object-cover opacity-60"
+            fill
+            priority
+            className="object-cover opacity-60"
+            sizes="100vw"
           />
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
@@ -85,6 +91,15 @@ export const StoreHero = ({
           <Share2 className="w-5 h-5" />
         </button>
       </div>
+
+      {!isAvailable && (
+        <div className="absolute top-[80px] left-0 right-0 z-20 px-4">
+          <div className="bg-red-500/90 backdrop-blur-md text-white text-[10px] font-bold py-2 px-4 rounded-xl flex items-center gap-2 shadow-lg animate-in slide-in-from-top-4">
+            <MapPin className="w-3 h-3" />
+            This store is not available in your current location.
+          </div>
+        </div>
+      )}
 
       {/* Info */}
       <div className="absolute bottom-0 left-0 right-0 z-20 p-6 text-white">

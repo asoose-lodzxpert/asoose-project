@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { useRideStore } from "@/app/main/ride/store/ride";
 import { toast } from "react-toastify";
+import { ApiService } from "@/services/api.service";
 
 /**
  * LocationProvider automatically attempts to detect the user's GPS coordinates
@@ -27,12 +28,26 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
     }
 
     navigator.geolocation.getCurrentPosition(
-      (position) => {
+      async (position) => {
         const coords = {
           lat: position.coords.latitude,
           lng: position.coords.longitude,
         };
         setUserLocation(coords);
+
+        // Resolve cityId from coordinates
+        try {
+          const cityData: any = await ApiService.get(
+            `/maps/city-by-coords?lat=${coords.lat}&lng=${coords.lng}`,
+          );
+          if (cityData && cityData.id) {
+            useRideStore.getState().setCityId(cityData.id);
+            console.log("🏙️ City detected:", cityData.name);
+          }
+        } catch (cityErr) {
+          console.error("Failed to resolve city from coordinates:", cityErr);
+        }
+
         setGeolocationError(null);
         console.log("📍 Location detected:", coords);
       },

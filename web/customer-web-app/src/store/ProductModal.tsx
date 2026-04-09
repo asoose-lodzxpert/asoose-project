@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useEffect } from "react";
+import { createPortal } from "react-dom";
 import Image from "next/image";
 import { X, Minus, Plus, Loader2 } from "lucide-react";
 import { useCartStore } from "@/store/useCartStore";
@@ -44,6 +45,7 @@ export const ProductModal = ({
   storeId,
   onClose,
 }: ProductModalProps) => {
+  const [mounted, setMounted] = useState(false);
   const [quantity, setQuantity] = useState(1);
   const [imgError, setImgError] = useState(false);
   const [selectedModifiers, setSelectedModifiers] = useState<
@@ -54,6 +56,10 @@ export const ProductModal = ({
   const addItem = useCartStore((state) => state.addItem);
   const { data: session, status } = useSession();
   const router = useRouter();
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Reset state when product changes
   useEffect(() => {
@@ -178,19 +184,17 @@ export const ProductModal = ({
     }
   };
 
-  if (!product) return null;
+  if (!product || !mounted) return null;
 
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center px-4">
+  return createPortal(
+    <div className="fixed inset-0 z-[9998] flex items-center justify-center px-4">
       <div
         className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
         onClick={onClose}
       />
 
       <div className="relative bg-white dark:bg-[#1a1a1a] w-full max-w-lg max-h-[85vh] rounded-3xl overflow-hidden flex flex-col shadow-2xl animate-in zoom-in-95 duration-200">
-        {/* Scrollable Body */}
         <div className="flex-1 overflow-y-auto custom-scrollbar">
-          {/* Header Image - IMPROVED */}
           <div className="relative h-56 bg-gradient-to-br from-gray-100 to-gray-200 dark:from-slate-800 dark:to-slate-900 overflow-hidden">
             <button
               onClick={onClose}
@@ -207,11 +211,8 @@ export const ProductModal = ({
                 width={512}
                 height={224}
                 className="w-full h-full object-cover"
-                placeholder="blur"
-                blurDataURL="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTEyIiBoZWlnaHQ9IjIyNCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZTJlOGYwIi8+PC9zdmc+"
                 onError={() => setImgError(true)}
                 quality={85}
-                priority={false}
               />
             ) : (
               <div className="w-full h-full flex flex-col items-center justify-center gap-2">
@@ -233,7 +234,6 @@ export const ProductModal = ({
               </p>
             </div>
 
-            {/* Modifiers List */}
             {(product.modifierGroups || []).map((group) => (
               <div key={group.id}>
                 <div className="flex justify-between items-center mb-3">
@@ -292,7 +292,6 @@ export const ProductModal = ({
           </div>
         </div>
 
-        {/* Footer */}
         <div className="p-4 border-t border-gray-100 dark:border-white/5 bg-white dark:bg-[#1a1a1a]">
           <div className="flex items-center gap-4 mb-4 justify-center">
             <button
@@ -334,6 +333,7 @@ export const ProductModal = ({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

@@ -205,6 +205,7 @@ function useStoreData(query: string | null) {
 function StorePage() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const userLocation = useRideStore((state) => state.userLocation);
   const query = searchParams.get("q")?.trim() || null;
 
   // Data
@@ -330,7 +331,7 @@ function StorePage() {
                 {verticals.map((v) => (
                   <Link
                     key={v.id}
-                    href={`/main/store/category/${v.id}`}
+                    href={`/main/store/category/${v.id}${userLocation ? `?lat=${userLocation.lat}&lng=${userLocation.lng}` : ""}`}
                     className="min-w-[72px] snap-start flex flex-col items-center gap-2 group cursor-pointer"
                   >
                     <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl sm:rounded-3xl bg-white dark:bg-[#151515] border border-gray-100 dark:border-white/5 flex items-center justify-center text-gray-400 group-hover:bg-yellow-500 group-hover:text-black group-hover:border-yellow-500 transition-all shadow-sm">
@@ -361,7 +362,7 @@ function StorePage() {
                       </p>
                     </div>
                     <Link
-                      href={`/main/store/category/${section.id}`}
+                      href={`/main/store/category/${section.id}${userLocation ? `?lat=${userLocation.lat}&lng=${userLocation.lng}` : ""}`}
                       className="w-8 h-8 rounded-full bg-gray-100 dark:bg-white/10 flex items-center justify-center hover:bg-yellow-500 hover:text-black transition-colors"
                     >
                       <ChevronRight className="w-4 h-4" />

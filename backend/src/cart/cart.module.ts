@@ -4,9 +4,10 @@ import { CartController } from './cart.controller';
 import { PrismaModule } from '../prisma/prisma.module';
 import { PricingService } from '../users/pricing.service';
 import { FareModule } from '../fare/fare.module';
+import { MapsModule } from '../maps/maps.module';
 
 @Module({
-  imports: [PrismaModule, FareModule],
+  imports: [PrismaModule, FareModule, MapsModule],
   controllers: [CartController],
   providers: [CartService, PricingService],
   exports: [CartService], // Export service if OrderModule needs to validate cart later

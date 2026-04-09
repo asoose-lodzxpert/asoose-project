@@ -10,6 +10,7 @@ import React, {
   useRef,
   useState,
 } from "react";
+import { useLocation } from "./LocationContext";
 
 type CartContextType = {
   items: CartItem[];
@@ -50,6 +51,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
   const [hydrating, setHydrating] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { location } = useLocation();
   const syncRequestRef = useRef(0);
 
   const loading = hydrating || syncing;
@@ -95,6 +97,8 @@ export const CartProvider: React.FC<CartProviderProps> = ({
                 g.selectedModifiers.map((m) => m.id),
               ) ?? [],
           })),
+          lat: location?.coords?.latitude,
+          lng: location?.coords?.longitude,
         });
 
         if (requestId !== syncRequestRef.current) return;
@@ -200,7 +204,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
         }
       }
     },
-    [persistItems],
+    [persistItems, location],
   );
 
   // Hydrate cart on mount or when userId changes
@@ -230,7 +234,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
     hydrate();
     // Clear cart if user changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId]);
+  }, [userId, location]);
 
   async function addItem(item: CartItem) {
     // Multi-cart: Allow items from different vendors
@@ -292,7 +296,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({
   }
 
   const canCheckout = useMemo(() => {
-    return items.length > 0;
+    return items.length > 0 && items.every((i) => i.available !== false);
   }, [items]);
 
   return (

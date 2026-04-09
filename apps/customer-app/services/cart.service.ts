@@ -7,6 +7,8 @@ export type CartSummaryPayload = {
     quantity: number;
     modifierIds?: string[];
   }[];
+  lat?: number;
+  lng?: number;
 };
 
 export async function fetchCartSummary(

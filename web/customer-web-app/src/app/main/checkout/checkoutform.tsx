@@ -140,9 +140,11 @@ export default function CheckoutForm() {
         } else {
           const errData = await res.json().catch(() => ({}));
           console.error("[CheckoutForm] Quote API error:", res.status, errData);
-          toast.warn(
-            "Could not calculate delivery fee. You can still place your order.",
-          );
+          
+          // Display the specific backend error (e.g. "Store does not deliver to your current city")
+          const errorMsg = errData.message || "Could not calculate delivery fee. Please double check your address.";
+          toast.error(errorMsg);
+
           setDeliveryFee(null);
           setServiceFee(null);
           setVatAmount(null);

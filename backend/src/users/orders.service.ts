@@ -17,6 +17,7 @@ import { FareService } from '../fare/fare.service';
 import { NotificationFacade } from './notification.facade';
 import type { RedisClientType } from 'redis';
 import { InventoryService } from './inventory.service';
+import { MapsService } from '../maps/maps.service';
 import { VendorOrdersStreamService } from '../vendor/orders/vendor-orders-stream.service';
 import { NotificationsGateway } from '../notifications/notifications.gateway';
 import { QueueService } from '../matching/queue/queue.service';
@@ -112,6 +113,7 @@ export class OrdersService {
     private notificationsGateway: NotificationsGateway,
     private queueService: QueueService, // Injected for Durable Handoff
     private fareService: FareService,
+    private mapsService: MapsService,
     @Inject('REDIS_CLIENT') private readonly redis: RedisClientType,
     private eventEmitter: EventEmitter2,
     @InjectQueue('order-reminders') private orderRemindersQueue: Queue,
@@ -145,6 +147,7 @@ export class OrdersService {
             isOpen: true,
             openHours: true,
             openingHours: true,
+            cityId: true,
           },
         }),
         this.prisma.address.findUnique({
@@ -164,6 +167,19 @@ export class OrdersService {
 
       if (!address || address.userId !== userId) {
         throw new BadRequestException('Invalid delivery address');
+      }
+
+      // ── Service Boundary guard ─────────────────────────────────────
+      if (store.cityId) {
+        const userCity = await this.mapsService.getCityByCoords(
+          address.lat,
+          address.lng,
+        );
+        if (store.cityId !== userCity?.id) {
+          throw new BadRequestException(
+            `"${store.name}" does not deliver to your current city.`,
+          );
+        }
       }
 
       // Fetch and validate products
@@ -324,6 +340,7 @@ export class OrdersService {
             openHours: true,
             openingHours: true,
             name: true,
+            cityId: true,
           },
         });
         if (storeAvail) {
@@ -332,6 +349,19 @@ export class OrdersService {
             throw new BadRequestException(
               `${storeAvail.name}: ${avail.message}`,
             );
+          }
+
+          // ── Service Boundary guard ──────────────────────────────────
+          if (storeAvail.cityId) {
+            const userCity = await this.mapsService.getCityByCoords(
+              dropoffAddress.lat,
+              dropoffAddress.lng,
+            );
+            if (storeAvail.cityId !== userCity?.id) {
+              throw new BadRequestException(
+                `"${storeAvail.name}" does not deliver to your current city.`,
+              );
+            }
           }
         }
         let subtotal = 0;
@@ -1267,6 +1297,7 @@ export class OrdersService {
             openHours: true,
             openingHours: true,
             name: true,
+            cityId: true,
           },
         });
         if (storeAvail) {
@@ -1275,6 +1306,19 @@ export class OrdersService {
             throw new BadRequestException(
               `${storeAvail.name}: ${avail.message}`,
             );
+          }
+
+          // ── Service Boundary guard ──────────────────────────────────
+          if (storeAvail.cityId) {
+            const userCity = await this.mapsService.getCityByCoords(
+              dropoffAddress.lat,
+              dropoffAddress.lng,
+            );
+            if (storeAvail.cityId !== userCity?.id) {
+              throw new BadRequestException(
+                `"${storeAvail.name}" does not deliver to your current city.`,
+              );
+            }
           }
         }
 
